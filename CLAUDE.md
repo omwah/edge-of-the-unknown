@@ -2,13 +2,29 @@
 
 ## What this project is
 
-Project Helix is a clone of **TradeWars 2002** (the classic BBS door game of
-space trading and galactic conquest) built in **Python 3.12+** with the
-**Textual** TUI framework. The intent is an authentic TW2002 core loop —
-warp-graph universe, port pair-trading in Fuel Ore / Organics / Equipment,
-turns-per-day, planets, sector fighters, NPC raiders — delivered through a
-modern terminal UI, with a codebase that is deterministic, testable, and
-extensible to multiplayer later. Single-player first.
+Project Helix is a game of **space exploration and discovery** built on the
+mechanical bones of **TradeWars 2002** (the classic BBS door game), in
+**Python 3.12+** with the **Textual** TUI framework. The TW2002 foundation
+is kept authentic — warp-graph universe, port pair-trading in Fuel Ore /
+Organics / Equipment, turns-per-day, planets — but **trading is a means to
+an end**: it funds the engines, shields, sensors, cloaks, and armaments
+needed to push outward and discover things. Key pillars:
+
+- **Discoveries** — planets (which can be descended onto for surface sites:
+  ruins, artifacts, ancient tech, crashed ships), shipwrecks, nebulae,
+  black holes, space entities. Rarity *and* technology-progression value
+  increase with warp-hop distance from FedSpace (distance bands).
+- **Races** — friendly races outnumber hostile; each has a tech level
+  (travel speed + what aspect upgrades it can sell for **gold-pressed
+  latinum**, the universal currency, or barter against artifacts). Hostile
+  races have threat (damage) and interception (anti-flee) ratings; rarity
+  scales inversely with threat; player escape chance is always ≥ a config
+  floor (default 10%). FedSpace hosts only Federation-aligned friendly races.
+- **Ship aspects** — cargo capacity, shields, engine speed, cloak/stealth,
+  sensors, armaments; upgraded via trade profits and race tech.
+
+Deterministic, testable, extensible to multiplayer later. Single-player
+first.
 
 ## Authoritative spec
 
@@ -56,6 +72,9 @@ What each is for:
    (core / bigbang / engine / store / server / tui), data model, big bang
    pipeline, economy formulas, turn/tick engine, combat, Textual UI design,
    persistence, testing strategy, 5-phase roadmap.
+4. Revised the design (v0.2, June 2026) to the exploration-first focus
+   described above: races, discoveries, distance bands, latinum, ship
+   aspects, encounter/flee rules (DESIGN.md §§7, 8, 11).
 
 **No implementation code exists yet.** The next session starts Phase 1.
 
@@ -76,22 +95,27 @@ What each is for:
 - Single-player embeds the server in-process; never let the TUI reach
   around the service API into core state directly.
 
-## Roadmap (from DESIGN.md §13)
+## Roadmap (from DESIGN.md §15)
 
-- **Phase 1 (current):** core models, big bang (cluster+bridge+validate,
-  FedSpace sectors 1-10, StarDock), movement with turn costs, port docking
-  + trading with live pricing and haggling, SQLite persistence, Textual
-  game screen (sector view, clickable warp list, status sidebar, port
-  screen). Exit criterion: pair-trading loop is fun for 30 minutes.
-- **Phase 2:** StarDock services, multiple ship types, planets with
-  BNT-style production, Genesis torpedoes, Computer screen (pair-trade
-  finder, route planner).
-- **Phase 3:** sector fighters/mines, ship combat with salvage and escape
-  pods, alignment/experience, FedSpace law, NPC raider faction + NPC
-  traders.
+- **Phase 1 (current):** core models, big bang (cluster+bridge+distance
+  bands+validate, FedSpace sectors 1-10, StarDock), movement with turn
+  costs, port docking + trading with live pricing and haggling in latinum,
+  SQLite persistence, Textual game screen (sector view, clickable warp
+  list, status sidebar, port screen). Exit criterion: pair-trading loop is
+  fun for 30 minutes and funds a first ship upgrade.
+- **Phase 2 (the pivot phase):** discovery system with distance-banded
+  rarity, planet descent + surface sites, sensor detection, discovery
+  codex, friendly races with tech barter/latinum sales of aspect upgrades,
+  StarDock services, multiple ship types, planets with BNT-style
+  production, Genesis torpedoes, Computer screen (pair-trade finder, route
+  planner).
+- **Phase 3:** hostile races (threat/interception, rarity inverse to
+  threat, escape-chance floor), encounter system, ship combat with salvage
+  and escape pods, sector fighters/mines, alignment/experience, FedSpace
+  law, friendly NPC traders, hostile homeworld raids.
 - **Phase 4:** multiplayer (JSON-RPC over websockets), corporations.
-- **Phase 5:** order-book economy, citadels, cloaking/probes, sysop
-  console, scripting hooks.
+- **Phase 5:** order-book economy, citadels, probes, richer race
+  interactions, sysop console, scripting hooks.
 
 ## Conventions
 
@@ -100,5 +124,5 @@ What each is for:
   golden-master replays of command logs against fixed seeds; bigbang
   validation across many seeds; Textual Pilot for UI flows.
 - Dependencies (Phase 1): textual, rich, networkx, pydantic v2; stdlib
-  sqlite3. Add nothing else without updating DESIGN.md §14.
+  sqlite3. Add nothing else without updating DESIGN.md §16.
 - Commit style: small, phase-tagged (e.g. `p1: bigbang cluster pass`).

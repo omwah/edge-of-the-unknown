@@ -1,15 +1,15 @@
 # Project Helix — Design Document
-## A TradeWars 2002 Clone in Python + Textual
+## An Exploration-First Space Game on TradeWars 2002 Bones, in Python + Textual
 
-*Version 0.1 — June 2026*
+*Version 0.2 — June 2026 (exploration-first revision)*
 
 ---
 
 ## 1. Purpose and Scope
 
-Project Helix is a faithful-in-spirit recreation of TradeWars 2002 (TW2002), the classic BBS door game of space trading and galactic conquest, built as a modern terminal application using Python 3.12+ and the Textual TUI framework. The goal is to capture the core TW2002 loop — explore a warp-connected universe, run trade routes between ports, build wealth, upgrade your ship, claim planets, and fight for territory — while delivering it through a polished, mouse-and-keyboard-friendly terminal interface and a codebase that is testable, deterministic, and extensible to multiplayer.
+Project Helix is a game of space exploration and discovery built on the mechanical bones of TradeWars 2002 (TW2002), the classic BBS door game, as a modern terminal application using Python 3.12+ and the Textual TUI framework. The player's goal is to push outward from FedSpace into an unknown warp-connected universe and find what is out there: uncharted planets that can be descended onto, derelict shipwrecks, nebulae and black holes, strange space-borne entities, and the ruins, artifacts, and ancient technology of lost civilizations. The classic TW2002 port pair-trading loop is retained intact — but as a means to an end. Trading funds the faster engines, stronger shields, better sensors, cloaking devices, and armaments needed to travel farther, survive hostile space, and reach rarer and more valuable discoveries. The galaxy is inhabited by friendly and hostile alien races: friendly races (the majority) offer technology for barter or for the universal currency, gold-pressed latinum; hostile races are the escalating price of deep space, with the deadliest among them also the rarest.
 
-This document is informed by direct source analysis of seven existing TradeWars clones and the original 1986 TradeWars II BASIC source. Section 2 summarizes what each codebase taught us; the remainder of the document specifies our design.
+This document is informed by direct source analysis of seven existing TradeWars clones and the original 1986 TradeWars II BASIC source; the warp-graph universe, port economy, turn system, and engine foundations remain TW2002-authentic even where the goals diverge. Section 2 summarizes what each codebase taught us; the remainder of the document specifies our design.
 
 ---
 
@@ -85,9 +85,9 @@ Three independent codebases (twclone, terminal-space, ExchangeConflict) converge
 
 ## 3. Design Goals and Non-Goals
 
-**Goals.** Authentic TW2002 core loop and feel (single-keystroke commands, ANSI-flavored aesthetics, the canonical port/planet/combat systems); deterministic, seedable universe and rules engine with full unit-test coverage of game math; single-player first with a clean path to LAN/hosted multiplayer; modern TUI affordances layered on top (clickable warps, sortable tables, built-in route planner); everything configurable (universe size, economy constants, ship stats) via versioned config files.
+**Goals.** An exploration-first core loop — venture out, discover, return, upgrade, venture farther — layered on an authentic TW2002 foundation (warp graph, turns per day, port pair-trading, single-keystroke commands, ANSI-flavored aesthetics); a tangible risk/reward gradient in which discovery rarity, technology value, and danger all scale with distance from FedSpace; trading as the reliable income floor and discovery as the progression ceiling; deterministic, seedable universe and rules engine with full unit-test coverage of game math; single-player first with a clean path to LAN/hosted multiplayer; modern TUI affordances layered on top (clickable warps, sortable tables, built-in route planner, discovery codex); everything configurable (universe size, economy constants, ship stats, race rosters, discovery tables) via versioned config files.
 
-**Non-goals (v1).** Telnet/BBS door compatibility; TWGS protocol compatibility with existing TW2002 helper tools; massive concurrency (we design for tens of players, not hundreds); pixel graphics.
+**Non-goals (v1).** Telnet/BBS door compatibility; TWGS protocol compatibility with existing TW2002 helper tools; massive concurrency (we design for tens of players, not hundreds); pixel graphics; full 4X-style diplomacy or empire simulation (race attitude is a simple score, not a diplomacy tree).
 
 ---
 
@@ -105,19 +105,22 @@ helix/
 │   │   ├── economy.py        # Pricing, trade resolution, port regen math
 │   │   ├── combat.py         # Attack/defense resolution, odds, salvage
 │   │   ├── movement.py       # Warp validation, pathfinding, turn costs
-│   │   ├── planets.py        # Colonist production, citadel logic
+│   │   ├── planets.py        # Colonist production, descent & surface exploration
+│   │   ├── races.py          # Race archetypes, disposition, attitude, tech-barter offers
+│   │   ├── discovery.py      # Discovery tables, rarity gradient, detection, salvage
+│   │   ├── encounters.py     # Hostile-race encounter rolls, flee resolution (escape floor)
 │   │   ├── rules.py          # Command -> Event reducers (the only state mutators)
 │   │   └── events.py         # Immutable event dataclasses (facts)
 │   ├── bigbang/              # Universe generation (imports core, networkx)
 │   │   ├── generator.py      # Cluster-and-bridge graph builder
 │   │   ├── topology.py       # Tunnels, deadends, rings, fedspace carving
-│   │   ├── populate.py       # Ports, planets, NPCs, StarDock placement
+│   │   ├── populate.py       # Ports, planets, races, discoveries, StarDock placement
 │   │   └── validate.py       # Connectivity, distance, fairness checks
 │   ├── engine/               # Time & background simulation (asyncio)
 │   │   ├── ticker.py         # Short tick loop + cron tasks (daily turn reset...)
 │   │   ├── port_economy.py   # Hourly stock regen / order generation
 │   │   ├── planet_growth.py  # BNT-style production tick
-│   │   └── npc.py            # Ferengi-style trader AI, Cabal-style raiders
+│   │   └── npc.py            # Race ship AI: friendly traders, hostile hunters
 │   ├── store/                # Persistence (SQLite via sqlite3/SQLAlchemy)
 │   │   ├── repo.py           # Repository interface (swap target for Postgres)
 │   │   ├── schema.sql
@@ -149,19 +152,23 @@ Core entities and their key fields (persisted 1:1 in SQLite tables; in memory as
 | Entity | Key fields |
 |---|---|
 | `Game` | id, seed, config_version, created_at, day_number |
-| `Sector` | id, region_id, warps_out [list], beacon_text, fighters (owner, qty, mode), mines (owner, qty), is_fedspace |
-| `Region` | id, name ("Halaf Zone"...) — the named cluster from generation |
-| `Port` | id, sector_id, name, class (1–9), size, per-commodity {stock, capacity, mode buy/sell}, credits |
-| `Planet` | id, sector_id, name, class, colonists, allocation %s, stores {ore, organics, equipment, fighters}, citadel_level, owner |
-| `Ship` | id, type_id, name, owner, sector_id, holds_total, cargo {commodity: qty}, fighters, shields, colonists, devices (genesis, probes, beacons, cloak...) |
-| `Player` | id, name, credits, bank_balance, turns_remaining, alignment, experience, corp_id, explored_sectors (bitset), ship_id |
+| `Sector` | id, region_id, warps_out [list], beacon_text, fighters (owner, qty, mode), mines (owner, qty), is_fedspace, distance_band (hops from sector 1, precomputed), phenomena [nebula, black_hole...] |
+| `Region` | id, name ("Halaf Zone"...) — the named cluster from generation; controlling_race_id |
+| `Port` | id, sector_id, name, class (1–9), size, per-commodity {stock, capacity, mode buy/sell}, latinum |
+| `Planet` | id, sector_id, name, class, colonists, allocation %s, stores {ore, organics, equipment, fighters}, citadel_level, owner, surface_sites [Discovery ids] |
+| `Ship` | id, type_id, name, owner, sector_id, holds_total, cargo {commodity: qty}, shields {current, max}, engine_speed, cloak_rating, sensor_rating, fighters, armaments, colonists, devices (genesis, probes, beacons...) |
+| `Player` | id, name, latinum, bank_balance, turns_remaining, alignment, experience, corp_id, explored_sectors (bitset), ship_id, race_attitudes {race_id: score}, codex (found discovery ids) |
+| `Race` | id, name, archetype_id, disposition (friendly/hostile), federation_aligned, tech_level (1–10), home_region_id, threat_rating + interception_rating (hostile only), encounter_weight |
+| `Discovery` | id, location (sector_id or planet_id + site slot), kind (wreck, nebula, black_hole, entity, ruins, artifact, ancient_tech, crashed_ship), rarity_tier, hidden (needs sensor check), payload (tech item / latinum / lore fragment), found_by |
 | `Corporation` | id, name, tag, ceo_id, bank_balance — NPC factions are corporations (twclone pattern) |
 | `EventLog` | id (monotonic), tick, type, payload JSON — the durable rail |
 | `Config` | typed key/value by scope, versioned (twclone's DB-backed config, simplified to a YAML file + table snapshot) |
 
 Commodities are the canonical TW2002 trio — Fuel Ore, Organics, Equipment — with port classes the eight buy/sell triples (terminal-space enum, Section 2.2) plus Class 0/9 StarDock selling hardware. BNT's fourth commodity (energy) is deliberately omitted for authenticity.
 
-Ship types are config data, not code (ExchangeConflict's ships.json generalized): each type defines holds min/max, fighter/shield/mine maxes, turns-per-warp, offensive/defensive odds multipliers, and price. v1 ships at minimum: Merchant Cruiser (starter, 20–75 holds per the original data), Scout Marauder, Missile Frigate, BattleShip, Imperial StarShip, plus the Ferengi NPC hulls.
+**Currency.** The universal currency is **gold-pressed latinum** ("latinum"). All port prices, bank balances, hardware costs, and race technology offers are denominated in it; high-value race tech may additionally (or exclusively) demand barter in artifacts and recovered technology from the player's discoveries.
+
+**Ship aspects.** Every ship is described by a common set of aspects: *cargo capacity* (holds), *shields* (max + regen), *engine speed* (governs turns-per-warp and is the primary input to flee rolls), *cloak/stealth rating* (chance to avoid detection by hostile races; 0 = none), *sensor rating* (chance to detect hidden discoveries and to spot hostiles first), and *armaments* (fighters plus weapon hardpoints). Race technology upgrades improve individual aspects within hull-defined caps. Ship types are config data, not code (ExchangeConflict's ships.json generalized): each type defines per-aspect base values and caps, turns-per-warp, offensive/defensive odds multipliers, and price. v1 ships at minimum: Merchant Cruiser (starter, 20–75 holds per the original data), Scout Marauder, Missile Frigate, BattleShip, Imperial StarShip, plus race NPC hulls.
 
 ---
 
@@ -173,16 +180,53 @@ Deterministic from `(seed, config)`. Default 1000 sectors (config 100–5000). P
 2. **Bridge pass.** Connect each group to 1–5 other groups via single warps; with probability `one_way_chance` (default 0.15) a bridge is directional only.
 3. **Motif pass.** Inject configured counts of *tunnels* (chains of length 4–9 grafted at one end — twclone default ~15), *deadends* (1–2 sector stubs), and *rings* (cycles of 3/5/7/9, ExchangeConflict weights).
 4. **FedSpace carve.** Sectors 1–10 become FedSpace: fully interlinked neighborhood around sector 1 (Terra), protected (no attacks, no fighter/mine deployment), with guaranteed exits to the wider graph (twclone's `ensure_fedspace_exit`).
-5. **Populate.** StarDock (Class 9) placed 2–5 hops from FedSpace. Standard ports at ~45% sector density with the terminal-space class distribution (20/20/20/10/10/10/5/5) and initial stock `randint(200, 2000)` scaled by port size. Planets seeded in ~25% of sectors. NPC faction homeworlds at tunnel endpoints (twclone), with garrisons scaled to distance from FedSpace — our Cabal-descendant raider territory.
-6. **Validate.** Assert: single strongly-reachable component from sector 1 (treating one-ways correctly); max warps per sector ≤ 6 (TW2002 canon); StarDock reachable; at least one profitable port-pair (opposed classes, e.g. BBS↔SSB) within 5 hops of FedSpace so new players can earn; per-region port balance within tolerance. Regenerate with a perturbed sub-seed on failure (bounded retries, then error).
+5. **Distance bands.** Compute every sector's warp-hop distance from sector 1 and bucket into config-defined bands (e.g. Core 0–5, Frontier 6–12, Deep 13–20, Void 21+). Bands drive race placement, discovery rarity, and encounter danger throughout the game.
+6. **Populate.** StarDock (Class 9) placed 2–5 hops from FedSpace. Standard ports at ~45% sector density with the terminal-space class distribution (20/20/20/10/10/10/5/5) and initial stock `randint(200, 2000)` scaled by port size; port density thins in the outer bands (deep space is wild, not commercial). Planets seeded in ~25% of sectors. **Races:** the friendly-majority roster (Section 7) is assigned home regions — FedSpace and all Core-band regions receive only Federation-aligned friendly races; hostile races claim territory in outer bands, with homeworlds at tunnel endpoints (twclone) and mean threat rating rising with band. **Discoveries:** every sector and planet rolls on its band's rarity table (Section 8); planets additionally roll surface sites (ruins, artifacts, ancient tech, crashed ships).
+7. **Validate.** Assert: single strongly-reachable component from sector 1 (treating one-ways correctly); max warps per sector ≤ 6 (TW2002 canon); StarDock reachable; at least one profitable port-pair (opposed classes, e.g. BBS↔SSB) within 5 hops of FedSpace so new players can earn; per-region port balance within tolerance; no hostile race presence in FedSpace or Core-band regions; mean discovery rarity/value strictly increasing across bands; at least one friendly-race contact point per band so deep explorers can resupply and barter. Regenerate with a perturbed sub-seed on failure (bounded retries, then error).
 
 A dev tool `helix bigbang --inspect` renders the graph (networkx + matplotlib export, plus an in-TUI map debugger) with port sectors highlighted, mirroring ExchangeConflict's uniview.
 
 ---
 
-## 7. Economy
+## 7. Races
 
-**Pricing.** BNT's parameterized linear model with terminal-space's stock-ratio shape. Per commodity `c` at a port: when the port *sells* `c`: `price(c) = base[c] - delta[c] * stock_ratio * elasticity`; when it *buys*: `price(c) = base[c] + delta[c] * (1 - stock_ratio) * elasticity`. Defaults (per-unit credits): fuel ore base 11 delta 5; organics base 5 delta 2; equipment base 15 delta 7 (BNT's tuned values, relabeled to the TW trio). All constants in config.
+The universe is inhabited by alien races, generated at big bang from a config-defined roster of archetypes and seeded into regions of the warp graph. Races replace the single faceless NPC faction of classic TW2002 — the Cabal/Ferengi lineage survives as hostile-race archetypes and as the friendly traders who keep the economy circulating.
+
+**Disposition.** Every race is friendly or hostile, and friendly races outnumber hostile ones (default 70/30 roster split, config-tunable). FedSpace and the Core distance band are populated exclusively by friendly races aligned with the Federation; hostile territory begins in the Frontier band and deepens outward.
+
+**Tech level.** Each race has a tech level (1–10) expressed in two ways: how fast its ships travel (the engine speed of its hulls — which for hostile races also makes them harder to outrun) and what technology upgrades it can offer the player. Friendly races sell or barter upgrades to ship aspects — engine tunings, shield arrays, sensor suites, cloaking modules, hold expansions, armaments — priced in gold-pressed latinum or traded against artifacts and recovered technology from the player's discoveries. Higher-tech races offer better goods but demand rarer barter; race tech level loosely correlates with distance from FedSpace, so the best upgrades require traveling to, and surviving, deep space.
+
+**Hostile races.** Each hostile race has a *threat rating* (damage dealt per combat round) and an *interception rating* (how effectively it prevents a fleeing player from escaping). Encounter frequency is inversely proportional to threat: the deadliest races are the rarest (encounter weights per band live in config alongside the roster). Flee resolution is specified in Section 11; as a hard invariant, the player's escape probability never drops below a configured floor (default 10%), no matter how heavily damaged the ship is.
+
+**Attitude.** Friendly races track a simple per-player attitude score — raised by trading with them and doing favors, lowered by attacking their ships — which gates access to their best technology tiers. Full diplomacy trees are out of scope for v1.
+
+Race rosters — names, archetypes, dispositions, tech curves, threat/interception tables, encounter weights, barter preferences — are config data, not code.
+
+---
+
+## 8. Exploration and Discovery
+
+Discovery is the game's central reward system: the universe is salted at big bang with things to find, and finding them is how the player advances beyond what latinum alone can buy.
+
+**Discovery classes.**
+- *Astronomical phenomena* — nebulae (sensor interference: ships inside are harder to detect, a hiding mechanic that stacks with cloaking), black holes (navigation hazards with configurable behavior, from damage-on-approach to one-way gravity warps), and rarer singular phenomena.
+- *Derelict shipwrecks* — salvageable in space for cargo, latinum, technology, and log fragments that hint at the locations of other discoveries.
+- *Space entities* — living things encountered in open space, ranging from harmless curiosities to hazards to beings that can be traded with.
+- *Planets* — beyond their classic TW2002 colony role, planets can be **descended onto**. Surface exploration reveals sites: ruins, artifacts, ancient technology caches, crashed ships.
+
+**Rarity gradient.** Every discovery has a rarity tier — Common, Uncommon, Rare, Exceptional, Legendary. Two rules govern placement: (1) rarity probability shifts upward with the sector's distance band, so FedSpace neighborhoods hold only common curiosities while the deep frontier holds the legendary finds; and (2) value scales with rarity, specifically *technology-progression* value — rare finds yield aspect upgrades, unique devices, and barter goods that no amount of near-home trading can buy. Band weights and tier payout tables are config data; the big bang validator asserts the gradient is monotonic.
+
+**Discovery flow.** Entering a sector reveals its obvious features; the ship's sensor rating determines whether hidden discoveries (drifting wrecks, nebula-shrouded sites) are detected, so sensors are a real progression axis. Planet descent costs turns and presents the planet's surface sites for exploration one at a time. All outcomes draw from the game's seeded RNG: a given seed always buries the same treasures in the same places.
+
+**The loop.** Trade near home → buy engine/shield/sensor upgrades → push one band deeper → discover → barter finds with high-tech friendly races for better upgrades → push deeper still. Trading remains the reliable income floor; discovery is the progression ceiling.
+
+---
+
+## 9. Economy
+
+**Pricing.** BNT's parameterized linear model with terminal-space's stock-ratio shape, denominated in gold-pressed latinum. Per commodity `c` at a port: when the port *sells* `c`: `price(c) = base[c] - delta[c] * stock_ratio * elasticity`; when it *buys*: `price(c) = base[c] + delta[c] * (1 - stock_ratio) * elasticity`. Defaults (per-unit latinum): fuel ore base 11 delta 5; organics base 5 delta 2; equipment base 15 delta 7 (BNT's tuned values, relabeled to the TW trio). All constants in config.
+
+**Role of trading.** Trading is deliberately the means, not the end: profit curves are tuned so that pair-trading reliably funds early aspect upgrades (engine, shields, sensors, holds), while the highest technology tiers are gated behind race barter and rare discoveries that latinum alone cannot buy. The pair-trade finder and route planner keep the trading loop tight so it stays a fun engine for exploration rather than a grind.
 
 **Haggling.** TW2002's signature negotiation, implemented as a bounded mini-game: the port quotes; the player counter-offers; acceptance probability falls off with distance from fair price and with the player's recent haggling history at that port; 2 rejections end negotiation at the port's final price; an insulting offer (>~30% off fair) aborts the trade. Tunable; can be disabled for "quick trade" mode.
 
@@ -190,65 +234,69 @@ A dev tool `helix bigbang --inspect` renders the graph (networkx + matplotlib ex
 
 **Banking.** Player bank accounts at StarDock with modest interest (BNT's 1.0005/tick compounded is the reference; we tune to ~0.5%/game-day) and corp accounts. Invariants enforced in one place (`core.economy`): balances never negative, goods conserved, every mutation inside a transaction.
 
-**NPC traders.** Ferengi-style mobile arbitrageurs (twclone model): roam nearby sectors, compare port prices, execute real trades that move real stock and credits, hold persistent cargo/cash under their faction corporation. They are the economy's circulation system and an emergent piracy target.
+**NPC traders.** Friendly-race merchant ships are Ferengi-style mobile arbitrageurs (twclone model): they roam nearby sectors, compare port prices, execute real trades that move real stock and latinum, and hold persistent cargo/cash under their race's corporation. They are the economy's circulation system, and trading alongside them builds race attitude.
 
 ---
 
-## 8. Time, Turns, and the Engine
+## 10. Time, Turns, and the Engine
 
 Per the original TWINSTR.DOC rules: players get N turns per game-day (default 250, config); each warp move costs turns per the ship's `turns_per_warp`; docking costs 1. The engine (`engine.ticker`, an asyncio task) implements twclone's two-level scheduling: a short tick (default 1 s real time) that consumes the event log, steps NPCs in bounded batches, and runs sweepers; plus durable cron tasks — `daily_turn_reset`, `hourly_port_economy`, `planet_growth`, `interest_accrual` — with persisted `next_due_at` so a reloaded save never double-runs or skips a tick. In single-player, game time can be configured to advance only while playing, or in real time.
 
 ---
 
-## 9. Combat and Territory
+## 11. Encounters, Combat, and Territory
 
-Phase 3 ships the classic stack. Sector fighters: deployable in offensive/defensive/toll modes; entering a hostile-fighter sector forces engagement or retreat (retreat costs one fighter — the original rule). Mines (Armid/limpet split deferred to Phase 5) damage on entry with deflector mitigation. Ship-to-ship combat resolves in rounds: attacker commits fighters, hit ratios derive from ship-type odds multipliers and percentile rolls (BNT's shape), shields absorb first, destroyed ships yield 10–20% cargo salvage (BNT) and drop the pilot to an escape pod if owned. Defensive devices: emergency warp (random-sector escape on trigger), cloak (Phase 5). FedSpace is combat-free and deployment-free; Federal response punishes criminal alignment there. NPC raiders defend their tunnel territory and occasionally raid trade lanes; clearing their homeworld is the single-player long-game objective, with bounties per fighter destroyed echoing the Cabal's 100/kill.
+**Hostile-race encounters.** Moving through or lingering in hostile territory rolls for encounters from the region's race table, with weights inverse to threat rating (Section 7): common raiders harass the Frontier; the apex races of the Void are rarely seen and never forgotten. An encounter opens with a detection check — the race's sensors against the player's cloak rating plus any nebula cover; an undetected player may slip away freely, making stealth a genuine alternative to firepower. Once engaged, each round the player chooses **fight** or **flee**. Flee success is a function of base chance, the player's engine speed minus the race's interception rating, cloak rating, and accumulated hull damage — and is *clamped to a configured floor (default 10%)*, so escape is always possible even in a crippled ship; this floor is a core invariant with its own property test. A failed flight attempt costs one round of incoming damage at the race's threat rating. Shields absorb damage before hull; ship destruction drops the player to an escape pod if owned.
+
+**Classic stack (Phase 3).** Sector fighters: deployable in offensive/defensive/toll modes; entering a hostile-fighter sector forces engagement or retreat (retreat costs one fighter — the original rule). Mines (Armid/limpet split deferred to Phase 5) damage on entry with deflector mitigation. Ship-to-ship combat resolves in rounds: attacker commits fighters, hit ratios derive from ship-type odds multipliers and percentile rolls (BNT's shape), shields absorb first, destroyed ships yield 10–20% cargo salvage (BNT). Defensive devices: emergency warp (random-sector escape on trigger); cloak doubles as the pre-engagement stealth stat above.
+
+**Territory and law.** FedSpace is combat-free and deployment-free, hosts only Federation-aligned friendly races, and Federal response punishes criminal alignment there. Hostile races defend their home regions and occasionally raid trade lanes near the band boundary; raiding *their* homeworlds for legendary-tier technology caches is the single-player long game, with bounties per hostile fighter destroyed echoing the Cabal's 100/kill. Attacking friendly-race ships tanks attitude and locks away their tech offers — piracy has a price.
 
 ---
 
-## 10. Textual UI
+## 12. Textual UI
 
 Textual gives us screens, CSS layout, widgets, mouse support, and free web deployment via `textual serve`. The design honors TW2002 muscle memory while exploiting modern widgets.
 
-**Screen map.** `MainMenu` → `Game` (the primary screen) with modal/pushed screens: `PortScreen`, `PlanetScreen`, `StarDockScreen` (shipyard/hardware/bank/tavern tabs), `ComputerScreen`, `MapScreen`, `MessagesScreen`.
+**Screen map.** `MainMenu` → `Game` (the primary screen) with modal/pushed screens: `PortScreen`, `PlanetScreen` (orbit view → `SurfaceScreen` for descent and site-by-site exploration), `StarDockScreen` (shipyard/hardware/bank/tavern tabs), `RaceContactScreen` (greeting, tech offers, latinum purchase and artifact barter), `EncounterScreen` (fight/flee rounds against hostile races), `ComputerScreen`, `MapScreen`, `MessagesScreen`.
 
-**Game screen layout.** Three regions. Left 2/3: the sector view — region name, sector number, ANSI-art flavor header, contents (ports, planets, ships, fighters, beacons) as a Rich-renderable log, and a clickable `WarpList` widget showing outbound warps (unexplored ones dimmed with `?`). Right 1/3: status sidebar — ship name/type, holds bar (per-commodity fill), fighters/shields, credits, turns remaining, current region mini-map (explored neighbors as a small node diagram). Bottom: a one-line command input plus a scrolling event ticker.
+**Game screen layout.** Three regions. Left 2/3: the sector view — region name, sector number, ANSI-art flavor header, contents (ports, planets, ships, fighters, beacons) as a Rich-renderable log, and a clickable `WarpList` widget showing outbound warps (unexplored ones dimmed with `?`). Right 1/3: status sidebar — ship name/type, aspect readout (shields, engine speed, cloak, sensors), holds bar (per-commodity fill), fighters/armaments, latinum, turns remaining, current distance band, current region mini-map (explored neighbors as a small node diagram). Bottom: a one-line command input plus a scrolling event ticker.
 
 **Command grammar.** Single-keystroke commands matching TW2002 where it matters — number keys warp by sector number, `M` move (prompt for sector), `P` dock at port, `L` land on planet, `D` re-display sector, `C` computer, `T` corporate/team menu, `G` galactic map, `I` ship info, `Q` quit — implemented as Textual key bindings with an Esc-cancelable prompt model (terminal-space's InstantCmd concept, replaced by Textual's native bindings + Input). Every keystroke action also has a clickable affordance.
 
-**Computer screen** bakes in what the community bolted onto real TW2002 via TWX Proxy/twstak-class tools: explored-universe map (Tree/DataTable), port directory with last-seen stock and class, *pair-trade finder* (scores opposed-class port pairs by round-trip profit per turn using current price model and shortest-path distance), *route planner* (shortest path with one-way awareness; sends the ship hop-by-hop with per-sector hazard confirmation), and notes/avoid lists. Since we own the engine, these are first-class queries rather than screen-scrapers.
+**Computer screen** bakes in what the community bolted onto real TW2002 via TWX Proxy/twstak-class tools: explored-universe map (Tree/DataTable), port directory with last-seen stock and class, *pair-trade finder* (scores opposed-class port pairs by round-trip profit per turn using current price model and shortest-path distance), *route planner* (shortest path with one-way awareness; sends the ship hop-by-hop with per-sector hazard confirmation), *discovery codex* (every find logged with location, rarity, and lore fragments; collected log fragments surface as rumor pins on the map), *race dossier* (known races, disposition, attitude, last-seen tech offers), and notes/avoid lists. Since we own the engine, these are first-class queries rather than screen-scrapers.
 
 **Aesthetics.** A `tw2002` Textual theme: cyan/yellow/magenta on black, CP437-flavored box drawing, optional CRT-ish flourishes (subtle starfield animation on the title screen — terminal-space's terminaltexteffects idea, reimplemented with Textual animation primitives). A `--plain` flag disables effects.
 
 ---
 
-## 11. Persistence
+## 13. Persistence
 
 SQLite, one file per game (`~/.helix/games/<name>.db`), WAL mode. Tables mirror Section 5 entities plus `event_log` and `config`. Saves are implicit (every command is durable once its transaction commits — the BBS property that you can hang up mid-session and resume, per TWINSTR.DOC). `snapshots.py` adds export/import of a portable save (gzipped JSON of state + command log). The repository interface is the swap point for PostgreSQL if hosted multiplayer ever demands it (twclone's lesson, pre-paid architecturally rather than adopted prematurely).
 
 ---
 
-## 12. Testing Strategy
+## 14. Testing Strategy
 
-The pure core makes this cheap: property-based tests (hypothesis) for economy invariants (no negative balances, goods conservation under arbitrary trade sequences, price monotonicity in stock); golden-master tests replaying recorded command logs against fixed seeds and asserting final state hashes; bigbang validation tests across 100 seeds (connectivity, port-pair reachability, degree caps); and Textual's `Pilot` test harness for UI flows (dock → haggle → buy → warp). NPC AI is tested by running headless bot-vs-engine simulations — twclone's `ai_player` bug-report harness shows how productive bot-driven QA is for this genre, and our service API is bot-friendly by construction.
+The pure core makes this cheap: property-based tests (hypothesis) for economy invariants (no negative balances, goods conservation under arbitrary trade sequences, price monotonicity in stock) and for encounter invariants (flee probability never below the configured floor under arbitrary damage/engine/interception combinations; hostile encounter weight inverse to threat rating); golden-master tests replaying recorded command logs against fixed seeds and asserting final state hashes; bigbang validation tests across 100 seeds (connectivity, port-pair reachability, degree caps, FedSpace/Core hosting only Federation-aligned friendly races, discovery rarity and value monotonically increasing across distance bands); and Textual's `Pilot` test harness for UI flows (dock → haggle → buy → warp; descend → explore site → log discovery). NPC AI is tested by running headless bot-vs-engine simulations — twclone's `ai_player` bug-report harness shows how productive bot-driven QA is for this genre, and our service API is bot-friendly by construction.
 
 ---
 
-## 13. Roadmap
+## 15. Roadmap
 
-**Phase 1 — Walking skeleton.** Core models, bigbang (cluster+bridge+validate), movement with turn costs, port docking and trading with live pricing and haggling, SQLite persistence, Textual game screen with sector view/warp list/status bar/port screen. Playable trading game, single ship type. *Exit criterion: profitable pair-trading loop is fun for 30 minutes.*
+**Phase 1 — Walking skeleton.** Core models, bigbang (cluster+bridge+distance bands+validate), movement with turn costs, port docking and trading with live pricing and haggling in latinum, SQLite persistence, Textual game screen with sector view/warp list/status bar/port screen. Playable trading game, single ship type. *Exit criterion: profitable pair-trading loop is fun for 30 minutes and visibly funds a first ship upgrade.*
 
-**Phase 2 — Progression.** StarDock (shipyard, hardware emporium, bank), multiple ship types from config, cargo/hold upgrades, planets with landing and BNT production model, Genesis torpedoes, explored-map Computer screen with pair-trade finder and route planner.
+**Phase 2 — Exploration & discovery.** The pivot phase. Discovery system with distance-banded rarity tables (wrecks, nebulae, black holes, entities), planet descent with surface sites (ruins, artifacts, ancient tech, crashed ships), sensor-based detection of hidden finds, discovery codex; friendly races with tech levels, contact screen, latinum sales and artifact barter for aspect upgrades (engine/shields/sensors/cloak/holds); StarDock (shipyard, hardware emporium, bank), multiple ship types from config, planets with BNT production model, Genesis torpedoes, Computer screen with pair-trade finder and route planner. *Exit criterion: a one-hour push-out-and-return exploration run is fun and yields tech that trading alone could not buy.*
 
-**Phase 3 — Conflict.** Sector fighters (off/def/toll), mines, ship combat with salvage and escape pods, alignment/experience, FedSpace law, NPC raider faction in tunnel territory with bounties, NPC Ferengi-style traders moving real goods.
+**Phase 3 — Danger.** Hostile races with threat/interception ratings and rarity-inverse encounter weights, the encounter system (detection, fight/flee rounds, escape-probability floor), ship combat with salvage and escape pods, black hole and entity hazards live, sector fighters (off/def/toll), mines, alignment/experience, FedSpace law, race attitude consequences, friendly-race NPC traders moving real goods, hostile homeworld raids with bounties. *Exit criterion: the outer bands feel scary but irresistible; players quote their narrow escapes.*
 
 **Phase 4 — Multiplayer.** Extract `server.net` (JSON-RPC over websockets, Pydantic DTOs already in place), lobby/auth, corporations with shared assets and corp bank, broadcast pipeline, `textual serve` hosted client.
 
-**Phase 5 — Depth.** Order-book market economy (twclone Phase-4 model), citadels and planetary combat, cloaking/probes/interdictor, tavern/noticeboard, sysop console (AAT's admin catalog as the menu), TWX-style scripting hooks for bots.
+**Phase 5 — Depth.** Order-book market economy (twclone Phase-4 model), citadels and planetary combat, probes/interdictor, richer race interactions (favors, escort contracts), tavern/noticeboard, sysop console (AAT's admin catalog as the menu), TWX-style scripting hooks for bots.
 
 ---
 
-## 14. Technology Stack
+## 16. Technology Stack
 
 Python ≥ 3.12; Textual (TUI) + Rich; networkx (generation/pathfinding only — runtime adjacency is plain dicts); Pydantic v2 (DTOs/config); SQLite stdlib (repository pattern; SQLAlchemy optional later); hypothesis + pytest (+ pytest-asyncio, textual Pilot); ruff + mypy strict on `core/` and `bigbang/`. Phase 4 adds websockets + pjrpc-style JSON-RPC.
 
