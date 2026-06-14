@@ -1,12 +1,69 @@
-"""Reusable widgets for the TUI skeleton: status sidebar and warp list."""
+"""Reusable widgets for the TUI skeleton: starfield, status sidebar, warp list."""
 
 from __future__ import annotations
 
+import random
+
+from rich.text import Text
 from textual.containers import Horizontal
 from textual.message import Message
 from textual.widgets import Button, Static
 
 from edge.tui.dummy import ShipDTO, WarpDTO
+
+
+class Starfield(Static):
+    """A sparse twinkling starfield (UI_MOCKUPS.md §0 / §11 aesthetics).
+
+    Seeded so screenshots are reproducible. `animate=False` (the `--plain` path)
+    renders a static field with no twinkle timer.
+    """
+
+    DEFAULT_CSS = "Starfield { width: 1fr; height: 1fr; color: $primary; }"
+    _CHARS = (".", ".", ".", "·", "*", "+")
+
+    def __init__(self, animate: bool = True, density: float = 0.03, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._animate = animate
+        self._density = density
+        self._rng = random.Random(7)
+        self._stars: dict[tuple[int, int], str] = {}
+
+    def on_mount(self) -> None:
+        self._populate()
+        if self._animate:
+            self.set_interval(0.6, self._twinkle)
+
+    def on_resize(self) -> None:
+        self._populate()
+
+    def _populate(self) -> None:
+        w, h = self.size.width, self.size.height
+        self._stars = {}
+        if not w or not h:
+            return
+        for _ in range(int(w * h * self._density)):
+            x, y = self._rng.randrange(w), self._rng.randrange(h)
+            self._stars[(x, y)] = self._rng.choice(self._CHARS)
+        self.refresh()
+
+    def _twinkle(self) -> None:
+        if not self._stars:
+            return
+        keys = list(self._stars)
+        for _ in range(max(1, len(keys) // 8)):
+            self._stars[self._rng.choice(keys)] = self._rng.choice((*self._CHARS, " "))
+        self.refresh()
+
+    def render(self) -> Text:
+        w, h = self.size.width, self.size.height
+        if not w or not h:
+            return Text("")
+        grid = [[" "] * w for _ in range(h)]
+        for (x, y), ch in self._stars.items():
+            if 0 <= x < w and 0 <= y < h:
+                grid[y][x] = ch
+        return Text("\n".join("".join(row) for row in grid), style="dim cyan")
 
 
 def bar(filled: int, total: int = 10) -> str:

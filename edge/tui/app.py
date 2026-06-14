@@ -6,11 +6,13 @@ Reads only the dummy DTOs in `edge.tui.dummy`; no engine/server yet (DESIGN.md
 
 from __future__ import annotations
 
+import argparse
+
 from textual.app import App
 from textual.theme import Theme
 
-from edge.tui.dummy import sample_port, sample_state
-from edge.tui.screens.game import GameScreen
+from edge.tui.dummy import sample_port
+from edge.tui.screens.main_menu import MainMenuScreen
 from edge.tui.screens.port import PortScreen
 
 TW2002_THEME = Theme(
@@ -34,14 +36,23 @@ class EdgeApp(App[None]):
     SCREENS = {"port": lambda: PortScreen(sample_port())}
     TITLE = "Edge of the Unknown"
 
+    def __init__(self, plain: bool = False) -> None:
+        super().__init__()
+        self.plain = plain
+
     def on_mount(self) -> None:
         self.register_theme(TW2002_THEME)
         self.theme = "tw2002"
-        self.push_screen(GameScreen(sample_state()))
+        self.push_screen(MainMenuScreen())
 
 
 def main() -> None:
-    EdgeApp().run()
+    parser = argparse.ArgumentParser(prog="edge")
+    parser.add_argument(
+        "--plain", action="store_true", help="disable starfield/CRT animation effects"
+    )
+    args = parser.parse_args()
+    EdgeApp(plain=args.plain).run()
 
 
 if __name__ == "__main__":
