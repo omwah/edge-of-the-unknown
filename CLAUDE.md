@@ -36,8 +36,14 @@ needed to push outward and discover things. Key pillars:
   config-parameterized systemic hook (trojan-gift, reprogram-unlock,
   influence-gate, morality-judge, escalating-demand, literalist, contract-kill,
   …, DESIGN.md §7.2). Species are grouped into rival **alliances** (DESIGN.md
-  §7.3): the player may join **at most one**, gated by an `admission_price` and
-  a `membership_gate`; joining warms members and turns rival blocs hostile.
+  §7.3): the player may belong to **at most one**, gated by an `admission_price`
+  and a `membership_gate`; joining warms members and turns rival blocs hostile.
+  The **Federation** is the always-present alliance that governs FedSpace; the
+  player **starts aligned with it**, which is what makes FedSpace a safe home.
+  Each alien alliance has a `federation_stance` (aligned / neutral / hostile);
+  joining any other bloc resigns Federation membership, and aligning with a
+  Federation-**hostile** bloc makes **FedSpace itself unsafe to enter** — Federal
+  forces engage the player on sight until that allegiance is given up.
   Species also hold dispositions **toward each other** — an inter-species
   relation matrix plus dated **grudges/vendettas** (DESIGN.md §7.4–7.5) — which
   drives NPC-vs-NPC behavior and reputation spillover. The **species roster is a
