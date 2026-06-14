@@ -126,13 +126,22 @@ layout. Assets are already in-repo (read-only):
 
 ## Next steps
 
-1. **Browse live**: `pip install textual && textual demo`; optionally run the
-   cousin — `cd references/terminal-space && make pyenv && make run` — to feel
-   the InstantCmd/sidebar flow, or just watch the asciinema cast.
-2. **Capture** any screenshots worth pinning into `docs/ui/inspiration/img/`
-   (keep to things we generate ourselves or that are clearly license-OK; prefer
-   links for third-party game captures).
-3. **Promote to a Textual skeleton**: start with **Game + PortScreen** (most
-   load-bearing, best-referenced), using the StatFrame sidebar pattern and the
-   Harlequin/Dolphie widget idioms above.
+The project is a [pixi](https://pixi.sh) project (`pyproject.toml` + `pixi.lock`,
+conda-forge); all tooling runs through `pixi run`.
+
+1. **Browse live**: `pixi run python -m textual` for the interactive demo/widget
+   gallery (the `textual-dev` CLI also gives `pixi run textual colors` and
+   `pixi run textual borders` design explorers, plus `run --dev` / `console` /
+   `serve` for our own app). Optionally run the cousin —
+   `cd references/terminal-space && make pyenv && make run` — to feel the
+   InstantCmd/sidebar flow, or just watch the asciinema cast.
+2. **Skeleton (done for Game + Port)**: a throwaway Textual skeleton fed by dummy
+   DTOs lives in `edge/tui/`. Launch it with `pixi run tui`; regenerate the SVG
+   screenshots in `docs/ui/shots/` with `pixi run shots`. It uses the StatFrame
+   sidebar pattern and the Harlequin/Dolphie widget idioms above.
+3. **Add the remaining Phase-1 screens** to the skeleton — StarDock (tabs),
+   Computer (pair-trade finder DataTable), Map — then iterate to taste.
+4. **Capture** any third-party screenshots worth pinning into
+   `docs/ui/inspiration/img/` (prefer links for copyrighted game captures; only
+   vendor what we generate ourselves or that is clearly license-OK).
 </content>
