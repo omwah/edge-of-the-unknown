@@ -14,22 +14,22 @@ needed to push outward and discover things. Key pillars:
   ruins, artifacts, ancient tech, crashed ships), shipwrecks, nebulae,
   black holes, space entities. Rarity *and* technology-progression value
   increase with warp-hop distance from FedSpace (distance bands).
-- **Races** — each has a **disposition** on a continuous `0.0` (most
+- **Alien species** — each has a **disposition** on a continuous `0.0` (most
   hostile) → `1.0` (most friendly) scale, not a binary flag; the roster
   skews friendly. Per-player **attitude offsets** (raised by trading/favors,
   lowered by attacks) shift base disposition into an **effective
   disposition** that drives whether an encounter opens with greeting or
-  violence, prices/barter, and tech unlocks. Each race has a tech level
+  violence, prices/barter, and tech unlocks. Each species has a tech level
   (travel speed + what aspect upgrades it can sell for **gold-pressed
   latinum**, the universal currency, or barter against artifacts), plus
   threat (damage) and interception (anti-flee) ratings whose use scales with
-  how hostile it is; among hostile-leaning races, rarity scales inversely
+  how hostile it is; among hostile-leaning aliens, rarity scales inversely
   with threat. Player escape chance is always ≥ a config floor (default
   10%). Config thresholds (default hostility 0.35 / amity 0.65) name the
-  bands; FedSpace and the Core band host only Federation-aligned races in the
+  bands; FedSpace and the Core band host only Federation-aligned species in the
   friendly band.
 - **Ship aspects** — cargo capacity, shields, engine speed, cloak/stealth,
-  sensors, armaments; upgraded via trade profits and race tech.
+  sensors, armaments; upgraded via trade profits and alien tech.
 
 Deterministic, testable, extensible to multiplayer later. Single-player
 first.
@@ -81,7 +81,7 @@ What each is for:
    pipeline, economy formulas, turn/tick engine, combat, Textual UI design,
    persistence, testing strategy, 5-phase roadmap.
 4. Revised the design (v0.2, June 2026) to the exploration-first focus
-   described above: races, discoveries, distance bands, latinum, ship
+   described above: alien species, discoveries, distance bands, latinum, ship
    aspects, encounter/flee rules (DESIGN.md §§7, 8, 11).
 
 **No implementation code exists yet.** The next session starts Phase 1.
@@ -113,17 +113,17 @@ What each is for:
   fun for 30 minutes and funds a first ship upgrade.
 - **Phase 2 (the pivot phase):** discovery system with distance-banded
   rarity, planet descent + surface sites, sensor detection, discovery
-  codex, friendly-disposition races with tech barter/latinum sales of aspect upgrades,
+  codex, friendly-disposition alien species with tech barter/latinum sales of aspect upgrades,
   StarDock services, multiple ship types, planets with BNT-style
   production, Genesis torpedoes, Computer screen (pair-trade finder, route
   planner).
-- **Phase 3:** low-disposition (hostile-band) races (threat/interception,
+- **Phase 3:** low-disposition (hostile-band) alien species (threat/interception,
   rarity inverse to threat, escape-chance floor), encounter system
   (disposition roll for greeting vs. violence), ship combat with salvage
   and escape pods, sector fighters/mines, alignment/experience, FedSpace
   law, friendly-disposition NPC traders, hostile homeworld raids.
 - **Phase 4:** multiplayer (JSON-RPC over websockets), corporations.
-- **Phase 5:** order-book economy, citadels, probes, richer race
+- **Phase 5:** order-book economy, citadels, probes, richer alien
   interactions, sysop console, scripting hooks.
 
 ## Conventions
