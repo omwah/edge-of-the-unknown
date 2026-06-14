@@ -77,6 +77,29 @@ needed to push outward and discover things. Key pillars:
   finite **homing missiles** (no point-defense). NPC hulls keep flat
   aspects/defenses via an optional `subsystems` block, so localized damage is
   player-first.
+- **Planets & orbital starbases** (DESIGN.md §5.2, *Lightspeed* §1.4.6-inspired) —
+  every planet has a **`planet_type`** (terrestrial warm / cool / hot / cold,
+  jovian, asteroid_belt, barren) that fixes its colonizability, a `yield_profile`
+  over the Fuel Ore / Organics / Equipment trio, and a `habitability` cap — keeping
+  the trio sacred (no fourth commodity) while expressing Lightspeed's
+  metal/organics/radioactives/water as yield-and-habitability shaping. Planets carry
+  **ownership** — `none` / an **alliance_id** / a **player_id** (a `player_id` so the
+  model already fits eventual multiplayer): Core Space planets are owned by the
+  governing alliance automatically (re-keying if governance flips), and the **unowned
+  fraction rises monotonically with distance band**, so the frontier's reward is
+  *claimable territory* as well as rarer finds. A planet may carry an **orbital
+  starbase** that reuses the engine-room model **minus thrusters/spindrive, plus a
+  `fusion_reactor`** (built from the same shared component vocabulary, so parts are
+  fungible across ships and bases). **Derelict is not a special type or stored flag** —
+  a base is derelict when broken/missing components leave it unable to power or defend
+  itself; the big bang makes an **unowned**-world base derelict by **removing or
+  damaging its components** (so repair is just refilling slots), leaving a
+  component-salvage cache to strip (engine-room cannibalize) or **repair and claim**
+  into an operational forward foothold. A base on an owned planet is built intact and
+  **defends the planetary system** against entrants
+  hostile to its owner, with hostility resolved through the alliance system (rival
+  bloc / at-war / hostile effective disposition). Defense strength scales with
+  surviving components and reactor efficiency.
 
 Deterministic, testable, extensible to multiplayer later. Single-player
 first.
@@ -133,6 +156,14 @@ What each is for:
 5. Added the *Lightspeed*-inspired engine-room subsystem/component ship model
    (DESIGN.md §5.1): slotted subsystems, shared component vocabulary, localized
    combat damage, hybrid repair, global engine bonus, homing missiles.
+6. Added the planetary system (DESIGN.md §5.2, *Lightspeed* §1.4.6-inspired):
+   `planet_type` taxonomy with yield profiles + habitability, three-way ownership
+   (none / alliance_id / player_id) with Core-owned-by-governor and band-rising
+   unowned density, and orbital starbases (engine-room model minus thrusters/spindrive
+   plus a fusion reactor) that the big bang can make derelict by stripping/damaging
+   components on unowned worlds (so repair is routine, not special-cased), are
+   scavengeable for components, and defend owned planetary systems via alliance-keyed
+   hostility.
 
 **No implementation code exists yet.** The next session starts Phase 1.
 
@@ -166,16 +197,20 @@ What each is for:
   codex, friendly-disposition alien species with tech barter/latinum sales of aspect upgrades,
   the engine-room subsystem/component model (§5.1: slotted upgrades, component
   tiers, derived aspects, repair), StarDock services, multiple ship types,
-  planets with BNT-style production, Genesis torpedoes, Computer screen
-  (pair-trade finder, route planner).
+  **typed planets with band-weighted types/ownership and BNT-style production
+  shaped by `planet_type`/habitability, player colonization of unowned worlds,
+  derelict orbital starbases as scavengeable component caches** (DESIGN.md §5.2),
+  Genesis torpedoes, Computer screen (pair-trade finder, route planner).
 - **Phase 3:** low-disposition (hostile-band) alien species (threat/interception,
   threat tiers, rarity inverse to threat, escape-chance floor), encounter system
   (disposition roll for greeting vs. violence, escort/pack spawns, firing-arc
   combat, localized component damage + field-kit repair, homing missiles),
   signature-mechanic hooks, alliances (join one bloc, admission-price
   tasks, rival fallout) and inter-species relations/grudges, ship combat with
-  salvage and escape pods, NPC starbases as destructible set-pieces, sector
-  fighters/mines, alignment/experience, Core Space law keyed to the governing
+  salvage and escape pods, NPC starbases as destructible set-pieces,
+  **orbital/planetary starbases with ownership-keyed planetary-system defense and
+  player repair/claim of derelict bases into forward footholds** (DESIGN.md §5.2),
+  sector fighters/mines, alignment/experience, Core Space law keyed to the governing
   alliance (static Federation governor this phase; Core safety driven by the
   player's standing with the governor), friendly-disposition NPC traders, hostile
   homeworld raids.
