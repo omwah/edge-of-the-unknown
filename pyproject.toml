@@ -1,5 +1,5 @@
 [project]
-name = "trade-wars-clone"
+name = "edge-of-the-unknown"
 version = "0.1.0"
 description = "Edge of the Unknown — an exploration-first descendant of TradeWars 2002"
 authors = [{name = "James McDuffie", email = "mcduffie@pitfall.org"}]
@@ -25,7 +25,7 @@ ruff = "*"
 mypy = "*"
 
 [tool.pixi.pypi-dependencies]
-trade-wars-clone = { path = ".", editable = true }
+edge-of-the-unknown = { path = ".", editable = true }
 
 [tool.pixi.tasks]
 tui = "python -m edge.tui"
