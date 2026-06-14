@@ -178,6 +178,13 @@ What each is for:
    navigable lanes** of empty space between clusters so the player can always reach the
    outer bands without transiting a bloc's territory. Clusters are friendly-band by
    disposition, so the Hub stays peaceable until the player aligns against a bloc.
+8. Reviewed and tightened the economy spec (DESIGN.md §9): made the §9 pricing
+   formula **normative** over the §2.2 reference (whose buy-side sign is inverted —
+   selling into a port must *lower* its price), defined `stock_ratio`/`capacity`/
+   `elasticity` and a positive-price **clamp** invariant, and added an **Economy
+   constants** block (starting capital, Tier-I/II/III component prices and barter
+   equivalence, ship/repair costs, and an explicit latinum faucet/sink model) so the
+   `trade → fund first upgrade` loop has a tunable, testable balance ratio.
 
 **No implementation code exists yet.** The next session starts Phase 1.
 
