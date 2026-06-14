@@ -36,7 +36,11 @@ needed to push outward and discover things. Key pillars:
   raw threat), `combatant` flag, `trade_posture`, `treaty_mode`, `memory_model`
   (none / normal / never_forgets), `betrayal_model` (recoverable / permanent),
   a `befriend_price` task list, `pack_behavior`/escort composition, a `fleet`,
-  a `starbase_policy`, a `persona`, and one **signature mechanic** — a named,
+  a `starbase_policy`, a `persona`, a config-driven **`dialogue_pack`**
+  (standing-keyed, persona-voiced conversation: a closed vocabulary of context keys →
+  conditional line entries with **variant pools and a recency ring** so repeat encounters
+  rephrase rather than replay; templated `{placeholders}`; species → persona → generic
+  fallback; DESIGN.md §6.7), and one **signature mechanic** — a named,
   config-parameterized systemic hook (trojan-gift, reprogram-unlock,
   influence-gate, morality-judge, escalating-demand, literalist, contract-kill,
   …, DESIGN.md §6.2). Species are grouped into rival **alliances** (DESIGN.md
@@ -185,6 +189,15 @@ What each is for:
    constants** block (starting capital, Tier-I/II/III component prices and barter
    equivalence, ship/repair costs, and an explicit latinum faucet/sink model) so the
    `trade → fund first upgrade` loop has a tunable, testable balance ratio.
+9. Added the **alien dialogue system** (DESIGN.md §6.7), stress-tested against the
+   Lightspeed per-species dialogue corpus (`lightspeed-analysis/Lightspeed_Alien_Dialogue_Reference.md`):
+   a config-driven `dialogue_pack` of context keys → conditional (`when`) line entries
+   keyed to standing band / treaty / grudge / mechanic stage, with **variant pools + a
+   recency ring** for non-repeating variability, templated placeholders, and a
+   species → `persona` → generic fallback chain. The contact-screen conversation **verb
+   menu is derived** from species parameters, not authored. Wired into §4 data model
+   (`dialogue_pack`, `Player.dialogue_recency`), §10/§11 (encounter & contact screens),
+   §13 (dialogue-integrity validation), and Appendix B.
 
 **No implementation code exists yet.** The next session starts Phase 1.
 
