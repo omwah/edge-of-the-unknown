@@ -1,0 +1,41 @@
+ File Edit View Info
+┌───────| Player |───────┐  Sector  : 1 in uncharted space                                                              ^┌────────| Map |────────┐
+│Name:    Jim            │  Port    : Janus 4, Class 1 (BBS)                                                             │1 (BBS)                │
+│Port:    BBS            │  Warps to Sector(s) : (2) - (3) - (4) - (5) - (6) - (7)                                       │├ (2)                  │
+│Credits: 2000           │                                                                                               │├ (3)                  │
+│                        │  Command [TL=00:00:00]:[1] (?=Help)? : p                                                      │├ (4)                  │
+└────────────────────────┘                                                                                               │├ (5)                  │
+┌───────| Holds |────────┐  Docking...                                                                                   │├ (6)                  │
+│Total:     0            │                                                                                               │└ (7)                  │
+│Fuel Ore:  0            │  <T>Trade at this Port                                                                        │                       │
+│Organics:  0            │  <Q>Quit, nevermind                                                                           └───────────────────────┘
+│Equipment: 0            │
+│Empty:     200          │  Enter your choice [T]
+│                        │  Port
+└────────────────────────┘
+┌────────| Ship |────────┐  Commerce report for Janus 4: 12:50:33 PM Sat May 06, 2028
+│Name: Foo               │  -=-=-        Docking Log        -=-=-
+│Type: Merchant Cruiser  │
+│Weapons:                │  No current ship docking log on file.
+│ - Concussion Missile   │
+│ - Railgun              │    Items     Status    Trading    % of max    OnBoard
+│ - Mining Laser         │  ---------  --------  ---------  ----------  ---------
+│Countermeasures:        │  Fuel Ore    Buying      659        100%         0
+│ - Plastic Shrapnel     │  Organics    Buying     1265        100%         0
+│ - Maneuvering Thrusters│  Equipment  Selling     1742        100%         0
+│ - Plastic Chaff        │
+│                        │
+└────────────────────────┘  You have 2000 credits and 200 empty cargo holds
+
+                            We are selling up to 1742. You have 0 in your holds.
+                            How many holds of Equipment do you want to buy[200]?
+
+
+
+
+
+                                                                                                                        v
+┌────────────────────────────────────────────────┐ ┌───────────────────────────────────────────┐ ┌───────────────────────────────────────────────┐
+│right bottom frame                              │ │middle frame                               │ │left bottom frame                              │
+│content                                         │ │content                                    │ │content                                        │
+└────────────────────────────────────────────────┘ └───────────────────────────────────────────┘ └───────────────────────────────────────────────┘

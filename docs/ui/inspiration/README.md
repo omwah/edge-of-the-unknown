@@ -26,6 +26,8 @@ Source: `references/terminal-space/` (read-only per CLAUDE.md — **reimplement
 ideas, don't copy code**; it's `prompt_toolkit`, not Textual, so translate
 idioms). Live recording: **asciinema cast**
 <https://asciinema.org/a/Rud50qG0utHbHBpHGl60WuRRX> (linked from its README).
+**Local captures** of its main menu, game, and port screens (with what-to-steal
+notes) live in [`terminal-space/`](terminal-space/README.md).
 
 Concrete patterns harvested, with file pointers and the screen each informs:
 

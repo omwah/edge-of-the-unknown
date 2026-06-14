@@ -1,0 +1,41 @@
+ File Edit View Info
+┌───────| Player |───────┐  Sector  : 1 in uncharted space                                                              ^┌────────| Map |────────┐
+│Name:    Jim            │  Port    : Janus 4, Class 1 (BBS)                                                             │1 (BBS)                │
+│Port:                   │  Warps to Sector(s) : (2) - (3) - (4) - (5) - (6) - (7)                                       │├ (2)                  │
+│Credits: 2000           │                                                                                               │├ (3)                  │
+│                        │  Command [TL=00:00:00]:[1] (?=Help)? :                                                        │├ (4)                  │
+└────────────────────────┘                                                                                               │├ (5)                  │
+┌───────| Holds |────────┐                                                                                               │├ (6)                  │
+│Total:     0            │                                                                                               │└ (7)                  │
+│Fuel Ore:  0            │                                                                                               │                       │
+│Organics:  0            │                                                                                               └───────────────────────┘
+│Equipment: 0            │
+│Empty:     200          │
+│                        │
+└────────────────────────┘
+┌────────| Ship |────────┐
+│Name: Foo               │
+│Type: Merchant Cruiser  │
+│Weapons:                │
+│ - Concussion Missile   │
+│ - Railgun              │
+│ - Mining Laser         │
+│Countermeasures:        │
+│ - Plastic Shrapnel     │
+│ - Maneuvering Thrusters│
+│ - Plastic Chaff        │
+│                        │
+└────────────────────────┘
+
+
+
+
+
+
+
+
+                                                                                                                        v
+┌────────────────────────────────────────────────┐ ┌───────────────────────────────────────────┐ ┌───────────────────────────────────────────────┐
+│right bottom frame                              │ │middle frame                               │ │left bottom frame                              │
+│content                                         │ │content                                    │ │content                                        │
+└────────────────────────────────────────────────┘ └───────────────────────────────────────────┘ └───────────────────────────────────────────────┘
