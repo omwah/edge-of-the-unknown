@@ -18,11 +18,14 @@ async def _capture() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
+        app.save_screenshot(filename="main-menu.svg", path=str(OUT))
+        await pilot.press("n")  # New game -> GameScreen
+        await pilot.pause()
         app.save_screenshot(filename="game.svg", path=str(OUT))
-        await pilot.press("p")
+        await pilot.press("p")  # dock at port
         await pilot.pause()
         app.save_screenshot(filename="port.svg", path=str(OUT))
-    print(f"wrote {OUT}/game.svg and {OUT}/port.svg")
+    print(f"wrote main-menu.svg, game.svg, port.svg to {OUT}")
 
 
 def main() -> None:

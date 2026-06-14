@@ -2,6 +2,58 @@ Screen {
     background: $background;
 }
 
+/* Main menu (title screen) */
+MainMenuScreen {
+    layers: stars menu;
+    align: center middle;
+}
+
+MainMenuScreen Starfield {
+    layer: stars;
+}
+
+#menu-box {
+    layer: menu;
+    width: 60;
+    height: auto;
+    padding: 1 2;
+    background: $surface;
+    border: round $primary;
+}
+
+#menu-box .title {
+    width: 100%;
+    text-align: center;
+    text-style: bold;
+    color: $primary;
+}
+
+#menu-box .subtitle {
+    width: 100%;
+    text-align: center;
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+#menu-box #menu-items {
+    height: auto;
+    align: center middle;
+}
+
+#menu-box Button {
+    width: 40;
+    height: 1;
+    border: none;
+    margin-bottom: 1;
+}
+
+#menu-box .footer {
+    width: 100%;
+    text-align: center;
+    color: $text-muted;
+    margin-top: 1;
+}
+
 #body {
     height: 1fr;
 }
