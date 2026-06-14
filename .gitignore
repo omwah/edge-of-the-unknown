@@ -1,2 +1,7 @@
 references/**
 DESIGN.pdf
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+__pycache__/
+*.pyc

@@ -1,0 +1,44 @@
+Screen {
+    background: $background;
+}
+
+#body {
+    height: 1fr;
+}
+
+#bottom {
+    dock: bottom;
+    height: auto;
+}
+
+#command {
+    height: 3;
+    border: tall $primary;
+}
+
+#ticker {
+    height: 6;
+    background: $surface;
+    border-top: solid $primary;
+    padding: 0 1;
+}
+
+/* Port screen */
+#port-body {
+    padding: 1 2;
+}
+
+#port-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#commodities {
+    height: auto;
+    max-height: 8;
+}
+
+#port-footer {
+    margin-top: 1;
+    color: $text-muted;
+}
