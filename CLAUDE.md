@@ -1,8 +1,8 @@
-# CLAUDE.md — Project Helix
+# CLAUDE.md — Edge of the Unknown
 
 ## What this project is
 
-Project Helix is a game of **space exploration and discovery** built on the
+Edge of the Unknown is a game of **space exploration and discovery** built on the
 mechanical bones of **TradeWars 2002** (the classic BBS door game), in
 **Python 3.12+** with the **Textual** TUI framework. The TW2002 foundation
 is kept authentic — warp-graph universe, port pair-trading in Fuel Ore /
@@ -123,12 +123,12 @@ What each is for:
 
 ## Architecture rules (non-negotiable)
 
-- Layered, downward-only dependencies: `helix/core` (pure rules, **no I/O,
-  no async, no Textual imports**), `helix/bigbang` (generation, networkx),
-  `helix/engine` (asyncio background ticks), `helix/store` (SQLite behind a
-  repository interface), `helix/server` (command -> event service; fog of
+- Layered, downward-only dependencies: `edge/core` (pure rules, **no I/O,
+  no async, no Textual imports**), `edge/bigbang` (generation, networkx),
+  `edge/engine` (asyncio background ticks), `edge/store` (SQLite behind a
+  repository interface), `edge/server` (command -> event service; fog of
   war enforced at the `to_public(context)` serialization boundary),
-  `helix/tui` (Textual app only).
+  `edge/tui` (Textual app only).
 - All randomness flows through a seeded `random.Random` owned by game
   state. A game must be reproducible from `(seed, command log)`.
 - Economy invariants enforced in core, always: no negative balances, goods

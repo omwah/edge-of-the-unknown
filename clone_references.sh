@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-clone the TradeWars 2002 reference codebases analyzed for Project Helix.
+# Re-clone the TradeWars 2002 reference codebases analyzed for Edge of the Unknown.
 # Usage: ./clone_references.sh [target_dir]   (default: ./references)
 set -euo pipefail
 
