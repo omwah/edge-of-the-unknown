@@ -5,12 +5,14 @@ from __future__ import annotations
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Input, RichLog, Static
+from textual.widgets import Footer, RichLog, Static
 
 from edge.tui.dummy import GameState
-from edge.tui.widgets import StatusSidebar, WarpButton, WarpList
+from edge.tui.screens.planet import PlanetScreen
+from edge.tui.screens.stardock import StarDockScreen
+from edge.tui.widgets import ClickableEntry, StatusSidebar, WarpButton, WarpGrid
 
 
 class TopBar(Static):
@@ -38,6 +40,7 @@ class SectorView(VerticalScroll):
     SectorView #flavor { color: $text-muted; text-style: italic; }
     SectorView #contents { margin: 1 0; }
     SectorView .heading { color: $secondary; text-style: bold; }
+    SectorView .spacer { height: 1; }
     """
 
     def __init__(self, state: GameState) -> None:
@@ -49,25 +52,42 @@ class SectorView(VerticalScroll):
         yield Static(f"[b cyan]{sec.region} - Sector {sec.sector_id}[/]", id="title")
         yield Static(f"░▒▓ {sec.flavor} ▓▒░", id="flavor")
 
-        body: list[str] = []
-        body.append("[b]Ports[/]")
-        body += [f"  [magenta]P[/] {p}" for p in sec.ports] or ["  none"]
-        body.append("[b]Planets[/]")
-        body += [f"  [green]@[/] {p}" for p in sec.planets] or ["  none"]
-        body.append(f"[b]Ships[/]    {', '.join(sec.ships) or 'none'}")
-        if sec.beacon:
-            body.append(f"[b]Beacons[/]  [yellow]![/] {sec.beacon}")
-        yield Static("\n".join(body), id="contents")
+        yield Static("", classes="spacer")
+        yield Static("Ports", classes="heading")
+        if sec.ports:
+            for p in sec.ports:
+                # "Stardock" ports open the StarDock services screen; the rest trade.
+                dest = "stardock" if "Stardock" in p else "port"
+                yield ClickableEntry(f"  [magenta]P[/] {p}", dest=dest)
+        else:
+            yield Static("  none")
 
+        yield Static("", classes="spacer")
+        yield Static("Planets", classes="heading")
+        if sec.planets:
+            for p in sec.planets:
+                yield ClickableEntry(f"  [green]@[/] {p}", dest="planet")
+        else:
+            yield Static("  none")
+
+        yield Static("", classes="spacer")
+        if sec.beacon:
+            yield Static("Beacons", classes="heading")
+            yield Static(f"  [yellow]![/] {sec.beacon}")
+            yield Static("", classes="spacer")
+        yield Static("Ships", classes="heading")
+        yield Static(f"  {', '.join(sec.ships) or 'none'}")
+
+        yield Static("", classes="spacer")
         yield Static("Warps", classes="heading")
-        yield WarpList(sec.warps)
+        yield WarpGrid(sec.warps, sec.sector_id)
 
 
 class GameScreen(Screen):
     BINDINGS = [
         Binding("p", "dock_port", "Port"),
-        Binding("c", "noop", "Computer"),
-        Binding("g", "noop", "Map"),
+        Binding("c", "computer", "Computer"),
+        Binding("g", "map", "Map"),
         Binding("d", "redisplay", "Redisplay"),
         Binding("q", "quit", "Quit"),
     ]
@@ -81,9 +101,8 @@ class GameScreen(Screen):
         with Horizontal(id="body"):
             yield SectorView(self._state)
             yield StatusSidebar(self._state.ship, id="sidebar")
-        with Vertical(id="bottom"):
-            yield Input(placeholder="command…", id="command")
-            yield RichLog(id="ticker", max_lines=200, markup=True)
+        yield RichLog(id="ticker", max_lines=200, markup=True)
+        yield Footer()
 
     def on_mount(self) -> None:
         log = self.query_one("#ticker", RichLog)
@@ -95,9 +114,14 @@ class GameScreen(Screen):
     def on_warp_button_warp(self, msg: WarpButton.Warp) -> None:
         self._tick(f"[cyan]» Plotting warp to Sector {msg.sector_id}…[/]")
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self._tick(f"> {event.value}")
-        event.input.clear()
+    def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
+        match msg.dest:
+            case "stardock":
+                self.app.push_screen(StarDockScreen("Sol"))
+            case "planet":
+                self.app.push_screen(PlanetScreen("Terra Nova"))
+            case _:
+                self.app.push_screen("port")
 
     def action_dock_port(self) -> None:
         self.app.push_screen("port")
@@ -105,5 +129,8 @@ class GameScreen(Screen):
     def action_redisplay(self) -> None:
         self._tick("[dim]· Redisplay.[/]")
 
-    def action_noop(self) -> None:
-        self._tick("[dim](not wired in the skeleton)[/]")
+    def action_computer(self) -> None:
+        self._tick("[dim]· Ship computer — not wired in the skeleton.[/]")
+
+    def action_map(self) -> None:
+        self._tick("[dim]· Galactic map — not wired in the skeleton.[/]")

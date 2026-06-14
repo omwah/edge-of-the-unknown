@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 
 from rich.text import Text
-from textual.containers import Horizontal
+from textual.containers import Grid
 from textual.message import Message
 from textual.widgets import Button, Static
 
@@ -113,6 +113,27 @@ class StatusSidebar(Static):
         return "\n".join(lines)
 
 
+class ClickableEntry(Static):
+    """A clickable line in the sector view (a port or planet) that navigates."""
+
+    DEFAULT_CSS = """
+    ClickableEntry { height: 1; }
+    ClickableEntry:hover { background: $boost; text-style: bold; }
+    """
+
+    class Picked(Message):
+        def __init__(self, dest: str) -> None:
+            self.dest = dest
+            super().__init__()
+
+    def __init__(self, markup: str, dest: str, **kwargs: object) -> None:
+        super().__init__(markup, **kwargs)
+        self._dest = dest
+
+    def on_click(self) -> None:
+        self.post_message(self.Picked(self._dest))
+
+
 class WarpButton(Button):
     """A single clickable warp affordance."""
 
@@ -135,19 +156,58 @@ class WarpButton(Button):
         self.post_message(self.Warp(self._warp.sector_id))
 
 
-class WarpList(Horizontal):
-    """Row of clickable outbound warps (unexplored ones dimmed)."""
+class CurrentSectorMarker(Static):
+    """Non-clickable marker for the player's current sector (the grid's centre)."""
 
     DEFAULT_CSS = """
-    WarpList { height: auto; }
-    WarpList WarpButton { min-width: 9; height: 3; margin: 0 1 0 0; }
-    WarpList WarpButton.unexplored { color: $text-disabled; }
+    CurrentSectorMarker {
+        width: 1fr; height: 1; content-align: center middle;
+        color: $background; background: $secondary; text-style: bold;
+    }
     """
 
-    def __init__(self, warps: list[WarpDTO], **kwargs: object) -> None:
+    def __init__(self, sector_id: int) -> None:
+        super().__init__(f"({sector_id})")
+
+
+class _EmptyWarpCell(Static):
+    DEFAULT_CSS = "_EmptyWarpCell { width: 1fr; height: 1; }"
+
+
+class WarpGrid(Grid):
+    """Outbound warps in a 3x3 grid around the current sector.
+
+    The current sector sits in the centre cell (unclickable); the eight cells
+    around it hold warp buttons in order (unexplored ones dimmed). TW2002 sectors
+    warp to at most six others, so the eight surrounding cells always suffice;
+    any overflow spills into a fourth row.
+    """
+
+    _SURROUND = (0, 1, 2, 3, 5, 6, 7, 8)  # the 3x3 cells that aren't the centre
+
+    DEFAULT_CSS = """
+    WarpGrid {
+        grid-size: 3;
+        grid-columns: 10;
+        grid-rows: 1;
+        grid-gutter: 0 1;
+        height: auto;
+        width: auto;
+    }
+    WarpGrid WarpButton { width: 1fr; height: 1; border: none !important; }
+    WarpGrid WarpButton.unexplored { color: $text-disabled; }
+    """
+
+    def __init__(self, warps: list[WarpDTO], current_sector: int, **kwargs: object) -> None:
         super().__init__(**kwargs)
         self._warps = warps
+        self._current = current_sector
 
     def compose(self):
-        for w in self._warps:
-            yield WarpButton(w)
+        cells: list[Static] = [_EmptyWarpCell() for _ in range(9)]
+        cells[4] = CurrentSectorMarker(self._current)
+        for slot, warp in zip(self._SURROUND, self._warps):
+            cells[slot] = WarpButton(warp)
+        yield from cells
+        for warp in self._warps[len(self._SURROUND):]:  # rare overflow -> extra row
+            yield WarpButton(warp)
