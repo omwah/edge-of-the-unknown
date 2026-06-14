@@ -451,15 +451,15 @@ The table below maps each analyzed repository to its role in this design; the su
 
 | Repo | Language | Role in this design |
 |---|---|---|
-| rdearman/twclone | C + PostgreSQL | Architecture (server/engine split, event rails, cron), market economy, tunnels/FedSpace bigbang, protocol catalog |
-| mrdon/terminal-space | Python | Domain model, port class enum & distribution, pricing shape, public-DTO/fog-of-war pattern, embedded-server single-player |
-| cheevauva/blacknovatraders (BNT mirror) | PHP | Tuned economy constants, planet production math, equipment prices, combat baseline |
-| tarnus/aatraders | PHP | Sysop/admin feature catalog |
-| leonard4/SectorWars | C++ | TW sector-graph algorithm description (cluster-and-bridge) |
-| jzmiller1/ExchangeConflict2016 | Python | Graph motifs (deadends/rings), networkx generation, map inspector, config-driven ships |
-| drbeco/tradewars (incl. tw2bas/) | C + 1986 BASIC | Original rules (turns, sector fighters, retreat cost, Cabal NPCs, 500-sector scale), authenticity reference |
+| [rdearman/twclone](https://github.com/rdearman/twclone) | C + PostgreSQL | Architecture (server/engine split, event rails, cron), market economy, tunnels/FedSpace bigbang, protocol catalog |
+| [mrdon/terminal-space](https://github.com/mrdon/terminal-space) | Python | Domain model, port class enum & distribution, pricing shape, public-DTO/fog-of-war pattern, embedded-server single-player |
+| [cheevauva/blacknovatraders](https://github.com/cheevauva/blacknovatraders) (BNT mirror; project: [SourceForge](https://sourceforge.net/projects/blacknova/)) | PHP | Tuned economy constants, planet production math, equipment prices, combat baseline |
+| [tarnus/aatraders](https://github.com/tarnus/aatraders) | PHP | Sysop/admin feature catalog |
+| [leonard4/SectorWars](https://github.com/leonard4/SectorWars) | C++ | TW sector-graph algorithm description (cluster-and-bridge) |
+| [jzmiller1/ExchangeConflict2016](https://github.com/jzmiller1/ExchangeConflict2016) | Python | Graph motifs (deadends/rings), networkx generation, map inspector, config-driven ships |
+| [drbeco/tradewars](https://github.com/drbeco/tradewars) (incl. tw2bas/) | C + 1986 BASIC | Original rules (turns, sector fighters, retreat cost, Cabal NPCs, 500-sector scale), authenticity reference |
 
-### A.1 twclone (rdearman/twclone) — C, PostgreSQL, JSON protocol
+### A.1 [twclone](https://github.com/rdearman/twclone) (rdearman/twclone) — C, PostgreSQL, JSON protocol
 
 The most architecturally mature clone, and our primary structural reference. Key findings from `src/`, `docs/ENGINE.md`, `docs/GALACTIC_ECONOMY.md`, and `docs/PROTOCOL.v3/`:
 
@@ -475,7 +475,7 @@ The most architecturally mature clone, and our primary structural reference. Key
 
 **Protocol catalog.** Their PROTOCOL.v3 docs enumerate the full command surface of a complete TW game: ship, player, sector/movement, trade/port, combat/weapons, planets/citadels, corporations/stock market, banking/ledger, NPC/Ferengi AI, tavern/noticeboard, and sysop commands. We use this catalog as our feature checklist and phase planning input.
 
-### A.2 terminal-space (mrdon/terminal-space) — Python, the closest cousin
+### A.2 [terminal-space](https://github.com/mrdon/terminal-space) (mrdon/terminal-space) — Python, the closest cousin
 
 A ~3,900-line Python implementation of TW2002 basics with a client/server split. This is our primary *code-level* reference because its domain model is clean, idiomatic Python:
 
@@ -491,7 +491,7 @@ A ~3,900-line Python implementation of TW2002 basics with a client/server split.
 
 **RPC layer.** Client and server share Pydantic models in `tspace/common/` and communicate via JSON-RPC (pjrpc) over aiohttp, with the server embeddable in-process for single-player ("local mode" just instantiates `Server` directly). This embedded-server pattern is exactly how we will do single-player while keeping multiplayer reachable.
 
-### A.3 BlackNova Traders (cheevauva/blacknovatraders mirror) — PHP/SQL web clone
+### A.3 [BlackNova Traders](https://sourceforge.net/projects/blacknova/) ([cheevauva/blacknovatraders](https://github.com/cheevauva/blacknovatraders) mirror) — PHP/SQL web clone
 
 A long-lived web clone whose economy constants were tuned by years of live games. From `config.php` and `port.php`:
 
@@ -503,19 +503,19 @@ A long-lived web clone whose economy constants were tuned by years of live games
 
 **Combat.** `attack.php` resolves attacks with percentile rolls plus device checks (emergency warp device triggers on a failed roll and teleports the defender to a random sector) and 10–20% salvage of a destroyed ship's cargo. Simple, swingy, fun — a good Phase-3 baseline before TW2002's more elaborate odds tables.
 
-### A.4 Alien Assault Traders (tarnus/aatraders) — PHP, BNT/NGS fork
+### A.4 [Alien Assault Traders](https://github.com/tarnus/aatraders) (tarnus/aatraders) — PHP, BNT/NGS fork
 
 A 75 MB fork of BlackNova with heavy feature accretion: admin tooling (port price re-seeding, universe editors, IP bans, player/planet reports), team systems, shoutboxes, 3D galaxy map imaging. The main lesson is curatorial: AAT shows what twenty years of feature creep on the BNT economy looks like. We mine it for admin/sysop feature ideas (the `admin/` directory is effectively a sysop-tooling catalog) but treat its gameplay code as redundant with BNT.
 
-### A.5 SectorWars (leonard4/SectorWars) — C++, early-stage
+### A.5 [SectorWars](https://github.com/leonard4/SectorWars) (leonard4/SectorWars) — C++, early-stage
 
 Rudimentary, but it preserves a valuable artifact: `TW Sector Algorithm.txt`, a community description of how TW2002-style universes are believed to be generated. Summarized: allocate ~1000 sectors; repeatedly pick groups of 5–25 unassigned sectors and randomly interlink within each group (bidirectionally); name each group as a region/nebula (40–200 groups); then connect each group to 1–5 other groups with random inter-group warps; finally run pathfinding from a fixed origin to verify full reachability. This cluster-then-bridge algorithm produces the authentic TW2002 feel — local neighborhoods, sparse bridges, natural chokepoints — and is the core of our big bang (Section 5).
 
-### A.6 ExchangeConflict2016 (jzmiller1) — Python, universe-gen experiments
+### A.6 [ExchangeConflict2016](https://github.com/jzmiller1/ExchangeConflict2016) (jzmiller1) — Python, universe-gen experiments
 
 A Python sandbox focused on generation. Its `bigbang.py` builds a networkx graph with explicit *deadends* (2-sector stubs), *rings* (cycles of size drawn from a weighted choice of {3,5,7,9}), and a connectivity pass that attaches every remaining sector to the connected component — a menu of graph motifs we reuse. It enforces sanity constraints (minimum 20 systems; deadends capped relative to universe size). It also demonstrates per-sector procedural star systems (via StarGen) and a `uniview.py` map debugger that renders the universe with networkx-viewer, coloring port sectors green and empty sectors red — we will build the same kind of dev-mode map inspector with Textual or matplotlib. Its `data/ships.json` shows config-driven ship definitions (holds min/max, shield max, hull cost), which we generalize.
 
-### A.7 drbeco/tradewars — C clone + original 1986 TradeWars II BASIC source
+### A.7 [drbeco/tradewars](https://github.com/drbeco/tradewars) — C clone + original 1986 TradeWars II BASIC source
 
 The `tw2bas/` directory contains Chris Sherrick's original TW2 (RBBS QuixPlus lineage): `TW2.BAS`, `TW2SUB.BAS`, `TWVAR.BAS`, data files, and `TWINSTR.DOC`. The instructions document is primary-source material on the original rules: limited turns per day where each warp move or port landing costs one turn; sector fighters that must be fought (or retreated from at the cost of one fighter) before acting in a sector; trading in three commodities; buying fighters and cargo holds with profits; defending ports and sector chains for exclusive trading; the Cabal NPC menace dwelling in a region of space, with a 100-point bounty per Cabal fighter destroyed and 100,000 points for defeating them. The 500-sector universe (`S(500,1)` in TWVAR.BAS, TWMAP500 tooling) confirms the classic scale. The Cabal is the design ancestor of TW2002's Ferengi; our NPC faction follows the same role — a hostile NPC empire occupying defensible territory that strong players can raid.
 
