@@ -596,5 +596,5 @@ packages:
   size: 13378
   timestamp: 1772479008776
 - pypi: .
-  name: trade-wars-clone
+  name: edge-of-the-unknown
   requires_python: '>=3.12'
