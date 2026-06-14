@@ -57,14 +57,26 @@ needed to push outward and discover things. Key pillars:
   game can use an entirely different source roster, and each species' base
   disposition is drawn per-generation from a bounded spread around its roster
   center, so disposition varies between universe generations.
-- **Ship aspects** — cargo capacity, shields, engine speed, cloak/stealth,
-  sensors, armaments; upgraded via trade profits and alien tech. Every hull
-  (player, NPC, and starbase) is a config-driven **ship class** (DESIGN.md §5):
-  `role` (fighter / warship / capital_warship / transport / starbase / …),
-  `length_m`, `speed`, `armament` (weapons with damage + `firing_arc` of
-  ahead / all_round / spinal), and `defenses` (laser_turret / armour / screens /
-  energy_plates / speed_and_size). **Starbases** are immobile ship classes —
-  destructible set-pieces whose razing is the coin of alliance diplomacy.
+- **Ship aspects** — cargo capacity, shields, engine speed (split into **warp
+  speed** for travel and **combat speed** for evasion), cloak/stealth, sensors,
+  armaments; upgraded via trade profits and alien tech. Every hull (player, NPC,
+  and starbase) is a config-driven **ship class** (DESIGN.md §5): `role` (fighter
+  / warship / capital_warship / transport / starbase / …), `length_m`, `speed`,
+  `armament` (weapons with damage + `firing_arc` of ahead / all_round / spinal),
+  and `defenses` (laser_turret / armour / screens / energy_plates /
+  speed_and_size). **Starbases** are immobile ship classes — destructible
+  set-pieces whose razing is the coin of alliance diplomacy.
+- **Engine room** (DESIGN.md §5.1, *Lightspeed*-inspired) — the player ship's
+  aspects are **derived from four slotted subsystems** (`spindrive`, `thrusters`,
+  `screens`, `main_gun`) built from a small shared component vocabulary
+  (accelerator / converter / radiator / secondary / turbine / burner / linkage /
+  navigator) in tech tiers I–III. Combat damage **knocks out components**
+  (localized degradation); repair is hybrid (carried **repair-kits** field-patch;
+  full swaps/upgrades at StarDock or a friendly alien base). Spindrive efficiency
+  gives **one global combat bonus**. Weapons are the spinal **Main Gun** plus
+  finite **homing missiles** (no point-defense). NPC hulls keep flat
+  aspects/defenses via an optional `subsystems` block, so localized damage is
+  player-first.
 
 Deterministic, testable, extensible to multiplayer later. Single-player
 first.
@@ -118,6 +130,9 @@ What each is for:
 4. Revised the design (v0.2, June 2026) to the exploration-first focus
    described above: alien species, discoveries, distance bands, latinum, ship
    aspects, encounter/flee rules (DESIGN.md §§7, 8, 11).
+5. Added the *Lightspeed*-inspired engine-room subsystem/component ship model
+   (DESIGN.md §5.1): slotted subsystems, shared component vocabulary, localized
+   combat damage, hybrid repair, global engine bonus, homing missiles.
 
 **No implementation code exists yet.** The next session starts Phase 1.
 
@@ -149,13 +164,15 @@ What each is for:
 - **Phase 2 (the pivot phase):** discovery system with distance-banded
   rarity, planet descent + surface sites, sensor detection, discovery
   codex, friendly-disposition alien species with tech barter/latinum sales of aspect upgrades,
-  StarDock services, multiple ship types, planets with BNT-style
-  production, Genesis torpedoes, Computer screen (pair-trade finder, route
-  planner).
+  the engine-room subsystem/component model (§5.1: slotted upgrades, component
+  tiers, derived aspects, repair), StarDock services, multiple ship types,
+  planets with BNT-style production, Genesis torpedoes, Computer screen
+  (pair-trade finder, route planner).
 - **Phase 3:** low-disposition (hostile-band) alien species (threat/interception,
   threat tiers, rarity inverse to threat, escape-chance floor), encounter system
   (disposition roll for greeting vs. violence, escort/pack spawns, firing-arc
-  combat), signature-mechanic hooks, alliances (join one bloc, admission-price
+  combat, localized component damage + field-kit repair, homing missiles),
+  signature-mechanic hooks, alliances (join one bloc, admission-price
   tasks, rival fallout) and inter-species relations/grudges, ship combat with
   salvage and escape pods, NPC starbases as destructible set-pieces, sector
   fighters/mines, alignment/experience, Core Space law keyed to the governing
