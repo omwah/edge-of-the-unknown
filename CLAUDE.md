@@ -27,8 +27,11 @@ needed to push outward and discover things. Key pillars:
   with threat. Player escape chance is always ≥ a config floor (default
   10%). Config thresholds (default hostility 0.35 / amity 0.65) name the
   bands; the **Core Space** (the protected central region, sectors 1–10) and
-  the Hub band host only friendly-band members of the alliance that governs the
-  Core. Beyond disposition, each species carries a rich **parameter
+  the neutral home lanes around it host only friendly-band members of the alliance
+  that governs the Core, while every other bloc holds its own friendly-band **home
+  cluster** of worlds just outside the Core (so the whole Hub stays innately
+  peaceable; near-home menace is alliance-political, not low disposition). Beyond
+  disposition, each species carries a rich **parameter
   set** (DESIGN.md §7.1): a `threat_tier` (narrative difficulty, decoupled from
   raw threat), `combatant` flag, `trade_posture`, `treaty_mode`, `memory_model`
   (none / normal / never_forgets), `betrayal_model` (recoverable / permanent),
@@ -39,6 +42,11 @@ needed to push outward and discover things. Key pillars:
   …, DESIGN.md §7.2). Species are grouped into rival **alliances** (DESIGN.md
   §7.3): the player may belong to **at most one**, gated by an `admission_price`
   and a `membership_gate`; joining warms members and turns rival blocs hostile.
+  Each non-governing alliance holds a compact **home cluster** of worlds just
+  outside the Core — smaller than the Core, never adjacent to it, separated from it
+  and from rival clusters by **neutral navigable lanes** of empty space, so the
+  outer bands are always reachable without transiting a bloc's territory (DESIGN.md
+  §6, §7.3).
   No alliance is privileged in the schema: the **Federation** is just an ordinary
   alliance that the default roster names as the **initial governor of Core
   Space** (`Game.core_governing_alliance_id`), and the player **starts as one of its
@@ -164,6 +172,12 @@ What each is for:
    components on unowned worlds (so repair is routine, not special-cased), are
    scavengeable for components, and defend owned planetary systems via alliance-keyed
    hostility.
+7. Added alliance **home clusters** to universe generation (DESIGN.md §6 step 6,
+   §7.3): each non-governing alliance gets a compact, alliance-owned cluster of worlds
+   just outside the Core — smaller than the Core, never adjacent to it — with **neutral
+   navigable lanes** of empty space between clusters so the player can always reach the
+   outer bands without transiting a bloc's territory. Clusters are friendly-band by
+   disposition, so the Hub stays peaceable until the player aligns against a bloc.
 
 **No implementation code exists yet.** The next session starts Phase 1.
 
