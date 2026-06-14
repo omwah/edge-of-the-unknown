@@ -13,7 +13,7 @@ needed to push outward and discover things. Key pillars:
 - **Discoveries** — planets (which can be descended onto for surface sites:
   ruins, artifacts, ancient tech, crashed ships), shipwrecks, nebulae,
   black holes, space entities. Rarity *and* technology-progression value
-  increase with warp-hop distance from the Galactic Core (distance bands).
+  increase with warp-hop distance from the Core Space (distance bands).
 - **Alien species** — each has a **disposition** on a continuous `0.0` (most
   hostile) → `1.0` (most friendly) scale, not a binary flag; the roster
   skews friendly. Per-player **attitude offsets** (raised by trading/favors,
@@ -26,7 +26,7 @@ needed to push outward and discover things. Key pillars:
   how hostile it is; among hostile-leaning aliens, rarity scales inversely
   with threat. Player escape chance is always ≥ a config floor (default
   10%). Config thresholds (default hostility 0.35 / amity 0.65) name the
-  bands; the **Galactic Core** (the protected central region, sectors 1–10) and
+  bands; the **Core Space** (the protected central region, sectors 1–10) and
   the Hub band host only friendly-band members of the alliance that governs the
   Core. Beyond disposition, each species carries a rich **parameter
   set** (DESIGN.md §7.1): a `threat_tier` (narrative difficulty, decoupled from
@@ -40,12 +40,12 @@ needed to push outward and discover things. Key pillars:
   §7.3): the player may belong to **at most one**, gated by an `admission_price`
   and a `membership_gate`; joining warms members and turns rival blocs hostile.
   No alliance is privileged in the schema: the **Federation** is just an ordinary
-  alliance that the default roster names as the **initial governor of the Galactic
-  Core** (`Game.core_governing_alliance_id`), and the player **starts as one of its
+  alliance that the default roster names as the **initial governor of Core
+  Space** (`Game.core_governing_alliance_id`), and the player **starts as one of its
   members** — which is what makes the Core a safe home at the start. Core safety
   follows **whoever currently governs the Core**, not the Federation by name:
   joining any other bloc resigns that membership, and aligning with a bloc the
-  governor counts as a rival makes **the Galactic Core itself unsafe to enter** —
+  governor counts as a rival makes **the Core Space itself unsafe to enter** —
   the governor's forces engage the player on sight until that allegiance is given
   up. Governance can change hands (a `covets_core` bloc seizing the Core via the
   player's deeds or NPC events, Phase 5), re-keying who is welcome there.
@@ -141,7 +141,7 @@ What each is for:
 ## Roadmap (from DESIGN.md §15)
 
 - **Phase 1 (current):** core models, big bang (cluster+bridge+distance
-  bands+validate, Galactic Core sectors 1-10, StarDock), movement with turn
+  bands+validate, Core Space sectors 1-10, StarDock), movement with turn
   costs, port docking + trading with live pricing and haggling in latinum,
   SQLite persistence, Textual game screen (sector view, clickable warp
   list, status sidebar, port screen). Exit criterion: pair-trading loop is
@@ -158,13 +158,13 @@ What each is for:
   combat), signature-mechanic hooks, alliances (join one bloc, admission-price
   tasks, rival fallout) and inter-species relations/grudges, ship combat with
   salvage and escape pods, NPC starbases as destructible set-pieces, sector
-  fighters/mines, alignment/experience, Galactic Core law keyed to the governing
+  fighters/mines, alignment/experience, Core Space law keyed to the governing
   alliance (static Federation governor this phase; Core safety driven by the
   player's standing with the governor), friendly-disposition NPC traders, hostile
   homeworld raids.
 - **Phase 4:** multiplayer (JSON-RPC over websockets), corporations.
-- **Phase 5:** order-book economy, citadels, dynamic governance of the Galactic
-  Core (a `covets_core` bloc seizing control, flipping the governing alliance),
+- **Phase 5:** order-book economy, citadels, dynamic governance of Core
+  Space (a `covets_core` bloc seizing control, flipping the governing alliance),
   probes, richer alien interactions, sysop console, scripting hooks.
 
 ## Conventions
