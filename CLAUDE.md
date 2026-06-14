@@ -27,14 +27,33 @@ needed to push outward and discover things. Key pillars:
   with threat. Player escape chance is always ≥ a config floor (default
   10%). Config thresholds (default hostility 0.35 / amity 0.65) name the
   bands; FedSpace and the Core band host only Federation-aligned species in the
-  friendly band. The **species roster is a config file** — each game is generated
-  against a named roster, the big bang draws a seeded *subset* of it (not every
-  species need appear), a different game can use an entirely different source
-  roster, and each species' base disposition is drawn per-generation from a
-  bounded spread around its roster center, so disposition varies between universe
-  generations (DESIGN.md §7).
+  friendly band. Beyond disposition, each species carries a rich **parameter
+  set** (DESIGN.md §7.1): a `threat_tier` (narrative difficulty, decoupled from
+  raw threat), `combatant` flag, `trade_posture`, `treaty_mode`, `memory_model`
+  (none / normal / never_forgets), `betrayal_model` (recoverable / permanent),
+  a `befriend_price` task list, `pack_behavior`/escort composition, a `fleet`,
+  a `starbase_policy`, a `persona`, and one **signature mechanic** — a named,
+  config-parameterized systemic hook (trojan-gift, reprogram-unlock,
+  influence-gate, morality-judge, escalating-demand, literalist, contract-kill,
+  …, DESIGN.md §7.2). Species are grouped into rival **alliances** (DESIGN.md
+  §7.3): the player may join **at most one**, gated by an `admission_price` and
+  a `membership_gate`; joining warms members and turns rival blocs hostile.
+  Species also hold dispositions **toward each other** — an inter-species
+  relation matrix plus dated **grudges/vendettas** (DESIGN.md §7.4–7.5) — which
+  drives NPC-vs-NPC behavior and reputation spillover. The **species roster is a
+  config file** — each game is generated against a named roster, the big bang
+  draws a seeded *subset* of it (not every species need appear), a different
+  game can use an entirely different source roster, and each species' base
+  disposition is drawn per-generation from a bounded spread around its roster
+  center, so disposition varies between universe generations.
 - **Ship aspects** — cargo capacity, shields, engine speed, cloak/stealth,
-  sensors, armaments; upgraded via trade profits and alien tech.
+  sensors, armaments; upgraded via trade profits and alien tech. Every hull
+  (player, NPC, and starbase) is a config-driven **ship class** (DESIGN.md §5):
+  `role` (fighter / warship / capital_warship / transport / starbase / …),
+  `length_m`, `speed`, `armament` (weapons with damage + `firing_arc` of
+  ahead / all_round / spinal), and `defenses` (laser_turret / armour / screens /
+  energy_plates / speed_and_size). **Starbases** are immobile ship classes —
+  destructible set-pieces whose razing is the coin of alliance diplomacy.
 
 Deterministic, testable, extensible to multiplayer later. Single-player
 first.
@@ -123,10 +142,13 @@ What each is for:
   production, Genesis torpedoes, Computer screen (pair-trade finder, route
   planner).
 - **Phase 3:** low-disposition (hostile-band) alien species (threat/interception,
-  rarity inverse to threat, escape-chance floor), encounter system
-  (disposition roll for greeting vs. violence), ship combat with salvage
-  and escape pods, sector fighters/mines, alignment/experience, FedSpace
-  law, friendly-disposition NPC traders, hostile homeworld raids.
+  threat tiers, rarity inverse to threat, escape-chance floor), encounter system
+  (disposition roll for greeting vs. violence, escort/pack spawns, firing-arc
+  combat), signature-mechanic hooks, alliances (join one bloc, admission-price
+  tasks, rival fallout) and inter-species relations/grudges, ship combat with
+  salvage and escape pods, NPC starbases as destructible set-pieces, sector
+  fighters/mines, alignment/experience, FedSpace law, friendly-disposition NPC
+  traders, hostile homeworld raids.
 - **Phase 4:** multiplayer (JSON-RPC over websockets), corporations.
 - **Phase 5:** order-book economy, citadels, probes, richer alien
   interactions, sysop console, scripting hooks.
