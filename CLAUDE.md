@@ -32,21 +32,21 @@ needed to push outward and discover things. Key pillars:
   cluster** of worlds just outside the Core (so the whole Hub stays innately
   peaceable; near-home menace is alliance-political, not low disposition). Beyond
   disposition, each species carries a rich **parameter
-  set** (DESIGN.md §7.1): a `threat_tier` (narrative difficulty, decoupled from
+  set** (DESIGN.md §6.1): a `threat_tier` (narrative difficulty, decoupled from
   raw threat), `combatant` flag, `trade_posture`, `treaty_mode`, `memory_model`
   (none / normal / never_forgets), `betrayal_model` (recoverable / permanent),
   a `befriend_price` task list, `pack_behavior`/escort composition, a `fleet`,
   a `starbase_policy`, a `persona`, and one **signature mechanic** — a named,
   config-parameterized systemic hook (trojan-gift, reprogram-unlock,
   influence-gate, morality-judge, escalating-demand, literalist, contract-kill,
-  …, DESIGN.md §7.2). Species are grouped into rival **alliances** (DESIGN.md
-  §7.3): the player may belong to **at most one**, gated by an `admission_price`
+  …, DESIGN.md §6.2). Species are grouped into rival **alliances** (DESIGN.md
+  §6.3): the player may belong to **at most one**, gated by an `admission_price`
   and a `membership_gate`; joining warms members and turns rival blocs hostile.
   Each non-governing alliance holds a compact **home cluster** of worlds just
   outside the Core — smaller than the Core, never adjacent to it, separated from it
   and from rival clusters by **neutral navigable lanes** of empty space, so the
   outer bands are always reachable without transiting a bloc's territory (DESIGN.md
-  §6, §7.3).
+  §5, §6.3).
   No alliance is privileged in the schema: the **Federation** is just an ordinary
   alliance that the default roster names as the **initial governor of Core
   Space** (`Game.core_governing_alliance_id`), and the player **starts as one of its
@@ -58,7 +58,7 @@ needed to push outward and discover things. Key pillars:
   up. Governance can change hands (a `covets_core` bloc seizing the Core via the
   player's deeds or NPC events, Phase 5), re-keying who is welcome there.
   Species also hold dispositions **toward each other** — an inter-species
-  relation matrix plus dated **grudges/vendettas** (DESIGN.md §7.4–7.5) — which
+  relation matrix plus dated **grudges/vendettas** (DESIGN.md §6.4–7.5) — which
   drives NPC-vs-NPC behavior and reputation spillover. The **species roster is a
   config file** — each game is generated against a named roster, the big bang
   draws a seeded *subset* of it (not every species need appear), a different
@@ -68,13 +68,13 @@ needed to push outward and discover things. Key pillars:
 - **Ship aspects** — cargo capacity, shields, engine speed (split into **warp
   speed** for travel and **combat speed** for evasion), cloak/stealth, sensors,
   armaments; upgraded via trade profits and alien tech. Every hull (player, NPC,
-  and starbase) is a config-driven **ship class** (DESIGN.md §5): `role` (fighter
+  and starbase) is a config-driven **ship class** (DESIGN.md §4): `role` (fighter
   / warship / capital_warship / transport / starbase / …), `length_m`, `speed`,
   `armament` (weapons with damage + `firing_arc` of ahead / all_round / spinal),
   and `defenses` (laser_turret / armour / screens / energy_plates /
   speed_and_size). **Starbases** are immobile ship classes — destructible
   set-pieces whose razing is the coin of alliance diplomacy.
-- **Engine room** (DESIGN.md §5.1, *Lightspeed*-inspired) — the player ship's
+- **Engine room** (DESIGN.md §4.1, *Lightspeed*-inspired) — the player ship's
   aspects are **derived from four slotted subsystems** (`spindrive`, `thrusters`,
   `screens`, `main_gun`) built from a small shared component vocabulary
   (accelerator / converter / radiator / secondary / turbine / burner / linkage /
@@ -85,7 +85,7 @@ needed to push outward and discover things. Key pillars:
   finite **homing missiles** (no point-defense). NPC hulls keep flat
   aspects/defenses via an optional `subsystems` block, so localized damage is
   player-first.
-- **Planets & orbital starbases** (DESIGN.md §5.2, *Lightspeed* §1.4.6-inspired) —
+- **Planets & orbital starbases** (DESIGN.md §4.2, *Lightspeed* §1.4.6-inspired) —
   every planet has a **`planet_type`** (terrestrial warm / cool / hot / cold,
   jovian, asteroid_belt, barren) that fixes its colonizability, a `yield_profile`
   over the Fuel Ore / Organics / Equipment trio, and a `habitability` cap — keeping
@@ -160,11 +160,11 @@ What each is for:
    persistence, testing strategy, 5-phase roadmap.
 4. Revised the design (v0.2, June 2026) to the exploration-first focus
    described above: alien species, discoveries, distance bands, latinum, ship
-   aspects, encounter/flee rules (DESIGN.md §§7, 8, 11).
+   aspects, encounter/flee rules (DESIGN.md §§6, 8, 11).
 5. Added the *Lightspeed*-inspired engine-room subsystem/component ship model
-   (DESIGN.md §5.1): slotted subsystems, shared component vocabulary, localized
+   (DESIGN.md §4.1): slotted subsystems, shared component vocabulary, localized
    combat damage, hybrid repair, global engine bonus, homing missiles.
-6. Added the planetary system (DESIGN.md §5.2, *Lightspeed* §1.4.6-inspired):
+6. Added the planetary system (DESIGN.md §4.2, *Lightspeed* §1.4.6-inspired):
    `planet_type` taxonomy with yield profiles + habitability, three-way ownership
    (none / alliance_id / player_id) with Core-owned-by-governor and band-rising
    unowned density, and orbital starbases (engine-room model minus thrusters/spindrive
@@ -172,14 +172,14 @@ What each is for:
    components on unowned worlds (so repair is routine, not special-cased), are
    scavengeable for components, and defend owned planetary systems via alliance-keyed
    hostility.
-7. Added alliance **home clusters** to universe generation (DESIGN.md §6 step 6,
-   §7.3): each non-governing alliance gets a compact, alliance-owned cluster of worlds
+7. Added alliance **home clusters** to universe generation (DESIGN.md §5 step 6,
+   §6.3): each non-governing alliance gets a compact, alliance-owned cluster of worlds
    just outside the Core — smaller than the Core, never adjacent to it — with **neutral
    navigable lanes** of empty space between clusters so the player can always reach the
    outer bands without transiting a bloc's territory. Clusters are friendly-band by
    disposition, so the Hub stays peaceable until the player aligns against a bloc.
-8. Reviewed and tightened the economy spec (DESIGN.md §9): made the §9 pricing
-   formula **normative** over the §2.2 reference (whose buy-side sign is inverted —
+8. Reviewed and tightened the economy spec (DESIGN.md §8): made the §8 pricing
+   formula **normative** over the §A.2 reference (whose buy-side sign is inverted —
    selling into a port must *lower* its price), defined `stock_ratio`/`capacity`/
    `elasticity` and a positive-price **clamp** invariant, and added an **Economy
    constants** block (starting capital, Tier-I/II/III component prices and barter
@@ -205,7 +205,7 @@ What each is for:
 - Single-player embeds the server in-process; never let the TUI reach
   around the service API into core state directly.
 
-## Roadmap (from DESIGN.md §15)
+## Roadmap (from DESIGN.md §14)
 
 - **Phase 1 (current):** core models, big bang (cluster+bridge+distance
   bands+validate, Core Space sectors 1-10, StarDock), movement with turn
@@ -216,11 +216,11 @@ What each is for:
 - **Phase 2 (the pivot phase):** discovery system with distance-banded
   rarity, planet descent + surface sites, sensor detection, discovery
   codex, friendly-disposition alien species with tech barter/latinum sales of aspect upgrades,
-  the engine-room subsystem/component model (§5.1: slotted upgrades, component
+  the engine-room subsystem/component model (§4.1: slotted upgrades, component
   tiers, derived aspects, repair), StarDock services, multiple ship types,
   **typed planets with band-weighted types/ownership and BNT-style production
   shaped by `planet_type`/habitability, player colonization of unowned worlds,
-  derelict orbital starbases as scavengeable component caches** (DESIGN.md §5.2),
+  derelict orbital starbases as scavengeable component caches** (DESIGN.md §4.2),
   Genesis torpedoes, Computer screen (pair-trade finder, route planner).
 - **Phase 3:** low-disposition (hostile-band) alien species (threat/interception,
   threat tiers, rarity inverse to threat, escape-chance floor), encounter system
@@ -230,7 +230,7 @@ What each is for:
   tasks, rival fallout) and inter-species relations/grudges, ship combat with
   salvage and escape pods, NPC starbases as destructible set-pieces,
   **orbital/planetary starbases with ownership-keyed planetary-system defense and
-  player repair/claim of derelict bases into forward footholds** (DESIGN.md §5.2),
+  player repair/claim of derelict bases into forward footholds** (DESIGN.md §4.2),
   sector fighters/mines, alignment/experience, Core Space law keyed to the governing
   alliance (static Federation governor this phase; Core safety driven by the
   player's standing with the governor), friendly-disposition NPC traders, hostile
@@ -247,5 +247,5 @@ What each is for:
   golden-master replays of command logs against fixed seeds; bigbang
   validation across many seeds; Textual Pilot for UI flows.
 - Dependencies (Phase 1): textual, rich, networkx, pydantic v2; stdlib
-  sqlite3. Add nothing else without updating DESIGN.md §16.
+  sqlite3. Add nothing else without updating DESIGN.md §15.
 - Commit style: small, phase-tagged (e.g. `p1: bigbang cluster pass`).
