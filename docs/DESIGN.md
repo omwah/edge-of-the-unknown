@@ -1,4 +1,4 @@
-# Project Helix — Design Document
+# Edge of the Unknown — Design Document
 ## An Exploration-First Space Game on TradeWars 2002 Bones, in Python + Textual
 
 *Version 0.2 — June 2026 (exploration-first revision)*
@@ -7,7 +7,7 @@
 
 ## 1. Purpose and Scope
 
-Project Helix is a game of space exploration and discovery built on the mechanical bones of TradeWars 2002 (TW2002), the classic BBS door game, as a modern terminal application using Python 3.12+ and the Textual TUI framework. The player's goal is to push outward from the Core Space — the protected central region governed at the outset by the Federation — into an unknown warp-connected universe and find what is out there: uncharted planets that can be descended onto, derelict shipwrecks, nebulae and black holes, strange space-borne entities, and the ruins, artifacts, and ancient technology of lost civilizations. The classic TW2002 port pair-trading loop is retained intact — but as a means to an end. Trading funds the faster engines, stronger shields, better sensors, cloaking devices, and armaments needed to travel farther, survive hostile space, and reach rarer and more valuable discoveries. The galaxy is inhabited by alien species whose disposition runs a continuous scale from openly hostile to warmly friendly: most lean friendly and offer technology for barter or for the universal currency, gold-pressed latinum; the hostile-leaning aliens are the escalating price of deep space, with the deadliest among them also the rarest. Species are bound into rival **alliances** the player can join — but only one at a time, so winning one bloc's favor forfeits its rivals' — over a field of unaligned wild cards, and they hold stances toward *each other* as well as toward the player. The Federation is simply the alliance that governs the Core Space at the start; control of that home region can pass to another alliance through the player's deeds or the galaxy's own upheavals, and with it, whether the Core remains a safe harbor.
+Edge of the Unknown is a game of space exploration and discovery built on the mechanical bones of TradeWars 2002 (TW2002), the classic BBS door game, as a modern terminal application using Python 3.12+ and the Textual TUI framework. The player's goal is to push outward from the Core Space — the protected central region governed at the outset by the Federation — into an unknown warp-connected universe and find what is out there: uncharted planets that can be descended onto, derelict shipwrecks, nebulae and black holes, strange space-borne entities, and the ruins, artifacts, and ancient technology of lost civilizations. The classic TW2002 port pair-trading loop is retained intact — but as a means to an end. Trading funds the faster engines, stronger shields, better sensors, cloaking devices, and armaments needed to travel farther, survive hostile space, and reach rarer and more valuable discoveries. The galaxy is inhabited by alien species whose disposition runs a continuous scale from openly hostile to warmly friendly: most lean friendly and offer technology for barter or for the universal currency, gold-pressed latinum; the hostile-leaning aliens are the escalating price of deep space, with the deadliest among them also the rarest. Species are bound into rival **alliances** the player can join — but only one at a time, so winning one bloc's favor forfeits its rivals' — over a field of unaligned wild cards, and they hold stances toward *each other* as well as toward the player. The Federation is simply the alliance that governs the Core Space at the start; control of that home region can pass to another alliance through the player's deeds or the galaxy's own upheavals, and with it, whether the Core remains a safe harbor.
 
 This document is informed by direct source analysis of seven existing TradeWars clones and the original 1986 TradeWars II BASIC source; the warp-graph universe, port economy, turn system, and engine foundations remain TW2002-authentic even where the goals diverge. Section 2 summarizes what each codebase taught us; the remainder of the document specifies our design.
 
@@ -96,9 +96,9 @@ Three independent codebases (twclone, terminal-space, ExchangeConflict) converge
 Following the twclone/terminal-space consensus, the system is four layers with strict downward-only dependencies:
 
 ```
-helix/
+edge/
 ├── pyproject.toml
-├── helix/
+├── edge/
 │   ├── core/                 # Pure rules engine. No I/O, no async, no Textual.
 │   │   ├── models.py         # Entities: Sector, Port, Planet, Ship, Player, Corp...
 │   │   ├── enums.py          # PortClass, Commodity, ShipType ids, etc.
@@ -130,7 +130,7 @@ helix/
 │   │   ├── session.py        # Player session + fog-of-war context
 │   │   └── net.py            # (Phase 4) JSON-RPC over websockets
 │   └── tui/                  # Textual application
-│       ├── app.py            # HelixApp, screen stack, keybinds
+│       ├── app.py            # EdgeApp, screen stack, keybinds
 │       ├── screens/          # Sector, Port, Planet, StarDock, Computer, Map...
 │       ├── widgets/          # WarpList, HoldsBar, TickerLog, SectorScan...
 │       └── theme.tcss        # Textual CSS, TW2002 cyan/magenta/yellow palette
@@ -204,7 +204,7 @@ Deterministic from `(seed, config)`. Default 1000 sectors (config 100–5000). P
 6. **Populate.** StarDock (Class 9) placed 2–5 hops from the Core Space. Standard ports at ~45% sector density with the terminal-space class distribution (20/20/20/10/10/10/5/5) and initial stock `randint(200, 2000)` scaled by port size; port density thins in the outer bands (deep space is wild, not commercial). Planets seeded in ~25% of sectors. **Aliens:** a seeded subset is drawn from the configured species roster (Section 7) — not every roster member need appear — and each instantiated species draws its base disposition from a config-bounded spread around its roster center, then is assigned home regions. The Core Space and all Hub-band regions receive only members of the initial governing alliance (the Federation by default) whose realized disposition sits in the friendly band; species outside that alliance claim territory in outer bands, with homeworlds at tunnel endpoints (twclone) and mean threat rating rising (and mean disposition falling) with band. **Discoveries:** every sector and planet rolls on its band's rarity table (Section 8); planets additionally roll surface sites (ruins, artifacts, ancient tech, crashed ships).
 7. **Validate.** Assert: single strongly-reachable component from sector 1 (treating one-ways correctly); max warps per sector ≤ 6 (TW2002 canon); StarDock reachable; at least one profitable port-pair (opposed classes, e.g. BBS↔SSB) within 5 hops of the Core Space so new players can earn; per-region port balance within tolerance; the Core Space and Hub-band regions host only friendly-band members of the initial governing alliance (no species below the friendly disposition band, and none from a rival bloc, present there at generation); mean discovery rarity/value strictly increasing across bands; mean alien disposition non-increasing across bands; at least one friendly-disposition contact point per band so deep explorers can resupply and barter. Regenerate with a perturbed sub-seed on failure (bounded retries, then error).
 
-A dev tool `helix bigbang --inspect` renders the graph (networkx + matplotlib export, plus an in-TUI map debugger) with port sectors highlighted, mirroring ExchangeConflict's uniview.
+A dev tool `edge bigbang --inspect` renders the graph (networkx + matplotlib export, plus an in-TUI map debugger) with port sectors highlighted, mirroring ExchangeConflict's uniview.
 
 ---
 
@@ -384,7 +384,7 @@ Textual gives us screens, CSS layout, widgets, mouse support, and free web deplo
 
 ## 13. Persistence
 
-SQLite, one file per game (`~/.helix/games/<name>.db`), WAL mode. Tables mirror Section 5 entities plus `event_log` and `config`. Saves are implicit (every command is durable once its transaction commits — the BBS property that you can hang up mid-session and resume, per TWINSTR.DOC). `snapshots.py` adds export/import of a portable save (gzipped JSON of state + command log). The repository interface is the swap point for PostgreSQL if hosted multiplayer ever demands it (twclone's lesson, pre-paid architecturally rather than adopted prematurely).
+SQLite, one file per game (`~/.edge/games/<name>.db`), WAL mode. Tables mirror Section 5 entities plus `event_log` and `config`. Saves are implicit (every command is durable once its transaction commits — the BBS property that you can hang up mid-session and resume, per TWINSTR.DOC). `snapshots.py` adds export/import of a portable save (gzipped JSON of state + command log). The repository interface is the swap point for PostgreSQL if hosted multiplayer ever demands it (twclone's lesson, pre-paid architecturally rather than adopted prematurely).
 
 ---
 
