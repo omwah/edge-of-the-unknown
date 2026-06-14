@@ -1,5 +1,5 @@
 # Edge of the Unknown — Design Document
-## An Exploration-First Space Game on TradeWars 2002 Bones, in Python + Textual
+## An Exploration-First Space Game of Trade, Discovery, and Alien Diplomacy
 
 *Version 0.2 — June 2026 (exploration-first revision)*
 
