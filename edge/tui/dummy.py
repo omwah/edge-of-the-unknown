@@ -131,7 +131,17 @@ def sample_state() -> GameState:
         kits=2,
         latinum=14_250,
         band="0 - Core",
-        region_map=["(4)-(7)-(8)", "      |", "    (12)"],
+        # The mini-map is the current sector's neighbourhood, so the sectors drawn
+        # adjacent to (7) must be exactly its warp targets below (1,3,6,8,12). In the
+        # real game both this and the warp list are projected from the one warp graph
+        # via to_public(); here they're hand-synced.
+        region_map=[
+            " (3) (6)",
+            "   \\ /",
+            "(1)-(7)",
+            "   / \\",
+            " (8) (12)",
+        ],
     )
     sector = SectorDTO(
         region="CORE SPACE",

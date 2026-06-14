@@ -96,35 +96,52 @@ MapScreen**. The rest are Phase 2-3 (marked per screen).
 │ ░▒▓ the lanes hum w/ traffic ▓▒░│ -----------------------------      │
 │                                 │ Shields  ████████░░  82%           │
 │ Ports                           │ Warp     ███░░░░░░░   3            │
-│   P Stardock - Class 0 (Spec.)  │ Combat   ████░░░░░░   4            │
-│ Planets                         │ Cloak    ░░░░░░░░░░  off           │
-│   @ Terra Nova terrestrial,warm │ Sensors  ██████░░░░  Tier II       │
-│     # orbital starbase (Fed)    │ subsystems: all nominal            │
-│ Ships    none                   │ -----------------------------      │
-│ Beacons  ! "Welcome to Sol"     │ Holds 40/60                        │
-│                                 │  Fuel  ████████░░░░  20            │
-│ Warps ------------------------- │  Org   ████░░░░░░░░  12            │
-│   [1] <    [3] / Sol    [6] >   │  Equ   ██░░░░░░░░░░   8            │
-│   [8] ?    [12] ?               │ Gun [+]  Missiles x3  Kits x2      │
-│                                 │ Latinum  14,250 gpl                │
+│  »P Stardock - Class 0 (Spec.)  │ Combat   ████░░░░░░   4            │
+│                                 │ Cloak    ░░░░░░░░░░  off           │
+│ Planets                         │ Sensors  ██████░░░░  Tier II       │
+│  »@ Terra Nova terrestrial,warm │ subsystems: all nominal            │
+│     # orbital starbase (Fed)    │ -----------------------------      │
+│                                 │ Holds 40/60                        │
+│ Beacons                         │  Fuel  ████████░░░░  20            │
+│   ! "Welcome to Sol"            │  Org   ████░░░░░░░░  12            │
+│                                 │  Equ   ██░░░░░░░░░░   8            │
+│ Ships                           │ Gun [+]  Missiles x3  Kits x2      │
+│   none                          │ Latinum  14,250 gpl                │
 │                                 │ Band 0 - Core                      │
-│                                 │ region:   (4)-(7)-(8)              │
-│                                 │                |                   │
-│                                 │              (12)                  │
+│ Warps                           │ region:                            │
+│  1<    3/Sol  6>                │   (3) (6)                          │
+│  8?    (7)    12?               │     \ /                            │
+│                                 │  (1)-(7)                           │
+│                                 │     / \                            │
+│                                 │   (8) (12)                         │
 ├──────────────────────────────────────────────────────────────────────┤
-│> _                                                                   │
 │- arrive in Sector 7.   - Stardock detected.   - 287 turns left.      │
+├──────────────────────────────────────────────────────────────────────┤
+│ P Port   C Computer   G Map   D Redisplay   Q Quit                   │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Left 2/3 — sector view**: region + sector header; ANSI-art flavor line
-  (`Static`); contents as a Rich-renderable log (ports/planets/ships/fighters/
-  beacons); **`WarpList`** widget — clickable, unexplored warps dimmed with `?`.
+  (`Static`); then five **bold, consistently-coloured section headers** (Ports,
+  Planets, Ships, Beacons, Warps — the `.heading` style, `$secondary`) each above
+  its values with a blank-line gap between sections; ports and planets are
+  **clickable rows** (`»` prefix) that open the matching screen — a Stardock port
+  -> StarDockScreen (§5), a trade port -> PortScreen (§2), a planet ->
+  PlanetScreen (§3); then ships/beacons; a
+  **`WarpGrid`** — a 3x3 grid with the **current sector pinned to the centre
+  cell** (non-clickable `(7)`) and outbound warps in the eight cells around it
+  (clickable, unexplored dimmed with `?`). TW2002 sectors warp to <= 6 others, so
+  eight surrounding cells suffice.
 - **Right 1/3 — status sidebar**: ship name/type; aspect readout with bars
   (shields/warp/combat/cloak/sensors) + a compact **subsystem-integrity line**
   (flags knocked-out components, §4.1); holds bar per commodity; Gun/missile/
   repair-kit counts; latinum; turns; current **distance band**; region mini-map.
-- **Bottom**: one-line command `Input` + scrolling event ticker (`RichLog`).
+  The mini-map is the current sector's neighbourhood, so the sectors drawn next to
+  `(7)` are exactly the `WarpGrid`'s targets — both are projected from the one warp
+  graph, so they cannot drift.
+- **Bottom**: scrolling event ticker (`RichLog`) above a docked **status bar**
+  (`Footer`) listing the active key bindings as a persistent reminder — there is
+  no command-line input; actions are keystrokes and mouse clicks (§11 grammar).
 - **Bindings** (§11): number keys = warp by sector; `M` move, `P` dock port (§2),
   `L` land planet (§3), `D` redisplay, `C` computer (§9), `G` galactic map (§10),
   `I` ship info, `Q` quit. Esc cancels a prompt.
