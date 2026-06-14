@@ -27,7 +27,12 @@ needed to push outward and discover things. Key pillars:
   with threat. Player escape chance is always ≥ a config floor (default
   10%). Config thresholds (default hostility 0.35 / amity 0.65) name the
   bands; FedSpace and the Core band host only Federation-aligned species in the
-  friendly band.
+  friendly band. The **species roster is a config file** — each game is generated
+  against a named roster, the big bang draws a seeded *subset* of it (not every
+  species need appear), a different game can use an entirely different source
+  roster, and each species' base disposition is drawn per-generation from a
+  bounded spread around its roster center, so disposition varies between universe
+  generations (DESIGN.md §7).
 - **Ship aspects** — cargo capacity, shields, engine speed, cloak/stealth,
   sensors, armaments; upgraded via trade profits and alien tech.
 
