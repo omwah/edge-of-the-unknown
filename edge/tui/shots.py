@@ -34,8 +34,11 @@ async def _capture() -> None:
         await pilot.pause()
         app.save_screenshot(filename="game.svg", path=str(OUT))
         # Sector 7 holds a StarDock: docking (P) or clicking it opens the services
-        # hub, where trading is the default Commodities tab.
+        # hub. Show the Hardware tab (the component emporium) rather than the
+        # default Commodities tab.
         await pilot.press("p")
+        await pilot.pause()
+        app.screen.query_one(TabbedContent).active = "hardware"
         await pilot.pause()
         app.save_screenshot(filename="stardock.svg", path=str(OUT))
         await pilot.press("escape")  # back to GameScreen
