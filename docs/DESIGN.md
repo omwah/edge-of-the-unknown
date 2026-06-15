@@ -462,7 +462,7 @@ The pure core makes this cheap: property-based tests (hypothesis) for economy in
 
 ## 15. Technology Stack
 
-Python ≥ 3.12; Textual (TUI) + Rich; networkx (generation/pathfinding only — runtime adjacency is plain dicts); Pydantic v2 (DTOs/config) + PyYAML (parsing the YAML config file of §4); matplotlib + scipy (the dev-only `bigbang --render` graph inspector of §5; scipy is networkx's sparse layout backend); SQLite stdlib (repository pattern; SQLAlchemy optional later); hypothesis + pytest (+ pytest-asyncio, textual Pilot); ruff + mypy strict on `core/`, `bigbang/`, and `store/`. Phase 4 adds websockets + pjrpc-style JSON-RPC.
+Python ≥ 3.12; Textual (TUI) + Rich; networkx (generation/pathfinding only — runtime adjacency is plain dicts); Pydantic v2 (DTOs/config) + PyYAML (parsing the YAML config file of §4); matplotlib + scipy (the dev-only `bigbang --render` graph inspector of §5; scipy is networkx's sparse layout backend); SQLite stdlib (repository pattern; SQLAlchemy optional later); hypothesis + pytest (+ pytest-asyncio, textual Pilot); ruff + mypy strict on `core/`, `bigbang/`, `store/`, and `server/`. Phase 4 adds websockets + pjrpc-style JSON-RPC.
 
 ---
 
