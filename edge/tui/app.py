@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 
 from textual.app import App
+from textual.binding import Binding
 from textual.theme import Theme
 
 from edge.tui.dummy import sample_port
@@ -35,6 +36,11 @@ class EdgeApp(App[None]):
     CSS_PATH = "app.tcss"
     SCREENS = {"port": lambda: PortScreen(sample_port())}
     TITLE = "Edge of the Unknown"
+    # Textual's built-in quit is ctrl+q but priority + show=False, so it shadows
+    # any screen binding and never reaches the footer. Re-declare it without
+    # priority so a screen's own ctrl+q binding wins display; keep it hidden here
+    # so the "^q Quit" label surfaces only where a screen opts in (the GameScreen).
+    BINDINGS = [Binding("ctrl+q", "quit", "Quit", show=False)]
 
     def __init__(self, plain: bool = False) -> None:
         super().__init__()

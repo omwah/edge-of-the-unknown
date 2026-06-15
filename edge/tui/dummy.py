@@ -138,6 +138,54 @@ class MapDTO:
 
 
 @dataclass(frozen=True)
+class Slot:
+    """One component slot in a subsystem panel (UI_MOCKUPS.md §8).
+
+    `state` is "filled" | "empty" | "knocked" (knocked-out by combat); a filled
+    slot names its `component`, and the structural `keystone` slot is marked.
+    """
+
+    state: str
+    component: str = ""
+    keystone: bool = False
+
+
+@dataclass(frozen=True)
+class Subsystem:
+    name: str  # "SPINDRIVE", "THRUSTERS", "SCREENS", "MAIN GUN"
+    derived: str  # the aspect this subsystem drives, e.g. "warp 3"
+    slots: list[Slot]
+
+
+@dataclass(frozen=True)
+class EngineRoomDTO:
+    """The player ship's slotted subsystems (UI_MOCKUPS.md §8, DESIGN §4.1)."""
+
+    ship: str
+    efficiency_bonus: str  # spindrive global combat buff, e.g. "+2 all"
+    subsystems: list[Subsystem]
+    kits: int
+    on_hand: list[str]  # carried components, e.g. ["converter x1", "turbine x1"]
+
+
+@dataclass(frozen=True)
+class TradePair:
+    """One row of the Computer's pair-trade finder (UI_MOCKUPS.md §9)."""
+
+    pair: str
+    goods: str
+    dist: int
+    profit_rt: int  # round-trip profit
+    per_turn: int  # profit per turn (the finder's score)
+
+
+@dataclass(frozen=True)
+class ComputerDTO:
+    pairs: list[TradePair]
+    selected: str
+
+
+@dataclass(frozen=True)
 class GameState:
     turns: int
     max_turns: int
@@ -302,6 +350,73 @@ def sample_map() -> MapDTO:
                     "[dim]deep void[/]",
                 ],
             ),
+        ],
+    )
+
+
+def sample_engine_room() -> EngineRoomDTO:
+    """The S.S. Wayfarer's engine room from UI_MOCKUPS.md §8.
+
+    Mirrors the sidebar ship: warp 3, shields 82%, combat 4, a knocked-out
+    thruster burner (so the integrity line has something to flag), and a couple
+    of on-hand parts to install/cannibalise.
+    """
+    return EngineRoomDTO(
+        ship="S.S. Wayfarer",
+        efficiency_bonus="+2 all",
+        subsystems=[
+            Subsystem(
+                "SPINDRIVE", "warp 3",
+                [
+                    Slot("filled", "navigator", keystone=True),
+                    Slot("filled", "turbine"),
+                    Slot("filled", "accelerator"),
+                    Slot("empty"),
+                    Slot("empty"),
+                ],
+            ),
+            Subsystem(
+                "SCREENS", "shields 82%",
+                [
+                    Slot("filled", "secondary", keystone=True),
+                    Slot("filled", "accelerator"),
+                    Slot("empty"),
+                    Slot("empty"),
+                ],
+            ),
+            Subsystem(
+                "THRUSTERS", "combat spd 4",
+                [
+                    Slot("filled", "burner", keystone=True),
+                    Slot("knocked", "burner"),
+                    Slot("empty"),
+                    Slot("empty"),
+                ],
+            ),
+            Subsystem(
+                "MAIN GUN", "dmg 18 · rate 2",
+                [
+                    Slot("filled", "accelerator", keystone=True),
+                    Slot("filled", "linkage"),
+                    Slot("empty"),
+                    Slot("empty"),
+                    Slot("empty"),
+                ],
+            ),
+        ],
+        kits=2,
+        on_hand=["converter x1", "turbine x1"],
+    )
+
+
+def sample_computer() -> ComputerDTO:
+    """The Computer's pair-trade finder from UI_MOCKUPS.md §9."""
+    return ComputerDTO(
+        selected="Sol <-> Halaf-2",
+        pairs=[
+            TradePair("Sol <-> Halaf-2", "Org/Equ", 2, 640, 320),
+            TradePair("Sol <-> Mirach", "Fuel/Equ", 3, 810, 270),
+            TradePair("Halaf-2 <-> Vega-9", "Org/Fuel", 4, 900, 225),
         ],
     )
 

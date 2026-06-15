@@ -120,7 +120,7 @@ MapScreen**. The rest are Phase 2-3 (marked per screen).
 ├──────────────────────────────────────────────────────────────────────┤
 │- arrive in Sector 7.   - Stardock detected.   - 287 turns left.      │
 ├──────────────────────────────────────────────────────────────────────┤
-│ P Dock   S Survey   C Computer   M Map   Q Quit                      │
+│ P Dock  S Survey  C Computer  E Engine  M Map  ^q Quit               │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -184,8 +184,8 @@ text on the left, sprites in the right negative space):
   (`Footer`) listing the active key bindings as a persistent reminder — there is
   no command-line input; actions are keystrokes and mouse clicks (§11 grammar).
 - **Bindings** (§11): number keys = warp by sector; `P` dock port (§2),
-  `S` survey planet (orbit view, §3), `C` computer (§9),
-  `M` galactic map (§10), `I` ship info, `Q` quit. Esc cancels a prompt.
+  `S` survey planet (orbit view, §3), `C` computer (§9), `E` engine room (§8),
+  `M` galactic map (§10), `I` ship info, `^q` quit. Esc cancels a prompt.
 - DESIGN: §11, §4 (aspects/holds), §4.1 (integrity line), §9 (turns).
 
 ---
