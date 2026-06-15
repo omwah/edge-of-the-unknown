@@ -88,7 +88,7 @@ class HagglePanel(Static):
     def render(self) -> str:
         return (
             "[b]Haggle: Sell Fuel Ore[/]\n"
-            "Quote:  13/u  x  20 units  =  [yellow]260 gpl[/]\n"
+            "Quote:  13/u  x  20 units  =  [yellow]260 slips[/]\n"
             "Your counter: ( [b]15[/] )/u    fair ~ 13    [green]likely[/]\n"
             'Round 1 of 2   · "Hah, 14 and not a slip more."\n'
             "[b]\\[A][/]ccept quote   [b]\\[O][/]ffer counter   [b]\\[Esc][/] walk away"
@@ -170,7 +170,7 @@ class StatusSidebar(Static):
         for h in s.holds:
             lines.append(f" {h.label:<5}[yellow]{_scaled_bar(h.qty, h.capacity)}[/] {h.qty:>3}")
         lines += [
-            f"Latinum  [b yellow]{s.latinum:,}[/] gpl",
+            f"Latinum  [b yellow]{s.latinum:,}[/] slips",
             rule,
             f"Band {s.band}",
             "[dim]region:[/]",
