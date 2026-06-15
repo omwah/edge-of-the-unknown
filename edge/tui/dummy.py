@@ -186,6 +186,81 @@ class ComputerDTO:
 
 
 @dataclass(frozen=True)
+class ContactVerb:
+    """One row of the AlienContactScreen verb menu (UI_MOCKUPS.md §6).
+
+    The menu is *derived* from species params (trade_posture, treaty_mode, …),
+    not authored — a disabled verb carries the `reason` it is greyed.
+    """
+
+    key: str
+    label: str
+    enabled: bool = True
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class AlienContactDTO:
+    """A peaceful alien contact (UI_MOCKUPS.md §6, DESIGN §6.1–6.7)."""
+
+    species: str  # "Threllian Envoy"
+    disposition_filled: int  # 0..5 for the effective-disposition bar
+    band: str  # "amity" / "friendly" / …
+    standing: str  # "friendly (base .72 +.06 you)"
+    alliance: str
+    speech: list[str]  # dialogue-pack lines (markup ok)
+    verbs: list[ContactVerb]
+    dossier: list[str]  # dossier-panel lines (markup ok)
+
+
+@dataclass(frozen=True)
+class EnemyShip:
+    """One hostile in an encounter group (UI_MOCKUPS.md §7)."""
+
+    name: str
+    hull_filled: int  # 0..10 for the hull bar
+    hull_pct: int
+
+
+@dataclass(frozen=True)
+class EncounterDTO:
+    """A hostile encounter: greeting-or-fight/flee (UI_MOCKUPS.md §7, DESIGN §10)."""
+
+    title: str  # "Kessrin Raider pack (x3)"
+    opener: str  # "they SHOOT FIRST"
+    disposition_filled: int  # 0..5 for the effective-disposition bar
+    band: str  # "hostile"
+    detection: str  # "they spotted you"
+    taunt: str  # dialogue-pack taunt line
+    enemies: list[EnemyShip]
+    arc_hint: str  # firing-arc tip, e.g. "arc: ahead/spinal → strafe it"
+    shields_filled: int
+    shields_pct: int
+    hull_filled: int
+    hull_pct: int
+    combat_line: str  # "Combat spd 4 (-2 intcpt)"
+    integrity_flag: str  # knocked-out-component flag, e.g. "thrusters: 1 burner out"
+    round_no: int
+    flee_chance: int  # %
+    flee_floor: int  # % — the config escape-chance floor (clamp)
+
+
+@dataclass(frozen=True)
+class LogEntry:
+    """One line in the messages/event log (UI_MOCKUPS.md §11)."""
+
+    when: str  # "day 4 · 09:12"
+    text: str  # markup ok
+
+
+@dataclass(frozen=True)
+class MessagesDTO:
+    """The messages & log screen (UI_MOCKUPS.md §11, DESIGN §12 event_log)."""
+
+    events: list[LogEntry]
+
+
+@dataclass(frozen=True)
 class GameState:
     turns: int
     max_turns: int
@@ -417,6 +492,89 @@ def sample_computer() -> ComputerDTO:
             TradePair("Sol <-> Halaf-2", "Org/Equ", 2, 640, 320),
             TradePair("Sol <-> Mirach", "Fuel/Equ", 3, 810, 270),
             TradePair("Halaf-2 <-> Vega-9", "Org/Fuel", 4, 900, 225),
+        ],
+    )
+
+
+def sample_contact() -> AlienContactDTO:
+    """The Threllian Envoy contact from UI_MOCKUPS.md §6.
+
+    A friendly-band envoy of the Concord alliance: the dialogue is persona-voiced
+    and the verb menu is derived from params — treaty is greyed (conditional).
+    """
+    return AlienContactDTO(
+        species="Threllian Envoy",
+        disposition_filled=4,  # ████░ — high in the amity band
+        band="amity",
+        standing="friendly (base .72 +.06 you)",
+        alliance="Concord",
+        speech=[
+            '"Trader. Your hull still carries Sol\'s dust —',
+            ' welcome it. We have drives that would shame',
+            ' your little spindrive."',
+        ],
+        verbs=[
+            ContactVerb("1", "Browse tech offers"),
+            ContactVerb("2", "Barter an artifact"),
+            ContactVerb("3", "Ask about the region"),
+            ContactVerb("4", "Propose treaty", enabled=False, reason="conditional"),
+            ContactVerb("5", "Trade goods"),
+            ContactVerb("6", "Leave"),
+        ],
+        dossier=[
+            "[red]Kessrin[/]  hostile-lean",
+            '  [dim]"raiders; shoot 1st"[/]',
+            "[cyan]Federation[/]  ally of Core",
+            "Grudges: [green]none vs you[/]",
+            "Last tech: Tier-II",
+            "  [dim]turbine, screens[/]",
+        ],
+    )
+
+
+def sample_encounter() -> EncounterDTO:
+    """The Kessrin Raider pack from UI_MOCKUPS.md §7.
+
+    A hostile-band group that opens with violence (they detected the player's
+    drive-glow); the flee chance is shown clamped to the config floor (§10).
+    """
+    return EncounterDTO(
+        title="Kessrin Raider pack (x3)",
+        opener="they SHOOT FIRST",
+        disposition_filled=1,  # █░░░░ — deep in the hostile band
+        band="hostile",
+        detection="they spotted you",
+        taunt='"Sol-meat. Your drive-glow led us right to you."',
+        enemies=[
+            EnemyShip("Raider", 7, 70),
+            EnemyShip("Raider", 10, 99),
+            EnemyShip("Skiff", 4, 40),
+        ],
+        arc_hint="arc: ahead/spinal → strafe it",
+        shields_filled=4,
+        shields_pct=38,
+        hull_filled=7,
+        hull_pct=74,
+        combat_line="Combat spd 4 (-2 intcpt)",
+        integrity_flag="thrusters: 1 burner out",
+        round_no=3,
+        flee_chance=31,
+        flee_floor=10,
+    )
+
+
+def sample_messages() -> MessagesDTO:
+    """The messages & log from UI_MOCKUPS.md §11 (the durable event_log, §12)."""
+    return MessagesDTO(
+        events=[
+            LogEntry("day 4 · 09:12", "Stardock: interest accrued [green]+71 slips[/]"),
+            LogEntry("day 4 · 08:50", "Kessrin raid reported near Band-2 boundary"),
+            LogEntry(
+                "day 4 · 08:31",
+                "[magenta]*[/] Discovery logged: Crashed Ship (Uncommon)",
+            ),
+            LogEntry("day 3 · 22:04", 'Concord envoy: "Our drives await you, trader."'),
+            LogEntry("day 3 · 21:10", "Trade: sold 20 Fuel Ore @ 14 → [green]+280 slips[/]"),
         ],
     )
 

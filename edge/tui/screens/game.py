@@ -13,14 +13,20 @@ from edge.tui.dummy import (
     GameState,
     SectorDTO,
     sample_computer,
+    sample_contact,
+    sample_encounter,
     sample_engine_room,
     sample_map,
+    sample_messages,
     sample_port,
     sample_stardock_port,
 )
 from edge.tui.screens.computer import ComputerScreen
+from edge.tui.screens.contact import AlienContactScreen
+from edge.tui.screens.encounter import EncounterScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.map import MapScreen
+from edge.tui.screens.messages import MessagesScreen
 from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
@@ -31,6 +37,16 @@ from edge.tui.widgets import (
     WarpButton,
     WarpGrid,
 )
+
+
+# Ship-name keywords that mark a hostile (engaging one opens an encounter rather
+# than a peaceful contact). Skeleton heuristic; the real game reads disposition.
+_HOSTILE_SHIP_WORDS = ("marauder", "raider", "cabal", "pirate", "reaver", "kessrin")
+
+
+def _ship_dest(name: str) -> str:
+    low = name.lower()
+    return "encounter" if any(w in low for w in _HOSTILE_SHIP_WORDS) else "contact"
 
 
 class TopBar(Static):
@@ -112,7 +128,9 @@ class SectorView(Container):
         yield Static("Ships", classes="heading")
         if sec.ships:
             for s in sec.ships:
-                yield Static(f"  [white]>[/] {s}")
+                # Hailing a ship opens contact (friendly) or an encounter (hostile);
+                # the §1 ship rows are clickable affordances like planets/ports.
+                yield ClickableEntry(f"  [white]>[/] {s}", dest=_ship_dest(s))
         else:
             yield Static("  none")
 
@@ -128,6 +146,7 @@ class GameScreen(Screen):
         Binding("c", "computer", "Computer"),
         Binding("e", "engine_room", "Engine Room"),
         Binding("m", "map", "Map"),
+        Binding("g", "messages", "Log"),
         Binding("ctrl+q", "quit", "Quit"),
     ]
 
@@ -159,6 +178,10 @@ class GameScreen(Screen):
         match msg.dest:
             case "planet":
                 self.action_survey_planet()
+            case "contact":
+                self.app.push_screen(AlienContactScreen(sample_contact()))
+            case "encounter":
+                self.app.push_screen(EncounterScreen(sample_encounter()))
             case _:
                 self.action_dock_port()
 
@@ -191,3 +214,6 @@ class GameScreen(Screen):
 
     def action_map(self) -> None:
         self.app.push_screen(MapScreen(sample_map()))
+
+    def action_messages(self) -> None:
+        self.app.push_screen(MessagesScreen(sample_messages()))

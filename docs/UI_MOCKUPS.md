@@ -59,7 +59,7 @@ MainMenu -> Game -+- PortScreen
 ```
 
 Phase 1 builds: **MainMenu, Game, PortScreen, StarDockScreen, ComputerScreen,
-MapScreen**. The rest are Phase 2-3 (marked per screen).
+MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
 
 ---
 
@@ -125,7 +125,7 @@ MapScreen**. The rest are Phase 2-3 (marked per screen).
 ├──────────────────────────────────────────────────────────────────────┤
 │- arrive in Sector 7.   - Stardock detected.   - 287 turns left.      │
 ├──────────────────────────────────────────────────────────────────────┤
-│ P Dock  S Survey  C Computer  E Engine  M Map  ^q Quit               │
+│ P Dock  S Survey  C Computer  E Engine  M Map  G Log  ^q Quit        │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -173,7 +173,10 @@ text on the left, sprites in the right negative space):
   resolves to the **same destination as the `P` dock key**, so there is one way
   into a sector's trade UI: a StarDock port -> StarDockScreen (§5), where trading
   is the default **Commodities** tab; a plain commodities port -> PortScreen (§2);
-  a planet -> PlanetScreen (§3); then ships/beacons; a
+  a planet -> PlanetScreen (§3). **Ships are clickable too** — hailing one opens
+  AlienContactScreen (§6) for a friendly-band ship or EncounterScreen (§7) for a
+  hostile one (skeleton: by name keyword; the real game reads disposition). Then
+  beacons; a
   **`WarpGrid`** — a 3x3 grid with the **current sector pinned to the centre
   cell** (non-clickable `(7)`) and outbound warps in the eight cells around it
   (clickable, unexplored dimmed with `?`). TW2002 sectors warp to <= 6 others, so
@@ -190,7 +193,8 @@ text on the left, sprites in the right negative space):
   no command-line input; actions are keystrokes and mouse clicks (§11 grammar).
 - **Bindings** (§11): number keys = warp by sector; `P` dock port (§2),
   `S` survey planet (orbit view, §3), `C` computer (§9), `E` engine room (§8),
-  `M` galactic map (§10), `I` ship info, `^q` quit. Esc cancels a prompt.
+  `M` galactic map (§10), `G` messages & log (§11), `I` ship info, `^q` quit.
+  Clicking a ship row hails it (AlienContact §6 / Encounter §7). Esc cancels a prompt.
 - DESIGN: §11, §4 (aspects/holds), §4.1 (integrity line), §9 (turns).
 
 ---
