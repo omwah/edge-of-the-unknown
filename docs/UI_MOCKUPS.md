@@ -437,9 +437,12 @@ docking reaches an identical trade experience — only the container differs.
 ```
 
 - **Four subsystem panels** (`spindrive`/`thrusters`/`screens`/`main_gun`), each
-  a slot grid: keystone marked, filled `[+]`, empty `[ ]`, knocked-out `[!]`;
-  the **derived aspect** shown in each header (§4.1). The same screen renders an
-  orbital starbase (swap thrusters/spindrive for `fusion_reactor`, §4.2).
+  a slot grid on the left — keystone marked, filled `[+]`, empty `[ ]`,
+  knocked-out `[!]` — with a tall **representative ASCII icon** down the right
+  side (colour-keyed: warp cyan, thrust amber, shields blue, gun red —
+  `sprites.SUBSYSTEMS`); the **derived aspect** shown in each header (§4.1). The
+  same screen renders an orbital starbase (swap thrusters/spindrive for
+  `fusion_reactor`, §4.2).
 - **Global bonus**: Spindrive efficiency -> one combat buff, shown in the title
   bar (§4.1).
 - **Actions**: `[P]` field-patch (repair-kit, minimal function), `[I]` install
