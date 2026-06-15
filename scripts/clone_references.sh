@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Re-clone the TradeWars 2002 reference codebases analyzed for Edge of the Unknown.
-# Usage: ./clone_references.sh [target_dir]   (default: ./references)
+# Usage: ./scripts/clone_references.sh [target_dir]   (default: ./references)
 set -euo pipefail
+
+# Anchor to the repo root (this script lives in scripts/) so a relative target
+# dir — and the default ./references — lands at the repo root, not in scripts/.
+cd "$(dirname "$0")/.."
 
 DIR="${1:-references}"
 mkdir -p "$DIR" && cd "$DIR"

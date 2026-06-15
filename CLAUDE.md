@@ -127,7 +127,7 @@ deviation, update DESIGN.md in the same change and note the reason.
 ## Reference code (read-only)
 
 `references/` contains shallow clones of the analyzed codebases (recreate
-with `clone_references.sh` if absent). **Never modify these; they are for
+with `scripts/clone_references.sh` if absent). **Never modify these; they are for
 reading only. Never copy code from them verbatim** — they are inspiration
 and a source of constants/algorithms, and they carry assorted licenses
 (GPL-era code among them). Reimplement ideas cleanly.
