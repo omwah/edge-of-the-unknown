@@ -36,7 +36,7 @@ from edge.core.events import (
     Upgraded,
     Warped,
 )
-from edge.core.models import Player, Port, Ship, UniverseState
+from edge.core.models import Game, Player, Port, Ship, UniverseState
 from edge.core.movement import MovementError, can_warp
 
 # --- commands ---------------------------------------------------------------
@@ -95,6 +95,7 @@ class ReduceResult:
     players: tuple[Player, ...] = ()
     ships: tuple[Ship, ...] = ()
     ports: tuple[Port, ...] = ()
+    game: Game | None = None  # set by maintenance reducers (e.g. daily day-number bump)
 
 
 def apply_result(state: UniverseState, result: ReduceResult) -> None:
@@ -105,6 +106,8 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
         state.ships[ship.id] = ship
     for port in result.ports:
         state.ports[port.id] = port
+    if result.game is not None:
+        state.game = result.game
 
 
 # --- reducers ---------------------------------------------------------------
