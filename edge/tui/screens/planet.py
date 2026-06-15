@@ -12,11 +12,14 @@ from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from edge.tui.dummy import sample_surface
+from edge.tui.screens.surface import SurfaceScreen
+
 
 class PlanetScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Break orbit"),
-        Binding("d", "noop", "Descend"),
+        Binding("d", "descend", "Descend"),
         Binding("t", "noop", "Trade"),
         Binding("c", "noop", "Claim"),
     ]
@@ -59,6 +62,9 @@ class PlanetScreen(Screen):
 
     def action_back(self) -> None:
         self.app.pop_screen()
+
+    def action_descend(self) -> None:
+        self.app.push_screen(SurfaceScreen(sample_surface()))
 
     def action_noop(self) -> None:
         self.notify("Not wired in the skeleton.", timeout=2)

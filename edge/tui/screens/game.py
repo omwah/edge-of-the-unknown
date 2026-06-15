@@ -120,9 +120,9 @@ class SectorView(Container):
 class GameScreen(Screen):
     BINDINGS = [
         Binding("p", "dock_port", "Dock"),
+        Binding("s", "survey_planet", "Survey Planet"),
         Binding("c", "computer", "Computer"),
         Binding("m", "map", "Map"),
-        Binding("d", "redisplay", "Redisplay"),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -153,7 +153,7 @@ class GameScreen(Screen):
         # there is one way to reach a sector's trade UI (StarDock tab or plain port).
         match msg.dest:
             case "planet":
-                self.app.push_screen(PlanetScreen("Terra Nova"))
+                self.action_survey_planet()
             case _:
                 self.action_dock_port()
 
@@ -169,8 +169,14 @@ class GameScreen(Screen):
         else:
             self.app.push_screen(PortScreen(sample_port()))
 
-    def action_redisplay(self) -> None:
-        self._tick("[dim]· Redisplay.[/]")
+    def action_survey_planet(self) -> None:
+        planets = self._state.sector.planets
+        if not planets:
+            self._tick("[dim]· No planet to survey in this sector.[/]")
+            return
+        # The dummy label is "Name  type, climate"; the orbit view wants just the name.
+        name = planets[0].split("  ")[0].strip()
+        self.app.push_screen(PlanetScreen(name))
 
     def action_computer(self) -> None:
         self._tick("[dim]· Ship computer — not wired in the skeleton.[/]")

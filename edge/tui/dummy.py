@@ -103,6 +103,25 @@ class ShipDTO:
 
 
 @dataclass(frozen=True)
+class SurfaceSite:
+    """A discoverable surface site on a descended planet (UI_MOCKUPS.md §4)."""
+
+    marker: str  # "[1]", "[2]", "[?]" — keyed to the terrain map
+    name: str
+    rarity: str  # "Rare", "Uncommon", …
+    status: str  # "unexplored", "explored → ancient", "hidden"
+    payload: list[str] = field(default_factory=list)  # detail lines (markup ok)
+
+
+@dataclass(frozen=True)
+class SurfaceDTO:
+    planet: str
+    descent_fuel: str  # "n/a" in Phase 1 (movement costs turns, not fuel)
+    terrain: list[str]  # top-down ASCII map rows (markup ok)
+    sites: list[SurfaceSite] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class MapBand:
     """One distance band's column on the galactic map (UI_MOCKUPS.md §10)."""
 
@@ -188,6 +207,35 @@ def sample_port() -> PortDTO:
             CommodityLine("Fuel Ore", "BUY", 410, 1000, 13, 11, 20),
             CommodityLine("Organics", "SELL", 220, 1000, 6, 5, 12),
             CommodityLine("Equipment", "BUY", 580, 1000, 14, 15, 8),
+        ],
+    )
+
+
+def sample_surface() -> SurfaceDTO:
+    """The Terra Nova descent scene from UI_MOCKUPS.md §4."""
+    return SurfaceDTO(
+        planet="Terra Nova",
+        descent_fuel="n/a",
+        terrain=[
+            "[dim].[/] [green]^[/]    [red]*?[/]       [green]^^[/]",
+            "  [green]^^^[/]  [yellow][1][/]     [dim].[/]      [yellow]*[/]",
+            "[blue]~~~~~[/]   [green]^[/]     [yellow][2][/]    [green]^^^[/]",
+            "  [dim].[/]  [magenta]crashed-ship[/]    [blue]~~~~[/]",
+            "    [green]^^[/]     [dim].[/]       [dim].[/]",
+        ],
+        sites=[
+            SurfaceSite(
+                "[1]", "Ruined Spire", "Rare", "unexplored",
+                payload=["[red]ancient_tech ?[/]", "lore fragment"],
+            ),
+            SurfaceSite(
+                "[2]", "Crashed Ship", "Uncommon", "explored → ancient",
+                payload=["ancient drive (claimed)", "salvage cache"],
+            ),
+            SurfaceSite(
+                "[?]", "(hidden)", "?", "hidden",
+                payload=["needs a sensor sweep", "sensors Tier II"],
+            ),
         ],
     )
 
