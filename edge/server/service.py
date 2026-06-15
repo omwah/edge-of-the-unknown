@@ -18,7 +18,7 @@ from edge.core import dto
 from edge.core.config import GameConfig
 from edge.core.events import Event
 from edge.core.models import UniverseState
-from edge.core.rules import Command, apply_result, reduce
+from edge.core.rules import Command, ReduceResult, apply_result, reduce
 from edge.server import session
 from edge.store.repo import Repository
 from edge.store.snapshots import rebuild
@@ -59,6 +59,16 @@ class GameService:
         apply_result(self._state, result)
         return result.events
 
+    def apply_maintenance(self, result: ReduceResult) -> None:
+        """Apply an engine cron's result: upsert entities + persist its events.
+
+        Unlike `apply`, this records no command_log entry — maintenance is
+        time-driven, not a player action — only the resulting events.
+        """
+        apply_result(self._state, result)
+        for event in result.events:
+            self._repo.append_event(event)
+
     # --- read-only fog-of-war projections (§3) -------------------------------
 
     def game_view(self, player_id: int) -> dto.GameState:
@@ -77,3 +87,7 @@ class GameService:
     def state(self) -> UniverseState:
         """The authoritative state (engine/tests only — not for the TUI)."""
         return self._state
+
+    @property
+    def config(self) -> GameConfig:
+        return self._config

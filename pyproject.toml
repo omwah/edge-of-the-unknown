@@ -52,7 +52,7 @@ target-version = "py312"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["edge/core", "edge/bigbang", "edge/store", "edge/server"]
+files = ["edge/core", "edge/bigbang", "edge/store", "edge/server", "edge/engine"]
 plugins = ["pydantic.mypy"]
 
 # PyYAML ships no type stubs; the config loader treats parsed data as Any at the
