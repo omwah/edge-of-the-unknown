@@ -255,7 +255,7 @@ What each is for:
 
 ## Conventions
 
-- Python >= 3.12, `ruff` + `mypy --strict` on `core/` and `bigbang/`.
+- Python >= 3.12, `ruff` + `mypy --strict` on `core/`, `bigbang/`, and `store/`.
 - Tests: pytest + hypothesis. Property tests for economy invariants;
   golden-master replays of command logs against fixed seeds; bigbang
   validation across many seeds; Textual Pilot for UI flows.

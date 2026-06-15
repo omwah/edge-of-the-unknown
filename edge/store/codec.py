@@ -1,0 +1,129 @@
+"""(De)serialize commands and events to JSON-able payloads for the logs (§12).
+
+Commands round-trip (encode for persistence, decode for replay); events encode
+only — they are append-only facts the store never has to reconstruct into objects
+for Phase-1 replay (state comes from replaying the *command* log).
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from edge.core.enums import Commodity
+from edge.core.events import (
+    Banked,
+    Docked,
+    Event,
+    Haggled,
+    StockRegenerated,
+    Traded,
+    TurnsReset,
+    Upgraded,
+    Warped,
+)
+from edge.core.rules import (
+    BuyUpgrade,
+    Command,
+    Deposit,
+    Dock,
+    HaggleOffer,
+    Trade,
+    Warp,
+    Withdraw,
+)
+
+
+def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
+    """A (type tag, JSON-able payload) pair for a command."""
+    match command:
+        case Warp():
+            return "Warp", {"to_sector": command.to_sector}
+        case Dock():
+            return "Dock", {}
+        case Trade():
+            return "Trade", {
+                "commodity": command.commodity.value,
+                "units": command.units,
+                "unit_price": command.unit_price,
+            }
+        case HaggleOffer():
+            return "HaggleOffer", {
+                "commodity": command.commodity.value,
+                "units": command.units,
+                "counter_price": command.counter_price,
+            }
+        case Deposit():
+            return "Deposit", {"amount": command.amount}
+        case Withdraw():
+            return "Withdraw", {"amount": command.amount}
+        case BuyUpgrade():
+            return "BuyUpgrade", {}
+
+
+def decode_command(type_: str, payload: dict[str, Any]) -> Command:
+    """Reconstruct a command from its persisted (type, payload)."""
+    match type_:
+        case "Warp":
+            return Warp(to_sector=payload["to_sector"])
+        case "Dock":
+            return Dock()
+        case "Trade":
+            return Trade(
+                commodity=Commodity(payload["commodity"]),
+                units=payload["units"],
+                unit_price=payload["unit_price"],
+            )
+        case "HaggleOffer":
+            return HaggleOffer(
+                commodity=Commodity(payload["commodity"]),
+                units=payload["units"],
+                counter_price=payload["counter_price"],
+            )
+        case "Deposit":
+            return Deposit(amount=payload["amount"])
+        case "Withdraw":
+            return Withdraw(amount=payload["amount"])
+        case "BuyUpgrade":
+            return BuyUpgrade()
+        case _:
+            raise ValueError(f"unknown command type {type_!r}")
+
+
+def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
+    """A (type tag, JSON-able payload) pair for an event (persistence only)."""
+    match event:
+        case Warped():
+            return "Warped", {
+                "player_id": event.player_id, "from_sector": event.from_sector,
+                "to_sector": event.to_sector, "turn_cost": event.turn_cost,
+            }
+        case Docked():
+            return "Docked", {
+                "player_id": event.player_id, "sector_id": event.sector_id, "port_id": event.port_id,
+            }
+        case Traded():
+            return "Traded", {
+                "player_id": event.player_id, "port_id": event.port_id,
+                "commodity": event.commodity.value, "mode": event.mode.value,
+                "units": event.units, "unit_price": event.unit_price, "total": event.total,
+            }
+        case Haggled():
+            return "Haggled", {
+                "player_id": event.player_id, "port_id": event.port_id,
+                "commodity": event.commodity.value, "status": event.status, "price": event.price,
+            }
+        case Banked():
+            return "Banked", {
+                "player_id": event.player_id, "kind": event.kind,
+                "amount": event.amount, "balance": event.balance,
+            }
+        case Upgraded():
+            return "Upgraded", {"player_id": event.player_id, "aspect": event.aspect, "cost": event.cost}
+        case TurnsReset():
+            return "TurnsReset", {"player_id": event.player_id, "turns": event.turns}
+        case StockRegenerated():
+            return "StockRegenerated", {
+                "port_id": event.port_id, "commodity": event.commodity.value, "new_stock": event.new_stock,
+            }
+        case _:
+            raise ValueError(f"unknown event type {type(event).__name__}")
