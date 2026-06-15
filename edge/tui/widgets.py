@@ -162,13 +162,16 @@ class StatusSidebar(Static):
         lines += [
             f"[green]subsystems: {s.integrity}[/]",
             rule,
+            f"Gun [green]{s.gun}[/]  Missiles x{s.missiles}",
+            f"Kits x{s.kits}",
+            rule,
             f"Holds {s.holds_used}/{s.holds_total}",
         ]
         for h in s.holds:
             lines.append(f" {h.label:<5}[yellow]{_scaled_bar(h.qty, h.capacity)}[/] {h.qty:>3}")
         lines += [
-            f"Gun [green]{s.gun}[/]  Missiles x{s.missiles}  Kits x{s.kits}",
             f"Latinum  [b yellow]{s.latinum:,}[/] gpl",
+            rule,
             f"Band {s.band}",
             "[dim]region:[/]",
         ]
