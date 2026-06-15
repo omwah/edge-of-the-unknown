@@ -95,24 +95,24 @@ MapScreen**. The rest are Phase 2-3 (marked per screen).
 │ CORE SPACE - Sector 7           │ S.S. Wayfarer  (Trailblazer)       │
 │ ░▒▓ the lanes hum w/ traffic ▓▒░│ -----------------------------      │
 │                                 │ Shields  ████████░░  82%           │
-│ Ports                           │ Warp     ███░░░░░░░   3            │
-│  »P Stardock - Class 0 (Spec.)  │ Combat   ████░░░░░░   4            │
+│ Planets                         │ Warp     ███░░░░░░░   3            │
+│  »@ Terra Nova terrestrial,warm │ Combat   ████░░░░░░   4            │
 │                                 │ Cloak    ░░░░░░░░░░  off           │
-│ Planets                         │ Sensors  ██████░░░░  Tier II       │
-│  »@ Terra Nova terrestrial,warm │ subsystems: all nominal            │
-│     # orbital starbase (Fed)    │ -----------------------------      │
+│ Ports                           │ Sensors  ██████░░░░  Tier II       │
+│  »P Stardock - Class 0          │ subsystems: all nominal            │
+│                                 │ -----------------------------      │
 │                                 │ Holds 40/60                        │
 │ Beacons                         │  Fuel  ████████░░░░  20            │
 │   ! "Welcome to Sol"            │  Org   ████░░░░░░░░  12            │
 │                                 │  Equ   ██░░░░░░░░░░   8            │
 │ Ships                           │ Gun [+]  Missiles x3  Kits x2      │
-│   none                          │ Latinum  14,250 gpl                │
-│                                 │ Band 0 - Core                      │
-│ Warps                           │ region:                            │
-│  1<    3/Sol  6>                │   (3) (6)                          │
-│  8?    (7)    12?               │     \ /                            │
-│                                 │  (1)-(7)                           │
-│                                 │     / \                            │
+│  > Kestrel  free trader         │ Latinum  14,250 gpl                │
+│  > Cabal Marauder               │ Band 0 - Core                      │
+│  > Verdani escort               │ region:                            │
+│                                 │   (3) (6)                          │
+│ Warps                           │     \ /                            │
+│  1<    3/Sol  6>                │  (1)-(7)                           │
+│  8?    (7)    12?               │     / \                            │
 │                                 │   (8) (12)                         │
 ├──────────────────────────────────────────────────────────────────────┤
 │- arrive in Sector 7.   - Stardock detected.   - 287 turns left.      │
@@ -121,10 +121,46 @@ MapScreen**. The rest are Phase 2-3 (marked per screen).
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+The sector view carries a **dim ASCII scene** behind the text (the narrow
+wireframe cell above can't show it; at the true 2/3 width it looks like this —
+text on the left, sprites in the right negative space):
+
+```
+ CORE SPACE - Sector 7
+ ░▒▓ the lanes hum w/ traffic ▓▒░       .-~~~-.
+                                      .'~ .o. ~'.
+ Planets                             / .o~   ~o. \
+  »@ Terra Nova terrestrial,warm     : ~  .O.  ~ :
+                                     \ ~o.   .o~ /
+ Ports                                '.~ .o. ~.'
+  »P Stardock - Class 0                 '-~~~-'
+                                       =[#####]=
+ Beacons                             =[#o#o#o#]=
+   ! "Welcome to Sol"                 =[#####]=
+                                          ___
+ Ships                                   [===]=>
+   > Kestrel  free trader                  <+=-
+   > Cabal Marauder                       ___
+   > Verdani escort                      <##==>
+
+ Warps
+  1<   3/Sol  6>
+  8?   (7)    12?
+```
+
+- **Sector scene (background)**: a `SectorScene(Static)` on a lower `scene`
+  **layer** composites dim sprites — sized **planet > port > ship** — into a
+  character grid anchored to the right edge; the interface text rides above on a
+  `content` layer kept to the left ~60% (`overflow-x: hidden`), so **art and text
+  never share a cell** (a terminal cell holds one glyph; transparent overlay does
+  not blend — verified). Sprites are a config-style asset library keyed by type
+  (`edge/tui/sprites.py`: `planet_type` / port class / ship role), selected from
+  the DTO. Below the floor width the scene is suppressed so it never crowds text.
 - **Left 2/3 — sector view**: region + sector header; ANSI-art flavor line
-  (`Static`); then five **bold, consistently-coloured section headers** (Ports,
-  Planets, Ships, Beacons, Warps — the `.heading` style, `$secondary`) each above
-  its values with a blank-line gap between sections; ports and planets are
+  (`Static`); then five **bold, consistently-coloured section headers** (Planets,
+  Ports, Beacons, Ships, Warps — the `.heading` style, `$secondary`; planets lead
+  so the text order matches the scene's planet-above-port sprites) each above
+  its values with a blank-line gap between sections; planets and ports are
   **clickable rows** (`»` prefix) that open the matching screen — a Stardock port
   -> StarDockScreen (§5), a trade port -> PortScreen (§2), a planet ->
   PlanetScreen (§3); then ships/beacons; a

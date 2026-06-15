@@ -148,9 +148,9 @@ def sample_state() -> GameState:
         sector_id=7,
         flavor="the lanes hum with traffic",
         beacon='"Welcome to Sol"',
-        ports=["Stardock - Class 0 (Special)"],
-        planets=["Terra Nova  terrestrial, warm  + orbital starbase (Fed)"],
-        ships=[],
+        ports=["Stardock - Class 0"],
+        planets=["Terra Nova  terrestrial, warm"],
+        ships=["Kestrel  free trader", "Cabal Marauder", "Verdani escort"],
         warps=[
             WarpDTO(1, "<"),
             WarpDTO(3, "/", "Sol"),

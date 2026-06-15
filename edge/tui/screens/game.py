@@ -5,14 +5,20 @@ from __future__ import annotations
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, RichLog, Static
 
-from edge.tui.dummy import GameState
+from edge.tui.dummy import GameState, SectorDTO
 from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.stardock import StarDockScreen
-from edge.tui.widgets import ClickableEntry, StatusSidebar, WarpButton, WarpGrid
+from edge.tui.widgets import (
+    ClickableEntry,
+    SectorScene,
+    StatusSidebar,
+    WarpButton,
+    WarpGrid,
+)
 
 
 class TopBar(Static):
@@ -34,11 +40,22 @@ class TopBar(Static):
         return Text.assemble(left, ("  ", ""), right)
 
 
-class SectorView(VerticalScroll):
+class SectorView(Container):
+    # An ASCII scene (planets/ports/ships) is drawn on the `scene` layer; the
+    # interface text rides above it on the `content` layer. The content scroll is
+    # transparent and its rows are narrow/left-aligned, so the scene shows through
+    # the right-hand negative space without art and text ever sharing a cell.
     DEFAULT_CSS = """
-    SectorView { width: 2fr; padding: 0 1; }
+    SectorView { width: 2fr; layers: scene content; background: transparent; }
+    SectorView SectorScene { layer: scene; }
+    SectorView #sector-text {
+        layer: content; width: 60%; height: 1fr;
+        padding: 0 1; overflow-x: hidden; background: transparent;
+    }
+    SectorView #sector-text > Static, SectorView #sector-text > ClickableEntry {
+        width: auto; background: transparent;
+    }
     SectorView #flavor { color: $text-muted; text-style: italic; }
-    SectorView #contents { margin: 1 0; }
     SectorView .heading { color: $secondary; text-style: bold; }
     SectorView .spacer { height: 1; }
     """
@@ -49,8 +66,21 @@ class SectorView(VerticalScroll):
 
     def compose(self) -> ComposeResult:
         sec = self._state.sector
+        yield SectorScene(sec)
+        with VerticalScroll(id="sector-text"):
+            yield from self._content(sec)
+
+    def _content(self, sec: SectorDTO) -> ComposeResult:
         yield Static(f"[b cyan]{sec.region} - Sector {sec.sector_id}[/]", id="title")
         yield Static(f"░▒▓ {sec.flavor} ▓▒░", id="flavor")
+
+        yield Static("", classes="spacer")
+        yield Static("Planets", classes="heading")
+        if sec.planets:
+            for p in sec.planets:
+                yield ClickableEntry(f"  [green]@[/] {p}", dest="planet")
+        else:
+            yield Static("  none")
 
         yield Static("", classes="spacer")
         yield Static("Ports", classes="heading")
@@ -63,20 +93,16 @@ class SectorView(VerticalScroll):
             yield Static("  none")
 
         yield Static("", classes="spacer")
-        yield Static("Planets", classes="heading")
-        if sec.planets:
-            for p in sec.planets:
-                yield ClickableEntry(f"  [green]@[/] {p}", dest="planet")
-        else:
-            yield Static("  none")
-
-        yield Static("", classes="spacer")
         if sec.beacon:
             yield Static("Beacons", classes="heading")
             yield Static(f"  [yellow]![/] {sec.beacon}")
             yield Static("", classes="spacer")
         yield Static("Ships", classes="heading")
-        yield Static(f"  {', '.join(sec.ships) or 'none'}")
+        if sec.ships:
+            for s in sec.ships:
+                yield Static(f"  [white]>[/] {s}")
+        else:
+            yield Static("  none")
 
         yield Static("", classes="spacer")
         yield Static("Warps", classes="heading")
