@@ -9,8 +9,9 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, RichLog, Static
 
-from edge.tui.dummy import GameState, SectorDTO
+from edge.tui.dummy import GameState, SectorDTO, sample_port, sample_stardock_port
 from edge.tui.screens.planet import PlanetScreen
+from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
 from edge.tui.widgets import (
     ClickableEntry,
@@ -111,7 +112,7 @@ class SectorView(Container):
 
 class GameScreen(Screen):
     BINDINGS = [
-        Binding("p", "dock_port", "Port"),
+        Binding("p", "dock_port", "Dock"),
         Binding("c", "computer", "Computer"),
         Binding("g", "map", "Map"),
         Binding("d", "redisplay", "Redisplay"),
@@ -141,16 +142,25 @@ class GameScreen(Screen):
         self._tick(f"[cyan]» Plotting warp to Sector {msg.sector_id}…[/]")
 
     def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
+        # Clicking a port resolves to the same destination as the Dock hotkey, so
+        # there is one way to reach a sector's trade UI (StarDock tab or plain port).
         match msg.dest:
-            case "stardock":
-                self.app.push_screen(StarDockScreen("Sol"))
             case "planet":
                 self.app.push_screen(PlanetScreen("Terra Nova"))
             case _:
-                self.app.push_screen("port")
+                self.action_dock_port()
 
     def action_dock_port(self) -> None:
-        self.app.push_screen("port")
+        ports = self._state.sector.ports
+        if not ports:
+            self._tick("[dim]· No port to dock with in this sector.[/]")
+            return
+        # A StarDock opens the services hub (trading is its Commodities tab); a
+        # plain commodities port opens the standalone trade screen.
+        if "Stardock" in ports[0]:
+            self.app.push_screen(StarDockScreen("Sol", sample_stardock_port()))
+        else:
+            self.app.push_screen(PortScreen(sample_port()))
 
     def action_redisplay(self) -> None:
         self._tick("[dim]· Redisplay.[/]")

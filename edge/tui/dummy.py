@@ -163,7 +163,7 @@ def sample_state() -> GameState:
 
 
 def sample_port() -> PortDTO:
-    """The Sol Exchange trade screen from UI_MOCKUPS.md §2."""
+    """The Sol Exchange trade screen from UI_MOCKUPS.md §2 (a plain port)."""
     return PortDTO(
         name="Sol Exchange",
         klass="Class 4 (BBS)",
@@ -172,5 +172,22 @@ def sample_port() -> PortDTO:
             CommodityLine("Fuel Ore", "BUY", 410, 1000, 13, 11, 20),
             CommodityLine("Organics", "SELL", 220, 1000, 6, 5, 12),
             CommodityLine("Equipment", "BUY", 580, 1000, 14, 15, 8),
+        ],
+    )
+
+
+def sample_stardock_port() -> PortDTO:
+    """The StarDock's own commodities counter (its Commodities tab, §5).
+
+    A StarDock sells all three goods (Class 0), so every line is a SELL.
+    """
+    return PortDTO(
+        name="Sol StarDock",
+        klass="Class 0 (StarDock)",
+        sector_id=7,
+        commodities=[
+            CommodityLine("Fuel Ore", "SELL", 880, 1000, 12, 11, 20),
+            CommodityLine("Organics", "SELL", 760, 1000, 6, 5, 12),
+            CommodityLine("Equipment", "SELL", 820, 1000, 15, 15, 8),
         ],
     )

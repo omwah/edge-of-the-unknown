@@ -43,7 +43,7 @@ flourishes.
 ```
 MainMenu -> Game -+- PortScreen
                   +- PlanetScreen -> SurfaceScreen
-                  +- StarDockScreen   (tabs: Shipyard . Hardware . Bank . Tavern)
+                  +- StarDockScreen   (tabs: Commodities . Shipyard . Hardware . Bank . Tavern)
                   +- AlienContactScreen
                   +- EncounterScreen
                   +- EngineRoomScreen
@@ -161,9 +161,11 @@ text on the left, sprites in the right negative space):
   Ports, Beacons, Ships, Warps — the `.heading` style, `$secondary`; planets lead
   so the text order matches the scene's planet-above-port sprites) each above
   its values with a blank-line gap between sections; planets and ports are
-  **clickable rows** (`»` prefix) that open the matching screen — a Stardock port
-  -> StarDockScreen (§5), a trade port -> PortScreen (§2), a planet ->
-  PlanetScreen (§3); then ships/beacons; a
+  **clickable rows** (`»` prefix) that open the matching screen — clicking a port
+  resolves to the **same destination as the `P` dock key**, so there is one way
+  into a sector's trade UI: a StarDock port -> StarDockScreen (§5), where trading
+  is the default **Commodities** tab; a plain commodities port -> PortScreen (§2);
+  a planet -> PlanetScreen (§3); then ships/beacons; a
   **`WarpGrid`** — a 3x3 grid with the **current sector pinned to the centre
   cell** (non-clickable `(7)`) and outbound warps in the eight cells around it
   (clickable, unexplored dimmed with `?`). TW2002 sectors warp to <= 6 others, so
@@ -186,6 +188,11 @@ text on the left, sprites in the right negative space):
 ---
 
 ## 2. PortScreen  *(Phase 1)* — trading + haggling
+
+The trade UI is a reusable widget (`TradePanel`): the standalone `PortScreen`
+below wraps it for a **plain commodities port**, and the StarDock embeds the same
+widget as its **Commodities** tab (§5). So whether or not a port is a StarDock,
+docking reaches an identical trade experience — only the container differs.
 
 ```
 ┌─ TRADEPORT . Sol Exchange . Class 4 (BBS) ──────────────── Sector 3 ─┐
@@ -290,7 +297,7 @@ text on the left, sprites in the right negative space):
 
 ```
 ┌─ STARDOCK . Sol ─────────────────────────────────────────────────────┐
-│ [ Shipyard ][ Hardware ][ Bank ][ Tavern ]                           │
+│ [ Commodities ][ Shipyard ][ Hardware ][ Bank ][ Tavern ]            │
 ├──────────────────────────────────────────────────────────────────────┤
 │  HARDWARE EMPORIUM                          Latinum 14,250           │
 │                                                                      │
@@ -310,9 +317,11 @@ text on the left, sprites in the right negative space):
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Tabs**: `TabbedContent` — **Shipyard** (buy/sell hulls, §4), **Hardware**
-  (components + consumables, the upgrade sink, §8), **Bank** (deposit/withdraw,
-  interest, §8), **Tavern** (rumors/contracts, Phase 5).
+- **Tabs**: `TabbedContent` — **Commodities** (the default: the §2 `TradePanel`,
+  so a StarDock trades through a tab rather than a separate screen), **Shipyard**
+  (buy/sell hulls, §4), **Hardware** (components + consumables, the upgrade sink,
+  §8), **Bank** (deposit/withdraw, interest, §8), **Tavern** (rumors/contracts,
+  Phase 5).
 - **Hardware tab** (shown): component list with tech tier + price; Tier II marks
   barter; Tier III is discovery/barter only and won't appear for straight cash
   (§8 constants). `[Install]` opens a slot picker in the Engine room (§8 below).
