@@ -17,6 +17,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from edge.core.enums import Commodity
+
 _FROZEN = ConfigDict(frozen=True, extra="forbid")
 
 
@@ -28,6 +30,16 @@ class CommodityPricing(BaseModel):
     base: float  # undisturbed per-unit price in latinum
     delta: float  # how far price swings with stock
     elasticity: float = 1.0  # multiplies the swing (per-commodity tunable)
+
+
+class HagglingConfig(BaseModel):
+    """The haggling mini-game's tunables (DESIGN §8)."""
+
+    model_config = _FROZEN
+
+    insult_frac: float = 0.30  # counter better-for-player than fair by > this aborts
+    max_rejections: int = 2  # rejections that end negotiation at the port's price
+    history_penalty: float = 0.08  # acceptance drop per recent attempt at this port
 
 
 class EconomyConfig(BaseModel):
@@ -58,6 +70,16 @@ class EconomyConfig(BaseModel):
     regen_fraction: float = 0.05  # stock moves 5% toward desired each econ tick
     desired_stock_frac_standard: float = 0.50
     desired_stock_frac_stardock: float = 0.90
+
+    haggling: HagglingConfig = HagglingConfig()
+
+    def pricing(self, commodity: Commodity) -> CommodityPricing:
+        """The pricing inputs for one commodity."""
+        return {
+            Commodity.FUEL_ORE: self.fuel_ore,
+            Commodity.ORGANICS: self.organics,
+            Commodity.EQUIPMENT: self.equipment,
+        }[commodity]
 
 
 class DistanceBand(BaseModel):
