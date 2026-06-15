@@ -30,12 +30,12 @@ class SurfaceScreen(Screen):
         dock: top; height: 1; background: $primary; color: $background;
         text-style: bold; padding: 0 1;
     }
-    SurfaceScreen #surface-top { height: auto; padding: 1 1; }
+    SurfaceScreen #surface-top { height: 12; padding: 1 1; }
     SurfaceScreen #terrain {
-        width: 3fr; height: auto; border: round $primary; padding: 0 1;
+        width: 3fr; height: 1fr; border: round $primary; padding: 0 1;
     }
     SurfaceScreen #site-detail {
-        width: 2fr; height: auto; border: round $secondary; padding: 0 1;
+        width: 2fr; height: 1fr; border: round $secondary; padding: 0 1;
         margin-left: 1;
     }
     SurfaceScreen #sites { height: auto; max-height: 8; margin: 0 1; }
