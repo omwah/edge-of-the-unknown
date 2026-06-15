@@ -15,9 +15,14 @@ pixel-exact spacing is not.
   region → widget, key bindings, data source, and the DESIGN.md section it realizes.
 - Tokens in `[ ]` are clickable affordances **and** key bindings (§11 grammar:
   every keystroke action also has a mouse affordance).
-- The wireframes use **ASCII plus block-bar glyphs only** (`█`/`░`), so the
-  borders stay aligned in any monospace renderer — the final Textual UI uses the
-  richer `tw2002` glyph set and CSS fractional widths, not these fixed columns.
+- **This document is ASCII-only** (plus the block-bar glyphs `█`/`░`), so the
+  borders and columns stay aligned in any monospace markdown renderer — wider or
+  ambiguous-width unicode breaks that alignment. This constraint binds *the doc
+  only*: wherever an annotation says **"ASCII art"** (scene sprites, planet art,
+  subsystem icons, …), the **Textual UI is free to use the richer unicode glyph
+  set** — the `tw2002` CP437/box-drawing set, block shapes, arrows, etc. — and CSS
+  fractional widths, not these fixed ASCII columns. When a TUI asset uses unicode,
+  this doc shows its ASCII transliteration instead (e.g. the §8 subsystem icons).
 
 ### Glyph legend (wireframes)
 
