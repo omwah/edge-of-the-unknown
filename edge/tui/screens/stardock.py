@@ -1,7 +1,10 @@
 """StarDockScreen — services hub (UI_MOCKUPS.md §5).
 
-Phase-1 shell: the four tabs exist; only Hardware is populated. The component
-list mirrors the §5 wireframe and the §8 economy constants.
+Phase-1 shell: the tabs exist; only Commodities and Hardware are populated.
+Trading lives in the **Commodities** tab (the default), which reuses the same
+`TradePanel` as the standalone `PortScreen` — so docking at a StarDock reaches
+the trade UI through a tab rather than a separate screen. The component list
+mirrors the §5 wireframe and the §8 economy constants.
 """
 
 from __future__ import annotations
@@ -10,6 +13,9 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
+
+from edge.tui.dummy import PortDTO
+from edge.tui.widgets import TradePanel
 
 
 class StarDockScreen(Screen):
@@ -36,13 +42,16 @@ class StarDockScreen(Screen):
         ("navigator (keystone)", "I", "2,000", "[Install]"),
     ]
 
-    def __init__(self, location: str) -> None:
+    def __init__(self, location: str, port: PortDTO) -> None:
         super().__init__()
         self._location = location
+        self._port = port
 
     def compose(self) -> ComposeResult:
         yield Static(f"STARDOCK · {self._location}", id="dock-title")
-        with TabbedContent(initial="hardware"):
+        with TabbedContent(initial="trade"):
+            with TabPane("Commodities", id="trade"):
+                yield TradePanel(self._port, show_title=False)
             with TabPane("Shipyard", id="shipyard"):
                 yield Static("[dim]Hull sales — not wired in the skeleton.[/]")
             with TabPane("Hardware", id="hardware"):

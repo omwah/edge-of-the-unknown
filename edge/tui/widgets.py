@@ -5,12 +5,13 @@ from __future__ import annotations
 import random
 
 from rich.text import Text
-from textual.containers import Grid
+from textual.app import ComposeResult
+from textual.containers import Grid, Vertical
 from textual.message import Message
-from textual.widgets import Button, Static
+from textual.widgets import Button, DataTable, Static
 
 from edge.tui import sprites
-from edge.tui.dummy import SectorDTO, ShipDTO, WarpDTO
+from edge.tui.dummy import PortDTO, SectorDTO, ShipDTO, WarpDTO
 
 
 class Starfield(Static):
@@ -75,6 +76,67 @@ def bar(filled: int, total: int = 10) -> str:
 def _scaled_bar(qty: int, capacity: int, width: int = 12) -> str:
     filled = round(qty / capacity * width) if capacity else 0
     return bar(filled, width)
+
+
+class HagglePanel(Static):
+    DEFAULT_CSS = """
+    HagglePanel {
+        border: round $secondary; padding: 0 1; margin: 1 0; height: auto;
+    }
+    """
+
+    def render(self) -> str:
+        return (
+            "[b]Haggle: Sell Fuel Ore[/]\n"
+            "Quote:  13/u  x  20 units  =  [yellow]260 gpl[/]\n"
+            "Your counter: ( [b]15[/] )/u    fair ~ 13    [green]likely[/]\n"
+            'Round 1 of 2   · "Hah, 14 and not a slip more."\n'
+            "[b]\\[A][/]ccept quote   [b]\\[O][/]ffer counter   [b]\\[Esc][/] walk away"
+        )
+
+
+class TradePanel(Vertical):
+    """The commodities trade UI: live pricing table + a haggle stub.
+
+    Reusable as the body of the standalone `PortScreen` (a plain commodities
+    port) or as the **Commodities** tab of a `StarDockScreen` — so docking at a
+    port reaches one trade UI regardless of whether the port is a StarDock
+    (UI_MOCKUPS.md §2/§5). `show_title` is suppressed inside the StarDock tab,
+    where the screen already carries a banner.
+    """
+
+    DEFAULT_CSS = "TradePanel { height: auto; }"
+
+    def __init__(self, port: PortDTO, *, show_title: bool = True, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._port = port
+        self._show_title = show_title
+
+    def compose(self) -> ComposeResult:
+        p = self._port
+        if self._show_title:
+            yield Static(
+                f"[b cyan]TRADEPORT · {p.name} · {p.klass}[/]"
+                f"      [dim]Sector {p.sector_id}[/]",
+                id="port-title",
+            )
+        yield DataTable(id="commodities", zebra_stripes=True, cursor_type="row")
+        yield HagglePanel()
+        yield Static(
+            "[dim]^ port buys from you (you SELL)   v port sells to you (you BUY)[/]\n"
+            "Latinum [yellow]14,250[/]   ·   [b]Q[/]uick-trade off   ·   [b]Esc[/] leave dock",
+            id="port-footer",
+        )
+
+    def on_mount(self) -> None:
+        table = self.query_one("#commodities", DataTable)
+        table.add_columns("Commodity", "They", "Stock", "Price/u", "You", "Action")
+        for c in self._port.commodities:
+            stock = f"{bar(round(c.stock_ratio * 9), 9)} {round(c.stock_ratio * 100):>2}%"
+            action = "[b]Sell[/]" if c.mode == "BUY" else "[b]Buy[/]"
+            table.add_row(
+                c.name, c.mode, stock, f"{c.price} {c.trend}", str(c.player_qty), action
+            )
 
 
 class StatusSidebar(Static):
