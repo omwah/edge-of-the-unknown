@@ -117,7 +117,7 @@ MapScreen**. The rest are Phase 2-3 (marked per screen).
 ├──────────────────────────────────────────────────────────────────────┤
 │- arrive in Sector 7.   - Stardock detected.   - 287 turns left.      │
 ├──────────────────────────────────────────────────────────────────────┤
-│ P Dock   C Computer   M Map   D Redisplay   Q Quit                   │
+│ P Dock   S Survey   C Computer   M Map   Q Quit                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -181,8 +181,8 @@ text on the left, sprites in the right negative space):
   (`Footer`) listing the active key bindings as a persistent reminder — there is
   no command-line input; actions are keystrokes and mouse clicks (§11 grammar).
 - **Bindings** (§11): number keys = warp by sector; `P` dock port (§2),
-  `L` land planet (§3), `D` redisplay, `C` computer (§9), `M` galactic map (§10),
-  `I` ship info, `Q` quit. Esc cancels a prompt.
+  `S` survey planet (orbit view, §3), `C` computer (§9),
+  `M` galactic map (§10), `I` ship info, `Q` quit. Esc cancels a prompt.
 - DESIGN: §11, §4 (aspects/holds), §4.1 (integrity line), §9 (turns).
 
 ---
@@ -283,10 +283,12 @@ docking reaches an identical trade experience — only the container differs.
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+- **Reached** from PlanetScreen's `[D]` Descend (§3); `[Esc]` ascends to orbit.
 - **Terrain panel**: simple top-down `Static` map; site markers `[n]`, hidden
   sites shown as `*?` only after a successful sensor sweep.
-- **Site detail**: selected site's kind, rarity tier, status, and (post-explore)
-  payload — tech item / latinum / lore fragment (§7 Discovery).
+- **Site detail**: the highlighted site's kind, rarity tier, status, and
+  (post-explore) payload — tech item / latinum / lore fragment (§7 Discovery);
+  driven by `DataTable` row highlighting.
 - **Site list**: `DataTable`/`ListView`; `[S]` sensor sweep reveals hidden finds
   (sensor-rating check, §7/§10 detection); `[L]` logs to the codex.
 - DESIGN: §7 (discovery kinds/rarity/hidden), §4.2 (surface_sites).
