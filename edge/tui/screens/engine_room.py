@@ -18,15 +18,6 @@ from textual.widgets import Footer, Static
 from edge.tui import sprites
 from edge.tui.dummy import EngineRoomDTO, Subsystem
 
-# A representative colour for each subsystem's icon (warp = cyan, thrust = amber,
-# shields = blue, weapon = red), keyed by the DTO subsystem name.
-_ICON_COLOR = {
-    "SPINDRIVE": "cyan",
-    "THRUSTERS": "yellow",
-    "SCREENS": "blue",
-    "MAIN GUN": "red",
-}
-
 
 class _SubsystemPanel(Horizontal):
     """One subsystem: slot list on the left, a vertical icon down the right side;
@@ -50,7 +41,7 @@ class _SubsystemPanel(Horizontal):
         # Colour the icon via an inline style rather than wrapping the art in
         # markup, so the glyphs are rendered verbatim (no markup escaping).
         icon = Static("\n".join(sprites.pick_subsystem(self._system.name)), classes="icon")
-        icon.styles.color = _ICON_COLOR.get(self._system.name, "cyan")
+        icon.styles.color = sprites.SUBSYSTEM_COLORS.get(self._system.name, "cyan")
         yield icon
 
     def on_mount(self) -> None:

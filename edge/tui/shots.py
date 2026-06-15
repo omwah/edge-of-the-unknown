@@ -8,9 +8,20 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from textual.widgets import TabbedContent
+
 from edge.tui.app import EdgeApp
 
 OUT = Path("docs/ui/shots")
+
+# Sprite-gallery tabs to capture, each to its own SVG: (TabPane id, file stem).
+_GALLERY_TABS = [
+    ("planets", "gallery-planets"),
+    ("orbit", "gallery-orbit"),
+    ("ports", "gallery-ports"),
+    ("ships", "gallery-ships"),
+    ("subsystems", "gallery-subsystems"),
+]
 
 
 async def _capture() -> None:
@@ -67,9 +78,25 @@ async def _capture() -> None:
         await pilot.press("e")
         await pilot.pause()
         app.save_screenshot(filename="engine-room.svg", path=str(OUT))
+
+    # The secret sprite gallery is a TabbedContent (one category per tab), so the
+    # running app reaches it via the hidden "~" Main Menu key. Capture every tab
+    # in turn so the PDF handout shows all asset categories, not just the default.
+    gal = EdgeApp()
+    async with gal.run_test(size=(100, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("~")  # Main Menu -> SpriteGalleryScreen
+        await pilot.pause()
+        tabs = gal.screen.query_one(TabbedContent)
+        for tab_id, stem in _GALLERY_TABS:
+            tabs.active = tab_id
+            await pilot.pause()
+            gal.save_screenshot(filename=f"{stem}.svg", path=str(OUT))
+
+    gallery_stems = ", ".join(stem for _, stem in _GALLERY_TABS)
     print(
         "wrote main-menu, game, stardock, port, planet, surface, map, computer, "
-        f"engine-room .svg to {OUT}"
+        f"engine-room, {gallery_stems} .svg to {OUT}"
     )
 
 

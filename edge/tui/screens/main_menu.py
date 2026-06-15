@@ -10,6 +10,7 @@ from textual.widgets import Button, Static
 
 from edge.tui.dummy import sample_state
 from edge.tui.screens.game import GameScreen
+from edge.tui.screens.sprites_gallery import SpriteGalleryScreen
 from edge.tui.widgets import Starfield
 
 _BANNER = r"""
@@ -34,6 +35,8 @@ class MainMenuScreen(Screen):
         Binding("l", "unavailable", "Load"),
         Binding("o", "unavailable", "Options"),
         Binding("q", "quit_app", "Quit"),
+        # Secret: open the sprite gallery (dev preview). Unadvertised.
+        Binding("~", "gallery", "Sprite gallery", show=False),
     ]
 
     def compose(self) -> ComposeResult:
@@ -60,6 +63,9 @@ class MainMenuScreen(Screen):
 
     def action_new_game(self) -> None:
         self.app.push_screen(GameScreen(sample_state()))
+
+    def action_gallery(self) -> None:
+        self.app.push_screen(SpriteGalleryScreen())
 
     def action_unavailable(self) -> None:
         self.notify("Not wired in the skeleton.", timeout=2)
