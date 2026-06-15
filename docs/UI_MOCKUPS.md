@@ -150,9 +150,9 @@ text on the left, sprites in the right negative space):
 
 - **Sector scene (background)**: a `SectorScene(Static)` on a lower `scene`
   **layer** composites dim sprites — sized **planet > port > ship** — into a
-  character grid anchored to the right edge; the interface text rides above on a
-  `content` layer kept to the left ~60% (`overflow-x: hidden`), so **art and text
-  never share a cell** (a terminal cell holds one glyph; transparent overlay does
+  character grid, each **centred within the art region** (the right span left
+  clear by the text); the interface text rides above on a `content` layer kept to
+  the left ~60% (`overflow-x: hidden`), so **art and text never share a cell** (a terminal cell holds one glyph; transparent overlay does
   not blend — verified). Sprites are a config-style asset library keyed by type
   (`edge/tui/sprites.py`: `planet_type` / port class / ship role), selected from
   the DTO. Below the floor width the scene is suppressed so it never crowds text.
