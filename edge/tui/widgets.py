@@ -118,11 +118,11 @@ class SectorScene(Static):
     """A dim ASCII scene of the sector's planets/ports/ships, drawn on the right.
 
     This is the *background* layer of the SectorView (UI_MOCKUPS.md §1): sprites
-    (sized planet > port > ship, §sprites) are composited into a character grid
-    anchored to the right edge, leaving the left columns clear for the interface
-    text that sits on the layer above. Art and text never share a cell — they are
-    kept spatially apart (text left / art right), so the scene reads as a backdrop
-    rather than noise behind the words.
+    (sized planet > port > ship, §sprites) are composited into a character grid,
+    each **centred** within the art region — the right portion left clear by the
+    interface text, which occupies the left columns on the layer above. Art and
+    text never share a cell — they are kept spatially apart (text left / art
+    right), so the scene reads as a backdrop rather than noise behind the words.
     """
 
     DEFAULT_CSS = """
@@ -130,6 +130,7 @@ class SectorScene(Static):
     """
 
     _MIN_WIDTH = 46  # below this the scene is suppressed so it never crowds text
+    _TEXT_FRACTION = 0.60  # left share reserved for text (mirrors #sector-text width)
 
     def __init__(self, sector: SectorDTO, **kwargs: object) -> None:
         super().__init__(**kwargs)
@@ -143,11 +144,13 @@ class SectorScene(Static):
         if w < self._MIN_WIDTH or h < 6:
             return Text("")
         grid = [[(" ", "") for _ in range(w)] for _ in range(h)]
-        right = w - 1  # anchor sprites to the right edge
+        # Centre sprites in the art region: the right span left clear by the text.
+        art_left = int(w * self._TEXT_FRACTION)
+        centre = (art_left + w) / 2
 
         def stamp(sprite: list[str], top: int, style: str) -> int:
             sw = max((len(line) for line in sprite), default=0)
-            left = max(0, right - sw)
+            left = max(art_left, min(int(centre - sw / 2), w - sw))
             for r, line in enumerate(sprite):
                 y = top + r
                 if 0 <= y < h:
