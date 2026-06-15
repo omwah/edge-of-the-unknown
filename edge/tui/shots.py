@@ -44,7 +44,13 @@ async def _capture() -> None:
         await pilot.click(entry("planet"))
         await pilot.pause()
         app.save_screenshot(filename="planet.svg", path=str(OUT))
-    print(f"wrote main-menu, game, stardock, port, planet .svg to {OUT}")
+        await pilot.press("escape")
+        await pilot.pause()
+        # Galactic map (M).
+        await pilot.press("m")
+        await pilot.pause()
+        app.save_screenshot(filename="map.svg", path=str(OUT))
+    print(f"wrote main-menu, game, stardock, port, planet, map .svg to {OUT}")
 
 
 def main() -> None:

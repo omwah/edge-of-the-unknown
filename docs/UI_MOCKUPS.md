@@ -117,7 +117,7 @@ MapScreen**. The rest are Phase 2-3 (marked per screen).
 ├──────────────────────────────────────────────────────────────────────┤
 │- arrive in Sector 7.   - Stardock detected.   - 287 turns left.      │
 ├──────────────────────────────────────────────────────────────────────┤
-│ P Port   C Computer   G Map   D Redisplay   Q Quit                   │
+│ P Dock   C Computer   M Map   D Redisplay   Q Quit                   │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -180,8 +180,8 @@ text on the left, sprites in the right negative space):
 - **Bottom**: scrolling event ticker (`RichLog`) above a docked **status bar**
   (`Footer`) listing the active key bindings as a persistent reminder — there is
   no command-line input; actions are keystrokes and mouse clicks (§11 grammar).
-- **Bindings** (§11): number keys = warp by sector; `M` move, `P` dock port (§2),
-  `L` land planet (§3), `D` redisplay, `C` computer (§9), `G` galactic map (§10),
+- **Bindings** (§11): number keys = warp by sector; `P` dock port (§2),
+  `L` land planet (§3), `D` redisplay, `C` computer (§9), `M` galactic map (§10),
   `I` ship info, `Q` quit. Esc cancels a prompt.
 - DESIGN: §11, §4 (aspects/holds), §4.1 (integrity line), §9 (turns).
 
@@ -496,12 +496,13 @@ docking reaches an identical trade experience — only the container differs.
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Banded layout**: distance bands left->right (Core / Hub / Frontier / Void),
-  each band a cluster region; **neutral lanes** drawn as `~~` between alliance
-  home clusters (always passable, §5/§10). Unexplored shown as `?`.
+- **Banded layout** (`MapView`): distance bands left->right (Core / Hub /
+  Frontier / Void), each band a bordered `MapBandPanel` whose border-title is the
+  band name; **neutral lanes** are `_MapLane` connectors between the panels
+  (always passable, §5/§10). Unexplored shown as `?`. Reached by the `M` key.
 - **Overlays**: rumor pins from codex fragments, hazards, ports/planets/
-  starbases; click a node -> sector inspector (ExchangeConflict uniview idea,
-  §A.6).
+  starbases; clicking a band panel -> sector inspector (ExchangeConflict uniview
+  idea, §A.6; `MapBandPanel.Picked`, stubbed in the skeleton).
 - DESIGN: §5 (generation/bands/clusters), §10 (territory/lanes), §7 (rumors).
 
 ---
