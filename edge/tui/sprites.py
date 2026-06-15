@@ -132,42 +132,42 @@ PORTS: dict[str, list[str]] = {
 PORT_DEFAULT = "port"
 
 # --- engine-room subsystem icons (UI_MOCKUPS.md §8) ------------------------
-# A tall, vertical ASCII glyph per subsystem, drawn down the right-hand side of
-# each panel in the Engine Room (beside the slot list) as a representative icon.
-# Keyed by the subsystem name in the DTO (DESIGN §4.1: spindrive / thrusters /
-# screens / main_gun).
+# A tall, vertical glyph per subsystem, drawn down the right-hand side of each
+# panel in the Engine Room (beside the slot list) as a representative icon. These
+# use box-drawing/block unicode for the TUI; UI_MOCKUPS.md §8 documents the
+# ASCII-only transliteration. Keyed by the subsystem name in the DTO (DESIGN
+# §4.1: spindrive / thrusters / screens / main_gun).
 
 SUBSYSTEMS: dict[str, list[str]] = {
-    "SPINDRIVE": [  # warp-drive nacelle: spark, tapered casing, twin cores, exhaust
-        "  *",
-        " /=\\",
-        " |O|",
-        " |O|",
-        " \\=/",
-        "  v",
+    "SPINDRIVE": [  # warp-drive block radiating a field sideways
+        " »✦«",
+        " ▟█▙",
+        " ▐█▌",
+        " ▐█▌",
+        " ▜█▛",
+        " »▼«",
     ],
-    "THRUSTERS": [  # stacked engine block tapering to a nozzle and flame
-        " |=|",
-        " |=|",
-        " |#|",
-        " \\#/",
-        "  v",
-        "  .",
+    "THRUSTERS": [  # slim rocket body firing a twin plume
+        "  ╱╲",
+        "  ┃┃",
+        " ▟██▙",
+        " ╲▼▼╱",
+        "  ⇣⇣",
     ],
-    "SCREENS": [  # heraldic deflector shield
-        " .--.",
-        " |  |",
-        " |  |",
-        " \\  /",
-        "  \\/",
+    "SCREENS": [  # faceted diamond deflector shield
+        "  ╱╲",
+        " ╱  ╲",
+        "▐    ▌",
+        " ╲  ╱",
+        "  ╲╱",
     ],
-    "MAIN GUN": [  # vertical cannon firing a round upward
-        "  o",
-        "  |",
-        " |^|",
-        " |#|",
-        " |#|",
-        " [=]",
+    "MAIN GUN": [  # flared muzzle over a heavy spinal barrel
+        "  ▲",
+        " ╱█╲",
+        " ▐█▌",
+        " ▐█▌",
+        " ▐█▌",
+        " ▙█▟",
     ],
 }
 

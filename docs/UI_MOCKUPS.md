@@ -436,13 +436,26 @@ docking reaches an identical trade experience — only the container differs.
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+Subsystem icons (ASCII transliteration for this doc; the TUI renders the
+box-drawing/block unicode forms in `sprites.SUBSYSTEMS`):
+
+```
+SPINDRIVE   THRUSTERS   SCREENS     MAIN GUN
+ >*<          /\          /\          ^
+ /#\          ||         /  \        /#\
+ |#|         /##\       |    |       |#|
+ |#|         \vv/        \  /        |#|
+ \#/          vv          \/         |#|
+ >v<                                 \#/
+```
+
 - **Four subsystem panels** (`spindrive`/`thrusters`/`screens`/`main_gun`), each
   a slot grid on the left — keystone marked, filled `[+]`, empty `[ ]`,
-  knocked-out `[!]` — with a tall **representative ASCII icon** down the right
+  knocked-out `[!]` — with a tall **representative icon** down the right
   side (colour-keyed: warp cyan, thrust amber, shields blue, gun red —
-  `sprites.SUBSYSTEMS`); the **derived aspect** shown in each header (§4.1). The
-  same screen renders an orbital starbase (swap thrusters/spindrive for
-  `fusion_reactor`, §4.2).
+  `sprites.SUBSYSTEMS`, shown ASCII-transliterated above); the **derived aspect**
+  shown in each header (§4.1). The same screen renders an orbital starbase (swap
+  thrusters/spindrive for `fusion_reactor`, §4.2).
 - **Global bonus**: Spindrive efficiency -> one combat buff, shown in the title
   bar (§4.1).
 - **Actions**: `[P]` field-patch (repair-kit, minimal function), `[I]` install

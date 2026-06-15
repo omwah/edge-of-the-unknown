@@ -47,8 +47,8 @@ class _SubsystemPanel(Horizontal):
     def compose(self) -> ComposeResult:
         slots = "\n".join(self._slot_line(i) for i in range(len(self._system.slots)))
         yield Static(slots, classes="slots")
-        # Colour the icon via an inline style, not markup: the art contains
-        # backslashes, and a line ending in "\" would escape a trailing "[/]".
+        # Colour the icon via an inline style rather than wrapping the art in
+        # markup, so the glyphs are rendered verbatim (no markup escaping).
         icon = Static("\n".join(sprites.pick_subsystem(self._system.name)), classes="icon")
         icon.styles.color = _ICON_COLOR.get(self._system.name, "cyan")
         yield icon
