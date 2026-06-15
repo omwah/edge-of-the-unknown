@@ -561,6 +561,49 @@ SPINDRIVE   THRUSTERS   SCREENS     MAIN GUN
 
 ---
 
+## 12. SpriteGalleryScreen  *(secret dev preview)*
+
+A hidden review screen — **not part of the player flow**. From the Main Menu,
+press the unadvertised **`~`** key to open it; `Esc` returns. It previews every
+sprite asset in `edge/tui/sprites.py`, **one category per tab** (Planets · Orbit
+Views · Ports · Ships · Subsystems), each sprite in a bordered card captioned
+with its asset key — so art changes are easy to eyeball and the keys double as a
+reference.
+
+```
+┌ SPRITE GALLERY · all sprite assets ──────────────────────────────────┐
+│ [ Planets ][ Orbit Views ][ Ports ][ Ships ][ Subsystems ]          │
+├──────────────────────────────────────────────────────────────────────┤
+│  ┌ terrestrial ┐ ┌ jovian ┐ ┌ asteroid_belt ┐ ┌ barren ┐            │
+│  │  .-~~~-.    │ │ .-----. │ │ . o . , o .   │ │ .----.  │           │
+│  │ ( .o.o. )   │ │(=======)│ │  o . O .  o   │ │( o () )  │           │
+│  └─────────────┘ └─────────┘ └───────────────┘ └─────────┘           │
+│                                                                      │
+│  (Ships tab)                                                         │
+│  ┌ player ┐ ┌ freighter ┐ ┌ fighter ┐ ┌ warship ┐ ┌ npc ┐           │
+│  │ /==}>  │ │ [===]=>   │ │ <+=-    │ │ <##==>  │ │>--o> │           │
+│  └────────┘ └───────────┘ └─────────┘ └─────────┘ └──────┘           │
+│                                                                      │
+│  (Subsystems tab — icons per §8; ASCII here)                        │
+│  ┌ SPINDRIVE ┐ ┌ THRUSTERS ┐ ┌ SCREENS ┐ ┌ MAIN GUN ┐               │
+│  │   >*<     │ │    /\     │ │   /\    │ │    ^     │                │
+│  │  [|||]    │ │   /||\    │ │  <  >   │ │  [|||]   │                │
+│  └───────────┘ └───────────┘ └─────────┘ └──────────┘               │
+│ esc Back                                                             │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+- Each tab arranges its cards in a grid (the large Orbit Views wrap onto two
+  rows so nothing exceeds the 100-col width). Each card tints its art with the
+  category colour (planets cyan, ports magenta, ships white, subsystems
+  per-icon — warp cyan / thrust amber / shields blue / weapon red) and labels it
+  with the dict key. Subsystem icons are unicode in the TUI; this doc shows the
+  ASCII transliteration (see §8).
+- Reads `sprites` directly: these are static presentation assets, not game
+  state, so no DTO/service boundary is crossed.
+
+---
+
 ## Open layout questions (resolve during the Phase 1 UI build)
 
 - **Sidebar width** on narrow terminals (<100 cols): collapse the region mini-map

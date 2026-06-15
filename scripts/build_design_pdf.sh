@@ -35,6 +35,11 @@ SHOTS=(
     "map|Galactic Map"
     "computer|Ship Computer"
     "engine-room|Engine Room — subsystems & components"
+    "gallery-planets|Sprite Gallery — Planets (dev preview)"
+    "gallery-orbit|Sprite Gallery — Orbit Views"
+    "gallery-ports|Sprite Gallery — Ports"
+    "gallery-ships|Sprite Gallery — Ships"
+    "gallery-subsystems|Sprite Gallery — Subsystems"
 )
 
 for tool in pandoc weasyprint; do

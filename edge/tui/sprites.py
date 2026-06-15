@@ -172,6 +172,17 @@ SUBSYSTEMS: dict[str, list[str]] = {
 }
 
 
+# A representative colour per subsystem (warp = cyan, thrust = amber, shields =
+# blue, weapon = red), keyed by the DTO subsystem name. Shared by the Engine
+# Room panels and the sprite gallery so the colour mapping lives in one place.
+SUBSYSTEM_COLORS: dict[str, str] = {
+    "SPINDRIVE": "cyan",
+    "THRUSTERS": "yellow",
+    "SCREENS": "blue",
+    "MAIN GUN": "red",
+}
+
+
 def pick_subsystem(name: str) -> list[str]:
     """The decorative ASCII icon for an engine-room subsystem (§8)."""
     return SUBSYSTEMS.get(name, [])
