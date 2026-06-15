@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from edge.bigbang.generator import generate
 from edge.config import load_default_config
 from edge.core.enums import Commodity, PortClass
@@ -82,6 +84,17 @@ def test_command_log_replay_reproduces_state(tmp_path: Path) -> None:
     assert bundle.seed == seed
     assert state_hash(rebuild_from_bundle(config, bundle)) == expected  # type: ignore[arg-type]
     repo.close()
+
+
+def test_repo_context_manager_and_missing_meta(tmp_path: Path) -> None:
+    from edge.core.events import Banked
+    from edge.store.repo import SqliteRepository
+
+    with SqliteRepository(tmp_path / "empty.db") as repo:
+        with pytest.raises(LookupError):
+            repo.load_meta()  # nothing saved yet
+        seq = repo.append_event(Banked(1, "interest", 5, 105), tick=3)
+        assert seq >= 1  # event_log row id returned
 
 
 def test_meta_persists_and_commands_are_ordered(tmp_path: Path) -> None:

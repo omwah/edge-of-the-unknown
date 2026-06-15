@@ -147,3 +147,28 @@ def test_upgrade_requires_stardock() -> None:
     state.ports[1] = replace(state.ports[1], klass=PortClass.CLASS_1)
     with pytest.raises(EconomyError):
         reduce(state, 1, BuyUpgrade(), CONFIG)
+
+
+def test_unknown_player_rejected() -> None:
+    with pytest.raises(MovementError):
+        reduce(_universe(), 99, Dock(), CONFIG)
+
+
+def test_unknown_upgrade_aspect_rejected() -> None:
+    state = _universe()  # player is at the StarDock in sector 2
+    bad = CONFIG.model_copy(
+        update={"economy": CONFIG.economy.model_copy(update={"first_upgrade_aspect": "warp"})}
+    )
+    with pytest.raises(EconomyError):
+        reduce(state, 1, BuyUpgrade(), bad)
+
+
+def test_dock_and_trade_require_a_port() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], sector_id=1)  # sector 1 has no port
+    with pytest.raises(MovementError):
+        reduce(state, 1, Dock(), CONFIG)
+    with pytest.raises(MovementError):
+        reduce(state, 1, Trade(commodity=Commodity.FUEL_ORE, units=1), CONFIG)

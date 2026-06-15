@@ -4,6 +4,29 @@
 > *how and in what order*. Where the two ever disagree, DESIGN wins and this doc
 > is corrected in the same change.
 
+## Status — all work packages complete
+
+WP0–WP9 are implemented and all milestones M1–M5 are reached. The build is a
+playable, deterministic, persistable, replayable game with a ticking economy:
+192 tests, `mypy --strict` across every real layer, ruff clean, ~98% coverage.
+
+| WP | What | Commit |
+|----|------|--------|
+| WP0 | scaffolding, config schema, test harness | `eda4e99` |
+| WP1 | core models, enums, public DTOs | `c1b7a6c` |
+| WP2 | economy (property-tested) — **M1** | `062b60a` |
+| WP3 | movement, events, command reducers | `ddad2c8` |
+| WP4 | big bang (gen/validate) — **M2** + `--render` | `e665d16`, `86bec80` |
+| WP5 | SQLite store + golden-master replay — **M3** | `1447001` |
+| WP6 | GameService + fog-of-war projections | `fb47aaa` |
+| WP7 | engine tick loop — **M4** | `6e1b791` |
+| WP8 | live TUI wiring — **M5** | `a282504` |
+| WP9 | test sweep to ~98% coverage + `pixi run check` | _(this change)_ |
+
+The only remaining Phase-1 item is the **exit-criterion playtest** (M5's "fun for
+30 minutes") — a human-judgment session, not a code gap — plus optional polish
+(UI haggling, on-disk persistence, richer trade quantities).
+
 ## 1. Goal & exit criterion
 
 Build the bottom of the layered stack for real and wire the existing Textual

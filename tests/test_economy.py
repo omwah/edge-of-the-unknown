@@ -229,6 +229,46 @@ def test_interest_grows_balance() -> None:
     assert accrue_interest(0, 0.005) == 0
 
 
+def test_banking_error_paths() -> None:
+    p = _player(latinum=100)
+    for bad in (deposit, withdraw):
+        with pytest.raises(EconomyError):
+            bad(p, 0)  # non-positive
+    with pytest.raises(EconomyError):
+        deposit(p, 1_000)  # more than on hand
+    with pytest.raises(EconomyError):
+        withdraw(p, 1)  # empty bank
+
+
+def test_resolve_haggle_insult_aborts() -> None:
+    r = resolve_haggle(
+        100, 40, PortMode.SELL, random.Random(0),
+        insult_frac=0.30, history_penalty=0.0, recent_attempts=0,
+    )
+    assert r.status is HaggleStatus.INSULTING and r.price is None
+
+
+def test_trade_rejects_oversell_and_over_capacity() -> None:
+    buy_port = _port(PortMode.BUY, stock=995, capacity=1000)  # near full
+    ship = _ship(cargo=2, holds=60)
+    player = _player(1_000)
+    # Selling more than held.
+    with pytest.raises(EconomyError):
+        execute_trade(port=buy_port, ship=ship, player=player,
+                      commodity=Commodity.FUEL_ORE, units=50, unit_price=11)
+    # Selling more than the port can absorb (stock would exceed capacity).
+    full_ship = _ship(cargo=100, holds=200)
+    with pytest.raises(EconomyError):
+        execute_trade(port=buy_port, ship=full_ship, player=player,
+                      commodity=Commodity.FUEL_ORE, units=20, unit_price=11)
+
+
+def test_trade_rejects_nonpositive_units() -> None:
+    with pytest.raises(EconomyError):
+        execute_trade(port=_port(PortMode.SELL, 100), ship=_ship(), player=_player(),
+                      commodity=Commodity.FUEL_ORE, units=0, unit_price=11)
+
+
 @given(stock=st.integers(0, 1000), data=st.data())
 def test_regen_moves_toward_desired_and_stays_in_bounds(
     stock: int, data: st.DataObject,
