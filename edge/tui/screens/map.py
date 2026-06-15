@@ -12,7 +12,7 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
-from edge.tui.dummy import MapDTO
+from edge.server.service import GameService
 from edge.tui.widgets import MapBandPanel, MapView
 
 
@@ -41,9 +41,9 @@ class MapScreen(Screen):
         "[red]#[/] starbase   [red]?[/] unexplored"
     )
 
-    def __init__(self, gmap: MapDTO) -> None:
+    def __init__(self, service: GameService, player_id: int) -> None:
         super().__init__()
-        self._map = gmap
+        self._map = service.map_view(player_id)
 
     def compose(self) -> ComposeResult:
         m = self._map

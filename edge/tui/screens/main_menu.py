@@ -8,7 +8,6 @@ from textual.containers import Container, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Static
 
-from edge.tui.dummy import sample_state
 from edge.tui.screens.game import GameScreen
 from edge.tui.screens.sprites_gallery import SpriteGalleryScreen
 from edge.tui.widgets import Starfield
@@ -62,7 +61,8 @@ class MainMenuScreen(Screen):
                 self.action_unavailable()
 
     def action_new_game(self) -> None:
-        self.app.push_screen(GameScreen(sample_state()))
+        service = self.app.start_new_game()  # type: ignore[attr-defined]
+        self.app.push_screen(GameScreen(service, self.app.player_id))  # type: ignore[attr-defined]
 
     def action_gallery(self) -> None:
         self.app.push_screen(SpriteGalleryScreen())

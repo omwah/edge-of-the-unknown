@@ -77,6 +77,14 @@ class GameService:
     def port_view(self, player_id: int, port_id: int) -> dto.PortDTO:
         return session.port_view(self._state, player_id, port_id, self._config)
 
+    def current_port_view(self, player_id: int) -> dto.PortDTO | None:
+        """The trade view for the port in the player's current sector, if any."""
+        ship = self._state.ships[self._state.players[player_id].ship_id]
+        port = self._state.port_in_sector(ship.sector_id)
+        if port is None:
+            return None
+        return session.port_view(self._state, player_id, port.id, self._config)
+
     def map_view(self, player_id: int) -> dto.MapDTO:
         return session.map_view(self._state, player_id)
 

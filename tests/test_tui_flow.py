@@ -1,0 +1,69 @@
+"""WP8/WP9 — Textual Pilot flow over the live service (DESIGN §13).
+
+Drives the real app: new game, navigate to the StarDock, dock, trade, and buy
+the first upgrade — asserting the underlying game state changes through the UI.
+Navigation between sectors is done via the service (clicking each warp button is
+fiddly); the dock/trade/upgrade interactions are exercised through the UI.
+"""
+
+from __future__ import annotations
+
+from edge.core.movement import shortest_path
+from edge.core.rules import Warp
+from edge.tui.app import EdgeApp
+from edge.tui.screens.stardock import StarDockScreen
+
+
+async def _new_game_at_stardock(app: EdgeApp, pilot: object) -> object:
+    """Press New game, then warp the player to the StarDock and dock (press P)."""
+    await pilot.press("n")  # type: ignore[attr-defined]
+    await pilot.pause()  # type: ignore[attr-defined]
+    svc = app.service
+    assert svc is not None
+    dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)
+    path = shortest_path(svc.state.adjacency, 1, dock.sector_id)
+    assert path is not None
+    for hop in path[1:]:
+        svc.apply(1, Warp(to_sector=hop))
+    await pilot.press("p")  # dock -> StarDockScreen  # type: ignore[attr-defined]
+    await pilot.pause()  # type: ignore[attr-defined]
+    return svc
+
+
+async def test_new_game_pushes_live_game_screen() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        assert app.service is not None
+        view = app.service.game_view(1)
+        assert view.sector.sector_id == 1 and view.turns == 250
+
+
+async def test_dock_and_trade_buys_fuel() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game_at_stardock(app, pilot)
+        assert isinstance(app.screen, StarDockScreen)
+        await pilot.press("t")  # trade the highlighted row (Fuel Ore) -> buy
+        await pilot.pause()
+        from edge.core.enums import Commodity
+
+        assert svc.state.ships[1].cargo.get(Commodity.FUEL_ORE, 0) > 0
+        assert svc.state.players[1].latinum < 2_000  # spent latinum buying
+
+
+async def test_dock_and_buy_upgrade() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game_at_stardock(app, pilot)
+        holds0 = svc.state.ships[1].holds_total
+        await pilot.press("u")  # Hardware: buy the first upgrade
+        await pilot.pause()
+        amount = svc.config.economy.first_upgrade_amount
+        cost = svc.config.economy.first_upgrade_latinum
+        assert svc.state.ships[1].holds_total == holds0 + amount
+        assert svc.state.players[1].latinum == 2_000 - cost

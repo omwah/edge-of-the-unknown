@@ -13,7 +13,7 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
 
-from edge.tui.dummy import ComputerDTO
+from edge.server.service import GameService
 
 
 class ComputerScreen(Screen):
@@ -34,9 +34,9 @@ class ComputerScreen(Screen):
     ComputerScreen .note { color: $text-muted; margin-top: 1; }
     """
 
-    def __init__(self, computer: ComputerDTO) -> None:
+    def __init__(self, service: GameService, player_id: int) -> None:
         super().__init__()
-        self._computer = computer
+        self._computer = service.computer_view(player_id)
 
     def compose(self) -> ComposeResult:
         yield Static("SHIP COMPUTER", id="computer-title")

@@ -12,9 +12,15 @@ from textual.app import App
 from textual.binding import Binding
 from textual.theme import Theme
 
-from edge.tui.dummy import sample_port
+from edge.config import load_default_config
+from edge.engine.ticker import EngineTicker
+from edge.server.service import GameService
+from edge.store.repo import SqliteRepository
 from edge.tui.screens.main_menu import MainMenuScreen
-from edge.tui.screens.port import PortScreen
+
+# A fixed default seed for "New game" — chosen so the player's opening neighbourhood
+# reads well (a curated universe per the WP8 screenshot decision).
+DEFAULT_SEED = 4
 
 TW2002_THEME = Theme(
     name="tw2002",
@@ -34,7 +40,6 @@ TW2002_THEME = Theme(
 
 class EdgeApp(App[None]):
     CSS_PATH = "app.tcss"
-    SCREENS = {"port": lambda: PortScreen(sample_port())}
     TITLE = "Edge of the Unknown"
     # Textual's built-in quit is ctrl+q but priority + show=False, so it shadows
     # any screen binding and never reaches the footer. Re-declare it without
@@ -42,14 +47,30 @@ class EdgeApp(App[None]):
     # so the "^q Quit" label surfaces only where a screen opts in (the GameScreen).
     BINDINGS = [Binding("ctrl+q", "quit", "Quit", show=False)]
 
+    player_id = 1
+
     def __init__(self, plain: bool = False) -> None:
         super().__init__()
         self.plain = plain
+        self.service: GameService | None = None
+        self._ticker: EngineTicker | None = None
 
     def on_mount(self) -> None:
         self.register_theme(TW2002_THEME)
         self.theme = "tw2002"
         self.push_screen(MainMenuScreen())
+
+    def start_new_game(self, seed: int = DEFAULT_SEED) -> GameService:
+        """Generate a fresh universe in-process and start the background ticker.
+
+        Single-player embeds the service (DESIGN §3). The repository is in-memory
+        for the skeleton; the ticker runs as a Textual worker (cancelled on exit).
+        """
+        config = load_default_config()
+        self.service = GameService.new_game(config, seed, SqliteRepository(":memory:"))
+        self._ticker = EngineTicker(self.service)
+        self.run_worker(self._ticker.run(), name="engine-ticker", group="engine")
+        return self.service
 
 
 def main() -> None:

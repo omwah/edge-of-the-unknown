@@ -1,4 +1,10 @@
-"""GameScreen — the primary screen (UI_MOCKUPS.md §1)."""
+"""GameScreen — the primary screen, wired to the live GameService (UI_MOCKUPS.md §1).
+
+Reads `service.game_view(player_id)` (the fog-of-war DTO) and issues commands
+through `service.apply`; after a state change it recomposes from the fresh view.
+Warps and docking are real commands (turn costs, persistence); the deferred
+Phase 2-3 screens still open on sample data.
+"""
 
 from __future__ import annotations
 
@@ -7,23 +13,16 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, RichLog, Static
+from textual.widgets import Footer, Static
 
-from edge.tui.dummy import (
-    GameState,
-    SectorDTO,
-    sample_computer,
-    sample_contact,
-    sample_encounter,
-    sample_engine_room,
-    sample_map,
-    sample_messages,
-    sample_port,
-    sample_stardock_port,
-)
+from edge.core.economy import EconomyError
+from edge.core.enums import PortMode
+from edge.core.events import Banked, Docked, Event, Traded, Upgraded, Warped
+from edge.core.movement import MovementError
+from edge.core.rules import Dock, Warp
+from edge.server.service import GameService
+from edge.tui.dummy import SectorDTO, sample_engine_room, sample_messages
 from edge.tui.screens.computer import ComputerScreen
-from edge.tui.screens.contact import AlienContactScreen
-from edge.tui.screens.encounter import EncounterScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.map import MapScreen
 from edge.tui.screens.messages import MessagesScreen
@@ -39,16 +38,6 @@ from edge.tui.widgets import (
 )
 
 
-# Ship-name keywords that mark a hostile (engaging one opens an encounter rather
-# than a peaceful contact). Skeleton heuristic; the real game reads disposition.
-_HOSTILE_SHIP_WORDS = ("marauder", "raider", "cabal", "pirate", "reaver", "kessrin")
-
-
-def _ship_dest(name: str) -> str:
-    low = name.lower()
-    return "encounter" if any(w in low for w in _HOSTILE_SHIP_WORDS) else "contact"
-
-
 class TopBar(Static):
     DEFAULT_CSS = """
     TopBar {
@@ -57,22 +46,16 @@ class TopBar(Static):
     }
     """
 
-    def __init__(self, state: GameState) -> None:
+    def __init__(self, turns: int, max_turns: int) -> None:
         super().__init__()
-        self._state = state
+        self._turns = turns
+        self._max = max_turns
 
     def render(self) -> Text:
-        s = self._state
-        left = "EDGE OF THE UNKNOWN"
-        right = f"turns {s.turns}/{s.max_turns}"
-        return Text.assemble(left, ("  ", ""), right)
+        return Text.assemble("EDGE OF THE UNKNOWN", ("  ", ""), f"turns {self._turns}/{self._max}")
 
 
 class SectorView(Container):
-    # An ASCII scene (planets/ports/ships) is drawn on the `scene` layer; the
-    # interface text rides above it on the `content` layer. The content scroll is
-    # transparent and its rows are narrow/left-aligned, so the scene shows through
-    # the right-hand negative space without art and text ever sharing a cell.
     DEFAULT_CSS = """
     SectorView { width: 2fr; layers: scene content; background: transparent; }
     SectorView SectorScene { layer: scene; }
@@ -88,15 +71,14 @@ class SectorView(Container):
     SectorView .spacer { height: 1; }
     """
 
-    def __init__(self, state: GameState) -> None:
+    def __init__(self, sector: SectorDTO) -> None:
         super().__init__()
-        self._state = state
+        self._sector = sector
 
     def compose(self) -> ComposeResult:
-        sec = self._state.sector
-        yield SectorScene(sec)
+        yield SectorScene(self._sector)
         with VerticalScroll(id="sector-text"):
-            yield from self._content(sec)
+            yield from self._content(self._sector)
 
     def _content(self, sec: SectorDTO) -> ComposeResult:
         yield Static(f"[b cyan]{sec.region} - Sector {sec.sector_id}[/]", id="title")
@@ -114,9 +96,7 @@ class SectorView(Container):
         yield Static("Ports", classes="heading")
         if sec.ports:
             for p in sec.ports:
-                # "Stardock" ports open the StarDock services screen; the rest trade.
-                dest = "stardock" if "Stardock" in p else "port"
-                yield ClickableEntry(f"  [magenta]P[/] {p}", dest=dest)
+                yield ClickableEntry(f"  [magenta]P[/] {p}", dest="port")
         else:
             yield Static("  none")
 
@@ -128,9 +108,7 @@ class SectorView(Container):
         yield Static("Ships", classes="heading")
         if sec.ships:
             for s in sec.ships:
-                # Hailing a ship opens contact (friendly) or an encounter (hostile);
-                # the §1 ship rows are clickable affordances like planets/ports.
-                yield ClickableEntry(f"  [white]>[/] {s}", dest=_ship_dest(s))
+                yield Static(f"  [white]>[/] {s}")
         else:
             yield Static("  none")
 
@@ -150,70 +128,110 @@ class GameScreen(Screen):
         Binding("ctrl+q", "quit", "Quit"),
     ]
 
-    def __init__(self, state: GameState) -> None:
+    def __init__(self, service: GameService, player_id: int) -> None:
         super().__init__()
-        self._state = state
+        self._service = service
+        self._pid = player_id
+        self._log: list[str] = []
+        self._active = False
 
     def compose(self) -> ComposeResult:
-        yield TopBar(self._state)
+        view = self._service.game_view(self._pid)
+        yield TopBar(view.turns, view.max_turns)
         with Horizontal(id="body"):
-            yield SectorView(self._state)
-            yield StatusSidebar(self._state.ship, id="sidebar")
-        yield RichLog(id="ticker", max_lines=200, markup=True)
+            yield SectorView(view.sector)
+            yield StatusSidebar(view.ship, id="sidebar")
+        ticker = "\n".join(self._log[-3:]) or "[dim]· New game — find a port and start trading.[/]"
+        yield Static(ticker, id="ticker")
         yield Footer()
 
-    def on_mount(self) -> None:
-        log = self.query_one("#ticker", RichLog)
-        log.write("[dim]· You arrive in Sector 7.  · Stardock detected.  · 287 turns left.[/]")
-
-    def _tick(self, msg: str) -> None:
-        self.query_one("#ticker", RichLog).write(msg)
-
-    def on_warp_button_warp(self, msg: WarpButton.Warp) -> None:
-        self._tick(f"[cyan]» Plotting warp to Sector {msg.sector_id}…[/]")
-
-    def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
-        # Clicking a port resolves to the same destination as the Dock hotkey, so
-        # there is one way to reach a sector's trade UI (StarDock tab or plain port).
-        match msg.dest:
-            case "planet":
-                self.action_survey_planet()
-            case "contact":
-                self.app.push_screen(AlienContactScreen(sample_contact()))
-            case "encounter":
-                self.app.push_screen(EncounterScreen(sample_encounter()))
-            case _:
-                self.action_dock_port()
-
-    def action_dock_port(self) -> None:
-        ports = self._state.sector.ports
-        if not ports:
-            self._tick("[dim]· No port to dock with in this sector.[/]")
-            return
-        # A StarDock opens the services hub (trading is its Commodities tab); a
-        # plain commodities port opens the standalone trade screen.
-        if "Stardock" in ports[0]:
-            self.app.push_screen(StarDockScreen("Sol", sample_stardock_port()))
+    async def on_screen_resume(self) -> None:
+        # Rebuild from fresh state when this screen becomes active again (after a
+        # pushed trade/map screen pops); skip the very first activation.
+        if self._active:
+            await self.recompose()
         else:
-            self.app.push_screen(PortScreen(sample_port()))
+            self._active = True
 
-    def action_survey_planet(self) -> None:
-        planets = self._state.sector.planets
-        if not planets:
-            self._tick("[dim]· No planet to survey in this sector.[/]")
+    # --- commands ------------------------------------------------------------
+
+    async def on_warp_button_warp(self, msg: WarpButton.Warp) -> None:
+        await self._warp(msg.sector_id)
+
+    async def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
+        if msg.dest == "planet":
+            self.action_survey_planet()
+        else:
+            await self._dock()
+
+    async def _warp(self, sector_id: int) -> None:
+        try:
+            events = self._service.apply(self._pid, Warp(to_sector=sector_id))
+        except (MovementError, EconomyError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
             return
-        # The dummy label is "Name  type, climate"; the orbit view wants just the name.
-        name = planets[0].split("  ")[0].strip()
-        self.app.push_screen(PlanetScreen(name))
+        self._record(events)
+        await self.recompose()
+
+    async def action_dock_port(self) -> None:
+        await self._dock()
+
+    async def _dock(self) -> None:
+        view = self._service.game_view(self._pid)
+        ports = view.sector.ports
+        if not ports:
+            self.notify("No port to dock with here.", timeout=2)
+            return
+        try:
+            self._record(self._service.apply(self._pid, Dock()))
+        except MovementError as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        is_stardock = any("stardock" in p.lower() for p in ports)
+        screen = (
+            StarDockScreen(self._service, self._pid)
+            if is_stardock
+            else PortScreen(self._service, self._pid)
+        )
+        self.app.push_screen(screen)
+
+    # --- other screens (live: computer/map; sample: the Phase 2-3 ones) ------
 
     def action_computer(self) -> None:
-        self.app.push_screen(ComputerScreen(sample_computer()))
+        self.app.push_screen(ComputerScreen(self._service, self._pid))
+
+    def action_map(self) -> None:
+        self.app.push_screen(MapScreen(self._service, self._pid))
+
+    def action_survey_planet(self) -> None:
+        planets = self._service.game_view(self._pid).sector.planets
+        if not planets:
+            self.notify("No planet to survey here.", timeout=2)
+            return
+        self.app.push_screen(PlanetScreen(planets[0].split("  ")[0].strip()))
 
     def action_engine_room(self) -> None:
         self.app.push_screen(EngineRoomScreen(sample_engine_room()))
 
-    def action_map(self) -> None:
-        self.app.push_screen(MapScreen(sample_map()))
-
     def action_messages(self) -> None:
         self.app.push_screen(MessagesScreen(sample_messages()))
+
+    # --- event ticker --------------------------------------------------------
+
+    def _record(self, events: tuple[Event, ...]) -> None:
+        self._log.extend(self._format(e) for e in events)
+
+    @staticmethod
+    def _format(event: Event) -> str:
+        if isinstance(event, Warped):
+            return f"[cyan]» Warp to Sector {event.to_sector}[/]  (-{event.turn_cost} turn)"
+        if isinstance(event, Docked):
+            return "[magenta]⚓ Docked.[/]"
+        if isinstance(event, Traded):
+            verb = "Bought" if event.mode is PortMode.SELL else "Sold"
+            return f"{verb} {event.units} {event.commodity.value} @ {event.unit_price} = {event.total} slips"
+        if isinstance(event, Upgraded):
+            return f"[green]Upgraded {event.aspect}[/]  (-{event.cost} slips)"
+        if isinstance(event, Banked):
+            return f"Bank {event.kind}: {event.amount}  (balance {event.balance})"
+        return type(event).__name__
