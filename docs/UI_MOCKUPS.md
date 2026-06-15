@@ -249,6 +249,11 @@ docking reaches an identical trade experience — only the container differs.
 ```
 
 - **Header**: `planet_type` (sets yield + habitability, §4.2).
+- **Planet art**: a **larger, more detailed** orbit-view sprite for the
+  `planet_type` (`sprites.PLANETS_LARGE` / `pick_planet_large`) is shown on the
+  right, the orbit data on the left — a focal image, distinct from the small
+  scene marker the sector view draws (`sprites.PLANETS`), keyed off the same
+  planet type.
 - **Ownership/production block**: owner (none / alliance / player), habitability
   bar, colonists, `yield_profile` over the trio, citadel level, stores;
   allocation sliders shown **only to the owner** (§8 production).

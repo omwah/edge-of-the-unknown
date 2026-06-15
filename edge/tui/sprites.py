@@ -53,6 +53,68 @@ PLANETS: dict[str, list[str]] = {
 }
 PLANET_DEFAULT = "terrestrial"
 
+# --- planets, large orbit-view variants ------------------------------------
+# A second, larger and more detailed rendering of each planet type, for the
+# PlanetScreen orbit view (UI_MOCKUPS.md §3) — same taxonomy as PLANETS above,
+# but a focal image rather than a tiny scene marker. Lines are centred by the
+# widget (text-align: center), so each row is kept roughly symmetric.
+
+PLANETS_LARGE: dict[str, list[str]] = {
+    "terrestrial": [
+        "        ._-~~~~-_.",
+        "      .-~ .~~. ~~-.",
+        "    .~~ .(    ). ~~~.",
+        "   /~~ (  .~~.  ) ~~~\\",
+        "  |~~~  '~(  )~'  ~~~~|",
+        "  |~~ .~. '~~' .~~. ~~|",
+        "  |~~ ( )  ~~  (  ) ~~|",
+        "  |~~~ '~' ~~~~ '~' ~~|",
+        "   \\~~~  .~~.   ~~~~~/",
+        "    '~~ (    ) ~~~~~'",
+        "      '-~ '~~' ~~-'",
+        "        '~-____-~'",
+    ],
+    "jovian": [
+        "        ._-~~~~-_.",
+        "      .-~~~~~~~~~~-.",
+        "    .~~~~~~~~~~~~~~~~.",
+        "   /==================\\",
+        "  |~~~~~~~~~~~~~~~~~~~~|",
+        "  |====================|",
+        "  |~~~~~( o )~~~~~~~~~~~|",
+        "  |====================|",
+        "  |~~~~~~~~~~~~~~~~~~~~|",
+        "   \\==================/",
+        "      '-~~~~~~~~~~-'",
+        "        '~-____-~'",
+    ],
+    "asteroid_belt": [
+        "   .      o          .",
+        "      o  .     .  O     o",
+        "  .    O    o      .   .",
+        "    .     o   .  O    o  .",
+        "  o   .      O    .      o",
+        "     .   o    .      o  .",
+        "  .     O   .   o  .    O",
+        "      o   .    .    O  o",
+        "   .    o   .     o   .",
+    ],
+    "barren": [
+        "        ._-~~~~-_.",
+        "      .-~ o    .~-.",
+        "    .~  .  O  .   . ~.",
+        "   / .    .-.   o    .\\",
+        "  | o    ( . )    .  o |",
+        "  |   .   '-'  .    .  |",
+        "  | .   o    .   O    .|",
+        "  | O .    .   o .   . |",
+        "   \\  .  O   .    o  ./",
+        "    '~ .   o   .  . ~'",
+        "      '-~ .   O .~-'",
+        "        '~-____-~'",
+    ],
+}
+
 # --- ports / starbases (smaller) -------------------------------------------
 
 PORTS: dict[str, list[str]] = {
@@ -100,13 +162,23 @@ _SHIP_KEYWORDS = {
 }
 
 
-def pick_planet(label: str) -> list[str]:
-    """Skeleton: choose a planet sprite by keyword in the dummy label string."""
+def _planet_key(label: str) -> str:
+    """Skeleton: resolve a planet-type key by keyword in the dummy label string."""
     low = label.lower()
     for key in PLANETS:
         if key.replace("_", " ") in low or key in low:
-            return PLANETS[key]
-    return PLANETS[PLANET_DEFAULT]
+            return key
+    return PLANET_DEFAULT
+
+
+def pick_planet(label: str) -> list[str]:
+    """The small scene-marker sprite for a planet (sector view)."""
+    return PLANETS[_planet_key(label)]
+
+
+def pick_planet_large(label: str) -> list[str]:
+    """The large, detailed orbit-view sprite for the same planet type (§3)."""
+    return PLANETS_LARGE[_planet_key(label)]
 
 
 def pick_port(label: str) -> list[str]:
