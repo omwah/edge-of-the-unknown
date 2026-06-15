@@ -1,5 +1,6 @@
 references/**
-DESIGN.pdf
+# generated PDFs are build artifacts — never commit them
+*.pdf
 # pixi environments
 .pixi/*
 !.pixi/config.toml
