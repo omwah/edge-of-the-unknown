@@ -32,6 +32,7 @@ mypy = "*"
 pytest = "*"
 hypothesis = "*"
 pytest-asyncio = "*"
+pytest-cov = "*"
 
 [tool.pixi.pypi-dependencies]
 edge-of-the-unknown = { path = ".", editable = true }
@@ -40,9 +41,11 @@ edge-of-the-unknown = { path = ".", editable = true }
 tui = "python -m edge.tui"
 shots = "python -m edge.tui.shots"
 bigbang = "python -m edge.bigbang"
-lint = "ruff check edge"
+lint = "ruff check edge tests"
 test = "pytest"
 typecheck = "mypy"
+cov = "pytest --cov=edge.core --cov=edge.bigbang --cov=edge.store --cov=edge.server --cov=edge.engine --cov-report=term-missing"
+check = { depends-on = ["lint", "typecheck", "test"] }
 
 # ruff / mypy are enforced on core/ and bigbang/ per CLAUDE.md; the throwaway
 # tui skeleton is intentionally exempt until Phase 1 wiring lands.

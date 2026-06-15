@@ -39,6 +39,14 @@ def test_interest_grows_only_nonempty_balances(tmp_path: Path) -> None:
     assert svc.state.players[1].bank_balance == 10_050  # 0.5%/day
 
 
+def test_interest_skips_when_rounding_yields_no_change(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    # A balance of 1 at 0.5%/day rounds back to 1 — no event, no change.
+    svc._state.players[1] = replace(svc.state.players[1], bank_balance=1)  # type: ignore[attr-defined]
+    result = accrue_interest(svc.state, svc.config)
+    assert result.players == () and result.events == ()
+
+
 def test_regen_moves_stock_toward_desired(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     port = next(iter(svc.state.ports.values()))

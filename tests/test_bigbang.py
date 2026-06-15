@@ -13,7 +13,7 @@ from edge.bigbang.topology import bfs_distances
 from edge.config import load_default_config
 from edge.core.enums import PortClass
 
-SEEDS = list(range(40))
+SEEDS = list(range(100))  # the §13 100-seed validation sweep
 
 
 def _small_config() -> object:
