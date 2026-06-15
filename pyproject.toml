@@ -22,8 +22,13 @@ python = "3.12.*"
 textual = "*"
 textual-dev = "*"  # `textual` CLI: demo, run --dev, console, serve
 rich = "*"
+pydantic = ">=2"   # config schema + (later) public DTOs (DESIGN §15)
+pyyaml = "*"       # parse the YAML game config (DESIGN §4 config file)
 ruff = "*"
 mypy = "*"
+pytest = "*"
+hypothesis = "*"
+pytest-asyncio = "*"
 
 [tool.pixi.pypi-dependencies]
 edge-of-the-unknown = { path = ".", editable = true }
@@ -32,6 +37,8 @@ edge-of-the-unknown = { path = ".", editable = true }
 tui = "python -m edge.tui"
 shots = "python -m edge.tui.shots"
 lint = "ruff check edge"
+test = "pytest"
+typecheck = "mypy"
 
 # ruff / mypy are enforced on core/ and bigbang/ per CLAUDE.md; the throwaway
 # tui skeleton is intentionally exempt until Phase 1 wiring lands.
@@ -42,3 +49,8 @@ target-version = "py312"
 python_version = "3.12"
 strict = true
 files = ["edge/core", "edge/bigbang"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
