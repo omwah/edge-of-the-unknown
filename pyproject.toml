@@ -36,6 +36,7 @@ edge-of-the-unknown = { path = ".", editable = true }
 [tool.pixi.tasks]
 tui = "python -m edge.tui"
 shots = "python -m edge.tui.shots"
+bigbang = "python -m edge.bigbang"
 lint = "ruff check edge"
 test = "pytest"
 typecheck = "mypy"
@@ -50,6 +51,12 @@ python_version = "3.12"
 strict = true
 files = ["edge/core", "edge/bigbang"]
 plugins = ["pydantic.mypy"]
+
+# PyYAML ships no type stubs; the config loader treats parsed data as Any at the
+# I/O seam (validated immediately by Pydantic).
+[[tool.mypy.overrides]]
+module = "yaml"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
