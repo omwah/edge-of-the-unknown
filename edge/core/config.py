@@ -64,6 +64,7 @@ class EconomyConfig(BaseModel):
     repair_kit_latinum: int = 200
     first_upgrade_latinum: int = 2_000
     first_upgrade_aspect: str = "holds"  # "holds" | "shields" (config-selectable)
+    first_upgrade_amount: int = 20  # how much the bought aspect bumps
 
     # Banking + stock regen (engine cron applies these; the math is pure).
     bank_interest_per_day: float = 0.005  # ~0.5%/game-day

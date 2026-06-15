@@ -27,6 +27,7 @@ economy:
   repair_kit_latinum: 200
   first_upgrade_latinum: 2000
   first_upgrade_aspect: holds   # holds | shields
+  first_upgrade_amount: 20      # how much the bought aspect bumps
 
   # Banking + stock regeneration (engine cron applies; the math is pure).
   bank_interest_per_day: 0.005
