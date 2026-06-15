@@ -94,9 +94,9 @@ in Phase 1.
   base, delta}, latinum, size, class), `Planet` (type + name only), `Ship`
   (flat aspects + hull + holds/cargo + latinum-independent gear counts),
   `Player` (latinum, bank_balance, turns_remaining, explored_sectors, alliance_id,
-  ship_id), `Alliance` (Federation stub). A `GameState` container owns the seeded
-  `random.Random` and the runtime **adjacency dict** (networkx is generation-only,
-  §15).
+  ship_id), `Alliance` (Federation stub). A `UniverseState` container owns the
+  seeded `random.Random` and the runtime **adjacency dict** (networkx is
+  generation-only, §15).
 - **`core/dto.py`:** the public projection shapes — keep them **structurally
   identical to today's `edge/tui/dummy.py`** so the TUI is the contract and widget
   code is untouched. `to_public(context)` lives at the server boundary (WP6).
