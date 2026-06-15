@@ -81,6 +81,24 @@ async def _capture() -> None:
         await pilot.press("e")
         await pilot.pause()
         app.save_screenshot(filename="engine-room.svg", path=str(OUT))
+        await pilot.press("escape")  # back to GameScreen
+        await pilot.pause()
+        # Hail the friendly trader (Kestrel) -> AlienContactScreen.
+        await pilot.click(entry("contact"))
+        await pilot.pause()
+        app.save_screenshot(filename="contact.svg", path=str(OUT))
+        await pilot.press("escape")  # break contact -> GameScreen
+        await pilot.pause()
+        # Engage the hostile (Cabal Marauder) -> EncounterScreen.
+        await pilot.click(entry("encounter"))
+        await pilot.pause()
+        app.save_screenshot(filename="encounter.svg", path=str(OUT))
+        await pilot.press("escape")  # disengage -> GameScreen
+        await pilot.pause()
+        # Message log (G).
+        await pilot.press("g")
+        await pilot.pause()
+        app.save_screenshot(filename="messages.svg", path=str(OUT))
 
     # The secret sprite gallery is a TabbedContent (one category per tab), so the
     # running app reaches it via the hidden "~" Main Menu key. Capture every tab
@@ -99,7 +117,7 @@ async def _capture() -> None:
     gallery_stems = ", ".join(stem for _, stem in _GALLERY_TABS)
     print(
         "wrote main-menu, game, stardock, port, planet, surface, map, computer, "
-        f"engine-room, {gallery_stems} .svg to {OUT}"
+        f"engine-room, contact, encounter, messages, {gallery_stems} .svg to {OUT}"
     )
 
 
