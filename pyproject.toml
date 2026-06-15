@@ -24,6 +24,9 @@ textual-dev = "*"  # `textual` CLI: demo, run --dev, console, serve
 rich = "*"
 pydantic = ">=2"   # config schema + (later) public DTOs (DESIGN §15)
 pyyaml = "*"       # parse the YAML game config (DESIGN §4 config file)
+networkx = "*"     # graph layout for the bigbang --render inspector (§5)
+scipy = "*"        # networkx's sparse layout backend (spring_layout, >=500 nodes)
+matplotlib = "*"   # the bigbang --render graph dump (§5)
 ruff = "*"
 mypy = "*"
 pytest = "*"
@@ -56,6 +59,12 @@ plugins = ["pydantic.mypy"]
 # I/O seam (validated immediately by Pydantic).
 [[tool.mypy.overrides]]
 module = "yaml"
+ignore_missing_imports = true
+
+# networkx/matplotlib ship no type stubs and are used only by the dev-only
+# graph-render inspector (edge/bigbang/render.py), isolated behind lazy imports.
+[[tool.mypy.overrides]]
+module = ["networkx.*", "matplotlib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
