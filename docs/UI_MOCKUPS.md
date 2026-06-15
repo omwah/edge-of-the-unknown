@@ -101,18 +101,21 @@ MapScreen**. The rest are Phase 2-3 (marked per screen).
 │ Ports                           │ Sensors  ██████░░░░  Tier II       │
 │  »P Stardock - Class 0          │ subsystems: all nominal            │
 │                                 │ -----------------------------      │
+│                                 │ Gun online  Missiles x3            │
+│ Beacons                         │ Kits x2                            │
+│   ! "Welcome to Sol"            │ -----------------------------      │
 │                                 │ Holds 40/60                        │
-│ Beacons                         │  Fuel  ████████░░░░  20            │
-│   ! "Welcome to Sol"            │  Org   ████░░░░░░░░  12            │
-│                                 │  Equ   ██░░░░░░░░░░   8            │
-│ Ships                           │ Gun [+]  Missiles x3  Kits x2      │
-│  > Kestrel  free trader         │ Latinum  14,250 gpl                │
-│  > Cabal Marauder               │ Band 0 - Core                      │
-│  > Verdani escort               │ region:                            │
-│                                 │   (3) (6)                          │
-│ Warps                           │     \ /                            │
-│  1<    3/Sol  6>                │  (1)-(7)                           │
-│  8?    (7)    12?               │     / \                            │
+│ Ships                           │  Fuel  ████████░░░░  20            │
+│  > Kestrel  free trader         │  Org   ████░░░░░░░░  12            │
+│  > Cabal Marauder               │  Equ   ██░░░░░░░░░░   8            │
+│  > Verdani escort               │ Latinum  14,250 slips              │
+│                                 │ -----------------------------      │
+│ Warps                           │ Band 0 - Core                      │
+│  1<    3/Sol  6>                │ region:                            │
+│  8?    (7)    12?               │   (3) (6)                          │
+│                                 │     \ /                            │
+│                                 │  (1)-(7)                           │
+│                                 │     / \                            │
 │                                 │   (8) (12)                         │
 ├──────────────────────────────────────────────────────────────────────┤
 │- arrive in Sector 7.   - Stardock detected.   - 287 turns left.      │
@@ -204,7 +207,7 @@ docking reaches an identical trade experience — only the container differs.
 │  Equipment    BUY     █████░░░░ 58%    14 ^     8    [Sell]          │
 │                                                                      │
 │  +- Haggle: Sell Fuel Ore --------------------------------+          │
-│  | Quote:  13/u  x  20 units  =  260 gpl                  |          │
+│  | Quote:  13/u  x  20 units  =  260 slips                |          │
 │  | Your counter: [ 15 ]/u    fair ~ 13    ( likely        |          │
 │  | Round 1 of 2   - "Hah, 14 and not a slip more."        |          │
 │  | [A]ccept quote   [O]ffer counter   [Esc] walk away     |          │
@@ -306,7 +309,7 @@ docking reaches an identical trade experience — only the container differs.
 ┌─ STARDOCK . Sol ─────────────────────────────────────────────────────┐
 │ [ Commodities ][ Shipyard ][ Hardware ][ Bank ][ Tavern ]            │
 ├──────────────────────────────────────────────────────────────────────┤
-│  HARDWARE EMPORIUM                          Latinum 14,250           │
+│  HARDWARE EMPORIUM                          Latinum 14,250 slips     │
 │                                                                      │
 │  Components (engine-room parts)     Tier   Price     Action          │
 │  ----------------------------------------------------------          │
@@ -520,11 +523,11 @@ docking reaches an identical trade experience — only the container differs.
 ┌─ MESSAGES & LOG ─────────────────────────────────────────────────────┐
 │ [ Events ][ Comms ][ Bounties ]                                      │
 ├──────────────────────────────────────────────────────────────────────┤
-│  day 4 . 09:12   Stardock: interest accrued +71 gpl                  │
+│  day 4 . 09:12   Stardock: interest accrued +71 slips                │
 │  day 4 . 08:50   Kessrin raid reported near Band-2 boundary          │
 │  day 4 . 08:31   * Discovery logged: Crashed Ship (Uncommon)         │
 │  day 3 . 22:04   Concord envoy: "Our drives await you, trader."      │
-│  day 3 . 21:10   Trade: sold 20 Fuel Ore @ 14 -> +280 gpl            │
+│  day 3 . 21:10   Trade: sold 20 Fuel Ore @ 14 -> +280 slips          │
 │                                                                      │
 │  ------------------------------------------------------------        │
 │  [Enter] open   [F] filter   [M] mark read   [Esc] back              │

@@ -56,7 +56,7 @@ class StarDockScreen(Screen):
                 yield Static("[dim]Hull sales — not wired in the skeleton.[/]")
             with TabPane("Hardware", id="hardware"):
                 yield Static(
-                    "[b]HARDWARE EMPORIUM[/]        Latinum [b yellow]14,250[/] gpl"
+                    "[b]HARDWARE EMPORIUM[/]        Latinum [b yellow]14,250[/] slips"
                 )
                 yield DataTable(id="hardware-table", cursor_type="row")
                 yield Static(
