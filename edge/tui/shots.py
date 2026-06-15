@@ -1,6 +1,11 @@
-"""Capture SVG screenshots of the skeleton screens for review.
+"""Capture SVG screenshots of the screens for review.
 
-Run with `pixi run shots`. Writes to docs/ui/shots/.
+Run with `pixi run shots`. Writes to docs/ui/shots/. The live screens (game,
+port, stardock, map, computer) are captured against a real generated universe
+(WP8): the player is navigated to a presentable sector via the service, then the
+GameScreen is recomposed. The Phase 2-3 screens (planet, surface, engine room,
+contact, encounter, messages) are still skeletons, captured by pushing them
+directly with sample data.
 """
 
 from __future__ import annotations
@@ -10,7 +15,20 @@ from pathlib import Path
 
 from textual.widgets import TabbedContent
 
+from edge.core.movement import shortest_path
+from edge.core.rules import Warp
 from edge.tui.app import EdgeApp
+from edge.tui.dummy import (
+    sample_contact,
+    sample_encounter,
+    sample_engine_room,
+    sample_messages,
+)
+from edge.tui.screens.contact import AlienContactScreen
+from edge.tui.screens.encounter import EncounterScreen
+from edge.tui.screens.engine_room import EngineRoomScreen
+from edge.tui.screens.messages import MessagesScreen
+from edge.tui.screens.planet import PlanetScreen
 
 OUT = Path("docs/ui/shots")
 
@@ -30,83 +48,92 @@ async def _capture() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         app.save_screenshot(filename="main-menu.svg", path=str(OUT))
-        await pilot.press("n")  # New game -> GameScreen
+
+        await pilot.press("n")  # New game -> live GameScreen
         await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        state = svc.state
+        ports = {p.sector_id: p for p in state.ports.values()}
+        planet_sectors = {pl.sector_id for pl in state.planets.values()}
+
+        async def goto(sector_id: int) -> None:
+            here = state.ships[1].sector_id
+            path = shortest_path(state.adjacency, here, sector_id)
+            if path is None:
+                return
+            for hop in path[1:]:
+                svc.apply(1, Warp(to_sector=hop))
+            await app.screen.recompose()
+            await pilot.pause()
+
+        # A presentable sector: one that has both a port and a planet.
+        nice = next((s for s in ports if s in planet_sectors), None)
+        if nice is not None:
+            await goto(nice)
         app.save_screenshot(filename="game.svg", path=str(OUT))
-        # Sector 7 holds a StarDock: docking (P) or clicking it opens the services
-        # hub. Show the Hardware tab (the component emporium) rather than the
-        # default Commodities tab.
+
+        # A plain commodities port -> the standalone trade screen.
+        plain = next((s for s, p in ports.items() if p.klass.value != 9), None)
+        if plain is not None:
+            await goto(plain)
+            await pilot.press("p")
+            await pilot.pause()
+            app.save_screenshot(filename="port.svg", path=str(OUT))
+            await pilot.press("escape")
+            await pilot.pause()
+
+        # The StarDock -> services hub, Hardware tab.
+        dock = next(s for s, p in ports.items() if p.klass.value == 9)
+        await goto(dock)
         await pilot.press("p")
         await pilot.pause()
         app.screen.query_one(TabbedContent).active = "hardware"
         await pilot.pause()
         app.save_screenshot(filename="stardock.svg", path=str(OUT))
-        await pilot.press("escape")  # back to GameScreen
+        await pilot.press("escape")
         await pilot.pause()
-        # A plain commodities port (no StarDock) opens the standalone trade screen.
-        app.push_screen("port")
-        await pilot.pause()
-        app.save_screenshot(filename="port.svg", path=str(OUT))
-        app.pop_screen()
-        await pilot.pause()
-        # Click the planet -> PlanetScreen.
-        from edge.tui.widgets import ClickableEntry
 
-        def entry(dest: str) -> ClickableEntry:
-            return next(e for e in app.screen.query(ClickableEntry) if e._dest == dest)
-
-        await pilot.click(entry("planet"))
-        await pilot.pause()
-        app.save_screenshot(filename="planet.svg", path=str(OUT))
-        # Descend (D) -> SurfaceScreen.
-        await pilot.press("d")
-        await pilot.pause()
-        app.save_screenshot(filename="surface.svg", path=str(OUT))
-        await pilot.press("escape")  # ascend to orbit
-        await pilot.press("escape")  # break orbit -> GameScreen
-        await pilot.pause()
-        # Galactic map (M).
-        await pilot.press("m")
+        await pilot.press("m")  # Galactic map (live)
         await pilot.pause()
         app.save_screenshot(filename="map.svg", path=str(OUT))
-        await pilot.press("escape")  # back to GameScreen
+        await pilot.press("escape")
         await pilot.pause()
-        # Ship computer (C).
-        await pilot.press("c")
+
+        await pilot.press("c")  # Ship computer (live pair-finder over seen ports)
         await pilot.pause()
         app.save_screenshot(filename="computer.svg", path=str(OUT))
-        await pilot.press("escape")  # back to GameScreen
+        await pilot.press("escape")
         await pilot.pause()
-        # Engine room (E).
-        await pilot.press("e")
-        await pilot.pause()
-        app.save_screenshot(filename="engine-room.svg", path=str(OUT))
-        await pilot.press("escape")  # back to GameScreen
-        await pilot.pause()
-        # Hail the friendly trader (Kestrel) -> AlienContactScreen.
-        await pilot.click(entry("contact"))
-        await pilot.pause()
-        app.save_screenshot(filename="contact.svg", path=str(OUT))
-        await pilot.press("escape")  # break contact -> GameScreen
-        await pilot.pause()
-        # Engage the hostile (Cabal Marauder) -> EncounterScreen.
-        await pilot.click(entry("encounter"))
-        await pilot.pause()
-        app.save_screenshot(filename="encounter.svg", path=str(OUT))
-        await pilot.press("escape")  # disengage -> GameScreen
-        await pilot.pause()
-        # Message log (G).
-        await pilot.press("g")
-        await pilot.pause()
-        app.save_screenshot(filename="messages.svg", path=str(OUT))
 
-    # The secret sprite gallery is a TabbedContent (one category per tab), so the
-    # running app reaches it via the hidden "~" Main Menu key. Capture every tab
-    # in turn so the PDF handout shows all asset categories, not just the default.
+        # The Phase 2-3 skeleton screens, pushed directly with sample data.
+        app.push_screen(PlanetScreen("Terra Nova"))
+        await pilot.pause()
+        app.save_screenshot(filename="planet.svg", path=str(OUT))
+        await pilot.press("d")  # descend -> SurfaceScreen
+        await pilot.pause()
+        app.save_screenshot(filename="surface.svg", path=str(OUT))
+        await pilot.press("escape")
+        await pilot.press("escape")
+        await pilot.pause()
+
+        for name, screen in (
+            ("engine-room", EngineRoomScreen(sample_engine_room())),
+            ("contact", AlienContactScreen(sample_contact())),
+            ("encounter", EncounterScreen(sample_encounter())),
+            ("messages", MessagesScreen(sample_messages())),
+        ):
+            app.push_screen(screen)
+            await pilot.pause()
+            app.save_screenshot(filename=f"{name}.svg", path=str(OUT))
+            await pilot.press("escape")
+            await pilot.pause()
+
+    # The secret sprite gallery is reached via the hidden "~" Main Menu key.
     gal = EdgeApp()
     async with gal.run_test(size=(100, 40)) as pilot:
         await pilot.pause()
-        await pilot.press("~")  # Main Menu -> SpriteGalleryScreen
+        await pilot.press("~")
         await pilot.pause()
         tabs = gal.screen.query_one(TabbedContent)
         for tab_id, stem in _GALLERY_TABS:
@@ -116,7 +143,7 @@ async def _capture() -> None:
 
     gallery_stems = ", ".join(stem for _, stem in _GALLERY_TABS)
     print(
-        "wrote main-menu, game, stardock, port, planet, surface, map, computer, "
+        "wrote main-menu, game, port, stardock, map, computer, planet, surface, "
         f"engine-room, contact, encounter, messages, {gallery_stems} .svg to {OUT}"
     )
 

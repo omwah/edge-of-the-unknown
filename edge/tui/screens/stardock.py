@@ -1,10 +1,8 @@
-"""StarDockScreen — services hub (UI_MOCKUPS.md §5).
+"""StarDockScreen — the services hub, wired to the live service (UI_MOCKUPS.md §5).
 
-Phase-1 shell: the tabs exist; only Commodities and Hardware are populated.
-Trading lives in the **Commodities** tab (the default), which reuses the same
-`TradePanel` as the standalone `PortScreen` — so docking at a StarDock reaches
-the trade UI through a tab rather than a separate screen. The component list
-mirrors the §5 wireframe and the §8 economy constants.
+The Commodities tab reuses the same `TradePanel` as `PortScreen` (so `T` trades
+there too); the Hardware tab sells the Phase-1 flat-aspect "first upgrade" via
+`U` (BuyUpgrade, PHASE1_PLAN §2). Shipyard/Bank/Tavern remain stubs.
 """
 
 from __future__ import annotations
@@ -12,15 +10,20 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
+from textual.widgets import Footer, Static, TabbedContent, TabPane
 
-from edge.tui.dummy import PortDTO
+from edge.core.economy import EconomyError
+from edge.core.rules import BuyUpgrade
+from edge.server.service import GameService
+from edge.tui.screens.port import _trade_highlighted
 from edge.tui.widgets import TradePanel
 
 
 class StarDockScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Undock"),
+        Binding("t", "trade", "Trade"),
+        Binding("u", "buy_upgrade", "Buy upgrade"),
         Binding("e", "noop", "Engine room"),
         Binding("r", "noop", "Repair"),
     ]
@@ -31,36 +34,40 @@ class StarDockScreen(Screen):
         text-style: bold; padding: 0 1;
     }
     StarDockScreen TabPane { padding: 1 2; }
-    StarDockScreen DataTable { height: auto; max-height: 10; margin-top: 1; }
     StarDockScreen .note { color: $text-muted; margin-top: 1; }
     """
 
-    _COMPONENTS = [
-        ("accelerator", "I", "2,000", "[Install]"),
-        ("converter", "I", "2,000", "[Install]"),
-        ("turbine", "II", "8,000*", "[Barter]"),
-        ("navigator (keystone)", "I", "2,000", "[Install]"),
-    ]
-
-    def __init__(self, location: str, port: PortDTO) -> None:
+    def __init__(self, service: GameService, player_id: int) -> None:
         super().__init__()
-        self._location = location
-        self._port = port
+        self._service = service
+        self._pid = player_id
 
     def compose(self) -> ComposeResult:
-        yield Static(f"STARDOCK · {self._location}", id="dock-title")
+        port = self._service.current_port_view(self._pid)
+        if port is None:
+            yield Static("No StarDock here.", id="dock-title")
+            yield Footer()
+            return
+        latinum = self._service.game_view(self._pid).ship.latinum
+        econ = self._service.config.economy
+        yield Static(f"STARDOCK · Sector {port.sector_id}", id="dock-title")
         with TabbedContent(initial="trade"):
             with TabPane("Commodities", id="trade"):
-                yield TradePanel(self._port, show_title=False)
+                yield TradePanel(port, latinum=latinum, show_title=False)
             with TabPane("Shipyard", id="shipyard"):
                 yield Static("[dim]Hull sales — not wired in the skeleton.[/]")
             with TabPane("Hardware", id="hardware"):
                 yield Static(
-                    "[b]HARDWARE EMPORIUM[/]        Latinum [b yellow]14,250[/] slips"
+                    f"[b]HARDWARE EMPORIUM[/]        Latinum [b yellow]{latinum:,}[/] slips",
+                    id="hardware-latinum",
                 )
-                yield DataTable(id="hardware-table", cursor_type="row")
                 yield Static(
-                    "[dim]* Tier II = latinum + artifact barter[/]", classes="note"
+                    f"  {econ.first_upgrade_aspect} +{econ.first_upgrade_amount}"
+                    f"        {econ.first_upgrade_latinum:,} slips        [b]\\[U][/] Install"
+                )
+                yield Static(
+                    "[dim]* full engine-room slot upgrades arrive in Phase 2 (§4.1)[/]",
+                    classes="note",
                 )
             with TabPane("Bank", id="bank"):
                 yield Static("[dim]Deposit / withdraw / interest — Phase 2.[/]")
@@ -68,11 +75,23 @@ class StarDockScreen(Screen):
                 yield Static("[dim]Rumors & contracts — Phase 5.[/]")
         yield Footer()
 
-    def on_mount(self) -> None:
-        table = self.query_one("#hardware-table", DataTable)
-        table.add_columns("Component", "Tier", "Price", "Action")
-        for row in self._COMPONENTS:
-            table.add_row(*row)
+    def action_trade(self) -> None:
+        _trade_highlighted(self, self._service, self._pid)
+
+    def action_buy_upgrade(self) -> None:
+        try:
+            self._service.apply(self._pid, BuyUpgrade())
+        except EconomyError as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        latinum = self._service.game_view(self._pid).ship.latinum
+        self.notify("Upgrade installed!", timeout=2)
+        self.query_one("#hardware-latinum", Static).update(
+            f"[b]HARDWARE EMPORIUM[/]        Latinum [b yellow]{latinum:,}[/] slips"
+        )
+        port = self._service.current_port_view(self._pid)
+        if port is not None:
+            self.query_one(TradePanel).refresh_port(port, latinum)
 
     def action_back(self) -> None:
         self.app.pop_screen()

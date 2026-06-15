@@ -11,36 +11,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-
-@dataclass(frozen=True)
-class CommodityLine:
-    name: str
-    mode: str  # "BUY" (port buys from you) | "SELL" (port sells to you)
-    stock: int
-    capacity: int
-    price: int
-    base_price: int
-    player_qty: int
-
-    @property
-    def stock_ratio(self) -> float:
-        return self.stock / self.capacity if self.capacity else 0.0
-
-    @property
-    def trend(self) -> str:
-        if self.price > self.base_price:
-            return "^"
-        if self.price < self.base_price:
-            return "v"
-        return "="
-
-
-@dataclass(frozen=True)
-class PortDTO:
-    name: str
-    klass: str
-    sector_id: int
-    commodities: list[CommodityLine]
+# The Phase-1 public DTO shapes now live canonically in `edge.core.dto` (the
+# service's `to_public` output); they are re-exported here so existing TUI
+# imports keep working unchanged (the WP8 DTO-contract unification). The Phase
+# 2-3 DTOs below stay defined locally until their engines land.
+from edge.core.dto import (
+    Aspect,
+    CommodityLine,
+    ComputerDTO,
+    GameState,
+    Hold,
+    MapBand,
+    MapDTO,
+    PortDTO,
+    SectorDTO,
+    ShipDTO,
+    TradePair,
+    WarpDTO,
+)
 
 
 @dataclass(frozen=True)
@@ -49,57 +37,6 @@ class PlanetDTO:
     ptype: str
     owner: str
     starbase: str | None = None
-
-
-@dataclass(frozen=True)
-class WarpDTO:
-    sector_id: int
-    arrow: str
-    label: str | None = None
-    explored: bool = True
-
-
-@dataclass(frozen=True)
-class SectorDTO:
-    region: str
-    sector_id: int
-    flavor: str
-    beacon: str | None
-    ports: list[str] = field(default_factory=list)
-    planets: list[str] = field(default_factory=list)
-    ships: list[str] = field(default_factory=list)
-    warps: list[WarpDTO] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class Aspect:
-    label: str
-    filled: int  # 0..10 for the bar
-    note: str
-
-
-@dataclass(frozen=True)
-class Hold:
-    label: str
-    qty: int
-    capacity: int
-
-
-@dataclass(frozen=True)
-class ShipDTO:
-    name: str
-    klass: str
-    aspects: list[Aspect]
-    integrity: str
-    holds_used: int
-    holds_total: int
-    holds: list[Hold]
-    gun: str
-    missiles: int
-    kits: int
-    latinum: int
-    band: str
-    region_map: list[str]
 
 
 @dataclass(frozen=True)
@@ -119,22 +56,6 @@ class SurfaceDTO:
     descent_fuel: str  # "n/a" in Phase 1 (movement costs turns, not fuel)
     terrain: list[str]  # top-down ASCII map rows (markup ok)
     sites: list[SurfaceSite] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class MapBand:
-    """One distance band's column on the galactic map (UI_MOCKUPS.md §10)."""
-
-    title: str  # e.g. "Band 0 · Core"
-    rows: list[str]  # rendered content lines (Rich markup allowed)
-    lane: str | None = None  # neutral-lane glyph drawn to this band's left, if any
-
-
-@dataclass(frozen=True)
-class MapDTO:
-    you_sector: int
-    you_band: str
-    bands: list[MapBand]
 
 
 @dataclass(frozen=True)
@@ -166,23 +87,6 @@ class EngineRoomDTO:
     subsystems: list[Subsystem]
     kits: int
     on_hand: list[str]  # carried components, e.g. ["converter x1", "turbine x1"]
-
-
-@dataclass(frozen=True)
-class TradePair:
-    """One row of the Computer's pair-trade finder (UI_MOCKUPS.md §9)."""
-
-    pair: str
-    goods: str
-    dist: int
-    profit_rt: int  # round-trip profit
-    per_turn: int  # profit per turn (the finder's score)
-
-
-@dataclass(frozen=True)
-class ComputerDTO:
-    pairs: list[TradePair]
-    selected: str
 
 
 @dataclass(frozen=True)
@@ -258,14 +162,6 @@ class MessagesDTO:
     """The messages & log screen (UI_MOCKUPS.md §11, DESIGN §12 event_log)."""
 
     events: list[LogEntry]
-
-
-@dataclass(frozen=True)
-class GameState:
-    turns: int
-    max_turns: int
-    ship: ShipDTO
-    sector: SectorDTO
 
 
 def sample_state() -> GameState:

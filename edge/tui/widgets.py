@@ -10,6 +10,7 @@ from textual.containers import Grid, Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Button, DataTable, Static
 
+from edge.core.enums import Commodity
 from edge.tui import sprites
 from edge.tui.dummy import MapBand, MapDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
 
@@ -95,6 +96,15 @@ class HagglePanel(Static):
         )
 
 
+# Map the public commodity *display* names back to the core enum, so a trade
+# screen can turn the highlighted row into a Trade command.
+NAME_TO_COMMODITY = {
+    "Fuel Ore": Commodity.FUEL_ORE,
+    "Organics": Commodity.ORGANICS,
+    "Equipment": Commodity.EQUIPMENT,
+}
+
+
 class TradePanel(Vertical):
     """The commodities trade UI: live pricing table + a haggle stub.
 
@@ -102,14 +112,17 @@ class TradePanel(Vertical):
     port) or as the **Commodities** tab of a `StarDockScreen` — so docking at a
     port reaches one trade UI regardless of whether the port is a StarDock
     (UI_MOCKUPS.md §2/§5). `show_title` is suppressed inside the StarDock tab,
-    where the screen already carries a banner.
+    where the screen already carries a banner. `refresh_port` re-renders it after
+    a trade; `cursor_commodity` is the highlighted row's commodity name.
     """
 
     DEFAULT_CSS = "TradePanel { height: auto; }"
 
-    def __init__(self, port: PortDTO, *, show_title: bool = True, **kwargs: object) -> None:
+    def __init__(self, port: PortDTO, *, latinum: int = 0, show_title: bool = True,
+                 **kwargs: object) -> None:
         super().__init__(**kwargs)
         self._port = port
+        self._latinum = latinum
         self._show_title = show_title
 
     def compose(self) -> ComposeResult:
@@ -122,21 +135,41 @@ class TradePanel(Vertical):
             )
         yield DataTable(id="commodities", zebra_stripes=True, cursor_type="row")
         yield HagglePanel()
-        yield Static(
-            "[dim]^ port buys from you (you SELL)   v port sells to you (you BUY)[/]\n"
-            "Latinum [yellow]14,250[/]   ·   [b]Q[/]uick-trade off   ·   [b]Esc[/] leave dock",
-            id="port-footer",
-        )
+        yield Static(self._footer_text(), id="port-footer")
 
     def on_mount(self) -> None:
         table = self.query_one("#commodities", DataTable)
         table.add_columns("Commodity", "They", "Stock", "Price/u", "You", "Action")
+        self._fill_rows()
+
+    def _fill_rows(self) -> None:
+        table = self.query_one("#commodities", DataTable)
+        table.clear()
         for c in self._port.commodities:
             stock = f"{bar(round(c.stock_ratio * 9), 9)} {round(c.stock_ratio * 100):>2}%"
             action = "[b]Sell[/]" if c.mode == "BUY" else "[b]Buy[/]"
             table.add_row(
                 c.name, c.mode, stock, f"{c.price} {c.trend}", str(c.player_qty), action
             )
+
+    def _footer_text(self) -> str:
+        return (
+            "[dim]^ port buys from you (you SELL)   v port sells to you (you BUY)[/]\n"
+            f"Latinum [yellow]{self._latinum:,}[/]   ·   [b]T[/]rade highlighted   ·   "
+            "[b]Esc[/] leave dock"
+        )
+
+    def refresh_port(self, port: PortDTO, latinum: int) -> None:
+        self._port = port
+        self._latinum = latinum
+        self._fill_rows()
+        self.query_one("#port-footer", Static).update(self._footer_text())
+
+    def cursor_commodity(self) -> str | None:
+        row = self.query_one("#commodities", DataTable).cursor_row
+        if 0 <= row < len(self._port.commodities):
+            return self._port.commodities[row].name
+        return None
 
 
 class StatusSidebar(Static):
