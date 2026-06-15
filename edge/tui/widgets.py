@@ -9,7 +9,8 @@ from textual.containers import Grid
 from textual.message import Message
 from textual.widgets import Button, Static
 
-from edge.tui.dummy import ShipDTO, WarpDTO
+from edge.tui import sprites
+from edge.tui.dummy import SectorDTO, ShipDTO, WarpDTO
 
 
 class Starfield(Static):
@@ -111,6 +112,66 @@ class StatusSidebar(Static):
         ]
         lines += [f"  {row}" for row in s.region_map]
         return "\n".join(lines)
+
+
+class SectorScene(Static):
+    """A dim ASCII scene of the sector's planets/ports/ships, drawn on the right.
+
+    This is the *background* layer of the SectorView (UI_MOCKUPS.md §1): sprites
+    (sized planet > port > ship, §sprites) are composited into a character grid
+    anchored to the right edge, leaving the left columns clear for the interface
+    text that sits on the layer above. Art and text never share a cell — they are
+    kept spatially apart (text left / art right), so the scene reads as a backdrop
+    rather than noise behind the words.
+    """
+
+    DEFAULT_CSS = """
+    SectorScene { width: 100%; height: 100%; background: transparent; }
+    """
+
+    _MIN_WIDTH = 46  # below this the scene is suppressed so it never crowds text
+
+    def __init__(self, sector: SectorDTO, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._sector = sector
+
+    def on_resize(self) -> None:
+        self.refresh()
+
+    def render(self) -> Text:
+        w, h = self.size.width, self.size.height
+        if w < self._MIN_WIDTH or h < 6:
+            return Text("")
+        grid = [[(" ", "") for _ in range(w)] for _ in range(h)]
+        right = w - 1  # anchor sprites to the right edge
+
+        def stamp(sprite: list[str], top: int, style: str) -> int:
+            sw = max((len(line) for line in sprite), default=0)
+            left = max(0, right - sw)
+            for r, line in enumerate(sprite):
+                y = top + r
+                if 0 <= y < h:
+                    for c, ch in enumerate(line):
+                        x = left + c
+                        if ch != " " and 0 <= x < w:
+                            grid[y][x] = (ch, style)
+            return top + len(sprite)
+
+        cursor = 1
+        if self._sector.planets:
+            cursor = stamp(sprites.pick_planet(self._sector.planets[0]), cursor, "cyan") + 1
+        if self._sector.ports:
+            cursor = stamp(sprites.pick_port(self._sector.ports[0]), cursor, "magenta") + 1
+        for name in self._sector.ships:
+            cursor = stamp(sprites.pick_ship(name), cursor, "white") + 1
+
+        out = Text()
+        for y in range(h):
+            for ch, style in grid[y]:
+                out.append(ch, style=f"dim {style}" if style else None)
+            if y < h - 1:
+                out.append("\n")
+        return out
 
 
 class ClickableEntry(Static):

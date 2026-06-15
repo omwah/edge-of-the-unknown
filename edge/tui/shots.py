@@ -30,14 +30,16 @@ async def _capture() -> None:
         # Click the sector's Stardock port -> StarDockScreen.
         from edge.tui.widgets import ClickableEntry
 
-        entries = list(app.screen.query(ClickableEntry))
-        await pilot.click(entries[0])
+        def entry(dest: str) -> ClickableEntry:
+            return next(e for e in app.screen.query(ClickableEntry) if e._dest == dest)
+
+        await pilot.click(entry("stardock"))
         await pilot.pause()
         app.save_screenshot(filename="stardock.svg", path=str(OUT))
         await pilot.press("escape")
         await pilot.pause()
         # Click the planet -> PlanetScreen.
-        await pilot.click(list(app.screen.query(ClickableEntry))[1])
+        await pilot.click(entry("planet"))
         await pilot.pause()
         app.save_screenshot(filename="planet.svg", path=str(OUT))
     print(f"wrote main-menu, game, port, stardock, planet .svg to {OUT}")
