@@ -6,12 +6,12 @@ import random
 
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Grid, Vertical
+from textual.containers import Grid, Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Button, DataTable, Static
 
 from edge.tui import sprites
-from edge.tui.dummy import PortDTO, SectorDTO, ShipDTO, WarpDTO
+from edge.tui.dummy import MapBand, MapDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
 
 
 class Starfield(Static):
@@ -237,6 +237,69 @@ class SectorScene(Static):
             if y < h - 1:
                 out.append("\n")
         return out
+
+
+class MapBandPanel(Static):
+    """One distance-band column on the galactic map (UI_MOCKUPS.md §10).
+
+    A bordered panel whose border-title is the band name; the body is the band's
+    pre-rendered rows (sector graph / cluster / rumor pins). Clicking it would
+    open the sector inspector in the real game — a stub `Picked` message here.
+    """
+
+    class Picked(Message):
+        def __init__(self, title: str) -> None:
+            self.title = title
+            super().__init__()
+
+    def __init__(self, band: MapBand, **kwargs: object) -> None:
+        super().__init__("\n".join(band.rows), **kwargs)
+        self._title = band.title
+        self.border_title = band.title
+
+    def on_click(self) -> None:
+        self.post_message(self.Picked(self._title))
+
+
+class _MapLane(Static):
+    """A neutral navigable lane drawn between two band columns (§5/§10)."""
+
+    def __init__(self, glyph: str, **kwargs: object) -> None:
+        # One blank lead-in lines the lane up with the bordered panels' bodies,
+        # then a run of glyphs spans their height so the lane reads as continuous.
+        super().__init__("\n".join(["", *([glyph] * 6)]), **kwargs)
+
+
+class MapView(Horizontal):
+    """The banded galactic map: band columns left→right with lane connectors.
+
+    Bands are laid out Core→Hub→Frontier→Void; a `_MapLane` is inserted before
+    any band that declares a neutral-lane glyph, so the always-passable lanes
+    between alliance home clusters read as gaps in territory (§5/§10).
+    """
+
+    DEFAULT_CSS = """
+    MapView { height: 1fr; align-vertical: middle; padding: 1 1; }
+    MapView MapBandPanel {
+        width: 1fr; height: auto; border: round $primary; padding: 0 1;
+        color: $text;
+    }
+    MapView MapBandPanel:hover { border: round $secondary; }
+    MapView _MapLane {
+        width: 5; height: auto; color: $secondary;
+        text-align: center; content-align: center middle;
+    }
+    """
+
+    def __init__(self, gmap: MapDTO, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._map = gmap
+
+    def compose(self) -> ComposeResult:
+        for band in self._map.bands:
+            if band.lane:
+                yield _MapLane(band.lane)
+            yield MapBandPanel(band)
 
 
 class ClickableEntry(Static):

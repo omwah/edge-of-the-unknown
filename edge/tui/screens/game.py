@@ -9,7 +9,14 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, RichLog, Static
 
-from edge.tui.dummy import GameState, SectorDTO, sample_port, sample_stardock_port
+from edge.tui.dummy import (
+    GameState,
+    SectorDTO,
+    sample_map,
+    sample_port,
+    sample_stardock_port,
+)
+from edge.tui.screens.map import MapScreen
 from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
@@ -114,7 +121,7 @@ class GameScreen(Screen):
     BINDINGS = [
         Binding("p", "dock_port", "Dock"),
         Binding("c", "computer", "Computer"),
-        Binding("g", "map", "Map"),
+        Binding("m", "map", "Map"),
         Binding("d", "redisplay", "Redisplay"),
         Binding("q", "quit", "Quit"),
     ]
@@ -169,4 +176,4 @@ class GameScreen(Screen):
         self._tick("[dim]· Ship computer — not wired in the skeleton.[/]")
 
     def action_map(self) -> None:
-        self._tick("[dim]· Galactic map — not wired in the skeleton.[/]")
+        self.app.push_screen(MapScreen(sample_map()))

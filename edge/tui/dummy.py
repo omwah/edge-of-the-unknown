@@ -103,6 +103,22 @@ class ShipDTO:
 
 
 @dataclass(frozen=True)
+class MapBand:
+    """One distance band's column on the galactic map (UI_MOCKUPS.md §10)."""
+
+    title: str  # e.g. "Band 0 · Core"
+    rows: list[str]  # rendered content lines (Rich markup allowed)
+    lane: str | None = None  # neutral-lane glyph drawn to this band's left, if any
+
+
+@dataclass(frozen=True)
+class MapDTO:
+    you_sector: int
+    you_band: str
+    bands: list[MapBand]
+
+
+@dataclass(frozen=True)
 class GameState:
     turns: int
     max_turns: int
@@ -172,6 +188,72 @@ def sample_port() -> PortDTO:
             CommodityLine("Fuel Ore", "BUY", 410, 1000, 13, 11, 20),
             CommodityLine("Organics", "SELL", 220, 1000, 6, 5, 12),
             CommodityLine("Equipment", "BUY", 580, 1000, 14, 15, 8),
+        ],
+    )
+
+
+def sample_map() -> MapDTO:
+    """The banded galactic map from UI_MOCKUPS.md §10.
+
+    Bands run Core → Hub → Frontier → Void, left to right; `lane` glyphs are the
+    neutral navigable lanes between alliance home clusters (§5/§10). The current
+    sector `(7@)` sits in the Core column, matching `sample_state()`.
+    """
+    return MapDTO(
+        you_sector=7,
+        you_band="0 - Core",
+        bands=[
+            MapBand(
+                title="Band 0 · Core",
+                rows=[
+                    "[dim](3)[/]   [dim](6)[/]",
+                    "  \\   /",
+                    "[dim](1)[/]─[reverse cyan](7@)[/]",
+                    "  /   \\",
+                    "[dim](8)[/]   [dim](12)[/]",
+                    "",
+                    "[magenta]P[/] Sol  [green]o[/] Terra",
+                ],
+            ),
+            MapBand(
+                title="Band 1 · Hub",
+                lane="~",
+                rows=[
+                    "[cyan]Concord[/]",
+                    "cluster",
+                    "",
+                    "[dim](21)(22)[/]",
+                    "[dim](24)(25)[/]",
+                    "",
+                    "[green]o[/] [green]o[/]  owned",
+                ],
+            ),
+            MapBand(
+                title="Band 2 · Frontier",
+                lane="~",
+                rows=[
+                    "[yellow]*[/] rumor",
+                    "",
+                    "(40)(41)[red]?[/]",
+                    "(43)[red]?[/]  [red]#?[/]",
+                    "",
+                    "[red]~[/] hazard",
+                    "[green]o[/]   [red]#?[/]",
+                ],
+            ),
+            MapBand(
+                title="Band 3+ · Void",
+                lane="·",
+                rows=[
+                    "",
+                    "[dim]· · · ·[/]",
+                    "[dim]unknown[/]",
+                    "",
+                    "[red]~ ?[/]",
+                    "",
+                    "[dim]deep void[/]",
+                ],
+            ),
         ],
     )
 
