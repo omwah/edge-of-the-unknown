@@ -11,30 +11,51 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid
+from textual.containers import Grid, Horizontal
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from edge.tui import sprites
 from edge.tui.dummy import EngineRoomDTO, Subsystem
 
+# A representative colour for each subsystem's icon (warp = cyan, thrust = amber,
+# shields = blue, weapon = red), keyed by the DTO subsystem name.
+_ICON_COLOR = {
+    "SPINDRIVE": "cyan",
+    "THRUSTERS": "yellow",
+    "SCREENS": "blue",
+    "MAIN GUN": "red",
+}
 
-class _SubsystemPanel(Static):
-    """One subsystem's slot grid, derived aspect in the border title (§8)."""
+
+class _SubsystemPanel(Horizontal):
+    """One subsystem: slot list on the left, a vertical icon down the right side;
+    derived aspect in the border subtitle (§8)."""
 
     DEFAULT_CSS = """
     _SubsystemPanel {
         height: auto; border: round $primary; padding: 0 1; margin: 0 1 1 0;
     }
+    _SubsystemPanel .slots { width: 1fr; height: auto; }
+    _SubsystemPanel .icon { width: auto; height: auto; margin-left: 2; }
     """
 
     def __init__(self, system: Subsystem) -> None:
         super().__init__()
         self._system = system
 
+    def compose(self) -> ComposeResult:
+        slots = "\n".join(self._slot_line(i) for i in range(len(self._system.slots)))
+        yield Static(slots, classes="slots")
+        # Colour the icon via an inline style, not markup: the art contains
+        # backslashes, and a line ending in "\" would escape a trailing "[/]".
+        icon = Static("\n".join(sprites.pick_subsystem(self._system.name)), classes="icon")
+        icon.styles.color = _ICON_COLOR.get(self._system.name, "cyan")
+        yield icon
+
     def on_mount(self) -> None:
         self.border_title = self._system.name
         self.border_subtitle = f"→ {self._system.derived}"
-        self.update("\n".join(self._slot_line(i) for i in range(len(self._system.slots))))
 
     def _slot_line(self, idx: int) -> str:
         slot = self._system.slots[idx]

@@ -131,6 +131,52 @@ PORTS: dict[str, list[str]] = {
 }
 PORT_DEFAULT = "port"
 
+# --- engine-room subsystem icons (UI_MOCKUPS.md §8) ------------------------
+# A tall, vertical ASCII glyph per subsystem, drawn down the right-hand side of
+# each panel in the Engine Room (beside the slot list) as a representative icon.
+# Keyed by the subsystem name in the DTO (DESIGN §4.1: spindrive / thrusters /
+# screens / main_gun).
+
+SUBSYSTEMS: dict[str, list[str]] = {
+    "SPINDRIVE": [  # warp-drive nacelle: spark, tapered casing, twin cores, exhaust
+        "  *",
+        " /=\\",
+        " |O|",
+        " |O|",
+        " \\=/",
+        "  v",
+    ],
+    "THRUSTERS": [  # stacked engine block tapering to a nozzle and flame
+        " |=|",
+        " |=|",
+        " |#|",
+        " \\#/",
+        "  v",
+        "  .",
+    ],
+    "SCREENS": [  # heraldic deflector shield
+        " .--.",
+        " |  |",
+        " |  |",
+        " \\  /",
+        "  \\/",
+    ],
+    "MAIN GUN": [  # vertical cannon firing a round upward
+        "  o",
+        "  |",
+        " |^|",
+        " |#|",
+        " |#|",
+        " [=]",
+    ],
+}
+
+
+def pick_subsystem(name: str) -> list[str]:
+    """The decorative ASCII icon for an engine-room subsystem (§8)."""
+    return SUBSYSTEMS.get(name, [])
+
+
 # --- ships (smallest) ------------------------------------------------------
 
 SHIPS: dict[str, list[str]] = {
