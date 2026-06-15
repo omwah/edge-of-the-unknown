@@ -12,10 +12,14 @@ from textual.widgets import Footer, RichLog, Static
 from edge.tui.dummy import (
     GameState,
     SectorDTO,
+    sample_computer,
+    sample_engine_room,
     sample_map,
     sample_port,
     sample_stardock_port,
 )
+from edge.tui.screens.computer import ComputerScreen
+from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.map import MapScreen
 from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.port import PortScreen
@@ -122,8 +126,9 @@ class GameScreen(Screen):
         Binding("p", "dock_port", "Dock"),
         Binding("s", "survey_planet", "Survey Planet"),
         Binding("c", "computer", "Computer"),
+        Binding("e", "engine_room", "Engine Room"),
         Binding("m", "map", "Map"),
-        Binding("q", "quit", "Quit"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(self, state: GameState) -> None:
@@ -179,7 +184,10 @@ class GameScreen(Screen):
         self.app.push_screen(PlanetScreen(name))
 
     def action_computer(self) -> None:
-        self._tick("[dim]· Ship computer — not wired in the skeleton.[/]")
+        self.app.push_screen(ComputerScreen(sample_computer()))
+
+    def action_engine_room(self) -> None:
+        self.app.push_screen(EngineRoomScreen(sample_engine_room()))
 
     def action_map(self) -> None:
         self.app.push_screen(MapScreen(sample_map()))

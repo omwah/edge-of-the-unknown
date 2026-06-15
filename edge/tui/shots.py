@@ -55,7 +55,22 @@ async def _capture() -> None:
         await pilot.press("m")
         await pilot.pause()
         app.save_screenshot(filename="map.svg", path=str(OUT))
-    print(f"wrote main-menu, game, stardock, port, planet, surface, map .svg to {OUT}")
+        await pilot.press("escape")  # back to GameScreen
+        await pilot.pause()
+        # Ship computer (C).
+        await pilot.press("c")
+        await pilot.pause()
+        app.save_screenshot(filename="computer.svg", path=str(OUT))
+        await pilot.press("escape")  # back to GameScreen
+        await pilot.pause()
+        # Engine room (E).
+        await pilot.press("e")
+        await pilot.pause()
+        app.save_screenshot(filename="engine-room.svg", path=str(OUT))
+    print(
+        "wrote main-menu, game, stardock, port, planet, surface, map, computer, "
+        f"engine-room .svg to {OUT}"
+    )
 
 
 def main() -> None:
