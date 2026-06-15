@@ -6,13 +6,13 @@
 # DESIGN.md changes. Requires pandoc and the weasyprint PDF engine.
 #
 # Usage:
-#   ./build_design_pdf.sh                # -> docs/DESIGN.pdf
-#   ./build_design_pdf.sh path/out.pdf   # custom output path
+#   ./scripts/build_design_pdf.sh                # -> docs/DESIGN.pdf
+#   ./scripts/build_design_pdf.sh path/out.pdf   # custom output path
 
 set -euo pipefail
 
-# Run relative to the repo root (the directory holding this script).
-cd "$(dirname "$0")"
+# Run relative to the repo root (this script lives in scripts/).
+cd "$(dirname "$0")/.."
 
 SRC="docs/DESIGN.md"
 OUT="${1:-docs/DESIGN.pdf}"
