@@ -259,6 +259,6 @@ What each is for:
 - Tests: pytest + hypothesis. Property tests for economy invariants;
   golden-master replays of command logs against fixed seeds; bigbang
   validation across many seeds; Textual Pilot for UI flows.
-- Dependencies (Phase 1): textual, rich, networkx, pydantic v2; stdlib
+- Dependencies (Phase 1): textual, rich, networkx, pydantic v2, pyyaml; stdlib
   sqlite3. Add nothing else without updating DESIGN.md §15.
 - Commit style: small, phase-tagged (e.g. `p1: bigbang cluster pass`).

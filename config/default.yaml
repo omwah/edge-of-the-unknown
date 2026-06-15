@@ -1,0 +1,73 @@
+# Edge of the Unknown — default game configuration.
+#
+# Tunable constants for the economy (DESIGN §8), universe generation (§5), and
+# the starter ship (§4). Validated against edge.core.config.GameConfig. Every
+# game constant lives here, not in code (CLAUDE.md). Omitted fields fall back to
+# the schema defaults; the values below are spelled out so the balance is legible.
+
+config_version: 1
+turns_per_day: 250  # TWINSTR.DOC default (§9)
+
+economy:
+  starting_latinum: 2000
+  starting_bank: 0
+
+  # Price clamp: [floor_frac*base, ceiling_frac*base], always > 0 (§8 invariant).
+  floor_frac: 0.25
+  ceiling_frac: 2.0
+
+  # BNT's tuned values relabeled to the TW trio (§8).
+  fuel_ore:  { base: 11, delta: 5, elasticity: 1.0 }
+  organics:  { base: 5,  delta: 2, elasticity: 1.0 }
+  equipment: { base: 15, delta: 7, elasticity: 1.0 }
+
+  # The upgrade sink + the Phase-1 flat-aspect "first upgrade" (PHASE1_PLAN §2).
+  tier_i_component_latinum: 2000
+  tier_ii_component_latinum: 8000
+  repair_kit_latinum: 200
+  first_upgrade_latinum: 2000
+  first_upgrade_aspect: holds   # holds | shields
+
+  # Banking + stock regeneration (engine cron applies; the math is pure).
+  bank_interest_per_day: 0.005
+  regen_fraction: 0.05
+  desired_stock_frac_standard: 0.50
+  desired_stock_frac_stardock: 0.90
+
+bigbang:
+  sector_count: 1000
+  cluster_min: 5
+  cluster_max: 25
+  intra_group_degree: 2.5
+  bridges_min: 1
+  bridges_max: 5
+  one_way_chance: 0.15
+  max_warps_per_sector: 6
+  core_sector_count: 10
+  stardock_min_hops: 2
+  stardock_max_hops: 5
+  port_density: 0.45
+  planet_density: 0.25
+  port_class_distribution: [20, 20, 20, 10, 10, 10, 5, 5]
+  initial_stock_min: 200
+  initial_stock_max: 2000
+  bands:
+    - { name: Hub,      min_hops: 0,  max_hops: 5 }
+    - { name: Frontier, min_hops: 6,  max_hops: 12 }
+    - { name: Deep,     min_hops: 13, max_hops: 20 }
+    - { name: Void,     min_hops: 21, max_hops: 9999 }
+
+# The starter hull — a Trailblazer-class explorer (§4). Phase 1: flat aspects,
+# no engine-room subsystems yet (those arrive in Phase 2, §4.1).
+starter_ship:
+  id: trailblazer
+  name: S.S. Wayfarer
+  role: transport
+  holds_total: 60
+  turns_per_warp: 1
+  shields_max: 100
+  warp_speed: 3
+  combat_speed: 4
+  cloak_rating: 0
+  sensor_rating: 2
+  hull_max: 100
