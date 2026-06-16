@@ -12,6 +12,7 @@ from edge.bigbang.generator import generate
 from edge.bigbang.topology import bfs_distances
 from edge.config import load_default_config
 from edge.core.enums import PortClass
+from edge.core.movement import shortest_path
 
 SEEDS = list(range(100))  # the §13 100-seed validation sweep
 
@@ -58,3 +59,25 @@ def test_different_seeds_differ() -> None:
     a = generate(CONFIG, 1)  # type: ignore[arg-type]
     b = generate(CONFIG, 2)  # type: ignore[arg-type]
     assert a.adjacency != b.adjacency
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_stardock_route_starts_explored(seed: int) -> None:
+    """The path from the start sector to StarDock opens pre-explored (round-2).
+
+    Only the shortest path is revealed — the rest of the universe stays fogged —
+    and the breadcrumb chain matches it, so `TravelTo(dock)` works on turn one.
+    """
+    state = generate(CONFIG, seed)  # type: ignore[arg-type]
+    player = state.players[1]
+    dock = next(p for p in state.ports.values() if p.klass is PortClass.STARDOCK)
+
+    route = shortest_path(state.adjacency, 1, dock.sector_id)
+    assert route is not None
+    # Exactly the route is explored — nothing more, nothing less.
+    assert player.explored_sectors == frozenset(route)
+    # The breadcrumb chains each hop back to its predecessor.
+    assert dict(player.entered_from) == {route[i + 1]: route[i] for i in range(len(route) - 1)}
+    # The route is uncovered for route-locked travel, off-route stays fogged.
+    assert shortest_path(state.adjacency, 1, dock.sector_id, allowed=set(player.explored_sectors))
+    assert len(player.explored_sectors) < len(state.sectors)

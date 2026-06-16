@@ -15,6 +15,7 @@ import random
 from edge.bigbang.topology import bfs_distances
 from edge.core.config import GameConfig
 from edge.core.economy import capacity_for_size
+from edge.core.movement import shortest_path
 from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass
 from edge.core.models import (
     Alliance,
@@ -137,11 +138,19 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
             turns_per_warp=sc.turns_per_warp,
         )
     }
+    # StarDock is an auto-known route: the path from the start sector to the dock
+    # opens pre-explored so the opening signpost is actionable (the player can
+    # `TravelTo` it on turn one). Only the shortest path is revealed — the rest of
+    # the universe stays fogged. The route is also recorded as the breadcrumb chain
+    # so the way back reads correctly from the dock.
+    dock_route = shortest_path(state.adjacency, 1, dock_sector) or [1]
+    entered_from = {dock_route[i + 1]: dock_route[i] for i in range(len(dock_route) - 1)}
     state.players = {
         1: Player(
             id=1, name="Trailblazer", ship_id=1,
             latinum=config.economy.starting_latinum, bank_balance=config.economy.starting_bank,
-            turns_remaining=config.turns_per_day, alliance_id=1, explored_sectors=frozenset({1}),
+            turns_remaining=config.turns_per_day, alliance_id=1,
+            explored_sectors=frozenset(dock_route), entered_from=entered_from,
         )
     }
 
