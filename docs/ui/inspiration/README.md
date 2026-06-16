@@ -138,7 +138,7 @@ conda-forge); all tooling runs through `pixi run`.
    `cd references/terminal-space && make pyenv && make run` — to feel the
    InstantCmd/sidebar flow, or just watch the asciinema cast.
 2. **Skeleton (done for Game + Port)**: a throwaway Textual skeleton fed by dummy
-   DTOs lives in `edge/tui/`. Launch it with `pixi run tui`; regenerate the SVG
+   DTOs lives in `edge/tui/`. Launch it with `pixi run edge`; regenerate the SVG
    screenshots in `docs/ui/shots/` with `pixi run shots`. It uses the StatFrame
    sidebar pattern and the Harlequin/Dolphie widget idioms above.
 3. **Add the remaining Phase-1 screens** to the skeleton — StarDock (tabs),
