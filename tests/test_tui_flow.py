@@ -12,6 +12,7 @@ from edge.core.movement import shortest_path
 from edge.core.rules import Warp
 from edge.tui.app import EdgeApp
 from edge.tui.screens.stardock import StarDockScreen
+from edge.tui.widgets import NeighborRow
 
 
 async def _new_game_at_stardock(app: EdgeApp, pilot: object) -> object:
@@ -39,6 +40,25 @@ async def test_new_game_pushes_live_game_screen() -> None:
         assert app.service is not None
         view = app.service.game_view(1)
         assert view.sector.sector_id == 1 and view.turns == 250
+
+
+async def test_sidebar_neighbor_click_warps() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        start = svc.game_view(1).sector.sector_id
+        rows = app.screen.query(NeighborRow)
+        assert rows
+        first = rows.first()
+        target = first._sector_id
+        await pilot.click(first)
+        await pilot.pause()
+        moved = svc.game_view(1).sector.sector_id
+        assert moved == target != start
 
 
 async def test_dock_and_trade_buys_fuel() -> None:

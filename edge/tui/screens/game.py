@@ -81,7 +81,10 @@ class SectorView(Container):
             yield from self._content(self._sector)
 
     def _content(self, sec: SectorDTO) -> ComposeResult:
-        yield Static(f"[b cyan]{sec.region} - Sector {sec.sector_id}[/]", id="title")
+        title = f"[{sec.sector_id}] {sec.region}"
+        if sec.band:
+            title += f" ({sec.band})"
+        yield Static(f"[b cyan]{title}[/]", id="title")
         yield Static(f"░▒▓ {sec.flavor} ▓▒░", id="flavor")
 
         yield Static("", classes="spacer")
