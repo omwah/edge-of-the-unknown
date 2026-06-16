@@ -6,6 +6,7 @@ import random
 
 from rich.text import Text
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Button, DataTable, Static
@@ -444,13 +445,23 @@ class WarpButton(Button):
 
 
 class CurrentSectorMarker(Static):
-    """Non-clickable marker for the player's current sector (the grid's centre)."""
+    """Marker for the player's current sector (the grid's centre).
+
+    Not clickable (warping to your own sector is a no-op), but it *is* focusable:
+    it is the anchor the warp grid focuses on entry, so the first arrow press moves
+    relative to the current sector (Up = the warp rendered directly above it, etc.).
+    """
+
+    can_focus = True
 
     DEFAULT_CSS = """
     CurrentSectorMarker {
         width: 1fr; height: 1; content-align: center middle;
         color: $background; background: $secondary; text-style: bold;
     }
+    /* The marker is only a focus anchor for the arrow keys — it should look the
+       same focused or not (no highlight). */
+    CurrentSectorMarker:focus { color: $background; background: $secondary; text-style: bold; }
     """
 
     def __init__(self, sector_id: int) -> None:
@@ -471,6 +482,18 @@ class WarpGrid(Grid):
     """
 
     _SURROUND = (0, 1, 2, 3, 5, 6, 7, 8)  # the 3x3 cells that aren't the centre
+    _COLUMNS = 3
+
+    # Arrow keys move focus between warp buttons by their on-screen grid position
+    # (Up = the button rendered above, etc.) — purely spatial, nothing to do with
+    # warp gravity. They fire while a warp button is focused (the keys bubble up to
+    # the grid) and are hidden from the footer.
+    BINDINGS = [
+        Binding("up", "move(-1, 0)", show=False),
+        Binding("down", "move(1, 0)", show=False),
+        Binding("left", "move(0, -1)", show=False),
+        Binding("right", "move(0, 1)", show=False),
+    ]
 
     DEFAULT_CSS = """
     WarpGrid {
@@ -499,3 +522,42 @@ class WarpGrid(Grid):
         yield from cells
         for warp in self._warps[len(self._SURROUND):]:  # rare overflow -> extra row
             yield WarpButton(warp)
+
+    def on_mount(self) -> None:
+        # Anchor focus on the current-sector marker (the grid centre) as soon as the
+        # grid appears, so the arrow keys drive warp selection immediately — without a
+        # priming Tab — and the first press moves *relative to the current sector*.
+        # The grid is remounted on every recompose (after a warp/travel/screen-resume),
+        # so focus re-homes to the centre each time the sector view refreshes.
+        self.call_after_refresh(self._focus_anchor)
+
+    def _focus_anchor(self) -> None:
+        marker = next((c for c in self.children if isinstance(c, CurrentSectorMarker)), None)
+        if marker is not None:
+            marker.focus()
+
+    def action_move(self, drow: int, dcol: int) -> None:
+        """Move focus to the next warp button in the (drow, dcol) screen direction.
+
+        Children flow into the fixed-column grid in order, so child index i sits at
+        (i // columns, i % columns). The anchor is whichever grid cell holds focus —
+        the centre marker on entry, then each warp button as you step. We step one
+        cell at a time, skipping the centre marker and empty cells, until we land on
+        a warp button or walk off the grid.
+        """
+        children = list(self.children)
+        grid = {(i // self._COLUMNS, i % self._COLUMNS): c for i, c in enumerate(children)}
+        pos = {c: rc for rc, c in grid.items()}
+        focused = self.app.focused
+        if focused not in pos:  # focus drifted off the grid — re-anchor on the centre
+            self._focus_anchor()
+            return
+        row, col = pos[focused]
+        max_row = (len(children) - 1) // self._COLUMNS
+        row, col = row + drow, col + dcol
+        while 0 <= row <= max_row and 0 <= col < self._COLUMNS:
+            target = grid.get((row, col))
+            if isinstance(target, WarpButton):
+                target.focus()
+                return
+            row, col = row + drow, col + dcol
