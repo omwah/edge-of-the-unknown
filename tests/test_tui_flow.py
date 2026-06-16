@@ -102,6 +102,62 @@ async def test_travel_prompt_warps_along_known_route() -> None:
         assert svc.game_view(1).sector.sector_id == 1
 
 
+async def test_arrow_keys_move_warp_focus() -> None:
+    """Arrow keys move focus between warp buttons by their on-screen layout (round-2).
+
+    The current-sector marker (grid centre) is auto-focused on the fresh game screen
+    (no priming Tab), so the first arrow press moves *relative to the current sector*;
+    further presses step by grid geometry — Right/Left along a row, Down/Up a column.
+    """
+    from edge.tui.widgets import CurrentSectorMarker, WarpButton, WarpGrid
+
+    def land(buttons: dict, start: tuple[int, int], delta: tuple[int, int], max_row: int):
+        r, c = start[0] + delta[0], start[1] + delta[1]
+        while 0 <= r <= max_row and 0 <= c < 3:
+            if (r, c) in buttons:
+                return (r, c)
+            r, c = r + delta[0], c + delta[1]
+        return None
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        # No Tab pressed: the current-sector marker holds focus as the anchor.
+        assert isinstance(app.focused, CurrentSectorMarker)
+
+        grid = app.screen.query_one(WarpGrid)
+        children = list(grid.children)
+        pos = {c: (i // 3, i % 3) for i, c in enumerate(children)}
+        buttons = {pos[c]: c for c in children if isinstance(c, WarpButton)}
+        max_row = (len(children) - 1) // 3
+        centre = pos[app.focused]  # the marker's grid position (1, 1)
+
+        # First press from the centre lands on the warp in that screen direction.
+        keys = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
+        first = next(((k, land(buttons, centre, d, max_row)) for k, d in keys.items()
+                      if land(buttons, centre, d, max_row) is not None), None)
+        assert first is not None
+        key, target = first
+        await pilot.press(key)
+        await pilot.pause()
+        assert app.focused is buttons[target]
+
+        # Right/Left along a row, relative to the now-focused warp button.
+        row_pair = next(((p, (p[0], p[1] + 1)) for p in buttons if (p[0], p[1] + 1) in buttons), None)
+        assert row_pair is not None
+        src, dst = row_pair
+        buttons[src].focus()
+        await pilot.pause()
+        await pilot.press("right")
+        await pilot.pause()
+        assert app.focused is buttons[dst]
+        await pilot.press("left")
+        await pilot.pause()
+        assert app.focused is buttons[src]
+
+
 async def test_dock_and_trade_buys_fuel() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:

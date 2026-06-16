@@ -139,8 +139,15 @@ between the `WarpButton`s by their **on-screen grid position**: Up focuses the
 button rendered directly above the focused one, Down the one below, Left/Right the
 horizontal neighbours; Enter warps the focused button (the existing
 `WarpButton.Warp` message). This is purely spatial focus over the rendered layout
-— it has nothing to do with warp gravity or distance-from-Core. `tui/`-only
-(mypy-exempt); Pilot-tested in `test_tui_flow.py`.
+— it has nothing to do with warp gravity or distance-from-Core. Textual (8.x) has
+no built-in arrow focus (only Tab/Shift+Tab), so `WarpGrid` owns the arrow
+bindings and steps the grid geometry itself (children flow into the fixed-column
+grid, so child index `i` → `(i // cols, i % cols)`; it skips the centre marker and
+empty cells). Crucially, `WarpGrid.on_mount` **auto-focuses its first warp
+button** so the keys work the instant the sector view appears — no priming Tab —
+and re-homes focus on every recompose (after a warp / travel / screen-resume).
+`tui/`-only (mypy-exempt); Pilot-tested in `test_tui_flow.py` (auto-focus present,
+Right/Left and Down/Up geometry).
 
 ---
 
