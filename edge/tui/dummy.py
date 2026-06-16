@@ -23,6 +23,7 @@ from edge.core.dto import (
     Hold,
     MapBand,
     MapDTO,
+    NeighborDTO,
     PortDTO,
     SectorDTO,
     ShipDTO,
@@ -185,16 +186,16 @@ def sample_state() -> GameState:
         kits=2,
         latinum=14_250,
         band="0 - Core",
-        # The mini-map is the current sector's neighbourhood, so the sectors drawn
-        # adjacent to (7) must be exactly its warp targets below (1,3,6,8,12). In the
-        # real game both this and the warp list are projected from the one warp graph
-        # via to_public(); here they're hand-synced.
-        region_map=[
-            " (3) (6)",
-            "   \\ /",
-            "(1)-(7)",
-            "   / \\",
-            " (8) (12)",
+        # The sidebar quick-reference lists the current sector's neighbours, so these
+        # must be exactly the warp targets below (1,3,6,8,12). In the real game both
+        # this and the warp list are projected from the one warp graph via to_public();
+        # here they're hand-synced.
+        neighbors=[
+            NeighborDTO(1, "[1] Sol Core", "Hub", True, ["S"]),
+            NeighborDTO(3, "[3] Sol Core", "Hub", True, ["P", "@"]),
+            NeighborDTO(6, "[6] Vega Reach", "Hub", True, []),
+            NeighborDTO(8, "[8] —", "?", False),
+            NeighborDTO(12, "[12] —", "?", False),
         ],
     )
     sector = SectorDTO(
@@ -202,15 +203,16 @@ def sample_state() -> GameState:
         sector_id=7,
         flavor="the lanes hum with traffic",
         beacon='"Welcome to Sol"',
+        band="Core",
         ports=["Stardock - Class 0"],
         planets=["Terra Nova  terrestrial, warm"],
         ships=["Kestrel  free trader", "Cabal Marauder", "Verdani escort"],
         warps=[
-            WarpDTO(1, "<"),
-            WarpDTO(3, "/", "Sol"),
-            WarpDTO(6, ">"),
-            WarpDTO(8, "?", explored=False),
-            WarpDTO(12, "?", explored=False),
+            WarpDTO(1, "<<"),
+            WarpDTO(3, "--", "Sol"),
+            WarpDTO(6, "--"),
+            WarpDTO(8, ">>", kind="unexplored"),
+            WarpDTO(12, ">>", kind="unexplored"),
         ],
     )
     return GameState(turns=287, max_turns=300, ship=ship, sector=sector)

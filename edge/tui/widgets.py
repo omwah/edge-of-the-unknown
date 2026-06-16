@@ -12,7 +12,7 @@ from textual.widgets import Button, DataTable, Static
 
 from edge.core.enums import Commodity
 from edge.tui import sprites
-from edge.tui.dummy import MapBand, MapDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
+from edge.tui.dummy import MapBand, MapDTO, NeighborDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
 
 
 class Starfield(Static):
@@ -172,18 +172,78 @@ class TradePanel(Vertical):
         return None
 
 
-class StatusSidebar(Static):
-    """Right-hand status readout derived from a ShipDTO (UI_MOCKUPS.md §1)."""
+_CODE_STYLE = {"S": "b magenta", "P": "magenta", "@": "green"}
+
+
+def _code_markup(codes: list[str]) -> str:
+    """Render content tokens (S/P StarDock-port, @ planet) colour-coded by type."""
+    return " ".join(f"[{_CODE_STYLE.get(c, 'white')}]{c}[/]" for c in codes)
+
+
+def _warp_legend() -> str:
+    """The warp colour/arrow key shown beneath the sidebar (WP-A)."""
+    return (
+        "[dim]─ warps ─[/]\n"
+        "[cyan]■[/] visited  [magenta]■[/] came-from  [dim]■ unmapped[/]\n"
+        "[dim]<< toward Core · -- level · >> deeper[/]"
+    )
+
+
+class NeighborRow(Static):
+    """A clickable adjacent-sector row in the sidebar quick-reference (WP-A).
+
+    Clicking warps to the neighbour — it reuses `WarpButton.Warp` so the
+    GameScreen's existing `on_warp_button_warp` handler drives both affordances.
+    """
+
+    DEFAULT_CSS = """
+    NeighborRow { height: 1; }
+    NeighborRow:hover { background: $boost; text-style: bold; }
+    NeighborRow.unexplored { color: $text-disabled; }
+    """
+
+    def __init__(self, neighbor: NeighborDTO, **kwargs: object) -> None:
+        super().__init__(self._markup(neighbor), **kwargs)
+        self._sector_id = neighbor.sector_id
+        if not neighbor.explored:
+            self.add_class("unexplored")
+
+    @staticmethod
+    def _markup(n: NeighborDTO) -> str:
+        if not n.explored:
+            return f"  {n.name}"
+        codes = _code_markup(n.codes)
+        tail = f"  {codes}" if codes else ""
+        return f"  {n.name} [dim]({n.band})[/]{tail}"
+
+    def on_click(self) -> None:
+        self.post_message(WarpButton.Warp(self._sector_id))
+
+
+class StatusSidebar(Vertical):
+    """Right-hand status readout derived from a ShipDTO (UI_MOCKUPS.md §1).
+
+    A container (not a single Static) so the neighbour quick-reference rows are
+    individually clickable warp affordances (WP-A).
+    """
 
     DEFAULT_CSS = """
     StatusSidebar { width: 1fr; padding: 0 1; border-left: solid $primary; }
+    StatusSidebar > Static { height: auto; }
     """
 
     def __init__(self, ship: ShipDTO, **kwargs: object) -> None:
         super().__init__(**kwargs)
         self._ship = ship
 
-    def render(self) -> str:
+    def compose(self) -> ComposeResult:
+        yield Static(self._stats_markup())
+        yield Static("[dim]nearby (click to warp):[/]")
+        for neighbor in self._ship.neighbors:
+            yield NeighborRow(neighbor)
+        yield Static(_warp_legend())
+
+    def _stats_markup(self) -> str:
         s = self._ship
         rule = "[dim]" + "─" * 30 + "[/]"
         lines: list[str] = [
@@ -206,9 +266,8 @@ class StatusSidebar(Static):
             f"Latinum  [b yellow]{s.latinum:,}[/] slips",
             rule,
             f"Band {s.band}",
-            "[dim]region:[/]",
+            rule,
         ]
-        lines += [f"  {row}" for row in s.region_map]
         return "\n".join(lines)
 
 
@@ -371,10 +430,13 @@ class WarpButton(Button):
         label = f"{warp.sector_id} {warp.arrow}"
         if warp.label:
             label += f" {warp.label}"
-        super().__init__(label, variant="primary" if warp.explored else "default")
+        variant = "primary" if warp.kind == "explored" else "default"
+        super().__init__(label, variant=variant)
         self._warp = warp
-        if not warp.explored:
+        if warp.kind == "unexplored":
             self.add_class("unexplored")
+        elif warp.kind == "backtrack":
+            self.add_class("backtrack")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
@@ -421,6 +483,7 @@ class WarpGrid(Grid):
     }
     WarpGrid WarpButton { width: 1fr; height: 1; border: none !important; }
     WarpGrid WarpButton.unexplored { color: $text-disabled; }
+    WarpGrid WarpButton.backtrack { color: $accent; }
     """
 
     def __init__(self, warps: list[WarpDTO], current_sector: int, **kwargs: object) -> None:

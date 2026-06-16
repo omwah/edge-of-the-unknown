@@ -51,9 +51,28 @@ class PortDTO:
 @dataclass(frozen=True)
 class WarpDTO:
     sector_id: int
-    arrow: str
+    arrow: str  # gravity glyph relative to the Core: "<<" closer / ">>" deeper / "--" level
     label: str | None = None
-    explored: bool = True
+    kind: str = "explored"  # "explored" | "unexplored" | "backtrack" — drives colour
+
+    @property
+    def explored(self) -> bool:
+        return self.kind != "unexplored"
+
+
+@dataclass(frozen=True)
+class NeighborDTO:
+    """One adjacent sector for the sidebar quick-reference (a clickable warp).
+
+    `name`/`band` and content `codes` are filled only for sectors the player has
+    explored; an unexplored neighbour reads as `[id] —` with no codes.
+    """
+
+    sector_id: int
+    name: str  # "[432] Halaf Verge" (explored) | "[432] —" (unexplored)
+    band: str  # "Frontier" (explored) | "?" (unexplored)
+    explored: bool
+    codes: list[str] = field(default_factory=list)  # short content tokens, explored only
 
 
 @dataclass(frozen=True)
@@ -62,6 +81,7 @@ class SectorDTO:
     sector_id: int
     flavor: str
     beacon: str | None
+    band: str = ""  # distance-band name, e.g. "Frontier" (for the "[id] Region (Band)" title)
     ports: list[str] = field(default_factory=list)
     planets: list[str] = field(default_factory=list)
     ships: list[str] = field(default_factory=list)
@@ -96,7 +116,7 @@ class ShipDTO:
     kits: int
     latinum: int
     band: str
-    region_map: list[str]
+    neighbors: list[NeighborDTO]
 
 
 @dataclass(frozen=True)
