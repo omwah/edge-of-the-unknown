@@ -36,7 +36,9 @@ def test_new_game_view_starts_at_core(tmp_path: Path) -> None:
 
 def test_warp_updates_view_and_reveals_fog(tmp_path: Path) -> None:
     svc = _service(tmp_path)
-    target = svc.state.sectors[1].warps_out[0]
+    # Pick a neighbour off the pre-explored StarDock route so it's still fogged.
+    explored = svc.state.players[1].explored_sectors
+    target = next(s for s in svc.state.sectors[1].warps_out if s not in explored)
     # Before warping, the neighbour is an unexplored '?' warp.
     before = next(w for w in svc.game_view(1).sector.warps if w.sector_id == target)
     assert not before.explored
