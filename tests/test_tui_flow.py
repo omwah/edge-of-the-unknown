@@ -13,6 +13,7 @@ from edge.core.rules import Warp
 from edge.tui.app import EdgeApp
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.stardock import StarDockScreen
+from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.widgets import NeighborRow
 
 
@@ -76,6 +77,29 @@ async def test_log_hotkey_opens_computer_with_signpost() -> None:
         rows = app.screen.query_one("#log-table", DataTable)
         cells = [str(rows.get_cell_at((r, 1))) for r in range(rows.row_count)]
         assert any("StarDock" in c for c in cells)
+
+
+async def test_travel_prompt_warps_along_known_route() -> None:
+    from textual.widgets import Input
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        # Uncover a neighbour with a two-way edge, then travel back to the Core (1).
+        a = next(s for s in svc.state.sectors[1].warps_out
+                 if 1 in svc.state.sectors[s].warps_out)
+        svc.apply(1, Warp(to_sector=a))
+        await pilot.press("w")  # open the travel prompt (WP-C)
+        await pilot.pause()
+        assert isinstance(app.screen, TravelPromptScreen)
+        app.screen.query_one("#travel-input", Input).value = "1"
+        await pilot.press("enter")
+        await pilot.pause()
+        assert svc.game_view(1).sector.sector_id == 1
 
 
 async def test_dock_and_trade_buys_fuel() -> None:

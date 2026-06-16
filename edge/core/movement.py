@@ -27,20 +27,30 @@ def can_warp(adjacency: Adjacency, from_sector: int, to_sector: int) -> bool:
     return to_sector in warp_targets(adjacency, from_sector)
 
 
-def shortest_path(adjacency: Adjacency, src: int, dst: int) -> list[int] | None:
+def shortest_path(
+    adjacency: Adjacency, src: int, dst: int, allowed: set[int] | None = None
+) -> list[int] | None:
     """Fewest-hop path from `src` to `dst` (inclusive), or None if unreachable.
 
     BFS over the directional graph — the route planner's primitive (§11). Returns
-    `[src]` when `src == dst`.
+    `[src]` when `src == dst`. When `allowed` is given, the path may only traverse
+    sectors in that set (`src` excepted) — the route-lock used by multi-hop travel,
+    so the player can only `TravelTo` a destination whose route they've uncovered.
     """
     if src == dst:
         return [src]
+
+    def passable(node: int) -> bool:
+        return allowed is None or node in allowed
+
+    if not passable(dst):
+        return None
     prev: dict[int, int] = {src: src}
     queue: deque[int] = deque([src])
     while queue:
         current = queue.popleft()
         for nxt in adjacency.get(current, ()):
-            if nxt in prev:
+            if nxt in prev or not passable(nxt):
                 continue
             prev[nxt] = current
             if nxt == dst:

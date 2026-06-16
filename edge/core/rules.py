@@ -37,13 +37,20 @@ from edge.core.events import (
     Warped,
 )
 from edge.core.models import Game, Player, Port, Ship, UniverseState
-from edge.core.movement import MovementError, can_warp
+from edge.core.movement import MovementError, can_warp, shortest_path
 
 # --- commands ---------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
 class Warp:
+    to_sector: int
+
+
+@dataclass(frozen=True, slots=True)
+class TravelTo:
+    """A multi-hop warp to a known sector along its uncovered route (WP-C)."""
+
     to_sector: int
 
 
@@ -81,7 +88,7 @@ class BuyUpgrade:
     pass
 
 
-Command = Warp | Dock | Trade | HaggleOffer | Deposit | Withdraw | BuyUpgrade
+Command = Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw | BuyUpgrade
 
 
 # --- result -----------------------------------------------------------------
@@ -120,6 +127,8 @@ def reduce(
     match command:
         case Warp():
             return _warp(state, player_id, command)
+        case TravelTo():
+            return _travel(state, player_id, command)
         case Dock():
             return _dock(state, player_id)
         case Trade():
@@ -167,12 +176,63 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp) -> ReduceResult:
         player,
         turns_remaining=player.turns_remaining - cost,
         explored_sectors=player.explored_sectors | frozenset({cmd.to_sector}),
+        entered_from={**player.entered_from, cmd.to_sector: ship.sector_id},
     )
     return ReduceResult(
         events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost),),
         players=(new_player,),
         ships=(new_ship,),
     )
+
+
+def _should_interrupt(state: UniverseState, player: Player, sector_id: int) -> bool:
+    """Whether a multi-hop journey must halt on entering `sector_id`.
+
+    Phase-1 stub — always False. Phase 3 injects the hostile-encounter roll here
+    so a `TravelTo` stops mid-route when an alien intercepts the player (§10).
+    """
+    return False
+
+
+def _travel(state: UniverseState, player_id: int, cmd: TravelTo) -> ReduceResult:
+    """Multi-hop warp along a *known* route (§9, §11, WP-C).
+
+    Route-locked: the path is found through already-explored sectors only, so the
+    player can only `TravelTo` a destination whose route they have uncovered. The
+    journey applies hop-by-hop (one `Warped` per hop), halting early if turns run
+    out or `_should_interrupt` fires — the same per-sector seam combat will use.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    path = shortest_path(state.adjacency, ship.sector_id, cmd.to_sector,
+                         allowed=set(player.explored_sectors))
+    if path is None:
+        raise MovementError(f"no uncovered route to {cmd.to_sector}")
+    hops = path[1:]
+    if not hops:
+        raise MovementError("already in that sector")
+    cost = ship.turns_per_warp
+    if player.turns_remaining < cost:
+        raise MovementError("out of turns")
+
+    events: list[Event] = []
+    current = ship.sector_id
+    turns = player.turns_remaining
+    explored = player.explored_sectors
+    entered = dict(player.entered_from)
+    for nxt in hops:
+        if turns < cost or _should_interrupt(state, player, nxt):
+            break
+        turns -= cost
+        events.append(Warped(player_id, current, nxt, cost))
+        entered[nxt] = current
+        explored = explored | frozenset({nxt})
+        current = nxt
+
+    new_ship = replace(ship, sector_id=current)
+    new_player = replace(player, turns_remaining=turns,
+                         explored_sectors=explored, entered_from=entered)
+    return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,))
 
 
 def _dock(state: UniverseState, player_id: int) -> ReduceResult:

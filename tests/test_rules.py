@@ -23,6 +23,7 @@ from edge.core.rules import (
     Dock,
     HaggleOffer,
     Trade,
+    TravelTo,
     Warp,
     Withdraw,
     apply_result,
@@ -79,6 +80,81 @@ def test_warp_costs_turns_and_records_exploration() -> None:
     assert state.players[1].turns_remaining == 249
     assert state.ships[1].sector_id == 2
     assert 2 in state.players[1].explored_sectors
+
+
+def _line_universe() -> UniverseState:
+    """Sectors 1<->2<->3<->4 in a line; player starts at 1 with only 1 explored."""
+    from edge.core.models import Sector
+
+    game = Game(id=1, seed=1, config_version=1, created_at="2026-06-15T00:00:00Z")
+    state = UniverseState.new(game)
+    state.sectors = {
+        1: Sector(id=1, region_id=1, warps_out=(2,), distance_band="Hub"),
+        2: Sector(id=2, region_id=1, warps_out=(1, 3), distance_band="Hub"),
+        3: Sector(id=3, region_id=1, warps_out=(2, 4), distance_band="Frontier"),
+        4: Sector(id=4, region_id=1, warps_out=(3,), distance_band="Frontier"),
+    }
+    state.rebuild_adjacency()
+    state.ships = {
+        1: Ship(id=1, type_id="trailblazer", name="S.S.", owner_player_id=1,
+                sector_id=1, holds_total=60, turns_per_warp=1),
+    }
+    state.players = {
+        1: Player(id=1, name="you", ship_id=1, latinum=0, turns_remaining=250,
+                  explored_sectors=frozenset({1})),
+    }
+    return state
+
+
+def test_warp_records_breadcrumb() -> None:
+    state = _line_universe()
+    _do(state, Warp(to_sector=2))
+    assert dict(state.players[1].entered_from) == {2: 1}
+    _do(state, Warp(to_sector=3))
+    assert state.players[1].entered_from[3] == 2  # last-entered-from per sector
+
+
+def test_travel_to_multi_hop_known_route() -> None:
+    state = _line_universe()
+    _do(state, Warp(to_sector=2))  # uncover the route 1->2->3
+    _do(state, Warp(to_sector=3))
+    turns = state.players[1].turns_remaining
+    result = _do(state, TravelTo(to_sector=1))  # travel back along explored sectors
+    assert state.ships[1].sector_id == 1
+    assert len(result.events) == 2  # two hops: 3->2, 2->1  # type: ignore[attr-defined]
+    assert state.players[1].turns_remaining == turns - 2
+    assert state.players[1].entered_from[1] == 2  # crumb updated on the way back
+
+
+def test_travel_to_rejects_unexplored_route() -> None:
+    state = _line_universe()
+    _do(state, Warp(to_sector=2))  # explored {1, 2} only
+    with pytest.raises(MovementError):
+        reduce(state, 1, TravelTo(to_sector=4), CONFIG)  # route past 3/4 not uncovered
+
+
+def test_travel_to_same_sector_and_out_of_turns_are_rejected() -> None:
+    from dataclasses import replace
+
+    state = _line_universe()
+    with pytest.raises(MovementError):
+        reduce(state, 1, TravelTo(to_sector=1), CONFIG)  # already in that sector
+    _do(state, Warp(to_sector=2))
+    state.players[1] = replace(state.players[1], turns_remaining=0)
+    with pytest.raises(MovementError):
+        reduce(state, 1, TravelTo(to_sector=1), CONFIG)  # can't afford the first hop
+
+
+def test_travel_to_stops_partway_when_turns_run_out() -> None:
+    from dataclasses import replace
+
+    state = _line_universe()
+    _do(state, Warp(to_sector=2))  # uncover 1->2->3
+    _do(state, Warp(to_sector=3))
+    state.players[1] = replace(state.players[1], turns_remaining=1)  # only one hop's worth
+    result = _do(state, TravelTo(to_sector=1))  # 3->2->1 needs two
+    assert state.ships[1].sector_id == 2  # halted midway
+    assert len(result.events) == 1 and state.players[1].turns_remaining == 0  # type: ignore[attr-defined]
 
 
 def test_warp_rejects_illegal_and_when_out_of_turns() -> None:

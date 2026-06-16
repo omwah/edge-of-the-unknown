@@ -28,6 +28,7 @@ from edge.core.rules import (
     Dock,
     HaggleOffer,
     Trade,
+    TravelTo,
     Warp,
     Withdraw,
 )
@@ -38,6 +39,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
     match command:
         case Warp():
             return "Warp", {"to_sector": command.to_sector}
+        case TravelTo():
+            return "TravelTo", {"to_sector": command.to_sector}
         case Dock():
             return "Dock", {}
         case Trade():
@@ -65,6 +68,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
     match type_:
         case "Warp":
             return Warp(to_sector=payload["to_sector"])
+        case "TravelTo":
+            return TravelTo(to_sector=payload["to_sector"])
         case "Dock":
             return Dock()
         case "Trade":

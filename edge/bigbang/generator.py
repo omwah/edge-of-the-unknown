@@ -22,6 +22,7 @@ from edge.bigbang.topology import (
     add_bidirectional,
     add_directed,
     add_ring_motifs,
+    bfs_distances,
     carve_core,
     compute_bands,
 )
@@ -145,6 +146,7 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
             for sid in out
         }
         state.rebuild_adjacency()
+        state.core_hops = bfs_distances(out, 1)  # gravity-arrow cache (§11, WP-C)
 
         _populate.populate(state, config, build_rng)
 

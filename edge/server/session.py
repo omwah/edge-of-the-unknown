@@ -85,17 +85,25 @@ def _gravity_arrow(here: int, there: int) -> str:
     return "--"
 
 
+def _warp_kind(target: int, came_from: int | None, explored: frozenset[int]) -> str:
+    """The warp's colour band: the way back you came / visited / still unmapped (WP-C)."""
+    if target == came_from:
+        return "backtrack"
+    return "explored" if target in explored else "unexplored"
+
+
 def _sector_dto(
     state: UniverseState, player: Player, sector: Sector, core_hops: dict[int, int]
 ) -> dto.SectorDTO:
     ports = [p.name for p in state.ports.values() if p.sector_id == sector.id]
     planets = [f"{pl.name}  {pl.planet_type}" for pl in state.planets.values() if pl.sector_id == sector.id]
     here = core_hops.get(sector.id, 0)
+    came_from = player.entered_from.get(sector.id)
     warps = [
         dto.WarpDTO(
             sector_id=target,
             arrow=_gravity_arrow(here, core_hops.get(target, here)),
-            kind="explored" if target in player.explored_sectors else "unexplored",
+            kind=_warp_kind(target, came_from, player.explored_sectors),
         )
         for target in sector.warps_out
     ]
@@ -112,7 +120,7 @@ def game_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.G
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
     sector = state.sectors[ship.sector_id]
-    core_hops = bfs_distances(state.adjacency, 1)
+    core_hops = state.core_hops or bfs_distances(state.adjacency, 1)  # cached at gen (WP-C)
     return dto.GameState(
         turns=player.turns_remaining, max_turns=config.turns_per_day,
         ship=_ship_dto(state, ship, player, sector),

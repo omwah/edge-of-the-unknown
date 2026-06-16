@@ -18,13 +18,14 @@ from textual.widgets import Footer, Static
 from edge.core.economy import EconomyError
 from edge.core.events import Event
 from edge.core.movement import MovementError
-from edge.core.rules import Dock, Warp
+from edge.core.rules import Dock, TravelTo, Warp
 from edge.server.service import GameService
 from edge.server.session import format_event
 from edge.tui.dummy import SectorDTO, sample_engine_room
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.planet import PlanetScreen
+from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
 from edge.tui.widgets import (
@@ -121,6 +122,7 @@ class SectorView(Container):
 class GameScreen(Screen):
     BINDINGS = [
         Binding("p", "dock_port", "Dock"),
+        Binding("w", "travel", "Travel"),
         Binding("s", "survey_planet", "Survey Planet"),
         Binding("c", "computer", "Computer"),
         Binding("e", "engine_room", "Engine Room"),
@@ -180,6 +182,23 @@ class GameScreen(Screen):
             return
         self._record(events)
         await self.recompose()
+
+    def action_travel(self) -> None:
+        self.app.push_screen(TravelPromptScreen(), self._after_travel)
+
+    def _after_travel(self, dest: int | None) -> None:
+        if dest is None:
+            return
+        try:
+            events = self._service.apply(self._pid, TravelTo(to_sector=dest))
+        except (MovementError, EconomyError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        if not events:
+            self.notify("No move made.", timeout=2)
+            return
+        self._record(events)
+        self.run_worker(self.recompose())
 
     async def action_dock_port(self) -> None:
         await self._dock()
