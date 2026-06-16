@@ -116,6 +116,17 @@ def test_game_view_gravity_arrows() -> None:
     assert arrows == {1: "<<", 3: ">>", 6: "--"}  # toward Core / deeper / level
 
 
+def test_game_view_marks_the_way_back() -> None:
+    from dataclasses import replace
+
+    world = _nav_world()  # player at sector 2
+    world.players[1] = replace(world.players[1], entered_from={2: 1})  # arrived from 1
+    kinds = {w.sector_id: w.kind for w in session.game_view(world, 1, CONFIG).sector.warps}
+    assert kinds[1] == "backtrack"  # the way we came in
+    assert kinds[3] == "explored"  # visited, but not the breadcrumb
+    assert kinds[6] == "unexplored"
+
+
 def test_game_view_sector_title_carries_band() -> None:
     view = session.game_view(_nav_world(), 1, CONFIG)
     assert view.sector.region == "Sol Core" and view.sector.band == "Hub"

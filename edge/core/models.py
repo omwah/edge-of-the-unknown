@@ -137,6 +137,9 @@ class Player:
     turns_remaining: int = 0
     alliance_id: int | None = None
     explored_sectors: frozenset[int] = frozenset()
+    # For each visited sector, the neighbour the player last arrived from — the
+    # breadcrumb that colours the "way back" warp (§11, WP-C).
+    entered_from: Mapping[int, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,6 +170,9 @@ class UniverseState:
     players: dict[int, Player] = field(default_factory=dict)
     alliances: dict[int, Alliance] = field(default_factory=dict)
     adjacency: dict[int, tuple[int, ...]] = field(default_factory=dict)
+    # Hop distance from the Core (sector 1) per sector — a runtime-only cache (like
+    # adjacency, excluded from `state_hash`) driving the warp "gravity" arrows (§11).
+    core_hops: dict[int, int] = field(default_factory=dict)
 
     @classmethod
     def new(cls, game: Game) -> UniverseState:

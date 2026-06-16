@@ -23,6 +23,7 @@ from edge.core.rules import (
     Dock,
     HaggleOffer,
     Trade,
+    TravelTo,
     Warp,
     Withdraw,
 )
@@ -30,6 +31,7 @@ from edge.store import codec
 
 COMMANDS: list[Command] = [
     Warp(to_sector=12),
+    TravelTo(to_sector=20),
     Dock(),
     Trade(commodity=Commodity.FUEL_ORE, units=10, unit_price=13),
     Trade(commodity=Commodity.ORGANICS, units=5),  # unit_price None

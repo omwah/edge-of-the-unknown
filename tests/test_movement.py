@@ -25,3 +25,12 @@ def test_shortest_path_respects_direction() -> None:
     assert shortest_path(ADJ, 1, 1) == [1]
     # 3->2 does not exist (2->3 is one-way), so 4 cannot reach 1.
     assert shortest_path(ADJ, 4, 1) is None
+
+
+def test_shortest_path_route_lock() -> None:
+    # The full graph is reachable; an `allowed` set restricts which sectors a path
+    # may traverse (the route-lock used by multi-hop travel, WP-C).
+    assert shortest_path(ADJ, 1, 4, allowed={1, 2, 3, 4}) == [1, 2, 3, 4]
+    assert shortest_path(ADJ, 1, 4, allowed={1, 2, 4}) is None  # 3 not uncovered
+    assert shortest_path(ADJ, 1, 3, allowed={1, 2}) is None  # destination not uncovered
+    assert shortest_path(ADJ, 1, 1, allowed=set()) == [1]  # src is always reachable
