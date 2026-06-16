@@ -131,7 +131,7 @@ class TradePanel(Vertical):
         if self._show_title:
             yield Static(
                 f"[b cyan]TRADEPORT · {p.name} · {p.klass}[/]"
-                f"      [dim]Sector {p.sector_id}[/]",
+                f"      [dim]Sector {p.display_id}[/]",
                 id="port-title",
             )
         yield DataTable(id="commodities", zebra_stripes=True, cursor_type="row")
@@ -428,7 +428,7 @@ class WarpButton(Button):
             super().__init__()
 
     def __init__(self, warp: WarpDTO) -> None:
-        label = f"{warp.sector_id} {warp.arrow}"
+        label = f"{warp.display_id} {warp.arrow}"  # spatial id shown; sector_id is the action
         if warp.label:
             label += f" {warp.label}"
         variant = "primary" if warp.kind == "explored" else "default"

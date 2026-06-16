@@ -92,7 +92,8 @@ def test_intro_line_names_the_stardock_sector(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)
     line = svc.intro_line(1)
-    assert line is not None and f"Sector {dock.sector_id}" in line
+    # The signpost names the StarDock's *spatial* display id (§5.1), not the internal id.
+    assert line is not None and f"Sector {svc.state.spatial_ids[dock.sector_id]}" in line
 
 
 def test_messages_view_signpost_and_real_events(tmp_path: Path) -> None:
@@ -100,9 +101,31 @@ def test_messages_view_signpost_and_real_events(tmp_path: Path) -> None:
     # Fresh game: only the derived StarDock signpost is present.
     fresh = svc.messages_view(1)
     assert len(fresh.events) == 1 and "StarDock" in fresh.events[0].text
-    # After a warp, the newest event leads and the signpost sinks to the bottom.
+    # After a warp, the newest event leads (with the spatial id) and the signpost sinks.
     target = svc.state.sectors[1].warps_out[0]
     svc.apply(1, Warp(to_sector=target))
     after = svc.messages_view(1)
-    assert f"Sector {target}" in after.events[0].text
+    assert f"Sector {svc.state.spatial_ids[target]}" in after.events[0].text
     assert "StarDock" in after.events[-1].text
+
+
+def test_resolve_display_id_round_trips(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    # A typed spatial id maps back to its internal sector id (§5.1, the travel prompt).
+    for internal, spatial in svc.state.spatial_ids.items():
+        assert svc.resolve_display_id(spatial) == internal
+    # An id that names no sector is rejected.
+    assert svc.resolve_display_id(999_999) is None
+
+
+def test_resolve_display_id_identity_without_spatial_ids(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    svc.state.spatial_ids = {}  # a state that never ran the numbering pass
+    assert svc.resolve_display_id(42) == 42  # falls back to the internal id
+
+
+def test_describe_event_uses_spatial_id(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    target = svc.state.sectors[1].warps_out[0]
+    (event,) = svc.apply(1, Warp(to_sector=target))
+    assert f"Sector {svc.state.spatial_ids[target]}" in svc.describe_event(event)

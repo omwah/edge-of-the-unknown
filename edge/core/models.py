@@ -173,6 +173,11 @@ class UniverseState:
     # Hop distance from the Core (sector 1) per sector — a runtime-only cache (like
     # adjacency, excluded from `state_hash`) driving the warp "gravity" arrows (§11).
     core_hops: dict[int, int] = field(default_factory=dict)
+    # Internal sector id -> band-monotone spatial *display* id (DESIGN §5.1). A
+    # runtime-only cache derived from topology at generation; the internal ids stay
+    # authoritative, so this never touches persistence or `state_hash`. Surfaced
+    # only at the projection boundary; empty for hand-built (test) states.
+    spatial_ids: dict[int, int] = field(default_factory=dict)
 
     @classmethod
     def new(cls, game: Game) -> UniverseState:

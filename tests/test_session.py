@@ -132,6 +132,37 @@ def test_game_view_sector_title_carries_band() -> None:
     assert view.sector.region == "Sol Core" and view.sector.band == "Hub"
 
 
+def test_display_ids_fall_back_to_internal_without_spatial_ids() -> None:
+    # A fixture state never ran the numbering pass: display_id mirrors the internal id.
+    view = session.game_view(_nav_world(), 1, CONFIG)
+    assert view.sector.display_id == view.sector.sector_id == 2
+    assert all(w.display_id == w.sector_id for w in view.sector.warps)
+    assert all(n.display_id == n.sector_id for n in view.ship.neighbors)
+
+
+def test_display_ids_surface_spatial_ids_when_present() -> None:
+    world = _nav_world()  # player at sector 2; warps 1, 3, 6
+    world.spatial_ids = {1: 10101, 2: 10102, 3: 20101, 6: 10103}
+    view = session.game_view(world, 1, CONFIG)
+    assert view.sector.display_id == 10102  # sector title shows the spatial id
+    assert {w.sector_id: w.display_id for w in view.sector.warps} == {1: 10101, 3: 20101, 6: 10103}
+    by_id = {n.sector_id: n for n in view.ship.neighbors}
+    assert by_id[3].name == "[20101] Halaf Verge"  # explored neighbour embeds the spatial id
+    assert by_id[6].name == "[10103] —"  # masked neighbour still numbered spatially
+    # The gravity arrows are unchanged — they key off core_hops, not the display id.
+    assert {w.sector_id: w.arrow for w in view.sector.warps} == {1: "<<", 3: ">>", 6: "--"}
+    # The StarDock signpost would use the spatial id too (sector 3 hosts the SSB port here).
+    world.ports[3] = _port(3, 3, PortClass.STARDOCK)
+    assert "Sector 20101" in (session.stardock_signpost(world) or "")
+
+
+def test_format_event_uses_display_map_for_warps() -> None:
+    from edge.core.events import Warped
+
+    assert "Sector 12" in session.format_event(Warped(1, 7, 12, 1))  # no map -> internal id
+    assert "Sector 20116" in session.format_event(Warped(1, 7, 12, 1), {12: 20116})
+
+
 def test_format_event_covers_kinds_and_filters_noise() -> None:
     from edge.core.enums import PortMode
     from edge.core.events import (

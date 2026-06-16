@@ -257,13 +257,13 @@ webserver."
 
 ---
 
-## WP-E — Sector renumbering: research + DESIGN proposal + prototype (no cutover)
+## WP-E — Spatial sector numbering (research + DESIGN + prototype)
 
-The hard item, scoped to a **proposal + prototype** this round per the user's
-decision. The risk that makes a full cutover its own round: sector IDs are the
-primary key across `models.py`, `adjacency`, `events`, the SQLite **command/event
-log**, **golden-master state hashes** (`store/snapshots.py`), and every test
-fixture — changing them invalidates all recorded replays.
+The hard item. Originally scoped to a **proposal + prototype** (the risky cutover —
+sector IDs are the primary key across `models.py`, `adjacency`, `events`, the SQLite
+command/event log, golden-master hashes, and every fixture — deferred). **WP-G then
+superseded the cutover** with a dual-id model (below): the prototype became the
+live, player-facing display id with *no* cutover at all.
 
 ### Research findings (web, June 2026)
 
@@ -285,31 +285,66 @@ fixture — changing them invalidates all recorded replays.
   This directly endorses *region-prefix + locally-sequential-within-region*, plus
   coarse directional cues (the gravity arrows from WP-C).
 
-### Proposed scheme (to be written into DESIGN.md §5)
+### Proposed scheme (written into DESIGN.md §5.1)
 
-A **multi-level, gapped, band-monotone ID**, e.g. `BRR LL`:
-- **Band digit(s)** first, so a numerically larger ID ⇒ farther from Core
-  (topological sort on `core_hops`): Core/Hub < Frontier < Deep < Void.
-- **Region prefix** shared by all sectors in a region (Elite-style boxel idea;
-  satisfies "all sectors in a region share the same prefix"). Alliance/home-cluster
-  regions get their own reserved prefix block.
-- **Local ordinal** within the region, **gapped** (no monotonic global counter —
-  the feedback explicitly allows gaps), and **strictly sequential for `tunnel`
-  motif regions** (Halaf 10,11,12,13) to signal a linear path. (Tunnels are a
-  DESIGN §5 step-3 motif not yet generated in code — coordinate with that.)
-- IDs stay integers (so the column type and codec are unchanged) but are *encoded*
-  as `band*10000 + region*100 + ordinal` (4–5 digit), preserving sortability.
+A **multi-level, gapped, band-monotone integer** `band·region·ordinal`:
+- **Band digit** first, so a numerically larger ID ⇒ farther from Core
+  (Hub < Frontier < Deep < Void); one decimal digit (≤ 9 bands).
+- **Region prefix** shared by all sectors in a region, numbered **within their
+  band** by representative (min-hop) distance (Elite-style boxel idea; satisfies
+  "all sectors in a region share the same prefix").
+- **Local ordinal** within the region, ordered by hop then id — which lays a
+  **tunnel** motif region out **sequentially** (Halaf 10,11,12,13). **Gapped** (the
+  feedback explicitly allows gaps).
+- Encoded positionally as `(band+1)·band_stride + region_local·region_stride +
+  ordinal`, with field widths **derived from the actual counts** (compact 4–5
+  digit IDs for a 1000-sector universe — `10101` for Terra — widening gracefully).
 
-### Deliverables this round (no production cutover)
-1. **DESIGN.md update**: new §5 sub-section specifying the scheme, the research
-   rationale above, and the validator invariant "ID order is consistent with
-   `core_hops` order."
-2. **Prototype function** (in `bigbang/`, behind a test, not wired into
-   `generate`): `assign_spatial_ids(groups, core_hops, bands, cfg) -> dict[old,new]`
-   producing the encoded IDs deterministically from the build RNG.
-3. **A migration note** in the proposal: the cutover round must remap the command
-   log or (cleaner) treat it as a `config_version` bump that regenerates golden
-   masters, since IDs are derived, not authored.
+**Key design decision — region atomicity over strict per-sector monotonicity.** A
+5–25-sector cluster can straddle a band boundary, so "one prefix per region" and
+"strict higher-ID-is-farther *per sector*" can't both hold. We chose **region
+atomicity**: each region gets one home band (its min-hop sector's band) and a
+shared prefix; monotonicity then holds at **region granularity**, with per-sector
+direction still exact via the WP-C gravity arrows. (Deviation from the original
+"ID order consistent with `core_hops` order" invariant — refined in DESIGN §5.1.)
+
+### Deliverables — **done**
+1. **DESIGN.md §5.1** — scheme, research rationale, the region/monotonicity
+   decision, validator invariants. ✓ (Migration note replaced by the WP-G dual-id
+   model.)
+2. **Function** `edge/bigbang/numbering.py::assign_spatial_ids(groups, core_hops,
+   bands) -> dict[old, new]` — a **pure, deterministic, bijective** function of
+   topology (no RNG; a deliberate simplification of the planned "from the build
+   RNG"), pinned by `tests/test_numbering.py`. ✓ (Wired into `generate` by WP-G.)
+
+---
+
+## WP-G — Spatial ids as a UI-only secondary id (supersedes the WP-E cutover)
+
+The user's insight: keep the **internal incremental ids authoritative** and surface
+the spatial ids as a **derived, UI-only secondary id**, so we ship the legibility
+win now with **zero cutover risk**. Player-facing UI shows/accepts **spatial ids
+only**; internal ids stay for code/persistence and `bigbang --inspect`.
+
+- **Runtime cache:** `UniverseState.spatial_ids` (beside `core_hops`, excluded from
+  `state_hash`), filled in `generate` via `assign_spatial_ids(groups, core_hops,
+  cfg.bands)`. Recomputed identically on `rebuild`, so never persisted.
+- **DTOs:** a defaulted `display_id` on `WarpDTO`/`SectorDTO`/`PortDTO`/`NeighborDTO`
+  (+ `you_display` on `MapDTO`); `sector_id` stays the internal click/command payload.
+- **Projection (`session.py`):** a `_display(state, sid)` helper (`.get(…, sid)`
+  fallback keeps fixture states rendering internal ids) fills `display_id` and the
+  StarDock signpost + `Warped` log line; `format_event` gained a `display` map.
+- **Service:** `resolve_display_id` (reverse lookup for the travel prompt) and
+  `describe_event` (ticker text with spatial ids, no TUI→core reach).
+- **TUI:** warp labels, sector title, centre marker, sidebar, port/StarDock/map
+  headers render `display_id`; the travel callback maps the typed spatial id back
+  to internal. Clicks already carry internal ids — unchanged.
+- **Docs:** DESIGN §5.1 reframed to the dual-id model (no migration); this plan.
+- **Tests:** generate-time wiring + bijection (`test_bigbang`); projection
+  display/fallback + `format_event` map (`test_session`); `resolve_display_id` +
+  `describe_event` (`test_service`); title shows spatial id + travel by spatial id
+  (`test_tui_flow`). Golden-master/replay tests pass **unchanged** — the proof the
+  cutover risk is gone.
 
 ---
 
@@ -347,8 +382,11 @@ arrow-key focus to WP-A and the auto-known route to WP-B.)
   assert the warp legend + `[id] Region (Band)` title; **arrow-key focus:** Down
   moves focus to the warp button rendered below the focused one (Up above,
   Left/Right horizontally), Enter warps it.
-- **WP-E:** a bigbang test asserting `assign_spatial_ids` is deterministic and
-  band-monotone (ID order matches `core_hops` order) across several seeds.
+- **WP-E:** `tests/test_numbering.py` asserts `assign_spatial_ids` is a
+  deterministic bijection, **region-atomic** (one shared prefix per region), and
+  **band-monotone** (IDs sort by band; each sector's band digit is its region's
+  representative band), with Terra (sector 1) anchoring the lowest ID, across a
+  seed sweep.
 - **Manual:** `pixi run edge` (renamed) and `pixi run edge --serve` then open the
   browser; confirm the StarDock signpost appears in the opening log, gravity
   arrows point sensibly, and the backtrack color marks the way you came.

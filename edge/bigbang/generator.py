@@ -17,6 +17,7 @@ import random
 
 from edge.bigbang import populate as _populate
 from edge.bigbang import validate as _validate
+from edge.bigbang.numbering import assign_spatial_ids
 from edge.bigbang.topology import (
     OutEdges,
     add_bidirectional,
@@ -147,6 +148,7 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
         }
         state.rebuild_adjacency()
         state.core_hops = bfs_distances(out, 1)  # gravity-arrow cache (§11, WP-C)
+        state.spatial_ids = assign_spatial_ids(groups, state.core_hops, cfg.bands)  # §5.1 display ids
 
         _populate.populate(state, config, build_rng)
 

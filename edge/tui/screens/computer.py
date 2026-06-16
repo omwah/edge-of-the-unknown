@@ -49,7 +49,7 @@ class ComputerScreen(Screen):
         with TabbedContent(initial=self._initial_tab):
             with TabPane("Map", id="map"):
                 yield Static(
-                    f"[b]GALACTIC MAP[/]   [dim]you @ Sector {self._map.you_sector} · "
+                    f"[b]GALACTIC MAP[/]   [dim]you @ Sector {self._map.you_display} · "
                     f"Band {self._map.you_band}[/]"
                 )
                 yield MapView(self._map)
