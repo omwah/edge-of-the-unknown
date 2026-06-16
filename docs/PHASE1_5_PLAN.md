@@ -31,6 +31,61 @@ constant in config, TUI only through the service boundary. `ruff` + `mypy
 
 ---
 
+## User feedback (source)
+
+The verbatim source for this round, lightly edited for clarity. The framing:
+the game *works*, but wandering feels aimless — the player needs an incentive
+and the legibility to know *where* to go. Each bullet maps to a work package
+below.
+
+**Navigation — quick quality-of-life fixes (→ WP-A, WP-B, WP-C):**
+
+- Allow clicking on warp numbers in the sidebar.
+- Tell the player where StarDock is at the start of the game (in the logs).
+- On the sidebar map, once a sector is explored, indicate what is there with
+  short codes for planets and/or ports, color-coded by type.
+- The sidebar map quick reference should also name the region of space (Hub,
+  Frontier, …): instead of just "Sector 432," show `[432] Halaf Verge
+  (Frontier)`. All sectors in the same region share the same name prefix.
+- Add the ability to `(W)` warp to a sector through the intermediary sectors —
+  you would have to stop for hostile encounters.
+- You can only warp to sectors whose route you have already uncovered.
+- Add a third warp-button color marking where you just came from (in addition
+  to where you have already been): per sector, where you last entered from.
+  Not following the path back can leave a broken trail — acceptable.
+- Add a legend for the warp-button colors.
+
+**Navigation — the harder improvement (→ WP-E, research + proposal only):**
+
+- The current navigation leans too much on trial and error and is
+  unintuitive.
+- It would be more intuitive if the sector numbering grouped numbers by
+  proximity. Numbers need not be monotonically increasing — gaps are fine — so
+  the numbers can follow a pattern:
+  - All sectors in a band of space share the same prefix (e.g. all Hub sectors).
+  - All sectors in an alliance or region share a prefix too.
+  - The prefix is multi-level; sector numbers may be 4–5 digits.
+  - If a region is a "Tunnel" motif (§5 step 3), the numbers within it should
+    be strictly sequential (e.g. Halaf 10, 11, 12, 13) to show a linear path.
+- Sector numbers should be topologically sorted so a higher number means
+  greater distance from the Core.
+- In the warp list (§11), use Unicode arrows for the "gravity" of a warp:
+  `[12] <<` leads significantly closer to the Core; `[45] >>` leads deeper into
+  the frontier; `[22] --` stays within the same distance band.
+- Research how this is solved in other games and in human-intuition papers.
+
+**Other (non-warp) issues (→ WP-A legend, WP-B, WP-D):**
+
+- The trading screen needs a list of shortcuts at the bottom — there's no way
+  to know that `T` = trade.
+- Map and log should be part of the ship's computer, but may keep direct
+  hotkeys.
+- Rename the TUI binary to `edge` in `pyproject.toml` and the documentation.
+- Add a `--serve` option to the renamed `edge` binary to serve a Textual web
+  server.
+
+---
+
 ## WP-A — Warp UI legibility (TUI + projection)
 
 Covers feedback bullets: clickable sidebar warps; region+band sector labels;
