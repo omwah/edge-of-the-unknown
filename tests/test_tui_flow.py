@@ -96,10 +96,28 @@ async def test_travel_prompt_warps_along_known_route() -> None:
         await pilot.press("w")  # open the travel prompt (WP-C)
         await pilot.pause()
         assert isinstance(app.screen, TravelPromptScreen)
-        app.screen.query_one("#travel-input", Input).value = "1"
+        # The prompt takes a *spatial* display id (§5.1) — type Sector 1's spatial id.
+        app.screen.query_one("#travel-input", Input).value = str(svc.state.spatial_ids[1])
         await pilot.press("enter")
         await pilot.pause()
         assert svc.game_view(1).sector.sector_id == 1
+
+
+async def test_sector_title_shows_spatial_id() -> None:
+    """The game screen renders the sector's spatial display id, not the internal id (§5.1)."""
+    from textual.widgets import Static
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        spatial = svc.state.spatial_ids[1]  # the player starts at internal sector 1
+        assert spatial != 1  # the spatial id genuinely differs from the internal id
+        title = str(app.screen.query_one("#title", Static).render())
+        assert f"[{spatial}]" in title
 
 
 async def test_arrow_keys_move_warp_focus() -> None:

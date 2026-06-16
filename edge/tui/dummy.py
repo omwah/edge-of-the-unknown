@@ -180,11 +180,11 @@ def sample_state() -> GameState:
         # this and the warp list are projected from the one warp graph via to_public();
         # here they're hand-synced.
         neighbors=[
-            NeighborDTO(1, "[1] Sol Core", "Hub", True, ["S"]),
-            NeighborDTO(3, "[3] Sol Core", "Hub", True, ["P", "@"]),
-            NeighborDTO(6, "[6] Vega Reach", "Hub", True, []),
-            NeighborDTO(8, "[8] —", "?", False),
-            NeighborDTO(12, "[12] —", "?", False),
+            NeighborDTO(1, "[1] Sol Core", "Hub", True, ["S"], display_id=1),
+            NeighborDTO(3, "[3] Sol Core", "Hub", True, ["P", "@"], display_id=3),
+            NeighborDTO(6, "[6] Vega Reach", "Hub", True, [], display_id=6),
+            NeighborDTO(8, "[8] —", "?", False, display_id=8),
+            NeighborDTO(12, "[12] —", "?", False, display_id=12),
         ],
     )
     sector = SectorDTO(
@@ -197,12 +197,13 @@ def sample_state() -> GameState:
         planets=["Terra Nova  terrestrial, warm"],
         ships=["Kestrel  free trader", "Cabal Marauder", "Verdani escort"],
         warps=[
-            WarpDTO(1, "<<"),
-            WarpDTO(3, "--", "Sol"),
-            WarpDTO(6, "--"),
-            WarpDTO(8, ">>", kind="unexplored"),
-            WarpDTO(12, ">>", kind="unexplored"),
+            WarpDTO(1, "<<", display_id=1),
+            WarpDTO(3, "--", "Sol", display_id=3),
+            WarpDTO(6, "--", display_id=6),
+            WarpDTO(8, ">>", kind="unexplored", display_id=8),
+            WarpDTO(12, ">>", kind="unexplored", display_id=12),
         ],
+        display_id=7,
     )
     return GameState(turns=287, max_turns=300, ship=ship, sector=sector)
 
@@ -218,6 +219,7 @@ def sample_port() -> PortDTO:
             CommodityLine("Organics", "SELL", 220, 1000, 6, 5, 12),
             CommodityLine("Equipment", "BUY", 580, 1000, 14, 15, 8),
         ],
+        display_id=3,
     )
 
 
@@ -259,6 +261,7 @@ def sample_map() -> MapDTO:
     """
     return MapDTO(
         you_sector=7,
+        you_display=7,
         you_band="0 - Core",
         bands=[
             MapBand(
@@ -480,4 +483,5 @@ def sample_stardock_port() -> PortDTO:
             CommodityLine("Organics", "SELL", 760, 1000, 6, 5, 12),
             CommodityLine("Equipment", "SELL", 820, 1000, 15, 15, 8),
         ],
+        display_id=7,
     )

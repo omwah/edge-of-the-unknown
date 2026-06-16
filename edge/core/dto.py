@@ -40,12 +40,18 @@ class CommodityLine:
         return "="
 
 
+# Every `*_id` below is the *internal* sector id (the click/message payload and
+# key); the parallel `display_id` is the band-monotone spatial id the player sees
+# (DESIGN §5.1). The TUI renders `display_id` and acts on `sector_id`.
+
+
 @dataclass(frozen=True)
 class PortDTO:
     name: str
     klass: str
     sector_id: int
     commodities: list[CommodityLine]
+    display_id: int = 0  # spatial id of the port's sector (§5.1)
 
 
 @dataclass(frozen=True)
@@ -54,6 +60,7 @@ class WarpDTO:
     arrow: str  # gravity glyph relative to the Core: "<<" closer / ">>" deeper / "--" level
     label: str | None = None
     kind: str = "explored"  # "explored" | "unexplored" | "backtrack" — drives colour
+    display_id: int = 0  # spatial id rendered on the warp button (§5.1)
 
     @property
     def explored(self) -> bool:
@@ -65,14 +72,16 @@ class NeighborDTO:
     """One adjacent sector for the sidebar quick-reference (a clickable warp).
 
     `name`/`band` and content `codes` are filled only for sectors the player has
-    explored; an unexplored neighbour reads as `[id] —` with no codes.
+    explored; an unexplored neighbour reads as `[id] —` with no codes. `name`
+    embeds the spatial `display_id`; `sector_id` stays internal for the warp action.
     """
 
     sector_id: int
-    name: str  # "[432] Halaf Verge" (explored) | "[432] —" (unexplored)
+    name: str  # "[10604] Halaf Verge" (explored) | "[10604] —" (unexplored)
     band: str  # "Frontier" (explored) | "?" (unexplored)
     explored: bool
     codes: list[str] = field(default_factory=list)  # short content tokens, explored only
+    display_id: int = 0  # spatial id shown in `name` (§5.1)
 
 
 @dataclass(frozen=True)
@@ -86,6 +95,7 @@ class SectorDTO:
     planets: list[str] = field(default_factory=list)
     ships: list[str] = field(default_factory=list)
     warps: list[WarpDTO] = field(default_factory=list)
+    display_id: int = 0  # spatial id shown in the sector title (§5.1)
 
 
 @dataclass(frozen=True)
@@ -146,6 +156,7 @@ class MapDTO:
     you_sector: int
     you_band: str
     bands: list[MapBand]
+    you_display: int = 0  # spatial id of the player's sector (§5.1)
 
 
 @dataclass(frozen=True)

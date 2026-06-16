@@ -50,7 +50,7 @@ class StarDockScreen(Screen):
             return
         latinum = self._service.game_view(self._pid).ship.latinum
         econ = self._service.config.economy
-        yield Static(f"STARDOCK · Sector {port.sector_id}", id="dock-title")
+        yield Static(f"STARDOCK · Sector {port.display_id}", id="dock-title")
         with TabbedContent(initial="trade"):
             with TabPane("Commodities", id="trade"):
                 yield TradePanel(port, latinum=latinum, show_title=False)

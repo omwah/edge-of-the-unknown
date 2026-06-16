@@ -48,7 +48,7 @@ class MapScreen(Screen):
     def compose(self) -> ComposeResult:
         m = self._map
         yield Static(
-            f"GALACTIC MAP · you @ Sector {m.you_sector} · Band {m.you_band}",
+            f"GALACTIC MAP · you @ Sector {m.you_display} · Band {m.you_band}",
             id="map-title",
         )
         yield MapView(self._map)

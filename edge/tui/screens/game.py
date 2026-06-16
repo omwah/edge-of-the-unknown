@@ -20,7 +20,6 @@ from edge.core.events import Event
 from edge.core.movement import MovementError
 from edge.core.rules import Dock, TravelTo, Warp
 from edge.server.service import GameService
-from edge.server.session import format_event
 from edge.tui.dummy import SectorDTO, sample_engine_room
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
@@ -80,7 +79,7 @@ class SectorView(Container):
             yield from self._content(self._sector)
 
     def _content(self, sec: SectorDTO) -> ComposeResult:
-        title = f"[{sec.sector_id}] {sec.region}"
+        title = f"[{sec.display_id}] {sec.region}"
         if sec.band:
             title += f" ({sec.band})"
         yield Static(f"[b cyan]{title}[/]", id="title")
@@ -116,7 +115,7 @@ class SectorView(Container):
 
         yield Static("", classes="spacer")
         yield Static("Warps", classes="heading")
-        yield WarpGrid(sec.warps, sec.sector_id)
+        yield WarpGrid(sec.warps, sec.display_id)  # centre marker shows the spatial id
 
 
 class GameScreen(Screen):
@@ -189,8 +188,12 @@ class GameScreen(Screen):
     def _after_travel(self, dest: int | None) -> None:
         if dest is None:
             return
+        internal = self._service.resolve_display_id(dest)  # player typed a spatial id (§5.1)
+        if internal is None:
+            self.notify(f"No sector {dest}.", severity="warning", timeout=3)
+            return
         try:
-            events = self._service.apply(self._pid, TravelTo(to_sector=dest))
+            events = self._service.apply(self._pid, TravelTo(to_sector=internal))
         except (MovementError, EconomyError) as exc:
             self.notify(str(exc), severity="warning", timeout=3)
             return
@@ -246,4 +249,4 @@ class GameScreen(Screen):
     # --- event ticker --------------------------------------------------------
 
     def _record(self, events: tuple[Event, ...]) -> None:
-        self._log.extend(line for line in map(format_event, events) if line)
+        self._log.extend(line for line in map(self._service.describe_event, events) if line)

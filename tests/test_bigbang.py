@@ -62,6 +62,16 @@ def test_different_seeds_differ() -> None:
 
 
 @pytest.mark.parametrize("seed", range(20))
+def test_spatial_ids_wired_into_generate(seed: int) -> None:
+    """`generate` caches a spatial display id per sector (DESIGN §5.1, WP-G)."""
+    state = generate(CONFIG, seed)  # type: ignore[arg-type]
+    spatial = state.spatial_ids
+    assert set(spatial) == set(state.sectors)  # every sector mapped
+    assert len(set(spatial.values())) == len(spatial)  # bijection (reversible for input)
+    assert spatial[1] == min(spatial.values())  # Terra anchors the lowest id
+
+
+@pytest.mark.parametrize("seed", range(20))
 def test_stardock_route_starts_explored(seed: int) -> None:
     """The path from the start sector to StarDock opens pre-explored (round-2).
 
