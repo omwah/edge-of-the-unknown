@@ -11,6 +11,7 @@ from __future__ import annotations
 from edge.core.movement import shortest_path
 from edge.core.rules import Warp
 from edge.tui.app import EdgeApp
+from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.stardock import StarDockScreen
 from edge.tui.widgets import NeighborRow
 
@@ -59,6 +60,22 @@ async def test_sidebar_neighbor_click_warps() -> None:
         await pilot.pause()
         moved = svc.game_view(1).sector.sector_id
         assert moved == target != start
+
+
+async def test_log_hotkey_opens_computer_with_signpost() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        await pilot.press("g")  # Log -> Computer, folded in (WP-B)
+        await pilot.pause()
+        assert isinstance(app.screen, ComputerScreen)
+        from textual.widgets import DataTable
+
+        rows = app.screen.query_one("#log-table", DataTable)
+        cells = [str(rows.get_cell_at((r, 1))) for r in range(rows.row_count)]
+        assert any("StarDock" in c for c in cells)
 
 
 async def test_dock_and_trade_buys_fuel() -> None:

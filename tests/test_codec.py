@@ -58,10 +58,11 @@ def test_command_round_trips(command: Command) -> None:
 
 
 @pytest.mark.parametrize("event", EVENTS)
-def test_event_encodes(event: Event) -> None:
+def test_event_round_trips(event: Event) -> None:
     type_, payload = codec.encode_event(event)
     assert type_ == type(event).__name__
     assert isinstance(payload, dict)
+    assert codec.decode_event(type_, payload) == event
 
 
 def test_decode_unknown_command_raises() -> None:
@@ -72,3 +73,8 @@ def test_decode_unknown_command_raises() -> None:
 def test_encode_unknown_event_raises() -> None:
     with pytest.raises(ValueError):
         codec.encode_event(Event())
+
+
+def test_decode_unknown_event_raises() -> None:
+    with pytest.raises(ValueError):
+        codec.decode_event("Nonsense", {})

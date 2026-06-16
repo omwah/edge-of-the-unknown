@@ -84,3 +84,23 @@ def test_computer_and_map_views_render(tmp_path: Path) -> None:
     assert isinstance(cv.pairs, list)  # may be empty until ports are discovered
     mv = svc.map_view(1)
     assert mv.you_sector == 1 and mv.bands
+
+
+def test_intro_line_names_the_stardock_sector(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)
+    line = svc.intro_line(1)
+    assert line is not None and f"Sector {dock.sector_id}" in line
+
+
+def test_messages_view_signpost_and_real_events(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    # Fresh game: only the derived StarDock signpost is present.
+    fresh = svc.messages_view(1)
+    assert len(fresh.events) == 1 and "StarDock" in fresh.events[0].text
+    # After a warp, the newest event leads and the signpost sinks to the bottom.
+    target = svc.state.sectors[1].warps_out[0]
+    svc.apply(1, Warp(to_sector=target))
+    after = svc.messages_view(1)
+    assert f"Sector {target}" in after.events[0].text
+    assert "StarDock" in after.events[-1].text

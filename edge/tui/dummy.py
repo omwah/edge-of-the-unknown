@@ -21,8 +21,10 @@ from edge.core.dto import (
     ComputerDTO,
     GameState,
     Hold,
+    LogEntry,
     MapBand,
     MapDTO,
+    MessagesDTO,
     NeighborDTO,
     PortDTO,
     SectorDTO,
@@ -150,19 +152,6 @@ class EncounterDTO:
     flee_floor: int  # % — the config escape-chance floor (clamp)
 
 
-@dataclass(frozen=True)
-class LogEntry:
-    """One line in the messages/event log (UI_MOCKUPS.md §11)."""
-
-    when: str  # "day 4 · 09:12"
-    text: str  # markup ok
-
-
-@dataclass(frozen=True)
-class MessagesDTO:
-    """The messages & log screen (UI_MOCKUPS.md §11, DESIGN §12 event_log)."""
-
-    events: list[LogEntry]
 
 
 def sample_state() -> GameState:

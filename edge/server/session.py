@@ -14,6 +14,16 @@ from edge.core import dto
 from edge.core.config import GameConfig
 from edge.core.economy import port_unit_price
 from edge.core.enums import Commodity, PortClass, PortMode
+from edge.core.events import (
+    Banked,
+    Docked,
+    Event,
+    Haggled,
+    TurnsReset,
+    Traded,
+    Upgraded,
+    Warped,
+)
 from edge.core.models import Player, Port, Sector, Ship, UniverseState
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
@@ -169,6 +179,54 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     pairs.sort(key=lambda tp: tp.per_turn, reverse=True)
     top = pairs[:3]
     return dto.ComputerDTO(pairs=top, selected=top[0].pair if top else "—")
+
+
+def format_event(event: Event) -> str:
+    """Render one event as a log/ticker line — the single shared formatter (§11/§12).
+
+    Returns "" for events that should not surface to the player (e.g. per-commodity
+    stock regen), so callers can filter them out.
+    """
+    if isinstance(event, Warped):
+        return f"[cyan]» Warp to Sector {event.to_sector}[/]  (-{event.turn_cost} turn)"
+    if isinstance(event, Docked):
+        return "[magenta]⚓ Docked.[/]"
+    if isinstance(event, Traded):
+        verb = "Bought" if event.mode is PortMode.SELL else "Sold"
+        return f"{verb} {event.units} {event.commodity.value} @ {event.unit_price} = {event.total} slips"
+    if isinstance(event, Haggled):
+        price = "—" if event.price is None else event.price
+        return f"Haggle {event.status} @ {price}"
+    if isinstance(event, Upgraded):
+        return f"[green]Upgraded {event.aspect}[/]  (-{event.cost} slips)"
+    if isinstance(event, Banked):
+        return f"Bank {event.kind}: {event.amount}  (balance {event.balance})"
+    if isinstance(event, TurnsReset):
+        return f"[green]Turns reset to {event.turns}[/]"
+    return ""  # StockRegenerated and any unmodelled event: not player-facing
+
+
+def stardock_signpost(state: UniverseState) -> str | None:
+    """The opening navigation beacon naming the StarDock's location (WP-B).
+
+    Derived from state (the Class-9 port) rather than persisted, so it survives a
+    reload and never duplicates. An intentional reveal of a known landmark (§5).
+    """
+    dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
+    if dock is None:
+        return None
+    region = state.regions[state.sectors[dock.sector_id].region_id].name
+    return f"Navigation beacon: StarDock lies in Sector {dock.sector_id} — {region}."
+
+
+def messages_view(state: UniverseState, events: list[Event]) -> dto.MessagesDTO:
+    """Project the durable event log into a newest-first message list (§11, §12)."""
+    entries = [dto.LogEntry(when="", text=text) for text in map(format_event, events) if text]
+    entries.reverse()  # newest first
+    signpost = stardock_signpost(state)
+    if signpost is not None:
+        entries.append(dto.LogEntry(when="start", text=f"[yellow]{signpost}[/]"))
+    return dto.MessagesDTO(events=entries)
 
 
 def _best_pair(buy_from: Port, sell_to: Port, units: int, dist: dict[int, int],

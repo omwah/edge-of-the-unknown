@@ -121,6 +121,37 @@ def test_game_view_sector_title_carries_band() -> None:
     assert view.sector.region == "Sol Core" and view.sector.band == "Hub"
 
 
+def test_format_event_covers_kinds_and_filters_noise() -> None:
+    from edge.core.enums import PortMode
+    from edge.core.events import (
+        Banked,
+        Docked,
+        Haggled,
+        StockRegenerated,
+        Traded,
+        TurnsReset,
+        Upgraded,
+        Warped,
+    )
+
+    assert "Sector 12" in session.format_event(Warped(1, 7, 12, 1))
+    assert session.format_event(Docked(1, 12, 3))
+    assert "Bought" in session.format_event(Traded(1, 3, Commodity.FUEL_ORE, PortMode.SELL, 5, 13, 65))
+    assert "Sold" in session.format_event(Traded(1, 3, Commodity.FUEL_ORE, PortMode.BUY, 5, 13, 65))
+    assert "Haggle" in session.format_event(Haggled(1, 3, Commodity.ORGANICS, "rejected", None))
+    assert session.format_event(Upgraded(1, "holds", 2_000))
+    assert session.format_event(Banked(1, "deposit", 500, 500))
+    assert session.format_event(TurnsReset(1, 250))
+    # Per-commodity restock is not player-facing — filtered out of the log.
+    assert session.format_event(StockRegenerated(3, Commodity.EQUIPMENT, 480)) == ""
+
+
+def test_signpost_is_none_without_a_stardock() -> None:
+    world = _nav_world()  # ports are a Class-5 SSB only — no StarDock
+    assert session.stardock_signpost(world) is None
+    assert session.messages_view(world, []).events == []
+
+
 def test_commodity_line_trend_and_ratio_edges() -> None:
     flat = CommodityLine("Fuel Ore", "SELL", 500, 1000, 11, 11, 0)
     assert flat.trend == "="  # price == base_price

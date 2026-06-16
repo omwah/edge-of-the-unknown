@@ -16,16 +16,14 @@ from textual.screen import Screen
 from textual.widgets import Footer, Static
 
 from edge.core.economy import EconomyError
-from edge.core.enums import PortMode
-from edge.core.events import Banked, Docked, Event, Traded, Upgraded, Warped
+from edge.core.events import Event
 from edge.core.movement import MovementError
 from edge.core.rules import Dock, Warp
 from edge.server.service import GameService
-from edge.tui.dummy import SectorDTO, sample_engine_room, sample_messages
+from edge.server.session import format_event
+from edge.tui.dummy import SectorDTO, sample_engine_room
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
-from edge.tui.screens.map import MapScreen
-from edge.tui.screens.messages import MessagesScreen
 from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
@@ -144,9 +142,16 @@ class GameScreen(Screen):
         with Horizontal(id="body"):
             yield SectorView(view.sector)
             yield StatusSidebar(view.ship, id="sidebar")
-        ticker = "\n".join(self._log[-3:]) or "[dim]· New game — find a port and start trading.[/]"
-        yield Static(ticker, id="ticker")
+        yield Static(self._ticker_text(), id="ticker")
         yield Footer()
+
+    def _ticker_text(self) -> str:
+        if self._log:
+            return "\n".join(self._log[-3:])
+        signpost = self._service.intro_line(self._pid)
+        if signpost is not None:
+            return f"[yellow]· {signpost}[/]"
+        return "[dim]· New game — find a port and start trading.[/]"
 
     async def on_screen_resume(self) -> None:
         # Rebuild from fresh state when this screen becomes active again (after a
@@ -204,7 +209,7 @@ class GameScreen(Screen):
         self.app.push_screen(ComputerScreen(self._service, self._pid))
 
     def action_map(self) -> None:
-        self.app.push_screen(MapScreen(self._service, self._pid))
+        self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="map"))
 
     def action_survey_planet(self) -> None:
         planets = self._service.game_view(self._pid).sector.planets
@@ -217,24 +222,9 @@ class GameScreen(Screen):
         self.app.push_screen(EngineRoomScreen(sample_engine_room()))
 
     def action_messages(self) -> None:
-        self.app.push_screen(MessagesScreen(sample_messages()))
+        self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="log"))
 
     # --- event ticker --------------------------------------------------------
 
     def _record(self, events: tuple[Event, ...]) -> None:
-        self._log.extend(self._format(e) for e in events)
-
-    @staticmethod
-    def _format(event: Event) -> str:
-        if isinstance(event, Warped):
-            return f"[cyan]» Warp to Sector {event.to_sector}[/]  (-{event.turn_cost} turn)"
-        if isinstance(event, Docked):
-            return "[magenta]⚓ Docked.[/]"
-        if isinstance(event, Traded):
-            verb = "Bought" if event.mode is PortMode.SELL else "Sold"
-            return f"{verb} {event.units} {event.commodity.value} @ {event.unit_price} = {event.total} slips"
-        if isinstance(event, Upgraded):
-            return f"[green]Upgraded {event.aspect}[/]  (-{event.cost} slips)"
-        if isinstance(event, Banked):
-            return f"Bank {event.kind}: {event.amount}  (balance {event.balance})"
-        return type(event).__name__
+        self._log.extend(line for line in map(format_event, events) if line)
