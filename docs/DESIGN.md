@@ -13,7 +13,7 @@ The remainder of this document specifies our design. The lineage and influences 
 
 ### 1.1 Inspiration
 
-**TradeWars 2002.** Edge of the Unknown is built on the mechanical bones of TradeWars 2002 (TW2002), the classic BBS door game. The warp-graph universe, port economy, turn system, and engine foundations remain TW2002-authentic even where our exploration-first goals diverge — most visibly in the retained port pair-trading loop. This foundation is informed by direct source analysis of seven existing TradeWars clones and the original 1986 TradeWars II BASIC source; Appendix A summarizes what each codebase taught us.
+**TradeWars 2002.** Edge of the Unknown is built on the mechanical bones of TradeWars 2002 (TW2002), the classic BBS door game. The warp-graph universe, port economy, turn system, and engine foundations are inherited from TW2002 — most visibly in the retained port pair-trading loop — and the exploration-first design builds on them, free to diverge as its own concepts take shape rather than holding TW2002 fidelity as a constraint. This foundation is informed by direct source analysis of seven existing TradeWars clones and the original 1986 TradeWars II BASIC source; Appendix A summarizes what each codebase taught us.
 
 **Lightspeed (MicroProse, 1990).** The exploration-first reframing draws on Lightspeed, in which a lone scout pushes into an unknown cluster where habitable worlds are rare and aliens must be befriended or eliminated to secure the region. From it we take the engine-room subsystem/component ship model (§4.1: slotted subsystems built from a shared component vocabulary, localized combat damage, hybrid repair), the planetary type taxonomy with yield profiles and habitability caps (§4.2), and the per-species alien dialogue corpus that informs our dialogue system (§6.7). Appendix B details what we took from Lightspeed and what we left behind.
 
@@ -21,7 +21,7 @@ The remainder of this document specifies our design. The lineage and influences 
 
 ## 2. Design Goals and Non-Goals
 
-**Goals.** An exploration-first core loop — venture out, discover, return, upgrade, venture farther — layered on an authentic TW2002 foundation (warp graph, turns per day, port pair-trading, single-keystroke commands, ANSI-flavored aesthetics); a tangible risk/reward gradient in which discovery rarity, technology value, and danger all scale with distance from the Core Space; trading as the reliable income floor and discovery as the progression ceiling; deterministic, seedable universe and rules engine with full unit-test coverage of game math; single-player first with a clean path to LAN/hosted multiplayer; modern TUI affordances layered on top (clickable warps, sortable tables, built-in route planner, discovery codex); everything configurable (universe size, economy constants, ship stats, alien species rosters, discovery tables) via versioned config files.
+**Goals.** An exploration-first core loop — venture out, discover, return, upgrade, venture farther — layered on a TW2002-derived foundation (warp graph, turns per day, port pair-trading, single-keystroke commands, ANSI-flavored aesthetics); a tangible risk/reward gradient in which discovery rarity, technology value, and danger all scale with distance from the Core Space; trading as the reliable income floor and discovery as the progression ceiling; deterministic, seedable universe and rules engine with full unit-test coverage of game math; single-player first with a clean path to LAN/hosted multiplayer; modern TUI affordances layered on top (clickable warps, sortable tables, built-in route planner, discovery codex); everything configurable (universe size, economy constants, ship stats, alien species rosters, discovery tables) via versioned config files.
 
 **Non-goals (v1).** Telnet/BBS door compatibility; TWGS protocol compatibility with existing TW2002 helper tools; massive concurrency (we design for tens of players, not hundreds); pixel graphics; full 4X-style diplomacy or empire simulation (an alien species' attitude is a simple score, not a diplomacy tree).
 
@@ -103,7 +103,7 @@ Core entities and their key fields (persisted 1:1 in SQLite tables; in memory as
 | `EventLog` | id (monotonic), tick, type, payload JSON — the durable rail |
 | `Config` | typed key/value by scope, versioned (twclone's DB-backed config, simplified to a YAML file + table snapshot) |
 
-Commodities are the canonical TW2002 trio — Fuel Ore, Organics, Equipment — with port classes the eight buy/sell triples (terminal-space enum, §A.2) plus Class 0/9 StarDock selling hardware. BNT's fourth commodity (energy) is deliberately omitted for authenticity.
+Commodities are the canonical TW2002 trio — Fuel Ore, Organics, Equipment — with port classes the eight buy/sell triples (terminal-space enum, §A.2) plus Class 0/9 StarDock selling hardware. BNT's fourth commodity (energy) is deliberately omitted to keep the canonical trio.
 
 **Currency.** The universal currency is **gold-pressed latinum** ("latinum"), measured in **slips** — the standard unit of account, so balances and prices read as e.g. `14,250 slips`. All port prices, bank balances, hardware costs, and alien technology offers are denominated in it; high-value alien tech may additionally (or exclusively) demand barter in artifacts and recovered technology from the player's discoveries.
 
@@ -508,7 +508,7 @@ A ~3,900-line Python implementation of TW2002 basics with a client/server split.
 
 **Pricing formula.** Base costs per unit: fuel ore sells at 1 / buys at 1.5; organics 2 / 3; equipment 4 / 6. Live price scales linearly with stock ratio: when a port is *buying*, `price = buy_offer + (amount/capacity) * buy_offer / 2`; when *selling*, `price = sell_cost - (amount/capacity) * sell_cost / 2`. So a port pays more as its buying stock fills and charges less as its selling stock fills — simple, but it produces the right player incentive gradient. We extend this with BlackNova's parameterization (A.3). *(Reference description only: our normative pricing is §8, which flips the buy-side sign so that selling into a port lowers — never raises — what it pays. Implement §8, not this paragraph.)*
 
-**Universe shape.** Hex-grid generation (`gen_hex_center(diameter)`) followed by `remove_warps(graph, warp_density, rnd)` to thin the lattice, using networkx. Coordinates map to sector IDs with sector 1 at origin. Ports placed by density roll; planets via `gauss(4.5, 1.5)` count in ~half the sectors. The hex-grid look is a deliberate aesthetic departure from TW2002's abstract graph; we instead follow the cluster-graph approach (A.5, A.6) for authenticity, but keep networkx as the generation/validation substrate.
+**Universe shape.** Hex-grid generation (`gen_hex_center(diameter)`) followed by `remove_warps(graph, warp_density, rnd)` to thin the lattice, using networkx. Coordinates map to sector IDs with sector 1 at origin. Ports placed by density roll; planets via `gauss(4.5, 1.5)` count in ~half the sectors. The hex-grid look is a deliberate aesthetic departure from TW2002's abstract graph; we instead follow the cluster-graph approach (A.5, A.6) to match TW2002's graph shape, but keep networkx as the generation/validation substrate.
 
 **Client architecture.** Full-screen prompt-toolkit app at 15 FPS with a scene stack (title scene, terminal scene, battle scene), an `InstantCmd` single-keystroke command dispatcher, a TW2002 color theme module, and visual flourishes via `terminaltexteffects` (starfields, animated transitions). Notably it does *not* use Textual — confirming our framework choice gives us widgets (DataTable, Tree, Input, tabs, CSS layout, `textual serve` web hosting) that terminal-space had to hand-build.
 
@@ -544,7 +544,7 @@ The `tw2bas/` directory contains Chris Sherrick's original TW2 (RBBS QuixPlus li
 
 ### A.8 Cross-cutting conclusions
 
-Three independent codebases (twclone, terminal-space, ExchangeConflict) converge on the same generation stack — seeded RNG, graph library, validation pass — and two converge on the same pricing shape (linear in stock ratio). The two most complete games (twclone, terminal-space) both separate a pure rules core from transport and UI, and both treat single-player as an embedded server. Where they differ (hex grid vs. cluster graph; order-book economy vs. simple regen), we choose the option closer to TW2002 authenticity for defaults and keep the alternative reachable via configuration.
+Three independent codebases (twclone, terminal-space, ExchangeConflict) converge on the same generation stack — seeded RNG, graph library, validation pass — and two converge on the same pricing shape (linear in stock ratio). The two most complete games (twclone, terminal-space) both separate a pure rules core from transport and UI, and both treat single-player as an embedded server. Where they differ (hex grid vs. cluster graph; order-book economy vs. simple regen), we choose the option closer to the TW2002 foundation for defaults and keep the alternative reachable via configuration.
 
 ---
 
@@ -558,7 +558,7 @@ Where Appendix A records what the TradeWars lineage gave us — the warp graph, 
 
 Our source text is the game's printed manual, rendered to Markdown from the 58-page archive.org scan and held locally at `lightspeed-analysis/manuals/Lightspeed_Manual.md`. **When citing it, link the public copy at <https://archive.org/details/lightspeed-1990-manual>**; section numbers below (e.g. *manual §2.4.5*) refer to that manual. A companion file, `lightspeed-analysis/Alien_Race_Reference.md` — a seventeen-species Hyades-cluster catalogue distilled from the manual's "A Few Aliens" chapter (manual §4) and related lore — was the stress-test roster for the species parameter set (§6.1); it is Lightspeed-derived and is referenced here as the practical proof that the §6 schema can express a real, idiosyncratic cast as pure data. A second companion file, `lightspeed-analysis/Lightspeed_Alien_Dialogue_Reference.md` — each species' branching conversation prose and verb menus extracted verbatim from the game's per-species `.bin` data files — was the stress-test corpus for the **dialogue system** (§6.7), and is the proof that standing-keyed, persona-voiced conversation can likewise be expressed as config rather than code.
 
-The guiding instruction throughout was **inspiration, not imitation, and never a burden on the player**: take Lightspeed's systemic ideas, reimplement them cleanly against our turn-based / TUI / TW2002-authentic constraints, and drop anything that only made sense in a real-time 3-D cockpit.
+The guiding instruction throughout was **inspiration, not imitation, and never a burden on the player**: take Lightspeed's systemic ideas, reimplement them cleanly against our turn-based / TUI / TW2002-derived constraints, and drop anything that only made sense in a real-time 3-D cockpit.
 
 ### B.2 What we integrated, by manual section
 
@@ -594,7 +594,7 @@ Lightspeed is a real-time 3-D action game; we are a turn-based TUI. Several of i
 
 ### B.4 Where we transformed it (deliberate divergences)
 
-Some ideas were kept but **reshaped** to fit TW2002 authenticity and our constraints. These are noted so a reader of the manual isn't surprised by the differences:
+Some ideas were kept but **reshaped** to fit our turn-based / TUI constraints and the TW2002-derived foundation. These are noted so a reader of the manual isn't surprised by the differences:
 
 - **Fuel → turns.** Lightspeed meters travel by **fuel per jump** (manual §1.2.1, §2.4.5); we keep TW2002's **turns-per-warp** instead (movement costs turns, not fuel). The Spindrive therefore drives `turns_per_warp`, and "fuel economy" has no analog — the standing latinum sinks are components, ships, and repair (§8).
 - **Four raw materials → the sacred trio.** Lightspeed's colony commodities are **Metal / Organics / Radioactives / Water** (manual §1.4.6). We hold the line at TW2002's **Fuel Ore / Organics / Equipment** and express Lightspeed's four as `planet_type` *yield-and-habitability shaping* (radioactive hot worlds read as Fuel-Ore-rich, metal-rich cold worlds as Equipment-rich, watery cool worlds as high-habitability), adding **no fourth commodity** (§4.2).
@@ -606,5 +606,5 @@ Some ideas were kept but **reshaped** to fit TW2002 authenticity and our constra
 
 ### B.5 The net
 
-Lightspeed's lasting contribution to this design is a single, reusable mechanism — **the engine room of slotted subsystems built from a shared, fungible component vocabulary** — that simultaneously gives us localized combat damage, tangible repair, physical upgrades, a planetary-starbase model, and a deep-space salvage/barter economy (§4.1, §4.2). Around that core, its planetary taxonomy (§4.2) and its richly idiosyncratic alien cast — temperament, tactics, and **voiced, standing-keyed dialogue** alike (§6, §6.7) — gave the exploration-first layer its texture. Everything tied to its real-time cockpit was left at the door; everything systemic was reimplemented cleanly against our turn-based, TUI, TW2002-authentic foundation.
+Lightspeed's lasting contribution to this design is a single, reusable mechanism — **the engine room of slotted subsystems built from a shared, fungible component vocabulary** — that simultaneously gives us localized combat damage, tangible repair, physical upgrades, a planetary-starbase model, and a deep-space salvage/barter economy (§4.1, §4.2). Around that core, its planetary taxonomy (§4.2) and its richly idiosyncratic alien cast — temperament, tactics, and **voiced, standing-keyed dialogue** alike (§6, §6.7) — gave the exploration-first layer its texture. Everything tied to its real-time cockpit was left at the door; everything systemic was reimplemented cleanly against our turn-based, TUI, TW2002-derived foundation.
 

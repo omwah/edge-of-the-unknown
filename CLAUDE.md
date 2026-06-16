@@ -5,10 +5,11 @@
 Edge of the Unknown is a game of **space exploration and discovery** built on the
 mechanical bones of **TradeWars 2002** (the classic BBS door game), in
 **Python 3.12+** with the **Textual** TUI framework. The TW2002 foundation
-is kept authentic — warp-graph universe, port pair-trading in Fuel Ore /
-Organics / Equipment, turns-per-day, planets — but **trading is a means to
-an end**: it funds the engines, shields, sensors, cloaks, and armaments
-needed to push outward and discover things. Key pillars:
+is inherited — warp-graph universe, port pair-trading in Fuel Ore /
+Organics / Equipment, turns-per-day, planets — and the exploration-first
+design is free to diverge from it as its own concepts take shape; **trading is
+a means to an end**: it funds the engines, shields, sensors, cloaks, and
+armaments needed to push outward and discover things. Key pillars:
 
 - **Discoveries** — planets (which can be descended onto for surface sites:
   ruins, artifacts, ancient tech, crashed ships), shipwrecks, nebulae,
