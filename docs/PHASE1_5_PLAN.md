@@ -84,6 +84,15 @@ below.
 - Add a `--serve` option to the renamed `edge` binary to serve a Textual web
   server.
 
+**Amendments — round 2 (`changes_to_make2.md`) (→ WP-A, WP-B):**
+
+- StarDock should be an automatically known route (not just named in the log —
+  the path to it should already be uncovered).
+- Use the arrow keys to move focus between warp buttons by their on-screen
+  layout: Up focuses the button rendered above the current one, Down the one
+  below, Left/Right the neighbours. (Pure 2D grid focus — unrelated to warp
+  gravity / Core direction.)
+
 ---
 
 ## WP-A — Warp UI legibility (TUI + projection)
@@ -125,6 +134,14 @@ sidebar-map content codes; third warp-button color + legend.
 - Add a small **legend** Static under `WarpGrid` (or in the sidebar) explaining
   the three colors and the `<< / -- / >>` arrows.
 
+**Arrow-key warp focus (round-2 amendment).** Let the arrow keys move focus
+between the `WarpButton`s by their **on-screen grid position**: Up focuses the
+button rendered directly above the focused one, Down the one below, Left/Right the
+horizontal neighbours; Enter warps the focused button (the existing
+`WarpButton.Warp` message). This is purely spatial focus over the rendered layout
+— it has nothing to do with warp gravity or distance-from-Core. `tui/`-only
+(mypy-exempt); Pilot-tested in `test_tui_flow.py`.
+
 ---
 
 ## WP-B — Real event log + StarDock signpost + Computer reorg
@@ -145,6 +162,19 @@ log should be part of the ship's computer but keep direct hotkeys."
   (`game.py:144`) and the Log tab. This is an intentional reveal (a known
   landmark giving the player a goal), consistent with DESIGN §5's "StarDock
   reachable" guarantee.
+
+**StarDock as an auto-known route (round-2 amendment).** Naming StarDock in the
+log isn't enough — the *route* to it should already be uncovered so the player
+can `(W)` travel there from turn one (route-lock requires explored sectors).
+Adjacency and `core_hops` already exist before `populate` runs (generator.py:148–
+151), so in `populate.py` (where player 1 is built, populate.py:140) seed the
+opening fog with the StarDock path: `path = shortest_path(state.adjacency, 1,
+dock.sector_id)`, then `explored_sectors = frozenset(path)` and a matching
+`entered_from` chain (`{path[i+1]: path[i]}`). Only the shortest path is revealed
+— everything off it stays fogged — so the frontier is still earned. This makes
+the signpost actionable and the warp buttons along the way render explored.
+Touches the **core/bigbang** layer, so it must go through the build RNG-free
+deterministic path helper (no randomness) and is covered by a bigbang test.
 
 **Fold Map + Log into the Computer (`edge/tui/screens/computer.py`)**
 - Move the live `MapView` (widgets.py:309) into the Computer's **Map** tab (wire to
@@ -280,11 +310,14 @@ A **multi-level, gapped, band-monotone ID**, e.g. `BRR LL`:
 
 1. `p1.5: WP-A` warp UI legibility (DTO + projection + widgets).
 2. `p1.5: WP-C` gravity arrows + breadcrumb + multi-hop/route-lock (core + TUI).
-3. `p1.5: WP-B` real event log + StarDock signpost + Computer reorg.
+3. `p1.5: WP-B` real event log + StarDock signpost + auto-known route + Computer reorg.
 4. `p1.5: WP-D` rename binary + `--serve`.
 5. `p1.5: WP-E` renumbering proposal (DESIGN.md) + prototype + tests.
 
 WP-A and WP-C share the `WarpDTO` change, so land A and C together or A first.
+WP-B's auto-known route depends on WP-C's `shortest_path` route-lock landing
+first. (WP-A–WP-D are already committed; the round-2 amendments add the
+arrow-key focus to WP-A and the auto-known route to WP-B.)
 
 ## Verification
 
@@ -298,9 +331,15 @@ WP-A and WP-C share the `WarpDTO` change, so land A and C together or A first.
 - **Projection:** unit-test `messages_view` (StarDock intro present; events
   formatted) and the gravity-arrow logic (`<<`/`>>`/`--`) against a tiny fixture
   universe.
+- **Bigbang (WP-B route):** assert the new game seeds `explored_sectors` with a
+  contiguous path from sector 1 to the StarDock sector (and a matching
+  `entered_from` chain), that the off-route remainder stays fogged, and that
+  `TravelTo(stardock)` succeeds from the opening state.
 - **TUI (Textual Pilot, `test_tui_flow.py`):** click a sidebar neighbor → warp;
   press `w` → TravelTo a known sector; open Computer → Map/Log tabs render;
-  assert the warp legend + `[id] Region (Band)` title.
+  assert the warp legend + `[id] Region (Band)` title; **arrow-key focus:** Down
+  moves focus to the warp button rendered below the focused one (Up above,
+  Left/Right horizontally), Enter warps it.
 - **WP-E:** a bigbang test asserting `assign_spatial_ids` is deterministic and
   band-monotone (ID order matches `core_hops` order) across several seeds.
 - **Manual:** `pixi run edge` (renamed) and `pixi run edge --serve` then open the
