@@ -149,6 +149,21 @@ class MapDTO:
 
 
 @dataclass(frozen=True)
+class LogEntry:
+    """One line in the messages/event log (UI_MOCKUPS.md §11, DESIGN §12)."""
+
+    when: str  # short label, e.g. "" or "start"; markup-free
+    text: str  # markup ok
+
+
+@dataclass(frozen=True)
+class MessagesDTO:
+    """The messages & log view, projected from the durable event_log (§12)."""
+
+    events: list[LogEntry]
+
+
+@dataclass(frozen=True)
 class GameState:
     """The game-screen view bundle (the public counterpart of `UniverseState`)."""
 

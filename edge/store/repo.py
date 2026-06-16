@@ -59,6 +59,9 @@ class Repository(ABC):
     def append_event(self, event: Event, tick: int = 0) -> int: ...
 
     @abstractmethod
+    def load_events(self) -> list[Event]: ...
+
+    @abstractmethod
     def close(self) -> None: ...
 
     def __enter__(self) -> Repository:
@@ -122,6 +125,12 @@ class SqliteRepository(Repository):
         )
         self._conn.commit()
         return int(cur.lastrowid or 0)
+
+    def load_events(self) -> list[Event]:
+        rows = self._conn.execute(
+            "SELECT type, payload FROM event_log ORDER BY seq"
+        ).fetchall()
+        return [codec.decode_event(r[0], json.loads(r[1])) for r in rows]
 
     def close(self) -> None:
         self._conn.close()

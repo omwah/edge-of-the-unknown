@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from edge.core.enums import Commodity
+from edge.core.enums import Commodity, PortMode
 from edge.core.events import (
     Banked,
     Docked,
@@ -127,3 +127,29 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             }
         case _:
             raise ValueError(f"unknown event type {type(event).__name__}")
+
+
+def decode_event(type_: str, payload: dict[str, Any]) -> Event:
+    """Reconstruct an event from its persisted (type, payload) — for log views (§11)."""
+    match type_:
+        case "Warped":
+            return Warped(payload["player_id"], payload["from_sector"],
+                          payload["to_sector"], payload["turn_cost"])
+        case "Docked":
+            return Docked(payload["player_id"], payload["sector_id"], payload["port_id"])
+        case "Traded":
+            return Traded(payload["player_id"], payload["port_id"], Commodity(payload["commodity"]),
+                          PortMode(payload["mode"]), payload["units"], payload["unit_price"], payload["total"])
+        case "Haggled":
+            return Haggled(payload["player_id"], payload["port_id"], Commodity(payload["commodity"]),
+                           payload["status"], payload["price"])
+        case "Banked":
+            return Banked(payload["player_id"], payload["kind"], payload["amount"], payload["balance"])
+        case "Upgraded":
+            return Upgraded(payload["player_id"], payload["aspect"], payload["cost"])
+        case "TurnsReset":
+            return TurnsReset(payload["player_id"], payload["turns"])
+        case "StockRegenerated":
+            return StockRegenerated(payload["port_id"], Commodity(payload["commodity"]), payload["new_stock"])
+        case _:
+            raise ValueError(f"unknown event type {type_!r}")
