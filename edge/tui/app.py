@@ -73,12 +73,32 @@ class EdgeApp(App[None]):
         return self.service
 
 
+def _serve(host: str, port: int, *, plain: bool) -> None:
+    """Host the app in a browser via `textual-serve` (DESIGN §11, §15).
+
+    The served subprocess runs the *plain* `edge` invocation (never `--serve`), so
+    each browser session gets an ordinary app instance and there is no recursion.
+    """
+    from textual_serve.server import Server
+
+    command = "python -m edge.tui --plain" if plain else "python -m edge.tui"
+    Server(command, host=host, port=port).serve()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="edge")
     parser.add_argument(
         "--plain", action="store_true", help="disable starfield/CRT animation effects"
     )
+    parser.add_argument(
+        "--serve", action="store_true", help="host the app in a web browser instead of the terminal"
+    )
+    parser.add_argument("--host", default="localhost", help="bind host for --serve")
+    parser.add_argument("--port", type=int, default=8000, help="bind port for --serve")
     args = parser.parse_args()
+    if args.serve:
+        _serve(args.host, args.port, plain=args.plain)
+        return
     EdgeApp(plain=args.plain).run()
 
 

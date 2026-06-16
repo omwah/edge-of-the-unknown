@@ -55,13 +55,15 @@ This project uses [pixi](https://pixi.sh/) to manage its environment.
 
 ```bash
 pixi install        # create the environment from pyproject.toml / pixi.lock
-pixi run tui        # play (use `pixi run tui --plain` to drop animations)
+pixi run edge       # play (use `pixi run edge --plain` to drop animations)
+pixi run serve      # or play in a browser (Textual web server; --host/--port)
 ```
 
 From the main menu, press **N** for a new game, then explore: click a warp in
-the grid to move (each costs turns), **P** to dock at a port and trade
-(**T** trades the highlighted commodity; at a StarDock, **U** buys an upgrade),
-**C** for the ship computer's pair-trade finder, **M** for the galactic map.
+the grid (or a neighbour in the sidebar) to move one hop, **W** to travel a known
+multi-hop route, **P** to dock at a port and trade (**T** trades the highlighted
+commodity; at a StarDock, **U** buys an upgrade), **C** for the ship computer
+(pair-trade finder), **M** for its galactic map, **G** for its event log.
 
 ## Development
 
