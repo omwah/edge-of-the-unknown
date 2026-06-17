@@ -190,6 +190,53 @@ async def test_dock_and_trade_buys_fuel() -> None:
         assert svc.state.players[1].latinum < 2_000  # spent latinum buying
 
 
+async def test_dock_and_haggle_accepts_fair_counter() -> None:
+    """Press H, counter at the fair price (improvement 0 ⇒ always accepted), and the
+    deal goes through as a HaggleOffer — the path playtesting found missing."""
+    from textual.widgets import Input
+
+    from edge.core.enums import Commodity
+    from edge.core.events import Haggled
+    from edge.tui.screens.haggle import HaggleScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game_at_stardock(app, pilot)
+        assert isinstance(app.screen, StarDockScreen)
+        port = svc.current_port_view(1)
+        assert port is not None
+        fair = next(c for c in port.commodities if c.name == "Fuel Ore").price
+
+        await pilot.press("h")  # open the haggle modal on the highlighted row (Fuel Ore)
+        await pilot.pause()
+        assert isinstance(app.screen, HaggleScreen)
+        # Countering at the fair price does not favour the player → accepted with p=1.0.
+        app.screen.query_one("#haggle-input", Input).value = str(fair)
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert svc.state.ships[1].cargo.get(Commodity.FUEL_ORE, 0) > 0  # bought via haggle
+        assert svc.state.players[1].latinum < 2_000  # spent latinum
+        assert any(isinstance(e, Haggled) for e in svc._repo.load_events())  # logged as a haggle
+
+
+async def test_haggle_walk_away_makes_no_trade() -> None:
+    from edge.tui.screens.haggle import HaggleScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game_at_stardock(app, pilot)
+        await pilot.press("h")
+        await pilot.pause()
+        assert isinstance(app.screen, HaggleScreen)
+        await pilot.press("escape")  # walk away — no offer made
+        await pilot.pause()
+        assert isinstance(app.screen, StarDockScreen)
+        assert svc.state.players[1].latinum == 2_000  # nothing spent
+
+
 async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
     from textual.widgets import TabbedContent
 

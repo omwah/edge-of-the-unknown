@@ -664,6 +664,49 @@ round-trips identically.
 
 ---
 
+## WP13 — Multi-round haggle sessions (§8)
+
+The haggle **engine** shipped in Phase 1 — `HaggleOffer` + `_haggle` (rules.py),
+`resolve_haggle`/`haggle_acceptance_probability` (economy.py), `HagglingConfig`
+(`insult_frac` / `max_rejections` / `history_penalty`), the `Haggled` event, codec,
+and tests. A follow-up wired a **single counter-offer** into the trade UI
+(`HaggleScreen` modal, `H` on the port / StarDock screens, the read-only
+`haggle_quote` hint) so haggling is real and visible. What is **not** yet built is
+the full mini-game the design and the original mockup imply: an
+**accept / counter / walk-away loop over multiple rounds**, with the port's patience
+wearing thin as the player keeps pushing.
+
+**The blocker (why it was deferred).** `_haggle` calls
+`haggle_acceptance_probability(..., recent_attempts=0)` — the history penalty exists
+in config but is always fed zero, because nothing tracks how many times the player
+has already haggled this port today. Wiring a real `recent_attempts` means the count
+is **player progress that must survive replay**: state is reconstructed as
+`generate(seed) + replay(command log)`, so the count cannot be ephemeral UI state —
+each `HaggleOffer` must carry (or the reducer must derive) a value that is identical
+on replay. Today's single-offer flow is replay-safe precisely because it pins
+`recent_attempts=0`.
+
+**Approach.**
+- **Track attempts in the command log, not the UI.** Add per-(player, port, day)
+  haggle-attempt tracking to core state (e.g. a small map on `Player`, reset by the
+  `daily_turn_reset` cron), incremented inside `_haggle` on each non-accepted offer
+  and read as `recent_attempts`. Because it is mutated by the reducer and reset by a
+  durable cron (WP12), it reconstructs exactly under replay — no new command field
+  needed. Enforce `max_rejections`: once exceeded, the port closes negotiation at the
+  fair price for the rest of the day.
+- **Promote the modal into a session screen.** Turn the Part-1 `HaggleScreen` into a
+  stateful accept / counter / walk loop showing "Round N of M", the running quote,
+  and the live `haggle_quote` hint; each counter issues a `HaggleOffer` and the
+  screen reacts to the `Haggled` result until accept / walk / exhaustion.
+- Optional persona flavour line per round (ties into the §6.7 dialogue work).
+
+**Tests.** History penalty actually lowers acceptance across rounds (deterministic
+seed); `max_rejections` closes negotiation at fair; the attempt counter round-trips
+through reload (golden-master) and resets on the daily cron; Pilot flow for the
+multi-round screen.
+
+---
+
 ## Suggested order / commits (phase-tagged, small)
 
 Grouped by milestone; land each WP's entity-field additions + golden-master

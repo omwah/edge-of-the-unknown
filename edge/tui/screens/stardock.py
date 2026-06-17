@@ -20,7 +20,7 @@ from edge.core.enums import Component, ComponentTier
 from edge.core.rules import BuyComponent, BuyShip, RecruitColonists
 from edge.server.service import GameService
 from edge.tui.screens.engine_room import EngineRoomScreen
-from edge.tui.screens.port import _trade_highlighted
+from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.widgets import TradePanel
 
 
@@ -28,6 +28,7 @@ class StarDockScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Undock"),
         Binding("t", "trade", "Trade"),
+        Binding("h", "haggle", "Haggle"),
         Binding("b", "buy", "Buy"),
         Binding("k", "recruit", "Recruit colonists"),
         Binding("e", "engine_room", "Engine room"),
@@ -106,6 +107,9 @@ class StarDockScreen(Screen):
 
     def action_trade(self) -> None:
         _trade_highlighted(self, self._service, self._pid)
+
+    def action_haggle(self) -> None:
+        _haggle_highlighted(self, self._service, self._pid)
 
     def action_buy(self) -> None:
         active = self.query_one(TabbedContent).active

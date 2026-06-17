@@ -55,6 +55,23 @@ class PortDTO:
 
 
 @dataclass(frozen=True)
+class HaggleQuote:
+    """A read-only read on a counter-offer before the player commits it (§8).
+
+    `fair` is the undisturbed §8 price; `mode` is the port's stance ("BUY"/"SELL");
+    `label` is the likelihood the port would accept this `counter` — one of
+    "accepted" / "likely" / "unlikely" / "insulting". Purely advisory: it issues no
+    command and never touches the seeded RNG, so it has no effect on replay.
+    """
+
+    commodity: str
+    fair: int
+    counter: int
+    mode: str
+    label: str
+
+
+@dataclass(frozen=True)
 class WarpDTO:
     sector_id: int
     arrow: str  # gravity glyph relative to the Core: "<<" closer / ">>" deeper / "--" level
