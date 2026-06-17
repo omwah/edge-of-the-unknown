@@ -16,7 +16,6 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     DiscoveryCollected,
-    DiscoveryDetected,
     Docked,
     Event,
     Haggled,
@@ -43,7 +42,6 @@ from edge.core.rules import (
     RecruitColonists,
     RepairAtDock,
     Salvage,
-    Scan,
     SetAllocation,
     SwapComponent,
     Trade,
@@ -74,8 +72,7 @@ COMMANDS: list[Command] = [
     Cannibalize(Subsystem.MAIN_GUN, 2),
     Cannibalize(Subsystem.FUSION_REACTOR, 0, starbase_id=4),  # WP4 starbase salvage
     FieldPatch(Subsystem.THRUSTERS, 0),
-    Scan(),                       # WP5 sensor sweep
-    Salvage(discovery_id=7),      # WP5 collect a discovery
+    Salvage(discovery_id=7),      # WP5 log a discovery to the codex
 ]
 
 EVENTS: list[Event] = [
@@ -94,7 +91,6 @@ EVENTS: list[Event] = [
     ComponentRemoved(1, "main_gun", 2, "linkage", "I"),
     Repaired(1, "thrusters", 0),
     StarbaseSalvaged(1, 4, "fusion_reactor", 0, "converter", "I"),
-    DiscoveryDetected(1, 7, "wreck", "RARE"),
     DiscoveryCollected(1, 7, "wreck", "RARE", "artifact"),
     TurnsReset(1, 250),
     StockRegenerated(3, Commodity.EQUIPMENT, 480),

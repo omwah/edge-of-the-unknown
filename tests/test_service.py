@@ -107,8 +107,9 @@ def test_load_game_replays_maintenance_ticks(tmp_path: Path) -> None:
 def test_discovery_collection_replays_into_identical_state(tmp_path: Path) -> None:
     """WP5: warping to + salvaging a discovery survives a reload (Player.codex golden master).
 
-    Everything flows through the command log — warp (which runs on-entry detection)
-    and salvage — so replay reproduces the codex exactly; no direct state pokes.
+    Everything flows through the command log — warp and salvage — so replay
+    reproduces the codex exactly; no direct state pokes. Visibility is recomputed
+    live from sensors, so the salvage's gate is deterministic on replay too.
     """
     from edge.core.rules import Salvage, Warp
 
@@ -128,7 +129,7 @@ def test_discovery_collection_replays_into_identical_state(tmp_path: Path) -> No
     candidates.sort(key=lambda t: t[0])
     _, path, disc = candidates[0]
     for hop in path[1:]:
-        svc.apply(1, Warp(to_sector=hop))  # on-entry detection fires here (logged)
+        svc.apply(1, Warp(to_sector=hop))
     svc.apply(1, Salvage(discovery_id=disc.id))
     assert disc.id in svc.state.players[1].codex
     expected = state_hash(svc.state)
