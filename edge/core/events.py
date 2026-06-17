@@ -70,6 +70,31 @@ class Upgraded(Event):
 
 
 @dataclass(frozen=True)
+class ComponentInstalled(Event):
+    player_id: int
+    subsystem: str  # Subsystem value
+    slot_index: int
+    component: str  # Component value
+    tier: str  # ComponentTier name (I/II/III)
+
+
+@dataclass(frozen=True)
+class ComponentRemoved(Event):
+    player_id: int
+    subsystem: str
+    slot_index: int
+    component: str
+    tier: str
+
+
+@dataclass(frozen=True)
+class Repaired(Event):
+    player_id: int
+    subsystem: str
+    slot_index: int
+
+
+@dataclass(frozen=True)
 class TurnsReset(Event):
     player_id: int
     turns: int

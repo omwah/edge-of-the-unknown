@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from edge.core.enums import Commodity, PortMode
+from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsystem
 from edge.core.events import (
     Banked,
+    ComponentInstalled,
+    ComponentRemoved,
     Docked,
     Event,
     Haggled,
+    Repaired,
     StockRegenerated,
     Traded,
     TurnsReset,
@@ -23,10 +26,14 @@ from edge.core.events import (
 )
 from edge.core.rules import (
     BuyUpgrade,
+    Cannibalize,
     Command,
     Deposit,
     Dock,
+    FieldPatch,
     HaggleOffer,
+    InstallComponent,
+    SwapComponent,
     Trade,
     TravelTo,
     Warp,
@@ -61,6 +68,24 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "Withdraw", {"amount": command.amount}
         case BuyUpgrade():
             return "BuyUpgrade", {}
+        case InstallComponent():
+            return "InstallComponent", {
+                "subsystem": command.subsystem.value, "slot_index": command.slot_index,
+                "component": command.component.value, "tier": command.tier.name,
+            }
+        case SwapComponent():
+            return "SwapComponent", {
+                "subsystem": command.subsystem.value, "slot_index": command.slot_index,
+                "component": command.component.value, "tier": command.tier.name,
+            }
+        case Cannibalize():
+            return "Cannibalize", {
+                "subsystem": command.subsystem.value, "slot_index": command.slot_index,
+            }
+        case FieldPatch():
+            return "FieldPatch", {
+                "subsystem": command.subsystem.value, "slot_index": command.slot_index,
+            }
 
 
 def decode_command(type_: str, payload: dict[str, Any]) -> Command:
@@ -90,6 +115,24 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return Withdraw(amount=payload["amount"])
         case "BuyUpgrade":
             return BuyUpgrade()
+        case "InstallComponent":
+            return InstallComponent(
+                subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
+                component=Component(payload["component"]), tier=ComponentTier[payload["tier"]],
+            )
+        case "SwapComponent":
+            return SwapComponent(
+                subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
+                component=Component(payload["component"]), tier=ComponentTier[payload["tier"]],
+            )
+        case "Cannibalize":
+            return Cannibalize(
+                subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
+            )
+        case "FieldPatch":
+            return FieldPatch(
+                subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
+            )
         case _:
             raise ValueError(f"unknown command type {type_!r}")
 
@@ -124,6 +167,20 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             }
         case Upgraded():
             return "Upgraded", {"player_id": event.player_id, "aspect": event.aspect, "cost": event.cost}
+        case ComponentInstalled():
+            return "ComponentInstalled", {
+                "player_id": event.player_id, "subsystem": event.subsystem,
+                "slot_index": event.slot_index, "component": event.component, "tier": event.tier,
+            }
+        case ComponentRemoved():
+            return "ComponentRemoved", {
+                "player_id": event.player_id, "subsystem": event.subsystem,
+                "slot_index": event.slot_index, "component": event.component, "tier": event.tier,
+            }
+        case Repaired():
+            return "Repaired", {
+                "player_id": event.player_id, "subsystem": event.subsystem, "slot_index": event.slot_index,
+            }
         case TurnsReset():
             return "TurnsReset", {"player_id": event.player_id, "turns": event.turns}
         case StockRegenerated():
@@ -152,6 +209,14 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return Banked(payload["player_id"], payload["kind"], payload["amount"], payload["balance"])
         case "Upgraded":
             return Upgraded(payload["player_id"], payload["aspect"], payload["cost"])
+        case "ComponentInstalled":
+            return ComponentInstalled(payload["player_id"], payload["subsystem"],
+                                      payload["slot_index"], payload["component"], payload["tier"])
+        case "ComponentRemoved":
+            return ComponentRemoved(payload["player_id"], payload["subsystem"],
+                                    payload["slot_index"], payload["component"], payload["tier"])
+        case "Repaired":
+            return Repaired(payload["player_id"], payload["subsystem"], payload["slot_index"])
         case "TurnsReset":
             return TurnsReset(payload["player_id"], payload["turns"])
         case "StockRegenerated":

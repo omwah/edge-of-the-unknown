@@ -51,6 +51,35 @@ def _world() -> UniverseState:
     return world
 
 
+def test_engine_room_view_projects_slots_and_derived_aspects() -> None:
+    from edge.core.engine_room import build_subsystems
+    from edge.core.enums import Component, ComponentTier
+
+    world = _world()
+    sc = CONFIG.starter_ship
+    world.ships[1] = Ship(
+        1, sc.id, sc.name, 1, 2, sc.holds_total, shields=sc.shields_max,
+        warp_speed=sc.warp_speed, combat_speed=sc.combat_speed, repair_kits=2,
+        subsystems=build_subsystems(sc),
+        components={(Component.CONVERTER, ComponentTier.II): 1},
+    )
+    er = session.engine_room_view(world, 1, CONFIG)
+    assert [s.name for s in er.subsystems] == ["SPINDRIVE", "SCREENS", "THRUSTERS", "MAIN GUN"]
+    spindrive = er.subsystems[0]
+    assert spindrive.derived == "warp 3"
+    assert spindrive.slots[0].keystone and spindrive.slots[0].state == "filled"
+    assert spindrive.slots[-1].state == "empty"
+    assert er.efficiency_bonus == "+2 all"
+    assert er.kits == 2
+    assert er.on_hand == ["converter (II) x1"]
+
+
+def test_engine_room_view_handles_a_flat_hull() -> None:
+    """An NPC-style flat hull (no subsystems) projects no panels, not an error."""
+    er = session.engine_room_view(_world(), 1, CONFIG)  # _world's ship has subsystems=None
+    assert er.subsystems == []
+
+
 def test_computer_view_finds_profitable_pair() -> None:
     cv = session.computer_view(_world(), 1, CONFIG)
     assert cv.pairs  # at least one opposed pair among discovered ports
@@ -184,6 +213,10 @@ def test_format_event_covers_kinds_and_filters_noise() -> None:
     assert session.format_event(Upgraded(1, "holds", 2_000))
     assert session.format_event(Banked(1, "deposit", 500, 500))
     assert session.format_event(TurnsReset(1, 250))
+    from edge.core.events import ComponentInstalled, ComponentRemoved, Repaired
+    assert "Installed" in session.format_event(ComponentInstalled(1, "spindrive", 3, "turbine", "II"))
+    assert "Removed" in session.format_event(ComponentRemoved(1, "main_gun", 2, "linkage", "I"))
+    assert "patched" in session.format_event(Repaired(1, "thrusters", 1))
     # Per-commodity restock is not player-facing — filtered out of the log.
     assert session.format_event(StockRegenerated(3, Commodity.EQUIPMENT, 480)) == ""
 

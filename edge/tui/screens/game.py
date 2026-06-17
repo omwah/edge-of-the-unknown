@@ -20,7 +20,7 @@ from edge.core.events import Event
 from edge.core.movement import MovementError
 from edge.core.rules import Dock, TravelTo, Warp
 from edge.server.service import GameService
-from edge.tui.dummy import SectorDTO, sample_engine_room
+from edge.tui.dummy import SectorDTO
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.planet import PlanetScreen
@@ -241,7 +241,8 @@ class GameScreen(Screen):
         self.app.push_screen(PlanetScreen(planets[0].split("  ")[0].strip()))
 
     def action_engine_room(self) -> None:
-        self.app.push_screen(EngineRoomScreen(sample_engine_room()))
+        self.app.push_screen(EngineRoomScreen(
+            self._service.engine_room_view(self._pid), self._service, self._pid))
 
     def action_messages(self) -> None:
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="log"))

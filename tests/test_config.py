@@ -12,7 +12,7 @@ from edge.core.config import GameConfig
 def test_default_config_loads() -> None:
     cfg = load_default_config()
     assert isinstance(cfg, GameConfig)
-    assert cfg.config_version == 1
+    assert cfg.config_version == 2  # Phase-2 schema epoch (engine room, §4.1)
     assert cfg.turns_per_day == 250
 
 
