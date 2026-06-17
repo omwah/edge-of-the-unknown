@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from edge.bigbang.topology import bfs_distances
 from edge.core.config import GameConfig
+from edge.core.discovery import rarity_value
 from edge.core.economy import port_unit_price
 from edge.core.enums import Commodity, PortClass, PortMode
 from edge.core.models import Port, UniverseState
@@ -28,6 +29,7 @@ def validate(state: UniverseState, config: GameConfig) -> None:
     _check_profitable_pair(state, config)
     _check_planet_ownership(state, config)
     _check_starbases(state)
+    _check_discovery_gradient(state, config)
 
 
 def _check_reachable(state: UniverseState) -> None:
@@ -120,6 +122,31 @@ def _check_starbases(state: UniverseState) -> None:
             raise ValidationError(f"starbase {base.id} on owned planet {planet.id} is derelict")
         if not is_operational(base) and (planet.owner.is_owned or planet.inhabited_by_species_id is not None):
             raise ValidationError(f"derelict starbase {base.id} is not on an unowned, uninhabited world")
+
+
+def _check_discovery_gradient(state: UniverseState, config: GameConfig) -> None:
+    """Discovery gradient (§7 / §5 step 8): mean rarity **and** value strictly rising
+    across consecutive non-empty bands, so the deep frontier holds the richer finds."""
+    if config.discovery is None or not state.discoveries:
+        return
+    by_band: dict[str, list[tuple[int, int]]] = {}  # band -> [(rarity rank, value)]
+    for d in state.discoveries.values():
+        band = state.sectors[d.sector_id].distance_band
+        by_band.setdefault(band, []).append((d.rarity_tier.value, rarity_value(d.rarity_tier, config)))
+
+    prev_rank = prev_value = -1.0
+    for band in (b.name for b in config.bigbang.bands):
+        finds = by_band.get(band)
+        if not finds:
+            continue
+        mean_rank = sum(r for r, _ in finds) / len(finds)
+        mean_value = sum(v for _, v in finds) / len(finds)
+        if mean_rank <= prev_rank or mean_value <= prev_value:
+            raise ValidationError(
+                f"discovery gradient not strictly increasing at band {band} "
+                f"(rank {mean_rank:.2f}≤{prev_rank:.2f} or value {mean_value:.0f}≤{prev_value:.0f})"
+            )
+        prev_rank, prev_value = mean_rank, mean_value
 
 
 def _check_profitable_pair(state: UniverseState, config: GameConfig) -> None:

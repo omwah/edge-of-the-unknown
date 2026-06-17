@@ -104,6 +104,27 @@ class Repaired(Event):
 
 
 @dataclass(frozen=True)
+class DiscoveryDetected(Event):
+    """A hidden discovery a ship's sensors picked out on entering its sector (§7, WP5)."""
+
+    player_id: int
+    discovery_id: int
+    kind: str  # DiscoveryKind value
+    rarity: str  # RarityTier name
+
+
+@dataclass(frozen=True)
+class DiscoveryCollected(Event):
+    """A discovery logged into the codex, its payload taken aboard (§7, WP5)."""
+
+    player_id: int
+    discovery_id: int
+    kind: str  # DiscoveryKind value
+    rarity: str  # RarityTier name
+    payload: str  # PayloadKind value (what was gained)
+
+
+@dataclass(frozen=True)
 class StarbaseSalvaged(Event):
     """A component cannibalized out of an orbital starbase into the ship (§4.2, WP4)."""
 

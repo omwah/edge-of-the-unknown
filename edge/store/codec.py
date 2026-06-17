@@ -18,6 +18,8 @@ from edge.core.events import (
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
+    DiscoveryCollected,
+    DiscoveryDetected,
     Docked,
     Event,
     Haggled,
@@ -43,6 +45,8 @@ from edge.core.rules import (
     InstallComponent,
     RecruitColonists,
     RepairAtDock,
+    Salvage,
+    Scan,
     SetAllocation,
     SwapComponent,
     Trade,
@@ -110,6 +114,10 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "FieldPatch", {
                 "subsystem": command.subsystem.value, "slot_index": command.slot_index,
             }
+        case Scan():
+            return "Scan", {}
+        case Salvage():
+            return "Salvage", {"discovery_id": command.discovery_id}
 
 
 def decode_command(type_: str, payload: dict[str, Any]) -> Command:
@@ -172,6 +180,10 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return FieldPatch(
                 subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
             )
+        case "Scan":
+            return Scan()
+        case "Salvage":
+            return Salvage(discovery_id=payload["discovery_id"])
         case _:
             raise ValueError(f"unknown command type {type_!r}")
 
@@ -234,6 +246,16 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "subsystem": event.subsystem, "slot_index": event.slot_index,
                 "component": event.component, "tier": event.tier,
             }
+        case DiscoveryDetected():
+            return "DiscoveryDetected", {
+                "player_id": event.player_id, "discovery_id": event.discovery_id,
+                "kind": event.kind, "rarity": event.rarity,
+            }
+        case DiscoveryCollected():
+            return "DiscoveryCollected", {
+                "player_id": event.player_id, "discovery_id": event.discovery_id,
+                "kind": event.kind, "rarity": event.rarity, "payload": event.payload,
+            }
         case ColonistsRecruited():
             return "ColonistsRecruited", {
                 "player_id": event.player_id, "source": event.source,
@@ -290,6 +312,12 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "StarbaseSalvaged":
             return StarbaseSalvaged(payload["player_id"], payload["starbase_id"], payload["subsystem"],
                                     payload["slot_index"], payload["component"], payload["tier"])
+        case "DiscoveryDetected":
+            return DiscoveryDetected(payload["player_id"], payload["discovery_id"],
+                                     payload["kind"], payload["rarity"])
+        case "DiscoveryCollected":
+            return DiscoveryCollected(payload["player_id"], payload["discovery_id"],
+                                      payload["kind"], payload["rarity"], payload["payload"])
         case "ColonistsRecruited":
             return ColonistsRecruited(payload["player_id"], payload["source"],
                                       payload["count"], payload["cost"])

@@ -67,6 +67,7 @@ def state_hash(state: UniverseState) -> str:
         "ports": state.ports,
         "planets": state.planets,
         "starbases": state.starbases,
+        "discoveries": state.discoveries,
         "ships": state.ships,
         "players": state.players,
         "alliances": state.alliances,

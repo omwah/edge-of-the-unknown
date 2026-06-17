@@ -25,6 +25,8 @@ from edge.core.events import (
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
+    DiscoveryCollected,
+    DiscoveryDetected,
     Docked,
     Event,
     Haggled,
@@ -119,6 +121,28 @@ def _warp_kind(target: int, came_from: int | None, explored: frozenset[int]) -> 
     return "explored" if target in explored else "unexplored"
 
 
+def _discovery_label(kind: str, rarity: str) -> str:
+    return f"{kind.replace('_', ' ').capitalize()} · {rarity.capitalize()}"
+
+
+def _sector_discoveries(state: UniverseState, player: Player, sector_id: int) -> list[dto.SectorDiscovery]:
+    """Open-space finds the player can see in `sector_id`: obvious + sensor-detected (§7)."""
+    out: list[dto.SectorDiscovery] = []
+    for d in state.discoveries.values():
+        if d.planet_id is not None or d.sector_id != sector_id:
+            continue  # surface sites are reached by descent (WP6), not listed in space
+        visible = (not d.hidden) or (d.id in player.detected)
+        if not visible:
+            continue
+        collected = d.found_by is not None
+        out.append(dto.SectorDiscovery(
+            discovery_id=d.id, label=_discovery_label(d.kind.value, d.rarity_tier.name),
+            kind=d.kind.value, rarity=d.rarity_tier.name,
+            salvageable=not collected, collected=collected,
+        ))
+    return out
+
+
 def _sector_dto(
     state: UniverseState, player: Player, sector: Sector, core_hops: dict[int, int]
 ) -> dto.SectorDTO:
@@ -139,7 +163,9 @@ def _sector_dto(
     return dto.SectorDTO(
         region=region, sector_id=sector.id, flavor=f"{sector.distance_band.lower()} space",
         beacon=sector.beacon_text, band=sector.distance_band,
-        ports=ports, planets=planets, ships=[], warps=warps, display_id=_display(state, sector.id),
+        ports=ports, planets=planets, ships=[], warps=warps,
+        discoveries=_sector_discoveries(state, player, sector.id),
+        display_id=_display(state, sector.id),
     )
 
 
@@ -394,6 +420,10 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
         return f"[green]Field-patched {event.subsystem} slot {event.slot_index}[/]"
     if isinstance(event, StarbaseSalvaged):
         return f"[green]Salvaged {event.component} ({event.tier})[/] from a derelict starbase"
+    if isinstance(event, DiscoveryDetected):
+        return f"[cyan]✦ Sensors: {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
+    if isinstance(event, DiscoveryCollected):
+        return f"[green]✦ Logged {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
     if isinstance(event, ColonistsRecruited):
         via = "StarDock" if event.source == "stardock" else "emigration"
         cost = f"  (-{event.cost} slips)" if event.cost else ""
