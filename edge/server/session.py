@@ -31,12 +31,14 @@ from edge.core.events import (
     PlanetProduced,
     Repaired,
     ShipPurchased,
+    StarbaseSalvaged,
     TurnsReset,
     Traded,
     Warped,
 )
 from edge.core.models import Planet, Player, Port, Sector, Ship, SubsystemState, UniverseState
 from edge.core.planets import is_colonizable
+from edge.core.starbases import is_operational
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
 _FULL = {Commodity.FUEL_ORE: "Fuel Ore", Commodity.ORGANICS: "Organics", Commodity.EQUIPMENT: "Equipment"}
@@ -244,6 +246,20 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     owned_by_you = planet.owner.kind == "player" and planet.owner.ref == player_id
     stores = [(_FULL[c], planet.stores.get(c, 0)) for c in Commodity]
     allocation = [(_FULL[c], round(planet.allocation.get(c, 0.0) * 100)) for c in Commodity]
+    base = state.starbases.get(planet.starbase_id) if planet.starbase_id is not None else None
+    starbase_status: str | None = None
+    starbase_derelict = False
+    salvage: list[tuple[str, int, str]] = []
+    if base is not None:
+        operational = is_operational(base)
+        starbase_derelict = not operational
+        starbase_status = "operational" if operational else "derelict — salvageable"
+        base_owned_by_you = base.owner.kind == "player" and base.owner.ref == player_id
+        if not operational or base_owned_by_you:  # the cannibalize-allowed condition (§4.2)
+            for subsystem, sub in base.subsystems.items():
+                for idx, comp in enumerate(sub.slots):
+                    if comp is not None:
+                        salvage.append((subsystem.value, idx, comp.kind.value))
     return dto.PlanetDTO(
         planet_id=planet.id, name=planet.name, ptype=planet.planet_type,
         owner=_owner_label(state, planet, player_id), colonizable=colonizable,
@@ -251,7 +267,8 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         colonists=planet.colonists, habitability_cap=planet.habitability_cap,
         stores=stores, allocation=allocation, ship_colonists=ship.colonists,
         ship_colonist_capacity=ship.colonist_capacity,
-        starbase="operational" if planet.starbase_id is not None else None,
+        starbase=starbase_status, starbase_id=planet.starbase_id,
+        starbase_derelict=starbase_derelict, salvage=salvage,
     )
 
 
@@ -375,6 +392,8 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
         return f"Removed {event.component} ({event.tier}) from {event.subsystem}"
     if isinstance(event, Repaired):
         return f"[green]Field-patched {event.subsystem} slot {event.slot_index}[/]"
+    if isinstance(event, StarbaseSalvaged):
+        return f"[green]Salvaged {event.component} ({event.tier})[/] from a derelict starbase"
     if isinstance(event, ColonistsRecruited):
         via = "StarDock" if event.source == "stardock" else "emigration"
         cost = f"  (-{event.cost} slips)" if event.cost else ""

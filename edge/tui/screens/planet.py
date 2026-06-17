@@ -16,7 +16,9 @@ from textual.widgets import Footer, Static
 
 from edge.core.economy import EconomyError
 from edge.core.dto import PlanetDTO
-from edge.core.rules import Colonize
+from edge.core.engine_room import EngineRoomError
+from edge.core.enums import Subsystem
+from edge.core.rules import Cannibalize, Colonize
 from edge.server.service import GameService
 from edge.tui import sprites
 from edge.tui.dummy import sample_surface
@@ -29,6 +31,7 @@ class PlanetScreen(Screen):
         Binding("d", "descend", "Descend"),
         Binding("t", "noop", "Trade"),
         Binding("c", "colonize", "Claim/Colonize"),
+        Binding("s", "salvage", "Salvage"),
     ]
 
     CSS = """
@@ -65,7 +68,11 @@ class PlanetScreen(Screen):
                     alloc = "   ".join(f"{label} {pct}%" for label, pct in p.allocation)
                     yield Static(f"Allocation   {alloc}", classes="section")
                 if p.starbase:
-                    yield Static(f"[green]#[/] Orbital starbase — {p.starbase}", classes="section")
+                    colour = "yellow" if p.starbase_derelict else "green"
+                    yield Static(f"[{colour}]#[/] Orbital starbase — {p.starbase}", classes="section")
+                    if p.salvage:
+                        parts = ", ".join(f"{label}" for _, _, label in p.salvage)
+                        yield Static(f"[yellow]\\[S] Salvage[/] — {len(p.salvage)} components: {parts}")
                 hint = self._claim_hint()
                 if hint:
                     yield Static(hint, classes="section")
@@ -98,6 +105,27 @@ class PlanetScreen(Screen):
             self.notify(str(exc), severity="warning", timeout=3)
             return
         self.notify("Colony established!", timeout=2)
+        self.app.pop_screen()
+        self.app.push_screen(PlanetScreen(
+            self._service.planet_view(self._pid, p.planet_id), self._service, self._pid))
+
+    def action_salvage(self) -> None:
+        """Cannibalize one component from the orbital base into the ship's hold (§4.2)."""
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        if p.starbase_id is None or not p.salvage:
+            self.notify("Nothing to salvage here.", timeout=2)
+            return
+        subsystem, slot_index, _ = p.salvage[0]
+        try:
+            self._service.apply(self._pid, Cannibalize(
+                subsystem=Subsystem(subsystem), slot_index=slot_index, starbase_id=p.starbase_id))
+        except (EngineRoomError, EconomyError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify("Component salvaged.", timeout=2)
         self.app.pop_screen()
         self.app.push_screen(PlanetScreen(
             self._service.planet_view(self._pid, p.planet_id), self._service, self._pid))

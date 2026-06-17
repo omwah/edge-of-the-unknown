@@ -21,6 +21,7 @@ from edge.core.events import (
     PlanetProduced,
     Repaired,
     ShipPurchased,
+    StarbaseSalvaged,
     StockRegenerated,
     Traded,
     TurnsReset,
@@ -67,6 +68,7 @@ COMMANDS: list[Command] = [
     InstallComponent(Subsystem.SPINDRIVE, 3, Component.TURBINE, ComponentTier.II),
     SwapComponent(Subsystem.SCREENS, 1, Component.RADIATOR, ComponentTier.III),
     Cannibalize(Subsystem.MAIN_GUN, 2),
+    Cannibalize(Subsystem.FUSION_REACTOR, 0, starbase_id=4),  # WP4 starbase salvage
     FieldPatch(Subsystem.THRUSTERS, 0),
 ]
 
@@ -85,6 +87,7 @@ EVENTS: list[Event] = [
     ComponentInstalled(1, "spindrive", 3, "turbine", "II"),
     ComponentRemoved(1, "main_gun", 2, "linkage", "I"),
     Repaired(1, "thrusters", 0),
+    StarbaseSalvaged(1, 4, "fusion_reactor", 0, "converter", "I"),
     TurnsReset(1, 250),
     StockRegenerated(3, Commodity.EQUIPMENT, 480),
 ]

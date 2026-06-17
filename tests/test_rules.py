@@ -26,12 +26,14 @@ from edge.core.models import (
     Port,
     PortCommodity,
     Ship,
+    Starbase,
     UniverseState,
 )
 from edge.core.movement import MovementError
 from edge.core.rules import (
     BuyComponent,
     BuyShip,
+    Cannibalize,
     Colonize,
     Deposit,
     Dock,
@@ -491,3 +493,75 @@ def test_dock_and_trade_require_a_port() -> None:
         reduce(state, 1, Dock(), CONFIG)
     with pytest.raises(MovementError):
         reduce(state, 1, Trade(commodity=Commodity.FUEL_ORE, units=1), CONFIG)
+
+
+# --- WP4: orbital starbase salvage (§4.2) -----------------------------------
+
+
+def _with_starbase(state: UniverseState, *, derelict: bool, owner: Ownership) -> Starbase:
+    """Hang a base off a planet in the player's sector (2); return the base."""
+    from dataclasses import replace as _replace
+
+    from edge.core.engine_room import build_layouts
+    from edge.core.enums import Subsystem
+
+    assert CONFIG.starbase is not None
+    subs = build_layouts(CONFIG.starbase.subsystems)
+    if derelict:
+        reactor = subs[Subsystem.FUSION_REACTOR]
+        slots = list(reactor.slots)
+        slots[reactor.keystone_index] = None  # strip the keystone → derelict
+        subs[Subsystem.FUSION_REACTOR] = _replace(reactor, slots=tuple(slots))
+    base = Starbase(id=1, sector_id=2, planet_id=1, ship_class_id="orbital_platform",
+                    owner=owner, subsystems=subs)
+    state.starbases = {1: base}
+    state.planets = {1: Planet(1, 2, "World", "barren", starbase_id=1)}
+    return base
+
+
+def _first_filled(base: Starbase) -> tuple[object, int]:
+    from edge.core.enums import Subsystem  # noqa: F401
+
+    for subsystem, sub in base.subsystems.items():
+        for idx, comp in enumerate(sub.slots):
+            if comp is not None:
+                return subsystem, idx
+    raise AssertionError("no filled slot")
+
+
+def test_salvage_derelict_starbase_conserves_components() -> None:
+    state = _universe()
+    base = _with_starbase(state, derelict=True, owner=Ownership("none"))
+    subsystem, idx = _first_filled(base)
+    before = sum(state.ships[1].components.values())
+    _do(state, Cannibalize(subsystem=subsystem, slot_index=idx, starbase_id=1))  # type: ignore[arg-type]
+    after = sum(state.ships[1].components.values())
+    assert after == before + 1  # the ship gained exactly what the base lost
+    assert state.starbases[1].subsystems[subsystem].slots[idx] is None
+
+
+def test_salvage_operational_starbase_rejected() -> None:
+    state = _universe()
+    base = _with_starbase(state, derelict=False, owner=Ownership("alliance", 1))
+    subsystem, idx = _first_filled(base)
+    with pytest.raises(EngineRoomError):
+        reduce(state, 1, Cannibalize(subsystem=subsystem, slot_index=idx, starbase_id=1), CONFIG)
+
+
+def test_salvage_player_owned_operational_base_allowed() -> None:
+    state = _universe()
+    base = _with_starbase(state, derelict=False, owner=Ownership("player", 1))
+    subsystem, idx = _first_filled(base)
+    _do(state, Cannibalize(subsystem=subsystem, slot_index=idx, starbase_id=1))  # type: ignore[arg-type]
+    assert state.starbases[1].subsystems[subsystem].slots[idx] is None
+
+
+def test_salvage_requires_base_in_sector() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    base = _with_starbase(state, derelict=True, owner=Ownership("none"))
+    subsystem, idx = _first_filled(base)
+    state.ships[1] = replace(state.ships[1], sector_id=1)  # leave the base's sector
+    with pytest.raises(EngineRoomError):
+        reduce(state, 1, Cannibalize(subsystem=subsystem, slot_index=idx, starbase_id=1), CONFIG)

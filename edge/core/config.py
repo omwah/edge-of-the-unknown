@@ -281,6 +281,25 @@ class PlanetsConfig(BaseModel):
     ownership: dict[str, OwnershipWeights] = Field(default_factory=dict)
 
 
+class StarbaseConfig(BaseModel):
+    """Orbital-starbase generation + layout (DESIGN §4.2, WP4).
+
+    A starbase reuses the slotted-subsystem model minus thrusters/spindrive, plus a
+    `fusion_reactor` (`subsystems` here are keyed by Subsystem value, like a hull's).
+    `owned_base_chance` is the per-planet roll for an **intact** base on an owned
+    world; `derelict_chance` the roll for a **derelict** base on an unowned,
+    uninhabited world (effected by stripping the reactor keystone, so the remaining
+    parts are a salvage cache). `ship_class_id` is the base's class label.
+    """
+
+    model_config = _FROZEN
+
+    ship_class_id: str = "orbital_platform"
+    owned_base_chance: float = 0.0
+    derelict_chance: float = 0.0
+    subsystems: Mapping[str, SubsystemLayout]
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -292,6 +311,7 @@ class GameConfig(BaseModel):
     bigbang: BigBangConfig = BigBangConfig()
     engine_room: EngineRoomConfig
     planets: PlanetsConfig
+    starbase: StarbaseConfig | None = None  # WP4 orbital bases (None ⇒ none generated)
     starter_ship: ShipClassConfig
     ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (StarDock)
     hardware: HardwareConfig

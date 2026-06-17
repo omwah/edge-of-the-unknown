@@ -24,6 +24,7 @@ from edge.core.events import (
     PlanetProduced,
     Repaired,
     ShipPurchased,
+    StarbaseSalvaged,
     StockRegenerated,
     Traded,
     TurnsReset,
@@ -103,6 +104,7 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
         case Cannibalize():
             return "Cannibalize", {
                 "subsystem": command.subsystem.value, "slot_index": command.slot_index,
+                "starbase_id": command.starbase_id,
             }
         case FieldPatch():
             return "FieldPatch", {
@@ -164,6 +166,7 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
         case "Cannibalize":
             return Cannibalize(
                 subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
+                starbase_id=payload.get("starbase_id"),
             )
         case "FieldPatch":
             return FieldPatch(
@@ -225,6 +228,12 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "Repaired", {
                 "player_id": event.player_id, "subsystem": event.subsystem, "slot_index": event.slot_index,
             }
+        case StarbaseSalvaged():
+            return "StarbaseSalvaged", {
+                "player_id": event.player_id, "starbase_id": event.starbase_id,
+                "subsystem": event.subsystem, "slot_index": event.slot_index,
+                "component": event.component, "tier": event.tier,
+            }
         case ColonistsRecruited():
             return "ColonistsRecruited", {
                 "player_id": event.player_id, "source": event.source,
@@ -278,6 +287,9 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                                     payload["slot_index"], payload["component"], payload["tier"])
         case "Repaired":
             return Repaired(payload["player_id"], payload["subsystem"], payload["slot_index"])
+        case "StarbaseSalvaged":
+            return StarbaseSalvaged(payload["player_id"], payload["starbase_id"], payload["subsystem"],
+                                    payload["slot_index"], payload["component"], payload["tier"])
         case "ColonistsRecruited":
             return ColonistsRecruited(payload["player_id"], payload["source"],
                                       payload["count"], payload["cost"])

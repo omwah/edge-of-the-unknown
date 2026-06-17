@@ -80,6 +80,48 @@ def test_load_game_reconstructs_identical_state(tmp_path: Path) -> None:
     assert state_hash(reloaded.state) == expected
 
 
+def test_load_game_replays_maintenance_ticks(tmp_path: Path) -> None:
+    """WP12: a session that ticks (interest/regen/growth/reset) reloads identically.
+
+    The prior test reloads *before* any cron fires; this one ticks between commands,
+    so it only passes if the maintenance timeline is durable and replayed in order.
+    """
+    from edge.core.rules import Deposit
+    from edge.engine.ticker import EngineTicker
+
+    svc = _service(tmp_path, "ticked.db")
+    svc.apply(1, Deposit(amount=1_000))  # a balance for interest to grow
+    target = svc.state.sectors[1].warps_out[0]
+    svc.apply(1, Warp(to_sector=target))
+    ticker = EngineTicker(svc, tick_seconds=0.0, ticks_per_hour=2, ticks_per_day=5)
+    for _ in range(7):  # fire port regen, planet growth, interest, daily reset
+        ticker.step()
+    svc.apply(1, Deposit(amount=200))  # a command *after* the ticks — ordering matters
+    expected = state_hash(svc.state)
+    assert svc.state.game.day_number == 2  # the daily reset actually fired
+
+    reloaded = GameService.load_game(_config(), SqliteRepository(tmp_path / "ticked.db"))  # type: ignore[arg-type]
+    assert state_hash(reloaded.state) == expected
+
+
+def test_ticker_schedule_survives_reload(tmp_path: Path) -> None:
+    """WP12: a reloaded ticker resumes its tick counter and next-due schedule."""
+    from edge.engine.ticker import EngineTicker
+
+    svc = _service(tmp_path, "sched.db")
+    ticker = EngineTicker(svc, tick_seconds=0.0, ticks_per_hour=2, ticks_per_day=5)
+    for _ in range(3):
+        ticker.step()
+    assert ticker.tick == 3
+
+    reloaded = GameService.load_game(_config(), SqliteRepository(tmp_path / "sched.db"))  # type: ignore[arg-type]
+    resumed = EngineTicker(reloaded, tick_seconds=0.0, ticks_per_hour=2, ticks_per_day=5)
+    assert resumed.tick == 3  # tick counter restored
+    # The hourly crons fired at tick 2; the next is due at 4 — resuming must not refire 2.
+    fired = resumed.step()  # advances to tick 4
+    assert resumed.tick == 4 and "hourly_port_economy" in fired
+
+
 def test_computer_and_map_views_render(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     cv = svc.computer_view(1)

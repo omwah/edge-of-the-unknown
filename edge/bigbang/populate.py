@@ -16,9 +16,9 @@ from dataclasses import replace
 from edge.bigbang.topology import bfs_distances
 from edge.core.config import GameConfig
 from edge.core.economy import capacity_for_size
-from edge.core.engine_room import apply_derived, build_subsystems
+from edge.core.engine_room import apply_derived, build_layouts, build_subsystems
 from edge.core.movement import shortest_path
-from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass
+from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass, Subsystem
 from edge.core.models import (
     Alliance,
     Ownership,
@@ -27,6 +27,8 @@ from edge.core.models import (
     Port,
     PortCommodity,
     Ship,
+    Starbase,
+    SubsystemState,
     UNOWNED,
     UniverseState,
 )
@@ -34,6 +36,8 @@ from edge.core.models import (
 # Sub-RNG salt for planet ownership (§5 RNG discipline): an independent draw stream
 # so owner assignment never shifts the topology / port / planet-type draw order.
 _OWNERSHIP_SALT = 0x504C414E  # "PLAN"
+# A second independent salt for orbital-starbase placement (same discipline).
+_STARBASE_SALT = 0x42415345  # "BASE"
 
 _REGION_ADJ = ("Halaf", "Vega", "Mirach", "Orin", "Cygnus", "Halcyon", "Tsoraan",
                "Verdani", "Kessrin", "Drelb", "Sol", "Antares", "Lyra", "Nexus")
@@ -137,6 +141,7 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     # post-pass so the planet-*type* draws above stay bit-identical to Phase 1; the
     # ownership roll uses its own sub-RNG (golden-master ordering).
     _finalize_planets(state, config)
+    _place_starbases(state, config)
 
     # --- alliance + player + starter ship ------------------------------------
     state.alliances = {1: Alliance(id=1, name="Federation")}
@@ -214,6 +219,60 @@ def _finalize_planets(state: UniverseState, config: GameConfig) -> None:
         for i, pid in enumerate(pids):
             owner = UNOWNED if i < unowned else Ownership("alliance", gov)
             state.planets[pid] = replace(state.planets[pid], owner=owner)
+
+
+def _strip_reactor_keystone(subsystems: dict[Subsystem, SubsystemState]) -> dict[Subsystem, SubsystemState]:
+    """Empty the fusion reactor's keystone slot — the minimal break that derelicts a base.
+
+    Derelict is emergent (§4.2): with the keystone `converter` gone the base can no
+    longer power itself, yet every other component remains as a salvage cache. Repair
+    is then just refilling the one slot (Phase 3).
+    """
+    reactor = subsystems[Subsystem.FUSION_REACTOR]
+    assert reactor.keystone_index is not None
+    slots = list(reactor.slots)
+    slots[reactor.keystone_index] = None
+    out = dict(subsystems)
+    out[Subsystem.FUSION_REACTOR] = replace(reactor, slots=tuple(slots))
+    return out
+
+
+def _place_starbases(state: UniverseState, config: GameConfig) -> None:
+    """Hang orbital bases off planets (§4.2, WP4) using an independent sub-RNG.
+
+    Owned worlds carry an **intact** base with probability `owned_base_chance`; an
+    unowned, uninhabited world carries a **derelict** (built then stripped of its
+    reactor keystone) with probability `derelict_chance`. Placement runs after
+    ownership so an owned/unowned split is known, and on its own RNG stream so it
+    never perturbs the topology/port/planet draws (golden-master ordering, §5).
+    """
+    sbcfg = config.starbase
+    if sbcfg is None:
+        return
+    srng = random.Random(state.game.seed ^ _STARBASE_SALT)
+    bases: dict[int, Starbase] = {}
+    bid = 1
+    for pid in sorted(state.planets):  # deterministic order, independent of dict order
+        planet = state.planets[pid]
+        subsystems = build_layouts(sbcfg.subsystems)
+        if planet.owner.is_owned:
+            if srng.random() >= sbcfg.owned_base_chance:
+                continue
+            owner = planet.owner
+        elif planet.inhabited_by_species_id is None:
+            if srng.random() >= sbcfg.derelict_chance:
+                continue
+            owner = UNOWNED
+            subsystems = _strip_reactor_keystone(subsystems)  # derelict by construction
+        else:
+            continue
+        bases[bid] = Starbase(
+            id=bid, sector_id=planet.sector_id, planet_id=pid,
+            ship_class_id=sbcfg.ship_class_id, owner=owner, subsystems=subsystems,
+        )
+        state.planets[pid] = replace(planet, starbase_id=bid)
+        bid += 1
+    state.starbases = bases
 
 
 def _mid_stock(port: Port) -> Port:

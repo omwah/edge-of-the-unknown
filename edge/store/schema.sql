@@ -30,3 +30,28 @@ CREATE TABLE IF NOT EXISTS event_log (
     type    TEXT    NOT NULL,
     payload TEXT    NOT NULL  -- JSON
 );
+
+-- The durable *maintenance* rail (WP12): each engine cron firing, interleaved with
+-- the command log via `after_command_seq` (the command it follows), so rebuild can
+-- replay a single total order of player commands + cron ticks and reproduce state
+-- exactly. Only the fact (cron name + tick) is stored — the pure cron reducer is
+-- re-run on replay, so no derived state is persisted and the golden-master rail
+-- stays honest.
+CREATE TABLE IF NOT EXISTS maintenance_log (
+    seq               INTEGER PRIMARY KEY AUTOINCREMENT,
+    after_command_seq INTEGER NOT NULL,  -- command_log.seq this tick fired after (0 = before any)
+    cron_name         TEXT    NOT NULL,
+    tick              INTEGER NOT NULL
+);
+
+-- The ticker schedule (WP12): the logical tick counter and each cron's next-due
+-- tick, so a reloaded game resumes mid-interval without double-running or skipping.
+CREATE TABLE IF NOT EXISTS engine_state (
+    id   INTEGER PRIMARY KEY CHECK (id = 1),
+    tick INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cron_schedule (
+    name     TEXT PRIMARY KEY,
+    next_due INTEGER NOT NULL
+);

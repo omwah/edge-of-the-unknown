@@ -8,6 +8,7 @@ the hourly port-economy regen (re-exported from `port_economy`).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 
 from edge.core.config import GameConfig
@@ -18,7 +19,12 @@ from edge.core.planets import produce
 from edge.core.rules import ReduceResult
 from edge.engine.port_economy import regenerate_ports
 
-__all__ = ["daily_turn_reset", "accrue_interest", "regenerate_ports", "planet_growth"]
+CronFn = Callable[[UniverseState, GameConfig], ReduceResult]
+
+__all__ = [
+    "daily_turn_reset", "accrue_interest", "regenerate_ports", "planet_growth",
+    "CronFn", "CRONS", "resolve_cron",
+]
 
 
 def daily_turn_reset(state: UniverseState, config: GameConfig) -> ReduceResult:
@@ -66,3 +72,23 @@ def accrue_interest(state: UniverseState, config: GameConfig) -> ReduceResult:
         players.append(replace(p, bank_balance=new_balance))
         events.append(Banked(p.id, "interest", new_balance - p.bank_balance, new_balance))
     return ReduceResult(events=tuple(events), players=tuple(players))
+
+
+# The canonical cron name → pure reducer registry (WP12). The ticker schedules
+# these by name and persists each firing as a `MaintenanceTick`; replay (rebuild)
+# resolves the name back to the reducer through `resolve_cron`, re-running it in
+# the merged command+maintenance order. Names are durable — keep them stable.
+CRONS: dict[str, CronFn] = {
+    "hourly_port_economy": regenerate_ports,
+    "hourly_planet_growth": planet_growth,
+    "interest_accrual": accrue_interest,
+    "daily_turn_reset": daily_turn_reset,
+}
+
+
+def resolve_cron(name: str) -> CronFn:
+    """The pure reducer for a persisted cron name (raises on an unknown name)."""
+    try:
+        return CRONS[name]
+    except KeyError as exc:
+        raise ValueError(f"unknown cron {name!r}") from exc

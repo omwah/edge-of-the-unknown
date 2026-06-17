@@ -15,7 +15,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from edge.core.config import AspectFormula, EngineRoomConfig, GameConfig, ShipClassConfig
+from collections.abc import Mapping
+
+from edge.core.config import (
+    AspectFormula,
+    EngineRoomConfig,
+    GameConfig,
+    ShipClassConfig,
+    SubsystemLayout,
+)
 from edge.core.enums import Component, ComponentTier, Subsystem
 from edge.core.models import InstalledComponent, Ship, SubsystemState
 
@@ -37,16 +45,15 @@ class ShipAspects:
     efficiency_bonus: int  # the one global combat bonus from spindrive efficiency
 
 
-def build_subsystems(klass: ShipClassConfig) -> dict[Subsystem, SubsystemState] | None:
-    """Instantiate a hull's starting subsystems from its config layout (§4.1).
+def build_layouts(layouts: Mapping[str, SubsystemLayout]) -> dict[Subsystem, SubsystemState]:
+    """Instantiate intact subsystems from a layout mapping (§4.1).
 
     Base components fill the first slots at Tier I (index 0 = keystone); the rest
-    start empty. Returns `None` for a hull with no engine room (an NPC flat hull).
+    start empty. Shared by player hulls (`build_subsystems`) and orbital starbases
+    (WP4 §4.2), whose parts come from the same component vocabulary.
     """
-    if klass.subsystems is None:
-        return None
     built: dict[Subsystem, SubsystemState] = {}
-    for name, layout in klass.subsystems.items():
+    for name, layout in layouts.items():
         filled: list[InstalledComponent | None] = [
             InstalledComponent(Component(c), ComponentTier.I) for c in layout.base_components
         ]
@@ -54,6 +61,16 @@ def build_subsystems(klass: ShipClassConfig) -> dict[Subsystem, SubsystemState] 
         keystone_index = layout.base_components.index(layout.keystone)
         built[Subsystem(name)] = SubsystemState(slots=tuple(filled), keystone_index=keystone_index)
     return built
+
+
+def build_subsystems(klass: ShipClassConfig) -> dict[Subsystem, SubsystemState] | None:
+    """Instantiate a hull's starting subsystems from its config layout (§4.1).
+
+    Returns `None` for a hull with no engine room (an NPC flat hull).
+    """
+    if klass.subsystems is None:
+        return None
+    return build_layouts(klass.subsystems)
 
 
 def _apply(formula: AspectFormula, active: int, tier_bonus: int) -> int:

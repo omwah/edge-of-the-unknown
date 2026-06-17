@@ -48,10 +48,12 @@ from edge.core.events import (
     Haggled,
     Repaired,
     ShipPurchased,
+    StarbaseSalvaged,
     Traded,
     Warped,
 )
 from edge.core.planets import is_colonizable
+from edge.core.starbases import is_operational
 from edge.core.models import (
     Game,
     InstalledComponent,
@@ -60,6 +62,7 @@ from edge.core.models import (
     Player,
     Port,
     Ship,
+    Starbase,
     SubsystemState,
     UniverseState,
 )
@@ -182,10 +185,16 @@ class SwapComponent:
 
 @dataclass(frozen=True, slots=True)
 class Cannibalize:
-    """Pull a component out of a filled slot into the loose-part inventory (§4.1)."""
+    """Pull a component out of a filled slot into the loose-part inventory (§4.1).
+
+    `starbase_id` None ⇒ strip the player's own ship; a starbase id ⇒ salvage an
+    orbital base in the current sector (§4.2, WP4) — allowed only when that base is
+    derelict or player-owned. The salvaged part lands in the ship's loose inventory.
+    """
 
     subsystem: Subsystem
     slot_index: int
+    starbase_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,6 +229,7 @@ class ReduceResult:
     ships: tuple[Ship, ...] = ()
     ports: tuple[Port, ...] = ()
     planets: tuple[Planet, ...] = ()
+    starbases: tuple[Starbase, ...] = ()
     game: Game | None = None  # set by maintenance reducers (e.g. daily day-number bump)
 
 
@@ -233,6 +243,8 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
         state.ports[port.id] = port
     for planet in result.planets:
         state.planets[planet.id] = planet
+    for starbase in result.starbases:
+        state.starbases[starbase.id] = starbase
     if result.game is not None:
         state.game = result.game
 
@@ -783,6 +795,8 @@ def _swap_component(
 def _cannibalize(
     state: UniverseState, player_id: int, cmd: Cannibalize, config: GameConfig
 ) -> ReduceResult:
+    if cmd.starbase_id is not None:
+        return _cannibalize_starbase(state, player_id, cmd, config)
     ship = _engine_ship(state, player_id)
     sub = _subsystem(ship, cmd.subsystem)
     _check_slot(sub, cmd.slot_index)
@@ -798,6 +812,43 @@ def _cannibalize(
         events=(ComponentRemoved(player_id, cmd.subsystem.value, cmd.slot_index,
                                  comp.kind.value, comp.tier.name),),
         ships=(new_ship,),
+    )
+
+
+def _cannibalize_starbase(
+    state: UniverseState, player_id: int, cmd: Cannibalize, config: GameConfig
+) -> ReduceResult:
+    """Strip a component out of an orbital starbase into the ship's hold (§4.2, WP4).
+
+    Allowed only when the base is derelict (the frontier salvage cache) or already
+    player-owned. The base loses exactly what the ship gains (components conserved).
+    """
+    assert cmd.starbase_id is not None
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    base = state.starbases.get(cmd.starbase_id)
+    if base is None or base.sector_id != ship.sector_id:
+        raise EngineRoomError("no such starbase in this sector")
+    player_owned = base.owner.kind == "player" and base.owner.ref == player_id
+    if is_operational(base) and not player_owned:
+        raise EngineRoomError("that starbase is operational — only a derelict or your own base can be salvaged")
+    sub = base.subsystems.get(cmd.subsystem)
+    if sub is None:
+        raise EngineRoomError(f"starbase has no {cmd.subsystem.value} subsystem")
+    _check_slot(sub, cmd.slot_index)
+    comp = sub.slots[cmd.slot_index]
+    if comp is None:
+        raise EngineRoomError("slot is already empty")
+    if ship.holds_free < 1:
+        raise EngineRoomError("no free hold for the salvaged component — sell cargo first")
+    slots = list(sub.slots)
+    slots[cmd.slot_index] = None
+    new_base = replace(base, subsystems={**base.subsystems, cmd.subsystem: replace(sub, slots=tuple(slots))})
+    new_ship = replace(ship, components=_inv_add(ship.components, (comp.kind, comp.tier)))
+    return ReduceResult(
+        events=(StarbaseSalvaged(player_id, base.id, cmd.subsystem.value, cmd.slot_index,
+                                 comp.kind.value, comp.tier.name),),
+        ships=(new_ship,), starbases=(new_base,),
     )
 
 
