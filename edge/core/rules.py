@@ -52,7 +52,6 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     DiscoveryCollected,
-    DiscoveryDetected,
     Docked,
     Event,
     Haggled,
@@ -209,20 +208,13 @@ class Cannibalize:
 
 
 @dataclass(frozen=True, slots=True)
-class Scan:
-    """An explicit sensor sweep of the current sector (§7, WP5).
-
-    Detection also happens automatically on entry; `Scan` re-sweeps (e.g. after a
-    sensor upgrade) to pick out hidden finds missed before. Costs a turn.
-    """
-
-
-@dataclass(frozen=True, slots=True)
 class Salvage:
-    """Collect a detected/obvious open-space discovery into the codex (§7, WP5).
+    """Log/collect a currently-visible open-space discovery into the codex (§7, WP5).
 
-    Takes its payload aboard (component / latinum / artifact; lore is codex-only) and
-    marks it found. Surface sites are reached by descent (WP6), not from space.
+    Visibility is recomputed live from the ship's sensors (obvious finds always; a
+    hidden find only when sensors clear its tier difficulty). Takes the payload
+    aboard (component / latinum / artifact; lore is codex-only) and marks it found.
+    Surface sites are reached by descent (WP6), not from space.
     """
 
     discovery_id: int
@@ -245,7 +237,7 @@ Command = (
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SetAllocation
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
-    | Scan | Salvage
+    | Salvage
 )
 
 
@@ -293,9 +285,9 @@ def reduce(
     """Validate `command` for `player_id` and return its delta + events."""
     match command:
         case Warp():
-            return _warp(state, player_id, command, config)
+            return _warp(state, player_id, command)
         case TravelTo():
-            return _travel(state, player_id, command, config)
+            return _travel(state, player_id, command)
         case Dock():
             return _dock(state, player_id)
         case Trade():
@@ -326,8 +318,6 @@ def reduce(
             return _cannibalize(state, player_id, command, config)
         case FieldPatch():
             return _field_patch(state, player_id, command, config)
-        case Scan():
-            return _scan(state, player_id, config)
         case Salvage():
             return _salvage(state, player_id, command, config)
         case _ as unreachable:
@@ -352,34 +342,7 @@ def _docked_port(state: UniverseState, ship: Ship) -> Port:
     return port
 
 
-def _detect_in_sector(
-    state: UniverseState, detected: frozenset[int], sensor_rating: int,
-    sector_id: int, player_id: int, config: GameConfig,
-) -> tuple[frozenset[int], tuple[Event, ...]]:
-    """Sensor-detect the hidden open-space finds in `sector_id` (§7, WP5).
-
-    Pure and deterministic (no RNG): a hidden find is revealed when effective sensor
-    rating clears its tier difficulty (a nebula here dims that). Returns the updated
-    `detected` set and one `DiscoveryDetected` per newly revealed find. Obvious finds
-    are never added — they are always shown by the projection.
-    """
-    if config.discovery is None:
-        return detected, ()
-    in_nebula = sector_has_nebula(state, sector_id)
-    revealed = set(detected)
-    events: list[Event] = []
-    for d in state.discoveries.values():
-        if d.planet_id is not None or d.sector_id != sector_id or d.id in revealed or not d.hidden:
-            continue
-        if is_detectable(d, sensor_rating, in_nebula=in_nebula, config=config):
-            revealed.add(d.id)
-            events.append(DiscoveryDetected(player_id, d.id, d.kind.value, d.rarity_tier.name))
-    if not events:
-        return detected, ()
-    return frozenset(revealed), tuple(events)
-
-
-def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -> ReduceResult:
+def _warp(state: UniverseState, player_id: int, cmd: Warp) -> ReduceResult:
     player = _player(state, player_id)
     ship = _ship(state, player)
     if not can_warp(state.adjacency, ship.sector_id, cmd.to_sector):
@@ -388,17 +351,14 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
     if player.turns_remaining < cost:
         raise MovementError("out of turns")
     new_ship = replace(ship, sector_id=cmd.to_sector)
-    detected, det_events = _detect_in_sector(
-        state, player.detected, ship.sensor_rating, cmd.to_sector, player_id, config)
     new_player = replace(
         player,
         turns_remaining=player.turns_remaining - cost,
         explored_sectors=player.explored_sectors | frozenset({cmd.to_sector}),
         entered_from={**player.entered_from, cmd.to_sector: ship.sector_id},
-        detected=detected,
     )
     return ReduceResult(
-        events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost), *det_events),
+        events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost),),
         players=(new_player,),
         ships=(new_ship,),
     )
@@ -413,7 +373,7 @@ def _should_interrupt(state: UniverseState, player: Player, sector_id: int) -> b
     return False
 
 
-def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameConfig) -> ReduceResult:
+def _travel(state: UniverseState, player_id: int, cmd: TravelTo) -> ReduceResult:
     """Multi-hop warp along a *known* route (§9, §11, WP-C).
 
     Route-locked: the path is found through already-explored sectors only, so the
@@ -439,7 +399,6 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
     turns = player.turns_remaining
     explored = player.explored_sectors
     entered = dict(player.entered_from)
-    detected = player.detected
     for nxt in hops:
         if turns < cost or _should_interrupt(state, player, nxt):
             break
@@ -447,14 +406,11 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
         events.append(Warped(player_id, current, nxt, cost))
         entered[nxt] = current
         explored = explored | frozenset({nxt})
-        detected, det_events = _detect_in_sector(
-            state, detected, ship.sensor_rating, nxt, player_id, config)
-        events.extend(det_events)
         current = nxt
 
     new_ship = replace(ship, sector_id=current)
-    new_player = replace(player, turns_remaining=turns, explored_sectors=explored,
-                         entered_from=entered, detected=detected)
+    new_player = replace(player, turns_remaining=turns,
+                         explored_sectors=explored, entered_from=entered)
     return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,))
 
 
@@ -947,32 +903,19 @@ def _field_patch(
     )
 
 
-# --- discovery: scan / salvage (§7, WP5) ------------------------------------
-
-
-def _scan(state: UniverseState, player_id: int, config: GameConfig) -> ReduceResult:
-    """An explicit sensor sweep of the current sector — re-detect hidden finds (§7)."""
-    player = _player(state, player_id)
-    ship = _ship(state, player)
-    if config.discovery is None:
-        return ReduceResult()
-    cost = config.discovery.scan_turn_cost
-    if player.turns_remaining < cost:
-        raise MovementError("out of turns")
-    detected, events = _detect_in_sector(
-        state, player.detected, ship.sensor_rating, ship.sector_id, player_id, config)
-    new_player = replace(player, turns_remaining=player.turns_remaining - cost, detected=detected)
-    return ReduceResult(events=events, players=(new_player,))
+# --- discovery: salvage / log to codex (§7, WP5) ----------------------------
 
 
 def _salvage(
     state: UniverseState, player_id: int, cmd: Salvage, config: GameConfig
 ) -> ReduceResult:
-    """Collect a detected/obvious open-space discovery into the codex (§7, WP5).
+    """Log a currently-visible open-space discovery into the codex (§7, WP5).
 
-    The payload is taken aboard (component → hold, latinum → purse, artifact →
-    barter store; lore is codex-only) and the find is marked `found_by`. Surface
-    sites (`planet_id` set) are reached by descent in WP6, not from space.
+    Visibility is recomputed live from the ship's sensors here (the same gate the
+    sector view uses), so you can only log what you can presently see. The payload
+    is taken aboard (component → hold, latinum → purse, artifact → barter store;
+    lore is codex-only) and the find marked `found_by`. Surface sites (`planet_id`
+    set) are reached by descent in WP6, not from space.
     """
     player = _player(state, player_id)
     ship = _ship(state, player)
@@ -983,8 +926,9 @@ def _salvage(
         raise EconomyError("that discovery is not in this sector")
     if disc.found_by is not None:
         raise EconomyError("that discovery has already been collected")
-    if disc.hidden and disc.id not in player.detected:
-        raise EconomyError("undetected — scan for it first")
+    in_nebula = sector_has_nebula(state, ship.sector_id)
+    if not is_detectable(disc, ship.sensor_rating, in_nebula=in_nebula, config=config):
+        raise EconomyError("undetected — your sensors can't pick it out here")
     cost = config.discovery.salvage_turn_cost if config.discovery is not None else 1
     if player.turns_remaining < cost:
         raise MovementError("out of turns")

@@ -19,7 +19,7 @@ from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.events import Event
 from edge.core.movement import MovementError
-from edge.core.rules import Dock, Salvage, Scan, TravelTo, Warp
+from edge.core.rules import Dock, Salvage, TravelTo, Warp
 from edge.server.service import GameService
 from edge.tui.dummy import SectorDTO
 from edge.tui.screens.computer import ComputerScreen
@@ -107,9 +107,10 @@ class SectorView(Container):
         if sec.discoveries:
             for d in sec.discoveries:
                 if d.collected:
-                    yield Static(f"  [dim]✦ {d.label} — logged[/]")
+                    yield Static(f"  [cyan]✦[/] {d.label} — logged")
                 else:
-                    yield ClickableEntry(f"  [cyan]✦[/] {d.label}", dest="discovery", ref=d.discovery_id)
+                    yield ClickableEntry(
+                        f"  [cyan]✦[/] {d.label} — unlogged (Scan)", dest="discovery", ref=d.discovery_id)
         else:
             yield Static("  none")
 
@@ -219,15 +220,13 @@ class GameScreen(Screen):
         self.run_worker(self.recompose())
 
     async def action_scan(self) -> None:
-        try:
-            events = self._service.apply(self._pid, Scan())
-        except (MovementError, EconomyError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+        # Scan logs the first unlogged visible find — the same action as clicking one.
+        view = self._service.game_view(self._pid)
+        target = next((d for d in view.sector.discoveries if d.salvageable), None)
+        if target is None:
+            self.notify("No unlogged discoveries in sensor range here.", timeout=2)
             return
-        if not events:
-            self.notify("Sweep complete — nothing new on sensors.", timeout=2)
-        self._record(events)
-        await self.recompose()
+        await self._salvage(target.discovery_id)
 
     async def _salvage(self, discovery_id: int) -> None:
         try:

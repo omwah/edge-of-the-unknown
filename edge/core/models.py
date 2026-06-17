@@ -305,10 +305,9 @@ class Player:
     # For each visited sector, the neighbour the player last arrived from — the
     # breadcrumb that colours the "way back" warp (§11, WP-C).
     entered_from: Mapping[int, int] = field(default_factory=dict)
-    # Discovery ids whose hidden finds the player's sensors have detected on entry
-    # (obvious finds need no detection); the sector view shows these (§7, WP5).
-    detected: frozenset[int] = frozenset()
-    # Discovery ids the player has collected/logged — the codex (§4, §7).
+    # Discovery ids the player has collected/logged — the codex (§4, §7). Whether a
+    # find is *visible* is recomputed live from the ship's current sensor rating
+    # (DESIGN §7); only the codex (what's been logged) is durable player progress.
     codex: frozenset[int] = frozenset()
     # Recovered artifact barter-goods, keyed by ComponentTier name (count); the WP9
     # contact screen spends these against alien tech (§8 barter equivalence).
