@@ -23,6 +23,19 @@ def is_colonizable(planet_type: str, config: GameConfig) -> bool:
     return bool(profile and profile.colonizable)
 
 
+def retype_planet(planet: Planet, new_type: str, config: GameConfig) -> Planet:
+    """Return `planet` re-typed to `new_type` with its yield/habitability re-rolled
+    from config (§4.2). Deterministic — the type's profile is fixed config, so a
+    Genesis retype (WP10) replays exactly. Raises on an unknown type."""
+    profile = config.planets.types.get(new_type)
+    if profile is None:
+        raise ValueError(f"unknown planet_type {new_type!r}")
+    return replace(
+        planet, planet_type=new_type, habitability_cap=profile.habitability,
+        yield_profile={Commodity(k): v for k, v in profile.yield_profile.items()},
+    )
+
+
 def _add(stores: dict[Commodity, int], commodity: Commodity, amount: int) -> None:
     if amount:
         stores[commodity] = max(0, stores.get(commodity, 0) + amount)

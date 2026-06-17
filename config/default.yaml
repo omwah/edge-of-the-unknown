@@ -171,6 +171,15 @@ discovery:
   black_hole_gravity_warp: false  # Phase-3 hazard seam; inert in Phase 2
   black_hole_warp_turn_cost: 5
 
+# Genesis torpedoes (§4.2, WP10): a StarDock device that terraforms a dead, unowned
+# world (barren / asteroid belt / gas giant) into a colonizable terrestrial, ready to
+# claim. A latinum sink at the high end of the economy.
+genesis:
+  device_id: genesis_torpedo
+  price: 15000
+  result_type: terrestrial_warm
+  eligible_types: [barren, asteroid_belt, jovian, terrestrial_hot, terrestrial_cold]
+
 # The starter hull — a Trailblazer-class explorer (§4). Its engine room is built
 # "complete but minimal": every base slot filled at Tier I, every upgrade slot
 # empty — the canonical first upgrade target (§4.1). The flat aspect scalars below

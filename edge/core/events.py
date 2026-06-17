@@ -114,6 +114,24 @@ class DiscoveryDetected(Event):
 
 
 @dataclass(frozen=True)
+class DevicePurchased(Event):
+    """A special device bought at StarDock (§4, WP10), e.g. a genesis torpedo."""
+
+    player_id: int
+    device_id: str
+    cost: int
+
+
+@dataclass(frozen=True)
+class GenesisDeployed(Event):
+    """A Genesis torpedo terraformed a planet to a new type (§4.2, WP10)."""
+
+    player_id: int
+    planet_id: int
+    new_type: str  # the planet_type the world became
+
+
+@dataclass(frozen=True)
 class Descended(Event):
     """The player landed on a planet surface to explore its sites (§7, WP6)."""
 
