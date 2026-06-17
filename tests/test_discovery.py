@@ -10,8 +10,7 @@ from edge.bigbang.generator import generate
 from edge.config import load_default_config
 from edge.core.discovery import is_detectable, rarity_value
 from edge.core.enums import PayloadKind, RarityTier
-from edge.core.rules import Salvage, apply_result, reduce
-from edge.server import session
+from edge.core.rules import Salvage, Warp, apply_result, reduce
 
 CONFIG = load_default_config().model_copy(
     update={"bigbang": load_default_config().bigbang.model_copy(update={"sector_count": 120})}
@@ -55,25 +54,40 @@ def test_rarity_and_value_gradient_monotone(seed: int) -> None:
 # --- detection (the sensor gate) --------------------------------------------
 
 
-def test_sensor_gate_blocks_then_admits() -> None:
-    """A hidden find below the sensor threshold isn't listed/salvageable; raising the
-    ship's sensors reveals it live — no re-entry, no stored detection state (§7)."""
-    state = generate(CONFIG, 3)  # type: ignore[arg-type]
-    disc = next(d for d in state.discoveries.values()
-                if d.hidden and d.planet_id is None and d.rarity_tier.value >= 3)
+def _hidden_find_with_neighbor(seeds: range) -> tuple[object, object, int]:
+    """First (state, hidden high-tier find, two-way neighbour sector) over `seeds`."""
+    for seed in seeds:
+        state = generate(CONFIG, seed)  # type: ignore[arg-type]
+        for d in state.discoveries.values():
+            if not (d.hidden and d.planet_id is None and d.rarity_tier.value >= 3):
+                continue
+            nbr = next((n for n in state.sectors[d.sector_id].warps_out
+                        if d.sector_id in state.sectors[n].warps_out), None)
+            if nbr is not None:
+                return state, d, nbr
+    raise AssertionError("no suitable hidden find found")
 
-    def visible_ids(sensor: int) -> set[int]:
-        state.ships[1] = replace(state.ships[1], sector_id=disc.sector_id, sensor_rating=sensor)
-        view = session.game_view(state, 1, CONFIG)  # the projection re-detects each render
-        return {d.discovery_id for d in view.sector.discoveries}
 
-    # Weak sensors: the find is neither listed nor salvageable.
-    assert disc.id not in visible_ids(1)
-    with pytest.raises(Exception):
+def test_sensor_gate_requires_reentry_after_upgrade() -> None:
+    """Detection snapshots on entry: a hidden find stays unseen after a sensor upgrade
+    until the player re-enters the sector (§7)."""
+    state, disc, nbr = _hidden_find_with_neighbor(range(40))
+
+    # Enter with weak sensors — the high-tier find isn't detected.
+    state.ships[1] = replace(state.ships[1], sector_id=nbr, sensor_rating=1)
+    _do(state, Warp(to_sector=disc.sector_id))
+    assert disc.id not in state.players[1].detected
+    with pytest.raises(Exception):  # can't log what wasn't detected
         reduce(state, 1, Salvage(discovery_id=disc.id), CONFIG)
 
-    # Strong sensors: the same find is now visible and salvageable — purely live.
-    assert disc.id in visible_ids(9)
+    # Upgrade sensors but DON'T re-enter — still undetected (the snapshot stands).
+    state.ships[1] = replace(state.ships[1], sensor_rating=9)
+    assert disc.id not in state.players[1].detected
+
+    # Re-enter (warp out, warp back) — now the stronger sensors pick it up.
+    _do(state, Warp(to_sector=nbr))
+    _do(state, Warp(to_sector=disc.sector_id))
+    assert disc.id in state.players[1].detected
     _do(state, Salvage(discovery_id=disc.id))
     assert disc.id in state.players[1].codex
 
@@ -99,9 +113,12 @@ def _space_find(state: object, payload_kind: PayloadKind) -> object:
 
 
 def _park_and_detect(state: object, disc: object) -> None:
-    """Place the ship on the find with sensors strong enough to see it live."""
+    """Place the ship on the find and mark it detected (these tests assert payload
+    handling, not the entry-detection gate, which has its own test)."""
     state.ships[1] = replace(  # type: ignore[attr-defined]
         state.ships[1], sector_id=disc.sector_id, sensor_rating=9)  # type: ignore[attr-defined]
+    state.players[1] = replace(  # type: ignore[attr-defined]
+        state.players[1], detected=state.players[1].detected | frozenset({disc.id}))  # type: ignore[attr-defined]
 
 
 def test_salvage_latinum_payload_credits_purse_and_logs_codex() -> None:

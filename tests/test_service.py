@@ -124,7 +124,11 @@ def test_discovery_collection_replays_into_identical_state(tmp_path: Path) -> No
         path = shortest_path(svc.state.adjacency, 1, d.sector_id)
         if path is None:
             continue
-        if (not d.hidden) or sensor >= diff[d.rarity_tier.name]:
+        # Obvious finds need no detection; a hidden one must be detectable AND reached
+        # via a real warp (≥1 hop) so on-entry detection actually fires before salvage.
+        if not d.hidden:
+            candidates.append((len(path), path, d))
+        elif sensor >= diff[d.rarity_tier.name] and len(path) >= 2:
             candidates.append((len(path), path, d))
     candidates.sort(key=lambda t: t[0])
     _, path, disc = candidates[0]

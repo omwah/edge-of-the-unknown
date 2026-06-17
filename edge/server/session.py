@@ -26,6 +26,7 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     DiscoveryCollected,
+    DiscoveryDetected,
     Docked,
     Event,
     Haggled,
@@ -37,7 +38,6 @@ from edge.core.events import (
     Traded,
     Warped,
 )
-from edge.core.discovery import is_detectable, sector_has_nebula
 from edge.core.models import Planet, Player, Port, Sector, Ship, SubsystemState, UniverseState
 from edge.core.planets import is_colonizable
 from edge.core.starbases import is_operational
@@ -125,23 +125,19 @@ def _discovery_label(kind: str, rarity: str) -> str:
     return f"{kind.replace('_', ' ').capitalize()} · {rarity.capitalize()}"
 
 
-def _sector_discoveries(
-    state: UniverseState, sector_id: int, ship: Ship, config: GameConfig
-) -> list[dto.SectorDiscovery]:
-    """Open-space finds visible in `sector_id` right now (§7, WP5).
+def _sector_discoveries(state: UniverseState, player: Player, sector_id: int) -> list[dto.SectorDiscovery]:
+    """Open-space finds the player can see in `sector_id`: obvious + detected-on-entry (§7).
 
-    Visibility is recomputed live from the ship's *current* sensor rating (minus any
-    nebula interference): obvious phenomena always show, a hidden find shows once
-    sensors clear its tier difficulty — so upgrading sensors reveals more without
-    re-entering. A find already logged stays listed (it's in the codex).
+    A hidden find shows only once it was detected on entry (`player.detected`), so a
+    sensor upgrade reveals more only after re-entering. An already-logged find stays
+    listed (it's in the codex).
     """
-    in_nebula = sector_has_nebula(state, sector_id)
     out: list[dto.SectorDiscovery] = []
     for d in state.discoveries.values():
         if d.planet_id is not None or d.sector_id != sector_id:
             continue  # surface sites are reached by descent (WP6), not listed in space
         collected = d.found_by is not None
-        visible = is_detectable(d, ship.sensor_rating, in_nebula=in_nebula, config=config)
+        visible = (not d.hidden) or (d.id in player.detected)
         if not (collected or visible):
             continue
         out.append(dto.SectorDiscovery(
@@ -153,8 +149,7 @@ def _sector_discoveries(
 
 
 def _sector_dto(
-    state: UniverseState, player: Player, sector: Sector, core_hops: dict[int, int],
-    ship: Ship, config: GameConfig,
+    state: UniverseState, player: Player, sector: Sector, core_hops: dict[int, int]
 ) -> dto.SectorDTO:
     ports = [p.name for p in state.ports.values() if p.sector_id == sector.id]
     planets = [f"{pl.name}  {pl.planet_type}" for pl in state.planets.values() if pl.sector_id == sector.id]
@@ -174,7 +169,7 @@ def _sector_dto(
         region=region, sector_id=sector.id, flavor=f"{sector.distance_band.lower()} space",
         beacon=sector.beacon_text, band=sector.distance_band,
         ports=ports, planets=planets, ships=[], warps=warps,
-        discoveries=_sector_discoveries(state, sector.id, ship, config),
+        discoveries=_sector_discoveries(state, player, sector.id),
         display_id=_display(state, sector.id),
     )
 
@@ -188,7 +183,7 @@ def game_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.G
     return dto.GameState(
         turns=player.turns_remaining, max_turns=config.turns_per_day,
         ship=_ship_dto(state, ship, player, sector),
-        sector=_sector_dto(state, player, sector, core_hops, ship, config),
+        sector=_sector_dto(state, player, sector, core_hops),
     )
 
 
@@ -430,6 +425,8 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
         return f"[green]Field-patched {event.subsystem} slot {event.slot_index}[/]"
     if isinstance(event, StarbaseSalvaged):
         return f"[green]Salvaged {event.component} ({event.tier})[/] from a derelict starbase"
+    if isinstance(event, DiscoveryDetected):
+        return f"[cyan]✦ Sensors: {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
     if isinstance(event, DiscoveryCollected):
         return f"[green]✦ Logged {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
     if isinstance(event, ColonistsRecruited):
