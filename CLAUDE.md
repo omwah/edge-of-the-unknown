@@ -100,7 +100,13 @@ armaments needed to push outward and discover things. Key pillars:
   model already fits eventual multiplayer): Core Space planets are owned by the
   governing alliance automatically (re-keying if governance flips), and the **unowned
   fraction rises monotonically with distance band**, so the frontier's reward is
-  *claimable territory* as well as rarer finds. A planet may carry an **orbital
+  *claimable territory* as well as rarer finds. **Colonists are people, not a
+  commodity** — never bought or sold like the Fuel Ore / Organics / Equipment trio.
+  They are **recruited** (they have a choice): enlisted at StarDock for a per-head
+  latinum *incentive*, or by emigration from inhabited worlds with a positive
+  disposition toward the player. They ride a **separate occupancy limit**
+  (`Ship.colonist_capacity`), not cargo holds, so peopling a colony never competes
+  with trade cargo. A planet may carry an **orbital
   starbase** that reuses the engine-room model **minus thrusters/spindrive, plus a
   `fusion_reactor`** (built from the same shared component vocabulary, so parts are
   fungible across ships and bases). **Derelict is not a special type or stored flag** —
