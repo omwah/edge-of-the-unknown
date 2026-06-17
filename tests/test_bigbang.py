@@ -13,6 +13,7 @@ from edge.bigbang.topology import bfs_distances
 from edge.config import load_default_config
 from edge.core.enums import PortClass
 from edge.core.movement import shortest_path
+from edge.core.starbases import is_operational
 
 SEEDS = list(range(100))  # the §13 100-seed validation sweep
 
@@ -46,6 +47,35 @@ def test_universe_is_valid(seed: int) -> None:
     assert state.game.core_governing_alliance_id == 1
 
 
+@pytest.mark.parametrize("seed", range(20))
+def test_starbases_placed_and_consistent(seed: int) -> None:
+    """Orbital bases hang off planets with the §4.2 derelict/owned split (WP4)."""
+    state = generate(CONFIG, seed)  # type: ignore[arg-type]
+    for base in state.starbases.values():
+        planet = state.planets[base.planet_id]
+        assert planet.starbase_id == base.id  # planet back-references its base
+        assert base.sector_id == planet.sector_id
+        if planet.owner.is_owned:
+            assert is_operational(base)  # owned worlds keep working bases
+        elif not is_operational(base):
+            # A derelict sits only on an unowned, uninhabited world…
+            assert not planet.owner.is_owned and planet.inhabited_by_species_id is None
+            # …and still holds salvageable components (a cache, not an empty husk).
+            assert any(c is not None for sub in base.subsystems.values() for c in sub.slots)
+
+
+def test_starbase_population_split_over_seeds() -> None:
+    """Across seeds, generation yields both intact and derelict bases (WP4)."""
+    intact = derelict = 0
+    for seed in range(30):
+        for base in generate(CONFIG, seed).starbases.values():  # type: ignore[arg-type]
+            if is_operational(base):
+                intact += 1
+            else:
+                derelict += 1
+    assert intact > 0 and derelict > 0
+
+
 def test_generation_is_deterministic() -> None:
     a = generate(CONFIG, 7)  # type: ignore[arg-type]
     b = generate(CONFIG, 7)  # type: ignore[arg-type]
@@ -53,6 +83,7 @@ def test_generation_is_deterministic() -> None:
     assert a.sectors == b.sectors
     assert a.ports == b.ports
     assert a.planets == b.planets
+    assert a.starbases == b.starbases
 
 
 def test_different_seeds_differ() -> None:

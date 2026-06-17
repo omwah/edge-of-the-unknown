@@ -104,6 +104,18 @@ class Repaired(Event):
 
 
 @dataclass(frozen=True)
+class StarbaseSalvaged(Event):
+    """A component cannibalized out of an orbital starbase into the ship (§4.2, WP4)."""
+
+    player_id: int
+    starbase_id: int
+    subsystem: str  # Subsystem value
+    slot_index: int
+    component: str  # Component value
+    tier: str  # ComponentTier name
+
+
+@dataclass(frozen=True)
 class ColonistsRecruited(Event):
     player_id: int
     source: str  # "stardock" | "emigration"

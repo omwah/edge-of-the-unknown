@@ -4,10 +4,22 @@ from __future__ import annotations
 
 import pytest
 
+from dataclasses import replace
+
 from edge.bigbang.validate import ValidationError, validate
 from edge.config import load_default_config
-from edge.core.enums import Commodity, PortClass, PortMode
-from edge.core.models import Game, Ownership, Planet, Port, PortCommodity, Sector, UniverseState
+from edge.core.engine_room import build_layouts
+from edge.core.enums import Commodity, PortClass, PortMode, Subsystem
+from edge.core.models import (
+    Game,
+    Ownership,
+    Planet,
+    Port,
+    PortCommodity,
+    Sector,
+    Starbase,
+    UniverseState,
+)
 
 CONFIG = load_default_config()
 
@@ -119,6 +131,49 @@ def test_unowned_fraction_decreasing_rejected() -> None:
     world.planets = {
         1: Planet(1, 2, "Eden", "terrestrial_warm", owner=Ownership("none")),       # Hub: unowned
         2: Planet(2, 4, "Outpost", "terrestrial_cool", owner=Ownership("alliance", 1)),  # Frontier: owned
+    }
+    with pytest.raises(ValidationError):
+        validate(world, CONFIG)
+
+
+def _intact_base() -> dict[Subsystem, object]:
+    assert CONFIG.starbase is not None
+    return build_layouts(CONFIG.starbase.subsystems)
+
+
+def _derelict_base() -> dict[Subsystem, object]:
+    subs = _intact_base()
+    reactor = subs[Subsystem.FUSION_REACTOR]
+    slots = list(reactor.slots)  # type: ignore[attr-defined]
+    slots[reactor.keystone_index] = None  # type: ignore[attr-defined]
+    subs[Subsystem.FUSION_REACTOR] = replace(reactor, slots=tuple(slots))  # type: ignore[type-var]
+    return subs
+
+
+def test_derelict_base_on_owned_planet_rejected() -> None:
+    world = _good_world()
+    world.planets[1] = replace(world.planets[1], owner=Ownership("alliance", 1), starbase_id=1)
+    world.starbases = {
+        1: Starbase(1, 2, 1, "orbital_platform", owner=Ownership("alliance", 1), subsystems=_derelict_base()),
+    }
+    with pytest.raises(ValidationError):  # an owned world's base must be operational
+        validate(world, CONFIG)
+
+
+def test_derelict_base_on_unowned_world_validates() -> None:
+    world = _good_world()  # planet 1 is unowned + uninhabited
+    world.planets[1] = replace(world.planets[1], starbase_id=1)
+    world.starbases = {
+        1: Starbase(1, 2, 1, "orbital_platform", owner=Ownership("none"), subsystems=_derelict_base()),
+    }
+    validate(world, CONFIG)  # no raise — a derelict on the frontier is legal salvage
+
+
+def test_base_without_planet_backref_rejected() -> None:
+    world = _good_world()
+    # The base claims planet 1 but the planet does not point back at it.
+    world.starbases = {
+        1: Starbase(1, 2, 1, "orbital_platform", owner=Ownership("none"), subsystems=_derelict_base()),
     }
     with pytest.raises(ValidationError):
         validate(world, CONFIG)

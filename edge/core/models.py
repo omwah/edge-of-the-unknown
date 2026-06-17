@@ -164,6 +164,28 @@ class SubsystemState:
 
 
 @dataclass(frozen=True, slots=True)
+class Starbase:
+    """An orbital starbase (DESIGN §4.2): the engine-room model minus mobility.
+
+    A starbase reuses the slotted-subsystem model (`SubsystemState`, §4.1) but
+    drops `spindrive`/`thrusters` and gains a `fusion_reactor`; its live subsystems
+    are `{fusion_reactor, screens, main_gun}`. **Derelict is emergent, not a flag**
+    (§4.2): a base is derelict when broken/missing components leave its reactor
+    unable to power itself — see `core.starbases.is_operational`. The big bang makes
+    an unowned-world base derelict by stripping/damaging components, leaving a
+    salvage cache to cannibalize (WP4); repair (refilling slots) and planetary-system
+    defense are Phase 3.
+    """
+
+    id: int
+    sector_id: int
+    planet_id: int
+    ship_class_id: str
+    owner: Ownership = UNOWNED
+    subsystems: Mapping[Subsystem, SubsystemState] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class Ship:
     """A ship hull (DESIGN §4).
 
@@ -258,6 +280,7 @@ class UniverseState:
     sectors: dict[int, Sector] = field(default_factory=dict)
     ports: dict[int, Port] = field(default_factory=dict)
     planets: dict[int, Planet] = field(default_factory=dict)
+    starbases: dict[int, Starbase] = field(default_factory=dict)
     ships: dict[int, Ship] = field(default_factory=dict)
     players: dict[int, Player] = field(default_factory=dict)
     alliances: dict[int, Alliance] = field(default_factory=dict)

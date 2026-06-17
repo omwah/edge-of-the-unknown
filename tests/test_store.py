@@ -86,6 +86,28 @@ def test_command_log_replay_reproduces_state(tmp_path: Path) -> None:
     repo.close()
 
 
+def test_ticked_game_export_round_trips(tmp_path: Path) -> None:
+    """WP12: a portable save of a *ticked* game replays its maintenance timeline."""
+    from edge.engine.cron import resolve_cron
+    from edge.engine.ticker import EngineTicker
+    from edge.server.service import GameService
+
+    config = _small_config()
+    svc = GameService.new_game(config, 42, SqliteRepository(tmp_path / "t.db"), created_at=_CREATED)  # type: ignore[arg-type]
+    target = svc.state.sectors[1].warps_out[0]
+    svc.apply(1, Warp(to_sector=target))
+    ticker = EngineTicker(svc, tick_seconds=0.0, ticks_per_hour=2, ticks_per_day=5)
+    for _ in range(6):
+        ticker.step()
+    expected = state_hash(svc.state)
+
+    blob = export_save(SqliteRepository(tmp_path / "t.db"))
+    bundle = import_save(blob)
+    assert bundle.maintenance  # the maintenance timeline travelled with the save
+    rebuilt = rebuild_from_bundle(config, bundle, cron_resolver=resolve_cron)  # type: ignore[arg-type]
+    assert state_hash(rebuilt) == expected
+
+
 def test_repo_context_manager_and_missing_meta(tmp_path: Path) -> None:
     from edge.core.events import Banked
     from edge.store.repo import SqliteRepository

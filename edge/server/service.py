@@ -19,16 +19,21 @@ from edge.core.config import GameConfig
 from edge.core.events import Event
 from edge.core.models import UniverseState
 from edge.core.rules import Command, ReduceResult, apply_result, reduce
+from edge.engine.cron import resolve_cron
 from edge.server import session
-from edge.store.repo import Repository
+from edge.store.repo import EngineState, Repository
 from edge.store.snapshots import rebuild
 
 
 class GameService:
-    def __init__(self, state: UniverseState, config: GameConfig, repo: Repository) -> None:
+    def __init__(self, state: UniverseState, config: GameConfig, repo: Repository, *,
+                 last_command_seq: int = 0) -> None:
         self._state = state
         self._config = config
         self._repo = repo
+        # The latest command_log seq applied — the `after_command_seq` stamped on a
+        # maintenance firing so replay interleaves it correctly with commands (WP12).
+        self._last_command_seq = last_command_seq
 
     @classmethod
     def new_game(cls, config: GameConfig, seed: int, repo: Repository, *,
@@ -40,10 +45,13 @@ class GameService:
 
     @classmethod
     def load_game(cls, config: GameConfig, repo: Repository) -> GameService:
-        """Reconstruct a saved game by replaying its command log (§3)."""
+        """Reconstruct a saved game by replaying the merged command+maintenance log (§3, WP12)."""
         meta = repo.load_meta()
-        state = rebuild(config, meta.seed, repo.load_commands(), created_at=meta.created_at)
-        return cls(state, config, repo)
+        commands = repo.load_commands()
+        state = rebuild(config, meta.seed, commands, created_at=meta.created_at,
+                        maintenance=repo.load_maintenance(), cron_resolver=resolve_cron)
+        last_seq = max((c.seq for c in commands), default=0)
+        return cls(state, config, repo, last_command_seq=last_seq)
 
     def apply(self, player_id: int, command: Command) -> tuple[Event, ...]:
         """Validate, persist, and apply a command; return the events it produced.
@@ -53,21 +61,35 @@ class GameService:
         touches memory, so a persistence failure can't desync the in-memory state.
         """
         result = reduce(self._state, player_id, command, self._config)
-        self._repo.append_command(player_id, command)
+        self._last_command_seq = self._repo.append_command(player_id, command)
         for event in result.events:
             self._repo.append_event(event)
         apply_result(self._state, result)
         return result.events
 
-    def apply_maintenance(self, result: ReduceResult) -> None:
-        """Apply an engine cron's result: upsert entities + persist its events.
+    def apply_maintenance(self, result: ReduceResult, *,
+                          cron_name: str | None = None, tick: int = 0) -> None:
+        """Apply an engine cron's result: upsert entities + persist its durable trail.
 
         Unlike `apply`, this records no command_log entry — maintenance is
-        time-driven, not a player action — only the resulting events.
+        time-driven, not a player action. When `cron_name` is given (the ticker
+        path), the firing is recorded as a `MaintenanceTick` stamped with the last
+        command seq, so reload replays it in the right order (WP12); the resulting
+        events are always persisted to the event rail.
         """
+        if cron_name is not None:
+            self._repo.append_maintenance(cron_name, tick, self._last_command_seq)
         apply_result(self._state, result)
         for event in result.events:
             self._repo.append_event(event)
+
+    def save_engine_state(self, tick: int, schedule: dict[str, int]) -> None:
+        """Persist the ticker schedule so a reload resumes mid-interval (WP12)."""
+        self._repo.save_engine_state(tick, schedule)
+
+    def load_engine_state(self) -> EngineState | None:
+        """The saved ticker schedule, or None for a fresh game (WP12)."""
+        return self._repo.load_engine_state()
 
     # --- read-only fog-of-war projections (§3) -------------------------------
 

@@ -263,7 +263,11 @@ class PlanetDTO:
     allocation: list[tuple[str, int]]  # (commodity label, percent)
     ship_colonists: int  # colonists aboard the player's ship (for the Colonize affordance)
     ship_colonist_capacity: int
-    starbase: str | None = None  # WP4
+    starbase: str | None = None  # WP4 display status: "operational" | "derelict — salvageable"
+    starbase_id: int | None = None
+    starbase_derelict: bool = False
+    # Salvageable components on a derelict/own base: (subsystem value, slot index, label).
+    salvage: list[tuple[str, int, str]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

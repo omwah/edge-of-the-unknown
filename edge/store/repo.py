@@ -40,6 +40,25 @@ class RecordedCommand:
     command: Command
 
 
+@dataclass(frozen=True)
+class RecordedMaintenance:
+    """One persisted engine-cron firing (WP12): which cron, at which tick, and the
+    command it followed (its place in the merged replay order)."""
+
+    seq: int
+    after_command_seq: int
+    cron_name: str
+    tick: int
+
+
+@dataclass(frozen=True)
+class EngineState:
+    """The persisted ticker schedule (WP12): the tick counter + each cron's next-due tick."""
+
+    tick: int
+    schedule: dict[str, int]
+
+
 class Repository(ABC):
     """The persistence seam. A new game writes meta once, then appends commands."""
 
@@ -60,6 +79,18 @@ class Repository(ABC):
 
     @abstractmethod
     def load_events(self) -> list[Event]: ...
+
+    @abstractmethod
+    def append_maintenance(self, cron_name: str, tick: int, after_command_seq: int) -> int: ...
+
+    @abstractmethod
+    def load_maintenance(self) -> list[RecordedMaintenance]: ...
+
+    @abstractmethod
+    def save_engine_state(self, tick: int, schedule: dict[str, int]) -> None: ...
+
+    @abstractmethod
+    def load_engine_state(self) -> EngineState | None: ...
 
     @abstractmethod
     def close(self) -> None: ...
@@ -131,6 +162,39 @@ class SqliteRepository(Repository):
             "SELECT type, payload FROM event_log ORDER BY seq"
         ).fetchall()
         return [codec.decode_event(r[0], json.loads(r[1])) for r in rows]
+
+    def append_maintenance(self, cron_name: str, tick: int, after_command_seq: int) -> int:
+        cur = self._conn.execute(
+            "INSERT INTO maintenance_log (after_command_seq, cron_name, tick) VALUES (?, ?, ?)",
+            (after_command_seq, cron_name, tick),
+        )
+        self._conn.commit()
+        return int(cur.lastrowid or 0)
+
+    def load_maintenance(self) -> list[RecordedMaintenance]:
+        rows = self._conn.execute(
+            "SELECT seq, after_command_seq, cron_name, tick FROM maintenance_log ORDER BY seq"
+        ).fetchall()
+        return [RecordedMaintenance(seq=r[0], after_command_seq=r[1], cron_name=r[2], tick=r[3])
+                for r in rows]
+
+    def save_engine_state(self, tick: int, schedule: dict[str, int]) -> None:
+        self._conn.execute("INSERT OR REPLACE INTO engine_state (id, tick) VALUES (1, ?)", (tick,))
+        for name, next_due in schedule.items():
+            self._conn.execute(
+                "INSERT OR REPLACE INTO cron_schedule (name, next_due) VALUES (?, ?)", (name, next_due)
+            )
+        self._conn.commit()
+
+    def load_engine_state(self) -> EngineState | None:
+        row = self._conn.execute("SELECT tick FROM engine_state WHERE id = 1").fetchone()
+        if row is None:
+            return None
+        schedule = {
+            name: next_due
+            for name, next_due in self._conn.execute("SELECT name, next_due FROM cron_schedule").fetchall()
+        }
+        return EngineState(tick=row[0], schedule=schedule)
 
     def close(self) -> None:
         self._conn.close()

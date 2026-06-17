@@ -112,6 +112,32 @@ planets:
     Deep:     { alliance: 3, none: 7 }
     Void:     { alliance: 1, none: 9 }
 
+# Orbital starbases (§4.2, WP4): the engine-room model minus thrusters/spindrive,
+# plus a fusion_reactor (whose keystone `converter` powers the base). Owned worlds
+# can carry an intact base that defends the system (Phase 3); an unowned, uninhabited
+# world can carry a derelict — built then stripped of its reactor keystone, so the
+# remaining parts are a salvage cache the player can cannibalize.
+starbase:
+  ship_class_id: orbital_platform
+  owned_base_chance: 0.5      # an owned planet carries an intact defensive base
+  derelict_chance: 0.4        # an unowned, uninhabited planet carries a derelict
+  subsystems:
+    fusion_reactor:
+      slot_count: 4
+      keystone: converter
+      base_components: [converter, radiator, accelerator]
+      legal_components: [converter, radiator, accelerator, secondary]
+    screens:
+      slot_count: 3
+      keystone: secondary
+      base_components: [secondary, accelerator]
+      legal_components: [secondary, accelerator, converter, radiator]
+    main_gun:
+      slot_count: 3
+      keystone: accelerator
+      base_components: [accelerator, linkage]
+      legal_components: [accelerator, linkage, converter, secondary]
+
 # The starter hull — a Trailblazer-class explorer (§4). Its engine room is built
 # "complete but minimal": every base slot filled at Tier I, every upgrade slot
 # empty — the canonical first upgrade target (§4.1). The flat aspect scalars below

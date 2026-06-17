@@ -14,6 +14,7 @@ from edge.core.config import GameConfig
 from edge.core.economy import port_unit_price
 from edge.core.enums import Commodity, PortClass, PortMode
 from edge.core.models import Port, UniverseState
+from edge.core.starbases import is_operational
 
 
 class ValidationError(Exception):
@@ -26,6 +27,7 @@ def validate(state: UniverseState, config: GameConfig) -> None:
     _check_stardock(state)
     _check_profitable_pair(state, config)
     _check_planet_ownership(state, config)
+    _check_starbases(state)
 
 
 def _check_reachable(state: UniverseState) -> None:
@@ -96,6 +98,28 @@ def _check_planet_ownership(state: UniverseState, config: GameConfig) -> None:
                 f"unowned fraction decreases at band {band} ({frac:.3f} < {prev:.3f})"
             )
         prev = frac
+
+
+def _check_starbases(state: UniverseState) -> None:
+    """Orbital-base invariants (§4.2 / §5 step 8, WP4).
+
+    Every base sits in its planet's sector and is back-referenced by that planet;
+    a derelict base sits only on an unowned, uninhabited world; and a base on an
+    owned planet is operational (derelicts are an unowned-frontier reward, not a
+    governing alliance's neglect).
+    """
+    for base in state.starbases.values():
+        planet = state.planets.get(base.planet_id)
+        if planet is None:
+            raise ValidationError(f"starbase {base.id} references missing planet {base.planet_id}")
+        if planet.starbase_id != base.id:
+            raise ValidationError(f"planet {planet.id} does not back-reference starbase {base.id}")
+        if base.sector_id != planet.sector_id:
+            raise ValidationError(f"starbase {base.id} not in its planet's sector")
+        if planet.owner.is_owned and not is_operational(base):
+            raise ValidationError(f"starbase {base.id} on owned planet {planet.id} is derelict")
+        if not is_operational(base) and (planet.owner.is_owned or planet.inhabited_by_species_id is not None):
+            raise ValidationError(f"derelict starbase {base.id} is not on an unowned, uninhabited world")
 
 
 def _check_profitable_pair(state: UniverseState, config: GameConfig) -> None:
