@@ -163,6 +163,8 @@ def sample_state() -> GameState:
             NeighborDTO(8, "[8] —", "?", False, display_id=8),
             NeighborDTO(12, "[12] —", "?", False, display_id=12),
         ],
+        colonists=25,
+        colonist_capacity=100,
     )
     sector = SectorDTO(
         region="CORE SPACE",
