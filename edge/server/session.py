@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from edge.bigbang.topology import bfs_distances
 from edge.core import dto
 from edge.core.config import GameConfig
-from edge.core.economy import port_unit_price
+from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import build_subsystems, derive_aspects
 from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
 from edge.core.events import (
@@ -202,6 +202,44 @@ def port_view(state: UniverseState, player_id: int, port_id: int, config: GameCo
     return dto.PortDTO(
         name=port.name, klass=f"Class {port.klass.value}", sector_id=port.sector_id,
         commodities=lines, display_id=_display(state, port.sector_id),
+    )
+
+
+# Above this acceptance probability a non-insulting counter reads as "likely".
+_HAGGLE_LIKELY_P = 0.5
+
+
+def haggle_quote(
+    state: UniverseState, player_id: int, commodity: Commodity, counter_price: int, config: GameConfig
+) -> dto.HaggleQuote:
+    """An advisory read on `counter_price` for the player's docked port (§8, WP-haggle).
+
+    Mirrors what `_haggle` would compute (the §8 fair price + the port's acceptance
+    odds), but commits nothing — a UI guidance hint only. Recent-attempt history is
+    not modelled in Phase 1, so `recent_attempts=0` matches the reducer exactly.
+    """
+    ship = state.ships[state.players[player_id].ship_id]
+    port = state.port_in_sector(ship.sector_id)
+    line = port.line(commodity) if port is not None else None
+    if line is None:
+        raise EconomyError(f"this port does not trade {commodity.value}")
+    fair = port_unit_price(line, config.economy)
+    hg = config.economy.haggling
+    p = haggle_acceptance_probability(
+        fair, counter_price, line.mode, insult_frac=hg.insult_frac,
+        history_penalty=hg.history_penalty, recent_attempts=0,
+    )
+    if p is None:
+        label = "insulting"
+    elif p >= 1.0:
+        label = "accepted"
+    elif p >= _HAGGLE_LIKELY_P:
+        label = "likely"
+    else:
+        label = "unlikely"
+    return dto.HaggleQuote(
+        commodity=_FULL[commodity], fair=fair, counter=counter_price,
+        mode=line.mode.name, label=label,
     )
 
 

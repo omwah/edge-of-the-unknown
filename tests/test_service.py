@@ -58,6 +58,23 @@ def test_illegal_warp_persists_nothing(tmp_path: Path) -> None:
     assert svc.state.players[1].turns_remaining == 250
 
 
+def test_haggle_quote_labels_track_generosity(tmp_path: Path) -> None:
+    """The advisory haggle hint reads accepted / insulting / (un)likely for a buy."""
+    svc = _service(tmp_path)
+    dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)
+    for hop in shortest_path(svc.state.adjacency, 1, dock.sector_id)[1:]:  # type: ignore[index]
+        svc.apply(1, Warp(to_sector=hop))
+    svc.apply(1, Dock())
+    fair = next(c for c in svc.port_view(1, dock.id).commodities if c.name == "Fuel Ore").price
+
+    # Fuel Ore at a StarDock is a player buy: paying fair (or more) is auto-accepted,
+    # paying a pittance is insulting, and a mild discount is a real negotiation.
+    assert svc.haggle_quote(1, Commodity.FUEL_ORE, fair).label == "accepted"
+    assert svc.haggle_quote(1, Commodity.FUEL_ORE, 1).label == "insulting"
+    mild = fair - max(1, round(fair * 0.1))  # ~10% under fair, within the insult band
+    assert svc.haggle_quote(1, Commodity.FUEL_ORE, mild).label in {"likely", "unlikely"}
+
+
 def test_trade_at_stardock_reflected_in_port_view(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)

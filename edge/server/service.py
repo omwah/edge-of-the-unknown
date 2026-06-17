@@ -16,6 +16,7 @@ from __future__ import annotations
 from edge.bigbang.generator import generate
 from edge.core import dto
 from edge.core.config import GameConfig
+from edge.core.enums import Commodity
 from edge.core.events import Event
 from edge.core.models import UniverseState
 from edge.core.rules import Command, ReduceResult, apply_result, reduce
@@ -106,6 +107,10 @@ class GameService:
         if port is None:
             return None
         return session.port_view(self._state, player_id, port.id, self._config)
+
+    def haggle_quote(self, player_id: int, commodity: Commodity, counter_price: int) -> dto.HaggleQuote:
+        """An advisory read on a counter-offer for the docked port (§8). Commits nothing."""
+        return session.haggle_quote(self._state, player_id, commodity, counter_price, self._config)
 
     def map_view(self, player_id: int) -> dto.MapDTO:
         return session.map_view(self._state, player_id)

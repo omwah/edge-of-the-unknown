@@ -80,23 +80,6 @@ def _scaled_bar(qty: int, capacity: int, width: int = 12) -> str:
     return bar(filled, width)
 
 
-class HagglePanel(Static):
-    DEFAULT_CSS = """
-    HagglePanel {
-        border: round $secondary; padding: 0 1; margin: 1 0; height: auto;
-    }
-    """
-
-    def render(self) -> str:
-        return (
-            "[b]Haggle: Sell Fuel Ore[/]\n"
-            "Quote:  13/u  x  20 units  =  [yellow]260 slips[/]\n"
-            "Your counter: ( [b]15[/] )/u    fair ~ 13    [green]likely[/]\n"
-            'Round 1 of 2   · "Hah, 14 and not a slip more."\n'
-            "[b]\\[A][/]ccept quote   [b]\\[O][/]ffer counter   [b]\\[Esc][/] walk away"
-        )
-
-
 # Map the public commodity *display* names back to the core enum, so a trade
 # screen can turn the highlighted row into a Trade command.
 NAME_TO_COMMODITY = {
@@ -107,7 +90,7 @@ NAME_TO_COMMODITY = {
 
 
 class TradePanel(Vertical):
-    """The commodities trade UI: live pricing table + a haggle stub.
+    """The commodities trade UI: a live pricing table over the docked port.
 
     Reusable as the body of the standalone `PortScreen` (a plain commodities
     port) or as the **Commodities** tab of a `StarDockScreen` — so docking at a
@@ -135,7 +118,6 @@ class TradePanel(Vertical):
                 id="port-title",
             )
         yield DataTable(id="commodities", zebra_stripes=True, cursor_type="row")
-        yield HagglePanel()
         yield Static(self._footer_text(), id="port-footer")
 
     def on_mount(self) -> None:
@@ -157,7 +139,7 @@ class TradePanel(Vertical):
         return (
             "[dim]^ port buys from you (you SELL)   v port sells to you (you BUY)[/]\n"
             f"Latinum [yellow]{self._latinum:,}[/]   ·   [b]T[/]rade highlighted   ·   "
-            "[b]Esc[/] leave dock"
+            "[b]H[/]aggle   ·   [b]Esc[/] leave dock"
         )
 
     def refresh_port(self, port: PortDTO, latinum: int) -> None:
