@@ -85,6 +85,23 @@ class NeighborDTO:
 
 
 @dataclass(frozen=True)
+class SectorDiscovery:
+    """One discovery visible in the current sector (§7, WP5).
+
+    Obvious phenomena and sensor-detected hidden finds appear here; `salvageable`
+    is True when it can be collected now (visible and not yet logged). `collected`
+    marks one already in the codex. `discovery_id` is the Salvage payload.
+    """
+
+    discovery_id: int
+    label: str  # "Drifting wreck · Rare"
+    kind: str  # DiscoveryKind value
+    rarity: str  # RarityTier name
+    salvageable: bool
+    collected: bool = False
+
+
+@dataclass(frozen=True)
 class SectorDTO:
     region: str
     sector_id: int
@@ -95,6 +112,7 @@ class SectorDTO:
     planets: list[str] = field(default_factory=list)
     ships: list[str] = field(default_factory=list)
     warps: list[WarpDTO] = field(default_factory=list)
+    discoveries: list[SectorDiscovery] = field(default_factory=list)
     display_id: int = 0  # spatial id shown in the sector title (§5.1)
 
 

@@ -64,6 +64,54 @@ class Subsystem(Enum):
     FUSION_REACTOR = "fusion_reactor"
 
 
+class RarityTier(Enum):
+    """Discovery rarity tiers (DESIGN §7). Int value = rank, used for the rarity/value
+    gradient the big-bang validator asserts is monotone across distance bands.
+
+    Rarity probability shifts upward with the distance band, and value scales with
+    rarity — Rare ≈ Tier-II barter, Exceptional ≈ Tier-III (§8 barter equivalence).
+    """
+
+    COMMON = 1
+    UNCOMMON = 2
+    RARE = 3
+    EXCEPTIONAL = 4
+    LEGENDARY = 5
+
+
+class DiscoveryKind(Enum):
+    """The classes of thing the big bang salts into the universe (DESIGN §7).
+
+    Sector-space finds: `nebula` / `black_hole` (astronomical phenomena, obvious),
+    `wreck` / `entity` (drifting, often sensor-hidden). Planet surface sites
+    (revealed by descent, WP6): `ruins` / `artifact` / `ancient_tech` /
+    `crashed_ship`.
+    """
+
+    NEBULA = "nebula"
+    BLACK_HOLE = "black_hole"
+    WRECK = "wreck"
+    ENTITY = "entity"
+    RUINS = "ruins"
+    ARTIFACT = "artifact"
+    ANCIENT_TECH = "ancient_tech"
+    CRASHED_SHIP = "crashed_ship"
+
+
+class PayloadKind(Enum):
+    """What collecting a discovery yields (DESIGN §7 payload tagged value).
+
+    `component` → a loose part of a tier into the hold; `latinum` → cash; `artifact`
+    → a barter good keyed to a component tier (consumed in WP9 barter); `lore` → a
+    log fragment only (phenomena, hints) — codex value, no material gain.
+    """
+
+    COMPONENT = "component"
+    LATINUM = "latinum"
+    ARTIFACT = "artifact"
+    LORE = "lore"
+
+
 class PortMode(Enum):
     """What a port does with a commodity, from the player's point of view.
 

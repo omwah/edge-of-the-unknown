@@ -16,9 +16,10 @@ from textual.screen import Screen
 from textual.widgets import Footer, Static
 
 from edge.core.economy import EconomyError
+from edge.core.engine_room import EngineRoomError
 from edge.core.events import Event
 from edge.core.movement import MovementError
-from edge.core.rules import Dock, TravelTo, Warp
+from edge.core.rules import Dock, Salvage, Scan, TravelTo, Warp
 from edge.server.service import GameService
 from edge.tui.dummy import SectorDTO
 from edge.tui.screens.computer import ComputerScreen
@@ -102,6 +103,17 @@ class SectorView(Container):
             yield Static("  none")
 
         yield Static("", classes="spacer")
+        yield Static("Discoveries", classes="heading")
+        if sec.discoveries:
+            for d in sec.discoveries:
+                if d.collected:
+                    yield Static(f"  [dim]✦ {d.label} — logged[/]")
+                else:
+                    yield ClickableEntry(f"  [cyan]✦[/] {d.label}", dest="discovery", ref=d.discovery_id)
+        else:
+            yield Static("  none")
+
+        yield Static("", classes="spacer")
         if sec.beacon:
             yield Static("Beacons", classes="heading")
             yield Static(f"  [yellow]![/] {sec.beacon}")
@@ -123,6 +135,7 @@ class GameScreen(Screen):
         Binding("p", "dock_port", "Dock"),
         Binding("w", "travel", "Travel"),
         Binding("s", "survey_planet", "Survey Planet"),
+        Binding("z", "scan", "Scan"),
         Binding("c", "computer", "Computer"),
         Binding("e", "engine_room", "Engine Room"),
         Binding("m", "map", "Map"),
@@ -170,6 +183,8 @@ class GameScreen(Screen):
     async def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
         if msg.dest == "planet":
             self.action_survey_planet()
+        elif msg.dest == "discovery" and msg.ref is not None:
+            await self._salvage(msg.ref)
         else:
             await self._dock()
 
@@ -202,6 +217,26 @@ class GameScreen(Screen):
             return
         self._record(events)
         self.run_worker(self.recompose())
+
+    async def action_scan(self) -> None:
+        try:
+            events = self._service.apply(self._pid, Scan())
+        except (MovementError, EconomyError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        if not events:
+            self.notify("Sweep complete — nothing new on sensors.", timeout=2)
+        self._record(events)
+        await self.recompose()
+
+    async def _salvage(self, discovery_id: int) -> None:
+        try:
+            events = self._service.apply(self._pid, Salvage(discovery_id=discovery_id))
+        except (MovementError, EconomyError, EngineRoomError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self._record(events)
+        await self.recompose()
 
     async def action_dock_port(self) -> None:
         await self._dock()

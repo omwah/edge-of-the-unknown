@@ -19,7 +19,17 @@ import random
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
+from edge.core.enums import (
+    Commodity,
+    Component,
+    ComponentTier,
+    DiscoveryKind,
+    PayloadKind,
+    PortClass,
+    PortMode,
+    RarityTier,
+    Subsystem,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +250,47 @@ class Ship:
 
 
 @dataclass(frozen=True, slots=True)
+class DiscoveryPayload:
+    """What collecting a discovery yields (DESIGN §7) — a small tagged value.
+
+    `kind` selects which field matters: COMPONENT uses `component` + `tier` (a loose
+    part into the hold); LATINUM uses `latinum`; ARTIFACT uses `barter_tier` (a
+    ComponentTier name the WP9 contact screen maps to a barter equivalence); LORE
+    carries only the `lore` fragment (codex flavor, no material gain).
+    """
+
+    kind: PayloadKind
+    component: Component | None = None
+    tier: ComponentTier | None = None
+    latinum: int = 0
+    barter_tier: str | None = None  # ComponentTier name for an artifact's barter value
+    lore: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Discovery:
+    """A thing the big bang salted into the universe to be found (DESIGN §4, §7).
+
+    Located either in open space (`sector_id` set, `planet_id` None) or on a planet
+    surface site (`planet_id` + `site_slot`, revealed by descent in WP6); `sector_id`
+    always names the containing sector. `hidden` finds need a sensor check on entry
+    (`core.discovery`); obvious phenomena are listed automatically. `rarity_tier`
+    drives the band gradient and the payload's value; `found_by` is the player id
+    that has collected it (None until logged into the codex).
+    """
+
+    id: int
+    kind: DiscoveryKind
+    rarity_tier: RarityTier
+    sector_id: int
+    payload: DiscoveryPayload
+    planet_id: int | None = None
+    site_slot: int = 0
+    hidden: bool = False
+    found_by: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Player:
     """The player (DESIGN §4). Starts as a member of the Core's governing alliance."""
 
@@ -254,6 +305,14 @@ class Player:
     # For each visited sector, the neighbour the player last arrived from — the
     # breadcrumb that colours the "way back" warp (§11, WP-C).
     entered_from: Mapping[int, int] = field(default_factory=dict)
+    # Discovery ids whose hidden finds the player's sensors have detected on entry
+    # (obvious finds need no detection); the sector view shows these (§7, WP5).
+    detected: frozenset[int] = frozenset()
+    # Discovery ids the player has collected/logged — the codex (§4, §7).
+    codex: frozenset[int] = frozenset()
+    # Recovered artifact barter-goods, keyed by ComponentTier name (count); the WP9
+    # contact screen spends these against alien tech (§8 barter equivalence).
+    artifacts: Mapping[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -281,6 +340,7 @@ class UniverseState:
     ports: dict[int, Port] = field(default_factory=dict)
     planets: dict[int, Planet] = field(default_factory=dict)
     starbases: dict[int, Starbase] = field(default_factory=dict)
+    discoveries: dict[int, Discovery] = field(default_factory=dict)
     ships: dict[int, Ship] = field(default_factory=dict)
     players: dict[int, Player] = field(default_factory=dict)
     alliances: dict[int, Alliance] = field(default_factory=dict)

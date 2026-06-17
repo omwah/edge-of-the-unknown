@@ -17,6 +17,7 @@ import random
 
 from edge.bigbang import populate as _populate
 from edge.bigbang import validate as _validate
+from edge.bigbang.discoveries import salt_discoveries
 from edge.bigbang.numbering import assign_spatial_ids
 from edge.bigbang.topology import (
     OutEdges,
@@ -151,6 +152,7 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
         state.spatial_ids = assign_spatial_ids(groups, state.core_hops, cfg.bands)  # §5.1 display ids
 
         _populate.populate(state, config, build_rng)
+        salt_discoveries(state, config, attempt)  # §7 finds on an independent sub-RNG
 
         try:
             _validate.validate(state, config)

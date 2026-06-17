@@ -300,6 +300,40 @@ class StarbaseConfig(BaseModel):
     subsystems: Mapping[str, SubsystemLayout]
 
 
+class DiscoveryConfig(BaseModel):
+    """Discovery salting + detection + payout tables (DESIGN §7, WP5).
+
+    The big bang rolls a discovery into a fraction of sectors (`sector_density`) and a
+    surface site onto a fraction of planets (`surface_site_chance`), picking a kind by
+    weight and a rarity tier from the sector's **band** weights — so rarity (and the
+    `tier_value` it maps to) rises with distance, the gradient the validator asserts.
+    Detection is a capability gate: a `hidden` find is revealed on entry only when the
+    ship's effective sensor rating (minus `nebula_interference` inside a nebula) meets
+    the tier's `sensor_difficulty`. `barter_equivalence` maps a rarity tier to a
+    component tier for artifact payloads (§8). The black-hole gravity warp is a
+    configured-but-inert seam in Phase 2 (`black_hole_gravity_warp` default off).
+    """
+
+    model_config = _FROZEN
+
+    sector_density: float = 0.20      # fraction of sectors with a space discovery
+    surface_site_chance: float = 0.50  # fraction of planets with a surface site
+    # band name -> {RarityTier name -> weight}; outer bands weight the high tiers.
+    band_rarity_weights: dict[str, dict[str, int]]
+    tier_value: dict[str, int]        # RarityTier name -> latinum-equivalent value (gradient)
+    barter_equivalence: dict[str, str]  # RarityTier name -> ComponentTier name (artifact payloads)
+    sensor_difficulty: dict[str, int]  # RarityTier name -> min effective sensor to detect
+    nebula_interference: int = 2      # sensor rating subtracted inside a nebula sector
+    space_kinds: dict[str, int]       # DiscoveryKind name -> weight (open-space finds)
+    surface_kinds: dict[str, int]     # DiscoveryKind name -> weight (planet sites)
+    hidden_kinds: list[str] = Field(default_factory=list)  # kinds needing a sensor check
+    component_pool: list[str] = Field(default_factory=list)  # Component names for component payloads
+    salvage_turn_cost: int = 2        # turns to collect a discovery (§7)
+    scan_turn_cost: int = 1           # turns for an explicit sensor sweep
+    black_hole_gravity_warp: bool = False  # Phase-3 seam; inert in Phase 2
+    black_hole_warp_turn_cost: int = 5
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -312,6 +346,7 @@ class GameConfig(BaseModel):
     engine_room: EngineRoomConfig
     planets: PlanetsConfig
     starbase: StarbaseConfig | None = None  # WP4 orbital bases (None ⇒ none generated)
+    discovery: DiscoveryConfig | None = None  # WP5 discoveries (None ⇒ none salted)
     starter_ship: ShipClassConfig
     ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (StarDock)
     hardware: HardwareConfig

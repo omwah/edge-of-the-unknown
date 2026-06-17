@@ -138,6 +138,35 @@ starbase:
       base_components: [accelerator, linkage]
       legal_components: [accelerator, linkage, converter, secondary]
 
+# Discoveries (§7, WP5): the universe is salted at big bang with finds whose rarity
+# (and value) rises with distance band. Hidden finds (wrecks/entities) need a sensor
+# check on entry; nebulae interfere with that check. Rare+ finds yield artifact
+# barter-goods (mapped to a component tier, §8); lesser finds give latinum/components.
+discovery:
+  sector_density: 0.20        # fraction of sectors holding an open-space find
+  surface_site_chance: 0.5    # fraction of planets seeded with a surface site (WP6 reveals)
+  # band -> rarity weights. Strongly separated so the mean-rarity gradient is monotone
+  # Hub -> Frontier -> Deep -> Void (the §5 step-8 validator asserts strictly rising).
+  band_rarity_weights:
+    Hub:      { COMMON: 80, UNCOMMON: 20 }
+    Frontier: { COMMON: 25, UNCOMMON: 50, RARE: 25 }
+    Deep:     { UNCOMMON: 20, RARE: 45, EXCEPTIONAL: 35 }
+    Void:     { RARE: 15, EXCEPTIONAL: 45, LEGENDARY: 40 }
+  tier_value:  { COMMON: 250, UNCOMMON: 1000, RARE: 4000, EXCEPTIONAL: 12000, LEGENDARY: 30000 }
+  # Artifact payloads barter at a component tier (§8: Rare ≈ II, Exceptional ≈ III).
+  barter_equivalence: { RARE: II, EXCEPTIONAL: III, LEGENDARY: III }
+  # Min effective sensor rating to detect a hidden find of each tier (rarer = harder).
+  sensor_difficulty: { COMMON: 1, UNCOMMON: 2, RARE: 3, EXCEPTIONAL: 4, LEGENDARY: 5 }
+  nebula_interference: 2      # sensor rating subtracted while inside a nebula sector
+  space_kinds:   { wreck: 5, entity: 3, nebula: 2, black_hole: 1 }
+  surface_kinds: { ruins: 4, artifact: 3, ancient_tech: 2, crashed_ship: 3 }
+  hidden_kinds: [wreck, entity]   # phenomena are obvious; drifting finds need sensors
+  component_pool: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]
+  salvage_turn_cost: 2
+  scan_turn_cost: 1
+  black_hole_gravity_warp: false  # Phase-3 hazard seam; inert in Phase 2
+  black_hole_warp_turn_cost: 5
+
 # The starter hull — a Trailblazer-class explorer (§4). Its engine room is built
 # "complete but minimal": every base slot filled at Tier I, every upgrade slot
 # empty — the canonical first upgrade target (§4.1). The flat aspect scalars below

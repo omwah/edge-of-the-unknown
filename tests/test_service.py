@@ -104,6 +104,40 @@ def test_load_game_replays_maintenance_ticks(tmp_path: Path) -> None:
     assert state_hash(reloaded.state) == expected
 
 
+def test_discovery_collection_replays_into_identical_state(tmp_path: Path) -> None:
+    """WP5: warping to + salvaging a discovery survives a reload (Player.codex golden master).
+
+    Everything flows through the command log — warp (which runs on-entry detection)
+    and salvage — so replay reproduces the codex exactly; no direct state pokes.
+    """
+    from edge.core.rules import Salvage, Warp
+
+    svc = _service(tmp_path, "codex.db")
+    sensor = svc.state.ships[1].sensor_rating
+    diff = svc.config.discovery.sensor_difficulty  # type: ignore[union-attr]
+    # Nearest open-space find the starter sensors can see on arrival (obvious or low-tier).
+    candidates = []
+    for d in svc.state.discoveries.values():
+        if d.planet_id is not None:
+            continue
+        path = shortest_path(svc.state.adjacency, 1, d.sector_id)
+        if path is None:
+            continue
+        if (not d.hidden) or sensor >= diff[d.rarity_tier.name]:
+            candidates.append((len(path), path, d))
+    candidates.sort(key=lambda t: t[0])
+    _, path, disc = candidates[0]
+    for hop in path[1:]:
+        svc.apply(1, Warp(to_sector=hop))  # on-entry detection fires here (logged)
+    svc.apply(1, Salvage(discovery_id=disc.id))
+    assert disc.id in svc.state.players[1].codex
+    expected = state_hash(svc.state)
+
+    reloaded = GameService.load_game(_config(), SqliteRepository(tmp_path / "codex.db"))  # type: ignore[arg-type]
+    assert state_hash(reloaded.state) == expected
+    assert disc.id in reloaded.state.players[1].codex
+
+
 def test_ticker_schedule_survives_reload(tmp_path: Path) -> None:
     """WP12: a reloaded ticker resumes its tick counter and next-due schedule."""
     from edge.engine.ticker import EngineTicker
