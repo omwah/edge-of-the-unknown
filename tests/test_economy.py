@@ -12,7 +12,7 @@ import math
 import random
 
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from edge.core.economy import (
@@ -118,6 +118,10 @@ def _player(latinum: int = 10_000) -> Player:
     return Player(id=1, name="you", ship_id=1, latinum=latinum)
 
 
+# deadline disabled: a 40-step pure-arithmetic loop is timing-irrelevant to the
+# invariant under test, but coverage instrumentation can push a single example
+# past hypothesis's 200ms per-example deadline (a spurious failure).
+@settings(deadline=None)
 @given(actions=st.lists(st.tuples(st.booleans(), st.integers(1, 30)), max_size=40))
 def test_goods_conserved_and_balance_non_negative_over_sequence(
     actions: list[tuple[bool, int]],

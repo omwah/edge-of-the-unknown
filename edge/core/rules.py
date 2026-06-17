@@ -7,8 +7,9 @@ mutable container (the service wraps that in a store transaction, WP6). Invarian
 are delegated to `core.economy` and `core.movement`; randomness (haggling) is
 drawn from the state-owned RNG, so replay from `(seed, command log)` is exact.
 
-Phase-1 command set: Warp, Dock, Trade, HaggleOffer, Deposit, Withdraw,
-BuyUpgrade (the flat-aspect StarDock purchase, PHASE1_PLAN §2).
+Command set: movement (Warp, TravelTo, Dock), trade (Trade, HaggleOffer), banking
+(Deposit, Withdraw), StarDock services (BuyComponent, BuyShip, RepairAtDock), and
+engine-room work (InstallComponent, SwapComponent, Cannibalize, FieldPatch).
 """
 
 from __future__ import annotations
@@ -27,18 +28,25 @@ from edge.core.economy import (
     resolve_haggle,
     withdraw,
 )
-from edge.core.engine_room import EngineRoomError, apply_derived, legal_components, tier_ceiling
+from edge.core.engine_room import (
+    EngineRoomError,
+    apply_derived,
+    build_subsystems,
+    legal_components,
+    tier_ceiling,
+)
 from edge.core.enums import Commodity, Component, ComponentTier, PortClass, Subsystem
 from edge.core.events import (
     Banked,
     ComponentInstalled,
+    ComponentPurchased,
     ComponentRemoved,
     Docked,
     Event,
     Haggled,
     Repaired,
+    ShipPurchased,
     Traded,
-    Upgraded,
     Warped,
 )
 from edge.core.models import Game, InstalledComponent, Player, Port, Ship, SubsystemState, UniverseState
@@ -89,8 +97,26 @@ class Withdraw:
 
 
 @dataclass(frozen=True, slots=True)
-class BuyUpgrade:
-    pass
+class BuyComponent:
+    """Buy a loose component from the StarDock hardware emporium (§8). Tier III is barter-only."""
+
+    component: Component
+    tier: ComponentTier
+
+
+@dataclass(frozen=True, slots=True)
+class BuyShip:
+    """Trade the current hull for a buyable class at the StarDock shipyard (§8)."""
+
+    ship_class_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class RepairAtDock:
+    """StarDock restoration of a knocked-out component (§4.1). Inert until Phase-3 combat."""
+
+    subsystem: Subsystem
+    slot_index: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,7 +160,8 @@ class FieldPatch:
 
 
 Command = (
-    Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw | BuyUpgrade
+    Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
+    | BuyComponent | BuyShip | RepairAtDock
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
 )
 
@@ -187,8 +214,12 @@ def reduce(
             return _bank(state, player_id, command.amount, withdraw_=False)
         case Withdraw():
             return _bank(state, player_id, command.amount, withdraw_=True)
-        case BuyUpgrade():
-            return _buy_upgrade(state, player_id, config)
+        case BuyComponent():
+            return _buy_component(state, player_id, command, config)
+        case BuyShip():
+            return _buy_ship(state, player_id, command, config)
+        case RepairAtDock():
+            return _repair_at_dock(state, player_id, command, config)
         case InstallComponent():
             return _install_component(state, player_id, command, config)
         case SwapComponent():
@@ -365,26 +396,127 @@ def _bank(
     )
 
 
-def _buy_upgrade(
-    state: UniverseState, player_id: int, config: GameConfig
+# --- StarDock services: buy component / buy hull / repair (§8, §11) ---------
+
+
+def _stardock(state: UniverseState, ship: Ship) -> Port:
+    """The StarDock in the ship's current sector, or raise (services are dock-only)."""
+    port = _docked_port(state, ship)
+    if port.klass is not PortClass.STARDOCK:
+        raise EconomyError("that service is offered only at a StarDock")
+    return port
+
+
+def _buy_component(
+    state: UniverseState, player_id: int, cmd: BuyComponent, config: GameConfig
 ) -> ReduceResult:
     player = _player(state, player_id)
     ship = _ship(state, player)
-    port = _docked_port(state, ship)
-    if port.klass is not PortClass.STARDOCK:
-        raise EconomyError("upgrades are sold only at a StarDock")
-    econ = config.economy
-    if player.latinum < econ.first_upgrade_latinum:
-        raise EconomyError("insufficient latinum for the upgrade")
-    new_player = replace(player, latinum=player.latinum - econ.first_upgrade_latinum)
-    if econ.first_upgrade_aspect == "holds":
-        new_ship = replace(ship, holds_total=ship.holds_total + econ.first_upgrade_amount)
-    elif econ.first_upgrade_aspect == "shields":
-        new_ship = replace(ship, shields=ship.shields + econ.first_upgrade_amount)
-    else:
-        raise EconomyError(f"unknown upgrade aspect {econ.first_upgrade_aspect!r}")
+    _stardock(state, ship)
+    price = config.economy.component_price(cmd.tier)
+    if price is None:
+        raise EconomyError(f"tier {cmd.tier.name} components are barter-only, not for sale")
+    if cmd.component.value not in config.hardware.components or cmd.tier.name not in config.hardware.tiers:
+        raise EconomyError(f"this dock does not stock {cmd.component.value} (tier {cmd.tier.name})")
+    if player.latinum < price:
+        raise EconomyError("insufficient latinum for the component")
+    if ship.holds_free < 1:
+        raise EconomyError("no free hold for the component — sell cargo first")
+    key = (cmd.component, cmd.tier)
+    new_components = {**ship.components, key: ship.components.get(key, 0) + 1}
+    new_ship = replace(ship, components=new_components)
+    new_player = replace(player, latinum=player.latinum - price)
     return ReduceResult(
-        events=(Upgraded(player_id, econ.first_upgrade_aspect, econ.first_upgrade_latinum),),
+        events=(ComponentPurchased(player_id, cmd.component.value, cmd.tier.name, price),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _buy_ship(
+    state: UniverseState, player_id: int, cmd: BuyShip, config: GameConfig
+) -> ReduceResult:
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    try:
+        new_class = config.ship_class(cmd.ship_class_id)
+    except KeyError as exc:
+        raise EconomyError(f"no such hull {cmd.ship_class_id!r}") from exc
+    if new_class.id == ship.type_id:
+        raise EconomyError("you already fly that hull")
+    if new_class.price <= 0:
+        raise EconomyError("that hull is not for sale")
+
+    # Trade-in credit for the current hull (the starter hull is free → 0 credit).
+    old_class = config.ship_class(ship.type_id)
+    trade_in = round(old_class.price * config.economy.ship_trade_in_frac)
+    net_cost = new_class.price - trade_in
+    if player.latinum < net_cost:
+        raise EconomyError("insufficient latinum for the hull, even after trade-in")
+
+    # The old hull's installed components return to loose inventory; the new hull
+    # arrives with its own fresh base slots. Cargo and existing loose parts carry over.
+    returned = _strip_installed(ship)
+    merged = dict(ship.components)
+    for key, count in returned.items():
+        merged[key] = merged.get(key, 0) + count
+    new_ship = apply_derived(replace(
+        ship, type_id=new_class.id, name=new_class.name, holds_total=new_class.holds_total,
+        hull_max=new_class.hull_max, hull_current=new_class.hull_max,
+        cloak_rating=new_class.cloak_rating, sensor_rating=new_class.sensor_rating,
+        shields=new_class.shields_max, warp_speed=new_class.warp_speed,
+        combat_speed=new_class.combat_speed, turns_per_warp=new_class.turns_per_warp,
+        subsystems=build_subsystems(new_class), components=merged,
+    ), config)
+    if new_ship.holds_used > new_ship.holds_total:
+        raise EconomyError(
+            "returned components plus cargo exceed the new hull's holds — "
+            "sell components down to make room first"
+        )
+    new_player = replace(player, latinum=player.latinum - net_cost)
+    return ReduceResult(
+        events=(ShipPurchased(player_id, new_class.id, net_cost, trade_in),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _strip_installed(ship: Ship) -> dict[tuple[Component, ComponentTier], int]:
+    """Count every component installed in the hull's subsystems (for trade-in return)."""
+    counts: dict[tuple[Component, ComponentTier], int] = {}
+    for sub in (ship.subsystems or {}).values():
+        for slot in sub.slots:
+            if slot is not None:
+                key = (slot.kind, slot.tier)
+                counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _repair_at_dock(
+    state: UniverseState, player_id: int, cmd: RepairAtDock, config: GameConfig
+) -> ReduceResult:
+    """Pay the StarDock to restore a knocked-out component (§4.1, §8).
+
+    Inert in Phase 2 (nothing is knocked out yet); the path is exercised in Phase 3.
+    """
+    player = _player(state, player_id)
+    ship = _engine_ship(state, player_id)
+    _stardock(state, ship)
+    sub = _subsystem(ship, cmd.subsystem)
+    _check_slot(sub, cmd.slot_index)
+    comp = sub.slots[cmd.slot_index]
+    if comp is None:
+        raise EngineRoomError("slot is empty — nothing to repair")
+    if not comp.knocked_out:
+        raise EngineRoomError("component is not knocked out")
+    price = config.economy.component_price(comp.tier) or config.economy.tier_ii_component_latinum
+    cost = round(price * config.economy.repair_cost_frac)
+    if player.latinum < cost:
+        raise EconomyError("insufficient latinum for the repair")
+    new_ship = _with_slot(ship, cmd.subsystem, cmd.slot_index, replace(comp, knocked_out=False))
+    new_ship = apply_derived(new_ship, config)
+    new_player = replace(player, latinum=player.latinum - cost)
+    return ReduceResult(
+        events=(Repaired(player_id, cmd.subsystem.value, cmd.slot_index),),
         players=(new_player,), ships=(new_ship,),
     )
 
@@ -512,6 +644,8 @@ def _cannibalize(
     comp = sub.slots[cmd.slot_index]
     if comp is None:
         raise EngineRoomError("slot is already empty")
+    if ship.holds_free < 1:
+        raise EngineRoomError("no free hold for the salvaged component — sell cargo first")
     new_components = _inv_add(ship.components, (comp.kind, comp.tier))
     new_ship = _with_slot(ship, cmd.subsystem, cmd.slot_index, None)
     new_ship = apply_derived(replace(new_ship, components=new_components), config)

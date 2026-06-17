@@ -13,19 +13,21 @@ from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsy
 from edge.core.events import (
     Banked,
     ComponentInstalled,
+    ComponentPurchased,
     ComponentRemoved,
     Docked,
     Event,
     Haggled,
     Repaired,
+    ShipPurchased,
     StockRegenerated,
     Traded,
     TurnsReset,
-    Upgraded,
     Warped,
 )
 from edge.core.rules import (
-    BuyUpgrade,
+    BuyComponent,
+    BuyShip,
     Cannibalize,
     Command,
     Deposit,
@@ -33,6 +35,7 @@ from edge.core.rules import (
     FieldPatch,
     HaggleOffer,
     InstallComponent,
+    RepairAtDock,
     SwapComponent,
     Trade,
     TravelTo,
@@ -66,8 +69,14 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "Deposit", {"amount": command.amount}
         case Withdraw():
             return "Withdraw", {"amount": command.amount}
-        case BuyUpgrade():
-            return "BuyUpgrade", {}
+        case BuyComponent():
+            return "BuyComponent", {"component": command.component.value, "tier": command.tier.name}
+        case BuyShip():
+            return "BuyShip", {"ship_class_id": command.ship_class_id}
+        case RepairAtDock():
+            return "RepairAtDock", {
+                "subsystem": command.subsystem.value, "slot_index": command.slot_index,
+            }
         case InstallComponent():
             return "InstallComponent", {
                 "subsystem": command.subsystem.value, "slot_index": command.slot_index,
@@ -113,8 +122,16 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return Deposit(amount=payload["amount"])
         case "Withdraw":
             return Withdraw(amount=payload["amount"])
-        case "BuyUpgrade":
-            return BuyUpgrade()
+        case "BuyComponent":
+            return BuyComponent(
+                component=Component(payload["component"]), tier=ComponentTier[payload["tier"]],
+            )
+        case "BuyShip":
+            return BuyShip(ship_class_id=payload["ship_class_id"])
+        case "RepairAtDock":
+            return RepairAtDock(
+                subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
+            )
         case "InstallComponent":
             return InstallComponent(
                 subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
@@ -165,8 +182,16 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "kind": event.kind,
                 "amount": event.amount, "balance": event.balance,
             }
-        case Upgraded():
-            return "Upgraded", {"player_id": event.player_id, "aspect": event.aspect, "cost": event.cost}
+        case ComponentPurchased():
+            return "ComponentPurchased", {
+                "player_id": event.player_id, "component": event.component,
+                "tier": event.tier, "cost": event.cost,
+            }
+        case ShipPurchased():
+            return "ShipPurchased", {
+                "player_id": event.player_id, "ship_class_id": event.ship_class_id,
+                "cost": event.cost, "trade_in": event.trade_in,
+            }
         case ComponentInstalled():
             return "ComponentInstalled", {
                 "player_id": event.player_id, "subsystem": event.subsystem,
@@ -207,8 +232,12 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                            payload["status"], payload["price"])
         case "Banked":
             return Banked(payload["player_id"], payload["kind"], payload["amount"], payload["balance"])
-        case "Upgraded":
-            return Upgraded(payload["player_id"], payload["aspect"], payload["cost"])
+        case "ComponentPurchased":
+            return ComponentPurchased(payload["player_id"], payload["component"],
+                                      payload["tier"], payload["cost"])
+        case "ShipPurchased":
+            return ShipPurchased(payload["player_id"], payload["ship_class_id"],
+                                 payload["cost"], payload["trade_in"])
         case "ComponentInstalled":
             return ComponentInstalled(payload["player_id"], payload["subsystem"],
                                       payload["slot_index"], payload["component"], payload["tier"])

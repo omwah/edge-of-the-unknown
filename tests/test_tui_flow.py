@@ -190,15 +190,45 @@ async def test_dock_and_trade_buys_fuel() -> None:
         assert svc.state.players[1].latinum < 2_000  # spent latinum buying
 
 
-async def test_dock_and_buy_upgrade() -> None:
+async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
+    from textual.widgets import TabbedContent
+
+    from edge.tui.screens.engine_room import EngineRoomScreen
+
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         svc = await _new_game_at_stardock(app, pilot)
-        holds0 = svc.state.ships[1].holds_total
-        await pilot.press("u")  # Hardware: buy the first upgrade
+        assert isinstance(app.screen, StarDockScreen)
+        app.screen.query_one(TabbedContent).active = "hardware"
         await pilot.pause()
-        amount = svc.config.economy.first_upgrade_amount
-        cost = svc.config.economy.first_upgrade_latinum
-        assert svc.state.ships[1].holds_total == holds0 + amount
-        assert svc.state.players[1].latinum == 2_000 - cost
+        lat0 = svc.state.players[1].latinum
+        await pilot.press("b")  # buy the highlighted component (Tier-I, affordable)
+        await pilot.pause()
+        loose = sum(svc.state.ships[1].components.values())
+        assert loose == 1 and svc.state.players[1].latinum < lat0
+        # Slot it in the engine room — a derived aspect must rise.
+        await pilot.press("e")
+        await pilot.pause()
+        assert isinstance(app.screen, EngineRoomScreen)
+        await pilot.press("i")  # install the on-hand part into a legal slot
+        await pilot.pause()
+        assert sum(svc.state.ships[1].components.values()) == 0  # the loose part was installed
+
+
+async def test_stardock_shipyard_swaps_hull() -> None:
+    from dataclasses import replace
+
+    from textual.widgets import TabbedContent
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game_at_stardock(app, pilot)
+        svc.state.players[1] = replace(svc.state.players[1], latinum=50_000)  # afford a hull
+        app.screen.query_one(TabbedContent).active = "shipyard"
+        await pilot.pause()
+        await pilot.press("b")  # buy the highlighted hull (Scout Marauder)
+        await pilot.pause()
+        assert svc.state.ships[1].type_id == "scout_marauder"
+        assert svc.state.players[1].latinum < 50_000
