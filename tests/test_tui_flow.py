@@ -216,6 +216,68 @@ async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
         assert sum(svc.state.ships[1].components.values()) == 0  # the loose part was installed
 
 
+async def test_continue_focused_and_new_game_confirms_when_save_exists() -> None:
+    """With a save present, Continue takes focus and New game asks before clobbering it."""
+    from textual.widgets import Button
+
+    from edge.tui.screens.confirm import ConfirmScreen
+    from edge.tui.screens.game import GameScreen
+    from edge.tui.screens.main_menu import MainMenuScreen
+
+    # First run writes a save into the (isolated) scratch save dir.
+    async with EdgeApp().run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+
+    # Second run: a save now exists.
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, MainMenuScreen)
+        assert app.focused is app.screen.query_one("#continue", Button)  # Continue is focused
+        # New game asks first; "Keep save" (Esc) returns to the menu, no game started.
+        await pilot.press("n")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmScreen)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, MainMenuScreen)
+        assert app.service is None
+        # Confirming overwrites and starts a fresh game.
+        await pilot.press("n")
+        await pilot.pause()
+        await pilot.press("y")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+        assert app.service is not None
+
+
+async def test_continue_reloads_saved_game() -> None:
+    """Pressing Continue replays the saved command log back to where the player left off."""
+    from edge.tui.screens.game import GameScreen
+
+    app1 = EdgeApp()
+    async with app1.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app1.service
+        assert svc is not None
+        target = svc.state.sectors[1].warps_out[0]
+        svc.apply(1, Warp(to_sector=target))  # a durable command in the save's log
+        moved = svc.game_view(1).sector.sector_id
+
+    app2 = EdgeApp()
+    async with app2.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("c")  # Continue
+        await pilot.pause()
+        assert isinstance(app2.screen, GameScreen)
+        assert app2.service is not None
+        assert app2.service.game_view(1).sector.sector_id == moved  # resumed, not reset
+
+
 async def test_stardock_shipyard_swaps_hull() -> None:
     from dataclasses import replace
 

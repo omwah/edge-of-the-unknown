@@ -16,6 +16,7 @@ from edge.config import load_default_config
 from edge.engine.ticker import EngineTicker
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
+from edge.tui.saves import clear_slot, default_save, has_save
 from edge.tui.screens.main_menu import MainMenuScreen
 
 # A fixed default seed for "New game" — chosen so the player's opening neighbourhood
@@ -61,16 +62,37 @@ class EdgeApp(App[None]):
         self.push_screen(MainMenuScreen())
 
     def start_new_game(self, seed: int = DEFAULT_SEED) -> GameService:
-        """Generate a fresh universe in-process and start the background ticker.
+        """Generate a fresh universe on disk and start the background ticker.
 
-        Single-player embeds the service (DESIGN §3). The repository is in-memory
-        for the skeleton; the ticker runs as a Textual worker (cancelled on exit).
+        Single-player embeds the service (DESIGN §3). The repository is a WAL
+        SQLite file (the single save slot); a new game replaces any prior slot so
+        its command log starts clean. The ticker runs as a Textual worker
+        (cancelled on exit).
         """
         config = load_default_config()
-        self.service = GameService.new_game(config, seed, SqliteRepository(":memory:"))
-        self._ticker = EngineTicker(self.service)
-        self.run_worker(self._ticker.run(), name="engine-ticker", group="engine")
+        save = default_save()
+        save.parent.mkdir(parents=True, exist_ok=True)
+        clear_slot()
+        self.service = GameService.new_game(config, seed, SqliteRepository(save))
+        self._start_ticker(self.service)
         return self.service
+
+    def continue_game(self) -> GameService | None:
+        """Reload the saved game by replaying its command log (DESIGN §12).
+
+        Returns None when no save exists. The big bang is regenerated from the
+        saved seed, then the durable command log is replayed on top.
+        """
+        if not has_save():
+            return None
+        config = load_default_config()
+        self.service = GameService.load_game(config, SqliteRepository(default_save()))
+        self._start_ticker(self.service)
+        return self.service
+
+    def _start_ticker(self, service: GameService) -> None:
+        self._ticker = EngineTicker(service)
+        self.run_worker(self._ticker.run(), name="engine-ticker", group="engine")
 
 
 def _serve(host: str, port: int, *, plain: bool) -> None:
