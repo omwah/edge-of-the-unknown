@@ -127,6 +127,8 @@ class ShipDTO:
     latinum: int
     band: str
     neighbors: list[NeighborDTO]
+    colonists: int
+    colonist_capacity: int
 
 
 @dataclass(frozen=True)

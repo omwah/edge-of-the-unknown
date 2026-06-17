@@ -97,6 +97,7 @@ def _ship_dto(state: UniverseState, ship: Ship, player: Player, sector: Sector) 
         holds_used=ship.holds_used, holds_total=ship.holds_total, holds=holds,
         gun="online", missiles=ship.missiles, kits=ship.repair_kits,
         latinum=player.latinum, band=sector.distance_band, neighbors=neighbors,
+        colonists=ship.colonists, colonist_capacity=ship.colonist_capacity,
     )
 
 

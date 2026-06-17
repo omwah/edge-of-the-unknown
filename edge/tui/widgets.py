@@ -264,6 +264,7 @@ class StatusSidebar(Vertical):
         for h in s.holds:
             lines.append(f" {h.label:<5}[yellow]{_scaled_bar(h.qty, h.capacity)}[/] {h.qty:>3}")
         lines += [
+            f"Colonists {s.colonists:,}/{s.colonist_capacity:,}",
             f"Latinum  [b yellow]{s.latinum:,}[/] slips",
             rule,
             f"Band {s.band}",
