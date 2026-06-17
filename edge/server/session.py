@@ -27,9 +27,11 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     Descended,
+    DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
+    GenesisDeployed,
     SiteExplored,
     Event,
     Haggled,
@@ -316,6 +318,12 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     ship = state.ships[state.players[player_id].ship_id]
     colonizable = is_colonizable(planet.planet_type, config)
     owned_by_you = planet.owner.kind == "player" and planet.owner.ref == player_id
+    genesis = config.genesis
+    ship_genesis = ship.devices.get(genesis.device_id, 0) if genesis is not None else 0
+    genesis_eligible = (
+        genesis is not None and not planet.owner.is_owned
+        and planet.planet_type in genesis.eligible_types
+    )
     stores = [(_FULL[c], planet.stores.get(c, 0)) for c in Commodity]
     allocation = [(_FULL[c], round(planet.allocation.get(c, 0.0) * 100)) for c in Commodity]
     base = state.starbases.get(planet.starbase_id) if planet.starbase_id is not None else None
@@ -339,6 +347,7 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         colonists=planet.colonists, habitability_cap=planet.habitability_cap,
         stores=stores, allocation=allocation, ship_colonists=ship.colonists,
         ship_colonist_capacity=ship.colonist_capacity,
+        ship_genesis=ship_genesis, genesis_eligible=genesis_eligible,
         starbase=starbase_status, starbase_id=planet.starbase_id,
         starbase_derelict=starbase_derelict, salvage=salvage,
     )
@@ -531,6 +540,10 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
         return f"[green]Field-patched {event.subsystem} slot {event.slot_index}[/]"
     if isinstance(event, StarbaseSalvaged):
         return f"[green]Salvaged {event.component} ({event.tier})[/] from a derelict starbase"
+    if isinstance(event, DevicePurchased):
+        return f"[green]Bought {event.device_id.replace('_', ' ')}[/]  (-{event.cost} slips)"
+    if isinstance(event, GenesisDeployed):
+        return f"[green]✦ Genesis: world re-formed to {event.new_type.replace('_', ' ')}[/]"
     if isinstance(event, Descended):
         return "[magenta]▼ Descended to the surface.[/]"
     if isinstance(event, SiteExplored):

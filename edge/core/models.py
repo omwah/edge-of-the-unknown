@@ -230,6 +230,9 @@ class Ship:
     colonists: int = 0  # recruited colonists aboard (≤ colonist_capacity); not cargo
     subsystems: Mapping[Subsystem, SubsystemState] | None = None
     components: Mapping[tuple[Component, ComponentTier], int] = field(default_factory=dict)
+    # Counted special devices keyed by device id (e.g. "genesis_torpedo"); bought at
+    # StarDock, deployed by their own command (§4, WP10). Not cargo — no hold cost.
+    devices: Mapping[str, int] = field(default_factory=dict)
 
     @property
     def holds_used(self) -> int:

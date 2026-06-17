@@ -17,7 +17,7 @@ from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier
-from edge.core.rules import BuyComponent, BuyShip, RecruitColonists
+from edge.core.rules import BuyComponent, BuyGenesis, BuyShip, RecruitColonists
 from edge.server.service import GameService
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
@@ -30,6 +30,7 @@ class StarDockScreen(Screen):
         Binding("t", "trade", "Trade"),
         Binding("h", "haggle", "Haggle"),
         Binding("b", "buy", "Buy"),
+        Binding("g", "buy_genesis", "Buy Genesis"),
         Binding("k", "recruit", "Recruit colonists"),
         Binding("e", "engine_room", "Engine room"),
         Binding("r", "noop", "Repair"),
@@ -131,6 +132,10 @@ class StarDockScreen(Screen):
     def action_recruit(self) -> None:
         """Enlist colonists into the ship's free berths (the reducer clamps to capacity)."""
         self._issue(RecruitColonists(count=10**9), "Recruited colonists")
+
+    def action_buy_genesis(self) -> None:
+        """Buy one Genesis torpedo (§4.2, WP10)."""
+        self._issue(BuyGenesis(), "Bought a genesis torpedo")
 
     def _buy_ship(self) -> None:
         table = self.query_one("#shipyard-table", DataTable)

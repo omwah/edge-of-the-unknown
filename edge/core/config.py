@@ -338,6 +338,23 @@ class DiscoveryConfig(BaseModel):
     black_hole_warp_turn_cost: int = 5
 
 
+class GenesisConfig(BaseModel):
+    """Genesis-torpedo device tunables (DESIGN §4.2, WP10).
+
+    A Genesis torpedo is bought at StarDock for `price` latinum and deployed on an
+    **unowned** planet of an `eligible_types` kind (the dead worlds — barren / belts /
+    gas giants), transforming it into a `result_type` (a colonizable terrestrial) by
+    re-rolling its yield/habitability from config. Deterministic, so it replays.
+    """
+
+    model_config = _FROZEN
+
+    device_id: str = "genesis_torpedo"
+    price: int = 15_000
+    result_type: str = "terrestrial_warm"
+    eligible_types: list[str] = Field(default_factory=list)
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -351,6 +368,7 @@ class GameConfig(BaseModel):
     planets: PlanetsConfig
     starbase: StarbaseConfig | None = None  # WP4 orbital bases (None ⇒ none generated)
     discovery: DiscoveryConfig | None = None  # WP5 discoveries (None ⇒ none salted)
+    genesis: GenesisConfig | None = None  # WP10 genesis torpedoes (None ⇒ not sold)
     starter_ship: ShipClassConfig
     ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (StarDock)
     hardware: HardwareConfig

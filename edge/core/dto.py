@@ -328,6 +328,8 @@ class PlanetDTO:
     allocation: list[tuple[str, int]]  # (commodity label, percent)
     ship_colonists: int  # colonists aboard the player's ship (for the Colonize affordance)
     ship_colonist_capacity: int
+    ship_genesis: int = 0  # genesis torpedoes aboard (drives the Genesis affordance, WP10)
+    genesis_eligible: bool = False  # this world can be re-formed by a genesis torpedo
     starbase: str | None = None  # WP4 display status: "operational" | "derelict — salvageable"
     starbase_id: int | None = None
     starbase_derelict: bool = False

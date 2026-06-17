@@ -52,10 +52,12 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     Descended,
+    DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
     Event,
+    GenesisDeployed,
     Haggled,
     Repaired,
     ShipPurchased,
@@ -64,7 +66,7 @@ from edge.core.events import (
     Traded,
     Warped,
 )
-from edge.core.planets import is_colonizable
+from edge.core.planets import is_colonizable, retype_planet
 from edge.core.starbases import is_operational
 from edge.core.models import (
     Discovery,
@@ -243,6 +245,22 @@ class Explore:
 
 
 @dataclass(frozen=True, slots=True)
+class BuyGenesis:
+    """Buy one Genesis torpedo from the StarDock (§4.2, WP10). A latinum sink."""
+
+
+@dataclass(frozen=True, slots=True)
+class DeployGenesis:
+    """Terraform an eligible unowned planet in the current sector (§4.2, WP10).
+
+    Consumes one carried Genesis torpedo and re-types the world to the configured
+    colonizable type, re-rolling its yield/habitability — leaving it claimable.
+    """
+
+    planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class FieldPatch:
     """Spend one repair-kit to un-knock-out a damaged component (§4.1).
 
@@ -259,7 +277,7 @@ Command = (
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SetAllocation
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
-    | Salvage | Descend | Explore
+    | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
 )
 
 
@@ -346,6 +364,10 @@ def reduce(
             return _descend(state, player_id, command, config)
         case Explore():
             return _explore(state, player_id, command, config)
+        case BuyGenesis():
+            return _buy_genesis(state, player_id, config)
+        case DeployGenesis():
+            return _deploy_genesis(state, player_id, command, config)
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -1072,4 +1094,60 @@ def _salvage(
         events=(DiscoveryCollected(player_id, disc.id, disc.kind.value,
                                    disc.rarity_tier.name, payload.kind.value),),
         players=(new_player,), ships=(new_ship,), discoveries=(new_disc,),
+    )
+
+
+# --- Genesis torpedoes: buy / deploy (§4.2, WP10) ---------------------------
+
+
+def _buy_genesis(state: UniverseState, player_id: int, config: GameConfig) -> ReduceResult:
+    """Buy one Genesis torpedo from the StarDock (§4.2, WP10)."""
+    if config.genesis is None:
+        raise EconomyError("genesis torpedoes are not sold in this universe")
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    gen = config.genesis
+    if player.latinum < gen.price:
+        raise EconomyError("insufficient latinum for a genesis torpedo")
+    new_devices = {**ship.devices, gen.device_id: ship.devices.get(gen.device_id, 0) + 1}
+    new_ship = replace(ship, devices=new_devices)
+    new_player = replace(player, latinum=player.latinum - gen.price)
+    return ReduceResult(
+        events=(DevicePurchased(player_id, gen.device_id, gen.price),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _deploy_genesis(
+    state: UniverseState, player_id: int, cmd: DeployGenesis, config: GameConfig
+) -> ReduceResult:
+    """Terraform an eligible unowned planet in the current sector (§4.2, WP10).
+
+    Deterministic: the world is re-typed to the configured `result_type` and its
+    yield/habitability re-rolled from config (no RNG), so the change replays exactly.
+    """
+    if config.genesis is None:
+        raise EconomyError("genesis torpedoes are not sold in this universe")
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    gen = config.genesis
+    if ship.devices.get(gen.device_id, 0) < 1:
+        raise EconomyError("no genesis torpedo aboard")
+    planet = state.planets.get(cmd.planet_id)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise EconomyError("no such planet in this sector")
+    if planet.owner.is_owned:
+        raise EconomyError("that world is claimed — genesis only re-forms unclaimed worlds")
+    if planet.planet_type not in gen.eligible_types:
+        raise EconomyError(f"a {planet.planet_type} world cannot be re-formed by genesis")
+    new_devices = dict(ship.devices)
+    new_devices[gen.device_id] = new_devices[gen.device_id] - 1
+    if new_devices[gen.device_id] == 0:
+        del new_devices[gen.device_id]
+    new_ship = replace(ship, devices=new_devices)
+    new_planet = retype_planet(planet, gen.result_type, config)
+    return ReduceResult(
+        events=(GenesisDeployed(player_id, planet.id, gen.result_type),),
+        ships=(new_ship,), planets=(new_planet,),
     )

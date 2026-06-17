@@ -16,9 +16,11 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     Descended,
+    DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
+    GenesisDeployed,
     SiteExplored,
     Event,
     Haggled,
@@ -33,10 +35,12 @@ from edge.core.events import (
 )
 from edge.core.rules import (
     BuyComponent,
+    BuyGenesis,
     BuyShip,
     Cannibalize,
     Colonize,
     Command,
+    DeployGenesis,
     Deposit,
     Descend,
     Dock,
@@ -80,6 +84,8 @@ COMMANDS: list[Command] = [
     Salvage(discovery_id=7),      # WP5 log a discovery to the codex
     Descend(planet_id=5),         # WP6 descend to a planet surface
     Explore(planet_id=5),         # WP6 survey the next surface site
+    BuyGenesis(),                 # WP10 buy a genesis torpedo
+    DeployGenesis(planet_id=5),   # WP10 terraform a world
 ]
 
 EVENTS: list[Event] = [
@@ -102,6 +108,8 @@ EVENTS: list[Event] = [
     DiscoveryCollected(1, 7, "wreck", "RARE", "artifact"),
     Descended(1, 5),
     SiteExplored(1, 5, 9, "ruins", "RARE"),
+    DevicePurchased(1, "genesis_torpedo", 15_000),
+    GenesisDeployed(1, 5, "terrestrial_warm"),
     TurnsReset(1, 250),
     StockRegenerated(3, Commodity.EQUIPMENT, 480),
 ]

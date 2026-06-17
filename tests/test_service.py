@@ -188,6 +188,39 @@ def test_surface_exploration_replays_into_identical_state(tmp_path: Path) -> Non
     assert site.id in reloaded.state.players[1].codex
 
 
+def test_genesis_deploy_replays_into_identical_state(tmp_path: Path) -> None:
+    """WP10: buy + deploy a genesis torpedo survives a reload (planet retype golden master).
+
+    Everything flows through the command log (warp → buy → warp → deploy) so replay
+    reproduces the retype exactly. A cheap-genesis config keeps it inside starting
+    capital — no direct state pokes that would diverge on reload.
+    """
+    from edge.core.enums import PortClass
+    from edge.core.rules import BuyGenesis, DeployGenesis
+
+    cfg = _config()
+    cfg = cfg.model_copy(update={"genesis": cfg.genesis.model_copy(update={"price": 1_000})})  # type: ignore[union-attr]
+    db = tmp_path / "genesis.db"
+    svc = GameService.new_game(cfg, 42, SqliteRepository(db), created_at=_CREATED)  # type: ignore[arg-type]
+    dock = next(p for p in svc.state.ports.values() if p.klass is PortClass.STARDOCK)
+    for hop in shortest_path(svc.state.adjacency, 1, dock.sector_id)[1:]:  # type: ignore[index]
+        svc.apply(1, Warp(to_sector=hop))
+    svc.apply(1, BuyGenesis())
+    target = next(
+        pl for pl in svc.state.planets.values()
+        if not pl.owner.is_owned and pl.planet_type in cfg.genesis.eligible_types  # type: ignore[union-attr]
+        and shortest_path(svc.state.adjacency, dock.sector_id, pl.sector_id) is not None
+    )
+    for hop in shortest_path(svc.state.adjacency, dock.sector_id, target.sector_id)[1:]:  # type: ignore[index]
+        svc.apply(1, Warp(to_sector=hop))
+    svc.apply(1, DeployGenesis(planet_id=target.id))
+    assert svc.state.planets[target.id].planet_type == cfg.genesis.result_type  # type: ignore[union-attr]
+    expected = state_hash(svc.state)
+
+    reloaded = GameService.load_game(cfg, SqliteRepository(db))  # type: ignore[arg-type]
+    assert state_hash(reloaded.state) == expected
+
+
 def test_ticker_schedule_survives_reload(tmp_path: Path) -> None:
     """WP12: a reloaded ticker resumes its tick counter and next-due schedule."""
     from edge.engine.ticker import EngineTicker

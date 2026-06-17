@@ -19,10 +19,12 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     Descended,
+    DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
     Event,
+    GenesisDeployed,
     Haggled,
     PlanetProduced,
     Repaired,
@@ -36,10 +38,12 @@ from edge.core.events import (
 )
 from edge.core.rules import (
     BuyComponent,
+    BuyGenesis,
     BuyShip,
     Cannibalize,
     Colonize,
     Command,
+    DeployGenesis,
     Deposit,
     Descend,
     Dock,
@@ -123,6 +127,10 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "Descend", {"planet_id": command.planet_id}
         case Explore():
             return "Explore", {"planet_id": command.planet_id}
+        case BuyGenesis():
+            return "BuyGenesis", {}
+        case DeployGenesis():
+            return "DeployGenesis", {"planet_id": command.planet_id}
 
 
 def decode_command(type_: str, payload: dict[str, Any]) -> Command:
@@ -191,6 +199,10 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return Descend(planet_id=payload["planet_id"])
         case "Explore":
             return Explore(planet_id=payload["planet_id"])
+        case "BuyGenesis":
+            return BuyGenesis()
+        case "DeployGenesis":
+            return DeployGenesis(planet_id=payload["planet_id"])
         case _:
             raise ValueError(f"unknown command type {type_!r}")
 
@@ -252,6 +264,14 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "starbase_id": event.starbase_id,
                 "subsystem": event.subsystem, "slot_index": event.slot_index,
                 "component": event.component, "tier": event.tier,
+            }
+        case DevicePurchased():
+            return "DevicePurchased", {
+                "player_id": event.player_id, "device_id": event.device_id, "cost": event.cost,
+            }
+        case GenesisDeployed():
+            return "GenesisDeployed", {
+                "player_id": event.player_id, "planet_id": event.planet_id, "new_type": event.new_type,
             }
         case Descended():
             return "Descended", {"player_id": event.player_id, "planet_id": event.planet_id}
@@ -326,6 +346,10 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "StarbaseSalvaged":
             return StarbaseSalvaged(payload["player_id"], payload["starbase_id"], payload["subsystem"],
                                     payload["slot_index"], payload["component"], payload["tier"])
+        case "DevicePurchased":
+            return DevicePurchased(payload["player_id"], payload["device_id"], payload["cost"])
+        case "GenesisDeployed":
+            return GenesisDeployed(payload["player_id"], payload["planet_id"], payload["new_type"])
         case "Descended":
             return Descended(payload["player_id"], payload["planet_id"])
         case "SiteExplored":
