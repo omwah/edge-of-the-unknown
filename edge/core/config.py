@@ -127,8 +127,69 @@ class BigBangConfig(BaseModel):
     )
 
 
+class SubsystemLayout(BaseModel):
+    """One subsystem's slot layout for a hull (DESIGN §4.1).
+
+    `slot_count` fixed slots; `base_components` are the parts pre-installed at Tier I
+    when the hull is built (index 0 is the keystone slot), the rest start empty;
+    `legal_components` is what may be installed/swapped into any slot;
+    `keystone` names the structural component (it sits at `base_components[0]`).
+    Component names are the `Component` enum values.
+    """
+
+    model_config = _FROZEN
+
+    slot_count: int
+    legal_components: list[str]
+    base_components: list[str]
+    keystone: str
+
+
+class AspectFormula(BaseModel):
+    """Coefficients turning a subsystem's filled slots into a derived aspect (§4.1).
+
+    `value = base + per_component·active + per_tier·tier_bonus`, where `active` is the
+    number of filled non-knocked-out slots and `tier_bonus` sums `(tier − 1)` over them
+    (so Tier-I parts add nothing beyond `per_component`). Caps emerge from slot count ×
+    max tier — there is no separate cap number (§4.1).
+    """
+
+    model_config = _FROZEN
+
+    base: float = 0.0
+    per_component: float = 0.0
+    per_tier: float = 0.0
+
+
+class EngineRoomConfig(BaseModel):
+    """Game-global engine-room tunables (DESIGN §4.1).
+
+    The per-subsystem layouts live on each `ShipClassConfig`; these are the formulas
+    shared across all hulls: how each subsystem's parts map to its aspect, the
+    spindrive-efficiency → one global combat bonus, the warp-speed → turns-per-warp
+    relation, and the main-gun rate-of-fire.
+    """
+
+    model_config = _FROZEN
+
+    # Keyed by Subsystem value: spindrive→warp, thrusters→combat, screens→shields,
+    # main_gun→gun damage. (sensors/cloak stay flat scalars — not subsystem-derived.)
+    aspects: Mapping[str, AspectFormula]
+    efficiency: AspectFormula  # applied to the spindrive's filled slots → global bonus
+    warp_turn_divisor: float = 3.0  # turns_per_warp = max(1, round(divisor / warp_speed))
+    gun_rate_base: int = 1
+    gun_rate_step: int = 2  # +1 rate per this many parts in the main gun
+    tier_ceiling: str = "III"  # highest installable tier (enum name)
+
+
 class ShipClassConfig(BaseModel):
-    """A ship class (DESIGN §4). Phase 1 uses flat aspect scalars (no subsystems)."""
+    """A ship class (DESIGN §4).
+
+    A hull with an engine room carries a `subsystems` layout (the player hulls, §4.1);
+    the flat aspect scalars (`shields_max`, `warp_speed`, `combat_speed`) then serve as
+    the NPC fallback and as the caps/defaults, with the live values *derived* from the
+    slotted layout. An NPC hull omits `subsystems` and uses the flat scalars directly.
+    """
 
     model_config = _FROZEN
 
@@ -143,6 +204,7 @@ class ShipClassConfig(BaseModel):
     cloak_rating: int
     sensor_rating: int
     hull_max: int
+    subsystems: Mapping[str, SubsystemLayout] | None = None
 
 
 class GameConfig(BaseModel):
@@ -154,7 +216,18 @@ class GameConfig(BaseModel):
     turns_per_day: int = 250  # TWINSTR.DOC default (§9)
     economy: EconomyConfig = EconomyConfig()
     bigbang: BigBangConfig = BigBangConfig()
+    engine_room: EngineRoomConfig
     starter_ship: ShipClassConfig
+
+    def ship_class(self, class_id: str) -> ShipClassConfig:
+        """The ship-class config for `class_id` (Phase 2: only the starter hull).
+
+        WP2 extends this to a registry of buyable hulls; for now the starter ship is
+        the sole class, so this resolves it or raises for any other id.
+        """
+        if class_id == self.starter_ship.id:
+            return self.starter_ship
+        raise KeyError(f"unknown ship class {class_id!r}")
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> GameConfig:

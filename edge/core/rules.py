@@ -13,6 +13,7 @@ BuyUpgrade (the flat-aspect StarDock purchase, PHASE1_PLAN §2).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import assert_never
 
@@ -26,17 +27,21 @@ from edge.core.economy import (
     resolve_haggle,
     withdraw,
 )
-from edge.core.enums import Commodity, PortClass
+from edge.core.engine_room import EngineRoomError, apply_derived, legal_components, tier_ceiling
+from edge.core.enums import Commodity, Component, ComponentTier, PortClass, Subsystem
 from edge.core.events import (
     Banked,
+    ComponentInstalled,
+    ComponentRemoved,
     Docked,
     Event,
     Haggled,
+    Repaired,
     Traded,
     Upgraded,
     Warped,
 )
-from edge.core.models import Game, Player, Port, Ship, UniverseState
+from edge.core.models import Game, InstalledComponent, Player, Port, Ship, SubsystemState, UniverseState
 from edge.core.movement import MovementError, can_warp, shortest_path
 
 # --- commands ---------------------------------------------------------------
@@ -88,7 +93,50 @@ class BuyUpgrade:
     pass
 
 
-Command = Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw | BuyUpgrade
+@dataclass(frozen=True, slots=True)
+class InstallComponent:
+    """Slot a loose component from the hold into an empty subsystem slot (§4.1)."""
+
+    subsystem: Subsystem
+    slot_index: int
+    component: Component
+    tier: ComponentTier
+
+
+@dataclass(frozen=True, slots=True)
+class SwapComponent:
+    """Replace a filled slot's component with a loose one; the old part returns to the hold."""
+
+    subsystem: Subsystem
+    slot_index: int
+    component: Component
+    tier: ComponentTier
+
+
+@dataclass(frozen=True, slots=True)
+class Cannibalize:
+    """Pull a component out of a filled slot into the loose-part inventory (§4.1)."""
+
+    subsystem: Subsystem
+    slot_index: int
+
+
+@dataclass(frozen=True, slots=True)
+class FieldPatch:
+    """Spend one repair-kit to un-knock-out a damaged component (§4.1).
+
+    Structurally present in Phase 2 but only meaningful once Phase-3 combat sets
+    `knocked_out`; against an undamaged slot it is rejected (nothing to patch).
+    """
+
+    subsystem: Subsystem
+    slot_index: int
+
+
+Command = (
+    Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw | BuyUpgrade
+    | InstallComponent | SwapComponent | Cannibalize | FieldPatch
+)
 
 
 # --- result -----------------------------------------------------------------
@@ -141,6 +189,14 @@ def reduce(
             return _bank(state, player_id, command.amount, withdraw_=True)
         case BuyUpgrade():
             return _buy_upgrade(state, player_id, config)
+        case InstallComponent():
+            return _install_component(state, player_id, command, config)
+        case SwapComponent():
+            return _swap_component(state, player_id, command, config)
+        case Cannibalize():
+            return _cannibalize(state, player_id, command, config)
+        case FieldPatch():
+            return _field_patch(state, player_id, command, config)
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -330,4 +386,159 @@ def _buy_upgrade(
     return ReduceResult(
         events=(Upgraded(player_id, econ.first_upgrade_aspect, econ.first_upgrade_latinum),),
         players=(new_player,), ships=(new_ship,),
+    )
+
+
+# --- engine room: install / swap / cannibalize / field-patch (§4.1) ---------
+
+
+def _engine_ship(state: UniverseState, player_id: int) -> Ship:
+    ship = _ship(state, _player(state, player_id))
+    if ship.subsystems is None:
+        raise EngineRoomError("this hull has no engine room")
+    return ship
+
+
+def _subsystem(ship: Ship, subsystem: Subsystem) -> SubsystemState:
+    assert ship.subsystems is not None  # guarded by _engine_ship
+    sub = ship.subsystems.get(subsystem)
+    if sub is None:
+        raise EngineRoomError(f"hull has no {subsystem.value} subsystem")
+    return sub
+
+
+def _check_slot(sub: SubsystemState, slot_index: int) -> None:
+    if not 0 <= slot_index < len(sub.slots):
+        raise EngineRoomError(f"no slot {slot_index} in subsystem")
+
+
+def _validate_install(
+    ship: Ship, subsystem: Subsystem, component: Component, tier: ComponentTier, config: GameConfig
+) -> None:
+    klass = config.ship_class(ship.type_id)
+    if component not in legal_components(klass, subsystem):
+        raise EngineRoomError(f"{component.value} is not legal in {subsystem.value}")
+    if tier.value > tier_ceiling(config.engine_room).value:
+        raise EngineRoomError(f"tier {tier.name} exceeds the install ceiling")
+
+
+def _inv_take(components: Mapping[tuple[Component, ComponentTier], int],
+              key: tuple[Component, ComponentTier]) -> dict[tuple[Component, ComponentTier], int]:
+    """Return the inventory with one of `key` removed; raise if none on hand."""
+    have = components.get(key, 0)
+    if have < 1:
+        raise EngineRoomError(f"no {key[0].value} (tier {key[1].name}) in the hold")
+    new = dict(components)
+    if have == 1:
+        del new[key]
+    else:
+        new[key] = have - 1
+    return new
+
+
+def _inv_add(components: Mapping[tuple[Component, ComponentTier], int],
+             key: tuple[Component, ComponentTier]) -> dict[tuple[Component, ComponentTier], int]:
+    """Return the inventory with one of `key` added."""
+    new = dict(components)
+    new[key] = new.get(key, 0) + 1
+    return new
+
+
+def _with_slot(ship: Ship, subsystem: Subsystem, slot_index: int,
+               value: InstalledComponent | None) -> Ship:
+    """Return `ship` with one subsystem slot replaced (subsystems map copied)."""
+    assert ship.subsystems is not None
+    sub = ship.subsystems[subsystem]
+    slots = list(sub.slots)
+    slots[slot_index] = value
+    new_sub = replace(sub, slots=tuple(slots))
+    return replace(ship, subsystems={**ship.subsystems, subsystem: new_sub})
+
+
+def _install_component(
+    state: UniverseState, player_id: int, cmd: InstallComponent, config: GameConfig
+) -> ReduceResult:
+    ship = _engine_ship(state, player_id)
+    sub = _subsystem(ship, cmd.subsystem)
+    _check_slot(sub, cmd.slot_index)
+    if sub.slots[cmd.slot_index] is not None:
+        raise EngineRoomError("slot is already filled")
+    _validate_install(ship, cmd.subsystem, cmd.component, cmd.tier, config)
+    new_components = _inv_take(ship.components, (cmd.component, cmd.tier))
+    new_ship = _with_slot(ship, cmd.subsystem, cmd.slot_index,
+                          InstalledComponent(cmd.component, cmd.tier))
+    new_ship = apply_derived(replace(new_ship, components=new_components), config)
+    return ReduceResult(
+        events=(ComponentInstalled(player_id, cmd.subsystem.value, cmd.slot_index,
+                                   cmd.component.value, cmd.tier.name),),
+        ships=(new_ship,),
+    )
+
+
+def _swap_component(
+    state: UniverseState, player_id: int, cmd: SwapComponent, config: GameConfig
+) -> ReduceResult:
+    ship = _engine_ship(state, player_id)
+    sub = _subsystem(ship, cmd.subsystem)
+    _check_slot(sub, cmd.slot_index)
+    old = sub.slots[cmd.slot_index]
+    if old is None:
+        raise EngineRoomError("slot is empty — install instead of swap")
+    _validate_install(ship, cmd.subsystem, cmd.component, cmd.tier, config)
+    # The new part comes off the hold; the old part goes back on (conserved).
+    new_components = _inv_add(
+        _inv_take(ship.components, (cmd.component, cmd.tier)), (old.kind, old.tier)
+    )
+    new_ship = _with_slot(ship, cmd.subsystem, cmd.slot_index,
+                          InstalledComponent(cmd.component, cmd.tier))
+    new_ship = apply_derived(replace(new_ship, components=new_components), config)
+    return ReduceResult(
+        events=(
+            ComponentRemoved(player_id, cmd.subsystem.value, cmd.slot_index,
+                             old.kind.value, old.tier.name),
+            ComponentInstalled(player_id, cmd.subsystem.value, cmd.slot_index,
+                               cmd.component.value, cmd.tier.name),
+        ),
+        ships=(new_ship,),
+    )
+
+
+def _cannibalize(
+    state: UniverseState, player_id: int, cmd: Cannibalize, config: GameConfig
+) -> ReduceResult:
+    ship = _engine_ship(state, player_id)
+    sub = _subsystem(ship, cmd.subsystem)
+    _check_slot(sub, cmd.slot_index)
+    comp = sub.slots[cmd.slot_index]
+    if comp is None:
+        raise EngineRoomError("slot is already empty")
+    new_components = _inv_add(ship.components, (comp.kind, comp.tier))
+    new_ship = _with_slot(ship, cmd.subsystem, cmd.slot_index, None)
+    new_ship = apply_derived(replace(new_ship, components=new_components), config)
+    return ReduceResult(
+        events=(ComponentRemoved(player_id, cmd.subsystem.value, cmd.slot_index,
+                                 comp.kind.value, comp.tier.name),),
+        ships=(new_ship,),
+    )
+
+
+def _field_patch(
+    state: UniverseState, player_id: int, cmd: FieldPatch, config: GameConfig
+) -> ReduceResult:
+    ship = _engine_ship(state, player_id)
+    sub = _subsystem(ship, cmd.subsystem)
+    _check_slot(sub, cmd.slot_index)
+    comp = sub.slots[cmd.slot_index]
+    if comp is None:
+        raise EngineRoomError("slot is empty — nothing to patch")
+    if not comp.knocked_out:
+        raise EngineRoomError("component is not knocked out")
+    if ship.repair_kits < 1:
+        raise EngineRoomError("no repair kits")
+    new_ship = _with_slot(ship, cmd.subsystem, cmd.slot_index,
+                          replace(comp, knocked_out=False))
+    new_ship = apply_derived(replace(new_ship, repair_kits=ship.repair_kits - 1), config)
+    return ReduceResult(
+        events=(Repaired(player_id, cmd.subsystem.value, cmd.slot_index),),
+        ships=(new_ship,),
     )

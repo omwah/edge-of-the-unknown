@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import pytest
 
-from edge.core.enums import Commodity, PortMode
+from typing import get_args
+
+from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsystem
 from edge.core.events import (
     Banked,
+    ComponentInstalled,
+    ComponentRemoved,
     Docked,
     Event,
     Haggled,
+    Repaired,
     StockRegenerated,
     Traded,
     TurnsReset,
@@ -18,10 +23,14 @@ from edge.core.events import (
 )
 from edge.core.rules import (
     BuyUpgrade,
+    Cannibalize,
     Command,
     Deposit,
     Dock,
+    FieldPatch,
     HaggleOffer,
+    InstallComponent,
+    SwapComponent,
     Trade,
     TravelTo,
     Warp,
@@ -39,6 +48,10 @@ COMMANDS: list[Command] = [
     Deposit(amount=500),
     Withdraw(amount=250),
     BuyUpgrade(),
+    InstallComponent(Subsystem.SPINDRIVE, 3, Component.TURBINE, ComponentTier.II),
+    SwapComponent(Subsystem.SCREENS, 1, Component.RADIATOR, ComponentTier.III),
+    Cannibalize(Subsystem.MAIN_GUN, 2),
+    FieldPatch(Subsystem.THRUSTERS, 0),
 ]
 
 EVENTS: list[Event] = [
@@ -48,6 +61,9 @@ EVENTS: list[Event] = [
     Haggled(1, 3, Commodity.ORGANICS, "accepted", 6),
     Banked(1, "interest", 50, 10_050),
     Upgraded(1, "holds", 2_000),
+    ComponentInstalled(1, "spindrive", 3, "turbine", "II"),
+    ComponentRemoved(1, "main_gun", 2, "linkage", "I"),
+    Repaired(1, "thrusters", 0),
     TurnsReset(1, 250),
     StockRegenerated(3, Commodity.EQUIPMENT, 480),
 ]
@@ -65,6 +81,17 @@ def test_event_round_trips(event: Event) -> None:
     assert type_ == type(event).__name__
     assert isinstance(payload, dict)
     assert codec.decode_event(type_, payload) == event
+
+
+def test_every_command_variant_is_covered() -> None:
+    """Exhaustiveness guard: every member of the `Command` union round-trips (§12).
+
+    Fails the build if a new command type is added without a `COMMANDS` fixture (and
+    thus without a codec entry), so a command can't silently skip the log.
+    """
+    covered = {type(c) for c in COMMANDS}
+    declared = set(get_args(Command))
+    assert declared - covered == set(), f"command variants missing a codec fixture: {declared - covered}"
 
 
 def test_decode_unknown_command_raises() -> None:

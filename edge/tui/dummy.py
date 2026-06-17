@@ -19,6 +19,7 @@ from edge.core.dto import (
     Aspect,
     CommodityLine,
     ComputerDTO,
+    EngineRoomDTO,
     GameState,
     Hold,
     LogEntry,
@@ -29,6 +30,8 @@ from edge.core.dto import (
     PortDTO,
     SectorDTO,
     ShipDTO,
+    Slot,
+    Subsystem,
     TradePair,
     WarpDTO,
 )
@@ -59,37 +62,6 @@ class SurfaceDTO:
     descent_fuel: str  # "n/a" in Phase 1 (movement costs turns, not fuel)
     terrain: list[str]  # top-down ASCII map rows (markup ok)
     sites: list[SurfaceSite] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class Slot:
-    """One component slot in a subsystem panel (UI_MOCKUPS.md §8).
-
-    `state` is "filled" | "empty" | "knocked" (knocked-out by combat); a filled
-    slot names its `component`, and the structural `keystone` slot is marked.
-    """
-
-    state: str
-    component: str = ""
-    keystone: bool = False
-
-
-@dataclass(frozen=True)
-class Subsystem:
-    name: str  # "SPINDRIVE", "THRUSTERS", "SCREENS", "MAIN GUN"
-    derived: str  # the aspect this subsystem drives, e.g. "warp 3"
-    slots: list[Slot]
-
-
-@dataclass(frozen=True)
-class EngineRoomDTO:
-    """The player ship's slotted subsystems (UI_MOCKUPS.md §8, DESIGN §4.1)."""
-
-    ship: str
-    efficiency_bonus: str  # spindrive global combat buff, e.g. "+2 all"
-    subsystems: list[Subsystem]
-    kits: int
-    on_hand: list[str]  # carried components, e.g. ["converter x1", "turbine x1"]
 
 
 @dataclass(frozen=True)

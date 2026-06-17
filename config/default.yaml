@@ -5,7 +5,7 @@
 # game constant lives here, not in code (CLAUDE.md). Omitted fields fall back to
 # the schema defaults; the values below are spelled out so the balance is legible.
 
-config_version: 1
+config_version: 2  # Phase-2 schema epoch (engine room, §4.1)
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 
 economy:
@@ -64,8 +64,30 @@ bigbang:
     - { name: Deep,     min_hops: 13, max_hops: 20 }
     - { name: Void,     min_hops: 21, max_hops: 9999 }
 
-# The starter hull — a Trailblazer-class explorer (§4). Phase 1: flat aspects,
-# no engine-room subsystems yet (those arrive in Phase 2, §4.1).
+# Engine room (§4.1): the game-global formulas turning a hull's slotted parts into
+# derived aspects. Per-subsystem layouts live on each ship class below. The
+# coefficients are tuned so the starter Trailblazer's "every base slot filled, all
+# upgrade slots empty" layout derives exactly the Phase-1 flat numbers (shields 100,
+# warp 3, combat 4) — a regression pin (PHASE2_PLAN WP1).
+#
+#   aspect = base + per_component*active + per_tier*tier_bonus
+#   (active = filled, non-knocked-out slots; tier_bonus = sum of (tier-1) over them)
+engine_room:
+  aspects:
+    spindrive: { base: 0, per_component: 1,  per_tier: 1 }   # -> warp speed
+    thrusters: { base: 0, per_component: 2,  per_tier: 1 }   # -> combat speed
+    screens:   { base: 0, per_component: 50, per_tier: 25 }  # -> shields
+    main_gun:  { base: 2, per_component: 8,  per_tier: 6 }   # -> gun damage
+  efficiency: { base: -1, per_component: 1, per_tier: 1 }    # spindrive -> global combat bonus
+  warp_turn_divisor: 3      # turns_per_warp = max(1, round(divisor / warp_speed))
+  gun_rate_base: 1
+  gun_rate_step: 2          # +1 rate of fire per 2 parts in the main gun
+  tier_ceiling: III
+
+# The starter hull — a Trailblazer-class explorer (§4). Its engine room is built
+# "complete but minimal": every base slot filled at Tier I, every upgrade slot
+# empty — the canonical first upgrade target (§4.1). The flat aspect scalars below
+# are the NPC-fallback / cap values; the live aspects are derived from the slots.
 starter_ship:
   id: trailblazer
   name: S.S. Wayfarer
@@ -78,3 +100,24 @@ starter_ship:
   cloak_rating: 0
   sensor_rating: 2
   hull_max: 100
+  subsystems:
+    spindrive:
+      slot_count: 5
+      keystone: navigator
+      base_components: [navigator, turbine, accelerator]
+      legal_components: [navigator, turbine, accelerator, converter, radiator]
+    thrusters:
+      slot_count: 4
+      keystone: burner
+      base_components: [burner, burner]
+      legal_components: [burner, turbine, accelerator, radiator]
+    screens:
+      slot_count: 4
+      keystone: secondary
+      base_components: [secondary, accelerator]
+      legal_components: [secondary, accelerator, converter, radiator]
+    main_gun:
+      slot_count: 5
+      keystone: accelerator
+      base_components: [accelerator, linkage]
+      legal_components: [accelerator, linkage, converter, secondary]

@@ -15,18 +15,22 @@ from edge.bigbang.topology import bfs_distances
 from edge.core import dto
 from edge.core.config import GameConfig
 from edge.core.economy import port_unit_price
-from edge.core.enums import Commodity, PortClass, PortMode
+from edge.core.engine_room import derive_aspects
+from edge.core.enums import Commodity, PortClass, PortMode, Subsystem
 from edge.core.events import (
     Banked,
+    ComponentInstalled,
+    ComponentRemoved,
     Docked,
     Event,
     Haggled,
+    Repaired,
     TurnsReset,
     Traded,
     Upgraded,
     Warped,
 )
-from edge.core.models import Player, Port, Sector, Ship, UniverseState
+from edge.core.models import Player, Port, Sector, Ship, SubsystemState, UniverseState
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
 _FULL = {Commodity.FUEL_ORE: "Fuel Ore", Commodity.ORGANICS: "Organics", Commodity.EQUIPMENT: "Equipment"}
@@ -161,6 +165,57 @@ def port_view(state: UniverseState, player_id: int, port_id: int, config: GameCo
     )
 
 
+_ENGINE_ORDER = (Subsystem.SPINDRIVE, Subsystem.SCREENS, Subsystem.THRUSTERS, Subsystem.MAIN_GUN)
+_SUBSYSTEM_DISPLAY = {
+    Subsystem.SPINDRIVE: "SPINDRIVE", Subsystem.SCREENS: "SCREENS",
+    Subsystem.THRUSTERS: "THRUSTERS", Subsystem.MAIN_GUN: "MAIN GUN",
+}
+
+
+def _slot_dto(sub: SubsystemState, idx: int) -> dto.Slot:
+    comp = sub.slots[idx]
+    keystone = idx == sub.keystone_index
+    if comp is None:
+        return dto.Slot(state="empty", keystone=keystone)
+    state = "knocked" if comp.knocked_out else "filled"
+    return dto.Slot(state=state, component=comp.kind.value, keystone=keystone)
+
+
+def engine_room_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.EngineRoomDTO:
+    """The player ship's slotted subsystems + derived aspects (§4.1, UI_MOCKUPS §8).
+
+    Reads the live derived values through `derive_aspects` so the panel always
+    reflects the installed parts; loose components are listed as the install pool.
+    """
+    ship = state.ships[state.players[player_id].ship_id]
+    aspects = derive_aspects(ship, config)
+    derived_label = {
+        Subsystem.SPINDRIVE: f"warp {aspects.warp_speed}",
+        Subsystem.SCREENS: f"shields {aspects.shields}",
+        Subsystem.THRUSTERS: f"combat spd {aspects.combat_speed}",
+        Subsystem.MAIN_GUN: f"dmg {aspects.gun_damage} · rate {aspects.gun_rate}",
+    }
+    panels: list[dto.Subsystem] = []
+    subsystems = ship.subsystems or {}
+    for kind in _ENGINE_ORDER:
+        sub = subsystems.get(kind)
+        if sub is None:
+            continue
+        panels.append(dto.Subsystem(
+            name=_SUBSYSTEM_DISPLAY[kind], derived=derived_label[kind],
+            slots=[_slot_dto(sub, i) for i in range(len(sub.slots))],
+        ))
+    on_hand = [
+        f"{comp.value} ({tier.name}) x{n}"
+        for (comp, tier), n in sorted(ship.components.items(), key=lambda kv: (kv[0][0].value, kv[0][1].value))
+        if n > 0
+    ]
+    return dto.EngineRoomDTO(
+        ship=ship.name, efficiency_bonus=f"+{aspects.efficiency_bonus} all",
+        subsystems=panels, kits=ship.repair_kits, on_hand=on_hand,
+    )
+
+
 def _ordered_bands(present: set[str]) -> list[str]:
     ranked = [b for b in _BAND_ORDER if b in present]
     return ranked + sorted(present - set(ranked))
@@ -228,6 +283,12 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
         return f"Haggle {event.status} @ {price}"
     if isinstance(event, Upgraded):
         return f"[green]Upgraded {event.aspect}[/]  (-{event.cost} slips)"
+    if isinstance(event, ComponentInstalled):
+        return f"[green]Installed {event.component} ({event.tier})[/] in {event.subsystem}"
+    if isinstance(event, ComponentRemoved):
+        return f"Removed {event.component} ({event.tier}) from {event.subsystem}"
+    if isinstance(event, Repaired):
+        return f"[green]Field-patched {event.subsystem} slot {event.slot_index}[/]"
     if isinstance(event, Banked):
         return f"Bank {event.kind}: {event.amount}  (balance {event.balance})"
     if isinstance(event, TurnsReset):

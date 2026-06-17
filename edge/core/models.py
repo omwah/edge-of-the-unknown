@@ -19,7 +19,7 @@ import random
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from edge.core.enums import Commodity, PortClass, PortMode
+from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,8 +95,51 @@ class Planet:
 
 
 @dataclass(frozen=True, slots=True)
+class InstalledComponent:
+    """One component slotted into a subsystem (DESIGN §4.1).
+
+    `knocked_out` is set true by Phase-3 combat (localized damage); in Phase 2 it
+    is always false. A knocked-out component contributes nothing to derived aspects
+    until a field-patch (`repair_kit`) or StarDock restoration clears it.
+    """
+
+    kind: Component
+    tier: ComponentTier
+    knocked_out: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SubsystemState:
+    """A fixed-length slot tuple for one subsystem (DESIGN §4.1).
+
+    `slots[i]` is the component in slot `i`, or `None` for an empty slot. The
+    `keystone_index` names the structural slot (navigator / burner / secondary / …)
+    that anchors the subsystem; emptying it leaves the subsystem unable to function
+    (the emergent-derelict / knocked-out logic Phase 3 reads).
+    """
+
+    slots: tuple[InstalledComponent | None, ...]
+    keystone_index: int | None = None
+
+    @property
+    def active(self) -> tuple[InstalledComponent, ...]:
+        """Filled, non-knocked-out components (the ones the aspect formula counts)."""
+        return tuple(c for c in self.slots if c is not None and not c.knocked_out)
+
+
+@dataclass(frozen=True, slots=True)
 class Ship:
-    """A ship hull (DESIGN §4). Phase 1: flat aspect scalars, no subsystems (§4.1)."""
+    """A ship hull (DESIGN §4).
+
+    A player hull carries `subsystems` (the engine-room model, §4.1): its
+    `shields` / `warp_speed` / `combat_speed` / `turns_per_warp` scalars are the
+    **derived** values written by the reducers whenever a slot changes (derive-on-
+    write, PHASE2_PLAN WP1), so everything downstream keeps reading plain aspects.
+    An NPC hull leaves `subsystems = None` and carries flat aspects directly (the
+    optional-`subsystems`-block rule, §4.1). `components` is the loose-part
+    inventory (not yet installed), conserved across install / cannibalize exactly
+    as cargo is conserved across trade.
+    """
 
     id: int
     type_id: str  # ship-class id (config), e.g. "trailblazer"
@@ -115,6 +158,8 @@ class Ship:
     missiles: int = 0
     repair_kits: int = 0
     turns_per_warp: int = 1
+    subsystems: Mapping[Subsystem, SubsystemState] | None = None
+    components: Mapping[tuple[Component, ComponentTier], int] = field(default_factory=dict)
 
     @property
     def holds_used(self) -> int:

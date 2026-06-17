@@ -175,6 +175,39 @@ class MessagesDTO:
 
 
 @dataclass(frozen=True)
+class Slot:
+    """One component slot in a subsystem panel (UI_MOCKUPS.md §8, DESIGN §4.1).
+
+    `state` is "filled" | "empty" | "knocked" (knocked-out by combat — Phase 3);
+    a filled slot names its `component`, and the structural `keystone` slot is marked.
+    """
+
+    state: str
+    component: str = ""
+    keystone: bool = False
+
+
+@dataclass(frozen=True)
+class Subsystem:
+    """One subsystem panel: its derived aspect and its slot grid (§4.1)."""
+
+    name: str  # "SPINDRIVE", "THRUSTERS", "SCREENS", "MAIN GUN"
+    derived: str  # the aspect this subsystem drives, e.g. "warp 3"
+    slots: list[Slot]
+
+
+@dataclass(frozen=True)
+class EngineRoomDTO:
+    """The player ship's slotted subsystems (UI_MOCKUPS.md §8, DESIGN §4.1)."""
+
+    ship: str
+    efficiency_bonus: str  # spindrive global combat buff, e.g. "+2 all"
+    subsystems: list[Subsystem]
+    kits: int
+    on_hand: list[str]  # loose carried components, e.g. ["converter (I) x1"]
+
+
+@dataclass(frozen=True)
 class GameState:
     """The game-screen view bundle (the public counterpart of `UniverseState`)."""
 

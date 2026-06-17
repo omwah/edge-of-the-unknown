@@ -15,6 +15,7 @@ import random
 from edge.bigbang.topology import bfs_distances
 from edge.core.config import GameConfig
 from edge.core.economy import capacity_for_size
+from edge.core.engine_room import apply_derived, build_subsystems
 from edge.core.movement import shortest_path
 from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass
 from edge.core.models import (
@@ -129,15 +130,19 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     # --- alliance + player + starter ship ------------------------------------
     state.alliances = {1: Alliance(id=1, name="Federation")}
     sc = config.starter_ship
-    state.ships = {
-        1: Ship(
-            id=1, type_id=sc.id, name=sc.name, owner_player_id=1, sector_id=1,
-            holds_total=sc.holds_total, hull_current=sc.hull_max, hull_max=sc.hull_max,
-            shields=sc.shields_max, warp_speed=sc.warp_speed, combat_speed=sc.combat_speed,
-            cloak_rating=sc.cloak_rating, sensor_rating=sc.sensor_rating,
-            turns_per_warp=sc.turns_per_warp,
-        )
-    }
+    # The player hull carries the engine-room model (§4.1): build its subsystems
+    # from the class layout, then derive-on-write its aspect scalars so the stored
+    # shields/warp/combat match the slotted parts (the flat config values are the
+    # NPC fallback / caps). The Trailblazer's minimal layout derives exactly the
+    # Phase-1 flat numbers (a regression pin, PHASE2_PLAN WP1).
+    starter = Ship(
+        id=1, type_id=sc.id, name=sc.name, owner_player_id=1, sector_id=1,
+        holds_total=sc.holds_total, hull_current=sc.hull_max, hull_max=sc.hull_max,
+        shields=sc.shields_max, warp_speed=sc.warp_speed, combat_speed=sc.combat_speed,
+        cloak_rating=sc.cloak_rating, sensor_rating=sc.sensor_rating,
+        turns_per_warp=sc.turns_per_warp, subsystems=build_subsystems(sc),
+    )
+    state.ships = {1: apply_derived(starter, config)}
     # StarDock is an auto-known route: the path from the start sector to the dock
     # opens pre-explored so the opening signpost is actionable (the player can
     # `TravelTo` it on turn one). Only the shortest path is revealed — the rest of

@@ -18,6 +18,52 @@ class Commodity(Enum):
     EQUIPMENT = "equipment"
 
 
+class Component(Enum):
+    """The shared engine-room component vocabulary (DESIGN §4.1).
+
+    Eight fungible part kinds slot into the four subsystems (and WP4 starbase
+    reactors). What a part *does* depends on the subsystem it fills; the aspect
+    formulas (config) read only how many parts a subsystem carries and their tier.
+    """
+
+    ACCELERATOR = "accelerator"
+    CONVERTER = "converter"
+    RADIATOR = "radiator"
+    SECONDARY = "secondary"
+    TURBINE = "turbine"
+    BURNER = "burner"
+    LINKAGE = "linkage"
+    NAVIGATOR = "navigator"
+
+
+class ComponentTier(Enum):
+    """Component tech tiers I–III (DESIGN §4.1). Int values give natural ordering.
+
+    Tier I is latinum-buyable; II is latinum + barter; III is barter-only (§8).
+    The integer value is the tier's "rank" used by the aspect formulas
+    (`per_tier × (tier − 1)`); the name (`I`/`II`/`III`) is the display/serialized form.
+    """
+
+    I = 1  # noqa: E741 — Roman-numeral tier name, not an ambiguous identifier
+    II = 2
+    III = 3
+
+
+class Subsystem(Enum):
+    """The four slotted player-ship subsystems plus the WP4 starbase reactor (§4.1).
+
+    A ship's `shields` / `warp_speed` / `combat_speed` / main-gun aspects are
+    *derived* from the components filling these subsystems; `fusion_reactor` powers
+    an orbital starbase (the engine-room model minus thrusters/spindrive, §4.2).
+    """
+
+    SPINDRIVE = "spindrive"
+    THRUSTERS = "thrusters"
+    SCREENS = "screens"
+    MAIN_GUN = "main_gun"
+    FUSION_REACTOR = "fusion_reactor"
+
+
 class PortMode(Enum):
     """What a port does with a commodity, from the player's point of view.
 

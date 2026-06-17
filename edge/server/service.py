@@ -91,6 +91,9 @@ class GameService:
     def computer_view(self, player_id: int) -> dto.ComputerDTO:
         return session.computer_view(self._state, player_id, self._config)
 
+    def engine_room_view(self, player_id: int) -> dto.EngineRoomDTO:
+        return session.engine_room_view(self._state, player_id, self._config)
+
     def messages_view(self, player_id: int) -> dto.MessagesDTO:
         """The durable event log + opening signpost, newest first (§11, §12)."""
         return session.messages_view(self._state, self._repo.load_events())
