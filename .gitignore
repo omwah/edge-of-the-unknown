@@ -6,3 +6,5 @@ references/**
 !.pixi/config.toml
 __pycache__/
 *.pyc
+# Coverage.py
+.coverage
