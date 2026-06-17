@@ -144,7 +144,8 @@ starbase:
 # barter-goods (mapped to a component tier, §8); lesser finds give latinum/components.
 discovery:
   sector_density: 0.20        # fraction of sectors holding an open-space find
-  surface_site_chance: 0.5    # fraction of planets seeded with a surface site (WP6 reveals)
+  surface_site_chance: 0.5    # fraction of planets seeded with surface sites (WP6 reveals)
+  surface_sites_max: 3        # up to this many sites on a seeded planet (WP6)
   # band -> rarity weights. Strongly separated so the mean-rarity gradient is monotone
   # Hub -> Frontier -> Deep -> Void (the §5 step-8 validator asserts strictly rising).
   band_rarity_weights:
@@ -164,6 +165,9 @@ discovery:
   component_pool: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]
   salvage_turn_cost: 2
   scan_turn_cost: 1
+  descent_turn_cost: 3            # turns to land on a planet surface (WP6)
+  explore_turn_cost: 1            # turns to reveal one surface site (WP6)
+  surface_hidden_min_rank: 3      # Rare+ surface sites need a sensor sweep to reveal
   black_hole_gravity_warp: false  # Phase-3 hazard seam; inert in Phase 2
   black_hole_warp_turn_cost: 5
 

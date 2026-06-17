@@ -18,7 +18,8 @@ from edge.core.economy import EconomyError
 from edge.core.dto import PlanetDTO
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Subsystem
-from edge.core.rules import Cannibalize, Colonize
+from edge.core.movement import MovementError
+from edge.core.rules import Cannibalize, Colonize, Descend
 from edge.server.service import GameService
 from edge.tui import sprites
 from edge.tui.dummy import sample_surface
@@ -134,7 +135,17 @@ class PlanetScreen(Screen):
         self.app.pop_screen()
 
     def action_descend(self) -> None:
-        self.app.push_screen(SurfaceScreen(sample_surface()))
+        if self._service is None:
+            self.app.push_screen(SurfaceScreen(sample_surface()))  # screenshot harness
+            return
+        p = self._planet
+        try:
+            self._service.apply(self._pid, Descend(planet_id=p.planet_id))
+        except (EconomyError, MovementError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.app.push_screen(SurfaceScreen(
+            self._service.surface_view(self._pid, p.planet_id), self._service, self._pid))
 
     def action_noop(self) -> None:
         self.notify("Not wired in the skeleton.", timeout=2)

@@ -55,6 +55,36 @@ class PortDTO:
 
 
 @dataclass(frozen=True)
+class SurfaceSite:
+    """A surface-exploration site on a descended planet (UI_MOCKUPS.md §4, §7).
+
+    `status` is "unexplored" / "explored" / "logged"; a still-hidden unexplored site
+    is masked ("[?]" / "(unsurveyed)") until a sensor sweep reveals it. `salvageable`
+    means it's revealed and uncollected, so `Salvage(discovery_id)` can log it.
+    """
+
+    marker: str  # "[1]" by slot, or "[?]" for an unsurveyed hidden site
+    name: str
+    rarity: str  # "Rare" … or "?" while masked
+    status: str  # "unexplored" | "explored" | "logged"
+    payload: list[str] = field(default_factory=list)  # detail lines (markup ok)
+    discovery_id: int = 0
+    salvageable: bool = False
+
+
+@dataclass(frozen=True)
+class SurfaceDTO:
+    """The descended-planet view: terrain + the planet's surface sites (§7, WP6)."""
+
+    planet: str
+    descent_fuel: str  # "n/a" (movement costs turns, not fuel)
+    terrain: list[str]  # top-down ASCII map rows (markup ok)
+    sites: list[SurfaceSite] = field(default_factory=list)
+    planet_id: int = 0
+    explorable: bool = False  # at least one site can still be revealed (drives [E])
+
+
+@dataclass(frozen=True)
 class HaggleQuote:
     """A read-only read on a counter-offer before the player commits it (§8).
 

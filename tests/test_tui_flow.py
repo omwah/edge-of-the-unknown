@@ -237,6 +237,51 @@ async def test_haggle_walk_away_makes_no_trade() -> None:
         assert svc.state.players[1].latinum == 2_000  # nothing spent
 
 
+async def test_descend_explore_log_flow() -> None:
+    """The §13 named flow: survey a planet → descend → explore a site → log it."""
+    from collections import defaultdict
+
+    from edge.core.rules import Warp
+    from edge.tui.screens.planet import PlanetScreen
+    from edge.tui.screens.surface import SurfaceScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+
+        # A reachable planet whose lowest-slot site is obvious (so one Explore at the
+        # starter sensor reveals the row-0 site, which Log then collects).
+        by_planet: dict[int, list[object]] = defaultdict(list)
+        for d in svc.state.discoveries.values():
+            if d.planet_id is not None:
+                by_planet[d.planet_id].append(d)
+        target = None
+        for _pid, ds in by_planet.items():
+            slot0 = min(ds, key=lambda d: d.site_slot)
+            if not slot0.hidden and shortest_path(svc.state.adjacency, 1, slot0.sector_id) is not None:
+                target = slot0
+                break
+        assert target is not None
+        for hop in shortest_path(svc.state.adjacency, 1, target.sector_id)[1:]:
+            svc.apply(1, Warp(to_sector=hop))
+
+        await pilot.press("s")  # survey planet -> PlanetScreen
+        await pilot.pause()
+        assert isinstance(app.screen, PlanetScreen)
+        await pilot.press("d")  # descend -> SurfaceScreen
+        await pilot.pause()
+        assert isinstance(app.screen, SurfaceScreen)
+        await pilot.press("e")  # survey the next site (the obvious slot-0 one)
+        await pilot.pause()
+        await pilot.press("l")  # log the highlighted (now revealed) site
+        await pilot.pause()
+        assert target.id in svc.state.players[1].codex
+
+
 async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
     from textual.widgets import TabbedContent
 

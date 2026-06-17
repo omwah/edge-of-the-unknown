@@ -51,6 +51,7 @@ from edge.core.events import (
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
+    Descended,
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
@@ -58,6 +59,7 @@ from edge.core.events import (
     Haggled,
     Repaired,
     ShipPurchased,
+    SiteExplored,
     StarbaseSalvaged,
     Traded,
     Warped,
@@ -210,15 +212,34 @@ class Cannibalize:
 
 @dataclass(frozen=True, slots=True)
 class Salvage:
-    """Log/collect a detected (or obvious) open-space discovery into the codex (§7, WP5).
+    """Log/collect a revealed discovery into the codex (§7, WP5/WP6).
 
-    A hidden find must have been detected on entry first (sensors are snapshotted at
-    entry, so re-enter after a sensor upgrade to pick up more). Takes the payload
-    aboard (component / latinum / artifact; lore is codex-only) and marks it found.
-    Surface sites are reached by descent (WP6), not from space.
+    Open-space: a hidden find must have been detected on entry first (sensors are
+    snapshotted at entry, so re-enter after a sensor upgrade to pick up more). Surface
+    sites must have been explored first (WP6). Either way takes the payload aboard
+    (component / latinum / artifact; lore is codex-only) and marks it found.
     """
 
     discovery_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class Descend:
+    """Land on a planet's surface to explore its sites (§7, WP6). Costs turns."""
+
+    planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class Explore:
+    """Reveal the next surface site of a planet (§7, WP6).
+
+    Surveys site-by-site: each call reveals the lowest-slot still-hidden site the
+    ship's sensors can resolve (obvious sites always; Rare+ sites need a sensor
+    sweep). Revealed sites enter `Player.detected` and can then be logged (`Salvage`).
+    """
+
+    planet_id: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -238,7 +259,7 @@ Command = (
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SetAllocation
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
-    | Salvage
+    | Salvage | Descend | Explore
 )
 
 
@@ -321,6 +342,10 @@ def reduce(
             return _field_patch(state, player_id, command, config)
         case Salvage():
             return _salvage(state, player_id, command, config)
+        case Descend():
+            return _descend(state, player_id, command, config)
+        case Explore():
+            return _explore(state, player_id, command, config)
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -939,30 +964,88 @@ def _field_patch(
     )
 
 
-# --- discovery: salvage / log to codex (§7, WP5) ----------------------------
+# --- discovery: descend / explore / salvage / log to codex (§7, WP5/WP6) ----
+
+
+def _planet_in_sector(state: UniverseState, ship: Ship, planet_id: int) -> Planet:
+    planet = state.planets.get(planet_id)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise EconomyError("no such planet in this sector")
+    return planet
+
+
+def _surface_sites(state: UniverseState, planet_id: int) -> list[Discovery]:
+    """A planet's surface-site discoveries, in slot order (§7, WP6)."""
+    sites = [d for d in state.discoveries.values() if d.planet_id == planet_id]
+    return sorted(sites, key=lambda d: d.site_slot)
+
+
+def _descend(
+    state: UniverseState, player_id: int, cmd: Descend, config: GameConfig
+) -> ReduceResult:
+    """Land on a planet surface (§7, WP6). A turn cost that opens site exploration."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _planet_in_sector(state, ship, cmd.planet_id)
+    cost = config.discovery.descent_turn_cost if config.discovery is not None else 1
+    if player.turns_remaining < cost:
+        raise MovementError("out of turns")
+    new_player = replace(player, turns_remaining=player.turns_remaining - cost)
+    return ReduceResult(events=(Descended(player_id, cmd.planet_id),), players=(new_player,))
+
+
+def _explore(
+    state: UniverseState, player_id: int, cmd: Explore, config: GameConfig
+) -> ReduceResult:
+    """Reveal the next still-hidden surface site the ship's sensors can resolve (§7, WP6)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _planet_in_sector(state, ship, cmd.planet_id)
+    undetected = [d for d in _surface_sites(state, cmd.planet_id) if d.id not in player.detected]
+    if not undetected:
+        raise EconomyError("every site here is already surveyed")
+    target = next(
+        (d for d in undetected
+         if is_detectable(d, ship.sensor_rating, in_nebula=False, config=config)),
+        None,
+    )
+    if target is None:
+        raise EconomyError("sensors too weak to resolve the remaining sites — upgrade and retry")
+    cost = config.discovery.explore_turn_cost if config.discovery is not None else 1
+    if player.turns_remaining < cost:
+        raise MovementError("out of turns")
+    new_player = replace(player, turns_remaining=player.turns_remaining - cost,
+                         detected=player.detected | frozenset({target.id}))
+    return ReduceResult(
+        events=(SiteExplored(player_id, cmd.planet_id, target.id,
+                             target.kind.value, target.rarity_tier.name),),
+        players=(new_player,),
+    )
 
 
 def _salvage(
     state: UniverseState, player_id: int, cmd: Salvage, config: GameConfig
 ) -> ReduceResult:
-    """Log a detected (or obvious) open-space discovery into the codex (§7, WP5).
+    """Log a revealed discovery into the codex (§7, WP5/WP6).
 
-    A hidden find must already be in the player's `detected` set (sensed on entry);
-    obvious finds need no detection. The payload is taken aboard (component → hold,
-    latinum → purse, artifact → barter store; lore is codex-only) and the find
-    marked `found_by`. Surface sites (`planet_id` set) are reached by descent in
-    WP6, not from space.
+    Open-space: a hidden find must already be in `detected` (sensed on entry).
+    Surface site: must have been explored (also in `detected`). Either way the
+    payload is taken aboard (component → hold, latinum → purse, artifact → barter
+    store; lore is codex-only) and the find marked `found_by`.
     """
     player = _player(state, player_id)
     ship = _ship(state, player)
     disc = state.discoveries.get(cmd.discovery_id)
     if disc is None:
         raise EconomyError("no such discovery")
-    if disc.planet_id is not None or disc.sector_id != ship.sector_id:
+    if disc.sector_id != ship.sector_id:
         raise EconomyError("that discovery is not in this sector")
     if disc.found_by is not None:
         raise EconomyError("that discovery has already been collected")
-    if disc.hidden and disc.id not in player.detected:
+    if disc.planet_id is not None:
+        if disc.id not in player.detected:
+            raise EconomyError("unexplored — survey the site first")
+    elif disc.hidden and disc.id not in player.detected:
         raise EconomyError("undetected — re-enter the sector with stronger sensors")
     cost = config.discovery.salvage_turn_cost if config.discovery is not None else 1
     if player.turns_remaining < cost:

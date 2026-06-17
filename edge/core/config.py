@@ -317,7 +317,8 @@ class DiscoveryConfig(BaseModel):
     model_config = _FROZEN
 
     sector_density: float = 0.20      # fraction of sectors with a space discovery
-    surface_site_chance: float = 0.50  # fraction of planets with a surface site
+    surface_site_chance: float = 0.50  # fraction of planets with surface sites
+    surface_sites_max: int = 3        # up to this many sites on a seeded planet (§7, WP6)
     # band name -> {RarityTier name -> weight}; outer bands weight the high tiers.
     band_rarity_weights: dict[str, dict[str, int]]
     tier_value: dict[str, int]        # RarityTier name -> latinum-equivalent value (gradient)
@@ -330,6 +331,9 @@ class DiscoveryConfig(BaseModel):
     component_pool: list[str] = Field(default_factory=list)  # Component names for component payloads
     salvage_turn_cost: int = 2        # turns to collect a discovery (§7)
     scan_turn_cost: int = 1           # turns for an explicit sensor sweep
+    descent_turn_cost: int = 3        # turns to descend to a planet surface (§7, WP6)
+    explore_turn_cost: int = 1        # turns to reveal one surface site (§7, WP6)
+    surface_hidden_min_rank: int = 3  # surface sites of this rarity rank+ need a sensor sweep
     black_hole_gravity_warp: bool = False  # Phase-3 seam; inert in Phase 2
     black_hole_warp_turn_cost: int = 5
 

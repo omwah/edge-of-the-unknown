@@ -160,6 +160,34 @@ def test_discovery_collection_replays_into_identical_state(tmp_path: Path) -> No
     assert disc.id in reloaded.state.players[1].codex
 
 
+def test_surface_exploration_replays_into_identical_state(tmp_path: Path) -> None:
+    """WP6: descend → explore → log a surface site survives a reload (codex golden master)."""
+    from edge.core.rules import Descend, Explore, Salvage
+
+    svc = _service(tmp_path, "surface.db")
+    # Nearest planet whose lowest-slot site is obvious (revealable at starter sensors).
+    best = None
+    for d in svc.state.discoveries.values():
+        if d.planet_id is None or d.site_slot != 0 or d.hidden:
+            continue
+        path = shortest_path(svc.state.adjacency, 1, d.sector_id)
+        if path is not None:
+            best = (len(path), path, d) if best is None or len(path) < best[0] else best
+    assert best is not None
+    _, path, site = best
+    for hop in path[1:]:
+        svc.apply(1, Warp(to_sector=hop))
+    svc.apply(1, Descend(planet_id=site.planet_id))
+    svc.apply(1, Explore(planet_id=site.planet_id))  # reveals the slot-0 obvious site
+    svc.apply(1, Salvage(discovery_id=site.id))
+    assert site.id in svc.state.players[1].codex
+    expected = state_hash(svc.state)
+
+    reloaded = GameService.load_game(_config(), SqliteRepository(tmp_path / "surface.db"))  # type: ignore[arg-type]
+    assert state_hash(reloaded.state) == expected
+    assert site.id in reloaded.state.players[1].codex
+
+
 def test_ticker_schedule_survives_reload(tmp_path: Path) -> None:
     """WP12: a reloaded ticker resumes its tick counter and next-due schedule."""
     from edge.engine.ticker import EngineTicker

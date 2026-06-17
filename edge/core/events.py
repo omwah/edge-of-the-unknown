@@ -114,6 +114,25 @@ class DiscoveryDetected(Event):
 
 
 @dataclass(frozen=True)
+class Descended(Event):
+    """The player landed on a planet surface to explore its sites (§7, WP6)."""
+
+    player_id: int
+    planet_id: int
+
+
+@dataclass(frozen=True)
+class SiteExplored(Event):
+    """A surface site revealed by exploration/sensor sweep on descent (§7, WP6)."""
+
+    player_id: int
+    planet_id: int
+    discovery_id: int
+    kind: str  # DiscoveryKind value
+    rarity: str  # RarityTier name
+
+
+@dataclass(frozen=True)
 class DiscoveryCollected(Event):
     """A discovery logged into the codex, its payload taken aboard (§7, WP5)."""
 

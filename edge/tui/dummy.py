@@ -9,7 +9,7 @@ screens render against realistic shapes.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # The Phase-1 public DTO shapes now live canonically in `edge.core.dto` (the
 # service's `to_public` output); they are re-exported here so existing TUI
@@ -33,6 +33,8 @@ from edge.core.dto import (
     ShipDTO,
     Slot,
     Subsystem,
+    SurfaceDTO,
+    SurfaceSite,
     TradePair,
     WarpDTO,
 )
@@ -48,25 +50,6 @@ def sample_planet() -> PlanetDTO:
         allocation=[("Fuel Ore", 20), ("Organics", 60), ("Equipment", 20)],
         ship_colonists=0, ship_colonist_capacity=100, starbase="operational",
     )
-
-
-@dataclass(frozen=True)
-class SurfaceSite:
-    """A discoverable surface site on a descended planet (UI_MOCKUPS.md §4)."""
-
-    marker: str  # "[1]", "[2]", "[?]" — keyed to the terrain map
-    name: str
-    rarity: str  # "Rare", "Uncommon", …
-    status: str  # "unexplored", "explored → ancient", "hidden"
-    payload: list[str] = field(default_factory=list)  # detail lines (markup ok)
-
-
-@dataclass(frozen=True)
-class SurfaceDTO:
-    planet: str
-    descent_fuel: str  # "n/a" in Phase 1 (movement costs turns, not fuel)
-    terrain: list[str]  # top-down ASCII map rows (markup ok)
-    sites: list[SurfaceSite] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
