@@ -17,7 +17,7 @@ from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier
-from edge.core.rules import BuyComponent, BuyShip
+from edge.core.rules import BuyComponent, BuyShip, RecruitColonists
 from edge.server.service import GameService
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.port import _trade_highlighted
@@ -29,6 +29,7 @@ class StarDockScreen(Screen):
         Binding("escape", "back", "Undock"),
         Binding("t", "trade", "Trade"),
         Binding("b", "buy", "Buy"),
+        Binding("k", "recruit", "Recruit colonists"),
         Binding("e", "engine_room", "Engine room"),
         Binding("r", "noop", "Repair"),
     ]
@@ -122,6 +123,10 @@ class StarDockScreen(Screen):
             return
         component, tier = row_key.value.split(":")
         self._issue(BuyComponent(Component(component), ComponentTier[tier]), f"Bought {component}")
+
+    def action_recruit(self) -> None:
+        """Enlist colonists into the ship's free berths (the reducer clamps to capacity)."""
+        self._issue(RecruitColonists(count=10**9), "Recruited colonists")
 
     def _buy_ship(self) -> None:
         table = self.query_one("#shipyard-table", DataTable)

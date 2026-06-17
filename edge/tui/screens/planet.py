@@ -1,7 +1,9 @@
-"""PlanetScreen — orbit view (UI_MOCKUPS.md §3).
+"""PlanetScreen — orbit view, wired to the live service (UI_MOCKUPS.md §3, §4.2).
 
-Phase-2 screen, stubbed here so the sector view's planet line has somewhere to
-go. Content mirrors the §3 wireframe (Terra Nova, a Core world).
+Reads `planet_view` for the planet in the player's current sector: type, owner,
+colony population, allocation, stores, starbase status. `C` claims/colonizes an
+unowned colonizable world by landing the colonists aboard; `D` descends (WP6).
+With no service (screenshot harness) it shows a static sample.
 """
 
 from __future__ import annotations
@@ -12,6 +14,10 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from edge.core.economy import EconomyError
+from edge.core.dto import PlanetDTO
+from edge.core.rules import Colonize
+from edge.server.service import GameService
 from edge.tui import sprites
 from edge.tui.dummy import sample_surface
 from edge.tui.screens.surface import SurfaceScreen
@@ -22,7 +28,7 @@ class PlanetScreen(Screen):
         Binding("escape", "back", "Break orbit"),
         Binding("d", "descend", "Descend"),
         Binding("t", "noop", "Trade"),
-        Binding("c", "noop", "Claim"),
+        Binding("c", "colonize", "Claim/Colonize"),
     ]
 
     CSS = """
@@ -39,36 +45,62 @@ class PlanetScreen(Screen):
     PlanetScreen .section { margin-top: 1; }
     """
 
-    _PTYPE = "terrestrial, warm"
-
-    def __init__(self, planet_name: str) -> None:
+    def __init__(self, planet: PlanetDTO, service: GameService | None = None, pid: int = 1) -> None:
         super().__init__()
-        self._name = planet_name
+        self._planet = planet
+        self._service = service
+        self._pid = pid
 
     def compose(self) -> ComposeResult:
-        yield Static(f"ORBIT · {self._name} · {self._PTYPE}", id="orbit-title")
+        p = self._planet
+        yield Static(f"ORBIT · {p.name} · {p.ptype}", id="orbit-title")
         with Horizontal(id="orbit-main"):
             with VerticalScroll(id="orbit-body"):
-                yield Static("Owner    [cyan]Federation[/] (Core world)        Citadel  Lv 2")
-                yield Static(
-                    "Habitability  [yellow]██████████░░[/] high     Colonists  1,240,000"
-                )
-                yield Static("Yield profile   Fuel (low)   Organics (high)   Equip (med)")
-                yield Static(
-                    "[green]#[/] Orbital starbase — OPERATIONAL  (defends for owner)\n"
-                    "    reactor [+]  screens [+]  gun [+]",
-                    classes="section",
-                )
-                yield Static(
-                    "Stores   Ore 8,200   Org 31,400   Equ 5,100   Ftrs 900",
-                    classes="section",
-                )
-                yield Static(
-                    "Surface sites detected:  [magenta]*[/] 2   (1 hidden — sensors Tier II)",
-                    classes="section",
-                )
-            yield Static("\n".join(sprites.pick_planet_large(self._PTYPE)), id="orbit-art")
+                yield Static(f"Owner    [cyan]{p.owner}[/]")
+                cap = f"{p.habitability_cap:,}" if p.colonizable else "—"
+                yield Static(f"Habitability cap  {cap}      Colonists  {p.colonists:,}")
+                stores = "   ".join(f"{label} {qty:,}" for label, qty in p.stores)
+                yield Static(f"Stores   {stores}", classes="section")
+                if p.owned_by_you:
+                    alloc = "   ".join(f"{label} {pct}%" for label, pct in p.allocation)
+                    yield Static(f"Allocation   {alloc}", classes="section")
+                if p.starbase:
+                    yield Static(f"[green]#[/] Orbital starbase — {p.starbase}", classes="section")
+                hint = self._claim_hint()
+                if hint:
+                    yield Static(hint, classes="section")
+            yield Static("\n".join(sprites.pick_planet_large(p.ptype)), id="orbit-art")
         yield Footer()
+
+    def _claim_hint(self) -> str:
+        p = self._planet
+        if p.owned_by_you:
+            return "[dim]Your colony.[/]"
+        if not p.colonizable:
+            return "[dim]Uncolonizable — extraction only.[/]"
+        if not p.claimable:
+            return "[dim]Already claimed.[/]"
+        if p.ship_colonists <= 0:
+            return "[yellow]Unclaimed — recruit colonists at a StarDock first.[/]"
+        return f"[green]\\[C] Colonize[/] — land {p.ship_colonists} colonists aboard."
+
+    def action_colonize(self) -> None:
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        if not p.claimable or p.ship_colonists <= 0:
+            self.notify("Nothing to colonize here (need colonists + an unclaimed world).", timeout=2)
+            return
+        try:
+            self._service.apply(self._pid, Colonize(p.planet_id, p.ship_colonists))
+        except EconomyError as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify("Colony established!", timeout=2)
+        self.app.pop_screen()
+        self.app.push_screen(PlanetScreen(
+            self._service.planet_view(self._pid, p.planet_id), self._service, self._pid))
 
     def action_back(self) -> None:
         self.app.pop_screen()

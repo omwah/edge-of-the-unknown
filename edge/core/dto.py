@@ -245,6 +245,26 @@ class StarDockDTO:
 
 
 @dataclass(frozen=True)
+class PlanetDTO:
+    """The orbit view of a planet (UI_MOCKUPS.md §3, DESIGN §4.2)."""
+
+    planet_id: int
+    name: str
+    ptype: str
+    owner: str  # display: "unowned" | alliance name | "you"
+    colonizable: bool
+    claimable: bool  # unowned + colonizable (the player can settle it)
+    owned_by_you: bool
+    colonists: int
+    habitability_cap: int
+    stores: list[tuple[str, int]]  # (commodity label, quantity)
+    allocation: list[tuple[str, int]]  # (commodity label, percent)
+    ship_colonists: int  # colonists aboard the player's ship (for the Colonize affordance)
+    ship_colonist_capacity: int
+    starbase: str | None = None  # WP4
+
+
+@dataclass(frozen=True)
 class GameState:
     """The game-screen view bundle (the public counterpart of `UniverseState`)."""
 

@@ -38,6 +38,8 @@ from edge.core.engine_room import (
 from edge.core.enums import Commodity, Component, ComponentTier, PortClass, Subsystem
 from edge.core.events import (
     Banked,
+    Colonized,
+    ColonistsRecruited,
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
@@ -49,7 +51,18 @@ from edge.core.events import (
     Traded,
     Warped,
 )
-from edge.core.models import Game, InstalledComponent, Player, Port, Ship, SubsystemState, UniverseState
+from edge.core.planets import is_colonizable
+from edge.core.models import (
+    Game,
+    InstalledComponent,
+    Ownership,
+    Planet,
+    Player,
+    Port,
+    Ship,
+    SubsystemState,
+    UniverseState,
+)
 from edge.core.movement import MovementError, can_warp, shortest_path
 
 # --- commands ---------------------------------------------------------------
@@ -120,6 +133,34 @@ class RepairAtDock:
 
 
 @dataclass(frozen=True, slots=True)
+class RecruitColonists:
+    """Recruit colonists into the ship's occupancy (§4.2). Recruited, never bought.
+
+    `from_planet` None ⇒ StarDock recruitment office (pay a per-head latinum incentive);
+    a planet id ⇒ emigration from that inhabited world (the disposition gate lands in WP7).
+    """
+
+    count: int
+    from_planet: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Colonize:
+    """Settle recruited colonists onto an unowned colonizable world, claiming it (§8)."""
+
+    planet_id: int
+    colonists: int
+
+
+@dataclass(frozen=True, slots=True)
+class SetAllocation:
+    """Set a player-owned colony's production split over the trio (§8)."""
+
+    planet_id: int
+    allocation: dict[str, float]  # Commodity value -> share
+
+
+@dataclass(frozen=True, slots=True)
 class InstallComponent:
     """Slot a loose component from the hold into an empty subsystem slot (§4.1)."""
 
@@ -162,6 +203,7 @@ class FieldPatch:
 Command = (
     Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
+    | RecruitColonists | Colonize | SetAllocation
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
 )
 
@@ -177,6 +219,7 @@ class ReduceResult:
     players: tuple[Player, ...] = ()
     ships: tuple[Ship, ...] = ()
     ports: tuple[Port, ...] = ()
+    planets: tuple[Planet, ...] = ()
     game: Game | None = None  # set by maintenance reducers (e.g. daily day-number bump)
 
 
@@ -188,6 +231,8 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
         state.ships[ship.id] = ship
     for port in result.ports:
         state.ports[port.id] = port
+    for planet in result.planets:
+        state.planets[planet.id] = planet
     if result.game is not None:
         state.game = result.game
 
@@ -220,6 +265,12 @@ def reduce(
             return _buy_ship(state, player_id, command, config)
         case RepairAtDock():
             return _repair_at_dock(state, player_id, command, config)
+        case RecruitColonists():
+            return _recruit_colonists(state, player_id, command, config)
+        case Colonize():
+            return _colonize(state, player_id, command, config)
+        case SetAllocation():
+            return _set_allocation(state, player_id, command, config)
         case InstallComponent():
             return _install_component(state, player_id, command, config)
         case SwapComponent():
@@ -453,6 +504,8 @@ def _buy_ship(
     net_cost = new_class.price - trade_in
     if player.latinum < net_cost:
         raise EconomyError("insufficient latinum for the hull, even after trade-in")
+    if ship.colonists > new_class.colonist_capacity:
+        raise EconomyError("the new hull has too few berths for your colonists — settle them first")
 
     # The old hull's installed components return to loose inventory; the new hull
     # arrives with its own fresh base slots. Cargo and existing loose parts carry over.
@@ -466,6 +519,7 @@ def _buy_ship(
         cloak_rating=new_class.cloak_rating, sensor_rating=new_class.sensor_rating,
         shields=new_class.shields_max, warp_speed=new_class.warp_speed,
         combat_speed=new_class.combat_speed, turns_per_warp=new_class.turns_per_warp,
+        colonist_capacity=new_class.colonist_capacity,
         subsystems=build_subsystems(new_class), components=merged,
     ), config)
     if new_ship.holds_used > new_ship.holds_total:
@@ -519,6 +573,97 @@ def _repair_at_dock(
         events=(Repaired(player_id, cmd.subsystem.value, cmd.slot_index),),
         players=(new_player,), ships=(new_ship,),
     )
+
+
+# --- colonists: recruit / colonize / allocation (§4.2, §8) ------------------
+
+
+def _even_allocation() -> dict[Commodity, float]:
+    """An equal split of production over the trio — the default for a new colony."""
+    share = 1.0 / len(Commodity)
+    return {c: share for c in Commodity}
+
+
+def _recruit_colonists(
+    state: UniverseState, player_id: int, cmd: RecruitColonists, config: GameConfig
+) -> ReduceResult:
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    if cmd.count <= 0:
+        raise EconomyError("recruit count must be positive")
+    free = ship.colonist_capacity - ship.colonists
+    if free <= 0:
+        raise EconomyError("no colonist berths free")
+    count = min(cmd.count, free)  # clamp to the ship's separate occupancy limit (§4.2)
+
+    if cmd.from_planet is None:
+        # StarDock recruitment office — a per-head latinum incentive (not a purchase).
+        _stardock(state, ship)
+        cost = count * config.economy.colonist_incentive
+        if player.latinum < cost:
+            raise EconomyError("insufficient latinum for the recruitment incentive")
+        new_player = replace(player, latinum=player.latinum - cost)
+        new_ship = replace(ship, colonists=ship.colonists + count)
+        return ReduceResult(
+            events=(ColonistsRecruited(player_id, "stardock", count, cost),),
+            players=(new_player,), ships=(new_ship,),
+        )
+
+    # Emigration from an inhabited world in orbit (the disposition gate lands in WP7).
+    planet = state.planets.get(cmd.from_planet)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise EconomyError("no such world here to recruit from")
+    if planet.inhabited_by_species_id is None:
+        raise EconomyError("that world has no population to emigrate")
+    new_ship = replace(ship, colonists=ship.colonists + count)
+    return ReduceResult(
+        events=(ColonistsRecruited(player_id, "emigration", count, 0),), ships=(new_ship,),
+    )
+
+
+def _colonize(
+    state: UniverseState, player_id: int, cmd: Colonize, config: GameConfig
+) -> ReduceResult:
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    planet = state.planets.get(cmd.planet_id)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise EconomyError("no such world in this sector")
+    if planet.owner.is_owned:
+        raise EconomyError("that world is already claimed")  # Core worlds are governor-owned
+    if not is_colonizable(planet.planet_type, config):
+        raise EconomyError(f"a {planet.planet_type} world cannot be colonized")
+    if cmd.colonists <= 0:
+        raise EconomyError("must land at least one colonist")
+    if cmd.colonists > ship.colonists:
+        raise EconomyError("not enough colonists aboard")
+    new_ship = replace(ship, colonists=ship.colonists - cmd.colonists)
+    new_planet = replace(
+        planet, owner=Ownership("player", player_id),
+        colonists=planet.colonists + cmd.colonists,
+        allocation=planet.allocation or _even_allocation(),
+    )
+    return ReduceResult(
+        events=(Colonized(player_id, planet.id, cmd.colonists),),
+        ships=(new_ship,), planets=(new_planet,),
+    )
+
+
+def _set_allocation(
+    state: UniverseState, player_id: int, cmd: SetAllocation, config: GameConfig
+) -> ReduceResult:
+    _player(state, player_id)
+    planet = state.planets.get(cmd.planet_id)
+    if planet is None:
+        raise EconomyError("no such world")
+    if planet.owner.kind != "player" or planet.owner.ref != player_id:
+        raise EconomyError("you do not own that world")
+    alloc = {c: float(cmd.allocation.get(c.value, 0.0)) for c in Commodity}
+    total = sum(alloc.values())
+    if total <= 0:
+        raise EconomyError("allocation must be positive")
+    normalized = {c: v / total for c, v in alloc.items()}
+    return ReduceResult(planets=(replace(planet, allocation=normalized),))
 
 
 # --- engine room: install / swap / cannibalize / field-patch (§4.1) ---------

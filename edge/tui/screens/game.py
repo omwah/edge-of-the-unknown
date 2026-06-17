@@ -234,11 +234,11 @@ class GameScreen(Screen):
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="map"))
 
     def action_survey_planet(self) -> None:
-        planets = self._service.game_view(self._pid).sector.planets
-        if not planets:
+        planet = self._service.current_planet_view(self._pid)
+        if planet is None:
             self.notify("No planet to survey here.", timeout=2)
             return
-        self.app.push_screen(PlanetScreen(planets[0].split("  ")[0].strip()))
+        self.app.push_screen(PlanetScreen(planet, self._service, self._pid))
 
     def action_engine_room(self) -> None:
         self.app.push_screen(EngineRoomScreen(

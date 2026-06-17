@@ -25,6 +25,7 @@ def validate(state: UniverseState, config: GameConfig) -> None:
     _check_degree_cap(state, config)
     _check_stardock(state)
     _check_profitable_pair(state, config)
+    _check_planet_ownership(state, config)
 
 
 def _check_reachable(state: UniverseState) -> None:
@@ -62,6 +63,39 @@ def _best_roundtrip_margin(sell_port: Port, buy_port: Port, config: GameConfig) 
         margin = port_unit_price(buy_line, config.economy) - port_unit_price(sell_line, config.economy)
         best = max(best, margin)
     return best
+
+
+def _check_planet_ownership(state: UniverseState, config: GameConfig) -> None:
+    """Ownership invariants (§4.2 / §5 step 8): Core governor-owned, unowned fraction
+    non-decreasing across bands, and at least one habitable Hub world."""
+    gov = state.game.core_governing_alliance_id
+    per_band: dict[str, list[int]] = {}  # band -> [1 if unowned else 0]
+    hub_habitable = False
+    for planet in state.planets.values():
+        sector = state.sectors[planet.sector_id]
+        if sector.is_galactic_core:
+            if planet.owner.kind != "alliance" or planet.owner.ref != gov:
+                raise ValidationError(f"Core planet {planet.id} is not governor-owned")
+            continue
+        per_band.setdefault(sector.distance_band, []).append(0 if planet.owner.is_owned else 1)
+        profile = config.planets.types.get(planet.planet_type)
+        if sector.distance_band == "Hub" and profile is not None and profile.colonizable:
+            hub_habitable = True
+
+    if not hub_habitable and any(s.distance_band == "Hub" for s in state.sectors.values()):
+        raise ValidationError("no habitable world in the Hub band")
+
+    prev = -1.0
+    for band in (b.name for b in config.bigbang.bands):
+        flags = per_band.get(band)
+        if not flags:
+            continue
+        frac = sum(flags) / len(flags)
+        if frac < prev - 1e-9:
+            raise ValidationError(
+                f"unowned fraction decreases at band {band} ({frac:.3f} < {prev:.3f})"
+            )
+        prev = frac
 
 
 def _check_profitable_pair(state: UniverseState, config: GameConfig) -> None:

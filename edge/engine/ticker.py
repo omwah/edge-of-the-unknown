@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from edge.core.config import GameConfig
 from edge.core.models import UniverseState
 from edge.core.rules import ReduceResult
-from edge.engine.cron import accrue_interest, daily_turn_reset, regenerate_ports
+from edge.engine.cron import accrue_interest, daily_turn_reset, planet_growth, regenerate_ports
 from edge.server.service import GameService
 
 CronFn = Callable[[UniverseState, GameConfig], ReduceResult]
@@ -46,6 +46,7 @@ class EngineTicker:
         self._running = False
         self._crons = [
             CronTask("hourly_port_economy", ticks_per_hour, regenerate_ports, ticks_per_hour),
+            CronTask("hourly_planet_growth", ticks_per_hour, planet_growth, ticks_per_hour),
             CronTask("interest_accrual", ticks_per_day, accrue_interest, ticks_per_day),
             CronTask("daily_turn_reset", ticks_per_day, daily_turn_reset, ticks_per_day),
         ]

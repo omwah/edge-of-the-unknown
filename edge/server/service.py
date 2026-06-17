@@ -97,6 +97,17 @@ class GameService:
     def stardock_view(self, player_id: int) -> dto.StarDockDTO:
         return session.stardock_view(self._state, player_id, self._config)
 
+    def planet_view(self, player_id: int, planet_id: int) -> dto.PlanetDTO:
+        return session.planet_view(self._state, player_id, planet_id, self._config)
+
+    def current_planet_view(self, player_id: int) -> dto.PlanetDTO | None:
+        """The orbit view for a planet in the player's current sector, if any."""
+        ship = self._state.ships[self._state.players[player_id].ship_id]
+        planet = next((p for p in self._state.planets.values() if p.sector_id == ship.sector_id), None)
+        if planet is None:
+            return None
+        return session.planet_view(self._state, player_id, planet.id, self._config)
+
     def messages_view(self, player_id: int) -> dto.MessagesDTO:
         """The durable event log + opening signpost, newest first (§11, §12)."""
         return session.messages_view(self._state, self._repo.load_events())

@@ -7,7 +7,7 @@ import pytest
 from edge.bigbang.validate import ValidationError, validate
 from edge.config import load_default_config
 from edge.core.enums import Commodity, PortClass, PortMode
-from edge.core.models import Game, Port, PortCommodity, Sector, UniverseState
+from edge.core.models import Game, Ownership, Planet, Port, PortCommodity, Sector, UniverseState
 
 CONFIG = load_default_config()
 
@@ -48,7 +48,10 @@ def _good_world() -> UniverseState:
         2: _stardock(2, 2),
         3: _pair(3, 3, PortClass.CLASS_5),
     }
-    return _world(sectors, ports)
+    world = _world(sectors, ports)
+    # A habitable Hub world (non-Core) satisfies the §5 step-8 colonization invariant.
+    world.planets = {1: Planet(1, 2, "Eden", "terrestrial_warm", owner=Ownership("none"))}
+    return world
 
 
 def test_good_world_validates() -> None:
@@ -92,3 +95,30 @@ def test_no_profitable_pair_rejected() -> None:
     }
     with pytest.raises(ValidationError):
         validate(_world(sectors, ports), CONFIG)
+
+
+def test_unowned_core_planet_rejected() -> None:
+    world = _good_world()
+    world.game = Game(id=1, seed=1, config_version=1, created_at="t", core_governing_alliance_id=1)
+    # A Core (sector 1) planet left unowned violates the governor-owned invariant.
+    world.planets[2] = Planet(2, 1, "Core World", "terrestrial_warm", owner=Ownership("none"))
+    with pytest.raises(ValidationError):
+        validate(world, CONFIG)
+
+
+def test_unowned_fraction_decreasing_rejected() -> None:
+    # Hub fully unowned but Frontier fully owned → the fraction drops across bands.
+    sectors = {
+        1: Sector(1, 1, (2,), "Hub", is_galactic_core=True),
+        2: Sector(2, 1, (1, 3), "Hub"),
+        3: Sector(3, 1, (2, 4), "Hub"),
+        4: Sector(4, 1, (3,), "Frontier"),
+    }
+    ports = {1: _pair(1, 1, PortClass.CLASS_1), 2: _stardock(2, 2), 3: _pair(3, 3, PortClass.CLASS_5)}
+    world = _world(sectors, ports)
+    world.planets = {
+        1: Planet(1, 2, "Eden", "terrestrial_warm", owner=Ownership("none")),       # Hub: unowned
+        2: Planet(2, 4, "Outpost", "terrestrial_cool", owner=Ownership("alliance", 1)),  # Frontier: owned
+    }
+    with pytest.raises(ValidationError):
+        validate(world, CONFIG)

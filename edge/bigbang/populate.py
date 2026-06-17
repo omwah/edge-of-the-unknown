@@ -11,6 +11,7 @@ and planet ownership are deferred to Phase 2.
 from __future__ import annotations
 
 import random
+from dataclasses import replace
 
 from edge.bigbang.topology import bfs_distances
 from edge.core.config import GameConfig
@@ -20,13 +21,19 @@ from edge.core.movement import shortest_path
 from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass
 from edge.core.models import (
     Alliance,
+    Ownership,
     Planet,
     Player,
     Port,
     PortCommodity,
     Ship,
+    UNOWNED,
     UniverseState,
 )
+
+# Sub-RNG salt for planet ownership (§5 RNG discipline): an independent draw stream
+# so owner assignment never shifts the topology / port / planet-type draw order.
+_OWNERSHIP_SALT = 0x504C414E  # "PLAN"
 
 _REGION_ADJ = ("Halaf", "Vega", "Mirach", "Orin", "Cygnus", "Halcyon", "Tsoraan",
                "Verdani", "Kessrin", "Drelb", "Sol", "Antares", "Lyra", "Nexus")
@@ -126,6 +133,10 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
         planets[plid] = Planet(id=plid, sector_id=sid, name=f"Planet {plid}", planet_type=ptype)
         plid += 1
     state.planets = planets
+    # Type-derived production shaping + band-weighted ownership (§4.2). Kept in a
+    # post-pass so the planet-*type* draws above stay bit-identical to Phase 1; the
+    # ownership roll uses its own sub-RNG (golden-master ordering).
+    _finalize_planets(state, config)
 
     # --- alliance + player + starter ship ------------------------------------
     state.alliances = {1: Alliance(id=1, name="Federation")}
@@ -140,7 +151,8 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
         holds_total=sc.holds_total, hull_current=sc.hull_max, hull_max=sc.hull_max,
         shields=sc.shields_max, warp_speed=sc.warp_speed, combat_speed=sc.combat_speed,
         cloak_rating=sc.cloak_rating, sensor_rating=sc.sensor_rating,
-        turns_per_warp=sc.turns_per_warp, subsystems=build_subsystems(sc),
+        turns_per_warp=sc.turns_per_warp, colonist_capacity=sc.colonist_capacity,
+        subsystems=build_subsystems(sc),
     )
     state.ships = {1: apply_derived(starter, config)}
     # StarDock is an auto-known route: the path from the start sector to the dock
@@ -160,9 +172,51 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     }
 
 
+def _finalize_planets(state: UniverseState, config: GameConfig) -> None:
+    """Set each planet's yield/habitability from its type and assign ownership (§4.2).
+
+    Core worlds are owned by the governing alliance unconditionally; non-Core worlds
+    are alliance-owned or unowned by a band-weighted, *monotone* unowned fraction
+    (Hub→Frontier→Deep→Void), enforced by construction so the §5 step-8 invariant
+    holds per seed rather than only in expectation.
+    """
+    types = config.planets.types
+    for pid, planet in list(state.planets.items()):
+        profile = types.get(planet.planet_type)
+        if profile is not None:
+            state.planets[pid] = replace(
+                planet, habitability_cap=profile.habitability,
+                yield_profile={Commodity(k): v for k, v in profile.yield_profile.items()},
+            )
+
+    gov = state.game.core_governing_alliance_id
+    orng = random.Random(state.game.seed ^ _OWNERSHIP_SALT)
+    by_band: dict[str, list[int]] = {}
+    for pid, planet in state.planets.items():
+        if state.sectors[planet.sector_id].is_galactic_core:
+            state.planets[pid] = replace(planet, owner=Ownership("alliance", gov))
+        else:
+            by_band.setdefault(state.sectors[planet.sector_id].distance_band, []).append(pid)
+
+    floor = 0.0  # the previous band's realized unowned fraction (kept non-decreasing)
+    for band in (b.name for b in config.bigbang.bands):
+        pids = by_band.get(band)
+        if not pids:
+            continue
+        weights = config.planets.ownership.get(band)
+        target = weights.none / (weights.none + weights.alliance) if weights else floor
+        n = len(pids)
+        unowned = round(max(target, floor) * n)
+        if unowned / n < floor:  # rounding must never drop below the prior band
+            unowned = min(n, unowned + 1)
+        floor = unowned / n
+        orng.shuffle(pids)
+        for i, pid in enumerate(pids):
+            owner = UNOWNED if i < unowned else Ownership("alliance", gov)
+            state.planets[pid] = replace(state.planets[pid], owner=owner)
+
+
 def _mid_stock(port: Port) -> Port:
     """Set every commodity to ~half capacity (a neutral price point)."""
-    from dataclasses import replace
-
     lines = tuple(replace(c, stock=c.capacity // 2) for c in port.commodities)
     return replace(port, commodities=lines)

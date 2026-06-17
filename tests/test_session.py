@@ -98,6 +98,36 @@ def test_stardock_view_lists_hardware_and_shipyard() -> None:
     assert scout.affordable and scout.net_price == scout.price  # free starter → no trade-in
 
 
+def test_planet_view_reports_ownership_and_claimability() -> None:
+    from edge.core.models import Ownership, Planet
+
+    world = _world()
+    world.planets = {
+        1: Planet(1, 2, "Eden", "terrestrial_warm", owner=Ownership("none"), habitability_cap=100_000),
+        2: Planet(2, 3, "Gasworld", "jovian", owner=Ownership("alliance", 1)),
+    }
+    world.ships[1] = Ship(1, "trailblazer", "S.S.", 1, 2, 60, colonist_capacity=100, colonists=20)
+    eden = session.planet_view(world, 1, 1, CONFIG)
+    assert eden.owner == "unowned" and eden.colonizable and eden.claimable
+    assert eden.ship_colonists == 20
+    gas = session.planet_view(world, 1, 2, CONFIG)
+    assert not gas.colonizable and not gas.claimable  # jovian is extraction-only
+
+
+def test_planet_view_owner_labels() -> None:
+    from edge.core.models import Alliance, Ownership, Planet
+
+    world = _world()
+    world.alliances = {1: Alliance(1, "Federation")}
+    world.planets = {
+        1: Planet(1, 2, "Mine", "terrestrial_warm", owner=Ownership("player", 1)),
+        2: Planet(2, 3, "Theirs", "terrestrial_cool", owner=Ownership("alliance", 1)),
+    }
+    assert session.planet_view(world, 1, 1, CONFIG).owner == "you"
+    assert session.planet_view(world, 1, 1, CONFIG).owned_by_you
+    assert session.planet_view(world, 1, 2, CONFIG).owner == "Federation"
+
+
 def test_computer_view_finds_profitable_pair() -> None:
     cv = session.computer_view(_world(), 1, CONFIG)
     assert cv.pairs  # at least one opposed pair among discovered ports

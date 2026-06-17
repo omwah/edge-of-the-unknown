@@ -61,8 +61,8 @@ def test_cron_cadence_fires_once_per_interval(tmp_path: Path) -> None:
     ticker = EngineTicker(svc, tick_seconds=0.0, ticks_per_hour=2, ticks_per_day=5)
     fired_by_tick = [ticker.step() for _ in range(5)]
     # hourly (interval 2) at ticks 2 and 4; the day crons (interval 5) at tick 5.
-    assert fired_by_tick[1] == ["hourly_port_economy"]  # tick 2
-    assert fired_by_tick[3] == ["hourly_port_economy"]  # tick 4
+    assert fired_by_tick[1] == ["hourly_port_economy", "hourly_planet_growth"]  # tick 2
+    assert fired_by_tick[3] == ["hourly_port_economy", "hourly_planet_growth"]  # tick 4
     assert fired_by_tick[4] == ["interest_accrual", "daily_turn_reset"]  # tick 5
     assert fired_by_tick[0] == [] and fired_by_tick[2] == []  # no spurious/double fires
 
