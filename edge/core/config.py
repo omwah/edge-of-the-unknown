@@ -17,7 +17,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from edge.core.enums import Commodity
+from edge.core.enums import Commodity, ComponentTier
 
 _FROZEN = ConfigDict(frozen=True, extra="forbid")
 
@@ -58,13 +58,16 @@ class EconomyConfig(BaseModel):
     organics: CommodityPricing = CommodityPricing(base=5, delta=2)
     equipment: CommodityPricing = CommodityPricing(base=15, delta=7)
 
-    # The upgrade sink + Phase-1 "first upgrade" (PHASE1_PLAN §2).
+    # The component sink: StarDock hardware prices by tier (§8). Tier III is not
+    # latinum-buyable — it comes only from alien barter (WP9) or salvage (WP4).
     tier_i_component_latinum: int = 2_000
     tier_ii_component_latinum: int = 8_000
     repair_kit_latinum: int = 200
-    first_upgrade_latinum: int = 2_000
-    first_upgrade_aspect: str = "holds"  # "holds" | "shields" (config-selectable)
-    first_upgrade_amount: int = 20  # how much the bought aspect bumps
+    # Fraction of a hull's purchase price credited as trade-in toward a new one,
+    # and StarDock battle-damage repair priced at this fraction of a tier price
+    # (the repair path is inert until Phase-3 combat knocks components out, §8).
+    ship_trade_in_frac: float = 0.5
+    repair_cost_frac: float = 0.25
 
     # Banking + stock regen (engine cron applies these; the math is pure).
     bank_interest_per_day: float = 0.005  # ~0.5%/game-day
@@ -81,6 +84,16 @@ class EconomyConfig(BaseModel):
             Commodity.ORGANICS: self.organics,
             Commodity.EQUIPMENT: self.equipment,
         }[commodity]
+
+    def component_price(self, tier: ComponentTier) -> int | None:
+        """The StarDock latinum price for a component tier, or None if barter-only.
+
+        Tier III has no latinum price (it is bartered for, not bought, §8).
+        """
+        return {
+            ComponentTier.I: self.tier_i_component_latinum,
+            ComponentTier.II: self.tier_ii_component_latinum,
+        }.get(tier)
 
 
 class DistanceBand(BaseModel):
@@ -204,7 +217,22 @@ class ShipClassConfig(BaseModel):
     cloak_rating: int
     sensor_rating: int
     hull_max: int
+    price: int = 0  # StarDock purchase price in latinum (0 = the free starter hull)
     subsystems: Mapping[str, SubsystemLayout] | None = None
+
+
+class HardwareConfig(BaseModel):
+    """The StarDock hardware emporium catalog (DESIGN §5, §8).
+
+    `components` are the part kinds offered for sale (Component enum values) and
+    `tiers` the tiers stocked (enum names). Prices come from the economy block
+    (`component_price`); Tier III is excluded here — it is barter-only (§8).
+    """
+
+    model_config = _FROZEN
+
+    components: list[str]
+    tiers: list[str]
 
 
 class GameConfig(BaseModel):
@@ -218,15 +246,16 @@ class GameConfig(BaseModel):
     bigbang: BigBangConfig = BigBangConfig()
     engine_room: EngineRoomConfig
     starter_ship: ShipClassConfig
+    ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (StarDock)
+    hardware: HardwareConfig
 
     def ship_class(self, class_id: str) -> ShipClassConfig:
-        """The ship-class config for `class_id` (Phase 2: only the starter hull).
-
-        WP2 extends this to a registry of buyable hulls; for now the starter ship is
-        the sole class, so this resolves it or raises for any other id.
-        """
+        """The ship-class config for `class_id` — the starter hull or a buyable one."""
         if class_id == self.starter_ship.id:
             return self.starter_ship
+        for klass in self.ship_classes:
+            if klass.id == class_id:
+                return klass
         raise KeyError(f"unknown ship class {class_id!r}")
 
     @classmethod

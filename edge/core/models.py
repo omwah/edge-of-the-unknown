@@ -163,7 +163,16 @@ class Ship:
 
     @property
     def holds_used(self) -> int:
-        return sum(self.cargo.values())
+        """Holds occupied — trade cargo plus loose (uninstalled) components.
+
+        Loose parts ride in the hold (§4.1), so they compete with cargo for space:
+        buying or salvaging a component, and trading goods, both draw on the same
+        `holds_total`. Installed components sit in subsystem slots and cost no hold.
+        """
+        used = sum(self.cargo.values())
+        if self.components:  # the common (no loose parts) path stays a single sum
+            used += sum(self.components.values())
+        return used
 
     @property
     def holds_free(self) -> int:

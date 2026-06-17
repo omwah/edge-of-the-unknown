@@ -21,13 +21,13 @@ economy:
   organics:  { base: 5,  delta: 2, elasticity: 1.0 }
   equipment: { base: 15, delta: 7, elasticity: 1.0 }
 
-  # The upgrade sink + the Phase-1 flat-aspect "first upgrade" (PHASE1_PLAN §2).
+  # The component sink: StarDock hardware prices by tier (§8). Tier III is
+  # barter-only (alien trade / salvage), so it has no latinum price.
   tier_i_component_latinum: 2000
   tier_ii_component_latinum: 8000
   repair_kit_latinum: 200
-  first_upgrade_latinum: 2000
-  first_upgrade_aspect: holds   # holds | shields
-  first_upgrade_amount: 20      # how much the bought aspect bumps
+  ship_trade_in_frac: 0.5   # credit toward a new hull when trading the old one in
+  repair_cost_frac: 0.25    # StarDock battle-damage repair, per tier price (Phase 3)
 
   # Banking + stock regeneration (engine cron applies; the math is pure).
   bank_interest_per_day: 0.005
@@ -121,3 +121,148 @@ starter_ship:
       keystone: accelerator
       base_components: [accelerator, linkage]
       legal_components: [accelerator, linkage, converter, secondary]
+
+# StarDock hardware emporium (§5, §8): which component kinds are stocked and at
+# which tiers. Prices come from the economy block; Tier III is barter-only and is
+# deliberately absent here.
+hardware:
+  components: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]
+  tiers: [I, II]
+
+# Buyable hulls beyond the free starter (§4 v1 set; price band ~20k–150k rising
+# with role, DESIGN §8). Each is an engine-room hull (the player ship is always
+# slotted): bigger roles get more slots (upgrade headroom) and richer base loadouts.
+# The flat aspect scalars are caps/fallbacks; live aspects derive from the slots.
+ship_classes:
+  - id: scout_marauder
+    name: Scout Marauder
+    role: fighter
+    holds_total: 30
+    turns_per_warp: 1
+    shields_max: 120
+    warp_speed: 4
+    combat_speed: 6
+    cloak_rating: 1
+    sensor_rating: 3
+    hull_max: 80
+    price: 20000
+    subsystems:
+      spindrive:
+        slot_count: 6
+        keystone: navigator
+        base_components: [navigator, turbine, accelerator, accelerator]
+        legal_components: [navigator, turbine, accelerator, converter, radiator]
+      thrusters:
+        slot_count: 6
+        keystone: burner
+        base_components: [burner, burner, burner]
+        legal_components: [burner, turbine, accelerator, radiator]
+      screens:
+        slot_count: 3
+        keystone: secondary
+        base_components: [secondary]
+        legal_components: [secondary, accelerator, converter, radiator]
+      main_gun:
+        slot_count: 5
+        keystone: accelerator
+        base_components: [accelerator, linkage]
+        legal_components: [accelerator, linkage, converter, secondary]
+  - id: missile_frigate
+    name: Missile Frigate
+    role: warship
+    holds_total: 50
+    turns_per_warp: 1
+    shields_max: 200
+    warp_speed: 3
+    combat_speed: 4
+    cloak_rating: 0
+    sensor_rating: 2
+    hull_max: 140
+    price: 50000
+    subsystems:
+      spindrive:
+        slot_count: 5
+        keystone: navigator
+        base_components: [navigator, turbine, accelerator]
+        legal_components: [navigator, turbine, accelerator, converter, radiator]
+      thrusters:
+        slot_count: 5
+        keystone: burner
+        base_components: [burner, burner]
+        legal_components: [burner, turbine, accelerator, radiator]
+      screens:
+        slot_count: 5
+        keystone: secondary
+        base_components: [secondary, accelerator, accelerator]
+        legal_components: [secondary, accelerator, converter, radiator]
+      main_gun:
+        slot_count: 6
+        keystone: accelerator
+        base_components: [accelerator, linkage, linkage]
+        legal_components: [accelerator, linkage, converter, secondary]
+  - id: battleship
+    name: BattleShip
+    role: capital_warship
+    holds_total: 80
+    turns_per_warp: 1
+    shields_max: 300
+    warp_speed: 3
+    combat_speed: 4
+    cloak_rating: 0
+    sensor_rating: 2
+    hull_max: 250
+    price: 100000
+    subsystems:
+      spindrive:
+        slot_count: 6
+        keystone: navigator
+        base_components: [navigator, turbine, accelerator]
+        legal_components: [navigator, turbine, accelerator, converter, radiator]
+      thrusters:
+        slot_count: 6
+        keystone: burner
+        base_components: [burner, burner]
+        legal_components: [burner, turbine, accelerator, radiator]
+      screens:
+        slot_count: 6
+        keystone: secondary
+        base_components: [secondary, accelerator, accelerator, accelerator]
+        legal_components: [secondary, accelerator, converter, radiator]
+      main_gun:
+        slot_count: 7
+        keystone: accelerator
+        base_components: [accelerator, linkage, accelerator]
+        legal_components: [accelerator, linkage, converter, secondary]
+  - id: imperial_starship
+    name: Imperial StarShip
+    role: capital_warship
+    holds_total: 120
+    turns_per_warp: 1
+    shields_max: 400
+    warp_speed: 4
+    combat_speed: 6
+    cloak_rating: 0
+    sensor_rating: 3
+    hull_max: 350
+    price: 150000
+    subsystems:
+      spindrive:
+        slot_count: 7
+        keystone: navigator
+        base_components: [navigator, turbine, accelerator, accelerator]
+        legal_components: [navigator, turbine, accelerator, converter, radiator]
+      thrusters:
+        slot_count: 6
+        keystone: burner
+        base_components: [burner, burner, burner]
+        legal_components: [burner, turbine, accelerator, radiator]
+      screens:
+        slot_count: 7
+        keystone: secondary
+        base_components: [secondary, accelerator, accelerator, accelerator, accelerator]
+        legal_components: [secondary, accelerator, converter, radiator]
+      main_gun:
+        slot_count: 8
+        keystone: accelerator
+        base_components: [accelerator, linkage, accelerator, linkage]
+        legal_components: [accelerator, linkage, converter, secondary]

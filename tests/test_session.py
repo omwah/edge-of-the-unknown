@@ -80,6 +80,24 @@ def test_engine_room_view_handles_a_flat_hull() -> None:
     assert er.subsystems == []
 
 
+def test_stardock_view_lists_hardware_and_shipyard() -> None:
+    world = _world()
+    # Put a StarDock under the player and give them real buying power.
+    world.ports[2] = _port(2, 2, PortClass.STARDOCK)
+    world.players[1] = Player(1, "you", 1, 60_000, turns_remaining=250,
+                              explored_sectors=frozenset({1, 2, 3}))
+    sv = session.stardock_view(world, 1, CONFIG)
+    # Hardware: Tier I + II only (III is barter-only and absent).
+    assert sv.hardware and {h.tier for h in sv.hardware} == {"I", "II"}
+    assert all(h.price > 0 for h in sv.hardware)
+    # Shipyard: every buyable hull, with the trailblazer flagged owned nowhere
+    # (the player flies it but it isn't in ship_classes) and net price ≤ price.
+    ids = {s.class_id for s in sv.shipyard}
+    assert "scout_marauder" in ids
+    scout = next(s for s in sv.shipyard if s.class_id == "scout_marauder")
+    assert scout.affordable and scout.net_price == scout.price  # free starter → no trade-in
+
+
 def test_computer_view_finds_profitable_pair() -> None:
     cv = session.computer_view(_world(), 1, CONFIG)
     assert cv.pairs  # at least one opposed pair among discovered ports
@@ -201,7 +219,6 @@ def test_format_event_covers_kinds_and_filters_noise() -> None:
         StockRegenerated,
         Traded,
         TurnsReset,
-        Upgraded,
         Warped,
     )
 
@@ -210,10 +227,17 @@ def test_format_event_covers_kinds_and_filters_noise() -> None:
     assert "Bought" in session.format_event(Traded(1, 3, Commodity.FUEL_ORE, PortMode.SELL, 5, 13, 65))
     assert "Sold" in session.format_event(Traded(1, 3, Commodity.FUEL_ORE, PortMode.BUY, 5, 13, 65))
     assert "Haggle" in session.format_event(Haggled(1, 3, Commodity.ORGANICS, "rejected", None))
-    assert session.format_event(Upgraded(1, "holds", 2_000))
     assert session.format_event(Banked(1, "deposit", 500, 500))
     assert session.format_event(TurnsReset(1, 250))
-    from edge.core.events import ComponentInstalled, ComponentRemoved, Repaired
+    from edge.core.events import (
+        ComponentInstalled,
+        ComponentPurchased,
+        ComponentRemoved,
+        Repaired,
+        ShipPurchased,
+    )
+    assert "Bought" in session.format_event(ComponentPurchased(1, "turbine", "II", 8_000))
+    assert "Acquired" in session.format_event(ShipPurchased(1, "scout_marauder", 20_000, 0))
     assert "Installed" in session.format_event(ComponentInstalled(1, "spindrive", 3, "turbine", "II"))
     assert "Removed" in session.format_event(ComponentRemoved(1, "main_gun", 2, "linkage", "I"))
     assert "patched" in session.format_event(Repaired(1, "thrusters", 1))

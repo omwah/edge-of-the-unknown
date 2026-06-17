@@ -63,10 +63,19 @@ class Banked(Event):
 
 
 @dataclass(frozen=True)
-class Upgraded(Event):
+class ComponentPurchased(Event):
     player_id: int
-    aspect: str
+    component: str  # Component value
+    tier: str  # ComponentTier name
     cost: int
+
+
+@dataclass(frozen=True)
+class ShipPurchased(Event):
+    player_id: int
+    ship_class_id: str
+    cost: int  # net latinum spent (price − trade-in credit)
+    trade_in: int  # trade-in credit applied
 
 
 @dataclass(frozen=True)

@@ -15,19 +15,20 @@ from edge.bigbang.topology import bfs_distances
 from edge.core import dto
 from edge.core.config import GameConfig
 from edge.core.economy import port_unit_price
-from edge.core.engine_room import derive_aspects
-from edge.core.enums import Commodity, PortClass, PortMode, Subsystem
+from edge.core.engine_room import build_subsystems, derive_aspects
+from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
 from edge.core.events import (
     Banked,
     ComponentInstalled,
+    ComponentPurchased,
     ComponentRemoved,
     Docked,
     Event,
     Haggled,
     Repaired,
+    ShipPurchased,
     TurnsReset,
     Traded,
-    Upgraded,
     Warped,
 )
 from edge.core.models import Player, Port, Sector, Ship, SubsystemState, UniverseState
@@ -216,6 +217,50 @@ def engine_room_view(state: UniverseState, player_id: int, config: GameConfig) -
     )
 
 
+def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.StarDockDTO:
+    """The StarDock hardware + shipyard catalogs for the docked player (§8, §11).
+
+    Hardware prices come from the economy block; the shipyard shows each hull's
+    derived stats and its trade-in-adjusted net price against the player's current
+    hull, flagging what is affordable and which hull is already flown.
+    """
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    econ = config.economy
+
+    hardware: list[dto.HardwareItem] = []
+    for cname in config.hardware.components:
+        for tname in config.hardware.tiers:
+            price = econ.component_price(ComponentTier[tname])
+            if price is None:  # tier III isn't stocked for latinum
+                continue
+            hardware.append(dto.HardwareItem(
+                component=Component(cname).value, tier=tname, price=price,
+                affordable=player.latinum >= price and ship.holds_free >= 1,
+            ))
+
+    trade_in = round(config.ship_class(ship.type_id).price * econ.ship_trade_in_frac)
+    shipyard: list[dto.ShipyardItem] = []
+    for klass in config.ship_classes:
+        a = derive_aspects(Ship(
+            id=0, type_id=klass.id, name=klass.name, owner_player_id=None, sector_id=0,
+            holds_total=klass.holds_total, shields=klass.shields_max, warp_speed=klass.warp_speed,
+            combat_speed=klass.combat_speed, turns_per_warp=klass.turns_per_warp,
+            subsystems=build_subsystems(klass),
+        ), config)
+        net = klass.price - trade_in
+        shipyard.append(dto.ShipyardItem(
+            class_id=klass.id, name=klass.name, role=klass.role, price=klass.price,
+            net_price=net, holds=klass.holds_total, shields=a.shields, warp=a.warp_speed,
+            combat=a.combat_speed, affordable=player.latinum >= net, owned=klass.id == ship.type_id,
+        ))
+
+    return dto.StarDockDTO(
+        sector_display=_display(state, ship.sector_id),
+        latinum=player.latinum, hardware=hardware, shipyard=shipyard,
+    )
+
+
 def _ordered_bands(present: set[str]) -> list[str]:
     ranked = [b for b in _BAND_ORDER if b in present]
     return ranked + sorted(present - set(ranked))
@@ -281,8 +326,11 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
     if isinstance(event, Haggled):
         price = "—" if event.price is None else event.price
         return f"Haggle {event.status} @ {price}"
-    if isinstance(event, Upgraded):
-        return f"[green]Upgraded {event.aspect}[/]  (-{event.cost} slips)"
+    if isinstance(event, ComponentPurchased):
+        return f"[green]Bought {event.component} ({event.tier})[/]  (-{event.cost} slips)"
+    if isinstance(event, ShipPurchased):
+        credit = f" (trade-in +{event.trade_in})" if event.trade_in else ""
+        return f"[green]Acquired {event.ship_class_id}[/]  (-{event.cost} slips){credit}"
     if isinstance(event, ComponentInstalled):
         return f"[green]Installed {event.component} ({event.tier})[/] in {event.subsystem}"
     if isinstance(event, ComponentRemoved):

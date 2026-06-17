@@ -208,6 +208,43 @@ class EngineRoomDTO:
 
 
 @dataclass(frozen=True)
+class HardwareItem:
+    """One row in the StarDock hardware emporium (UI_MOCKUPS.md §5, DESIGN §8)."""
+
+    component: str
+    tier: str
+    price: int  # latinum
+    affordable: bool
+
+
+@dataclass(frozen=True)
+class ShipyardItem:
+    """One buyable hull in the StarDock shipyard, with a stat line (§8, §11)."""
+
+    class_id: str
+    name: str
+    role: str
+    price: int
+    net_price: int  # price after the current hull's trade-in credit
+    holds: int
+    shields: int
+    warp: int
+    combat: int
+    affordable: bool
+    owned: bool  # the hull the player currently flies
+
+
+@dataclass(frozen=True)
+class StarDockDTO:
+    """The StarDock services catalog (hardware + shipyard), fog-of-war scoped (§3)."""
+
+    sector_display: int
+    latinum: int
+    hardware: list[HardwareItem]
+    shipyard: list[ShipyardItem]
+
+
+@dataclass(frozen=True)
 class GameState:
     """The game-screen view bundle (the public counterpart of `UniverseState`)."""
 

@@ -6,8 +6,9 @@ import pytest
 
 from edge.config import load_default_config
 from edge.core.economy import EconomyError
-from edge.core.enums import Commodity, PortClass, PortMode
-from edge.core.events import Banked, Docked, Traded, Upgraded, Warped
+from edge.core.engine_room import EngineRoomError, build_subsystems
+from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
+from edge.core.events import Banked, ComponentPurchased, Docked, ShipPurchased, Traded, Warped
 from edge.core.models import (
     Game,
     Player,
@@ -18,10 +19,13 @@ from edge.core.models import (
 )
 from edge.core.movement import MovementError
 from edge.core.rules import (
-    BuyUpgrade,
+    BuyComponent,
+    BuyShip,
     Deposit,
     Dock,
     HaggleOffer,
+    InstallComponent,
+    RepairAtDock,
     Trade,
     TravelTo,
     Warp,
@@ -188,13 +192,121 @@ def test_trade_buy_moves_goods_and_burns_latinum() -> None:
     assert state.players[1].latinum == before - traded.total
 
 
-def test_buy_upgrade_at_stardock_bumps_holds() -> None:
+def _with_engine_room(state: UniverseState) -> None:
+    """Give the docked ship the starter engine room (so install/derive applies)."""
+    from dataclasses import replace
+
+    from edge.core.engine_room import apply_derived
+    sc = CONFIG.starter_ship
+    ship = replace(state.ships[1], type_id=sc.id, subsystems=build_subsystems(sc))
+    state.ships[1] = apply_derived(ship, CONFIG)
+
+
+def test_buy_component_costs_latinum_and_fills_a_hold() -> None:
     state = _universe()
-    holds0 = state.ships[1].holds_total
-    result = _do(state, BuyUpgrade())
-    assert isinstance(result.events[0], Upgraded)  # type: ignore[attr-defined]
-    assert state.ships[1].holds_total == holds0 + CONFIG.economy.first_upgrade_amount
-    assert state.players[1].latinum == 10_000 - CONFIG.economy.first_upgrade_latinum
+    result = _do(state, BuyComponent(Component.TURBINE, ComponentTier.I))
+    assert isinstance(result.events[0], ComponentPurchased)  # type: ignore[attr-defined]
+    ship = state.ships[1]
+    assert ship.components[(Component.TURBINE, ComponentTier.I)] == 1
+    assert state.players[1].latinum == 10_000 - CONFIG.economy.tier_i_component_latinum
+
+
+def test_buy_component_then_install_raises_derived_aspect() -> None:
+    state = _universe()
+    _with_engine_room(state)
+    warp0 = state.ships[1].warp_speed
+    _do(state, BuyComponent(Component.ACCELERATOR, ComponentTier.I))
+    empty = state.ships[1].subsystems[Subsystem.SPINDRIVE].slots.index(None)  # type: ignore[index,union-attr]
+    _do(state, InstallComponent(Subsystem.SPINDRIVE, empty, Component.ACCELERATOR, ComponentTier.I))
+    assert state.ships[1].warp_speed == warp0 + 1  # the new part lifts warp speed
+
+
+def test_buy_tier_iii_component_rejected() -> None:
+    with pytest.raises(EconomyError):
+        _do(_universe(), BuyComponent(Component.TURBINE, ComponentTier.III))
+
+
+def test_buy_ship_swaps_hull_and_carries_cargo() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.players[1] = replace(state.players[1], latinum=50_000)  # afford the hull
+    state.ships[1] = replace(state.ships[1], cargo={Commodity.FUEL_ORE: 5})
+    result = _do(state, BuyShip("scout_marauder"))
+    assert isinstance(result.events[0], ShipPurchased)  # type: ignore[attr-defined]
+    ship = state.ships[1]
+    assert ship.type_id == "scout_marauder"
+    assert ship.holds_total == CONFIG.ship_class("scout_marauder").holds_total
+    assert ship.cargo[Commodity.FUEL_ORE] == 5  # cargo migrated
+    assert ship.subsystems is not None  # arrives with the new hull's engine room
+    assert state.players[1].latinum == 50_000 - 20_000  # net cost (free starter → 0 trade-in)
+
+
+def test_buy_ship_refused_when_cargo_exceeds_new_holds() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    # Scout Marauder holds only 30; load 40 cargo so the swap can't fit.
+    state.ships[1] = replace(state.ships[1], cargo={Commodity.FUEL_ORE: 40})
+    with pytest.raises(EconomyError):
+        _do(state, BuyShip("scout_marauder"))
+
+
+def test_buy_ship_requires_stardock() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ports[1] = replace(state.ports[1], klass=PortClass.CLASS_1)
+    with pytest.raises(EconomyError):
+        _do(state, BuyShip("scout_marauder"))
+
+
+def test_buy_ship_rejects_current_hull_and_unknown() -> None:
+    state = _universe()
+    with pytest.raises(EconomyError):
+        _do(state, BuyShip("trailblazer"))  # already flown (the free starter)
+    with pytest.raises(EconomyError):
+        _do(state, BuyShip("nonesuch"))
+
+
+def test_buy_component_needs_latinum_and_a_free_hold() -> None:
+    from dataclasses import replace
+
+    poor = _universe()
+    poor.players[1] = replace(poor.players[1], latinum=10)
+    with pytest.raises(EconomyError):
+        _do(poor, BuyComponent(Component.TURBINE, ComponentTier.I))
+
+    full = _universe()
+    full.ships[1] = replace(full.ships[1], cargo={Commodity.FUEL_ORE: full.ships[1].holds_total})
+    with pytest.raises(EconomyError):
+        _do(full, BuyComponent(Component.TURBINE, ComponentTier.I))
+
+
+def test_repair_at_dock_restores_knocked_out_for_latinum() -> None:
+    from dataclasses import replace
+
+    from edge.core.engine_room import apply_derived
+
+    state = _universe()
+    _with_engine_room(state)
+    sub = state.ships[1].subsystems[Subsystem.THRUSTERS]  # type: ignore[index]
+    slots = list(sub.slots)
+    slots[1] = replace(slots[1], knocked_out=True)  # type: ignore[arg-type]
+    subsystems = {**state.ships[1].subsystems, Subsystem.THRUSTERS: replace(sub, slots=tuple(slots))}  # type: ignore[dict-item]
+    state.ships[1] = apply_derived(replace(state.ships[1], subsystems=subsystems), CONFIG)
+    combat_damaged = state.ships[1].combat_speed
+    lat0 = state.players[1].latinum
+    _do(state, RepairAtDock(Subsystem.THRUSTERS, 1))
+    assert state.ships[1].combat_speed > combat_damaged  # restored
+    assert state.players[1].latinum < lat0  # paid for the repair
+
+
+def test_repair_at_dock_rejected_when_nothing_damaged() -> None:
+    state = _universe()
+    _with_engine_room(state)
+    with pytest.raises(EngineRoomError):
+        _do(state, RepairAtDock(Subsystem.THRUSTERS, 0))
 
 
 def test_bank_deposit_then_withdraw() -> None:
@@ -216,27 +328,18 @@ def test_haggle_is_deterministic_from_seed() -> None:
     assert [type(e) for e in ra.events] == [type(e) for e in rb.events]
 
 
-def test_upgrade_requires_stardock() -> None:
+def test_buy_component_requires_stardock() -> None:
     state = _universe()
     from dataclasses import replace
 
     state.ports[1] = replace(state.ports[1], klass=PortClass.CLASS_1)
     with pytest.raises(EconomyError):
-        reduce(state, 1, BuyUpgrade(), CONFIG)
+        reduce(state, 1, BuyComponent(Component.TURBINE, ComponentTier.I), CONFIG)
 
 
 def test_unknown_player_rejected() -> None:
     with pytest.raises(MovementError):
         reduce(_universe(), 99, Dock(), CONFIG)
-
-
-def test_unknown_upgrade_aspect_rejected() -> None:
-    state = _universe()  # player is at the StarDock in sector 2
-    bad = CONFIG.model_copy(
-        update={"economy": CONFIG.economy.model_copy(update={"first_upgrade_aspect": "warp"})}
-    )
-    with pytest.raises(EconomyError):
-        reduce(state, 1, BuyUpgrade(), bad)
 
 
 def test_dock_and_trade_require_a_port() -> None:

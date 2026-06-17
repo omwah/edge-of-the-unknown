@@ -24,7 +24,16 @@ def test_default_economy_values() -> None:
     assert (econ.equipment.base, econ.equipment.delta) == (15, 7)
     assert econ.floor_frac == 0.25
     assert econ.starting_latinum == 2_000
-    assert econ.first_upgrade_aspect in {"holds", "shields"}
+    assert econ.tier_i_component_latinum == 2_000
+
+
+def test_default_ship_classes_and_hardware() -> None:
+    cfg = load_default_config()
+    ids = {s.id for s in cfg.ship_classes}
+    assert {"scout_marauder", "missile_frigate", "battleship", "imperial_starship"} <= ids
+    assert all(s.price > 0 for s in cfg.ship_classes)  # buyable hulls are priced
+    assert cfg.hardware.components and cfg.hardware.tiers == ["I", "II"]  # III is barter-only
+    assert cfg.ship_class("scout_marauder").subsystems is not None
 
 
 def test_default_bigbang_and_ship() -> None:
