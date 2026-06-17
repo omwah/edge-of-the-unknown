@@ -81,18 +81,25 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
         )
         did += 1
 
-    for pid in sorted(state.planets):  # surface sites (descent reveals them in WP6)
+    for pid in sorted(state.planets):  # surface sites (descent + Explore reveal them, WP6)
         planet = state.planets[pid]
         if rng.random() >= dcfg.surface_site_chance:
             continue
-        tier = _roll_tier(dcfg, state.sectors[planet.sector_id].distance_band, rng)
-        if tier is None:
-            continue
-        kind = _roll_kind(dcfg.surface_kinds, rng)
-        discoveries[did] = Discovery(
-            id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
-            payload=_make_payload(kind, tier, dcfg, rng), planet_id=pid, site_slot=0,
-        )
-        did += 1
+        band = state.sectors[planet.sector_id].distance_band
+        n_sites = rng.randint(1, max(1, dcfg.surface_sites_max))
+        for slot in range(n_sites):
+            tier = _roll_tier(dcfg, band, rng)
+            if tier is None:
+                continue
+            kind = _roll_kind(dcfg.surface_kinds, rng)
+            # Rare+ surface sites are sensor-gated — descent reveals the slot, but a
+            # sensor sweep (Explore with enough sensor rating) identifies them.
+            hidden = tier.value >= dcfg.surface_hidden_min_rank
+            discoveries[did] = Discovery(
+                id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
+                payload=_make_payload(kind, tier, dcfg, rng), planet_id=pid, site_slot=slot,
+                hidden=hidden,
+            )
+            did += 1
 
     state.discoveries = discoveries

@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from edge.bigbang.topology import bfs_distances
 from edge.core import dto
 from edge.core.config import GameConfig
+from edge.core.discovery import is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import build_subsystems, derive_aspects
 from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
@@ -25,9 +26,11 @@ from edge.core.events import (
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
+    Descended,
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
+    SiteExplored,
     Event,
     Haggled,
     PlanetProduced,
@@ -341,6 +344,71 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     )
 
 
+_SITE_NAME = {
+    "ruins": "Ruins", "artifact": "Artifact Cache", "ancient_tech": "Ancient Tech",
+    "crashed_ship": "Crashed Ship",
+}
+
+
+def _payload_lines(payload: object) -> list[str]:
+    """Human-readable detail lines for a revealed site's payload (§7)."""
+    from edge.core.enums import PayloadKind
+    from edge.core.models import DiscoveryPayload
+
+    assert isinstance(payload, DiscoveryPayload)
+    if payload.kind is PayloadKind.COMPONENT and payload.component is not None and payload.tier is not None:
+        return [f"component: {payload.component.value} (Tier {payload.tier.name})"]
+    if payload.kind is PayloadKind.LATINUM:
+        return [f"{payload.latinum:,} latinum"]
+    if payload.kind is PayloadKind.ARTIFACT and payload.barter_tier is not None:
+        return [f"artifact — barter ≈ Tier {payload.barter_tier}"]
+    return [payload.lore or "a fragment of lore"]
+
+
+def surface_view(state: UniverseState, player_id: int, planet_id: int, config: GameConfig) -> dto.SurfaceDTO:
+    """The descended-planet view: terrain + surface sites with explore/log state (§7, WP6)."""
+    planet = state.planets[planet_id]
+    ship = state.ships[state.players[player_id].ship_id]
+    detected = state.players[player_id].detected
+    sites_src = sorted(
+        (d for d in state.discoveries.values() if d.planet_id == planet_id),
+        key=lambda d: d.site_slot,
+    )
+    sites: list[dto.SurfaceSite] = []
+    explorable = False
+    for site in sites_src:
+        explored = site.id in detected
+        collected = site.found_by is not None
+        masked = site.hidden and not explored  # an unsurveyed hidden site stays unknown
+        if not (explored or collected) and is_detectable(site, ship.sensor_rating, in_nebula=False, config=config):
+            explorable = True
+        marker = "[?]" if masked else f"[{site.site_slot + 1}]"
+        status = "logged" if collected else ("explored" if explored else "unexplored")
+        if collected:
+            payload = ["[dim]logged to codex[/]"]
+        elif explored:
+            payload = _payload_lines(site.payload)
+        elif masked:
+            payload = ["[dim]needs a sensor sweep[/]"]
+        else:
+            payload = ["[dim]survey to reveal[/]"]
+        sites.append(dto.SurfaceSite(
+            marker=marker,
+            name="(unsurveyed)" if masked else _SITE_NAME.get(site.kind.value, site.kind.value),
+            rarity="?" if masked else site.rarity_tier.name.capitalize(),
+            status=status, payload=payload, discovery_id=site.id,
+            salvageable=explored and not collected,
+        ))
+    terrain = [
+        f"[dim]surface scan — {planet.planet_type}[/]",
+        "  " + "   ".join(s.marker for s in sites) if sites else "  [dim](no sites detected)[/]",
+    ]
+    return dto.SurfaceDTO(
+        planet=planet.name, descent_fuel="n/a", terrain=terrain, sites=sites,
+        planet_id=planet_id, explorable=explorable,
+    )
+
+
 def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.StarDockDTO:
     """The StarDock hardware + shipyard catalogs for the docked player (§8, §11).
 
@@ -463,6 +531,10 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
         return f"[green]Field-patched {event.subsystem} slot {event.slot_index}[/]"
     if isinstance(event, StarbaseSalvaged):
         return f"[green]Salvaged {event.component} ({event.tier})[/] from a derelict starbase"
+    if isinstance(event, Descended):
+        return "[magenta]▼ Descended to the surface.[/]"
+    if isinstance(event, SiteExplored):
+        return f"[cyan]✦ Site surveyed: {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
     if isinstance(event, DiscoveryDetected):
         return f"[cyan]✦ Sensors: {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
     if isinstance(event, DiscoveryCollected):

@@ -135,6 +135,10 @@ class GameService:
             return None
         return session.planet_view(self._state, player_id, planet.id, self._config)
 
+    def surface_view(self, player_id: int, planet_id: int) -> dto.SurfaceDTO:
+        """The descended-planet surface view: terrain + sites (§7, WP6)."""
+        return session.surface_view(self._state, player_id, planet_id, self._config)
+
     def messages_view(self, player_id: int) -> dto.MessagesDTO:
         """The durable event log + opening signpost, newest first (§11, §12)."""
         return session.messages_view(self._state, self._repo.load_events())

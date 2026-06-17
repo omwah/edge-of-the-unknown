@@ -10,7 +10,7 @@ from edge.bigbang.generator import generate
 from edge.config import load_default_config
 from edge.core.discovery import is_detectable, rarity_value
 from edge.core.enums import PayloadKind, RarityTier
-from edge.core.rules import Salvage, Warp, apply_result, reduce
+from edge.core.rules import Descend, Explore, Salvage, Warp, apply_result, reduce
 
 CONFIG = load_default_config().model_copy(
     update={"bigbang": load_default_config().bigbang.model_copy(update={"sector_count": 120})}
@@ -161,3 +161,90 @@ def test_double_salvage_rejected() -> None:
     with pytest.raises(Exception):
         reduce(state, 1, Salvage(discovery_id=disc.id), CONFIG)  # already collected
     assert state.players[1].codex == codex_after_first  # codex unchanged (idempotent)
+
+
+# --- WP6: planet descent & surface-site exploration -------------------------
+
+
+def _planet_with_sites(min_sites: int = 2) -> tuple[object, int]:
+    """First (state, planet_id) over seeds whose planet carries ≥ min_sites surface sites."""
+    from collections import Counter
+
+    for seed in range(40):
+        state = generate(CONFIG, seed)  # type: ignore[arg-type]
+        counts = Counter(d.planet_id for d in state.discoveries.values() if d.planet_id is not None)
+        hit = next((pid for pid, n in counts.items() if n >= min_sites), None)
+        if hit is not None:
+            return state, hit
+    raise AssertionError("no planet with enough surface sites found")
+
+
+def _sites(state: object, pid: int) -> list[object]:
+    return sorted((d for d in state.discoveries.values() if d.planet_id == pid),  # type: ignore[attr-defined]
+                  key=lambda d: d.site_slot)
+
+
+def test_descend_costs_turns() -> None:
+    state, pid = _planet_with_sites()
+    state.ships[1] = replace(state.ships[1], sector_id=state.planets[pid].sector_id)  # type: ignore[attr-defined]
+    before = state.players[1].turns_remaining  # type: ignore[attr-defined]
+    _do(state, Descend(planet_id=pid))
+    assert state.players[1].turns_remaining == before - CONFIG.discovery.descent_turn_cost  # type: ignore[union-attr]
+
+
+def test_explore_reveals_sites_one_at_a_time_then_log() -> None:
+    state, pid = _planet_with_sites()
+    state.ships[1] = replace(state.ships[1], sector_id=state.planets[pid].sector_id, sensor_rating=9)  # type: ignore[attr-defined]
+    sites = _sites(state, pid)
+    assert all(s.id not in state.players[1].detected for s in sites)  # nothing surveyed yet
+
+    revealed = 0
+    for _ in sites:  # each Explore reveals exactly one more (sensors clear all here)
+        _do(state, Explore(planet_id=pid))
+        now = sum(1 for s in sites if s.id in state.players[1].detected)
+        assert now == revealed + 1
+        revealed = now
+    with pytest.raises(Exception):  # nothing left to survey
+        reduce(state, 1, Explore(planet_id=pid), CONFIG)
+
+    first = sites[0]
+    _do(state, Salvage(discovery_id=first.id))
+    assert first.id in state.players[1].codex and state.discoveries[first.id].found_by == 1
+
+
+def test_salvage_unexplored_surface_site_rejected() -> None:
+    state, pid = _planet_with_sites(min_sites=1)
+    state.ships[1] = replace(state.ships[1], sector_id=state.planets[pid].sector_id, sensor_rating=9)  # type: ignore[attr-defined]
+    site = _sites(state, pid)[0]
+    with pytest.raises(Exception):  # must Explore before you can log it
+        reduce(state, 1, Salvage(discovery_id=site.id), CONFIG)
+
+
+def test_explore_sensor_gates_hidden_surface_sites() -> None:
+    """At weak sensors the obvious sites survey but Rare+ sites stay unresolved (§7)."""
+    from collections import defaultdict
+
+    state = pid = None  # type: ignore[assignment]
+    for seed in range(60):
+        st = generate(CONFIG, seed)  # type: ignore[arg-type]
+        by_planet: dict[int, list[object]] = defaultdict(list)
+        for d in st.discoveries.values():
+            if d.planet_id is not None:
+                by_planet[d.planet_id].append(d)
+        hit = next((p for p, ds in by_planet.items()
+                    if any(d.hidden for d in ds) and any(not d.hidden for d in ds)), None)
+        if hit is not None:
+            state, pid = st, hit
+            break
+    assert state is not None and pid is not None
+
+    state.ships[1] = replace(state.ships[1], sector_id=state.planets[pid].sector_id, sensor_rating=1)
+    sites = _sites(state, pid)
+    obvious = [d for d in sites if not d.hidden]
+    hidden = [d for d in sites if d.hidden]
+    for _ in obvious:  # weak sensors still resolve every obvious site
+        _do(state, Explore(planet_id=pid))
+    assert all(o.id in state.players[1].detected for o in obvious)
+    assert all(h.id not in state.players[1].detected for h in hidden)  # Rare+ stay hidden
+    with pytest.raises(Exception):  # sensors too weak for what remains
+        reduce(state, 1, Explore(planet_id=pid), CONFIG)

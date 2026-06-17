@@ -1,9 +1,9 @@
-"""SurfaceScreen — planet descent & site exploration (UI_MOCKUPS.md §4).
+"""SurfaceScreen — planet descent & site exploration, wired to the live service (§7, WP6).
 
-Phase-2 screen, stubbed here so PlanetScreen's Descend action has somewhere to
-go. A top-down terrain panel sits beside a detail panel for the highlighted
-site; the site list below drives the detail via row highlighting. Explore,
-sensor sweep, and codex logging are stubbed.
+A top-down terrain panel sits beside a detail panel for the highlighted site; the
+site list below drives the detail via row highlighting. `E` surveys the next site
+(sensor-gated for Rare+ sites), `L` logs the highlighted revealed site to the codex,
+`Esc` ascends to orbit. With no service (screenshot harness) it shows a static sample.
 """
 
 from __future__ import annotations
@@ -14,15 +14,19 @@ from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static
 
-from edge.tui.dummy import SurfaceDTO, SurfaceSite
+from edge.core.economy import EconomyError
+from edge.core.dto import SurfaceDTO, SurfaceSite
+from edge.core.engine_room import EngineRoomError
+from edge.core.movement import MovementError
+from edge.core.rules import Explore, Salvage
+from edge.server.service import GameService
 
 
 class SurfaceScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Ascend to orbit"),
-        Binding("e", "noop", "Explore"),
-        Binding("s", "noop", "Sensor sweep"),
-        Binding("l", "noop", "Log to codex"),
+        Binding("e", "explore", "Survey site"),
+        Binding("l", "log", "Log to codex"),
     ]
 
     CSS = """
@@ -41,9 +45,11 @@ class SurfaceScreen(Screen):
     SurfaceScreen #sites { height: auto; max-height: 8; margin: 0 1; }
     """
 
-    def __init__(self, surface: SurfaceDTO) -> None:
+    def __init__(self, surface: SurfaceDTO, service: GameService | None = None, pid: int = 1) -> None:
         super().__init__()
         self._surface = surface
+        self._service = service
+        self._pid = pid
 
     def compose(self) -> ComposeResult:
         s = self._surface
@@ -77,16 +83,58 @@ class SurfaceScreen(Screen):
             f"rarity  {site.rarity}",
             f"status  {site.status}",
             "",
-            "Payload (on explore)",
+            "Payload" + ("" if site.status == "logged" else " (on log)"),
             *[f"  - {line}" for line in site.payload],
         ]
+        if site.salvageable:
+            lines += ["", "[green]\\[L][/] log to codex"]
         detail.update("\n".join(lines))
 
     def on_data_table_row_highlighted(self, msg: DataTable.RowHighlighted) -> None:
-        self._show_site(self._surface.sites[msg.cursor_row])
+        if 0 <= msg.cursor_row < len(self._surface.sites):
+            self._show_site(self._surface.sites[msg.cursor_row])
+
+    def _highlighted(self) -> SurfaceSite | None:
+        row = self.query_one("#sites", DataTable).cursor_row
+        if 0 <= row < len(self._surface.sites):
+            return self._surface.sites[row]
+        return None
+
+    def action_explore(self) -> None:
+        if self._service is None:
+            self.notify("Not wired in the skeleton.", timeout=2)
+            return
+        try:
+            self._service.apply(self._pid, Explore(planet_id=self._surface.planet_id))
+        except (EconomyError, MovementError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify("Site surveyed.", timeout=2)
+        self._reload()
+
+    def action_log(self) -> None:
+        if self._service is None:
+            self.notify("Not wired in the skeleton.", timeout=2)
+            return
+        site = self._highlighted()
+        if site is None or not site.salvageable:
+            self.notify("Survey a site first, then log it.", timeout=2)
+            return
+        try:
+            self._service.apply(self._pid, Salvage(discovery_id=site.discovery_id))
+        except (EconomyError, EngineRoomError, MovementError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify(f"Logged {site.name} to the codex.", timeout=2)
+        self._reload()
+
+    def _reload(self) -> None:
+        """Re-open the screen on a fresh surface view after a survey/log."""
+        assert self._service is not None
+        self.app.pop_screen()
+        self.app.push_screen(
+            SurfaceScreen(self._service.surface_view(self._pid, self._surface.planet_id),
+                          self._service, self._pid))
 
     def action_back(self) -> None:
         self.app.pop_screen()
-
-    def action_noop(self) -> None:
-        self.notify("Not wired in the skeleton.", timeout=2)

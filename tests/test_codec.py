@@ -15,9 +15,11 @@ from edge.core.events import (
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
+    Descended,
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
+    SiteExplored,
     Event,
     Haggled,
     PlanetProduced,
@@ -36,7 +38,9 @@ from edge.core.rules import (
     Colonize,
     Command,
     Deposit,
+    Descend,
     Dock,
+    Explore,
     FieldPatch,
     HaggleOffer,
     InstallComponent,
@@ -74,6 +78,8 @@ COMMANDS: list[Command] = [
     Cannibalize(Subsystem.FUSION_REACTOR, 0, starbase_id=4),  # WP4 starbase salvage
     FieldPatch(Subsystem.THRUSTERS, 0),
     Salvage(discovery_id=7),      # WP5 log a discovery to the codex
+    Descend(planet_id=5),         # WP6 descend to a planet surface
+    Explore(planet_id=5),         # WP6 survey the next surface site
 ]
 
 EVENTS: list[Event] = [
@@ -94,6 +100,8 @@ EVENTS: list[Event] = [
     StarbaseSalvaged(1, 4, "fusion_reactor", 0, "converter", "I"),
     DiscoveryDetected(1, 7, "wreck", "RARE"),
     DiscoveryCollected(1, 7, "wreck", "RARE", "artifact"),
+    Descended(1, 5),
+    SiteExplored(1, 5, 9, "ruins", "RARE"),
     TurnsReset(1, 250),
     StockRegenerated(3, Commodity.EQUIPMENT, 480),
 ]
