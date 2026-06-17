@@ -104,6 +104,16 @@ class Repaired(Event):
 
 
 @dataclass(frozen=True)
+class DiscoveryDetected(Event):
+    """A hidden discovery a ship's sensors picked out on entering its sector (§7, WP5)."""
+
+    player_id: int
+    discovery_id: int
+    kind: str  # DiscoveryKind value
+    rarity: str  # RarityTier name
+
+
+@dataclass(frozen=True)
 class DiscoveryCollected(Event):
     """A discovery logged into the codex, its payload taken aboard (§7, WP5)."""
 
