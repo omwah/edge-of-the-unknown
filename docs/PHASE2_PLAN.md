@@ -603,6 +603,67 @@ fixture); codex/dossier projections reflect collected finds / met species.
 
 ---
 
+## WP12 — Durable engine maintenance (cron effects survive reload)
+
+A persistence-correctness gap the rest of the plan silently depends on. State is
+reconstructed as **`generate(seed) + replay(command log)`** (snapshots.py:69
+`rebuild`), but the engine ticker's cron effects do **not** flow through that
+path. `EngineTicker.step` (ticker.py:59) applies each due cron via
+`GameService.apply_maintenance` (service.py:62), which mutates live state and
+appends the cron's *events* to the `event_log` — and the event log is **not** a
+rebuild input. So on reload every cron-driven mutation is lost: port stock regen,
+daily interest accrual, the daily turn reset, and (new in WP3) `planet_growth`
+production/colony growth all rewind to their command-only values. The schedule is
+lost too — the tick counter and each cron's `next_due` (ticker.py:45–51) live only
+in the ticker instance, and `Game.day_number` is written to `meta` once at
+`new_game` (service.py:38) and never re-saved — so a reloaded game restarts the
+cron clock at tick 0, violating the §9/§12 promise that "a reloaded save never
+double-runs or skips a tick." `export_save` (snapshots.py:82) inherits the same
+gap, so portable saves are affected identically.
+
+This blocks nothing in M6–M9 *within a single session* (the ticker keeps live
+state correct while running), but it must land before Phase 2 ships, or any
+save/resume silently corrupts the economy and colony state. Independent of every
+gameplay WP; recommended to land right after **M7** (WP3's `planet_growth` is the
+most visible loss) but valid any time.
+
+**Approach (recommended): one ordered, replayable timeline.** Keep the
+"command log is the source of truth" model rather than snapshotting derived state.
+Make maintenance a durable, replayable entry interleaved with player commands in a
+single monotonic sequence, so `rebuild` reproduces state exactly:
+- Persist each cron firing as a `MaintenanceTick(cron_name, tick)` record (a new
+  durable log, or a typed entry in a **unified ordered log** alongside
+  `command_log` — ordering across the two streams must be total, since interest
+  accruing *before* vs *after* a player's purchase changes the result). Add it to
+  `edge/store/codec.py` like any command/event.
+- `apply_maintenance` (service.py:62) appends the `MaintenanceTick` to that log
+  the moment it fires (same immediate-commit durability as `append_command`).
+- `rebuild` (snapshots.py:69) replays the merged stream in `seq` order, re-running
+  the **pure** cron reducer (`cron.fn` from cron.py) for each `MaintenanceTick` —
+  no derived state is stored, only the fact and tick that it fired, so the
+  determinism rail and `state_hash` stay honest.
+- **Persist the schedule.** Store the ticker's `tick` counter and each cron's
+  `next_due` (a small `engine` meta table or columns) and restore them in
+  `continue_game`, so firing resumes mid-interval without double-running or
+  skipping. Re-save `Game.day_number` when the daily reset fires (today it is
+  written only at `new_game`).
+
+**Rejected alternative:** periodic full-state snapshots (the gzipped-JSON path
+§12 anticipates) would also fix it, but it departs from pure replay, duplicates
+the golden-master rail, and is deferred — note it here so the choice is explicit.
+
+**Tests.** A recorded session that warps, trades, **then ticks** (interest +
+port regen + planet growth fire) reloads to an **identical `state_hash`** — the
+proof the maintenance timeline replays (extends the existing
+`test_load_game_reconstructs_identical_state`, which currently reloads *before*
+any cron fires and so passes blind to this gap). Schedule round-trips: a reload at
+tick N re-fires the next cron at exactly its original `next_due`, never twice,
+never skipped (deterministic ticker-driven fixture). Codec round-trip +
+exhaustiveness for `MaintenanceTick`. `export_save`/`import` of a ticked game
+round-trips identically.
+
+---
+
 ## Suggested order / commits (phase-tagged, small)
 
 Grouped by milestone; land each WP's entity-field additions + golden-master
@@ -613,6 +674,9 @@ regeneration together.
 2. `p2: WP2` StarDock hardware + shipyard + multiple ship classes.  → **M6**
 3. `p2: WP3` typed planets — ownership, BNT production cron, colonization.
 4. `p2: WP4` orbital starbases + derelict salvage.  → **M7**
+4a. `p2: WP12` durable engine maintenance (cron effects survive reload).
+   *Independent infra; recommended here, where saved worlds first need to persist
+   production. May land any time before Phase 2 ships.*
 5. `p2: WP5` discovery system — rarity tables, sensor detection, codex.
 6. `p2: WP6` planet descent + surface sites.
 7. `p2: WP10` Genesis torpedoes.  → **M8**
@@ -625,7 +689,9 @@ regeneration together.
 Within a milestone, the order above is the dependency order. WP8 must precede WP9
 (contact needs dialogue). WP1 must precede WP2/WP4/WP9 (they install components).
 WP5 must precede WP6/WP9 (surface sites and barter consume discoveries). WP3
-should precede WP4 (starbases hang on planets).
+should precede WP4 (starbases hang on planets). WP12 depends only on the cron set
+existing (WP3's `planet_growth` is the last cron added this phase), so it can land
+any time after M7 but **must** precede the Phase-2 ship.
 
 ---
 
@@ -644,6 +710,11 @@ should precede WP4 (starbases hang on planets).
 - **Codec exhaustiveness.** `test_codec` round-trips every new command and event;
   an exhaustiveness guard fails the build if a command type is missing from
   `encode_command`.
+- **Save fidelity under ticking (WP12).** A session that *ticks* before saving
+  (interest, port regen, planet growth fire) reloads to an identical `state_hash`,
+  and the cron schedule resumes at the original `next_due` — never double-run,
+  never skipped (§9/§12). Distinct from the golden-master replays above, which
+  exercise the command log; this one proves the maintenance timeline replays too.
 - **Bigbang validation (100 seeds, `bigbang/validate.py` + `test_bigbang`).** New
   §5 step-8 invariants: all Core planets governor-owned; unowned fraction
   non-decreasing across bands; ≥1 habitable Hub world; any derelict base on an
