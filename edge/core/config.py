@@ -68,6 +68,9 @@ class EconomyConfig(BaseModel):
     # (the repair path is inert until Phase-3 combat knocks components out, §8).
     ship_trade_in_frac: float = 0.5
     repair_cost_frac: float = 0.25
+    # Per-head latinum incentive paid to enlist a willing colonist at StarDock
+    # (colonists are recruited, not bought — §4.2; not a tradeable commodity).
+    colonist_incentive: int = 5
 
     # Banking + stock regen (engine cron applies these; the math is pure).
     bank_interest_per_day: float = 0.005  # ~0.5%/game-day
@@ -217,6 +220,7 @@ class ShipClassConfig(BaseModel):
     cloak_rating: int
     sensor_rating: int
     hull_max: int
+    colonist_capacity: int = 0  # life-support berths — recruited colonists (§4.2)
     price: int = 0  # StarDock purchase price in latinum (0 = the free starter hull)
     subsystems: Mapping[str, SubsystemLayout] | None = None
 
@@ -235,6 +239,48 @@ class HardwareConfig(BaseModel):
     tiers: list[str]
 
 
+class PlanetTypeProfile(BaseModel):
+    """Per-`planet_type` production shaping (DESIGN §4.2 table).
+
+    `yield_profile` multiplies per-commodity colonist output (keyed by Commodity
+    value); `habitability` caps colonist population/growth (0 for uncolonizable
+    types); `colonizable` gates the claim/colonize path (extraction types produce
+    without colonists instead).
+    """
+
+    model_config = _FROZEN
+
+    colonizable: bool
+    habitability: int
+    yield_profile: dict[str, float] = Field(default_factory=dict)
+
+
+class OwnershipWeights(BaseModel):
+    """Big-bang owner roll for a band: relative weight of alliance-owned vs unowned."""
+
+    model_config = _FROZEN
+
+    alliance: int
+    none: int
+
+
+class PlanetsConfig(BaseModel):
+    """Planetary production constants + the per-type table (DESIGN §4.2, §8/§A.3)."""
+
+    model_config = _FROZEN
+
+    types: dict[str, PlanetTypeProfile]
+    # BNT colonist model (§A.3 / §559), per production tick.
+    production_rate: float = 0.005
+    food_per_colonist: float = 0.05
+    growth_rate: float = 0.02
+    starvation_rate: float = 0.05
+    jovian_scoop: int = 50  # fuel-ore per tick from a gas giant (no colonists)
+    asteroid_mining: int = 50  # equipment per tick from a belt (no colonists)
+    # Band-weighted ownership at generation (unowned fraction non-decreasing, §4.2).
+    ownership: dict[str, OwnershipWeights] = Field(default_factory=dict)
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -245,6 +291,7 @@ class GameConfig(BaseModel):
     economy: EconomyConfig = EconomyConfig()
     bigbang: BigBangConfig = BigBangConfig()
     engine_room: EngineRoomConfig
+    planets: PlanetsConfig
     starter_ship: ShipClassConfig
     ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (StarDock)
     hardware: HardwareConfig

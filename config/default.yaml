@@ -28,6 +28,7 @@ economy:
   repair_kit_latinum: 200
   ship_trade_in_frac: 0.5   # credit toward a new hull when trading the old one in
   repair_cost_frac: 0.25    # StarDock battle-damage repair, per tier price (Phase 3)
+  colonist_incentive: 5     # per-head latinum to enlist a colonist (recruited, not bought)
 
   # Banking + stock regeneration (engine cron applies; the math is pure).
   bank_interest_per_day: 0.005
@@ -84,6 +85,33 @@ engine_room:
   gun_rate_step: 2          # +1 rate of fire per 2 parts in the main gun
   tier_ceiling: III
 
+# Typed planets (§4.2): per-type production shaping + BNT colonist constants +
+# band-weighted ownership. yield_profile multiplies per-commodity colonist output;
+# habitability caps colonist population (0 = uncolonizable, extraction-only).
+planets:
+  production_rate: 0.005     # output per (capped) colonist per tick (§A.3)
+  food_per_colonist: 0.05    # organics eaten per colonist per tick
+  growth_rate: 0.02          # colonist reproduction when fed
+  starvation_rate: 0.05      # colonist die-off when food runs out
+  jovian_scoop: 50           # fuel ore per tick, fuel-scooped (no colonists)
+  asteroid_mining: 50        # equipment per tick, mined (no colonists)
+  types:
+    terrestrial_warm:  { colonizable: true,  habitability: 100000, yield_profile: { fuel_ore: 0.3, organics: 1.5, equipment: 0.5 } }
+    terrestrial_cool:  { colonizable: true,  habitability: 120000, yield_profile: { fuel_ore: 0.3, organics: 1.3, equipment: 0.5 } }
+    terrestrial_hot:   { colonizable: true,  habitability: 20000,  yield_profile: { fuel_ore: 1.5, organics: 0.2, equipment: 0.4 } }
+    terrestrial_cold:  { colonizable: true,  habitability: 20000,  yield_profile: { fuel_ore: 0.4, organics: 0.2, equipment: 1.5 } }
+    jovian:            { colonizable: false, habitability: 0,      yield_profile: { fuel_ore: 1.0, organics: 0.0, equipment: 0.0 } }
+    asteroid_belt:     { colonizable: false, habitability: 0,      yield_profile: { fuel_ore: 0.2, organics: 0.0, equipment: 1.0 } }
+    barren:            { colonizable: false, habitability: 0,      yield_profile: {} }
+  # Band-weighted owner roll (non-Core): alliance-owned vs unowned. The unowned
+  # fraction is non-decreasing Hub→Frontier→Deep→Void (§4.2 invariant). Core worlds
+  # are always governor-owned regardless of this table.
+  ownership:
+    Hub:      { alliance: 8, none: 2 }
+    Frontier: { alliance: 5, none: 5 }
+    Deep:     { alliance: 3, none: 7 }
+    Void:     { alliance: 1, none: 9 }
+
 # The starter hull — a Trailblazer-class explorer (§4). Its engine room is built
 # "complete but minimal": every base slot filled at Tier I, every upgrade slot
 # empty — the canonical first upgrade target (§4.1). The flat aspect scalars below
@@ -100,6 +128,7 @@ starter_ship:
   cloak_rating: 0
   sensor_rating: 2
   hull_max: 100
+  colonist_capacity: 100
   subsystems:
     spindrive:
       slot_count: 5
@@ -145,6 +174,7 @@ ship_classes:
     cloak_rating: 1
     sensor_rating: 3
     hull_max: 80
+    colonist_capacity: 50
     price: 20000
     subsystems:
       spindrive:
@@ -178,6 +208,7 @@ ship_classes:
     cloak_rating: 0
     sensor_rating: 2
     hull_max: 140
+    colonist_capacity: 150
     price: 50000
     subsystems:
       spindrive:
@@ -211,6 +242,7 @@ ship_classes:
     cloak_rating: 0
     sensor_rating: 2
     hull_max: 250
+    colonist_capacity: 300
     price: 100000
     subsystems:
       spindrive:
@@ -244,6 +276,7 @@ ship_classes:
     cloak_rating: 0
     sensor_rating: 3
     hull_max: 350
+    colonist_capacity: 500
     price: 150000
     subsystems:
       spindrive:

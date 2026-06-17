@@ -85,13 +85,49 @@ class Port:
 
 
 @dataclass(frozen=True, slots=True)
+class Ownership:
+    """Three-way planet/base ownership (DESIGN §4.2): none / an alliance / a player.
+
+    `kind` is "none" | "alliance" | "player"; `ref` is the alliance_id or player_id
+    (None when unowned). Kept as a small frozen value so the three-way stays explicit
+    and hashable (it rides `state_hash` cleanly).
+    """
+
+    kind: str = "none"
+    ref: int | None = None
+
+    @property
+    def is_owned(self) -> bool:
+        return self.kind != "none"
+
+
+UNOWNED = Ownership("none")
+
+
+@dataclass(frozen=True, slots=True)
 class Planet:
-    """A planet (DESIGN §4.2). Phase 1: a navigational object with a type only."""
+    """A planet (DESIGN §4.2): a typed, ownable, producing world.
+
+    `planet_type` fixes colonizability, the `yield_profile` over the trio, and the
+    `habitability_cap` (max colonists). `owner` is three-way (§4.2): Core worlds are
+    governor-owned, the unowned fraction rises with band. `colonists` settle an owned
+    colony and produce into `stores` per `allocation` × `yield_profile` (the §8 cron);
+    `inhabited_by_species_id` marks an unaligned-species holding (set in WP7).
+    """
 
     id: int
     sector_id: int
     name: str
     planet_type: str
+    owner: Ownership = UNOWNED
+    inhabited_by_species_id: int | None = None
+    colonists: int = 0
+    habitability_cap: int = 0
+    yield_profile: Mapping[Commodity, float] = field(default_factory=dict)
+    allocation: Mapping[Commodity, float] = field(default_factory=dict)
+    stores: Mapping[Commodity, int] = field(default_factory=dict)
+    citadel_level: int = 0
+    starbase_id: int | None = None  # WP4 orbital base
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +194,8 @@ class Ship:
     missiles: int = 0
     repair_kits: int = 0
     turns_per_warp: int = 1
+    colonist_capacity: int = 0  # life-support berths (separate occupancy limit, §4.2)
+    colonists: int = 0  # recruited colonists aboard (≤ colonist_capacity); not cargo
     subsystems: Mapping[Subsystem, SubsystemState] | None = None
     components: Mapping[tuple[Component, ComponentTier], int] = field(default_factory=dict)
 

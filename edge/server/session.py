@@ -19,19 +19,24 @@ from edge.core.engine_room import build_subsystems, derive_aspects
 from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
 from edge.core.events import (
     Banked,
+    Colonized,
+    ColonistsRecruited,
+    ColonyGrew,
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
     Docked,
     Event,
     Haggled,
+    PlanetProduced,
     Repaired,
     ShipPurchased,
     TurnsReset,
     Traded,
     Warped,
 )
-from edge.core.models import Player, Port, Sector, Ship, SubsystemState, UniverseState
+from edge.core.models import Planet, Player, Port, Sector, Ship, SubsystemState, UniverseState
+from edge.core.planets import is_colonizable
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
 _FULL = {Commodity.FUEL_ORE: "Fuel Ore", Commodity.ORGANICS: "Organics", Commodity.EQUIPMENT: "Equipment"}
@@ -217,6 +222,38 @@ def engine_room_view(state: UniverseState, player_id: int, config: GameConfig) -
     )
 
 
+_COMMODITY_PCT = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
+
+
+def _owner_label(state: UniverseState, planet: Planet, player_id: int) -> str:
+    owner = planet.owner
+    if owner.kind == "none":
+        return "unowned"
+    if owner.kind == "player":
+        return "you" if owner.ref == player_id else f"player {owner.ref}"
+    alliance = state.alliances.get(owner.ref) if owner.ref is not None else None
+    return alliance.name if alliance is not None else "alliance"
+
+
+def planet_view(state: UniverseState, player_id: int, planet_id: int, config: GameConfig) -> dto.PlanetDTO:
+    """The orbit view of a planet for `player_id` (§4.2): type, owner, colony, stores."""
+    planet = state.planets[planet_id]
+    ship = state.ships[state.players[player_id].ship_id]
+    colonizable = is_colonizable(planet.planet_type, config)
+    owned_by_you = planet.owner.kind == "player" and planet.owner.ref == player_id
+    stores = [(_FULL[c], planet.stores.get(c, 0)) for c in Commodity]
+    allocation = [(_FULL[c], round(planet.allocation.get(c, 0.0) * 100)) for c in Commodity]
+    return dto.PlanetDTO(
+        planet_id=planet.id, name=planet.name, ptype=planet.planet_type,
+        owner=_owner_label(state, planet, player_id), colonizable=colonizable,
+        claimable=colonizable and not planet.owner.is_owned, owned_by_you=owned_by_you,
+        colonists=planet.colonists, habitability_cap=planet.habitability_cap,
+        stores=stores, allocation=allocation, ship_colonists=ship.colonists,
+        ship_colonist_capacity=ship.colonist_capacity,
+        starbase="operational" if planet.starbase_id is not None else None,
+    )
+
+
 def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.StarDockDTO:
     """The StarDock hardware + shipyard catalogs for the docked player (§8, §11).
 
@@ -337,6 +374,16 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
         return f"Removed {event.component} ({event.tier}) from {event.subsystem}"
     if isinstance(event, Repaired):
         return f"[green]Field-patched {event.subsystem} slot {event.slot_index}[/]"
+    if isinstance(event, ColonistsRecruited):
+        via = "StarDock" if event.source == "stardock" else "emigration"
+        cost = f"  (-{event.cost} slips)" if event.cost else ""
+        return f"Recruited {event.count} colonists ({via}){cost}"
+    if isinstance(event, Colonized):
+        return f"[green]Colonized world {event.planet_id}[/] with {event.colonists} colonists"
+    if isinstance(event, ColonyGrew):
+        return f"Colony {event.planet_id} grew to {event.colonists}"
+    if isinstance(event, PlanetProduced):
+        return ""  # produced-output ticks are not surfaced per-tick (avoid log flood)
     if isinstance(event, Banked):
         return f"Bank {event.kind}: {event.amount}  (balance {event.balance})"
     if isinstance(event, TurnsReset):

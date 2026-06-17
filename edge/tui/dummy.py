@@ -27,6 +27,7 @@ from edge.core.dto import (
     MapDTO,
     MessagesDTO,
     NeighborDTO,
+    PlanetDTO,
     PortDTO,
     SectorDTO,
     ShipDTO,
@@ -37,12 +38,16 @@ from edge.core.dto import (
 )
 
 
-@dataclass(frozen=True)
-class PlanetDTO:
-    name: str
-    ptype: str
-    owner: str
-    starbase: str | None = None
+def sample_planet() -> PlanetDTO:
+    """The Terra Nova orbit scene (UI_MOCKUPS.md §3) for the screenshot harness."""
+    return PlanetDTO(
+        planet_id=1, name="Terra Nova", ptype="terrestrial_warm", owner="Federation",
+        colonizable=True, claimable=False, owned_by_you=False, colonists=1_240_000,
+        habitability_cap=2_000_000, stores=[("Fuel Ore", 8_200), ("Organics", 31_400),
+                                            ("Equipment", 5_100)],
+        allocation=[("Fuel Ore", 20), ("Organics", 60), ("Equipment", 20)],
+        ship_colonists=0, ship_colonist_capacity=100, starbase="operational",
+    )
 
 
 @dataclass(frozen=True)

@@ -8,9 +8,20 @@ from edge.config import load_default_config
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError, build_subsystems
 from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
-from edge.core.events import Banked, ComponentPurchased, Docked, ShipPurchased, Traded, Warped
+from edge.core.events import (
+    Banked,
+    Colonized,
+    ColonistsRecruited,
+    ComponentPurchased,
+    Docked,
+    ShipPurchased,
+    Traded,
+    Warped,
+)
 from edge.core.models import (
     Game,
+    Ownership,
+    Planet,
     Player,
     Port,
     PortCommodity,
@@ -21,11 +32,14 @@ from edge.core.movement import MovementError
 from edge.core.rules import (
     BuyComponent,
     BuyShip,
+    Colonize,
     Deposit,
     Dock,
     HaggleOffer,
     InstallComponent,
+    RecruitColonists,
     RepairAtDock,
+    SetAllocation,
     Trade,
     TravelTo,
     Warp,
@@ -307,6 +321,132 @@ def test_repair_at_dock_rejected_when_nothing_damaged() -> None:
     _with_engine_room(state)
     with pytest.raises(EngineRoomError):
         _do(state, RepairAtDock(Subsystem.THRUSTERS, 0))
+
+
+# --- colonists: recruit / colonize / allocation (§4.2, §8) ------------------
+
+
+def _with_colony_world(state: UniverseState, ptype: str = "terrestrial_warm") -> None:
+    """Place an unowned colonizable world in the player's sector (2)."""
+    profile = CONFIG.planets.types[ptype]
+    state.planets = {1: Planet(
+        id=1, sector_id=2, name="New Eden", planet_type=ptype,
+        owner=Ownership("none"), habitability_cap=profile.habitability,
+    )}
+
+
+def test_recruit_colonists_at_stardock_pays_incentive() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100)
+    result = _do(state, RecruitColonists(count=40))
+    assert isinstance(result.events[0], ColonistsRecruited)  # type: ignore[attr-defined]
+    assert state.ships[1].colonists == 40
+    assert state.players[1].latinum == 10_000 - 40 * CONFIG.economy.colonist_incentive
+
+
+def test_recruit_clamped_to_berths() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=30)
+    _do(state, RecruitColonists(count=100))
+    assert state.ships[1].colonists == 30  # the separate occupancy limit caps it
+
+
+def test_colonize_claims_unowned_world_and_moves_colonists() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=50)
+    _with_colony_world(state)
+    result = _do(state, Colonize(planet_id=1, colonists=30))
+    assert isinstance(result.events[0], Colonized)  # type: ignore[attr-defined]
+    assert state.planets[1].owner == Ownership("player", 1)
+    assert state.planets[1].colonists == 30
+    assert state.ships[1].colonists == 20  # the rest stay aboard
+    assert state.planets[1].allocation  # a default split was set
+
+
+def test_colonize_rejects_owned_and_uncolonizable() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=50)
+    _with_colony_world(state, "barren")  # uncolonizable
+    with pytest.raises(EconomyError):
+        _do(state, Colonize(planet_id=1, colonists=10))
+    _with_colony_world(state)  # now colonizable but pre-owned
+    state.planets[1] = replace(state.planets[1], owner=Ownership("alliance", 1))
+    with pytest.raises(EconomyError):
+        _do(state, Colonize(planet_id=1, colonists=10))
+
+
+def test_recruit_emigration_from_inhabited_world_is_free() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100)
+    state.planets = {1: Planet(1, 2, "Homeworld", "terrestrial_warm", inhabited_by_species_id=7)}
+    _do(state, RecruitColonists(count=20, from_planet=1))
+    assert state.ships[1].colonists == 20
+    assert state.players[1].latinum == 10_000  # emigration costs no incentive
+
+
+def test_recruit_rejects_nonpositive_and_no_berths() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=0)
+    with pytest.raises(EconomyError):
+        _do(state, RecruitColonists(count=5))  # no berths
+    state.ships[1] = replace(state.ships[1], colonist_capacity=10)
+    with pytest.raises(EconomyError):
+        _do(state, RecruitColonists(count=0))  # non-positive
+
+
+def test_colonize_requires_colonists_and_presence() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=5)
+    _with_colony_world(state)
+    with pytest.raises(EconomyError):
+        _do(state, Colonize(planet_id=1, colonists=10))  # more than aboard
+    state.ships[1] = replace(state.ships[1], sector_id=1)  # leave the planet's sector
+    with pytest.raises(EconomyError):
+        _do(state, Colonize(planet_id=1, colonists=1))
+
+
+def test_buy_ship_refused_when_colonists_exceed_new_berths() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.players[1] = replace(state.players[1], latinum=60_000)
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=80)
+    with pytest.raises(EconomyError):  # Scout Marauder berths only 50
+        _do(state, BuyShip("scout_marauder"))
+
+
+def test_set_allocation_normalizes_and_requires_ownership() -> None:
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=50)
+    _with_colony_world(state)
+    _do(state, Colonize(planet_id=1, colonists=30))
+    _do(state, SetAllocation(planet_id=1, allocation={"fuel_ore": 1.0, "organics": 3.0}))
+    alloc = state.planets[1].allocation
+    assert abs(sum(alloc.values()) - 1.0) < 1e-9  # normalized to a unit split
+    assert alloc[Commodity.ORGANICS] == 0.75
+    # an all-zero allocation is rejected (must be positive)
+    with pytest.raises(EconomyError):
+        _do(state, SetAllocation(planet_id=1, allocation={"fuel_ore": 0.0}))
+    # a world the player does not own is rejected
+    state.planets[1] = replace(state.planets[1], owner=Ownership("alliance", 1))
+    with pytest.raises(EconomyError):
+        _do(state, SetAllocation(planet_id=1, allocation={"fuel_ore": 1.0}))
 
 
 def test_bank_deposit_then_withdraw() -> None:

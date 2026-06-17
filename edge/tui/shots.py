@@ -23,6 +23,7 @@ from edge.tui.dummy import (
     sample_encounter,
     sample_engine_room,
     sample_messages,
+    sample_planet,
 )
 from edge.tui.screens.contact import AlienContactScreen
 from edge.tui.screens.encounter import EncounterScreen
@@ -107,7 +108,7 @@ async def _capture() -> None:
         await pilot.pause()
 
         # The Phase 2-3 skeleton screens, pushed directly with sample data.
-        app.push_screen(PlanetScreen("Terra Nova"))
+        app.push_screen(PlanetScreen(sample_planet()))
         await pilot.pause()
         app.save_screenshot(filename="planet.svg", path=str(OUT))
         await pilot.press("d")  # descend -> SurfaceScreen

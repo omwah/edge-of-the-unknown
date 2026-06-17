@@ -104,6 +104,33 @@ class Repaired(Event):
 
 
 @dataclass(frozen=True)
+class ColonistsRecruited(Event):
+    player_id: int
+    source: str  # "stardock" | "emigration"
+    count: int
+    cost: int  # latinum incentive paid
+
+
+@dataclass(frozen=True)
+class Colonized(Event):
+    player_id: int
+    planet_id: int
+    colonists: int
+
+
+@dataclass(frozen=True)
+class PlanetProduced(Event):
+    planet_id: int
+    owner_player_id: int  # only player-owned colonies announce (alliance output is silent)
+
+
+@dataclass(frozen=True)
+class ColonyGrew(Event):
+    planet_id: int
+    colonists: int  # new colonist count
+
+
+@dataclass(frozen=True)
 class TurnsReset(Event):
     player_id: int
     turns: int

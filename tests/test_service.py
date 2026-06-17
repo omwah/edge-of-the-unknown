@@ -88,6 +88,20 @@ def test_computer_and_map_views_render(tmp_path: Path) -> None:
     assert mv.you_sector == 1 and mv.bands
 
 
+def test_current_planet_view_finds_or_none(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    # Move the ship to a sector that has a planet, then to one that doesn't.
+    planet = next(iter(svc.state.planets.values()))
+    from dataclasses import replace
+    svc._state.ships[1] = replace(svc.state.ships[1], sector_id=planet.sector_id)  # type: ignore[attr-defined]
+    view = svc.current_planet_view(1)
+    assert view is not None and view.planet_id == planet.id
+    empty = next(s for s in svc.state.sectors if not any(
+        p.sector_id == s for p in svc.state.planets.values()))
+    svc._state.ships[1] = replace(svc.state.ships[1], sector_id=empty)  # type: ignore[attr-defined]
+    assert svc.current_planet_view(1) is None
+
+
 def test_intro_line_names_the_stardock_sector(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)
