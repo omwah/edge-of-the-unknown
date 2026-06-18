@@ -390,19 +390,18 @@ class ClickableEntry(Static):
     """
 
     class Picked(Message):
-        def __init__(self, dest: str, ref: int | None = None) -> None:
+        def __init__(self, dest: str, ref: int | str | None = None) -> None:
             self.dest = dest
             self.ref = ref  # an optional target id (e.g. a discovery to salvage)
             super().__init__()
 
-    def __init__(self, markup: str, dest: str, ref: int | None = None, **kwargs: object) -> None:
+    def __init__(self, markup: str, dest: str, ref: int | str | None = None, **kwargs: object) -> None:
         super().__init__(markup, **kwargs)
         self._dest = dest
         self._ref = ref
 
     def on_click(self) -> None:
         self.post_message(self.Picked(self._dest, self._ref))
-
 
 class WarpButton(Button):
     """A single clickable warp affordance."""
