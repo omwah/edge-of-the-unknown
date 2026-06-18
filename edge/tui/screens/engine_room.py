@@ -51,12 +51,25 @@ class _SubsystemPanel(Horizontal):
     def __init__(self, system: Subsystem) -> None:
         super().__init__()
         self._system = system
-        self._selected_component = None
-        self._is_panel_selected = False
+        # Slot indices the player has marked for cannibalization (filled,
+        # non-keystone only). Reset whenever the screen reopens.
+        self._selected_slots: set[int] = set()
+
+    @property
+    def system(self) -> Subsystem:
+        return self._system
+
+    @property
+    def selected_slots(self) -> set[int]:
+        return self._selected_slots
 
     def compose(self) -> ComposeResult:
-        slots = "\n".join(self._slot_line(i) for i in range(len(self._system.slots)))
-        yield Static(slots, classes="slots")
+        # One clickable line per slot so individual components can be selected.
+        with Vertical(classes="slots"):
+            for i in range(len(self._system.slots)):
+                yield ClickableEntry(
+                    self._slot_line(i), dest="slot", ref=i, classes="slot"
+                )
         # Colour the icon via an inline style rather than wrapping the art in
         # markup, so the glyphs are rendered verbatim (no markup escaping).
         icon = Static("\n".join(sprites.pick_subsystem(self._system.name)), classes="icon")
@@ -67,14 +80,31 @@ class _SubsystemPanel(Horizontal):
         self.border_title = self._system.name
         self.border_subtitle = f"→ {self._system.derived}"
 
+    def _is_selectable(self, idx: int) -> bool:
+        slot = self._system.slots[idx]
+        return slot.state == "filled" and not slot.keystone
+
     def _slot_line(self, idx: int) -> str:
         slot = self._system.slots[idx]
         key = " [dim](keystone)[/]" if slot.keystone else ""
         if slot.state == "filled":
-            return f"[green][+][/] {slot.component}{key}"
+            marker = "[green][✓][/]" if idx in self._selected_slots else "[green][+][/]"
+            return f"{marker} {slot.component}{key}"
         if slot.state == "knocked":
             return f"[red][!][/] {slot.component}  [red]knocked-out[/]"
         return "[dim][ ][/] [dim]____[/]"
+
+    async def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
+        if msg.dest != "slot":
+            return
+
+        idx = int(msg.ref)  # ref is the slot index
+        if not self._is_selectable(idx):
+            return  # only filled, non-keystone slots can be pulled
+
+        # Toggle this slot's selection, then redraw its marker.
+        self._selected_slots.symmetric_difference_update({idx})
+        await self.recompose()
 
     def on_click(self) -> None:
         self.post_message(self.TargetedSystem(self._system))
@@ -189,7 +219,8 @@ class EngineRoomScreen(Screen):
                 yield self._component_picker
 
         yield Static(
-            f"[green][+][/] healthy   [red][!][/] knocked-out   [dim][ ][/] empty slot\n"
+            f"[green][+][/] healthy   [green][✓][/] selected   "
+            f"[red][!][/] knocked-out   [dim][ ][/] empty slot\n"
             f"Repair-kits x{r.kits}\n"
             f"[b]P[/] Field-patch   [b]X[/] Cannibalize   "
             f"[b]U[/] Upgrade [dim](StarDock/base)[/]   [b]Esc[/] Back",
@@ -204,19 +235,47 @@ class EngineRoomScreen(Screen):
         self.notify("Not wired in the skeleton.", timeout=2)
 
     def action_cannibalize(self) -> None:
-        """Pull the first filled non-keystone component into the loose-part hold."""
+        """Cannibalize every slot the player has selected across the subsystem
+        panels, returning each pulled component to the loose on-hand hold."""
         if self._service is None:
             self.action_noop()
             return
-        for system in self._room.subsystems:
-            kind = _DISPLAY_TO_KIND.get(system.name)
-            if kind is None:
-                continue
-            for idx, slot in enumerate(system.slots):
-                if slot.state == "filled" and not slot.keystone:
-                    self._issue(Cannibalize(kind, idx), f"Cannibalized {slot.component}")
-                    return
-        self.notify("Nothing safe to cannibalize.", timeout=2)
+
+        # Collect the (subsystem, slot) targets before issuing anything: each
+        # cannibalize empties its slot in place (indices stay valid), so we can
+        # apply them all and reopen the screen once at the end.
+        targets = [
+            (panel.system, idx)
+            for panel in self.query(_SubsystemPanel)
+            for idx in sorted(panel.selected_slots)
+        ]
+        if not targets:
+            self.notify("Select a filled slot to cannibalize first.", timeout=2)
+            return
+
+        pulled = 0
+        for system, idx in targets:
+            try:
+                self.cannibalize_component(system, idx)
+                pulled += 1
+            except Exception:  # core rejected this pull — skip it, keep going
+                self.notify(f"Couldn't cannibalize slot {idx} of {system.name}.",
+                            timeout=2)
+
+        if pulled:
+            self._reopen()
+
+    def cannibalize_component(self, system: Subsystem, slot_index: int) -> None:
+        """Pull the component in `system`'s slot `slot_index` back into the
+        loose on-hand hold (does not reopen the screen — the caller does)."""
+        assert self._service is not None
+        kind = _DISPLAY_TO_KIND.get(system.name)
+        if kind is None:
+            return
+        slot = system.slots[slot_index]
+        if slot.state != "filled" or slot.keystone:
+            return
+        self._service.apply(self._pid, Cannibalize(kind, slot_index))  # type: ignore[arg-type]
 
     def install(self, on_hand: str, system: Subsystem) -> None:
         """Install the selected loose component into the subystem targetd by clicking on it"""
@@ -237,8 +296,7 @@ class EngineRoomScreen(Screen):
             if slot.state != "empty":
                 continue
             try:
-                self._issue(InstallComponent(kind, idx, component, tier),
-                            f"Installed {component.value}")
+                self._issue(InstallComponent(kind, idx, component, tier))
                 return
             except Exception:  # illegal slot for this part
                 self.notify(f"That component can not be installed there", timeout=2)
@@ -253,10 +311,9 @@ class EngineRoomScreen(Screen):
 
         self.install(self._component_picker._selected_component, msg.system)
 
-    def _issue(self, command: object, ok: str) -> None:
+    def _issue(self, command: object) -> None:
         assert self._service is not None
         self._service.apply(self._pid, command)  # type: ignore[arg-type]
-        self.notify(ok, timeout=2)
         self._reopen()
 
 
