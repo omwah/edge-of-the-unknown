@@ -111,7 +111,7 @@ class _SubsystemPanel(Horizontal):
 
 class _ComponentsPickerPanel(Vertical):
     """
-    Selects the component that will be installed into a subsystem
+    Selects the component(s) that will be installed into a subsystem
     """
 
     DEFAULT_CSS = """
@@ -125,7 +125,12 @@ class _ComponentsPickerPanel(Vertical):
         super().__init__()
 
         self._loose_components = loose_components
-        self._selected_component = None
+        # Labels the player has marked for installation. Reset on reopen.
+        self._selected_components: set[str] = set()
+
+    @property
+    def selected_components(self) -> set[str]:
+        return self._selected_components
 
     def compose(self) -> ComposeResult:
 
@@ -134,11 +139,11 @@ class _ComponentsPickerPanel(Vertical):
 
     def on_mount(self) -> None:
         self.border_title = "Loose Components"
-        self.border_subtitle = f"→ Select component, then subsystem"
+        self.border_subtitle = f"→ Select component(s), then subsystem"
 
     def _component_line(self, component_desc: str) -> ClickableEntry:
 
-        if component_desc == self._selected_component:
+        if component_desc in self._selected_components:
             content = f"[green][✓][/] {component_desc}"
         else:
             content = f"[dim][ ][/] [dim]{component_desc}[/]"
@@ -155,9 +160,8 @@ class _ComponentsPickerPanel(Vertical):
         if msg.dest != "loose_component":
             return
 
-        # Re-clicking the current selection clears it; clicking any other
-        # entry switches the selection to it.
-        self._selected_component = None if self._selected_component == msg.ref else msg.ref
+        # Toggle this component in/out of the selection, then redraw its marker.
+        self._selected_components.symmetric_difference_update({msg.ref})
 
         await self.recompose()
 
@@ -175,7 +179,10 @@ class EngineRoomScreen(Screen):
         text-style: bold; padding: 0 1;
     }
     EngineRoomScreen #engine-grid {
-        grid-size: 2; grid-gutter: 0; height: 1fr; padding: 1 1 0 1;
+        grid-size: 2; grid-gutter: 0; height: auto; padding: 1 1 0 1;
+    }
+    EngineRoomScreen #engine-picker {
+        height: 1fr;
     }
     EngineRoomScreen #engine-foot {
         height: auto; padding: 0 1; border-top: solid $primary; color: $text-muted;
@@ -213,9 +220,11 @@ class EngineRoomScreen(Screen):
             for system in r.subsystems:
                 yield _SubsystemPanel(system)
 
-        if len(r.on_hand) > 0:
-            with Grid():
-                # _ComponentsPickerPanel
+        # Dedicated, always-present region for the picker so hiding it (when no
+        # loose components are on hand) leaves empty space below the subsystems
+        # rather than resizing the subsystem panels above.
+        with Vertical(id="engine-picker"):
+            if len(r.on_hand) > 0:
                 yield self._component_picker
 
         yield Static(
@@ -277,39 +286,55 @@ class EngineRoomScreen(Screen):
             return
         self._service.apply(self._pid, Cannibalize(kind, slot_index))  # type: ignore[arg-type]
 
-    def install(self, on_hand: str, system: Subsystem) -> None:
-        """Install the selected loose component into the subystem targetd by clicking on it"""
+    def install_component(self, label: str, system: Subsystem,
+                          skip_slots: set[int]) -> int | None:
+        """Install one loose component into the first legal empty slot of
+        `system` not already in `skip_slots`. Returns the slot index used, or
+        None if it couldn't be placed. Does not reopen — the caller does."""
+        assert self._service is not None
+        kind = _DISPLAY_TO_KIND.get(system.name)
+        if kind is None:
+            return None
+        component, tier = _parse_on_hand(label)
+        for idx, slot in enumerate(system.slots):
+            if slot.state != "empty" or idx in skip_slots:
+                continue
+            try:
+                self._service.apply(  # type: ignore[arg-type]
+                    self._pid, InstallComponent(kind, idx, component, tier))
+            except Exception:  # this slot rejects this part — try the next
+                continue
+            return idx
+        return None
 
-        from textual import log
-
+    async def on_subsystem_panel_targeted_system(
+            self, msg: _SubsystemPanel.TargetedSystem) -> None:
+        """Install every selected loose component into the targeted subsystem,
+        each in its own empty slot, then reopen the screen once."""
+        selected = self._component_picker.selected_components
+        if not selected:
+            return
         if self._service is None:
             self.action_noop()
             return
 
-        kind = _DISPLAY_TO_KIND.get(system.name)
-        component, tier = _parse_on_hand(on_hand)
+        used: set[int] = set()
+        failed: list[str] = []
+        for label in sorted(selected):
+            idx = self.install_component(label, msg.system, used)
+            if idx is None:
+                failed.append(label)
+            else:
+                used.add(idx)
 
-        if kind is None:
+        if len(failed) == len(selected):
+            self.notify(f"No legal empty slot in {msg.system.name} for the "
+                        f"selected component(s).", timeout=2)
             return
-
-        for idx, slot in enumerate(system.slots):
-            if slot.state != "empty":
-                continue
-            try:
-                self._issue(InstallComponent(kind, idx, component, tier))
-                return
-            except Exception:  # illegal slot for this part
-                self.notify(f"That component can not be installed there", timeout=2)
-                return
-
-        self.notify(f"No legal empty slot for {component.value}.", timeout=2)
-
-    async def on_subsystem_panel_targeted_system(self, msg: _SubsystemPanel.TargetedSystem) -> None:
-
-        if self._component_picker._selected_component is None:
-            return
-
-        self.install(self._component_picker._selected_component, msg.system)
+        if failed:
+            self.notify(f"No slot in {msg.system.name} for: "
+                        f"{', '.join(failed)}", timeout=2)
+        self._reopen()
 
     def _issue(self, command: object) -> None:
         assert self._service is not None
