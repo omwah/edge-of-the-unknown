@@ -156,10 +156,12 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
 
     Reference integrity (the governing alliance and every species' `alliance_id` resolve);
     Phase-2 friendliness (every placed species sits in the amity band, so no hostile
-    encounter spawns, placed outside Core Space); and at least one contact per non-empty
-    distance band (the §5 step-8 resupply invariant). The disposition-rises-with-distance
-    gradient is a Phase-3 property (hostiles placed by band) — not asserted here, where
-    the friendly clamp gives a floor, not a monotone gradient.
+    encounter spawns, placed outside Core Space — bar the StarDock hub, where ≥2
+    Core-welcome species are staged on purpose, §6.3); and at least one contact per
+    non-empty distance band (the §5 step-8 resupply invariant). The
+    disposition-rises-with-distance gradient is a Phase-3 property (hostiles placed by
+    band) — not asserted here, where the friendly clamp gives a floor, not a monotone
+    gradient.
     """
     if config.roster is None:
         return
@@ -170,11 +172,14 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
         return
 
     core_ids = {s.id for s in state.sectors.values() if s.is_galactic_core}
+    # The StarDock is the one sanctioned Core-side contact point (high-traffic hub).
+    dock_sector = next((p.sector_id for p in state.ports.values()
+                        if p.klass is PortClass.STARDOCK), None)
     contact_bands: set[str] = set()
     for sp in state.species.values():
         if sp.alliance_id is not None and sp.alliance_id not in state.alliances:
             raise ValidationError(f"species {sp.id} references missing alliance {sp.alliance_id}")
-        if sp.sector_id in core_ids:
+        if sp.sector_id in core_ids and sp.sector_id != dock_sector:
             raise ValidationError(f"species {sp.id} placed inside Core Space")
         if not is_friendly(sp.base_disposition, config.aliens):
             raise ValidationError(f"species {sp.id} placed below the amity band (Phase 2)")

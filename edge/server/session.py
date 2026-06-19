@@ -168,6 +168,13 @@ def _sector_dto(
 ) -> dto.SectorDTO:
     ports = [p.name for p in state.ports.values() if p.sector_id == sector.id]
     planets = [f"{pl.name}  {pl.planet_type}" for pl in state.planets.values() if pl.sector_id == sector.id]
+    # A staged species shows as a present vessel so the player can see (and hail) it —
+    # friendly contacts are visible just like ports/planets (§6, WP9). One row per species;
+    # `contact_ids` runs parallel to `ships` so clicking a row hails that species.
+    here_species = [sp for sp in sorted(state.species.values(), key=lambda s: s.id)
+                    if sp.sector_id == sector.id]
+    ships = [f"{sp.name} vessel" for sp in here_species]
+    contact_ids = [sp.id for sp in here_species]
     here = core_hops.get(sector.id, 0)
     came_from = player.entered_from.get(sector.id)
     warps = [
@@ -183,7 +190,7 @@ def _sector_dto(
     return dto.SectorDTO(
         region=region, sector_id=sector.id, flavor=f"{sector.distance_band.lower()} space",
         beacon=sector.beacon_text, band=sector.distance_band,
-        ports=ports, planets=planets, ships=[], warps=warps,
+        ports=ports, planets=planets, ships=ships, contact_ids=contact_ids, warps=warps,
         discoveries=_sector_discoveries(state, player, sector.id),
         display_id=_display(state, sector.id),
     )
@@ -513,7 +520,8 @@ def _codex_entries(state: UniverseState, player: Player) -> list[dto.CodexEntry]
         if disc is None:
             continue
         if disc.planet_id is not None:
-            location = f"Planet {disc.planet_id} · site {disc.site_slot + 1}"
+            location = (f"Sector {_display(state, disc.sector_id)} · "
+                        f"Planet {disc.planet_id} · site {disc.site_slot + 1}")
         else:
             location = f"Sector {_display(state, disc.sector_id)}"
         entries.append((disc.rarity_tier.value, dto.CodexEntry(
@@ -547,12 +555,14 @@ def _dossier_entries(state: UniverseState, player: Player, config: GameConfig) -
         allied = player.alliance_id is not None and player.alliance_id == species.alliance_id
         effective = effective_disposition(species, player)
         alliance = roster.alliance(species.alliance_id) if species.alliance_id is not None else None
+        seen = player.species_last_seen.get(sid)
         out.append(dto.DossierEntry(
             species=species.name, alliance=alliance.name if alliance else "unaligned",
             band=disposition_band(effective, config.aliens),
             standing=dialogue.standing_for(effective, allied=allied, aliens=config.aliens),
             disposition_filled=max(0, min(5, round(effective * 5))), effective=round(effective, 3),
             offers=_offer_summary(sc),
+            last_seen=str(_display(state, seen)) if seen is not None else "—",
             note=_line(state, roster, species, player, "dossier_self", config),
         ))
     return out
@@ -569,7 +579,7 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         for sell_to in seen:
             if buy_from.id == sell_to.id:
                 continue
-            best = _best_pair(buy_from, sell_to, ship.holds_total, dist, config)
+            best = _best_pair(state, buy_from, sell_to, ship.holds_total, dist, config)
             if best is not None:
                 pairs.append(best)
     pairs.sort(key=lambda tp: tp.per_turn, reverse=True)
@@ -795,8 +805,8 @@ def messages_view(state: UniverseState, events: list[Event]) -> dto.MessagesDTO:
     return dto.MessagesDTO(events=entries)
 
 
-def _best_pair(buy_from: Port, sell_to: Port, units: int, dist: dict[int, int],
-               config: GameConfig) -> dto.TradePair | None:
+def _best_pair(state: UniverseState, buy_from: Port, sell_to: Port, units: int,
+               dist: dict[int, int], config: GameConfig) -> dto.TradePair | None:
     da, db = dist.get(buy_from.sector_id), dist.get(sell_to.sector_id)
     if da is None or db is None:
         return None
@@ -814,6 +824,8 @@ def _best_pair(buy_from: Port, sell_to: Port, units: int, dist: dict[int, int],
         return None
     profit = best_margin * units
     return dto.TradePair(
-        pair=f"{buy_from.name} <-> {sell_to.name}", goods=best_goods,
+        pair=(f"{buy_from.name} (S{_display(state, buy_from.sector_id)}) <-> "
+              f"{sell_to.name} (S{_display(state, sell_to.sector_id)})"),
+        goods=best_goods,
         dist=hops, profit_rt=profit, per_turn=profit // hops,
     )

@@ -161,6 +161,7 @@ class SectorDTO:
     ports: list[str] = field(default_factory=list)
     planets: list[str] = field(default_factory=list)
     ships: list[str] = field(default_factory=list)
+    contact_ids: list[int] = field(default_factory=list)  # species id per `ships` row (§6, hail target)
     warps: list[WarpDTO] = field(default_factory=list)
     discoveries: list[SectorDiscovery] = field(default_factory=list)
     display_id: int = 0  # spatial id shown in the sector title (§5.1)
@@ -229,7 +230,8 @@ class DossierEntry:
     disposition_filled: int  # 0..5 effective-disposition bar
     effective: float
     offers: str  # last-seen tech-offer summary
-    note: str  # a self-description line in the species' own voice (WP8 dialogue)
+    last_seen: str = "—"  # spatial id of the sector where last encountered (§6)
+    note: str = ""  # a self-description line in the species' own voice (WP8 dialogue)
 
 
 @dataclass(frozen=True)

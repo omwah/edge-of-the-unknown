@@ -122,8 +122,12 @@ class SectorView(Container):
             yield Static("", classes="spacer")
         yield Static("Ships", classes="heading")
         if sec.ships:
-            for s in sec.ships:
-                yield Static(f"  [white]>[/] {s}")
+            for i, s in enumerate(sec.ships):
+                cid = sec.contact_ids[i] if i < len(sec.contact_ids) else None
+                if cid is None:  # a non-hailable hull (sample data) — show but don't click
+                    yield Static(f"  [white]>[/] {s}")
+                else:
+                    yield ClickableEntry(f"  [white]>[/] {s} [dim](Hail)[/]", dest="contact", ref=cid)
         else:
             yield Static("  none")
 
@@ -188,6 +192,8 @@ class GameScreen(Screen):
             self.action_survey_planet()
         elif msg.dest == "discovery" and msg.ref is not None:
             await self._salvage(msg.ref)
+        elif msg.dest == "contact" and msg.ref is not None:
+            self._hail_species(int(msg.ref))
         else:
             await self._dock()
 
@@ -270,11 +276,15 @@ class GameScreen(Screen):
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="map"))
 
     def action_hail(self) -> None:
-        """Open contact with a friendly species in this sector, if any (§6, WP9)."""
+        """Hail the first friendly species in this sector (H is a shortcut; click a ship to pick)."""
         species_id = self._service.species_in_sector(self._pid)
         if species_id is None:
             self.notify("No alien contact in this sector.", timeout=2)
             return
+        self._hail_species(species_id)
+
+    def _hail_species(self, species_id: int) -> None:
+        """Open contact with a specific species in this sector (§6, WP9)."""
         self._record(self._service.apply(self._pid, Hail(species_id)))
         self.app.push_screen(AlienContactScreen(
             self._service.contact_view(self._pid, species_id),

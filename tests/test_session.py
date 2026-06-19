@@ -6,6 +6,7 @@ from edge.config import load_default_config
 from edge.core.dto import CommodityLine
 from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass
 from edge.core.models import (
+    AlienSpecies,
     Game,
     Planet,
     Player,
@@ -49,6 +50,33 @@ def _world() -> UniverseState:
     }
     world.rebuild_adjacency()
     return world
+
+
+def _species(sid: int, sector_id: int, name: str) -> AlienSpecies:
+    return AlienSpecies(
+        id=sid, roster_id=f"sp{sid}", name=name, archetype_id="trader", sector_id=sector_id,
+        home_band="Hub", tech_level=1, base_disposition=0.8,
+        disposition_center=0.8, disposition_variance=0.05,
+    )
+
+
+def test_staged_species_surfaces_as_a_ship_in_its_sector() -> None:
+    """A friendly contact is visible as a present vessel so the player can see/hail it."""
+    world = _world()
+    world.regions = {1: Region(1, "Hub")}  # game_view renders the sector region label
+    world.species = {
+        1: _species(1, 2, "Vesk"),   # in the player's sector (sector 2)
+        2: _species(2, 4, "Selvani"),  # elsewhere
+    }
+    here = session.game_view(world, 1, CONFIG).sector
+    assert here.ships == ["Vesk vessel"]  # only the one in this sector, not the distant one
+    assert here.contact_ids == [1]  # parallel to `ships` — clicking the row hails species 1
+
+
+def test_empty_sector_lists_no_ships() -> None:
+    world = _world()  # no species placed
+    world.regions = {1: Region(1, "Hub")}
+    assert session.game_view(world, 1, CONFIG).sector.ships == []
 
 
 def test_engine_room_view_projects_slots_and_derived_aspects() -> None:

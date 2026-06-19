@@ -322,6 +322,10 @@ class Player:
     # effective disposition (`core.aliens.effective_disposition`, §6). Empty until the
     # player deals with a species (WP9).
     species_attitudes: Mapping[int, float] = field(default_factory=dict)
+    # Where each species was last encountered (species_id -> sector_id), stamped at hail
+    # time so the dossier records the contact point even after the alien moves on (§6,
+    # alien-movement WP). Reconstructs under replay (set by the Hail reducer).
+    species_last_seen: Mapping[int, int] = field(default_factory=dict)
     # Dialogue no-repeat ring (DESIGN §6.7): per (species_id, context) the last K
     # variant indices spoken, so a repeat encounter rephrases rather than replays.
     # Cosmetic but persisted (it rides the command log via contact commands, WP9) so

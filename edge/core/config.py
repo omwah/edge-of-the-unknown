@@ -548,6 +548,10 @@ class RosterConfig(BaseModel):
     species: list[SpeciesConfig]
     subset_min: int = 6
     subset_max: int = 12
+    # High-traffic Core hub: at least this many distinct Core-welcome species (governing
+    # alliance members + unaligned neutrals) are staged at the StarDock so a brand-new
+    # player meets friendly aliens at the one place every game funnels through (§6.3).
+    stardock_contacts: int = Field(default=2, ge=0)
     # Persona id → a shareable dialogue pack of generic, voice-correct lines (§6.7). A
     # species inherits its `persona`'s pack and overrides only distinctive beats; the
     # special `generic` persona is the ultimate fallback so a line never blanks.

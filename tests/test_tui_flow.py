@@ -364,6 +364,39 @@ async def test_hail_opens_contact_then_buys_tech() -> None:
         assert sum(svc.state.ships[1].components.values()) == 1
 
 
+async def test_click_ship_hails_that_specific_species() -> None:
+    """Two contacts in the sector: clicking the second ship hails it, not the first."""
+    from edge.core.models import AlienSpecies
+    from edge.tui.screens.contact import AlienContactScreen
+    from edge.tui.widgets import ClickableEntry
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        _inject_species(svc, "vesk")  # id 1, the "first" ship (H would hail this one)
+        sc2 = svc.config.roster.species_by_id("selvani")
+        sector_id = svc.state.ships[1].sector_id
+        svc.state.species[2] = AlienSpecies(
+            id=2, roster_id="selvani", name=sc2.name, archetype_id=sc2.archetype_id,
+            sector_id=sector_id, home_band="Hub", tech_level=sc2.tech_level,
+            base_disposition=0.9, disposition_center=sc2.disposition_center,
+            disposition_variance=sc2.disposition_variance, alliance_id=sc2.alliance_id,
+            trade_posture=sc2.trade_posture, treaty_mode=sc2.treaty_mode, persona=sc2.persona)
+        await app.screen.recompose()  # render the now-present ships
+        await pilot.pause()
+        rows = [e for e in app.screen.query(ClickableEntry) if "vessel" in str(e.render())]
+        assert len(rows) == 2  # both contacts show as clickable ships
+        await pilot.click(next(e for e in rows if sc2.name in str(e.render())))  # click Selvani
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        met = svc.state.players[1].species_attitudes
+        assert 2 in met and 1 not in met  # hailed the clicked ship, not the first
+
+
 async def test_haggle_session_stays_open_across_a_rejected_round() -> None:
     from textual.widgets import Input
 

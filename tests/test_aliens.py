@@ -22,6 +22,7 @@ from edge.core.aliens import (
     is_friendly,
 )
 from edge.core.config import GameConfig, RosterConfig
+from edge.core.enums import PortClass
 from edge.core.models import AlienSpecies, Player
 
 CFG = load_default_config()
@@ -133,10 +134,25 @@ def test_all_placed_species_are_friendly_and_outside_core(seed: int) -> None:
     state = generate(WIDE, seed)
     assert state.species  # the default roster always places some
     core = {s.id for s in state.sectors.values() if s.is_galactic_core}
+    dock_sector = next(p.sector_id for p in state.ports.values() if p.klass is PortClass.STARDOCK)
     for sp in state.species.values():
         assert is_friendly(sp.base_disposition, CFG.aliens)
-        assert sp.sector_id not in core
+        # No Core placement except the sanctioned StarDock hub (high-traffic, §6.3).
+        assert sp.sector_id not in core or sp.sector_id == dock_sector
         assert sp.alliance_id is None or sp.alliance_id in state.alliances
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_stardock_hosts_at_least_two_core_welcome_species(seed: int) -> None:
+    """The high-traffic hub always greets a new player with ≥2 distinct friendly species."""
+    state = generate(WIDE, seed)
+    dock_sector = next(p.sector_id for p in state.ports.values() if p.klass is PortClass.STARDOCK)
+    gov = state.game.core_governing_alliance_id
+    at_dock = [sp for sp in state.species.values() if sp.sector_id == dock_sector]
+    assert len({sp.roster_id for sp in at_dock}) >= CFG.roster.stardock_contacts  # type: ignore[union-attr]
+    for sp in at_dock:
+        assert sp.alliance_id in (gov, None)  # Core-welcome: governor's own or unaligned
+        assert is_friendly(sp.base_disposition, CFG.aliens)
 
 
 @pytest.mark.parametrize("seed", range(30))
