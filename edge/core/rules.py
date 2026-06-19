@@ -18,7 +18,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import assert_never
 
-from edge.core.config import GameConfig
+from edge.core import dialogue
+from edge.core.aliens import effective_disposition
+
+from edge.core.config import GameConfig, SpeciesConfig, TechOfferConfig
 from edge.core.economy import (
     EconomyError,
     HaggleStatus,
@@ -45,6 +48,9 @@ from edge.core.enums import (
     Subsystem,
 )
 from edge.core.events import (
+    AlienHailed,
+    AlienTraded,
+    AttitudeChanged,
     Banked,
     Colonized,
     ColonistsRecruited,
@@ -69,6 +75,7 @@ from edge.core.events import (
 from edge.core.planets import is_colonizable, retype_planet
 from edge.core.starbases import is_operational
 from edge.core.models import (
+    AlienSpecies,
     Discovery,
     Game,
     InstalledComponent,
@@ -272,12 +279,50 @@ class FieldPatch:
     slot_index: int
 
 
+@dataclass(frozen=True, slots=True)
+class Hail:
+    """Open contact with a friendly species in the current sector (§6, §6.7, WP9).
+
+    Marks the species met and advances the greeting recency ring so re-hailing
+    rephrases rather than replays. No combat — Phase 2 places only friendly species.
+    """
+
+    species_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class BuyAlienTech:
+    """Buy an alien tech offer for latinum (§6, §8, WP9).
+
+    `offer_index` indexes the species' `tech_offers`; the offer must be latinum-mode,
+    reachable at the player's effective disposition, and affordable. Delivers a loose
+    component or a flat aspect upgrade and raises the player's attitude with the species.
+    """
+
+    species_id: int
+    offer_index: int
+
+
+@dataclass(frozen=True, slots=True)
+class BarterArtifact:
+    """Barter a recovered artifact for an alien tech offer (§6, §8, WP9).
+
+    The offer must be barter-mode and reachable; the player spends one artifact of the
+    offer's tier (a discovery payload, §7) for tech no latinum sale gives — the
+    exit-criterion payoff. Raises attitude like a purchase.
+    """
+
+    species_id: int
+    offer_index: int
+
+
 Command = (
     Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SetAllocation
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
+    | Hail | BuyAlienTech | BarterArtifact
 )
 
 
@@ -368,6 +413,12 @@ def reduce(
             return _buy_genesis(state, player_id, config)
         case DeployGenesis():
             return _deploy_genesis(state, player_id, command, config)
+        case Hail():
+            return _hail(state, player_id, command, config)
+        case BuyAlienTech():
+            return _buy_alien_tech(state, player_id, command, config)
+        case BarterArtifact():
+            return _barter_artifact(state, player_id, command, config)
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -1151,3 +1202,152 @@ def _deploy_genesis(
         events=(GenesisDeployed(player_id, planet.id, gen.result_type),),
         ships=(new_ship,), planets=(new_planet,),
     )
+
+
+# --- alien contact: hail / buy / barter (§6, §8, WP9) -----------------------
+
+
+def _species_here(state: UniverseState, ship: Ship, species_id: int) -> AlienSpecies:
+    """The species at the player's current sector, or raise if not in contact range."""
+    species = state.species.get(species_id)
+    if species is None or species.sector_id != ship.sector_id:
+        raise EconomyError("no such species in this sector")
+    return species
+
+
+def _species_config(config: GameConfig, species: AlienSpecies) -> SpeciesConfig:
+    if config.roster is None:
+        raise EconomyError("no species roster configured")
+    sc = config.roster.species_by_id(species.roster_id)
+    if sc is None:
+        raise EconomyError(f"species {species.roster_id!r} is not in the roster")
+    return sc
+
+
+def _advance_recency(player: Player, species_id: int, context: str,
+                     new_ring: tuple[int, ...]) -> dict[tuple[int, str], tuple[int, ...]]:
+    """A copy of the player's dialogue recency with one (species, context) slot updated."""
+    recency = dict(player.dialogue_recency)
+    recency[(species_id, context)] = new_ring
+    return recency
+
+
+def _met(player: Player, species_id: int) -> Mapping[int, float]:
+    """Mark a species met (attitude entry exists) without changing the offset."""
+    if species_id in player.species_attitudes:
+        return player.species_attitudes
+    return {**player.species_attitudes, species_id: 0.0}
+
+
+def _hail(state: UniverseState, player_id: int, cmd: Hail, config: GameConfig) -> ReduceResult:
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    species = _species_here(state, ship, cmd.species_id)
+    assert config.roster is not None
+    # Advance the greeting ring (re-hailing rephrases) and mark the species met.
+    ring = player.dialogue_recency.get((species.id, "greeting"), ())
+    rng = dialogue.encounter_rng(state.game.seed, species.id, "greeting", ring)
+    _, new_ring = dialogue.speak(config.roster, species, player, "greeting",
+                                 aliens=config.aliens, rng=rng)
+    new_player = replace(player, species_attitudes=_met(player, species.id),
+                         dialogue_recency=_advance_recency(player, species.id, "greeting", new_ring))
+    return ReduceResult(events=(AlienHailed(player_id, species.id),), players=(new_player,))
+
+
+def _select_offer(config: GameConfig, species: AlienSpecies, player: Player,
+                  offer_index: int) -> TechOfferConfig:
+    sc = _species_config(config, species)
+    if not 0 <= offer_index < len(sc.tech_offers):
+        raise EconomyError("no such tech offer")
+    offer = sc.tech_offers[offer_index]
+    if effective_disposition(species, player) < offer.min_disposition:
+        raise EconomyError("they will not offer you that yet — raise your standing first")
+    return offer
+
+
+def _deliver_offer(ship: Ship, offer: TechOfferConfig) -> tuple[Ship, str]:
+    """Apply a tech offer to the hull: a loose component or a flat aspect bump."""
+    if offer.component is not None:
+        if ship.holds_free < 1:
+            raise EconomyError("no free hold for the component — sell cargo first")
+        component, tier = Component(offer.component), ComponentTier[offer.tier]
+        key = (component, tier)
+        new_ship = replace(ship, components={**ship.components, key: ship.components.get(key, 0) + 1})
+        return new_ship, f"{component.value} ({offer.tier})"
+    if offer.aspect == "sensors":
+        return replace(ship, sensor_rating=ship.sensor_rating + offer.amount), f"sensors +{offer.amount}"
+    if offer.aspect == "cloak":
+        return replace(ship, cloak_rating=ship.cloak_rating + offer.amount), f"cloak +{offer.amount}"
+    if offer.aspect == "holds":
+        return replace(ship, holds_total=ship.holds_total + offer.amount), f"holds +{offer.amount}"
+    raise EconomyError(f"unsupported tech offer ({offer.aspect})")
+
+
+def _raise_attitude(player: Player, species: AlienSpecies,
+                    config: GameConfig) -> tuple[Player, AttitudeChanged]:
+    """Raise the player's attitude offset toward `species` (capped so effective ≤ 1)."""
+    sc = _species_config(config, species)
+    cap = max(0.0, 1.0 - species.base_disposition)
+    current = player.species_attitudes.get(species.id, 0.0)
+    new_offset = min(cap, current + sc.attitude_gain_rate)
+    attitudes = {**player.species_attitudes, species.id: new_offset}
+    new_player = replace(player, species_attitudes=attitudes)
+    effective = effective_disposition(species, new_player)
+    return new_player, AttitudeChanged(player.id, species.id, round(new_offset, 6), round(effective, 6))
+
+
+def _trade_alien(state: UniverseState, player_id: int, species_id: int, offer_index: int,
+                 config: GameConfig, *, barter: bool) -> ReduceResult:
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    species = _species_here(state, ship, species_id)
+    assert config.roster is not None
+    offer = _select_offer(config, species, player, offer_index)
+
+    cost = 0
+    if barter:
+        if offer.mode != "barter":
+            raise EconomyError("that offer is a latinum sale, not a barter")
+        if player.artifacts.get(offer.tier, 0) < 1:
+            raise EconomyError(f"you have no Tier-{offer.tier} artifact to barter")
+    else:
+        if offer.mode != "latinum":
+            raise EconomyError("that offer is barter-only — trade an artifact for it")
+        cost = offer.price
+        if player.latinum < cost:
+            raise EconomyError("insufficient latinum for that offer")
+
+    new_ship, detail = _deliver_offer(ship, offer)
+    new_player = player
+    if barter:
+        artifacts = dict(player.artifacts)
+        artifacts[offer.tier] = artifacts[offer.tier] - 1
+        if artifacts[offer.tier] == 0:
+            del artifacts[offer.tier]
+        new_player = replace(new_player, artifacts=artifacts)
+    else:
+        new_player = replace(new_player, latinum=new_player.latinum - cost)
+
+    new_player, attitude_event = _raise_attitude(new_player, species, config)
+    # Advance the trade dialogue ring so a repeat sale rephrases.
+    ring = player.dialogue_recency.get((species.id, "trade_open"), ())
+    rng = dialogue.encounter_rng(state.game.seed, species.id, "trade_open", ring)
+    _, new_ring = dialogue.speak(config.roster, species, new_player, "trade_open",
+                                 aliens=config.aliens, rng=rng)
+    new_player = replace(new_player,
+                         dialogue_recency=_advance_recency(new_player, species.id, "trade_open", new_ring))
+    kind = "barter" if barter else "buy"
+    return ReduceResult(
+        events=(AlienTraded(player_id, species.id, kind, detail, cost), attitude_event),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _buy_alien_tech(state: UniverseState, player_id: int, cmd: BuyAlienTech,
+                    config: GameConfig) -> ReduceResult:
+    return _trade_alien(state, player_id, cmd.species_id, cmd.offer_index, config, barter=False)
+
+
+def _barter_artifact(state: UniverseState, player_id: int, cmd: BarterArtifact,
+                     config: GameConfig) -> ReduceResult:
+    return _trade_alien(state, player_id, cmd.species_id, cmd.offer_index, config, barter=True)

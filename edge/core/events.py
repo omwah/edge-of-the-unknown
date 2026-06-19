@@ -211,3 +211,40 @@ class StockRegenerated(Event):
     port_id: int
     commodity: Commodity
     new_stock: int
+
+
+@dataclass(frozen=True)
+class AlienHailed(Event):
+    """The player opened contact with a friendly species (§6, §6.7, WP9)."""
+
+    player_id: int
+    species_id: int
+
+
+@dataclass(frozen=True)
+class AlienTraded(Event):
+    """Bought or bartered alien tech (§6, §8, WP9).
+
+    `kind` is "buy" (latinum) or "barter" (an artifact); `detail` labels the delivered
+    upgrade (a component+tier, or an aspect); `cost` is the latinum paid (0 for barter).
+    """
+
+    player_id: int
+    species_id: int
+    kind: str
+    detail: str
+    cost: int
+
+
+@dataclass(frozen=True)
+class AttitudeChanged(Event):
+    """The player's standing with a species shifted (§6, WP9).
+
+    `offset` is the new accumulated attitude offset; `effective` the resulting effective
+    disposition (base + offset, clamped) that gates greetings, prices, and tech tiers.
+    """
+
+    player_id: int
+    species_id: int
+    offset: float
+    effective: float

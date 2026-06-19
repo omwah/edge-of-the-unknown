@@ -12,7 +12,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from edge.bigbang.topology import bfs_distances
-from edge.core import dto
+from edge.core import dialogue, dto
+from edge.core.aliens import disposition_band, effective_disposition
 from edge.core.config import GameConfig
 from edge.core.discovery import is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
@@ -43,7 +44,16 @@ from edge.core.events import (
     Traded,
     Warped,
 )
-from edge.core.models import Planet, Player, Port, Sector, Ship, SubsystemState, UniverseState
+from edge.core.models import (
+    AlienSpecies,
+    Planet,
+    Player,
+    Port,
+    Sector,
+    Ship,
+    SubsystemState,
+    UniverseState,
+)
 from edge.core.planets import is_colonizable
 from edge.core.starbases import is_operational
 
@@ -507,6 +517,137 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     pairs.sort(key=lambda tp: tp.per_turn, reverse=True)
     top = pairs[:3]
     return dto.ComputerDTO(pairs=top, selected=top[0].pair if top else "—")
+
+
+def _line(state: UniverseState, roster: object, species: AlienSpecies, player: Player,
+          context: str, config: GameConfig, *, salt: str = "",
+          extra: Mapping[str, str] | None = None) -> str:
+    """Render a dialogue line **read-only** (the recency ring is not advanced here).
+
+    The projection shows a stable line until a reducer (hail/trade) advances the ring;
+    both seed the same deterministic RNG, so they agree and replay reproduces them.
+    """
+    ring = player.dialogue_recency.get((species.id, context), ())
+    rng = dialogue.encounter_rng(state.game.seed, species.id, context + salt, ring)
+    text, _ = dialogue.speak(roster, species, player, context,  # type: ignore[arg-type]
+                             aliens=config.aliens, rng=rng, extra=extra)
+    return text
+
+
+def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOfferDTO]) -> list[dto.ContactVerbDTO]:
+    """Derive the conversation verb menu from species params (§6.7), greying with reasons."""
+    posture = getattr(sc, "trade_posture", "open")
+    treaty_mode = getattr(sc, "treaty_mode", "open")
+    combatant = getattr(sc, "combatant", True)
+    has_latinum = any(o.mode == "latinum" for o in offers)
+    has_barter = any(o.mode == "barter" for o in offers)
+
+    verbs = [dto.ContactVerbDTO("hail", "Hail / greet")]
+    # TRADE (latinum sales).
+    if posture == "refuses":
+        verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "they refuse to trade"))
+    elif posture == "alliance_gated":
+        verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "requires alliance membership (Phase 3)"))
+    elif posture == "circuit_gated":
+        verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "needs a reprogram circuit (Phase 3)"))
+    elif not has_latinum:
+        verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "nothing for sale in latinum"))
+    else:
+        verbs.append(dto.ContactVerbDTO("trade", "Buy tech"))
+    # BARTER (artifacts → tech no latinum sale offers).
+    verbs.append(dto.ContactVerbDTO("barter", "Barter artifact", has_barter,
+                                    "" if has_barter else "they offer no barter"))
+    # TREATY — Phase 3.
+    treaty_reason = {
+        "none": "they sign no treaties", "superfluous": "a treaty would be superfluous",
+        "home_planet_only": "treaty requires their homeworld (Phase 3)",
+    }.get(treaty_mode, "treaties open in a later phase")
+    verbs.append(dto.ContactVerbDTO("treaty", "Treaty", False, treaty_reason))
+    # FIGHT — Phase 3; Phase 2 places only friendly species.
+    verbs.append(dto.ContactVerbDTO("fight", "Attack", False,
+                                    "non-combatant" if not combatant else "they are friendly"))
+    verbs.append(dto.ContactVerbDTO("leave", "Leave"))
+    return verbs
+
+
+def _tech_offers(species: AlienSpecies, sc: object, player: Player, ship: Ship,
+                 effective: float) -> list[dto.TechOfferDTO]:
+    """Annotate each tech offer with its price/barter cost and availability (§6, §8)."""
+    out: list[dto.TechOfferDTO] = []
+    for i, offer in enumerate(getattr(sc, "tech_offers", [])):
+        label = (f"{offer.component} ({offer.tier})" if offer.component
+                 else f"{offer.aspect} +{offer.amount}")
+        needs_hold = offer.component is not None
+        reachable = effective >= offer.min_disposition
+        reason = ""
+        if offer.mode == "latinum":
+            price, barter_cost = offer.price, ""
+            available = reachable and player.latinum >= price and (not needs_hold or ship.holds_free >= 1)
+            if not reachable:
+                reason = f"needs standing ≥ {offer.min_disposition:.2f}"
+            elif player.latinum < price:
+                reason = "insufficient latinum"
+            elif needs_hold and ship.holds_free < 1:
+                reason = "no free hold"
+        else:  # barter
+            price, barter_cost = 0, f"1 Tier-{offer.tier} artifact"
+            have = player.artifacts.get(offer.tier, 0) >= 1
+            available = reachable and have and (not needs_hold or ship.holds_free >= 1)
+            if not reachable:
+                reason = f"needs standing ≥ {offer.min_disposition:.2f}"
+            elif not have:
+                reason = f"need a Tier-{offer.tier} artifact"
+            elif needs_hold and ship.holds_free < 1:
+                reason = "no free hold"
+        out.append(dto.TechOfferDTO(
+            index=i, label=label, tier=offer.tier, mode=offer.mode, price=price,
+            barter_cost=barter_cost, available=available, reason=reason,
+        ))
+    return out
+
+
+def contact_view(state: UniverseState, player_id: int, species_id: int,
+                 config: GameConfig) -> dto.ContactDTO:
+    """The alien-contact screen for a species in the player's sector (§6, §6.7, §11).
+
+    Renders the WP8 greeting opener, the derived verb menu, the tech-offer list (latinum
+    vs barter, gated by effective disposition), and dossier lines about other met species
+    in this species' voice. Read-only: dialogue lines are stable until a hail/trade
+    reducer advances the recency ring.
+    """
+    if config.roster is None:
+        raise EconomyError("no species roster configured")
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    species = state.species.get(species_id)
+    if species is None:
+        raise EconomyError("no such species")
+    roster = config.roster
+    sc = roster.species_by_id(species.roster_id)
+
+    allied = player.alliance_id is not None and player.alliance_id == species.alliance_id
+    effective = effective_disposition(species, player)
+    standing = dialogue.standing_for(effective, allied=allied, aliens=config.aliens)
+    band = disposition_band(effective, config.aliens)
+    alliance = roster.alliance(species.alliance_id) if species.alliance_id is not None else None
+
+    offers = _tech_offers(species, sc, player, ship, effective)
+    dossier = [
+        _line(state, roster, species, player, "dossier_other", config,
+              salt=f":{other_id}", extra={"subject": other.name})
+        for other_id in sorted(player.species_attitudes)
+        if other_id != species_id and (other := state.species.get(other_id)) is not None
+    ]
+    return dto.ContactDTO(
+        species=species.name, persona=species.persona,
+        alliance=alliance.name if alliance else "unaligned",
+        standing=standing, band=band, disposition_filled=max(0, min(5, round(effective * 5))),
+        base_disposition=round(species.base_disposition, 3),
+        attitude=round(player.species_attitudes.get(species_id, 0.0), 3),
+        effective=round(effective, 3),
+        opener=_line(state, roster, species, player, "greeting", config),
+        verbs=_contact_verbs(species, sc, offers), offers=offers, dossier=dossier,
+    )
 
 
 def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
