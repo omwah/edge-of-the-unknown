@@ -14,8 +14,7 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from edge.core.economy import EconomyError
-from edge.core.events import Traded
-from edge.core.rules import HaggleOffer, Trade
+from edge.core.rules import Trade
 from edge.server.service import GameService
 from edge.tui.screens.haggle import HaggleScreen
 from edge.tui.widgets import NAME_TO_COMMODITY, TradePanel
@@ -106,24 +105,13 @@ def _haggle_highlighted(screen: Screen, service: GameService, player_id: int) ->
         return
     commodity = NAME_TO_COMMODITY[line.name]
 
-    def _commit(counter: int | None) -> None:
-        if counter is None:
-            return
-        try:
-            events = service.apply(player_id, HaggleOffer(commodity=commodity, units=qty,
-                                                          counter_price=counter))
-        except EconomyError as exc:
-            screen.notify(str(exc), severity="warning", timeout=3)
-            return
+    def _after(_traded: bool | None) -> None:
+        # The multi-round screen issues the offers itself and self-notifies each round;
+        # we only refresh the panel from the resulting state when it closes (§8, WP13).
         _refresh(panel, service, player_id)
-        if any(isinstance(e, Traded) for e in events):
-            verb = "Bought" if line.mode == "SELL" else "Sold"
-            screen.notify(f"Deal! {verb} {qty} {line.name} @ {counter}/u.", timeout=2)
-        else:
-            screen.notify("No deal — they passed on that price.", severity="warning", timeout=2)
 
     screen.app.push_screen(
-        HaggleScreen(service, player_id, commodity, line.name, line.mode, line.price, qty), _commit)
+        HaggleScreen(service, player_id, commodity, line.name, line.mode, line.price, qty), _after)
 
 
 def _refresh(panel: TradePanel, service: GameService, player_id: int) -> None:
