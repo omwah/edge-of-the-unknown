@@ -322,6 +322,11 @@ class Player:
     # effective disposition (`core.aliens.effective_disposition`, §6). Empty until the
     # player deals with a species (WP9).
     species_attitudes: Mapping[int, float] = field(default_factory=dict)
+    # Dialogue no-repeat ring (DESIGN §6.7): per (species_id, context) the last K
+    # variant indices spoken, so a repeat encounter rephrases rather than replays.
+    # Cosmetic but persisted (it rides the command log via contact commands, WP9) so
+    # dialogue stays reproducible from (seed, command log). Empty until first contact.
+    dialogue_recency: Mapping[tuple[int, str], tuple[int, ...]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
