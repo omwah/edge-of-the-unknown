@@ -246,9 +246,13 @@ def _occupy_species() -> AlienSpecies:
     )
 
 
-def test_may_occupy_bars_the_core() -> None:
-    state, sp = _occupy_state(), _occupy_species()
-    assert not may_occupy(state, sp, 1, CFG.aliens)  # Core stays protected/empty
+def test_may_occupy_bars_the_core_except_for_the_governor() -> None:
+    from dataclasses import replace
+
+    state, sp = _occupy_state(), _occupy_species()  # sp is alliance 2; the Core governor is 1
+    assert not may_occupy(state, sp, 1, CFG.aliens)  # a non-governor may not enter the Core
+    governor = replace(sp, alliance_id=state.game.core_governing_alliance_id)
+    assert may_occupy(state, governor, 1, CFG.aliens)  # the governor's own may roam it (WP18)
 
 
 def test_may_occupy_bars_rival_territory_allows_neutral_and_own() -> None:

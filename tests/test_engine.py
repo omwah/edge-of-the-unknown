@@ -172,3 +172,20 @@ def test_drift_never_lands_in_core_or_rival_territory(tmp_path: Path, seed: int)
     cfg = _with_drift(svc.config, 1.0)
     for sp in alien_drift(svc.state, cfg).species:
         assert may_occupy(svc.state, sp, sp.sector_id, cfg.aliens)
+
+
+def test_drift_lets_governor_members_into_the_core_but_not_others() -> None:
+    """WP18: the governing alliance's members may drift into the Core; others never (WP16).
+
+    Sector 5's only neighbour is the Core (sector 1): a deterministic contrast — the
+    governor must step in, a non-governor is hemmed in and stays put.
+    """
+    state = _drift_world()
+    cfg = _with_drift(load_default_config(), 1.0)
+    gov = state.game.core_governing_alliance_id
+
+    state.species = {1: _sp(1, 5, alliance_id=gov)}
+    assert alien_drift(state, cfg).species[0].sector_id == 1  # the governor enters its capital
+
+    state.species = {1: _sp(1, 5, alliance_id=2)}
+    assert alien_drift(state, cfg).species == ()  # a rival/unaligned ship can't — no legal move
