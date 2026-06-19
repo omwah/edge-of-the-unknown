@@ -20,10 +20,19 @@ from edge.core.aliens import (
     disposition_band,
     effective_disposition,
     is_friendly,
+    may_occupy,
 )
 from edge.core.config import GameConfig, RosterConfig
 from edge.core.enums import PortClass
-from edge.core.models import AlienSpecies, Player
+from edge.core.models import (
+    AlienSpecies,
+    Game,
+    Ownership,
+    Planet,
+    Player,
+    Sector,
+    UniverseState,
+)
 
 CFG = load_default_config()
 SMALL = CFG.model_copy(update={"bigbang": CFG.bigbang.model_copy(update={"sector_count": 80})})
@@ -202,3 +211,46 @@ def test_roster_lookup_helpers() -> None:
     assert roster.alliance(999) is None
     assert roster.species_by_id("vesk") is not None
     assert roster.species_by_id("nope") is None
+
+
+# --- WP16: territory validity (may_occupy) ---
+
+
+def _occupy_state() -> UniverseState:
+    """A tiny world: a Core sector, an empty sector, a rival-owned and an own-owned one."""
+    game = Game(1, 1, 1, "t", core_governing_alliance_id=1)
+    state = UniverseState.new(game)
+    state.sectors = {
+        1: Sector(1, 1, (), "Hub", is_galactic_core=True),
+        2: Sector(2, 1, (), "Frontier"),  # empty / neutral
+        3: Sector(3, 1, (), "Frontier"),  # holds a rival-alliance planet (bloc 9)
+        4: Sector(4, 1, (), "Frontier"),  # holds the species' own-alliance planet (bloc 2)
+        5: Sector(5, 1, (), "Frontier"),  # holds an unowned planet
+    }
+    state.planets = {
+        1: Planet(1, 3, "Rival", "barren", owner=Ownership("alliance", 9)),
+        2: Planet(2, 4, "Home", "barren", owner=Ownership("alliance", 2)),
+        3: Planet(3, 5, "Free", "barren", owner=Ownership("none")),
+    }
+    return state
+
+
+def _occupy_species() -> AlienSpecies:
+    return AlienSpecies(
+        id=1, roster_id="x", name="X", archetype_id="a", sector_id=2, home_band="Frontier",
+        tech_level=5, base_disposition=0.7, disposition_center=0.7, disposition_variance=0.1,
+        alliance_id=2,
+    )
+
+
+def test_may_occupy_bars_the_core() -> None:
+    state, sp = _occupy_state(), _occupy_species()
+    assert not may_occupy(state, sp, 1, CFG.aliens)  # Core stays protected/empty
+
+
+def test_may_occupy_bars_rival_territory_allows_neutral_and_own() -> None:
+    state, sp = _occupy_state(), _occupy_species()
+    assert may_occupy(state, sp, 2, CFG.aliens)  # empty/neutral
+    assert not may_occupy(state, sp, 3, CFG.aliens)  # rival bloc's holding
+    assert may_occupy(state, sp, 4, CFG.aliens)  # the species' own holding
+    assert may_occupy(state, sp, 5, CFG.aliens)  # unowned planet is fine

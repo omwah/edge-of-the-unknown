@@ -379,6 +379,13 @@ class AliensConfig(BaseModel):
     amity_threshold: float = 0.65
     escape_floor: float = 0.10  # player escape chance never drops below this (§10)
 
+    # Alien ship drift (WP16, §6.3): each species rolls `drift_move_chance` per firing
+    # to warp to a uniformly-chosen legal adjacent sector. A quiet galaxy is chance 0
+    # or `drift_enabled=False`. `drift_ticks_per_firing` is the cron cadence.
+    drift_enabled: bool = True
+    drift_move_chance: float = Field(default=0.25, ge=0.0, le=1.0)
+    drift_ticks_per_firing: int = Field(default=3600, ge=1)  # in ticks (≈ hourly at 1 tick/s)
+
 
 class AllianceConfig(BaseModel):
     """One alliance / rival bloc in the roster (DESIGN §6.3)."""
