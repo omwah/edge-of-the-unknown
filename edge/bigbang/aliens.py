@@ -21,7 +21,8 @@ from __future__ import annotations
 import random
 
 from edge.core.aliens import is_friendly
-from edge.core.config import GameConfig
+from edge.core.config import GameConfig, RosterConfig, SpeciesConfig
+from edge.core.enums import PortClass
 from edge.core.models import Alliance, AlienSpecies, UniverseState
 
 # Independent draw stream for species placement (§5 RNG discipline).
@@ -100,15 +101,51 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     placed: dict[int, AlienSpecies] = {}
     for sid, (sp, band) in enumerate(zip(chosen, assignment), start=1):
         sector_id = rng.choice(sectors_by_band[band])
-        base = _friendly_disposition(sp.disposition_center, sp.disposition_variance, config, rng)
-        assert is_friendly(base, config.aliens)  # Phase-2 placement invariant
-        placed[sid] = AlienSpecies(
-            id=sid, roster_id=sp.id, name=sp.name, archetype_id=sp.archetype_id,
-            sector_id=sector_id, home_band=band, tech_level=sp.tech_level,
-            base_disposition=base, disposition_center=sp.disposition_center,
-            disposition_variance=sp.disposition_variance,
-            alliance_id=sp.alliance_id, alliance_role=sp.alliance_role,
-            threat_tier=sp.threat_tier, trade_posture=sp.trade_posture,
-            treaty_mode=sp.treaty_mode, persona=sp.persona,
-        )
+        placed[sid] = _make_species(sid, sp, sector_id, band, config, rng)
+
+    _place_stardock_contacts(state, config, roster, rng, placed)
     state.species = placed
+
+
+def _make_species(sid: int, sp: SpeciesConfig, sector_id: int, band: str,
+                  config: GameConfig, rng: random.Random) -> AlienSpecies:
+    """Build one placed species, drawing its clamped friendly-band disposition (§6)."""
+    base = _friendly_disposition(sp.disposition_center, sp.disposition_variance, config, rng)
+    assert is_friendly(base, config.aliens)  # Phase-2 placement invariant
+    return AlienSpecies(
+        id=sid, roster_id=sp.id, name=sp.name, archetype_id=sp.archetype_id,
+        sector_id=sector_id, home_band=band, tech_level=sp.tech_level,
+        base_disposition=base, disposition_center=sp.disposition_center,
+        disposition_variance=sp.disposition_variance,
+        alliance_id=sp.alliance_id, alliance_role=sp.alliance_role,
+        threat_tier=sp.threat_tier, trade_posture=sp.trade_posture,
+        treaty_mode=sp.treaty_mode, persona=sp.persona,
+    )
+
+
+def _place_stardock_contacts(state: UniverseState, config: GameConfig, roster: RosterConfig,
+                             rng: random.Random, placed: dict[int, AlienSpecies]) -> None:
+    """Stage ≥`stardock_contacts` Core-welcome species at the StarDock (high-traffic hub, §6.3).
+
+    The Core is otherwise free of placed contacts, but every game funnels through the
+    StarDock — so a brand-new player should meet friendly aliens there. "Core-welcome"
+    means the governing alliance's own members plus unaligned neutrals (never a rival
+    bloc). Prefer species not already met in a band so the hub adds variety, falling back
+    to reuse only if the welcome pool is too small to field the requested count.
+    """
+    want = roster.stardock_contacts
+    dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
+    if want <= 0 or dock is None:
+        return
+    gov = state.game.core_governing_alliance_id
+    welcome = [s for s in sorted(roster.species, key=lambda s: s.id)
+               if s.alliance_id in (gov, None)]
+    already = {s.roster_id for s in placed.values()}
+    fresh = [s for s in welcome if s.id not in already]
+    pick_from = fresh if len(fresh) >= want else welcome
+    rng.shuffle(pick_from)
+    band = state.sectors[dock.sector_id].distance_band
+    next_id = max(placed, default=0) + 1
+    for sp in pick_from[:want]:
+        placed[next_id] = _make_species(next_id, sp, dock.sector_id, band, config, rng)
+        next_id += 1

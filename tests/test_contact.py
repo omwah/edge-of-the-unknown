@@ -243,6 +243,9 @@ def test_computer_dossier_reflects_met_species() -> None:
     assert entry is not None
     assert entry.standing == "friendly" and entry.note  # a voiced self-description
     assert "navigator" in entry.offers  # last-seen tech-offer summary
+    # The contact sector is stamped at hail time (spatial id), so it survives later movement.
+    here = state.ships[1].sector_id
+    assert entry.last_seen == str(state.spatial_ids.get(here, here))
 
 
 def test_computer_dossier_empty_before_meeting_anyone() -> None:

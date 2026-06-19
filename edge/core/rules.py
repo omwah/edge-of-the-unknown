@@ -1258,6 +1258,7 @@ def _hail(state: UniverseState, player_id: int, cmd: Hail, config: GameConfig) -
     _, new_ring = dialogue.speak(config.roster, species, player, "greeting",
                                  aliens=config.aliens, rng=rng)
     new_player = replace(player, species_attitudes=_met(player, species.id),
+                         species_last_seen={**player.species_last_seen, species.id: ship.sector_id},
                          dialogue_recency=_advance_recency(player, species.id, "greeting", new_ring))
     return ReduceResult(events=(AlienHailed(player_id, species.id),), players=(new_player,))
 

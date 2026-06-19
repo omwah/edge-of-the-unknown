@@ -102,12 +102,13 @@ class ComputerScreen(Screen):
             codex.add_row(Text("no discoveries logged yet", style="dim"), Text(""), Text(""), Text(""))
 
         dossier = self.query_one("#dossier-table", DataTable)
-        dossier.add_columns("Species", "Alliance", "Standing", "Disp", "Tech offers")
+        dossier.add_columns("Species", "Alliance", "Standing", "Last seen", "Disp", "Tech offers")
         if self._computer.dossier:
             for d in self._computer.dossier:
-                dossier.add_row(d.species, d.alliance, d.standing, bar(d.disposition_filled, 5), d.offers)
+                dossier.add_row(d.species, d.alliance, d.standing, f"S{d.last_seen}",
+                                bar(d.disposition_filled, 5), d.offers)
         else:
-            dossier.add_row(Text("no species met yet", style="dim"), Text(""), Text(""), Text(""), Text(""))
+            dossier.add_row(*(Text("no species met yet", style="dim"), *(Text(""),) * 5))
 
     def _dossier_notes(self) -> str:
         if not self._computer.dossier:
