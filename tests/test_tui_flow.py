@@ -285,7 +285,7 @@ async def test_descend_explore_log_flow() -> None:
 async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
     from textual.widgets import TabbedContent
 
-    from edge.tui.screens.engine_room import EngineRoomScreen
+    from edge.tui.screens.engine_room import EngineRoomScreen, _SubsystemPanel
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -299,12 +299,22 @@ async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
         await pilot.pause()
         loose = sum(svc.state.ships[1].components.values())
         assert loose == 1 and svc.state.players[1].latinum < lat0
-        # Slot it in the engine room — a derived aspect must rise.
+        # Slot it in the engine room. Install is a two-step interaction: select the
+        # loose component in the picker, then click a subsystem panel to drop it into
+        # that subsystem's first legal empty slot — a derived aspect then rises.
         await pilot.press("e")
         await pilot.pause()
-        assert isinstance(app.screen, EngineRoomScreen)
-        await pilot.press("i")  # install the on-hand part into a legal slot
+        screen = app.screen
+        assert isinstance(screen, EngineRoomScreen)
+        await pilot.click(screen.query(".loose_components").first())  # select the part
         await pilot.pause()
+        # Target whichever subsystem accepts the on-hand part (Tier-I parts are widely
+        # legal); a successful install reopens the screen, so stop once it lands.
+        for panel in list(screen.query(_SubsystemPanel)):
+            await pilot.click(panel)
+            await pilot.pause()
+            if sum(svc.state.ships[1].components.values()) == 0:
+                break
         assert sum(svc.state.ships[1].components.values()) == 0  # the loose part was installed
 
 
