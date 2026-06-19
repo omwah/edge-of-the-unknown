@@ -18,6 +18,7 @@ from edge.core.config import GameConfig
 from edge.core.discovery import is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import build_subsystems, derive_aspects
+from edge.core.movement import RoutePlan, plan_route, plan_route_legs
 from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
 from edge.core.events import (
     Banked,
@@ -527,6 +528,7 @@ def _codex_entries(state: UniverseState, player: Player) -> list[dto.CodexEntry]
         entries.append((disc.rarity_tier.value, dto.CodexEntry(
             name=f"{disc.kind.value} · {disc.rarity_tier.name}", location=location,
             rarity=disc.rarity_tier.name, detail="; ".join(_payload_lines(disc.payload)),
+            sector_id=disc.sector_id,
         )))
     entries.sort(key=lambda t: (-t[0], t[1].name))
     return [e for _, e in entries]
@@ -588,6 +590,79 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         pairs=top, selected=top[0].pair if top else "—",
         codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
     )
+
+
+def _hop_label(state: UniverseState, sector_id: int) -> str:
+    """A Route-tab hop label: spatial id plus any port/planet markers (§11, WP14)."""
+    did = _display(state, sector_id)
+    words = []
+    for code in _sector_codes(state, sector_id):
+        words.append({"S": "StarDock", "P": "port", "@": "planet"}.get(code, code))
+    return f"({did}) · {' '.join(words)}" if words else f"({did})"
+
+
+def _route_dto(state: UniverseState, player: Player, plan: RoutePlan) -> dto.RouteDTO:
+    """Map a pure `RoutePlan` to the read-only, spatial-id Route DTO (§11, WP14)."""
+    hops = [
+        dto.RouteHopDTO(
+            display_id=_display(state, h.sector_id),
+            label=_hop_label(state, h.sector_id),
+            one_way=h.one_way,
+        )
+        for h in plan.hops
+    ]
+    turns = player.turns_remaining
+    affordable = turns >= plan.turn_cost
+    if not plan.reachable:
+        reason = "No charted route — explore a path there first."
+    elif plan.src == plan.dst:
+        reason = "You are already here."
+    elif not affordable:
+        reason = f"Out of turns — needs {plan.turn_cost}, you have {turns}."
+    else:
+        reason = ""
+    one_ways = sum(1 for h in hops if h.one_way)
+    parts = [f"{len(hops)} hop{'s' if len(hops) != 1 else ''}", f"{plan.turn_cost} turns"]
+    if one_ways:
+        parts.append(f"{one_ways} one-way")
+    return dto.RouteDTO(
+        origin_display=_display(state, plan.src),
+        dest_display=_display(state, plan.dst),
+        hops=hops,
+        turn_cost=plan.turn_cost,
+        turns_remaining=turns,
+        affordable=affordable,
+        reachable=plan.reachable,
+        reason=reason,
+        hazards=[],  # Phase-3 encounter seam (empty in Phase 2)
+        summary=" · ".join(parts),
+    )
+
+
+def route_view(
+    state: UniverseState, player_id: int, dst_sector: int, config: GameConfig
+) -> dto.RouteDTO:
+    """Plot the fewest-hop route to `dst_sector` through explored space (§11, WP14)."""
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    plan = plan_route(
+        state.adjacency, ship.sector_id, dst_sector,
+        allowed=set(player.explored_sectors), turns_per_warp=ship.turns_per_warp,
+    )
+    return _route_dto(state, player, plan)
+
+
+def route_legs_view(
+    state: UniverseState, player_id: int, waypoints: list[int], config: GameConfig
+) -> dto.RouteDTO:
+    """Plot a multi-leg route through `waypoints` (the Trade round trip, §11, WP14)."""
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    plan = plan_route_legs(
+        state.adjacency, ship.sector_id, waypoints,
+        allowed=set(player.explored_sectors), turns_per_warp=ship.turns_per_warp,
+    )
+    return _route_dto(state, player, plan)
 
 
 def _line(state: UniverseState, roster: object, species: AlienSpecies, player: Player,
@@ -828,4 +903,5 @@ def _best_pair(state: UniverseState, buy_from: Port, sell_to: Port, units: int,
               f"{sell_to.name} (S{_display(state, sell_to.sector_id)})"),
         goods=best_goods,
         dist=hops, profit_rt=profit, per_turn=profit // hops,
+        buy_sector=buy_from.sector_id, sell_sector=sell_to.sector_id,
     )

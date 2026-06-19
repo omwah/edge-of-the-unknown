@@ -170,6 +170,44 @@ def test_computer_view_empty_without_discovered_ports() -> None:
     assert cv.pairs == [] and cv.selected == "—"
 
 
+# --- WP14: route_view / route_legs_view ---
+
+
+def test_route_view_maps_to_spatial_ids_and_costs() -> None:
+    # Ship at sector 2; route to 3 is one hop (no spatial_ids: display == internal).
+    rv = session.route_view(_world(), 1, 3, CONFIG)
+    assert rv.reachable and rv.affordable and rv.reason == ""
+    assert [h.display_id for h in rv.hops] == [3]
+    assert rv.origin_display == 2 and rv.dest_display == 3
+    assert rv.turn_cost == 1  # 1 hop * turns_per_warp(1)
+    assert rv.hazards == []  # Phase-2 seam stays empty
+
+
+def test_route_view_out_of_turns_is_reachable_but_unaffordable() -> None:
+    world = _world()
+    world.players[1] = Player(1, "you", 1, 2_000, turns_remaining=0,
+                              explored_sectors=frozenset({1, 2, 3}))
+    rv = session.route_view(world, 1, 3, CONFIG)
+    assert rv.reachable and not rv.affordable
+    assert "turns" in rv.reason.lower()
+
+
+def test_route_view_fogged_destination_is_unreachable() -> None:
+    # Sector 4 is not explored — no charted route within the fog set.
+    rv = session.route_view(_world(), 1, 4, CONFIG)
+    assert not rv.reachable and rv.hops == []
+    assert rv.reason != ""
+
+
+def test_route_legs_view_walks_the_trade_round_trip() -> None:
+    world = _world()
+    pair = session.computer_view(world, 1, CONFIG).pairs[0]
+    assert pair.buy_sector != -1 and pair.sell_sector != -1
+    rv = session.route_legs_view(world, 1, [pair.buy_sector, pair.sell_sector], CONFIG)
+    assert rv.reachable
+    assert rv.dest_display == session._display(world, pair.sell_sector)
+
+
 def test_map_view_orders_bands_and_counts() -> None:
     mv = session.map_view(_world(), 1)
     assert mv.you_sector == 2 and mv.you_band == "Hub"
