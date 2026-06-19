@@ -11,6 +11,7 @@ renders the passed sample DTO.
 
 from __future__ import annotations
 
+from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical
@@ -88,13 +89,14 @@ class _SubsystemPanel(Horizontal):
         slot = self._system.slots[idx]
         key = " [dim](keystone)[/]" if slot.keystone else ""
         if slot.state == "filled":
-            marker = "[green][✓][/]" if idx in self._selected_slots else "[green][+][/]"
+            marker = "[white][✓][/]" if idx in self._selected_slots else "[green][+][/]"
             return f"{marker} {slot.component}{key}"
         if slot.state == "knocked":
             return f"[red][!][/] {slot.component}  [red]knocked-out[/]"
         return "[dim][ ][/] [dim]____[/]"
 
-    async def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
+    @on(ClickableEntry.Picked)
+    async def on_component_picked(self, msg: ClickableEntry.Picked) -> None:
         if msg.dest != "slot":
             return
 
@@ -144,7 +146,7 @@ class _ComponentsPickerPanel(Vertical):
     def _component_line(self, component_desc: str) -> ClickableEntry:
 
         if component_desc in self._selected_components:
-            content = f"[green][✓][/] {component_desc}"
+            content = f"[white][✓][/] {component_desc}"
         else:
             content = f"[dim][ ][/] [dim]{component_desc}[/]"
 
@@ -155,7 +157,8 @@ class _ComponentsPickerPanel(Vertical):
             classes="loose_components"
         )
 
-    async def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
+    @on(ClickableEntry.Picked)
+    async def on_component_picked(self, msg: ClickableEntry.Picked) -> None:
 
         if msg.dest != "loose_component":
             return
@@ -228,7 +231,7 @@ class EngineRoomScreen(Screen):
                 yield self._component_picker
 
         yield Static(
-            f"[green][+][/] healthy   [green][✓][/] selected   "
+            f"[green][+][/] healthy   [white][✓][/] selected   "
             f"[red][!][/] knocked-out   [dim][ ][/] empty slot\n"
             f"Repair-kits x{r.kits}\n"
             f"[b]P[/] Field-patch   [b]X[/] Cannibalize   "
