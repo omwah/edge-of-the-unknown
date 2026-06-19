@@ -268,11 +268,26 @@ class DossierEntry:
 
 
 @dataclass(frozen=True)
+class PortDirEntry:
+    """One known port for the Computer's Ports tab (§11, WP15)."""
+
+    port_id: int
+    sector_id: int  # internal id (for the [P] route tie-in)
+    sector_display: int  # spatial id (§5.1), what the player reads
+    name: str
+    klass: str  # PortClass label, e.g. "Class 1 (BBS)"
+    buys: str  # "Org, Equ" — commodities the port buys
+    sells: str  # "Fuel" — commodities the port sells
+    dist: int  # hops from the player's current sector (BFS), -1 if unreachable
+
+
+@dataclass(frozen=True)
 class ComputerDTO:
     pairs: list[TradePair]
     selected: str
     codex: list[CodexEntry] = field(default_factory=list)
     dossier: list[DossierEntry] = field(default_factory=list)
+    ports: list[PortDirEntry] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

@@ -208,6 +208,34 @@ def test_route_legs_view_walks_the_trade_round_trip() -> None:
     assert rv.dest_display == session._display(world, pair.sell_sector)
 
 
+# --- WP15: ports directory ---
+
+
+def test_port_directory_lists_explored_ports_nearest_first() -> None:
+    cv = session.computer_view(_world(), 1, CONFIG)
+    # Both fixture ports sit in explored sectors (1 and 3); ship is at sector 2.
+    sectors = {e.sector_id for e in cv.ports}
+    assert sectors == {1, 3}
+    dists = [e.dist for e in cv.ports]
+    assert dists == sorted(dists)  # nearest first
+    assert all(e.dist == 1 for e in cv.ports)  # 2->1 and 2->3 are each one hop
+
+
+def test_port_directory_honours_fog_of_war() -> None:
+    world = _world()
+    # Explore only sector 2 (no ports there): the directory is empty.
+    world.players[1] = Player(1, "you", 1, 2_000, explored_sectors=frozenset({2}))
+    cv = session.computer_view(world, 1, CONFIG)
+    assert cv.ports == []
+
+
+def test_port_directory_buy_sell_labels_match_class() -> None:
+    cv = session.computer_view(_world(), 1, CONFIG)
+    bbs = next(e for e in cv.ports if e.sector_id == 1)  # CLASS_1 = BBS
+    assert "BBS" in bbs.klass
+    assert bbs.buys == "Fuel, Org" and bbs.sells == "Equ"
+
+
 def test_map_view_orders_bands_and_counts() -> None:
     mv = session.map_view(_world(), 1)
     assert mv.you_sector == 2 and mv.you_band == "Hub"
