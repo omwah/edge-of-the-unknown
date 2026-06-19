@@ -40,9 +40,9 @@ def test_universe_is_valid(seed: int) -> None:
     assert len(docks) == 1
     # Core flagged on sectors 1..N.
     assert all(state.sectors[s].is_galactic_core for s in range(1, cfg.core_sector_count + 1))
-    # Player, ship, and the Federation alliance are seeded.
+    # Player, ship, and the governing alliance (the roster's Federation) are seeded.
     assert state.players[1].alliance_id == 1
-    assert state.alliances[1].name == "Federation"
+    assert state.alliances[1].name == "Terran Federation"
     assert state.ships[state.players[1].ship_id].sector_id == 1
     assert state.game.core_governing_alliance_id == 1
 

@@ -10,6 +10,7 @@ ownership) arrive with their Phase-2/3 generation steps.
 from __future__ import annotations
 
 from edge.bigbang.topology import bfs_distances
+from edge.core.aliens import is_friendly
 from edge.core.config import GameConfig
 from edge.core.discovery import rarity_value
 from edge.core.economy import port_unit_price
@@ -30,6 +31,7 @@ def validate(state: UniverseState, config: GameConfig) -> None:
     _check_planet_ownership(state, config)
     _check_starbases(state)
     _check_discovery_gradient(state, config)
+    _check_species(state, config)
 
 
 def _check_reachable(state: UniverseState) -> None:
@@ -147,6 +149,43 @@ def _check_discovery_gradient(state: UniverseState, config: GameConfig) -> None:
                 f"(rank {mean_rank:.2f}≤{prev_rank:.2f} or value {mean_value:.0f}≤{prev_value:.0f})"
             )
         prev_rank, prev_value = mean_rank, mean_value
+
+
+def _check_species(state: UniverseState, config: GameConfig) -> None:
+    """Alien-placement invariants (§6 / §5 step 8, WP7).
+
+    Reference integrity (the governing alliance and every species' `alliance_id` resolve);
+    Phase-2 friendliness (every placed species sits in the amity band, so no hostile
+    encounter spawns, placed outside Core Space); and at least one contact per non-empty
+    distance band (the §5 step-8 resupply invariant). The disposition-rises-with-distance
+    gradient is a Phase-3 property (hostiles placed by band) — not asserted here, where
+    the friendly clamp gives a floor, not a monotone gradient.
+    """
+    if config.roster is None:
+        return
+    gov = state.game.core_governing_alliance_id
+    if gov is not None and gov not in state.alliances:
+        raise ValidationError(f"governing alliance {gov} is not in the roster")
+    if not state.species:
+        return
+
+    core_ids = {s.id for s in state.sectors.values() if s.is_galactic_core}
+    contact_bands: set[str] = set()
+    for sp in state.species.values():
+        if sp.alliance_id is not None and sp.alliance_id not in state.alliances:
+            raise ValidationError(f"species {sp.id} references missing alliance {sp.alliance_id}")
+        if sp.sector_id in core_ids:
+            raise ValidationError(f"species {sp.id} placed inside Core Space")
+        if not is_friendly(sp.base_disposition, config.aliens):
+            raise ValidationError(f"species {sp.id} placed below the amity band (Phase 2)")
+        contact_bands.add(state.sectors[sp.sector_id].distance_band)
+
+    for band in (b.name for b in config.bigbang.bands):
+        has_non_core = any(
+            not s.is_galactic_core and s.distance_band == band for s in state.sectors.values()
+        )
+        if has_non_core and band not in contact_bands:
+            raise ValidationError(f"no alien contact in band {band}")
 
 
 def _check_profitable_pair(state: UniverseState, config: GameConfig) -> None:

@@ -141,7 +141,7 @@ class _ComponentsPickerPanel(Vertical):
 
     def on_mount(self) -> None:
         self.border_title = "Loose Components"
-        self.border_subtitle = f"→ Select component(s), then subsystem"
+        self.border_subtitle = "→ Select component(s), then subsystem"
 
     def _component_line(self, component_desc: str) -> ClickableEntry:
 

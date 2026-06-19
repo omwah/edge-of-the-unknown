@@ -17,6 +17,7 @@ import random
 
 from edge.bigbang import populate as _populate
 from edge.bigbang import validate as _validate
+from edge.bigbang.aliens import populate_species
 from edge.bigbang.discoveries import salt_discoveries
 from edge.bigbang.numbering import assign_spatial_ids
 from edge.bigbang.topology import (
@@ -125,9 +126,10 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
         out, groups = build_graph(cfg, build_rng)
         bands = compute_bands(out, 1, cfg.bands)
 
+        gov = config.roster.core_governing_alliance_id if config.roster else 1
         game = Game(
             id=1, seed=seed, config_version=config.config_version,
-            created_at=created_at, core_governing_alliance_id=1,
+            created_at=created_at, core_governing_alliance_id=gov,
         )
         state = UniverseState.new(game)  # runtime rng = Random(seed), left untouched
 
@@ -153,6 +155,7 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
 
         _populate.populate(state, config, build_rng)
         salt_discoveries(state, config, attempt)  # §7 finds on an independent sub-RNG
+        populate_species(state, config)  # §6 friendly aliens on an independent sub-RNG (WP7)
 
         try:
             _validate.validate(state, config)

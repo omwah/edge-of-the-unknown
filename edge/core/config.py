@@ -13,13 +13,22 @@ and testable without touching the rules engine.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from edge.core.enums import Commodity, ComponentTier
 
 _FROZEN = ConfigDict(frozen=True, extra="forbid")
+
+# The built-in signature-mechanic hooks (DESIGN §6.2). A species' `signature_mechanic`
+# must name one of these; the roster validator checks it for reference integrity. The
+# hooks themselves are implemented in Phase 3 — authored-but-inert in Phase 2 (WP7).
+KNOWN_SIGNATURE_HOOKS = frozenset({
+    "trojan_gift", "reprogram_unlock", "influence_gate", "morality_judge",
+    "escalating_demand", "literalist", "contract_kill", "coordinate_broker",
+    "passage_broker", "flee_drop",
+})
 
 
 class CommodityPricing(BaseModel):
@@ -355,6 +364,177 @@ class GenesisConfig(BaseModel):
     eligible_types: list[str] = Field(default_factory=list)
 
 
+class AliensConfig(BaseModel):
+    """Disposition thresholds + escape floor for the alien system (DESIGN §6, §10).
+
+    Effective disposition (base + the player's attitude offset, clamped 0–1) falls in
+    a band named by these thresholds: < `hostility` is hostile, ≥ `amity` is friendly,
+    the middle is neutral. Phase 2 places only friendly-band species; the thresholds
+    are read now (`core.aliens`) and gate greeting-vs-violence in Phase 3.
+    """
+
+    model_config = _FROZEN
+
+    hostility_threshold: float = 0.35
+    amity_threshold: float = 0.65
+    escape_floor: float = 0.10  # player escape chance never drops below this (§10)
+
+
+class AllianceConfig(BaseModel):
+    """One alliance / rival bloc in the roster (DESIGN §6.3)."""
+
+    model_config = _FROZEN
+
+    id: int
+    name: str
+    banner: str = ""
+    covets_core: bool = False  # may seize the Core in Phase 5 (authored hint, inert now)
+
+
+class SignatureMechanicConfig(BaseModel):
+    """A species' one systemic hook (DESIGN §6.2): a named hook + its params.
+
+    Authored now for Phase-3 forward-compat (the hook is implemented in Phase 3);
+    Phase 2 only validates that `hook` names a known mechanic for reference integrity.
+    """
+
+    model_config = _FROZEN
+
+    hook: str  # trojan_gift / reprogram_unlock / influence_gate / morality_judge / …
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class TechOfferConfig(BaseModel):
+    """One aspect-upgrade a species sells or barters (DESIGN §6, §6.1 tech-offer table).
+
+    Either a `component` (a `Component` value installed via the engine room) or a flat
+    `aspect` label (sensors / cloak / holds). `mode` is `latinum` (cash sale) or
+    `barter` (traded for an artifact of `tier`-equivalent rarity, §8). `min_disposition`
+    gates the offer behind effective disposition (favours unlock higher tiers). Consumed
+    by WP9; authored now so the roster is complete.
+    """
+
+    model_config = _FROZEN
+
+    tier: str  # ComponentTier name (I/II/III)
+    mode: Literal["latinum", "barter"] = "latinum"
+    component: str | None = None  # a Component value, or None for an `aspect` offer
+    aspect: str | None = None  # sensors / cloak / holds (flat aspect upgrade)
+    price: int = 0  # latinum price when mode == latinum
+    min_disposition: float = 0.0
+
+
+class PackConfig(BaseModel):
+    """How an encounter group spawns (DESIGN §6.1). Phase-3 forward-compat."""
+
+    model_config = _FROZEN
+
+    behavior: Literal["solo", "escorted", "swarm", "family_group", "colony"] = "solo"
+    escort: list[str] = Field(default_factory=list)  # ship_class ids accompanying
+
+
+class SpeciesConfig(BaseModel):
+    """A roster species' full §6.1 parameter set (DESIGN §6.1).
+
+    Authored in full as Phase-3 forward-compat; the **friendly-path subset** Phase 2
+    actually exercises is the identity, disposition spread, alliance, `tech_level`,
+    `home_band`, `trade_posture`/`treaty_mode` (friendly values), `persona`, and
+    `tech_offers`. The hostile/Phase-3 fields (`threat_rating`, `interception_rating`,
+    `combatant`, `signature_mechanic`, `memory_model`, `betrayal_model`,
+    `befriend_price`, `pack`, `fleet`, `starbase_policy`) are carried and checked for
+    reference integrity but unread until Phase 3 (PHASE2_PLAN WP7).
+    """
+
+    model_config = _FROZEN
+
+    id: str  # roster key (stable; the AlienSpecies entity's `roster_id`)
+    name: str
+    archetype_id: str
+    description: str = ""  # one-line flavour blurb (dossier/codex narration, §6.6/§11)
+    disposition_center: float = Field(ge=0.0, le=1.0)
+    disposition_variance: float = Field(default=0.1, ge=0.0, le=1.0)
+    tech_level: int = Field(default=1, ge=1, le=10)
+    alliance_id: int | None = None
+    alliance_role: Literal["leader", "member", "aspirant", "none"] = "none"
+    home_band: str | None = None  # preferred band hint (None ⇒ placed by round-robin)
+    trade_posture: Literal[
+        "open", "earn", "goods_only", "barter", "alliance_gated", "circuit_gated", "refuses"
+    ] = "open"
+    treaty_mode: Literal[
+        "open", "conditional", "prove_intent", "alliance_gated",
+        "home_planet_only", "none", "superfluous"
+    ] = "open"
+    persona: str = "generic"
+    tech_offers: list[TechOfferConfig] = Field(default_factory=list)
+    # --- Phase-3 forward-compat (authored, validated for reference integrity, unread) -
+    threat_tier: Literal["fearsome", "worthy", "feeble", "special"] = "feeble"
+    threat_rating: float = 0.0
+    interception_rating: float = Field(default=0.0, ge=0.0, le=1.0)
+    combatant: bool = True
+    memory_model: Literal["normal", "none", "never_forgets"] = "normal"
+    betrayal_model: Literal["recoverable", "permanent"] = "recoverable"
+    befriend_price: list[Literal["serve", "obey", "prove", "pay", "purge"]] = Field(
+        default_factory=list
+    )
+    signature_mechanic: SignatureMechanicConfig | None = None
+    pack: PackConfig = PackConfig()
+    fleet: list[str] = Field(default_factory=list)  # ship_class ids the species fields
+    starbase_policy: Literal[
+        "none", "homeworld", "territorial", "secret", "nomadic_holding"
+    ] = "none"
+    attitude_gain_rate: float = 0.1
+    attitude_loss_rate: float = 0.2
+    # Standing-keyed conversation lines (DESIGN §6.7). Opaque here — WP8 owns the schema;
+    # authored per species there. Empty ⇒ inherits the persona/generic pack.
+    dialogue_pack: dict[str, Any] = Field(default_factory=dict)
+
+
+class RosterConfig(BaseModel):
+    """A named species roster (DESIGN §6): alliances + the species pool drawn from.
+
+    The big bang draws a **seeded subset** of `species` (not all need appear, §6) sized
+    in `[subset_min, subset_max]`, clamped to the pool size. Phase 2 places only
+    friendly-band members (`bigbang.aliens`). `core_governing_alliance_id` names the
+    bloc that governs Core Space (the Federation in the default roster); the player is
+    seeded as one of its members.
+    """
+
+    model_config = _FROZEN
+
+    core_governing_alliance_id: int
+    alliances: list[AllianceConfig]
+    species: list[SpeciesConfig]
+    subset_min: int = 6
+    subset_max: int = 12
+
+    def alliance(self, alliance_id: int) -> AllianceConfig | None:
+        return next((a for a in self.alliances if a.id == alliance_id), None)
+
+    def species_by_id(self, roster_id: str) -> SpeciesConfig | None:
+        return next((s for s in self.species if s.id == roster_id), None)
+
+    @model_validator(mode="after")
+    def _check_reference_integrity(self) -> RosterConfig:
+        """Dialogue/diplomacy reference integrity (§6, §13): ids and hooks resolve."""
+        ids = {a.id for a in self.alliances}
+        if self.core_governing_alliance_id not in ids:
+            raise ValueError(
+                f"core_governing_alliance_id {self.core_governing_alliance_id} is not an alliance"
+            )
+        seen: set[str] = set()
+        for sp in self.species:
+            if sp.id in seen:
+                raise ValueError(f"duplicate species id {sp.id!r}")
+            seen.add(sp.id)
+            if sp.alliance_id is not None and sp.alliance_id not in ids:
+                raise ValueError(f"species {sp.id!r} references unknown alliance {sp.alliance_id}")
+            if sp.signature_mechanic is not None and sp.signature_mechanic.hook not in KNOWN_SIGNATURE_HOOKS:
+                raise ValueError(
+                    f"species {sp.id!r} has unknown signature hook {sp.signature_mechanic.hook!r}"
+                )
+        return self
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -363,12 +543,14 @@ class GameConfig(BaseModel):
     config_version: int
     turns_per_day: int = 250  # TWINSTR.DOC default (§9)
     economy: EconomyConfig = EconomyConfig()
+    aliens: AliensConfig = AliensConfig()
     bigbang: BigBangConfig = BigBangConfig()
     engine_room: EngineRoomConfig
     planets: PlanetsConfig
     starbase: StarbaseConfig | None = None  # WP4 orbital bases (None ⇒ none generated)
     discovery: DiscoveryConfig | None = None  # WP5 discoveries (None ⇒ none salted)
     genesis: GenesisConfig | None = None  # WP10 genesis torpedoes (None ⇒ not sold)
+    roster: RosterConfig | None = None  # WP7 species roster (None ⇒ no aliens placed)
     starter_ship: ShipClassConfig
     ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (StarDock)
     hardware: HardwareConfig
