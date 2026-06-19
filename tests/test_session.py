@@ -379,3 +379,29 @@ def test_commodity_line_trend_and_ratio_edges() -> None:
     flat = CommodityLine("Fuel Ore", "SELL", 500, 1000, 11, 11, 0)
     assert flat.trend == "="  # price == base_price
     assert CommodityLine("Fuel Ore", "SELL", 0, 0, 11, 11, 0).stock_ratio == 0.0
+
+
+# --- WP16: drift fog split (dossier remembers; sector view tracks live position) ---
+
+
+def test_drift_keeps_dossier_last_seen_while_sector_view_tracks_position() -> None:
+    from dataclasses import replace
+
+    from edge.core.models import Region
+
+    world = _world()
+    world.regions = {1: Region(1, "Hub")}
+    world.species = {1: _species(1, 2, "Vesk")}  # at the player's sector (2)
+    world.players[1] = replace(world.players[1],
+                               species_attitudes={1: 0.1}, species_last_seen={1: 2})
+
+    # Before drift: visible here; dossier last-seen names the hail sector.
+    assert session.game_view(world, 1, CONFIG).sector.ships == ["Vesk vessel"]
+    seen0 = session.computer_view(world, 1, CONFIG).dossier[0].last_seen
+    assert seen0 == str(session._display(world, 2))
+
+    # Drift carries it to sector 3: it leaves the player's view, but last-seen is frozen.
+    world.species[1] = replace(world.species[1], sector_id=3)
+    assert session.game_view(world, 1, CONFIG).sector.ships == []  # must be re-found
+    seen1 = session.computer_view(world, 1, CONFIG).dossier[0].last_seen
+    assert seen1 == str(session._display(world, 2))  # still the hail sector, not the live position

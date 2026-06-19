@@ -121,6 +121,38 @@ def test_load_game_replays_maintenance_ticks(tmp_path: Path) -> None:
     assert state_hash(reloaded.state) == expected
 
 
+def _drift_config() -> object:
+    """Config that drifts aliens fast and surely (small cadence, certain move)."""
+    cfg = load_default_config()
+    return cfg.model_copy(update={
+        "bigbang": cfg.bigbang.model_copy(update={"sector_count": 90}),
+        "aliens": cfg.aliens.model_copy(update={
+            "drift_ticks_per_firing": 2, "drift_move_chance": 1.0}),
+    })
+
+
+def test_load_game_replays_alien_drift(tmp_path: Path) -> None:
+    """WP16: ticking fires `alien_drift`; species positions reconstruct on reload.
+
+    Drift is a pure function of `(seed, drift_seq)` and never touches the shared RNG,
+    so the maintenance timeline replays movement exactly — same positions, same hash.
+    """
+    from edge.engine.ticker import EngineTicker
+
+    cfg = _drift_config()
+    svc = GameService.new_game(cfg, 42, SqliteRepository(tmp_path / "drift.db"), created_at=_CREATED)  # type: ignore[arg-type]
+    ticker = EngineTicker(svc, tick_seconds=0.0, ticks_per_hour=100, ticks_per_day=1000)
+    for _ in range(7):  # drift cadence 2 → fires at ticks 2/4/6
+        ticker.step()
+    expected = state_hash(svc.state)
+    positions = {sid: sp.sector_id for sid, sp in svc.state.species.items()}
+    assert svc.state.game.drift_seq == 3  # drift actually fired three times
+
+    reloaded = GameService.load_game(cfg, SqliteRepository(tmp_path / "drift.db"))  # type: ignore[arg-type]
+    assert state_hash(reloaded.state) == expected
+    assert {sid: sp.sector_id for sid, sp in reloaded.state.species.items()} == positions
+
+
 def test_discovery_collection_replays_into_identical_state(tmp_path: Path) -> None:
     """WP5: warping to + salvaging a discovery survives a reload (Player.codex golden master).
 
