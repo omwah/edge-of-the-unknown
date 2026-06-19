@@ -71,6 +71,7 @@ def state_hash(state: UniverseState) -> str:
         "ships": state.ships,
         "players": state.players,
         "alliances": state.alliances,
+        "species": state.species,
     }
     blob = json.dumps(_canonical(snapshot), sort_keys=True).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()

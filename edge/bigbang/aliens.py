@@ -1,0 +1,114 @@
+"""Populate alien species from the roster (DESIGN §5 step 6, §6; PHASE2_PLAN WP7).
+
+The big bang draws a **seeded subset** of the roster's species pool (not every species
+need appear, §6), draws each one's `base_disposition` from its bounded `center ±
+variance` spread (so stance varies between universe generations), and assigns each a
+**contact point** — a non-Core sector in a distance band — guaranteeing at least one
+friendly contact per non-empty band (the §5 step-8 resupply invariant).
+
+Phase 2 places **only friendly-band** species: every drawn disposition is clamped up
+into the amity band, so no hostile encounter can spawn (hostiles are Phase 3). The
+roster's alliances become `state.alliances`, generalising the Phase-1 Federation stub —
+no alliance is privileged in the schema (CLAUDE.md); the default roster simply names the
+Federation as the Core's governor and seeds the player into it.
+
+Runs on its own sub-RNG (`Random(seed ^ _SPECIES_SALT)`) so species draws never shift
+the topology / port / planet / discovery draw order (golden-master ordering, §5).
+"""
+
+from __future__ import annotations
+
+import random
+
+from edge.core.aliens import is_friendly
+from edge.core.config import GameConfig
+from edge.core.models import Alliance, AlienSpecies, UniverseState
+
+# Independent draw stream for species placement (§5 RNG discipline).
+_SPECIES_SALT = 0x53504543  # "SPEC"
+
+
+def build_alliances(config: GameConfig) -> dict[int, Alliance]:
+    """The roster's alliances as entities (or the Federation stub when no roster)."""
+    roster = config.roster
+    if roster is None:
+        return {1: Alliance(id=1, name="Federation")}
+    return {
+        a.id: Alliance(id=a.id, name=a.name, banner=a.banner, covets_core=a.covets_core)
+        for a in roster.alliances
+    }
+
+
+def _friendly_disposition(center: float, variance: float, config: GameConfig,
+                          rng: random.Random) -> float:
+    """Draw a base disposition, clamped into the friendly band for Phase-2 placement.
+
+    The draw is the species' per-generation stance (§6); clamping the lower bound to the
+    amity threshold keeps every *placed* species friendly while still letting the high
+    end vary. (Phase 3 lifts the clamp so hostiles can spawn.)
+    """
+    floor = config.aliens.amity_threshold
+    drawn = rng.uniform(center - variance, center + variance)
+    return max(floor, min(1.0, drawn))
+
+
+def populate_species(state: UniverseState, config: GameConfig) -> None:
+    """Draw a friendly-band subset of the roster and place it across the bands (WP7)."""
+    state.alliances = build_alliances(config)
+    roster = config.roster
+    if roster is None or not roster.species:
+        return
+
+    rng = random.Random(state.game.seed ^ _SPECIES_SALT)
+
+    # Non-Core sectors grouped by band — the home lanes where aliens are met (the Core
+    # itself stays free of placed contacts; its safety is the governing alliance's).
+    band_order = [b.name for b in config.bigbang.bands]
+    sectors_by_band: dict[str, list[int]] = {b: [] for b in band_order}
+    for sid in sorted(state.sectors):
+        sector = state.sectors[sid]
+        if sector.is_galactic_core:
+            continue
+        sectors_by_band.setdefault(sector.distance_band, []).append(sid)
+    live_bands = [b for b in band_order if sectors_by_band.get(b)]
+    if not live_bands:
+        return
+
+    # Seeded subset: shuffle the pool, take a count in [subset_min, subset_max] (clamped
+    # to the pool size and to at least one-per-live-band so the resupply invariant holds).
+    pool = sorted(roster.species, key=lambda s: s.id)
+    rng.shuffle(pool)
+    lo = max(roster.subset_min, len(live_bands))
+    hi = max(roster.subset_max, lo)
+    count = min(len(pool), rng.randint(lo, hi))
+    chosen = pool[:count]
+
+    # Band assignment: honour a species' `home_band` hint when that band is live, else
+    # round-robin — but first guarantee each live band gets one contact (front of the
+    # shuffled list seeds the guarantee deterministically).
+    assignment: list[str] = []
+    for i, _ in enumerate(chosen):
+        assignment.append(live_bands[i] if i < len(live_bands) else "")
+    for i, sp in enumerate(chosen):
+        if assignment[i]:
+            continue
+        if sp.home_band in sectors_by_band and sectors_by_band[sp.home_band]:
+            assignment[i] = sp.home_band
+        else:
+            assignment[i] = live_bands[i % len(live_bands)]
+
+    placed: dict[int, AlienSpecies] = {}
+    for sid, (sp, band) in enumerate(zip(chosen, assignment), start=1):
+        sector_id = rng.choice(sectors_by_band[band])
+        base = _friendly_disposition(sp.disposition_center, sp.disposition_variance, config, rng)
+        assert is_friendly(base, config.aliens)  # Phase-2 placement invariant
+        placed[sid] = AlienSpecies(
+            id=sid, roster_id=sp.id, name=sp.name, archetype_id=sp.archetype_id,
+            sector_id=sector_id, home_band=band, tech_level=sp.tech_level,
+            base_disposition=base, disposition_center=sp.disposition_center,
+            disposition_variance=sp.disposition_variance,
+            alliance_id=sp.alliance_id, alliance_role=sp.alliance_role,
+            threat_tier=sp.threat_tier, trade_posture=sp.trade_posture,
+            treaty_mode=sp.treaty_mode, persona=sp.persona,
+        )
+    state.species = placed

@@ -317,14 +317,64 @@ class Player:
     # Recovered artifact barter-goods, keyed by ComponentTier name (count); the WP9
     # contact screen spends these against alien tech (§8 barter equivalence).
     artifacts: Mapping[str, int] = field(default_factory=dict)
+    # Per-species attitude offset (species_id -> offset), raised by trading/favours
+    # (lowered by aggression in Phase 3). Shifts a species' base disposition into its
+    # effective disposition (`core.aliens.effective_disposition`, §6). Empty until the
+    # player deals with a species (WP9).
+    species_attitudes: Mapping[int, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
 class Alliance:
-    """An alliance (DESIGN §4/§6.3). Phase 1 uses only a Federation stub."""
+    """An alliance / rival bloc (DESIGN §4/§6.3).
+
+    No alliance is privileged in the schema (CLAUDE.md): the **Federation** is just
+    an ordinary alliance the default roster names as the initial governor of Core
+    Space (`Game.core_governing_alliance_id`), with the player seeded as a member.
+    `covets_core` marks a bloc that may seize the Core in Phase 5 (an authored hint;
+    inert before then). `banner` is the bloc's flavour tag.
+    """
 
     id: int
     name: str
+    banner: str = ""
+    covets_core: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class AlienSpecies:
+    """An alien species placed by the big bang (DESIGN §4, §6.1).
+
+    The roster (`config.roster`) is the authored parameter catalogue; this entity is
+    one **per-generation** instance: it carries the identity + the small set of params
+    Phase 2 reads, plus `base_disposition` — the per-generation draw from the species'
+    `disposition_center ± disposition_variance` spread (so stance varies between
+    universes, §6). Deeper Phase-3 params (threat / interception / signature mechanic /
+    memory / fleet …) and the `dialogue_pack` stay in the roster config, looked up by
+    `roster_id`; they ride generation as static config, not per-entity state.
+
+    `base_disposition` is the species' *base* stance toward the player; the player's
+    per-species `attitude` offset (raised by trade/favours) shifts it into the
+    **effective disposition** that gates greeting-vs-violence and trade (`core.aliens`).
+    `sector_id` is the species' contact point — the home-band sector where it is met.
+    """
+
+    id: int
+    roster_id: str  # key into `config.roster` for the full param set + dialogue
+    name: str
+    archetype_id: str
+    sector_id: int  # contact point (a non-Core sector in `home_band`)
+    home_band: str
+    tech_level: int
+    base_disposition: float  # per-generation draw, clamped to its placement band
+    disposition_center: float
+    disposition_variance: float
+    alliance_id: int | None = None
+    alliance_role: str = "none"  # leader / member / aspirant / none (§6.3)
+    threat_tier: str = "feeble"  # fearsome / worthy / feeble / special (dossier label)
+    trade_posture: str = "open"  # §6.1: open / earn / goods_only / barter / … / refuses
+    treaty_mode: str = "open"  # §6.1: open / conditional / prove_intent / … / none
+    persona: str = "generic"  # dialogue voice key (§6.7)
 
 
 @dataclass
@@ -348,6 +398,7 @@ class UniverseState:
     ships: dict[int, Ship] = field(default_factory=dict)
     players: dict[int, Player] = field(default_factory=dict)
     alliances: dict[int, Alliance] = field(default_factory=dict)
+    species: dict[int, AlienSpecies] = field(default_factory=dict)
     adjacency: dict[int, tuple[int, ...]] = field(default_factory=dict)
     # Hop distance from the Core (sector 1) per sector — a runtime-only cache (like
     # adjacency, excluded from `state_hash`) driving the warp "gravity" arrows (§11).

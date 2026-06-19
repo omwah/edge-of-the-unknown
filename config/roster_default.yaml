@@ -1,0 +1,462 @@
+# Edge of the Unknown — default species roster (DESIGN §6).
+#
+# A named roster of rival alliances + the species pool the big bang draws a seeded
+# *subset* from (not every species appears in a given universe). Validated against
+# edge.core.config.RosterConfig. Each entry carries the full §6.1 parameter set; the
+# friendly-path subset (disposition spread, alliance, tech_level, trade_posture /
+# treaty_mode, persona, tech_offers) is what Phase 2 exercises, while the hostile /
+# Phase-3 fields (threat_rating, interception_rating, signature_mechanic, memory_model,
+# betrayal_model, befriend_price, pack, fleet, starbase_policy) are authored now as
+# forward-compat and checked for reference integrity, but unread until Phase 3.
+#
+# The structure (three rival blocs + a field of unaligned wild cards, each species with
+# one memorable systemic hook) and the species archetypes are inspired by MicroProse's
+# *Lightspeed* (1990); the names and flavour are this game's own.
+
+# The Terran Federation governs Core Space; the player starts as one of its members.
+core_governing_alliance_id: 1
+
+# How many species the big bang draws from the pool (clamped to the pool size and to
+# at least one-per-live-band so every band has a friendly contact, §5 step 8).
+subset_min: 7
+subset_max: 11
+
+alliances:
+  - { id: 1, name: Terran Federation, banner: "Exploration & mutual defence" }
+  - { id: 2, name: Verdant Compact,   banner: "Order through moral authority" }
+  - { id: 3, name: Iron Covenant,     banner: "Loyalty & retribution" }
+  - { id: 4, name: Liberty Front,     banner: "Self-determination (a front)", covets_core: true }
+
+species:
+  # --- Unaligned wild cards ------------------------------------------------------
+
+  # Vesk — small fox/canine folk; peaceful resourceful technologists. The roster's
+  # warmest contact and best low-cost tech vendor. (cf. Lightspeed Halicot.)
+  - id: vesk
+    name: Vesk
+    archetype_id: canid_technologist
+    description: >-
+      Small fox-like folk; peaceful, resourceful technologists. The roster's warmest
+      contact and best low-cost tech vendor.
+    disposition_center: 0.85
+    disposition_variance: 0.08
+    tech_level: 7
+    alliance_id: null
+    alliance_role: none
+    home_band: Hub
+    trade_posture: open
+    treaty_mode: open
+    persona: serial_formal       # introduces itself by serial-style name ("Xeron XM9413")
+    threat_tier: feeble
+    threat_rating: 0.4
+    interception_rating: 0.1
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [prove]
+    signature_mechanic: { hook: reprogram_unlock, params: { item: philanthropy_circuit, target_species: helot, new_posture: open } }
+    pack: { behavior: family_group }
+    fleet: [scout_marauder]
+    starbase_policy: homeworld
+    attitude_gain_rate: 0.12
+    attitude_loss_rate: 0.20
+    tech_offers:
+      - { tier: I,   mode: latinum, component: navigator, price: 1800, min_disposition: 0.65 }
+      - { tier: II,  mode: latinum, component: radiator,  price: 7000, min_disposition: 0.75 }
+      - { tier: III, mode: barter,  aspect: sensors,                   min_disposition: 0.85 }
+
+  # Selvani — many-limbed, soft-bodied, cautiously peaceful good-faith partner; a
+  # non-combatant that rewards proven intent with a habitable world. (cf. Fel.)
+  - id: selvani
+    name: Selvani
+    archetype_id: tentacled_envoy
+    description: >-
+      Many-limbed, soft-bodied, cautiously peaceful; a good-faith, non-combatant
+      partner that rewards proven intent with the coordinates of a habitable world.
+    disposition_center: 0.78
+    disposition_variance: 0.1
+    tech_level: 5
+    alliance_id: null
+    alliance_role: none
+    home_band: Frontier
+    trade_posture: earn
+    treaty_mode: prove_intent
+    persona: reserved_honest
+    threat_tier: special
+    threat_rating: 0.0
+    interception_rating: 0.0
+    combatant: false
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [prove]
+    signature_mechanic: { hook: coordinate_broker, params: { reward: habitable_world } }
+    pack: { behavior: solo }
+    fleet: []
+    starbase_policy: homeworld
+    attitude_gain_rate: 0.08
+    attitude_loss_rate: 0.25
+    tech_offers:
+      - { tier: II, mode: latinum, component: converter, price: 7500, min_disposition: 0.7 }
+
+  # Helot — faceless brain-dome robots; cold, literal, no fear of death. Refuse trade
+  # until reprogrammed by a Vesk circuit (the reprogram_unlock either/or). (cf. Automata.)
+  - id: helot
+    name: Helot
+    archetype_id: brain_dome_automaton
+    description: >-
+      Faceless brain-dome robots; cold, literal, and without fear of death. They
+      refuse trade until reprogrammed by a Vesk circuit — the reprogram either/or.
+    disposition_center: 0.45
+    disposition_variance: 0.12
+    tech_level: 8
+    alliance_id: 3
+    alliance_role: member
+    home_band: Deep
+    trade_posture: circuit_gated      # opens only once a reprogram circuit is installed
+    treaty_mode: alliance_gated
+    persona: dictionary_literal       # defines every concept in dictionary entries
+    threat_tier: fearsome
+    threat_rating: 2.4
+    interception_rating: 0.3
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [obey]
+    signature_mechanic: { hook: reprogram_unlock, params: { item: philanthropy_circuit, source_species: vesk, new_posture: open, side_effect: alliance_disables } }
+    pack: { behavior: escorted, escort: [scout_marauder] }
+    fleet: [battleship]
+    starbase_policy: territorial
+    attitude_gain_rate: 0.05
+    attitude_loss_rate: 0.1
+    tech_offers:
+      - { tier: III, mode: barter, component: linkage, min_disposition: 0.8 }
+
+  # Quill — predatory salvagers that live entirely in ships; buy coordinates of
+  # undefended worlds, then strip them. Engine-flux weapon. (cf. Didinium.)
+  - id: quill
+    name: Quill
+    archetype_id: ribbon_salvager
+    description: >-
+      Predatory salvagers that live entirely aboard ship; they buy the coordinates of
+      undefended worlds, then strip them. Their engine-flux weapon turns your drive
+      against you.
+    disposition_center: 0.32
+    disposition_variance: 0.1
+    tech_level: 6
+    alliance_id: null
+    alliance_role: none
+    home_band: Deep
+    trade_posture: goods_only
+    treaty_mode: conditional
+    persona: macabre_transactional
+    threat_tier: fearsome
+    threat_rating: 2.0
+    interception_rating: 0.5
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [pay]
+    signature_mechanic: { hook: coordinate_broker, params: { reward: components } }
+    pack: { behavior: swarm }
+    fleet: [missile_frigate]
+    starbase_policy: nomadic_holding
+    attitude_gain_rate: 0.07
+    attitude_loss_rate: 0.15
+    tech_offers:
+      - { tier: II, mode: barter, component: accelerator, min_disposition: 0.7 }
+
+  # Stryx — small, time-dabbling mercenary brokers; sell information and passage in
+  # barely-intelligible garble. Feared out of proportion to their stats. (cf. Stentor.)
+  - id: stryx
+    name: Stryx
+    archetype_id: temporal_broker
+    description: >-
+      Small, time-dabbling mercenary brokers who sell information and passage in
+      barely-intelligible garble. Feared far out of proportion to their stats.
+    disposition_center: 0.3
+    disposition_variance: 0.12
+    tech_level: 8
+    alliance_id: null
+    alliance_role: none
+    home_band: Void
+    trade_posture: barter
+    treaty_mode: none
+    persona: garbled_translator
+    threat_tier: special
+    threat_rating: 1.0
+    interception_rating: 0.4
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [pay]
+    signature_mechanic: { hook: passage_broker, params: { offer: time_jump, price: home_base } }
+    pack: { behavior: solo }
+    fleet: [scout_marauder]
+    starbase_policy: secret
+    attitude_gain_rate: 0.06
+    attitude_loss_rate: 0.12
+    tech_offers:
+      - { tier: III, mode: barter, aspect: cloak, min_disposition: 0.75 }
+
+  # Concordance — a bodiless fixed-lair entity that judges the player's whole record
+  # and dispenses blessings/curses; fields no ships. (cf. Monad.)
+  - id: concordance
+    name: The Concordance
+    archetype_id: cosmic_arbiter
+    description: >-
+      A bodiless, fixed-lair entity that judges your whole record of conduct and
+      dispenses blessings or curses. It fields no ships, yet defends itself absolutely.
+    disposition_center: 0.5
+    disposition_variance: 0.15
+    tech_level: 10
+    alliance_id: null
+    alliance_role: none
+    home_band: Void
+    trade_posture: refuses
+    treaty_mode: none
+    persona: biblical_arbiter
+    threat_tier: special
+    threat_rating: 0.0
+    interception_rating: 0.0
+    combatant: false
+    memory_model: never_forgets
+    betrayal_model: permanent
+    befriend_price: [prove]
+    signature_mechanic: { hook: morality_judge, params: { audited_metrics: [aggression, genocide, virtue] } }
+    pack: { behavior: solo }
+    fleet: []
+    starbase_policy: none
+    attitude_gain_rate: 0.03
+    attitude_loss_rate: 0.3
+
+  # --- Verdant Compact (order through moral authority) ---------------------------
+
+  # Dignar — camelid-faced aristocratic mind-mages; lead the Compact. Treaties require
+  # visiting their home planet; they can forbid being attacked. (cf. Dignee.)
+  - id: dignar
+    name: Dignar
+    archetype_id: telepath_aristocrat
+    description: >-
+      Camelid-faced aristocratic mind-mages who lead the Verdant Compact. Treaties
+      require visiting their home planet, and they can forbid being attacked at all.
+    disposition_center: 0.55
+    disposition_variance: 0.12
+    tech_level: 9
+    alliance_id: 2
+    alliance_role: leader
+    home_band: Frontier
+    trade_posture: open
+    treaty_mode: home_planet_only
+    persona: concept_fragments        # speaks in telepathic concept-fragments
+    threat_tier: fearsome
+    threat_rating: 2.6
+    interception_rating: 0.4
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [serve, obey]
+    signature_mechanic: { hook: influence_gate, params: { cannot_attack_unbidden: true, breakthrough: hard_and_fast } }
+    pack: { behavior: escorted, escort: [battleship] }
+    fleet: [imperial_starship]
+    starbase_policy: homeworld
+    attitude_gain_rate: 0.06
+    attitude_loss_rate: 0.15
+    tech_offers:
+      - { tier: II,  mode: latinum, component: secondary, price: 7800, min_disposition: 0.7 }
+      - { tier: III, mode: barter,  component: navigator,              min_disposition: 0.85 }
+
+  # Cibelline — engineered aesthetes who prize beauty above all; condescending but
+  # tractable, trading only with the proven. Vendetta hooks. (cf. Cicisbeo.)
+  - id: cibelline
+    name: Cibelline
+    archetype_id: engineered_aesthete
+    description: >-
+      Engineered aesthetes who prize beauty above all — condescending but tractable,
+      trading only with the proven and nursing jealous vendettas.
+    disposition_center: 0.6
+    disposition_variance: 0.12
+    tech_level: 8
+    alliance_id: 2
+    alliance_role: member
+    home_band: Frontier
+    trade_posture: earn
+    treaty_mode: conditional
+    persona: flowery_aesthete         # flowery self-names; "Avenger" vendetta suffix
+    threat_tier: worthy
+    threat_rating: 1.2
+    interception_rating: 0.3
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [serve, purge]
+    signature_mechanic: { hook: contract_kill, params: { targets: [vesk], reward: equipment, redemption: true } }
+    pack: { behavior: escorted, escort: [scout_marauder] }
+    fleet: [missile_frigate]
+    starbase_policy: homeworld
+    attitude_gain_rate: 0.07
+    attitude_loss_rate: 0.18
+    tech_offers:
+      - { tier: II,  mode: barter, component: turbine,                 min_disposition: 0.72 }
+      - { tier: III, mode: barter, component: burner,                  min_disposition: 0.85 }
+
+  # Selvi — amorous imp-like flatterers; easily cowed, flee at once dropping cargo.
+  # Cheap low-tier vendor and easy first contact. (cf. Acari.)
+  - id: selvi
+    name: Selvi
+    archetype_id: amorous_imp
+    description: >-
+      Amorous, imp-like flatterers; easily cowed, fleeing at once and dropping cargo.
+      A cheap low-tier vendor and the easiest first contact in the cluster.
+    disposition_center: 0.7
+    disposition_variance: 0.1
+    tech_level: 2
+    alliance_id: 2
+    alliance_role: member
+    home_band: Hub
+    trade_posture: open
+    treaty_mode: open
+    persona: amorous
+    threat_tier: feeble
+    threat_rating: 0.2
+    interception_rating: 0.05
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [prove]
+    signature_mechanic: { hook: flee_drop, params: { drop_table: cargo_packets } }
+    pack: { behavior: family_group }
+    fleet: [scout_marauder]
+    starbase_policy: homeworld
+    attitude_gain_rate: 0.15
+    attitude_loss_rate: 0.1
+    tech_offers:
+      - { tier: I, mode: latinum, component: accelerator, price: 1600, min_disposition: 0.65 }
+
+  # --- Iron Covenant (loyalty & retribution) -------------------------------------
+
+  # Vennrith — horned grudge-keepers; the Covenant's fierce backbone. Never forgive,
+  # never forget; one betrayal is permanent. Escalating demands. (cf. Venge.)
+  - id: vennrith
+    name: Vennrith
+    archetype_id: horned_grudgekeeper
+    description: >-
+      Horned grudge-keepers, the Iron Covenant's fierce backbone. They never forgive
+      and never forget; one betrayal is permanent, and friendship means escalating demands.
+    disposition_center: 0.3
+    disposition_variance: 0.1
+    tech_level: 7
+    alliance_id: 3
+    alliance_role: member
+    home_band: Deep
+    trade_posture: alliance_gated
+    treaty_mode: alliance_gated
+    persona: inverted_syntax          # inverted, Yoda-like phrasing
+    threat_tier: fearsome
+    threat_rating: 3.0
+    interception_rating: 0.5
+    combatant: true
+    memory_model: never_forgets
+    betrayal_model: permanent
+    befriend_price: [obey, pay, purge]
+    signature_mechanic: { hook: escalating_demand, params: { demand_ladder: [donate, destroy_target, surrender_base], fail_consequence: permanent_hatred } }
+    pack: { behavior: escorted, escort: [battleship] }
+    fleet: [imperial_starship]
+    starbase_policy: territorial
+    attitude_gain_rate: 0.05
+    attitude_loss_rate: 0.4
+
+  # Thessarch — psionic big-brain rulers; gatekeep Covenant membership. (cf. Jot.)
+  - id: thessarch
+    name: Thessarch
+    archetype_id: psionic_overlord
+    description: >-
+      Psionic "big-brain" rulers who gatekeep Iron Covenant membership; nothing joins
+      the bloc without their consent.
+    disposition_center: 0.4
+    disposition_variance: 0.12
+    tech_level: 9
+    alliance_id: 3
+    alliance_role: leader
+    home_band: Void
+    trade_posture: alliance_gated
+    treaty_mode: alliance_gated
+    persona: authoritarian_dogma
+    threat_tier: fearsome
+    threat_rating: 3.2
+    interception_rating: 0.4
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [obey]
+    signature_mechanic: { hook: influence_gate, params: { compel: alliance_fealty } }
+    pack: { behavior: escorted, escort: [imperial_starship] }
+    fleet: [imperial_starship]
+    starbase_policy: homeworld
+    attitude_gain_rate: 0.05
+    attitude_loss_rate: 0.2
+
+  # --- Liberty Front (self-determination — a front for conquest) -----------------
+
+  # Thessbrood — colonial brain-sac masters attended by insect broodlings; lead the
+  # Front. Oily servility masking conquest; plant TDX bombs in goods. (cf. Broodmasters.)
+  - id: thessbrood
+    name: Thessbrood
+    archetype_id: colonial_broodmaster
+    description: >-
+      Colonial brain-sac masters attended by insect broodlings; they lead the Liberty
+      Front behind oily servility, and plant hidden bombs in goods given to the distrusted.
+    disposition_center: 0.3
+    disposition_variance: 0.1
+    tech_level: 9
+    alliance_id: 4
+    alliance_role: leader
+    home_band: Frontier
+    trade_posture: open
+    treaty_mode: conditional
+    persona: oily_servile             # "powerful Earthman", "humble governor"
+    threat_tier: fearsome
+    threat_rating: 3.4
+    interception_rating: 0.2
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [serve, purge]
+    signature_mechanic: { hook: trojan_gift, params: { trigger: accept_gift, delay: 1, effect: bomb, removable_by: stardock } }
+    pack: { behavior: escorted, escort: [missile_frigate] }
+    fleet: [imperial_starship]
+    starbase_policy: territorial
+    attitude_gain_rate: 0.08
+    attitude_loss_rate: 0.15
+    tech_offers:
+      - { tier: II, mode: latinum, component: converter, price: 8200, min_disposition: 0.7 }
+
+  # Dacaran — winged horned "allies of convenience" scheming to usurp the Front's
+  # leadership; probe loyalty, refuse trade. (cf. Dacian.)
+  - id: dacaran
+    name: Dacaran
+    archetype_id: winged_schemer
+    description: >-
+      Winged, horned "allies of convenience" scheming to usurp the Liberty Front's
+      leadership. They probe your loyalty and refuse to trade.
+    disposition_center: 0.35
+    disposition_variance: 0.1
+    tech_level: 6
+    alliance_id: 4
+    alliance_role: aspirant
+    home_band: Frontier
+    trade_posture: refuses
+    treaty_mode: alliance_gated
+    persona: false_idealist           # preaches "liberty" while plotting
+    threat_tier: worthy
+    threat_rating: 1.4
+    interception_rating: 0.45
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    befriend_price: [serve]
+    signature_mechanic: { hook: contract_kill, params: { targets: [thessbrood], reward: territory, redemption: true } }
+    pack: { behavior: swarm }
+    fleet: [scout_marauder]
+    starbase_policy: territorial
+    attitude_gain_rate: 0.06
+    attitude_loss_rate: 0.2

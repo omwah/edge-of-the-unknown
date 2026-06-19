@@ -18,9 +18,21 @@ DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "defau
 
 
 def load_config(path: Path | str) -> GameConfig:
-    """Load and validate a YAML game config from `path`."""
+    """Load and validate a YAML game config from `path`.
+
+    A `roster_file:` pointer (relative to the config's directory) is resolved here —
+    the species roster lives in its own file (`roster_default.yaml`, §6) so a game can
+    be generated against a different source roster. The pointer is read at this I/O
+    seam and the parsed roster injected as the `roster` field before validation; core
+    never touches the filesystem.
+    """
+    path = Path(path)
     with open(path, encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
+    roster_file = data.pop("roster_file", None)
+    if roster_file is not None and "roster" not in data:
+        with open(path.parent / roster_file, encoding="utf-8") as fh:
+            data["roster"] = yaml.safe_load(fh)
     return GameConfig.from_mapping(data)
 
 

@@ -20,7 +20,6 @@ from edge.core.engine_room import apply_derived, build_layouts, build_subsystems
 from edge.core.movement import shortest_path
 from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass, Subsystem
 from edge.core.models import (
-    Alliance,
     Ownership,
     Planet,
     Player,
@@ -143,8 +142,11 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     _finalize_planets(state, config)
     _place_starbases(state, config)
 
-    # --- alliance + player + starter ship ------------------------------------
-    state.alliances = {1: Alliance(id=1, name="Federation")}
+    # --- player + starter ship -----------------------------------------------
+    # Alliances are seeded from the roster by `populate_species` (§6.3); the player
+    # starts as a member of whichever bloc governs the Core (the Federation in the
+    # default roster). No alliance is privileged in the schema (CLAUDE.md).
+    gov = state.game.core_governing_alliance_id
     sc = config.starter_ship
     # The player hull carries the engine-room model (§4.1): build its subsystems
     # from the class layout, then derive-on-write its aspect scalars so the stored
@@ -171,7 +173,7 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
         1: Player(
             id=1, name="Trailblazer", ship_id=1,
             latinum=config.economy.starting_latinum, bank_balance=config.economy.starting_bank,
-            turns_remaining=config.turns_per_day, alliance_id=1,
+            turns_remaining=config.turns_per_day, alliance_id=gov,
             explored_sectors=frozenset(dock_route), entered_from=entered_from,
         )
     }
