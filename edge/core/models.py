@@ -42,6 +42,10 @@ class Game:
     created_at: str  # ISO timestamp; set by the caller (no clock reads in core)
     day_number: int = 1
     core_governing_alliance_id: int | None = None
+    # Monotonic counter advanced by the `alien_drift` cron (WP16): seeds the drift
+    # sub-RNG so movement is deterministic and reproduces under replay, without ever
+    # touching the shared command-stream RNG. Rebuilt by re-running crons on reload.
+    drift_seq: int = 0
 
 
 @dataclass(frozen=True, slots=True)

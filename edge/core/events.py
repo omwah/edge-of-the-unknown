@@ -222,6 +222,20 @@ class AlienHailed(Event):
 
 
 @dataclass(frozen=True)
+class AlienMoved(Event):
+    """A species drifted between sectors on the tick clock (§6.3, WP16).
+
+    Emitted by the `alien_drift` cron, but surfaced to the player only when the move
+    touches their current sector (a vessel warps in/out beside them) — so the log isn't
+    flooded by galaxy-wide drift. `from_sector`/`to_sector` are internal ids.
+    """
+
+    species_id: int
+    from_sector: int
+    to_sector: int
+
+
+@dataclass(frozen=True)
 class AlienTraded(Event):
     """Bought or bartered alien tech (§6, §8, WP9).
 

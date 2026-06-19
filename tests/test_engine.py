@@ -1,15 +1,51 @@
-"""WP7 — the engine cron reducers and tick scheduler (DESIGN §9)."""
+"""WP7 — the engine cron reducers and tick scheduler (DESIGN §9).
+
+WP16 adds the `alien_drift` cron (alien ships drift between sectors on the clock).
+"""
 
 from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from edge.config import load_default_config
-from edge.engine.cron import accrue_interest, daily_turn_reset, regenerate_ports
+from edge.core.aliens import may_occupy
+from edge.core.config import GameConfig
+from edge.core.models import AlienSpecies, Game, Sector, UniverseState
+from edge.engine import cron
+from edge.engine.cron import accrue_interest, alien_drift, daily_turn_reset, regenerate_ports
 from edge.engine.ticker import EngineTicker
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
+
+
+def _with_drift(config: GameConfig, chance: float) -> GameConfig:
+    """A config copy with the drift move-chance overridden (the cron knob)."""
+    return config.model_copy(
+        update={"aliens": config.aliens.model_copy(update={"drift_move_chance": chance})})
+
+
+def _sp(sid: int, sector_id: int, alliance_id: int | None = 2) -> AlienSpecies:
+    return AlienSpecies(
+        id=sid, roster_id=f"s{sid}", name=f"S{sid}", archetype_id="a", sector_id=sector_id,
+        home_band="Frontier", tech_level=5, base_disposition=0.8,
+        disposition_center=0.8, disposition_variance=0.05, alliance_id=alliance_id)
+
+
+def _drift_world() -> UniverseState:
+    """1(Core)-2-3-4 chain plus a dead-end sector 5 whose only neighbour is the Core."""
+    state = UniverseState.new(Game(1, 99, 1, "t", core_governing_alliance_id=1))
+    state.sectors = {
+        1: Sector(1, 1, (2, 5), "Hub", is_galactic_core=True),
+        2: Sector(2, 1, (1, 3), "Frontier"),
+        3: Sector(3, 1, (2, 4), "Frontier"),
+        4: Sector(4, 1, (3,), "Frontier"),
+        5: Sector(5, 1, (1,), "Frontier"),  # only exit is back into the Core
+    }
+    state.rebuild_adjacency()
+    return state
 
 _CREATED = "2026-06-15T00:00:00Z"
 
@@ -77,3 +113,62 @@ async def test_async_run_ticks_then_stops(tmp_path: Path) -> None:
     ticker.stop()
     await asyncio.wait_for(task, timeout=1.0)
     assert ticker.tick > 0  # the loop advanced
+
+
+# --- WP16: alien_drift cron ---
+
+
+def test_drift_steps_to_a_legal_neighbour_at_full_chance() -> None:
+    state = _drift_world()
+    state.species = {1: _sp(1, 2)}  # at sector 2; neighbours 1(Core, barred), 3(ok)
+    result = alien_drift(state, _with_drift(load_default_config(), 1.0))
+    assert len(result.species) == 1
+    assert result.species[0].sector_id == 3  # the only legal neighbour
+    assert result.game is not None and result.game.drift_seq == 1  # counter advanced
+
+
+def test_drift_never_moves_at_zero_chance() -> None:
+    state = _drift_world()
+    state.species = {1: _sp(1, 2)}
+    result = alien_drift(state, _with_drift(load_default_config(), 0.0))
+    assert result.species == ()
+    assert result.game is not None and result.game.drift_seq == 1  # seq still advances
+
+
+def test_drift_leaves_a_hemmed_in_species_put() -> None:
+    state = _drift_world()
+    state.species = {1: _sp(1, 5)}  # sector 5's only neighbour is the Core — no legal move
+    result = alien_drift(state, _with_drift(load_default_config(), 1.0))
+    assert result.species == ()
+
+
+def test_drift_is_reproducible_from_seed_and_seq() -> None:
+    state = _drift_world()
+    state.species = {1: _sp(1, 2), 2: _sp(2, 3)}
+    cfg = _with_drift(load_default_config(), 0.5)
+    r1 = alien_drift(state, cfg)  # pure: does not mutate `state`
+    r2 = alien_drift(state, cfg)
+    assert {(s.id, s.sector_id) for s in r1.species} == {(s.id, s.sector_id) for s in r2.species}
+
+
+def test_drift_does_not_consume_the_shared_rng(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    before = svc.state.rng.getstate()
+    alien_drift(svc.state, _with_drift(svc.config, 1.0))
+    assert svc.state.rng.getstate() == before  # drift uses only its salted sub-RNG
+
+
+def test_drift_pins_stardock_contacts(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    pinned = cron._pinned_species(svc.state)
+    assert pinned  # the generated universe stages contacts at the StarDock
+    result = alien_drift(svc.state, _with_drift(svc.config, 1.0))
+    assert {s.id for s in result.species}.isdisjoint(pinned)  # staged contacts never wander
+
+
+@pytest.mark.parametrize("seed", range(8))
+def test_drift_never_lands_in_core_or_rival_territory(tmp_path: Path, seed: int) -> None:
+    svc = GameService.new_game(_config(), seed, SqliteRepository(tmp_path / f"d{seed}.db"))  # type: ignore[arg-type]
+    cfg = _with_drift(svc.config, 1.0)
+    for sp in alien_drift(svc.state, cfg).species:
+        assert may_occupy(svc.state, sp, sp.sector_id, cfg.aliens)

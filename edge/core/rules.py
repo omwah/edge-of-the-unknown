@@ -340,6 +340,7 @@ class ReduceResult:
     planets: tuple[Planet, ...] = ()
     starbases: tuple[Starbase, ...] = ()
     discoveries: tuple[Discovery, ...] = ()
+    species: tuple[AlienSpecies, ...] = ()  # cron-mutated species positions (WP16 drift)
     game: Game | None = None  # set by maintenance reducers (e.g. daily day-number bump)
 
 
@@ -357,6 +358,8 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
         state.starbases[starbase.id] = starbase
     for discovery in result.discoveries:
         state.discoveries[discovery.id] = discovery
+    for species in result.species:
+        state.species[species.id] = species
     if result.game is not None:
         state.game = result.game
 
