@@ -206,9 +206,35 @@ class TradePair:
 
 
 @dataclass(frozen=True)
+class CodexEntry:
+    """One logged discovery for the Computer's Codex tab (§7, §11, WP11)."""
+
+    name: str  # "wreck · RARE"
+    location: str  # "Sector 42" / "Planet 7 · site 2"
+    rarity: str
+    detail: str  # payload / lore fragment
+
+
+@dataclass(frozen=True)
+class DossierEntry:
+    """One met species for the Computer's Dossier tab (§6.6, §11, WP11)."""
+
+    species: str
+    alliance: str
+    band: str  # friendly / neutral / …
+    standing: str
+    disposition_filled: int  # 0..5 effective-disposition bar
+    effective: float
+    offers: str  # last-seen tech-offer summary
+    note: str  # a self-description line in the species' own voice (WP8 dialogue)
+
+
+@dataclass(frozen=True)
 class ComputerDTO:
     pairs: list[TradePair]
     selected: str
+    codex: list[CodexEntry] = field(default_factory=list)
+    dossier: list[DossierEntry] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

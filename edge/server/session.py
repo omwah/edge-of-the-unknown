@@ -500,8 +500,61 @@ def map_view(state: UniverseState, player_id: int) -> dto.MapDTO:
     )
 
 
+def _codex_entries(state: UniverseState, player: Player) -> list[dto.CodexEntry]:
+    """The player's logged discoveries, richest first (§7, §11 Codex tab)."""
+    entries: list[tuple[int, dto.CodexEntry]] = []
+    for did in player.codex:
+        disc = state.discoveries.get(did)
+        if disc is None:
+            continue
+        if disc.planet_id is not None:
+            location = f"Planet {disc.planet_id} · site {disc.site_slot + 1}"
+        else:
+            location = f"Sector {_display(state, disc.sector_id)}"
+        entries.append((disc.rarity_tier.value, dto.CodexEntry(
+            name=f"{disc.kind.value} · {disc.rarity_tier.name}", location=location,
+            rarity=disc.rarity_tier.name, detail="; ".join(_payload_lines(disc.payload)),
+        )))
+    entries.sort(key=lambda t: (-t[0], t[1].name))
+    return [e for _, e in entries]
+
+
+def _offer_summary(sc: object) -> str:
+    """A compact last-seen tech-offer summary for the dossier (§6.6)."""
+    labels = []
+    for o in getattr(sc, "tech_offers", []):
+        what = o.component or o.aspect or "?"
+        labels.append(f"{what}({o.tier})")
+    return ", ".join(labels) if labels else "—"
+
+
+def _dossier_entries(state: UniverseState, player: Player, config: GameConfig) -> list[dto.DossierEntry]:
+    """Every met species with standing, last-seen offers, and a voiced self-note (§6.6, §11)."""
+    if config.roster is None:
+        return []
+    roster = config.roster
+    out: list[dto.DossierEntry] = []
+    for sid in sorted(player.species_attitudes):
+        species = state.species.get(sid)
+        if species is None:
+            continue
+        sc = roster.species_by_id(species.roster_id)
+        allied = player.alliance_id is not None and player.alliance_id == species.alliance_id
+        effective = effective_disposition(species, player)
+        alliance = roster.alliance(species.alliance_id) if species.alliance_id is not None else None
+        out.append(dto.DossierEntry(
+            species=species.name, alliance=alliance.name if alliance else "unaligned",
+            band=disposition_band(effective, config.aliens),
+            standing=dialogue.standing_for(effective, allied=allied, aliens=config.aliens),
+            disposition_filled=max(0, min(5, round(effective * 5))), effective=round(effective, 3),
+            offers=_offer_summary(sc),
+            note=_line(state, roster, species, player, "dossier_self", config),
+        ))
+    return out
+
+
 def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.ComputerDTO:
-    """Pair-trade finder over the ports the player has discovered (§9, §11)."""
+    """Pair-trade finder + discovery codex + alien dossier (§9, §11)."""
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
     dist = bfs_distances(state.adjacency, ship.sector_id)
@@ -516,7 +569,10 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
                 pairs.append(best)
     pairs.sort(key=lambda tp: tp.per_turn, reverse=True)
     top = pairs[:3]
-    return dto.ComputerDTO(pairs=top, selected=top[0].pair if top else "—")
+    return dto.ComputerDTO(
+        pairs=top, selected=top[0].pair if top else "—",
+        codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
+    )
 
 
 def _line(state: UniverseState, roster: object, species: AlienSpecies, player: Player,

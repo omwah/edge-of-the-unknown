@@ -364,6 +364,33 @@ async def test_hail_opens_contact_then_buys_tech() -> None:
         assert sum(svc.state.ships[1].components.values()) == 1
 
 
+async def test_computer_dossier_lists_a_met_species() -> None:
+    from textual.widgets import DataTable, TabbedContent
+
+    from edge.tui.screens.computer import ComputerScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        _inject_species(svc, "vesk")
+        await pilot.press("h")  # hail → marks the species met
+        await pilot.pause()
+        await pilot.press("escape")  # leave contact
+        await pilot.pause()
+        await pilot.press("c")  # open the computer
+        await pilot.pause()
+        assert isinstance(app.screen, ComputerScreen)
+        app.screen.query_one(TabbedContent).active = "dossier"
+        await pilot.pause()
+        table = app.screen.query_one("#dossier-table", DataTable)
+        assert table.row_count == 1
+        assert "Vesk" in str(table.get_cell_at((0, 0)))
+
+
 async def test_continue_focused_and_new_game_confirms_when_save_exists() -> None:
     """With a save present, Continue takes focus and New game asks before clobbering it."""
     from textual.widgets import Button
