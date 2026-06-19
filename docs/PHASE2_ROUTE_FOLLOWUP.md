@@ -5,7 +5,7 @@
 > Computer tabs still stubbed. Where the two disagree, DESIGN wins and is
 > corrected in the same change (CLAUDE.md).
 >
-> **Status: WP14 shipped (Route planner live); WP15–WP18 draft.**
+> **Status: WP14 + WP15 shipped (Route planner + Ports directory live); WP16–WP18 draft.**
 >
 > Work packages: **WP14 — Route planner** · **WP15 — Ports directory** ·
 > **WP16 — Alien ship movement** · **WP17 — Alien encounter "Say / Do" menu** ·
