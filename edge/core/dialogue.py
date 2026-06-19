@@ -164,6 +164,19 @@ def select_line(chain: Sequence[DialoguePack], context: str, *, standing: str,
     return "", recency
 
 
+def encounter_rng(seed: int, species_id: int, context: str,
+                  recency: tuple[int, ...]) -> random.Random:
+    """A deterministic RNG for line selection, reproducible under (seed, command log).
+
+    Seeded from the game seed, the species, the context, and the current recency ring,
+    so the projection (read-only) and the reducer (which advances the ring) agree on the
+    line, and replay reproduces it exactly. A **string** seed is used deliberately —
+    `random.Random` derives it via SHA-512, which is stable across processes (unlike the
+    hash-randomised `hash()` of a tuple), keeping `(seed, command log)` replay exact.
+    """
+    return random.Random(f"{seed}|{species_id}|{context}|{recency}")
+
+
 def speak(roster: RosterConfig, species: AlienSpecies, player: Player, context: str, *,
           aliens: AliensConfig, rng: random.Random,
           extra: Mapping[str, str] | None = None,

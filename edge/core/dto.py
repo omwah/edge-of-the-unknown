@@ -345,3 +345,49 @@ class GameState:
     max_turns: int
     ship: ShipDTO
     sector: SectorDTO
+
+
+@dataclass(frozen=True)
+class ContactVerbDTO:
+    """One row of the alien-contact verb menu (§6.7), derived from species params.
+
+    A disabled verb carries the `reason` it is greyed (e.g. "they refuse to trade").
+    """
+
+    key: str
+    label: str
+    enabled: bool = True
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class TechOfferDTO:
+    """One alien tech offer (§6, §8): a component or aspect upgrade, for latinum or barter."""
+
+    index: int
+    label: str  # "radiator (II)" / "sensors +1"
+    tier: str
+    mode: str  # "latinum" / "barter"
+    price: int  # latinum price (0 for barter)
+    barter_cost: str  # "1 Tier-III artifact" or ""
+    available: bool
+    reason: str = ""  # why unavailable (standing / latinum / artifact / hold)
+
+
+@dataclass(frozen=True)
+class ContactDTO:
+    """A peaceful alien contact screen (§6, §6.7, §11)."""
+
+    species: str
+    persona: str
+    alliance: str
+    standing: str  # "friendly" / "allied" / …
+    band: str
+    disposition_filled: int  # 0..5 effective-disposition bar
+    base_disposition: float
+    attitude: float
+    effective: float
+    opener: str  # the greeting line (WP8 dialogue)
+    verbs: list[ContactVerbDTO]
+    offers: list[TechOfferDTO]
+    dossier: list[str]  # lines about other met species, in this species' voice

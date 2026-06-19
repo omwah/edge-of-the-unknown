@@ -420,6 +420,7 @@ class TechOfferConfig(BaseModel):
     mode: Literal["latinum", "barter"] = "latinum"
     component: str | None = None  # a Component value, or None for an `aspect` offer
     aspect: str | None = None  # sensors / cloak / holds (flat aspect upgrade)
+    amount: int = 1  # magnitude of an aspect upgrade (ignored for component offers)
     price: int = 0  # latinum price when mode == latinum
     min_disposition: float = 0.0
 

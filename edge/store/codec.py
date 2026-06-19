@@ -11,6 +11,9 @@ from typing import Any
 
 from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsystem
 from edge.core.events import (
+    AlienHailed,
+    AlienTraded,
+    AttitudeChanged,
     Banked,
     Colonized,
     ColonistsRecruited,
@@ -37,6 +40,8 @@ from edge.core.events import (
     Warped,
 )
 from edge.core.rules import (
+    BarterArtifact,
+    BuyAlienTech,
     BuyComponent,
     BuyGenesis,
     BuyShip,
@@ -49,6 +54,7 @@ from edge.core.rules import (
     Dock,
     Explore,
     FieldPatch,
+    Hail,
     HaggleOffer,
     InstallComponent,
     RecruitColonists,
@@ -131,6 +137,12 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "BuyGenesis", {}
         case DeployGenesis():
             return "DeployGenesis", {"planet_id": command.planet_id}
+        case Hail():
+            return "Hail", {"species_id": command.species_id}
+        case BuyAlienTech():
+            return "BuyAlienTech", {"species_id": command.species_id, "offer_index": command.offer_index}
+        case BarterArtifact():
+            return "BarterArtifact", {"species_id": command.species_id, "offer_index": command.offer_index}
 
 
 def decode_command(type_: str, payload: dict[str, Any]) -> Command:
@@ -203,6 +215,12 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return BuyGenesis()
         case "DeployGenesis":
             return DeployGenesis(planet_id=payload["planet_id"])
+        case "Hail":
+            return Hail(species_id=payload["species_id"])
+        case "BuyAlienTech":
+            return BuyAlienTech(species_id=payload["species_id"], offer_index=payload["offer_index"])
+        case "BarterArtifact":
+            return BarterArtifact(species_id=payload["species_id"], offer_index=payload["offer_index"])
         case _:
             raise ValueError(f"unknown command type {type_!r}")
 
@@ -309,6 +327,18 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "StockRegenerated", {
                 "port_id": event.port_id, "commodity": event.commodity.value, "new_stock": event.new_stock,
             }
+        case AlienHailed():
+            return "AlienHailed", {"player_id": event.player_id, "species_id": event.species_id}
+        case AlienTraded():
+            return "AlienTraded", {
+                "player_id": event.player_id, "species_id": event.species_id,
+                "kind": event.kind, "detail": event.detail, "cost": event.cost,
+            }
+        case AttitudeChanged():
+            return "AttitudeChanged", {
+                "player_id": event.player_id, "species_id": event.species_id,
+                "offset": event.offset, "effective": event.effective,
+            }
         case _:
             raise ValueError(f"unknown event type {type(event).__name__}")
 
@@ -374,5 +404,13 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return TurnsReset(payload["player_id"], payload["turns"])
         case "StockRegenerated":
             return StockRegenerated(payload["port_id"], Commodity(payload["commodity"]), payload["new_stock"])
+        case "AlienHailed":
+            return AlienHailed(payload["player_id"], payload["species_id"])
+        case "AlienTraded":
+            return AlienTraded(payload["player_id"], payload["species_id"], payload["kind"],
+                               payload["detail"], payload["cost"])
+        case "AttitudeChanged":
+            return AttitudeChanged(payload["player_id"], payload["species_id"],
+                                   payload["offset"], payload["effective"])
         case _:
             raise ValueError(f"unknown event type {type_!r}")

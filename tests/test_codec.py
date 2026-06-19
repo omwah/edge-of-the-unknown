@@ -8,6 +8,9 @@ from typing import get_args
 
 from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsystem
 from edge.core.events import (
+    AlienHailed,
+    AlienTraded,
+    AttitudeChanged,
     Banked,
     Colonized,
     ColonistsRecruited,
@@ -34,6 +37,8 @@ from edge.core.events import (
     Warped,
 )
 from edge.core.rules import (
+    BarterArtifact,
+    BuyAlienTech,
     BuyComponent,
     BuyGenesis,
     BuyShip,
@@ -46,6 +51,7 @@ from edge.core.rules import (
     Dock,
     Explore,
     FieldPatch,
+    Hail,
     HaggleOffer,
     InstallComponent,
     RecruitColonists,
@@ -86,6 +92,9 @@ COMMANDS: list[Command] = [
     Explore(planet_id=5),         # WP6 survey the next surface site
     BuyGenesis(),                 # WP10 buy a genesis torpedo
     DeployGenesis(planet_id=5),   # WP10 terraform a world
+    Hail(species_id=3),                          # WP9 open alien contact
+    BuyAlienTech(species_id=3, offer_index=1),   # WP9 buy tech for latinum
+    BarterArtifact(species_id=3, offer_index=0), # WP9 barter an artifact for tech
 ]
 
 EVENTS: list[Event] = [
@@ -112,6 +121,9 @@ EVENTS: list[Event] = [
     GenesisDeployed(1, 5, "terrestrial_warm"),
     TurnsReset(1, 250),
     StockRegenerated(3, Commodity.EQUIPMENT, 480),
+    AlienHailed(1, 3),
+    AlienTraded(1, 3, "buy", "radiator (II)", 7_000),
+    AttitudeChanged(1, 3, 0.12, 0.87),
 ]
 
 
