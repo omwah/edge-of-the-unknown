@@ -433,6 +433,45 @@ class PackConfig(BaseModel):
     escort: list[str] = Field(default_factory=list)  # ship_class ids accompanying
 
 
+class DialogueWhen(BaseModel):
+    """A line entry's `when` predicate (DESIGN §6.7).
+
+    Matched against encounter state: `standing` (the effective-disposition band, plus
+    an `allied` band when the player shares the species' alliance), whether a `treaty`
+    is in force, and — forward-compat for Phase 3 — the species' current `posture` /
+    a `stage` on its signature-mechanic or befriend ladder. An omitted field matches
+    anything; an entry with no fields is the catch-all default.
+    """
+
+    model_config = _FROZEN
+
+    standing: str | None = None  # allied / friendly / neutral / wary / hostile
+    treaty: bool | None = None
+    posture: str | None = None  # forward-compat (trade_posture-gated lines)
+    stage: str | None = None  # forward-compat (signature/befriend ladder stage)
+
+
+class DialogueLine(BaseModel):
+    """One conditional line entry (DESIGN §6.7): a `when` + a variant pool + weight.
+
+    `variants` are interchangeable phrasings of the *same* beat (templated with
+    `{placeholders}`); the selector draws one through the seeded RNG avoiding the
+    recently-shown indices (the recency ring), and picks among matching entries by
+    `weight`.
+    """
+
+    model_config = _FROZEN
+
+    variants: list[str] = Field(min_length=1)
+    when: DialogueWhen = DialogueWhen()
+    weight: int = Field(default=1, ge=1)
+
+
+# A dialogue pack maps a context key (greeting, trade_open, dossier_other, …) to its
+# ordered list of conditional line entries (DESIGN §6.7).
+DialoguePack = dict[str, list[DialogueLine]]
+
+
 class SpeciesConfig(BaseModel):
     """A roster species' full §6.1 parameter set (DESIGN §6.1).
 
@@ -484,9 +523,11 @@ class SpeciesConfig(BaseModel):
     ] = "none"
     attitude_gain_rate: float = 0.1
     attitude_loss_rate: float = 0.2
-    # Standing-keyed conversation lines (DESIGN §6.7). Opaque here — WP8 owns the schema;
-    # authored per species there. Empty ⇒ inherits the persona/generic pack.
-    dialogue_pack: dict[str, Any] = Field(default_factory=dict)
+    # Standing-keyed conversation lines (DESIGN §6.7): context key → conditional line
+    # entries. A species overrides only the beats that make it distinctive; everything
+    # else falls back species → persona → generic (`core.dialogue`). Empty ⇒ the species
+    # speaks entirely in its persona's voice.
+    dialogue_pack: DialoguePack = Field(default_factory=dict)
 
 
 class RosterConfig(BaseModel):
@@ -506,6 +547,11 @@ class RosterConfig(BaseModel):
     species: list[SpeciesConfig]
     subset_min: int = 6
     subset_max: int = 12
+    # Persona id → a shareable dialogue pack of generic, voice-correct lines (§6.7). A
+    # species inherits its `persona`'s pack and overrides only distinctive beats; the
+    # special `generic` persona is the ultimate fallback so a line never blanks.
+    personas: dict[str, DialoguePack] = Field(default_factory=dict)
+    recency_k: int = Field(default=2, ge=0)  # dialogue no-repeat ring depth (§6.7)
 
     def alliance(self, alliance_id: int) -> AllianceConfig | None:
         return next((a for a in self.alliances if a.id == alliance_id), None)

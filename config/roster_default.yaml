@@ -460,3 +460,317 @@ species:
     starbase_policy: territorial
     attitude_gain_rate: 0.06
     attitude_loss_rate: 0.2
+
+# --- Dialogue (DESIGN §6.7) ------------------------------------------------------
+#
+# `personas` are shareable dialogue packs of generic, voice-correct lines. A species
+# inherits its `persona`'s pack and overrides only distinctive beats; everything else
+# falls back species -> persona -> `generic`, the ultimate fallback. A line entry is
+# { when: <standing/treaty predicate>, variants: [phrasings], weight }; an entry with no
+# `when` is the catch-all. `{placeholders}` ({player} {species} {alliance} {subject} ...)
+# fill from the encounter context. `recency_k` is the no-repeat ring depth.
+recency_k: 2
+
+personas:
+  # The complete fallback pack: a catch-all line for every base context key, so a line
+  # never blanks. `greeting` is standing-keyed; the rest are voiced over by the personas.
+  generic:
+    greeting:
+      - when: { standing: allied }
+        variants:
+          - "Welcome back, friend {player}. The {species} are glad of your company."
+          - "Ah, {player}. Among allies you are always welcome among the {species}."
+          - "Our friend returns. Speak, {player} — the {species} listen."
+      - when: { standing: friendly }
+        variants:
+          - "Greetings, {player}. The {species} receive you in good faith."
+          - "Well met, traveller. What brings you to the {species} today?"
+          - "You are welcome here, {player}. How may the {species} assist you?"
+      - when: { standing: neutral }
+        variants:
+          - "We are the {species}. State your business, {player}."
+          - "You stand before the {species}. What do you want?"
+      - when: { standing: hostile }
+        variants:
+          - "You have nerve to hail the {species}, {player}. Speak quickly."
+          - "The {species} have little love for you. Why do you call?"
+      - variants:
+          - "The {species} acknowledge you, {player}."
+          - "You have the attention of the {species}."
+    trade_open:
+      - variants:
+          - "The {species} will deal with you. Show us what you seek."
+          - "Our wares are open to you, {player}. Let us trade."
+    trade_refuse:
+      - variants:
+          - "The {species} have nothing for you today."
+          - "We do not trade with you, {player}. Not now."
+    treaty_offer:
+      - variants:
+          - "A lasting peace between us? The {species} will consider it."
+          - "Speak of treaty, {player}, and the {species} will weigh your words."
+    treaty_grant:
+      - variants:
+          - "It is done. The {species} and {player} are at peace."
+          - "Let the accord stand. The {species} honour it."
+    treaty_condition:
+      - variants:
+          - "First prove yourself, {player}, and the {species} will talk of treaty."
+          - "Earn our trust, and peace with the {species} may follow."
+    treaty_refuse:
+      - variants:
+          - "There will be no treaty with you, {player}."
+          - "The {species} decline your offer of peace."
+    refuel:
+      - variants:
+          - "Take on fuel, {player}, and go in peace."
+          - "The {species} will see your tanks filled."
+    extort_response:
+      - variants:
+          - "You would threaten the {species}? Take your goods and be gone."
+          - "We yield this once, {player}. Do not mistake it for weakness."
+    demand:
+      - variants:
+          - "The {species} require {reward}. See it done."
+          - "Bring us {reward}, {player}, if you would keep our favour."
+    reward:
+      - variants:
+          - "You have served well. The {species} grant you {reward}."
+          - "Take this {reward}, {player}, with the thanks of the {species}."
+    combat_open:
+      - variants:
+          - "Then it is battle. The {species} will not yield!"
+          - "You chose this, {player}. The {species} answer in kind."
+    combat_taunt:
+      - variants:
+          - "Is that the best you bring, {player}?"
+          - "The {species} have weathered worse than you."
+    surrender:
+      - variants:
+          - "Hold! The {species} yield. Spare us."
+          - "Enough! We surrender, {player}."
+    flee_scorn:
+      - variants:
+          - "Run, then. The {species} expected no better of you."
+          - "Coward. Do not show your hull to the {species} again."
+    betrayal:
+      - variants:
+          - "Betrayer! The {species} will not forget this, {player}."
+          - "You have broken faith. The {species} are done with you."
+    farewell:
+      - variants:
+          - "Go well, {player}."
+          - "The {species} bid you farewell."
+          - "Safe warp, traveller."
+    dossier_self:
+      - variants:
+          - "We are the {species}, of {alliance}."
+          - "The {species} keep our own counsel in this cluster."
+    dossier_other:
+      - variants:
+          - "The {subject}? The {species} have dealings with them, of a kind."
+          - "Ah, the {subject}. Tread carefully where they are concerned."
+
+  # Vesk — introduces itself by serial-style name; warm, helpful technologists.
+  serial_formal:
+    greeting:
+      - variants:
+          - "Greetings, {player}. I am Veska VK-7 of the {species}. We are at your service."
+          - "I am Veska VK-7 of the {species}. How may we be of service, {player}?"
+          - "Well met. Veska VK-7 of the {species} greets you, {player}, in friendship."
+    trade_open:
+      - variants:
+          - "The {species} trade gladly. Our circuits and sensors are yours, {player}."
+          - "We have built fine things, {player}. The {species} will sell to a friend."
+    farewell:
+      - variants:
+          - "This makes us very happy. Good warp, {player}."
+          - "Go in peace, {player}. The {species} are always at your service."
+    dossier_other:
+      - variants:
+          - "The {subject}? We know them. Beware those whose minds are unkind, {player}."
+          - "Of the {subject} the {species} can tell you much. Listen well."
+
+  # Selvani — cautious, reserved, good-faith.
+  reserved_honest:
+    greeting:
+      - variants:
+          - "We are the {species}. We are cautious, {player}, but mean you no harm."
+          - "You may mean to harm the {species}. Yet we will hear you, {player}."
+          - "Greetings, friend. Our intent is peace. What do you wish of the {species}?"
+    trade_open:
+      - variants:
+          - "We will deal, {player}, with those who have proven honest."
+          - "The {species} trade carefully. Show us good faith and we will reciprocate."
+    dossier_other:
+      - variants:
+          - "The {subject}? We know little, but we will tell you what we know, {player}."
+
+  # Cibelline — vain engineered aesthetes; condescending self-names.
+  flowery_aesthete:
+    greeting:
+      - variants:
+          - "Felicitations, fortunate one. You behold Gold Moon Rising of the {species}."
+          - "Your eyes descry Jade Flowerbud of the {species}. State your need, {player}."
+          - "Behold Summer Breeze of the {species}, perfection made flesh. What is it, {player}?"
+    trade_open:
+      - variants:
+          - "We of the {species} deign to deal with you. Do not waste our beauty's time."
+          - "Such sordid commerce. Yet the {species} permit it — be quick, {player}."
+    dossier_other:
+      - variants:
+          - "The {subject}? Aesthetically beneath contempt, but instructive, {player}."
+
+  # Selvi — amorous, flirtatious, easily cowed.
+  amorous:
+    greeting:
+      - variants:
+          - "Friendliest greetings, warm one! The {species} adore your shapely hull, {player}."
+          - "Are you the female of your species, {player}? No matter — open your capsule!"
+          - "Heu! What camaraderie shall we share, {player}? Come closer to the {species}."
+    trade_open:
+      - variants:
+          - "For you, lovely {player}, the {species} will trade and gladly."
+          - "Anything for such a friend! The {species} open their stalls to you."
+    dossier_other:
+      - variants:
+          - "The {subject}? Ooh. Some are cute, some are not. The {species} can tell you which."
+
+  # Dignar — telepathic concept-fragment speech.
+  concept_fragments:
+    greeting:
+      - variants:
+          - "* Auspicious * Cordial * * {player} * Amicable * Welcome *"
+          - "* Prudence * Circumspection * * {player} * Attend * Speak *"
+          - "* Credence * Recognition * * {species} * Acknowledge * {player} *"
+    trade_open:
+      - variants:
+          - "* Reciprocity * Interchange * * Goods * Permitted * Proceed *"
+          - "* Commerce * Sanctioned * * {player} * Select * Offer *"
+    farewell:
+      - variants:
+          - "* Departure * Sanctioned * * Peace * Go *"
+          - "* Conclusion * * {player} * Dismissed * Benevolence *"
+    dossier_other:
+      - variants:
+          - "* {subject} * Assessment * * Caution * Advice *"
+
+  # Thessbrood — oily servility masking conquest.
+  oily_servile:
+    greeting:
+      - variants:
+          - "I welcome you, powerful {player}. I am but a humble governor of the {species}."
+          - "Have mercy upon me, {player}, and the {species} shall be your willing servants."
+          - "I welcome you, friend {player}. Let us plot together, you and the {species}."
+    trade_open:
+      - variants:
+          - "The {species} have such fine goods for an honoured friend as you, {player}."
+          - "Take what you wish, generous {player}. The {species} live but to serve you."
+    dossier_other:
+      - variants:
+          - "The {subject}? Heed my counsel, {player}, and you will be the safer for it."
+
+  # Helot — cold machine-logic, dictionary entries.
+  dictionary_literal:
+    greeting:
+      - variants:
+          - "Query acknowledged. Unit of the {species} responds. State purpose, {player}."
+          - "1. A greeting. 2. The {species} register your presence, {player}. Proceed."
+          - "Interface open. The {species} await input, {player}."
+    trade_open:
+      - variants:
+          - "Function: trade. The {species} will exchange goods. Specify, {player}."
+    trade_refuse:
+      - variants:
+          - "Trade function unavailable. The {species} require authorisation, {player}."
+    dossier_other:
+      - variants:
+          - "{subject}: 1. A known entity. 2. The {species} provide data on request, {player}."
+
+  # Vennrith — inverted, grudge-keeping syntax.
+  inverted_syntax:
+    greeting:
+      - variants:
+          - "The {species} we are. Suspicious your motives we are, {player}."
+          - "Come why have you? What with the {species}, {player}, do you want?"
+          - "Careful, lest us you anger. Speak, {player}, you must."
+    trade_open:
+      - variants:
+          - "Trade with you the {species} will. Beholden to us then you are, {player}."
+    dossier_other:
+      - variants:
+          - "The {subject}? Forget them the {species} never shall. Tell you of them, we will."
+
+  # Concordance — archaic, biblical judgement.
+  biblical_arbiter:
+    greeting:
+      - variants:
+          - "Thou hast come before the {species}, {player}. Let justice be weighed."
+          - "I am the voice of the {species}. Thou art judged, {player}."
+          - "Thou approachest the {species}. Speak, and sin no more."
+    trade_refuse:
+      - variants:
+          - "The {species} barter not. Get thee to honest dealings, {player}."
+    farewell:
+      - variants:
+          - "Go now, {player}, and return not, lest wrath be kindled."
+          - "Depart in peace, {player}, and walk the path of Cosmic good."
+    dossier_other:
+      - variants:
+          - "The {subject}? Their sins the {species} know. Learn from their errors, {player}."
+
+  # Stryx — mangled translator garble.
+  garbled_translator:
+    greeting:
+      - variants:
+          - "Yuhaf fown da {species}. Shalwee trayd, {player}?"
+          - "Meeno tyme. Wutyu wan, {player}? Speek da {species}."
+          - "Greetinz. Da {species} see yu. Yu paie, wee tok, {player}."
+    trade_open:
+      - variants:
+          - "In formay shun, goodz — da {species} sell. Wutyu givv, {player}?"
+    dossier_other:
+      - variants:
+          - "Da {subject}? Mee no much. Yumuss paie da {species} for tel, {player}."
+
+  # Quill — predatory salvage, transactional menace.
+  macabre_transactional:
+    greeting:
+      - variants:
+          - "The {species} smell salvage. What do you bring us, {player}?"
+          - "Fresh hull, fresh prey. Speak quickly, {player}, the {species} lose patience."
+          - "The {species} acknowledge you. Coordinates, or goods — which, {player}?"
+    trade_open:
+      - variants:
+          - "Give the {species} the location of an undefended world, and goods are yours."
+    dossier_other:
+      - variants:
+          - "The {subject}? Weak worlds, ripe for stripping. The {species} know them well."
+
+  # Thessarch — authoritarian gatekeeper.
+  authoritarian_dogma:
+    greeting:
+      - variants:
+          - "You stand before the {species}, {player}. We rule here. State your purpose."
+          - "The {species} command this gate, {player}. Speak, and we shall judge."
+          - "Approach, {player}. The {species} weigh all who would join us."
+    trade_refuse:
+      - variants:
+          - "The {species} trade only with the loyal. Pledge first, {player}."
+    dossier_other:
+      - variants:
+          - "The {subject}? They serve, or they are nothing. The {species} decide, {player}."
+
+  # Dacaran — false idealism, probing loyalty.
+  false_idealist:
+    greeting:
+      - variants:
+          - "We the {species} have watched you, {player}. Your true opinion of our masters?"
+          - "Friend {player}, think of liberty. Would not the {species} be better leaders?"
+          - "Welcome, {player}. Have you destroyed any enemies of freedom recently?"
+    trade_refuse:
+      - variants:
+          - "Oddly enough, the {species} have no goods for sale today. So sorry, {player}."
+    dossier_other:
+      - variants:
+          - "The {subject}? A minor concern, {player}. The cluster is full of such."
