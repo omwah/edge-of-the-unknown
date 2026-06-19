@@ -15,7 +15,13 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
 
+from edge.core.dto import RouteDTO
+from edge.core.economy import EconomyError
+from edge.core.movement import MovementError
+from edge.core.rules import TravelTo
 from edge.server.service import GameService
+from edge.tui.screens.confirm import ConfirmScreen
+from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.widgets import MapBandPanel, MapView, bar
 
 
@@ -23,7 +29,9 @@ class ComputerScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Back"),
         Binding("c", "back", "Back"),
-        Binding("p", "noop", "Plot route"),
+        Binding("p", "plot_route", "Plot route"),
+        Binding("g", "engage", "Engage"),
+        Binding("r", "route_prompt", "Route to…"),
         Binding("a", "noop", "Add note"),
     ]
 
@@ -39,10 +47,14 @@ class ComputerScreen(Screen):
 
     def __init__(self, service: GameService, player_id: int, *, initial_tab: str = "trade") -> None:
         super().__init__()
+        self._service = service
+        self._pid = player_id
         self._computer = service.computer_view(player_id)
         self._map = service.map_view(player_id)
         self._messages = service.messages_view(player_id)
         self._initial_tab = initial_tab
+        self._route: RouteDTO | None = None  # the plotted route (per-interaction)
+        self._engage_target: int | None = None  # internal sector [G] travels to
 
     def compose(self) -> ComposeResult:
         yield Static("SHIP COMPUTER", id="computer-title")
@@ -67,7 +79,9 @@ class ComputerScreen(Screen):
                 yield Static("[b]EVENT LOG[/]        [dim]newest first[/]")
                 yield DataTable(id="log-table", zebra_stripes=True, cursor_type="row")
             with TabPane("Route", id="route"):
-                yield Static("[dim]Shortest path + hazard confirm — Phase 2.[/]")
+                yield Static("[b]ROUTE PLANNER[/]        [dim]plot before you commit[/]")
+                yield DataTable(id="route-table", zebra_stripes=True, cursor_type="row")
+                yield Static("", id="route-summary", classes="note")
             with TabPane("Codex", id="codex"):
                 yield Static("[b]DISCOVERY CODEX[/]        [dim]logged finds, richest first[/]")
                 yield DataTable(id="codex-table", zebra_stripes=True, cursor_type="row")
@@ -101,6 +115,10 @@ class ComputerScreen(Screen):
         else:
             codex.add_row(Text("no discoveries logged yet", style="dim"), Text(""), Text(""), Text(""))
 
+        route = self.query_one("#route-table", DataTable)
+        route.add_columns("Hop", "Sector", "Notes")
+        self._render_route()
+
         dossier = self.query_one("#dossier-table", DataTable)
         dossier.add_columns("Species", "Alliance", "Standing", "Last seen", "Disp", "Tech offers")
         if self._computer.dossier:
@@ -117,6 +135,110 @@ class ComputerScreen(Screen):
 
     def on_map_band_panel_picked(self, msg: MapBandPanel.Picked) -> None:
         self.notify(f"{msg.title} — sector inspector not wired in the skeleton.", timeout=2)
+
+    # --- Route planner (WP14) ------------------------------------------------
+
+    def _render_route(self) -> None:
+        """Repaint the Route tab from the plotted `RouteDTO` (or the empty state)."""
+        table = self.query_one("#route-table", DataTable)
+        table.clear()
+        summary = self.query_one("#route-summary", Static)
+        dto = self._route
+        if dto is None:
+            summary.update(
+                "[dim]Plot a route from the Trade or Codex tab, "
+                "or press R to enter a destination.[/]"
+            )
+            return
+        for i, hop in enumerate(dto.hops, 1):
+            note = Text("one-way ⚠", style="yellow") if hop.one_way else Text("")
+            table.add_row(str(i), hop.label, note)
+        head = f"[b]{dto.origin_display} → {dto.dest_display}[/]   [dim]{dto.summary}[/]"
+        if dto.reachable and dto.affordable:
+            summary.update(f"{head}   ·   [green]G Engage[/]")
+        else:
+            summary.update(f"{head}   ·   [red]{dto.reason}[/]")
+
+    def _show_route(self) -> None:
+        self._render_route()
+        self.query_one(TabbedContent).active = "route"
+
+    def _cursor_entry(self, table_id: str, items: list) -> object | None:  # type: ignore[type-arg]
+        """The DTO under the highlighted row of `table_id`, or None."""
+        row = self.query_one(table_id, DataTable).cursor_row
+        if not items or row is None or row >= len(items):
+            return None
+        return items[row]
+
+    def _current_sector(self) -> int:
+        state = self._service.state
+        player = state.players[self._pid]
+        return state.ships[player.ship_id].sector_id
+
+    def action_plot_route(self) -> None:
+        active = self.query_one(TabbedContent).active
+        if active == "trade":
+            pair = self._cursor_entry("#finder", self._computer.pairs)
+            if pair is None:
+                self.notify("No trade pair selected.", timeout=2)
+                return
+            self._route = self._service.route_legs_view(
+                self._pid, [pair.buy_sector, pair.sell_sector])  # type: ignore[attr-defined]
+            # [G] engages the first leg (§ WP14); skip a leg already standing on.
+            here = self._current_sector()
+            self._engage_target = next(
+                (w for w in (pair.buy_sector, pair.sell_sector) if w != here), None)  # type: ignore[attr-defined]
+            self._show_route()
+        elif active == "codex":
+            entry = self._cursor_entry("#codex-table", self._computer.codex)
+            if entry is None or entry.sector_id < 0:  # type: ignore[attr-defined]
+                self.notify("No charted find selected.", timeout=2)
+                return
+            self._route = self._service.route_view(self._pid, entry.sector_id)  # type: ignore[attr-defined]
+            self._engage_target = entry.sector_id  # type: ignore[attr-defined]
+            self._show_route()
+        else:
+            self.notify("Plot a route from the Trade or Codex tab.", timeout=2)
+
+    def action_route_prompt(self) -> None:
+        self.app.push_screen(TravelPromptScreen(), self._after_route_prompt)
+
+    def _after_route_prompt(self, dest: int | None) -> None:
+        if dest is None:
+            return
+        internal = self._service.resolve_display_id(dest)  # player typed a spatial id (§5.1)
+        if internal is None:
+            self.notify(f"No sector {dest}.", severity="warning", timeout=3)
+            return
+        self._route = self._service.route_view(self._pid, internal)
+        self._engage_target = internal
+        self._show_route()
+
+    def action_engage(self) -> None:
+        dto = self._route
+        if dto is None:
+            self.notify("No route plotted.", timeout=2)
+            return
+        if not dto.reachable or not dto.affordable:
+            self.notify(dto.reason or "Cannot travel that route.", severity="warning", timeout=3)
+            return
+        if dto.hazards:  # Phase-3 seam: empty in Phase 2, so the confirm never appears yet
+            self.app.push_screen(
+                ConfirmScreen("Hazards on route:\n" + "\n".join(dto.hazards) + "\n\nProceed?"),
+                self._engage_confirmed,
+            )
+            return
+        self._engage_confirmed(True)
+
+    def _engage_confirmed(self, ok: bool | None) -> None:
+        if not ok or self._engage_target is None:
+            return
+        try:
+            self._service.apply(self._pid, TravelTo(to_sector=self._engage_target))
+        except (MovementError, EconomyError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.app.pop_screen()  # back to the game screen, which recomposes on resume
 
     def action_back(self) -> None:
         self.app.pop_screen()
