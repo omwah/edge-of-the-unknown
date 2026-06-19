@@ -15,7 +15,7 @@ import pytest
 from edge.config import load_default_config
 from edge.core.aliens import effective_disposition
 from edge.core.economy import EconomyError
-from edge.core.enums import ComponentTier
+from edge.core.enums import ComponentTier, RarityTier
 from edge.core.models import AlienSpecies, UniverseState
 from edge.core.movement import shortest_path
 from edge.core.rules import (
@@ -230,6 +230,37 @@ def test_current_contact_view_finds_species_in_sector(tmp_path: Path) -> None:
     svc = GameService(state, CFG, SqliteRepository(tmp_path / "c.db"))  # type: ignore[arg-type]
     view = svc.current_contact_view(1)
     assert view is not None and view.species == "Vesk"
+
+
+# --- WP11: Computer dossier + codex projections ----------------------------------
+
+def test_computer_dossier_reflects_met_species() -> None:
+    state = _world()
+    sp = _inject(state, "vesk")
+    apply_result(state, reduce(state, 1, Hail(sp.id), CFG))
+    cv = session.computer_view(state, 1, CFG)
+    entry = next((d for d in cv.dossier if d.species == "Vesk"), None)
+    assert entry is not None
+    assert entry.standing == "friendly" and entry.note  # a voiced self-description
+    assert "navigator" in entry.offers  # last-seen tech-offer summary
+
+
+def test_computer_dossier_empty_before_meeting_anyone() -> None:
+    state = _world()
+    assert session.computer_view(state, 1, CFG).dossier == []
+
+
+def test_computer_codex_lists_logged_finds_richest_first() -> None:
+    state = _world()
+    if not state.discoveries:  # this seed salted none — nothing to assert
+        return
+    ids = list(state.discoveries)[:3]
+    state.players[1] = replace(state.players[1], codex=frozenset(ids))
+    cv = session.computer_view(state, 1, CFG)
+    assert len(cv.codex) == len(ids)
+    ranks = [RarityTier[e.rarity].value for e in cv.codex]
+    assert ranks == sorted(ranks, reverse=True)  # richest first
+    assert all(e.location for e in cv.codex)
 
 
 # --- replay / golden master ------------------------------------------------------

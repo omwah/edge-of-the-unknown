@@ -16,7 +16,7 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
 
 from edge.server.service import GameService
-from edge.tui.widgets import MapBandPanel, MapView
+from edge.tui.widgets import MapBandPanel, MapView, bar
 
 
 class ComputerScreen(Screen):
@@ -69,9 +69,12 @@ class ComputerScreen(Screen):
             with TabPane("Route", id="route"):
                 yield Static("[dim]Shortest path + hazard confirm — Phase 2.[/]")
             with TabPane("Codex", id="codex"):
-                yield Static("[dim]Discoveries & lore — Phase 2.[/]")
+                yield Static("[b]DISCOVERY CODEX[/]        [dim]logged finds, richest first[/]")
+                yield DataTable(id="codex-table", zebra_stripes=True, cursor_type="row")
             with TabPane("Dossier", id="dossier"):
-                yield Static("[dim]Species standing & grudges — Phase 3.[/]")
+                yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
+                yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
+                yield Static(self._dossier_notes(), classes="note")
             with TabPane("Notes", id="notes"):
                 yield Static("[dim]Avoid lists & player notes — Phase 2.[/]")
         yield Footer()
@@ -89,6 +92,27 @@ class ComputerScreen(Screen):
                 log.add_row(Text(entry.when, style="dim"), Text.from_markup(entry.text))
         else:
             log.add_row(Text(""), Text("no events yet", style="dim"))
+
+        codex = self.query_one("#codex-table", DataTable)
+        codex.add_columns("Find", "Location", "Rarity", "Detail")
+        if self._computer.codex:
+            for c in self._computer.codex:
+                codex.add_row(c.name, c.location, c.rarity, c.detail)
+        else:
+            codex.add_row(Text("no discoveries logged yet", style="dim"), Text(""), Text(""), Text(""))
+
+        dossier = self.query_one("#dossier-table", DataTable)
+        dossier.add_columns("Species", "Alliance", "Standing", "Disp", "Tech offers")
+        if self._computer.dossier:
+            for d in self._computer.dossier:
+                dossier.add_row(d.species, d.alliance, d.standing, bar(d.disposition_filled, 5), d.offers)
+        else:
+            dossier.add_row(Text("no species met yet", style="dim"), Text(""), Text(""), Text(""), Text(""))
+
+    def _dossier_notes(self) -> str:
+        if not self._computer.dossier:
+            return "[dim]Hail a friendly species to begin a dossier.[/]"
+        return "\n".join(f"[cyan]{d.species}:[/] [dim]{d.note}[/]" for d in self._computer.dossier)
 
     def on_map_band_panel_picked(self, msg: MapBandPanel.Picked) -> None:
         self.notify(f"{msg.title} — sector inspector not wired in the skeleton.", timeout=2)
