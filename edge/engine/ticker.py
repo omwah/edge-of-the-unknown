@@ -43,9 +43,11 @@ class EngineTicker:
         self._tick_seconds = tick_seconds
         self._tick = 0
         self._running = False
+        drift_ticks = max(1, service.config.aliens.drift_ticks_per_firing)
         self._crons = [
             CronTask("hourly_port_economy", ticks_per_hour, CRONS["hourly_port_economy"], ticks_per_hour),
             CronTask("hourly_planet_growth", ticks_per_hour, CRONS["hourly_planet_growth"], ticks_per_hour),
+            CronTask("alien_drift", drift_ticks, CRONS["alien_drift"], drift_ticks),
             CronTask("interest_accrual", ticks_per_day, CRONS["interest_accrual"], ticks_per_day),
             CronTask("daily_turn_reset", ticks_per_day, CRONS["daily_turn_reset"], ticks_per_day),
         ]

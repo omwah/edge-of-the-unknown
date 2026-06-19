@@ -29,6 +29,7 @@ from edge.core.enums import (
     Subsystem,
 )
 from edge.core.events import (
+    AlienMoved,
     Banked,
     Colonized,
     ColonistsRecruited,
@@ -893,6 +894,9 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
         return f"Bank {event.kind}: {event.amount}  (balance {event.balance})"
     if isinstance(event, TurnsReset):
         return f"[green]Turns reset to {event.turns}[/]"
+    if isinstance(event, AlienMoved):
+        # Only emitted for a move touching the player's sector (WP16), so it's always relevant.
+        return "[cyan]✦ An alien vessel warps through the sector.[/]"
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 

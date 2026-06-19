@@ -9,6 +9,7 @@ from typing import get_args
 from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsystem
 from edge.core.events import (
     AlienHailed,
+    AlienMoved,
     AlienTraded,
     AttitudeChanged,
     Banked,
@@ -122,6 +123,7 @@ EVENTS: list[Event] = [
     TurnsReset(1, 250),
     StockRegenerated(3, Commodity.EQUIPMENT, 480),
     AlienHailed(1, 3),
+    AlienMoved(3, 7, 12),
     AlienTraded(1, 3, "buy", "radiator (II)", 7_000),
     AttitudeChanged(1, 3, 0.12, 0.87),
 ]

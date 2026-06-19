@@ -12,6 +12,7 @@ from typing import Any
 from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsystem
 from edge.core.events import (
     AlienHailed,
+    AlienMoved,
     AlienTraded,
     AttitudeChanged,
     Banked,
@@ -329,6 +330,11 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             }
         case AlienHailed():
             return "AlienHailed", {"player_id": event.player_id, "species_id": event.species_id}
+        case AlienMoved():
+            return "AlienMoved", {
+                "species_id": event.species_id,
+                "from_sector": event.from_sector, "to_sector": event.to_sector,
+            }
         case AlienTraded():
             return "AlienTraded", {
                 "player_id": event.player_id, "species_id": event.species_id,
@@ -406,6 +412,8 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return StockRegenerated(payload["port_id"], Commodity(payload["commodity"]), payload["new_stock"])
         case "AlienHailed":
             return AlienHailed(payload["player_id"], payload["species_id"])
+        case "AlienMoved":
+            return AlienMoved(payload["species_id"], payload["from_sector"], payload["to_sector"])
         case "AlienTraded":
             return AlienTraded(payload["player_id"], payload["species_id"], payload["kind"],
                                payload["detail"], payload["cost"])

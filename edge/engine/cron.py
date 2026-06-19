@@ -8,13 +8,16 @@ the hourly port-economy regen (re-exported from `port_economy`).
 
 from __future__ import annotations
 
+import random
 from collections.abc import Callable
 from dataclasses import replace
 
+from edge.core.aliens import may_occupy
 from edge.core.config import GameConfig
 from edge.core.economy import accrue_interest as _accrue
-from edge.core.events import Banked, ColonyGrew, Event, PlanetProduced, TurnsReset
-from edge.core.models import UniverseState
+from edge.core.enums import PortClass
+from edge.core.events import AlienMoved, Banked, ColonyGrew, Event, PlanetProduced, TurnsReset
+from edge.core.models import AlienSpecies, UniverseState
 from edge.core.planets import produce
 from edge.core.rules import ReduceResult
 from edge.engine.port_economy import regenerate_ports
@@ -23,7 +26,7 @@ CronFn = Callable[[UniverseState, GameConfig], ReduceResult]
 
 __all__ = [
     "daily_turn_reset", "accrue_interest", "regenerate_ports", "planet_growth",
-    "CronFn", "CRONS", "resolve_cron",
+    "alien_drift", "CronFn", "CRONS", "resolve_cron",
 ]
 
 
@@ -63,6 +66,50 @@ def planet_growth(state: UniverseState, config: GameConfig) -> ReduceResult:
     return ReduceResult(events=tuple(events), planets=tuple(changed))
 
 
+def _pinned_species(state: UniverseState) -> frozenset[int]:
+    """Species staged at the StarDock — the hub's standing welcome; they don't wander (§6.3)."""
+    dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
+    if dock is None:
+        return frozenset()
+    return frozenset(s.id for s in state.species.values() if s.sector_id == dock.sector_id)
+
+
+def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
+    """Drift each species to a legal adjacent sector on the tick clock (§6.3, WP16).
+
+    A per-firing **sub-RNG** salted from `(seed, drift_seq)` keeps movement deterministic
+    and reproducible under replay without ever drawing from the shared command-stream
+    `state.rng`. `drift_seq` (a counter on `Game`) advances each firing, so live and
+    reloaded runs seed identically. Territory is gated by `may_occupy` (no Core, no rival
+    bloc); StarDock contacts are pinned. `AlienMoved` is emitted only for a move that
+    touches a player's current sector, so the log isn't flooded by galaxy-wide drift.
+    """
+    aliens = config.aliens
+    if not aliens.drift_enabled or not state.species:
+        return ReduceResult()
+    firing = state.game.drift_seq
+    rng = random.Random(f"{state.game.seed}|alien_drift|{firing}")
+    pinned = _pinned_species(state)
+    player_sectors = {state.ships[p.ship_id].sector_id for p in state.players.values()}
+    moved: list[AlienSpecies] = []
+    events: list[Event] = []
+    for sp in sorted(state.species.values(), key=lambda s: s.id):
+        if sp.id in pinned:
+            continue
+        if rng.random() >= aliens.drift_move_chance:
+            continue
+        legal = [n for n in sorted(state.adjacency.get(sp.sector_id, ()))
+                 if may_occupy(state, sp, n, aliens)]
+        if not legal:
+            continue
+        dst = rng.choice(legal)
+        moved.append(replace(sp, sector_id=dst))
+        if sp.sector_id in player_sectors or dst in player_sectors:
+            events.append(AlienMoved(sp.id, sp.sector_id, dst))
+    game = replace(state.game, drift_seq=firing + 1)
+    return ReduceResult(events=tuple(events), species=tuple(moved), game=game)
+
+
 def accrue_interest(state: UniverseState, config: GameConfig) -> ReduceResult:
     """Compound interest on every non-empty bank balance (§8)."""
     rate = config.economy.bank_interest_per_day
@@ -86,6 +133,7 @@ def accrue_interest(state: UniverseState, config: GameConfig) -> ReduceResult:
 CRONS: dict[str, CronFn] = {
     "hourly_port_economy": regenerate_ports,
     "hourly_planet_growth": planet_growth,
+    "alien_drift": alien_drift,
     "interest_accrual": accrue_interest,
     "daily_turn_reset": daily_turn_reset,
 }
