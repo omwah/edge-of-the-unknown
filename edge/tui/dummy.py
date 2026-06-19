@@ -15,6 +15,7 @@ from dataclasses import dataclass
 # service's `to_public` output); they are re-exported here so existing TUI
 # imports keep working unchanged (the WP8 DTO-contract unification). The Phase
 # 2-3 DTOs below stay defined locally until their engines land.
+from edge.core import dto
 from edge.core.dto import (
     Aspect,
     CommodityLine,
@@ -50,34 +51,6 @@ def sample_planet() -> PlanetDTO:
         allocation=[("Fuel Ore", 20), ("Organics", 60), ("Equipment", 20)],
         ship_colonists=0, ship_colonist_capacity=100, starbase="operational",
     )
-
-
-@dataclass(frozen=True)
-class ContactVerb:
-    """One row of the AlienContactScreen verb menu (UI_MOCKUPS.md §6).
-
-    The menu is *derived* from species params (trade_posture, treaty_mode, …),
-    not authored — a disabled verb carries the `reason` it is greyed.
-    """
-
-    key: str
-    label: str
-    enabled: bool = True
-    reason: str = ""
-
-
-@dataclass(frozen=True)
-class AlienContactDTO:
-    """A peaceful alien contact (UI_MOCKUPS.md §6, DESIGN §6.1–6.7)."""
-
-    species: str  # "Threllian Envoy"
-    disposition_filled: int  # 0..5 for the effective-disposition bar
-    band: str  # "amity" / "friendly" / …
-    standing: str  # "friendly (base .72 +.06 you)"
-    alliance: str
-    speech: list[str]  # dialogue-pack lines (markup ok)
-    verbs: list[ContactVerb]
-    dossier: list[str]  # dossier-panel lines (markup ok)
 
 
 @dataclass(frozen=True)
@@ -348,38 +321,33 @@ def sample_computer() -> ComputerDTO:
     )
 
 
-def sample_contact() -> AlienContactDTO:
-    """The Threllian Envoy contact from UI_MOCKUPS.md §6.
+def sample_contact() -> dto.ContactDTO:
+    """A sample alien contact for the screenshot harness (UI_MOCKUPS.md §6).
 
-    A friendly-band envoy of the Concord alliance: the dialogue is persona-voiced
-    and the verb menu is derived from params — treaty is greyed (conditional).
+    A friendly-band envoy: the dialogue is persona-voiced and the verb menu is derived
+    from params — treaty/fight are greyed (Phase-2 / non-reachable), with reasons.
     """
-    return AlienContactDTO(
-        species="Threllian Envoy",
-        disposition_filled=4,  # ████░ — high in the amity band
-        band="amity",
-        standing="friendly (base .72 +.06 you)",
-        alliance="Concord",
-        speech=[
-            '"Trader. Your hull still carries Sol\'s dust —',
-            ' welcome it. We have drives that would shame',
-            ' your little spindrive."',
-        ],
+    return dto.ContactDTO(
+        species="Vesk", persona="serial_formal", alliance="unaligned",
+        standing="friendly", band="friendly", disposition_filled=4,
+        base_disposition=0.85, attitude=0.06, effective=0.91,
+        opener="Greetings, Trailblazer. I am Veska VK-7 of the Vesk. We are at your service.",
         verbs=[
-            ContactVerb("1", "Browse tech offers"),
-            ContactVerb("2", "Barter an artifact"),
-            ContactVerb("3", "Ask about the region"),
-            ContactVerb("4", "Propose treaty", enabled=False, reason="conditional"),
-            ContactVerb("5", "Trade goods"),
-            ContactVerb("6", "Leave"),
+            dto.ContactVerbDTO("hail", "Hail / greet"),
+            dto.ContactVerbDTO("trade", "Buy tech"),
+            dto.ContactVerbDTO("barter", "Barter artifact"),
+            dto.ContactVerbDTO("treaty", "Treaty", False, "treaties open in a later phase"),
+            dto.ContactVerbDTO("fight", "Attack", False, "they are friendly"),
+            dto.ContactVerbDTO("leave", "Leave"),
+        ],
+        offers=[
+            dto.TechOfferDTO(0, "navigator (I)", "I", "latinum", 1800, "", True),
+            dto.TechOfferDTO(1, "radiator (II)", "II", "latinum", 7000, "", False, "insufficient latinum"),
+            dto.TechOfferDTO(2, "sensors +1", "III", "barter", 0, "1 Tier-III artifact", False,
+                             "need a Tier-III artifact"),
         ],
         dossier=[
-            "[red]Kessrin[/]  hostile-lean",
-            '  [dim]"raiders; shoot 1st"[/]',
-            "[cyan]Federation[/]  ally of Core",
-            "Grudges: [green]none vs you[/]",
-            "Last tech: Tier-II",
-            "  [dim]turbine, screens[/]",
+            "The Selvani? We know them. Beware those whose minds are unkind, Trailblazer.",
         ],
     )
 
