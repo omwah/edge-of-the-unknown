@@ -247,3 +247,38 @@ def test_validate_requires_dossier_other_subject() -> None:
         d["personas"]["generic"]["dossier_other"] = [{"variants": ["I know them well."]}]
     with pytest.raises(DialogueIntegrityError, match="dossier_other"):
         validate_dialogue(_mutated_roster(mutate))
+
+
+# --- WP18: Federation humanoid_diplomat allied voice ---
+
+
+def _terran_entity() -> AlienSpecies:
+    return AlienSpecies(
+        id=1, roster_id="terran", name="Terrans", archetype_id="humanoid_diplomat",
+        sector_id=1, home_band="Hub", tech_level=8, base_disposition=1.0,
+        disposition_center=1.0, disposition_variance=0.03, alliance_id=1,
+        alliance_role="leader", persona="humanoid_diplomat")
+
+
+def test_federation_member_greets_a_fellow_citizen_as_allied() -> None:
+    roster = CFG.roster
+    assert roster is not None
+    terran = _terran_entity()
+    member = Player(id=1, name="Cap", ship_id=1, latinum=0, alliance_id=1)  # fellow citizen
+    outsider = Player(id=2, name="Cap", ship_id=1, latinum=0, alliance_id=None)
+
+    allied_markers = ("stands with you", "fellow citizen", "friendly flag")
+
+    member_lines = {speak(roster, terran, member, "greeting",
+                          aliens=CFG.aliens, rng=random.Random(s))[0] for s in range(20)}
+    outsider_lines = {speak(roster, terran, outsider, "greeting",
+                            aliens=CFG.aliens, rng=random.Random(s))[0] for s in range(20)}
+
+    def has_kin_line(lines: set[str]) -> bool:
+        return any(any(m in line for m in allied_markers) for line in lines)
+
+    # The allied 'fellow-citizen' branch fires for kin — and never for an outsider.
+    assert has_kin_line(member_lines)
+    assert not has_kin_line(outsider_lines)
+    # The outsider still hears the warm generic peaceful opener.
+    assert any("come in peace" in line or "understanding" in line for line in outsider_lines)

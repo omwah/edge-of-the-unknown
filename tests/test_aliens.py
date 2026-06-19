@@ -254,3 +254,31 @@ def test_may_occupy_bars_rival_territory_allows_neutral_and_own() -> None:
     assert not may_occupy(state, sp, 3, CFG.aliens)  # rival bloc's holding
     assert may_occupy(state, sp, 4, CFG.aliens)  # the species' own holding
     assert may_occupy(state, sp, 5, CFG.aliens)  # unowned planet is fine
+
+
+# --- WP18: Federation humanoid_diplomat roster content ---
+
+
+def test_federation_members_are_humanoid_diplomats_at_top_of_band() -> None:
+    roster = CFG.roster
+    assert roster is not None
+    gov = roster.core_governing_alliance_id
+    members = [s for s in roster.species if s.alliance_id == gov]
+    assert members, "the governing alliance must field its own people (WP18)"
+    assert any(s.alliance_role == "leader" for s in members)  # a founding leader exists
+    roles = {s.alliance_role for s in members}
+    assert roles <= {"leader", "member"}
+    for sp in members:
+        assert sp.alliance_id in {a.id for a in roster.alliances}
+        assert sp.archetype_id == "humanoid_diplomat"
+        assert sp.persona == "humanoid_diplomat"
+        # 100% friendly by construction: even the low end of the spread stays in amity.
+        assert sp.disposition_center - sp.disposition_variance >= CFG.aliens.amity_threshold
+
+
+def test_humanoid_diplomat_persona_passes_dialogue_integrity() -> None:
+    from edge.core.dialogue import validate_dialogue
+
+    assert CFG.roster is not None
+    assert "humanoid_diplomat" in CFG.roster.personas
+    validate_dialogue(CFG.roster)  # raises on any unfillable/blank context

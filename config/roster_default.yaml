@@ -28,6 +28,68 @@ alliances:
   - { id: 4, name: Liberty Front,     banner: "Self-determination (a front)", covets_core: true }
 
 species:
+  # --- Terran Federation — the Core's governing alliance & the player's own people ---
+
+  # Terrans — Star-Trek-style humans; principled explorer-diplomats, the Core's
+  # founding people and the player's own. 100% friendly (a fellow citizen): the warmest
+  # contact in the game and the natural first tech vendor a new player reaches.
+  - id: terran
+    name: Terrans
+    archetype_id: humanoid_diplomat
+    description: >-
+      Humans of the Terran Federation — principled explorers and diplomats, the Core's
+      founding people and the player's own. The warmest contact in the game.
+    disposition_center: 1.0
+    disposition_variance: 0.03      # always at the very top of the friendly band
+    tech_level: 8
+    alliance_id: 1                  # the Core governor
+    alliance_role: leader
+    home_band: Core
+    trade_posture: open
+    treaty_mode: open
+    persona: humanoid_diplomat
+    threat_tier: feeble
+    threat_rating: 0.3
+    interception_rating: 0.1
+    combatant: true                 # capable, but never reaches violence at full amity
+    memory_model: normal
+    betrayal_model: recoverable
+    attitude_gain_rate: 0.12
+    attitude_loss_rate: 0.2
+    tech_offers:
+      - { tier: I,   mode: latinum, component: turbine,   price: 1600, min_disposition: 0.60 }
+      - { tier: II,  mode: latinum, component: converter, price: 6500, min_disposition: 0.70 }
+      - { tier: III, mode: barter,  aspect: holds, amount: 10,         min_disposition: 0.80 }
+
+  # Centaurians — a close Federation founding partner; humanoid, warm, cooperative.
+  # Fellow Core citizens and reliable friends on the home lanes.
+  - id: centaurian
+    name: Centaurians
+    archetype_id: humanoid_diplomat
+    description: >-
+      A founding partner species of the Terran Federation — humanoid, warm and
+      cooperative; fellow citizens of the Core and reliable friends on the lanes.
+    disposition_center: 0.98
+    disposition_variance: 0.03
+    tech_level: 7
+    alliance_id: 1
+    alliance_role: member
+    home_band: Core
+    trade_posture: open
+    treaty_mode: open
+    persona: humanoid_diplomat
+    threat_tier: feeble
+    threat_rating: 0.2
+    interception_rating: 0.1
+    combatant: true
+    memory_model: normal
+    betrayal_model: recoverable
+    attitude_gain_rate: 0.12
+    attitude_loss_rate: 0.2
+    tech_offers:
+      - { tier: I,  mode: latinum, component: radiator,  price: 1700, min_disposition: 0.60 }
+      - { tier: II, mode: latinum, component: navigator, price: 6800, min_disposition: 0.70 }
+
   # --- Unaligned wild cards ------------------------------------------------------
 
   # Vesk — small fox/canine folk; peaceful resourceful technologists. The roster's
@@ -570,6 +632,35 @@ personas:
       - variants:
           - "The {subject}? The {species} have dealings with them, of a kind."
           - "Ah, the {subject}. Tread carefully where they are concerned."
+
+  # Terrans / Centaurians — Starfleet voice: warm, formal-but-friendly, exploration-
+  # and cooperation-minded. Allied-keyed lines address the player as a fellow citizen.
+  humanoid_diplomat:
+    greeting:
+      - when: { standing: allied }
+        variants:
+          - "Welcome home, {player}. The Federation stands with you."
+          - "{player}! Good to see a fellow citizen out on the lanes. Safe travels."
+          - "A friendly flag in the dark — well met, {player}. The {species} are glad of you."
+      - variants:    # any non-allied standing
+          - "We come in peace, {player}. The {species} of the Terran Federation greet you."
+          - "Greetings, traveller. The {species} seek understanding, not conflict."
+    trade_open:
+      - variants:
+          - "Everything we've built is open to a friend of the Federation, {player}."
+          - "The {species} trade gladly and fairly. Tell us what you need, {player}."
+    treaty_offer:
+      - variants:
+          - "Between friends a treaty is a formality — but gladly, {player}."
+          - "The {species} welcome a lasting accord. Let us make it so, {player}."
+    farewell:
+      - variants:
+          - "Go well, {player}. To boldly go — and come home safe."
+          - "Clear skies, {player}. The {species} will be here when you return."
+    dossier_other:
+      - variants:
+          - "The {subject}? The {species} seek peaceful understanding with all peoples, {player}."
+          - "Ah, the {subject}. We've reached out to them in good faith — as we do with all, {player}."
 
   # Vesk — introduces itself by serial-style name; warm, helpful technologists.
   serial_formal:
