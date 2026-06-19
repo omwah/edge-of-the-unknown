@@ -327,6 +327,10 @@ class Player:
     # Cosmetic but persisted (it rides the command log via contact commands, WP9) so
     # dialogue stays reproducible from (seed, command log). Empty until first contact.
     dialogue_recency: Mapping[tuple[int, str], tuple[int, ...]] = field(default_factory=dict)
+    # Per-port haggle attempts made *today* (port_id -> non-accepted offer count, §8,
+    # WP13). Drives the patience/history penalty and the per-day `max_rejections` close;
+    # reset by the daily_turn_reset cron, so it reconstructs exactly under replay.
+    haggle_attempts: Mapping[int, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

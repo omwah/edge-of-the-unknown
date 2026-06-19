@@ -167,6 +167,7 @@ class HaggleStatus(Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     INSULTING = "insulting"
+    EXHAUSTED = "exhausted"  # the port closed negotiation for the day (§8 max_rejections)
 
 
 def improvement_fraction(fair: int, counter: int, mode: PortMode) -> float:

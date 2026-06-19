@@ -90,8 +90,9 @@ class HaggleQuote:
 
     `fair` is the undisturbed §8 price; `mode` is the port's stance ("BUY"/"SELL");
     `label` is the likelihood the port would accept this `counter` — one of
-    "accepted" / "likely" / "unlikely" / "insulting". Purely advisory: it issues no
-    command and never touches the seeded RNG, so it has no effect on replay.
+    "accepted" / "likely" / "unlikely" / "insulting" / "exhausted". `attempts` /
+    `max_attempts` drive the "Round N of M" display and gate the multi-round screen
+    (WP13). Purely advisory: it issues no command and never touches the seeded RNG.
     """
 
     commodity: str
@@ -99,6 +100,8 @@ class HaggleQuote:
     counter: int
     mode: str
     label: str
+    attempts: int = 0
+    max_attempts: int = 0
 
 
 @dataclass(frozen=True)

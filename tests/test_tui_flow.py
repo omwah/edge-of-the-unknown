@@ -364,6 +364,28 @@ async def test_hail_opens_contact_then_buys_tech() -> None:
         assert sum(svc.state.ships[1].components.values()) == 1
 
 
+async def test_haggle_session_stays_open_across_a_rejected_round() -> None:
+    from textual.widgets import Input
+
+    from edge.tui.screens.haggle import HaggleScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game_at_stardock(app, pilot)
+        assert isinstance(app.screen, StarDockScreen)
+        await pilot.press("h")  # open the multi-round haggle on the highlighted commodity
+        await pilot.pause()
+        assert isinstance(app.screen, HaggleScreen)
+        # A lowball counter (StarDock sells → the player buys) insults them: the round is
+        # spent but the session stays open for another try.
+        app.screen.query_one("#haggle-input", Input).value = "1"
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, HaggleScreen)  # not dismissed — multi-round
+        assert svc.state.players[1].haggle_attempts  # the spent round was recorded
+
+
 async def test_computer_dossier_lists_a_met_species() -> None:
     from textual.widgets import DataTable, TabbedContent
 

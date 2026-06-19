@@ -28,9 +28,14 @@ __all__ = [
 
 
 def daily_turn_reset(state: UniverseState, config: GameConfig) -> ReduceResult:
-    """Refill every player's turns and advance the game day (TWINSTR.DOC, §9)."""
+    """Refill every player's turns and advance the game day (TWINSTR.DOC, §9).
+
+    Also clears the per-day haggle-attempt counters (§8, WP13) so each port's patience
+    is fresh at dawn; like turns, this rides the daily cron through the replay timeline.
+    """
     players = tuple(
-        replace(p, turns_remaining=config.turns_per_day) for p in state.players.values()
+        replace(p, turns_remaining=config.turns_per_day, haggle_attempts={})
+        for p in state.players.values()
     )
     events = tuple(TurnsReset(player_id=p.id, turns=config.turns_per_day) for p in players)
     game = replace(state.game, day_number=state.game.day_number + 1)

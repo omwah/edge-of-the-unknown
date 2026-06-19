@@ -591,11 +591,17 @@ def _haggle(
         raise EconomyError(f"port does not trade {cmd.commodity.value}")
     fair = port_unit_price(line, config.economy)
     hg = config.economy.haggling
-    # Recent-attempt history is not tracked in Phase 1 (no haggle-history field
-    # on Player yet), so recent_attempts is 0 here.
+    # Per-day, per-port attempt history drives the patience penalty + the `max_rejections`
+    # close. Reset by the daily cron, so it reconstructs exactly under replay (WP13).
+    attempts = player.haggle_attempts.get(port.id, 0)
+    if attempts >= hg.max_rejections:
+        # Negotiation is closed for the day — the port holds firm at the fair price.
+        haggled = Haggled(player_id, port.id, cmd.commodity, HaggleStatus.EXHAUSTED.value, fair)
+        return ReduceResult(events=(haggled,))
+
     result = resolve_haggle(
         fair, cmd.counter_price, line.mode, state.rng,
-        insult_frac=hg.insult_frac, history_penalty=hg.history_penalty, recent_attempts=0,
+        insult_frac=hg.insult_frac, history_penalty=hg.history_penalty, recent_attempts=attempts,
     )
     haggled = Haggled(player_id, port.id, cmd.commodity, result.status.value, result.price)
     if result.status is HaggleStatus.ACCEPTED and result.price is not None:
@@ -607,7 +613,9 @@ def _haggle(
         return ReduceResult(
             events=(haggled, traded), players=(out.player,), ships=(out.ship,), ports=(out.port,),
         )
-    return ReduceResult(events=(haggled,))
+    # A non-accepted offer wears the port's patience: bump the attempt counter.
+    new_player = replace(player, haggle_attempts={**player.haggle_attempts, port.id: attempts + 1})
+    return ReduceResult(events=(haggled,), players=(new_player,))
 
 
 def _bank(

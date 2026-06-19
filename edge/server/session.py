@@ -230,31 +230,36 @@ def haggle_quote(
     """An advisory read on `counter_price` for the player's docked port (§8, WP-haggle).
 
     Mirrors what `_haggle` would compute (the §8 fair price + the port's acceptance
-    odds), but commits nothing — a UI guidance hint only. Recent-attempt history is
-    not modelled in Phase 1, so `recent_attempts=0` matches the reducer exactly.
+    odds at the player's current attempt count), but commits nothing — a UI guidance
+    hint only, so it has no effect on replay (WP13).
     """
-    ship = state.ships[state.players[player_id].ship_id]
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
     port = state.port_in_sector(ship.sector_id)
     line = port.line(commodity) if port is not None else None
-    if line is None:
+    if line is None or port is None:
         raise EconomyError(f"this port does not trade {commodity.value}")
     fair = port_unit_price(line, config.economy)
     hg = config.economy.haggling
-    p = haggle_acceptance_probability(
-        fair, counter_price, line.mode, insult_frac=hg.insult_frac,
-        history_penalty=hg.history_penalty, recent_attempts=0,
-    )
-    if p is None:
-        label = "insulting"
-    elif p >= 1.0:
-        label = "accepted"
-    elif p >= _HAGGLE_LIKELY_P:
-        label = "likely"
+    attempts = player.haggle_attempts.get(port.id, 0)
+    if attempts >= hg.max_rejections:
+        label = "exhausted"
     else:
-        label = "unlikely"
+        p = haggle_acceptance_probability(
+            fair, counter_price, line.mode, insult_frac=hg.insult_frac,
+            history_penalty=hg.history_penalty, recent_attempts=attempts,
+        )
+        if p is None:
+            label = "insulting"
+        elif p >= 1.0:
+            label = "accepted"
+        elif p >= _HAGGLE_LIKELY_P:
+            label = "likely"
+        else:
+            label = "unlikely"
     return dto.HaggleQuote(
         commodity=_FULL[commodity], fair=fair, counter=counter_price,
-        mode=line.mode.name, label=label,
+        mode=line.mode.name, label=label, attempts=attempts, max_attempts=hg.max_rejections,
     )
 
 
