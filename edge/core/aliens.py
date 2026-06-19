@@ -51,15 +51,17 @@ def may_occupy(
 ) -> bool:
     """Whether `species` is allowed to sit in `sector_id` (Phase-2 alliance rules, WP16).
 
-    The Core Space stays protected/empty — no species drifts into it this phase. A
-    sector holding a **rival** alliance's planet (owned by an alliance other than the
-    species') is off-limits; empty/neutral sectors and the species' own holdings are
-    fine. Pure and side-effect-free, so the cron and tests share it. Phase 3 widens the
-    rival check from "different alliance" to "at war with / holds a grudge" (§6.4).
+    The Core Space admits only the governing alliance's own members — it is their
+    capital (WP18); every other species is barred. A sector holding a **rival**
+    alliance's planet (owned by an alliance other than the species') is off-limits;
+    empty/neutral sectors and the species' own holdings are fine. Pure and
+    side-effect-free, so the cron and tests share it. Phase 3 widens the rival check
+    from "different alliance" to "at war with / holds a grudge" (§6.4).
     """
     sector = state.sectors[sector_id]
     if sector.is_galactic_core:
-        return False  # the Core stays protected/empty (WP18 relaxes this for the governor)
+        # The governor's members may inhabit/roam their capital; all others are barred.
+        return species.alliance_id == state.game.core_governing_alliance_id
     for planet in state.planets.values():
         if planet.sector_id != sector_id:
             continue
