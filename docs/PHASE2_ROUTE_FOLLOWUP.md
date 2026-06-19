@@ -8,9 +8,10 @@
 > **Status: draft.**
 >
 > Work packages: **WP14 — Route planner** · **WP15 — Ports directory** ·
-> **WP16 — Alien ship movement** · **WP17 — Alien encounter "Say / Do" menu**.
-> WP14 lands first (WP15's per-row `[P] Plot route` reuses WP14's `route_view`);
-> WP16 and WP17 are independent of the others and of each other.
+> **WP16 — Alien ship movement** · **WP17 — Alien encounter "Say / Do" menu** ·
+> **WP18 — Federation species (humanoid diplomats)**. WP14 lands first (WP15's
+> per-row `[P] Plot route` reuses WP14's `route_view`); WP16, WP17, and WP18 are
+> independent of the others (WP18 has a single optional one-line tie-in to WP16).
 
 ## Context
 
@@ -808,3 +809,223 @@ existing "dialogue survives reload" replay coverage extends to every peaceful co
 WP17 is independent of WP14–WP16; it depends only on the WP9 contact screen and the
 WP8 dialogue engine, both shipped. It is the natural completion of the contact
 screen — the offers panel already acts; this makes the conversation act too.
+
+---
+
+# WP18 — Federation species (humanoid diplomats in Federation space)
+
+The **Terran Federation governs the Core but has no people of its own.** It is
+`alliance_id: 1` in the roster — the Core's governor, the bloc the player starts
+in — yet *every* species in `roster_default.yaml` is either unaligned (`null`) or a
+member of a rival bloc (2/3/4). So the Core is contact-free except the WP-staged
+StarDock greeters (drawn from unaligned neutrals, since there were no Federation
+members to draw from). WP18 fixes that: it gives the Federation its **founding
+species** — Star-Trek-human-style **humanoid diplomats**, the warmest contacts in
+the game — and settles them through **Federation space** (the Core and the
+governor's home lanes), so the player's home region finally feels *inhabited by
+their own people*, not just protected by faceless law.
+
+## Context
+
+This is the natural completion of three threads already in place:
+
+- **The governing-alliance model** (`Game.core_governing_alliance_id`, §6.3). The
+  Federation is the default governor and the player is seeded into it — but with no
+  member species, "you are a Federation member" is currently an abstraction with no
+  faces attached.
+- **The StarDock-greeter staging** (shipped): `_place_stardock_contacts` already
+  seeds **Core-welcome** species at the hub, and its comment notes the workaround —
+  "the default roster names no species as Federation members, so the hub is seeded
+  from the broader Core-welcome set." WP18 removes the need for that workaround by
+  *supplying* Federation members; the greeter logic then naturally prefers them.
+- **The §6.7 dialogue engine + allied standing band.** A fellow alliance member is
+  read in the **allied** band (effective disposition boosted by shared membership),
+  which the dialogue `when` predicates already key on. A maximally-friendly
+  Federation species lands squarely there — the ideal showcase for the allied-voice
+  lines.
+
+The Star Trek frame: the United Federation of Planets / Starfleet — principled,
+exploratory, diplomacy-first ("we come in peace," mutual understanding, peaceful
+contact), optimistic and humanoid. The roster's existing Terran Federation banner,
+*"Exploration & mutual defence,"* already reads as exactly this; WP18 puts a face
+and a voice to it.
+
+## Scope and non-goals
+
+**In scope:**
+
+- **Roster content** (`config/roster_default.yaml`): one to three **Federation-member
+  species** — `alliance_id: 1`, `alliance_role: member` (one `leader`) — with the new
+  **`archetype_id: humanoid_diplomat`**, `disposition_center: 1.0` (with small
+  `disposition_variance`, so they draw at the very top of the friendly band — "100%
+  friendly to the player"), `trade_posture: open`, `treaty_mode: open`, generous
+  `tech_offers`, and `persona: humanoid_diplomat`. The flagship is the **Terrans**
+  (humans); any companions are their close Federation partners.
+- **A new `humanoid_diplomat` persona dialogue pack** in the `personas:` block — the
+  Starfleet voice: warm, formal-but-friendly, exploration- and cooperation-minded,
+  with **allied-band** greeting/trade/treaty lines that speak to the player *as a
+  fellow Federation citizen* (the §6.7 standing-keyed `when` machinery).
+- **Placement in Federation space** (`bigbang/aliens.py`): a new generation step
+  that settles governing-alliance members across the **Core and the governor's home
+  lanes**, so the Core is populated by its own people. Generalises
+  `_place_stardock_contacts`; the StarDock greeter step then prefers real Federation
+  members over the unaligned-neutral fallback.
+- **Validation + drift relaxation**: the §13 "no contacts inside Core Space"
+  invariant (`bigbang/validate.py`) is relaxed for **the governing alliance's own
+  members** (they belong there — it is their capital), exactly as the dock sector is
+  already exempted. WP16's `may_occupy` predicate likewise lets a governing-alliance
+  member **drift within the Core**, while every other species still may not enter it.
+
+**Non-goals (deferred):**
+
+- **Changing who governs the Core / dynamic governance** — Phase 5
+  (`covets_core`). WP18 populates *the current* governor's space; if governance
+  flips later, re-population follows that, not this WP.
+- **A full multi-species Federation** (a deep bench of member races). WP18 establishes
+  the `humanoid_diplomat` archetype and a small founding set; more members are just
+  more roster entries against the same machinery.
+- **Hostility / betrayal arcs for the Federation.** They are 100%-friendly by
+  construction in Phase 2; a player turning *against* the governor already has its
+  consequences in the §6.3/§10 territory rules (the Core turns hostile to a
+  rival-aligned player) and does not need new Federation-specific combat content here.
+- **New mechanics.** WP18 is roster content + a placement/validation generalisation;
+  it introduces no new command, DTO, or screen. `archetype_id` stays a flavour label
+  (carried on the entity, not gated in code); the persona drives the voice.
+
+## Design
+
+### Roster — the species (`config/roster_default.yaml`)
+
+A new "Federation core" group, e.g. (abbreviated):
+
+```yaml
+  - id: terran
+    name: Terrans
+    archetype_id: humanoid_diplomat
+    description: >-
+      Humans of the Terran Federation — principled explorers and diplomats, the
+      Core's founding people and the player's own. The warmest contact in the game.
+    disposition_center: 1.0
+    disposition_variance: 0.03      # always at the very top of the friendly band
+    tech_level: 8
+    alliance_id: 1                  # the Core governor
+    alliance_role: leader
+    home_band: Core
+    trade_posture: open
+    treaty_mode: open
+    persona: humanoid_diplomat
+    threat_tier: feeble
+    combatant: true                 # capable, but never reaches violence at 100% amity
+    memory_model: normal
+    betrayal_model: recoverable
+    tech_offers:
+      - { tier: I,   mode: latinum, component: turbine,   price: 1600, min_disposition: 0.60 }
+      - { tier: II,  mode: latinum, component: converter, price: 6500, min_disposition: 0.70 }
+      - { tier: III, mode: barter,  aspect: shields,                   min_disposition: 0.80 }
+  # + 0-2 close Federation partners (alliance_role: member), same archetype/persona.
+```
+
+The low `min_disposition` thresholds and `disposition_center: 1.0` mean a
+Federation member — being a *fellow citizen* — opens essentially every offer
+immediately, making them the natural first tech vendor a new player reaches.
+
+### Roster — the `humanoid_diplomat` persona pack
+
+A new entry in `personas:`, voiced as Starfleet — warm, exploratory, principled —
+with **allied-keyed** variants so the lines address the player as kin:
+
+```yaml
+  humanoid_diplomat:
+    greeting:
+      - when: { standing: allied }
+        variants:
+          - "Welcome home, {player}. The Federation stands with you."
+          - "{player}! Good to see a fellow citizen out on the lanes. Safe travels."
+      - variants:    # fallback for any non-allied standing
+          - "We come in peace, {player}. The Terran Federation greets you."
+    trade_open:
+      - variants:
+          - "Everything we've built is open to a friend of the Federation, {player}."
+    treaty_offer:
+      - variants:
+          - "Between friends a treaty is a formality — but gladly, {player}."
+    dossier_other:
+      - variants:
+          - "The {subject}? We seek peaceful understanding with all peoples, {player}."
+    farewell:
+      - variants:
+          - "Go well, {player}. To boldly go — and come home safe."
+```
+
+The `dialogue_pack` validator (§13) already enforces that the persona resolves a
+non-empty pool for every reachable context and that `dossier_other` is
+subject-parameterised, so the pack must cover the peaceful set — no new validation
+rule, just new content the existing rule checks.
+
+### Placement — `bigbang/aliens.py`
+
+A `_populate_governing_space(state, config, rng, placed)` step (sibling to
+`_place_stardock_contacts`) settles `alliance_id == core_governing_alliance_id`,
+`alliance_role in {leader, member}` species across **Core sectors and the governor's
+near-Core home lanes**, guaranteeing the founding `leader` species appears. Count is
+config-driven (e.g. `RosterConfig.core_population` or reuse the
+`stardock_contacts` knob's sibling). The existing band-placement still skips Core for
+*non*-governing species; this step is the **only** way species enter the Core, and it
+admits only the governor's own members. The StarDock greeter step is updated to
+prefer real governing-alliance members (now that they exist) over the unaligned
+fallback. Runs on the same `_SPECIES_SALT` sub-RNG, so it does not perturb the
+port/planet/discovery draw order (golden-master ordering).
+
+### Validation + drift — `bigbang/validate.py`, `core/aliens.py`
+
+- `_check_species`: the "placed inside Core Space" rejection gains a second
+  exemption — `sp.alliance_id == state.game.core_governing_alliance_id` — beside the
+  existing dock-sector one. (Governor's members belong in the Core; everyone else is
+  still barred.) Add an invariant: **at least one** governing-alliance member is
+  placed in Core (the Federation inhabits its own capital).
+- WP16 `may_occupy`: `if sector.is_galactic_core: return species.alliance_id ==
+  governing_id` — Federation ships may drift within the Core; all others still can't
+  enter it. (If WP16 has not landed yet, this is a one-line addition when it does;
+  WP18 does not depend on WP16.)
+
+## Tests
+
+- **Roster integrity (`tests/test_aliens.py`)**: the Federation members resolve their
+  alliance (`alliance_id: 1` ∈ alliances), carry `archetype_id: humanoid_diplomat`,
+  and draw `is_friendly` at the top of the band (`base_disposition` ≈ 1.0); the
+  `humanoid_diplomat` persona passes `validate_dialogue` (every peaceful context
+  non-empty, `dossier_other` parameterised).
+- **Placement (`tests/test_aliens.py`, parametrised over seeds)**: ≥1 governing-alliance
+  member is placed in Core Space; **no** non-governing species is ever placed in Core
+  (the relaxed invariant still bars rivals); every live band still has its contact;
+  determinism guard — adding the Core population does not perturb port/planet draws.
+- **Dialogue (`tests/test_dialogue.py`)**: a Federation member greeted by the
+  (Federation-member) player speaks an **allied**-band line; a hypothetical
+  non-member hears the generic peaceful greeting (the `when: {standing: allied}`
+  branch fires only for kin).
+- **Drift (WP16 tests, when present)**: a Federation ship may step to an adjacent Core
+  sector; a rival ship adjacent to the Core never enters it.
+
+## Verification
+
+- **Gates**: `pixi run lint`, `pixi run python -m mypy`, `pixi run python -m pytest`
+  (roster/dialogue validation runs at config-load).
+- **Determinism**: placement uses the species sub-RNG; the golden-master replays stay
+  green.
+- **Manual**: `pixi run edge` — start a new game in the Core and find **Terran
+  vessels** in nearby sectors; hail one and hear the *fellow-citizen* greeting, buy
+  cheap early tech, and confirm the Computer dossier reads them as allied/100%-friendly.
+
+## Suggested order / commits (phase-tagged, small)
+
+1. `p2: WP18 (roster) Federation humanoid_diplomat species + persona pack` —
+   `roster_default.yaml` content; `test_aliens` integrity + `validate_dialogue`.
+2. `p2: WP18 (bigbang) settle governing-alliance members in Core + validation` —
+   `_populate_governing_space`, the Core exemption + "Federation inhabits its capital"
+   invariant, StarDock greeter preference; `test_aliens` placement.
+3. `p2: WP18 (drift) may_occupy lets governor members roam the Core` — the one-line
+   WP16 relaxation + test (lands with or after WP16). → **The Federation has a face.**
+
+WP18 depends only on the shipped roster/placement/dialogue machinery; its WP16 tie-in
+is a single line that can land whenever WP16 does. It is the content payoff of the
+governing-alliance model — the player's home region, peopled by the player's own.
