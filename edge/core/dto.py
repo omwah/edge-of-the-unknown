@@ -207,6 +207,8 @@ class TradePair:
     dist: int
     profit_rt: int  # round-trip profit
     per_turn: int  # profit per turn (the finder's score)
+    buy_sector: int = -1  # internal id of the buy port's sector (WP14 route tie-in)
+    sell_sector: int = -1  # internal id of the sell port's sector (WP14 route tie-in)
 
 
 @dataclass(frozen=True)
@@ -217,6 +219,37 @@ class CodexEntry:
     location: str  # "Sector 42" / "Planet 7 · site 2"
     rarity: str
     detail: str  # payload / lore fragment
+    sector_id: int = -1  # internal id of the find's containing sector (WP14 route tie-in)
+
+
+@dataclass(frozen=True)
+class RouteHopDTO:
+    """One traversed sector on a plotted route — what the player reads (§11, WP14)."""
+
+    display_id: int  # spatial id (§5.1)
+    label: str  # "(4) · port" / "(7) · planet @" / "(12)"
+    one_way: bool  # no direct way back along this hop
+
+
+@dataclass(frozen=True)
+class RouteDTO:
+    """A plotted route for the Computer's Route tab (§11, WP14).
+
+    Read-only and spatial-id only (internal ids stay in core). `reason` is "" when
+    reachable, else why not (fog, already here, out of turns). `hazards` is empty in
+    Phase 2 — the Phase-3 encounter system fills it without reshaping the DTO.
+    """
+
+    origin_display: int
+    dest_display: int
+    hops: list[RouteHopDTO]
+    turn_cost: int
+    turns_remaining: int
+    affordable: bool  # turns_remaining >= turn_cost
+    reachable: bool
+    reason: str
+    hazards: list[str]
+    summary: str  # "3 hops · 6 turns · 1 one-way"
 
 
 @dataclass(frozen=True)
