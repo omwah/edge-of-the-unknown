@@ -318,6 +318,52 @@ async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
         assert sum(svc.state.ships[1].components.values()) == 0  # the loose part was installed
 
 
+def _inject_species(svc: object, roster_id: str):  # type: ignore[no-untyped-def]
+    """Place a friendly roster species in the player's current sector + stock latinum."""
+    from dataclasses import replace
+
+    from edge.core.models import AlienSpecies
+
+    sc = svc.config.roster.species_by_id(roster_id)  # type: ignore[attr-defined]
+    ship = svc.state.ships[1]  # type: ignore[attr-defined]
+    species = AlienSpecies(
+        id=1, roster_id=roster_id, name=sc.name, archetype_id=sc.archetype_id,
+        sector_id=ship.sector_id, home_band="Hub", tech_level=sc.tech_level,
+        base_disposition=0.9, disposition_center=sc.disposition_center,
+        disposition_variance=sc.disposition_variance, alliance_id=sc.alliance_id,
+        trade_posture=sc.trade_posture, treaty_mode=sc.treaty_mode, persona=sc.persona,
+    )
+    svc.state.species[1] = species  # type: ignore[attr-defined]
+    svc.state.players[1] = replace(svc.state.players[1], latinum=100_000)  # type: ignore[attr-defined]
+    return species
+
+
+async def test_hail_opens_contact_then_buys_tech() -> None:
+    from textual.widgets import Static
+
+    from edge.tui.screens.contact import AlienContactScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        _inject_species(svc, "selvani")  # converter (II) latinum offer
+        await pilot.press("h")  # hail the species in this sector
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        # The persona-voiced opener renders, and a greyed verb shows its reason.
+        assert str(app.screen.query_one("#speech", Static).render())
+        verbs = " ".join(str(s.render()) for s in app.screen.query("#verbs Static"))
+        assert "(" in verbs and ")" in verbs  # at least one disabled verb shows a reason
+        # Click the (available) tech offer → buys it, a loose component lands aboard.
+        await pilot.click(app.screen.query(".offer").first())
+        await pilot.pause()
+        assert sum(svc.state.ships[1].components.values()) == 1
+
+
 async def test_continue_focused_and_new_game_confirms_when_save_exists() -> None:
     """With a save present, Continue takes focus and New game asks before clobbering it."""
     from textual.widgets import Button

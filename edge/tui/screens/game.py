@@ -19,10 +19,11 @@ from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.events import Event
 from edge.core.movement import MovementError
-from edge.core.rules import Dock, Salvage, TravelTo, Warp
+from edge.core.rules import Dock, Hail, Salvage, TravelTo, Warp
 from edge.server.service import GameService
 from edge.tui.dummy import SectorDTO
 from edge.tui.screens.computer import ComputerScreen
+from edge.tui.screens.contact import AlienContactScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.travel import TravelPromptScreen
@@ -135,6 +136,7 @@ class GameScreen(Screen):
     BINDINGS = [
         Binding("p", "dock_port", "Dock"),
         Binding("w", "travel", "Travel"),
+        Binding("h", "hail", "Hail"),
         Binding("s", "survey_planet", "Survey Planet"),
         Binding("z", "scan", "Scan"),
         Binding("c", "computer", "Computer"),
@@ -266,6 +268,17 @@ class GameScreen(Screen):
 
     def action_map(self) -> None:
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="map"))
+
+    def action_hail(self) -> None:
+        """Open contact with a friendly species in this sector, if any (§6, WP9)."""
+        species_id = self._service.species_in_sector(self._pid)
+        if species_id is None:
+            self.notify("No alien contact in this sector.", timeout=2)
+            return
+        self._record(self._service.apply(self._pid, Hail(species_id)))
+        self.app.push_screen(AlienContactScreen(
+            self._service.contact_view(self._pid, species_id),
+            self._service, self._pid, species_id))
 
     def action_survey_planet(self) -> None:
         planet = self._service.current_planet_view(self._pid)

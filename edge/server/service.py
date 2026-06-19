@@ -143,15 +143,20 @@ class GameService:
         """The alien-contact screen for a species in the player's sector (§6, WP9)."""
         return session.contact_view(self._state, player_id, species_id, self._config)
 
-    def current_contact_view(self, player_id: int) -> dto.ContactDTO | None:
-        """The contact view for the (first) species in the player's sector, if any."""
+    def species_in_sector(self, player_id: int) -> int | None:
+        """The id of the (lowest-id) species in the player's sector, or None (§6, WP9)."""
         player = self._state.players[player_id]
         sector_id = self._state.ships[player.ship_id].sector_id
         species = next((s for s in sorted(self._state.species.values(), key=lambda s: s.id)
                         if s.sector_id == sector_id), None)
-        if species is None:
+        return species.id if species is not None else None
+
+    def current_contact_view(self, player_id: int) -> dto.ContactDTO | None:
+        """The contact view for the (first) species in the player's sector, if any."""
+        species_id = self.species_in_sector(player_id)
+        if species_id is None:
             return None
-        return session.contact_view(self._state, player_id, species.id, self._config)
+        return session.contact_view(self._state, player_id, species_id, self._config)
 
     def messages_view(self, player_id: int) -> dto.MessagesDTO:
         """The durable event log + opening signpost, newest first (§11, §12)."""
