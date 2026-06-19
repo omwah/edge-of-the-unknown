@@ -142,12 +142,15 @@ def test_placement_is_seeded_and_deterministic() -> None:
 def test_all_placed_species_are_friendly_and_outside_core(seed: int) -> None:
     state = generate(WIDE, seed)
     assert state.species  # the default roster always places some
+    gov = state.game.core_governing_alliance_id
     core = {s.id for s in state.sectors.values() if s.is_galactic_core}
     dock_sector = next(p.sector_id for p in state.ports.values() if p.klass is PortClass.STARDOCK)
     for sp in state.species.values():
         assert is_friendly(sp.base_disposition, CFG.aliens)
-        # No Core placement except the sanctioned StarDock hub (high-traffic, §6.3).
-        assert sp.sector_id not in core or sp.sector_id == dock_sector
+        # No Core placement except the StarDock hub and the governor's own members,
+        # who inhabit their capital (WP18, §6.3).
+        if sp.sector_id in core:
+            assert sp.sector_id == dock_sector or sp.alliance_id == gov
         assert sp.alliance_id is None or sp.alliance_id in state.alliances
 
 
@@ -282,3 +285,19 @@ def test_humanoid_diplomat_persona_passes_dialogue_integrity() -> None:
     assert CFG.roster is not None
     assert "humanoid_diplomat" in CFG.roster.personas
     validate_dialogue(CFG.roster)  # raises on any unfillable/blank context
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_governing_alliance_inhabits_the_core(seed: int) -> None:
+    """≥1 governing-alliance member is settled in the Core; no rival/unaligned is (WP18)."""
+    state = generate(WIDE, seed)
+    gov = state.game.core_governing_alliance_id
+    core = {s.id for s in state.sectors.values() if s.is_galactic_core}
+    dock_sector = next(p.sector_id for p in state.ports.values() if p.klass is PortClass.STARDOCK)
+    in_core = [sp for sp in state.species.values() if sp.sector_id in core]
+    gov_in_core = [sp for sp in in_core if sp.alliance_id == gov]
+    assert gov_in_core  # the Federation inhabits its own capital
+    assert any(sp.alliance_role == "leader" for sp in gov_in_core)  # incl. the founding leader
+    # The only non-governor in the Core is a StarDock greeter; no rival/unaligned drifts in.
+    for sp in in_core:
+        assert sp.alliance_id == gov or sp.sector_id == dock_sector

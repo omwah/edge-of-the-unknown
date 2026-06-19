@@ -172,18 +172,32 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
         return
 
     core_ids = {s.id for s in state.sectors.values() if s.is_galactic_core}
-    # The StarDock is the one sanctioned Core-side contact point (high-traffic hub).
+    # The StarDock is a sanctioned Core-side contact point (high-traffic hub); the
+    # governing alliance's own members also belong in the Core — it is their capital (WP18).
     dock_sector = next((p.sector_id for p in state.ports.values()
                         if p.klass is PortClass.STARDOCK), None)
     contact_bands: set[str] = set()
+    gov_in_core = 0
     for sp in state.species.values():
         if sp.alliance_id is not None and sp.alliance_id not in state.alliances:
             raise ValidationError(f"species {sp.id} references missing alliance {sp.alliance_id}")
-        if sp.sector_id in core_ids and sp.sector_id != dock_sector:
-            raise ValidationError(f"species {sp.id} placed inside Core Space")
+        is_governor = sp.alliance_id is not None and sp.alliance_id == gov
+        if sp.sector_id in core_ids:
+            if sp.sector_id != dock_sector and not is_governor:
+                raise ValidationError(f"species {sp.id} placed inside Core Space")
+            if is_governor:
+                gov_in_core += 1
         if not is_friendly(sp.base_disposition, config.aliens):
             raise ValidationError(f"species {sp.id} placed below the amity band (Phase 2)")
         contact_bands.add(state.sectors[sp.sector_id].distance_band)
+
+    # The governor inhabits its own capital: if the roster fields governing members, at
+    # least one must be settled in the Core (WP18).
+    if config.roster is not None and any(
+        s.alliance_id == gov and s.alliance_role in ("leader", "member")
+        for s in config.roster.species
+    ) and gov_in_core == 0:
+        raise ValidationError("the governing alliance does not inhabit its Core capital")
 
     for band in (b.name for b in config.bigbang.bands):
         has_non_core = any(

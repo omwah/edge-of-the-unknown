@@ -77,7 +77,10 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
 
     # Seeded subset: shuffle the pool, take a count in [subset_min, subset_max] (clamped
     # to the pool size and to at least one-per-live-band so the resupply invariant holds).
-    pool = sorted(roster.species, key=lambda s: s.id)
+    # Governing-alliance members are excluded here — they are settled in the Core + home
+    # lanes by `_populate_governing_space`, the only path that enters the Core (WP18).
+    gov = state.game.core_governing_alliance_id
+    pool = sorted((s for s in roster.species if s.alliance_id != gov), key=lambda s: s.id)
     rng.shuffle(pool)
     lo = max(roster.subset_min, len(live_bands))
     hi = max(roster.subset_max, lo)
@@ -103,6 +106,7 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
         sector_id = rng.choice(sectors_by_band[band])
         placed[sid] = _make_species(sid, sp, sector_id, band, config, rng)
 
+    _populate_governing_space(state, config, roster, rng, placed)
     _place_stardock_contacts(state, config, roster, rng, placed)
     state.species = placed
 
@@ -121,6 +125,39 @@ def _make_species(sid: int, sp: SpeciesConfig, sector_id: int, band: str,
         threat_tier=sp.threat_tier, trade_posture=sp.trade_posture,
         treaty_mode=sp.treaty_mode, persona=sp.persona,
     )
+
+
+def _populate_governing_space(state: UniverseState, config: GameConfig, roster: RosterConfig,
+                              rng: random.Random, placed: dict[int, AlienSpecies]) -> None:
+    """Settle the Core governor's own people across Core Space (WP18, §6.3).
+
+    The Federation governs the Core but, without member species, "you are a member" was
+    an abstraction with no faces. This settles `core_population` governing-alliance
+    members (`alliance_role` leader/member) — leader always included — across distinct
+    Core sectors, so the player's home region is inhabited by their own people. It is the
+    **only** generation path that places a species in the Core; every other species is
+    barred (the band placement skips the Core). Runs on the same species sub-RNG, so it
+    does not perturb the topology/port/planet/discovery draw order (golden-master, §5).
+    """
+    gov = state.game.core_governing_alliance_id
+    if gov is None:
+        return
+    members = [s for s in roster.species
+               if s.alliance_id == gov and s.alliance_role in ("leader", "member")]
+    if not members:
+        return
+    core_sectors = [sid for sid in sorted(state.sectors) if state.sectors[sid].is_galactic_core]
+    if not core_sectors:
+        return
+    members.sort(key=lambda s: (s.alliance_role != "leader", s.id))  # leader first, then stable
+    want = min(roster.core_population, len(members), len(core_sectors))
+    chosen = members[:want]
+    sectors = rng.sample(core_sectors, k=want)
+    next_id = max(placed, default=0) + 1
+    for sp, sector_id in zip(chosen, sectors):
+        band = state.sectors[sector_id].distance_band
+        placed[next_id] = _make_species(next_id, sp, sector_id, band, config, rng)
+        next_id += 1
 
 
 def _place_stardock_contacts(state: UniverseState, config: GameConfig, roster: RosterConfig,
