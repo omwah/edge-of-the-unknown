@@ -11,7 +11,7 @@ bands (default hostility 0.35 / amity 0.65, §6).
 from __future__ import annotations
 
 from edge.core.config import AliensConfig
-from edge.core.models import AlienSpecies, Player
+from edge.core.models import AlienSpecies, Player, UniverseState
 
 HOSTILE = "hostile"
 NEUTRAL = "neutral"
@@ -44,3 +44,26 @@ def disposition_band(value: float, config: AliensConfig) -> str:
 def is_friendly(value: float, config: AliensConfig) -> bool:
     """Whether a disposition value sits in the friendly (amity) band."""
     return value >= config.amity_threshold
+
+
+def may_occupy(
+    state: UniverseState, species: AlienSpecies, sector_id: int, config: AliensConfig
+) -> bool:
+    """Whether `species` is allowed to sit in `sector_id` (Phase-2 alliance rules, WP16).
+
+    The Core Space stays protected/empty — no species drifts into it this phase. A
+    sector holding a **rival** alliance's planet (owned by an alliance other than the
+    species') is off-limits; empty/neutral sectors and the species' own holdings are
+    fine. Pure and side-effect-free, so the cron and tests share it. Phase 3 widens the
+    rival check from "different alliance" to "at war with / holds a grudge" (§6.4).
+    """
+    sector = state.sectors[sector_id]
+    if sector.is_galactic_core:
+        return False  # the Core stays protected/empty (WP18 relaxes this for the governor)
+    for planet in state.planets.values():
+        if planet.sector_id != sector_id:
+            continue
+        owner = planet.owner
+        if owner.kind == "alliance" and owner.ref != species.alliance_id:
+            return False  # a rival bloc's holding is off-limits
+    return True
