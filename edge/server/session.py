@@ -19,7 +19,15 @@ from edge.core.discovery import is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import build_subsystems, derive_aspects
 from edge.core.movement import RoutePlan, plan_route, plan_route_legs
-from edge.core.enums import Commodity, Component, ComponentTier, PortClass, PortMode, Subsystem
+from edge.core.enums import (
+    PORT_CLASS_TRADES,
+    Commodity,
+    Component,
+    ComponentTier,
+    PortClass,
+    PortMode,
+    Subsystem,
+)
 from edge.core.events import (
     Banked,
     Colonized,
@@ -570,8 +578,39 @@ def _dossier_entries(state: UniverseState, player: Player, config: GameConfig) -
     return out
 
 
+def _port_klass_label(klass: PortClass) -> str:
+    """A Ports-tab class label: 'Class 1 (BBS)' / 'StarDock' (§11, WP15)."""
+    if klass is PortClass.STARDOCK:
+        return "StarDock"
+    trades = PORT_CLASS_TRADES[klass]
+    mnemonic = "".join("B" if trades[c] is PortMode.BUY else "S" for c in Commodity)
+    return f"Class {klass.value} ({mnemonic})"
+
+
+def _port_directory(state: UniverseState, player_id: int) -> list[dto.PortDirEntry]:
+    """Every known port (explored sectors), nearest first — the Ports tab (§11, WP15)."""
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    dist = bfs_distances(state.adjacency, ship.sector_id)
+    out: list[dto.PortDirEntry] = []
+    for port in state.ports.values():
+        if port.sector_id not in player.explored_sectors:
+            continue  # fog of war: a port appears only once its sector is explored
+        buys = [_LABEL[c] for c in Commodity if (ln := port.line(c)) and ln.mode is PortMode.BUY]
+        sells = [_LABEL[c] for c in Commodity if (ln := port.line(c)) and ln.mode is PortMode.SELL]
+        out.append(dto.PortDirEntry(
+            port_id=port.id, sector_id=port.sector_id,
+            sector_display=_display(state, port.sector_id), name=port.name,
+            klass=_port_klass_label(port.klass),
+            buys=", ".join(buys) or "—", sells=", ".join(sells) or "—",
+            dist=dist.get(port.sector_id, -1),
+        ))
+    out.sort(key=lambda e: (e.dist if e.dist >= 0 else 1 << 30, e.sector_display))
+    return out
+
+
 def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.ComputerDTO:
-    """Pair-trade finder + discovery codex + alien dossier (§9, §11)."""
+    """Pair-trade finder + discovery codex + alien dossier + ports directory (§9, §11)."""
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
     dist = bfs_distances(state.adjacency, ship.sector_id)
@@ -589,6 +628,7 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     return dto.ComputerDTO(
         pairs=top, selected=top[0].pair if top else "—",
         codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
+        ports=_port_directory(state, player_id),
     )
 
 
