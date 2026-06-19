@@ -524,3 +524,76 @@ async def test_stardock_shipyard_swaps_hull() -> None:
         await pilot.pause()
         assert svc.state.ships[1].type_id == "scout_marauder"
         assert svc.state.players[1].latinum < 50_000
+
+
+async def test_trade_plot_route_and_engage() -> None:
+    """WP14: Trade tab → [P] plots the round trip → [G] engages and travels (§11)."""
+    from textual.widgets import DataTable, TabbedContent
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game_at_stardock(app, pilot)
+        assert svc.computer_view(1).pairs  # the default seed has a scored pair
+        await pilot.press("escape")  # undock back to the game screen
+        await pilot.pause()
+        await pilot.press("c")  # open the Computer on the Trade tab
+        await pilot.pause()
+        assert isinstance(app.screen, ComputerScreen)
+
+        before = svc.state.ships[1].sector_id
+        await pilot.press("p")  # plot the highlighted pair's round trip
+        await pilot.pause()
+        assert app.screen.query_one(TabbedContent).active == "route"
+        assert app.screen.query_one("#route-table", DataTable).row_count >= 1
+
+        await pilot.press("g")  # engage
+        await pilot.pause()
+        assert not isinstance(app.screen, ComputerScreen)  # popped back to the game
+        assert svc.state.ships[1].sector_id != before  # advanced off the buy port
+
+
+async def test_codex_plot_route_to_a_logged_find() -> None:
+    """WP14: a logged discovery → Codex [P] routes to the find's sector (§11)."""
+    from textual.widgets import DataTable, TabbedContent
+
+    from edge.core.rules import Salvage, Warp
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+
+        # Seed the codex: warp to the nearest obvious open-space find and salvage it.
+        sensor = svc.state.ships[1].sensor_rating
+        diff = svc.config.discovery.sensor_difficulty  # type: ignore[union-attr]
+        candidates = []
+        for d in svc.state.discoveries.values():
+            if d.planet_id is not None:
+                continue
+            path = shortest_path(svc.state.adjacency, 1, d.sector_id)
+            if path is None:
+                continue
+            if not d.hidden:
+                candidates.append((len(path), path, d))
+            elif sensor >= diff[d.rarity_tier.name] and len(path) >= 2:
+                candidates.append((len(path), path, d))
+        candidates.sort(key=lambda t: t[0])
+        _, path, disc = candidates[0]
+        for hop in path[1:]:
+            svc.apply(1, Warp(to_sector=hop))
+        svc.apply(1, Salvage(discovery_id=disc.id))
+        assert disc.id in svc.state.players[1].codex
+
+        app.push_screen(ComputerScreen(svc, 1, initial_tab="codex"))
+        await pilot.pause()
+        await pilot.press("p")  # plot a route to the highlighted find
+        await pilot.pause()
+        assert app.screen.query_one(TabbedContent).active == "route"
+        # The plotted route targets the find's sector and renders its hops.
+        assert app.screen._engage_target == disc.sector_id  # type: ignore[attr-defined]
+        route = svc.route_view(1, disc.sector_id)
+        assert app.screen.query_one("#route-table", DataTable).row_count == len(route.hops)
