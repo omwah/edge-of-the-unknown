@@ -597,3 +597,29 @@ async def test_codex_plot_route_to_a_logged_find() -> None:
         assert app.screen._engage_target == disc.sector_id  # type: ignore[attr-defined]
         route = svc.route_view(1, disc.sector_id)
         assert app.screen.query_one("#route-table", DataTable).row_count == len(route.hops)
+
+
+async def test_ports_directory_lists_and_plots_route() -> None:
+    """WP15: Ports tab lists charted ports → [P] plots a route to one (§11)."""
+    from textual.widgets import DataTable, TabbedContent
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game_at_stardock(app, pilot)
+        directory = svc.computer_view(1).ports
+        assert directory  # at least the StarDock is charted
+        await pilot.press("escape")  # undock back to the game screen
+        await pilot.pause()
+        await pilot.press("c")  # open the Computer
+        await pilot.pause()
+        assert isinstance(app.screen, ComputerScreen)
+
+        app.screen.query_one(TabbedContent).active = "ports"
+        await pilot.pause()
+        assert app.screen.query_one("#ports-table", DataTable).row_count == len(directory)
+
+        await pilot.press("p")  # plot a route to the highlighted (nearest) port
+        await pilot.pause()
+        assert app.screen.query_one(TabbedContent).active == "route"
+        assert app.screen._engage_target == directory[0].sector_id  # type: ignore[attr-defined]

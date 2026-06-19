@@ -3,8 +3,9 @@
 Phase-1 core screen: a tabbed query console over the owned game engine. The
 **Trade** tab is the pair-trade finder; the **Map** and **Log** tabs fold in the
 galactic map and the durable event log (WP-B — they live *inside* the computer
-but keep their direct `M`/`G` hotkeys on the game screen). Ports, Route, Codex,
-Dossier, and Notes grow through Phase 2.
+but keep their direct `M`/`G` hotkeys on the game screen). The **Ports** directory
+(WP15) and **Route** planner (WP14) are live; **Codex** and **Dossier** ship in
+WP11; **Notes** is the last Phase-2 stub.
 """
 
 from __future__ import annotations
@@ -66,7 +67,9 @@ class ComputerScreen(Screen):
                 )
                 yield MapView(self._map)
             with TabPane("Ports", id="ports"):
-                yield Static("[dim]Port directory (last-seen stock + class) — Phase 2.[/]")
+                yield Static("[b]PORTS DIRECTORY[/]        [dim]charted ports, nearest first[/]")
+                yield DataTable(id="ports-table", zebra_stripes=True, cursor_type="row")
+                yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
             with TabPane("Trade", id="trade"):
                 yield Static("[b]PAIR-TRADE FINDER[/]        [dim]scored by profit / turn[/]")
                 yield DataTable(id="finder", zebra_stripes=True, cursor_type="row")
@@ -114,6 +117,17 @@ class ComputerScreen(Screen):
                 codex.add_row(c.name, c.location, c.rarity, c.detail)
         else:
             codex.add_row(Text("no discoveries logged yet", style="dim"), Text(""), Text(""), Text(""))
+
+        ports = self.query_one("#ports-table", DataTable)
+        ports.add_columns("Sector", "Port", "Class", "Buys", "Sells", "Dist")
+        if self._computer.ports:
+            for e in self._computer.ports:
+                ports.add_row(f"S{e.sector_display}", e.name, e.klass, e.buys, e.sells,
+                              str(e.dist) if e.dist >= 0 else "—")
+        else:
+            ports.add_row(
+                Text("No ports discovered yet — explore to chart them.", style="dim"),
+                *(Text(""),) * 5)
 
         route = self.query_one("#route-table", DataTable)
         route.add_columns("Hop", "Sector", "Notes")
@@ -197,8 +211,16 @@ class ComputerScreen(Screen):
             self._route = self._service.route_view(self._pid, entry.sector_id)  # type: ignore[attr-defined]
             self._engage_target = entry.sector_id  # type: ignore[attr-defined]
             self._show_route()
+        elif active == "ports":
+            entry = self._cursor_entry("#ports-table", self._computer.ports)
+            if entry is None:
+                self.notify("No port selected.", timeout=2)
+                return
+            self._route = self._service.route_view(self._pid, entry.sector_id)  # type: ignore[attr-defined]
+            self._engage_target = entry.sector_id  # type: ignore[attr-defined]
+            self._show_route()
         else:
-            self.notify("Plot a route from the Trade or Codex tab.", timeout=2)
+            self.notify("Plot a route from the Trade, Codex or Ports tab.", timeout=2)
 
     def action_route_prompt(self) -> None:
         self.app.push_screen(TravelPromptScreen(), self._after_route_prompt)
