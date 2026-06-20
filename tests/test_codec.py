@@ -10,6 +10,7 @@ from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsy
 from edge.core.events import (
     AlienHailed,
     AlienMoved,
+    AlienSpoke,
     AlienTraded,
     AttitudeChanged,
     Banked,
@@ -46,6 +47,7 @@ from edge.core.rules import (
     Cannibalize,
     Colonize,
     Command,
+    Converse,
     DeployGenesis,
     Deposit,
     Descend,
@@ -94,6 +96,8 @@ COMMANDS: list[Command] = [
     BuyGenesis(),                 # WP10 buy a genesis torpedo
     DeployGenesis(planet_id=5),   # WP10 terraform a world
     Hail(species_id=3),                          # WP9 open alien contact
+    Converse(species_id=3, context="farewell"),  # WP17 say a peaceful line
+    Converse(species_id=3, context="dossier_other", subject_id=5),  # WP17 ask about X
     BuyAlienTech(species_id=3, offer_index=1),   # WP9 buy tech for latinum
     BarterArtifact(species_id=3, offer_index=0), # WP9 barter an artifact for tech
 ]
@@ -124,6 +128,8 @@ EVENTS: list[Event] = [
     StockRegenerated(3, Commodity.EQUIPMENT, 480),
     AlienHailed(1, 3),
     AlienMoved(3, 7, 12),
+    AlienSpoke(1, 3, "greeting", None),
+    AlienSpoke(1, 3, "dossier_other", 5),
     AlienTraded(1, 3, "buy", "radiator (II)", 7_000),
     AttitudeChanged(1, 3, 0.12, 0.87),
 ]

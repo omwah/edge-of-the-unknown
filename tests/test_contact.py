@@ -21,6 +21,7 @@ from edge.core.movement import shortest_path
 from edge.core.rules import (
     BarterArtifact,
     BuyAlienTech,
+    Converse,
     Hail,
     Warp,
     apply_result,
@@ -77,7 +78,9 @@ def test_hail_marks_met_and_advances_recency() -> None:
     player = state.players[1]
     assert sp.id in player.species_attitudes  # met
     assert player.dialogue_recency[(sp.id, "greeting")]  # ring advanced
-    assert [type(e).__name__ for e in res.events] == ["AlienHailed"]
+    # Hail is now Converse(greeting): it speaks the greeting via the general path (WP17).
+    assert [type(e).__name__ for e in res.events] == ["AlienSpoke"]
+    assert res.events[0].context == "greeting"
 
 
 def test_hail_again_rephrases() -> None:
@@ -96,6 +99,64 @@ def test_contact_requires_species_in_sector() -> None:
     state.species[sp.id] = replace(sp, sector_id=sp.sector_id + 500)  # move it away
     with pytest.raises(EconomyError):
         reduce(state, 1, Hail(sp.id), CFG)
+
+
+# --- WP17: Converse (general peaceful conversation) ------------------------------
+
+def test_converse_advances_ring_and_emits_alienspoke() -> None:
+    state = _world()
+    sp = _inject(state, "vesk")
+    res = reduce(state, 1, Converse(sp.id, "farewell"), CFG)
+    apply_result(state, res)
+    assert [type(e).__name__ for e in res.events] == ["AlienSpoke"]
+    assert res.events[0].context == "farewell" and res.events[0].subject_id is None
+    assert state.players[1].dialogue_recency[(sp.id, "farewell")]  # that context's ring advanced
+
+
+def test_converse_dossier_other_carries_subject_and_rephrases() -> None:
+    state = _world()
+    vesk = _inject(state, "vesk", sid=1)
+    selvani = _inject(state, "selvani", sid=2)  # the subject species, also met
+    cmd = Converse(vesk.id, "dossier_other", subject_id=selvani.id)
+    res = reduce(state, 1, cmd, CFG)
+    assert res.events[0].context == "dossier_other" and res.events[0].subject_id == selvani.id
+    first = session.contact_view(state, 1, vesk.id, CFG)  # (renders dossier line for selvani)
+    apply_result(state, res)
+    assert state.players[1].dialogue_recency[(vesk.id, "dossier_other")]
+    assert first is not None
+
+
+def test_converse_rejects_non_peaceful_or_unreachable_context() -> None:
+    state = _world()
+    sp = _inject(state, "vesk")  # open trader → trade_refuse is unreachable for it
+    for ctx in ("combat_open", "sig.trojan", "betrayal", "trade_refuse"):
+        with pytest.raises(EconomyError):
+            reduce(state, 1, Converse(sp.id, ctx), CFG)
+
+
+def test_hail_is_converse_greeting() -> None:
+    a, sp_a = _world(), None
+    sp_a = _inject(a, "vesk")
+    b = _world()
+    sp_b = _inject(b, "vesk")
+    apply_result(a, reduce(a, 1, Hail(sp_a.id), CFG))
+    apply_result(b, reduce(b, 1, Converse(sp_b.id, "greeting"), CFG))
+    assert state_hash(a) == state_hash(b)  # identical resulting state
+
+
+def test_every_reachable_peaceful_context_speaks() -> None:
+    from edge.core.dialogue import reachable_contexts
+
+    state = _world()
+    sp = _inject(state, "vesk")
+    _inject(state, "selvani", sid=2)  # a subject for dossier_other
+    sc = CFG.roster.species_by_id("vesk")
+    assert sc is not None
+    for ctx in sorted(reachable_contexts(sc)):
+        subject = 2 if ctx == "dossier_other" else None
+        res = reduce(state, 1, Converse(sp.id, ctx, subject_id=subject), CFG)
+        apply_result(state, res)  # no raise, ring advances for every reachable context
+        assert res.events[0].context == ctx
 
 
 # --- buy for latinum -------------------------------------------------------------
@@ -292,3 +353,25 @@ def test_hail_replays_into_identical_state(tmp_path: Path) -> None:
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "contact.db"))  # type: ignore[arg-type]
     assert state_hash(reloaded.state) == expected
     assert sp.id in reloaded.state.players[1].species_attitudes
+
+
+def test_converse_chain_replays_into_identical_state(tmp_path: Path) -> None:
+    """WP17: Hail → Converse(dossier_other) → Converse(farewell) reloads identically.
+
+    The generalised ring advance now flows through Converse for every peaceful context,
+    so the dialogue-survives-reload coverage extends past the greeting.
+    """
+    svc = GameService.new_game(SMALL, 3, SqliteRepository(tmp_path / "converse.db"), created_at=_CREATED)  # type: ignore[arg-type]
+    found = _reachable_species(svc.state)
+    assert found is not None
+    path, sp = found
+    for hop in path[1:]:
+        svc.apply(1, Warp(to_sector=hop))
+    svc.apply(1, Hail(sp.id))
+    svc.apply(1, Converse(sp.id, "dossier_other", subject_id=sp.id))
+    svc.apply(1, Converse(sp.id, "farewell"))
+    expected = state_hash(svc.state)
+    assert svc.state.players[1].dialogue_recency[(sp.id, "farewell")]  # rings advanced
+
+    reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "converse.db"))  # type: ignore[arg-type]
+    assert state_hash(reloaded.state) == expected
