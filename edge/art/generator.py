@@ -6,10 +6,12 @@ from rich.text import Text
 
 from edge.art.terrain import TerrainGenerator
 from edge.art.planet import PlanetGenerator
+from edge.art.starfield import StarfieldGenerator, STARFIELD_SUBTYPES
 
 _TERRAIN_GEN = TerrainGenerator(use_fg_color=True, use_bg_color=True)
 _PLANET_TERRAIN_GEN = TerrainGenerator(use_fg_color=False, use_bg_color=True)
 _PLANET_GEN = PlanetGenerator(terrain_gen=_PLANET_TERRAIN_GEN)
+_STARFIELD_GEN = StarfieldGenerator()
 
 @lru_cache(maxsize=128)
 def generate_sprite(
@@ -57,6 +59,15 @@ def generate_sprite(
                 combined_text.append(_PLANET_GEN.generate(rng, st, width, height))
             return combined_text
         return _PLANET_GEN.generate(rng, subtype, width, height)
+        
+    if entity_type == "starfield":
+        if subtype.lower() == "all":
+            combined_text = Text()
+            for st in STARFIELD_SUBTYPES:
+                combined_text.append(f"\n[ {st.upper()} ]\n", style="bold white")
+                combined_text.append(_STARFIELD_GEN.generate(rng, st, width, height))
+            return combined_text
+        return _STARFIELD_GEN.generate(rng, subtype, width, height)
     
     # Placeholder for other types (ships, ports, subsystems)
     if width < 2 or height < 2:
