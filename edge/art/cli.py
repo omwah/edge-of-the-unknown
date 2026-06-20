@@ -55,7 +55,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     else:
         subtypes_to_run = [args.subtype]
 
-    console = Console()
+    console = Console(force_terminal=True, color_system="truecolor")
     for st in subtypes_to_run:
         sprite = generate_sprite(
             entity_type=args.type,
@@ -66,7 +66,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             owner_species=args.owner_species,
         )
 
-        console.print(f"--- Generated {args.type} ({st}) [Size: {args.width}x{args.height}] ---")
+        header_text = f" {args.type.title()} - {st} ({args.width} x {args.height}) "
+        console.print(header_text.center(args.width, "-"))
         console.print(sprite)
         console.print("-" * args.width)
 
