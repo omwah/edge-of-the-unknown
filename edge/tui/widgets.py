@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 
 from rich.text import Text
+from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical
@@ -276,12 +277,17 @@ class SectorScene(Static):
     def __init__(self, sector: SectorDTO, **kwargs: object) -> None:
         super().__init__(**kwargs)
         self._sector = sector
+        # Click targets recorded on the last render: (x0, y0, x1, y1, dest). The
+        # planet/port art is clickable — clicking it launches Survey/Dock, matching
+        # the text-list affordances (the ship art is decorative only).
+        self._hotspots: list[tuple[int, int, int, int, str]] = []
 
     def on_resize(self) -> None:
         self.refresh()
 
     def render(self) -> Text:
         w, h = self.size.width, self.size.height
+        self._hotspots = []
         if w < self._MIN_WIDTH or h < 6:
             return Text("")
         grid = [[(" ", "") for _ in range(w)] for _ in range(h)]
@@ -289,7 +295,7 @@ class SectorScene(Static):
         art_left = int(w * self._TEXT_FRACTION)
         centre = (art_left + w) / 2
 
-        def stamp(sprite: list[str], top: int, style: str) -> int:
+        def stamp(sprite: list[str], top: int, style: str, dest: str | None = None) -> int:
             sw = max((len(line) for line in sprite), default=0)
             left = max(art_left, min(int(centre - sw / 2), w - sw))
             for r, line in enumerate(sprite):
@@ -299,13 +305,16 @@ class SectorScene(Static):
                         x = left + c
                         if ch != " " and 0 <= x < w:
                             grid[y][x] = (ch, style)
-            return top + len(sprite)
+            bottom = top + len(sprite)
+            if dest is not None:  # record the sprite's bounding box as a click target
+                self._hotspots.append((left, top, left + sw, bottom, dest))
+            return bottom
 
         cursor = 1
         if self._sector.planets:
-            cursor = stamp(sprites.pick_planet(self._sector.planets[0]), cursor, "cyan") + 1
+            cursor = stamp(sprites.pick_planet(self._sector.planets[0]), cursor, "cyan", "planet") + 1
         if self._sector.ports:
-            cursor = stamp(sprites.pick_port(self._sector.ports[0]), cursor, "magenta") + 1
+            cursor = stamp(sprites.pick_port(self._sector.ports[0]), cursor, "magenta", "port") + 1
         for name in self._sector.ships:
             cursor = stamp(sprites.pick_ship(name), cursor, "white") + 1
 
@@ -316,6 +325,16 @@ class SectorScene(Static):
             if y < h - 1:
                 out.append("\n")
         return out
+
+    def on_click(self, event: events.Click) -> None:
+        # Clicking the planet/port art fires the same affordance as its text-list
+        # entry: ClickableEntry.Picked, which the GameScreen routes to Survey/Dock.
+        x, y = int(event.x), int(event.y)
+        for x0, y0, x1, y1, dest in self._hotspots:
+            if x0 <= x < x1 and y0 <= y < y1:
+                event.stop()
+                self.post_message(ClickableEntry.Picked(dest))
+                return
 
 
 class MapBandPanel(Static):

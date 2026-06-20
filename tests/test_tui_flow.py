@@ -397,6 +397,62 @@ async def test_click_ship_hails_that_specific_species() -> None:
         assert 2 in met and 1 not in met  # hailed the clicked ship, not the first
 
 
+async def test_click_planet_art_opens_survey() -> None:
+    """Clicking the planet ASCII art (not just its text entry) surveys the planet."""
+    from edge.core.rules import Warp
+    from edge.tui.screens.planet import PlanetScreen
+    from edge.tui.widgets import SectorScene
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        # Reach any sector that holds a planet (the art is drawn from sector.planets).
+        planet = next(p for p in svc.state.planets.values()
+                      if shortest_path(svc.state.adjacency, 1, p.sector_id) is not None)
+        for hop in shortest_path(svc.state.adjacency, 1, planet.sector_id)[1:]:
+            svc.apply(1, Warp(to_sector=hop))
+        await app.screen.recompose()
+        await pilot.pause()
+        scene = app.screen.query_one(SectorScene)
+        spot = next(s for s in scene._hotspots if s[4] == "planet")
+        cx, cy = (spot[0] + spot[2]) // 2, (spot[1] + spot[3]) // 2
+        await pilot.click(scene, offset=(cx, cy))
+        await pilot.pause()
+        assert isinstance(app.screen, PlanetScreen)
+
+
+async def test_click_port_art_docks() -> None:
+    """Clicking the port ASCII art docks, the same as pressing P or its text entry."""
+    from edge.core.rules import Warp
+    from edge.tui.screens.port import PortScreen
+    from edge.tui.screens.stardock import StarDockScreen
+    from edge.tui.widgets import SectorScene
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        port = next(p for p in svc.state.ports.values()
+                    if shortest_path(svc.state.adjacency, 1, p.sector_id) is not None)
+        for hop in shortest_path(svc.state.adjacency, 1, port.sector_id)[1:]:
+            svc.apply(1, Warp(to_sector=hop))
+        await app.screen.recompose()
+        await pilot.pause()
+        scene = app.screen.query_one(SectorScene)
+        spot = next(s for s in scene._hotspots if s[4] == "port")
+        cx, cy = (spot[0] + spot[2]) // 2, (spot[1] + spot[3]) // 2
+        await pilot.click(scene, offset=(cx, cy))
+        await pilot.pause()
+        assert isinstance(app.screen, (PortScreen, StarDockScreen))
+
+
 async def test_haggle_session_stays_open_across_a_rejected_round() -> None:
     from textual.widgets import Input
 
