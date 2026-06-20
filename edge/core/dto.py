@@ -82,6 +82,7 @@ class SurfaceDTO:
     sites: list[SurfaceSite] = field(default_factory=list)
     planet_id: int = 0
     explorable: bool = False  # at least one site can still be revealed (drives [E])
+    terrain_blurb: str = ""  # planet-type flavor caption for the terrain panel title
 
 
 @dataclass(frozen=True)
