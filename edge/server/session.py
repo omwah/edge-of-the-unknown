@@ -65,7 +65,7 @@ from edge.core.models import (
     SubsystemState,
     UniverseState,
 )
-from edge.core.planets import is_colonizable
+from edge.core.planets import is_colonizable, pretty_planet_type
 from edge.core.starbases import is_operational
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
@@ -178,7 +178,8 @@ def _sector_dto(
     state: UniverseState, player: Player, sector: Sector, core_hops: dict[int, int]
 ) -> dto.SectorDTO:
     ports = [p.name for p in state.ports.values() if p.sector_id == sector.id]
-    planets = [f"{pl.name}  {pl.planet_type}" for pl in state.planets.values() if pl.sector_id == sector.id]
+    planets = [f"{pl.name}  {pretty_planet_type(pl.planet_type)}"
+               for pl in state.planets.values() if pl.sector_id == sector.id]
     # A staged species shows as a present vessel so the player can see (and hail) it —
     # friendly contacts are visible just like ports/planets (§6, WP9). One row per species;
     # `contact_ids` runs parallel to `ships` so clicking a row hails that species.
@@ -611,8 +612,34 @@ def _port_directory(state: UniverseState, player_id: int) -> list[dto.PortDirEnt
     return out
 
 
+def _planet_directory(state: UniverseState, player_id: int) -> list[dto.PlanetDirEntry]:
+    """Every charted planet (explored sectors), nearest first — the Planets tab (§11, §4.2)."""
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    dist = bfs_distances(state.adjacency, ship.sector_id)
+    out: list[dto.PlanetDirEntry] = []
+    for planet in state.planets.values():
+        if planet.sector_id not in player.explored_sectors:
+            continue  # fog of war: a planet appears only once its sector is explored
+        species = (
+            state.species.get(planet.inhabited_by_species_id)
+            if planet.inhabited_by_species_id is not None else None
+        )
+        stores = "  ".join(f"{_LABEL[c]} {planet.stores.get(c, 0)}" for c in Commodity)
+        out.append(dto.PlanetDirEntry(
+            planet_id=planet.id, sector_id=planet.sector_id,
+            sector_display=_display(state, planet.sector_id), name=planet.name,
+            ptype=pretty_planet_type(planet.planet_type), owner=_owner_label(state, planet, player_id),
+            colonists=planet.colonists,
+            species=species.name if species is not None else "—",
+            stores=stores, dist=dist.get(planet.sector_id, -1),
+        ))
+    out.sort(key=lambda e: (e.dist if e.dist >= 0 else 1 << 30, e.sector_display))
+    return out
+
+
 def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.ComputerDTO:
-    """Pair-trade finder + discovery codex + alien dossier + ports directory (§9, §11)."""
+    """Pair-trade finder + discovery codex + alien dossier + ports/planets directory (§9, §11)."""
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
     dist = bfs_distances(state.adjacency, ship.sector_id)
@@ -630,7 +657,7 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     return dto.ComputerDTO(
         pairs=top, selected=top[0].pair if top else "—",
         codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
-        ports=_port_directory(state, player_id),
+        ports=_port_directory(state, player_id), planets=_planet_directory(state, player_id),
     )
 
 

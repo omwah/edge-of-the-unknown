@@ -70,6 +70,10 @@ class ComputerScreen(Screen):
                 yield Static("[b]PORTS DIRECTORY[/]        [dim]charted ports, nearest first[/]")
                 yield DataTable(id="ports-table", zebra_stripes=True, cursor_type="row")
                 yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
+            with TabPane("Planets", id="planets"):
+                yield Static("[b]PLANETS DIRECTORY[/]        [dim]charted planets, nearest first[/]")
+                yield DataTable(id="planets-table", zebra_stripes=True, cursor_type="row")
+                yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
             with TabPane("Trade", id="trade"):
                 yield Static("[b]PAIR-TRADE FINDER[/]        [dim]scored by profit / turn[/]")
                 yield DataTable(id="finder", zebra_stripes=True, cursor_type="row")
@@ -128,6 +132,19 @@ class ComputerScreen(Screen):
             ports.add_row(
                 Text("No ports discovered yet — explore to chart them.", style="dim"),
                 *(Text(""),) * 5)
+
+        planets = self.query_one("#planets-table", DataTable)
+        planets.add_columns("Sector", "Planet", "Type", "Claim", "Pop", "Species", "Stores (F/O/E)", "Dist")
+        if self._computer.planets:
+            for pl in self._computer.planets:
+                planets.add_row(
+                    f"S{pl.sector_display}", pl.name, pl.ptype, pl.owner,
+                    f"{pl.colonists:,}", pl.species, pl.stores,
+                    str(pl.dist) if pl.dist >= 0 else "—")
+        else:
+            planets.add_row(
+                Text("No planets discovered yet — explore to chart them.", style="dim"),
+                *(Text(""),) * 7)
 
         route = self.query_one("#route-table", DataTable)
         route.add_columns("Hop", "Sector", "Notes")
@@ -219,8 +236,16 @@ class ComputerScreen(Screen):
             self._route = self._service.route_view(self._pid, entry.sector_id)  # type: ignore[attr-defined]
             self._engage_target = entry.sector_id  # type: ignore[attr-defined]
             self._show_route()
+        elif active == "planets":
+            entry = self._cursor_entry("#planets-table", self._computer.planets)
+            if entry is None:
+                self.notify("No planet selected.", timeout=2)
+                return
+            self._route = self._service.route_view(self._pid, entry.sector_id)  # type: ignore[attr-defined]
+            self._engage_target = entry.sector_id  # type: ignore[attr-defined]
+            self._show_route()
         else:
-            self.notify("Plot a route from the Trade, Codex or Ports tab.", timeout=2)
+            self.notify("Plot a route from the Trade, Codex, Ports or Planets tab.", timeout=2)
 
     def action_route_prompt(self) -> None:
         self.app.push_screen(TravelPromptScreen(), self._after_route_prompt)
