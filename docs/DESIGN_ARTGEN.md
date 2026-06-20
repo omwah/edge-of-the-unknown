@@ -33,7 +33,7 @@ The art generation logic will live in a new `edge.art` library to separate it fr
 We will use a hybrid algorithmic approach based on the entity type:
 - **Surface Terrain**: Rasterization via Noise (e.g., Simplex, Perlin, or cellular automata) to generate organic, continuous fields.
 - **Planets**: A combination of Compositional (assembling predefined parts like atmospheres or rings) and Rasterization (for surface textures).
-- **Ships, Ports, and Starbases**: A combination of Compositional (assembling pre-made ASCII fragments like hulls, thrusters) and Signed Distance Fields (SDFs) to trace sharp geometric structures onto an ASCII grid.
+- **Ships, Ports, and Starbases**: Compositional — hand-authored ASCII silhouettes (hulls, docking arms, thrusters) assembled and recolored at render time. These sprites are small (a port may be as little as 3 cells tall), and at that resolution Signed Distance Fields (SDFs) have too few samples to read as recognizable structure — the traced boundary degrades into a blob and per-cell noise greebling becomes speckle. Hand-drawn silhouettes stay crisp at small sizes and preserve the BBS/ANSI heritage, so SDFs are reserved for the large circular planet masks of §4.1 where the cell count justifies them.
 
 ### 2.1 TUI Integration
 
@@ -71,10 +71,10 @@ This ensures that a `terrestrial_warm` world always looks habitable and dynamica
 
 ### 4.2 Ships and Ports
 
-Ship and Port generation maps core data (`ship_class` and port type) to the visual output:
-- **Role / Port Type Defines Skeleton**: The `role` (for ships: `fighter`, `freighter`, `capital_warship`) or the port type (`trading port`, `starbase`, `stardock`) dictates the fundamental base composition and SDF skeleton. A freighter will always have a recognizable cargo backbone, while a port will have a stationary, orbital structure.
-- **Species Defines Style**: Just like ships, all three types of ports accept an `owner_species` argument. The `owner_species` dictates the stylistic generation parameters and the primary color palette. For example, a hostile insectoid species might generate sharp, angular SDF shapes for both its ships and its orbital starbases, while a friendly trader species might generate smooth, blocky industrial structures.
-- **Seed Adds Variation**: The local seed resolves the final geometric parameters, asymmetry, and modular additions (like extra antennae, docking bays, or engine nacelles) within the boundaries of the skeleton and species style.
+Ship and Port generation maps core data (`ship_class` and port type) to the visual output via a **compositional / template** path: each role or port type owns a set of hand-authored ASCII silhouettes at a few size tiers, and the renderer picks the largest tier that fits the requested bounds, centers it (cropping gracefully when the box is smaller than the smallest tier), and then recolors and lightly varies it.
+- **Role / Port Type Defines Skeleton**: The `role` (for ships: `fighter`, `freighter`, `capital_warship`) or the port type (`trading_port`, `starbase`, `stardock`) selects the silhouette set. A freighter always has a recognizable cargo backbone; a port reads as a stationary orbital structure. The flagship `stardock` deliberately evokes the classic TradeWars 2002 Federation StarDock: a vertical, left/right-symmetric station with a red beacon, control tower, a wide platform trailing thin docking arms, a tapering chevron body, and a yellow engine glow.
+- **Species Defines Style**: Just like ships, all three types of ports accept an `owner_species` argument. The `owner_species` selects the color palette — three hull shading levels plus navigation-beacon and lit-window hues. The default/`human` palette reads as the grey Federation hull; other species supply their own (e.g. a hostile insectoid bloc in angular reds, a friendly trader in industrial greens). Shading is carried by the authored glyphs themselves (solid blocks read bright, half/box-drawing chars read mid, light-shade blocks read dark), so a single template recolors cleanly across species without per-species geometry.
+- **Seed Adds Variation**: The local seed resolves steady per-station choices (which beacon hue, which hull cells light up as windows) on top of the chosen silhouette and species palette, so repeat entities differ without losing their iconic shape. Determinism is preserved because the seed drives every choice.
 
 ### 4.3 Engine Room Subsystems
 
