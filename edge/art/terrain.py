@@ -218,35 +218,46 @@ class TerrainGenerator:
         """Generate a raw procedural grid of (char, fg, bg)."""
         noise_seed = rng.randint(0, 2**31 - 1)
         gen = OpenSimplex(seed=noise_seed)
-        
-        if subtype.lower() == "asteroid_belt" or subtype.lower() == "asteroid":
-            grid = []
-            threshold = self.asteroid_cluster_threshold
-            scale_range = 1.0 - threshold
-            for y in range(height):
-                row = []
-                for x in range(width):
-                    cluster_noise = gen.noise2(x / self.asteroid_noise_scale, y / self.asteroid_noise_scale)
-                    if cluster_noise > threshold:
-                        density = (cluster_noise - threshold) / scale_range
-                        if rng.random() < density * self.asteroid_max_fill_rate:
-                            char = rng.choice(self.asteroid_chars)
-                            fg = rng.choice(self.asteroid_colors)
-                            row.append((char, fg, "black"))
-                        else:
-                            row.append((" ", "black", "black"))
+
+        if subtype.lower() in ("asteroid_belt", "asteroid"):
+            return self._get_asteroid_grid(rng, gen, width, height)
+        return self._get_biome_grid(rng, gen, subtype, width, height)
+
+    def _get_asteroid_grid(
+        self, rng: random.Random, gen: OpenSimplex, width: int, height: int
+    ) -> list[list[tuple[str, str, str]]]:
+        """Generate a sparse field of clustered debris for asteroid belts."""
+        grid = []
+        threshold = self.asteroid_cluster_threshold
+        scale_range = 1.0 - threshold
+        for y in range(height):
+            row = []
+            for x in range(width):
+                cluster_noise = gen.noise2(x / self.asteroid_noise_scale, y / self.asteroid_noise_scale)
+                if cluster_noise > threshold:
+                    density = (cluster_noise - threshold) / scale_range
+                    if rng.random() < density * self.asteroid_max_fill_rate:
+                        char = rng.choice(self.asteroid_chars)
+                        fg = rng.choice(self.asteroid_colors)
+                        row.append((char, fg, "black"))
                     else:
                         row.append((" ", "black", "black"))
-                grid.append(row)
-            return grid
-            
+                else:
+                    row.append((" ", "black", "black"))
+            grid.append(row)
+        return grid
+
+    def _get_biome_grid(
+        self, rng: random.Random, gen: OpenSimplex, subtype: str, width: int, height: int
+    ) -> list[list[tuple[str, str, str]]]:
+        """Generate a banded biome surface from layered noise."""
         subtype_key = subtype.lower()
         if subtype_key not in self.biomes_registry:
             raise ValueError(
                 f"Unknown terrain subtype '{subtype}'. "
                 f"Available subtypes: {list(self.biomes_registry.keys())}"
             )
-            
+
         biome_config = self.biomes_registry[subtype_key]
         bands = biome_config["bands"]
         sx = biome_config["scale_x"]
@@ -257,24 +268,24 @@ class TerrainGenerator:
             row = []
             ny = (y / max(1, height - 1)) * 2.0 - 1.0
             pole_dist = abs(ny)
-            
+
             for x in range(width):
                 noise_val = gen.noise2(x / sx, y / sy)
-                
+
                 # Polar ice caps: dramatically boost noise near poles on terrestrial planets
                 if "terrestrial" in subtype_key and pole_dist > 0.7:
                     pole_factor = (pole_dist - 0.7) / 0.3
                     noise_val += pole_factor * 1.5
-                    
+
                 feature_name, fg, bg = get_biome_feature(noise_val, bands)
-                
+
                 if self.use_fg_color:
                     char = resolve_feature_char(rng, feature_name, self.features_registry)
                     final_fg = fg
                 else:
                     char = " "
                     final_fg = ""
-                    
+
                 final_bg = bg if self.use_bg_color else ""
                 row.append((char, final_fg, final_bg))
             grid.append(row)
