@@ -57,10 +57,17 @@ For any given entity, `edge.art` takes the `game_seed`, `entity_id`, and `entity
 
 ### 4.1 Planets and Terrain
 
-For planets, the core `planet_type` (e.g., `terrestrial_warm`, `jovian`, `barren`) acts as the primary constraint:
+For planets and terrain, the core `planet_type` (e.g., `terrestrial_warm`, `jovian`, `barren`) acts as the primary constraint:
 - **Type Dictates Base**: The `planet_type` determines the core rasterization strategy (e.g., continuous land/water noise for terrestrials, horizontal gas band noise for jovians, dense cratering for barren) and sets the appropriate color palette.
-- **Seed Dictates Details**: The locally derived seed sets the specific noise offset/scale, precise crater placement, and the generation of optional compositional features like planetary rings or orbiting small moons. 
-This ensures that a `terrestrial_warm` world always looks habitable, but every such world is uniquely identifiable.
+- **Seed Dictates Details**: The locally derived seed sets the specific noise offset/scale and precise feature placement. 
+- **Planetary Projections & Polish**: While `terrain` requests generate rectangular fills using full ASCII characters, `planet` requests undergo a specialized masking phase:
+  - **SDF Masking & Outlines**: Planets are constrained to a circular SDF, bounded by a dynamically calculated outline using curved ASCII drawing characters. The outline color corresponds to the planet's atmosphere (e.g., cyan for terrestrial, yellow for jovian).
+  - **Smooth Fills**: Foreground texture characters are stripped from planetary surfaces, relying entirely on background colors to create a smooth, globe-like appearance.
+  - **3D Lighting & Dithering**: A directional 3D light vector casts a dithered shadow (`▓`, `▒`, `░`) across the dark side of the planet, preserving a fraction of the biome's background color instead of falling into pure black.
+  - **Polar Ice Caps**: For `terrestrial` subtypes, procedural noise is mathematically boosted near the Y-axis poles, naturally forcing high-altitude snow biomes to form ice caps.
+  - **Asteroid Belts**: Treated as a special case, asteroid belts bypass the spherical mask, atmospheric outline, and foreground stripping, allowing the sparse debris to pass through cleanly into the rectangular boundaries.
+
+This ensures that a `terrestrial_warm` world always looks habitable and dynamically polished, and every such world is uniquely identifiable.
 
 ### 4.2 Ships and Ports
 
