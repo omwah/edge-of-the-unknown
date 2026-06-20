@@ -99,18 +99,18 @@ class PlanetGenerator:
                         
                         # Apply shadow dithering based on dot product
                         if dot < -0.1:
-                            # Deep shadow
-                            char = " "
-                            fg = ""
+                            # Deep shadow (25% color, 75% black)
+                            char = "░"
+                            fg = bg if bg and bg not in ("black", "default") else "bright_black"
                             bg = "black"
-                        elif dot < 0.2:
-                            # Mid shadow
-                            char = "▓"
+                        elif dot < 0.15:
+                            # Mid shadow (50% color, 50% black)
+                            char = "▒"
                             fg = bg if bg and bg not in ("black", "default") else "bright_black"
                             bg = "black"
                         elif dot < 0.4:
-                            # Light shadow
-                            char = "▒"
+                            # Light shadow (75% color, 25% black)
+                            char = "▓"
                             fg = bg if bg and bg not in ("black", "default") else "bright_black"
                             bg = "black"
                             
