@@ -59,7 +59,7 @@ class SurfaceScreen(Screen):
         )
         with Horizontal(id="surface-top"):
             terrain = Static("\n".join(s.terrain), id="terrain")
-            terrain.border_title = "terrain"
+            terrain.border_title = f"terrain · {s.terrain_blurb}" if s.terrain_blurb else "terrain"
             yield terrain
             detail = Static(id="site-detail")
             detail.border_title = "site"

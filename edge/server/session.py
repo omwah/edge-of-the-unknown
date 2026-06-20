@@ -13,6 +13,7 @@ from collections.abc import Mapping
 
 from edge.bigbang.topology import bfs_distances
 from edge.core import dialogue, dto
+from edge.server import terrain as terrain_art
 from edge.core.aliens import disposition_band, effective_disposition
 from edge.core.config import GameConfig
 from edge.core.discovery import is_detectable
@@ -440,13 +441,13 @@ def surface_view(state: UniverseState, player_id: int, planet_id: int, config: G
             status=status, payload=payload, discovery_id=site.id,
             salvageable=explored and not collected,
         ))
-    terrain = [
-        f"[dim]surface scan — {planet.planet_type}[/]",
-        "  " + "   ".join(s.marker for s in sites) if sites else "  [dim](no sites detected)[/]",
-    ]
+    terrain = terrain_art.render_terrain(
+        planet.planet_type, sites, seed=state.game.seed, planet_id=planet_id,
+    )
     return dto.SurfaceDTO(
         planet=planet.name, descent_fuel="n/a", terrain=terrain, sites=sites,
         planet_id=planet_id, explorable=explorable,
+        terrain_blurb=terrain_art.blurb_for(planet.planet_type),
     )
 
 

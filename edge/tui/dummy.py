@@ -159,31 +159,35 @@ def sample_port() -> PortDTO:
 
 
 def sample_surface() -> SurfaceDTO:
-    """The Terra Nova descent scene from UI_MOCKUPS.md §4."""
+    """The Terra Nova descent scene from UI_MOCKUPS.md §4.
+
+    Terrain is produced by the live `edge.server.terrain` generator so the
+    screenshot harness shows exactly the procedural art the service emits.
+    """
+    from edge.server import terrain as terrain_art
+
+    sites = [
+        SurfaceSite(
+            "[1]", "Ruined Spire", "Rare", "unexplored",
+            payload=["[red]ancient_tech ?[/]", "lore fragment"],
+        ),
+        SurfaceSite(
+            "[2]", "Crashed Ship", "Uncommon", "explored → ancient",
+            payload=["ancient drive (claimed)", "salvage cache"],
+        ),
+        SurfaceSite(
+            "[?]", "(hidden)", "?", "hidden",
+            payload=["needs a sensor sweep", "sensors Tier II"],
+        ),
+    ]
     return SurfaceDTO(
         planet="Terra Nova",
         descent_fuel="n/a",
-        terrain=[
-            "[dim].[/] [green]^[/]    [red]*?[/]       [green]^^[/]",
-            "  [green]^^^[/]  [yellow][1][/]     [dim].[/]      [yellow]*[/]",
-            "[blue]~~~~~[/]   [green]^[/]     [yellow][2][/]    [green]^^^[/]",
-            "  [dim].[/]  [magenta]crashed-ship[/]    [blue]~~~~[/]",
-            "    [green]^^[/]     [dim].[/]       [dim].[/]",
-        ],
-        sites=[
-            SurfaceSite(
-                "[1]", "Ruined Spire", "Rare", "unexplored",
-                payload=["[red]ancient_tech ?[/]", "lore fragment"],
-            ),
-            SurfaceSite(
-                "[2]", "Crashed Ship", "Uncommon", "explored → ancient",
-                payload=["ancient drive (claimed)", "salvage cache"],
-            ),
-            SurfaceSite(
-                "[?]", "(hidden)", "?", "hidden",
-                payload=["needs a sensor sweep", "sensors Tier II"],
-            ),
-        ],
+        terrain=terrain_art.render_terrain(
+            "terrestrial_warm", sites, seed=1986, planet_id=1,
+        ),
+        sites=sites,
+        terrain_blurb=terrain_art.blurb_for("terrestrial_warm"),
     )
 
 
