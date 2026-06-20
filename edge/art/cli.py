@@ -49,6 +49,9 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
 
+    if args.type == "planet":
+        args.width = args.height * 2
+
     if args.subtype.lower() == "all" and args.type in ("terrain", "planet"):
         from edge.art.generator import _TERRAIN_GEN
         subtypes_to_run = list(_TERRAIN_GEN.biomes_registry.keys())
