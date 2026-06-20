@@ -18,6 +18,19 @@ def get_outline_char(dx: float, dy: float) -> str:
     if 292.5 <= angle < 337.5: return "╮" 
     return " "
 
+ATMOSPHERE_COLORS = {
+    "terrestrial_warm": "bright_cyan",
+    "terrestrial_cool": "cyan",
+    "terrestrial_hot": "bright_red",
+    "terrestrial_cold": "bright_white",
+    "jovian": "bright_yellow",
+    "barren": "bright_black",
+}
+
+def get_atmosphere_color(subtype: str) -> str:
+    """Return the atmospheric outline color based on the planet subtype."""
+    return ATMOSPHERE_COLORS.get(subtype.lower(), "bright_white")
+
 class PlanetGenerator:
     """Procedural planet generator using SDF masks over terrain fills."""
     
@@ -42,8 +55,13 @@ class PlanetGenerator:
         # Inner fill distance squared (leaves a narrow band for the outline)
         # Using 0.85 means roughly the outer ~10% of the radius is outline.
         fill_dist_sq = 0.85
-        
         is_asteroid = subtype.lower() in ("asteroid_belt", "asteroid")
+        outline_color = get_atmosphere_color(subtype)
+        
+        # Light vector (coming from top-left-front)
+        Lx, Ly, Lz = -0.7, -0.3, 0.6
+        length = math.sqrt(Lx*Lx + Ly*Ly + Lz*Lz)
+        Lx, Ly, Lz = Lx/length, Ly/length, Lz/length
 
         for y in range(height):
             for x in range(width):
@@ -61,10 +79,42 @@ class PlanetGenerator:
                     elif dist_sq > fill_dist_sq:
                         # Draw outline
                         char = get_outline_char(dx, dy)
-                        map_text.append(char, style="bright_white")
+                        
+                        # Dim the outline if it's on the dark side of the planet
+                        ndx = dx / math.sqrt(dist_sq) if dist_sq > 0 else 0
+                        ndy = dy / math.sqrt(dist_sq) if dist_sq > 0 else 0
+                        outline_dot = ndx*Lx + ndy*Ly
+                        
+                        if outline_dot < -0.2:
+                            map_text.append(char, style=f"dim {outline_color}")
+                        else:
+                            map_text.append(char, style=outline_color)
                     else:
                         # Draw inner terrain fill
                         char, fg, bg = grid[y][x]
+                        
+                        # 3D spherical lighting mask
+                        z = math.sqrt(max(0.0, 1.0 - dist_sq))
+                        dot = dx*Lx + dy*Ly + z*Lz
+                        
+                        # Apply shadow dithering based on dot product
+                        if dot < -0.1:
+                            # Deep shadow
+                            char = " "
+                            fg = ""
+                            bg = "black"
+                        elif dot < 0.2:
+                            # Mid shadow
+                            char = "▓"
+                            fg = bg if bg and bg not in ("black", "default") else "bright_black"
+                            bg = "black"
+                        elif dot < 0.4:
+                            # Light shadow
+                            char = "▒"
+                            fg = bg if bg and bg not in ("black", "default") else "bright_black"
+                            bg = "black"
+                            
+                        # Format final style
                         if bg and bg not in ("black", "default"):
                             style = f"{fg} on {bg}" if fg else f"on {bg}"
                         else:
