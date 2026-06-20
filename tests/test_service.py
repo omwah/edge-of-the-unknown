@@ -310,7 +310,8 @@ def test_messages_view_signpost_and_real_events(tmp_path: Path) -> None:
     target = svc.state.sectors[1].warps_out[0]
     svc.apply(1, Warp(to_sector=target))
     after = svc.messages_view(1)
-    assert f"Sector {svc.state.spatial_ids[target]}" in after.events[0].text
+    # The warp line leads, its destination carried by the spatial-sector gutter.
+    assert f"S{svc.state.spatial_ids[target]}" in after.events[0].text
     assert "StarDock" in after.events[-1].text
 
 
@@ -333,4 +334,5 @@ def test_describe_event_uses_spatial_id(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     target = svc.state.sectors[1].warps_out[0]
     (event,) = svc.apply(1, Warp(to_sector=target))
-    assert f"Sector {svc.state.spatial_ids[target]}" in svc.describe_event(event)
+    # The spatial id rides in the sector gutter the ticker prepends.
+    assert f"S{svc.state.spatial_ids[target]}" in svc.describe_event(event)
