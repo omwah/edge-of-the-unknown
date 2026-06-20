@@ -93,6 +93,10 @@ class PlanetGenerator:
                         # Draw inner terrain fill
                         char, fg, bg = grid[y][x]
                         
+                        # Prevent the planet surface from turning completely invisible in the void
+                        if not bg or bg in ("black", "default"):
+                            bg = "bright_black"
+                        
                         # 3D spherical lighting mask
                         z = math.sqrt(max(0.0, 1.0 - dist_sq))
                         dot = dx*Lx + dy*Ly + z*Lz
