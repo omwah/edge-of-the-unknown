@@ -7,7 +7,7 @@ from rich.text import Text
 from edge.art.terrain import TerrainGenerator
 from edge.art.planet import PlanetGenerator
 from edge.art.starfield import StarfieldGenerator, STARFIELD_SUBTYPES
-from edge.art.port import PortGenerator, PORT_SUBTYPES
+from edge.art.port import PortGenerator, PORT_SUBTYPES, ARCHETYPE_STYLES
 
 _TERRAIN_GEN = TerrainGenerator(use_fg_color=True, use_bg_color=True)
 _PLANET_TERRAIN_GEN = TerrainGenerator(use_fg_color=False, use_bg_color=True)
@@ -31,6 +31,16 @@ def available_subtypes(entity_type: str) -> list[str]:
     return []
 
 
+def available_archetypes() -> list[str]:
+    """Return the archetype ids that have a defined art palette.
+
+    Lets the CLI enumerate and loop over every archetype style (``--archetype-id
+    all``). The 'default' fallback alias is omitted so it doesn't render as a
+    duplicate of the archetype it points at.
+    """
+    return [a for a in ARCHETYPE_STYLES if a != "default"]
+
+
 @lru_cache(maxsize=128)
 def generate_sprite(
     entity_type: str,
@@ -38,25 +48,26 @@ def generate_sprite(
     seed: int,
     width: int,
     height: int,
-    owner_species: str | None = None
+    archetype_id: str | None = None
 ) -> Text:
     """Generate a procedural ASCII sprite based on parameters.
-    
+
     Args:
         entity_type: "planet", "terrain", "ship", or "port"
         subtype: The specific role or type (e.g., "terrestrial_warm", "fighter")
         seed: The deterministic seed derived from game_seed and entity_id
         width: The target width in characters
         height: The target height in lines
-        owner_species: Optional species name for stylistic variations
-        
+        archetype_id: Optional owner archetype id for stylistic variations
+            (stable across species renames, unlike a species id/name)
+
     Returns:
         A rich Text object representing the generated ASCII art.
     """
     # Derive a local PRNG from the input parameters to ensure determinism
     rng_seed = f"{seed}|{entity_type}|{subtype}"
-    if owner_species:
-        rng_seed += f"|{owner_species}"
+    if archetype_id:
+        rng_seed += f"|{archetype_id}"
     rng = random.Random(rng_seed)
     
     # Route to specific generation algorithms based on entity type
@@ -70,6 +81,6 @@ def generate_sprite(
         return _STARFIELD_GEN.generate(rng, subtype, width, height)
 
     if entity_type == "port":
-        return _PORT_GEN.generate(rng, subtype, width, height, owner_species)
+        return _PORT_GEN.generate(rng, subtype, width, height, archetype_id)
 
     raise ValueError(f"Unknown entity type '{entity_type}'.")

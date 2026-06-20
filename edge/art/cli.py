@@ -6,7 +6,11 @@ from typing import Sequence
 from rich.cells import cell_len
 from rich.console import Console
 from rich.text import Text
-from edge.art.generator import available_subtypes, generate_sprite
+from edge.art.generator import (
+    available_archetypes,
+    available_subtypes,
+    generate_sprite,
+)
 
 
 def banner(title: str, width: int, style: str = "bold white") -> Text:
@@ -53,10 +57,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="Target bounding height in lines.",
     )
     parser.add_argument(
-        "--owner-species",
+        "--archetype-id",
         type=str,
         default=None,
-        help="The species dictating the stylistic choices (for ships, ports, and subsystems).",
+        help="The owner archetype id dictating the stylistic choices "
+        "(for ships, ports, and subsystems); e.g. humanoid_diplomat, brain_dome_automaton.",
     )
 
     args = parser.parse_args(argv)
@@ -71,23 +76,34 @@ def main(argv: Sequence[str] | None = None) -> None:
     else:
         subtypes_to_run = [args.subtype]
 
+    if args.archetype_id is not None and args.archetype_id.lower() == "all":
+        archetypes_to_run = available_archetypes()
+        if not archetypes_to_run:
+            parser.error("--archetype-id all has no archetype styles to render")
+    else:
+        archetypes_to_run = [args.archetype_id]
+
     console = Console(force_terminal=True, color_system="truecolor")
 
     rendered: list[tuple[str, Text, int]] = []
     for st in subtypes_to_run:
-        sprite = generate_sprite(
-            entity_type=args.type,
-            subtype=st,
-            seed=args.seed,
-            width=args.width,
-            height=args.height,
-            owner_species=args.owner_species,
-        )
-        sprite_width = max(
-            (cell_len(line) for line in sprite.plain.split("\n")), default=0
-        )
-        title = f"{args.type.title()} - {st} ({args.width} x {args.height})"
-        rendered.append((title, sprite, sprite_width))
+        for arch in archetypes_to_run:
+            sprite = generate_sprite(
+                entity_type=args.type,
+                subtype=st,
+                seed=args.seed,
+                width=args.width,
+                height=args.height,
+                archetype_id=arch,
+            )
+            sprite_width = max(
+                (cell_len(line) for line in sprite.plain.split("\n")), default=0
+            )
+            label = f"{args.type.title()} - {st}"
+            if arch is not None:
+                label += f" / {arch}"
+            title = f"{label} ({args.width} x {args.height})"
+            rendered.append((title, sprite, sprite_width))
 
     # Size every banner to the widest sprite/title across the run so the headers
     # are uniform, keeping each title centered within that shared width.
