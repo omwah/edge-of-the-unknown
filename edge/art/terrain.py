@@ -6,71 +6,60 @@ from rich.text import Text
 
 # FEATURES_REGISTRY maps a generic feature name to a list of its visual representations.
 # Format: "feature_name": [("character", relative_frequency_weight), ...]
+# Note: Group the character tuples horizontally (up to 6 per row) to maintain compactness and readability.
 FEATURES_REGISTRY = {
     "water_deep": [
-        ("~", 1),
-        ("=", 1),
+        ("≋", 1), ("≈", 1),
     ],
     "water_shallow": [
-        ("~", 1),
-        ("-", 1),
+        ("~", 1), ("∿", 1), ("∽", 1),
     ],
     "sand": [
-        (".", 1),
-        (",", 1),
+        (".", 1), (",", 1),
     ],
     "grass": [
-        ('"', 1),
-        ("'", 1),
+        ('"', 1), ("'", 1),
     ],
     "forest": [
-        ("T", 1),
-        ("Y", 1),
-        ("t", 1),
+        (" ", 40), ("├", 1), ("┝", 1), ("┞", 1), ("┟", 1), ("┠", 1),
+        ("┡", 1), ("┢", 1), ("┣", 1), ("┤", 1), ("┥", 1), ("┦", 1),
+        ("┧", 1), ("┨", 1), ("┩", 1), ("┪", 1), ("┫", 1), ("┬", 1),
+        ("┭", 1), ("┮", 1), ("┯", 1), ("┰", 1), ("┱", 1), ("┲", 1),
+        ("┳", 1), ("┴", 1), ("┵", 1), ("┶", 1), ("┷", 1), ("┸", 1),
+        ("┹", 1), ("┺", 1), ("┻", 1), ("┼", 1), ("┽", 1), ("┾", 1),
+        ("┿", 1), ("╀", 1), ("╁", 1), ("╂", 1), ("╃", 1), ("╄", 1),
+        ("╅", 1), ("╆", 1), ("╇", 1), ("╈", 1), ("╉", 1), ("╊", 1),
+        ("╋", 1),
     ],
     "mountain": [
-        ("^", 1),
-        ("A", 1),
+        ("^", 1), ("A", 1),
     ],
     "snow": [
-        ("*", 1),
-        ("+", 1),
+        ("*", 1), ("+", 1),
     ],
     "ice": [
-        ("_", 1),
-        ("-", 1),
+        ("_", 1), ("-", 1),
     ],
     "ash": [
-        ("_", 1),
-        ("-", 1),
-        (".", 1),
+        ("_", 1), ("-", 1), (".", 1),
     ],
     "crater": [
-        ("o", 1),
-        ("O", 1),
-        ("C", 1),
+        ("o", 1), ("O", 1), ("C", 1),
     ],
     "dust": [
-        (".", 1),
-        ("_", 1),
+        (".", 1), ("_", 1),
     ],
     "rock": [
-        ("o", 1),
-        ("O", 1),
-        ("@", 1),
+        ("o", 1), ("O", 1), ("@", 1),
     ],
     "debris": [
-        ("*", 1),
-        (",", 1),
-        (".", 1),
+        ("*", 1), (",", 1), (".", 1),
     ],
     "gas_thick": [
-        ("=", 1),
-        ("#", 1),
+        ("=", 1), ("#", 1),
     ],
     "gas_thin": [
-        ("-", 1),
-        ("~", 1),
+        ("-", 1), ("~", 1),
     ],
     "void": [
         (" ", 1),
@@ -83,7 +72,7 @@ FEATURES_REGISTRY = {
 #       "scale_x": float,  # Noise stretching factor along the X axis
 #       "scale_y": float,  # Noise stretching factor along the Y axis
 #       "bands": [
-#           (noise_threshold_float, "feature_name", "rich_color_string"),
+#           (noise_threshold_float, "feature_name", "fg_color", "bg_color"),
 #           ...
 #       ]
 #   }
@@ -91,86 +80,86 @@ BIOMES_REGISTRY = {
     "terrestrial_warm": {
         "scale_x": 15.0, "scale_y": 15.0,
         "bands": [
-            (-0.2, "water_deep", "blue"),
-            (-0.05, "water_shallow", "cyan"),
-            (0.05, "sand", "bright_yellow"),
-            (0.3, "grass", "green"),
-            (0.6, "forest", "dark_green"),
-            (0.8, "mountain", "bright_black"),
-            (1.0, "snow", "white"),
+            (-0.2, "water_deep", "bright_blue", "blue"),
+            (-0.05, "water_shallow", "bright_cyan", "cyan"),
+            (0.05, "sand", "yellow", "bright_yellow"),
+            (0.3, "grass", "bright_green", "green"),
+            (0.6, "forest", "dark_green", "green"),
+            (0.8, "mountain", "white", "bright_black"),
+            (1.0, "snow", "bright_white", "white"),
         ]
     },
     "terrestrial_cool": {
         "scale_x": 15.0, "scale_y": 15.0,
         "bands": [
-            (-0.1, "water_deep", "blue"),
-            (0.1, "water_shallow", "cyan"),
-            (0.3, "dust", "white"),
-            (0.5, "grass", "dark_green"),
-            (0.7, "forest", "green"),
-            (0.9, "mountain", "white"),
-            (1.0, "snow", "bright_white"),
+            (-0.1, "water_deep", "bright_blue", "blue"),
+            (0.1, "water_shallow", "bright_cyan", "cyan"),
+            (0.3, "dust", "bright_white", "white"),
+            (0.5, "grass", "green", "dark_green"),
+            (0.7, "forest", "bright_green", "green"),
+            (0.9, "mountain", "white", "bright_black"),
+            (1.0, "snow", "bright_white", "white"),
         ]
     },
     "terrestrial_hot": {
         "scale_x": 12.0, "scale_y": 12.0,
         "bands": [
-            (-0.2, "water_deep", "red"),
-            (0.0, "water_shallow", "bright_red"),
-            (0.2, "ash", "dark_gray"),
-            (0.5, "dust", "bright_black"),
-            (0.8, "mountain", "red"),
-            (1.0, "snow", "yellow"),
+            (-0.2, "water_deep", "bright_red", "red"),
+            (0.0, "water_shallow", "yellow", "bright_red"),
+            (0.2, "ash", "dark_gray", "black"),
+            (0.5, "dust", "bright_black", "black"),
+            (0.8, "mountain", "bright_red", "bright_black"),
+            (1.0, "snow", "yellow", "red"),
         ]
     },
     "terrestrial_cold": {
         "scale_x": 18.0, "scale_y": 18.0,
         "bands": [
-            (-0.2, "water_shallow", "cyan"),
-            (0.1, "ice", "white"),
-            (0.4, "snow", "bright_white"),
-            (0.7, "mountain", "cyan"),
-            (1.0, "ice", "blue"),
+            (-0.2, "water_shallow", "cyan", "blue"),
+            (0.1, "ice", "bright_white", "white"),
+            (0.4, "snow", "bright_white", "cyan"),
+            (0.7, "mountain", "white", "cyan"),
+            (1.0, "ice", "bright_cyan", "blue"),
         ]
     },
     "jovian": {
         "scale_x": 50.0, "scale_y": 5.0,
         "bands": [
-            (-0.4, "gas_thick", "#8B4513"),
-            (-0.1, "gas_thin", "#D2691E"),
-            (0.2, "water_shallow", "#F4A460"),
-            (0.5, "gas_thick", "#FFDEAD"),
-            (0.8, "gas_thin", "#D2691E"),
-            (1.0, "water_shallow", "#8B4513"),
+            (-0.4, "gas_thick", "black", "#8B4513"),
+            (-0.1, "gas_thin", "black", "#D2691E"),
+            (0.2, "water_shallow", "black", "#F4A460"),
+            (0.5, "gas_thick", "black", "#FFDEAD"),
+            (0.8, "gas_thin", "black", "#D2691E"),
+            (1.0, "water_shallow", "black", "#8B4513"),
         ]
     },
     "asteroid_belt": {
         "scale_x": 8.0, "scale_y": 8.0,
         "bands": [
-            (-0.3, "void", "black"),
-            (0.3, "dust", "bright_black"),
-            (0.6, "rock", "gray"),
-            (0.8, "rock", "white"),
-            (1.0, "debris", "bright_white"),
+            (-0.3, "void", "black", "black"),
+            (0.3, "dust", "bright_black", "black"),
+            (0.6, "rock", "gray", "black"),
+            (0.8, "rock", "white", "black"),
+            (1.0, "debris", "bright_white", "black"),
         ]
     },
     "barren": {
         "scale_x": 15.0, "scale_y": 15.0,
         "bands": [
-            (-0.1, "dust", "yellow"),
-            (0.2, "rock", "bright_yellow"),
-            (0.6, "crater", "red"),
-            (1.0, "mountain", "bright_red"),
+            (-0.1, "dust", "bright_yellow", "yellow"),
+            (0.2, "rock", "yellow", "bright_black"),
+            (0.6, "crater", "bright_red", "red"),
+            (1.0, "mountain", "white", "bright_red"),
         ]
     }
 }
 
-def get_biome_feature(val: float, biomes: list[tuple[float, str, str]]) -> tuple[str, str]:
-    """Return the feature name and color for a given noise value."""
-    for threshold, feature_name, color in biomes:
+def get_biome_feature(val: float, biomes: list[tuple[float, str, str, str]]) -> tuple[str, str, str]:
+    """Return the feature name, fg, and bg color for a given noise value."""
+    for threshold, feature_name, fg, bg in biomes:
         if val <= threshold:
-            return feature_name, color
-    return biomes[-1][1], biomes[-1][2]
+            return feature_name, fg, bg
+    return biomes[-1][1], biomes[-1][2], biomes[-1][3]
 
 def resolve_feature_char(rng: random.Random, feature_name: str, features_registry: dict[str, list[tuple[str, int]]]) -> str:
     """Resolve a feature name to a specific character based on frequencies."""
@@ -201,13 +190,13 @@ class TerrainGenerator:
         
         chars = []
         colors = []
-        for _, feature_name, color in belt_bands:
+        for _, feature_name, fg, bg in belt_bands:
             if feature_name != "void":
                 for char, _ in self.features_registry.get(feature_name, []):
                     if char.strip():
                         chars.append(char)
-                if color.strip():
-                    colors.append(color)
+                if fg.strip() and fg != "black":
+                    colors.append(fg)
                     
         self.asteroid_chars = list(dict.fromkeys(chars))
         self.asteroid_colors = list(dict.fromkeys(colors))
@@ -233,8 +222,9 @@ class TerrainGenerator:
                     density = (cluster_noise - threshold) / scale_range
                     if rng.random() < density * self.asteroid_max_fill_rate:
                         char = rng.choice(self.asteroid_chars)
-                        color = rng.choice(self.asteroid_colors)
-                        map_text.append(char, style=color)
+                        fg = rng.choice(self.asteroid_colors)
+                        # Asteroids float in black void, so no bg needed
+                        map_text.append(char, style=fg)
                     else:
                         map_text.append(" ", style="black")
                 else:
@@ -253,7 +243,14 @@ class TerrainGenerator:
         if subtype.lower() == "asteroid_belt" or subtype.lower() == "asteroid":
             return self._generate_asteroid_belt(rng, gen, width, height)
             
-        biome_config = self.biomes_registry.get(subtype.lower(), self.biomes_registry["barren"])
+        subtype_key = subtype.lower()
+        if subtype_key not in self.biomes_registry:
+            raise ValueError(
+                f"Unknown terrain subtype '{subtype}'. "
+                f"Available subtypes: {list(self.biomes_registry.keys())}"
+            )
+            
+        biome_config = self.biomes_registry[subtype_key]
         bands = biome_config["bands"]
         sx = biome_config["scale_x"]
         sy = biome_config["scale_y"]
@@ -263,9 +260,11 @@ class TerrainGenerator:
         for y in range(height):
             for x in range(width):
                 noise_val = gen.noise2(x / sx, y / sy)
-                feature_name, color = get_biome_feature(noise_val, bands)
+                feature_name, fg, bg = get_biome_feature(noise_val, bands)
                 char = resolve_feature_char(rng, feature_name, self.features_registry)
-                map_text.append(char, style=color)
+                
+                style = f"{fg} on {bg}" if bg and bg != "black" and bg != "default" else fg
+                map_text.append(char, style=style)
             if y < height - 1:
                 map_text.append("\n")
                 

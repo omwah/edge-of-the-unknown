@@ -49,19 +49,26 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
 
-    sprite = generate_sprite(
-        entity_type=args.type,
-        subtype=args.subtype,
-        seed=args.seed,
-        width=args.width,
-        height=args.height,
-        owner_species=args.owner_species,
-    )
+    if args.subtype.lower() == "all" and args.type in ("terrain", "planet"):
+        from edge.art.generator import _TERRAIN_GEN
+        subtypes_to_run = list(_TERRAIN_GEN.biomes_registry.keys())
+    else:
+        subtypes_to_run = [args.subtype]
 
     console = Console()
-    console.print(f"--- Generated {args.type} ({args.subtype}) [Size: {args.width}x{args.height}] ---")
-    console.print(sprite)
-    console.print("-" * (args.width + 8))
+    for st in subtypes_to_run:
+        sprite = generate_sprite(
+            entity_type=args.type,
+            subtype=st,
+            seed=args.seed,
+            width=args.width,
+            height=args.height,
+            owner_species=args.owner_species,
+        )
+
+        console.print(f"--- Generated {args.type} ({st}) [Size: {args.width}x{args.height}] ---")
+        console.print(sprite)
+        console.print("-" * args.width)
 
 
 if __name__ == "__main__":
