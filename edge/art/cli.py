@@ -3,8 +3,19 @@
 import argparse
 from typing import Sequence
 
+from rich.cells import cell_len
 from rich.console import Console
-from edge.art.generator import generate_sprite
+from rich.text import Text
+from edge.art.generator import available_subtypes, generate_sprite
+
+
+def banner(title: str, width: int, style: str = "bold white") -> Text:
+    """Return a banner line: ``title`` centered to ``width`` and padded with dashes.
+
+    Titles wider than ``width`` are never truncated.
+    """
+    framed = f" {title} "
+    return Text(framed.center(max(width, len(framed)), "-"), style=style)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -13,9 +24,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     parser.add_argument(
         "--type",
+        type=str,
         required=True,
-        choices=["planet", "terrain", "ship", "port", "subsystem"],
-        help="The main entity type to generate.",
+        choices=["planet", "terrain", "ship", "port", "subsystem", "starfield"],
+        help="The category of the entity to generate.",
     )
     parser.add_argument(
         "--subtype",
@@ -52,9 +64,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.type == "planet":
         args.width = args.height * 2
 
-    if args.subtype.lower() == "all" and args.type in ("terrain", "planet"):
-        from edge.art.generator import _TERRAIN_GEN
-        subtypes_to_run = list(_TERRAIN_GEN.biomes_registry.keys())
+    if args.subtype.lower() == "all":
+        subtypes_to_run = available_subtypes(args.type)
+        if not subtypes_to_run:
+            parser.error(f"--subtype all is not supported for type '{args.type}'")
     else:
         subtypes_to_run = [args.subtype]
 
@@ -69,10 +82,14 @@ def main(argv: Sequence[str] | None = None) -> None:
             owner_species=args.owner_species,
         )
 
-        header_text = f" {args.type.title()} - {st} ({args.width} x {args.height}) "
-        console.print(header_text.center(args.width, "-"))
+        sprite_width = max(
+            (cell_len(line) for line in sprite.plain.split("\n")), default=0
+        )
+        title = f"{args.type.title()} - {st} ({args.width} x {args.height})"
+        header = banner(title, sprite_width)
+        console.print(header)
         console.print(sprite)
-        console.print("-" * args.width)
+        console.print("-" * header.cell_len)
 
 
 if __name__ == "__main__":

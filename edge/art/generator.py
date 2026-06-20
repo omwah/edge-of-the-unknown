@@ -13,6 +13,20 @@ _PLANET_TERRAIN_GEN = TerrainGenerator(use_fg_color=False, use_bg_color=True)
 _PLANET_GEN = PlanetGenerator(terrain_gen=_PLANET_TERRAIN_GEN)
 _STARFIELD_GEN = StarfieldGenerator()
 
+
+def available_subtypes(entity_type: str) -> list[str]:
+    """Return the known subtypes for an entity type.
+
+    Lets callers (e.g. the CLI) enumerate and loop over every subtype themselves;
+    ``generate_sprite`` always renders exactly one concrete subtype.
+    """
+    if entity_type in ("terrain", "planet"):
+        return list(_TERRAIN_GEN.biomes_registry.keys())
+    if entity_type == "starfield":
+        return list(STARFIELD_SUBTYPES)
+    return []
+
+
 @lru_cache(maxsize=128)
 def generate_sprite(
     entity_type: str,
@@ -43,45 +57,12 @@ def generate_sprite(
     
     # Route to specific generation algorithms based on entity type
     if entity_type == "terrain":
-        if subtype.lower() == "all":
-            combined_text = Text()
-            for st in _TERRAIN_GEN.biomes_registry.keys():
-                combined_text.append(f"\n[ {st.upper()} ]\n", style="bold white")
-                combined_text.append(_TERRAIN_GEN.generate(rng, st, width, height))
-            return combined_text
         return _TERRAIN_GEN.generate(rng, subtype, width, height)
-    
+
     if entity_type == "planet":
-        if subtype.lower() == "all":
-            combined_text = Text()
-            for st in _PLANET_GEN.biomes_registry.keys():
-                combined_text.append(f"\n[ {st.upper()} ]\n", style="bold white")
-                combined_text.append(_PLANET_GEN.generate(rng, st, width, height))
-            return combined_text
         return _PLANET_GEN.generate(rng, subtype, width, height)
-        
+
     if entity_type == "starfield":
-        if subtype.lower() == "all":
-            combined_text = Text()
-            for st in STARFIELD_SUBTYPES:
-                combined_text.append(f"\n[ {st.upper()} ]\n", style="bold white")
-                combined_text.append(_STARFIELD_GEN.generate(rng, st, width, height))
-            return combined_text
         return _STARFIELD_GEN.generate(rng, subtype, width, height)
-    
-    # Placeholder for other types (ships, ports, subsystems)
-    if width < 2 or height < 2:
-        return Text("?")
-        
-    lines = Text()
-    lines.append("+" + "-" * (width - 2) + "+\n")
-    for _ in range(height - 2):
-        row = "|"
-        for _ in range(width - 2):
-            char = rng.choice([".", "*", " ", "o", "O", "~", "+", "x"])
-            row += char
-        row += "|\n"
-        lines.append(row)
-    lines.append("+" + "-" * (width - 2) + "+")
-    
-    return lines
+
+    raise ValueError(f"Unknown entity type '{entity_type}'.")
