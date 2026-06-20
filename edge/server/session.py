@@ -937,6 +937,55 @@ def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 
+def _event_sector(event: Event, state: UniverseState) -> int | None:
+    """The internal sector id where `event` happened, for the log's sector gutter (§11/§12).
+
+    Resolved from whatever anchor the event carries — a sector directly, a port/planet/
+    discovery's location, or the acting player's current ship sector. Returns None only
+    when no anchor resolves (e.g. a hand-built state missing the referenced entity).
+    """
+    if isinstance(event, Warped):
+        return event.to_sector
+    if isinstance(event, Docked):
+        return event.sector_id
+    if isinstance(event, AlienMoved):
+        return event.to_sector
+    if isinstance(event, (Traded, Haggled)):
+        port = state.ports.get(event.port_id)
+        return port.sector_id if port is not None else None
+    if isinstance(event, (GenesisDeployed, Descended, SiteExplored, Colonized, ColonyGrew, PlanetProduced)):
+        planet = state.planets.get(event.planet_id)
+        return planet.sector_id if planet is not None else None
+    if isinstance(event, (DiscoveryDetected, DiscoveryCollected)):
+        disc = state.discoveries.get(event.discovery_id)
+        return disc.sector_id if disc is not None else None
+    if isinstance(event, (ComponentPurchased, ShipPurchased, ComponentInstalled, ComponentRemoved,
+                          Repaired, DevicePurchased, StarbaseSalvaged, ColonistsRecruited,
+                          Banked, TurnsReset)):
+        player = state.players.get(event.player_id)
+        if player is None:
+            return None
+        ship = state.ships.get(player.ship_id)
+        return ship.sector_id if ship is not None else None
+    return None
+
+
+def format_log_line(event: Event, state: UniverseState) -> str:
+    """A surfaced event line prefixed with the spatial sector id where it happened (§11/§12).
+
+    The single place the log and the live ticker stamp the leading `S{spatial}` gutter, so
+    every player-facing line names its location. Returns "" for non-surfaced events so callers
+    keep filtering them out.
+    """
+    text = format_event(event, state.spatial_ids)
+    if not text:
+        return ""
+    sector = _event_sector(event, state)
+    if sector is None:
+        return text
+    return f"[grey46]S{_display(state, sector)}[/] {text}"
+
+
 def stardock_signpost(state: UniverseState) -> str | None:
     """The opening navigation beacon naming the StarDock's location (WP-B).
 
@@ -952,7 +1001,7 @@ def stardock_signpost(state: UniverseState) -> str | None:
 
 def messages_view(state: UniverseState, events: list[Event]) -> dto.MessagesDTO:
     """Project the durable event log into a newest-first message list (§11, §12)."""
-    lines = (format_event(e, state.spatial_ids) for e in events)
+    lines = (format_log_line(e, state) for e in events)
     entries = [dto.LogEntry(when="", text=text) for text in lines if text]
     entries.reverse()  # newest first
     signpost = stardock_signpost(state)
