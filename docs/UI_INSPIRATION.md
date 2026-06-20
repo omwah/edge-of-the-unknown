@@ -1,8 +1,8 @@
 # UI Inspiration Board
 
 Visual and interaction references for the `DESIGN.md` §11 screens, organized so
-each entry says **what to steal** and maps back to a screen in
-[`../../UI_MOCKUPS.md`](../../UI_MOCKUPS.md). This is a research artifact, not a
+each entry says **what to borrow** and maps back to a screen in
+[`UI_MOCKUPS.md`](UI_MOCKUPS.md). This is a research artifact, not a
 spec — it feeds the next step (promoting the ASCII wireframes into a live Textual
 skeleton).
 
@@ -26,8 +26,6 @@ Source: `references/terminal-space/` (read-only per CLAUDE.md — **reimplement
 ideas, don't copy code**; it's `prompt_toolkit`, not Textual, so translate
 idioms). Live recording: **asciinema cast**
 <https://asciinema.org/a/Rud50qG0utHbHBpHGl60WuRRX> (linked from its README).
-**Local captures** of its main menu, game, and port screens (with what-to-steal
-notes) live in [`terminal-space/`](terminal-space/README.md).
 
 Concrete patterns harvested, with file pointers and the screen each informs:
 
@@ -74,7 +72,7 @@ canonical **sector display** and **port (CIM)** text format right.
   the sector/port prompts): <https://wiki.classictw.com/index.php/Gypsy's_Big_Dummy's_Guide_to_TradeWars_Text>
 - **v1 documentation text**: <http://wiki.classictw.com/index.php/TradeWars_2002_v1_Documentation_Text>
 
-**What to steal:** the sector-display block ordering (sector #, beacon, ports/
+**What to borrow:** the sector-display block ordering (sector #, beacon, ports/
 planets/ships, warps line), the terse prompt cadence, and the StarDock framing —
 for authenticity, then modernize with widgets.
 
@@ -86,7 +84,7 @@ Run `textual demo` (after `pip install textual`) for a live gallery; widget
 reference: <https://textual.textualize.io/widget_gallery/>. Curated list:
 <https://github.com/oleksis/awesome-textualize-projects>.
 
-| App | Link | Idiom to steal | Our screen |
+| App | Link | Idiom to borrow | Our screen |
 |-----|------|----------------|------------|
 | **Harlequin** (SQL IDE) | <https://harlequin.sh> · <https://github.com/tconbeer/harlequin> | Dense `DataTable`, results pane, tree sidebar | **ComputerScreen** (port directory, pair-trade finder), **MapScreen** tree |
 | **Posting** (HTTP client) | <https://posting.sh> · <https://github.com/darrenburns/posting> | `TabbedContent`, command palette, keyboard-first nav with mouse affordances | **StarDockScreen** / **ComputerScreen** tabs, our command grammar |
@@ -108,7 +106,7 @@ layout. Assets are already in-repo (read-only):
 
 ---
 
-## Mapping: our screen → steal-from
+## Mapping: our screen → borrow-from
 
 | Screen (UI_MOCKUPS) | Primary references |
 |---|---|
