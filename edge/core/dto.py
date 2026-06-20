@@ -431,12 +431,19 @@ class ContactVerbDTO:
     """One row of the alien-contact verb menu (§6.7), derived from species params.
 
     A disabled verb carries the `reason` it is greyed (e.g. "they refuse to trade").
+    `kind` groups the row under the **Say** (dialogue) or **Do** (mechanical) heading;
+    a "say" verb names the dialogue `context` it speaks and, for *Ask about…*, sets
+    `needs_subject` so the TUI opens the subject picker (WP17). The dispatch metadata
+    lets the screen drive the menu without hardcoding a verb→action map.
     """
 
     key: str
     label: str
     enabled: bool = True
     reason: str = ""
+    kind: str = "do"  # "say" | "do"
+    context: str = ""  # the dialogue context a "say" verb speaks ("" for "do" verbs)
+    needs_subject: bool = False  # this "say" verb opens the subject picker (dossier_other)
 
 
 @dataclass(frozen=True)
@@ -470,3 +477,4 @@ class ContactDTO:
     verbs: list[ContactVerbDTO]
     offers: list[TechOfferDTO]
     dossier: list[str]  # lines about other met species, in this species' voice
+    subjects: list[tuple[int, str]] = field(default_factory=list)  # (id, name) of met others (WP17 Ask about…)

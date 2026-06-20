@@ -721,15 +721,26 @@ def _line(state: UniverseState, roster: object, species: AlienSpecies, player: P
     return text
 
 
-def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOfferDTO]) -> list[dto.ContactVerbDTO]:
-    """Derive the conversation verb menu from species params (§6.7), greying with reasons."""
+def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOfferDTO],
+                   *, subjects_available: bool) -> list[dto.ContactVerbDTO]:
+    """Derive the conversation verb menu from species params (§6.7), greying with reasons.
+
+    Rows are tagged Say (dialogue) / Do (mechanical) so the TUI groups and dispatches them
+    (WP17): Greet / Ask about… / Farewell speak a dialogue context; the rest act.
+    """
     posture = getattr(sc, "trade_posture", "open")
     treaty_mode = getattr(sc, "treaty_mode", "open")
     combatant = getattr(sc, "combatant", True)
     has_latinum = any(o.mode == "latinum" for o in offers)
     has_barter = any(o.mode == "barter" for o in offers)
 
-    verbs = [dto.ContactVerbDTO("hail", "Hail / greet")]
+    # SAY — peaceful dialogue verbs (no mechanical effect; advance the recency ring).
+    verbs = [
+        dto.ContactVerbDTO("hail", "Greet", kind="say", context="greeting"),
+        dto.ContactVerbDTO("ask", "Ask about…", subjects_available,
+                           "" if subjects_available else "no other species met yet",
+                           kind="say", context="dossier_other", needs_subject=True),
+    ]
     # TRADE (latinum sales).
     if posture == "refuses":
         verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "they refuse to trade"))
@@ -753,6 +764,8 @@ def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOffer
     # FIGHT — Phase 3; Phase 2 places only friendly species.
     verbs.append(dto.ContactVerbDTO("fight", "Attack", False,
                                     "non-combatant" if not combatant else "they are friendly"))
+    # SAY — break contact with a parting line.
+    verbs.append(dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell"))
     verbs.append(dto.ContactVerbDTO("leave", "Leave"))
     return verbs
 
@@ -819,12 +832,17 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     alliance = roster.alliance(species.alliance_id) if species.alliance_id is not None else None
 
     offers = _tech_offers(species, sc, player, ship, effective)
-    dossier = [
-        _line(state, roster, species, player, "dossier_other", config,
-              salt=f":{other_id}", extra={"subject": other.name})
+    others = [
+        (other_id, other)
         for other_id in sorted(player.species_attitudes)
         if other_id != species_id and (other := state.species.get(other_id)) is not None
     ]
+    dossier = [
+        _line(state, roster, species, player, "dossier_other", config,
+              salt=f":{other_id}", extra={"subject": other.name})
+        for other_id, other in others
+    ]
+    subjects = [(other_id, other.name) for other_id, other in others]
     return dto.ContactDTO(
         species=species.name, persona=species.persona,
         alliance=alliance.name if alliance else "unaligned",
@@ -833,7 +851,8 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         attitude=round(player.species_attitudes.get(species_id, 0.0), 3),
         effective=round(effective, 3),
         opener=_line(state, roster, species, player, "greeting", config),
-        verbs=_contact_verbs(species, sc, offers), offers=offers, dossier=dossier,
+        verbs=_contact_verbs(species, sc, offers, subjects_available=bool(subjects)),
+        offers=offers, dossier=dossier, subjects=subjects,
     )
 
 
