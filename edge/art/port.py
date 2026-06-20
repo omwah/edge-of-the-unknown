@@ -41,6 +41,17 @@ PORT_ART: dict[str, tuple[tuple[str, ...], ...]] = {
     # tapering chevron body, engine glow -- the TW2002 StarDock shape.
     "stardock": (
         (
+            "       R       ",
+            "       █       ",
+            "      ███      ",
+            "   ▟███████▙   ",
+            "╾─▓█████████▓─╼",
+            "   ▜███████▛   ",
+            "     ▓███▓     ",
+            "      ▜█▛      ",
+            "       Y       ",
+        ),
+        (
             "      R      ",
             "      █      ",
             "    ▟███▙    ",
@@ -65,6 +76,17 @@ PORT_ART: dict[str, tuple[tuple[str, ...], ...]] = {
     # Compact trading module: boxed core, dish/antenna, side solar panels.
     "trading_port": (
         (
+            "     ▴     ",
+            "     │     ",
+            "   ┌───┐   ",
+            "▤──┤███├──▤",
+            "   │███│   ",
+            "▤──┤███├──▤",
+            "   └───┘   ",
+            "     │     ",
+            "     ▾     ",
+        ),
+        (
             "    ▴    ",
             "  ┌───┐  ",
             "▤─┤███├─▤",
@@ -84,6 +106,17 @@ PORT_ART: dict[str, tuple[tuple[str, ...], ...]] = {
     ),
     # Fortified octagonal bastion -- squat, armoured, distinct from the others.
     "starbase": (
+        (
+            "   ▄▄▄▄▄   ",
+            "  ▟█████▙  ",
+            " ▟███████▙ ",
+            "▟█████████▙",
+            "███████████",
+            "▜█████████▛",
+            " ▜███████▛ ",
+            "  ▜█████▛  ",
+            "   ▀▀▀▀▀   ",
+        ),
         (
             "   ▄▄▄   ",
             "  ▟███▙  ",
