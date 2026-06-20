@@ -145,9 +145,12 @@ class GameService:
         """The descended-planet surface view: terrain + sites (§7, WP6)."""
         return session.surface_view(self._state, player_id, planet_id, self._config)
 
-    def contact_view(self, player_id: int, species_id: int) -> dto.ContactDTO:
-        """The alien-contact screen for a species in the player's sector (§6, WP9)."""
-        return session.contact_view(self._state, player_id, species_id, self._config)
+    def contact_view(self, player_id: int, species_id: int,
+                     active_context: str = "greeting",
+                     active_subject: int | None = None) -> dto.ContactDTO:
+        """The alien-contact screen for a species in the player's sector (§6, WP9, WP17)."""
+        return session.contact_view(self._state, player_id, species_id, self._config,
+                                    active_context, active_subject)
 
     def species_in_sector(self, player_id: int) -> int | None:
         """The id of the (lowest-id) species in the player's sector, or None (§6, WP9)."""

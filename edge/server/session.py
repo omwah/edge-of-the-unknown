@@ -807,13 +807,16 @@ def _tech_offers(species: AlienSpecies, sc: object, player: Player, ship: Ship,
 
 
 def contact_view(state: UniverseState, player_id: int, species_id: int,
-                 config: GameConfig) -> dto.ContactDTO:
+                 config: GameConfig, active_context: str = "greeting",
+                 active_subject: int | None = None) -> dto.ContactDTO:
     """The alien-contact screen for a species in the player's sector (§6, §6.7, §11).
 
-    Renders the WP8 greeting opener, the derived verb menu, the tech-offer list (latinum
-    vs barter, gated by effective disposition), and dossier lines about other met species
-    in this species' voice. Read-only: dialogue lines are stable until a hail/trade
-    reducer advances the recency ring.
+    Renders the **active context's** line (the greeting by default; a "say" verb sets
+    another, WP17), the derived verb menu, the tech-offer list (latinum vs barter, gated
+    by effective disposition), and dossier lines about other met species in this species'
+    voice. Read-only: dialogue lines are stable until a hail/converse/trade reducer
+    advances the recency ring (the reducer speaks from the pre-advance ring and both seed
+    the same `encounter_rng`, so what is shown matches what was spoken).
     """
     if config.roster is None:
         raise EconomyError("no species roster configured")
@@ -843,6 +846,20 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         for other_id, other in others
     ]
     subjects = [(other_id, other.name) for other_id, other in others]
+
+    # The line shown is the active context's (default greeting); a "say" verb sets it. For
+    # `dossier_other` it narrates the picked subject (or the first met other) — with no salt,
+    # so it matches the variant the `Converse` reducer spoke (same `encounter_rng` seed).
+    shown = active_context if active_context in dialogue._PEACEFUL_CONTEXTS else "greeting"
+    subject_extra = None
+    if shown == "dossier_other":
+        sid = active_subject if active_subject is not None else (subjects[0][0] if subjects else None)
+        subj = state.species.get(sid) if sid is not None else None
+        if subj is None:
+            shown = "greeting"  # nothing to ask about — fall back to the opener
+        else:
+            subject_extra = {"subject": subj.name}
+    speech = _line(state, roster, species, player, shown, config, extra=subject_extra)
     return dto.ContactDTO(
         species=species.name, persona=species.persona,
         alliance=alliance.name if alliance else "unaligned",
@@ -850,7 +867,7 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         base_disposition=round(species.base_disposition, 3),
         attitude=round(player.species_attitudes.get(species_id, 0.0), 3),
         effective=round(effective, 3),
-        opener=_line(state, roster, species, player, "greeting", config),
+        opener=speech,
         verbs=_contact_verbs(species, sc, offers, subjects_available=bool(subjects)),
         offers=offers, dossier=dossier, subjects=subjects,
     )

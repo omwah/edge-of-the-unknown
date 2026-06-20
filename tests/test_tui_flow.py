@@ -623,3 +623,55 @@ async def test_ports_directory_lists_and_plots_route() -> None:
         await pilot.pause()
         assert app.screen.query_one(TabbedContent).active == "route"
         assert app.screen._engage_target == directory[0].sector_id  # type: ignore[attr-defined]
+
+
+async def test_say_do_menu_converse_and_trade() -> None:
+    """WP17: Ask about… (subject picker) → speech updates; Do-verb buys tech; Farewell closes."""
+    from dataclasses import replace
+
+    from textual.widgets import Static
+
+    from edge.core.models import AlienSpecies
+    from edge.tui.screens.contact import AlienContactScreen, SubjectPickerScreen
+    from edge.tui.widgets import ClickableEntry
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        _inject_species(svc, "selvani")  # id=1, in the player's sector (lone latinum offer)
+        sc = svc.config.roster.species_by_id("vesk")
+        ship = svc.state.ships[1]
+        svc.state.species[2] = AlienSpecies(  # a second *met* species: the ask-about subject
+            id=2, roster_id="vesk", name="Vesk", archetype_id=sc.archetype_id,
+            sector_id=ship.sector_id + 999, home_band="Hub", tech_level=sc.tech_level,
+            base_disposition=0.9, disposition_center=sc.disposition_center,
+            disposition_variance=sc.disposition_variance, alliance_id=sc.alliance_id,
+            trade_posture=sc.trade_posture, treaty_mode=sc.treaty_mode, persona=sc.persona)
+        svc.state.players[1] = replace(svc.state.players[1], species_attitudes={1: 0.0, 2: 0.0})
+
+        await pilot.press("h")  # hail the Selvani
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+
+        # Ask about… → subject picker → pick Vesk → the speech narrates the Vesk.
+        await pilot.press("a")
+        await pilot.pause()
+        assert isinstance(app.screen, SubjectPickerScreen)
+        await pilot.click(app.screen.query(ClickableEntry).first())
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        assert "Vesk" in str(app.screen.query_one("#speech", Static).render())
+
+        # Buy tech via the Do verb 't' (the lone available latinum offer) → a component lands.
+        await pilot.press("t")
+        await pilot.pause()
+        assert sum(svc.state.ships[1].components.values()) == 1
+
+        # Farewell speaks its parting line and breaks contact.
+        await pilot.press("f")
+        await pilot.pause()
+        assert not isinstance(app.screen, AlienContactScreen)
