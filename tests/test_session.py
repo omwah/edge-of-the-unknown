@@ -369,6 +369,25 @@ def test_format_event_covers_kinds_and_filters_noise() -> None:
     assert session.format_event(StockRegenerated(3, Commodity.EQUIPMENT, 480)) == ""
 
 
+def test_format_log_line_always_tags_the_sector() -> None:
+    """Every surfaced log line carries a leading spatial-sector gutter (§11/§12)."""
+    from edge.core.enums import PortMode
+    from edge.core.events import Banked, Docked, StockRegenerated, Traded, Warped
+
+    world = _world()  # ship 1 sits in sector 2; port 3 is in sector 3
+    # A sector-anchored event tags that sector; spatial_ids map through it.
+    world.spatial_ids = {3: 20103}
+    assert session.format_log_line(Warped(1, 2, 3, 1), world).startswith("[grey46]S20103[/] ")
+    # A trade resolves the sector from the port it happened at.
+    sell = Traded(1, 3, Commodity.FUEL_ORE, PortMode.SELL, 5, 13, 65)
+    assert session.format_log_line(sell, world).startswith("[grey46]S20103[/] ")
+    assert session.format_log_line(Docked(1, 3, 3), world).startswith("[grey46]S20103[/] ")
+    # A located-nowhere player action falls back to the actor's current ship sector (2).
+    assert session.format_log_line(Banked(1, "deposit", 500, 500), world).startswith("[grey46]S2[/] ")
+    # Non-surfaced events stay empty — no gutter stamped onto nothing.
+    assert session.format_log_line(StockRegenerated(3, Commodity.EQUIPMENT, 480), world) == ""
+
+
 def test_signpost_is_none_without_a_stardock() -> None:
     world = _nav_world()  # ports are a Class-5 SSB only — no StarDock
     assert session.stardock_signpost(world) is None

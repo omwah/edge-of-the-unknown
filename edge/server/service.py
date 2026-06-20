@@ -176,12 +176,13 @@ class GameService:
         return session.stardock_signpost(self._state)
 
     def describe_event(self, event: Event) -> str:
-        """Render one event for the live ticker, with spatial display ids (§5.1).
+        """Render one event for the live ticker, with a spatial sector gutter (§5.1, §11).
 
-        Wraps `session.format_event` so the TUI gets spatial ids without reaching
-        into core state for the id map. Returns "" for non-player-facing events.
+        Wraps `session.format_log_line` so the TUI gets the leading `S{spatial}` sector tag
+        and display ids without reaching into core state. Returns "" for non-player-facing
+        events.
         """
-        return session.format_event(event, self._state.spatial_ids)
+        return session.format_log_line(event, self._state)
 
     def resolve_display_id(self, shown: int) -> int | None:
         """Map a player-typed spatial id (§5.1) back to its internal sector id.
