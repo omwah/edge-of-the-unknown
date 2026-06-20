@@ -19,6 +19,7 @@ from edge.core.dto import PlanetDTO
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Subsystem
 from edge.core.movement import MovementError
+from edge.core.planets import pretty_planet_type
 from edge.core.rules import Cannibalize, Colonize, DeployGenesis, Descend
 from edge.server.service import GameService
 from edge.tui import sprites
@@ -58,7 +59,7 @@ class PlanetScreen(Screen):
 
     def compose(self) -> ComposeResult:
         p = self._planet
-        yield Static(f"ORBIT · {p.name} · {p.ptype}", id="orbit-title")
+        yield Static(f"ORBIT · {p.name} · {pretty_planet_type(p.ptype)}", id="orbit-title")
         with Horizontal(id="orbit-main"):
             with VerticalScroll(id="orbit-body"):
                 yield Static(f"Owner    [cyan]{p.owner}[/]")

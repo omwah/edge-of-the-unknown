@@ -17,6 +17,24 @@ from edge.core.enums import Commodity
 from edge.core.models import Planet
 
 
+_PLANET_TYPE_LABELS = {
+    "terrestrial_warm": "Warm Terrestrial",
+    "terrestrial_cool": "Cool Terrestrial",
+    "terrestrial_hot": "Hot Terrestrial",
+    "terrestrial_cold": "Cold Terrestrial",
+    "jovian": "Jovian",
+    "asteroid_belt": "Asteroid Belt",
+    "barren": "Barren",
+}
+
+
+def pretty_planet_type(planet_type: str) -> str:
+    """A human-readable label for a `planet_type` key (§4.2). The raw key still keys
+    config/yield/sprite lookups; this is display-only. Unknown keys fall back to a
+    title-cased de-underscoring so a new config type reads sensibly without a map edit."""
+    return _PLANET_TYPE_LABELS.get(planet_type, planet_type.replace("_", " ").title())
+
+
 def is_colonizable(planet_type: str, config: GameConfig) -> bool:
     """Whether a world of this type can be claimed and settled (§4.2)."""
     profile = config.planets.types.get(planet_type)
