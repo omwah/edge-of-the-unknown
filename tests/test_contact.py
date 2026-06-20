@@ -284,6 +284,38 @@ def test_contact_view_dossier_covers_other_met_species() -> None:
     assert any("Selvani" in line for line in view.dossier)  # a narrates b
 
 
+def test_contact_verbs_tag_say_and_do_kinds() -> None:
+    state = _world()
+    sp = _inject(state, "vesk")
+    verbs = {v.key: v for v in session.contact_view(state, 1, sp.id, CFG).verbs}
+    # Say verbs name the dialogue context they speak.
+    assert verbs["hail"].kind == "say" and verbs["hail"].context == "greeting"
+    assert verbs["farewell"].kind == "say" and verbs["farewell"].context == "farewell"
+    assert verbs["ask"].kind == "say" and verbs["ask"].needs_subject
+    # Do verbs carry no dialogue context.
+    for key in ("trade", "barter", "treaty", "fight", "leave"):
+        assert verbs[key].kind == "do" and verbs[key].context == ""
+
+
+def test_ask_about_is_gated_on_having_met_others_and_exposes_subjects() -> None:
+    state = _world()
+    a = _inject(state, "vesk", sid=1)
+    # Only one species met → 'Ask about…' is greyed and no subjects offered.
+    apply_result(state, reduce(state, 1, Hail(a.id), CFG))
+    view = session.contact_view(state, 1, a.id, CFG)
+    ask = next(v for v in view.verbs if v.key == "ask")
+    assert not ask.enabled and ask.reason and view.subjects == []
+
+    # Meet a second species → 'Ask about…' enables and the subject appears.
+    b = _inject(state, "selvani", sid=2)
+    state.species[2] = replace(b, sector_id=state.ships[1].sector_id)
+    apply_result(state, reduce(state, 1, Hail(b.id), CFG))
+    view2 = session.contact_view(state, 1, a.id, CFG)
+    ask2 = next(v for v in view2.verbs if v.key == "ask")
+    assert ask2.enabled
+    assert (b.id, "Selvani") in view2.subjects
+
+
 def test_current_contact_view_finds_species_in_sector(tmp_path: Path) -> None:
     state = _world()
     _inject(state, "vesk")
