@@ -11,6 +11,8 @@ directly with sample data.
 from __future__ import annotations
 
 import asyncio
+import os
+import tempfile
 from pathlib import Path
 
 from textual.widgets import TabbedContent
@@ -150,7 +152,12 @@ async def _capture() -> None:
 
 
 def main() -> None:
-    asyncio.run(_capture())
+    # Capture against a throwaway save slot so "New game" starts immediately
+    # (an existing real save would otherwise trip the overwrite confirm dialog)
+    # and the user's actual save is never touched.
+    with tempfile.TemporaryDirectory(prefix="edge-shots-") as scratch:
+        os.environ["EDGE_SAVE_DIR"] = scratch
+        asyncio.run(_capture())
 
 
 if __name__ == "__main__":
