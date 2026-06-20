@@ -4,91 +4,180 @@ import random
 from opensimplex import OpenSimplex
 from rich.text import Text
 
+# FEATURES_REGISTRY maps a generic feature name to a list of its visual representations.
+# Format: "feature_name": [("character", relative_frequency_weight), ...]
+FEATURES_REGISTRY = {
+    "water_deep": [
+        ("~", 1),
+        ("=", 1),
+    ],
+    "water_shallow": [
+        ("~", 1),
+        ("-", 1),
+    ],
+    "sand": [
+        (".", 1),
+        (",", 1),
+    ],
+    "grass": [
+        ('"', 1),
+        ("'", 1),
+    ],
+    "forest": [
+        ("T", 1),
+        ("Y", 1),
+        ("t", 1),
+    ],
+    "mountain": [
+        ("^", 1),
+        ("A", 1),
+    ],
+    "snow": [
+        ("*", 1),
+        ("+", 1),
+    ],
+    "ice": [
+        ("_", 1),
+        ("-", 1),
+    ],
+    "ash": [
+        ("_", 1),
+        ("-", 1),
+        (".", 1),
+    ],
+    "crater": [
+        ("o", 1),
+        ("O", 1),
+        ("C", 1),
+    ],
+    "dust": [
+        (".", 1),
+        ("_", 1),
+    ],
+    "rock": [
+        ("o", 1),
+        ("O", 1),
+        ("@", 1),
+    ],
+    "debris": [
+        ("*", 1),
+        (",", 1),
+        (".", 1),
+    ],
+    "gas_thick": [
+        ("=", 1),
+        ("#", 1),
+    ],
+    "gas_thin": [
+        ("-", 1),
+        ("~", 1),
+    ],
+    "void": [
+        (" ", 1),
+    ],
+}
+
+# BIOMES_REGISTRY maps a planet subtype to its noise generation parameters and visual bands.
+# Format:
+#   "subtype_name": {
+#       "scale_x": float,  # Noise stretching factor along the X axis
+#       "scale_y": float,  # Noise stretching factor along the Y axis
+#       "bands": [
+#           (noise_threshold_float, "feature_name", "rich_color_string"),
+#           ...
+#       ]
+#   }
 BIOMES_REGISTRY = {
     "terrestrial_warm": {
         "scale_x": 15.0, "scale_y": 15.0,
         "bands": [
-            (-0.2, "~", "blue"),          # Deep Water
-            (-0.05, "~", "cyan"),         # Shallow Water
-            (0.05, ".", "bright_yellow"), # Sand
-            (0.3, '"', "green"),          # Grass/Plains
-            (0.6, "T", "dark_green"),     # Forest
-            (0.8, "^", "bright_black"),   # Mountains
-            (1.0, "*", "white"),          # Snow Peaks
+            (-0.2, "water_deep", "blue"),
+            (-0.05, "water_shallow", "cyan"),
+            (0.05, "sand", "bright_yellow"),
+            (0.3, "grass", "green"),
+            (0.6, "forest", "dark_green"),
+            (0.8, "mountain", "bright_black"),
+            (1.0, "snow", "white"),
         ]
     },
     "terrestrial_cool": {
         "scale_x": 15.0, "scale_y": 15.0,
         "bands": [
-            (-0.1, "~", "blue"),
-            (0.1, "~", "cyan"),
-            (0.3, ".", "white"),         # Frost
-            (0.5, '"', "dark_green"),    # Hardy grass
-            (0.7, "T", "green"),         # Pine forest
-            (0.9, "^", "white"),         # Snow mountains
-            (1.0, "*", "bright_white"),  # Glaciers
+            (-0.1, "water_deep", "blue"),
+            (0.1, "water_shallow", "cyan"),
+            (0.3, "dust", "white"),
+            (0.5, "grass", "dark_green"),
+            (0.7, "forest", "green"),
+            (0.9, "mountain", "white"),
+            (1.0, "snow", "bright_white"),
         ]
     },
     "terrestrial_hot": {
         "scale_x": 12.0, "scale_y": 12.0,
         "bands": [
-            (-0.2, "~", "red"),           # Lava
-            (0.0, "~", "bright_red"),     # Shallow lava
-            (0.2, "_", "dark_gray"),      # Ash
-            (0.5, ".", "bright_black"),   # Charred rock
-            (0.8, "^", "red"),            # Volcanoes
-            (1.0, "*", "yellow"),         # Fire peaks
+            (-0.2, "water_deep", "red"),
+            (0.0, "water_shallow", "bright_red"),
+            (0.2, "ash", "dark_gray"),
+            (0.5, "dust", "bright_black"),
+            (0.8, "mountain", "red"),
+            (1.0, "snow", "yellow"),
         ]
     },
     "terrestrial_cold": {
         "scale_x": 18.0, "scale_y": 18.0,
         "bands": [
-            (-0.2, "~", "cyan"),          # Freezing water
-            (0.1, "_", "white"),          # Ice sheets
-            (0.4, ".", "bright_white"),   # Deep snow
-            (0.7, "^", "cyan"),           # Ice crags
-            (1.0, "*", "blue"),           # Blue ice
+            (-0.2, "water_shallow", "cyan"),
+            (0.1, "ice", "white"),
+            (0.4, "snow", "bright_white"),
+            (0.7, "mountain", "cyan"),
+            (1.0, "ice", "blue"),
         ]
     },
     "jovian": {
-        "scale_x": 50.0, "scale_y": 5.0,  # Highly stretched horizontally for gas bands
+        "scale_x": 50.0, "scale_y": 5.0,
         "bands": [
-            (-0.4, "=", "#8B4513"),       # Saddle Brown
-            (-0.1, "-", "#D2691E"),       # Chocolate
-            (0.2, "~", "#F4A460"),        # Sandy Brown
-            (0.5, "=", "#FFDEAD"),        # Navajo White
-            (0.8, "-", "#D2691E"),
-            (1.0, "~", "#8B4513"),
+            (-0.4, "gas_thick", "#8B4513"),
+            (-0.1, "gas_thin", "#D2691E"),
+            (0.2, "water_shallow", "#F4A460"),
+            (0.5, "gas_thick", "#FFDEAD"),
+            (0.8, "gas_thin", "#D2691E"),
+            (1.0, "water_shallow", "#8B4513"),
         ]
     },
     "asteroid_belt": {
-        "scale_x": 8.0, "scale_y": 8.0,   # High frequency for scattered rubble
+        "scale_x": 8.0, "scale_y": 8.0,
         "bands": [
-            (-0.3, " ", "black"),         # Void
-            (0.3, ".", "bright_black"),   # Dust
-            (0.6, "o", "gray"),           # Small rocks
-            (0.8, "O", "white"),          # Asteroids
-            (1.0, "@", "bright_white"),   # Dense clusters
+            (-0.3, "void", "black"),
+            (0.3, "dust", "bright_black"),
+            (0.6, "rock", "gray"),
+            (0.8, "rock", "white"),
+            (1.0, "debris", "bright_white"),
         ]
     },
     "barren": {
         "scale_x": 15.0, "scale_y": 15.0,
         "bands": [
-            (-0.1, "_", "yellow"),        # Dust plains
-            (0.2, ".", "bright_yellow"),  # Rocks
-            (0.6, "o", "red"),            # Craters
-            (1.0, "^", "bright_red"),     # High ridges
+            (-0.1, "dust", "yellow"),
+            (0.2, "rock", "bright_yellow"),
+            (0.6, "crater", "red"),
+            (1.0, "mountain", "bright_red"),
         ]
     }
 }
 
-def get_biome(val: float, biomes: list[tuple[float, str, str]]) -> tuple[str, str]:
-    """Return the character and color for a given noise value."""
-    for threshold, char, color in biomes:
+def get_biome_feature(val: float, biomes: list[tuple[float, str, str]]) -> tuple[str, str]:
+    """Return the feature name and color for a given noise value."""
+    for threshold, feature_name, color in biomes:
         if val <= threshold:
-            return char, color
+            return feature_name, color
     return biomes[-1][1], biomes[-1][2]
 
+def resolve_feature_char(rng: random.Random, feature_name: str, features_registry: dict[str, list[tuple[str, int]]]) -> str:
+    """Resolve a feature name to a specific character based on frequencies."""
+    choices = features_registry.get(feature_name, [("?", 1)])
+    chars = [c[0] for c in choices]
+    weights = [c[1] for c in choices]
+    return rng.choices(chars, weights=weights, k=1)[0]
 
 class TerrainGenerator:
     """Procedural terrain generator using configured noise and biomes."""
@@ -96,19 +185,32 @@ class TerrainGenerator:
     def __init__(
         self,
         biomes_registry: dict[str, dict[str, any]] | None = None,
+        features_registry: dict[str, list[tuple[str, int]]] | None = None,
         asteroid_noise_scale: float = 12.0,
         asteroid_cluster_threshold: float = 0.1,
         asteroid_max_fill_rate: float = 0.9,
     ):
         self.biomes_registry = biomes_registry or BIOMES_REGISTRY
+        self.features_registry = features_registry or FEATURES_REGISTRY
         self.asteroid_noise_scale = asteroid_noise_scale
         self.asteroid_cluster_threshold = asteroid_cluster_threshold
         self.asteroid_max_fill_rate = asteroid_max_fill_rate
         
         # Extract valid debris characters and colors from the registry bands
         belt_bands = self.biomes_registry.get("asteroid_belt", {}).get("bands", [])
-        self.asteroid_chars = [char for _, char, _ in belt_bands if char.strip()]
-        self.asteroid_colors = list(dict.fromkeys(color for _, char, color in belt_bands if char.strip()))
+        
+        chars = []
+        colors = []
+        for _, feature_name, color in belt_bands:
+            if feature_name != "void":
+                for char, _ in self.features_registry.get(feature_name, []):
+                    if char.strip():
+                        chars.append(char)
+                if color.strip():
+                    colors.append(color)
+                    
+        self.asteroid_chars = list(dict.fromkeys(chars))
+        self.asteroid_colors = list(dict.fromkeys(colors))
         
         # Fallbacks just in case the registry is empty
         if not self.asteroid_chars:
@@ -161,7 +263,8 @@ class TerrainGenerator:
         for y in range(height):
             for x in range(width):
                 noise_val = gen.noise2(x / sx, y / sy)
-                char, color = get_biome(noise_val, bands)
+                feature_name, color = get_biome_feature(noise_val, bands)
+                char = resolve_feature_char(rng, feature_name, self.features_registry)
                 map_text.append(char, style=color)
             if y < height - 1:
                 map_text.append("\n")
