@@ -179,12 +179,16 @@ class TerrainGenerator:
         asteroid_noise_scale: float = 12.0,
         asteroid_cluster_threshold: float = 0.1,
         asteroid_max_fill_rate: float = 0.9,
+        use_fg_color: bool = True,
+        use_bg_color: bool = True,
     ):
         self.biomes_registry = biomes_registry or BIOMES_REGISTRY
         self.features_registry = features_registry or FEATURES_REGISTRY
         self.asteroid_noise_scale = asteroid_noise_scale
         self.asteroid_cluster_threshold = asteroid_cluster_threshold
         self.asteroid_max_fill_rate = asteroid_max_fill_rate
+        self.use_fg_color = use_fg_color
+        self.use_bg_color = use_bg_color
         
         # Extract valid debris characters and colors from the registry bands
         belt_bands = self.biomes_registry.get("asteroid_belt", {}).get("bands", [])
@@ -208,41 +212,33 @@ class TerrainGenerator:
         if not self.asteroid_colors:
             self.asteroid_colors = ["gray", "white"]
 
-    def _generate_asteroid_belt(
-        self, rng: random.Random, gen: OpenSimplex, width: int, height: int
-    ) -> Text:
-        """Helper to generate sparse debris fields for asteroid belts."""
-        map_text = Text()
-        threshold = self.asteroid_cluster_threshold
-        scale_range = 1.0 - threshold
-
-        for y in range(height):
-            for x in range(width):
-                cluster_noise = gen.noise2(x / self.asteroid_noise_scale, y / self.asteroid_noise_scale)
-                if cluster_noise > threshold:
-                    density = (cluster_noise - threshold) / scale_range
-                    if rng.random() < density * self.asteroid_max_fill_rate:
-                        char = rng.choice(self.asteroid_chars)
-                        fg = rng.choice(self.asteroid_colors)
-                        # Asteroids float in black void, so no bg needed
-                        map_text.append(char, style=fg)
-                    else:
-                        map_text.append(" ", style="black")
-                else:
-                    map_text.append(" ", style="black")
-            if y < height - 1:
-                map_text.append("\n")
-        return map_text
-
-    def generate(
+    def get_grid(
         self, rng: random.Random, subtype: str, width: int, height: int
-    ) -> Text:
-        """Generate a procedural terrain map using noise."""
+    ) -> list[list[tuple[str, str, str]]]:
+        """Generate a raw procedural grid of (char, fg, bg)."""
         noise_seed = rng.randint(0, 2**31 - 1)
         gen = OpenSimplex(seed=noise_seed)
         
         if subtype.lower() == "asteroid_belt" or subtype.lower() == "asteroid":
-            return self._generate_asteroid_belt(rng, gen, width, height)
+            grid = []
+            threshold = self.asteroid_cluster_threshold
+            scale_range = 1.0 - threshold
+            for y in range(height):
+                row = []
+                for x in range(width):
+                    cluster_noise = gen.noise2(x / self.asteroid_noise_scale, y / self.asteroid_noise_scale)
+                    if cluster_noise > threshold:
+                        density = (cluster_noise - threshold) / scale_range
+                        if rng.random() < density * self.asteroid_max_fill_rate:
+                            char = rng.choice(self.asteroid_chars)
+                            fg = rng.choice(self.asteroid_colors)
+                            row.append((char, fg, "black"))
+                        else:
+                            row.append((" ", "black", "black"))
+                    else:
+                        row.append((" ", "black", "black"))
+                grid.append(row)
+            return grid
             
         subtype_key = subtype.lower()
         if subtype_key not in self.biomes_registry:
@@ -256,15 +252,39 @@ class TerrainGenerator:
         sx = biome_config["scale_x"]
         sy = biome_config["scale_y"]
 
+        grid = []
+        for y in range(height):
+            row = []
+            for x in range(width):
+                noise_val = gen.noise2(x / sx, y / sy)
+                feature_name, fg, bg = get_biome_feature(noise_val, bands)
+                
+                if self.use_fg_color:
+                    char = resolve_feature_char(rng, feature_name, self.features_registry)
+                    final_fg = fg
+                else:
+                    char = " "
+                    final_fg = ""
+                    
+                final_bg = bg if self.use_bg_color else ""
+                row.append((char, final_fg, final_bg))
+            grid.append(row)
+        return grid
+
+    def generate(
+        self, rng: random.Random, subtype: str, width: int, height: int
+    ) -> Text:
+        """Generate a procedural terrain map using noise."""
+        grid = self.get_grid(rng, subtype, width, height)
         map_text = Text()
         
         for y in range(height):
             for x in range(width):
-                noise_val = gen.noise2(x / sx, y / sy)
-                feature_name, fg, bg = get_biome_feature(noise_val, bands)
-                char = resolve_feature_char(rng, feature_name, self.features_registry)
-                
-                style = f"{fg} on {bg}" if bg and bg != "black" and bg != "default" else fg
+                char, fg, bg = grid[y][x]
+                if bg and bg not in ("black", "default"):
+                    style = f"{fg} on {bg}" if fg else f"on {bg}"
+                else:
+                    style = fg
                 map_text.append(char, style=style)
             if y < height - 1:
                 map_text.append("\n")

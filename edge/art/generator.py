@@ -5,8 +5,11 @@ from functools import lru_cache
 from rich.text import Text
 
 from edge.art.terrain import TerrainGenerator
+from edge.art.planet import PlanetGenerator
 
-_TERRAIN_GEN = TerrainGenerator()
+_TERRAIN_GEN = TerrainGenerator(use_fg_color=True, use_bg_color=True)
+_PLANET_TERRAIN_GEN = TerrainGenerator(use_fg_color=False, use_bg_color=True)
+_PLANET_GEN = PlanetGenerator(terrain_gen=_PLANET_TERRAIN_GEN)
 
 @lru_cache(maxsize=128)
 def generate_sprite(
@@ -37,8 +40,23 @@ def generate_sprite(
     rng = random.Random(rng_seed)
     
     # Route to specific generation algorithms based on entity type
-    if entity_type in ("terrain", "planet"):
+    if entity_type == "terrain":
+        if subtype.lower() == "all":
+            combined_text = Text()
+            for st in _TERRAIN_GEN.biomes_registry.keys():
+                combined_text.append(f"\n[ {st.upper()} ]\n", style="bold white")
+                combined_text.append(_TERRAIN_GEN.generate(rng, st, width, height))
+            return combined_text
         return _TERRAIN_GEN.generate(rng, subtype, width, height)
+    
+    if entity_type == "planet":
+        if subtype.lower() == "all":
+            combined_text = Text()
+            for st in _PLANET_GEN.biomes_registry.keys():
+                combined_text.append(f"\n[ {st.upper()} ]\n", style="bold white")
+                combined_text.append(_PLANET_GEN.generate(rng, st, width, height))
+            return combined_text
+        return _PLANET_GEN.generate(rng, subtype, width, height)
     
     # Placeholder for other types (ships, ports, subsystems)
     if width < 2 or height < 2:
