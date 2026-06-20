@@ -179,6 +179,8 @@ class TerrainGenerator:
         asteroid_noise_scale: float = 12.0,
         asteroid_cluster_threshold: float = 0.1,
         asteroid_max_fill_rate: float = 0.9,
+        asteroid_min_fill_rate: float = 0.06,
+        asteroid_octaves: int = 3,
         use_fg_color: bool = True,
         use_bg_color: bool = True,
     ):
@@ -187,6 +189,8 @@ class TerrainGenerator:
         self.asteroid_noise_scale = asteroid_noise_scale
         self.asteroid_cluster_threshold = asteroid_cluster_threshold
         self.asteroid_max_fill_rate = asteroid_max_fill_rate
+        self.asteroid_min_fill_rate = asteroid_min_fill_rate
+        self.asteroid_octaves = asteroid_octaves
         self.use_fg_color = use_fg_color
         self.use_bg_color = use_bg_color
         
@@ -223,6 +227,24 @@ class TerrainGenerator:
             return self._get_asteroid_grid(rng, gen, width, height)
         return self._get_biome_grid(rng, gen, subtype, width, height)
 
+    def _fractal_noise(self, gen: OpenSimplex, x: float, y: float) -> float:
+        """Sum several octaves of noise so clusters break up at multiple scales.
+
+        Layering higher-frequency octaves over the base field prevents the large,
+        smooth low regions that otherwise read as big connected black voids. The
+        result is normalised back to roughly [-1, 1].
+        """
+        total = 0.0
+        max_amplitude = 0.0
+        amplitude = 1.0
+        frequency = 1.0 / self.asteroid_noise_scale
+        for _ in range(max(1, self.asteroid_octaves)):
+            total += amplitude * gen.noise2(x * frequency, y * frequency)
+            max_amplitude += amplitude
+            amplitude *= 0.5
+            frequency *= 2.0
+        return total / max_amplitude
+
     def _get_asteroid_grid(
         self, rng: random.Random, gen: OpenSimplex, width: int, height: int
     ) -> list[list[tuple[str, str, str]]]:
@@ -230,18 +252,22 @@ class TerrainGenerator:
         grid = []
         threshold = self.asteroid_cluster_threshold
         scale_range = 1.0 - threshold
+        min_fill = self.asteroid_min_fill_rate
         for y in range(height):
             row = []
             for x in range(width):
-                cluster_noise = gen.noise2(x / self.asteroid_noise_scale, y / self.asteroid_noise_scale)
+                cluster_noise = self._fractal_noise(gen, x, y)
+                # Every cell keeps a baseline scatter probability so quiet regions
+                # stay speckled rather than collapsing into large black voids.
                 if cluster_noise > threshold:
                     density = (cluster_noise - threshold) / scale_range
-                    if rng.random() < density * self.asteroid_max_fill_rate:
-                        char = rng.choice(self.asteroid_chars)
-                        fg = rng.choice(self.asteroid_colors)
-                        row.append((char, fg, "black"))
-                    else:
-                        row.append((" ", "black", "black"))
+                    fill_rate = min_fill + density * (self.asteroid_max_fill_rate - min_fill)
+                else:
+                    fill_rate = min_fill
+                if rng.random() < fill_rate:
+                    char = rng.choice(self.asteroid_chars)
+                    fg = rng.choice(self.asteroid_colors)
+                    row.append((char, fg, "black"))
                 else:
                     row.append((" ", "black", "black"))
             grid.append(row)
