@@ -9,16 +9,16 @@ from rich.text import Text
 # Note: Group the character tuples horizontally (up to 6 per row) to maintain compactness and readability.
 FEATURES_REGISTRY = {
     "water_deep": [
-        ("≋", 1), ("≈", 1),
+        ("≋", 2), ("≈", 1),
     ],
     "water_shallow": [
         ("~", 1), ("∿", 1), ("∽", 1),
     ],
     "sand": [
-        (".", 1), (",", 1),
+        ("░", 1), ("▒", 1),
     ],
     "grass": [
-        ('"', 1), ("'", 1),
+        ('ψ', 1), ("ʬ", 2), (" ", 2), 
     ],
     "forest": [
         (" ", 40), ("├", 1), ("┝", 1), ("┞", 1), ("┟", 1), ("┠", 1),
@@ -32,7 +32,7 @@ FEATURES_REGISTRY = {
         ("╋", 1),
     ],
     "mountain": [
-        ("^", 1), ("A", 1),
+        ("^", 2), ("Λ", 1), (" ", 1),
     ],
     "snow": [
         ("*", 1), ("+", 1),
@@ -44,22 +44,22 @@ FEATURES_REGISTRY = {
         ("_", 1), ("-", 1), (".", 1),
     ],
     "crater": [
-        ("o", 1), ("O", 1), ("C", 1),
+        ("o", 0.5), ("O", 0.5), ("◌", 1), ("⁘", 1), (" ", 5),
     ],
     "dust": [
         (".", 1), ("_", 1),
     ],
     "rock": [
-        ("o", 1), ("O", 1), ("@", 1),
+        ("•", 1), ("⬢", 1), ("⛬", 1), (" ", 10),
     ],
     "debris": [
-        ("*", 1), (",", 1), (".", 1),
+        ("*", 1), ("⸝", 1), ("⹁", 1), (".", 1),
     ],
     "gas_thick": [
-        ("=", 1), ("#", 1),
+        ("≓", 0.05), ("≑", 0.5), ("=", 2), 
     ],
     "gas_thin": [
-        ("-", 1), ("~", 1),
+        ("┄", 2), ("─", 1), ("┈", 2), ("~", 2)
     ],
     "void": [
         (" ", 1),
@@ -84,7 +84,7 @@ BIOMES_REGISTRY = {
             (-0.05, "water_shallow", "bright_cyan", "cyan"),
             (0.05, "sand", "yellow", "bright_yellow"),
             (0.3, "grass", "bright_green", "green"),
-            (0.6, "forest", "dark_green", "green"),
+            (0.6, "forest", "#af5f00", "green"),
             (0.8, "mountain", "white", "bright_black"),
             (1.0, "snow", "bright_white", "white"),
         ]
@@ -106,6 +106,7 @@ BIOMES_REGISTRY = {
         "bands": [
             (-0.2, "water_deep", "bright_red", "red"),
             (0.0, "water_shallow", "yellow", "bright_red"),
+            (0.1, "sand", "yellow", "bright_yellow"),
             (0.2, "ash", "dark_gray", "black"),
             (0.5, "dust", "bright_black", "black"),
             (0.8, "mountain", "bright_red", "bright_black"),
@@ -127,10 +128,10 @@ BIOMES_REGISTRY = {
         "bands": [
             (-0.4, "gas_thick", "black", "#8B4513"),
             (-0.1, "gas_thin", "black", "#D2691E"),
-            (0.2, "water_shallow", "black", "#F4A460"),
+            (0.2, "gas_thin", "black", "#F4A460"),
             (0.5, "gas_thick", "black", "#FFDEAD"),
             (0.8, "gas_thin", "black", "#D2691E"),
-            (1.0, "water_shallow", "black", "#8B4513"),
+            (1.0, "gas_thick", "black", "#8B4513"),
         ]
     },
     "asteroid_belt": {
