@@ -7,11 +7,13 @@ from rich.text import Text
 from edge.art.terrain import TerrainGenerator
 from edge.art.planet import PlanetGenerator
 from edge.art.starfield import StarfieldGenerator, STARFIELD_SUBTYPES
+from edge.art.port import PortGenerator, PORT_SUBTYPES
 
 _TERRAIN_GEN = TerrainGenerator(use_fg_color=True, use_bg_color=True)
 _PLANET_TERRAIN_GEN = TerrainGenerator(use_fg_color=False, use_bg_color=True)
 _PLANET_GEN = PlanetGenerator(terrain_gen=_PLANET_TERRAIN_GEN)
 _STARFIELD_GEN = StarfieldGenerator()
+_PORT_GEN = PortGenerator()
 
 
 def available_subtypes(entity_type: str) -> list[str]:
@@ -24,6 +26,8 @@ def available_subtypes(entity_type: str) -> list[str]:
         return list(_TERRAIN_GEN.biomes_registry.keys())
     if entity_type == "starfield":
         return list(STARFIELD_SUBTYPES)
+    if entity_type == "port":
+        return list(PORT_SUBTYPES)
     return []
 
 
@@ -64,5 +68,8 @@ def generate_sprite(
 
     if entity_type == "starfield":
         return _STARFIELD_GEN.generate(rng, subtype, width, height)
+
+    if entity_type == "port":
+        return _PORT_GEN.generate(rng, subtype, width, height, owner_species)
 
     raise ValueError(f"Unknown entity type '{entity_type}'.")
