@@ -8,9 +8,12 @@ as anything recognizable, while a hand-drawn silhouette stays crisp and keeps
 the BBS/ANSI heritage the project is going for.
 
 The renderer picks the largest tier that fits the requested bounds, centers it,
-recolors the shading levels per the owner species' palette, and layers light
+recolors the shading levels per the owner's *archetype* palette, and layers light
 seeded variation (navigation-beacon hue, lit windows) on top so repeat ports
-differ without losing their iconic shape.
+differ without losing their iconic shape. Palettes key off ``archetype_id``
+rather than the species id/name: a roster can rename or reskin a species, but its
+archetype (humanoid_diplomat, brain_dome_automaton, ...) is the stable visual
+identity, so the hull look stays put across roster edits.
 
 The flagship ``stardock`` silhouette deliberately evokes the classic TradeWars
 2002 Federation StarDock: a vertical, left/right-symmetric station with a red
@@ -118,30 +121,112 @@ class PortStyle:
     window: tuple[str, ...]
 
 
-# Hull palettes keyed by owner species. 'default' / 'human' read as the grey
-# Federation hull of the classic StarDock.
-SPECIES_STYLES: dict[str, PortStyle] = {
-    "human": PortStyle(
+# Hull palettes keyed by ``archetype_id`` (see config/roster_default.yaml). The
+# Federation 'humanoid_diplomat' reads as the grey hull of the classic StarDock;
+# every other archetype gets a distinct hull/beacon hue family. Unknown archetypes
+# fall back to 'default'.
+ARCHETYPE_STYLES: dict[str, PortStyle] = {
+    # Terran/Centaurian Federation -- grey plating, red/yellow nav lights.
+    "humanoid_diplomat": PortStyle(
         bright="grey85", mid="grey58", dark="grey35",
         top=("red", "bright_red"),
         bottom=("yellow", "bright_yellow"),
         window=("bright_cyan", "bright_yellow", "grey100"),
     ),
-    "zorgon": PortStyle(
-        bright="green", mid="dark_green", dark="grey23",
-        top=("bright_green", "green"),
-        bottom=("bright_yellow", "yellow"),
-        window=("bright_green", "bright_yellow"),
+    # Vesk -- warm fox-folk technologists: amber-khaki hull, cyan windows.
+    "canid_technologist": PortStyle(
+        bright="khaki1", mid="dark_khaki", dark="grey35",
+        top=("orange1", "gold1"),
+        bottom=("cyan", "bright_cyan"),
+        window=("gold1", "bright_white"),
     ),
-    "arachni": PortStyle(
-        bright="grey70", mid="red", dark="dark_red",
-        top=("bright_red", "red"),
-        bottom=("orange1", "bright_red"),
-        window=("bright_red", "orange1"),
+    # Selvani -- soft-bodied envoys: aqua/teal organic hull.
+    "tentacled_envoy": PortStyle(
+        bright="pale_turquoise1", mid="cyan", dark="grey30",
+        top=("aquamarine1", "cyan"),
+        bottom=("turquoise2", "cyan"),
+        window=("pale_turquoise1", "bright_white"),
+    ),
+    # Helot -- cold brain-dome automata: chrome and electric blue.
+    "brain_dome_automaton": PortStyle(
+        bright="grey93", mid="grey62", dark="grey30",
+        top=("bright_cyan", "cyan"),
+        bottom=("dodger_blue1", "bright_cyan"),
+        window=("bright_cyan", "grey100"),
+    ),
+    # Quill -- predatory salvagers: rusted bronze hull, ember lights.
+    "ribbon_salvager": PortStyle(
+        bright="tan", mid="dark_orange3", dark="grey23",
+        top=("orange_red1", "red"),
+        bottom=("orange1", "dark_orange"),
+        window=("orange1", "red"),
+    ),
+    # Stryx -- time-dabbling brokers: violet, uncanny.
+    "temporal_broker": PortStyle(
+        bright="plum1", mid="medium_purple", dark="grey27",
+        top=("magenta", "violet"),
+        bottom=("blue_violet", "purple"),
+        window=("plum1", "bright_white"),
+    ),
+    # The Concordance -- bodiless arbiter: pale gold, luminous.
+    "cosmic_arbiter": PortStyle(
+        bright="khaki1", mid="gold3", dark="grey42",
+        top=("gold1", "yellow"),
+        bottom=("bright_white", "gold1"),
+        window=("gold1", "bright_white"),
+    ),
+    # Dignar -- aristocratic mind-mages: royal orchid/purple.
+    "telepath_aristocrat": PortStyle(
+        bright="orchid", mid="purple", dark="grey27",
+        top=("magenta", "bright_magenta"),
+        bottom=("violet", "magenta"),
+        window=("orchid", "bright_white"),
+    ),
+    # Cibelline -- engineered aesthetes: rose and pink-gold finery.
+    "engineered_aesthete": PortStyle(
+        bright="pink1", mid="hot_pink3", dark="grey30",
+        top=("gold1", "yellow"),
+        bottom=("deep_pink2", "hot_pink"),
+        window=("gold1", "pink1"),
+    ),
+    # Selvi -- playful imps: bright pinks and magenta.
+    "amorous_imp": PortStyle(
+        bright="light_pink1", mid="hot_pink", dark="grey30",
+        top=("hot_pink", "magenta"),
+        bottom=("bright_magenta", "hot_pink"),
+        window=("light_pink1", "bright_white"),
+    ),
+    # Vennrith -- horned grudge-keepers: iron grey and blood red.
+    "horned_grudgekeeper": PortStyle(
+        bright="grey66", mid="red3", dark="dark_red",
+        top=("red", "bright_red"),
+        bottom=("orange3", "red"),
+        window=("red", "orange1"),
+    ),
+    # Thessarch -- psionic overlords: deep indigo authority.
+    "psionic_overlord": PortStyle(
+        bright="slate_blue1", mid="purple4", dark="grey23",
+        top=("blue_violet", "purple"),
+        bottom=("dodger_blue1", "blue"),
+        window=("slate_blue1", "bright_cyan"),
+    ),
+    # Thessbrood -- colonial broodmasters: sickly insectoid chartreuse.
+    "colonial_broodmaster": PortStyle(
+        bright="green_yellow", mid="chartreuse4", dark="grey23",
+        top=("green_yellow", "chartreuse1"),
+        bottom=("yellow3", "chartreuse3"),
+        window=("green_yellow", "bright_yellow"),
+    ),
+    # Dacaran -- winged schemers: cold slate and dark teal.
+    "winged_schemer": PortStyle(
+        bright="grey62", mid="cadet_blue", dark="grey27",
+        top=("dark_cyan", "cyan"),
+        bottom=("steel_blue", "cyan"),
+        window=("cyan", "grey100"),
     ),
 }
-# Federation hull as the catch-all style.
-SPECIES_STYLES["default"] = SPECIES_STYLES["human"]
+# Federation hull as the catch-all style for unknown/unset archetypes.
+ARCHETYPE_STYLES["default"] = ARCHETYPE_STYLES["humanoid_diplomat"]
 
 # Glyphs that read as bright, lit plating; everything else structural defaults
 # to the mid level, and these recesses to the dark level.
@@ -177,12 +262,12 @@ class PortGenerator:
         subtype: str,
         width: int,
         height: int,
-        owner_species: str | None = None,
+        archetype_id: str | None = None,
     ) -> Text:
-        """Generate a procedural space port sprite."""
+        """Generate a procedural space port sprite, hued by owner ``archetype_id``."""
         tiers = PORT_ART.get(subtype.lower(), PORT_ART["trading_port"])
-        species_key = (owner_species or "default").lower()
-        style = SPECIES_STYLES.get(species_key, SPECIES_STYLES["default"])
+        archetype_key = (archetype_id or "default").lower()
+        style = ARCHETYPE_STYLES.get(archetype_key, ARCHETYPE_STYLES["default"])
 
         bright = style.bright
         mid = style.mid
