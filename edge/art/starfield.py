@@ -49,12 +49,12 @@ class StarfieldParams:
 
 # Generation parameters per procedural starfield variation.
 STARFIELD_PRESETS: dict[str, StarfieldParams] = {
-    "standard": StarfieldParams(threshold=-0.5, max_fill=0.15, min_fill=0.02, scale=15.0),
-    "dense": StarfieldParams(threshold=-0.8, max_fill=0.25, min_fill=0.05, scale=15.0),
+    "standard": StarfieldParams(threshold=-0.5, max_fill=0.25, min_fill=0.05, scale=35.0),
+    "dense": StarfieldParams(threshold=-0.8, max_fill=0.3, min_fill=0.1, scale=20.0),
     # genuine empty space between sparse stars
-    "sparse": StarfieldParams(threshold=0.0, max_fill=0.05, min_fill=0.0, scale=15.0),
+    "sparse": StarfieldParams(threshold=0.2 , max_fill=0.1, min_fill=0.01, scale=15.0),
     # tighter clusters with dark voids between them
-    "cluster": StarfieldParams(threshold=0.3, max_fill=0.5, min_fill=0.0, scale=10.0),
+    "cluster": StarfieldParams(threshold=0.0, max_fill=0.2, min_fill=0.05, scale=1.0),
 }
 
 # Available procedural starfield variations
