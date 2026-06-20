@@ -10,11 +10,20 @@ directly with sample data.
 
 from __future__ import annotations
 
-import asyncio
 import os
+
+# Textual reads TEXTUAL_ANIMATIONS once, at import time — so it must be set before the
+# textual imports below. "none" snaps transient UI (the sliding Tabs underline, scrollbars)
+# straight to its final state, a prerequisite for deterministic screenshots. The early
+# side-effect forces the imports past it, so E402 is suppressed file-wide for this script.
+os.environ.setdefault("TEXTUAL_ANIMATIONS", "none")
+
+# ruff: noqa: E402
+import asyncio
 import tempfile
 from pathlib import Path
 
+from textual.pilot import Pilot
 from textual.widgets import TabbedContent
 
 from edge.core.movement import shortest_path
@@ -45,12 +54,42 @@ _GALLERY_TABS = [
 ]
 
 
+async def _settle(app: EdgeApp, pilot: Pilot) -> None:
+    """Pump the layout pipeline until the rendered frame stops changing.
+
+    A single `pilot.pause()` can capture a half-laid-out screen — a footer not yet
+    placed, a DataTable still sizing its columns — which makes a screenshot differ run
+    to run. Exporting until two consecutive frames match lands on the stable final frame,
+    so captures are deterministic. The export id Rich emits is content-derived, so an
+    unchanged screen exports byte-identically and the loop terminates.
+
+    The warmup pumps a few cycles first so a deferred one-shot update (the Tabs underline
+    highlight, posted via call_after_refresh on a tab change) has fired before stability is
+    judged — otherwise two pre-update frames could match and the loop would stop too early.
+    """
+    for _ in range(6):
+        await pilot.pause()
+    prev = ""
+    for _ in range(40):
+        await pilot.pause()
+        cur = app.export_screenshot()
+        if cur == prev:
+            return
+        prev = cur
+
+
+async def _shot(app: EdgeApp, pilot: Pilot, name: str) -> None:
+    """Settle the screen, then write `name`.svg to the shots directory."""
+    await _settle(app, pilot)
+    app.save_screenshot(filename=name, path=str(OUT))
+
+
 async def _capture() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    app = EdgeApp()
+    # `plain=True` freezes the starfield twinkle timer; both keep captures deterministic.
+    app = EdgeApp(plain=True)
     async with app.run_test(size=(100, 34)) as pilot:
-        await pilot.pause()
-        app.save_screenshot(filename="main-menu.svg", path=str(OUT))
+        await _shot(app, pilot, "main-menu.svg")
 
         await pilot.press("n")  # New game -> live GameScreen
         await pilot.pause()
@@ -74,15 +113,14 @@ async def _capture() -> None:
         nice = next((s for s in ports if s in planet_sectors), None)
         if nice is not None:
             await goto(nice)
-        app.save_screenshot(filename="game.svg", path=str(OUT))
+        await _shot(app, pilot, "game.svg")
 
         # A plain commodities port -> the standalone trade screen.
         plain = next((s for s, p in ports.items() if p.klass.value != 9), None)
         if plain is not None:
             await goto(plain)
             await pilot.press("p")
-            await pilot.pause()
-            app.save_screenshot(filename="port.svg", path=str(OUT))
+            await _shot(app, pilot, "port.svg")
             await pilot.press("escape")
             await pilot.pause()
 
@@ -92,30 +130,25 @@ async def _capture() -> None:
         await pilot.press("p")
         await pilot.pause()
         app.screen.query_one(TabbedContent).active = "hardware"
-        await pilot.pause()
-        app.save_screenshot(filename="stardock.svg", path=str(OUT))
+        await _shot(app, pilot, "stardock.svg")
         await pilot.press("escape")
         await pilot.pause()
 
         await pilot.press("m")  # Galactic map (live)
-        await pilot.pause()
-        app.save_screenshot(filename="map.svg", path=str(OUT))
+        await _shot(app, pilot, "map.svg")
         await pilot.press("escape")
         await pilot.pause()
 
         await pilot.press("c")  # Ship computer (live pair-finder over seen ports)
-        await pilot.pause()
-        app.save_screenshot(filename="computer.svg", path=str(OUT))
+        await _shot(app, pilot, "computer.svg")
         await pilot.press("escape")
         await pilot.pause()
 
         # The Phase 2-3 skeleton screens, pushed directly with sample data.
         app.push_screen(PlanetScreen(sample_planet()))
-        await pilot.pause()
-        app.save_screenshot(filename="planet.svg", path=str(OUT))
+        await _shot(app, pilot, "planet.svg")
         await pilot.press("d")  # descend -> SurfaceScreen
-        await pilot.pause()
-        app.save_screenshot(filename="surface.svg", path=str(OUT))
+        await _shot(app, pilot, "surface.svg")
         await pilot.press("escape")
         await pilot.press("escape")
         await pilot.pause()
@@ -127,13 +160,12 @@ async def _capture() -> None:
             ("messages", MessagesScreen(sample_messages())),
         ):
             app.push_screen(screen)
-            await pilot.pause()
-            app.save_screenshot(filename=f"{name}.svg", path=str(OUT))
+            await _shot(app, pilot, f"{name}.svg")
             await pilot.press("escape")
             await pilot.pause()
 
     # The secret sprite gallery is reached via the hidden "~" Main Menu key.
-    gal = EdgeApp()
+    gal = EdgeApp(plain=True)
     async with gal.run_test(size=(100, 40)) as pilot:
         await pilot.pause()
         await pilot.press("~")
@@ -141,8 +173,7 @@ async def _capture() -> None:
         tabs = gal.screen.query_one(TabbedContent)
         for tab_id, stem in _GALLERY_TABS:
             tabs.active = tab_id
-            await pilot.pause()
-            gal.save_screenshot(filename=f"{stem}.svg", path=str(OUT))
+            await _shot(gal, pilot, f"{stem}.svg")
 
     gallery_stems = ", ".join(stem for _, stem in _GALLERY_TABS)
     print(
