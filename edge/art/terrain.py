@@ -4,6 +4,8 @@ import random
 from opensimplex import OpenSimplex
 from rich.text import Text
 
+from edge.art.noise import fractal_noise
+
 # FEATURES_REGISTRY maps a generic feature name to a list of its visual representations.
 # Format: "feature_name": [("character", relative_frequency_weight), ...]
 # Note: Group the character tuples horizontally (up to 6 per row) to maintain compactness and readability.
@@ -227,24 +229,6 @@ class TerrainGenerator:
             return self._get_asteroid_grid(rng, gen, width, height)
         return self._get_biome_grid(rng, gen, subtype, width, height)
 
-    def _fractal_noise(self, gen: OpenSimplex, x: float, y: float) -> float:
-        """Sum several octaves of noise so clusters break up at multiple scales.
-
-        Layering higher-frequency octaves over the base field prevents the large,
-        smooth low regions that otherwise read as big connected black voids. The
-        result is normalised back to roughly [-1, 1].
-        """
-        total = 0.0
-        max_amplitude = 0.0
-        amplitude = 1.0
-        frequency = 1.0 / self.asteroid_noise_scale
-        for _ in range(max(1, self.asteroid_octaves)):
-            total += amplitude * gen.noise2(x * frequency, y * frequency)
-            max_amplitude += amplitude
-            amplitude *= 0.5
-            frequency *= 2.0
-        return total / max_amplitude
-
     def _get_asteroid_grid(
         self, rng: random.Random, gen: OpenSimplex, width: int, height: int
     ) -> list[list[tuple[str, str, str]]]:
@@ -256,7 +240,9 @@ class TerrainGenerator:
         for y in range(height):
             row = []
             for x in range(width):
-                cluster_noise = self._fractal_noise(gen, x, y)
+                cluster_noise = fractal_noise(
+                    gen, x, y, self.asteroid_noise_scale, self.asteroid_octaves
+                )
                 # Every cell keeps a baseline scatter probability so quiet regions
                 # stay speckled rather than collapsing into large black voids.
                 if cluster_noise > threshold:

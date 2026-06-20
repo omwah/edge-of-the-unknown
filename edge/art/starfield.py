@@ -4,6 +4,8 @@ import random
 from rich.text import Text
 from opensimplex import OpenSimplex
 
+from edge.art.noise import fractal_noise
+
 # Default weighted stars. Format is a list of tuples:
 # (character_string, relative_probability_weight)
 # A higher weight means the character is more likely to be chosen.
@@ -44,13 +46,17 @@ class StarfieldGenerator:
         noise_scale: float = 15.0,
         cluster_threshold: float = -0.5,
         max_fill_rate: float = 0.15,
+        min_fill_rate: float = 0.02,
+        octaves: int = 3,
         star_chars: list[tuple[str, int]] | None = None,
         star_colors: list[tuple[str, int]] | None = None,
     ):
         self.noise_scale = noise_scale
         self.cluster_threshold = cluster_threshold
         self.max_fill_rate = max_fill_rate
-        
+        self.min_fill_rate = min_fill_rate
+        self.octaves = octaves
+
         # Default weighted stars: mostly tiny dots, rarely larger stars
         self.star_chars = star_chars or DEFAULT_STAR_CHARS
         
@@ -84,42 +90,49 @@ class StarfieldGenerator:
         # Adjust parameters based on subtype
         threshold = self.cluster_threshold
         fill_rate = self.max_fill_rate
+        min_fill = self.min_fill_rate
         scale = self.noise_scale
-        
+
         st = subtype.lower()
         if st == "dense":
             threshold = -0.8
             fill_rate = 0.25
+            min_fill = 0.05
         elif st == "sparse":
             threshold = 0.0
             fill_rate = 0.05
+            min_fill = 0.0  # genuine empty space between sparse stars
         elif st == "cluster":
             threshold = 0.3
             fill_rate = 0.5
             scale = 10.0 # tighter clusters
-            
+            min_fill = 0.0  # dark voids between tight clusters are the point
+
         scale_range = 1.0 - threshold
-        
+
         for y in range(height):
             for x in range(width):
-                cluster_noise = gen.noise2(x / scale, y / scale)
-                
-                # If we're above the threshold, we have a chance to place a star
+                # Fractal (multi-octave) noise breaks up the large smooth low
+                # regions that otherwise read as big connected black voids.
+                cluster_noise = fractal_noise(gen, x, y, scale, self.octaves)
+
+                # Above the cluster threshold the local density ramps the fill
+                # rate up; elsewhere a baseline keeps quiet regions speckled
+                # rather than collapsing into empty bands.
                 if cluster_noise > threshold:
-                    # Calculate local density multiplier (0.0 to 1.0)
                     density = (cluster_noise - threshold) / scale_range
-                    
-                    # Random check against density * max_fill_rate
-                    if rng.random() < density * fill_rate:
-                        char = self._pick_weighted(rng, self.star_chars)
-                        fg = self._pick_weighted(rng, self.star_colors)
-                        map_text.append(char, style=fg)
-                    else:
-                        map_text.append(" ")
+                    cell_fill = min_fill + density * (fill_rate - min_fill)
+                else:
+                    cell_fill = min_fill
+
+                if rng.random() < cell_fill:
+                    char = self._pick_weighted(rng, self.star_chars)
+                    fg = self._pick_weighted(rng, self.star_colors)
+                    map_text.append(char, style=fg)
                 else:
                     map_text.append(" ")
-                    
+
             if y < height - 1:
                 map_text.append("\n")
-                
+
         return map_text
