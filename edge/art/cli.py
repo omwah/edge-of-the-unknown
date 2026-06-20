@@ -72,6 +72,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         subtypes_to_run = [args.subtype]
 
     console = Console(force_terminal=True, color_system="truecolor")
+
+    rendered: list[tuple[str, Text, int]] = []
     for st in subtypes_to_run:
         sprite = generate_sprite(
             entity_type=args.type,
@@ -81,12 +83,21 @@ def main(argv: Sequence[str] | None = None) -> None:
             height=args.height,
             owner_species=args.owner_species,
         )
-
         sprite_width = max(
             (cell_len(line) for line in sprite.plain.split("\n")), default=0
         )
         title = f"{args.type.title()} - {st} ({args.width} x {args.height})"
-        header = banner(title, sprite_width)
+        rendered.append((title, sprite, sprite_width))
+
+    # Size every banner to the widest sprite/title across the run so the headers
+    # are uniform, keeping each title centered within that shared width.
+    banner_width = max(
+        (max(sprite_width, len(f" {title} ")) for title, _, sprite_width in rendered),
+        default=0,
+    )
+
+    for title, sprite, _ in rendered:
+        header = banner(title, banner_width)
         console.print(header)
         console.print(sprite)
         console.print("-" * header.cell_len)
