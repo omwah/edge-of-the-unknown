@@ -1041,7 +1041,7 @@ def messages_view(
             turn += _event_turn_cost(event, config)
         text = format_log_line(event, state)
         if text:
-            entries.append(dto.LogEntry(when=f"day {day} · t{turn}", text=text))
+            entries.append(dto.LogEntry(when=f"D{day} · T{turn}", text=text))
     entries.reverse()  # newest first
     signpost = stardock_signpost(state)
     if signpost is not None:
