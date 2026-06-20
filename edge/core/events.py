@@ -222,6 +222,22 @@ class AlienHailed(Event):
 
 
 @dataclass(frozen=True)
+class AlienSpoke(Event):
+    """The player steered the conversation to a peaceful dialogue context (§6.7, WP17).
+
+    `context` is the dialogue key spoken (greeting / dossier_other / farewell / …);
+    `subject_id` is the species asked about for `dossier_other`, else None. Records the
+    ring-advancing conversation turn so the log can carry "you asked the Vesk about the
+    Selvani" and replay reconstructs every peaceful exchange.
+    """
+
+    player_id: int
+    species_id: int
+    context: str
+    subject_id: int | None = None
+
+
+@dataclass(frozen=True)
 class AlienMoved(Event):
     """A species drifted between sectors on the tick clock (§6.3, WP16).
 

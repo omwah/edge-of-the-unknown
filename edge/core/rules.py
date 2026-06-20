@@ -48,7 +48,7 @@ from edge.core.enums import (
     Subsystem,
 )
 from edge.core.events import (
-    AlienHailed,
+    AlienSpoke,
     AlienTraded,
     AttitudeChanged,
     Banked,
@@ -291,6 +291,22 @@ class Hail:
 
 
 @dataclass(frozen=True, slots=True)
+class Converse:
+    """Steer an alien conversation to a peaceful dialogue context (§6.7, WP17).
+
+    Speaks the chosen `context` (a `dialogue._PEACEFUL_CONTEXTS` key) in the species'
+    voice and advances that context's recency ring so repeats rephrase — the same
+    mechanism `Hail` uses for `greeting`, generalised to every peaceful context.
+    `subject_id` names the species asked about for `dossier_other` ("ask about X").
+    Combat / signature contexts are Phase 3 and rejected here.
+    """
+
+    species_id: int
+    context: str
+    subject_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class BuyAlienTech:
     """Buy an alien tech offer for latinum (§6, §8, WP9).
 
@@ -322,7 +338,7 @@ Command = (
     | RecruitColonists | Colonize | SetAllocation
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
-    | Hail | BuyAlienTech | BarterArtifact
+    | Hail | Converse | BuyAlienTech | BarterArtifact
 )
 
 
@@ -418,6 +434,8 @@ def reduce(
             return _deploy_genesis(state, player_id, command, config)
         case Hail():
             return _hail(state, player_id, command, config)
+        case Converse():
+            return _converse(state, player_id, command, config)
         case BuyAlienTech():
             return _buy_alien_tech(state, player_id, command, config)
         case BarterArtifact():
@@ -1250,20 +1268,48 @@ def _met(player: Player, species_id: int) -> Mapping[int, float]:
     return {**player.species_attitudes, species_id: 0.0}
 
 
+def _subject_extra(state: UniverseState, subject_id: int | None) -> dict[str, str]:
+    """The `{subject}` placeholder fill for an 'ask about X' line, or empty (§6.7, WP17)."""
+    if subject_id is None:
+        return {}
+    subject = state.species.get(subject_id)
+    return {"subject": subject.name} if subject is not None else {}
+
+
 def _hail(state: UniverseState, player_id: int, cmd: Hail, config: GameConfig) -> ReduceResult:
+    """Open contact — the greeting case of the general conversation path (WP17)."""
+    return _converse(state, player_id, Converse(cmd.species_id, "greeting"), config)
+
+
+def _converse(state: UniverseState, player_id: int, cmd: Converse,
+              config: GameConfig) -> ReduceResult:
+    """Speak a chosen peaceful dialogue context and advance its recency ring (§6.7, WP17).
+
+    The single ring-advancing conversation path (`Hail` is `Converse(greeting)`). Guards:
+    the context must be peaceful (combat / signature lines are Phase 3) and the species
+    must be in the player's sector — a rejected context raises rather than silently
+    no-ops, so neither the codec nor the menu can smuggle a Phase-3 line through.
+    """
     player = _player(state, player_id)
     ship = _ship(state, player)
     species = _species_here(state, ship, cmd.species_id)
+    sc = _species_config(config, species)
+    if cmd.context not in dialogue.reachable_contexts(sc):
+        # Non-peaceful (combat / sig.*) or a context the species can't reach (its params):
+        # raise rather than silently no-op, so the codec/menu can't smuggle a line through.
+        raise EconomyError(f"not something you can say here ({cmd.context})")
     assert config.roster is not None
-    # Advance the greeting ring (re-hailing rephrases) and mark the species met.
-    ring = player.dialogue_recency.get((species.id, "greeting"), ())
-    rng = dialogue.encounter_rng(state.game.seed, species.id, "greeting", ring)
-    _, new_ring = dialogue.speak(config.roster, species, player, "greeting",
-                                 aliens=config.aliens, rng=rng)
-    new_player = replace(player, species_attitudes=_met(player, species.id),
-                         species_last_seen={**player.species_last_seen, species.id: ship.sector_id},
-                         dialogue_recency=_advance_recency(player, species.id, "greeting", new_ring))
-    return ReduceResult(events=(AlienHailed(player_id, species.id),), players=(new_player,))
+    extra = _subject_extra(state, cmd.subject_id)
+    ring = player.dialogue_recency.get((species.id, cmd.context), ())
+    rng = dialogue.encounter_rng(state.game.seed, species.id, cmd.context, ring)
+    _, new_ring = dialogue.speak(config.roster, species, player, cmd.context,
+                                 aliens=config.aliens, rng=rng, extra=extra)
+    new_player = replace(
+        player, species_attitudes=_met(player, species.id),
+        species_last_seen={**player.species_last_seen, species.id: ship.sector_id},
+        dialogue_recency=_advance_recency(player, species.id, cmd.context, new_ring))
+    event = AlienSpoke(player_id, species.id, cmd.context, cmd.subject_id)
+    return ReduceResult(events=(event,), players=(new_player,))
 
 
 def _select_offer(config: GameConfig, species: AlienSpecies, player: Player,

@@ -13,6 +13,7 @@ from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsy
 from edge.core.events import (
     AlienHailed,
     AlienMoved,
+    AlienSpoke,
     AlienTraded,
     AttitudeChanged,
     Banked,
@@ -49,6 +50,7 @@ from edge.core.rules import (
     Cannibalize,
     Colonize,
     Command,
+    Converse,
     DeployGenesis,
     Deposit,
     Descend,
@@ -140,6 +142,11 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "DeployGenesis", {"planet_id": command.planet_id}
         case Hail():
             return "Hail", {"species_id": command.species_id}
+        case Converse():
+            return "Converse", {
+                "species_id": command.species_id, "context": command.context,
+                "subject_id": command.subject_id,
+            }
         case BuyAlienTech():
             return "BuyAlienTech", {"species_id": command.species_id, "offer_index": command.offer_index}
         case BarterArtifact():
@@ -218,6 +225,9 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return DeployGenesis(planet_id=payload["planet_id"])
         case "Hail":
             return Hail(species_id=payload["species_id"])
+        case "Converse":
+            return Converse(species_id=payload["species_id"], context=payload["context"],
+                            subject_id=payload.get("subject_id"))
         case "BuyAlienTech":
             return BuyAlienTech(species_id=payload["species_id"], offer_index=payload["offer_index"])
         case "BarterArtifact":
@@ -335,6 +345,11 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "species_id": event.species_id,
                 "from_sector": event.from_sector, "to_sector": event.to_sector,
             }
+        case AlienSpoke():
+            return "AlienSpoke", {
+                "player_id": event.player_id, "species_id": event.species_id,
+                "context": event.context, "subject_id": event.subject_id,
+            }
         case AlienTraded():
             return "AlienTraded", {
                 "player_id": event.player_id, "species_id": event.species_id,
@@ -414,6 +429,9 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return AlienHailed(payload["player_id"], payload["species_id"])
         case "AlienMoved":
             return AlienMoved(payload["species_id"], payload["from_sector"], payload["to_sector"])
+        case "AlienSpoke":
+            return AlienSpoke(payload["player_id"], payload["species_id"],
+                              payload["context"], payload.get("subject_id"))
         case "AlienTraded":
             return AlienTraded(payload["player_id"], payload["species_id"], payload["kind"],
                                payload["detail"], payload["cost"])
