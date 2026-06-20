@@ -874,16 +874,17 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     )
 
 
-def format_event(event: Event, display: Mapping[int, int] | None = None) -> str:
-    """Render one event as a log/ticker line — the single shared formatter (§11/§12).
+def format_event(event: Event) -> str:
+    """Render one event's body as a log/ticker line — the single shared formatter (§11/§12).
 
-    Returns "" for events that should not surface to the player (e.g. per-commodity
-    stock regen), so callers can filter them out. `display` maps internal sector ids
-    to spatial display ids (§5.1); absent it, internal ids are shown.
+    Returns "" for events that should not surface to the player (e.g. per-commodity stock
+    regen), so callers can filter them out. The sector an event happened in is supplied by
+    the gutter that `format_log_line` prepends, so bodies never name their own sector.
     """
     if isinstance(event, Warped):
-        shown = (display or {}).get(event.to_sector, event.to_sector)
-        return f"[cyan]» Warp to Sector {shown}[/]  (-{event.turn_cost} turn)"
+        # The destination sector rides in the log's gutter (format_log_line), so the
+        # body no longer repeats it — just the action and its turn cost.
+        return f"[cyan]Warp to sector[/]  (-{event.turn_cost} turn)"
     if isinstance(event, Docked):
         return "[magenta]⚓ Docked.[/]"
     if isinstance(event, Traded):
@@ -977,13 +978,14 @@ def format_log_line(event: Event, state: UniverseState) -> str:
     every player-facing line names its location. Returns "" for non-surfaced events so callers
     keep filtering them out.
     """
-    text = format_event(event, state.spatial_ids)
+    text = format_event(event)
     if not text:
         return ""
     sector = _event_sector(event, state)
     if sector is None:
         return text
-    return f"[grey46]S{_display(state, sector)}[/] {text}"
+    # The » decor separates the sector gutter from the body on every line.
+    return f"[grey46]S{_display(state, sector)} »[/] {text}"
 
 
 def stardock_signpost(state: UniverseState) -> str | None:
@@ -999,10 +1001,47 @@ def stardock_signpost(state: UniverseState) -> str | None:
     return f"Navigation beacon: StarDock lies in Sector {_display(state, dock.sector_id)} — {region}."
 
 
-def messages_view(state: UniverseState, events: list[Event]) -> dto.MessagesDTO:
-    """Project the durable event log into a newest-first message list (§11, §12)."""
-    lines = (format_log_line(e, state) for e in events)
-    entries = [dto.LogEntry(when="", text=text) for text in lines if text]
+def _event_turn_cost(event: Event, config: GameConfig) -> int:
+    """Turns an event spent — used to reconstruct the day/turn each log line is stamped with.
+
+    Mirrors the turn costs the reducers charge (§9): warps carry their own cost, docking is
+    one turn, and the descent/explore/salvage actions read the discovery config (defaulting
+    to 1 like the reducers do). Every other event is free, so it shares the running turn.
+    """
+    if isinstance(event, Warped):
+        return event.turn_cost
+    if isinstance(event, Docked):
+        return 1
+    disc = config.discovery
+    if isinstance(event, Descended):
+        return disc.descent_turn_cost if disc is not None else 1
+    if isinstance(event, SiteExplored):
+        return disc.explore_turn_cost if disc is not None else 1
+    if isinstance(event, DiscoveryCollected):
+        return disc.salvage_turn_cost if disc is not None else 1
+    return 0
+
+
+def messages_view(
+    state: UniverseState, events: list[Event], config: GameConfig, player_id: int = 1
+) -> dto.MessagesDTO:
+    """Project the durable event log into a newest-first message list (§11, §12).
+
+    Each line's `when` carries the game day and the turn-of-day it happened on, rebuilt by
+    walking the log: the day rolls over on the player's `TurnsReset` (the daily cron, §9) and
+    the turn count accrues each event's turn cost, so a free event shares the turn of the last
+    turn-spending action before it. The pre-game StarDock beacon stays labelled "start".
+    """
+    day, turn = 1, 0
+    entries: list[dto.LogEntry] = []
+    for event in events:
+        if isinstance(event, TurnsReset) and event.player_id == player_id:
+            day, turn = day + 1, 0
+        else:
+            turn += _event_turn_cost(event, config)
+        text = format_log_line(event, state)
+        if text:
+            entries.append(dto.LogEntry(when=f"day {day} · t{turn}", text=text))
     entries.reverse()  # newest first
     signpost = stardock_signpost(state)
     if signpost is not None:

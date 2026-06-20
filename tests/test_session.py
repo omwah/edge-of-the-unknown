@@ -327,11 +327,13 @@ def test_display_ids_surface_spatial_ids_when_present() -> None:
     assert "Sector 20101" in (session.stardock_signpost(world) or "")
 
 
-def test_format_event_uses_display_map_for_warps() -> None:
+def test_format_event_warp_body_defers_sector_to_the_gutter() -> None:
     from edge.core.events import Warped
 
-    assert "Sector 12" in session.format_event(Warped(1, 7, 12, 1))  # no map -> internal id
-    assert "Sector 20116" in session.format_event(Warped(1, 7, 12, 1), {12: 20116})
+    # The body names the action, not the sector — the gutter (format_log_line) carries it.
+    line = session.format_event(Warped(1, 7, 12, 1))
+    assert "Warp to sector" in line
+    assert "Sector 12" not in line and "»" not in line
 
 
 def test_format_event_covers_kinds_and_filters_noise() -> None:
@@ -346,7 +348,7 @@ def test_format_event_covers_kinds_and_filters_noise() -> None:
         Warped,
     )
 
-    assert "Sector 12" in session.format_event(Warped(1, 7, 12, 1))
+    assert "Warp to sector" in session.format_event(Warped(1, 7, 12, 1))
     assert session.format_event(Docked(1, 12, 3))
     assert "Bought" in session.format_event(Traded(1, 3, Commodity.FUEL_ORE, PortMode.SELL, 5, 13, 65))
     assert "Sold" in session.format_event(Traded(1, 3, Commodity.FUEL_ORE, PortMode.BUY, 5, 13, 65))
@@ -377,21 +379,39 @@ def test_format_log_line_always_tags_the_sector() -> None:
     world = _world()  # ship 1 sits in sector 2; port 3 is in sector 3
     # A sector-anchored event tags that sector; spatial_ids map through it.
     world.spatial_ids = {3: 20103}
-    assert session.format_log_line(Warped(1, 2, 3, 1), world).startswith("[grey46]S20103[/] ")
+    assert session.format_log_line(Warped(1, 2, 3, 1), world).startswith("[grey46]S20103 »[/] ")
     # A trade resolves the sector from the port it happened at.
     sell = Traded(1, 3, Commodity.FUEL_ORE, PortMode.SELL, 5, 13, 65)
-    assert session.format_log_line(sell, world).startswith("[grey46]S20103[/] ")
-    assert session.format_log_line(Docked(1, 3, 3), world).startswith("[grey46]S20103[/] ")
+    assert session.format_log_line(sell, world).startswith("[grey46]S20103 »[/] ")
+    assert session.format_log_line(Docked(1, 3, 3), world).startswith("[grey46]S20103 »[/] ")
     # A located-nowhere player action falls back to the actor's current ship sector (2).
-    assert session.format_log_line(Banked(1, "deposit", 500, 500), world).startswith("[grey46]S2[/] ")
+    assert session.format_log_line(Banked(1, "deposit", 500, 500), world).startswith("[grey46]S2 »[/] ")
     # Non-surfaced events stay empty — no gutter stamped onto nothing.
     assert session.format_log_line(StockRegenerated(3, Commodity.EQUIPMENT, 480), world) == ""
+
+
+def test_messages_view_stamps_day_and_turn() -> None:
+    """Each log line's `when` carries the game day + turn-of-day, day rolling on TurnsReset."""
+    from edge.core.events import Banked, Docked, TurnsReset, Warped
+
+    world = _world()  # no StarDock here, so no "start" signpost is appended
+    events: list[object] = [
+        Warped(1, 2, 3, 2),                 # day 1, +2 turns -> t2
+        Docked(1, 3, 3),                    # +1 turn -> t3
+        Banked(1, "deposit", 500, 500),     # free -> shares t3
+        TurnsReset(1, 250),                 # day rolls over -> day 2, t0
+        Warped(1, 3, 2, 1),                 # day 2, +1 turn -> t1
+    ]
+    view = session.messages_view(world, events, CONFIG)  # type: ignore[arg-type]
+    assert [e.when for e in view.events] == [  # newest first
+        "day 2 · t1", "day 2 · t0", "day 1 · t3", "day 1 · t3", "day 1 · t2",
+    ]
 
 
 def test_signpost_is_none_without_a_stardock() -> None:
     world = _nav_world()  # ports are a Class-5 SSB only — no StarDock
     assert session.stardock_signpost(world) is None
-    assert session.messages_view(world, []).events == []
+    assert session.messages_view(world, [], CONFIG).events == []
 
 
 def test_commodity_line_trend_and_ratio_edges() -> None:

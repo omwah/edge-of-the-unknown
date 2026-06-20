@@ -169,7 +169,7 @@ class GameService:
 
     def messages_view(self, player_id: int) -> dto.MessagesDTO:
         """The durable event log + opening signpost, newest first (§11, §12)."""
-        return session.messages_view(self._state, self._repo.load_events())
+        return session.messages_view(self._state, self._repo.load_events(), self._config, player_id)
 
     def intro_line(self, player_id: int) -> str | None:
         """The opening StarDock signpost for the game-screen ticker (WP-B)."""
