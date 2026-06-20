@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Edge of the Unknown — an exploration-first descendant of TradeWars 2002"
 authors = [{name = "James McDuffie", email = "mcduffie@pitfall.org"}]
 requires-python = ">= 3.12"
-dependencies = []
+dependencies = ["opensimplex>=0.4.5.1,<0.5"]
 
 [project.scripts]
 edge = "edge.tui.app:main"

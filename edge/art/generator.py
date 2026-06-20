@@ -1,7 +1,14 @@
 """Procedural ASCII art generation logic."""
 
 import random
+from functools import lru_cache
+from rich.text import Text
 
+from edge.art.terrain import TerrainGenerator
+
+_TERRAIN_GEN = TerrainGenerator()
+
+@lru_cache(maxsize=128)
 def generate_sprite(
     entity_type: str,
     subtype: str,
@@ -9,7 +16,7 @@ def generate_sprite(
     width: int,
     height: int,
     owner_species: str | None = None
-) -> str:
+) -> Text:
     """Generate a procedural ASCII sprite based on parameters.
     
     Args:
@@ -21,7 +28,7 @@ def generate_sprite(
         owner_species: Optional species name for stylistic variations
         
     Returns:
-        A multiline string representing the generated ASCII art.
+        A rich Text object representing the generated ASCII art.
     """
     # Derive a local PRNG from the input parameters to ensure determinism
     rng_seed = f"{seed}|{entity_type}|{subtype}"
@@ -29,21 +36,23 @@ def generate_sprite(
         rng_seed += f"|{owner_species}"
     rng = random.Random(rng_seed)
     
-    # TODO: Implement the actual compositional/noise/SDF algorithms based on type
-    # For now, return a basic structural placeholder to verify the CLI works
+    # Route to specific generation algorithms based on entity type
+    if entity_type in ("terrain", "planet"):
+        return _TERRAIN_GEN.generate(rng, subtype, width, height)
     
+    # Placeholder for other types (ships, ports, subsystems)
     if width < 2 or height < 2:
-        return "?"
+        return Text("?")
         
-    lines = []
-    lines.append("+" + "-" * (width - 2) + "+")
+    lines = Text()
+    lines.append("+" + "-" * (width - 2) + "+\n")
     for _ in range(height - 2):
         row = "|"
         for _ in range(width - 2):
             char = rng.choice([".", "*", " ", "o", "O", "~", "+", "x"])
             row += char
-        row += "|"
+        row += "|\n"
         lines.append(row)
     lines.append("+" + "-" * (width - 2) + "+")
     
-    return "\n".join(lines)
+    return lines

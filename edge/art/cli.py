@@ -3,6 +3,7 @@
 import argparse
 from typing import Sequence
 
+from rich.console import Console
 from edge.art.generator import generate_sprite
 
 
@@ -57,9 +58,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         owner_species=args.owner_species,
     )
 
-    print(f"--- Generated {args.type} ({args.subtype}) [Size: {args.width}x{args.height}] ---")
-    print(sprite)
-    print("-" * (args.width + 8))
+    console = Console()
+    console.print(f"--- Generated {args.type} ({args.subtype}) [Size: {args.width}x{args.height}] ---")
+    console.print(sprite)
+    console.print("-" * (args.width + 8))
 
 
 if __name__ == "__main__":
