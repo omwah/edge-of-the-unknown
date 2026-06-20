@@ -5,17 +5,41 @@ import math
 from rich.text import Text
 from edge.art.terrain import TerrainGenerator
 
-def get_outline_char(dx: float, dy: float) -> str:
-    """Return an appropriate box drawing character for the planet's circular outline."""
-    angle = math.degrees(math.atan2(dy, dx)) % 360
-    if 337.5 <= angle or angle < 22.5: return "│" 
-    if 22.5 <= angle < 67.5: return "╯" 
-    if 67.5 <= angle < 112.5: return "─" 
-    if 112.5 <= angle < 157.5: return "╰" 
-    if 157.5 <= angle < 202.5: return "│" 
-    if 202.5 <= angle < 247.5: return "╭" 
-    if 247.5 <= angle < 292.5: return "─" 
-    if 292.5 <= angle < 337.5: return "╮" 
+def get_outline_char(u: bool, d: bool, l: bool, r: bool,
+                     ne: bool, nw: bool, se: bool, sw: bool) -> str:
+    """Pick a connecting box-drawing glyph for a boundary cell.
+
+    Selection is driven by which sides of the cell face the *exterior* of the
+    planet (``True`` == that neighbour is outside the disc). Because the glyph
+    is derived from the local boundary tangent, adjacent boundary cells emit
+    glyphs that link into a continuous ring rather than a chunky octagon.
+    """
+    vert = u or d  # exterior lies above and/or below -> boundary runs horizontally
+    horz = l or r  # exterior lies left and/or right  -> boundary runs vertically
+
+    if vert and horz:
+        # Convex corner: connect the two interior-facing sides.
+        v = "u" if u else "d"
+        h = "l" if l else "r"
+        return {
+            ("u", "l"): "╭", ("u", "r"): "╮",
+            ("d", "l"): "╰", ("d", "r"): "╯",
+        }[(v, h)]
+    if vert:
+        return "─"
+    if horz:
+        return "│"
+    # Only a diagonal neighbour is exterior: a steep shoulder step. The two
+    # orthogonal boundary cells flanking it are a horizontal run and a vertical
+    # run, so connect toward both with the matching box-curve glyph.
+    if nw:
+        return "╯"
+    if ne:
+        return "╰"
+    if sw:
+        return "╮"
+    if se:
+        return "╭"
     return " "
 
 ATMOSPHERE_COLORS = {
@@ -46,18 +70,43 @@ class PlanetGenerator:
         """Generate a procedural planet wrapped in a circular SDF."""
         grid = self.terrain_gen.get_grid(rng, subtype, width, height)
         map_text = Text()
-        
+
+        is_asteroid = subtype.lower() in ("asteroid_belt", "asteroid")
+        outline_color = get_atmosphere_color(subtype)
+
+        if is_asteroid:
+            # Pass through directly without border or spherical mask.
+            for y in range(height):
+                for x in range(width):
+                    char, fg, _ = grid[y][x]
+                    map_text.append(char, style=fg)
+                if y < height - 1:
+                    map_text.append("\n")
+            return map_text
+
         center_x = (width - 1) / 2.0
         center_y = (height - 1) / 2.0
         radius_x = width / 2.0
         radius_y = height / 2.0
-        
-        # Inner fill distance squared (leaves a narrow band for the outline)
-        # Using 0.85 means roughly the outer ~10% of the radius is outline.
-        fill_dist_sq = 0.85
-        is_asteroid = subtype.lower() in ("asteroid_belt", "asteroid")
-        outline_color = get_atmosphere_color(subtype)
-        
+
+        # Precompute the disc membership mask so boundary cells can be found by
+        # inspecting their neighbours instead of binning a thick angular band.
+        dist_sq = [[0.0] * width for _ in range(height)]
+        inside = [[False] * width for _ in range(height)]
+        for y in range(height):
+            for x in range(width):
+                dx = (x - center_x) / radius_x
+                dy = (y - center_y) / radius_y
+                d = dx * dx + dy * dy
+                dist_sq[y][x] = d
+                inside[y][x] = d <= 1.0
+
+        def is_exterior(px: int, py: int) -> bool:
+            """A cell off the grid or outside the disc counts as exterior."""
+            if px < 0 or py < 0 or px >= width or py >= height:
+                return True
+            return not inside[py][px]
+
         # Light vector (coming from top-left-front)
         Lx, Ly, Lz = -0.7, -0.3, 0.6
         length = math.sqrt(Lx*Lx + Ly*Ly + Lz*Lz)
@@ -65,67 +114,64 @@ class PlanetGenerator:
 
         for y in range(height):
             for x in range(width):
-                dx = (x - center_x) / radius_x
-                dy = (y - center_y) / radius_y
-                dist_sq = dx*dx + dy*dy
-                
-                if is_asteroid:
-                    # Pass through directly without border or spherical mask
-                    char, fg, bg = grid[y][x]
-                    map_text.append(char, style=fg)
+                if not inside[y][x]:
+                    map_text.append(" ", style="black")
+                    continue
+
+                u = is_exterior(x, y - 1)
+                d = is_exterior(x, y + 1)
+                l = is_exterior(x - 1, y)
+                r = is_exterior(x + 1, y)
+                ne = is_exterior(x + 1, y - 1)
+                nw = is_exterior(x - 1, y - 1)
+                se = is_exterior(x + 1, y + 1)
+                sw = is_exterior(x - 1, y + 1)
+
+                if u or d or l or r or ne or nw or se or sw:
+                    # Boundary cell: draw a connecting outline glyph.
+                    char = get_outline_char(u, d, l, r, ne, nw, se, sw)
+
+                    # Dim the outline if it sits on the dark side of the planet.
+                    dx = (x - center_x) / radius_x
+                    dy = (y - center_y) / radius_y
+                    norm = math.sqrt(dist_sq[y][x]) or 1.0
+                    outline_dot = (dx / norm) * Lx + (dy / norm) * Ly
+                    style = f"dim {outline_color}" if outline_dot < -0.2 else outline_color
+                    map_text.append(char, style=style)
                 else:
-                    if dist_sq > 1.0:
-                        map_text.append(" ", style="black")
-                    elif dist_sq > fill_dist_sq:
-                        # Draw outline
-                        char = get_outline_char(dx, dy)
-                        
-                        # Dim the outline if it's on the dark side of the planet
-                        ndx = dx / math.sqrt(dist_sq) if dist_sq > 0 else 0
-                        ndy = dy / math.sqrt(dist_sq) if dist_sq > 0 else 0
-                        outline_dot = ndx*Lx + ndy*Ly
-                        
-                        if outline_dot < -0.2:
-                            map_text.append(char, style=f"dim {outline_color}")
-                        else:
-                            map_text.append(char, style=outline_color)
+                    # Interior terrain fill with spherical lighting.
+                    char, fg, bg = grid[y][x]
+
+                    # Prevent the planet surface from turning invisible in the void.
+                    if not bg or bg in ("black", "default"):
+                        bg = "bright_black"
+
+                    dx = (x - center_x) / radius_x
+                    dy = (y - center_y) / radius_y
+                    z = math.sqrt(max(0.0, 1.0 - dist_sq[y][x]))
+                    dot = dx*Lx + dy*Ly + z*Lz
+
+                    # Apply shadow dithering based on dot product.
+                    if dot < -0.1:
+                        char = "░"
+                        fg = bg if bg and bg not in ("black", "default") else "bright_black"
+                        bg = "black"
+                    elif dot < 0.15:
+                        char = "▒"
+                        fg = bg if bg and bg not in ("black", "default") else "bright_black"
+                        bg = "black"
+                    elif dot < 0.4:
+                        char = "▓"
+                        fg = bg if bg and bg not in ("black", "default") else "bright_black"
+                        bg = "black"
+
+                    if bg and bg not in ("black", "default"):
+                        style = f"{fg} on {bg}" if fg else f"on {bg}"
                     else:
-                        # Draw inner terrain fill
-                        char, fg, bg = grid[y][x]
-                        
-                        # Prevent the planet surface from turning completely invisible in the void
-                        if not bg or bg in ("black", "default"):
-                            bg = "bright_black"
-                        
-                        # 3D spherical lighting mask
-                        z = math.sqrt(max(0.0, 1.0 - dist_sq))
-                        dot = dx*Lx + dy*Ly + z*Lz
-                        
-                        # Apply shadow dithering based on dot product
-                        if dot < -0.1:
-                            # Deep shadow (25% color, 75% black)
-                            char = "░"
-                            fg = bg if bg and bg not in ("black", "default") else "bright_black"
-                            bg = "black"
-                        elif dot < 0.15:
-                            # Mid shadow (50% color, 50% black)
-                            char = "▒"
-                            fg = bg if bg and bg not in ("black", "default") else "bright_black"
-                            bg = "black"
-                        elif dot < 0.4:
-                            # Light shadow (75% color, 25% black)
-                            char = "▓"
-                            fg = bg if bg and bg not in ("black", "default") else "bright_black"
-                            bg = "black"
-                            
-                        # Format final style
-                        if bg and bg not in ("black", "default"):
-                            style = f"{fg} on {bg}" if fg else f"on {bg}"
-                        else:
-                            style = fg
-                        map_text.append(char, style=style)
-                        
+                        style = fg
+                    map_text.append(char, style=style)
+
             if y < height - 1:
                 map_text.append("\n")
-                
+
         return map_text
