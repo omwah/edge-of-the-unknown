@@ -404,7 +404,7 @@ def test_messages_view_stamps_day_and_turn() -> None:
     ]
     view = session.messages_view(world, events, CONFIG)  # type: ignore[arg-type]
     assert [e.when for e in view.events] == [  # newest first
-        "day 2 · t1", "day 2 · t0", "day 1 · t3", "day 1 · t3", "day 1 · t2",
+        "D2 · T1", "D2 · T0", "D1 · T3", "D1 · T3", "D1 · T2",
     ]
 
 
