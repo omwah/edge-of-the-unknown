@@ -1,6 +1,7 @@
 """Procedural starfield generation."""
 
 import random
+from dataclasses import dataclass
 from rich.text import Text
 from opensimplex import OpenSimplex
 
@@ -30,36 +31,49 @@ DEFAULT_STAR_COLORS = [
     ("bright_yellow", 2), # occasional yellow star
 ]
 
+@dataclass(frozen=True)
+class StarfieldParams:
+    """Per-subtype knobs turning the noise field into stars.
+
+    threshold  - noise cutoff above which the local density ramp kicks in
+    max_fill   - peak star probability in the densest regions
+    min_fill   - baseline scatter probability (0.0 == genuine empty voids)
+    scale      - noise feature size (smaller == tighter clusters)
+    """
+
+    threshold: float
+    max_fill: float
+    min_fill: float
+    scale: float
+
+
+# Generation parameters per procedural starfield variation.
+STARFIELD_PRESETS: dict[str, StarfieldParams] = {
+    "standard": StarfieldParams(threshold=-0.5, max_fill=0.15, min_fill=0.02, scale=15.0),
+    "dense": StarfieldParams(threshold=-0.8, max_fill=0.25, min_fill=0.05, scale=15.0),
+    # genuine empty space between sparse stars
+    "sparse": StarfieldParams(threshold=0.0, max_fill=0.05, min_fill=0.0, scale=15.0),
+    # tighter clusters with dark voids between them
+    "cluster": StarfieldParams(threshold=0.3, max_fill=0.5, min_fill=0.0, scale=10.0),
+}
+
 # Available procedural starfield variations
-STARFIELD_SUBTYPES = [
-    "default",
-    "dense",
-    "sparse",
-    "cluster",
-]
+STARFIELD_SUBTYPES = list(STARFIELD_PRESETS)
 
 class StarfieldGenerator:
     """Generates procedural background starfields using noise clustering."""
     
     def __init__(
         self,
-        noise_scale: float = 15.0,
-        cluster_threshold: float = -0.5,
-        max_fill_rate: float = 0.15,
-        min_fill_rate: float = 0.02,
         octaves: int = 3,
         star_chars: list[tuple[str, int]] | None = None,
         star_colors: list[tuple[str, int]] | None = None,
     ):
-        self.noise_scale = noise_scale
-        self.cluster_threshold = cluster_threshold
-        self.max_fill_rate = max_fill_rate
-        self.min_fill_rate = min_fill_rate
         self.octaves = octaves
 
         # Default weighted stars: mostly tiny dots, rarely larger stars
         self.star_chars = star_chars or DEFAULT_STAR_CHARS
-        
+
         # Default weighted colors: mostly dim, occasionally bright
         self.star_colors = star_colors or DEFAULT_STAR_COLORS
 
@@ -77,36 +91,21 @@ class StarfieldGenerator:
         """Generate a procedural starfield.
         
         Supported subtypes:
-        - 'default': standard starfield
+        - 'standard': standard starfield
         - 'dense': more stars everywhere
         - 'sparse': very few stars
         - 'cluster': tightly grouped dense star clusters
         """
         noise_seed = rng.randint(0, 2**31 - 1)
         gen = OpenSimplex(seed=noise_seed)
-        
-        map_text = Text()
-        
-        # Adjust parameters based on subtype
-        threshold = self.cluster_threshold
-        fill_rate = self.max_fill_rate
-        min_fill = self.min_fill_rate
-        scale = self.noise_scale
 
-        st = subtype.lower()
-        if st == "dense":
-            threshold = -0.8
-            fill_rate = 0.25
-            min_fill = 0.05
-        elif st == "sparse":
-            threshold = 0.0
-            fill_rate = 0.05
-            min_fill = 0.0  # genuine empty space between sparse stars
-        elif st == "cluster":
-            threshold = 0.3
-            fill_rate = 0.5
-            scale = 10.0 # tighter clusters
-            min_fill = 0.0  # dark voids between tight clusters are the point
+        map_text = Text()
+
+        params = STARFIELD_PRESETS.get(subtype.lower(), STARFIELD_PRESETS["standard"])
+        threshold = params.threshold
+        fill_rate = params.max_fill
+        min_fill = params.min_fill
+        scale = params.scale
 
         scale_range = 1.0 - threshold
 
