@@ -36,6 +36,9 @@ PORT_SUBTYPES = ["trading_port", "starbase", "stardock"]
 #   'R'            -> red beacon  (rendered as an upper-half block, top light)
 #   'Y'            -> yellow glow (rendered as a lower-half block, engine light)
 #   ' '            -> empty space
+#   any other char -> a facet feature (see _HULL_CHARS): drawn in the archetype
+#                     facet colour over a bright-hull background, 
+#                     e.g. ☉ ° ◇ ◆ ◊ ⁐ ≡ ◇ ◆ ☉
 PORT_ART: dict[str, tuple[tuple[str, ...], ...]] = {
     # The hero. Vertical, symmetric: beacon, tower, docking-arm platform,
     # tapering chevron body, engine glow -- the TW2002 StarDock shape.
@@ -45,8 +48,8 @@ PORT_ART: dict[str, tuple[tuple[str, ...], ...]] = {
             "       █       ",
             "      ███      ",
             "    ▟█████▙    ",
-            "╾─▓█████████▓─╼",
-            "    ▜█████▛    ",
+            "╾─▓████◊█████▓─╼",
+            "    ▜██≡██▛    ",
             "     ▓███▓     ",
             "      ▜█▛      ",
             "       Y       ",
@@ -144,7 +147,9 @@ PORT_ART: dict[str, tuple[tuple[str, ...], ...]] = {
 @dataclass(frozen=True)
 class PortStyle:
     """Palette for a port hull: three shading levels, the navigation-beacon hue
-    pools (a steady hue is drawn per station), and the lit-window hue pool."""
+    pools (a steady hue is drawn per station), the lit-window hue pool, and the
+    ``facet`` colour -- the foreground hue for surface-feature glyphs, drawn over
+    a bright-hull background so the feature reads as etched into the plating."""
 
     bright: str
     mid: str
@@ -152,6 +157,7 @@ class PortStyle:
     top: tuple[str, ...]
     bottom: tuple[str, ...]
     window: tuple[str, ...]
+    facet: str
 
 
 # Hull palettes keyed by ``archetype_id`` (see config/roster_default.yaml). The
@@ -165,6 +171,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("red", "bright_red"),
         bottom=("yellow", "bright_yellow"),
         window=("bright_cyan", "bright_yellow", "grey100"),
+        facet="grey15",
     ),
     # Vesk -- warm fox-folk technologists: amber-khaki hull, cyan windows.
     "canid_technologist": PortStyle(
@@ -172,6 +179,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("orange1", "gold1"),
         bottom=("cyan", "bright_cyan"),
         window=("gold1", "bright_white"),
+        facet="dark_orange3",
     ),
     # Selvani -- soft-bodied envoys: aqua/teal organic hull.
     "tentacled_envoy": PortStyle(
@@ -179,6 +187,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("aquamarine1", "cyan"),
         bottom=("turquoise2", "cyan"),
         window=("pale_turquoise1", "bright_white"),
+        facet="dark_cyan",
     ),
     # Helot -- cold brain-dome automata: chrome and electric blue.
     "brain_dome_automaton": PortStyle(
@@ -186,6 +195,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("bright_cyan", "cyan"),
         bottom=("dodger_blue1", "bright_cyan"),
         window=("bright_cyan", "grey100"),
+        facet="deep_sky_blue4",
     ),
     # Quill -- predatory salvagers: rusted bronze hull, ember lights.
     "ribbon_salvager": PortStyle(
@@ -193,6 +203,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("orange_red1", "red"),
         bottom=("orange1", "dark_orange"),
         window=("orange1", "red"),
+        facet="grey15",
     ),
     # Stryx -- time-dabbling brokers: violet, uncanny.
     "temporal_broker": PortStyle(
@@ -200,6 +211,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("magenta", "violet"),
         bottom=("blue_violet", "purple"),
         window=("plum1", "bright_white"),
+        facet="purple4",
     ),
     # The Concordance -- bodiless arbiter: pale gold, luminous.
     "cosmic_arbiter": PortStyle(
@@ -207,6 +219,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("gold1", "yellow"),
         bottom=("bright_white", "gold1"),
         window=("gold1", "bright_white"),
+        facet="dark_goldenrod",
     ),
     # Dignar -- aristocratic mind-mages: royal orchid/purple.
     "telepath_aristocrat": PortStyle(
@@ -214,6 +227,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("magenta", "bright_magenta"),
         bottom=("violet", "magenta"),
         window=("orchid", "bright_white"),
+        facet="purple4",
     ),
     # Cibelline -- engineered aesthetes: rose and pink-gold finery.
     "engineered_aesthete": PortStyle(
@@ -221,6 +235,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("gold1", "yellow"),
         bottom=("deep_pink2", "hot_pink"),
         window=("gold1", "pink1"),
+        facet="medium_violet_red",
     ),
     # Selvi -- playful imps: bright pinks and magenta.
     "amorous_imp": PortStyle(
@@ -228,6 +243,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("hot_pink", "magenta"),
         bottom=("bright_magenta", "hot_pink"),
         window=("light_pink1", "bright_white"),
+        facet="medium_violet_red",
     ),
     # Vennrith -- horned grudge-keepers: iron grey and blood red.
     "horned_grudgekeeper": PortStyle(
@@ -235,6 +251,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("red", "bright_red"),
         bottom=("orange3", "red"),
         window=("red", "orange1"),
+        facet="grey15",
     ),
     # Thessarch -- psionic overlords: deep indigo authority.
     "psionic_overlord": PortStyle(
@@ -242,6 +259,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("blue_violet", "purple"),
         bottom=("dodger_blue1", "blue"),
         window=("slate_blue1", "bright_cyan"),
+        facet="grey15",
     ),
     # Thessbrood -- colonial broodmasters: sickly insectoid chartreuse.
     "colonial_broodmaster": PortStyle(
@@ -249,6 +267,7 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("green_yellow", "chartreuse1"),
         bottom=("yellow3", "chartreuse3"),
         window=("green_yellow", "bright_yellow"),
+        facet="green4",
     ),
     # Dacaran -- winged schemers: cold slate and dark teal.
     "winged_schemer": PortStyle(
@@ -256,15 +275,30 @@ ARCHETYPE_STYLES: dict[str, PortStyle] = {
         top=("dark_cyan", "cyan"),
         bottom=("steel_blue", "cyan"),
         window=("cyan", "grey100"),
+        facet="grey15",
     ),
 }
 # Federation hull as the catch-all style for unknown/unset archetypes.
 ARCHETYPE_STYLES["default"] = ARCHETYPE_STYLES["humanoid_diplomat"]
 
-# Glyphs that read as bright, lit plating; everything else structural defaults
-# to the mid level, and these recesses to the dark level.
+# Hull-glyph shading levels: bright (lit plating), dark (shadowed recesses), and
+# -- by exclusion -- mid for every other structural glyph (bevels, struts, arms,
+# panels, box edges).
 _BRIGHT_CHARS = frozenset("█")
 _DARK_CHARS = frozenset("▒░")
+_MID_CHARS = frozenset("▟▙▜▛▓▄▀╾╼─◢◣◥◤▴▾│┌┐└┘┤├▤▦")
+
+# The complete, closed set of glyphs the sprites draw as *hull*. A hull cell is
+# painted in its shading tone over the black void; ANY other non-space glyph is a
+# *facet* -- a surface feature (e.g. ☉ ◘ ◙ ° ◇ ◆ ◊ ▬ ⁐ ≡) drawn in the archetype
+# facet colour over a bright-hull background so its negative space blends into
+# the surrounding plating. We enumerate the hull set rather than every possible
+# facet because the hull alphabet is small and closed, so new feature glyphs just
+# work when dropped into a template.
+_HULL_CHARS = _BRIGHT_CHARS | _DARK_CHARS | _MID_CHARS
+
+# Background of every hull cell: the black of space.
+_VOID_BG = "black"
 
 # Chance a bright hull cell lights up as a window, for a touch of life.
 _WINDOW_PROB = 0.05
@@ -305,6 +339,7 @@ class PortGenerator:
         bright = style.bright
         mid = style.mid
         dark = style.dark
+        facet = style.facet
         # Pick this station's beacon hues once, so the lights are steady.
         top_color = rng.choice(style.top)
         bottom_color = rng.choice(style.bottom)
@@ -334,15 +369,21 @@ class PortGenerator:
                     map_text.append("▀", style=top_color)
                 elif char == "Y":
                     map_text.append("▄", style=bottom_color)
-                elif char in _BRIGHT_CHARS:
-                    if rng.random() < _WINDOW_PROB:
-                        map_text.append(char, style=rng.choice(windows))
+                elif char in _HULL_CHARS:
+                    # Hull plating: a shading tone over the black of space.
+                    if char in _BRIGHT_CHARS and rng.random() < _WINDOW_PROB:
+                        color = rng.choice(windows)
+                    elif char in _DARK_CHARS:
+                        color = dark
+                    elif char in _BRIGHT_CHARS:
+                        color = bright
                     else:
-                        map_text.append(char, style=bright)
-                elif char in _DARK_CHARS:
-                    map_text.append(char, style=dark)
+                        color = mid
+                    map_text.append(char, style=f"{color} on {_VOID_BG}")
                 else:
-                    map_text.append(char, style=mid)
+                    # Facet feature: a detail glyph over a patch of bright hull,
+                    # so its surrounding negative space matches the plating.
+                    map_text.append(char, style=f"{facet} on {bright}")
 
             if y < height - 1:
                 map_text.append("\n")
