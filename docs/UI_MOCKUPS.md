@@ -97,24 +97,23 @@ MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
 
 ```
 ┌─ EDGE OF THE UNKNOWN ──────────────────────────────── turns 287/300 ─┐
-│             [7] CORE SPACE (Core)           │ S.S. Wayfarer (Trailbl) │
-│         ░▒▓ the lanes hum w/ traffic ▓▒░    │ ----------------------- │
-│            ! "Welcome to Sol"               │ Shields ████████░░ 82%  │
+│  .          [7] CORE SPACE (Core)        *  │ S.S. Wayfarer (Trailbl) │
+│         ░▒▓ the lanes hum w/ traffic ▓▒░  . │ ----------------------- │
+│       *    ! "Welcome to Sol"          .    │ Shields ████████░░ 82%  │
 │   .      .-~~~-.       .    =[#####]=     . │ Warp    ███░░░░░░░  3    │
 │       . .'~ .o. ~'.       . =[#o#o#]=   .   │ Combat  ████░░░░░░  4    │
-│   .     : ~  .O.  ~ :  .       |||      .   │ Cloak   ░░░░░░░░░░ off   │
+│   .     : ~  .O.  ~ :  .  .    |||      .   │ Cloak   ░░░░░░░░░░ off   │
 │        . '.~ .o. ~.'      .  (orbital)    . │ Sensors ██████░░░░ TierII│
-│    Terra Nova terrestrial   Stardock-Cls0   │ subsystems: all nominal │
-│    Discoveries                              │ ----------------------- │
-│      ✦ Crashed Ship — unlogged (Scan)       │ Holds 40/60             │
-│    Ships                                    │  Fuel ████████░░░░ 20   │
-│       ___              ___                  │  Org  ████░░░░░░░░ 12   │
-│      [===]=>          <=[===]               │  Equ  ██░░░░░░░░░░  8   │
-│       Kestrel       Cabal Marauder (Hail)   │ Latinum 14,250 slips    │
-│      > Verdani escort (Hail)                │ ----------------------- │
-│                                             │ Band 0 - Core           │
-│                 1<   3/Sol  6>              │   (3) (6)               │
-│                 8?    (7)    12?            │  (1)-(7)  (8) (12)      │
+│     Terra Nova terrestrial  Stardock-Cls0   │ subsystems: all nominal │
+│   .       *        .  +        .      *   . │ ----------------------- │
+│       ___              ___                  │ Holds 40/60             │
+│      [===]=>          <=[===]            *  │  Fuel ████████░░░░ 20   │
+│   .   Kestrel       Cabal Marauder (Hail)   │  Org  ████░░░░░░░░ 12   │
+│      > Verdani escort (Hail)             .  │  Equ  ██░░░░░░░░░░  8   │
+│            Discoveries               *      │ Latinum 14,250 slips    │
+│      ✦ Crashed Ship — unlogged (Scan)    .  │ ----------------------- │
+│                 1<   3/Sol  6>              │ Band 0 - Core           │
+│   .             8?    (7)    12?         *  │  (1)-(7)  (8) (12)      │
 ├──────────────────────────────────────────────────────────────────────┤
 │- arrive in Sector 7.   - Stardock detected.   - 287 turns left.      │
 ├──────────────────────────────────────────────────────────────────────┤
@@ -122,35 +121,37 @@ MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Sector view layout**: the left 2/3 is a vertical stack on a `content` layer
-  over a full-bleed **`Starfield`** `backdrop` layer (the stars show through every
-  transparent gap in the sprites, so each body floats in space). Top to bottom:
-  a full-width **header** (`[id] REGION (Band)` + flavor line + beacon), a
-  two-column **orbit row** (planet | port), a **ships row**, then the **`WarpGrid`**
-  centred and pinned to the very bottom. The retired `SectorScene` compositor that
-  stamped sprites into the right negative space is gone — sprites and their labels
-  are now **co-located**, not kept apart.
-- **Orbit row**: two `1fr` columns. Left = the **planet** sprite with its name
-  beneath, then the **Discoveries** list (each unlogged find a clickable `Scan`
-  row); right = the **port** sprite with its name beneath. Each sprite+name is an
-  **`OrbitPanel`**, clickable to the same destination as its key — planet ->
-  PlanetScreen (§3, `S`); a StarDock port -> StarDockScreen (§5) / a plain port ->
-  PortScreen (§2), the **same target as `P`**. A column with no planet/port shows a
-  muted placeholder so the two-column shape stays stable as you warp. The planet
-  sprite's width is always **2×its height** so the disc reads round on the ~2:1
-  cell grid; all sprite sizes come from config `scene:` (`SceneArtConfig`).
-- **Ships row**: up to `scene.max_ships_shown` (default **2**) ship sprites side by
-  side as **`ShipPanel`**s, each with its name beneath; when two show, the second
-  may be flipped to **face the first** (deterministic per sector,
-  `scene.ship_face_inward_chance`). Any ships beyond the cap fall to a compact
-  **clickable text list** so every contact stays individually hailable. Clicking a
-  hailable ship opens AlienContactScreen (§6) for a friendly-band ship or
-  EncounterScreen (§7) for a hostile one (skeleton: by name keyword; the real game
-  reads disposition).
+- **Sector scene (the left 2/3)**: a single composited **`SectorScene`** Static —
+  a procedural `edge.art` **starfield base** with the header, planet, port, ships,
+  and discoveries stamped over it. It is one widget because a terminal cell holds a
+  single glyph and Textual does **not** blend overlapping widgets/layers; the only
+  way to show the starfield *behind* the sprites and text is to composite them in
+  one grid. Sprites' negative-space cells are left transparent, so stars show
+  through their gaps (each body floats in space); text lines clear the stars within
+  their own extent so words stay legible, with stars in the margins. Planet / port /
+  ship / unlogged-discovery **click hotspots** post the same `ClickableEntry.Picked`
+  the keys do. All sprite sizes come from config `scene:` (`SceneArtConfig`).
+  Top to bottom: a centred **header** (`[id] REGION (Band)` + flavor + beacon); a
+  two-column **orbit band** — **planet** left (name beneath), **port** right (name
+  beneath, sprite **vertically centred** against the taller planet); a blank
+  **margin**; a **ships row** (no heading); the **Discoveries** row; then the
+  **`WarpGrid`** beneath. A missing planet/port shows a muted placeholder so the two
+  columns stay put as you warp. The planet's width is always **2×its height** so the
+  disc reads round on the ~2:1 cell grid (`scene.planet`, distinct from
+  `scene.planet_detail` used by the larger PlanetScreen orbit view, §3).
+- **Orbit / ship clicks** open the same screen as the key: planet -> PlanetScreen
+  (§3, `S`); a StarDock port -> StarDockScreen (§5) / a plain port -> PortScreen
+  (§2), the **same target as `P`**; a hailable ship -> AlienContactScreen (§6) for a
+  friendly-band ship or EncounterScreen (§7) for a hostile one.
+- **Ships**: up to `scene.max_ships_shown` (default **2**) sprites side by side; when
+  two show, the second may be flipped to **face the first** (deterministic per
+  sector, `scene.ship_face_inward_chance`). Ships beyond the cap fall to a compact
+  **clickable text list** so every contact stays individually hailable.
 - **Warps**: the **`WarpGrid`** — a 3x3 grid with the **current sector pinned to the
   centre cell** (non-clickable `(7)`) and outbound warps in the eight cells around
-  it (clickable, unexplored dimmed with `?`), centred in a full-width area at the
-  bottom. TW2002 sectors warp to <= 6 others, so eight surrounding cells suffice.
+  it (clickable, unexplored dimmed with `?`), **centred** below the scene so the
+  current sector sits in the middle. TW2002 sectors warp to <= 6 others, so eight
+  surrounding cells suffice.
 - **Right 1/3 — status sidebar**: ship name/type; aspect readout with bars
   (shields/warp/combat/cloak/sensors) + a compact **subsystem-integrity line**
   (flags knocked-out components, §4.1); holds bar per commodity; Gun/missile/

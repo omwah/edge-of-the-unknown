@@ -32,6 +32,9 @@ def test_default_scene_art_values() -> None:
     # Planet width is derived as 2*height so the disc stays round (cells are ~2:1).
     assert scene.planet.max_height == 12
     assert scene.planet.max_width == 24
+    # PlanetScreen's orbit planet is configured independently of the SectorView one.
+    assert scene.planet_detail.max_height == 14
+    assert scene.planet_detail.max_width == 28
     assert (scene.port.max_width, scene.port.max_height) == (18, 8)
     assert (scene.ship.max_width, scene.ship.max_height) == (16, 6)
     assert scene.max_ships_shown == 2

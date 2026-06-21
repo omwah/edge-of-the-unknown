@@ -633,7 +633,8 @@ class SceneArtConfig(BaseModel):
 
     model_config = _FROZEN
 
-    planet: PlanetSpriteSize = PlanetSpriteSize()
+    planet: PlanetSpriteSize = PlanetSpriteSize()  # SectorView orbit-row planet
+    planet_detail: PlanetSpriteSize = PlanetSpriteSize(max_height=14)  # PlanetScreen orbit view
     port: SpriteSize = SpriteSize(max_width=18, max_height=8)
     ship: SpriteSize = SpriteSize(max_width=16, max_height=6)
     max_ships_shown: int = Field(default=2, gt=0)  # sprites; extras list as text

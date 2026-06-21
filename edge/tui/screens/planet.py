@@ -80,10 +80,11 @@ class PlanetScreen(Screen):
                     yield Static(hint, classes="section")
                 if p.genesis_eligible and p.ship_genesis > 0:
                     yield Static(f"[green]\\[G] Genesis[/] — re-form this world (torpedoes: {p.ship_genesis})")
+            detail = self.app.scene_art.planet_detail
             yield Static(
                 art_adapter.sprite(
                     "planet", art_adapter.planet_subtype(p.ptype),
-                    seed=p.planet_id, width=28, height=14,
+                    seed=p.planet_id, width=detail.max_width, height=detail.max_height,
                 ),
                 id="orbit-art",
             )

@@ -12,11 +12,13 @@ from textual.containers import Grid, Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Button, DataTable, Static
 
+from rich.style import Style
+
 from edge.core.config import SceneArtConfig
 from edge.core.enums import Commodity
 
 from edge.tui import art_adapter
-from edge.tui.dummy import MapBand, MapDTO, NeighborDTO, PortDTO, ShipDTO, WarpDTO
+from edge.tui.dummy import MapBand, MapDTO, NeighborDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
 
 
 class Starfield(Static):
@@ -258,149 +260,208 @@ class StatusSidebar(Vertical):
         return "\n".join(lines)
 
 
-class ArtView(Static):
-    """A single procedural sprite, centred, on a transparent background.
+class SectorScene(Static):
+    """The whole sector scene composited into one grid (UI_MOCKUPS.md §1).
 
-    Renders one `edge.art` sprite (planet / port / ship) sized to its own box but
-    clamped to the per-entity maxima in `app.scene_art` (config `scene:`). Sprite
-    space-cells stay transparent, so the SectorView starfield backdrop shows
-    through the gaps — the sprite floats in the stars. The planet's width is locked
-    to ``2 * height`` so the disc reads round, not oblong, on the ~2:1 cell grid.
+    A starfield base with the header, planet/port (port vertically centred against
+    the taller planet), ship sprites, and the discoveries list stamped over it. It
+    is one Static because a terminal cell holds a single glyph and Textual does not
+    blend overlapping widgets/layers — so the only way to show the starfield
+    *behind* the sprites and text is to composite them together here. Sprites'
+    negative-space cells are left transparent, so stars show through their gaps.
+
+    Planet / port / ship / unlogged-discovery click targets are recorded as
+    ``_hotspots`` and routed as ``ClickableEntry.Picked`` (mirroring the keys).
     """
 
     DEFAULT_CSS = """
-    ArtView {
-        width: 1fr; height: auto;
-        content-align: center middle; background: transparent;
-    }
+    SectorScene { width: 1fr; height: 1fr; background: transparent; }
     """
 
-    def __init__(self, entity: str, subtype: str, *, sprite_seed: int,
-                 facing: str = "right", **kwargs: object) -> None:
-        super().__init__("", **kwargs)
-        self._entity = entity
-        self._subtype = subtype
-        self._seed = sprite_seed
-        self._facing = facing
+    _ORBIT_MARGIN = 3  # blank rows between the planet/port band and the ships row
 
-    def _max_size(self) -> tuple[int, int]:
-        scene = getattr(self.app, "scene_art", None) or SceneArtConfig()
-        if self._entity == "planet":
-            return scene.planet.max_width, scene.planet.max_height
-        if self._entity == "port":
-            return scene.port.max_width, scene.port.max_height
-        return scene.ship.max_width, scene.ship.max_height
-
-    def on_mount(self) -> None:
-        # The box height is config-driven (the per-entity max) so the vertical
-        # layout is stable; the sprite is centred within it and may be smaller.
-        self.styles.height = self._max_size()[1]
-        self._rebuild()
+    def __init__(self, sector: SectorDTO, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._sector = sector
+        # (x0, y0, x1, y1, dest, ref) recorded each render; on_click maps a hit to
+        # the same ClickableEntry.Picked the keyboard/text affordances post.
+        self._hotspots: list[tuple[int, int, int, int, str, int | str | None]] = []
 
     def on_resize(self) -> None:
-        self._rebuild()
+        self.refresh()
 
-    def _rebuild(self) -> None:
-        box_w, box_h = self.size.width, self.size.height
-        if not box_w or not box_h:
+    def _scene_cfg(self) -> SceneArtConfig:
+        return getattr(self.app, "scene_art", None) or SceneArtConfig()
+
+    # --- grid helpers --------------------------------------------------------
+
+    def _starfield(self, w: int, h: int) -> list[list[tuple[str, Style | None]]]:
+        """Base grid from the procedural `edge.art` starfield (seeded per sector)."""
+        cells = art_adapter.text_to_cells(art_adapter.sprite(
+            "starfield", "standard", seed=self._sector.sector_id ^ 0x5EED, width=w, height=h))
+        grid: list[list[tuple[str, Style | None]]] = [[(" ", None)] * w for _ in range(h)]
+        for y in range(min(h, len(cells))):
+            for x in range(min(w, len(cells[y]))):
+                ch, style = cells[y][x]
+                if ch != " ":
+                    grid[y][x] = (ch, style)
+        return grid
+
+    @staticmethod
+    def _paint(grid: list[list[tuple[str, Style | None]]],
+               rows: list[list[tuple[str, Style | None]]], top: int, left: int) -> None:
+        h, w = len(grid), len(grid[0])
+        for r, row in enumerate(rows):
+            y = top + r
+            if not 0 <= y < h:
+                continue
+            for c, (ch, style) in enumerate(row):
+                x = left + c
+                if ch != " " and 0 <= x < w:  # spaces stay transparent -> stars show
+                    grid[y][x] = (ch, style)
+
+    def _stamp_line(self, grid: list[list[tuple[str, Style | None]]], markup: str,
+                    row: int, x0: int, span: int) -> None:
+        """Stamp one markup line centred within the horizontal span [x0, x0+span).
+
+        Unlike sprites, a text line clears the stars within its own extent (so a
+        star can't bleed through a space *inside* a word); stars still show in the
+        centring margins to either side.
+        """
+        line = art_adapter.text_to_cells(Text.from_markup(markup))[0:1]
+        cells = line[0] if line else []
+        if not (0 <= row < len(grid)):
             return
-        max_w, max_h = self._max_size()
-        if self._entity == "planet":
-            # Lock width = 2*height so the disc stays round, fitting within the box.
-            sh = max(3, min(max_h, box_h, box_w // 2))
-            sw = sh * 2
+        w = len(grid[0])
+        left = x0 + max(0, (span - len(cells)) // 2)
+        for c, (ch, style) in enumerate(cells):
+            x = left + c
+            if 0 <= x < w:
+                grid[row][x] = (ch, style)  # blanks included -> overwrite stars
+
+    def _sprite_cells(self, entity: str, subtype: str, *, seed: int, sw: int, sh: int,
+                      facing: str = "right") -> list[list[tuple[str, Style | None]]]:
+        return art_adapter.text_to_cells(
+            art_adapter.sprite(entity, subtype, seed=seed, width=sw, height=sh, facing=facing))
+
+    # --- render --------------------------------------------------------------
+
+    def render(self) -> Text:
+        self._hotspots = []
+        w, h = self.size.width, self.size.height
+        if w < 8 or h < 6:
+            return Text("")
+        sec = self._sector
+        cfg = self._scene_cfg()
+        grid = self._starfield(w, h)
+        half = w // 2
+        row = 0
+
+        # Header — sector + band, flavor, beacon; centred across the full width.
+        title = f"[{sec.display_id}] {sec.region}" + (f" ({sec.band})" if sec.band else "")
+        self._stamp_line(grid, f"[b cyan]{title}[/]", row, 0, w)
+        row += 1
+        self._stamp_line(grid, f"[i #8a8a8a]░▒▓ {sec.flavor} ▓▒░[/]", row, 0, w)
+        row += 1
+        if sec.beacon:
+            self._stamp_line(grid, f"[yellow]![/] {sec.beacon}", row, 0, w)
+            row += 1
+        row += 1  # blank
+
+        # Orbit band — planet (left half) | port (right half). Sizes from config,
+        # clamped to the space left below `row` for the margin + ships + discoveries.
+        reserved = self._ORBIT_MARGIN + (cfg.ship.max_height + 1) + 3
+        ph = max(4, min(cfg.planet.max_height, (half - 2) // 2, h - row - reserved))
+        pw = ph * 2  # width locked to 2*height so the disc reads round
+        portw = max(4, min(cfg.port.max_width, half - 2))
+        porth = max(3, min(cfg.port.max_height, ph))
+        band_h = max(ph, porth)
+        lcx, rcx = half // 2, half + half // 2  # column centres
+        # Planet (or placeholder), top-aligned in the band.
+        if sec.planets:
+            sub = art_adapter.planet_subtype_from_name(sec.planets[0])
+            self._paint(grid, self._sprite_cells("planet", sub, seed=sec.sector_id, sw=pw, sh=ph),
+                        row, lcx - pw // 2)
         else:
-            sw = max(3, min(max_w, box_w))
-            sh = max(3, min(max_h, box_h))
-        self.update(art_adapter.sprite(
-            self._entity, self._subtype, seed=self._seed,
-            width=sw, height=sh, facing=self._facing,
-        ))
+            self._stamp_line(grid, "[#8a8a8a]no planet[/]", row + band_h // 2, 0, half)
+        # Port (or placeholder), vertically centred against the taller planet.
+        if sec.ports:
+            sub = art_adapter.port_subtype(sec.ports[0])
+            self._paint(grid, self._sprite_cells("port", sub, seed=sec.sector_id, sw=portw, sh=porth),
+                        row + (band_h - porth) // 2, rcx - portw // 2)
+        else:
+            self._stamp_line(grid, "[#8a8a8a]no port[/]", row + band_h // 2, half, half)
+        name_row = row + band_h
+        if sec.planets:
+            self._stamp_line(grid, f"[b yellow]{sec.planets[0]}[/]", name_row, 0, half)
+            self._hotspots.append((0, row, half, name_row + 1, "planet", None))
+        if sec.ports:
+            self._stamp_line(grid, f"[b yellow]{sec.ports[0]}[/]", name_row, half, half)
+            self._hotspots.append((half, row, w, name_row + 1, "port", None))
+        row = name_row + 1 + self._ORBIT_MARGIN
 
+        # Ships — up to N sprites side by side (no heading), names beneath. The 2nd
+        # of a pair may face left so the two face inward (deterministic per sector).
+        shown = sec.ships[:cfg.max_ships_shown]
+        if shown:
+            sw = max(4, min(cfg.ship.max_width, (w - 2) // max(1, len(shown)) - 2))
+            sh = cfg.ship.max_height
+            gap = 2
+            total = len(shown) * sw + (len(shown) - 1) * gap
+            sx = max(0, (w - total) // 2)
+            frng = random.Random(sec.sector_id)
+            for i, name in enumerate(shown):
+                entity, sub = art_adapter.ship_entity(name)
+                facing = "left" if (i == 1 and frng.random() < cfg.ship_face_inward_chance) else "right"
+                left = sx + i * (sw + gap)
+                self._paint(grid, self._sprite_cells(entity, sub, seed=sec.sector_id * 16 + i,
+                                                     sw=sw, sh=sh, facing=facing), row, left)
+                cid = sec.contact_ids[i] if i < len(sec.contact_ids) else None
+                tag = " [dim](Hail)[/]" if cid is not None else ""
+                self._stamp_line(grid, f"{name}{tag}", row + sh, left, sw)
+                if cid is not None:
+                    self._hotspots.append((left, row, left + sw, row + sh + 1, "contact", cid))
+            row += sh + 1
+        # Overflow ships beyond the sprite cap stay hailable as centred text rows.
+        for i in range(cfg.max_ships_shown, len(sec.ships)):
+            name = sec.ships[i]
+            cid = sec.contact_ids[i] if i < len(sec.contact_ids) else None
+            tag = " [dim](Hail)[/]" if cid is not None else ""
+            self._stamp_line(grid, f"[white]>[/] {name}{tag}", row, 0, w)
+            if cid is not None:
+                self._hotspots.append((0, row, w, row + 1, "contact", cid))
+            row += 1
 
-class OrbitPanel(Vertical):
-    """A planet/port sprite with its name beneath — one orbit-row column (§1).
+        # Discoveries — their own row under the ships (clickable = scan).
+        row += 1
+        self._stamp_line(grid, "[b yellow]Discoveries[/]", row, 0, w)
+        row += 1
+        if sec.discoveries:
+            for d in sec.discoveries:
+                if d.collected:
+                    self._stamp_line(grid, f"[cyan]✦[/] {d.label} — logged", row, 0, w)
+                else:
+                    self._stamp_line(grid, f"[cyan]✦[/] {d.label} — unlogged (Scan)", row, 0, w)
+                    self._hotspots.append((0, row, w, row + 1, "discovery", d.discovery_id))
+                row += 1
+        else:
+            self._stamp_line(grid, "[#8a8a8a]none[/]", row, 0, w)
 
-    Clickable: posts ``ClickableEntry.Picked(dest, ref)`` so the GameScreen routes
-    the art exactly like its text affordance (planet -> Survey, port -> Dock). An
-    empty slot (no planet/port in the sector) shows a muted placeholder and is
-    inert, so the two-column orbit row stays stable as the player warps around.
-    """
-
-    DEFAULT_CSS = """
-    OrbitPanel { width: 1fr; height: auto; }
-    OrbitPanel > .scene-label {
-        width: 1fr; height: auto; text-align: center; color: $secondary; text-style: bold;
-    }
-    OrbitPanel > .scene-empty { color: $text-muted; text-style: none; }
-    OrbitPanel.clickable:hover { background: $boost; }
-    """
-
-    def __init__(self, entity: str, subtype: str | None, label: str, *,
-                 sprite_seed: int, dest: str, ref: int | str | None = None,
-                 **kwargs: object) -> None:
-        super().__init__(**kwargs)
-        self._entity = entity
-        self._subtype = subtype  # None => empty slot (placeholder, inert)
-        self._label = label
-        self._seed = sprite_seed
-        self._dest = dest
-        self._ref = ref
-
-    def compose(self) -> ComposeResult:
-        if self._subtype is None:
-            yield Static(self._label, classes="scene-label scene-empty")
-            return
-        self.add_class("clickable")
-        yield ArtView(self._entity, self._subtype, sprite_seed=self._seed)
-        yield Static(self._label, classes="scene-label")
-
-    def on_click(self, event: events.Click) -> None:
-        if self._subtype is None:
-            return
-        event.stop()
-        self.post_message(ClickableEntry.Picked(self._dest, self._ref))
-
-
-class ShipPanel(Vertical):
-    """One ship sprite with its name beneath — a ships-row cell (§1).
-
-    Clickable when the ship is a hailable contact (posts ``Picked('contact',
-    contact_id)``, opening AlienContact/Encounter); decorative otherwise. The
-    sprite may be flipped to ``facing='left'`` so a pair of ships faces inward.
-    """
-
-    DEFAULT_CSS = """
-    ShipPanel { width: 1fr; height: auto; }
-    ShipPanel > .scene-label {
-        width: 1fr; height: auto; text-align: center; color: $text;
-    }
-    ShipPanel.clickable:hover { background: $boost; }
-    """
-
-    def __init__(self, name: str, *, sprite_seed: int, contact_id: int | None,
-                 facing: str = "right", **kwargs: object) -> None:
-        super().__init__(**kwargs)
-        self._name = name
-        self._seed = sprite_seed
-        self._contact_id = contact_id
-        self._facing = facing
-
-    def compose(self) -> ComposeResult:
-        entity, sub = art_adapter.ship_entity(self._name)
-        yield ArtView(entity, sub, sprite_seed=self._seed, facing=self._facing)
-        suffix = " [dim](Hail)[/]" if self._contact_id is not None else ""
-        yield Static(f"{self._name}{suffix}", classes="scene-label")
-
-    def on_mount(self) -> None:
-        if self._contact_id is not None:
-            self.add_class("clickable")
+        out = Text()
+        for y in range(h):
+            for ch, style in grid[y]:
+                out.append(ch, style=style)
+            if y < h - 1:
+                out.append("\n")
+        return out
 
     def on_click(self, event: events.Click) -> None:
-        if self._contact_id is None:
-            return
-        event.stop()
-        self.post_message(ClickableEntry.Picked("contact", self._contact_id))
+        x, y = int(event.x), int(event.y)
+        for x0, y0, x1, y1, dest, ref in self._hotspots:
+            if x0 <= x < x1 and y0 <= y < y1:
+                event.stop()
+                self.post_message(ClickableEntry.Picked(dest, ref))
+                return
 
 
 class MapBandPanel(Static):
@@ -571,7 +632,10 @@ class WarpGrid(Grid):
         grid-rows: 1;
         grid-gutter: 0 1;
         height: auto;
-        width: auto;
+        /* Fixed content width (3 columns x 10 + 2 gutters) so the parent can
+           centre the whole grid — Grid does not shrink to content under width:auto,
+           and a full-width grid would left-pack the cells off-centre. */
+        width: 32;
     }
     WarpGrid WarpButton { width: 1fr; height: 1; border: none !important; }
     WarpGrid WarpButton.unexplored { color: $text-disabled; }

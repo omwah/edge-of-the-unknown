@@ -10,7 +10,8 @@ turns_per_day: 250  # TWINSTR.DOC default (§9)
 
 # SectorView sprite scene — sizes/counts only, no rules impact (presentation).
 scene:
-  planet: { max_height: 12 }   # width is ALWAYS 2*height so the disc stays round
+  planet: { max_height: 12 }        # SectorView orbit-row planet (width = 2*height)
+  planet_detail: { max_height: 14 } # PlanetScreen orbit view planet (independent of above)
   port:   { max_width: 18, max_height: 8 }
   ship:   { max_width: 16, max_height: 6 }
   max_ships_shown: 2           # sprites shown; extra ships fall to a clickable list
