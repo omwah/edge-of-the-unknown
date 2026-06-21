@@ -22,7 +22,7 @@ from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import Cannibalize, Colonize, DeployGenesis, Descend
 from edge.server.service import GameService
-from edge.tui import sprites
+from edge.tui import art_adapter
 from edge.tui.dummy import sample_surface
 from edge.tui.screens.surface import SurfaceScreen
 
@@ -46,7 +46,6 @@ class PlanetScreen(Screen):
     PlanetScreen #orbit-body { width: 2fr; padding: 1 2; }
     PlanetScreen #orbit-art {
         width: 1fr; height: 1fr; content-align: center top; text-align: center;
-        color: $primary; text-style: bold;
     }
     PlanetScreen .section { margin-top: 1; }
     """
@@ -81,7 +80,13 @@ class PlanetScreen(Screen):
                     yield Static(hint, classes="section")
                 if p.genesis_eligible and p.ship_genesis > 0:
                     yield Static(f"[green]\\[G] Genesis[/] — re-form this world (torpedoes: {p.ship_genesis})")
-            yield Static("\n".join(sprites.pick_planet_large(p.ptype)), id="orbit-art")
+            yield Static(
+                art_adapter.sprite(
+                    "planet", art_adapter.planet_subtype(p.ptype),
+                    seed=p.planet_id, width=28, height=14,
+                ),
+                id="orbit-art",
+            )
         yield Footer()
 
     def _claim_hint(self) -> str:

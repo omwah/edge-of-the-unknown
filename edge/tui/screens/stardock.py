@@ -19,6 +19,7 @@ from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier
 from edge.core.rules import BuyComponent, BuyGenesis, BuyShip, RecruitColonists
 from edge.server.service import GameService
+from edge.tui import art_adapter
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.widgets import TradePanel
@@ -41,6 +42,7 @@ class StarDockScreen(Screen):
         dock: top; height: 1; background: $primary; color: $background;
         text-style: bold; padding: 0 1;
     }
+    StarDockScreen #dock-art { height: auto; content-align: center top; }
     StarDockScreen TabPane { padding: 1 2; }
     StarDockScreen .note { color: $text-muted; margin-top: 1; }
     StarDockScreen DataTable { height: auto; max-height: 18; }
@@ -61,6 +63,12 @@ class StarDockScreen(Screen):
         dock = self._service.stardock_view(self._pid)
         latinum = dock.latinum
         yield Static(f"STARDOCK · Sector {dock.sector_display}", id="dock-title")
+        yield Static(
+            art_adapter.sprite(
+                "port", "stardock", seed=dock.sector_display, width=34, height=6,
+            ),
+            id="dock-art",
+        )
         with TabbedContent(initial=self._initial_tab):
             with TabPane("Commodities", id="trade"):
                 yield TradePanel(port, latinum=latinum, show_title=False)

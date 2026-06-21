@@ -188,6 +188,7 @@ def sample_surface() -> SurfaceDTO:
         ),
         sites=sites,
         terrain_blurb=terrain_art.blurb_for("terrestrial_warm"),
+        ptype="terrestrial_warm",
     )
 
 

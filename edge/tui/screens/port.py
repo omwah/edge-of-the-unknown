@@ -16,6 +16,7 @@ from textual.widgets import Static
 from edge.core.economy import EconomyError
 from edge.core.rules import Trade
 from edge.server.service import GameService
+from edge.tui import art_adapter
 from edge.tui.screens.haggle import HaggleScreen
 from edge.tui.widgets import NAME_TO_COMMODITY, TradePanel
 
@@ -41,6 +42,13 @@ class PortScreen(Screen):
             yield Static("No port to trade with here.", id="port-body")
             return
         latinum = self._service.game_view(self._pid).ship.latinum
+        yield Static(
+            art_adapter.sprite(
+                "port", art_adapter.port_subtype(port.klass),
+                seed=port.sector_id, width=30, height=5,
+            ),
+            id="port-art",
+        )
         yield TradePanel(port, latinum=latinum, id="port-body")
 
     def action_trade(self) -> None:
