@@ -8,10 +8,12 @@ Phase 2-3 screens still open on sample data.
 
 from __future__ import annotations
 
+import random
+
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, VerticalScroll
+from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
@@ -21,6 +23,7 @@ from edge.core.events import Event
 from edge.core.movement import MovementError
 from edge.core.rules import Dock, Hail, Salvage, TravelTo, Warp
 from edge.server.service import GameService
+from edge.tui import art_adapter
 from edge.tui.dummy import SectorDTO
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.contact import AlienContactScreen
@@ -31,7 +34,9 @@ from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
 from edge.tui.widgets import (
     ClickableEntry,
-    SectorScene,
+    OrbitPanel,
+    ShipPanel,
+    Starfield,
     StatusSidebar,
     WarpButton,
     WarpGrid,
@@ -56,19 +61,32 @@ class TopBar(Static):
 
 
 class SectorView(Container):
+    """The primary sector display: sprites co-located with their labels (§1).
+
+    A starfield backdrop layer sits behind a content layer that stacks, top to
+    bottom: a full-width header (sector + band), a two-column orbit row
+    (planet | port, each sprite with its name beneath; discoveries under the
+    planet), a ships row (up to `scene.max_ships_shown` sprites, the rest a
+    clickable text list), and a centred warp grid pinned to the bottom.
+    """
+
     DEFAULT_CSS = """
-    SectorView { width: 2fr; layers: scene content; background: transparent; }
-    SectorView SectorScene { layer: scene; }
-    SectorView #sector-text {
-        layer: content; width: 60%; height: 1fr;
-        padding: 0 1; overflow-x: hidden; background: transparent;
+    SectorView { width: 2fr; layers: backdrop content; background: transparent; }
+    SectorView Starfield { layer: backdrop; width: 100%; height: 100%; }
+    SectorView #sector-stack {
+        layer: content; width: 100%; height: 100%; padding: 0 1; background: transparent;
     }
-    SectorView #sector-text > Static, SectorView #sector-text > ClickableEntry {
-        width: auto; background: transparent;
-    }
+    SectorView #sector-header { width: 1fr; height: auto; text-align: center; }
     SectorView #flavor { color: $text-muted; text-style: italic; }
-    SectorView .heading { color: $secondary; text-style: bold; }
-    SectorView .spacer { height: 1; }
+    SectorView #orbit-row { height: auto; }
+    SectorView .orbit-col { width: 1fr; height: auto; }
+    SectorView .col-heading { width: 1fr; text-align: center; color: $secondary; text-style: bold; }
+    SectorView .muted { color: $text-muted; }
+    SectorView #ships-row { height: auto; }
+    SectorView #ship-sprites { height: auto; }
+    SectorView #scene-spacer { height: 1fr; }
+    SectorView #warp-area { width: 1fr; height: auto; align-horizontal: center; }
+    SectorView ClickableEntry { width: 1fr; background: transparent; }
     """
 
     def __init__(self, sector: SectorDTO) -> None:
@@ -76,64 +94,85 @@ class SectorView(Container):
         self._sector = sector
 
     def compose(self) -> ComposeResult:
-        yield SectorScene(self._sector)
-        with VerticalScroll(id="sector-text"):
-            yield from self._content(self._sector)
+        sec = self._sector
+        yield Starfield(animate=not self.app.plain)
+        with Vertical(id="sector-stack"):
+            # Header — sector name + band, spanning all columns at the very top.
+            title = f"[{sec.display_id}] {sec.region}"
+            if sec.band:
+                title += f" ({sec.band})"
+            with Vertical(id="sector-header"):
+                yield Static(f"[b cyan]{title}[/]", id="title")
+                yield Static(f"░▒▓ {sec.flavor} ▓▒░", id="flavor")
+                if sec.beacon:
+                    yield Static(f"[yellow]![/] {sec.beacon}")
 
-    def _content(self, sec: SectorDTO) -> ComposeResult:
-        title = f"[{sec.display_id}] {sec.region}"
-        if sec.band:
-            title += f" ({sec.band})"
-        yield Static(f"[b cyan]{title}[/]", id="title")
-        yield Static(f"░▒▓ {sec.flavor} ▓▒░", id="flavor")
+            # Orbit row — planet | port, each with its name beneath the sprite.
+            with Horizontal(id="orbit-row"):
+                with Vertical(classes="orbit-col"):
+                    if sec.planets:
+                        sub = art_adapter.planet_subtype_from_name(sec.planets[0])
+                        yield OrbitPanel("planet", sub, sec.planets[0],
+                                         sprite_seed=sec.sector_id, dest="planet")
+                    else:
+                        yield OrbitPanel("planet", None, "no planet",
+                                         sprite_seed=sec.sector_id, dest="planet")
+                    # Discoveries live with the planet column.
+                    yield Static("Discoveries", classes="col-heading")
+                    if sec.discoveries:
+                        for d in sec.discoveries:
+                            if d.collected:
+                                yield Static(f"  [cyan]✦[/] {d.label} — logged")
+                            else:
+                                yield ClickableEntry(
+                                    f"  [cyan]✦[/] {d.label} — unlogged (Scan)",
+                                    dest="discovery", ref=d.discovery_id)
+                    else:
+                        yield Static("  none", classes="muted")
+                with Vertical(classes="orbit-col"):
+                    if sec.ports:
+                        sub = art_adapter.port_subtype(sec.ports[0])
+                        yield OrbitPanel("port", sub, sec.ports[0],
+                                         sprite_seed=sec.sector_id, dest="port")
+                    else:
+                        yield OrbitPanel("port", None, "no port",
+                                         sprite_seed=sec.sector_id, dest="port")
 
-        yield Static("", classes="spacer")
-        yield Static("Planets", classes="heading")
-        if sec.planets:
-            for p in sec.planets:
-                yield ClickableEntry(f"  [green]@[/] {p}", dest="planet")
-        else:
-            yield Static("  none")
+            # Ships — up to N sprites side by side, the rest a clickable list.
+            yield from self._ships(sec)
 
-        yield Static("", classes="spacer")
-        yield Static("Ports", classes="heading")
-        if sec.ports:
-            for p in sec.ports:
-                yield ClickableEntry(f"  [magenta]P[/] {p}", dest="port")
-        else:
-            yield Static("  none")
+            # Push the warp interface to the very bottom, centred across columns.
+            yield Static("", id="scene-spacer")
+            with Container(id="warp-area"):
+                yield WarpGrid(sec.warps, sec.display_id)
 
-        yield Static("", classes="spacer")
-        yield Static("Discoveries", classes="heading")
-        if sec.discoveries:
-            for d in sec.discoveries:
-                if d.collected:
-                    yield Static(f"  [cyan]✦[/] {d.label} — logged")
-                else:
-                    yield ClickableEntry(
-                        f"  [cyan]✦[/] {d.label} — unlogged (Scan)", dest="discovery", ref=d.discovery_id)
-        else:
-            yield Static("  none")
-
-        yield Static("", classes="spacer")
-        if sec.beacon:
-            yield Static("Beacons", classes="heading")
-            yield Static(f"  [yellow]![/] {sec.beacon}")
-            yield Static("", classes="spacer")
-        yield Static("Ships", classes="heading")
-        if sec.ships:
-            for i, s in enumerate(sec.ships):
+    def _ships(self, sec: SectorDTO) -> ComposeResult:
+        max_shown = self.app.scene_art.max_ships_shown
+        flip_chance = self.app.scene_art.ship_face_inward_chance
+        with Vertical(id="ships-row"):
+            yield Static("Ships", classes="col-heading")
+            if not sec.ships:
+                yield Static("  none", classes="muted")
+                return
+            shown = sec.ships[:max_shown]
+            # Deterministic facing (seeded by sector) so it never flickers on
+            # recompose: the second of two ships may flip to face the first.
+            rng = random.Random(sec.sector_id)
+            with Horizontal(id="ship-sprites"):
+                for i, name in enumerate(shown):
+                    cid = sec.contact_ids[i] if i < len(sec.contact_ids) else None
+                    facing = "left" if (i == 1 and rng.random() < flip_chance) else "right"
+                    yield ShipPanel(name, sprite_seed=sec.sector_id * 16 + i,
+                                    contact_id=cid, facing=facing)
+            # Overflow beyond the sprite cap stays individually hailable as text.
+            for i in range(max_shown, len(sec.ships)):
+                name = sec.ships[i]
                 cid = sec.contact_ids[i] if i < len(sec.contact_ids) else None
-                if cid is None:  # a non-hailable hull (sample data) — show but don't click
-                    yield Static(f"  [white]>[/] {s}")
+                if cid is None:
+                    yield Static(f"  [white]>[/] {name}")
                 else:
-                    yield ClickableEntry(f"  [white]>[/] {s} [dim](Hail)[/]", dest="contact", ref=cid)
-        else:
-            yield Static("  none")
-
-        yield Static("", classes="spacer")
-        yield Static("Warps", classes="heading")
-        yield WarpGrid(sec.warps, sec.display_id)  # centre marker shows the spatial id
+                    yield ClickableEntry(f"  [white]>[/] {name} [dim](Hail)[/]",
+                                         dest="contact", ref=cid)
 
 
 class GameScreen(Screen):

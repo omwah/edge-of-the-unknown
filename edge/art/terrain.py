@@ -109,7 +109,7 @@ BIOMES_REGISTRY = {
             (-0.2, "water_deep", "bright_red", "red"),
             (0.0, "water_shallow", "yellow", "bright_red"),
             (0.1, "sand", "yellow", "bright_yellow"),
-            (0.2, "ash", "dark_gray", "black"),
+            (0.2, "ash", "grey35", "black"),
             (0.5, "dust", "bright_black", "black"),
             (0.8, "mountain", "bright_red", "bright_black"),
             (1.0, "snow", "yellow", "red"),
@@ -141,7 +141,7 @@ BIOMES_REGISTRY = {
         "bands": [
             (-0.3, "void", "black", "black"),
             (0.3, "dust", "bright_black", "black"),
-            (0.6, "rock", "gray", "black"),
+            (0.6, "rock", "grey50", "black"),
             (0.8, "rock", "white", "black"),
             (1.0, "debris", "bright_white", "black"),
         ]
@@ -216,7 +216,7 @@ class TerrainGenerator:
         if not self.asteroid_chars:
             self.asteroid_chars = ["o", "O", ".", "@"]
         if not self.asteroid_colors:
-            self.asteroid_colors = ["gray", "white"]
+            self.asteroid_colors = ["grey50", "white"]
 
     def get_grid(
         self, rng: random.Random, subtype: str, width: int, height: int
