@@ -22,6 +22,58 @@ def banner(title: str, width: int, style: str = "bold white") -> Text:
     return Text(framed.center(max(width, len(framed)), "-"), style=style)
 
 
+# Every renderable type, in page order. (ship/subsystem have no generator yet,
+# so they report no subtypes and are skipped.)
+_ALL_TYPES = ["port", "planet", "terrain", "starfield", "ship", "subsystem"]
+
+
+def _export_all_types(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    """Sweep every renderable type into one multi-page PDF (a page per type)."""
+    from edge.art.export import export_multipage_pdf
+
+    if not args.export:
+        parser.error("--type all requires --export PATH (a multi-page PDF)")
+
+    sheets: list[tuple[str, list[tuple[str, Text]], int | None]] = []
+    for entity_type in _ALL_TYPES:
+        subtypes = available_subtypes(entity_type)
+        if not subtypes:
+            continue  # not implemented yet (e.g. ship, subsystem)
+        # Ports carry an archetype (style) axis; other types do not. Planets
+        # render wide (width = 2 * height) like the single-type path.
+        archetypes = available_archetypes() if entity_type == "port" else [None]
+        width = args.height * 2 if entity_type == "planet" else args.width
+        height = args.height
+
+        items: list[tuple[str, Text]] = []
+        for st in subtypes:
+            for arch in archetypes:
+                sprite = generate_sprite(
+                    entity_type=entity_type,
+                    subtype=st,
+                    seed=args.seed,
+                    width=width,
+                    height=height,
+                    archetype_id=arch,
+                )
+                label = st if arch is None else f"{st} / {arch}"
+                items.append((label, sprite))
+
+        cols = args.export_cols
+        if cols is None and len(archetypes) > 1:
+            cols = len(archetypes)  # one column per archetype
+        sheets.append((entity_type, items, cols))
+
+    if not sheets:
+        parser.error("no renderable types found to export")
+
+    written = export_multipage_pdf(sheets, args.export)
+    total = sum(len(items) for _, items, _ in sheets)
+    Console().print(
+        f"Wrote {total} sprites across {len(sheets)} pages to {written}"
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description="Offline CLI tool to generate and preview Edge procedural ASCII art."
@@ -30,13 +82,16 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--type",
         type=str,
         required=True,
-        choices=["planet", "terrain", "ship", "port", "subsystem", "starfield"],
-        help="The category of the entity to generate.",
+        choices=["planet", "terrain", "ship", "port", "subsystem", "starfield", "all"],
+        help="The category of the entity to generate. 'all' sweeps every "
+        "renderable type into a multi-page PDF (one page per type); requires "
+        "--export.",
     )
     parser.add_argument(
         "--subtype",
-        required=True,
-        help="The specific subtype (e.g., terrestrial_warm, fighter, stardock).",
+        default=None,
+        help="The specific subtype (e.g., terrestrial_warm, fighter, stardock), "
+        "or 'all'. Required unless --type all.",
     )
     parser.add_argument(
         "--seed",
@@ -82,6 +137,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
 
     args = parser.parse_args(argv)
+
+    if args.type == "all":
+        _export_all_types(args, parser)
+        return
+
+    if args.subtype is None:
+        parser.error("--subtype is required (or use --type all)")
 
     if args.type == "planet":
         args.width = args.height * 2
