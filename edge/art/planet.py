@@ -183,6 +183,10 @@ class PlanetGenerator:
                         char = "▓"
                         fg = bg
                         bg = SHADOW_BG_NEAR
+                    else:
+                        char = "█"
+                        fg = bg
+                        bg = None
 
                     if bg and bg not in ("black", "default"):
                         style = f"{fg} on {bg}" if fg else f"on {bg}"
