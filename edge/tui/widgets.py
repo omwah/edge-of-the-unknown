@@ -259,7 +259,7 @@ class StatusSidebar(Vertical):
 
 
 class SectorScene(Static):
-    """A dim ASCII scene of the sector's planets/ports/ships, drawn on the right.
+    """A procedural ASCII scene of the sector's planets/ports/ships, drawn on the right.
 
     This is the *background* layer of the SectorView (UI_MOCKUPS.md §1): sprites
     (sized planet > port > ship, §sprites) are composited into a character grid,
@@ -292,10 +292,6 @@ class SectorScene(Static):
         self._hotspots = []
         if w < self._MIN_WIDTH or h < 6:
             return Text("")
-        # `True` keeps the art's own colours; `False` (the default) flattens the
-        # scene to the dim per-entity backdrop the layout was designed around
-        # (config `ui.sector_art_full_color`, set on the app at game start).
-        full_color = bool(getattr(self.app, "sector_art_full_color", False))
         grid: list[list[tuple[str, Style | None]]] = [[(" ", None)] * w for _ in range(h)]
         # Centre sprites in the art region: the right span left clear by the text.
         art_left = int(w * self._TEXT_FRACTION)
@@ -303,10 +299,10 @@ class SectorScene(Static):
         centre = (art_left + w) / 2
         seed = self._sector.sector_id
 
-        def cells(entity: str, subtype: str, *, sprite_seed: int, sw: int, sh: int,
-                  color: str) -> list[list[tuple[str, Style | None]]]:
+        def cells(entity: str, subtype: str, *, sprite_seed: int, sw: int,
+                  sh: int) -> list[list[tuple[str, Style | None]]]:
             spr = art_adapter.sprite(entity, subtype, seed=sprite_seed, width=sw, height=sh)
-            return art_adapter.text_to_cells(spr, dim_color=None if full_color else color)
+            return art_adapter.text_to_cells(spr)
 
         def paint(rows: list[list[tuple[str, Style | None]]], top: int, left: int) -> None:
             for r, row in enumerate(rows):
@@ -328,23 +324,23 @@ class SectorScene(Static):
             return bottom
 
         # Base layer: a procedural starfield filling the whole art region (§art).
-        paint(cells("starfield", "standard", sprite_seed=seed, sw=region_w, sh=h,
-                    color="white"), 0, art_left)
+        paint(cells("starfield", "standard", sprite_seed=seed, sw=region_w, sh=h),
+              0, art_left)
 
         cursor = 1
         if self._sector.planets:
             sh_p = min(max(6, h // 2), h - cursor)
             sub = art_adapter.planet_subtype_from_name(self._sector.planets[0])
             cursor = stamp(cells("planet", sub, sprite_seed=seed, sw=min(region_w, 24),
-                                 sh=sh_p, color="cyan"), cursor, "planet") + 1
+                                 sh=sh_p), cursor, "planet") + 1
         if self._sector.ports:
             sub = art_adapter.port_subtype(self._sector.ports[0])
-            cursor = stamp(cells("port", sub, sprite_seed=seed, sw=min(region_w, 18), sh=6,
-                                 color="magenta"), cursor, "port") + 1
+            cursor = stamp(cells("port", sub, sprite_seed=seed, sw=min(region_w, 18), sh=6),
+                           cursor, "port") + 1
         for i, name in enumerate(self._sector.ships):
             entity, sub = art_adapter.ship_entity(name)
             cursor = stamp(cells(entity, sub, sprite_seed=seed * 16 + i,
-                                 sw=min(region_w, 16), sh=5, color="white"), cursor) + 1
+                                 sw=min(region_w, 16), sh=5), cursor) + 1
 
         out = Text()
         for y in range(h):
