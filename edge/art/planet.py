@@ -55,6 +55,15 @@ def get_atmosphere_color(subtype: str) -> str:
     """Return the atmospheric outline color based on the planet subtype."""
     return ATMOSPHERE_COLORS.get(subtype.lower(), "bright_white")
 
+# Shadow-side fill backgrounds: a dark-grey ramp used in place of pure black so
+# the planet's shaded crescent still reads as part of the disc when composited
+# over the black starfield void. Collapsing a shaded cell to "black" (#000000)
+# makes it indistinguishable from empty space, which breaks the sphere
+# silhouette on the main game screen -- so the dimming never goes fully black.
+SHADOW_BG_DEEP = "grey11"  # #1c1c1c -- darkest night side, still above the void
+SHADOW_BG_MID = "grey15"   # #262626
+SHADOW_BG_NEAR = "grey19"  # #303030 -- just inside the terminator
+
 class PlanetGenerator:
     """Procedural planet generator using SDF masks over terrain fills."""
     
@@ -151,19 +160,29 @@ class PlanetGenerator:
                     z = math.sqrt(max(0.0, 1.0 - dist_sq[y][x]))
                     dot = dx*Lx + dy*Ly + z*Lz
 
-                    # Apply shadow dithering based on dot product.
+                    # Apply shadow dithering based on dot product. The block glyph
+                    # paints the terrain colour over a dark-grey fill; darker tiers
+                    # use sparser ink so the surface fades toward grey -- never to
+                    # pure black, which would merge the night side into the void.
+                    #
+                    # The terrain generator is bg-only (use_fg_color=False), so each
+                    # cell's surface colour lives in `bg`. A block glyph only shows
+                    # colour through its foreground, so each tier promotes that
+                    # surface colour into `fg`, then sets `bg` to the dark backing.
+                    # (The guard above has already replaced any black/default bg, so
+                    # `bg` here is always a visible colour.)
                     if dot < -0.1:
                         char = "░"
-                        fg = bg if bg and bg not in ("black", "default") else "bright_black"
-                        bg = "black"
+                        fg = bg
+                        bg = SHADOW_BG_DEEP
                     elif dot < 0.15:
                         char = "▒"
-                        fg = bg if bg and bg not in ("black", "default") else "bright_black"
-                        bg = "black"
+                        fg = bg
+                        bg = SHADOW_BG_MID
                     elif dot < 0.4:
                         char = "▓"
-                        fg = bg if bg and bg not in ("black", "default") else "bright_black"
-                        bg = "black"
+                        fg = bg
+                        bg = SHADOW_BG_NEAR
 
                     if bg and bg not in ("black", "default"):
                         style = f"{fg} on {bg}" if fg else f"on {bg}"
