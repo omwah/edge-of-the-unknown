@@ -63,6 +63,23 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="The owner archetype id dictating the stylistic choices "
         "(for ships, ports, and subsystems); e.g. humanoid_diplomat, brain_dome_automaton.",
     )
+    parser.add_argument(
+        "--export",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Instead of printing, write the rendered sprite(s) to a vector "
+        "contact sheet. A '.svg'/'.pdf' suffix writes just that format; any other "
+        "path writes both PATH.svg and PATH.pdf. Combine with '--subtype all "
+        "--archetype-id all' to dump every style and substyle.",
+    )
+    parser.add_argument(
+        "--export-cols",
+        type=int,
+        default=None,
+        help="Grid column count for the exported sheet (default: near-square, or "
+        "one column per archetype when '--archetype-id all' is used).",
+    )
 
     args = parser.parse_args(argv)
 
@@ -86,6 +103,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     console = Console(force_terminal=True, color_system="truecolor")
 
     rendered: list[tuple[str, Text, int]] = []
+    export_items: list[tuple[str, Text]] = []
     for st in subtypes_to_run:
         for arch in archetypes_to_run:
             sprite = generate_sprite(
@@ -100,10 +118,28 @@ def main(argv: Sequence[str] | None = None) -> None:
                 (cell_len(line) for line in sprite.plain.split("\n")), default=0
             )
             label = f"{args.type.title()} - {st}"
+            short = st
             if arch is not None:
                 label += f" / {arch}"
+                short += f" / {arch}"
             title = f"{label} ({args.width} x {args.height})"
             rendered.append((title, sprite, sprite_width))
+            export_items.append((short, sprite))
+
+    if args.export:
+        from edge.art.export import export_sprite_sheet
+
+        # One column per archetype when sweeping archetypes, else near-square.
+        cols = args.export_cols
+        if cols is None and len(archetypes_to_run) > 1:
+            cols = len(archetypes_to_run)
+        written = export_sprite_sheet(export_items, args.export, cols=cols)
+        plural = "s" if len(export_items) != 1 else ""
+        console.print(
+            f"Wrote {len(export_items)} sprite{plural} to "
+            + ", ".join(str(p) for p in written)
+        )
+        return
 
     # Size every banner to the widest sprite/title across the run so the headers
     # are uniform, keeping each title centered within that shared width.
