@@ -13,6 +13,7 @@ from textual.binding import Binding
 from textual.theme import Theme
 
 from edge.config import load_default_config
+from edge.core.config import SceneArtConfig
 from edge.engine.ticker import EngineTicker
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
@@ -56,6 +57,8 @@ class EdgeApp(App[None]):
         self.plain = plain
         self.service: GameService | None = None
         self._ticker: EngineTicker | None = None
+        # SectorView sprite-scene sizes; replaced from config when a game starts.
+        self.scene_art = SceneArtConfig()
 
     def on_mount(self) -> None:
         self.register_theme(TW2002_THEME)
@@ -94,13 +97,14 @@ class EdgeApp(App[None]):
         return self.service
 
     def _apply_art_config(self, config: object) -> None:
-        """Validate art coverage before a game starts.
+        """Validate art coverage and read scene-sprite sizes before a game starts.
 
         `validate_art_coverage` raises if any roster species names an archetype the
         art engine can't paint (fail fast on roster/art drift). The art layer is
         presentation, so this check lives here in the TUI, not in core/server.
         """
         art_adapter.validate_art_coverage(config)  # type: ignore[arg-type]
+        self.scene_art = config.scene  # type: ignore[attr-defined]
 
     def _start_ticker(self, service: GameService) -> None:
         self._ticker = EngineTicker(service)

@@ -12,11 +12,11 @@ from textual.containers import Grid, Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Button, DataTable, Static
 
+from edge.core.config import SceneArtConfig
 from edge.core.enums import Commodity
-from rich.style import Style
 
 from edge.tui import art_adapter
-from edge.tui.dummy import MapBand, MapDTO, NeighborDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
+from edge.tui.dummy import MapBand, MapDTO, NeighborDTO, PortDTO, ShipDTO, WarpDTO
 
 
 class Starfield(Static):
@@ -258,107 +258,149 @@ class StatusSidebar(Vertical):
         return "\n".join(lines)
 
 
-class SectorScene(Static):
-    """A procedural ASCII scene of the sector's planets/ports/ships, drawn on the right.
+class ArtView(Static):
+    """A single procedural sprite, centred, on a transparent background.
 
-    This is the *background* layer of the SectorView (UI_MOCKUPS.md §1): sprites
-    (sized planet > port > ship, §sprites) are composited into a character grid,
-    each **centred** within the art region — the right portion left clear by the
-    interface text, which occupies the left columns on the layer above. Art and
-    text never share a cell — they are kept spatially apart (text left / art
-    right), so the scene reads as a backdrop rather than noise behind the words.
+    Renders one `edge.art` sprite (planet / port / ship) sized to its own box but
+    clamped to the per-entity maxima in `app.scene_art` (config `scene:`). Sprite
+    space-cells stay transparent, so the SectorView starfield backdrop shows
+    through the gaps — the sprite floats in the stars. The planet's width is locked
+    to ``2 * height`` so the disc reads round, not oblong, on the ~2:1 cell grid.
     """
 
     DEFAULT_CSS = """
-    SectorScene { width: 100%; height: 100%; background: transparent; }
+    ArtView {
+        width: 1fr; height: auto;
+        content-align: center middle; background: transparent;
+    }
     """
 
-    _MIN_WIDTH = 46  # below this the scene is suppressed so it never crowds text
-    _TEXT_FRACTION = 0.60  # left share reserved for text (mirrors #sector-text width)
+    def __init__(self, entity: str, subtype: str, *, sprite_seed: int,
+                 facing: str = "right", **kwargs: object) -> None:
+        super().__init__("", **kwargs)
+        self._entity = entity
+        self._subtype = subtype
+        self._seed = sprite_seed
+        self._facing = facing
 
-    def __init__(self, sector: SectorDTO, **kwargs: object) -> None:
-        super().__init__(**kwargs)
-        self._sector = sector
-        # Click targets recorded on the last render: (x0, y0, x1, y1, dest). The
-        # planet/port art is clickable — clicking it launches Survey/Dock, matching
-        # the text-list affordances (the ship art is decorative only).
-        self._hotspots: list[tuple[int, int, int, int, str]] = []
+    def _max_size(self) -> tuple[int, int]:
+        scene = getattr(self.app, "scene_art", None) or SceneArtConfig()
+        if self._entity == "planet":
+            return scene.planet.max_width, scene.planet.max_height
+        if self._entity == "port":
+            return scene.port.max_width, scene.port.max_height
+        return scene.ship.max_width, scene.ship.max_height
+
+    def on_mount(self) -> None:
+        # The box height is config-driven (the per-entity max) so the vertical
+        # layout is stable; the sprite is centred within it and may be smaller.
+        self.styles.height = self._max_size()[1]
+        self._rebuild()
 
     def on_resize(self) -> None:
-        self.refresh()
+        self._rebuild()
 
-    def render(self) -> Text:
-        w, h = self.size.width, self.size.height
-        self._hotspots = []
-        if w < self._MIN_WIDTH or h < 6:
-            return Text("")
-        grid: list[list[tuple[str, Style | None]]] = [[(" ", None)] * w for _ in range(h)]
-        # Centre sprites in the art region: the right span left clear by the text.
-        art_left = int(w * self._TEXT_FRACTION)
-        region_w = max(8, w - art_left)
-        centre = (art_left + w) / 2
-        seed = self._sector.sector_id
+    def _rebuild(self) -> None:
+        box_w, box_h = self.size.width, self.size.height
+        if not box_w or not box_h:
+            return
+        max_w, max_h = self._max_size()
+        if self._entity == "planet":
+            # Lock width = 2*height so the disc stays round, fitting within the box.
+            sh = max(3, min(max_h, box_h, box_w // 2))
+            sw = sh * 2
+        else:
+            sw = max(3, min(max_w, box_w))
+            sh = max(3, min(max_h, box_h))
+        self.update(art_adapter.sprite(
+            self._entity, self._subtype, seed=self._seed,
+            width=sw, height=sh, facing=self._facing,
+        ))
 
-        def cells(entity: str, subtype: str, *, sprite_seed: int, sw: int,
-                  sh: int) -> list[list[tuple[str, Style | None]]]:
-            spr = art_adapter.sprite(entity, subtype, seed=sprite_seed, width=sw, height=sh)
-            return art_adapter.text_to_cells(spr)
 
-        def paint(rows: list[list[tuple[str, Style | None]]], top: int, left: int) -> None:
-            for r, row in enumerate(rows):
-                y = top + r
-                if 0 <= y < h:
-                    for c, (ch, style) in enumerate(row):
-                        x = left + c
-                        if ch != " " and 0 <= x < w:
-                            grid[y][x] = (ch, style)
+class OrbitPanel(Vertical):
+    """A planet/port sprite with its name beneath — one orbit-row column (§1).
 
-        def stamp(rows: list[list[tuple[str, Style | None]]], top: int,
-                  dest: str | None = None) -> int:
-            sw = max((len(row) for row in rows), default=0)
-            left = max(art_left, min(int(centre - sw / 2), w - sw))
-            paint(rows, top, left)
-            bottom = top + len(rows)
-            if dest is not None:  # record the sprite's bounding box as a click target
-                self._hotspots.append((left, top, left + sw, bottom, dest))
-            return bottom
+    Clickable: posts ``ClickableEntry.Picked(dest, ref)`` so the GameScreen routes
+    the art exactly like its text affordance (planet -> Survey, port -> Dock). An
+    empty slot (no planet/port in the sector) shows a muted placeholder and is
+    inert, so the two-column orbit row stays stable as the player warps around.
+    """
 
-        # Base layer: a procedural starfield filling the whole art region (§art).
-        paint(cells("starfield", "standard", sprite_seed=seed, sw=region_w, sh=h),
-              0, art_left)
+    DEFAULT_CSS = """
+    OrbitPanel { width: 1fr; height: auto; }
+    OrbitPanel > .scene-label {
+        width: 1fr; height: auto; text-align: center; color: $secondary; text-style: bold;
+    }
+    OrbitPanel > .scene-empty { color: $text-muted; text-style: none; }
+    OrbitPanel.clickable:hover { background: $boost; }
+    """
 
-        cursor = 1
-        if self._sector.planets:
-            sh_p = min(max(6, h // 2), h - cursor)
-            sub = art_adapter.planet_subtype_from_name(self._sector.planets[0])
-            cursor = stamp(cells("planet", sub, sprite_seed=seed, sw=min(region_w, 24),
-                                 sh=sh_p), cursor, "planet") + 1
-        if self._sector.ports:
-            sub = art_adapter.port_subtype(self._sector.ports[0])
-            cursor = stamp(cells("port", sub, sprite_seed=seed, sw=min(region_w, 18), sh=6),
-                           cursor, "port") + 1
-        for i, name in enumerate(self._sector.ships):
-            entity, sub = art_adapter.ship_entity(name)
-            cursor = stamp(cells(entity, sub, sprite_seed=seed * 16 + i,
-                                 sw=min(region_w, 16), sh=5), cursor) + 1
+    def __init__(self, entity: str, subtype: str | None, label: str, *,
+                 sprite_seed: int, dest: str, ref: int | str | None = None,
+                 **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._entity = entity
+        self._subtype = subtype  # None => empty slot (placeholder, inert)
+        self._label = label
+        self._seed = sprite_seed
+        self._dest = dest
+        self._ref = ref
 
-        out = Text()
-        for y in range(h):
-            for ch, style in grid[y]:
-                out.append(ch, style=style)
-            if y < h - 1:
-                out.append("\n")
-        return out
+    def compose(self) -> ComposeResult:
+        if self._subtype is None:
+            yield Static(self._label, classes="scene-label scene-empty")
+            return
+        self.add_class("clickable")
+        yield ArtView(self._entity, self._subtype, sprite_seed=self._seed)
+        yield Static(self._label, classes="scene-label")
 
     def on_click(self, event: events.Click) -> None:
-        # Clicking the planet/port art fires the same affordance as its text-list
-        # entry: ClickableEntry.Picked, which the GameScreen routes to Survey/Dock.
-        x, y = int(event.x), int(event.y)
-        for x0, y0, x1, y1, dest in self._hotspots:
-            if x0 <= x < x1 and y0 <= y < y1:
-                event.stop()
-                self.post_message(ClickableEntry.Picked(dest))
-                return
+        if self._subtype is None:
+            return
+        event.stop()
+        self.post_message(ClickableEntry.Picked(self._dest, self._ref))
+
+
+class ShipPanel(Vertical):
+    """One ship sprite with its name beneath — a ships-row cell (§1).
+
+    Clickable when the ship is a hailable contact (posts ``Picked('contact',
+    contact_id)``, opening AlienContact/Encounter); decorative otherwise. The
+    sprite may be flipped to ``facing='left'`` so a pair of ships faces inward.
+    """
+
+    DEFAULT_CSS = """
+    ShipPanel { width: 1fr; height: auto; }
+    ShipPanel > .scene-label {
+        width: 1fr; height: auto; text-align: center; color: $text;
+    }
+    ShipPanel.clickable:hover { background: $boost; }
+    """
+
+    def __init__(self, name: str, *, sprite_seed: int, contact_id: int | None,
+                 facing: str = "right", **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._name = name
+        self._seed = sprite_seed
+        self._contact_id = contact_id
+        self._facing = facing
+
+    def compose(self) -> ComposeResult:
+        entity, sub = art_adapter.ship_entity(self._name)
+        yield ArtView(entity, sub, sprite_seed=self._seed, facing=self._facing)
+        suffix = " [dim](Hail)[/]" if self._contact_id is not None else ""
+        yield Static(f"{self._name}{suffix}", classes="scene-label")
+
+    def on_mount(self) -> None:
+        if self._contact_id is not None:
+            self.add_class("clickable")
+
+    def on_click(self, event: events.Click) -> None:
+        if self._contact_id is None:
+            return
+        event.stop()
+        self.post_message(ClickableEntry.Picked("contact", self._contact_id))
 
 
 class MapBandPanel(Static):

@@ -9,16 +9,14 @@ art engine stay independent — it can be reused, re-skinned, or swapped without
 touching game code — and gives the runtime check and the coverage tests one
 source of truth.
 
-The art engine emits `rich.text.Text`; `text_to_cells` flattens a sprite into the
-per-cell grid the `SectorScene` backdrop composites, keeping the art's own colours.
+The art engine emits `rich.text.Text`; the SectorView renders those sprites
+directly (see `edge.tui.widgets.ArtView`).
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from rich.console import Console
-from rich.style import Style
 from rich.text import Text
 
 from edge.art.generator import (
@@ -29,11 +27,6 @@ from edge.art.generator import (
 
 if TYPE_CHECKING:
     from edge.core.config import GameConfig
-
-# A throwaway console used only to resolve a sprite's authored Rich styles into
-# per-cell colours for the SectorScene grid; it never writes anywhere. Truecolor
-# keeps named/RGB colours intact rather than downgrading them off a fake tty.
-_CONSOLE = Console(color_system="truecolor")
 
 
 # --- game vocabulary -> art subtype ----------------------------------------
@@ -118,23 +111,6 @@ def sprite(
     )
 
 
-def text_to_cells(text: Text) -> list[list[tuple[str, Style | None]]]:
-    """Flatten a Rich `Text` sprite into per-cell `(char, style)` rows for stamping.
-
-    Each cell keeps the art's own resolved colour. A space cell carries ``None`` so
-    the compositor treats it as transparent.
-    """
-    rows: list[list[tuple[str, Style | None]]] = []
-    for line in text.split(allow_blank=True):
-        cells: list[tuple[str, Style | None]] = []
-        for segment in line.render(_CONSOLE):
-            style = segment.style
-            for ch in segment.text:
-                cells.append((ch, style if ch != " " else None))
-        rows.append(cells)
-    return rows
-
-
 # --- runtime coverage check -------------------------------------------------
 
 
@@ -169,6 +145,5 @@ __all__ = [
     "port_subtype",
     "ship_entity",
     "sprite",
-    "text_to_cells",
     "validate_art_coverage",
 ]

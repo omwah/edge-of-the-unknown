@@ -97,31 +97,24 @@ MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
 
 ```
 ┌─ EDGE OF THE UNKNOWN ──────────────────────────────── turns 287/300 ─┐
-│ CORE SPACE - Sector 7           │ S.S. Wayfarer  (Trailblazer)       │
-│ ░▒▓ the lanes hum w/ traffic ▓▒░│ -----------------------------      │
-│                                 │ Shields  ████████░░  82%           │
-│ Planets                         │ Warp     ███░░░░░░░   3            │
-│  »@ Terra Nova terrestrial,warm │ Combat   ████░░░░░░   4            │
-│                                 │ Cloak    ░░░░░░░░░░  off           │
-│ Ports                           │ Sensors  ██████░░░░  Tier II       │
-│  »P Stardock - Class 0          │ subsystems: all nominal            │
-│                                 │ -----------------------------      │
-│                                 │ Gun online  Missiles x3            │
-│ Beacons                         │ Kits x2                            │
-│   ! "Welcome to Sol"            │ -----------------------------      │
-│                                 │ Holds 40/60                        │
-│ Ships                           │  Fuel  ████████░░░░  20            │
-│  > Kestrel  free trader         │  Org   ████░░░░░░░░  12            │
-│  > Cabal Marauder               │  Equ   ██░░░░░░░░░░   8            │
-│  > Verdani escort               │ Latinum  14,250 slips              │
-│                                 │ -----------------------------      │
-│ Warps                           │ Band 0 - Core                      │
-│  1<    3/Sol  6>                │ region:                            │
-│  8?    (7)    12?               │   (3) (6)                          │
-│                                 │     \ /                            │
-│                                 │  (1)-(7)                           │
-│                                 │     / \                            │
-│                                 │   (8) (12)                         │
+│             [7] CORE SPACE (Core)           │ S.S. Wayfarer (Trailbl) │
+│         ░▒▓ the lanes hum w/ traffic ▓▒░    │ ----------------------- │
+│            ! "Welcome to Sol"               │ Shields ████████░░ 82%  │
+│   .      .-~~~-.       .    =[#####]=     . │ Warp    ███░░░░░░░  3    │
+│       . .'~ .o. ~'.       . =[#o#o#]=   .   │ Combat  ████░░░░░░  4    │
+│   .     : ~  .O.  ~ :  .       |||      .   │ Cloak   ░░░░░░░░░░ off   │
+│        . '.~ .o. ~.'      .  (orbital)    . │ Sensors ██████░░░░ TierII│
+│    Terra Nova terrestrial   Stardock-Cls0   │ subsystems: all nominal │
+│    Discoveries                              │ ----------------------- │
+│      ✦ Crashed Ship — unlogged (Scan)       │ Holds 40/60             │
+│    Ships                                    │  Fuel ████████░░░░ 20   │
+│       ___              ___                  │  Org  ████░░░░░░░░ 12   │
+│      [===]=>          <=[===]               │  Equ  ██░░░░░░░░░░  8   │
+│       Kestrel       Cabal Marauder (Hail)   │ Latinum 14,250 slips    │
+│      > Verdani escort (Hail)                │ ----------------------- │
+│                                             │ Band 0 - Core           │
+│                 1<   3/Sol  6>              │   (3) (6)               │
+│                 8?    (7)    12?            │  (1)-(7)  (8) (12)      │
 ├──────────────────────────────────────────────────────────────────────┤
 │- arrive in Sector 7.   - Stardock detected.   - 287 turns left.      │
 ├──────────────────────────────────────────────────────────────────────┤
@@ -129,58 +122,35 @@ MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-The sector view carries a **dim ASCII scene** behind the text (the narrow
-wireframe cell above can't show it; at the true 2/3 width it looks like this —
-text on the left, sprites in the right negative space):
-
-```
- CORE SPACE - Sector 7
- ░▒▓ the lanes hum w/ traffic ▓▒░       .-~~~-.
-                                      .'~ .o. ~'.
- Planets                             / .o~   ~o. \
-  »@ Terra Nova terrestrial,warm     : ~  .O.  ~ :
-                                     \ ~o.   .o~ /
- Ports                                '.~ .o. ~.'
-  »P Stardock - Class 0                 '-~~~-'
-                                       =[#####]=
- Beacons                             =[#o#o#o#]=
-   ! "Welcome to Sol"                 =[#####]=
-                                          ___
- Ships                                   [===]=>
-   > Kestrel  free trader                  <+=-
-   > Cabal Marauder                       ___
-   > Verdani escort                      <##==>
-
- Warps
-  1<   3/Sol  6>
-  8?   (7)    12?
-```
-
-- **Sector scene (background)**: a `SectorScene(Static)` on a lower `scene`
-  **layer** composites dim sprites — sized **planet > port > ship** — into a
-  character grid, each **centred within the art region** (the right span left
-  clear by the text); the interface text rides above on a `content` layer kept to
-  the left ~60% (`overflow-x: hidden`), so **art and text never share a cell** (a terminal cell holds one glyph; transparent overlay does
-  not blend — verified). Sprites are a config-style asset library keyed by type
-  (`edge/tui/sprites.py`: `planet_type` / port class / ship role), selected from
-  the DTO. Below the floor width the scene is suppressed so it never crowds text.
-- **Left 2/3 — sector view**: region + sector header; ANSI-art flavor line
-  (`Static`); then five **bold, consistently-coloured section headers** (Planets,
-  Ports, Beacons, Ships, Warps — the `.heading` style, `$secondary`; planets lead
-  so the text order matches the scene's planet-above-port sprites) each above
-  its values with a blank-line gap between sections; planets and ports are
-  **clickable rows** (`»` prefix) that open the matching screen — clicking a port
-  resolves to the **same destination as the `P` dock key**, so there is one way
-  into a sector's trade UI: a StarDock port -> StarDockScreen (§5), where trading
-  is the default **Commodities** tab; a plain commodities port -> PortScreen (§2);
-  a planet -> PlanetScreen (§3). **Ships are clickable too** — hailing one opens
-  AlienContactScreen (§6) for a friendly-band ship or EncounterScreen (§7) for a
-  hostile one (skeleton: by name keyword; the real game reads disposition). Then
-  beacons; a
-  **`WarpGrid`** — a 3x3 grid with the **current sector pinned to the centre
-  cell** (non-clickable `(7)`) and outbound warps in the eight cells around it
-  (clickable, unexplored dimmed with `?`). TW2002 sectors warp to <= 6 others, so
-  eight surrounding cells suffice.
+- **Sector view layout**: the left 2/3 is a vertical stack on a `content` layer
+  over a full-bleed **`Starfield`** `backdrop` layer (the stars show through every
+  transparent gap in the sprites, so each body floats in space). Top to bottom:
+  a full-width **header** (`[id] REGION (Band)` + flavor line + beacon), a
+  two-column **orbit row** (planet | port), a **ships row**, then the **`WarpGrid`**
+  centred and pinned to the very bottom. The retired `SectorScene` compositor that
+  stamped sprites into the right negative space is gone — sprites and their labels
+  are now **co-located**, not kept apart.
+- **Orbit row**: two `1fr` columns. Left = the **planet** sprite with its name
+  beneath, then the **Discoveries** list (each unlogged find a clickable `Scan`
+  row); right = the **port** sprite with its name beneath. Each sprite+name is an
+  **`OrbitPanel`**, clickable to the same destination as its key — planet ->
+  PlanetScreen (§3, `S`); a StarDock port -> StarDockScreen (§5) / a plain port ->
+  PortScreen (§2), the **same target as `P`**. A column with no planet/port shows a
+  muted placeholder so the two-column shape stays stable as you warp. The planet
+  sprite's width is always **2×its height** so the disc reads round on the ~2:1
+  cell grid; all sprite sizes come from config `scene:` (`SceneArtConfig`).
+- **Ships row**: up to `scene.max_ships_shown` (default **2**) ship sprites side by
+  side as **`ShipPanel`**s, each with its name beneath; when two show, the second
+  may be flipped to **face the first** (deterministic per sector,
+  `scene.ship_face_inward_chance`). Any ships beyond the cap fall to a compact
+  **clickable text list** so every contact stays individually hailable. Clicking a
+  hailable ship opens AlienContactScreen (§6) for a friendly-band ship or
+  EncounterScreen (§7) for a hostile one (skeleton: by name keyword; the real game
+  reads disposition).
+- **Warps**: the **`WarpGrid`** — a 3x3 grid with the **current sector pinned to the
+  centre cell** (non-clickable `(7)`) and outbound warps in the eight cells around
+  it (clickable, unexplored dimmed with `?`), centred in a full-width area at the
+  bottom. TW2002 sectors warp to <= 6 others, so eight surrounding cells suffice.
 - **Right 1/3 — status sidebar**: ship name/type; aspect readout with bars
   (shields/warp/combat/cloak/sensors) + a compact **subsystem-integrity line**
   (flags knocked-out components, §4.1); holds bar per commodity; Gun/missile/

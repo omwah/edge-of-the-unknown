@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from edge.config import load_default_config
-from edge.core.config import GameConfig
+from edge.core.config import GameConfig, SceneArtConfig
 
 
 def test_default_config_loads() -> None:
@@ -25,6 +25,25 @@ def test_default_economy_values() -> None:
     assert econ.floor_frac == 0.25
     assert econ.starting_latinum == 2_000
     assert econ.tier_i_component_latinum == 2_000
+
+
+def test_default_scene_art_values() -> None:
+    scene = load_default_config().scene
+    # Planet width is derived as 2*height so the disc stays round (cells are ~2:1).
+    assert scene.planet.max_height == 12
+    assert scene.planet.max_width == 24
+    assert (scene.port.max_width, scene.port.max_height) == (18, 8)
+    assert (scene.ship.max_width, scene.ship.max_height) == (16, 6)
+    assert scene.max_ships_shown == 2
+    assert scene.ship_face_inward_chance == 0.5
+
+
+def test_scene_art_is_optional_with_defaults() -> None:
+    # The whole `scene:` block is optional — GameConfig.scene defaults to these,
+    # so configs/saves predating it still validate.
+    scene = SceneArtConfig()
+    assert scene.planet.max_width == 2 * scene.planet.max_height == 24
+    assert scene.max_ships_shown == 2
 
 
 def test_default_ship_classes_and_hardware() -> None:

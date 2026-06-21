@@ -597,6 +597,49 @@ class RosterConfig(BaseModel):
         return self
 
 
+class SpriteSize(BaseModel):
+    """Max footprint (character cells) for one SectorView scene sprite."""
+
+    model_config = _FROZEN
+
+    max_width: int = Field(gt=0)
+    max_height: int = Field(gt=0)
+
+
+class PlanetSpriteSize(BaseModel):
+    """Planet sprite footprint: height is authored, width is *derived* as 2*height.
+
+    Terminal cells are roughly twice as tall as they are wide, so a 2:1 character
+    grid keeps the planet disc round rather than oblong. Callers read `max_width`;
+    they never set it, so the round-aspect invariant can't drift.
+    """
+
+    model_config = _FROZEN
+
+    max_height: int = Field(default=12, gt=0)
+
+    @property
+    def max_width(self) -> int:
+        return self.max_height * 2
+
+
+class SceneArtConfig(BaseModel):
+    """Sizes/counts for the SectorView sprite scene (presentation only, no rules).
+
+    The constants the SectorView uses to build its planet/port/ship sprites, kept
+    in config per CLAUDE.md (constants live in config, not code). Consumed only by
+    the throwaway `tui` layer.
+    """
+
+    model_config = _FROZEN
+
+    planet: PlanetSpriteSize = PlanetSpriteSize()
+    port: SpriteSize = SpriteSize(max_width=18, max_height=8)
+    ship: SpriteSize = SpriteSize(max_width=16, max_height=6)
+    max_ships_shown: int = Field(default=2, gt=0)  # sprites; extras list as text
+    ship_face_inward_chance: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -604,6 +647,7 @@ class GameConfig(BaseModel):
 
     config_version: int
     turns_per_day: int = 250  # TWINSTR.DOC default (§9)
+    scene: SceneArtConfig = SceneArtConfig()
     economy: EconomyConfig = EconomyConfig()
     aliens: AliensConfig = AliensConfig()
     bigbang: BigBangConfig = BigBangConfig()
