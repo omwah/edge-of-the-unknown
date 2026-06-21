@@ -27,9 +27,16 @@ from rich.text import Text
 
 PORT_SUBTYPES = ["trading_port", "starbase", "stardock"]
 
-# Per-subtype silhouettes, ordered LARGEST tier first. Each tier is a tuple of
-# rows (rows are centered to the tier's natural width at render time, so minor
-# ragged-edge authoring is tolerated). Glyph legend, by shading level:
+# Sprites are LEFT/RIGHT symmetric and stack as vertical *bands*, so rather than
+# storing whole fixed-size silhouettes we store recombinable PARTS and compose
+# them. Each part is authored as its LEFT HALF, *including the centre column*, and
+# mirrored to full width at render time (see ``_mirror_row`` / ``_MIRROR``); this
+# guarantees symmetry and halves authoring. A subtype's grammar is an ordered
+# stack of slots (cap -> repeatable body -> base); the composer picks one part per
+# slot and repeats the body to fill the requested height -- so any height in range
+# is reachable, and interchangeable parts give per-station variety.
+#
+# Glyph legend, by shading level (same alphabet as before):
 #   '█'            -> bright hull       (lit, sun-facing plating)
 #   half/box chars -> mid hull / struts (bevelled edges, arms, panels)
 #   '▒' '░'        -> dark hull         (shadowed recesses)
@@ -37,110 +44,121 @@ PORT_SUBTYPES = ["trading_port", "starbase", "stardock"]
 #   'Y'            -> yellow glow (rendered as a lower-half block, engine light)
 #   ' '            -> empty space
 #   any other char -> a facet feature (see _HULL_CHARS): drawn in the archetype
-#                     facet colour over a bright-hull background, 
+#                     facet colour over a bright-hull background,
 #                     e.g. ☉ ° ◇ ◆ ◊ ⁐ ≡ ◇ ◆ ☉
-PORT_ART: dict[str, tuple[tuple[str, ...], ...]] = {
-    # The hero. Vertical, symmetric: beacon, tower, docking-arm platform,
-    # tapering chevron body, engine glow -- the TW2002 StarDock shape.
+# A part's centre-column glyph (the last char of each left-half row) must be
+# self-symmetric (in ``_SELF_SYMMETRIC``) so it reads correctly straddling the
+# mirror axis; corner/quadrant/triangle glyphs would seam.
+
+
+@dataclass(frozen=True)
+class Part:
+    """A recombinable band fragment, authored as left-half rows (centre column
+    included) and mirrored to full width. ``repeatable`` parts may be stacked
+    multiple times by the composer to grow a sprite's height."""
+
+    left: tuple[str, ...]
+    repeatable: bool = False
+
+
+@dataclass(frozen=True)
+class Slot:
+    """One position in a subtype's vertical band stack. The composer picks a
+    single part from ``parts`` (seeded), then -- if that part is repeatable --
+    emits its rows between ``min_repeat`` and ``max_repeat`` times to fill the box."""
+
+    parts: tuple[Part, ...]
+    min_repeat: int = 1
+    max_repeat: int = 1
+
+
+# Per-subtype band grammars, ordered top (cap) -> bottom (base). The FIRST part of
+# each slot is the *canonical* one: choosing all canonical parts at the repeat that
+# matches the historic height reproduces the original largest silhouette exactly
+# (this is "decompose what we had", not "redraw"). The remaining parts are
+# interchangeable variants that give repeat ports visible variety.
+PORT_GRAMMAR: dict[str, tuple[Slot, ...]] = {
+    # The hero. Beacon + shoulders, docking-arm platform, tapering chevron body,
+    # engine glow -- the TW2002 StarDock shape.
     "stardock": (
-        (
-            "       R       ",
-            "       █       ",
-            "      ███      ",
-            "    ▟█████▙    ",
-            "╾─▓████◊████▓─╼",
-            "    ▜██≡██▛    ",
-            "     ▓███▓     ",
-            "      ▜█▛      ",
-            "       Y       ",
+        # Cap: red beacon on a mast, widening to shoulders.
+        Slot((
+            Part(("       R", "       █", "      ██")),          # canonical
+            Part(("       R", "       █", "       █", "      ██")),  # tall mast
+            Part(("       R", "      ██")),                        # stubby
+        )),
+        # Platform: shoulder ridge + docking-arm deck.
+        Slot((
+            Part(("    ▟███", "╾─▓████◊")),  # canonical: arms + facet
+            Part(("    ▟███", "╾─▓█████")),  # plain deck
+            Part(("  ▟█████", "▓██████")),   # wide, armless platform
+        )),
+        # Body: tapering chevron, repeated to lengthen the hull.
+        Slot(
+            (
+                Part(("    ▜██≡", "     ▓██"), repeatable=True),  # canonical: faceted
+                Part(("    ▜███", "     ▓██"), repeatable=True),  # plain
+                Part(("    ▜██◊", "    ▓███"), repeatable=True),  # alt facet, fuller
+            ),
+            min_repeat=1,
+            max_repeat=5,
         ),
-        (
-            "      R      ",
-            "      █      ",
-            "    ▟███▙    ",
-            "╾─▓███████▓─╼",
-            "    ▓███▓    ",
-            "     ▜█▛     ",
-            "      Y      ",
-        ),
-        (
-            "    R    ",
-            "   ▟█▙   ",
-            "╾▟█████▙╼",
-            "   ▜█▛   ",
-            "    Y    ",
-        ),
-        (
-            "  R  ",
-            "╾███╼",
-            "  Y  ",
-        ),
+        # Base: final taper to the engine glow.
+        Slot((
+            Part(("      ▜█", "       Y")),               # canonical
+            Part(("     ▜██", "      ▓█", "       Y")),   # longer taper
+            Part(("       Y",)),                           # bare glow
+        )),
     ),
-    # Compact trading module: boxed core, dish/antenna, side solar panels.
+    # Compact trading module: dish/antenna, boxed core with side solar panels.
     "trading_port": (
-        (
-            "     ▴     ",
-            "     │     ",
-            "   ┌───┐   ",
-            "▤──┤███├──▤",
-            "   │███│   ",
-            "▤──┤███├──▤",
-            "   └───┘   ",
-            "     │     ",
-            "     ▾     ",
+        # Cap: antenna dish on a mast, down to the top box edge.
+        Slot((
+            Part(("     ▴", "     │", "   ┌──")),            # canonical
+            Part(("     ▴", "   ┌──")),                       # short mast
+            Part(("     ▴", "     │", "     │", "   ┌──")),  # tall mast
+        )),
+        # Core: solar-panel deck row + plain hull row, repeated to grow the box.
+        Slot(
+            (
+                Part(("▤──┤██", "   │██"), repeatable=True),  # canonical
+                Part(("   │██", "   │██"), repeatable=True),  # plain (no panels)
+                Part(("▦──┤██", "   │██"), repeatable=True),  # alt-panel
+            ),
+            min_repeat=1,
+            max_repeat=5,
         ),
-        (
-            "    ▴    ",
-            "  ┌───┐  ",
-            "▤─┤███├─▤",
-            "  └───┘  ",
-            "    ▾    ",
-        ),
-        (
-            " ┌─┐ ",
-            "▦│█│▦",
-            " └─┘ ",
-        ),
-        (
-            "┌─┐",
-            "▦█▦",
-            "└─┘",
-        ),
+        # Base: trailing panel deck, bottom box edge, mast, dish.
+        Slot((
+            Part(("▤──┤██", "   └──", "     │", "     ▾")),  # canonical
+            Part(("   └──", "     │", "     ▾")),             # no trailing deck
+            Part(("▤──┤██", "   └──", "     ▾")),             # short mast
+        )),
     ),
     # Fortified octagonal bastion -- squat, armoured, distinct from the others.
     "starbase": (
-        (
-            "   ▄▄▄▄▄   ",
-            "  ▟█████▙  ",
-            " ▟███████▙ ",
-            "▟█████████▙",
-            "███████████",
-            "▜█████████▛",
-            " ▜███████▛ ",
-            "  ▜█████▛  ",
-            "   ▀▀▀▀▀   ",
+        # Cap: top arc widening through the bevel to the full belt.
+        Slot((
+            Part(("   ▄▄▄", "  ▟███", " ▟████", "▟█████")),            # canonical
+            Part(("   ▄▄▄", "  ▟███", "▟█████")),                       # squat
+            Part(("    ▄▄", "   ▟██", "  ▟███", " ▟████", "▟█████")),  # tall
+        )),
+        # Belt: full-width armoured band, repeated to fatten the bastion.
+        Slot(
+            (
+                Part(("██████",), repeatable=True),   # canonical
+                Part(("▒█████",), repeatable=True),   # shadow streak
+                Part(("██≡███",), repeatable=True),   # facet band
+            ),
+            min_repeat=1,
+            max_repeat=8,
         ),
-        (
-            "   ▄▄▄   ",
-            "  ▟███▙  ",
-            " ▟█████▙ ",
-            "█████████",
-            " ▜█████▛ ",
-            "  ▜███▛  ",
-            "   ▀▀▀   ",
-        ),
-        (
-            "  ▄▄▄  ",
-            " ▟███▙ ",
-            "███████",
-            " ▜███▛ ",
-            "  ▀▀▀  ",
-        ),
-        (
-            " ◢█◣ ",
-            "█████",
-            " ◥█◤ ",
-        ),
+        # Base: bottom bevel narrowing through the arc.
+        Slot((
+            Part(("▜█████", " ▜████", "  ▜███", "   ▀▀▀")),            # canonical
+            Part(("▜█████", "  ▜███", "   ▀▀▀")),                       # squat
+            Part(("▜█████", " ▜████", "  ▜███", "   ▀▀", "    ▀")),    # tall
+        )),
     ),
 }
 
@@ -303,25 +321,85 @@ _VOID_BG = "black"
 # Chance a bright hull cell lights up as a window, for a touch of life.
 _WINDOW_PROB = 0.05
 
+# Glyphs whose shape is asymmetric and must be swapped when a left-half row is
+# mirrored to the right (quadrant blocks, heavy arm stubs, triangles, box edges).
+# Listed once as left->right pairs; both directions are seeded into ``_MIRROR``.
+_MIRROR_PAIRS = (
+    ("▟", "▙"), ("▜", "▛"), ("╾", "╼"),
+    ("◢", "◣"), ("◥", "◤"),
+    ("┌", "┐"), ("└", "┘"), ("├", "┤"),
+)
+_MIRROR: dict[str, str] = {}
+for _a, _b in _MIRROR_PAIRS:
+    _MIRROR[_a] = _b
+    _MIRROR[_b] = _a
+del _a, _b
+
+# Glyphs that read correctly straddling the mirror axis, so they are legal as a
+# part's centre column. Everything self-symmetric: full/half/shade blocks, the
+# vertical/horizontal rules, beacon/glow markers, and every facet feature (facets
+# are not hull glyphs, so any glyph outside ``_HULL_CHARS`` is treated as one and
+# is axis-safe). Asymmetric glyphs in ``_MIRROR`` are excluded.
+_SELF_SYMMETRIC = (_HULL_CHARS - frozenset(_MIRROR)) | frozenset(" RY")
+
+
+def _mirror_row(left: str) -> str:
+    """Expand a left-half row (centre column included) to a full symmetric row:
+    the centre glyph is emitted once and the body is reflected with each glyph
+    swapped to its mirror (``_MIRROR``), self-mirroring glyphs left as-is."""
+    if not left:
+        return ""
+    body, center = left[:-1], left[-1]
+    right = "".join(_MIRROR.get(ch, ch) for ch in reversed(body))
+    return body + center + right
+
+
+def _mirror_part(part: "Part") -> tuple[str, ...]:
+    """Mirror every left-half row of a part to full width."""
+    return tuple(_mirror_row(row) for row in part.left)
+
+
+def _compose(
+    grammar: tuple[Slot, ...], rng: random.Random, target_h: int
+) -> list[str]:
+    """Compose a full-width sprite grid from a band grammar, seeded by ``rng``.
+
+    One part is chosen per slot (in slot order -- a fixed number of draws,
+    independent of ``target_h``, so the downstream window/beacon draw stream is
+    stable across sizes). Repeatable parts are then stacked, by pure arithmetic,
+    to fill ``target_h`` as closely as possible without overshooting: every
+    repeatable starts at ``min_repeat`` and is grown round-robin one block at a
+    time while the next block still fits and ``max_repeat`` is not exceeded."""
+    chosen = [rng.choice(slot.parts) for slot in grammar]
+
+    # Block heights and starting repeats for the repeatable slots.
+    repeats = [slot.min_repeat for slot in grammar]
+    total = sum(len(part.left) * r for part, r in zip(chosen, repeats))
+    growable = [
+        i for i, (slot, part) in enumerate(zip(grammar, chosen)) if part.repeatable
+    ]
+    # Round-robin fill: keep adding one block to whichever repeatable still fits.
+    progressed = True
+    while progressed and growable:
+        progressed = False
+        for i in growable:
+            block = len(chosen[i].left)
+            if repeats[i] < grammar[i].max_repeat and total + block <= target_h:
+                repeats[i] += 1
+                total += block
+                progressed = True
+
+    rows: list[str] = []
+    for part, r in zip(chosen, repeats):
+        mirrored = _mirror_part(part)
+        for _ in range(r):
+            rows.extend(mirrored)
+    return rows
+
 
 class PortGenerator:
-    """Generates iconic, deterministic port/starbase sprites from templates."""
-
-    def _select_tier(
-        self, tiers: tuple[tuple[str, ...], ...], width: int, height: int
-    ) -> tuple[tuple[str, ...], int, int]:
-        """Return the largest tier that fits ``width`` x ``height`` (plus its
-        natural width/height). Falls back to the smallest tier when nothing fits
-        so a too-small box still renders a centred, cropped silhouette."""
-        for tier in tiers:
-            nh = len(tier)
-            nw = max((len(row) for row in tier), default=0)
-            if nw <= width and nh <= height:
-                return tier, nw, nh
-        smallest = tiers[-1]
-        nh = len(smallest)
-        nw = max((len(row) for row in smallest), default=0)
-        return smallest, nw, nh
+    """Generates iconic, deterministic port/starbase sprites by composing
+    mirror-symmetric band parts (see ``PORT_GRAMMAR`` / ``_compose``)."""
 
     def generate(
         self,
@@ -332,7 +410,7 @@ class PortGenerator:
         archetype_id: str | None = None,
     ) -> Text:
         """Generate a procedural space port sprite, hued by owner ``archetype_id``."""
-        tiers = PORT_ART.get(subtype.lower(), PORT_ART["trading_port"])
+        grammar = PORT_GRAMMAR.get(subtype.lower(), PORT_GRAMMAR["trading_port"])
         archetype_key = (archetype_id or "default").lower()
         style = ARCHETYPE_STYLES.get(archetype_key, ARCHETYPE_STYLES["default"])
 
@@ -345,20 +423,29 @@ class PortGenerator:
         bottom_color = rng.choice(style.bottom)
         windows = style.window
 
-        tier, nw, nh = self._select_tier(tiers, width, height)
-        # Centre the natural art within the requested bounds.
+        rows = _compose(grammar, rng, height)
+        nh = len(rows)
+        nw = max((len(row) for row in rows), default=0)
+        # Centre the composed art within the requested bounds. When the art is
+        # taller than the box, crop symmetrically (``crop_top``) so the body is
+        # sacrificed before the iconic cap and base, rather than beheading them.
         pad_top = max(0, (height - nh) // 2)
+        crop_top = max(0, (nh - height) // 2)
 
         map_text = Text()
         for y in range(height):
-            src = y - pad_top
-            row = tier[src].center(nw) if 0 <= src < nh else ""
-
-            # Centre (or, if the box is narrower than the art, crop) horizontally.
-            if nw <= width:
+            src = y - pad_top + crop_top
+            if not (0 <= src < nh):
+                # Blank padding above/below the art -- a full row of void.
+                line = " " * width
+            elif nw <= width:
+                # Centre the art horizontally within the wider box.
+                row = rows[src].center(nw)
                 left = (width - nw) // 2
                 line = (" " * left) + row + (" " * (width - nw - left))
             else:
+                # Box narrower than the art: crop symmetrically.
+                row = rows[src].center(nw)
                 start = (nw - width) // 2
                 line = row[start:start + width].ljust(width)
 
