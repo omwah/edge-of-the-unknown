@@ -29,14 +29,16 @@ def test_default_economy_values() -> None:
 
 def test_default_scene_art_values() -> None:
     scene = load_default_config().scene
-    # Planet width is derived as 2*height so the disc stays round (cells are ~2:1).
-    assert scene.planet.max_height == 12
-    assert scene.planet.max_width == 24
+    # Sprites are clamped to [min, max] per axis. Planet width is derived as
+    # 2*height (both bounds) so the disc stays round (cells are ~2:1).
+    assert (scene.planet.min_height, scene.planet.max_height) == (4, 12)
+    assert (scene.planet.min_width, scene.planet.max_width) == (8, 24)
     # PlanetScreen's orbit planet is configured independently of the SectorView one.
-    assert scene.planet_detail.max_height == 14
-    assert scene.planet_detail.max_width == 28
-    assert (scene.port.max_width, scene.port.max_height) == (18, 8)
-    assert (scene.ship.max_width, scene.ship.max_height) == (16, 6)
+    assert (scene.planet_detail.min_height, scene.planet_detail.max_height) == (4, 21)
+    assert (scene.port.min_width, scene.port.max_width) == (6, 18)
+    assert (scene.port.min_height, scene.port.max_height) == (4, 8)
+    assert (scene.ship.min_width, scene.ship.max_width) == (6, 16)
+    assert (scene.ship.min_height, scene.ship.max_height) == (3, 6)
     assert scene.max_ships_shown == 2
     assert scene.ship_face_inward_chance == 0.5
 
@@ -46,7 +48,17 @@ def test_scene_art_is_optional_with_defaults() -> None:
     # so configs/saves predating it still validate.
     scene = SceneArtConfig()
     assert scene.planet.max_width == 2 * scene.planet.max_height == 24
+    assert scene.planet.min_width == 2 * scene.planet.min_height
     assert scene.max_ships_shown == 2
+
+
+def test_scene_art_rejects_min_above_max() -> None:
+    from edge.core.config import PlanetSpriteSize, SpriteSize
+
+    with pytest.raises(ValidationError):
+        SpriteSize(max_width=10, max_height=10, min_width=20)
+    with pytest.raises(ValidationError):
+        PlanetSpriteSize(max_height=8, min_height=12)
 
 
 def test_default_ship_classes_and_hardware() -> None:
