@@ -62,46 +62,46 @@ SHIP_GRAMMAR: dict[str, tuple[tuple[Slot, ...], ...]] = {
             # Thrusters: twin exhaust glow.
             Slot((
                 Part(("  ", "Y▙", "Y▛", "  ")),
-                Part(("  ", "Y▓", "Y▓", "  ")),
+                Part(("  ", "Y█", "Y█", "  ")),
             )),
             # Spindrive: compact warp wedge with a dorsal fin.
             Slot((
-                Part((" ▴", "▓█", "▓█", "  ")),
-                Part(("  ", "▓█", "▓█", "  ")),
+                Part((" ▴", "██", "██", "  ")),
+                Part(("  ", "██", "██", "  ")),
             )),
             # Hull: thin fuselage, repeated to stretch the fighter.
             Slot(
                 (
-                    Part(("   ", "▟█▓", "▜█▓", "   "), repeatable=True),  # canonical
-                    Part((" ▴ ", "▓██", "▓██", "   "), repeatable=True),  # dorsal fin
-                    Part(("   ", "▓██", "▓██", " ▀ "), repeatable=True),  # ventral fin
+                    Part(("   ", "▟██", "▜██", "   "), repeatable=True),  # canonical
+                    Part((" ▴ ", "███", "███", "   "), repeatable=True),  # dorsal fin
+                    Part(("   ", "███", "███", " ▀ "), repeatable=True),  # ventral fin
                 ),
                 min_repeat=1,
                 max_repeat=6,
             ),
             # Screens: cockpit canopy with a nav light + deflector facet.
             Slot((
-                Part((" R", "◇▓", "██", "  ")),
-                Part(("  ", "◇▓", "██", "  ")),
+                Part((" R", "◇█", "██", "  ")),
+                Part(("  ", "◇█", "██", "  ")),
             )),
             # Main gun: short spinal barrel to a muzzle at the nose.
             Slot((
-                Part(("   ", "▓█▶", "▓█╼", "   ")),
-                Part(("   ", "▟▓▶", "▜██", "   ")),
+                Part(("   ", "██▶", "██╼", "   ")),
+                Part(("   ", "▟█▶", "▜██", "   ")),
             )),
         ),
         # --- compact (height 3): glow / hull band(s) / muzzle ---
         (
-            Slot((Part(("  ", "Y▓", "  ")),)),
+            Slot((Part(("  ", "Y█", "  ")),)),
             Slot(
                 (
-                    Part(("  ", "▓█", "  "), repeatable=True),
-                    Part((" ▴", "▓█", "  "), repeatable=True),
+                    Part(("  ", "██", "  "), repeatable=True),
+                    Part((" ▴", "██", "  "), repeatable=True),
                 ),
                 min_repeat=1,
                 max_repeat=8,
             ),
-            Slot((Part(("  ", "▓▶", "  ")),)),
+            Slot((Part(("  ", "█▶", "  ")),)),
         ),
     ),
     # Boxy freighter: a fat container backbone between drive and a token gun.
@@ -110,47 +110,47 @@ SHIP_GRAMMAR: dict[str, tuple[tuple[Slot, ...], ...]] = {
         (
             # Thrusters: broad engine block + glow.
             Slot((
-                Part(("   ", " ▟▓", "Y█▓", " ▜▓", "   ")),
-                Part(("   ", "Y▟▓", "Y█▓", "Y▜▓", "   ")),
+                Part(("   ", " ▟█", "Y██", " ▜█", "   ")),
+                Part(("   ", "Y▟█", "Y██", "Y▜█", "   ")),
             )),
             # Spindrive: warp block with a dorsal heat-fin facet.
             Slot((
-                Part((" ≡ ", "▓██", "▓█▓", "▓██", "   ")),
-                Part(("   ", "▓██", "▓█▓", "▓██", "   ")),
+                Part((" ≡ ", "███", "███", "███", "   ")),
+                Part(("   ", "███", "███", "███", "   ")),
             )),
             # Hull: container bays, repeated to lengthen the freighter.
             Slot(
                 (
-                    Part(("    ", "▛▦▦▜", "█▒▒█", "▙▦▦▟", "    "), repeatable=True),
-                    Part((" ▄▄ ", "▓██▓", "█▒▒█", "▓██▓", "    "), repeatable=True),
-                    Part(("    ", "▓██▓", "▓≡▓≡", "▓██▓", " ▀▀ "), repeatable=True),
+                    Part(("    ", "▛██▜", "████", "▙██▟", "    "), repeatable=True),
+                    Part((" ▄▄ ", "████", "████", "████", "    "), repeatable=True),
+                    Part(("    ", "████", "█≡█≡", "████", " ▀▀ "), repeatable=True),
                 ),
                 min_repeat=1,
                 max_repeat=8,
             ),
             # Screens: a slim deflector + bridge nav light.
             Slot((
-                Part((" R", "◇▓", "██", "◇▓", "  ")),
-                Part(("  ", "◇▓", "██", "◇▓", "  ")),
+                Part((" R", "◇█", "██", "◇█", "  ")),
+                Part(("  ", "◇█", "██", "◇█", "  ")),
             )),
             # Main gun: a stubby nose turret.
             Slot((
-                Part(("   ", "▓█▙", "▓█▶", "▓█▛", "   ")),
-                Part(("   ", "▓██", "▓█▶", "▓██", "   ")),
+                Part(("   ", "██▙", "██▶", "██▛", "   ")),
+                Part(("   ", "███", "██▶", "███", "   ")),
             )),
         ),
         # --- compact (height 3): glow / container band(s) / nose ---
         (
-            Slot((Part(("  ", "Y▓", "  ")),)),
+            Slot((Part(("  ", "Y█", "  ")),)),
             Slot(
                 (
-                    Part(("   ", "▟▒▙", "   "), repeatable=True),
-                    Part(("   ", "▓█▓", "   "), repeatable=True),
+                    Part(("   ", "▟█▙", "   "), repeatable=True),
+                    Part(("   ", "███", "   "), repeatable=True),
                 ),
                 min_repeat=1,
                 max_repeat=10,
             ),
-            Slot((Part(("  ", "▓▶", "  ")),)),
+            Slot((Part(("  ", "█▶", "  ")),)),
         ),
     ),
     # Lean warship: a prominent spinal gun and a faceted deflector prow.
@@ -159,47 +159,47 @@ SHIP_GRAMMAR: dict[str, tuple[tuple[Slot, ...], ...]] = {
         (
             # Thrusters: raked engine block with glow.
             Slot((
-                Part(("   ", "▟▓▓", "Y██", "▜▓▓", "   ")),
-                Part(("   ", " ▟▓", "Y██", " ▜▓", "   ")),
+                Part(("   ", "▟██", "Y██", "▜██", "   ")),
+                Part(("   ", " ▟█", "Y██", " ▜█", "   ")),
             )),
             # Spindrive: warp core with a dorsal facet.
             Slot((
-                Part((" ≡ ", "▓█▓", "███", "▓█▓", "   ")),
-                Part(("   ", "▓█▓", "███", "▓█▓", "   ")),
+                Part((" ≡ ", "███", "███", "███", "   ")),
+                Part(("   ", "███", "███", "███", "   ")),
             )),
             # Hull: armoured backbone; dorsal bridge / ventral pod variants.
             Slot(
                 (
-                    Part(("    ", "▓██▓", "█▒▒█", "▓██▓", "    "), repeatable=True),
-                    Part((" ▟▙ ", "▓██▓", "█▒▒█", "▓██▓", "    "), repeatable=True),
-                    Part(("    ", "▓██▓", "█▒◊█", "▓██▓", " ▜▛ "), repeatable=True),
+                    Part(("    ", "████", "████", "████", "    "), repeatable=True),
+                    Part((" ▟▙ ", "████", "████", "████", "    "), repeatable=True),
+                    Part(("    ", "████", "██◊█", "████", " ▜▛ "), repeatable=True),
                 ),
                 min_repeat=1,
                 max_repeat=8,
             ),
             # Screens: layered deflector facets + nav light.
             Slot((
-                Part((" R ", "◇▓▓", "◇██", "◇▓▓", "   ")),
-                Part(("   ", "◇▓▓", "███", "◇▓▓", "   ")),
+                Part((" R ", "◇██", "◇██", "◇██", "   ")),
+                Part(("   ", "◇██", "███", "◇██", "   ")),
             )),
             # Main gun: long spinal barrel tapering to a nose muzzle.
             Slot((
-                Part(("    ", "▓█▙ ", "██▓▶", "▓█▛ ", "    ")),
-                Part(("    ", "▓██▙", "██▓▶", "▓██▛", "    ")),
+                Part(("    ", "██▙ ", "███▶", "██▛ ", "    ")),
+                Part(("    ", "███▙", "███▶", "███▛", "    ")),
             )),
         ),
         # --- compact (height 3): glow / hull band(s) / spinal muzzle ---
         (
-            Slot((Part(("  ", "Y▓", "  ")),)),
+            Slot((Part(("  ", "Y█", "  ")),)),
             Slot(
                 (
-                    Part(("  ", "▓█", "  "), repeatable=True),
-                    Part((" ▴", "▓█", "  "), repeatable=True),
+                    Part(("  ", "██", "  "), repeatable=True),
+                    Part((" ▴", "██", "  "), repeatable=True),
                 ),
                 min_repeat=1,
                 max_repeat=10,
             ),
-            Slot((Part(("   ", "▓█▶", "   ")),)),
+            Slot((Part(("   ", "██▶", "   ")),)),
         ),
     ),
     # Capital warship: tall, blocky, a towering superstructure and heavy prow.
@@ -208,22 +208,22 @@ SHIP_GRAMMAR: dict[str, tuple[tuple[Slot, ...], ...]] = {
         (
             # Thrusters: bank of engines with glow.
             Slot((
-                Part(("    ", " ▟▓▓", "Y█▓▓", "Y██▓", "Y█▓▓", " ▜▓▓", "    ")),
-                Part(("    ", "Y▟▓▓", "Y█▓▓", "Y██▓", "Y█▓▓", "Y▜▓▓", "    ")),
+                Part(("    ", " ▟██", "Y███", "Y███", "Y███", " ▜██", "    ")),
+                Part(("    ", "Y▟██", "Y███", "Y███", "Y███", "Y▜██", "    ")),
             )),
             # Spindrive: heavy warp block with dorsal heat-sink facet.
             Slot((
-                Part((" ≡≡ ", "▓██▓", "████", "█▒▒█", "████", "▓██▓", "    ")),
-                Part(("    ", "▓██▓", "████", "█▒▒█", "████", "▓██▓", "    ")),
+                Part((" ≡≡ ", "████", "████", "████", "████", "████", "    ")),
+                Part(("    ", "████", "████", "████", "████", "████", "    ")),
             )),
             # Hull: superstructure backbone -- dorsal towers & ventral hangars.
             Slot(
                 (
-                    Part((" ▟▓▙ ", "▓███▓", "█▒░▒█", "█▒░▒█", "▓███▓", "▓███▓", "     "),
+                    Part((" ▟█▙ ", "█████", "█████", "█████", "█████", "█████", "     "),
                          repeatable=True),  # canonical: dorsal tower
-                    Part(("  R  ", "▟▓█▓▙", "▓███▓", "█▒░▒█", "█▒░▒█", "▓███▓", "     "),
+                    Part(("  R  ", "▟███▙", "█████", "█████", "█████", "█████", "     "),
                          repeatable=True),  # sensor mast w/ nav light
-                    Part(("     ", "▓███▓", "█▒◊▒█", "█▒░▒█", "▓███▓", "▓███▓", " ▜▓▛ "),
+                    Part(("     ", "█████", "██◊██", "█████", "█████", "█████", " ▜█▛ "),
                          repeatable=True),  # ventral hangar
                 ),
                 min_repeat=1,
@@ -231,27 +231,27 @@ SHIP_GRAMMAR: dict[str, tuple[tuple[Slot, ...], ...]] = {
             ),
             # Screens: stacked deflector facets across the prow.
             Slot((
-                Part((" R ", "◇▓▓", "◇██", "███", "◇██", "◇▓▓", "   ")),
-                Part(("   ", "◇▓▓", "███", "███", "███", "◇▓▓", "   ")),
+                Part((" R ", "◇██", "◇██", "███", "◇██", "◇██", "   ")),
+                Part(("   ", "◇██", "███", "███", "███", "◇██", "   ")),
             )),
             # Main gun: massive spinal lance to a nose muzzle.
             Slot((
-                Part(("      ", "▓██▓▙ ", "██▓▓█▙", "████▓▶", "██▓▓█▛", "▓██▓▛ ", "      ")),
-                Part(("      ", "▓██▓█▙", "████▓▓", "████▓▶", "████▓▓", "▓██▓█▛", "      ")),
+                Part(("      ", "████▙ ", "█████▙", "█████▶", "█████▛", "████▛ ", "      ")),
+                Part(("      ", "█████▙", "██████", "█████▶", "██████", "█████▛", "      ")),
             )),
         ),
         # --- compact (height 3): glow / hull band(s) / heavy muzzle ---
         (
-            Slot((Part((" ▓", "Y█", " ▓")),)),
+            Slot((Part((" █", "Y█", " █")),)),
             Slot(
                 (
-                    Part(("▓█", "██", "▓█"), repeatable=True),
-                    Part(("▀▓", "██", "▄▓"), repeatable=True),
+                    Part(("██", "██", "██"), repeatable=True),
+                    Part(("▀█", "██", "▄█"), repeatable=True),
                 ),
                 min_repeat=1,
                 max_repeat=12,
             ),
-            Slot((Part(("   ", "▓█▶", "   ")),)),
+            Slot((Part(("   ", "██▶", "   ")),)),
         ),
     ),
 }
