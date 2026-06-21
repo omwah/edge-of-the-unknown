@@ -597,20 +597,6 @@ class RosterConfig(BaseModel):
         return self
 
 
-class UIConfig(BaseModel):
-    """Presentation-only knobs for the (throwaway) TUI layer.
-
-    Kept in config per CLAUDE.md (constants live in config, not code) even though
-    they drive no rules. `sector_art_full_color` picks the SectorScene backdrop
-    look: ``False`` (default) flattens the procedural art to the dim monochrome
-    backdrop the layout was designed around; ``True`` keeps the art's own colours.
-    """
-
-    model_config = _FROZEN
-
-    sector_art_full_color: bool = False
-
-
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -618,7 +604,6 @@ class GameConfig(BaseModel):
 
     config_version: int
     turns_per_day: int = 250  # TWINSTR.DOC default (§9)
-    ui: UIConfig = UIConfig()
     economy: EconomyConfig = EconomyConfig()
     aliens: AliensConfig = AliensConfig()
     bigbang: BigBangConfig = BigBangConfig()

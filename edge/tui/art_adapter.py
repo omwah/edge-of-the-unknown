@@ -10,8 +10,7 @@ touching game code — and gives the runtime check and the coverage tests one
 source of truth.
 
 The art engine emits `rich.text.Text`; `text_to_cells` flattens a sprite into the
-per-cell grid the `SectorScene` backdrop composites, honouring a dim-monochrome
-vs. full-colour choice.
+per-cell grid the `SectorScene` backdrop composites, keeping the art's own colours.
 """
 
 from __future__ import annotations
@@ -119,28 +118,19 @@ def sprite(
     )
 
 
-def text_to_cells(
-    text: Text, *, dim_color: str | None = None
-) -> list[list[tuple[str, Style | None]]]:
+def text_to_cells(text: Text) -> list[list[tuple[str, Style | None]]]:
     """Flatten a Rich `Text` sprite into per-cell `(char, style)` rows for stamping.
 
-    With `dim_color` set, the art's own colours are discarded and every non-blank
-    cell takes a single ``dim <dim_color>`` style (the monochrome-backdrop mode);
-    with it ``None``, each cell keeps the art's resolved colour (full-colour mode).
-    A space cell carries ``None`` so the compositor treats it as transparent.
+    Each cell keeps the art's own resolved colour. A space cell carries ``None`` so
+    the compositor treats it as transparent.
     """
     rows: list[list[tuple[str, Style | None]]] = []
     for line in text.split(allow_blank=True):
         cells: list[tuple[str, Style | None]] = []
-        if dim_color is not None:
-            dim_style = Style(color=dim_color, dim=True)
-            for ch in line.plain:
-                cells.append((ch, dim_style if ch != " " else None))
-        else:
-            for segment in line.render(_CONSOLE):
-                style = segment.style
-                for ch in segment.text:
-                    cells.append((ch, style if ch != " " else None))
+        for segment in line.render(_CONSOLE):
+            style = segment.style
+            for ch in segment.text:
+                cells.append((ch, style if ch != " " else None))
         rows.append(cells)
     return rows
 
