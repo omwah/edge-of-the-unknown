@@ -36,6 +36,7 @@ def _archetype_paged_sheets(
     seed: int,
     width: int,
     height: int,
+    facing: str = "right",
 ) -> list[tuple[str, list[tuple[str, Text]], int | None]]:
     """Build one contact sheet per group of ``per_page`` archetypes: archetypes
     become columns, subtypes rows. ``per_page <= 0`` keeps them all on one page.
@@ -58,6 +59,7 @@ def _archetype_paged_sheets(
                     width=width,
                     height=height,
                     archetype_id=arch,
+                    facing=facing,
                 )
                 items.append((f"{st} / {arch}", sprite))
         title = f"{entity_type} [{page}/{len(chunks)}]  " + ", ".join(chunk)
@@ -81,18 +83,19 @@ def _export_all_types(args: argparse.Namespace, parser: argparse.ArgumentParser)
         width = args.height * 2 if entity_type == "planet" else args.width
         height = args.height
 
-        # Ports carry an archetype (style) axis -> paginate by archetype; other
-        # types have no styles, so they get a single near-square page.
-        if entity_type == "port":
+        # Ports and ships carry an archetype (style) axis -> paginate by
+        # archetype; other types have no styles, so they get a single page.
+        if entity_type in ("port", "ship"):
             sheets.extend(
                 _archetype_paged_sheets(
-                    "port",
+                    entity_type,
                     subtypes,
                     available_archetypes(),
                     args.archetypes_per_page,
                     seed=args.seed,
                     width=width,
                     height=height,
+                    facing=args.facing,
                 )
             )
             continue
@@ -165,6 +168,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         "(for ships, ports, and subsystems); e.g. humanoid_diplomat, brain_dome_automaton.",
     )
     parser.add_argument(
+        "--facing",
+        type=str,
+        default="right",
+        choices=["left", "right"],
+        help="For ships, which way the hull points: 'right' (canonical) or 'left' "
+        "(the same ship flipped). Ignored by other types.",
+    )
+    parser.add_argument(
         "--export",
         type=str,
         default=None,
@@ -230,6 +241,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 width=args.width,
                 height=args.height,
                 archetype_id=arch,
+                facing=args.facing,
             )
             sprite_width = max(
                 (cell_len(line) for line in sprite.plain.split("\n")), default=0
@@ -253,6 +265,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             sheets = _archetype_paged_sheets(
                 args.type, subtypes_to_run, archetypes_to_run, per_page,
                 seed=args.seed, width=args.width, height=args.height,
+                facing=args.facing,
             )
             pdf = export_multipage_pdf(sheets, args.export)
             console.print(

@@ -4,16 +4,19 @@ import random
 from functools import lru_cache
 from rich.text import Text
 
+from edge.art.hull import ARCHETYPE_STYLES
 from edge.art.terrain import TerrainGenerator
 from edge.art.planet import PlanetGenerator
 from edge.art.starfield import StarfieldGenerator, STARFIELD_SUBTYPES
-from edge.art.port import PortGenerator, PORT_SUBTYPES, ARCHETYPE_STYLES
+from edge.art.port import PortGenerator, PORT_SUBTYPES
+from edge.art.ship import ShipGenerator, SHIP_SUBTYPES
 
 _TERRAIN_GEN = TerrainGenerator(use_fg_color=True, use_bg_color=True)
 _PLANET_TERRAIN_GEN = TerrainGenerator(use_fg_color=False, use_bg_color=True)
 _PLANET_GEN = PlanetGenerator(terrain_gen=_PLANET_TERRAIN_GEN)
 _STARFIELD_GEN = StarfieldGenerator()
 _PORT_GEN = PortGenerator()
+_SHIP_GEN = ShipGenerator()
 
 
 def available_subtypes(entity_type: str) -> list[str]:
@@ -28,6 +31,8 @@ def available_subtypes(entity_type: str) -> list[str]:
         return list(STARFIELD_SUBTYPES)
     if entity_type == "port":
         return list(PORT_SUBTYPES)
+    if entity_type == "ship":
+        return list(SHIP_SUBTYPES)
     return []
 
 
@@ -48,7 +53,8 @@ def generate_sprite(
     seed: int,
     width: int,
     height: int,
-    archetype_id: str | None = None
+    archetype_id: str | None = None,
+    facing: str = "right",
 ) -> Text:
     """Generate a procedural ASCII sprite based on parameters.
 
@@ -60,16 +66,20 @@ def generate_sprite(
         height: The target height in lines
         archetype_id: Optional owner archetype id for stylistic variations
             (stable across species renames, unlike a species id/name)
+        facing: For ships, "right" (canonical) or "left" -- the same ship flipped
+            to point either way. Ignored by the other entity types.
 
     Returns:
         A rich Text object representing the generated ASCII art.
     """
-    # Derive a local PRNG from the input parameters to ensure determinism
+    # Derive a local PRNG from the input parameters to ensure determinism.
+    # ``facing`` is deliberately omitted from the seed: left/right are the same
+    # ship, just flipped, so they must share one composition.
     rng_seed = f"{seed}|{entity_type}|{subtype}"
     if archetype_id:
         rng_seed += f"|{archetype_id}"
     rng = random.Random(rng_seed)
-    
+
     # Route to specific generation algorithms based on entity type
     if entity_type == "terrain":
         return _TERRAIN_GEN.generate(rng, subtype, width, height)
@@ -82,5 +92,8 @@ def generate_sprite(
 
     if entity_type == "port":
         return _PORT_GEN.generate(rng, subtype, width, height, archetype_id)
+
+    if entity_type == "ship":
+        return _SHIP_GEN.generate(rng, subtype, width, height, archetype_id, facing)
 
     raise ValueError(f"Unknown entity type '{entity_type}'.")
