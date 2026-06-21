@@ -449,6 +449,7 @@ def surface_view(state: UniverseState, player_id: int, planet_id: int, config: G
         planet=planet.name, descent_fuel="n/a", terrain=terrain, sites=sites,
         planet_id=planet_id, explorable=explorable,
         terrain_blurb=terrain_art.blurb_for(planet.planet_type),
+        ptype=planet.planet_type,
     )
 
 

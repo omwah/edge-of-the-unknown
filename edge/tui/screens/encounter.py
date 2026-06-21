@@ -16,6 +16,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from edge.tui import art_adapter
 from edge.tui.dummy import EncounterDTO
 from edge.tui.widgets import bar
 
@@ -77,6 +78,11 @@ class EncounterScreen(Screen):
         with Horizontal(id="enc-main"):
             with Vertical(id="them") as them:
                 them.border_title = "THEM"
+                if e.enemies:
+                    # Art faces left -- the enemy group bears down on the player's ship.
+                    entity, sub = art_adapter.ship_entity(e.enemies[0].name)
+                    yield Static(art_adapter.sprite(
+                        entity, sub, seed=len(e.enemies), width=22, height=6, facing="left"))
                 for s in e.enemies:
                     yield Static(
                         f"[white]>[/] {s.name:<7} hull [red]{bar(s.hull_filled)}[/] "

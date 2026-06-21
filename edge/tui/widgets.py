@@ -13,7 +13,9 @@ from textual.message import Message
 from textual.widgets import Button, DataTable, Static
 
 from edge.core.enums import Commodity
-from edge.tui import sprites
+from rich.style import Style
+
+from edge.tui import art_adapter
 from edge.tui.dummy import MapBand, MapDTO, NeighborDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
 
 
@@ -290,38 +292,64 @@ class SectorScene(Static):
         self._hotspots = []
         if w < self._MIN_WIDTH or h < 6:
             return Text("")
-        grid = [[(" ", "") for _ in range(w)] for _ in range(h)]
+        # `True` keeps the art's own colours; `False` (the default) flattens the
+        # scene to the dim per-entity backdrop the layout was designed around
+        # (config `ui.sector_art_full_color`, set on the app at game start).
+        full_color = bool(getattr(self.app, "sector_art_full_color", False))
+        grid: list[list[tuple[str, Style | None]]] = [[(" ", None)] * w for _ in range(h)]
         # Centre sprites in the art region: the right span left clear by the text.
         art_left = int(w * self._TEXT_FRACTION)
+        region_w = max(8, w - art_left)
         centre = (art_left + w) / 2
+        seed = self._sector.sector_id
 
-        def stamp(sprite: list[str], top: int, style: str, dest: str | None = None) -> int:
-            sw = max((len(line) for line in sprite), default=0)
-            left = max(art_left, min(int(centre - sw / 2), w - sw))
-            for r, line in enumerate(sprite):
+        def cells(entity: str, subtype: str, *, sprite_seed: int, sw: int, sh: int,
+                  color: str) -> list[list[tuple[str, Style | None]]]:
+            spr = art_adapter.sprite(entity, subtype, seed=sprite_seed, width=sw, height=sh)
+            return art_adapter.text_to_cells(spr, dim_color=None if full_color else color)
+
+        def paint(rows: list[list[tuple[str, Style | None]]], top: int, left: int) -> None:
+            for r, row in enumerate(rows):
                 y = top + r
                 if 0 <= y < h:
-                    for c, ch in enumerate(line):
+                    for c, (ch, style) in enumerate(row):
                         x = left + c
                         if ch != " " and 0 <= x < w:
                             grid[y][x] = (ch, style)
-            bottom = top + len(sprite)
+
+        def stamp(rows: list[list[tuple[str, Style | None]]], top: int,
+                  dest: str | None = None) -> int:
+            sw = max((len(row) for row in rows), default=0)
+            left = max(art_left, min(int(centre - sw / 2), w - sw))
+            paint(rows, top, left)
+            bottom = top + len(rows)
             if dest is not None:  # record the sprite's bounding box as a click target
                 self._hotspots.append((left, top, left + sw, bottom, dest))
             return bottom
 
+        # Base layer: a procedural starfield filling the whole art region (§art).
+        paint(cells("starfield", "standard", sprite_seed=seed, sw=region_w, sh=h,
+                    color="white"), 0, art_left)
+
         cursor = 1
         if self._sector.planets:
-            cursor = stamp(sprites.pick_planet(self._sector.planets[0]), cursor, "cyan", "planet") + 1
+            sh_p = min(max(6, h // 2), h - cursor)
+            sub = art_adapter.planet_subtype_from_name(self._sector.planets[0])
+            cursor = stamp(cells("planet", sub, sprite_seed=seed, sw=min(region_w, 24),
+                                 sh=sh_p, color="cyan"), cursor, "planet") + 1
         if self._sector.ports:
-            cursor = stamp(sprites.pick_port(self._sector.ports[0]), cursor, "magenta", "port") + 1
-        for name in self._sector.ships:
-            cursor = stamp(sprites.pick_ship(name), cursor, "white") + 1
+            sub = art_adapter.port_subtype(self._sector.ports[0])
+            cursor = stamp(cells("port", sub, sprite_seed=seed, sw=min(region_w, 18), sh=6,
+                                 color="magenta"), cursor, "port") + 1
+        for i, name in enumerate(self._sector.ships):
+            entity, sub = art_adapter.ship_entity(name)
+            cursor = stamp(cells(entity, sub, sprite_seed=seed * 16 + i,
+                                 sw=min(region_w, 16), sh=5, color="white"), cursor) + 1
 
         out = Text()
         for y in range(h):
             for ch, style in grid[y]:
-                out.append(ch, style=f"dim {style}" if style else None)
+                out.append(ch, style=style)
             if y < h - 1:
                 out.append("\n")
         return out

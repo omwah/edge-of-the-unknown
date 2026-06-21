@@ -83,6 +83,7 @@ class SurfaceDTO:
     planet_id: int = 0
     explorable: bool = False  # at least one site can still be revealed (drives [E])
     terrain_blurb: str = ""  # planet-type flavor caption for the terrain panel title
+    ptype: str = ""  # planet_type, so the TUI can render the art-engine terrain backdrop
 
 
 @dataclass(frozen=True)

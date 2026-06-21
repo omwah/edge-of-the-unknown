@@ -16,6 +16,7 @@ from edge.config import load_default_config
 from edge.engine.ticker import EngineTicker
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
+from edge.tui import art_adapter
 from edge.tui.saves import clear_slot, default_save, has_save
 from edge.tui.screens.main_menu import MainMenuScreen
 
@@ -55,6 +56,8 @@ class EdgeApp(App[None]):
         self.plain = plain
         self.service: GameService | None = None
         self._ticker: EngineTicker | None = None
+        # Picked up by SectorScene; set from config when a game starts.
+        self.sector_art_full_color = False
 
     def on_mount(self) -> None:
         self.register_theme(TW2002_THEME)
@@ -70,6 +73,7 @@ class EdgeApp(App[None]):
         (cancelled on exit).
         """
         config = load_default_config()
+        self._apply_art_config(config)
         save = default_save()
         save.parent.mkdir(parents=True, exist_ok=True)
         clear_slot()
@@ -86,9 +90,20 @@ class EdgeApp(App[None]):
         if not has_save():
             return None
         config = load_default_config()
+        self._apply_art_config(config)
         self.service = GameService.load_game(config, SqliteRepository(default_save()))
         self._start_ticker(self.service)
         return self.service
+
+    def _apply_art_config(self, config: object) -> None:
+        """Validate art coverage and read presentation knobs before a game starts.
+
+        `validate_art_coverage` raises if any roster species names an archetype the
+        art engine can't paint (fail fast on roster/art drift). The art layer is
+        presentation, so this check lives here in the TUI, not in core/server.
+        """
+        art_adapter.validate_art_coverage(config)  # type: ignore[arg-type]
+        self.sector_art_full_color = config.ui.sector_art_full_color  # type: ignore[attr-defined]
 
     def _start_ticker(self, service: GameService) -> None:
         self._ticker = EngineTicker(service)

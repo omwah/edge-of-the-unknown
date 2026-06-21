@@ -20,6 +20,7 @@ from edge.core.engine_room import EngineRoomError
 from edge.core.movement import MovementError
 from edge.core.rules import Explore, Salvage
 from edge.server.service import GameService
+from edge.tui import art_adapter
 
 
 class SurfaceScreen(Screen):
@@ -58,7 +59,15 @@ class SurfaceScreen(Screen):
             id="surface-title",
         )
         with Horizontal(id="surface-top"):
-            terrain = Static("\n".join(s.terrain), id="terrain")
+            # Procedural terrain from the art engine when the planet type is known;
+            # fall back to the DTO's pre-rendered rows (screenshot harness / legacy).
+            if s.ptype:
+                body = art_adapter.sprite(
+                    "terrain", s.ptype, seed=s.planet_id, width=52, height=8,
+                )
+            else:
+                body = "\n".join(s.terrain)
+            terrain = Static(body, id="terrain")
             terrain.border_title = f"terrain · {s.terrain_blurb}" if s.terrain_blurb else "terrain"
             yield terrain
             detail = Static(id="site-detail")
