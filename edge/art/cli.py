@@ -27,6 +27,44 @@ def banner(title: str, width: int, style: str = "bold white") -> Text:
 _ALL_TYPES = ["port", "planet", "terrain", "starfield", "ship", "subsystem"]
 
 
+def _archetype_paged_sheets(
+    entity_type: str,
+    subtypes: list[str],
+    archetypes: list[str],
+    per_page: int,
+    *,
+    seed: int,
+    width: int,
+    height: int,
+) -> list[tuple[str, list[tuple[str, Text]], int | None]]:
+    """Build one contact sheet per group of ``per_page`` archetypes: archetypes
+    become columns, subtypes rows. ``per_page <= 0`` keeps them all on one page.
+
+    Returns ``(title, items, cols)`` sheets for ``export_multipage_pdf``.
+    """
+    if per_page <= 0:
+        per_page = len(archetypes)
+    chunks = [archetypes[i:i + per_page] for i in range(0, len(archetypes), per_page)]
+
+    sheets: list[tuple[str, list[tuple[str, Text]], int | None]] = []
+    for page, chunk in enumerate(chunks, start=1):
+        items: list[tuple[str, Text]] = []
+        for st in subtypes:  # subtype-major: rows = subtypes, cols = archetypes
+            for arch in chunk:
+                sprite = generate_sprite(
+                    entity_type=entity_type,
+                    subtype=st,
+                    seed=seed,
+                    width=width,
+                    height=height,
+                    archetype_id=arch,
+                )
+                items.append((f"{st} / {arch}", sprite))
+        title = f"{entity_type} [{page}/{len(chunks)}]  " + ", ".join(chunk)
+        sheets.append((title, items, len(chunk)))
+    return sheets
+
+
 def _export_all_types(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     """Sweep every renderable type into one multi-page PDF (a page per type)."""
     from edge.art.export import export_multipage_pdf
@@ -39,30 +77,38 @@ def _export_all_types(args: argparse.Namespace, parser: argparse.ArgumentParser)
         subtypes = available_subtypes(entity_type)
         if not subtypes:
             continue  # not implemented yet (e.g. ship, subsystem)
-        # Ports carry an archetype (style) axis; other types do not. Planets
-        # render wide (width = 2 * height) like the single-type path.
-        archetypes = available_archetypes() if entity_type == "port" else [None]
+        # Planets render wide (width = 2 * height) like the single-type path.
         width = args.height * 2 if entity_type == "planet" else args.width
         height = args.height
 
-        items: list[tuple[str, Text]] = []
-        for st in subtypes:
-            for arch in archetypes:
-                sprite = generate_sprite(
-                    entity_type=entity_type,
-                    subtype=st,
+        # Ports carry an archetype (style) axis -> paginate by archetype; other
+        # types have no styles, so they get a single near-square page.
+        if entity_type == "port":
+            sheets.extend(
+                _archetype_paged_sheets(
+                    "port",
+                    subtypes,
+                    available_archetypes(),
+                    args.archetypes_per_page,
                     seed=args.seed,
                     width=width,
                     height=height,
-                    archetype_id=arch,
                 )
-                label = st if arch is None else f"{st} / {arch}"
-                items.append((label, sprite))
+            )
+            continue
 
-        cols = args.export_cols
-        if cols is None and len(archetypes) > 1:
-            cols = len(archetypes)  # one column per archetype
-        sheets.append((entity_type, items, cols))
+        items: list[tuple[str, Text]] = []
+        for st in subtypes:
+            sprite = generate_sprite(
+                entity_type=entity_type,
+                subtype=st,
+                seed=args.seed,
+                width=width,
+                height=height,
+                archetype_id=None,
+            )
+            items.append((st, sprite))
+        sheets.append((entity_type, items, args.export_cols))
 
     if not sheets:
         parser.error("no renderable types found to export")
@@ -135,6 +181,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="Grid column count for the exported sheet (default: near-square, or "
         "one column per archetype when '--archetype-id all' is used).",
     )
+    parser.add_argument(
+        "--archetypes-per-page",
+        type=int,
+        default=2,
+        metavar="N",
+        help="When exporting ports across multiple archetypes, paginate the PDF "
+        "to N archetypes per page (columns), with their subtypes as rows "
+        "(default 2). Use 0 to keep every archetype on a single page.",
+    )
 
     args = parser.parse_args(argv)
 
@@ -189,7 +244,22 @@ def main(argv: Sequence[str] | None = None) -> None:
             export_items.append((short, sprite))
 
     if args.export:
-        from edge.art.export import export_sprite_sheet
+        from edge.art.export import export_multipage_pdf, export_sprite_sheet
+
+        sweeping_archetypes = len(archetypes_to_run) > 1 and archetypes_to_run[0]
+        per_page = args.archetypes_per_page
+        if sweeping_archetypes and 0 < per_page < len(archetypes_to_run):
+            # Paginate the PDF: per_page archetypes (columns) x subtypes (rows).
+            sheets = _archetype_paged_sheets(
+                args.type, subtypes_to_run, archetypes_to_run, per_page,
+                seed=args.seed, width=args.width, height=args.height,
+            )
+            pdf = export_multipage_pdf(sheets, args.export)
+            console.print(
+                f"Wrote {len(export_items)} sprites across {len(sheets)} pages "
+                f"to {pdf}"
+            )
+            return
 
         # One column per archetype when sweeping archetypes, else near-square.
         cols = args.export_cols
