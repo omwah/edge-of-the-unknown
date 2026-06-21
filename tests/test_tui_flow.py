@@ -105,7 +105,7 @@ async def test_travel_prompt_warps_along_known_route() -> None:
 
 async def test_sector_title_shows_spatial_id() -> None:
     """The game screen renders the sector's spatial display id, not the internal id (§5.1)."""
-    from textual.widgets import Static
+    from edge.tui.widgets import SectorScene
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -116,7 +116,7 @@ async def test_sector_title_shows_spatial_id() -> None:
         assert svc is not None
         spatial = svc.state.spatial_ids[1]  # the player starts at internal sector 1
         assert spatial != 1  # the spatial id genuinely differs from the internal id
-        title = str(app.screen.query_one("#title", Static).render())
+        title = app.screen.query_one(SectorScene).render().plain
         assert f"[{spatial}]" in title
 
 
@@ -364,11 +364,20 @@ async def test_hail_opens_contact_then_buys_tech() -> None:
         assert sum(svc.state.ships[1].components.values()) == 1
 
 
+async def _click_hotspot(pilot, scene, *, dest=None, ref=None) -> None:
+    """Click the centre of the first SectorScene hotspot matching dest/ref."""
+    spot = next(s for s in scene._hotspots
+                if (dest is None or s[4] == dest) and (ref is None or s[5] == ref))
+    cx, cy = (spot[0] + spot[2]) // 2, (spot[1] + spot[3]) // 2
+    await pilot.click(scene, offset=(cx, cy))
+    await pilot.pause()
+
+
 async def test_click_ship_hails_that_specific_species() -> None:
     """Two contacts in the sector: clicking the second ship sprite hails it, not the first."""
     from edge.core.models import AlienSpecies
     from edge.tui.screens.contact import AlienContactScreen
-    from edge.tui.widgets import ShipPanel
+    from edge.tui.widgets import SectorScene
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -388,21 +397,18 @@ async def test_click_ship_hails_that_specific_species() -> None:
             trade_posture=sc2.trade_posture, treaty_mode=sc2.treaty_mode, persona=sc2.persona)
         await app.screen.recompose()  # render the now-present ships
         await pilot.pause()
-        # Both contacts (<= scene.max_ships_shown) render as sprite panels.
-        panels = [p for p in app.screen.query(ShipPanel) if p._contact_id is not None]
-        assert len(panels) == 2
-        await pilot.click(next(p for p in panels if sc2.name in p._name))  # click Selvani
-        await pilot.pause()
+        scene = app.screen.query_one(SectorScene)
+        await _click_hotspot(pilot, scene, dest="contact", ref=2)  # click Selvani's sprite
         assert isinstance(app.screen, AlienContactScreen)
         met = svc.state.players[1].species_attitudes
         assert 2 in met and 1 not in met  # hailed the clicked ship, not the first
 
 
 async def test_click_planet_art_opens_survey() -> None:
-    """Clicking the planet sprite panel (not just its text entry) surveys the planet."""
+    """Clicking the planet sprite (not just its text entry) surveys the planet."""
     from edge.core.rules import Warp
     from edge.tui.screens.planet import PlanetScreen
-    from edge.tui.widgets import OrbitPanel
+    from edge.tui.widgets import SectorScene
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -418,18 +424,17 @@ async def test_click_planet_art_opens_survey() -> None:
             svc.apply(1, Warp(to_sector=hop))
         await app.screen.recompose()
         await pilot.pause()
-        panel = next(p for p in app.screen.query(OrbitPanel) if p._dest == "planet")
-        await pilot.click(panel)
-        await pilot.pause()
+        scene = app.screen.query_one(SectorScene)
+        await _click_hotspot(pilot, scene, dest="planet")
         assert isinstance(app.screen, PlanetScreen)
 
 
 async def test_click_port_art_docks() -> None:
-    """Clicking the port sprite panel docks, the same as pressing P or its text entry."""
+    """Clicking the port sprite docks, the same as pressing P or its text entry."""
     from edge.core.rules import Warp
     from edge.tui.screens.port import PortScreen
     from edge.tui.screens.stardock import StarDockScreen
-    from edge.tui.widgets import OrbitPanel
+    from edge.tui.widgets import SectorScene
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -444,18 +449,15 @@ async def test_click_port_art_docks() -> None:
             svc.apply(1, Warp(to_sector=hop))
         await app.screen.recompose()
         await pilot.pause()
-        panel = next(p for p in app.screen.query(OrbitPanel) if p._dest == "port")
-        await pilot.click(panel)
-        await pilot.pause()
+        scene = app.screen.query_one(SectorScene)
+        await _click_hotspot(pilot, scene, dest="port")
         assert isinstance(app.screen, (PortScreen, StarDockScreen))
 
 
-async def test_sector_view_caps_ship_sprites_and_overflows_to_text() -> None:
-    """The ships row shows <= scene.max_ships_shown sprites; extras become text rows."""
-    from textual.widgets import Static
-
+async def test_sector_view_caps_ship_sprites_and_keeps_overflow_hailable() -> None:
+    """<= scene.max_ships_shown ship sprites, but every contact stays hailable."""
     from edge.core.models import AlienSpecies
-    from edge.tui.widgets import ClickableEntry, OrbitPanel, ShipPanel
+    from edge.tui.widgets import SectorScene
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -477,14 +479,12 @@ async def test_sector_view_caps_ship_sprites_and_overflows_to_text() -> None:
                 trade_posture=sc.trade_posture, treaty_mode=sc.treaty_mode, persona=sc.persona)
         await app.screen.recompose()
         await pilot.pause()
-        # Header spans the top and both orbit columns exist.
-        assert "[" in str(app.screen.query_one("#title", Static).render())
-        dests = {p._dest for p in app.screen.query(OrbitPanel)}
-        assert {"planet", "port"} <= dests
-        # Exactly the cap renders as sprites; the third is a clickable text row.
-        assert len(app.screen.query(ShipPanel)) == app.scene_art.max_ships_shown
-        contact_rows = [e for e in app.screen.query(ClickableEntry) if e._dest == "contact"]
-        assert len(contact_rows) == 1
+        scene = app.screen.query_one(SectorScene)
+        # The header is composited at the top of the scene.
+        assert "[" in scene.render().plain
+        # All three contacts remain individually hailable (sprite cap + overflow list).
+        contact_refs = {s[5] for s in scene._hotspots if s[4] == "contact"}
+        assert contact_refs == {1, 2, 3}
 
 
 async def test_haggle_session_stays_open_across_a_rejected_round() -> None:
