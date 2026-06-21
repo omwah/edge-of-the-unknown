@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rich.color import Color
 from rich.console import Console
 from rich.style import Style
 from rich.text import Text
@@ -34,6 +35,34 @@ if TYPE_CHECKING:
 # per-cell colours for the SectorScene grid; it never writes anywhere. Truecolor
 # keeps named/RGB colours intact rather than downgrading them off a fake tty.
 _CONSOLE = Console(color_system="truecolor")
+
+
+def _truecolor(color: Color | None) -> Color | None:
+    """Resolve a (possibly ANSI/named) colour to an explicit RGB triplet colour."""
+    return Color.from_triplet(color.get_truecolor()) if color is not None else None
+
+
+def _to_truecolor(text: Text) -> Text:
+    """Re-resolve every style in `text` to explicit truecolor.
+
+    The art palettes use ANSI names (``blue``, ``cyan``, …) meaning the *standard*
+    ANSI hues. Textual otherwise remaps those names through its theme's ANSI palette
+    (a Monokai-ish one where ``blue`` is a violet), so the rendered sprite drifts
+    from the intended colours. Baking each colour to its standard RGB triplet here
+    pins the sprite to the art's intent regardless of the active Textual theme,
+    while leaving UI markup text (rendered elsewhere) free to follow the theme.
+    """
+    out = Text()
+    lines = text.split(allow_blank=True)
+    for i, line in enumerate(lines):
+        for seg in line.render(_CONSOLE):
+            st = seg.style
+            if st is not None:
+                st = st + Style.from_color(_truecolor(st.color), _truecolor(st.bgcolor))
+            out.append(seg.text, style=st)
+        if i < len(lines) - 1:
+            out.append("\n")
+    return out
 
 
 # --- game vocabulary -> art subtype ----------------------------------------
@@ -112,10 +141,15 @@ def sprite(
     archetype_id: str | None = None,
     facing: str = "right",
 ) -> Text:
-    """A procedural sprite as a Rich `Text` (a thin wrapper over the art engine)."""
-    return generate_sprite(
+    """A procedural sprite as a Rich `Text` (a thin wrapper over the art engine).
+
+    Colours are baked to explicit truecolor so the sprite renders as the art
+    intends rather than being re-tinted through the active Textual theme's ANSI
+    palette (see `_to_truecolor`).
+    """
+    return _to_truecolor(generate_sprite(
         entity_type, subtype, seed, width, height, archetype_id, facing
-    )
+    ))
 
 
 def text_to_cells(text: Text) -> list[list[tuple[str, Style | None]]]:
