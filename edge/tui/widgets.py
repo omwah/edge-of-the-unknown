@@ -371,10 +371,11 @@ class SectorScene(Static):
         # Orbit band — planet (left half) | port (right half). Sizes from config,
         # clamped to the space left below `row` for the margin + ships + discoveries.
         reserved = self._ORBIT_MARGIN + (cfg.ship.max_height + 1) + 3
-        ph = max(4, min(cfg.planet.max_height, (half - 2) // 2, h - row - reserved))
+        ph = max(cfg.planet.min_height,
+                 min(cfg.planet.max_height, (half - 2) // 2, h - row - reserved))
         pw = ph * 2  # width locked to 2*height so the disc reads round
-        portw = max(4, min(cfg.port.max_width, half - 2))
-        porth = max(3, min(cfg.port.max_height, ph))
+        portw = max(cfg.port.min_width, min(cfg.port.max_width, half - 2))
+        porth = max(cfg.port.min_height, min(cfg.port.max_height, ph))
         band_h = max(ph, porth)
         lcx, rcx = half // 2, half + half // 2  # column centres
         # Planet (or placeholder), top-aligned in the band.
@@ -404,8 +405,10 @@ class SectorScene(Static):
         # of a pair may face left so the two face inward (deterministic per sector).
         shown = sec.ships[:cfg.max_ships_shown]
         if shown:
-            sw = max(4, min(cfg.ship.max_width, (w - 2) // max(1, len(shown)) - 2))
-            sh = cfg.ship.max_height
+            sw = max(cfg.ship.min_width, min(cfg.ship.max_width, (w - 2) // max(1, len(shown)) - 2))
+            # Ship height isn't space-clamped (the layout reserves max_height), so it
+            # sits at max_height -- but never below the configured min.
+            sh = max(cfg.ship.min_height, cfg.ship.max_height)
             gap = 2
             total = len(shown) * sw + (len(shown) - 1) * gap
             sx = max(0, (w - total) // 2)

@@ -598,29 +598,54 @@ class RosterConfig(BaseModel):
 
 
 class SpriteSize(BaseModel):
-    """Max footprint (character cells) for one SectorView scene sprite."""
+    """Footprint bounds (character cells) for one SectorView scene sprite.
+
+    A sprite is sized to the space it's given, clamped to ``[min, max]`` per axis
+    so it never shrinks below legibility nor crowds the layout.
+    """
 
     model_config = _FROZEN
 
     max_width: int = Field(gt=0)
     max_height: int = Field(gt=0)
+    min_width: int = Field(default=4, gt=0)
+    min_height: int = Field(default=3, gt=0)
+
+    @model_validator(mode="after")
+    def _check_bounds(self) -> SpriteSize:
+        if self.min_width > self.max_width:
+            raise ValueError(f"min_width {self.min_width} > max_width {self.max_width}")
+        if self.min_height > self.max_height:
+            raise ValueError(f"min_height {self.min_height} > max_height {self.max_height}")
+        return self
 
 
 class PlanetSpriteSize(BaseModel):
     """Planet sprite footprint: height is authored, width is *derived* as 2*height.
 
     Terminal cells are roughly twice as tall as they are wide, so a 2:1 character
-    grid keeps the planet disc round rather than oblong. Callers read `max_width`;
+    grid keeps the planet disc round rather than oblong. Callers read `*_width`;
     they never set it, so the round-aspect invariant can't drift.
     """
 
     model_config = _FROZEN
 
     max_height: int = Field(default=12, gt=0)
+    min_height: int = Field(default=4, gt=0)
 
     @property
     def max_width(self) -> int:
         return self.max_height * 2
+
+    @property
+    def min_width(self) -> int:
+        return self.min_height * 2
+
+    @model_validator(mode="after")
+    def _check_bounds(self) -> PlanetSpriteSize:
+        if self.min_height > self.max_height:
+            raise ValueError(f"min_height {self.min_height} > max_height {self.max_height}")
+        return self
 
 
 class SceneArtConfig(BaseModel):
