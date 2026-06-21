@@ -72,93 +72,150 @@ class Slot:
     max_repeat: int = 1
 
 
-# Per-subtype band grammars, ordered top (cap) -> bottom (base). The FIRST part of
-# each slot is the *canonical* one: choosing all canonical parts at the repeat that
+# Per-subtype band grammars. Each subtype maps to an ordered tuple of grammar
+# *tiers*, largest-floor first; ``_select_grammar`` picks the richest tier whose
+# minimum stack fits the requested height (so big boxes get the detailed art and
+# tiny boxes get a legible compact silhouette -- the platform/octagon don't shrink
+# to a few rows gracefully, so the small regime needs its own parts).
+#
+# Within a tier the slots run top (cap) -> bottom (base). The FIRST part of each
+# slot is the *canonical* one: choosing all canonical parts at the repeat that
 # matches the historic height reproduces the original largest silhouette exactly
 # (this is "decompose what we had", not "redraw"). The remaining parts are
 # interchangeable variants that give repeat ports visible variety.
-PORT_GRAMMAR: dict[str, tuple[Slot, ...]] = {
+PORT_GRAMMAR: dict[str, tuple[tuple[Slot, ...], ...]] = {
     # The hero. Beacon + shoulders, docking-arm platform, tapering chevron body,
     # engine glow -- the TW2002 StarDock shape.
     "stardock": (
-        # Cap: red beacon on a mast, widening to shoulders.
-        Slot((
-            Part(("       R", "       █", "      ██")),          # canonical
-            Part(("       R", "       █", "       █", "      ██")),  # tall mast
-            Part(("       R", "      ██")),                        # stubby
-        )),
-        # Platform: shoulder ridge + docking-arm deck.
-        Slot((
-            Part(("    ▟███", "╾─▓████◊")),  # canonical: arms + facet
-            Part(("    ▟███", "╾─▓█████")),  # plain deck
-            Part(("  ▟█████", "▓██████")),   # wide, armless platform
-        )),
-        # Body: tapering chevron, repeated to lengthen the hull.
-        Slot(
-            (
-                Part(("    ▜██≡", "     ▓██"), repeatable=True),  # canonical: faceted
-                Part(("    ▜███", "     ▓██"), repeatable=True),  # plain
-                Part(("    ▜██◊", "    ▓███"), repeatable=True),  # alt facet, fuller
+        # --- full detail (floor 7) ---
+        (
+            # Cap: red beacon on a mast, widening to shoulders.
+            Slot((
+                Part(("       R", "       █", "      ██")),          # canonical
+                Part(("       R", "       █", "       █", "      ██")),  # tall mast
+                Part(("       R", "      ██")),                        # stubby
+            )),
+            # Platform: shoulder ridge + docking-arm deck.
+            Slot((
+                Part(("    ▟███", "╾─▓████◊")),  # canonical: arms + facet
+                Part(("    ▟███", "╾─▓█████")),  # plain deck
+                Part(("  ▟█████", "▓██████")),   # wide, armless platform
+            )),
+            # Body: tapering chevron, repeated to lengthen the hull.
+            Slot(
+                (
+                    Part(("    ▜██≡", "     ▓██"), repeatable=True),  # canonical: faceted
+                    Part(("    ▜███", "     ▓██"), repeatable=True),  # plain
+                    Part(("    ▜██◊", "    ▓███"), repeatable=True),  # alt facet, fuller
+                ),
+                min_repeat=1,
+                max_repeat=5,
             ),
-            min_repeat=1,
-            max_repeat=5,
+            # Base: final taper to the engine glow.
+            Slot((
+                Part(("      ▜█", "       Y")),               # canonical
+                Part(("     ▜██", "      ▓█", "       Y")),   # longer taper
+                Part(("       Y",)),                           # bare glow
+            )),
         ),
-        # Base: final taper to the engine glow.
-        Slot((
-            Part(("      ▜█", "       Y")),               # canonical
-            Part(("     ▜██", "      ▓█", "       Y")),   # longer taper
-            Part(("       Y",)),                           # bare glow
-        )),
+        # --- compact (floor 3, fills 3-6): beacon / hull band(s) / glow ---
+        (
+            Slot((Part(("    R",)),)),  # beacon
+            Slot(
+                (
+                    Part(("╾▟███",), repeatable=True),  # canonical: arm band
+                    Part(("╾████",), repeatable=True),  # plain arm band
+                    Part(("  ███",), repeatable=True),  # bare hull band
+                ),
+                min_repeat=1,
+                max_repeat=4,
+            ),
+            Slot((Part(("    Y",)),)),  # engine glow
+        ),
     ),
     # Compact trading module: dish/antenna, boxed core with side solar panels.
     "trading_port": (
-        # Cap: antenna dish on a mast, down to the top box edge.
-        Slot((
-            Part(("     ▴", "     │", "   ┌──")),            # canonical
-            Part(("     ▴", "   ┌──")),                       # short mast
-            Part(("     ▴", "     │", "     │", "   ┌──")),  # tall mast
-        )),
-        # Core: solar-panel deck row + plain hull row, repeated to grow the box.
-        Slot(
-            (
-                Part(("▤──┤██", "   │██"), repeatable=True),  # canonical
-                Part(("   │██", "   │██"), repeatable=True),  # plain (no panels)
-                Part(("▦──┤██", "   │██"), repeatable=True),  # alt-panel
+        # --- full detail (floor 7) ---
+        (
+            # Cap: antenna dish on a mast, down to the top box edge.
+            Slot((
+                Part(("     ▴", "     │", "   ┌──")),            # canonical
+                Part(("     ▴", "   ┌──")),                       # short mast
+                Part(("     ▴", "     │", "     │", "   ┌──")),  # tall mast
+            )),
+            # Core: solar-panel deck row + plain hull row, repeated to grow the box.
+            Slot(
+                (
+                    Part(("▤──┤██", "   │██"), repeatable=True),  # canonical
+                    Part(("   │██", "   │██"), repeatable=True),  # plain (no panels)
+                    Part(("▦──┤██", "   │██"), repeatable=True),  # alt-panel
+                ),
+                min_repeat=1,
+                max_repeat=5,
             ),
-            min_repeat=1,
-            max_repeat=5,
+            # Base: trailing panel deck, bottom box edge, mast, dish.
+            Slot((
+                Part(("▤──┤██", "   └──", "     │", "     ▾")),  # canonical
+                Part(("   └──", "     │", "     ▾")),             # no trailing deck
+                Part(("▤──┤██", "   └──", "     ▾")),             # short mast
+            )),
         ),
-        # Base: trailing panel deck, bottom box edge, mast, dish.
-        Slot((
-            Part(("▤──┤██", "   └──", "     │", "     ▾")),  # canonical
-            Part(("   └──", "     │", "     ▾")),             # no trailing deck
-            Part(("▤──┤██", "   └──", "     ▾")),             # short mast
-        )),
+        # --- compact (floor 3, fills 3-6): top edge / core band(s) / bottom edge ---
+        (
+            Slot((Part(("  ┌─",)),)),  # top box edge
+            Slot(
+                (
+                    Part(("▦│█",), repeatable=True),  # canonical: panelled core
+                    Part(("  │█",), repeatable=True),  # plain core
+                    Part(("▤─█",), repeatable=True),  # deck-panel core
+                ),
+                min_repeat=1,
+                max_repeat=4,
+            ),
+            Slot((Part(("  └─",)),)),  # bottom box edge
+        ),
     ),
     # Fortified octagonal bastion -- squat, armoured, distinct from the others.
     "starbase": (
-        # Cap: top arc widening through the bevel to the full belt.
-        Slot((
-            Part(("   ▄▄▄", "  ▟███", " ▟████", "▟█████")),            # canonical
-            Part(("   ▄▄▄", "  ▟███", "▟█████")),                       # squat
-            Part(("    ▄▄", "   ▟██", "  ▟███", " ▟████", "▟█████")),  # tall
-        )),
-        # Belt: full-width armoured band, repeated to fatten the bastion.
-        Slot(
-            (
-                Part(("██████",), repeatable=True),   # canonical
-                Part(("▒█████",), repeatable=True),   # shadow streak
-                Part(("██≡███",), repeatable=True),   # facet band
+        # --- full detail (floor 7) ---
+        (
+            # Cap: top arc widening through the bevel to the full belt.
+            Slot((
+                Part(("   ▄▄▄", "  ▟███", " ▟████", "▟█████")),            # canonical
+                Part(("   ▄▄▄", "  ▟███", "▟█████")),                       # squat
+                Part(("    ▄▄", "   ▟██", "  ▟███", " ▟████", "▟█████")),  # tall
+            )),
+            # Belt: full-width armoured band, repeated to fatten the bastion.
+            Slot(
+                (
+                    Part(("██████",), repeatable=True),   # canonical
+                    Part(("▒█████",), repeatable=True),   # shadow streak
+                    Part(("██≡███",), repeatable=True),   # facet band
+                ),
+                min_repeat=1,
+                max_repeat=8,
             ),
-            min_repeat=1,
-            max_repeat=8,
+            # Base: bottom bevel narrowing through the arc.
+            Slot((
+                Part(("▜█████", " ▜████", "  ▜███", "   ▀▀▀")),            # canonical
+                Part(("▜█████", "  ▜███", "   ▀▀▀")),                       # squat
+                Part(("▜█████", " ▜████", "  ▜███", "   ▀▀", "    ▀")),    # tall
+            )),
         ),
-        # Base: bottom bevel narrowing through the arc.
-        Slot((
-            Part(("▜█████", " ▜████", "  ▜███", "   ▀▀▀")),            # canonical
-            Part(("▜█████", "  ▜███", "   ▀▀▀")),                       # squat
-            Part(("▜█████", " ▜████", "  ▜███", "   ▀▀", "    ▀")),    # tall
-        )),
+        # --- compact (floor 3, fills 3-6): point cap / belt(s) / point base ---
+        (
+            Slot((Part((" ◢█",)),)),  # pointed cap
+            Slot(
+                (
+                    Part(("███",), repeatable=True),  # canonical: full belt
+                    Part(("▒██",), repeatable=True),  # shadow streak
+                    Part(("█≡█",), repeatable=True),  # facet belt
+                ),
+                min_repeat=1,
+                max_repeat=4,
+            ),
+            Slot((Part((" ◥█",)),)),  # pointed base
+        ),
     ),
 }
 
@@ -359,6 +416,27 @@ def _mirror_part(part: "Part") -> tuple[str, ...]:
     return tuple(_mirror_row(row) for row in part.left)
 
 
+def _grammar_floor(grammar: tuple[Slot, ...]) -> int:
+    """The shortest height this grammar can compose: the smallest part in each
+    slot at its minimum repeat. A grammar can never produce fewer rows than this."""
+    return sum(
+        min(len(part.left) for part in slot.parts) * slot.min_repeat
+        for slot in grammar
+    )
+
+
+def _select_grammar(
+    tiers: tuple[tuple[Slot, ...], ...], height: int
+) -> tuple[Slot, ...]:
+    """Pick the richest grammar tier (listed largest-floor first) whose minimum
+    stack still fits ``height``. Falls back to the smallest (compact) tier so a
+    tiny box renders a legible silhouette rather than a cropped detailed one."""
+    for grammar in tiers:
+        if _grammar_floor(grammar) <= height:
+            return grammar
+    return tiers[-1]
+
+
 def _compose(
     grammar: tuple[Slot, ...], rng: random.Random, target_h: int
 ) -> list[str]:
@@ -410,7 +488,8 @@ class PortGenerator:
         archetype_id: str | None = None,
     ) -> Text:
         """Generate a procedural space port sprite, hued by owner ``archetype_id``."""
-        grammar = PORT_GRAMMAR.get(subtype.lower(), PORT_GRAMMAR["trading_port"])
+        tiers = PORT_GRAMMAR.get(subtype.lower(), PORT_GRAMMAR["trading_port"])
+        grammar = _select_grammar(tiers, height)
         archetype_key = (archetype_id or "default").lower()
         style = ARCHETYPE_STYLES.get(archetype_key, ARCHETYPE_STYLES["default"])
 
