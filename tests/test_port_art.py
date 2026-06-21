@@ -16,9 +16,11 @@ from edge.art.port import (
     PORT_SUBTYPES,
     PortGenerator,
     _compose,
+    _grammar_floor,
     _MIRROR,
     _mirror_part,
     _mirror_row,
+    _select_grammar,
     _SELF_SYMMETRIC,
 )
 
@@ -60,15 +62,16 @@ def test_centre_columns_are_axis_legal(subtype: str) -> None:
     """Every part row's centre column (its last char) must read correctly on the
     mirror axis -- i.e. it must not be an asymmetric glyph that flips, or it would
     seam. Self-symmetric hull glyphs, spaces, beacons, and facets are all fine."""
-    for slot in PORT_GRAMMAR[subtype]:
-        for part in slot.parts:
-            for row in part.left:
-                assert row, "part rows must be non-empty (need a centre column)"
-                assert row[-1] not in _MIRROR, (subtype, row)
-                if row[-1] in _SELF_SYMMETRIC:
-                    continue  # explicitly-enumerated axis-safe hull glyph
-                # Otherwise it must be a facet (a non-hull decorative glyph),
-                # which is a single cell on the axis and mirrors to itself.
+    for grammar in PORT_GRAMMAR[subtype]:
+        for slot in grammar:
+            for part in slot.parts:
+                for row in part.left:
+                    assert row, "part rows must be non-empty (need a centre column)"
+                    assert row[-1] not in _MIRROR, (subtype, row)
+                    if row[-1] in _SELF_SYMMETRIC:
+                        continue  # explicitly-enumerated axis-safe hull glyph
+                    # Otherwise it must be a facet (a non-hull decorative glyph),
+                    # which is a single cell on the axis and mirrors to itself.
 
 
 def test_grammar_covers_the_public_subtypes() -> None:
@@ -81,12 +84,12 @@ def test_grammar_covers_the_public_subtypes() -> None:
 
 @pytest.mark.parametrize("subtype", _SUBTYPES)
 def test_composed_rows_are_symmetric(subtype: str) -> None:
-    grammar = PORT_GRAMMAR[subtype]
-    for seed in range(40):
-        for height in (5, 9, 14, 20, 33):
-            rows = _compose(grammar, random.Random(seed), height)
-            for row in rows:
-                assert row == _mirror_line(row), (subtype, seed, row)
+    for grammar in PORT_GRAMMAR[subtype]:  # every grammar tier
+        for seed in range(40):
+            for height in (3, 5, 9, 14, 20, 33):
+                rows = _compose(grammar, random.Random(seed), height)
+                for row in rows:
+                    assert row == _mirror_line(row), (subtype, seed, row)
 
 
 @pytest.mark.parametrize("subtype", _SUBTYPES)
@@ -111,12 +114,13 @@ def test_generation_is_deterministic(subtype: str) -> None:
 
 @pytest.mark.parametrize("subtype", _SUBTYPES)
 def test_compose_consumes_fixed_draws_regardless_of_height(subtype: str) -> None:
-    """The composer makes exactly one draw per slot, independent of target
-    height, so the downstream beacon/window draw stream is identical across
-    sizes -- two sprites of different heights share the same seeded details."""
-    grammar = PORT_GRAMMAR[subtype]
+    """Within a grammar tier the composer makes exactly one draw per slot,
+    independent of target height, so the downstream beacon/window draw stream is
+    identical across sizes -- two sprites of different heights share the same
+    seeded details."""
+    grammar = PORT_GRAMMAR[subtype][0]  # the full-detail tier
     short = random.Random(11)
-    _compose(grammar, short, 6)
+    _compose(grammar, short, 8)
     tall = random.Random(11)
     _compose(grammar, tall, 40)
     assert short.random() == tall.random()
@@ -127,20 +131,21 @@ def test_compose_consumes_fixed_draws_regardless_of_height(subtype: str) -> None
 
 @pytest.mark.parametrize("subtype", _SUBTYPES)
 def test_height_grows_monotonically_and_respects_bounds(subtype: str) -> None:
-    grammar = PORT_GRAMMAR[subtype]
-    # The minimum stack for this seed's chosen parts (target 0 forces min repeats).
-    min_stack = len(_compose(grammar, random.Random(0), 0))
+    tiers = PORT_GRAMMAR[subtype]
     prev = 0
     for height in range(3, 41):
+        grammar = _select_grammar(tiers, height)
         rows = _compose(grammar, random.Random(0), height)
         nh = len(rows)
+        # The selected grammar's minimum stack for this seed (target 0 -> minima).
+        min_stack = len(_compose(grammar, random.Random(0), 0))
         # Never overshoot unless even the minimum stack is taller than the box.
         assert nh <= height or nh == min_stack
-        # Taller boxes never yield a shorter sprite (same seed → same parts).
+        # Taller boxes never yield a shorter sprite (tiers are ordered by size).
         assert nh >= prev
         prev = nh
-    # By height 40 the repeatable body has grown beyond the minimum.
-    assert prev > min_stack
+    # By height 40 the repeatable body has grown well past any tier minimum.
+    assert prev > _grammar_floor(tiers[0])
 
 
 @pytest.mark.parametrize("subtype", _SUBTYPES)
@@ -173,6 +178,27 @@ def test_canonical_selection_reproduces_original_stardock() -> None:
     """Choosing the first (canonical) part of every slot, with the body at its
     minimum repeat, must rebuild the exact historic StarDock art."""
     rows: list[str] = []
-    for slot in PORT_GRAMMAR["stardock"]:
+    for slot in PORT_GRAMMAR["stardock"][0]:  # full-detail tier
         rows.extend(_mirror_part(slot.parts[0]))
     assert tuple(rows) == _CANONICAL_STARDOCK
+
+
+# --- compact tier (tiny boxes) ---------------------------------------------
+
+
+@pytest.mark.parametrize("subtype", _SUBTYPES)
+def test_compact_tier_renders_legibly_in_tiny_boxes(subtype: str) -> None:
+    """A 3-row box (and 4, 5) must fill exactly and keep its iconic top/bottom
+    extremities -- the compact grammar is chosen instead of cropping the full one."""
+    tiers = PORT_GRAMMAR[subtype]
+    assert _grammar_floor(tiers[-1]) <= 3, "compact tier must reach down to 3 rows"
+    for height in (3, 4, 5):
+        # The selected grammar at this height is the compact tier.
+        assert _select_grammar(tiers, height) is tiers[-1]
+        for seed in range(15):
+            text = _GEN.generate(random.Random(seed), subtype, 12, height)
+            lines = text.plain.split("\n")
+            assert len(lines) == height
+            assert all(len(line) == 12 for line in lines)
+            non_blank = [ln for ln in lines if ln.strip()]
+            assert len(non_blank) == height  # no blank padding: the box is filled
