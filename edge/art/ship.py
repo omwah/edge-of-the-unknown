@@ -62,86 +62,80 @@ SHIP_GRAMMAR: dict[str, tuple[tuple[Slot, ...], ...]] = {
             # Thrusters: twin exhaust glow.
             Slot((
                 Part((
-                    " Y▶═", 
-                    " Y▙▓", 
-                    " Y▛▓", 
-                    " Y▶═", 
+                    "     ", 
+                    "  Y▶▓", 
+                    "  Y▶▓", 
+                    "     ", 
                 )),
                 Part((
-                    " Y▶═", 
-                    " Y▓▓", 
-                    " Y▓▓", 
-                    " Y▶═", 
+                    "     ", 
+                    " YY▶▓", 
+                    " YY▶▓", 
+                    "     ", 
                 )),
             )),
-            # Spindrive: compact warp wedge with a dorsal fin.
+            # Spindrive: compact warp wedge containing the single set of swept wings.
             Slot((
                 Part((
-                    " ▴ ", 
-                    "▓██", 
-                    "▓██", 
-                    " ▾ ", 
+                    " Y▶══◥█", 
+                    "▓██████", 
+                    "▓██████", 
+                    " Y▶══◢█", 
                 )),
                 Part((
-                    "   ", 
-                    "▓██", 
-                    "▓██", 
-                    "   ", 
+                    "   ◥███", 
+                    "▓██████", 
+                    "▓██████", 
+                    "   ◢███", 
                 )),
             )),
-            # Hull: thin fuselage, repeated to stretch the fighter.
+            # Hull: thin central fuselage.
             Slot(
                 (
                     Part((
-                        " R  ", 
-                        "▟▓██", 
-                        "▜▓██", 
                         "    ", 
-                    ), repeatable=True),
-                    Part((
-                        " ▴  ", 
-                        "─▓██", 
-                        "─▓██", 
+                        "████", 
+                        "████", 
                         "    ", 
                     ), repeatable=True),
                     Part((
                         "    ", 
-                        "─▓██", 
-                        "─▓██", 
-                        " ▾  ", 
+                        "█▒▒█", 
+                        "█▒▒█", 
+                        "    ", 
                     ), repeatable=True),
                 ),
                 min_repeat=1,
                 max_repeat=6,
             ),
-            # Screens: cockpit canopy with a nav light + deflector facet.
+            # Screens: cockpit canopy.
             Slot((
                 Part((
-                    " R  ", 
-                    "◇▓██", 
-                    "████", 
-                    "    ", 
+                    "     ", 
+                    "◇▓███", 
+                    "█████", 
+                    "     ", 
                 )),
                 Part((
-                    "    ", 
-                    "◇▓██", 
-                    "████", 
-                    "    ", 
+                    "     ", 
+                    "◇▓███", 
+                    "█████", 
+                    "     ", 
                 )),
             )),
-            # Main gun: short spinal barrel to a muzzle at the nose.
+            # Main gun: asymmetrical pointed nose.
             Slot((
                 Part((
-                    "    ", 
-                    "─▓▶ ", 
-                    "─▓╼ ", 
-                    "    ", 
+                    "      ", 
+                    "─▓██▓▶", 
+                    " ▜██▛ ", 
+                    "      ", 
                 )),
                 Part((
-                    "    ", 
-                    "▟▓▶ ", 
-                    "▜██ ", 
-                    "    ", 
+                    "      ", 
+                    " ▟██▙ ", 
+                    "─▓██▓▶", 
+                    "      ", 
                 )),
             )),
         ),
