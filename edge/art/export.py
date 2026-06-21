@@ -98,23 +98,11 @@ def _draw_sprite(
                 )
 
 
-def export_sprite_sheet(
-    sprites: list[tuple[str, Text]],
-    out_path: str | Path,
-    *,
-    cols: int | None = None,
-) -> list[Path]:
-    """Render ``sprites`` (``(label, Text)`` pairs) onto one contact sheet and
-    write it to vector files.
-
-    ``out_path`` selects the format(s): a ``.svg`` or ``.pdf`` suffix writes just
-    that format; any other path writes both ``<path>.svg`` and ``<path>.pdf``.
-    ``cols`` sets the grid column count (defaults to a near-square layout).
-    Returns the paths written.
-    """
-    import matplotlib
-
-    matplotlib.use("Agg")  # headless: no display needed
+def _build_sheet(
+    sprites: list[tuple[str, Text]], cols: int | None, title: str | None
+) -> object:
+    """Build (but don't save) one contact-sheet matplotlib Figure: a grid of
+    sprite tiles on black, with an optional page ``title`` banner across the top."""
     import matplotlib.pyplot as plt
 
     if not sprites:
@@ -132,8 +120,9 @@ def export_sprite_sheet(
     tile_w = max((max((len(r) for r in c), default=0) for c in cells), default=1) + 2
     tile_h = max((len(c) for c in cells), default=1) + 2
 
+    header = 2 if title else 0
     sheet_cols = cols * tile_w
-    sheet_rows = rows * tile_h
+    sheet_rows = rows * tile_h + header
     fig = plt.figure(figsize=(sheet_cols * _CELL_W_IN, sheet_rows * _CELL_H_IN))
     fig.patch.set_facecolor("black")
     ax = fig.add_axes((0, 0, 1, 1))
@@ -143,10 +132,42 @@ def export_sprite_sheet(
     ax.invert_yaxis()  # row 0 at the top
     ax.axis("off")
 
+    if title:
+        ax.text(  # type: ignore[attr-defined]
+            sheet_cols / 2.0, 1.0, title,
+            color="white", ha="center", va="center",
+            family="monospace", fontsize=16, fontweight="bold",
+        )
+
     for idx, ((label, _), cell_rows) in enumerate(zip(sprites, cells)):
         ox = (idx % cols) * tile_w
-        oy = (idx // cols) * tile_h
+        oy = header + (idx // cols) * tile_h
         _draw_sprite(ax, cell_rows, label, ox=ox, oy=oy, tile_w=tile_w)
+
+    return fig
+
+
+def export_sprite_sheet(
+    sprites: list[tuple[str, Text]],
+    out_path: str | Path,
+    *,
+    cols: int | None = None,
+    title: str | None = None,
+) -> list[Path]:
+    """Render ``sprites`` (``(label, Text)`` pairs) onto one contact sheet and
+    write it to vector files.
+
+    ``out_path`` selects the format(s): a ``.svg`` or ``.pdf`` suffix writes just
+    that format; any other path writes both ``<path>.svg`` and ``<path>.pdf``.
+    ``cols`` sets the grid column count (defaults to a near-square layout).
+    Returns the paths written.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")  # headless: no display needed
+    import matplotlib.pyplot as plt
+
+    fig = _build_sheet(sprites, cols, title)
 
     base = Path(out_path)
     if base.suffix.lower() in (".svg", ".pdf"):
@@ -155,6 +176,35 @@ def export_sprite_sheet(
         targets = [base.with_suffix(".svg"), base.with_suffix(".pdf")]
 
     for target in targets:
-        fig.savefig(target, facecolor="black")
-    plt.close(fig)
+        fig.savefig(target, facecolor="black")  # type: ignore[attr-defined]
+    plt.close(fig)  # type: ignore[arg-type]
     return targets
+
+
+def export_multipage_pdf(
+    sheets: list[tuple[str, list[tuple[str, Text]], int | None]],
+    out_path: str | Path,
+) -> Path:
+    """Write a multi-page PDF, one contact sheet per ``(title, sprites, cols)``
+    entry. Lets sprite types with very different aspect ratios (wide planets,
+    tall ports) each get their own page instead of sharing distorted tiles.
+    Returns the path written (a ``.pdf`` suffix is enforced)."""
+    import matplotlib
+
+    matplotlib.use("Agg")  # headless: no display needed
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+
+    if not sheets:
+        raise ValueError("no sheets to export")
+
+    target = Path(out_path)
+    if target.suffix.lower() != ".pdf":
+        target = target.with_suffix(".pdf")
+
+    with PdfPages(target) as pdf:
+        for title, sprites, cols in sheets:
+            fig = _build_sheet(sprites, cols, title)
+            pdf.savefig(fig, facecolor="black")  # type: ignore[arg-type]
+            plt.close(fig)  # type: ignore[arg-type]
+    return target
