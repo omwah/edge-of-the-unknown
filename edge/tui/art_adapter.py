@@ -134,12 +134,16 @@ def sprite(
     ))
 
 
-def text_to_cells(text: Text) -> list[list[tuple[str, Style | None]]]:
+def text_to_cells(
+    text: Text, *, keep_space_style: bool = False
+) -> list[list[tuple[str, Style | None]]]:
     """Flatten a Rich `Text` sprite into per-cell `(char, style)` rows for stamping.
 
-    Each cell keeps the art's own resolved colour. A space cell carries ``None`` so
-    the `SectorScene` compositor treats it as transparent (leaves the starfield base
-    showing through the sprite's negative space).
+    Each cell keeps the art's own resolved colour. By default a space cell carries
+    ``None`` so the `SectorScene` compositor treats it as transparent (the starfield
+    shows through the sprite's negative space). Set ``keep_space_style`` for an opaque
+    sprite — e.g. terrain, whose colour partly lives in the *background* of space
+    glyphs — so those backgrounds aren't dropped (rendering as black).
     """
     rows: list[list[tuple[str, Style | None]]] = []
     for line in text.split(allow_blank=True):
@@ -147,7 +151,7 @@ def text_to_cells(text: Text) -> list[list[tuple[str, Style | None]]]:
         for segment in line.render(_CONSOLE):
             style = segment.style
             for ch in segment.text:
-                cells.append((ch, style if ch != " " else None))
+                cells.append((ch, style if (keep_space_style or ch != " ") else None))
         rows.append(cells)
     return rows
 

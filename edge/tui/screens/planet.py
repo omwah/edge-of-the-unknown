@@ -11,6 +11,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, VerticalScroll
+from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
@@ -25,6 +26,16 @@ from edge.server.service import GameService
 from edge.tui import art_adapter
 from edge.tui.dummy import sample_surface
 from edge.tui.screens.surface import SurfaceScreen
+
+
+class PlanetSprite(Static):
+    """The orbit planet sprite — clicking it descends to the surface (like pressing D)."""
+
+    class Descend(Message):
+        pass
+
+    def on_click(self) -> None:
+        self.post_message(self.Descend())
 
 
 class PlanetScreen(Screen):
@@ -81,14 +92,19 @@ class PlanetScreen(Screen):
                 if p.genesis_eligible and p.ship_genesis > 0:
                     yield Static(f"[green]\\[G] Genesis[/] — re-form this world (torpedoes: {p.ship_genesis})")
             detail = self.app.scene_art.planet_detail
-            yield Static(
+            art = PlanetSprite(
                 art_adapter.sprite(
                     "planet", art_adapter.planet_subtype(p.ptype),
                     seed=p.planet_id, width=detail.max_width, height=detail.max_height,
                 ),
                 id="orbit-art",
             )
+            art.tooltip = "Click to descend to the surface"
+            yield art
         yield Footer()
+
+    def on_planet_sprite_descend(self, msg: PlanetSprite.Descend) -> None:
+        self.action_descend()
 
     def _claim_hint(self) -> str:
         p = self._planet
