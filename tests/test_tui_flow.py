@@ -63,6 +63,24 @@ async def test_warp_cell_click_warps() -> None:
         assert moved == target != start
 
 
+async def test_enter_warps_focused_cell() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        start = svc.game_view(1).sector.sector_id
+        # The default-focus cell holds focus; Enter on it should warp there.
+        assert isinstance(app.focused, WarpCell)
+        target = app.focused._warp.sector_id
+        await pilot.press("enter")
+        await pilot.pause()
+        moved = svc.game_view(1).sector.sector_id
+        assert moved == target != start
+
+
 async def test_log_hotkey_opens_computer_with_signpost() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
