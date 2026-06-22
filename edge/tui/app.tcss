@@ -63,11 +63,6 @@ MainMenuScreen Starfield {
     padding: 1 2;
 }
 
-#port-title {
-    text-style: bold;
-    margin-bottom: 1;
-}
-
 #commodities {
     height: auto;
     max-height: 8;

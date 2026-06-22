@@ -11,7 +11,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import Static
+from textual.widgets import Footer, Static
 
 from edge.core.economy import EconomyError
 from edge.core.rules import Trade
@@ -31,6 +31,17 @@ class PortScreen(Screen):
         Binding("h", "haggle", "Haggle highlighted"),
     ]
 
+    # Mirror the StarDockScreen frame: a docked-top title bar, the port sprite
+    # centred beneath it, then the trade panel — so a plain port and a StarDock read
+    # the same (the title lives in the bar, so TradePanel's own title is suppressed).
+    CSS = """
+    PortScreen #port-title {
+        dock: top; height: 1; background: $primary; color: $background;
+        text-style: bold; padding: 0 1;
+    }
+    PortScreen #port-art { height: auto; content-align: center top; }
+    """
+
     def __init__(self, service: GameService, player_id: int) -> None:
         super().__init__()
         self._service = service
@@ -39,10 +50,15 @@ class PortScreen(Screen):
     def compose(self) -> ComposeResult:
         port = self._service.current_port_view(self._pid)
         if port is None:
-            yield Static("No port to trade with here.", id="port-body")
+            yield Static("No port to trade with here.", id="port-title")
+            yield Footer()
             return
         latinum = self._service.game_view(self._pid).ship.latinum
         size = self.app.scene_art.port  # one canonical port footprint, shared with SectorView
+        yield Static(
+            f"TRADEPORT · {port.name} · {port.klass}        Sector {port.display_id}",
+            id="port-title",
+        )
         yield Static(
             art_adapter.sprite(
                 "port", art_adapter.port_subtype(port.klass),
@@ -51,7 +67,8 @@ class PortScreen(Screen):
             ),
             id="port-art",
         )
-        yield TradePanel(port, latinum=latinum, id="port-body")
+        yield TradePanel(port, latinum=latinum, show_title=False, id="port-body")
+        yield Footer()
 
     def action_trade(self) -> None:
         _trade_highlighted(self, self._service, self._pid)
