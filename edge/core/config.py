@@ -667,19 +667,24 @@ class SceneArtConfig(BaseModel):
 
 
 class UIConfig(BaseModel):
-    """TUI presentation options (no rules) — the sector-screen warp grid.
+    """TUI presentation options (no rules) — the sector-screen warp grid + sidebar.
 
-    Distinct from `SceneArtConfig` (sprite footprints): these tune how the warp
-    affordances lay out. `warp_columns` is the grid width (cells fill the printable
-    area and wrap into rows); `warp_focus_default` is where keyboard focus lands when
-    the sector view loads — the first warp (reading order), the came-from/backtrack
-    warp, or the first still-unmapped warp. Consumed only by the throwaway `tui` layer.
+    Distinct from `SceneArtConfig` (sprite footprints): these tune how the screen lays
+    out. `warp_columns` is the warp-grid width (cells fill the printable area and wrap
+    into rows); `warp_focus_default` is where keyboard focus lands when the sector view
+    loads — the first warp (reading order), the came-from/backtrack warp, or the first
+    still-unmapped warp. `sidebar_width` is the status sidebar's fixed character width
+    (its content is fixed-width, so a proportional column just wastes space);
+    `sidebar_min_screen_width` hides the sidebar entirely when the terminal is narrower
+    than this, so the sector view isn't squished on small screens. tui-layer only.
     """
 
     model_config = _FROZEN
 
     warp_columns: int = Field(default=3, gt=0)
     warp_focus_default: Literal["first", "backtrack", "unexplored"] = "first"
+    sidebar_width: int = Field(default=33, gt=0)
+    sidebar_min_screen_width: int = Field(default=90, gt=0)
 
 
 class GameConfig(BaseModel):
