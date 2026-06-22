@@ -340,9 +340,11 @@ class SectorScene(Static):
                 grid[row][x] = (ch, style)  # blanks included -> overwrite stars
 
     def _sprite_cells(self, entity: str, subtype: str, *, seed: int, sw: int, sh: int,
-                      facing: str = "right") -> list[list[tuple[str, Style | None]]]:
-        return art_adapter.text_to_cells(
-            art_adapter.sprite(entity, subtype, seed=seed, width=sw, height=sh, facing=facing))
+                      facing: str = "right",
+                      archetype_id: str | None = None) -> list[list[tuple[str, Style | None]]]:
+        return art_adapter.text_to_cells(art_adapter.sprite(
+            entity, subtype, seed=seed, width=sw, height=sh, facing=facing,
+            archetype_id=archetype_id))
 
     # --- render --------------------------------------------------------------
 
@@ -380,24 +382,28 @@ class SectorScene(Static):
         lcx, rcx = half // 2, half + half // 2  # column centres
         # Planet (or placeholder), top-aligned in the band.
         if sec.planets:
-            sub = art_adapter.planet_subtype_from_name(sec.planets[0])
+            planet = sec.planets[0]
+            sub = art_adapter.planet_subtype(planet.ptype)
             self._paint(grid, self._sprite_cells("planet", sub, seed=sec.sector_id, sw=pw, sh=ph),
                         row, lcx - pw // 2)
         else:
             self._stamp_line(grid, "[#8a8a8a]no planet[/]", row + band_h // 2, 0, half)
-        # Port (or placeholder), vertically centred against the taller planet.
+        # Port (or placeholder), vertically centred against the taller planet. The
+        # controlling species' palette (`archetype_id`) styles the port sprite.
         if sec.ports:
-            sub = art_adapter.port_subtype(sec.ports[0])
-            self._paint(grid, self._sprite_cells("port", sub, seed=sec.sector_id, sw=portw, sh=porth),
+            port = sec.ports[0]
+            sub = art_adapter.port_subtype(port.klass)
+            self._paint(grid, self._sprite_cells("port", sub, seed=sec.sector_id, sw=portw,
+                                                 sh=porth, archetype_id=port.archetype_id),
                         row + (band_h - porth) // 2, rcx - portw // 2)
         else:
             self._stamp_line(grid, "[#8a8a8a]no port[/]", row + band_h // 2, half, half)
         name_row = row + band_h
         if sec.planets:
-            self._stamp_line(grid, f"[b yellow]{sec.planets[0]}[/]", name_row, 0, half)
+            self._stamp_line(grid, f"[b yellow]{sec.planets[0].name}[/]", name_row, 0, half)
             self._hotspots.append((0, row, half, name_row + 1, "planet", None))
         if sec.ports:
-            self._stamp_line(grid, f"[b yellow]{sec.ports[0]}[/]", name_row, half, half)
+            self._stamp_line(grid, f"[b yellow]{sec.ports[0].name}[/]", name_row, half, half)
             self._hotspots.append((half, row, w, name_row + 1, "port", None))
         row = name_row + 1 + self._ORBIT_MARGIN
 
@@ -413,24 +419,25 @@ class SectorScene(Static):
             total = len(shown) * sw + (len(shown) - 1) * gap
             sx = max(0, (w - total) // 2)
             frng = random.Random(sec.sector_id)
-            for i, name in enumerate(shown):
-                entity, sub = art_adapter.ship_entity(name)
+            for i, vessel in enumerate(shown):
+                entity, sub = art_adapter.ship_entity(vessel.role)
                 facing = "left" if (i == 1 and frng.random() < cfg.ship_face_inward_chance) else "right"
                 left = sx + i * (sw + gap)
                 self._paint(grid, self._sprite_cells(entity, sub, seed=sec.sector_id * 16 + i,
-                                                     sw=sw, sh=sh, facing=facing), row, left)
-                cid = sec.contact_ids[i] if i < len(sec.contact_ids) else None
+                                                     sw=sw, sh=sh, facing=facing,
+                                                     archetype_id=vessel.archetype_id), row, left)
+                cid = vessel.contact_id
                 tag = " [dim](Hail)[/]" if cid is not None else ""
-                self._stamp_line(grid, f"{name}{tag}", row + sh, left, sw)
+                self._stamp_line(grid, f"{vessel.name}{tag}", row + sh, left, sw)
                 if cid is not None:
                     self._hotspots.append((left, row, left + sw, row + sh + 1, "contact", cid))
             row += sh + 1
         # Overflow ships beyond the sprite cap stay hailable as centred text rows.
         for i in range(cfg.max_ships_shown, len(sec.ships)):
-            name = sec.ships[i]
-            cid = sec.contact_ids[i] if i < len(sec.contact_ids) else None
+            vessel = sec.ships[i]
+            cid = vessel.contact_id
             tag = " [dim](Hail)[/]" if cid is not None else ""
-            self._stamp_line(grid, f"[white]>[/] {name}{tag}", row, 0, w)
+            self._stamp_line(grid, f"[white]>[/] {vessel.name}{tag}", row, 0, w)
             if cid is not None:
                 self._hotspots.append((0, row, w, row + 1, "contact", cid))
             row += 1

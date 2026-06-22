@@ -154,16 +154,60 @@ class SectorDiscovery:
 
 
 @dataclass(frozen=True)
+class SectorPlanetDTO:
+    """A planet present in the current sector (§4.2).
+
+    Carries the `planet_type` key directly so the art engine can pick the planet
+    sprite without parsing it back out of a display string. `name` is the bare
+    display name (the type is conveyed by the sprite, not appended to the label).
+    """
+
+    planet_id: int
+    name: str  # display name only, e.g. "Terra Nova"
+    ptype: str  # planet_type key (art subtype), e.g. "terrestrial_warm"
+
+
+@dataclass(frozen=True)
+class SectorPortDTO:
+    """A port present in the current sector (§4).
+
+    `klass` is the display label (e.g. "Class 4 (BBS)" / "StarDock"); `is_stardock`
+    lets the docking flow branch without sniffing the name. `archetype_id` is the
+    controlling species' palette (the sector's region controller), or None.
+    """
+
+    port_id: int
+    name: str
+    klass: str
+    is_stardock: bool
+    archetype_id: str | None = None
+
+
+@dataclass(frozen=True)
+class SectorShipDTO:
+    """A vessel present in the current sector (§6).
+
+    `role` is the art ship role (transport / fighter / warship / …) derived from the
+    species' fleet, `archetype_id` is the vessel's own species palette, and
+    `contact_id` is the species id to hail (folding in the old parallel `contact_ids`).
+    """
+
+    name: str
+    role: str
+    archetype_id: str | None = None
+    contact_id: int | None = None
+
+
+@dataclass(frozen=True)
 class SectorDTO:
     region: str
     sector_id: int
     flavor: str
     beacon: str | None
     band: str = ""  # distance-band name, e.g. "Frontier" (for the "[id] Region (Band)" title)
-    ports: list[str] = field(default_factory=list)
-    planets: list[str] = field(default_factory=list)
-    ships: list[str] = field(default_factory=list)
-    contact_ids: list[int] = field(default_factory=list)  # species id per `ships` row (§6, hail target)
+    ports: list[SectorPortDTO] = field(default_factory=list)
+    planets: list[SectorPlanetDTO] = field(default_factory=list)
+    ships: list[SectorShipDTO] = field(default_factory=list)
     warps: list[WarpDTO] = field(default_factory=list)
     discoveries: list[SectorDiscovery] = field(default_factory=list)
     display_id: int = 0  # spatial id shown in the sector title (§5.1)
