@@ -1,8 +1,9 @@
 """CLI: `python -m edge.bigbang [--seed N] [--sectors M] [--inspect] [--render PATH]`.
 
 A dev entrypoint that generates a universe from the default config and prints a
-text report (`--inspect`) and/or renders the warp graph to a PNG with port
-sectors highlighted (`--render`, the §5 inspector).
+text report (`--inspect`), lists populated items (`--list ports planets …`), plots
+a route between two sectors (`--route SRC DST`, by internal *or* spatial id), and/or
+renders the warp graph to a PNG with port sectors highlighted (`--render`, §5).
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 import argparse
 
 from edge.bigbang.generator import generate, summarize
+from edge.bigbang.inspect import LIST_CATEGORIES, format_route, list_items
 from edge.config import load_default_config
 
 
@@ -18,6 +20,14 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--sectors", type=int, default=None, help="override sector_count")
     parser.add_argument("--inspect", action="store_true", help="print a universe report")
+    parser.add_argument(
+        "--list", nargs="+", metavar="CATEGORY", choices=(*LIST_CATEGORIES, "all"),
+        help=f"list populated items: {', '.join(LIST_CATEGORIES)}, or all",
+    )
+    parser.add_argument(
+        "--route", nargs=2, metavar=("SRC", "DST"),
+        help="plot the route between two sectors (internal or spatial id; i/s prefix forces)",
+    )
     parser.add_argument("--render", metavar="PATH", default=None, help="write a graph PNG")
     args = parser.parse_args()
 
@@ -27,14 +37,28 @@ def main() -> None:
             update={"bigbang": config.bigbang.model_copy(update={"sector_count": args.sectors})}
         )
     state = generate(config, args.seed)
+    did_something = False
     if args.inspect:
         print(summarize(state))
+        did_something = True
+    if args.list:
+        categories = LIST_CATEGORIES if "all" in args.list else args.list
+        for category in categories:
+            print(list_items(state, category))
+        did_something = True
+    if args.route is not None:
+        try:
+            print(format_route(state, args.route[0], args.route[1]))
+        except ValueError as exc:
+            parser.error(str(exc))
+        did_something = True
     if args.render is not None:
         from edge.bigbang.render import render_graph
 
         render_graph(state, args.render, layout_seed=args.seed)
         print(f"wrote graph to {args.render}")
-    if not args.inspect and args.render is None:
+        did_something = True
+    if not did_something:
         print(f"generated universe seed={args.seed} sectors={len(state.sectors)}")
 
 
