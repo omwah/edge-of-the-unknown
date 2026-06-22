@@ -5,7 +5,7 @@ import math
 from rich.text import Text
 from edge.art.terrain import TerrainGenerator
 
-def get_outline_char(u: bool, d: bool, l: bool, r: bool,
+def get_outline_char(u: bool, d: bool, lf: bool, r: bool,
                      ne: bool, nw: bool, se: bool, sw: bool) -> str:
     """Pick a connecting box-drawing glyph for a boundary cell.
 
@@ -15,12 +15,12 @@ def get_outline_char(u: bool, d: bool, l: bool, r: bool,
     glyphs that link into a continuous ring rather than a chunky octagon.
     """
     vert = u or d  # exterior lies above and/or below -> boundary runs horizontally
-    horz = l or r  # exterior lies left and/or right  -> boundary runs vertically
+    horz = lf or r  # exterior lies left and/or right  -> boundary runs vertically
 
     if vert and horz:
         # Convex corner: connect the two interior-facing sides.
         v = "u" if u else "d"
-        h = "l" if l else "r"
+        h = "l" if lf else "r"
         return {
             ("u", "l"): "╭", ("u", "r"): "╮",
             ("d", "l"): "╰", ("d", "r"): "╯",
@@ -129,16 +129,16 @@ class PlanetGenerator:
 
                 u = is_exterior(x, y - 1)
                 d = is_exterior(x, y + 1)
-                l = is_exterior(x - 1, y)
+                lf = is_exterior(x - 1, y)
                 r = is_exterior(x + 1, y)
                 ne = is_exterior(x + 1, y - 1)
                 nw = is_exterior(x - 1, y - 1)
                 se = is_exterior(x + 1, y + 1)
                 sw = is_exterior(x - 1, y + 1)
 
-                if u or d or l or r or ne or nw or se or sw:
+                if u or d or lf or r or ne or nw or se or sw:
                     # Boundary cell: draw a connecting outline glyph.
-                    char = get_outline_char(u, d, l, r, ne, nw, se, sw)
+                    char = get_outline_char(u, d, lf, r, ne, nw, se, sw)
 
                     # Dim the outline if it sits on the dark side of the planet.
                     dx = (x - center_x) / radius_x
