@@ -66,7 +66,7 @@ class SectorView(Container):
     DEFAULT_CSS = """
     SectorView { width: 2fr; background: transparent; }
     SectorView #warp-area {
-        width: 1fr; height: auto; align-horizontal: center; padding-top: 1;
+        width: 1fr; height: auto; align-horizontal: center;
     }
     """
 
@@ -204,7 +204,7 @@ class GameScreen(Screen):
         except MovementError as exc:
             self.notify(str(exc), severity="warning", timeout=3)
             return
-        is_stardock = any("stardock" in p.lower() for p in ports)
+        is_stardock = any(p.is_stardock for p in ports)
         screen = (
             StarDockScreen(self._service, self._pid)
             if is_stardock

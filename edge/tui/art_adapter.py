@@ -78,8 +78,9 @@ _ROLE_ENTITY: dict[str, tuple[str, str]] = {
     "starbase": ("port", "starbase"),
 }
 
-# Keyword fallback for free-text ship *names* (the dummy `SectorDTO.ships` strings
-# carry no role) -> a ship art subtype. Order matters: first match wins.
+# Defensive keyword fallback for a free-text ship *name* -> a ship art subtype, used
+# only when `ship_entity` is handed a name rather than an authoritative `role`. Order
+# matters: first match wins.
 _SHIP_NAME_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("capital_warship", ("capital", "dreadnought", "imperial", "battleship")),
     ("warship", ("warship", "cruiser", "destroyer", "frigate", "escort")),
@@ -91,25 +92,6 @@ _SHIP_NAME_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
 def planet_subtype(ptype: str) -> str:
     """The art planet subtype for a config `planet_type` (a 1:1 pass-through)."""
     return ptype
-
-
-def planet_subtype_from_name(name: str) -> str:
-    """Best-effort planet subtype from a free-text planet *name* (no ptype to hand).
-
-    Used by the sector scene, whose `SectorDTO.planets` are display strings only;
-    screens with a real `PlanetDTO.ptype` use `planet_subtype` directly.
-    """
-    low = name.lower()
-    for sub in available_subtypes("planet"):
-        if sub in low or sub.replace("_", " ") in low:
-            return sub
-    if "asteroid" in low or "belt" in low:
-        return "asteroid_belt"
-    if "gas" in low or "jovian" in low or "giant" in low:
-        return "jovian"
-    if "barren" in low or "rock" in low or "dead" in low:
-        return "barren"
-    return "terrestrial_warm"
 
 
 def port_subtype(klass: str) -> str:
@@ -200,7 +182,6 @@ __all__ = [
     "available_archetypes",
     "available_subtypes",
     "planet_subtype",
-    "planet_subtype_from_name",
     "port_subtype",
     "ship_entity",
     "sprite",

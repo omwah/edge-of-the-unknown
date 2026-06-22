@@ -69,8 +69,8 @@ def test_staged_species_surfaces_as_a_ship_in_its_sector() -> None:
         2: _species(2, 4, "Selvani"),  # elsewhere
     }
     here = session.game_view(world, 1, CONFIG).sector
-    assert here.ships == ["Vesk vessel"]  # only the one in this sector, not the distant one
-    assert here.contact_ids == [1]  # parallel to `ships` — clicking the row hails species 1
+    assert [s.name for s in here.ships] == ["Vesk vessel"]  # only the one in this sector
+    assert [s.contact_id for s in here.ships] == [1]  # clicking the row hails species 1
 
 
 def test_empty_sector_lists_no_ships() -> None:
@@ -435,7 +435,7 @@ def test_drift_keeps_dossier_last_seen_while_sector_view_tracks_position() -> No
                                species_attitudes={1: 0.1}, species_last_seen={1: 2})
 
     # Before drift: visible here; dossier last-seen names the hail sector.
-    assert session.game_view(world, 1, CONFIG).sector.ships == ["Vesk vessel"]
+    assert [s.name for s in session.game_view(world, 1, CONFIG).sector.ships] == ["Vesk vessel"]
     seen0 = session.computer_view(world, 1, CONFIG).dossier[0].last_seen
     assert seen0 == str(session._display(world, 2))
 

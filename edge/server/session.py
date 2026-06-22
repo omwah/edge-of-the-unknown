@@ -174,19 +174,57 @@ def _sector_discoveries(state: UniverseState, player: Player, sector_id: int) ->
     return out
 
 
+def _species_ship_role(species: AlienSpecies, config: GameConfig) -> str:
+    """The art ship role for a species' vessel, from its fleet's lead hull (§6.1).
+
+    Resolves roster `fleet[0]` → that ship class's `role`; falls back to "fighter"
+    (the art engine's own ship default) when the species has no fleet / no roster
+    entry, so a vessel always paints with *some* role rather than guessing on its name.
+    """
+    roster = config.roster
+    sc = roster.species_by_id(species.roster_id) if roster is not None else None
+    if sc is not None and sc.fleet:
+        try:
+            return config.ship_class(sc.fleet[0]).role
+        except KeyError:
+            pass
+    return "fighter"
+
+
 def _sector_dto(
-    state: UniverseState, player: Player, sector: Sector, core_hops: dict[int, int]
+    state: UniverseState, player: Player, sector: Sector, core_hops: dict[int, int],
+    config: GameConfig,
 ) -> dto.SectorDTO:
-    ports = [p.name for p in state.ports.values() if p.sector_id == sector.id]
-    planets = [f"{pl.name}  {pretty_planet_type(pl.planet_type)}"
-               for pl in state.planets.values() if pl.sector_id == sector.id]
+    # The sector's controlling species (region controller) styles its port sprite.
+    ctrl_region = state.regions.get(sector.region_id)
+    controller = (
+        state.species.get(ctrl_region.controlling_species_id)
+        if ctrl_region is not None and ctrl_region.controlling_species_id is not None else None
+    )
+    port_archetype = controller.archetype_id if controller is not None else None
+    ports = [
+        dto.SectorPortDTO(
+            port_id=p.id, name=p.name, klass=_port_klass_label(p.klass),
+            is_stardock=p.klass is PortClass.STARDOCK, archetype_id=port_archetype,
+        )
+        for p in state.ports.values() if p.sector_id == sector.id
+    ]
+    planets = [
+        dto.SectorPlanetDTO(planet_id=pl.id, name=pl.name, ptype=pl.planet_type)
+        for pl in state.planets.values() if pl.sector_id == sector.id
+    ]
     # A staged species shows as a present vessel so the player can see (and hail) it —
-    # friendly contacts are visible just like ports/planets (§6, WP9). One row per species;
-    # `contact_ids` runs parallel to `ships` so clicking a row hails that species.
+    # friendly contacts are visible just like ports/planets (§6, WP9). The vessel carries
+    # its own species' palette (`archetype_id`) and `contact_id` is the hail target.
     here_species = [sp for sp in sorted(state.species.values(), key=lambda s: s.id)
                     if sp.sector_id == sector.id]
-    ships = [f"{sp.name} vessel" for sp in here_species]
-    contact_ids = [sp.id for sp in here_species]
+    ships = [
+        dto.SectorShipDTO(
+            name=f"{sp.name} vessel", role=_species_ship_role(sp, config),
+            archetype_id=sp.archetype_id, contact_id=sp.id,
+        )
+        for sp in here_species
+    ]
     here = core_hops.get(sector.id, 0)
     came_from = player.entered_from.get(sector.id)
     warps = [
@@ -202,7 +240,7 @@ def _sector_dto(
     return dto.SectorDTO(
         region=region, sector_id=sector.id, flavor=f"{sector.distance_band.lower()} space",
         beacon=sector.beacon_text, band=sector.distance_band,
-        ports=ports, planets=planets, ships=ships, contact_ids=contact_ids, warps=warps,
+        ports=ports, planets=planets, ships=ships, warps=warps,
         discoveries=_sector_discoveries(state, player, sector.id),
         display_id=_display(state, sector.id),
     )
@@ -217,7 +255,7 @@ def game_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.G
     return dto.GameState(
         turns=player.turns_remaining, max_turns=config.turns_per_day,
         ship=_ship_dto(state, ship, player, sector),
-        sector=_sector_dto(state, player, sector, core_hops),
+        sector=_sector_dto(state, player, sector, core_hops, config),
     )
 
 

@@ -19,6 +19,7 @@ the topology / port / planet / discovery draw order (golden-master ordering, §5
 from __future__ import annotations
 
 import random
+from dataclasses import replace
 
 from edge.core.aliens import is_friendly
 from edge.core.config import GameConfig, RosterConfig, SpeciesConfig
@@ -109,6 +110,33 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     _populate_governing_space(state, config, roster, rng, placed)
     _place_stardock_contacts(state, config, roster, rng, placed)
     state.species = placed
+    _assign_region_control(state, placed)
+
+
+def _assign_region_control(state: UniverseState, placed: dict[int, AlienSpecies]) -> None:
+    """Stamp each region's controlling species/alliance from the species placed in it.
+
+    A region is controlled by the species present in its sectors — leader first, then
+    lowest id (deterministic). Regions with no placed species stay uncontrolled. Pure
+    post-processing over `placed`: no RNG draws, so the golden-master draw order is
+    untouched (it only mutates `state.regions`, shifting `state_hash`). Core regions
+    resolve to the governing leader (always settled in the Core, §6.3).
+    """
+    by_region: dict[int, list[AlienSpecies]] = {}
+    for sp in placed.values():
+        sector = state.sectors.get(sp.sector_id)
+        if sector is None:
+            continue
+        by_region.setdefault(sector.region_id, []).append(sp)
+    for region_id, members in by_region.items():
+        region = state.regions.get(region_id)
+        if region is None:
+            continue
+        controller = min(members, key=lambda s: (s.alliance_role != "leader", s.id))
+        state.regions[region_id] = replace(
+            region, controlling_species_id=controller.id,
+            controlling_alliance_id=controller.alliance_id,
+        )
 
 
 def _make_species(sid: int, sp: SpeciesConfig, sector_id: int, band: str,
