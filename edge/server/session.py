@@ -1060,19 +1060,6 @@ def format_log_line(event: Event, state: UniverseState) -> str:
     return f"[grey46]S{_display(state, sector)} »[/] {text}"
 
 
-def stardock_signpost(state: UniverseState) -> str | None:
-    """The opening navigation beacon naming the StarDock's location (WP-B).
-
-    Derived from state (the Class-9 port) rather than persisted, so it survives a
-    reload and never duplicates. An intentional reveal of a known landmark (§5).
-    """
-    dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
-    if dock is None:
-        return None
-    region = state.regions[state.sectors[dock.sector_id].region_id].name
-    return f"Navigation beacon: StarDock lies in Sector {_display(state, dock.sector_id)} — {region}."
-
-
 def _event_turn_cost(event: Event, config: GameConfig) -> int:
     """Turns an event spent — used to reconstruct the day/turn each log line is stamped with.
 
@@ -1102,7 +1089,7 @@ def messages_view(
     Each line's `when` carries the game day and the turn-of-day it happened on, rebuilt by
     walking the log: the day rolls over on the player's `TurnsReset` (the daily cron, §9) and
     the turn count accrues each event's turn cost, so a free event shares the turn of the last
-    turn-spending action before it. The pre-game StarDock beacon stays labelled "start".
+    turn-spending action before it.
     """
     day, turn = 1, 0
     entries: list[dto.LogEntry] = []
@@ -1115,9 +1102,6 @@ def messages_view(
         if text:
             entries.append(dto.LogEntry(when=f"D{day} · T{turn}", text=text))
     entries.reverse()  # newest first
-    signpost = stardock_signpost(state)
-    if signpost is not None:
-        entries.append(dto.LogEntry(when="start", text=f"[yellow]{signpost}[/]"))
     return dto.MessagesDTO(events=entries)
 
 

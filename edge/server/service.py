@@ -168,12 +168,8 @@ class GameService:
         return session.contact_view(self._state, player_id, species_id, self._config)
 
     def messages_view(self, player_id: int) -> dto.MessagesDTO:
-        """The durable event log + opening signpost, newest first (§11, §12)."""
+        """The durable event log, newest first (§11, §12)."""
         return session.messages_view(self._state, self._repo.load_events(), self._config, player_id)
-
-    def intro_line(self, player_id: int) -> str | None:
-        """The opening StarDock signpost for the game-screen ticker (WP-B)."""
-        return session.stardock_signpost(self._state)
 
     def describe_event(self, event: Event) -> str:
         """Render one event for the live ticker, with a spatial sector gutter (§5.1, §11).

@@ -93,20 +93,19 @@ async def test_enter_warps_focused_cell() -> None:
         assert moved == target != start
 
 
-async def test_log_hotkey_opens_computer_with_signpost() -> None:
+async def test_log_hotkey_opens_computer_log() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         await pilot.press("n")
         await pilot.pause()
-        await pilot.press("g")  # Log -> Computer, folded in (WP-B)
+        await pilot.press("g")  # Log -> Computer (log tab), folded in (WP-B)
         await pilot.pause()
         assert isinstance(app.screen, ComputerScreen)
         from textual.widgets import DataTable
 
-        rows = app.screen.query_one("#log-table", DataTable)
-        cells = [str(rows.get_cell_at((r, 1))) for r in range(rows.row_count)]
-        assert any("StarDock" in c for c in cells)
+        # The Computer opens on the log tab (empty at a fresh game — the beacon is gone).
+        assert app.screen.query_one("#log-table", DataTable) is not None
 
 
 async def test_travel_prompt_warps_along_known_route() -> None:
