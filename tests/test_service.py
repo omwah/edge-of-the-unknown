@@ -293,26 +293,15 @@ def test_current_planet_view_finds_or_none(tmp_path: Path) -> None:
     assert svc.current_planet_view(1) is None
 
 
-def test_intro_line_names_the_stardock_sector(tmp_path: Path) -> None:
+def test_messages_view_lists_real_events(tmp_path: Path) -> None:
     svc = _service(tmp_path)
-    dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)
-    line = svc.intro_line(1)
-    # The signpost names the StarDock's *spatial* display id (§5.1), not the internal id.
-    assert line is not None and f"Sector {svc.state.spatial_ids[dock.sector_id]}" in line
-
-
-def test_messages_view_signpost_and_real_events(tmp_path: Path) -> None:
-    svc = _service(tmp_path)
-    # Fresh game: only the derived StarDock signpost is present.
-    fresh = svc.messages_view(1)
-    assert len(fresh.events) == 1 and "StarDock" in fresh.events[0].text
-    # After a warp, the newest event leads (with the spatial id) and the signpost sinks.
+    # Fresh game: no events yet (the opening StarDock beacon was removed).
+    assert svc.messages_view(1).events == []
+    # After a warp, the newest event leads, its destination in the spatial-sector gutter.
     target = svc.state.sectors[1].warps_out[0]
     svc.apply(1, Warp(to_sector=target))
     after = svc.messages_view(1)
-    # The warp line leads, its destination carried by the spatial-sector gutter.
     assert f"S{svc.state.spatial_ids[target]}" in after.events[0].text
-    assert "StarDock" in after.events[-1].text
 
 
 def test_resolve_display_id_round_trips(tmp_path: Path) -> None:

@@ -321,9 +321,6 @@ def test_display_ids_surface_spatial_ids_when_present() -> None:
     assert by_id[6].label is None and by_id[6].display_id == 10103  # masked warp, still numbered
     # The gravity arrows are unchanged — they key off core_hops, not the display id.
     assert {w.sector_id: w.arrow for w in view.sector.warps} == {1: "<<", 3: ">>", 6: "--"}
-    # The StarDock signpost would use the spatial id too (sector 3 hosts the SSB port here).
-    world.ports[3] = _port(3, 3, PortClass.STARDOCK)
-    assert "Sector 20101" in (session.stardock_signpost(world) or "")
 
 
 def test_format_event_warp_body_defers_sector_to_the_gutter() -> None:
@@ -393,7 +390,7 @@ def test_messages_view_stamps_day_and_turn() -> None:
     """Each log line's `when` carries the game day + turn-of-day, day rolling on TurnsReset."""
     from edge.core.events import Banked, Docked, TurnsReset, Warped
 
-    world = _world()  # no StarDock here, so no "start" signpost is appended
+    world = _world()
     events: list[object] = [
         Warped(1, 2, 3, 2),                 # day 1, +2 turns -> t2
         Docked(1, 3, 3),                    # +1 turn -> t3
@@ -407,9 +404,8 @@ def test_messages_view_stamps_day_and_turn() -> None:
     ]
 
 
-def test_signpost_is_none_without_a_stardock() -> None:
-    world = _nav_world()  # ports are a Class-5 SSB only — no StarDock
-    assert session.stardock_signpost(world) is None
+def test_messages_view_empty_without_events() -> None:
+    world = _nav_world()
     assert session.messages_view(world, [], CONFIG).events == []
 
 

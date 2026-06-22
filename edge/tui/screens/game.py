@@ -146,10 +146,7 @@ class GameScreen(Screen):
         """The event-log lines, most recent last (a single fallback when empty)."""
         if self._log:
             return list(self._log)
-        signpost = self._service.intro_line(self._pid)
-        if signpost is not None:
-            return [f"[yellow]· {signpost}[/]"]
-        return ["[dim]· New game — find a port and start trading.[/]"]
+        return ["[dim]· New game — dock at the StarDock to trade and upgrade, then explore.[/]"]
 
     async def on_screen_resume(self) -> None:
         # Rebuild from fresh state when this screen becomes active again (after a
