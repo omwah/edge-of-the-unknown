@@ -97,21 +97,6 @@ def _sector_codes(state: UniverseState, sector_id: int) -> list[str]:
     return codes
 
 
-def _neighbor(state: UniverseState, player: Player, sector_id: int) -> dto.NeighborDTO:
-    """A sidebar quick-reference row — region/band/codes only once explored (fog of war)."""
-    sector = state.sectors[sector_id]
-    did = _display(state, sector_id)
-    if sector_id in player.explored_sectors:
-        region = state.regions[sector.region_id].name
-        return dto.NeighborDTO(
-            sector_id=sector_id, name=f"[{did}] {region}", band=sector.distance_band,
-            explored=True, codes=_sector_codes(state, sector_id), display_id=did,
-        )
-    return dto.NeighborDTO(
-        sector_id=sector_id, name=f"[{did}] —", band="?", explored=False, display_id=did
-    )
-
-
 def _ship_dto(state: UniverseState, ship: Ship, player: Player, sector: Sector) -> dto.ShipDTO:
     aspects = [
         dto.Aspect("Shields", _bar10(ship.shields, max(ship.hull_max, 1)), f"{ship.shields}%"),
@@ -121,12 +106,11 @@ def _ship_dto(state: UniverseState, ship: Ship, player: Player, sector: Sector) 
         dto.Aspect("Sensors", min(10, ship.sensor_rating * 3), f"Tier {ship.sensor_rating}"),
     ]
     holds = [dto.Hold(_LABEL[c], ship.cargo.get(c, 0), ship.holds_total) for c in Commodity]
-    neighbors = [_neighbor(state, player, t) for t in sector.warps_out]
     return dto.ShipDTO(
         name=ship.name, klass=ship.type_id.title(), aspects=aspects, integrity="all nominal",
         holds_used=ship.holds_used, holds_total=ship.holds_total, holds=holds,
         gun="online", missiles=ship.missiles, kits=ship.repair_kits,
-        latinum=player.latinum, band=sector.distance_band, neighbors=neighbors,
+        latinum=player.latinum, band=sector.distance_band,
         colonists=ship.colonists, colonist_capacity=ship.colonist_capacity,
     )
 
@@ -145,6 +129,24 @@ def _warp_kind(target: int, came_from: int | None, explored: frozenset[int]) -> 
     if target == came_from:
         return "backtrack"
     return "explored" if target in explored else "unexplored"
+
+
+def _warp_dto(
+    state: UniverseState, player: Player, sector: Sector, target: int, here: int,
+    came_from: int | None, core_hops: dict[int, int],
+) -> dto.WarpDTO:
+    """One outbound warp, with region/band/codes filled only once explored (fog of war)."""
+    did = _display(state, target)
+    kind = _warp_kind(target, came_from, player.explored_sectors)
+    arrow = _gravity_arrow(here, core_hops.get(target, here))
+    tgt = state.sectors[target]
+    if target in player.explored_sectors:
+        return dto.WarpDTO(
+            sector_id=target, arrow=arrow, label=state.regions[tgt.region_id].name,
+            kind=kind, display_id=did, band=tgt.distance_band,
+            codes=_sector_codes(state, target),
+        )
+    return dto.WarpDTO(sector_id=target, arrow=arrow, kind=kind, display_id=did, band="?")
 
 
 def _discovery_label(kind: str, rarity: str) -> str:
@@ -228,12 +230,7 @@ def _sector_dto(
     here = core_hops.get(sector.id, 0)
     came_from = player.entered_from.get(sector.id)
     warps = [
-        dto.WarpDTO(
-            sector_id=target,
-            arrow=_gravity_arrow(here, core_hops.get(target, here)),
-            kind=_warp_kind(target, came_from, player.explored_sectors),
-            display_id=_display(state, target),
-        )
+        _warp_dto(state, player, sector, target, here, came_from, core_hops)
         for target in sector.warps_out
     ]
     region = state.regions[sector.region_id].name

@@ -13,7 +13,7 @@ from textual.binding import Binding
 from textual.theme import Theme
 
 from edge.config import load_default_config
-from edge.core.config import SceneArtConfig
+from edge.core.config import SceneArtConfig, UIConfig
 from edge.engine.ticker import EngineTicker
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
@@ -57,8 +57,10 @@ class EdgeApp(App[None]):
         self.plain = plain
         self.service: GameService | None = None
         self._ticker: EngineTicker | None = None
-        # SectorView sprite-scene sizes; replaced from config when a game starts.
+        # SectorView sprite-scene sizes + warp-grid options; replaced from config
+        # when a game starts.
         self.scene_art = SceneArtConfig()
+        self.ui_config = UIConfig()
 
     def on_mount(self) -> None:
         self.register_theme(TW2002_THEME)
@@ -105,6 +107,7 @@ class EdgeApp(App[None]):
         """
         art_adapter.validate_art_coverage(config)  # type: ignore[arg-type]
         self.scene_art = config.scene  # type: ignore[attr-defined]
+        self.ui_config = config.ui  # type: ignore[attr-defined]
 
     def _start_ticker(self, service: GameService) -> None:
         self._ticker = EngineTicker(service)

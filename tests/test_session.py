@@ -269,16 +269,16 @@ def _nav_world() -> UniverseState:
     return world
 
 
-def test_game_view_neighbors_fog_of_war_and_codes() -> None:
+def test_game_view_warp_fog_of_war_and_codes() -> None:
     view = session.game_view(_nav_world(), 1, CONFIG)
-    by_id = {n.sector_id: n for n in view.ship.neighbors}
-    # Explored neighbour 3 names its region/band and lists its port + planet codes.
+    by_id = {w.sector_id: w for w in view.sector.warps}
+    # Explored warp 3 names its region/band and lists its port + planet codes.
     assert by_id[3].explored
-    assert by_id[3].name == "[3] Halaf Verge" and by_id[3].band == "Frontier"
+    assert by_id[3].label == "Halaf Verge" and by_id[3].band == "Frontier"
     assert by_id[3].codes == ["P", "@"]
-    # Unexplored neighbour 6 stays masked: no region, no codes.
+    # Unexplored warp 6 stays masked: no region, no codes.
     assert not by_id[6].explored
-    assert by_id[6].name == "[6] —" and by_id[6].band == "?" and by_id[6].codes == []
+    assert by_id[6].label is None and by_id[6].band == "?" and by_id[6].codes == []
 
 
 def test_game_view_gravity_arrows() -> None:
@@ -308,7 +308,6 @@ def test_display_ids_fall_back_to_internal_without_spatial_ids() -> None:
     view = session.game_view(_nav_world(), 1, CONFIG)
     assert view.sector.display_id == view.sector.sector_id == 2
     assert all(w.display_id == w.sector_id for w in view.sector.warps)
-    assert all(n.display_id == n.sector_id for n in view.ship.neighbors)
 
 
 def test_display_ids_surface_spatial_ids_when_present() -> None:
@@ -317,9 +316,9 @@ def test_display_ids_surface_spatial_ids_when_present() -> None:
     view = session.game_view(world, 1, CONFIG)
     assert view.sector.display_id == 10102  # sector title shows the spatial id
     assert {w.sector_id: w.display_id for w in view.sector.warps} == {1: 10101, 3: 20101, 6: 10103}
-    by_id = {n.sector_id: n for n in view.ship.neighbors}
-    assert by_id[3].name == "[20101] Halaf Verge"  # explored neighbour embeds the spatial id
-    assert by_id[6].name == "[10103] —"  # masked neighbour still numbered spatially
+    by_id = {w.sector_id: w for w in view.sector.warps}
+    assert by_id[3].label == "Halaf Verge" and by_id[3].display_id == 20101  # explored warp
+    assert by_id[6].label is None and by_id[6].display_id == 10103  # masked warp, still numbered
     # The gravity arrows are unchanged — they key off core_hops, not the display id.
     assert {w.sector_id: w.arrow for w in view.sector.warps} == {1: "<<", 3: ">>", 6: "--"}
     # The StarDock signpost would use the spatial id too (sector 3 hosts the SSB port here).

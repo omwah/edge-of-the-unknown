@@ -25,15 +25,18 @@ from edge.tui.dummy import SectorDTO
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.contact import AlienContactScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
+from edge.tui.screens.help import HelpScreen
 from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
 from edge.tui.widgets import (
     ClickableEntry,
+    SectionRule,
     SectorScene,
     StatusSidebar,
-    WarpButton,
+    Ticker,
+    WarpCell,
     WarpGrid,
 )
 
@@ -59,15 +62,13 @@ class SectorView(Container):
     """The primary sector display (§1).
 
     A single composited `SectorScene` (starfield behind header / planet / port /
-    ships / discoveries) fills the upper area, and the interactive `WarpGrid` sits
-    centred at the bottom with the current sector pinned to its middle cell.
+    ships) fills the upper area, and the interactive `WarpGrid` — the single,
+    information-rich warp affordance — fills the width at the bottom.
     """
 
     DEFAULT_CSS = """
     SectorView { width: 2fr; background: transparent; }
-    SectorView #warp-area {
-        width: 1fr; height: auto; align-horizontal: center;
-    }
+    SectorView #warp-area { width: 1fr; height: auto; }
     """
 
     def __init__(self, sector: SectorDTO) -> None:
@@ -76,12 +77,20 @@ class SectorView(Container):
 
     def compose(self) -> ComposeResult:
         sec = self._sector
+        ui = getattr(self.app, "ui_config", None)
+        columns = ui.warp_columns if ui is not None else 3
+        focus_default = ui.warp_focus_default if ui is not None else "first"
         yield SectorScene(sec)
+        yield SectionRule("Navigation", id="warp-rule")
         with Container(id="warp-area"):
-            yield WarpGrid(sec.warps, sec.display_id)
+            yield WarpGrid(sec.warps, columns, focus_default)
 
 
 class GameScreen(Screen):
+    # The overlay layer hosts the expanded event ticker, so it draws over the sector
+    # view instead of reflowing it (the ticker sets `layer: overlay` when expanded).
+    DEFAULT_CSS = "GameScreen { layers: overlay; }"
+
     BINDINGS = [
         Binding("p", "dock_port", "Dock"),
         Binding("w", "travel", "Travel"),
@@ -92,6 +101,7 @@ class GameScreen(Screen):
         Binding("e", "engine_room", "Engine Room"),
         Binding("m", "map", "Map"),
         Binding("g", "messages", "Log"),
+        Binding("question_mark", "help", "Help"),
         Binding("ctrl+q", "quit", "Quit"),
     ]
 
@@ -107,17 +117,18 @@ class GameScreen(Screen):
         yield TopBar(view.turns, view.max_turns)
         with Horizontal(id="body"):
             yield SectorView(view.sector)
-            yield StatusSidebar(view.ship, id="sidebar")
-        yield Static(self._ticker_text(), id="ticker")
+            yield StatusSidebar(view.ship, view.sector.discoveries, id="sidebar")
+        yield Ticker(self._ticker_lines())
         yield Footer()
 
-    def _ticker_text(self) -> str:
+    def _ticker_lines(self) -> list[str]:
+        """The event-log lines, most recent last (a single fallback when empty)."""
         if self._log:
-            return "\n".join(self._log[-3:])
+            return list(self._log)
         signpost = self._service.intro_line(self._pid)
         if signpost is not None:
-            return f"[yellow]· {signpost}[/]"
-        return "[dim]· New game — find a port and start trading.[/]"
+            return [f"[yellow]· {signpost}[/]"]
+        return ["[dim]· New game — find a port and start trading.[/]"]
 
     async def on_screen_resume(self) -> None:
         # Rebuild from fresh state when this screen becomes active again (after a
@@ -129,7 +140,7 @@ class GameScreen(Screen):
 
     # --- commands ------------------------------------------------------------
 
-    async def on_warp_button_warp(self, msg: WarpButton.Warp) -> None:
+    async def on_warp_cell_warp(self, msg: WarpCell.Warp) -> None:
         await self._warp(msg.sector_id)
 
     async def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
@@ -248,6 +259,9 @@ class GameScreen(Screen):
 
     def action_messages(self) -> None:
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="log"))
+
+    def action_help(self) -> None:
+        self.app.push_screen(HelpScreen())
 
     # --- event ticker --------------------------------------------------------
 

@@ -27,7 +27,6 @@ from edge.core.dto import (
     MapBand,
     MapDTO,
     MessagesDTO,
-    NeighborDTO,
     PlanetDTO,
     PortDTO,
     SectorDTO,
@@ -111,17 +110,6 @@ def sample_state() -> GameState:
         kits=2,
         latinum=14_250,
         band="0 - Core",
-        # The sidebar quick-reference lists the current sector's neighbours, so these
-        # must be exactly the warp targets below (1,3,6,8,12). In the real game both
-        # this and the warp list are projected from the one warp graph via to_public();
-        # here they're hand-synced.
-        neighbors=[
-            NeighborDTO(1, "[1] Sol Core", "Hub", True, ["S"], display_id=1),
-            NeighborDTO(3, "[3] Sol Core", "Hub", True, ["P", "@"], display_id=3),
-            NeighborDTO(6, "[6] Vega Reach", "Hub", True, [], display_id=6),
-            NeighborDTO(8, "[8] —", "?", False, display_id=8),
-            NeighborDTO(12, "[12] —", "?", False, display_id=12),
-        ],
         colonists=25,
         colonist_capacity=100,
     )
@@ -139,11 +127,11 @@ def sample_state() -> GameState:
             SectorShipDTO("Verdani escort", "warship"),
         ],
         warps=[
-            WarpDTO(1, "<<", display_id=1),
-            WarpDTO(3, "--", "Sol", display_id=3),
-            WarpDTO(6, "--", display_id=6),
-            WarpDTO(8, ">>", kind="unexplored", display_id=8),
-            WarpDTO(12, ">>", kind="unexplored", display_id=12),
+            WarpDTO(1, "<<", "Sol Core", display_id=1, band="Hub", codes=["S"]),
+            WarpDTO(3, "--", "Sol Core", display_id=3, band="Hub", codes=["P", "@"]),
+            WarpDTO(6, "--", "Vega Reach", display_id=6, band="Hub"),
+            WarpDTO(8, ">>", kind="unexplored", display_id=8, band="?"),
+            WarpDTO(12, ">>", kind="unexplored", display_id=12, band="?"),
         ],
         display_id=7,
     )
