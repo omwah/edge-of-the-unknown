@@ -7,6 +7,7 @@ Reads only the dummy DTOs in `edge.tui.dummy`; no engine/server yet (DESIGN.md
 from __future__ import annotations
 
 import argparse
+import random
 
 from textual.app import App
 from textual.binding import Binding
@@ -21,9 +22,8 @@ from edge.tui import art_adapter
 from edge.tui.saves import clear_slot, default_save, has_save
 from edge.tui.screens.main_menu import MainMenuScreen
 
-# A fixed default seed for "New game" — chosen so the player's opening neighbourhood
-# reads well (a curated universe per the WP8 screenshot decision).
-DEFAULT_SEED = 4
+# Fallback seed when neither the caller nor the config supplies one (random, below).
+_SEED_MAX = 2**31 - 1
 
 TW2002_THEME = Theme(
     name="tw2002",
@@ -68,8 +68,12 @@ class EdgeApp(App[None]):
         self.theme = "tw2002"
         self.push_screen(MainMenuScreen())
 
-    def start_new_game(self, seed: int = DEFAULT_SEED) -> GameService:
+    def start_new_game(self, seed: int | None = None) -> GameService:
         """Generate a fresh universe on disk and start the background ticker.
+
+        The seed comes from `seed` if given, else `config.seed`, else a random roll
+        (config `seed:` left empty). The chosen seed is persisted, so the game still
+        replays from (seed, command log).
 
         Single-player embeds the service (DESIGN §3). The repository is a WAL
         SQLite file (the single save slot); a new game replaces any prior slot so
@@ -81,6 +85,8 @@ class EdgeApp(App[None]):
         save = default_save()
         save.parent.mkdir(parents=True, exist_ok=True)
         clear_slot()
+        if seed is None:
+            seed = config.seed if config.seed is not None else random.randrange(_SEED_MAX)
         self.service = GameService.new_game(config, seed, SqliteRepository(save))
         self._start_ticker(self.service)
         return self.service

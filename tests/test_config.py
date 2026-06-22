@@ -14,6 +14,13 @@ def test_default_config_loads() -> None:
     assert isinstance(cfg, GameConfig)
     assert cfg.config_version == 2  # Phase-2 schema epoch (engine room, §4.1)
     assert cfg.turns_per_day == 250
+    assert cfg.seed == 4  # default.yaml pins a curated seed; empty ⇒ random at start
+    assert cfg.bigbang.start_sector == "stardock"  # the player starts at the StarDock
+
+
+def test_seed_accepts_null_for_random() -> None:
+    cfg = GameConfig.model_validate({**load_default_config().model_dump(), "seed": None})
+    assert cfg.seed is None  # empty seed ⇒ a random universe is rolled at start
 
 
 def test_default_economy_values() -> None:

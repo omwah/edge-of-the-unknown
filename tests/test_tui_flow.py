@@ -17,17 +17,27 @@ from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.widgets import WarpCell
 
 
+async def _warp_player_to(svc: object, target: int) -> None:
+    """Warp the player from wherever they are to `target` along the shortest path."""
+    start = svc.game_view(1).sector.sector_id  # type: ignore[attr-defined]
+    path = shortest_path(svc.state.adjacency, start, target)  # type: ignore[attr-defined]
+    assert path is not None
+    for hop in path[1:]:
+        svc.apply(1, Warp(to_sector=hop))  # type: ignore[attr-defined]
+
+
 async def _new_game_at_stardock(app: EdgeApp, pilot: object) -> object:
-    """Press New game, then warp the player to the StarDock and dock (press P)."""
+    """Press New game, then make sure the player is at the StarDock and dock (press P).
+
+    The default config starts the player *at* the StarDock, so the warp is usually a
+    no-op; it still resolves for configs that start the player elsewhere.
+    """
     await pilot.press("n")  # type: ignore[attr-defined]
     await pilot.pause()  # type: ignore[attr-defined]
     svc = app.service
     assert svc is not None
     dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)
-    path = shortest_path(svc.state.adjacency, 1, dock.sector_id)
-    assert path is not None
-    for hop in path[1:]:
-        svc.apply(1, Warp(to_sector=hop))
+    await _warp_player_to(svc, dock.sector_id)
     await pilot.press("p")  # dock -> StarDockScreen  # type: ignore[attr-defined]
     await pilot.pause()  # type: ignore[attr-defined]
     return svc
@@ -41,7 +51,9 @@ async def test_new_game_pushes_live_game_screen() -> None:
         await pilot.pause()
         assert app.service is not None
         view = app.service.game_view(1)
-        assert view.sector.sector_id == 1 and view.turns == 250
+        # The default config starts the player at the StarDock.
+        dock = next(p for p in app.service.state.ports.values() if p.klass.value == 9)
+        assert view.sector.sector_id == dock.sector_id and view.turns == 250
 
 
 async def test_warp_cell_click_warps() -> None:
@@ -107,18 +119,19 @@ async def test_travel_prompt_warps_along_known_route() -> None:
         await pilot.pause()
         svc = app.service
         assert svc is not None
-        # Uncover a neighbour with a two-way edge, then travel back to the Core (1).
-        a = next(s for s in svc.state.sectors[1].warps_out
-                 if 1 in svc.state.sectors[s].warps_out)
+        # Uncover a neighbour with a two-way edge, then travel back to the start sector.
+        start = svc.game_view(1).sector.sector_id
+        a = next(s for s in svc.state.sectors[start].warps_out
+                 if start in svc.state.sectors[s].warps_out)
         svc.apply(1, Warp(to_sector=a))
         await pilot.press("w")  # open the travel prompt (WP-C)
         await pilot.pause()
         assert isinstance(app.screen, TravelPromptScreen)
-        # The prompt takes a *spatial* display id (§5.1) — type Sector 1's spatial id.
-        app.screen.query_one("#travel-input", Input).value = str(svc.state.spatial_ids[1])
+        # The prompt takes a *spatial* display id (§5.1) — type the start sector's id.
+        app.screen.query_one("#travel-input", Input).value = str(svc.state.spatial_ids[start])
         await pilot.press("enter")
         await pilot.pause()
-        assert svc.game_view(1).sector.sector_id == 1
+        assert svc.game_view(1).sector.sector_id == start
 
 
 async def test_sector_title_shows_spatial_id() -> None:
@@ -132,8 +145,9 @@ async def test_sector_title_shows_spatial_id() -> None:
         await pilot.pause()
         svc = app.service
         assert svc is not None
-        spatial = svc.state.spatial_ids[1]  # the player starts at internal sector 1
-        assert spatial != 1  # the spatial id genuinely differs from the internal id
+        start = svc.game_view(1).sector.sector_id  # the player's start sector (the StarDock)
+        spatial = svc.state.spatial_ids[start]
+        assert spatial != start  # the spatial id genuinely differs from the internal id
         title = app.screen.query_one(SectorScene).render().plain
         assert f"[{spatial}]" in title
 
@@ -277,11 +291,11 @@ async def test_descend_explore_log_flow() -> None:
         target = None
         for _pid, ds in by_planet.items():
             slot0 = min(ds, key=lambda d: d.site_slot)
-            if not slot0.hidden and shortest_path(svc.state.adjacency, 1, slot0.sector_id) is not None:
+            if not slot0.hidden and shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, slot0.sector_id) is not None:
                 target = slot0
                 break
         assert target is not None
-        for hop in shortest_path(svc.state.adjacency, 1, target.sector_id)[1:]:
+        for hop in shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, target.sector_id)[1:]:
             svc.apply(1, Warp(to_sector=hop))
 
         await pilot.press("s")  # survey planet -> PlanetScreen
@@ -298,7 +312,6 @@ async def test_descend_explore_log_flow() -> None:
 
 
 async def test_clicking_planet_descends() -> None:
-    from collections import defaultdict
 
     from edge.core.rules import Warp
     from edge.tui.screens.planet import PlanetScreen, PlanetSprite
@@ -314,9 +327,9 @@ async def test_clicking_planet_descends() -> None:
         # A reachable planet — survey it to open the orbit view, then click its sprite.
         planet = next(
             pl for pl in svc.state.planets.values()
-            if shortest_path(svc.state.adjacency, 1, pl.sector_id) is not None
+            if shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, pl.sector_id) is not None
         )
-        for hop in shortest_path(svc.state.adjacency, 1, planet.sector_id)[1:]:
+        for hop in shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, planet.sector_id)[1:]:
             svc.apply(1, Warp(to_sector=hop))
         await pilot.press("s")  # survey planet -> PlanetScreen
         await pilot.pause()
@@ -463,8 +476,8 @@ async def test_click_planet_art_opens_survey() -> None:
         assert svc is not None
         # Reach any sector that holds a planet (the art is drawn from sector.planets).
         planet = next(p for p in svc.state.planets.values()
-                      if shortest_path(svc.state.adjacency, 1, p.sector_id) is not None)
-        for hop in shortest_path(svc.state.adjacency, 1, planet.sector_id)[1:]:
+                      if shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, p.sector_id) is not None)
+        for hop in shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, planet.sector_id)[1:]:
             svc.apply(1, Warp(to_sector=hop))
         await app.screen.recompose()
         await pilot.pause()
@@ -488,8 +501,8 @@ async def test_click_port_art_docks() -> None:
         svc = app.service
         assert svc is not None
         port = next(p for p in svc.state.ports.values()
-                    if shortest_path(svc.state.adjacency, 1, p.sector_id) is not None)
-        for hop in shortest_path(svc.state.adjacency, 1, port.sector_id)[1:]:
+                    if shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, p.sector_id) is not None)
+        for hop in shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, port.sector_id)[1:]:
             svc.apply(1, Warp(to_sector=hop))
         await app.screen.recompose()
         await pilot.pause()
@@ -512,6 +525,9 @@ async def test_sector_view_caps_ship_sprites_and_keeps_overflow_hailable() -> No
         assert svc is not None
         # Three contacts in one sector — one more than the sprite cap (default 2).
         sector_id = svc.state.ships[1].sector_id
+        # Clear any species the big bang staged here (the StarDock hub seeds contacts)
+        # so we control the exact set under test.
+        svc.state.species = {i: sp for i, sp in svc.state.species.items() if sp.sector_id != sector_id}
         for sid, roster_id in ((1, "vesk"), (2, "selvani"), (3, "vesk")):
             sc = svc.config.roster.species_by_id(roster_id)
             svc.state.species[sid] = AlienSpecies(
@@ -628,7 +644,8 @@ async def test_continue_reloads_saved_game() -> None:
         await pilot.pause()
         svc = app1.service
         assert svc is not None
-        target = svc.state.sectors[1].warps_out[0]
+        start = svc.game_view(1).sector.sector_id
+        target = svc.state.sectors[start].warps_out[0]
         svc.apply(1, Warp(to_sector=target))  # a durable command in the save's log
         moved = svc.game_view(1).sector.sector_id
 
@@ -668,6 +685,11 @@ async def test_trade_plot_route_and_engage() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         svc = await _new_game_at_stardock(app, pilot)
+        # Starting at the StarDock, only it is explored; chart the whole map so the
+        # (fog-gated) pair finder scores a pair and the route can plot through it.
+        from dataclasses import replace
+        svc.state.players[1] = replace(
+            svc.state.players[1], explored_sectors=frozenset(svc.state.sectors))
         assert svc.computer_view(1).pairs  # the default seed has a scored pair
         await pilot.press("escape")  # undock back to the game screen
         await pilot.pause()
@@ -708,7 +730,7 @@ async def test_codex_plot_route_to_a_logged_find() -> None:
         for d in svc.state.discoveries.values():
             if d.planet_id is not None:
                 continue
-            path = shortest_path(svc.state.adjacency, 1, d.sector_id)
+            path = shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, d.sector_id)
             if path is None:
                 continue
             if not d.hidden:

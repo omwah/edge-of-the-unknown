@@ -19,7 +19,7 @@ _CREATED = "2026-06-15T00:00:00Z"
 
 def _config() -> object:
     cfg = load_default_config()
-    return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(update={"sector_count": 90})})
+    return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1})})
 
 
 def _service(tmp_path: Path, name: str = "game.db") -> GameService:
@@ -125,7 +125,7 @@ def _drift_config() -> object:
     """Config that drifts aliens fast and surely (small cadence, certain move)."""
     cfg = load_default_config()
     return cfg.model_copy(update={
-        "bigbang": cfg.bigbang.model_copy(update={"sector_count": 90}),
+        "bigbang": cfg.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1}),
         "aliens": cfg.aliens.model_copy(update={
             "drift_ticks_per_firing": 2, "drift_move_chance": 1.0}),
     })

@@ -132,6 +132,10 @@ class BigBangConfig(BaseModel):
     one_way_chance: float = 0.15
     max_warps_per_sector: int = 6  # TW2002 canon
     core_sector_count: int = 10  # Core Space = sectors 1..N
+    # Where the player's ship starts: "stardock" (at the StarDock — no routing needed),
+    # "random" (a seeded random sector), or a specific sector id. The shortest path from
+    # the start to the StarDock opens pre-explored so the opening signpost stays actionable.
+    start_sector: int | Literal["stardock", "random"] = "stardock"
     stardock_min_hops: int = 2
     stardock_max_hops: int = 5
     port_density: float = 0.45
@@ -694,6 +698,9 @@ class GameConfig(BaseModel):
     model_config = _FROZEN
 
     config_version: int
+    # Universe seed for a new game; null/omitted ⇒ a random seed is rolled at start
+    # (the chosen seed is persisted, so the game still replays from (seed, command log)).
+    seed: int | None = None
     turns_per_day: int = 250  # TWINSTR.DOC default (§9)
     scene: SceneArtConfig = SceneArtConfig()
     ui: UIConfig = UIConfig()

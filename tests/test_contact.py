@@ -34,7 +34,7 @@ from edge.store.repo import SqliteRepository
 from edge.store.snapshots import state_hash
 
 CFG = load_default_config()
-SMALL = CFG.model_copy(update={"bigbang": CFG.bigbang.model_copy(update={"sector_count": 90})})
+SMALL = CFG.model_copy(update={"bigbang": CFG.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1})})
 _CREATED = "2026-06-18T00:00:00Z"
 
 
