@@ -503,6 +503,7 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
     if player.turns_remaining < cost:
         raise MovementError("out of turns")
     new_ship = replace(ship, sector_id=cmd.to_sector)
+    one_way = ship.sector_id not in state.adjacency.get(cmd.to_sector, ())
     detected, det_events = _detect_in_sector(
         state, player.detected, ship.sensor_rating, cmd.to_sector, player_id, config)
     new_player = replace(
@@ -513,7 +514,7 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
         detected=detected,
     )
     return ReduceResult(
-        events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost), *det_events),
+        events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost, one_way), *det_events),
         players=(new_player,),
         ships=(new_ship,),
     )
@@ -559,7 +560,8 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
         if turns < cost or _should_interrupt(state, player, nxt):
             break
         turns -= cost
-        events.append(Warped(player_id, current, nxt, cost))
+        one_way = current not in state.adjacency.get(nxt, ())
+        events.append(Warped(player_id, current, nxt, cost, one_way))
         entered[nxt] = current
         explored = explored | frozenset({nxt})
         detected, det_events = _detect_in_sector(

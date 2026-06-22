@@ -255,6 +255,7 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "Warped", {
                 "player_id": event.player_id, "from_sector": event.from_sector,
                 "to_sector": event.to_sector, "turn_cost": event.turn_cost,
+                "one_way": event.one_way,
             }
         case Docked():
             return "Docked", {
@@ -383,7 +384,8 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
     match type_:
         case "Warped":
             return Warped(payload["player_id"], payload["from_sector"],
-                          payload["to_sector"], payload["turn_cost"])
+                          payload["to_sector"], payload["turn_cost"],
+                          payload.get("one_way", False))
         case "Docked":
             return Docked(payload["player_id"], payload["sector_id"], payload["port_id"])
         case "Traded":

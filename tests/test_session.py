@@ -332,6 +332,14 @@ def test_format_event_warp_body_defers_sector_to_the_gutter() -> None:
     assert "Sector 12" not in line and "»" not in line
 
 
+def test_format_event_flags_a_one_way_warp() -> None:
+    from edge.core.events import Warped
+
+    # A one-way warp warns the player there's no direct way back; a normal warp doesn't.
+    assert "one-way" in session.format_event(Warped(1, 7, 12, 1, one_way=True))
+    assert "one-way" not in session.format_event(Warped(1, 7, 12, 1))
+
+
 def test_format_event_covers_kinds_and_filters_noise() -> None:
     from edge.core.enums import PortMode
     from edge.core.events import (

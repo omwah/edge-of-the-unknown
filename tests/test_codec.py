@@ -109,6 +109,7 @@ COMMANDS: list[Command] = [
 
 EVENTS: list[Event] = [
     Warped(1, 7, 12, 1),
+    Warped(1, 7, 12, 1, one_way=True),  # one-way warp heads-up (§9)
     Docked(1, 12, 3),
     Traded(1, 3, Commodity.FUEL_ORE, PortMode.SELL, 10, 13, 130),
     Haggled(1, 3, Commodity.ORGANICS, "accepted", 6),
