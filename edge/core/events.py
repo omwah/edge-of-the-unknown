@@ -38,6 +38,10 @@ class Warped(Event):
     from_sector: int
     to_sector: int
     turn_cost: int
+    # True when the traversed warp has no reverse edge — there is no *direct* warp
+    # back (the way home runs through other sectors). Drives a one-way heads-up in
+    # the log/ticker (§9). Defaulted so older persisted logs decode unchanged.
+    one_way: bool = False
 
 
 @dataclass(frozen=True)

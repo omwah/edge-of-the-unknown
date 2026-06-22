@@ -955,8 +955,10 @@ def format_event(event: Event) -> str:
     """
     if isinstance(event, Warped):
         # The destination sector rides in the log's gutter (format_log_line), so the
-        # body no longer repeats it — just the action and its turn cost.
-        return f"[cyan]Warp to sector[/]  (-{event.turn_cost} turn)"
+        # body no longer repeats it — just the action and its turn cost. A one-way
+        # warp gets a heads-up: there's no direct warp back (the way home differs, §9).
+        warn = "  [yellow]⚠ one-way warp — no direct way back[/]" if event.one_way else ""
+        return f"[cyan]Warp to sector[/]  (-{event.turn_cost} turn){warn}"
     if isinstance(event, Docked):
         return "[magenta]⚓ Docked.[/]"
     if isinstance(event, Traded):
