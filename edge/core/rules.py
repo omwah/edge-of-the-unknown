@@ -20,6 +20,7 @@ from typing import assert_never
 
 from edge.core import dialogue
 from edge.core.aliens import effective_disposition
+from edge.core.dev import DevPatch, apply_dev_patch
 
 from edge.core.config import GameConfig, SpeciesConfig, TechOfferConfig
 from edge.core.economy import (
@@ -339,6 +340,7 @@ Command = (
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
     | Hail | Converse | BuyAlienTech | BarterArtifact
+    | DevPatch  # dev/testing cheat (core.dev); recorded in the log like any command
 )
 
 
@@ -440,6 +442,8 @@ def reduce(
             return _buy_alien_tech(state, player_id, command, config)
         case BarterArtifact():
             return _barter_artifact(state, player_id, command, config)
+        case DevPatch():
+            return apply_dev_patch(state, player_id, command, config)
         case _ as unreachable:
             assert_never(unreachable)
 
