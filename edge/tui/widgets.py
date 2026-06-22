@@ -10,15 +10,16 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical
 from textual.message import Message
-from textual.widgets import Button, DataTable, Static
+from textual.widgets import DataTable, Static
 
 from rich.style import Style
 
 from edge.core.config import SceneArtConfig
+from edge.core.dto import SectorDiscovery
 from edge.core.enums import Commodity
 
 from edge.tui import art_adapter
-from edge.tui.dummy import MapBand, MapDTO, NeighborDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
+from edge.tui.dummy import MapBand, MapDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
 
 
 class Starfield(Static):
@@ -168,51 +169,51 @@ def _code_markup(codes: list[str]) -> str:
     return " ".join(f"[{_CODE_STYLE.get(c, 'white')}]{c}[/]" for c in codes)
 
 
-def _warp_legend() -> str:
-    """The warp colour/arrow key shown beneath the sidebar (WP-A)."""
+def warp_legend_markup() -> str:
+    """The warp colour/arrow key — shown in the Help modal's Warp Legend (Ctrl+H)."""
     return (
-        "[dim]─ warps ─[/]\n"
-        "[cyan]■[/] visited  [magenta]■[/] came-from  [dim]■ unmapped[/]\n"
-        "[dim]<< toward Core · -- level · >> deeper[/]"
+        "[cyan]■[/] visited   [magenta]■[/] came-from   [dim]■ unmapped[/]\n"
+        "[dim]<< toward Core   -- level   >> deeper[/]"
     )
 
 
-class NeighborRow(Static):
-    """A clickable adjacent-sector row in the sidebar quick-reference (WP-A).
+class AnomalyRow(Static):
+    """A clickable discovery row in the sidebar 'Anomalies' list (§7).
 
-    Clicking warps to the neighbour — it reuses `WarpButton.Warp` so the
-    GameScreen's existing `on_warp_button_warp` handler drives both affordances.
+    An unlogged find can be scanned/collected; clicking reuses the existing
+    `ClickableEntry.Picked("discovery", id)` the scene used, so the GameScreen
+    handler is untouched. A logged find is a plain, non-clickable line.
     """
 
     DEFAULT_CSS = """
-    NeighborRow { height: 1; }
-    NeighborRow:hover { background: $boost; text-style: bold; }
-    NeighborRow.unexplored { color: $text-disabled; }
+    AnomalyRow { height: 1; }
+    AnomalyRow.scan:hover { background: $boost; text-style: bold; }
     """
 
-    def __init__(self, neighbor: NeighborDTO, **kwargs: object) -> None:
-        super().__init__(self._markup(neighbor), **kwargs)
-        self._sector_id = neighbor.sector_id
-        if not neighbor.explored:
-            self.add_class("unexplored")
+    def __init__(self, discovery: SectorDiscovery, **kwargs: object) -> None:
+        super().__init__(self._markup(discovery), **kwargs)
+        self._discovery_id = discovery.discovery_id
+        self._scan = not discovery.collected
+        if self._scan:
+            self.add_class("scan")
 
     @staticmethod
-    def _markup(n: NeighborDTO) -> str:
-        if not n.explored:
-            return f"  {n.name}"
-        codes = _code_markup(n.codes)
-        tail = f"  {codes}" if codes else ""
-        return f"  {n.name} [dim]({n.band})[/]{tail}"
+    def _markup(d: SectorDiscovery) -> str:
+        if d.collected:
+            return f"[cyan]✦[/] {d.label} [dim]— logged[/]"
+        return f"[cyan]✦[/] {d.label} [dim](Scan)[/]"
 
     def on_click(self) -> None:
-        self.post_message(WarpButton.Warp(self._sector_id))
+        if self._scan:
+            self.post_message(ClickableEntry.Picked("discovery", self._discovery_id))
 
 
 class StatusSidebar(Vertical):
-    """Right-hand status readout derived from a ShipDTO (UI_MOCKUPS.md §1).
+    """Right-hand status readout: ship stats + the sector's Anomalies (UI_MOCKUPS.md §1).
 
-    A container (not a single Static) so the neighbour quick-reference rows are
-    individually clickable warp affordances (WP-A).
+    A container (not a single Static) so each anomaly row is an individually
+    clickable scan affordance. The warp quick-reference that used to live here is
+    folded into the sector warp grid; the warp legend moved to the Help modal.
     """
 
     DEFAULT_CSS = """
@@ -220,16 +221,19 @@ class StatusSidebar(Vertical):
     StatusSidebar > Static { height: auto; }
     """
 
-    def __init__(self, ship: ShipDTO, **kwargs: object) -> None:
+    def __init__(self, ship: ShipDTO, discoveries: list[SectorDiscovery], **kwargs: object) -> None:
         super().__init__(**kwargs)
         self._ship = ship
+        self._discoveries = discoveries
 
     def compose(self) -> ComposeResult:
         yield Static(self._stats_markup())
-        yield Static("[dim]nearby (click to warp):[/]")
-        for neighbor in self._ship.neighbors:
-            yield NeighborRow(neighbor)
-        yield Static(_warp_legend())
+        yield Static("[b yellow]Anomalies[/]")
+        if self._discoveries:
+            for discovery in self._discoveries:
+                yield AnomalyRow(discovery)
+        else:
+            yield Static("[#8a8a8a]none in sensor range[/]")
 
     def _stats_markup(self) -> str:
         s = self._ship
@@ -258,6 +262,72 @@ class StatusSidebar(Vertical):
             rule,
         ]
         return "\n".join(lines)
+
+
+class _TickerDivider(Static):
+    """The ticker's top divider — a horizontal rule with a right-aligned expand/collapse
+    toggle (▲ to expand up to 5 lines, ▼ to shrink back to one). Clicking it toggles."""
+
+    DEFAULT_CSS = "_TickerDivider { height: 1; color: $primary; }"
+
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._expanded = False
+
+    def set_expanded(self, expanded: bool) -> None:
+        self._expanded = expanded
+        self.refresh()
+
+    def render(self) -> Text:
+        width = max(1, self.size.width)
+        glyph = "▼" if self._expanded else "▲"
+        rule = "─" * (width - 1) + glyph
+        return Text(rule, style="dim")
+
+    def on_click(self, event: events.Click) -> None:
+        event.stop()
+        self.post_message(Ticker.Toggle())
+
+
+class Ticker(Vertical):
+    """The bottom event ticker (UI_MOCKUPS.md §1).
+
+    Collapsed it shows only the most recent log line under a divider; clicking the
+    divider's ▲ indicator expands it to overlay the screen with the last five lines
+    (▼ shrinks it back). It rides a higher layer when expanded, so growing upward
+    draws *over* the sector view rather than reflowing it.
+    """
+
+    class Toggle(Message):
+        pass
+
+    DEFAULT_CSS = """
+    Ticker { height: 2; background: $surface; padding: 0 1; }
+    /* Expanded, it rides the overlay layer docked to the bottom, so it grows upward
+       *over* the sector view instead of reflowing it (the screen declares the layer). */
+    Ticker.expanded { height: 6; layer: overlay; dock: bottom; }
+    Ticker #ticker-body { height: 1fr; color: $text; }
+    """
+
+    def __init__(self, lines: list[str], **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._lines = lines
+        self._expanded = False
+
+    def compose(self) -> ComposeResult:
+        yield _TickerDivider(id="ticker-divider")
+        yield Static(self._body_text(), id="ticker-body")
+
+    def _body_text(self) -> str:
+        count = 5 if self._expanded else 1
+        return "\n".join(self._lines[-count:])
+
+    def on_ticker_toggle(self, msg: Ticker.Toggle) -> None:
+        msg.stop()
+        self._expanded = not self._expanded
+        self.set_class(self._expanded, "expanded")
+        self.query_one("#ticker-divider", _TickerDivider).set_expanded(self._expanded)
+        self.query_one("#ticker-body", Static).update(self._body_text())
 
 
 class SectorScene(Static):
@@ -442,20 +512,7 @@ class SectorScene(Static):
                 self._hotspots.append((0, row, w, row + 1, "contact", cid))
             row += 1
 
-        # Discoveries — their own row under the ships (clickable = scan).
-        row += 1
-        self._stamp_line(grid, "[b yellow]Discoveries[/]", row, 0, w)
-        row += 1
-        if sec.discoveries:
-            for d in sec.discoveries:
-                if d.collected:
-                    self._stamp_line(grid, f"[cyan]✦[/] {d.label} — logged", row, 0, w)
-                else:
-                    self._stamp_line(grid, f"[cyan]✦[/] {d.label} — unlogged (Scan)", row, 0, w)
-                    self._hotspots.append((0, row, w, row + 1, "discovery", d.discovery_id))
-                row += 1
-        else:
-            self._stamp_line(grid, "[#8a8a8a]none[/]", row, 0, w)
+        # (Discoveries are listed in the sidebar's "Anomalies" panel, not the scene.)
 
         out = Text()
         for y in range(h):
@@ -559,75 +616,95 @@ class ClickableEntry(Static):
     def on_click(self) -> None:
         self.post_message(self.Picked(self._dest, self._ref))
 
-class WarpButton(Button):
-    """A single clickable warp affordance."""
+class WarpCell(Static):
+    """One outbound warp — the single, information-rich warp affordance (§5.1).
+
+    Focusable (arrow-key navigable) and clickable. Renders, left-justified, the
+    spatial id, the gravity arrow as the separator, and the region name + band;
+    the port/planet `codes` are right-justified against the cell's right edge.
+    Colour follows `kind` (visited / came-from / unmapped) via CSS classes.
+    """
+
+    can_focus = True
 
     class Warp(Message):
         def __init__(self, sector_id: int) -> None:
             self.sector_id = sector_id
             super().__init__()
 
-    def __init__(self, warp: WarpDTO) -> None:
-        label = f"{warp.display_id} {warp.arrow}"  # spatial id shown; sector_id is the action
-        if warp.label:
-            label += f" {warp.label}"
-        variant = "primary" if warp.kind == "explored" else "default"
-        super().__init__(label, variant=variant)
+    DEFAULT_CSS = """
+    WarpCell { width: 1fr; height: 1; padding: 0 1; color: $primary; }
+    WarpCell:focus { background: $boost; text-style: bold; }
+    WarpCell:hover { background: $boost; }
+    WarpCell.unexplored { color: $text-disabled; }
+    WarpCell.backtrack { color: $accent; }
+    """
+
+    def __init__(self, warp: WarpDTO, **kwargs: object) -> None:
+        super().__init__(**kwargs)
         self._warp = warp
         if warp.kind == "unexplored":
             self.add_class("unexplored")
         elif warp.kind == "backtrack":
             self.add_class("backtrack")
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        event.stop()
+    def render(self) -> Text:
+        w = self._warp
+        name = w.label or "—"
+        left = Text.from_markup(f"{w.display_id} {w.arrow} {name}")
+        if w.band:
+            left.append(f" ({w.band})", style="dim")
+        codes = _code_markup(w.codes)
+        right = Text.from_markup(codes) if codes else Text("")
+        # Left-justify the warp text, right-justify the codes; pad between to fill the
+        # printable cell width (account for the 1-cell horizontal padding each side).
+        width = max(0, self.size.width - 2)
+        gap = width - left.cell_len - right.cell_len
+        if gap < 1:  # no room for the codes — drop them rather than overflow/wrap
+            left.truncate(width, overflow="ellipsis")
+            return left
+        left.append(" " * gap)
+        left.append_text(right)
+        return left
+
+    def on_click(self) -> None:
         self.post_message(self.Warp(self._warp.sector_id))
 
 
-class CurrentSectorMarker(Static):
-    """Marker for the player's current sector (the grid's centre).
+class SectionRule(Static):
+    """A full-width horizontal rule with a centred caption laid over the line."""
 
-    Not clickable (warping to your own sector is a no-op), but it *is* focusable:
-    it is the anchor the warp grid focuses on entry, so the first arrow press moves
-    relative to the current sector (Up = the warp rendered directly above it, etc.).
-    """
+    DEFAULT_CSS = "SectionRule { height: 1; color: $primary; }"
 
-    can_focus = True
+    def __init__(self, label: str, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._label = label
 
-    DEFAULT_CSS = """
-    CurrentSectorMarker {
-        width: 1fr; height: 1; content-align: center middle;
-        color: $background; background: $secondary; text-style: bold;
-    }
-    /* The marker is only a focus anchor for the arrow keys — it should look the
-       same focused or not (no highlight). */
-    CurrentSectorMarker:focus { color: $background; background: $secondary; text-style: bold; }
-    """
-
-    def __init__(self, sector_id: int) -> None:
-        super().__init__(f"({sector_id})")
-
-
-class _EmptyWarpCell(Static):
-    DEFAULT_CSS = "_EmptyWarpCell { width: 1fr; height: 1; }"
+    def render(self) -> Text:
+        width = max(1, self.size.width)
+        cap = f" {self._label} "
+        dashes = max(0, width - len(cap))
+        left = dashes // 2
+        out = Text()
+        out.append("─" * left, style="dim")
+        out.append(cap, style="bold")
+        out.append("─" * (dashes - left), style="dim")
+        return out
 
 
 class WarpGrid(Grid):
-    """Outbound warps in a 3x3 grid around the current sector.
+    """Outbound warps laid out in a configurable-width grid (§5.1, §11).
 
-    The current sector sits in the centre cell (unclickable); the eight cells
-    around it hold warp buttons in order (unexplored ones dimmed). TW2002 sectors
-    warp to at most six others, so the eight surrounding cells always suffice;
-    any overflow spills into a fourth row.
+    Cells fill the printable area and wrap into rows (`columns` wide); TW2002 sectors
+    warp to at most `max_warps_per_sector` others. There is no current-sector cell —
+    the warps *are* the grid. Keyboard focus lands on a cell chosen by `focus_default`
+    (first / came-from / first unexplored) and the arrow keys step between cells by
+    on-screen grid position.
     """
 
-    _SURROUND = (0, 1, 2, 3, 5, 6, 7, 8)  # the 3x3 cells that aren't the centre
-    _COLUMNS = 3
-
-    # Arrow keys move focus between warp buttons by their on-screen grid position
-    # (Up = the button rendered above, etc.) — purely spatial, nothing to do with
-    # warp gravity. They fire while a warp button is focused (the keys bubble up to
-    # the grid) and are hidden from the footer.
+    # Arrow keys move focus between warp cells by their on-screen grid position
+    # (Up = the cell rendered above, etc.). They fire while a cell is focused (the keys
+    # bubble up to the grid) and are hidden from the footer.
     BINDINGS = [
         Binding("up", "move(-1, 0)", show=False),
         Binding("down", "move(1, 0)", show=False),
@@ -637,70 +714,64 @@ class WarpGrid(Grid):
 
     DEFAULT_CSS = """
     WarpGrid {
-        grid-size: 3;
-        grid-columns: 10;
         grid-rows: 1;
         grid-gutter: 0 1;
         height: auto;
-        /* Fixed content width (3 columns x 10 + 2 gutters) so the parent can
-           centre the whole grid — Grid does not shrink to content under width:auto,
-           and a full-width grid would left-pack the cells off-centre. */
-        width: 32;
+        width: 1fr;  /* full warp-area width; cell size derives from columns (§5.1) */
     }
-    WarpGrid WarpButton { width: 1fr; height: 1; border: none !important; }
-    WarpGrid WarpButton.unexplored { color: $text-disabled; }
-    WarpGrid WarpButton.backtrack { color: $accent; }
     """
 
-    def __init__(self, warps: list[WarpDTO], current_sector: int, **kwargs: object) -> None:
+    def __init__(
+        self, warps: list[WarpDTO], columns: int = 3, focus_default: str = "first",
+        **kwargs: object,
+    ) -> None:
         super().__init__(**kwargs)
         self._warps = warps
-        self._current = current_sector
+        self._columns = max(1, columns)
+        self._focus_default = focus_default
 
-    def compose(self):
-        cells: list[Static] = [_EmptyWarpCell() for _ in range(9)]
-        cells[4] = CurrentSectorMarker(self._current)
-        for slot, warp in zip(self._SURROUND, self._warps):
-            cells[slot] = WarpButton(warp)
-        yield from cells
-        for warp in self._warps[len(self._SURROUND):]:  # rare overflow -> extra row
-            yield WarpButton(warp)
+    def compose(self) -> ComposeResult:
+        for warp in self._warps:
+            yield WarpCell(warp)
 
     def on_mount(self) -> None:
-        # Anchor focus on the current-sector marker (the grid centre) as soon as the
-        # grid appears, so the arrow keys drive warp selection immediately — without a
-        # priming Tab — and the first press moves *relative to the current sector*.
-        # The grid is remounted on every recompose (after a warp/travel/screen-resume),
-        # so focus re-homes to the centre each time the sector view refreshes.
+        self.styles.grid_size_columns = self._columns
+        # Anchor focus as soon as the grid appears, so arrow keys drive selection
+        # immediately (no priming Tab). The grid is remounted on every recompose, so
+        # focus re-homes each time the sector view refreshes.
         self.call_after_refresh(self._focus_anchor)
 
     def _focus_anchor(self) -> None:
-        marker = next((c for c in self.children if isinstance(c, CurrentSectorMarker)), None)
-        if marker is not None:
-            marker.focus()
+        cells = [c for c in self.children if isinstance(c, WarpCell)]
+        if not cells:
+            return
+        target = cells[0]
+        if self._focus_default == "backtrack":
+            target = next((c for c in cells if c._warp.kind == "backtrack"), cells[0])
+        elif self._focus_default == "unexplored":
+            target = next((c for c in cells if c._warp.kind == "unexplored"), cells[0])
+        target.focus()
 
     def action_move(self, drow: int, dcol: int) -> None:
-        """Move focus to the next warp button in the (drow, dcol) screen direction.
+        """Move focus to the next warp cell in the (drow, dcol) screen direction.
 
         Children flow into the fixed-column grid in order, so child index i sits at
-        (i // columns, i % columns). The anchor is whichever grid cell holds focus —
-        the centre marker on entry, then each warp button as you step. We step one
-        cell at a time, skipping the centre marker and empty cells, until we land on
-        a warp button or walk off the grid.
+        (i // columns, i % columns). We step one cell at a time from the focused cell
+        until we land on another warp cell or walk off the grid.
         """
         children = list(self.children)
-        grid = {(i // self._COLUMNS, i % self._COLUMNS): c for i, c in enumerate(children)}
+        grid = {(i // self._columns, i % self._columns): c for i, c in enumerate(children)}
         pos = {c: rc for rc, c in grid.items()}
         focused = self.app.focused
-        if focused not in pos:  # focus drifted off the grid — re-anchor on the centre
+        if focused not in pos:  # focus drifted off the grid — re-anchor
             self._focus_anchor()
             return
         row, col = pos[focused]
-        max_row = (len(children) - 1) // self._COLUMNS
+        max_row = (len(children) - 1) // self._columns
         row, col = row + drow, col + dcol
-        while 0 <= row <= max_row and 0 <= col < self._COLUMNS:
+        while 0 <= row <= max_row and 0 <= col < self._columns:
             target = grid.get((row, col))
-            if isinstance(target, WarpButton):
+            if isinstance(target, WarpCell):
                 target.focus()
                 return
             row, col = row + drow, col + dcol

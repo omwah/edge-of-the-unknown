@@ -14,7 +14,7 @@ from edge.tui.app import EdgeApp
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.stardock import StarDockScreen
 from edge.tui.screens.travel import TravelPromptScreen
-from edge.tui.widgets import NeighborRow
+from edge.tui.widgets import WarpCell
 
 
 async def _new_game_at_stardock(app: EdgeApp, pilot: object) -> object:
@@ -44,7 +44,7 @@ async def test_new_game_pushes_live_game_screen() -> None:
         assert view.sector.sector_id == 1 and view.turns == 250
 
 
-async def test_sidebar_neighbor_click_warps() -> None:
+async def test_warp_cell_click_warps() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
@@ -53,10 +53,10 @@ async def test_sidebar_neighbor_click_warps() -> None:
         svc = app.service
         assert svc is not None
         start = svc.game_view(1).sector.sector_id
-        rows = app.screen.query(NeighborRow)
-        assert rows
-        first = rows.first()
-        target = first._sector_id
+        cells = app.screen.query(WarpCell)
+        assert cells
+        first = cells.first()
+        target = first._warp.sector_id
         await pilot.click(first)
         await pilot.pause()
         moved = svc.game_view(1).sector.sector_id
@@ -121,59 +121,56 @@ async def test_sector_title_shows_spatial_id() -> None:
 
 
 async def test_arrow_keys_move_warp_focus() -> None:
-    """Arrow keys move focus between warp buttons by their on-screen layout (round-2).
+    """Arrow keys move focus between warp cells by their on-screen layout.
 
-    The current-sector marker (grid centre) is auto-focused on the fresh game screen
-    (no priming Tab), so the first arrow press moves *relative to the current sector*;
-    further presses step by grid geometry — Right/Left along a row, Down/Up a column.
+    With the current-sector marker gone, the configured default (first warp) is
+    auto-focused on the fresh game screen (no priming Tab); further presses step by
+    grid geometry — Right/Left along a row, Down/Up a column — using the grid's
+    column count.
     """
-    from edge.tui.widgets import CurrentSectorMarker, WarpButton, WarpGrid
-
-    def land(buttons: dict, start: tuple[int, int], delta: tuple[int, int], max_row: int):
-        r, c = start[0] + delta[0], start[1] + delta[1]
-        while 0 <= r <= max_row and 0 <= c < 3:
-            if (r, c) in buttons:
-                return (r, c)
-            r, c = r + delta[0], c + delta[1]
-        return None
+    from edge.tui.widgets import WarpCell, WarpGrid
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         await pilot.press("n")
         await pilot.pause()
-        # No Tab pressed: the current-sector marker holds focus as the anchor.
-        assert isinstance(app.focused, CurrentSectorMarker)
 
         grid = app.screen.query_one(WarpGrid)
+        cols = grid._columns
         children = list(grid.children)
-        pos = {c: (i // 3, i % 3) for i, c in enumerate(children)}
-        buttons = {pos[c]: c for c in children if isinstance(c, WarpButton)}
-        max_row = (len(children) - 1) // 3
-        centre = pos[app.focused]  # the marker's grid position (1, 1)
+        cells = {(i // cols, i % cols): c for i, c in enumerate(children)
+                 if isinstance(c, WarpCell)}
+        assert cells
 
-        # First press from the centre lands on the warp in that screen direction.
-        keys = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
-        first = next(((k, land(buttons, centre, d, max_row)) for k, d in keys.items()
-                      if land(buttons, centre, d, max_row) is not None), None)
-        assert first is not None
-        key, target = first
-        await pilot.press(key)
-        await pilot.pause()
-        assert app.focused is buttons[target]
+        # No Tab pressed: the first warp cell (default focus = "first") holds focus.
+        assert app.focused is cells[(0, 0)]
 
-        # Right/Left along a row, relative to the now-focused warp button.
-        row_pair = next(((p, (p[0], p[1] + 1)) for p in buttons if (p[0], p[1] + 1) in buttons), None)
-        assert row_pair is not None
-        src, dst = row_pair
-        buttons[src].focus()
-        await pilot.pause()
-        await pilot.press("right")
-        await pilot.pause()
-        assert app.focused is buttons[dst]
-        await pilot.press("left")
-        await pilot.pause()
-        assert app.focused is buttons[src]
+        # Right/Left along a row, relative to the focused warp cell.
+        row_pair = next(((p, (p[0], p[1] + 1)) for p in cells if (p[0], p[1] + 1) in cells), None)
+        if row_pair is not None:
+            src, dst = row_pair
+            cells[src].focus()
+            await pilot.pause()
+            await pilot.press("right")
+            await pilot.pause()
+            assert app.focused is cells[dst]
+            await pilot.press("left")
+            await pilot.pause()
+            assert app.focused is cells[src]
+
+        # Down/Up along a column, relative to the focused warp cell.
+        col_pair = next(((p, (p[0] + 1, p[1])) for p in cells if (p[0] + 1, p[1]) in cells), None)
+        if col_pair is not None:
+            src, dst = col_pair
+            cells[src].focus()
+            await pilot.pause()
+            await pilot.press("down")
+            await pilot.pause()
+            assert app.focused is cells[dst]
+            await pilot.press("up")
+            await pilot.pause()
+            assert app.focused is cells[src]
 
 
 async def test_dock_and_trade_buys_fuel() -> None:
@@ -765,3 +762,41 @@ async def test_say_do_menu_converse_and_trade() -> None:
         await pilot.press("f")
         await pilot.pause()
         assert not isinstance(app.screen, AlienContactScreen)
+
+
+async def test_question_mark_opens_help_with_warp_legend() -> None:
+    from textual.widgets import Static
+
+    from edge.tui.screens.help import HelpScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        await pilot.press("question_mark")
+        await pilot.pause()
+        assert isinstance(app.screen, HelpScreen)
+        text = " ".join(str(s.render()) for s in app.screen.query(Static))
+        assert "Warp Legend" in text
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not isinstance(app.screen, HelpScreen)
+
+
+async def test_ticker_expands_and_collapses_on_divider_click() -> None:
+    from edge.tui.widgets import Ticker, _TickerDivider
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        ticker = app.screen.query_one(Ticker)
+        assert not ticker.has_class("expanded")
+        await pilot.click(app.screen.query_one(_TickerDivider))
+        await pilot.pause()
+        assert ticker.has_class("expanded")
+        await pilot.click(app.screen.query_one(_TickerDivider))
+        await pilot.pause()
+        assert not ticker.has_class("expanded")

@@ -108,32 +108,26 @@ class HaggleQuote:
 
 @dataclass(frozen=True)
 class WarpDTO:
+    """One outbound warp — the single, information-rich warp affordance (§5.1, §11).
+
+    Carries everything the sector grid renders: the gravity `arrow` (also the
+    separator between the spatial id and the name), the region `label`, `band`, and
+    content `codes` (port/planet) — all filled only once the target is explored
+    (fog of war); an unexplored warp reads as `—` / `?` with no codes. `kind` drives
+    the colour band; `sector_id` stays internal for the warp action.
+    """
+
     sector_id: int
     arrow: str  # gravity glyph relative to the Core: "<<" closer / ">>" deeper / "--" level
-    label: str | None = None
+    label: str | None = None  # region name (explored) | None (unexplored → "—")
     kind: str = "explored"  # "explored" | "unexplored" | "backtrack" — drives colour
     display_id: int = 0  # spatial id rendered on the warp button (§5.1)
+    band: str = ""  # distance-band name (explored) | "?" (unexplored)
+    codes: list[str] = field(default_factory=list)  # short content tokens, explored only
 
     @property
     def explored(self) -> bool:
         return self.kind != "unexplored"
-
-
-@dataclass(frozen=True)
-class NeighborDTO:
-    """One adjacent sector for the sidebar quick-reference (a clickable warp).
-
-    `name`/`band` and content `codes` are filled only for sectors the player has
-    explored; an unexplored neighbour reads as `[id] —` with no codes. `name`
-    embeds the spatial `display_id`; `sector_id` stays internal for the warp action.
-    """
-
-    sector_id: int
-    name: str  # "[10604] Halaf Verge" (explored) | "[10604] —" (unexplored)
-    band: str  # "Frontier" (explored) | "?" (unexplored)
-    explored: bool
-    codes: list[str] = field(default_factory=list)  # short content tokens, explored only
-    display_id: int = 0  # spatial id shown in `name` (§5.1)
 
 
 @dataclass(frozen=True)
@@ -241,7 +235,6 @@ class ShipDTO:
     kits: int
     latinum: int
     band: str
-    neighbors: list[NeighborDTO]
     colonists: int
     colonist_capacity: int
 

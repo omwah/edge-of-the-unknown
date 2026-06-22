@@ -666,6 +666,22 @@ class SceneArtConfig(BaseModel):
     ship_face_inward_chance: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
+class UIConfig(BaseModel):
+    """TUI presentation options (no rules) — the sector-screen warp grid.
+
+    Distinct from `SceneArtConfig` (sprite footprints): these tune how the warp
+    affordances lay out. `warp_columns` is the grid width (cells fill the printable
+    area and wrap into rows); `warp_focus_default` is where keyboard focus lands when
+    the sector view loads — the first warp (reading order), the came-from/backtrack
+    warp, or the first still-unmapped warp. Consumed only by the throwaway `tui` layer.
+    """
+
+    model_config = _FROZEN
+
+    warp_columns: int = Field(default=3, gt=0)
+    warp_focus_default: Literal["first", "backtrack", "unexplored"] = "first"
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -674,6 +690,7 @@ class GameConfig(BaseModel):
     config_version: int
     turns_per_day: int = 250  # TWINSTR.DOC default (§9)
     scene: SceneArtConfig = SceneArtConfig()
+    ui: UIConfig = UIConfig()
     economy: EconomyConfig = EconomyConfig()
     aliens: AliensConfig = AliensConfig()
     bigbang: BigBangConfig = BigBangConfig()
