@@ -685,6 +685,7 @@ class UIConfig(BaseModel):
     warp_focus_default: Literal["first", "backtrack", "unexplored"] = "first"
     sidebar_width: int = Field(default=33, gt=0)
     sidebar_min_screen_width: int = Field(default=90, gt=0)
+    surface_terrain_height: int = Field(default=12, gt=0)  # SurfaceScreen terrain panel height
 
 
 class GameConfig(BaseModel):

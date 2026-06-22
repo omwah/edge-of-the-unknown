@@ -297,6 +297,35 @@ async def test_descend_explore_log_flow() -> None:
         assert target.id in svc.state.players[1].codex
 
 
+async def test_clicking_planet_descends() -> None:
+    from collections import defaultdict
+
+    from edge.core.rules import Warp
+    from edge.tui.screens.planet import PlanetScreen, PlanetSprite
+    from edge.tui.screens.surface import SurfaceScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        # A reachable planet — survey it to open the orbit view, then click its sprite.
+        planet = next(
+            pl for pl in svc.state.planets.values()
+            if shortest_path(svc.state.adjacency, 1, pl.sector_id) is not None
+        )
+        for hop in shortest_path(svc.state.adjacency, 1, planet.sector_id)[1:]:
+            svc.apply(1, Warp(to_sector=hop))
+        await pilot.press("s")  # survey planet -> PlanetScreen
+        await pilot.pause()
+        assert isinstance(app.screen, PlanetScreen)
+        await pilot.click(app.screen.query_one(PlanetSprite))  # click descends
+        await pilot.pause()
+        assert isinstance(app.screen, SurfaceScreen)
+
+
 async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
     from textual.widgets import TabbedContent
 
