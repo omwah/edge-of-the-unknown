@@ -193,17 +193,25 @@ def _species_ship_role(species: AlienSpecies, config: GameConfig) -> str:
     return "fighter"
 
 
+def _controlling_archetype(state: UniverseState, sector_id: int) -> str | None:
+    """The palette of the species controlling `sector_id`'s region, or None (§4).
+
+    Styles the port sprite the same way in every view (sector scene + trade screens),
+    so a port keeps one identity regardless of where it's drawn.
+    """
+    sector = state.sectors.get(sector_id)
+    region = state.regions.get(sector.region_id) if sector is not None else None
+    cid = region.controlling_species_id if region is not None else None
+    controller = state.species.get(cid) if cid is not None else None
+    return controller.archetype_id if controller is not None else None
+
+
 def _sector_dto(
     state: UniverseState, player: Player, sector: Sector, core_hops: dict[int, int],
     config: GameConfig,
 ) -> dto.SectorDTO:
     # The sector's controlling species (region controller) styles its port sprite.
-    ctrl_region = state.regions.get(sector.region_id)
-    controller = (
-        state.species.get(ctrl_region.controlling_species_id)
-        if ctrl_region is not None and ctrl_region.controlling_species_id is not None else None
-    )
-    port_archetype = controller.archetype_id if controller is not None else None
+    port_archetype = _controlling_archetype(state, sector.id)
     ports = [
         dto.SectorPortDTO(
             port_id=p.id, name=p.name, klass=_port_klass_label(p.klass),
@@ -271,6 +279,7 @@ def port_view(state: UniverseState, player_id: int, port_id: int, config: GameCo
     return dto.PortDTO(
         name=port.name, klass=f"Class {port.klass.value}", sector_id=port.sector_id,
         commodities=lines, display_id=_display(state, port.sector_id),
+        archetype_id=_controlling_archetype(state, port.sector_id),
     )
 
 
