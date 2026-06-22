@@ -87,8 +87,7 @@ BIOMES_REGISTRY = {
             (0.05, "sand", "yellow", "bright_yellow"),
             (0.3, "grass", "bright_green", "green"),
             (0.6, "forest", "#af5f00", "green"),
-            (0.8, "mountain", "white", "bright_black"),
-            (1.0, "snow", "bright_white", "white"),
+            (0.7, "mountain", "white", "bright_black"),
         ]
     },
     "terrestrial_cool": {
