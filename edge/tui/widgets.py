@@ -170,7 +170,7 @@ def _code_markup(codes: list[str]) -> str:
 
 
 def warp_legend_markup() -> str:
-    """The warp colour/arrow key — shown in the Help modal's Warp Legend (Ctrl+H)."""
+    """The warp colour/arrow key — shown in the Help modal's Warp Legend (?)."""
     return (
         "[cyan]■[/] visited   [magenta]■[/] came-from   [dim]■ unmapped[/]\n"
         "[dim]<< toward Core   -- level   >> deeper[/]"
@@ -280,8 +280,8 @@ class _TickerDivider(Static):
 
     def render(self) -> Text:
         width = max(1, self.size.width)
-        glyph = "▼" if self._expanded else "▲"
-        rule = "─" * (width - 1) + glyph
+        glyph = "∨∨" if self._expanded else "∧∧"
+        rule = "─" * (width - 3) + glyph + "─"
         return Text(rule, style="dim")
 
     def on_click(self, event: events.Click) -> None:
@@ -456,8 +456,7 @@ class SectorScene(Static):
             sub = art_adapter.planet_subtype(planet.ptype)
             self._paint(grid, self._sprite_cells("planet", sub, seed=sec.sector_id, sw=pw, sh=ph),
                         row, lcx - pw // 2)
-        else:
-            self._stamp_line(grid, "[#8a8a8a]no planet[/]", row + band_h // 2, 0, half)
+
         # Port (or placeholder), vertically centred against the taller planet. The
         # controlling species' palette (`archetype_id`) styles the port sprite.
         if sec.ports:
@@ -466,8 +465,7 @@ class SectorScene(Static):
             self._paint(grid, self._sprite_cells("port", sub, seed=sec.sector_id, sw=portw,
                                                  sh=porth, archetype_id=port.archetype_id),
                         row + (band_h - porth) // 2, rcx - portw // 2)
-        else:
-            self._stamp_line(grid, "[#8a8a8a]no port[/]", row + band_h // 2, half, half)
+
         name_row = row + band_h
         if sec.planets:
             self._stamp_line(grid, f"[b yellow]{sec.planets[0].name}[/]", name_row, 0, half)
@@ -477,7 +475,7 @@ class SectorScene(Static):
             self._hotspots.append((half, row, w, name_row + 1, "port", None))
         row = name_row + 1 + self._ORBIT_MARGIN
 
-        # Ships — up to N sprites side by side (no heading), names beneath. The 2nd
+        # Ships — up to N sprites side by side (no heading), names beneath. The 3nd
         # of a pair may face left so the two face inward (deterministic per sector).
         shown = sec.ships[:cfg.max_ships_shown]
         if shown:
