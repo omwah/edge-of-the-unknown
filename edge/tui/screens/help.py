@@ -24,7 +24,9 @@ class HelpScreen(ModalScreen[None]):
     ]
 
     CSS = """
-    HelpScreen { align: center middle; }
+    /* Translucent so the game window shows through behind the box (the global
+       `Screen` rule would otherwise paint it opaque and blank the screen). */
+    HelpScreen { align: center middle; background: $background 60%; }
     HelpScreen #help-box {
         width: 64; max-height: 80%; height: auto; padding: 1 2;
         border: round $primary; background: $surface;
