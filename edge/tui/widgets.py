@@ -482,22 +482,23 @@ class SectorScene(Static):
             self._hotspots.append((half, row, w, name_row + 1, "port", None))
         row = name_row + 1 + self._ORBIT_MARGIN
 
-        # Ships — up to N sprites side by side (no heading), names beneath. The 3nd
+        # Ships — up to N sprites side by side (no heading), names beneath. The 2nd
         # of a pair may face left so the two face inward (deterministic per sector).
         shown = sec.ships[:cfg.max_ships_shown]
         if shown:
-            sw = max(cfg.ship.min_width, min(cfg.ship.max_width, (w - 2) // max(1, len(shown)) - 2))
+            n = len(shown)
+            sw = max(cfg.ship.min_width, min(cfg.ship.max_width, (w - 2) // max(1, n) - 2))
             # Ship height isn't space-clamped (the layout reserves max_height), so it
             # sits at max_height -- but never below the configured min.
             sh = max(cfg.ship.min_height, cfg.ship.max_height)
-            gap = 2
-            total = len(shown) * sw + (len(shown) - 1) * gap
-            sx = max(0, (w - total) // 2)
+            col_w = w / n  # one equal-width column per ship
             frng = random.Random(sec.sector_id)
             for i, vessel in enumerate(shown):
                 entity, sub = art_adapter.ship_entity(vessel.role)
                 facing = "left" if (i == 1 and frng.random() < cfg.ship_face_inward_chance) else "right"
-                left = sx + i * (sw + gap)
+                # Centre each ship within its own column, so a pair sits at the middle of
+                # its half rather than clustering against the other in the centre.
+                left = max(0, int(i * col_w + (col_w - sw) / 2))
                 self._paint(grid, self._sprite_cells(entity, sub, seed=sec.sector_id * 16 + i,
                                                      sw=sw, sh=sh, facing=facing,
                                                      archetype_id=vessel.archetype_id), row, left)
