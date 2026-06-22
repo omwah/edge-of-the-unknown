@@ -258,8 +258,6 @@ class StatusSidebar(Vertical):
             f"Colonists {s.colonists:,}/{s.colonist_capacity:,}",
             f"Latinum  [b yellow]{s.latinum:,}[/] slips",
             rule,
-            f"Band {s.band}",
-            rule,
         ]
         return "\n".join(lines)
 
@@ -454,7 +452,9 @@ class SectorScene(Static):
         if sec.planets:
             planet = sec.planets[0]
             sub = art_adapter.planet_subtype(planet.ptype)
-            self._paint(grid, self._sprite_cells("planet", sub, seed=sec.sector_id, sw=pw, sh=ph),
+            # Seed off the planet's own id (not the sector's) so this sprite matches the
+            # PlanetScreen orbit view, which seeds with planet_id — same planet, same art.
+            self._paint(grid, self._sprite_cells("planet", sub, seed=planet.planet_id, sw=pw, sh=ph),
                         row, lcx - pw // 2)
 
         # Port (or placeholder), vertically centred against the taller planet. The
