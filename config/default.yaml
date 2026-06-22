@@ -18,10 +18,12 @@ scene:
   max_ships_shown: 2           # sprites shown; extra ships fall to a clickable list
   ship_face_inward_chance: 0.5 # chance the 2nd of two ships is flipped to face the 1st
 
-# TUI presentation — the sector-screen warp grid (no rules impact).
+# TUI presentation — the sector-screen warp grid + status sidebar (no rules impact).
 ui:
   warp_columns: 3            # warp-grid width; cells fill the printable area, wrap into rows
   warp_focus_default: first  # default keyboard focus: first | backtrack | unexplored
+  sidebar_width: 33          # status sidebar fixed character width (content is fixed-width)
+  sidebar_min_screen_width: 90  # hide the sidebar when the terminal is narrower than this
 
 # The species roster lives in its own file (§6) so a game can be generated against a
 # different source roster. Resolved relative to this file and injected as `roster`.

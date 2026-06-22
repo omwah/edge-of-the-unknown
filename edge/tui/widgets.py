@@ -217,14 +217,19 @@ class StatusSidebar(Vertical):
     """
 
     DEFAULT_CSS = """
-    StatusSidebar { width: 1fr; padding: 0 1; border-left: solid $primary; }
+    StatusSidebar { width: 33; padding: 0 1; border-left: solid $primary; }
     StatusSidebar > Static { height: auto; }
     """
 
-    def __init__(self, ship: ShipDTO, discoveries: list[SectorDiscovery], **kwargs: object) -> None:
+    def __init__(self, ship: ShipDTO, discoveries: list[SectorDiscovery],
+                 width: int = 33, **kwargs: object) -> None:
         super().__init__(**kwargs)
         self._ship = ship
         self._discoveries = discoveries
+        self._width = width
+
+    def on_mount(self) -> None:
+        self.styles.width = self._width
 
     def compose(self) -> ComposeResult:
         yield Static(self._stats_markup())
@@ -237,7 +242,9 @@ class StatusSidebar(Vertical):
 
     def _stats_markup(self) -> str:
         s = self._ship
-        rule = "[dim]" + "─" * 30 + "[/]"
+        # Divider spans the panel's content width (width minus the left border + padding),
+        # so it tracks the configured sidebar width instead of a hardcoded 30.
+        rule = "[dim]" + "─" * max(8, self._width - 3) + "[/]"
         lines: list[str] = [
             f"[b cyan]{s.name}[/]  [dim]({s.klass})[/]",
             rule,

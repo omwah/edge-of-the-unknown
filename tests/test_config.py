@@ -31,10 +31,10 @@ def test_default_scene_art_values() -> None:
     scene = load_default_config().scene
     # Sprites are clamped to [min, max] per axis. Planet width is derived as
     # 2*height (both bounds) so the disc stays round (cells are ~2:1).
-    assert (scene.planet.min_height, scene.planet.max_height) == (4, 12)
-    assert (scene.planet.min_width, scene.planet.max_width) == (8, 24)
+    assert (scene.planet.min_height, scene.planet.max_height) == (4, 14)
+    assert (scene.planet.min_width, scene.planet.max_width) == (8, 28)
     # PlanetScreen's orbit planet is configured independently of the SectorView one.
-    assert (scene.planet_detail.min_height, scene.planet_detail.max_height) == (4, 21)
+    assert (scene.planet_detail.min_height, scene.planet_detail.max_height) == (4, 16)
     assert (scene.port.min_width, scene.port.max_width) == (6, 18)
     assert (scene.port.min_height, scene.port.max_height) == (4, 8)
     assert (scene.ship.min_width, scene.ship.max_width) == (6, 16)
@@ -50,6 +50,14 @@ def test_scene_art_is_optional_with_defaults() -> None:
     assert scene.planet.max_width == 2 * scene.planet.max_height == 24
     assert scene.planet.min_width == 2 * scene.planet.min_height
     assert scene.max_ships_shown == 2
+
+
+def test_default_ui_values() -> None:
+    ui = load_default_config().ui
+    assert ui.warp_columns == 3
+    assert ui.warp_focus_default == "first"
+    assert ui.sidebar_width == 33
+    assert ui.sidebar_min_screen_width == 90
 
 
 def test_scene_art_rejects_min_above_max() -> None:

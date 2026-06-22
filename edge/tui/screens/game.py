@@ -12,6 +12,7 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
@@ -67,7 +68,7 @@ class SectorView(Container):
     """
 
     DEFAULT_CSS = """
-    SectorView { width: 2fr; background: transparent; }
+    SectorView { width: 1fr; background: transparent; }
     SectorView #warp-area { width: 1fr; height: auto; }
     """
 
@@ -115,11 +116,29 @@ class GameScreen(Screen):
     def compose(self) -> ComposeResult:
         view = self._service.game_view(self._pid)
         yield TopBar(view.turns, view.max_turns)
+        ui = getattr(self.app, "ui_config", None)
+        sidebar_width = ui.sidebar_width if ui is not None else 33
         with Horizontal(id="body"):
             yield SectorView(view.sector)
-            yield StatusSidebar(view.ship, view.sector.discoveries, id="sidebar")
+            sidebar = StatusSidebar(view.ship, view.sector.discoveries, sidebar_width, id="sidebar")
+            sidebar.display = self._sidebar_visible()  # also re-evaluated on resize
+            yield sidebar
         yield Ticker(self._ticker_lines())
         yield Footer()
+
+    def _sidebar_visible(self) -> bool:
+        """Whether the sidebar fits — hidden on narrow terminals so the sector view
+        isn't squished (the threshold is configurable)."""
+        ui = getattr(self.app, "ui_config", None)
+        threshold = ui.sidebar_min_screen_width if ui is not None else 90
+        return self.app.size.width >= threshold
+
+    def on_resize(self) -> None:
+        try:
+            sidebar = self.query_one("#sidebar", StatusSidebar)
+        except NoMatches:
+            return
+        sidebar.display = self._sidebar_visible()
 
     def _ticker_lines(self) -> list[str]:
         """The event-log lines, most recent last (a single fallback when empty)."""
