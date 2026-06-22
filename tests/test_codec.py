@@ -21,6 +21,7 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     Descended,
+    DevApplied,
     DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
@@ -67,6 +68,7 @@ from edge.core.rules import (
     Warp,
     Withdraw,
 )
+from edge.core.dev import DevPatch
 from edge.store import codec
 
 COMMANDS: list[Command] = [
@@ -100,6 +102,9 @@ COMMANDS: list[Command] = [
     Converse(species_id=3, context="dossier_other", subject_id=5),  # WP17 ask about X
     BuyAlienTech(species_id=3, offer_index=1),   # WP9 buy tech for latinum
     BarterArtifact(species_id=3, offer_index=0), # WP9 barter an artifact for tech
+    DevPatch("set", "latinum", 1_000_000),            # dev cheat: set a field
+    DevPatch("grant", "component", 2, key="accelerator:III"),  # dev cheat: grant parts
+    DevPatch("claim", "planet", ref=5),               # dev cheat: claim a world
 ]
 
 EVENTS: list[Event] = [
@@ -132,6 +137,7 @@ EVENTS: list[Event] = [
     AlienSpoke(1, 3, "dossier_other", 5),
     AlienTraded(1, 3, "buy", "radiator (II)", 7_000),
     AttitudeChanged(1, 3, 0.12, 0.87),
+    DevApplied(1, "[dev] set latinum=1000000"),  # dev cheat audit marker
 ]
 
 

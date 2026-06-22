@@ -24,6 +24,7 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     Descended,
+    DevApplied,
     DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
@@ -41,6 +42,7 @@ from edge.core.events import (
     TurnsReset,
     Warped,
 )
+from edge.core.dev import DevPatch
 from edge.core.rules import (
     BarterArtifact,
     BuyAlienTech,
@@ -151,6 +153,11 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "BuyAlienTech", {"species_id": command.species_id, "offer_index": command.offer_index}
         case BarterArtifact():
             return "BarterArtifact", {"species_id": command.species_id, "offer_index": command.offer_index}
+        case DevPatch():
+            return "DevPatch", {
+                "op": command.op, "target": command.target, "value": command.value,
+                "key": command.key, "ref": command.ref,
+            }
 
 
 def decode_command(type_: str, payload: dict[str, Any]) -> Command:
@@ -232,6 +239,11 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return BuyAlienTech(species_id=payload["species_id"], offer_index=payload["offer_index"])
         case "BarterArtifact":
             return BarterArtifact(species_id=payload["species_id"], offer_index=payload["offer_index"])
+        case "DevPatch":
+            return DevPatch(
+                op=payload["op"], target=payload["target"], value=payload["value"],
+                key=payload.get("key"), ref=payload.get("ref"),
+            )
         case _:
             raise ValueError(f"unknown command type {type_!r}")
 
@@ -360,6 +372,8 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "species_id": event.species_id,
                 "offset": event.offset, "effective": event.effective,
             }
+        case DevApplied():
+            return "DevApplied", {"player_id": event.player_id, "detail": event.detail}
         case _:
             raise ValueError(f"unknown event type {type(event).__name__}")
 
@@ -438,5 +452,7 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "AttitudeChanged":
             return AttitudeChanged(payload["player_id"], payload["species_id"],
                                    payload["offset"], payload["effective"])
+        case "DevApplied":
+            return DevApplied(payload["player_id"], payload["detail"])
         case _:
             raise ValueError(f"unknown event type {type_!r}")

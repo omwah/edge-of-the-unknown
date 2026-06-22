@@ -20,6 +20,19 @@ class Event:
 
 
 @dataclass(frozen=True)
+class DevApplied(Event):
+    """A dev/testing `DevPatch` mutated the player (see `core.dev`).
+
+    `detail` is a human summary (prefixed `[dev]`). Deliberately has no
+    `format_log_line` case, so it stays invisible in the in-game message log —
+    it is an audit marker on the event rail, not player-facing.
+    """
+
+    player_id: int
+    detail: str
+
+
+@dataclass(frozen=True)
 class Warped(Event):
     player_id: int
     from_sector: int
