@@ -52,6 +52,7 @@ class PortDTO:
     sector_id: int
     commodities: list[CommodityLine]
     display_id: int = 0  # spatial id of the port's sector (§5.1)
+    archetype_id: str | None = None  # controlling species' palette, for the port sprite (§4)
 
 
 @dataclass(frozen=True)

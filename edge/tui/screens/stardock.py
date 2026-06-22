@@ -63,9 +63,12 @@ class StarDockScreen(Screen):
         dock = self._service.stardock_view(self._pid)
         latinum = dock.latinum
         yield Static(f"STARDOCK · Sector {dock.sector_display}", id="dock-title")
+        size = self.app.scene_art.port  # one canonical port footprint, shared with SectorView
         yield Static(
             art_adapter.sprite(
-                "port", "stardock", seed=dock.sector_display, width=34, height=6,
+                "port", "stardock", seed=port.sector_id,
+                width=size.max_width, height=size.max_height,
+                archetype_id=port.archetype_id,
             ),
             id="dock-art",
         )

@@ -42,10 +42,12 @@ class PortScreen(Screen):
             yield Static("No port to trade with here.", id="port-body")
             return
         latinum = self._service.game_view(self._pid).ship.latinum
+        size = self.app.scene_art.port  # one canonical port footprint, shared with SectorView
         yield Static(
             art_adapter.sprite(
                 "port", art_adapter.port_subtype(port.klass),
-                seed=port.sector_id, width=30, height=5,
+                seed=port.sector_id, width=size.max_width, height=size.max_height,
+                archetype_id=port.archetype_id,
             ),
             id="port-art",
         )
