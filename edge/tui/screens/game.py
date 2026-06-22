@@ -81,10 +81,12 @@ class SectorView(Container):
         ui = getattr(self.app, "ui_config", None)
         columns = ui.warp_columns if ui is not None else 3
         focus_default = ui.warp_focus_default if ui is not None else "first"
+        max_warps = getattr(self.app, "max_warps_per_sector", 6)
+        min_rows = -(-max_warps // columns)  # ceil — reserve a consistent grid height
         yield SectorScene(sec)
         yield SectionRule("Navigation", id="warp-rule")
         with Container(id="warp-area"):
-            yield WarpGrid(sec.warps, columns, focus_default)
+            yield WarpGrid(sec.warps, columns, focus_default, min_rows)
 
 
 class GameScreen(Screen):

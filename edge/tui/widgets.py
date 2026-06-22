@@ -638,6 +638,13 @@ class WarpCell(Static):
             self.sector_id = sector_id
             super().__init__()
 
+    # Enter/Space activate the focused cell (it's a Static, not a Button, so it needs
+    # its own keys — the arrow keys that move focus are bound on the parent grid).
+    BINDINGS = [
+        Binding("enter", "warp", "Warp", show=False),
+        Binding("space", "warp", "Warp", show=False),
+    ]
+
     DEFAULT_CSS = """
     WarpCell { width: 1fr; height: 1; padding: 0 1; color: $primary; }
     WarpCell:focus { background: $boost; text-style: bold; }
@@ -674,6 +681,9 @@ class WarpCell(Static):
         return left
 
     def on_click(self) -> None:
+        self.action_warp()
+
+    def action_warp(self) -> None:
         self.post_message(self.Warp(self._warp.sector_id))
 
 
@@ -703,9 +713,10 @@ class WarpGrid(Grid):
 
     Cells fill the printable area and wrap into rows (`columns` wide); TW2002 sectors
     warp to at most `max_warps_per_sector` others. There is no current-sector cell —
-    the warps *are* the grid. Keyboard focus lands on a cell chosen by `focus_default`
-    (first / came-from / first unexplored) and the arrow keys step between cells by
-    on-screen grid position.
+    the warps *are* the grid. The grid reserves `min_rows` rows (= ceil(max warps /
+    columns)) so its height is the same in every sector regardless of warp count.
+    Keyboard focus lands on a cell chosen by `focus_default` (first / came-from /
+    first unexplored); arrow keys step between cells, Enter/Space activates the focus.
     """
 
     # Arrow keys move focus between warp cells by their on-screen grid position
@@ -729,12 +740,13 @@ class WarpGrid(Grid):
 
     def __init__(
         self, warps: list[WarpDTO], columns: int = 3, focus_default: str = "first",
-        **kwargs: object,
+        min_rows: int = 1, **kwargs: object,
     ) -> None:
         super().__init__(**kwargs)
         self._warps = warps
         self._columns = max(1, columns)
         self._focus_default = focus_default
+        self._min_rows = max(1, min_rows)
 
     def compose(self) -> ComposeResult:
         for warp in self._warps:
@@ -742,6 +754,11 @@ class WarpGrid(Grid):
 
     def on_mount(self) -> None:
         self.styles.grid_size_columns = self._columns
+        # Reserve a consistent height: the rows the full warp cap would need, so the
+        # grid (and thus the sector scene above it) doesn't resize per sector. Each row
+        # is 1 tall with no row gutter, so height in cells == row count.
+        used_rows = -(-len(self._warps) // self._columns)  # ceil
+        self.styles.height = max(self._min_rows, used_rows)
         # Anchor focus as soon as the grid appears, so arrow keys drive selection
         # immediately (no priming Tab). The grid is remounted on every recompose, so
         # focus re-homes each time the sector view refreshes.

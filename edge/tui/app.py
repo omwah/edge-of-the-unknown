@@ -61,6 +61,7 @@ class EdgeApp(App[None]):
         # when a game starts.
         self.scene_art = SceneArtConfig()
         self.ui_config = UIConfig()
+        self.max_warps_per_sector = 6  # TW2002 cap; reserves the warp grid's row count
 
     def on_mount(self) -> None:
         self.register_theme(TW2002_THEME)
@@ -108,6 +109,7 @@ class EdgeApp(App[None]):
         art_adapter.validate_art_coverage(config)  # type: ignore[arg-type]
         self.scene_art = config.scene  # type: ignore[attr-defined]
         self.ui_config = config.ui  # type: ignore[attr-defined]
+        self.max_warps_per_sector = config.bigbang.max_warps_per_sector  # type: ignore[attr-defined]
 
     def _start_ticker(self, service: GameService) -> None:
         self._ticker = EngineTicker(service)
