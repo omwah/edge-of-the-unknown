@@ -41,6 +41,10 @@ def main() -> None:
     if args.inspect:
         print(summarize(state))
         did_something = True
+    # Every id below is specific to this seed; surface it so a --list in one run and
+    # a --route in another are never silently read against different universes.
+    if args.list or args.route is not None:
+        print(f"# universe seed={args.seed} ({len(state.sectors)} sectors); ids are seed-specific")
     if args.list:
         categories = LIST_CATEGORIES if "all" in args.list else args.list
         for category in categories:
@@ -50,7 +54,8 @@ def main() -> None:
         try:
             print(format_route(state, args.route[0], args.route[1]))
         except ValueError as exc:
-            parser.error(str(exc))
+            parser.error(f"{exc} — re-run --route with the same --seed you used to --list "
+                         f"(this run is seed {args.seed})")
         did_something = True
     if args.render is not None:
         from edge.bigbang.render import render_graph

@@ -51,20 +51,21 @@ def resolve_sector(state: UniverseState, token: str) -> int:
         raise ValueError(f"{token!r} is not a sector id") from None
 
     rev = _spatial_to_internal(state)
+    seed = state.game.seed
     if mode == "s":
         if value in rev:
             return rev[value]
-        raise ValueError(f"no sector with spatial id {value}")
+        raise ValueError(f"no sector with spatial id {value} in seed {seed}")
     if mode == "i":
         if value in state.sectors:
             return value
-        raise ValueError(f"no sector with internal id {value}")
+        raise ValueError(f"no sector with internal id {value} in seed {seed}")
     # Bare token: internal-first, then spatial.
     if value in state.sectors:
         return value
     if value in rev:
         return rev[value]
-    raise ValueError(f"{value} matches no internal or spatial sector id")
+    raise ValueError(f"{value} matches no internal or spatial sector id in seed {seed}")
 
 
 def _ports(state: UniverseState) -> list[str]:
