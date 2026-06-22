@@ -20,7 +20,7 @@ SEEDS = list(range(100))  # the §13 100-seed validation sweep
 
 def _small_config() -> object:
     cfg = load_default_config()
-    return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(update={"sector_count": 80})})
+    return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(update={"sector_count": 80, "start_sector": 1})})
 
 
 CONFIG = _small_config()
@@ -45,6 +45,32 @@ def test_universe_is_valid(seed: int) -> None:
     assert state.alliances[1].name == "Terran Federation"
     assert state.ships[state.players[1].ship_id].sector_id == 1
     assert state.game.core_governing_alliance_id == 1
+
+
+def _with_start(start: object) -> object:
+    return CONFIG.model_copy(  # type: ignore[attr-defined]
+        update={"bigbang": CONFIG.bigbang.model_copy(update={"start_sector": start})})  # type: ignore[attr-defined]
+
+
+def test_start_sector_stardock_places_player_at_the_dock() -> None:
+    state = generate(_with_start("stardock"), 7)  # type: ignore[arg-type]
+    dock = next(p for p in state.ports.values() if p.klass is PortClass.STARDOCK)
+    assert state.ships[state.players[1].ship_id].sector_id == dock.sector_id
+    # Starting at the dock, only the dock is explored (no pre-routed breadcrumb chain).
+    assert state.players[1].explored_sectors == frozenset({dock.sector_id})
+
+
+def test_start_sector_explicit_id() -> None:
+    state = generate(_with_start(5), 7)  # type: ignore[arg-type]
+    assert state.ships[state.players[1].ship_id].sector_id == 5
+
+
+def test_start_sector_random_is_deterministic_and_valid() -> None:
+    a = generate(_with_start("random"), 7)  # type: ignore[arg-type]
+    b = generate(_with_start("random"), 7)  # type: ignore[arg-type]
+    start_a = a.ships[a.players[1].ship_id].sector_id
+    assert start_a in a.sectors  # a real sector
+    assert start_a == b.ships[b.players[1].ship_id].sector_id  # reproducible from the seed
 
 
 @pytest.mark.parametrize("seed", range(20))

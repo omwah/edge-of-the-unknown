@@ -92,6 +92,17 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     ] or [s for s in sector_ids if s not in range(1, cfg.core_sector_count + 1)]
     dock_sector = rng.choice(dock_candidates)
 
+    # Resolve the player's start sector (config): the StarDock, a seeded random sector,
+    # or a specific id. "random" uses a *dedicated* sub-RNG so the build-RNG order (and
+    # the golden-master replays keyed off it) stays stable.
+    start_cfg = cfg.start_sector
+    if start_cfg == "stardock":
+        start_sector = dock_sector
+    elif start_cfg == "random":
+        start_sector = random.Random(f"{state.game.seed}-start").choice(sector_ids)
+    else:
+        start_sector = start_cfg if start_cfg in state.sectors else 1
+
     ports: dict[int, Port] = {}
     used_sectors: set[int] = {dock_sector}
     pid = 1
@@ -154,7 +165,7 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     # NPC fallback / caps). The Trailblazer's minimal layout derives exactly the
     # Phase-1 flat numbers (a regression pin, PHASE2_PLAN WP1).
     starter = Ship(
-        id=1, type_id=sc.id, name=sc.name, owner_player_id=1, sector_id=1,
+        id=1, type_id=sc.id, name=sc.name, owner_player_id=1, sector_id=start_sector,
         holds_total=sc.holds_total, hull_current=sc.hull_max, hull_max=sc.hull_max,
         shields=sc.shields_max, warp_speed=sc.warp_speed, combat_speed=sc.combat_speed,
         cloak_rating=sc.cloak_rating, sensor_rating=sc.sensor_rating,
@@ -162,12 +173,12 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
         subsystems=build_subsystems(sc),
     )
     state.ships = {1: apply_derived(starter, config)}
-    # StarDock is an auto-known route: the path from the start sector to the dock
-    # opens pre-explored so the opening signpost is actionable (the player can
-    # `TravelTo` it on turn one). Only the shortest path is revealed — the rest of
-    # the universe stays fogged. The route is also recorded as the breadcrumb chain
-    # so the way back reads correctly from the dock.
-    dock_route = shortest_path(state.adjacency, 1, dock_sector) or [1]
+    # StarDock is an auto-known route: the shortest path from the start sector to the
+    # dock opens pre-explored so the opening signpost is actionable (the player can
+    # `TravelTo` it on turn one); the rest of the universe stays fogged. The route is
+    # recorded as the breadcrumb chain so the way back reads correctly. When the player
+    # starts *at* the dock this collapses to a single explored sector with no breadcrumb.
+    dock_route = shortest_path(state.adjacency, start_sector, dock_sector) or [start_sector]
     entered_from = {dock_route[i + 1]: dock_route[i] for i in range(len(dock_route) - 1)}
     state.players = {
         1: Player(

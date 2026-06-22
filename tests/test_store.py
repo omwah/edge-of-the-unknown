@@ -40,7 +40,7 @@ _CREATED = "2026-06-15T00:00:00Z"
 
 def _small_config() -> object:
     cfg = load_default_config()
-    return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(update={"sector_count": 90})})
+    return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1})})
 
 
 def _scripted_commands(state: object) -> list[tuple[int, Command]]:

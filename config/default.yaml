@@ -6,6 +6,7 @@
 # the schema defaults; the values below are spelled out so the balance is legible.
 
 config_version: 2  # Phase-2 schema epoch (engine room, §4.1)
+seed: 4             # universe seed for a new game; leave empty (seed:) for a random seed
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 
 # SectorView sprite scene — sizes/counts only, no rules impact (presentation).
@@ -82,6 +83,7 @@ bigbang:
   one_way_chance: 0.15
   max_warps_per_sector: 6
   core_sector_count: 10
+  start_sector: stardock     # where the player starts: stardock | random | a sector number
   stardock_min_hops: 2
   stardock_max_hops: 5
   port_density: 0.45
