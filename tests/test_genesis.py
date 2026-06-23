@@ -32,8 +32,11 @@ def _at_stardock(state: object) -> None:
 
 
 def _eligible_planet(state: object) -> object:
+    # A *dead* eligible world (eligible_types also includes already-colonizable
+    # terrestrials, so filter those out) — the case Genesis exists to transform.
     return next(pl for pl in state.planets.values()  # type: ignore[attr-defined]
-                if not pl.owner.is_owned and pl.planet_type in CONFIG.genesis.eligible_types)  # type: ignore[union-attr]
+                if not pl.owner.is_owned and pl.planet_type in CONFIG.genesis.eligible_types  # type: ignore[union-attr]
+                and not is_colonizable(pl.planet_type, CONFIG))
 
 
 def test_buy_genesis_at_stardock_costs_latinum() -> None:

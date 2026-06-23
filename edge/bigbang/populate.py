@@ -80,11 +80,22 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     hops = bfs_distances(state.adjacency, 1)
 
     # --- StarDock: a Class-9 port a few hops out from the Core ---------------
+    # Bias toward the *near* edge of the 2–5 hop band: a uniform choice would skew
+    # far (the universe simply holds many more sectors at 4–5 hops than at 2–3), so
+    # weight each candidate by (max_hops - hops + 1)**3 — the closest tier dominates
+    # while farther sectors stay possible, keeping the dock a short hop from home.
     dock_candidates = [
         s for s in sector_ids
         if cfg.stardock_min_hops <= hops.get(s, 10**9) <= cfg.stardock_max_hops
-    ] or [s for s in sector_ids if s not in range(1, cfg.core_sector_count + 1)]
-    dock_sector = rng.choice(dock_candidates)
+    ]
+    if dock_candidates:
+        weights = [(cfg.stardock_max_hops - hops[s] + 1) ** 3 for s in dock_candidates]
+        dock_sector = rng.choices(dock_candidates, weights=weights, k=1)[0]
+    else:
+        # Degenerate topology with nothing in-band: fall back to the closest non-Core
+        # sector rather than any non-Core sector (which could be deep space).
+        non_core = [s for s in sector_ids if s not in range(1, cfg.core_sector_count + 1)]
+        dock_sector = min(non_core, key=lambda s: hops.get(s, 10**9))
 
     names_cfg = config.names
     stardock_gen = NameGenerator(names_cfg.stardock if names_cfg else None, "StarDock", rng)
