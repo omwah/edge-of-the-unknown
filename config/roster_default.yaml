@@ -44,7 +44,7 @@ species:
     tech_level: 8
     alliance_id: 1                  # the Core governor
     alliance_role: leader
-    home_band: Core
+    home_band: Hub                  # the Core is the inner Hub; gov members settle in Core Space
     trade_posture: open
     treaty_mode: open
     persona: humanoid_diplomat
@@ -74,7 +74,7 @@ species:
     tech_level: 7
     alliance_id: 1
     alliance_role: member
-    home_band: Core
+    home_band: Hub                  # the Core is the inner Hub; gov members settle in Core Space
     trade_posture: open
     treaty_mode: open
     persona: humanoid_diplomat

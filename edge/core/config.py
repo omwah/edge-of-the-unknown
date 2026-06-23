@@ -726,6 +726,28 @@ class GameConfig(BaseModel):
                 return klass
         raise KeyError(f"unknown ship class {class_id!r}")
 
+    @model_validator(mode="after")
+    def _check_species_home_bands(self) -> GameConfig:
+        """Every species' `home_band` hint must name a configured distance band (§6).
+
+        The bands are defined in `bigbang.bands` (Hub/Frontier/Deep/Void by default),
+        so this cross-check lives here rather than on `RosterConfig`, which is validated
+        in isolation and can't see them. The **Core Space is not a band** — it is the
+        innermost part of the Hub (sectors 1..N), and governing-alliance members are
+        settled there by generation regardless of this hint — so `home_band: Core` is
+        invalid and must be spelled as the band that contains the Core (`Hub`).
+        """
+        if self.roster is None:
+            return self
+        bands = {b.name for b in self.bigbang.bands}
+        for sp in self.roster.species:
+            if sp.home_band is not None and sp.home_band not in bands:
+                raise ValueError(
+                    f"species {sp.id!r} home_band {sp.home_band!r} is not a configured "
+                    f"distance band (valid: {', '.join(sorted(bands))})"
+                )
+        return self
+
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> GameConfig:
         """Validate an already-parsed mapping (e.g. from YAML) into a GameConfig."""

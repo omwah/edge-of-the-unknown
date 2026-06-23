@@ -94,6 +94,22 @@ def test_default_bigbang_and_ship() -> None:
     assert cfg.starter_ship.holds_total == 60
 
 
+def test_species_home_bands_are_valid_distance_bands() -> None:
+    cfg = load_default_config()
+    assert cfg.roster is not None
+    bands = {b.name for b in cfg.bigbang.bands}
+    # No species names a non-band like "Core" (the Core is the inner Hub, not a band).
+    assert all(s.home_band in bands for s in cfg.roster.species)
+
+
+def test_invalid_species_home_band_rejected() -> None:
+    """A home_band that isn't a configured distance band (e.g. the old 'Core') fails."""
+    data = load_default_config().model_dump()
+    data["roster"]["species"][0]["home_band"] = "Core"
+    with pytest.raises(ValidationError):
+        GameConfig.from_mapping(data)
+
+
 def test_config_is_frozen() -> None:
     cfg = load_default_config()
     with pytest.raises(ValidationError):
