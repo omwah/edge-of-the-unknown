@@ -10,6 +10,7 @@ structures scale geometrically to any requested bounding box.
 import random
 import math
 from rich.text import Text
+from opensimplex import OpenSimplex
 
 from edge.art.hull import (
     BRIGHT_CHARS,
@@ -19,6 +20,7 @@ from edge.art.hull import (
     render_grid,
     style_for,
 )
+from edge.art.noise import fractal_noise
 
 # Export the known grammar keys so generator.py knows what subtypes exist.
 # Since we use an algorithmic switch, we just list them here to satisfy the API.
@@ -37,90 +39,137 @@ DISCOVERY_GRAMMAR = {
 class DiscoveryGenerator:
     """Generates dynamic mathematical sprites for space discoveries."""
 
-    def _generate_nebula(self, rng: random.Random, width: int, height: int) -> Text:
-        """Draws a vibrant, multi-colored gas cloud."""
-        # Offset the core slightly from the exact geometric center
-        # Offset the core slightly from the exact geometric center
-        # Using standard width/2.0 radius
+    @staticmethod
+    def _nebula_palette(style: HullStyle, archetype_id: str | None) -> list[str]:
+        """The core→rim emission ramp (densest first).
+
+        Emission nebulae glow, so every stop is a saturated, *bright* hue — even the
+        faint rim, which covers the most area and would otherwise drag the whole cloud
+        toward a muddy dark red. With no owner archetype a nebula reads as a vivid warm
+        fire ramp (white-hot core → gold → orange → rose → magenta). When an archetype
+        applies, the cloud is tinted from that owner's saturated nav-light/window hues
+        (never the dull hull-plating greys), the same way ports and ships vary by owner.
+        """
+        if archetype_id is None:
+            return ["#ffffff", "#fff27a", "#ffb13b", "#ff6a2a", "#ff2e6e", "#d22bb8"]
+        # Saturated owner hues, brightest first; skip the grey bright/mid/dark plating.
+        return ["#ffffff", style.window[0], style.top[0],
+                style.top[-1], style.bottom[0], style.bottom[-1]]
+
+    def _generate_nebula(self, rng: random.Random, width: int, height: int,
+                         archetype_id: str | None = None) -> Text:
+        """A gaseous cloud as a domain-warped fractal-noise density field.
+
+        Unlike the other (analytic-icon) discovery subtypes, a nebula is literally
+        gas, so it uses the coherent-noise idiom shared by `terrain`/`starfield`:
+        a multi-octave noise density field (domain-warped for wispy curl) gives the
+        interior tendrils, cores, and voids, while a soft radial envelope fades the
+        edges to space. Both the shade ramp and colour are driven by that density
+        (so colour tracks structure, not radius), and the palette is archetype-aware.
+        """
+        palette = self._nebula_palette(style_for(archetype_id), archetype_id)
+        gen = OpenSimplex(seed=rng.randint(0, 2**31 - 1))
+
         radius_x = width / 2.0
         radius_y = height / 2.0
-        offset_x = rng.uniform(-0.15, 0.15) * radius_x
-        offset_y = rng.uniform(-0.15, 0.15) * radius_y
-        
+        offset_x = rng.uniform(-0.12, 0.12) * radius_x
+        offset_y = rng.uniform(-0.12, 0.12) * radius_y
         center_x = (width - 1) / 2.0 + offset_x
         center_y = (height - 1) / 2.0 + offset_y
 
-        # User-requested fire palette: White core -> Yellow -> Orange -> Red outer
-        nebula_gradient = [
-            "bright_white",
-            "bright_yellow",
-            "orange1",
-            "dark_orange",
-            "bright_red",
-            "red"
-        ]
-        
-        # Generate organic macro-distortion parameters for a mildly lopsided cloud
-        bulge_p1 = rng.uniform(0, math.pi * 2)
-        bulge_p2 = rng.uniform(0, math.pi * 2)
-        bulge_p3 = rng.uniform(0, math.pi * 2)
-        
-        # Gently boosted amplitudes for moderate organic waviness
-        bulge_a1 = rng.uniform(0.1, 0.25)  # 2-lobed stretch
-        bulge_a2 = rng.uniform(0.05, 0.15) # 3-lobed stretch
-        bulge_a3 = rng.uniform(0.1, 0.25)  # 1-lobed offset
-        
+        # Angular harmonics make the *envelope* lopsided (cheap asymmetry); texture
+        # comes from the noise field, not from these.
+        bulge_p1, bulge_p2, bulge_p3 = (rng.uniform(0, math.pi * 2) for _ in range(3))
+        bulge_a1 = rng.uniform(0.10, 0.22)
+        bulge_a2 = rng.uniform(0.05, 0.13)
+        bulge_a3 = rng.uniform(0.10, 0.22)
+
+        # Feature sizes relative to the sprite: a mid-scale density field, a coarser
+        # field warping the sample coords for the signature curl.
+        scale = max(6.0, width * 0.7)
+        warp_scale = max(10.0, width * 1.4)
+        warp_amp = width * 0.22
+
+        # A second, anisotropic field paints cool blue emission *streaks* woven through
+        # the warm gas (a bicolour nebula look). Stretching the sample coords along one
+        # axis makes the features read as filaments rather than blobs. Kept to the
+        # default (ownerless) palette so archetype-tinted clouds stay one owner hue.
+        blue_streaks = archetype_id is None
+        blue_ramp = ["#eaf4ff", "#9ad0ff", "#4aa3ff", "#2f6bff"]
+        blue_scale = max(5.0, width * 0.42)
+
+        def streak_field(px: float, py: float) -> float:
+            # Anisotropic sample (stretched coords ⇒ directional filaments).
+            return fractal_noise(gen, (px + 500.0) * 0.45, (py + 500.0) * 1.6, blue_scale, 3)
+
         map_text = Text()
+        n_pal = len(palette)
+        n_blue = len(blue_ramp)
+        space_cut = 0.16  # density floor — below this the cell is open space
+        peak = 0.72       # density that reads fully white-hot (top of the colour ramp)
         for y in range(height):
             for x in range(width):
                 dx = (x - center_x) / radius_x
                 dy = (y - center_y) / radius_y
                 d = math.sqrt(dx * dx + dy * dy)
-                
-                # Apply macroscopic organic bulges based on angle for organic asymmetry
                 angle = math.atan2(dy, dx)
                 bulge = (
-                    math.sin(angle * 2 + bulge_p1) * bulge_a1 + 
-                    math.cos(angle * 3 + bulge_p2) * bulge_a2 +
-                    math.sin(angle + bulge_p3) * bulge_a3
+                    math.sin(angle * 2 + bulge_p1) * bulge_a1
+                    + math.cos(angle * 3 + bulge_p2) * bulge_a2
+                    + math.sin(angle + bulge_p3) * bulge_a3
                 )
-                
-                # Scale the boundary by the bulge. Modest floor to prevent extreme pinching.
-                radius_mult = max(0.5, 1.0 + bulge)
-                organic_d = d / radius_mult
-                
-                # Keep some high-frequency pixel noise for gaseous texture
-                noise = rng.uniform(-0.15, 0.15)
-                fuzzy_d = organic_d + noise
-                
-                if fuzzy_d < 0.3:
-                    char = "█"
-                elif fuzzy_d < 0.6:
-                    char = "▓"
-                elif fuzzy_d < 0.9:
-                    char = "▒"
-                elif fuzzy_d < 1.1:
+                radius_mult = max(0.55, 1.0 + bulge)
+                # Smooth envelope: 1 at the core, easing to 0 past the bulged edge.
+                env = max(0.0, 1.0 - d / radius_mult)
+                env = env * env * (3.0 - 2.0 * env)  # smoothstep
+
+                # Domain-warp the sample coords, then read the multi-octave field.
+                wx = fractal_noise(gen, x + 100.0, y, warp_scale, 2) * warp_amp
+                wy = fractal_noise(gen, x, y + 100.0, warp_scale, 2) * warp_amp
+                n01 = (fractal_noise(gen, x + wx, y + wy, scale, 4) + 1.0) / 2.0
+                density = n01 * env
+
+                if density < space_cut:
+                    map_text.append(" ")  # space — stars show through when composited
+                    continue
+                if density < 0.30:
                     char = "░"
+                elif density < 0.45:
+                    char = "▒"
+                elif density < 0.62:
+                    char = "▓"
                 else:
-                    char = " "
-                
-                if char == " ":
-                    map_text.append(" ")
-                else:
-                    # Smooth radial gradient from the core outward
-                    # fuzzy_d naturally ranges from ~0.0 at the core to ~1.1 at the edges
-                    normalized_d = max(0.0, min(1.0, fuzzy_d / 1.1))
-                    
-                    color_idx = int(normalized_d * len(nebula_gradient))
-                    if color_idx >= len(nebula_gradient):
-                        color_idx = len(nebula_gradient) - 1
-                        
-                    color = nebula_gradient[color_idx]
-                    map_text.append(char, style=f"bold {color} on black")
-            
+                    char = "█"
+
+                # Colour tracks structure: stretch the palette across the visible
+                # density band so dense cores reach the hot head (white/yellow) and
+                # thin wisps take the cool rim hue, rather than clustering mid-ramp.
+                ct = (density - space_cut) / (peak - space_cut)
+                ct = max(0.0, min(1.0, ct))
+
+                # Blue filaments trace the zero-crossing contours of the anisotropic
+                # field. Normalising the contour distance by the local gradient keeps
+                # streaks a constant ~1–2 cells wide (instead of blobbing where the
+                # field is flat), so every cloud gets a few thin threads.
+                ramp, n_ramp = palette, n_pal
+                if blue_streaks:
+                    s = streak_field(x, y)
+                    sx = streak_field(x + 1, y) - streak_field(x - 1, y)
+                    sy = streak_field(x, y + 1) - streak_field(x, y - 1)
+                    grad = math.hypot(sx, sy) * 0.5 + 1e-6
+                    # Contour a *periodic* phase of the field so several parallel
+                    # filaments (not just one zero-crossing) thread the cloud; the
+                    # gradient normalisation keeps each ~1 cell wide.
+                    phase = s / 0.55
+                    dist_cells = abs(phase - round(phase)) * 0.55 / grad
+                    if dist_cells < 0.85:
+                        ramp, n_ramp = blue_ramp, n_blue
+                idx = int((1.0 - ct) * (n_ramp - 1) + 0.5)
+                map_text.append(char, style=f"bold {ramp[idx]}")
+
             if y < height - 1:
                 map_text.append("\n")
-                
+
         return map_text
 
     def generate(
@@ -133,7 +182,7 @@ class DiscoveryGenerator:
     ) -> Text:
         """Generate a procedural discovery sprite, hued by archetype."""
         if subtype == "nebula":
-            return self._generate_nebula(rng, width, height)
+            return self._generate_nebula(rng, width, height, archetype_id)
 
         style = style_for(archetype_id)
         
