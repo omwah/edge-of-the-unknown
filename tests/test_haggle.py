@@ -92,7 +92,8 @@ def test_daily_cron_resets_attempts() -> None:
 def test_attempt_counter_round_trips_through_reload(tmp_path: Path) -> None:
     svc = GameService.new_game(SMALL, 3, SqliteRepository(tmp_path / "haggle.db"), created_at=_CREATED)  # type: ignore[arg-type]
     dock = next(p for p in svc.state.ports.values() if p.klass is PortClass.STARDOCK)
-    path = shortest_path(svc.state.adjacency, 1, dock.sector_id)
+    start = svc.state.ships[svc.state.players[1].ship_id].sector_id
+    path = shortest_path(svc.state.adjacency, start, dock.sector_id)
     assert path is not None
     for hop in path[1:]:
         svc.apply(1, Warp(to_sector=hop))

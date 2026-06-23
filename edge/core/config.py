@@ -699,6 +699,37 @@ class UIConfig(BaseModel):
     surface_terrain_height: int = Field(default=12, gt=0)  # SurfaceScreen terrain panel height
 
 
+class NameList(BaseModel):
+    """A list of first and last names for combinatoric generation."""
+
+    model_config = _FROZEN
+
+    first_part: list[str] = Field(default_factory=list)
+    second_part: list[str] = Field(default_factory=list)
+
+
+class PlanetNamesConfig(BaseModel):
+    """Separate naming lists for grouped planet types."""
+
+    model_config = _FROZEN
+
+    terrestrial: NameList = Field(default_factory=NameList)
+    jovian: NameList = Field(default_factory=NameList)
+    asteroid_belt: NameList = Field(default_factory=NameList)
+    barren: NameList = Field(default_factory=NameList)
+
+
+class NamesConfig(BaseModel):
+    """Configurable name pools for universe entities."""
+
+    model_config = _FROZEN
+
+    regions: NameList = Field(default_factory=NameList)
+    ports: NameList = Field(default_factory=NameList)
+    stardock: NameList = Field(default_factory=NameList)
+    planets: PlanetNamesConfig = Field(default_factory=PlanetNamesConfig)
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -720,6 +751,7 @@ class GameConfig(BaseModel):
     discovery: DiscoveryConfig | None = None  # WP5 discoveries (None ⇒ none salted)
     genesis: GenesisConfig | None = None  # WP10 genesis torpedoes (None ⇒ not sold)
     roster: RosterConfig | None = None  # WP7 species roster (None ⇒ no aliens placed)
+    names: NamesConfig | None = None  # Configurable name pools
     starter_ship: ShipClassConfig
     ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (StarDock)
     hardware: HardwareConfig
