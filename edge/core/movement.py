@@ -28,6 +28,16 @@ def can_warp(adjacency: Adjacency, from_sector: int, to_sector: int) -> bool:
     return to_sector in warp_targets(adjacency, from_sector)
 
 
+def one_way_exits(adjacency: Adjacency, sector_id: int) -> tuple[int, ...]:
+    """Targets reachable from `sector_id` with no return edge (sorted, deterministic).
+
+    A "one-way source" sector has a non-empty result; its first element is the
+    far side of the wormhole the big bang anchors there (§7).
+    """
+    return tuple(sorted(t for t in adjacency.get(sector_id, ())
+                        if sector_id not in adjacency.get(t, ())))
+
+
 def shortest_path(
     adjacency: Adjacency, src: int, dst: int, allowed: set[int] | None = None
 ) -> list[int] | None:

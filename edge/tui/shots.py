@@ -45,12 +45,13 @@ from edge.tui.screens.planet import PlanetScreen
 OUT = Path("docs/ui/shots")
 
 # Sprite-gallery tabs to capture, each to its own SVG: (TabPane id, file stem).
-# Must match SpriteGalleryScreen's tabs (planets / ports / ships / terrain) plus
-# the subsystems tab.
+# Must match SpriteGalleryScreen's tabs (planets / ports / ships / discoveries /
+# terrain) plus the subsystems tab.
 _GALLERY_TABS = [
     ("planets", "gallery-planets"),
     ("ports", "gallery-ports"),
     ("ships", "gallery-ships"),
+    ("discoveries", "gallery-discoveries"),
     ("terrain", "gallery-terrain"),
     ("subsystems", "gallery-subsystems"),
 ]

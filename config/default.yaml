@@ -195,6 +195,9 @@ discovery:
   space_kinds:   { wreck: 5, entity: 3, nebula: 2, black_hole: 1 }
   surface_kinds: { ruins: 4, artifact: 3, ancient_tech: 2, crashed_ship: 3 }
   hidden_kinds: [wreck, entity]   # phenomena are obvious; drifting finds need sensors
+  # Kinds barred from sharing a sector with a port (seam; empty ⇒ all may coexist).
+  # Wormholes aren't listed here — they're force-placed on one-way edges, not rolled.
+  port_incompatible_kinds: []
   component_pool: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]
   salvage_turn_cost: 2
   scan_turn_cost: 1

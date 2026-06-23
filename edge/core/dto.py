@@ -146,6 +146,7 @@ class SectorDiscovery:
     rarity: str  # RarityTier name
     salvageable: bool
     collected: bool = False
+    warp_to: int | None = None  # one-way exit sector (wormholes only) — clicking warps here
 
 
 @dataclass(frozen=True)

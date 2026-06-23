@@ -23,6 +23,7 @@ from edge.bigbang.topology import bfs_distances
 from edge.core.config import GameConfig
 from edge.core.economy import capacity_for_size
 from edge.core.engine_room import build_layouts
+from edge.core.movement import one_way_exits
 from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass, Subsystem
 from edge.core.models import (
     Ownership,
@@ -144,10 +145,15 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     state.ports = ports
 
     # --- planets (type only in Phase 1) --------------------------------------
+    # One-way-source sectors carry a wormhole (salt_discoveries, §7) and a sector
+    # never holds both a planet and a space discovery, so they stay planet-free.
+    one_way = {sid for sid in sector_ids if one_way_exits(state.adjacency, sid)}
     planets: dict[int, Planet] = {}
     plid = 1
     for sid in sector_ids:
-        if rng.random() >= cfg.planet_density:
+        # Draw unconditionally so the build-RNG order is stable; the one-way skip
+        # only suppresses placement, it doesn't consume an extra draw.
+        if rng.random() >= cfg.planet_density or sid in one_way:
             continue
         band = state.sectors[sid].distance_band
         choices = _PLANET_WEIGHTS.get(band, _PLANET_WEIGHTS["Void"])

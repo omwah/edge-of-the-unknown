@@ -51,6 +51,57 @@ def test_rarity_and_value_gradient_monotone(seed: int) -> None:
         prev_rank, prev_value = mean_rank, mean_value
 
 
+# --- wormholes + planet/discovery separation --------------------------------
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_every_one_way_sector_has_a_wormhole(seed: int) -> None:
+    """A one-way-source sector carries exactly one wormhole; wormholes appear nowhere else."""
+    from edge.core.enums import DiscoveryKind
+    from edge.core.movement import one_way_exits
+
+    state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
+    one_way = {sid for sid in state.sectors if one_way_exits(state.adjacency, sid)}
+    wormhole_sectors = [d.sector_id for d in state.discoveries.values()
+                        if d.kind is DiscoveryKind.WORMHOLE]
+    assert sorted(wormhole_sectors) == sorted(one_way)  # bijection, no duplicates
+    assert len(wormhole_sectors) == len(set(wormhole_sectors))
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_space_finds_never_share_a_sector_with_a_planet(seed: int) -> None:
+    """Open-space discoveries only land in planet-free sectors; one-way sectors have no planet."""
+    from edge.core.movement import one_way_exits
+
+    state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
+    planet_sectors = {p.sector_id for p in state.planets.values()}
+    for d in state.discoveries.values():
+        if d.planet_id is None:  # a space find, not a surface site
+            assert d.sector_id not in planet_sectors
+    one_way = {sid for sid in state.sectors if one_way_exits(state.adjacency, sid)}
+    assert not (one_way & planet_sectors)
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_wormhole_warp_target_is_a_valid_one_way_exit(seed: int) -> None:
+    """The DTO's `warp_to` for a wormhole is a real one-way exit of its sector."""
+    from edge.core.enums import DiscoveryKind
+    from edge.core.movement import one_way_exits
+    from edge.server import session
+
+    config = CONFIG
+    state = generate_with_player(config, seed)  # type: ignore[arg-type]
+    player = state.players[1]
+    for d in state.discoveries.values():
+        if d.kind is not DiscoveryKind.WORMHOLE:
+            continue
+        dtos = session._sector_discoveries(state, player, d.sector_id)  # type: ignore[arg-type]
+        wh = next(x for x in dtos if x.discovery_id == d.id)
+        exits = one_way_exits(state.adjacency, d.sector_id)
+        assert wh.warp_to == exits[0]
+        assert wh.warp_to in state.sectors[d.sector_id].warps_out
+
+
 # --- detection (the sensor gate) --------------------------------------------
 
 
@@ -143,7 +194,7 @@ def test_salvage_component_payload_into_hold() -> None:
 
 
 def test_salvage_artifact_payload_into_barter_store() -> None:
-    state = generate_with_player(CONFIG, 4)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 3)  # type: ignore[arg-type]
     disc = _space_find(state, PayloadKind.ARTIFACT)
     _park_and_detect(state, disc)
     tier = disc.payload.barter_tier

@@ -19,12 +19,13 @@ from edge.core.config import GameConfig
 from edge.core.discovery import is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import build_subsystems, derive_aspects
-from edge.core.movement import RoutePlan, plan_route, plan_route_legs
+from edge.core.movement import RoutePlan, one_way_exits, plan_route, plan_route_legs
 from edge.core.enums import (
     PORT_CLASS_TRADES,
     Commodity,
     Component,
     ComponentTier,
+    DiscoveryKind,
     PortClass,
     PortMode,
     Subsystem,
@@ -150,6 +151,8 @@ def _warp_dto(
 
 
 def _discovery_label(kind: str, rarity: str) -> str:
+    if kind == DiscoveryKind.WORMHOLE.value:
+        return "Wormhole · one-way warp"  # shown only once scanned (warns of the one-way)
     return f"{kind.replace('_', ' ').capitalize()} · {rarity.capitalize()}"
 
 
@@ -168,10 +171,14 @@ def _sector_discoveries(state: UniverseState, player: Player, sector_id: int) ->
         visible = (not d.hidden) or (d.id in player.detected)
         if not (collected or visible):
             continue
+        warp_to = None
+        if d.kind is DiscoveryKind.WORMHOLE:
+            exits = one_way_exits(state.adjacency, sector_id)
+            warp_to = exits[0] if exits else None
         out.append(dto.SectorDiscovery(
             discovery_id=d.id, label=_discovery_label(d.kind.value, d.rarity_tier.name),
             kind=d.kind.value, rarity=d.rarity_tier.name,
-            salvageable=visible and not collected, collected=collected,
+            salvageable=visible and not collected, collected=collected, warp_to=warp_to,
         ))
     return out
 

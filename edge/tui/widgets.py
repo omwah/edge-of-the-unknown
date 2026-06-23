@@ -199,9 +199,10 @@ class AnomalyRow(Static):
 
     @staticmethod
     def _markup(d: SectorDiscovery) -> str:
+        # The find's identity stays hidden until scanned — pre-scan it reads generic.
         if d.collected:
             return f"[cyan]✦[/] {d.label} [dim]— logged[/]"
-        return f"[cyan]✦[/] {d.label} [dim](Scan)[/]"
+        return "[cyan]✦[/] Anomaly detected [dim](Scan)[/]"
 
     def on_click(self) -> None:
         if self._scan:
@@ -238,7 +239,7 @@ class StatusSidebar(Vertical):
             for discovery in self._discoveries:
                 yield AnomalyRow(discovery)
         else:
-            yield Static("[#8a8a8a]none in sensor range[/]")
+            yield Static("[#8a8a8a]-----[/]")
 
     def _stats_markup(self) -> str:
         s = self._ship
@@ -455,6 +456,14 @@ class SectorScene(Static):
         porth = max(cfg.port.min_height, min(cfg.port.max_height, ph))
         band_h = max(ph, porth)
         lcx, rcx = half // 2, half + half // 2  # column centres
+        # A sector with a visible discovery has no planet (bigbang keeps space finds
+        # off planet sectors), so the find takes the planet slot. A wormhole is the
+        # preferred primary — it's the navigable one. Centre it across the whole view
+        # when there's no port; otherwise keep it in the left (planet) half.
+        disc = None
+        if sec.discoveries and not sec.planets:
+            disc = next((d for d in sec.discoveries if d.kind == "wormhole"), sec.discoveries[0])
+        disc_centered = disc is not None and not sec.ports
         # Planet (or placeholder), top-aligned in the band.
         if sec.planets:
             planet = sec.planets[0]
@@ -463,6 +472,10 @@ class SectorScene(Static):
             # PlanetScreen orbit view, which seeds with planet_id — same planet, same art.
             self._paint(grid, self._sprite_cells("planet", sub, seed=planet.planet_id, sw=pw, sh=ph),
                         row, lcx - pw // 2)
+        elif disc is not None:
+            dleft = (w // 2 - pw // 2) if disc_centered else (lcx - pw // 2)
+            self._paint(grid, self._sprite_cells("discovery", disc.kind, seed=sec.sector_id, sw=pw, sh=ph),
+                        row, dleft)
 
         # Port (or placeholder), vertically centred against the taller planet. The
         # controlling species' palette (`archetype_id`) styles the port sprite.
@@ -477,6 +490,16 @@ class SectorScene(Static):
         if sec.planets:
             self._stamp_line(grid, f"[b yellow]{sec.planets[0].name}[/]", name_row, 0, half)
             self._hotspots.append((0, row, half, name_row + 1, "planet", None))
+        elif disc is not None:
+            # No caption until scanned — a sensor sweep (sidebar/Z) reveals the identity.
+            span = w if disc_centered else half
+            if disc.collected:
+                self._stamp_line(grid, f"[b cyan]{disc.label}[/]", name_row, 0, span)
+            if disc.kind == "wormhole" and disc.warp_to is not None:
+                dest, ref = "wormhole", disc.warp_to  # click warps to the far side
+            else:
+                dest, ref = "discovery", disc.discovery_id  # click scans/salvages
+            self._hotspots.append((0, row, span, name_row + 1, dest, ref))
         if sec.ports:
             self._stamp_line(grid, f"[b yellow]{sec.ports[0].name}[/]", name_row, half, half)
             self._hotspots.append((half, row, w, name_row + 1, "port", None))

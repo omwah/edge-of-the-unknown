@@ -93,6 +93,44 @@ async def test_enter_warps_focused_cell() -> None:
         assert moved == target != start
 
 
+async def test_wormhole_art_is_clickable_and_warps() -> None:
+    """A wormhole sector renders clickable discovery art whose hotspot warps to the
+    far side of the one-way edge (§7)."""
+    from dataclasses import replace
+
+    from edge.core.enums import DiscoveryKind
+    from edge.core.movement import one_way_exits
+    from edge.tui.widgets import ClickableEntry, SectorScene
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        wh = next((d for d in svc.state.discoveries.values()
+                   if d.kind is DiscoveryKind.WORMHOLE), None)
+        assert wh is not None  # the default universe has at least one one-way edge
+        exit_sector = one_way_exits(svc.state.adjacency, wh.sector_id)[0]
+
+        # Drop the player onto the wormhole sector and rebuild the view.
+        svc.state.ships[1] = replace(svc.state.ships[1], sector_id=wh.sector_id)
+        await app.screen.recompose()
+        await pilot.pause()
+
+        scene = app.screen.query_one(SectorScene)
+        scene.render()  # populates _hotspots
+        hot = [h for h in scene._hotspots if h[4] == "wormhole"]
+        assert hot and hot[0][5] == exit_sector
+
+        # Clicking the wormhole art warps to the far side of the one-way edge.
+        await app.screen.on_clickable_entry_picked(
+            ClickableEntry.Picked("wormhole", exit_sector))
+        await pilot.pause()
+        assert svc.game_view(1).sector.sector_id == exit_sector
+
+
 async def test_log_hotkey_opens_computer_log() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:

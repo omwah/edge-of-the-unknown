@@ -83,6 +83,7 @@ class DiscoveryKind(Enum):
     """The classes of thing the big bang salts into the universe (DESIGN §7).
 
     Sector-space finds: `nebula` / `black_hole` (astronomical phenomena, obvious),
+    `wormhole` (a navigable one-way warp, force-placed on every one-way edge),
     `wreck` / `entity` (drifting, often sensor-hidden). Planet surface sites
     (revealed by descent, WP6): `ruins` / `artifact` / `ancient_tech` /
     `crashed_ship`.
@@ -90,6 +91,7 @@ class DiscoveryKind(Enum):
 
     NEBULA = "nebula"
     BLACK_HOLE = "black_hole"
+    WORMHOLE = "wormhole"
     WRECK = "wreck"
     ENTITY = "entity"
     RUINS = "ruins"

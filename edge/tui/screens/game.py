@@ -164,6 +164,8 @@ class GameScreen(Screen):
     async def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:
         if msg.dest == "planet":
             self.action_survey_planet()
+        elif msg.dest == "wormhole" and msg.ref is not None:
+            await self._warp(int(msg.ref))  # the far side is a legal one-way warp
         elif msg.dest == "discovery" and msg.ref is not None:
             await self._salvage(msg.ref)
         elif msg.dest == "contact" and msg.ref is not None:
@@ -211,12 +213,19 @@ class GameScreen(Screen):
         await self._salvage(target.discovery_id)
 
     async def _salvage(self, discovery_id: int) -> None:
+        # Capture the find's kind before it's logged, so a wormhole scan can warn of
+        # the one-way warp (covers both the sidebar row and the Z scan action).
+        view = self._service.game_view(self._pid)
+        target = next((d for d in view.sector.discoveries if d.discovery_id == discovery_id), None)
         try:
             events = self._service.apply(self._pid, Salvage(discovery_id=discovery_id))
         except (MovementError, EconomyError, EngineRoomError) as exc:
             self.notify(str(exc), severity="warning", timeout=3)
             return
         self._record(events)
+        if target is not None and target.kind == "wormhole":
+            self.notify("Sensor reading: one-way warp — no direct way back.",
+                        severity="warning", timeout=3)
         await self.recompose()
 
     async def action_dock_port(self) -> None:
