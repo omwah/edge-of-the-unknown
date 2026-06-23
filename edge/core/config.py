@@ -341,6 +341,9 @@ class DiscoveryConfig(BaseModel):
     space_kinds: dict[str, int]       # DiscoveryKind name -> weight (open-space finds)
     surface_kinds: dict[str, int]     # DiscoveryKind name -> weight (planet sites)
     hidden_kinds: list[str] = Field(default_factory=list)  # kinds needing a sensor check
+    # Space-discovery kinds that may NOT share a sector with a port (§7 seam). Empty
+    # ⇒ every kind may coexist with a port; populate this to bar specific kinds later.
+    port_incompatible_kinds: list[str] = Field(default_factory=list)
     component_pool: list[str] = Field(default_factory=list)  # Component names for component payloads
     salvage_turn_cost: int = 2        # turns to collect a discovery (§7)
     scan_turn_cost: int = 1           # turns for an explicit sensor sweep

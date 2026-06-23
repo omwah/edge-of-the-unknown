@@ -20,8 +20,9 @@ import random
 from edge.core.config import DiscoveryConfig, GameConfig
 from edge.core.enums import Component, ComponentTier, DiscoveryKind, PayloadKind, RarityTier
 from edge.core.models import Discovery, DiscoveryPayload, UniverseState
+from edge.core.movement import one_way_exits
 
-_PHENOMENA = (DiscoveryKind.NEBULA, DiscoveryKind.BLACK_HOLE)
+_PHENOMENA = (DiscoveryKind.NEBULA, DiscoveryKind.BLACK_HOLE, DiscoveryKind.WORMHOLE)
 
 
 def _roll_tier(dcfg: DiscoveryConfig, band: str, rng: random.Random) -> RarityTier | None:
@@ -67,13 +68,38 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
     discoveries: dict[int, Discovery] = {}
     did = 1
 
+    planet_sectors = {p.sector_id for p in state.planets.values()}
+    port_sectors = {p.sector_id for p in state.ports.values()}
+    no_port_kinds = set(dcfg.port_incompatible_kinds)
+
+    # Wormholes: one per one-way-source sector, anchoring the far side of the edge.
+    # Force-placed (not rolled) and kept off planets by the populate planet exclusion.
+    wormhole_sectors = {sid for sid in sorted(state.sectors)
+                        if one_way_exits(state.adjacency, sid)}
+    for sid in sorted(wormhole_sectors):
+        tier = _roll_tier(dcfg, state.sectors[sid].distance_band, rng)
+        if tier is None:
+            continue
+        discoveries[did] = Discovery(
+            id=did, kind=DiscoveryKind.WORMHOLE, rarity_tier=tier, sector_id=sid,
+            payload=_make_payload(DiscoveryKind.WORMHOLE, tier, dcfg, rng),
+            hidden=DiscoveryKind.WORMHOLE.value in dcfg.hidden_kinds,
+        )
+        did += 1
+
     for sid in sorted(state.sectors):  # open-space finds, deterministic sector order
         if rng.random() >= dcfg.sector_density:
+            continue
+        # Space discoveries never share a sector with a planet; wormhole sectors are
+        # already taken. A port may coexist unless the rolled kind is barred (§7 seam).
+        if sid in planet_sectors or sid in wormhole_sectors:
             continue
         tier = _roll_tier(dcfg, state.sectors[sid].distance_band, rng)
         if tier is None:
             continue
         kind = _roll_kind(dcfg.space_kinds, rng)
+        if sid in port_sectors and kind.value in no_port_kinds:
+            continue
         discoveries[did] = Discovery(
             id=did, kind=kind, rarity_tier=tier, sector_id=sid,
             payload=_make_payload(kind, tier, dcfg, rng),

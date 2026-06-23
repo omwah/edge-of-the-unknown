@@ -79,6 +79,7 @@ class SpriteGalleryScreen(Screen):
         ("Planets", "planets", "planet", 22, 11, 3),
         ("Ports", "ports", "port", 18, 8, 3),
         ("Ships", "ships", "ship", 20, 6, 3),
+        ("Discoveries", "discoveries", "discovery", 20, 10, 3),
         ("Terrain", "terrain", "terrain", 30, 8, 2),
     ]
 

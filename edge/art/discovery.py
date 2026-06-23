@@ -25,6 +25,7 @@ from edge.art.hull import (
 DISCOVERY_GRAMMAR = {
     "nebula": True,
     "black_hole": True,
+    "wormhole": True,
     "wreck": True,
     "entity": True,
     "ruins": True,
@@ -172,6 +173,21 @@ class DiscoveryGenerator:
                     elif d_sq < 0.25:
                         # Photon ring edge glow
                         char = "R" if rng.random() > 0.5 else "Y"
+
+                elif subtype == "wormhole":
+                    # Swirling vortex: a two-armed spiral funnelling into a bright
+                    # throat (distinct from the black hole's tilted accretion disk).
+                    angle = math.atan2(dy, dx)
+                    swirl = math.sin(angle * 2.0 - d * 6.5)
+                    if d < 0.18:
+                        char = "◉"  # the open throat
+                    elif d < 1.0:
+                        if swirl > 0.45:
+                            char = "█" if d < 0.5 else "▓"
+                        elif swirl > -0.1:
+                            char = "▒" if d < 0.7 else "░"
+                        elif d > 0.85:
+                            char = "·"
 
                 elif subtype == "nebula":
                     # Handled above
