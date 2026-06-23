@@ -435,7 +435,7 @@ def test_drift_keeps_dossier_last_seen_while_sector_view_tracks_position() -> No
     world.regions = {1: Region(1, "Hub")}
     world.species = {1: _species(1, 2, "Vesk")}  # at the player's sector (2)
     world.players[1] = replace(world.players[1],
-                               species_attitudes={1: 0.1}, species_last_seen={1: 2})
+                               species_attitudes={"sp1": 0.1}, species_last_seen={"sp1": 2})
 
     # Before drift: visible here; dossier last-seen names the hail sector.
     assert [s.name for s in session.game_view(world, 1, CONFIG).sector.ships] == ["Vesk vessel"]

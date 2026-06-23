@@ -1347,19 +1347,19 @@ def _species_config(config: GameConfig, species: AlienSpecies) -> SpeciesConfig:
     return sc
 
 
-def _advance_recency(player: Player, species_id: int, context: str,
-                     new_ring: tuple[int, ...]) -> dict[tuple[int, str], tuple[int, ...]]:
-    """A copy of the player's dialogue recency with one (species, context) slot updated."""
+def _advance_recency(player: Player, roster_id: str, context: str,
+                     new_ring: tuple[int, ...]) -> dict[tuple[str, str], tuple[int, ...]]:
+    """A copy of the player's dialogue recency with one (kind, context) slot updated."""
     recency = dict(player.dialogue_recency)
-    recency[(species_id, context)] = new_ring
+    recency[(roster_id, context)] = new_ring
     return recency
 
 
-def _met(player: Player, species_id: int) -> Mapping[int, float]:
-    """Mark a species met (attitude entry exists) without changing the offset."""
-    if species_id in player.species_attitudes:
+def _met(player: Player, roster_id: str) -> Mapping[str, float]:
+    """Mark a species *kind* met (attitude entry exists) without changing the offset."""
+    if roster_id in player.species_attitudes:
         return player.species_attitudes
-    return {**player.species_attitudes, species_id: 0.0}
+    return {**player.species_attitudes, roster_id: 0.0}
 
 
 def _subject_extra(state: UniverseState, subject_id: int | None) -> dict[str, str]:
@@ -1394,14 +1394,14 @@ def _converse(state: UniverseState, player_id: int, cmd: Converse,
         raise EconomyError(f"not something you can say here ({cmd.context})")
     assert config.roster is not None
     extra = _subject_extra(state, cmd.subject_id)
-    ring = player.dialogue_recency.get((species.id, cmd.context), ())
-    rng = dialogue.encounter_rng(state.game.seed, species.id, cmd.context, ring)
+    ring = player.dialogue_recency.get((species.roster_id, cmd.context), ())
+    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, cmd.context, ring)
     _, new_ring = dialogue.speak(config.roster, species, player, cmd.context,
                                  aliens=config.aliens, rng=rng, extra=extra)
     new_player = replace(
-        player, species_attitudes=_met(player, species.id),
-        species_last_seen={**player.species_last_seen, species.id: ship.sector_id},
-        dialogue_recency=_advance_recency(player, species.id, cmd.context, new_ring))
+        player, species_attitudes=_met(player, species.roster_id),
+        species_last_seen={**player.species_last_seen, species.roster_id: ship.sector_id},
+        dialogue_recency=_advance_recency(player, species.roster_id, cmd.context, new_ring))
     event = AlienSpoke(player_id, species.id, cmd.context, cmd.subject_id)
     return ReduceResult(events=(event,), players=(new_player,))
 
@@ -1440,9 +1440,9 @@ def _raise_attitude(player: Player, species: AlienSpecies,
     """Raise the player's attitude offset toward `species` (capped so effective ≤ 1)."""
     sc = _species_config(config, species)
     cap = max(0.0, 1.0 - species.base_disposition)
-    current = player.species_attitudes.get(species.id, 0.0)
+    current = player.species_attitudes.get(species.roster_id, 0.0)
     new_offset = min(cap, current + sc.attitude_gain_rate)
-    attitudes = {**player.species_attitudes, species.id: new_offset}
+    attitudes = {**player.species_attitudes, species.roster_id: new_offset}
     new_player = replace(player, species_attitudes=attitudes)
     effective = effective_disposition(species, new_player)
     return new_player, AttitudeChanged(player.id, species.id, round(new_offset, 6), round(effective, 6))
@@ -1482,12 +1482,12 @@ def _trade_alien(state: UniverseState, player_id: int, species_id: int, offer_in
 
     new_player, attitude_event = _raise_attitude(new_player, species, config)
     # Advance the trade dialogue ring so a repeat sale rephrases.
-    ring = player.dialogue_recency.get((species.id, "trade_open"), ())
-    rng = dialogue.encounter_rng(state.game.seed, species.id, "trade_open", ring)
+    ring = player.dialogue_recency.get((species.roster_id, "trade_open"), ())
+    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, "trade_open", ring)
     _, new_ring = dialogue.speak(config.roster, species, new_player, "trade_open",
                                  aliens=config.aliens, rng=rng)
     new_player = replace(new_player,
-                         dialogue_recency=_advance_recency(new_player, species.id, "trade_open", new_ring))
+                         dialogue_recency=_advance_recency(new_player, species.roster_id, "trade_open", new_ring))
     kind = "barter" if barter else "buy"
     return ReduceResult(
         events=(AlienTraded(player_id, species.id, kind, detail, cost), attitude_event),

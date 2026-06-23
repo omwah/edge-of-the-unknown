@@ -599,21 +599,37 @@ def _offer_summary(sc: object) -> str:
     return ", ".join(labels) if labels else "—"
 
 
+def _representative_by_kind(state: UniverseState) -> dict[str, AlienSpecies]:
+    """A representative placed record per species kind (`roster_id` → lowest-id ship).
+
+    Reputation/dossier are keyed by kind, so views that need a concrete record for a kind
+    (name, alliance, base disposition — identical across that kind's ships) pick one here.
+    """
+    out: dict[str, AlienSpecies] = {}
+    for sp in sorted(state.species.values(), key=lambda s: s.id):
+        out.setdefault(sp.roster_id, sp)
+    return out
+
+
 def _dossier_entries(state: UniverseState, player: Player, config: GameConfig) -> list[dto.DossierEntry]:
-    """Every met species with standing, last-seen offers, and a voiced self-note (§6.6, §11)."""
+    """Every met species *kind* with standing, last-seen offers, and a voiced self-note (§6.6, §11)."""
     if config.roster is None:
         return []
     roster = config.roster
+    # One row per species *kind* met — reputation is keyed by `roster_id`, so many ships of
+    # a species collapse to a single dossier entry. Resolve a representative placed record
+    # per kind (lowest instance id) for its name / alliance / base disposition.
+    representative = _representative_by_kind(state)
     out: list[dto.DossierEntry] = []
-    for sid in sorted(player.species_attitudes):
-        species = state.species.get(sid)
+    for rid in sorted(player.species_attitudes):
+        species = representative.get(rid)
         if species is None:
             continue
         sc = roster.species_by_id(species.roster_id)
         allied = player.alliance_id is not None and player.alliance_id == species.alliance_id
         effective = effective_disposition(species, player)
         alliance = roster.alliance(species.alliance_id) if species.alliance_id is not None else None
-        seen = player.species_last_seen.get(sid)
+        seen = player.species_last_seen.get(rid)
         out.append(dto.DossierEntry(
             species=species.name, alliance=alliance.name if alliance else "unaligned",
             band=disposition_band(effective, config.aliens),
@@ -787,8 +803,8 @@ def _line(state: UniverseState, roster: object, species: AlienSpecies, player: P
     The projection shows a stable line until a reducer (hail/trade) advances the ring;
     both seed the same deterministic RNG, so they agree and replay reproduces them.
     """
-    ring = player.dialogue_recency.get((species.id, context), ())
-    rng = dialogue.encounter_rng(state.game.seed, species.id, context + salt, ring)
+    ring = player.dialogue_recency.get((species.roster_id, context), ())
+    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, context + salt, ring)
     text, _ = dialogue.speak(roster, species, player, context,  # type: ignore[arg-type]
                              aliens=config.aliens, rng=rng, extra=extra)
     return text
@@ -908,17 +924,20 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     alliance = roster.alliance(species.alliance_id) if species.alliance_id is not None else None
 
     offers = _tech_offers(species, sc, player, ship, effective)
+    # "Ask about" other met *kinds* (never the species' own kind). Reputation is keyed by
+    # `roster_id`, so each subject is presented via a representative ship instance id — the
+    # Converse command still targets a concrete ship.
+    representative = _representative_by_kind(state)
     others = [
-        (other_id, other)
-        for other_id in sorted(player.species_attitudes)
-        if other_id != species_id and (other := state.species.get(other_id)) is not None
+        rep for rid in sorted(player.species_attitudes)
+        if rid != species.roster_id and (rep := representative.get(rid)) is not None
     ]
     dossier = [
         _line(state, roster, species, player, "dossier_other", config,
-              salt=f":{other_id}", extra={"subject": other.name})
-        for other_id, other in others
+              salt=f":{rep.roster_id}", extra={"subject": rep.name})
+        for rep in others
     ]
-    subjects = [(other_id, other.name) for other_id, other in others]
+    subjects = [(rep.id, rep.name) for rep in others]
 
     # The line shown is the active context's (default greeting); a "say" verb sets it. For
     # `dossier_other` it narrates the picked subject (or the first met other) — with no salt,
@@ -938,7 +957,7 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         alliance=alliance.name if alliance else "unaligned",
         standing=standing, band=band, disposition_filled=max(0, min(5, round(effective * 5))),
         base_disposition=round(species.base_disposition, 3),
-        attitude=round(player.species_attitudes.get(species_id, 0.0), 3),
+        attitude=round(player.species_attitudes.get(species.roster_id, 0.0), 3),
         effective=round(effective, 3),
         opener=speech,
         verbs=_contact_verbs(species, sc, offers, subjects_available=bool(subjects)),

@@ -72,6 +72,13 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
         if sector.is_galactic_core:
             continue
         sectors_by_band.setdefault(sector.distance_band, []).append(sid)
+    # The StarDock sector is reserved for the curated Core-welcome greeting party
+    # (`_place_stardock_contacts`) — keep band homes and their clusters off it, so a
+    # rival-bloc ship can never wander into the new player's first port of call.
+    dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
+    reserved = frozenset({dock.sector_id}) if dock is not None else frozenset()
+    for sectors in sectors_by_band.values():
+        sectors[:] = [s for s in sectors if s not in reserved]
     live_bands = [b for b in band_order if sectors_by_band.get(b)]
     if not live_bands:
         return
@@ -102,15 +109,81 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
         else:
             assignment[i] = live_bands[i % len(live_bands)]
 
+    # One base disposition per species *kind*, memoised so every ship of a species shares
+    # it — the player's reputation is keyed by kind (`roster_id`), so a kind must present a
+    # single effective disposition regardless of which of its ships is met.
+    bases: dict[str, float] = {}
     placed: dict[int, AlienSpecies] = {}
-    for sid, (sp, band) in enumerate(zip(chosen, assignment), start=1):
-        sector_id = rng.choice(sectors_by_band[band])
-        placed[sid] = _make_species(sid, sp, sector_id, band, config, rng)
+    next_id = 1
+    for sp, band in zip(chosen, assignment):
+        home = rng.choice(sectors_by_band[band])
+        next_id = _place_cluster(placed, next_id, sp, home, band,
+                                 _base_for(bases, sp, config, rng), state, config, rng,
+                                 reserved=reserved)
 
-    _populate_governing_space(state, config, roster, rng, placed)
-    _place_stardock_contacts(state, config, roster, rng, placed)
+    _populate_governing_space(state, config, roster, rng, placed, bases)
+    _place_stardock_contacts(state, config, roster, rng, placed, bases)
     state.species = placed
     _assign_region_control(state, placed)
+
+
+def _base_for(bases: dict[str, float], sp: SpeciesConfig,
+              config: GameConfig, rng: random.Random) -> float:
+    """The species kind's base disposition, drawn once per generation and memoised."""
+    if sp.id not in bases:
+        bases[sp.id] = _friendly_disposition(sp.disposition_center, sp.disposition_variance,
+                                             config, rng)
+    return bases[sp.id]
+
+
+def _cluster_sectors(state: UniverseState, home: int, radius: int,
+                     reserved: frozenset[int]) -> list[int]:
+    """Non-Core, non-reserved sectors within `radius` warp-hops of `home`.
+
+    A bounded BFS over the directed warp graph (deterministic neighbour order), used to
+    scatter a species' satellite ships around its home sector (§6.3 presence). The Core and
+    the reserved StarDock sector are excluded so clusters never breach curated space.
+    """
+    seen = {home}
+    frontier = [home]
+    out: list[int] = []
+    for _ in range(radius):
+        nxt: list[int] = []
+        for s in frontier:
+            for n in sorted(state.adjacency.get(s, ())):
+                if n in seen:
+                    continue
+                seen.add(n)
+                nxt.append(n)
+                if not state.sectors[n].is_galactic_core and n not in reserved:
+                    out.append(n)
+        frontier = nxt
+    return out
+
+
+def _place_cluster(placed: dict[int, AlienSpecies], next_id: int, sp: SpeciesConfig,
+                   home: int, band: str, base: float, state: UniverseState,
+                   config: GameConfig, rng: random.Random, *,
+                   reserved: frozenset[int]) -> int:
+    """Place a species' home ship plus `ships_per_home - 1` satellites around it (§6.3).
+
+    Satellites are the same kind (shared `roster_id`/base), scattered across non-Core,
+    non-reserved sectors within `home_cluster_radius` hops, so a species is *met as a
+    cluster* rather than a lone contact. Returns the advanced instance-id counter.
+    """
+    assert config.roster is not None
+    placed[next_id] = _make_species(next_id, sp, home, band, base, config)
+    next_id += 1
+    satellites = config.roster.ships_per_home - 1
+    if satellites <= 0:
+        return next_id
+    candidates = _cluster_sectors(state, home, config.roster.home_cluster_radius, reserved)
+    rng.shuffle(candidates)
+    for sat in candidates[:satellites]:
+        sat_band = state.sectors[sat].distance_band
+        placed[next_id] = _make_species(next_id, sp, sat, sat_band, base, config)
+        next_id += 1
+    return next_id
 
 
 def _assign_region_control(state: UniverseState, placed: dict[int, AlienSpecies]) -> None:
@@ -140,9 +213,8 @@ def _assign_region_control(state: UniverseState, placed: dict[int, AlienSpecies]
 
 
 def _make_species(sid: int, sp: SpeciesConfig, sector_id: int, band: str,
-                  config: GameConfig, rng: random.Random) -> AlienSpecies:
-    """Build one placed species, drawing its clamped friendly-band disposition (§6)."""
-    base = _friendly_disposition(sp.disposition_center, sp.disposition_variance, config, rng)
+                  base: float, config: GameConfig) -> AlienSpecies:
+    """Build one placed ship of a species at `sector_id` with its kind's shared `base`."""
     assert is_friendly(base, config.aliens)  # Phase-2 placement invariant
     return AlienSpecies(
         id=sid, roster_id=sp.id, name=sp.name, archetype_id=sp.archetype_id,
@@ -156,16 +228,17 @@ def _make_species(sid: int, sp: SpeciesConfig, sector_id: int, band: str,
 
 
 def _populate_governing_space(state: UniverseState, config: GameConfig, roster: RosterConfig,
-                              rng: random.Random, placed: dict[int, AlienSpecies]) -> None:
-    """Settle the Core governor's own people across Core Space (WP18, §6.3).
+                              rng: random.Random, placed: dict[int, AlienSpecies],
+                              bases: dict[str, float]) -> None:
+    """Settle the Core governor's own people across Core Space and fill it with traffic (§6.3).
 
-    The Federation governs the Core but, without member species, "you are a member" was
-    an abstraction with no faces. This settles `core_population` governing-alliance
-    members (`alliance_role` leader/member) — leader always included — across distinct
-    Core sectors, so the player's home region is inhabited by their own people. It is the
-    **only** generation path that places a species in the Core; every other species is
-    barred (the band placement skips the Core). Runs on the same species sub-RNG, so it
-    does not perturb the topology/port/planet/discovery draw order (golden-master, §5).
+    Settles `core_population` distinct governing-alliance members (`alliance_role`
+    leader/member — leader always included) across distinct Core sectors so the player's
+    home region is inhabited by their own people, then scatters `core_traffic` additional
+    governing-member ships (kinds may repeat) so the Core *bustles*. This is the **only**
+    generation path that places a species in the Core; every other species is barred (the
+    band placement skips the Core). Runs on the same species sub-RNG, so it does not perturb
+    the topology/port/planet/discovery draw order (golden-master, §5).
     """
     gov = state.game.core_governing_alliance_id
     if gov is None:
@@ -184,12 +257,22 @@ def _populate_governing_space(state: UniverseState, config: GameConfig, roster: 
     next_id = max(placed, default=0) + 1
     for sp, sector_id in zip(chosen, sectors):
         band = state.sectors[sector_id].distance_band
-        placed[next_id] = _make_species(next_id, sp, sector_id, band, config, rng)
+        placed[next_id] = _make_species(next_id, sp, sector_id, band, _base_for(bases, sp, config, rng), config)
+        next_id += 1
+
+    # Core traffic: extra governing-member ships scattered across the Core (kinds repeat),
+    # all sharing their kind's reputation, so the home region feels alive (§6.3).
+    for _ in range(roster.core_traffic):
+        sp = rng.choice(members)
+        sector_id = rng.choice(core_sectors)
+        band = state.sectors[sector_id].distance_band
+        placed[next_id] = _make_species(next_id, sp, sector_id, band, _base_for(bases, sp, config, rng), config)
         next_id += 1
 
 
 def _place_stardock_contacts(state: UniverseState, config: GameConfig, roster: RosterConfig,
-                             rng: random.Random, placed: dict[int, AlienSpecies]) -> None:
+                             rng: random.Random, placed: dict[int, AlienSpecies],
+                             bases: dict[str, float]) -> None:
     """Stage ≥`stardock_contacts` Core-welcome species at the StarDock (high-traffic hub, §6.3).
 
     The Core is otherwise free of placed contacts, but every game funnels through the
@@ -212,5 +295,6 @@ def _place_stardock_contacts(state: UniverseState, config: GameConfig, roster: R
     band = state.sectors[dock.sector_id].distance_band
     next_id = max(placed, default=0) + 1
     for sp in pick_from[:want]:
-        placed[next_id] = _make_species(next_id, sp, dock.sector_id, band, config, rng)
+        placed[next_id] = _make_species(next_id, sp, dock.sector_id, band,
+                                        _base_for(bases, sp, config, rng), config)
         next_id += 1

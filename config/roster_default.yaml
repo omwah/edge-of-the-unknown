@@ -21,6 +21,14 @@ core_governing_alliance_id: 1
 subset_min: 7
 subset_max: 11
 
+# Presence density (§6.3). A drawn species fields a cluster of ships around its home
+# sector rather than a lone contact, and the Core bustles with governing-alliance
+# traffic. All ships of one species share that species' reputation/dossier, so this is
+# pure atmosphere — it never splinters standing.
+ships_per_home: 4       # ships per species home cluster (incl. the home contact)
+home_cluster_radius: 2  # how many warp-hops out the home cluster spreads
+core_traffic: 8         # extra governing-member ships scattered across Core Space
+
 alliances:
   - { id: 1, name: Terran Federation, banner: "Exploration & mutual defence" }
   - { id: 2, name: Verdant Compact,   banner: "Order through moral authority" }
