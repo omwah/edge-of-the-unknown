@@ -14,6 +14,7 @@ from edge.config import load_default_config
 from edge.core.enums import PortClass
 from edge.core.movement import shortest_path
 from edge.core.starbases import is_operational
+from helpers import enroll, generate_with_player
 
 SEEDS = list(range(100))  # the §13 100-seed validation sweep
 
@@ -40,11 +41,13 @@ def test_universe_is_valid(seed: int) -> None:
     assert len(docks) == 1
     # Core flagged on sectors 1..N.
     assert all(state.sectors[s].is_galactic_core for s in range(1, cfg.core_sector_count + 1))
-    # Player, ship, and the governing alliance (the roster's Federation) are seeded.
-    assert state.players[1].alliance_id == 1
+    # The governing alliance (the roster's Federation) is seeded by the big bang.
     assert state.alliances[1].name == "Terran Federation"
-    assert state.ships[state.players[1].ship_id].sector_id == 1
     assert state.game.core_governing_alliance_id == 1
+    # An enrolled player (JoinGame) joins the governor and spawns at the start sector.
+    enroll(state, CONFIG)  # type: ignore[arg-type]
+    assert state.players[1].alliance_id == 1
+    assert state.ships[state.players[1].ship_id].sector_id == 1
 
 
 def _with_start(start: object) -> object:
@@ -53,7 +56,7 @@ def _with_start(start: object) -> object:
 
 
 def test_start_sector_stardock_places_player_at_the_dock() -> None:
-    state = generate(_with_start("stardock"), 7)  # type: ignore[arg-type]
+    state = generate_with_player(_with_start("stardock"), 7)  # type: ignore[arg-type]
     dock = next(p for p in state.ports.values() if p.klass is PortClass.STARDOCK)
     assert state.ships[state.players[1].ship_id].sector_id == dock.sector_id
     # Starting at the dock, only the dock is explored (no pre-routed breadcrumb chain).
@@ -61,13 +64,13 @@ def test_start_sector_stardock_places_player_at_the_dock() -> None:
 
 
 def test_start_sector_explicit_id() -> None:
-    state = generate(_with_start(5), 7)  # type: ignore[arg-type]
+    state = generate_with_player(_with_start(5), 7)  # type: ignore[arg-type]
     assert state.ships[state.players[1].ship_id].sector_id == 5
 
 
 def test_start_sector_random_is_deterministic_and_valid() -> None:
-    a = generate(_with_start("random"), 7)  # type: ignore[arg-type]
-    b = generate(_with_start("random"), 7)  # type: ignore[arg-type]
+    a = generate_with_player(_with_start("random"), 7)  # type: ignore[arg-type]
+    b = generate_with_player(_with_start("random"), 7)  # type: ignore[arg-type]
     start_a = a.ships[a.players[1].ship_id].sector_id
     assert start_a in a.sectors  # a real sector
     assert start_a == b.ships[b.players[1].ship_id].sector_id  # reproducible from the seed
@@ -135,7 +138,7 @@ def test_stardock_route_starts_explored(seed: int) -> None:
     Only the shortest path is revealed — the rest of the universe stays fogged —
     and the breadcrumb chain matches it, so `TravelTo(dock)` works on turn one.
     """
-    state = generate(CONFIG, seed)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
     player = state.players[1]
     dock = next(p for p in state.ports.values() if p.klass is PortClass.STARDOCK)
 

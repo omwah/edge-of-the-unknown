@@ -27,11 +27,11 @@ from edge.core.rules import (
     apply_result,
     reduce,
 )
-from edge.bigbang.generator import generate
 from edge.server import session
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
 from edge.store.snapshots import state_hash
+from helpers import generate_with_player
 
 CFG = load_default_config()
 SMALL = CFG.model_copy(update={"bigbang": CFG.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1})})
@@ -39,7 +39,7 @@ _CREATED = "2026-06-18T00:00:00Z"
 
 
 def _world(seed: int = 1) -> UniverseState:
-    return generate(SMALL, seed)
+    return generate_with_player(SMALL, seed)
 
 
 def _inject(state: UniverseState, roster_id: str, *, base: float = 0.85,

@@ -1,11 +1,15 @@
-"""Populate the universe: ports, the StarDock, planets, and the player (DESIGN §5 step 7).
+"""Populate the universe: ports, the StarDock, and planets (DESIGN §5 step 7).
 
 Phase-1 subset: standard ports at config density with the terminal-space class
 split; one StarDock placed a few hops out; a *guaranteed* opposed-class port pair
 near the Core so a new player can always earn (the §5 profitable-pair promise);
-band-weighted planet *types* (no production/ownership yet); a Federation alliance
-stub with the player seeded as its member. Aliens, home clusters, discoveries,
-and planet ownership are deferred to Phase 2.
+band-weighted planet *types* (no production/ownership yet). Aliens, home clusters,
+discoveries, and planet ownership are deferred to Phase 2.
+
+The **player is not created here.** Enrolling a player is a recorded `JoinGame`
+command (`core.rules`), not part of seed-derived universe generation — so a player
+survives a save/load round-trip via the command log and multiple players can join
+the same universe (DESIGN §3). `populate` builds only the shared, seed-derived world.
 """
 
 from __future__ import annotations
@@ -16,16 +20,13 @@ from dataclasses import replace
 from edge.bigbang.topology import bfs_distances
 from edge.core.config import GameConfig
 from edge.core.economy import capacity_for_size
-from edge.core.engine_room import apply_derived, build_layouts, build_subsystems
-from edge.core.movement import shortest_path
+from edge.core.engine_room import build_layouts
 from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass, Subsystem
 from edge.core.models import (
     Ownership,
     Planet,
-    Player,
     Port,
     PortCommodity,
-    Ship,
     Starbase,
     SubsystemState,
     UNOWNED,
@@ -92,17 +93,6 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     ] or [s for s in sector_ids if s not in range(1, cfg.core_sector_count + 1)]
     dock_sector = rng.choice(dock_candidates)
 
-    # Resolve the player's start sector (config): the StarDock, a seeded random sector,
-    # or a specific id. "random" uses a *dedicated* sub-RNG so the build-RNG order (and
-    # the golden-master replays keyed off it) stays stable.
-    start_cfg = cfg.start_sector
-    if start_cfg == "stardock":
-        start_sector = dock_sector
-    elif start_cfg == "random":
-        start_sector = random.Random(f"{state.game.seed}-start").choice(sector_ids)
-    else:
-        start_sector = start_cfg if start_cfg in state.sectors else 1
-
     ports: dict[int, Port] = {}
     used_sectors: set[int] = {dock_sector}
     pid = 1
@@ -152,42 +142,8 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     # ownership roll uses its own sub-RNG (golden-master ordering).
     _finalize_planets(state, config)
     _place_starbases(state, config)
-
-    # --- player + starter ship -----------------------------------------------
-    # Alliances are seeded from the roster by `populate_species` (§6.3); the player
-    # starts as a member of whichever bloc governs the Core (the Federation in the
-    # default roster). No alliance is privileged in the schema (CLAUDE.md).
-    gov = state.game.core_governing_alliance_id
-    sc = config.starter_ship
-    # The player hull carries the engine-room model (§4.1): build its subsystems
-    # from the class layout, then derive-on-write its aspect scalars so the stored
-    # shields/warp/combat match the slotted parts (the flat config values are the
-    # NPC fallback / caps). The Trailblazer's minimal layout derives exactly the
-    # Phase-1 flat numbers (a regression pin, PHASE2_PLAN WP1).
-    starter = Ship(
-        id=1, type_id=sc.id, name=sc.name, owner_player_id=1, sector_id=start_sector,
-        holds_total=sc.holds_total, hull_current=sc.hull_max, hull_max=sc.hull_max,
-        shields=sc.shields_max, warp_speed=sc.warp_speed, combat_speed=sc.combat_speed,
-        cloak_rating=sc.cloak_rating, sensor_rating=sc.sensor_rating,
-        turns_per_warp=sc.turns_per_warp, colonist_capacity=sc.colonist_capacity,
-        subsystems=build_subsystems(sc),
-    )
-    state.ships = {1: apply_derived(starter, config)}
-    # StarDock is an auto-known route: the shortest path from the start sector to the
-    # dock opens pre-explored so the opening signpost is actionable (the player can
-    # `TravelTo` it on turn one); the rest of the universe stays fogged. The route is
-    # recorded as the breadcrumb chain so the way back reads correctly. When the player
-    # starts *at* the dock this collapses to a single explored sector with no breadcrumb.
-    dock_route = shortest_path(state.adjacency, start_sector, dock_sector) or [start_sector]
-    entered_from = {dock_route[i + 1]: dock_route[i] for i in range(len(dock_route) - 1)}
-    state.players = {
-        1: Player(
-            id=1, name="Trailblazer", ship_id=1,
-            latinum=config.economy.starting_latinum, bank_balance=config.economy.starting_bank,
-            turns_remaining=config.turns_per_day, alliance_id=gov,
-            explored_sectors=frozenset(dock_route), entered_from=entered_from,
-        )
-    }
+    # The player is enrolled separately by the `JoinGame` reducer (`core.rules`), not
+    # seeded here — joining is a recorded command, not seed-derived world generation.
 
 
 def _finalize_planets(state: UniverseState, config: GameConfig) -> None:

@@ -20,6 +20,7 @@ from edge.core.rules import (
     Deposit,
     Dock,
     HaggleOffer,
+    JoinGame,
     Trade,
     Warp,
     Withdraw,
@@ -48,7 +49,10 @@ def _scripted_commands(state: object) -> list[tuple[int, Command]]:
     dock = next(p for p in state.ports.values() if p.klass is PortClass.STARDOCK)  # type: ignore[attr-defined]
     path = shortest_path(state.adjacency, 1, dock.sector_id)  # type: ignore[attr-defined]
     assert path is not None
-    commands: list[tuple[int, Command]] = [(1, Warp(to_sector=s)) for s in path[1:]]
+    # The player joins via a recorded JoinGame (the big bang no longer seeds players),
+    # so it leads the log and `rebuild` reconstructs the player before replaying the rest.
+    commands: list[tuple[int, Command]] = [(1, JoinGame())]
+    commands += [(1, Warp(to_sector=s)) for s in path[1:]]
     commands += [
         (1, Dock()),
         (1, Trade(commodity=Commodity.FUEL_ORE, units=5)),

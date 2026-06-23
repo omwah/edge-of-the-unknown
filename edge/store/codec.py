@@ -62,6 +62,7 @@ from edge.core.rules import (
     Hail,
     HaggleOffer,
     InstallComponent,
+    JoinGame,
     RecruitColonists,
     RepairAtDock,
     Salvage,
@@ -77,6 +78,8 @@ from edge.core.rules import (
 def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
     """A (type tag, JSON-able payload) pair for a command."""
     match command:
+        case JoinGame():
+            return "JoinGame", {"name": command.name}
         case Warp():
             return "Warp", {"to_sector": command.to_sector}
         case TravelTo():
@@ -163,6 +166,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
 def decode_command(type_: str, payload: dict[str, Any]) -> Command:
     """Reconstruct a command from its persisted (type, payload)."""
     match type_:
+        case "JoinGame":
+            return JoinGame(name=payload["name"])
         case "Warp":
             return Warp(to_sector=payload["to_sector"])
         case "TravelTo":

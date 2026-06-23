@@ -19,7 +19,7 @@ from edge.core.config import GameConfig
 from edge.core.enums import Commodity
 from edge.core.events import Event
 from edge.core.models import UniverseState
-from edge.core.rules import Command, ReduceResult, apply_result, reduce
+from edge.core.rules import Command, JoinGame, ReduceResult, apply_result, reduce
 from edge.engine.cron import resolve_cron
 from edge.server import session
 from edge.store.repo import EngineState, Repository
@@ -39,10 +39,18 @@ class GameService:
     @classmethod
     def new_game(cls, config: GameConfig, seed: int, repo: Repository, *,
                  created_at: str = "1970-01-01T00:00:00Z") -> GameService:
-        """Generate a fresh universe, persist its meta, and return a service."""
+        """Generate a fresh universe, persist its meta, enroll player 1, and return.
+
+        The big bang seeds only the shared world; the player is enrolled by appending
+        a `JoinGame` command (DESIGN §3), so it lands in the durable log and `load_game`
+        replays it to reconstruct the player deterministically — the same path a second
+        player would join by in multiplayer.
+        """
         state = generate(config, seed, created_at=created_at)
         repo.save_meta(state.game)
-        return cls(state, config, repo)
+        service = cls(state, config, repo)
+        service.apply(1, JoinGame())
+        return service
 
     @classmethod
     def load_game(cls, config: GameConfig, repo: Repository) -> GameService:
