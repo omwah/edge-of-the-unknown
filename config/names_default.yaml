@@ -1,0 +1,328 @@
+regions:
+  first_part:
+    - Halaf
+    - Vega
+    - Mirach
+    - Orin
+    - Cygnus
+    - Halcyon
+    - Tsoraan
+    - Verdani
+    - Kessrin
+    - Drelb
+    - Sol
+    - Antares
+    - Lyra
+    - Nexus
+    - Termina
+    - Trantos
+    - Corusca
+    - Corellis
+    - Mandalia
+    - Kryptos
+    - Gallifra
+    - Caprico
+    - Kobal
+    - Solaris
+  second_part:
+    - Run
+    - Reach
+    - Verge
+    - Span
+    - Cluster
+    - Drift
+    - Expanse
+    - Marches
+    - Belt
+    - Gate
+    - Zone
+    - Hollow
+    - Sector
+    - Territory
+    - Quadrant
+    - System
+
+ports:
+  first_part:
+    - Vos
+    - Port
+    - Eros
+    - Tycho
+    - Ceres
+    - Medina
+    - Anchorhold
+    - Otoa
+    - Free
+    - High
+    - Low
+    - Outer
+    - Inner
+    - Grand
+    - Trade
+    - Smuggler
+    - Pirate
+    - Outlaw
+    - Neutral
+    - Alliance
+    - Republic
+    - Imperial
+    - Colonial
+    - Talon
+    - Echo
+    - Corsair
+    - Star
+    - Astra
+    - Nova
+    - Crimson
+    - Shadow
+    - Black
+    - Red
+    - Blue
+    - Gold
+    - Iron
+    - Steel
+    - Silver
+    - Crystal
+    - Void
+    - Drift
+    - Far
+    - Edge
+    - Border
+    - Frontier
+  second_part:
+    - Eisley
+    - Royal
+    - Station
+    - Terminal
+    - Dock
+    - Haven
+    - Point
+    - Gunga
+    - City
+    - Town
+    - Post
+    - Garrison
+    - Hub
+    - Nexus
+    - Port
+    - Landing
+    - Base
+    - Outpost
+    - Depot
+    - Market
+    - Bazaar
+    - Exchange
+    - Den
+    - Hideout
+    - Refuge
+    - Sanctuary
+    - Hold
+    - Keep
+    - Citadel
+    - Spire
+    - Tower
+    - Ring
+    - Orbital
+    - Platform
+    - Array
+    - Complex
+    - Facility
+    - Yard
+    - Works
+
+stardock:
+  first_part:
+    - Deep Void
+    - Empol
+    - Teron
+    - Babylos
+    - Farpeak
+    - Citadel
+    - Omega
+    - Alpha
+    - Starbase
+    - Gateway
+    - Vanguard
+    - Zenith
+    - Apex
+    - Pinnacle
+    - Crown
+  second_part:
+    - Nine
+    - Nor
+    - Five
+    - Station
+    - Base
+    - Outpost
+    - Command
+    - Prime
+    - One
+    - Two
+    - Three
+    - Alpha
+    - Beta
+    - Omega
+
+planets:
+  terrestrial:
+    first_part:
+      - Hyperion
+      - Pacem
+      - Lusus
+      - Hebron
+      - Renaissance
+      - Parvati
+      - God's Grove
+      - Tatooia
+      - Alderia
+      - Hotha
+      - Endora
+      - Naboa
+      - Volcanis
+      - Romulia
+      - Kronos
+      - Arrako
+      - Caladra
+      - Gieda
+      - Salus
+      - Trantos
+      - Termina
+      - Earth
+      - Mars
+      - Ilia
+      - New Terra
+      - Risia
+      - Bajora
+      - Cardis
+      - Bolaris
+      - Betaza
+      - Andoris
+      - Tellos
+      - Rylos
+      - Kashya
+      - Geonos
+      - Kamina
+      - Mustafo
+      - Dagobo
+      - Bespia
+      - Corusca
+      - Corellis
+      - Mandalia
+    second_part:
+      - Prime
+      - Alpha
+      - Beta
+      - Gamma
+      - Delta
+      - Epsilon
+      - I
+      - II
+      - III
+      - IV
+      - V
+      - VI
+      - VII
+      - VIII
+      - IX
+      - X
+      - Major
+      - Minor
+      - Secundus
+
+  jovian:
+    first_part:
+      - Bespia
+      - Jupiter
+      - Saturn
+      - Yavina
+      - Endora
+      - Polis Masso
+      - Boreal
+      - Q'tah
+      - Valyria
+      - Otoa
+      - Polyphemos
+      - Tempest
+      - Zephyr
+      - Maelstrom
+      - Vortex
+    second_part:
+      - Gas Giant
+      - Major
+      - Prime
+      - Alpha
+      - IV
+      - V
+      - VI
+      - VII
+      - VIII
+      - Storm
+      - Cloud
+      - Expanse
+
+  barren:
+    first_part:
+      - Geonos
+      - Mustafo
+      - Korribos
+      - Exegos
+      - LV-427
+      - Acheros
+      - Fioris
+      - Ceti Alphan
+      - Crematoris
+      - Morabos
+      - Dathomis
+      - Malachos
+      - Tatooia
+      - Jakkos
+      - Arrako
+      - Tartaros
+      - Hados
+      - Pluto
+    second_part:
+      - Wastes
+      - Desolation
+      - Rock
+      - V
+      - Prime
+      - Minor
+      - Major
+      - Alpha
+      - Beta
+      - Gamma
+      - Delta
+      - Ruin
+
+  asteroid_belt:
+    first_part:
+      - Ceres
+      - Eros
+      - Pallas
+      - Vesta
+      - Hotha
+      - Oort
+      - Kuiper
+      - Kepler
+      - Dax
+      - Halo
+      - Icarus
+      - Apollo
+      - Aten
+      - Amor
+      - Trojan
+      - Centaur
+      - Hilda
+      - Cybele
+      - Thule
+    second_part:
+      - Belt
+      - Field
+      - Ring
+      - Cluster
+      - Cloud
+      - Debris
+      - Remnant
+      - Shards
+      - Fragments
+      - Swarm

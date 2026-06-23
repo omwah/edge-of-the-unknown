@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import random
 from dataclasses import replace
+from collections import defaultdict
 
+from edge.bigbang.naming import NameGenerator
 from edge.bigbang.topology import bfs_distances
 from edge.core.config import GameConfig
 from edge.core.economy import capacity_for_size
@@ -39,11 +41,6 @@ _OWNERSHIP_SALT = 0x504C414E  # "PLAN"
 # A second independent salt for orbital-starbase placement (same discipline).
 _STARBASE_SALT = 0x42415345  # "BASE"
 
-_REGION_ADJ = ("Halaf", "Vega", "Mirach", "Orin", "Cygnus", "Halcyon", "Tsoraan",
-               "Verdani", "Kessrin", "Drelb", "Sol", "Antares", "Lyra", "Nexus")
-_REGION_NOUN = ("Run", "Reach", "Verge", "Span", "Cluster", "Drift", "Expanse",
-                "Marches", "Belt", "Gate", "Zone", "Hollow")
-
 _TRADE_CLASSES = [
     PortClass.CLASS_1, PortClass.CLASS_2, PortClass.CLASS_3, PortClass.CLASS_4,
     PortClass.CLASS_5, PortClass.CLASS_6, PortClass.CLASS_7, PortClass.CLASS_8,
@@ -59,10 +56,6 @@ _PLANET_WEIGHTS: dict[str, list[tuple[str, int]]] = {
              ("jovian", 3), ("barren", 4)],
     "Void": [("asteroid_belt", 4), ("barren", 5), ("jovian", 2), ("terrestrial_cold", 1)],
 }
-
-
-def region_name(rng: random.Random) -> str:
-    return f"{rng.choice(_REGION_ADJ)} {rng.choice(_REGION_NOUN)}"
 
 
 def _make_port(pid: int, sector_id: int, klass: PortClass, size: int, name: str,
@@ -93,10 +86,23 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     ] or [s for s in sector_ids if s not in range(1, cfg.core_sector_count + 1)]
     dock_sector = rng.choice(dock_candidates)
 
+    names_cfg = config.names
+    stardock_gen = NameGenerator(names_cfg.stardock if names_cfg else None, "StarDock", rng)
+    port_gen = NameGenerator(names_cfg.ports if names_cfg else None, "Port", rng)
+    
+    planet_gens = defaultdict(lambda: NameGenerator(None, "Planet", rng))
+    if names_cfg:
+        terr_gen = NameGenerator(names_cfg.planets.terrestrial, "Planet", rng)
+        for t in ["terrestrial_warm", "terrestrial_cool", "terrestrial_hot", "terrestrial_cold"]:
+            planet_gens[t] = terr_gen
+        planet_gens["jovian"] = NameGenerator(names_cfg.planets.jovian, "Planet", rng)
+        planet_gens["barren"] = NameGenerator(names_cfg.planets.barren, "Planet", rng)
+        planet_gens["asteroid_belt"] = NameGenerator(names_cfg.planets.asteroid_belt, "Asteroid", rng)
+
     ports: dict[int, Port] = {}
     used_sectors: set[int] = {dock_sector}
     pid = 1
-    ports[pid] = _make_port(pid, dock_sector, PortClass.STARDOCK, size=9, name="StarDock", rng=rng, config=config)
+    ports[pid] = _make_port(pid, dock_sector, PortClass.STARDOCK, size=9, name=stardock_gen.draw(), rng=rng, config=config)
     pid += 1
 
     # --- standard ports at config density ------------------------------------
@@ -105,7 +111,7 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
             continue
         klass = rng.choices(_TRADE_CLASSES, weights=cfg.port_class_distribution, k=1)[0]
         size = rng.randint(1, 5)
-        ports[pid] = _make_port(pid, sid, klass, size, f"Port {pid}", rng, config)
+        ports[pid] = _make_port(pid, sid, klass, size, port_gen.draw(), rng, config)
         used_sectors.add(sid)
         pid += 1
 
@@ -116,7 +122,8 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
         for sector, klass in ((a, PortClass.CLASS_1), (b, PortClass.CLASS_5)):
             existing = next((p for p in ports.values() if p.sector_id == sector), None)
             new_pid = existing.id if existing else pid
-            ports[new_pid] = _make_port(new_pid, sector, klass, size=4, name=f"Port {new_pid}", rng=rng, config=config)
+            p_name = existing.name if existing else port_gen.draw()
+            ports[new_pid] = _make_port(new_pid, sector, klass, size=4, name=p_name, rng=rng, config=config)
             # Mid-stock so the pair quotes a positive round-trip margin.
             ports[new_pid] = _mid_stock(ports[new_pid])
             if existing is None:
@@ -134,7 +141,7 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
         band = state.sectors[sid].distance_band
         choices = _PLANET_WEIGHTS.get(band, _PLANET_WEIGHTS["Void"])
         ptype = rng.choices([t for t, _ in choices], weights=[w for _, w in choices], k=1)[0]
-        planets[plid] = Planet(id=plid, sector_id=sid, name=f"Planet {plid}", planet_type=ptype)
+        planets[plid] = Planet(id=plid, sector_id=sid, name=planet_gens[ptype].draw(), planet_type=ptype)
         plid += 1
     state.planets = planets
     # Type-derived production shaping + band-weighted ownership (§4.2). Kept in a

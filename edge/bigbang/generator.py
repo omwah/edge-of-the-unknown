@@ -19,6 +19,7 @@ from edge.bigbang import populate as _populate
 from edge.bigbang import validate as _validate
 from edge.bigbang.aliens import populate_species
 from edge.bigbang.discoveries import salt_discoveries
+from edge.bigbang.naming import NameGenerator
 from edge.bigbang.numbering import assign_spatial_ids
 from edge.bigbang.topology import (
     OutEdges,
@@ -135,8 +136,12 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
 
         sector_to_region = {sid: gi + 1 for gi, group in enumerate(groups) for sid in group}
         core_ids = set(range(1, cfg.core_sector_count + 1))
+        
+        names_cfg = config.names
+        region_gen = NameGenerator(names_cfg.regions if names_cfg else None, "Region", build_rng)
+        
         state.regions = {
-            gi + 1: Region(id=gi + 1, name=_populate.region_name(build_rng))
+            gi + 1: Region(id=gi + 1, name=region_gen.draw())
             for gi in range(len(groups))
         }
         state.sectors = {

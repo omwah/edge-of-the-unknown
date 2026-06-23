@@ -34,6 +34,10 @@ def load_config(path: Path | str) -> GameConfig:
     if roster_file is not None and "roster" not in data:
         with open(path.parent / roster_file, encoding="utf-8") as fh:
             data["roster"] = yaml.safe_load(fh)
+    names_file = data.pop("names_file", None)
+    if names_file is not None and "names" not in data:
+        with open(path.parent / names_file, encoding="utf-8") as fh:
+            data["names"] = yaml.safe_load(fh)
     config = GameConfig.from_mapping(data)
     # Dialogue integrity (§13): only when the roster actually authors dialogue packs,
     # so a minimal/in-authoring roster still loads.
