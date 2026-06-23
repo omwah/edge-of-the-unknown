@@ -10,6 +10,7 @@ from edge.art.planet import PlanetGenerator
 from edge.art.starfield import StarfieldGenerator, STARFIELD_SUBTYPES
 from edge.art.port import PortGenerator, PORT_SUBTYPES
 from edge.art.ship import ShipGenerator, SHIP_SUBTYPES
+from edge.art.discovery import DiscoveryGenerator, DISCOVERY_GRAMMAR
 
 _TERRAIN_GEN = TerrainGenerator(use_fg_color=True, use_bg_color=True)
 _PLANET_TERRAIN_GEN = TerrainGenerator(use_fg_color=False, use_bg_color=True)
@@ -17,6 +18,7 @@ _PLANET_GEN = PlanetGenerator(terrain_gen=_PLANET_TERRAIN_GEN)
 _STARFIELD_GEN = StarfieldGenerator()
 _PORT_GEN = PortGenerator()
 _SHIP_GEN = ShipGenerator()
+_DISCOVERY_GEN = DiscoveryGenerator()
 
 
 def available_subtypes(entity_type: str) -> list[str]:
@@ -33,6 +35,8 @@ def available_subtypes(entity_type: str) -> list[str]:
         return list(PORT_SUBTYPES)
     if entity_type == "ship":
         return list(SHIP_SUBTYPES)
+    if entity_type == "discovery":
+        return list(DISCOVERY_GRAMMAR.keys())
     return []
 
 
@@ -59,7 +63,7 @@ def generate_sprite(
     """Generate a procedural ASCII sprite based on parameters.
 
     Args:
-        entity_type: "planet", "terrain", "ship", or "port"
+        entity_type: "planet", "terrain", "ship", "port", or "discovery"
         subtype: The specific role or type (e.g., "terrestrial_warm", "fighter")
         seed: The deterministic seed derived from game_seed and entity_id
         width: The target width in characters
@@ -95,5 +99,8 @@ def generate_sprite(
 
     if entity_type == "ship":
         return _SHIP_GEN.generate(rng, subtype, width, height, archetype_id, facing)
+
+    if entity_type == "discovery":
+        return _DISCOVERY_GEN.generate(rng, subtype, width, height, archetype_id)
 
     raise ValueError(f"Unknown entity type '{entity_type}'.")

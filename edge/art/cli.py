@@ -23,8 +23,7 @@ def banner(title: str, width: int, style: str = "bold white") -> Text:
 
 
 # Every renderable type, in page order. (ship/subsystem have no generator yet,
-# so they report no subtypes and are skipped.)
-_ALL_TYPES = ["port", "planet", "terrain", "starfield", "ship", "subsystem"]
+_ALL_TYPES = ["port", "planet", "terrain", "starfield", "ship", "subsystem", "discovery"]
 
 
 def _archetype_paged_sheets(
@@ -83,9 +82,9 @@ def _export_all_types(args: argparse.Namespace, parser: argparse.ArgumentParser)
         width = args.height * 2 if entity_type == "planet" else args.width
         height = args.height
 
-        # Ports and ships carry an archetype (style) axis -> paginate by
+        # Ports, ships, and discoveries carry an archetype (style) axis -> paginate by
         # archetype; other types have no styles, so they get a single page.
-        if entity_type in ("port", "ship"):
+        if entity_type in ("port", "ship", "discovery"):
             sheets.extend(
                 _archetype_paged_sheets(
                     entity_type,
@@ -131,7 +130,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--type",
         type=str,
         required=True,
-        choices=["planet", "terrain", "ship", "port", "subsystem", "starfield", "all"],
+        choices=["planet", "terrain", "ship", "port", "subsystem", "starfield", "discovery", "all"],
         help="The category of the entity to generate. 'all' sweeps every "
         "renderable type into a multi-page PDF (one page per type); requires "
         "--export.",
