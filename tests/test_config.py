@@ -110,6 +110,15 @@ def test_invalid_species_home_band_rejected() -> None:
         GameConfig.from_mapping(data)
 
 
+def test_presence_density_knobs() -> None:
+    roster = load_default_config().roster
+    assert roster is not None
+    assert roster.ships_per_home >= 1 and roster.home_cluster_radius >= 1
+    assert roster.core_traffic >= 0
+    # The default roster spells the "noticeably busy" values.
+    assert (roster.ships_per_home, roster.home_cluster_radius, roster.core_traffic) == (4, 2, 8)
+
+
 def test_config_is_frozen() -> None:
     cfg = load_default_config()
     with pytest.raises(ValidationError):

@@ -48,7 +48,7 @@ def _species(sid: int = 1, base: float = 0.7) -> AlienSpecies:
     )
 
 
-def _player(attitudes: dict[int, float] | None = None) -> Player:
+def _player(attitudes: dict[str, float] | None = None) -> Player:
     return Player(id=1, name="P", ship_id=1, latinum=0, species_attitudes=attitudes or {})
 
 
@@ -57,10 +57,10 @@ def _player(attitudes: dict[int, float] | None = None) -> Player:
 def test_effective_disposition_applies_offset_and_clamps() -> None:
     sp = _species(base=0.7)
     assert effective_disposition(sp, _player()) == pytest.approx(0.7)  # no offset yet
-    assert effective_disposition(sp, _player({1: 0.2})) == pytest.approx(0.9)
+    assert effective_disposition(sp, _player({"x": 0.2})) == pytest.approx(0.9)
     # Clamped to [0, 1] at both ends.
-    assert effective_disposition(sp, _player({1: 0.9})) == pytest.approx(1.0)
-    assert effective_disposition(sp, _player({1: -2.0})) == pytest.approx(0.0)
+    assert effective_disposition(sp, _player({"x": 0.9})) == pytest.approx(1.0)
+    assert effective_disposition(sp, _player({"x": -2.0})) == pytest.approx(0.0)
 
 
 def test_disposition_band_thresholds() -> None:
@@ -166,6 +166,44 @@ def test_stardock_hosts_at_least_two_core_welcome_species(seed: int) -> None:
     for sp in at_dock:
         assert sp.alliance_id in (gov, None)  # Core-welcome: governor's own or unaligned
         assert is_friendly(sp.base_disposition, CFG.aliens)
+
+
+def test_species_field_home_clusters_within_radius() -> None:
+    """A drawn species is met as a *cluster* of ships near its home, not a lone contact.
+
+    Checked on rival-bloc kinds (aligned, non-governor): they are never staged at the
+    StarDock or in the Core, so all their ships form a single BFS cluster around the home.
+    """
+    from collections import defaultdict
+
+    from edge.bigbang.topology import bfs_distances
+
+    radius = CFG.roster.home_cluster_radius  # type: ignore[union-attr]
+    checked = 0
+    for seed in range(10):
+        state = generate(WIDE, seed)
+        gov = state.game.core_governing_alliance_id
+        by_kind: dict[str, list] = defaultdict(list)
+        for sp in sorted(state.species.values(), key=lambda s: s.id):
+            by_kind[sp.roster_id].append(sp)
+        for ships in by_kind.values():
+            home = ships[0]
+            if home.alliance_id in (None, gov) or len(ships) < 2:
+                continue  # only pure band clusters (rival blocs) have a single home
+            dist = bfs_distances(state.adjacency, home.sector_id)
+            assert all(dist.get(s.sector_id, 10**9) <= radius for s in ships[1:])
+            checked += 1
+    assert checked  # at least one multi-ship cluster was verified
+
+
+def test_core_bustles_with_governing_traffic() -> None:
+    """The Core is busy with governing-alliance traffic — several ships, all governor's own."""
+    state = generate(WIDE, 1)
+    gov = state.game.core_governing_alliance_id
+    core_ids = {i for i, s in state.sectors.items() if s.is_galactic_core}
+    core_ships = [s for s in state.species.values() if s.sector_id in core_ids]
+    assert len(core_ships) >= CFG.roster.core_traffic  # type: ignore[union-attr]
+    assert all(s.alliance_id == gov for s in core_ships)  # Core barred to non-governor
 
 
 @pytest.mark.parametrize("seed", range(30))

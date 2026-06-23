@@ -23,8 +23,12 @@ def _clamp01(value: float) -> float:
 
 
 def attitude_offset(species: AlienSpecies, player: Player) -> float:
-    """The player's accumulated attitude offset toward `species` (0.0 if none yet)."""
-    return player.species_attitudes.get(species.id, 0.0)
+    """The player's accumulated attitude offset toward `species` (0.0 if none yet).
+
+    Keyed by `roster_id` (the species kind), so every ship of a species reads the same
+    standing — dealing with one Vesk vessel shifts the player's stance with all Vesk.
+    """
+    return player.species_attitudes.get(species.roster_id, 0.0)
 
 
 def effective_disposition(species: AlienSpecies, player: Player) -> float:

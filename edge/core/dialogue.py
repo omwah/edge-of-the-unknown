@@ -164,17 +164,18 @@ def select_line(chain: Sequence[DialoguePack], context: str, *, standing: str,
     return "", recency
 
 
-def encounter_rng(seed: int, species_id: int, context: str,
+def encounter_rng(seed: int, species_key: str, context: str,
                   recency: tuple[int, ...]) -> random.Random:
     """A deterministic RNG for line selection, reproducible under (seed, command log).
 
-    Seeded from the game seed, the species, the context, and the current recency ring,
-    so the projection (read-only) and the reducer (which advances the ring) agree on the
-    line, and replay reproduces it exactly. A **string** seed is used deliberately —
-    `random.Random` derives it via SHA-512, which is stable across processes (unlike the
-    hash-randomised `hash()` of a tuple), keeping `(seed, command log)` replay exact.
+    Seeded from the game seed, the species **kind** (`roster_id`), the context, and the
+    current recency ring, so the projection (read-only) and the reducer (which advances the
+    ring) agree on the line, and replay reproduces it exactly. Keying by kind means every
+    ship of a species draws from one shared, non-repeating dialogue ring. A **string** seed
+    is used deliberately — `random.Random` derives it via SHA-512, which is stable across
+    processes (unlike the hash-randomised `hash()` of a tuple), keeping replay exact.
     """
-    return random.Random(f"{seed}|{species_id}|{context}|{recency}")
+    return random.Random(f"{seed}|{species_key}|{context}|{recency}")
 
 
 def speak(roster: RosterConfig, species: AlienSpecies, player: Player, context: str, *,
@@ -186,7 +187,7 @@ def speak(roster: RosterConfig, species: AlienSpecies, player: Player, context: 
     Resolves the species' standing from its effective disposition (Phase 2: friendly /
     allied), builds the pack chain, seeds the interaction context with the common
     `{player}` / `{species}` / `{alliance}` placeholders, and reads the current recency
-    ring from the player. The caller stores the returned ring at `(species.id, context)`.
+    ring from the player. The caller stores the returned ring at `(roster_id, context)`.
     """
     sc = roster.species_by_id(species.roster_id)
     chain = build_chain(roster, sc, species.persona)
@@ -199,7 +200,7 @@ def speak(roster: RosterConfig, species: AlienSpecies, player: Player, context: 
     }
     if extra:
         ctx.update(extra)
-    recency = player.dialogue_recency.get((species.id, context), ())
+    recency = player.dialogue_recency.get((species.roster_id, context), ())
     return select_line(chain, context, standing=standing, treaty=treaty, ctx=ctx,
                        recency=recency, rng=rng, k=roster.recency_k)
 

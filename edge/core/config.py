@@ -567,6 +567,13 @@ class RosterConfig(BaseModel):
     # governor inhabits its own capital. Clamped to the available members and Core sectors;
     # the founding `leader` is always among them.
     core_population: int = Field(default=3, ge=1)
+    # Density knobs (DESIGN §6.3): a species is not a lone contact — it fields a cluster of
+    # ships around its home sector, and the Core bustles with governing-alliance traffic.
+    # All ships of one species share its kind's reputation/dossier (keyed by `roster_id`),
+    # so denser presence never fragments standing.
+    ships_per_home: int = Field(default=4, ge=1)      # ships per species home cluster (incl. home)
+    home_cluster_radius: int = Field(default=2, ge=1)  # BFS hop radius for the satellites
+    core_traffic: int = Field(default=8, ge=0)         # extra governing-member ships filling the Core
     # Persona id → a shareable dialogue pack of generic, voice-correct lines (§6.7). A
     # species inherits its `persona`'s pack and overrides only distinctive beats; the
     # special `generic` persona is the ultimate fallback so a line never blanks.

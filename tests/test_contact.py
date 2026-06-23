@@ -76,8 +76,8 @@ def test_hail_marks_met_and_advances_recency() -> None:
     res = reduce(state, 1, Hail(sp.id), CFG)
     apply_result(state, res)
     player = state.players[1]
-    assert sp.id in player.species_attitudes  # met
-    assert player.dialogue_recency[(sp.id, "greeting")]  # ring advanced
+    assert sp.roster_id in player.species_attitudes  # met (reputation keyed by kind)
+    assert player.dialogue_recency[(sp.roster_id, "greeting")]  # ring advanced
     # Hail is now Converse(greeting): it speaks the greeting via the general path (WP17).
     assert [type(e).__name__ for e in res.events] == ["AlienSpoke"]
     assert res.events[0].context == "greeting"
@@ -110,7 +110,7 @@ def test_converse_advances_ring_and_emits_alienspoke() -> None:
     apply_result(state, res)
     assert [type(e).__name__ for e in res.events] == ["AlienSpoke"]
     assert res.events[0].context == "farewell" and res.events[0].subject_id is None
-    assert state.players[1].dialogue_recency[(sp.id, "farewell")]  # that context's ring advanced
+    assert state.players[1].dialogue_recency[(sp.roster_id, "farewell")]  # that context's ring advanced
 
 
 def test_converse_dossier_other_carries_subject_and_rephrases() -> None:
@@ -122,7 +122,7 @@ def test_converse_dossier_other_carries_subject_and_rephrases() -> None:
     assert res.events[0].context == "dossier_other" and res.events[0].subject_id == selvani.id
     first = session.contact_view(state, 1, vesk.id, CFG)  # (renders dossier line for selvani)
     apply_result(state, res)
-    assert state.players[1].dialogue_recency[(vesk.id, "dossier_other")]
+    assert state.players[1].dialogue_recency[(vesk.roster_id, "dossier_other")]
     assert first is not None
 
 
@@ -316,6 +316,27 @@ def test_ask_about_is_gated_on_having_met_others_and_exposes_subjects() -> None:
     assert (b.id, "Selvani") in view2.subjects
 
 
+def test_reputation_is_shared_across_ships_of_one_species() -> None:
+    """Reputation is keyed by species kind: dealing with one ship moves standing with all
+    ships of that species, and the dossier lists the species once (§6.3 shared reputation)."""
+    state = _world()
+    here = _inject(state, "vesk", sid=1)  # a Vesk ship in the player's sector
+    elsewhere = replace(here, id=2, sector_id=here.sector_id + 500)  # another Vesk, far away
+    state.species[2] = elsewhere
+
+    before = effective_disposition(elsewhere, state.players[1])
+    idx = _offer_index("vesk", lambda o: o.mode == "latinum")
+    apply_result(state, reduce(state, 1, BuyAlienTech(here.id, idx), CFG))  # trade with ship 1
+
+    after = effective_disposition(state.species[2], state.players[1])  # ship 2's standing
+    assert after > before  # the whole Vesk kind warmed, not just the ship traded with
+    assert state.players[1].species_attitudes.keys() == {"vesk"}  # one entry, keyed by kind
+
+    # The Computer dossier shows a single Vesk row despite two Vesk ships.
+    vesk_rows = [d for d in session.computer_view(state, 1, CFG).dossier if d.species == "Vesk"]
+    assert len(vesk_rows) == 1
+
+
 def test_current_contact_view_finds_species_in_sector(tmp_path: Path) -> None:
     state = _world()
     _inject(state, "vesk")
@@ -379,12 +400,12 @@ def test_hail_replays_into_identical_state(tmp_path: Path) -> None:
     for hop in path[1:]:
         svc.apply(1, Warp(to_sector=hop))
     svc.apply(1, Hail(sp.id))
-    assert sp.id in svc.state.players[1].species_attitudes
+    assert sp.roster_id in svc.state.players[1].species_attitudes
     expected = state_hash(svc.state)
 
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "contact.db"))  # type: ignore[arg-type]
     assert state_hash(reloaded.state) == expected
-    assert sp.id in reloaded.state.players[1].species_attitudes
+    assert sp.roster_id in reloaded.state.players[1].species_attitudes
 
 
 def test_converse_chain_replays_into_identical_state(tmp_path: Path) -> None:
@@ -403,7 +424,7 @@ def test_converse_chain_replays_into_identical_state(tmp_path: Path) -> None:
     svc.apply(1, Converse(sp.id, "dossier_other", subject_id=sp.id))
     svc.apply(1, Converse(sp.id, "farewell"))
     expected = state_hash(svc.state)
-    assert svc.state.players[1].dialogue_recency[(sp.id, "farewell")]  # rings advanced
+    assert svc.state.players[1].dialogue_recency[(sp.roster_id, "farewell")]  # rings advanced
 
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "converse.db"))  # type: ignore[arg-type]
     assert state_hash(reloaded.state) == expected

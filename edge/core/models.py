@@ -321,20 +321,21 @@ class Player:
     # Recovered artifact barter-goods, keyed by ComponentTier name (count); the WP9
     # contact screen spends these against alien tech (§8 barter equivalence).
     artifacts: Mapping[str, int] = field(default_factory=dict)
-    # Per-species attitude offset (species_id -> offset), raised by trading/favours
+    # Per-species attitude offset (roster_id -> offset), raised by trading/favours
     # (lowered by aggression in Phase 3). Shifts a species' base disposition into its
-    # effective disposition (`core.aliens.effective_disposition`, §6). Empty until the
-    # player deals with a species (WP9).
-    species_attitudes: Mapping[int, float] = field(default_factory=dict)
-    # Where each species was last encountered (species_id -> sector_id), stamped at hail
+    # effective disposition (`core.aliens.effective_disposition`, §6). Keyed by the
+    # **species kind** (`AlienSpecies.roster_id`), not an individual ship, so every ship
+    # of a species shares one standing. Empty until the player deals with a species (WP9).
+    species_attitudes: Mapping[str, float] = field(default_factory=dict)
+    # Where each species was last encountered (roster_id -> sector_id), stamped at hail
     # time so the dossier records the contact point even after the alien moves on (§6,
     # alien-movement WP). Reconstructs under replay (set by the Hail reducer).
-    species_last_seen: Mapping[int, int] = field(default_factory=dict)
-    # Dialogue no-repeat ring (DESIGN §6.7): per (species_id, context) the last K
-    # variant indices spoken, so a repeat encounter rephrases rather than replays.
-    # Cosmetic but persisted (it rides the command log via contact commands, WP9) so
-    # dialogue stays reproducible from (seed, command log). Empty until first contact.
-    dialogue_recency: Mapping[tuple[int, str], tuple[int, ...]] = field(default_factory=dict)
+    species_last_seen: Mapping[str, int] = field(default_factory=dict)
+    # Dialogue no-repeat ring (DESIGN §6.7): per (roster_id, context) the last K variant
+    # indices spoken, so a repeat encounter rephrases rather than replays — shared across
+    # all ships of a species. Cosmetic but persisted (it rides the command log via contact
+    # commands, WP9) so dialogue stays reproducible from (seed, command log).
+    dialogue_recency: Mapping[tuple[str, str], tuple[int, ...]] = field(default_factory=dict)
     # Per-port haggle attempts made *today* (port_id -> non-accepted offer count, §8,
     # WP13). Drives the patience/history penalty and the per-day `max_rejections` close;
     # reset by the daily_turn_reset cron, so it reconstructs exactly under replay.

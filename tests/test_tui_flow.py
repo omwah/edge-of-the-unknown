@@ -457,7 +457,8 @@ async def test_click_ship_hails_that_specific_species() -> None:
         await _click_hotspot(pilot, scene, dest="contact", ref=2)  # click Selvani's sprite
         assert isinstance(app.screen, AlienContactScreen)
         met = svc.state.players[1].species_attitudes
-        assert 2 in met and 1 not in met  # hailed the clicked ship, not the first
+        # Reputation is keyed by species kind: clicking ship 2 hails the Selvani, not the Vesk.
+        assert "selvani" in met and "vesk" not in met
 
 
 async def test_click_planet_art_opens_survey() -> None:
@@ -806,7 +807,8 @@ async def test_say_do_menu_converse_and_trade() -> None:
             base_disposition=0.9, disposition_center=sc.disposition_center,
             disposition_variance=sc.disposition_variance, alliance_id=sc.alliance_id,
             trade_posture=sc.trade_posture, treaty_mode=sc.treaty_mode, persona=sc.persona)
-        svc.state.players[1] = replace(svc.state.players[1], species_attitudes={1: 0.0, 2: 0.0})
+        svc.state.players[1] = replace(svc.state.players[1],
+                                       species_attitudes={"selvani": 0.0, "vesk": 0.0})
 
         await pilot.press("h")  # hail the Selvani
         await pilot.pause()
