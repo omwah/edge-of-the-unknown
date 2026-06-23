@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from edge.bigbang.generator import generate
 from edge.config import GameConfig, load_default_config
 from edge.core.dev import DevPatch, DevPatchError
 from edge.core.enums import Component, ComponentTier
@@ -27,6 +26,7 @@ from edge.store.codec import (
 )
 from edge.store.repo import SqliteRepository
 from edge.store.snapshots import rebuild, state_hash
+from helpers import generate_with_player
 
 _CREATED = "2026-06-15T00:00:00Z"
 
@@ -40,7 +40,7 @@ def _config() -> GameConfig:
 
 def _state() -> tuple[UniverseState, GameConfig]:
     config = _config()
-    return generate(config, 42, created_at=_CREATED), config
+    return generate_with_player(config, 42, created_at=_CREATED), config
 
 
 def _apply(state: UniverseState, config: GameConfig, patch: DevPatch) -> None:

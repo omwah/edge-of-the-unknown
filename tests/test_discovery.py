@@ -6,11 +6,11 @@ from dataclasses import replace
 
 import pytest
 
-from edge.bigbang.generator import generate
 from edge.config import load_default_config
 from edge.core.discovery import is_detectable, rarity_value
 from edge.core.enums import PayloadKind, RarityTier
 from edge.core.rules import Descend, Explore, Salvage, Warp, apply_result, reduce
+from helpers import generate_with_player
 
 CONFIG = load_default_config().model_copy(
     update={"bigbang": load_default_config().bigbang.model_copy(update={"sector_count": 120})}
@@ -27,15 +27,15 @@ def _do(state: object, command: object, pid: int = 1) -> object:
 
 
 def test_discoveries_deterministic_from_seed() -> None:
-    a = generate(CONFIG, 11)  # type: ignore[arg-type]
-    b = generate(CONFIG, 11)  # type: ignore[arg-type]
+    a = generate_with_player(CONFIG, 11)  # type: ignore[arg-type]
+    b = generate_with_player(CONFIG, 11)  # type: ignore[arg-type]
     assert a.discoveries == b.discoveries and a.discoveries  # reproducible + non-empty
 
 
 @pytest.mark.parametrize("seed", range(40))
 def test_rarity_and_value_gradient_monotone(seed: int) -> None:
     """Mean rarity rank and value strictly increase across consecutive non-empty bands."""
-    state = generate(CONFIG, seed)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
     by_band: dict[str, list[tuple[int, int]]] = {}
     for d in state.discoveries.values():
         band = state.sectors[d.sector_id].distance_band
@@ -57,7 +57,7 @@ def test_rarity_and_value_gradient_monotone(seed: int) -> None:
 def _hidden_find_with_neighbor(seeds: range) -> tuple[object, object, int]:
     """First (state, hidden high-tier find, two-way neighbour sector) over `seeds`."""
     for seed in seeds:
-        state = generate(CONFIG, seed)  # type: ignore[arg-type]
+        state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
         for d in state.discoveries.values():
             if not (d.hidden and d.planet_id is None and d.rarity_tier.value >= 3):
                 continue
@@ -94,7 +94,7 @@ def test_sensor_gate_requires_reentry_after_upgrade() -> None:
 
 def test_nebula_interference_lowers_detection() -> None:
     """The nebula penalty pushes a marginal hidden find back under the threshold."""
-    state = generate(CONFIG, 5)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 5)  # type: ignore[arg-type]
     tier = RarityTier.RARE
     difficulty = CONFIG.discovery.sensor_difficulty[tier.name]  # type: ignore[union-attr]
     disc = next(d for d in state.discoveries.values()
@@ -122,7 +122,7 @@ def _park_and_detect(state: object, disc: object) -> None:
 
 
 def test_salvage_latinum_payload_credits_purse_and_logs_codex() -> None:
-    state = generate(CONFIG, 2)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 2)  # type: ignore[arg-type]
     disc = _space_find(state, PayloadKind.LATINUM)  # Common → latinum
     _park_and_detect(state, disc)
     before = state.players[1].latinum
@@ -133,7 +133,7 @@ def test_salvage_latinum_payload_credits_purse_and_logs_codex() -> None:
 
 
 def test_salvage_component_payload_into_hold() -> None:
-    state = generate(CONFIG, 8)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 8)  # type: ignore[arg-type]
     disc = _space_find(state, PayloadKind.COMPONENT)
     _park_and_detect(state, disc)
     key = (disc.payload.component, disc.payload.tier)
@@ -143,7 +143,7 @@ def test_salvage_component_payload_into_hold() -> None:
 
 
 def test_salvage_artifact_payload_into_barter_store() -> None:
-    state = generate(CONFIG, 4)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 4)  # type: ignore[arg-type]
     disc = _space_find(state, PayloadKind.ARTIFACT)
     _park_and_detect(state, disc)
     tier = disc.payload.barter_tier
@@ -153,7 +153,7 @@ def test_salvage_artifact_payload_into_barter_store() -> None:
 
 
 def test_double_salvage_rejected() -> None:
-    state = generate(CONFIG, 2)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 2)  # type: ignore[arg-type]
     disc = _space_find(state, PayloadKind.LATINUM)
     _park_and_detect(state, disc)
     _do(state, Salvage(discovery_id=disc.id))
@@ -171,7 +171,7 @@ def _planet_with_sites(min_sites: int = 2) -> tuple[object, int]:
     from collections import Counter
 
     for seed in range(40):
-        state = generate(CONFIG, seed)  # type: ignore[arg-type]
+        state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
         counts = Counter(d.planet_id for d in state.discoveries.values() if d.planet_id is not None)
         hit = next((pid for pid, n in counts.items() if n >= min_sites), None)
         if hit is not None:
@@ -226,7 +226,7 @@ def test_explore_sensor_gates_hidden_surface_sites() -> None:
 
     state = pid = None  # type: ignore[assignment]
     for seed in range(60):
-        st = generate(CONFIG, seed)  # type: ignore[arg-type]
+        st = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
         by_planet: dict[int, list[object]] = defaultdict(list)
         for d in st.discoveries.values():
             if d.planet_id is not None:

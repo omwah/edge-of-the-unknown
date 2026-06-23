@@ -6,7 +6,7 @@ from dataclasses import replace
 
 import pytest
 
-from edge.bigbang.generator import generate
+from helpers import generate_with_player
 from edge.config import load_default_config
 from edge.core.enums import PortClass
 from edge.core.events import GenesisDeployed
@@ -37,7 +37,7 @@ def _eligible_planet(state: object) -> object:
 
 
 def test_buy_genesis_at_stardock_costs_latinum() -> None:
-    state = generate(CONFIG, 7)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 7)  # type: ignore[arg-type]
     _at_stardock(state)
     before = state.players[1].latinum
     _do(state, BuyGenesis())
@@ -46,7 +46,7 @@ def test_buy_genesis_at_stardock_costs_latinum() -> None:
 
 
 def test_buy_genesis_requires_stardock() -> None:
-    state = generate(CONFIG, 7)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 7)  # type: ignore[arg-type]
     # Sit somewhere that isn't a StarDock.
     state.players[1] = replace(state.players[1], latinum=50_000)
     state.ships[1] = replace(state.ships[1], sector_id=1)
@@ -55,7 +55,7 @@ def test_buy_genesis_requires_stardock() -> None:
 
 
 def test_deploy_genesis_retypes_eligible_world() -> None:
-    state = generate(CONFIG, 7)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 7)  # type: ignore[arg-type]
     planet = _eligible_planet(state)
     assert not is_colonizable(planet.planet_type, CONFIG)  # a dead world to start
     state.ships[1] = replace(state.ships[1], sector_id=planet.sector_id, devices={_DEVICE: 1})
@@ -70,7 +70,7 @@ def test_deploy_genesis_retypes_eligible_world() -> None:
 
 
 def test_deploy_genesis_rejects_without_torpedo() -> None:
-    state = generate(CONFIG, 7)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 7)  # type: ignore[arg-type]
     planet = _eligible_planet(state)
     state.ships[1] = replace(state.ships[1], sector_id=planet.sector_id, devices={})
     with pytest.raises(Exception):
@@ -78,7 +78,7 @@ def test_deploy_genesis_rejects_without_torpedo() -> None:
 
 
 def test_deploy_genesis_rejects_owned_world() -> None:
-    state = generate(CONFIG, 7)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 7)  # type: ignore[arg-type]
     owned = next(pl for pl in state.planets.values() if pl.owner.is_owned)
     state.ships[1] = replace(state.ships[1], sector_id=owned.sector_id, devices={_DEVICE: 1})
     with pytest.raises(Exception):

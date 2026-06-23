@@ -14,6 +14,7 @@ engine-room work (InstallComponent, SwapComponent, Cannibalize, FieldPatch).
 
 from __future__ import annotations
 
+import random
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import assert_never
@@ -92,6 +93,20 @@ from edge.core.models import (
 from edge.core.movement import MovementError, can_warp, shortest_path
 
 # --- commands ---------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class JoinGame:
+    """Enroll a player into an already-generated universe (DESIGN §3).
+
+    Recorded in the command log like any other command, so `rebuild` replays it and
+    reconstructs the player deterministically — joining is a player action, not part
+    of seed-derived universe generation (`bigbang.populate` no longer seeds players).
+    The new player's id is the `player_id` the command is applied under; its start
+    sector / starting balances / starter hull are derived from config + world state.
+    """
+
+    name: str = "Trailblazer"
 
 
 @dataclass(frozen=True, slots=True)
@@ -334,7 +349,8 @@ class BarterArtifact:
 
 
 Command = (
-    Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
+    JoinGame
+    | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SetAllocation
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
@@ -390,6 +406,8 @@ def reduce(
 ) -> ReduceResult:
     """Validate `command` for `player_id` and return its delta + events."""
     match command:
+        case JoinGame():
+            return _join_game(state, player_id, command, config)
         case Warp():
             return _warp(state, player_id, command, config)
         case TravelTo():
@@ -457,6 +475,76 @@ def _player(state: UniverseState, player_id: int) -> Player:
 
 def _ship(state: UniverseState, player: Player) -> Ship:
     return state.ships[player.ship_id]
+
+
+def _resolve_start_sector(
+    state: UniverseState, config: GameConfig, dock_sector: int | None
+) -> int:
+    """Resolve the configured start sector (DESIGN §5): the StarDock, a seeded random
+    sector, or an explicit id. "random" draws from a *dedicated* sub-RNG so it never
+    perturbs the build-RNG order the golden-master replays are keyed off."""
+    start_cfg = config.bigbang.start_sector
+    if start_cfg == "stardock":
+        return dock_sector if dock_sector is not None else min(state.sectors)
+    if start_cfg == "random":
+        return random.Random(f"{state.game.seed}-start").choice(sorted(state.sectors))
+    return start_cfg if start_cfg in state.sectors else 1
+
+
+def _join_game(
+    state: UniverseState, player_id: int, command: JoinGame, config: GameConfig
+) -> ReduceResult:
+    """Enroll `player_id`: a starter hull at the config start sector, starting
+    balances/turns, membership of the Core's governing alliance, and the StarDock
+    auto-known as a pre-explored route (DESIGN §3, §5 step 7).
+
+    Player creation lives here — not in `bigbang.populate` — so a player is a recorded
+    command that `rebuild` replays, and multiple players can join one universe. The
+    block makes no build-RNG draw, so universe generation stays bit-identical.
+    """
+    if player_id in state.players:
+        raise MovementError(f"player {player_id} already joined")
+
+    dock_sector = next(
+        (p.sector_id for p in state.ports.values() if p.klass == PortClass.STARDOCK), None
+    )
+    start_sector = _resolve_start_sector(state, config, dock_sector)
+
+    # The player hull carries the engine-room model (§4.1): build its subsystems from
+    # the class layout, then derive-on-write its aspect scalars so the stored
+    # shields/warp/combat match the slotted parts (flat config values are the NPC
+    # fallback / caps). The Trailblazer's minimal layout derives the Phase-1 flat numbers.
+    ship_id = max(state.ships, default=0) + 1
+    sc = config.starter_ship
+    ship = apply_derived(
+        Ship(
+            id=ship_id, type_id=sc.id, name=sc.name, owner_player_id=player_id,
+            sector_id=start_sector, holds_total=sc.holds_total,
+            hull_current=sc.hull_max, hull_max=sc.hull_max, shields=sc.shields_max,
+            warp_speed=sc.warp_speed, combat_speed=sc.combat_speed,
+            cloak_rating=sc.cloak_rating, sensor_rating=sc.sensor_rating,
+            turns_per_warp=sc.turns_per_warp, colonist_capacity=sc.colonist_capacity,
+            subsystems=build_subsystems(sc),
+        ),
+        config,
+    )
+    # StarDock is an auto-known route: the shortest path from the start sector to the
+    # dock opens pre-explored so the opening signpost is actionable on turn one; the
+    # rest stays fogged. Recorded as the breadcrumb chain so the way back reads
+    # correctly. Starting *at* the dock collapses to a single explored sector.
+    dock_route = (
+        shortest_path(state.adjacency, start_sector, dock_sector)
+        if dock_sector is not None else None
+    ) or [start_sector]
+    entered_from = {dock_route[i + 1]: dock_route[i] for i in range(len(dock_route) - 1)}
+    player = Player(
+        id=player_id, name=command.name, ship_id=ship_id,
+        latinum=config.economy.starting_latinum, bank_balance=config.economy.starting_bank,
+        turns_remaining=config.turns_per_day,
+        alliance_id=state.game.core_governing_alliance_id,
+        explored_sectors=frozenset(dock_route), entered_from=entered_from,
+    )
+    return ReduceResult(players=(player,), ships=(ship,))
 
 
 def _docked_port(state: UniverseState, ship: Ship) -> Port:

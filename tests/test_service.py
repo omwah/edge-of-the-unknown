@@ -9,7 +9,7 @@ import pytest
 from edge.config import load_default_config
 from edge.core.enums import Commodity
 from edge.core.movement import MovementError, shortest_path
-from edge.core.rules import Dock, Trade, Warp
+from edge.core.rules import Dock, JoinGame, Trade, Warp
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
 from edge.store.snapshots import state_hash
@@ -95,6 +95,33 @@ def test_load_game_reconstructs_identical_state(tmp_path: Path) -> None:
 
     reloaded = GameService.load_game(_config(), SqliteRepository(tmp_path / "persist.db"))  # type: ignore[arg-type]
     assert state_hash(reloaded.state) == expected
+
+
+def test_second_player_joins_same_universe_and_survives_reload(tmp_path: Path) -> None:
+    """Enrolment is a recorded `JoinGame` (not seeded by the big bang), so a second
+    player joins the *same* universe by appending the command and is rebuilt on load —
+    the multiplayer seam (§3, §14 Phase 4)."""
+    svc = _service(tmp_path, "mp.db")
+    assert set(svc.state.players) == {1}  # only player 1 enrolled by new_game
+
+    svc.apply(2, JoinGame(name="Pathfinder"))
+    p2 = svc.state.players[2]
+    assert p2.name == "Pathfinder" and p2.alliance_id == svc.state.game.core_governing_alliance_id
+    # Distinct hull, owned by player 2 — no clash with player 1's ship.
+    assert p2.ship_id != svc.state.players[1].ship_id
+    assert svc.state.ships[p2.ship_id].owner_player_id == 2
+    expected = state_hash(svc.state)
+
+    # Both joins live in the command log, so reload reconstructs both players.
+    reloaded = GameService.load_game(_config(), SqliteRepository(tmp_path / "mp.db"))  # type: ignore[arg-type]
+    assert set(reloaded.state.players) == {1, 2}
+    assert state_hash(reloaded.state) == expected
+
+
+def test_double_join_same_id_rejected(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    with pytest.raises(MovementError):
+        svc.apply(1, JoinGame())  # player 1 already enrolled by new_game
 
 
 def test_load_game_replays_maintenance_ticks(tmp_path: Path) -> None:

@@ -12,6 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from edge.bigbang.generator import generate
+from helpers import generate_with_player
 from edge.config import load_default_config
 from edge.core.aliens import (
     FRIENDLY,
@@ -196,7 +197,7 @@ def test_species_placement_does_not_perturb_ports_or_planets() -> None:
 
 
 def test_no_roster_falls_back_to_federation_stub() -> None:
-    state = generate(SMALL.model_copy(update={"roster": None}), 1)
+    state = generate_with_player(SMALL.model_copy(update={"roster": None}), 1)
     assert state.alliances == {1: type(state.alliances[1])(id=1, name="Federation")}
     assert not state.species
     assert state.players[1].alliance_id == 1

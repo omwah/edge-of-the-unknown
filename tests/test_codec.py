@@ -58,6 +58,7 @@ from edge.core.rules import (
     Hail,
     HaggleOffer,
     InstallComponent,
+    JoinGame,
     RecruitColonists,
     RepairAtDock,
     Salvage,
@@ -72,6 +73,8 @@ from edge.core.dev import DevPatch
 from edge.store import codec
 
 COMMANDS: list[Command] = [
+    JoinGame(),
+    JoinGame(name="Pathfinder"),
     Warp(to_sector=12),
     TravelTo(to_sector=20),
     Dock(),
