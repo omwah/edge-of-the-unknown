@@ -1,24 +1,26 @@
-"""Config-driven alien dialogue (DESIGN §6.7) — pure core, no I/O.
+"""Salience dialogue selection (DESIGN §6.7) — pure, no I/O.
 
-A species' conversation is **data**, not code: its roster `dialogue_pack` maps a closed
-vocabulary of **context keys** (greeting, trade_open, treaty_grant, dossier_other, …) to
-lists of conditional **line entries**. Each entry carries a `when` predicate (matched
-against the player's standing band and whether a treaty is in force) and a pool of
-interchangeable **variants**. At runtime the selector:
+A species' conversation is **data**, not code: its roster `dialogue_pack` maps the closed
+vocabulary of **intent** keys (greeting, trade_open, dossier_other, …) to lists of
+conditional **line entries**. Each entry carries a `when` predicate and a pool of
+interchangeable **variants**. Selection follows the Valve "AI-driven dynamic dialog"
+(Ruskin, GDC 2012) / salience-based-narrative pattern: assemble a **fact dictionary** from
+the encounter state, score every entry whose criteria all hold by how *specific* it is
+(how many facts it pins), and let the **most-specific matching entry win** — ties broken by
+`weight` through the seeded RNG. The selector then:
 
   1. resolves the line by falling back up the chain **species → persona → generic**, so a
-     sparse roster entry still speaks in its persona's voice and a missing line never
-     blanks the screen;
-  2. keeps every entry whose `when` matches the encounter state and picks among them by
-     `weight` through the seeded RNG;
+     sparse roster entry still speaks in its persona's voice and a missing line never blanks;
+  2. among the winning pack, keeps the most-specific matching entry (Ruskin scoring);
   3. draws a variant from the chosen entry's pool **excluding the last K shown** (a small
      recency ring, `roster.recency_k`), so repeat encounters rephrase rather than replay;
   4. fills `{placeholders}` from an interaction-context dict.
 
-Selection routes through the seeded RNG and the persisted recency ring, so dialogue is
-reproducible from `(seed, command log)` — yet it is purely cosmetic, reporting outcomes
-the rules have already decided. Phase 2 reaches only the friendly-path contexts; combat /
-signature-mechanic prompts are authored-but-inert until Phase 3.
+`standing` and `treaty` are ordinary fact keys, so the Phase-2 friendly path ports
+unchanged; Phase 3 adds richer facts (player needs, intel availability) without touching the
+matcher. Selection routes through the seeded RNG and the persisted recency ring, so dialogue
+is reproducible from `(seed, command log)` — yet it is purely cosmetic, reporting outcomes
+the rules have already decided.
 """
 
 from __future__ import annotations
@@ -28,8 +30,15 @@ from collections.abc import Mapping, Sequence
 from string import Formatter
 
 from edge.core.aliens import FRIENDLY, HOSTILE, NEUTRAL, disposition_band, effective_disposition
-from edge.core.config import AliensConfig, DialoguePack, RosterConfig, SpeciesConfig
+from edge.core.config import AliensConfig, DialogueLine, DialoguePack, RosterConfig, SpeciesConfig
 from edge.core.models import AlienSpecies, Player
+from edge.dialogue import render
+from edge.dialogue.intents import (
+    DIALOGUE_CONTEXTS,
+    PEACEFUL_CONTEXTS,
+    allowed_placeholders,
+    is_known_context,
+)
 
 GENERIC_PERSONA = "generic"
 
@@ -39,41 +48,20 @@ ALLIED = "allied"
 WARY = "wary"
 STANDINGS = frozenset({ALLIED, FRIENDLY, NEUTRAL, WARY, HOSTILE})
 
-# The closed base vocabulary of context keys (DESIGN §6.7). Signature-mechanic prompts are
-# namespaced `sig.*` and validated separately (Phase 3); these are the always-present beats.
-DIALOGUE_CONTEXTS = (
-    "greeting", "trade_open", "trade_refuse",
-    "treaty_offer", "treaty_grant", "treaty_condition", "treaty_refuse",
-    "refuel", "extort_response", "demand", "reward",
-    "combat_open", "combat_taunt", "surrender", "flee_scorn", "betrayal",
-    "farewell", "dossier_self", "dossier_other",
-)
-
-# Placeholders every line may use, plus per-context extras (DESIGN §6.7 templates).
-_UNIVERSAL_PLACEHOLDERS = frozenset({"player", "species", "alliance"})
-_CONTEXT_PLACEHOLDERS: dict[str, frozenset[str]] = {
-    "dossier_other": frozenset({"subject"}),
-    "demand": frozenset({"subject", "count", "reward", "coords"}),
-    "reward": frozenset({"subject", "count", "reward"}),
-    "treaty_condition": frozenset({"subject", "count"}),
-    "combat_taunt": frozenset({"subject"}),
-    "betrayal": frozenset({"subject"}),
-}
-_SIG_PLACEHOLDERS = frozenset({"subject", "count", "reward", "coords", "item"})
-
-# The Phase-2 friendly-path contexts a contact can reach (combat / sig.* are Phase 3).
-_PEACEFUL_CONTEXTS = frozenset({
-    "greeting", "trade_open", "trade_refuse", "treaty_offer", "treaty_grant",
-    "treaty_condition", "treaty_refuse", "refuel", "extort_response", "farewell",
-    "dossier_self", "dossier_other",
-})
+# Re-export so external callers (server projection, rules) keep a single import surface.
+__all__ = [
+    "ALLIED", "FRIENDLY", "NEUTRAL", "WARY", "HOSTILE", "STANDINGS", "GENERIC_PERSONA",
+    "DIALOGUE_CONTEXTS", "PEACEFUL_CONTEXTS", "DialogueIntegrityError", "allowed_placeholders",
+    "standing_for", "build_chain", "select_line", "encounter_rng", "speak",
+    "reachable_contexts", "validate_dialogue",
+]
 
 
 class DialogueIntegrityError(Exception):
     """A roster's dialogue packs fail the §13 integrity checks."""
 
 
-# --- standing & predicate matching -----------------------------------------------
+# --- standing & predicate scoring ------------------------------------------------
 
 def standing_for(effective: float, *, allied: bool, aliens: AliensConfig) -> str:
     """Bucket an effective disposition into a standing band (allied overrides, §6.7)."""
@@ -82,28 +70,31 @@ def standing_for(effective: float, *, allied: bool, aliens: AliensConfig) -> str
     return disposition_band(effective, aliens)  # hostile / neutral / friendly
 
 
-def allowed_placeholders(context: str) -> frozenset[str]:
-    """The placeholder names a variant of `context` may use (validator + docs)."""
-    if context.startswith("sig."):
-        return _UNIVERSAL_PLACEHOLDERS | _SIG_PLACEHOLDERS
-    return _UNIVERSAL_PLACEHOLDERS | _CONTEXT_PLACEHOLDERS.get(context, frozenset())
+def _score(when: object, facts: Mapping[str, object]) -> int | None:
+    """Specificity of an entry whose criteria all hold, or `None` if it doesn't match.
 
-
-def _matches(when: object, standing: str, treaty: bool) -> bool:
-    """Whether a line entry's `when` predicate holds for the encounter state.
-
-    Phase 2 evaluates `standing` and `treaty`; the forward-compat `posture` / `stage`
-    fields can't be evaluated yet, so an entry that sets either is **excluded** in Phase 2
-    (it's a Phase-3 line) rather than matched blindly.
+    Specificity = the number of facts the `when` pins (standing + treaty + each general
+    `criteria` key). Phase 2 cannot evaluate the forward-compat `posture` / `stage` fields,
+    so an entry that sets either is **excluded** (it is a Phase-3 line) rather than matched.
     """
-    w = when
-    if getattr(w, "posture", None) is not None or getattr(w, "stage", None) is not None:
-        return False
-    if w.standing is not None and w.standing != standing:  # type: ignore[attr-defined]
-        return False
-    if w.treaty is not None and w.treaty != treaty:  # type: ignore[attr-defined]
-        return False
-    return True
+    if getattr(when, "posture", None) is not None or getattr(when, "stage", None) is not None:
+        return None
+    score = 0
+    standing = getattr(when, "standing", None)
+    if standing is not None:
+        if standing != facts.get("standing"):
+            return None
+        score += 1
+    treaty = getattr(when, "treaty", None)
+    if treaty is not None:
+        if treaty != facts.get("treaty"):
+            return None
+        score += 1
+    for key, want in getattr(when, "criteria", {}).items():
+        if facts.get(key) != want:
+            return None
+        score += 1
+    return score
 
 
 # --- selection -------------------------------------------------------------------
@@ -131,34 +122,58 @@ def _fill(template: str, ctx: Mapping[str, str]) -> str:
     return template.format_map(_Safe(ctx))
 
 
-def _pick_variant(variants: Sequence[str], recency: tuple[int, ...],
-                  rng: random.Random) -> int:
-    """A variant index avoiding the recency ring (falling back to the full pool)."""
-    fresh = [i for i in range(len(variants)) if i not in recency]
-    return rng.choice(fresh or list(range(len(variants))))
+def _pick_index(n: int, recency: tuple[int, ...], rng: random.Random) -> int:
+    """An index in [0, n) avoiding the recency ring (falling back to the full range)."""
+    fresh = [i for i in range(n) if i not in recency]
+    return rng.choice(fresh or list(range(n)))
+
+
+def _realise(entry: DialogueLine, *, ctx: Mapping[str, str], recency: tuple[int, ...],
+             rng: random.Random, shared: Mapping[str, Sequence[str]] | None) -> tuple[str, int]:
+    """Render one entry to (filled text, chosen ring index).
+
+    A `grammar` entry expands a Tracery grammar seeded from the RNG (the ring index rotates
+    the phrasing); a `variants` entry picks a phrasing avoiding the ring. Either way the
+    chosen index is returned so the caller advances the recency ring.
+    """
+    if entry.grammar:
+        idx = _pick_index(render.GRAMMAR_VARIANTS, recency, rng)
+        raw = render.expand(entry.grammar, shared=shared, seed=f"{rng.getrandbits(32)}|{idx}")
+        return _fill(raw, ctx), idx
+    idx = _pick_index(len(entry.variants), recency, rng)
+    return _fill(entry.variants[idx], ctx), idx
 
 
 def select_line(chain: Sequence[DialoguePack], context: str, *, standing: str,
                 treaty: bool, ctx: Mapping[str, str], recency: tuple[int, ...],
-                rng: random.Random, k: int = 2) -> tuple[str, tuple[int, ...]]:
+                rng: random.Random, k: int = 2,
+                facts: Mapping[str, object] | None = None,
+                shared: Mapping[str, Sequence[str]] | None = None) -> tuple[str, tuple[int, ...]]:
     """Resolve and render one line for `context`, returning (text, updated recency ring).
 
-    Walks the fallback chain; the first pack with a `when`-matching entry for `context`
-    wins. Picks an entry by weight, a variant avoiding the last `k` indices, fills
+    Walks the fallback chain; the first pack with any matching entry for `context` wins.
+    Within that pack the **most-specific** matching entry wins (Ruskin scoring), ties broken
+    by `weight` through the seeded RNG. Picks a variant avoiding the last `k` indices, fills
     placeholders, and returns the new recency ring (the caller persists it per
-    (species, context)). Returns ("", recency) only if nothing resolves — the validator
-    guarantees this cannot happen for a reachable context.
+    (species, context)). `standing`/`treaty` seed the fact dictionary; `facts` adds any
+    further encounter facts (player needs, intel availability — Phase 3). Returns
+    ("", recency) only if nothing resolves — the validator guarantees this cannot happen for
+    a reachable context.
     """
+    all_facts: dict[str, object] = {"standing": standing, "treaty": treaty}
+    if facts:
+        all_facts.update(facts)
     for pack in chain:
         entries = pack.get(context)
         if not entries:
             continue
-        matching = [e for e in entries if _matches(e.when, standing, treaty)]
-        if not matching:
+        scored = [(s, e) for e in entries if (s := _score(e.when, all_facts)) is not None]
+        if not scored:
             continue
-        entry = rng.choices(matching, weights=[e.weight for e in matching], k=1)[0]
-        idx = _pick_variant(entry.variants, recency, rng)
-        text = _fill(entry.variants[idx], ctx)
+        best = max(s for s, _ in scored)
+        winners = [e for s, e in scored if s == best]
+        entry = rng.choices(winners, weights=[e.weight for e in winners], k=1)[0]
+        text, idx = _realise(entry, ctx=ctx, recency=recency, rng=rng, shared=shared)
         new_recency = (*recency, idx)[-k:] if k > 0 else ()
         return text, new_recency
     return "", recency
@@ -181,7 +196,8 @@ def encounter_rng(seed: int, species_key: str, context: str,
 def speak(roster: RosterConfig, species: AlienSpecies, player: Player, context: str, *,
           aliens: AliensConfig, rng: random.Random,
           extra: Mapping[str, str] | None = None,
-          treaty: bool = False) -> tuple[str, tuple[int, ...]]:
+          treaty: bool = False,
+          facts: Mapping[str, object] | None = None) -> tuple[str, tuple[int, ...]]:
     """Convenience: select a line for a live encounter and return (text, new recency ring).
 
     Resolves the species' standing from its effective disposition (Phase 2: friendly /
@@ -202,14 +218,15 @@ def speak(roster: RosterConfig, species: AlienSpecies, player: Player, context: 
         ctx.update(extra)
     recency = player.dialogue_recency.get((species.roster_id, context), ())
     return select_line(chain, context, standing=standing, treaty=treaty, ctx=ctx,
-                       recency=recency, rng=rng, k=roster.recency_k)
+                       recency=recency, rng=rng, k=roster.recency_k, facts=facts,
+                       shared=roster.grammar)
 
 
 # --- validation (DESIGN §13 dialogue integrity) ----------------------------------
 
 def reachable_contexts(species: SpeciesConfig) -> frozenset[str]:
     """The friendly-path contexts a species can reach in Phase 2 (per its params, §6.7)."""
-    keys = set(_PEACEFUL_CONTEXTS)
+    keys = set(PEACEFUL_CONTEXTS)
     if species.trade_posture == "refuses":
         keys.discard("trade_open")
     else:
@@ -221,6 +238,11 @@ def reachable_contexts(species: SpeciesConfig) -> frozenset[str]:
 
 def _placeholders_in(template: str) -> set[str]:
     return {name for _, name, _, _ in Formatter().parse(template) if name}
+
+
+def _entry_strings(entry: DialogueLine) -> list[str]:
+    """Every authored template string in an entry (variant pool + grammar expansions)."""
+    return list(entry.variants) + render.grammar_strings(entry.grammar)
 
 
 def validate_dialogue(roster: RosterConfig) -> None:
@@ -243,11 +265,11 @@ def validate_dialogue(roster: RosterConfig) -> None:
     packs += [(f"species {s.id}", s.dialogue_pack) for s in roster.species if s.dialogue_pack]
     for label, pack in packs:
         for context, entries in pack.items():
-            if context not in DIALOGUE_CONTEXTS and not context.startswith("sig."):
+            if not is_known_context(context):
                 raise DialogueIntegrityError(f"{label}: unknown context key {context!r}")
             allowed = allowed_placeholders(context)
             for entry in entries:
-                for variant in entry.variants:
+                for variant in _entry_strings(entry):
                     bad = _placeholders_in(variant) - allowed
                     if bad:
                         raise DialogueIntegrityError(
@@ -261,7 +283,8 @@ def validate_dialogue(roster: RosterConfig) -> None:
             raise DialogueIntegrityError(f"generic persona missing a catch-all '{context}' line")
 
     # `dossier_other` must be parameterised so one line narrates any subject species.
-    if not any("subject" in _placeholders_in(v) for e in generic["dossier_other"] for v in e.variants):
+    if not any("subject" in _placeholders_in(v)
+               for e in generic["dossier_other"] for v in _entry_strings(e)):
         raise DialogueIntegrityError("generic dossier_other is not parameterised by {subject}")
 
     # Per-species: persona resolves, and every reachable context yields a line in all
@@ -276,7 +299,8 @@ def validate_dialogue(roster: RosterConfig) -> None:
             for standing in (ALLIED, FRIENDLY, NEUTRAL, HOSTILE):
                 for treaty in (False, True):
                     text, _ = select_line(chain, context, standing=standing, treaty=treaty,
-                                          ctx=ctx, recency=(), rng=probe, k=roster.recency_k)
+                                          ctx=ctx, recency=(), rng=probe, k=roster.recency_k,
+                                          shared=roster.grammar)
                     if not text:
                         raise DialogueIntegrityError(
                             f"species {sp.id!r} resolves no '{context}' line "
@@ -285,4 +309,7 @@ def validate_dialogue(roster: RosterConfig) -> None:
 
 
 def _is_catch_all(when: object) -> bool:
-    return all(getattr(when, f, None) is None for f in ("standing", "treaty", "posture", "stage"))
+    return (
+        all(getattr(when, f, None) is None for f in ("standing", "treaty", "posture", "stage"))
+        and not getattr(when, "criteria", {})
+    )

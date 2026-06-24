@@ -298,6 +298,37 @@ class Discovery:
 
 
 @dataclass(frozen=True, slots=True)
+class LocationRef:
+    """A pointer to a place of interest an alien may know about (DESIGN §6.7 intel).
+
+    `kind` is "discovery" | "starbase" (the headline tip targets: a rare relic/wreck, or a
+    forward base with better hardware); `ref` is the entity id; `sector_id` its containing
+    sector. Populated per species **kind** into `UniverseState.species_knowledge` at
+    generation, so a friendly alien can volunteer coordinates to somewhere unvisited.
+    """
+
+    kind: str
+    ref: int
+    sector_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class Lead:
+    """A coordinate tip the player accepted from an alien (DESIGN §6.7, the "map" mechanic).
+
+    A logged pointer to an as-yet-unvisited place, surfaced on the Computer/Map screen as a
+    plottable route. Rides the player's state (and so `state_hash`); it is appended by the
+    accept-lead command, so it reconstructs deterministically under `(seed, command log)`.
+    """
+
+    kind: str  # "discovery" | "starbase"
+    ref: int
+    sector_id: int
+    source_species: str  # roster_id of the alien that shared it
+    summary: str  # short human label for the Computer/Map screen
+
+
+@dataclass(frozen=True, slots=True)
 class Player:
     """The player (DESIGN §4). Starts as a member of the Core's governing alliance."""
 
@@ -340,6 +371,10 @@ class Player:
     # WP13). Drives the patience/history penalty and the per-day `max_rejections` close;
     # reset by the daily_turn_reset cron, so it reconstructs exactly under replay.
     haggle_attempts: Mapping[int, int] = field(default_factory=dict)
+    # Coordinate tips the player has accepted from aliens (DESIGN §6.7 intel) — pointers to
+    # unvisited places, plotted on the Computer/Map screen. Appended by the accept-lead
+    # command, so the log reconstructs them under replay.
+    leads: tuple[Lead, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -426,6 +461,11 @@ class UniverseState:
     # authoritative, so this never touches persistence or `state_hash`. Surfaced
     # only at the projection boundary; empty for hand-built (test) states.
     spatial_ids: dict[int, int] = field(default_factory=dict)
+    # Per species **kind** (roster_id), the places of interest that kind knows about and a
+    # friendly member may volunteer as a coordinate tip (DESIGN §6.7 intel). A generation-
+    # time cache rebuilt by the big bang (like `core_hops`/`spatial_ids`), excluded from
+    # `state_hash`; empty for hand-built (test) states until populated.
+    species_knowledge: dict[str, tuple[LocationRef, ...]] = field(default_factory=dict)
 
     @classmethod
     def new(cls, game: Game) -> UniverseState:

@@ -449,37 +449,60 @@ class PackConfig(BaseModel):
 
 
 class DialogueWhen(BaseModel):
-    """A line entry's `when` predicate (DESIGN §6.7).
+    """A line entry's criteria predicate (DESIGN §6.7, salience-scored selection).
 
-    Matched against encounter state: `standing` (the effective-disposition band, plus
-    an `allied` band when the player shares the species' alliance), whether a `treaty`
-    is in force, and — forward-compat for Phase 3 — the species' current `posture` /
-    a `stage` on its signature-mechanic or befriend ladder. An omitted field matches
-    anything; an entry with no fields is the catch-all default.
+    Matched against the encounter **fact dictionary**: `standing` (the effective-disposition
+    band, plus an `allied` band when the player shares the species' alliance), whether a
+    `treaty` is in force, any general `criteria` (arbitrary fact key → required value — e.g.
+    `low_fuel`, `has_intel_target` — for the Ruskin most-specific-wins matcher), and —
+    forward-compat for Phase 3 — the species' current `posture` / a `stage` on its
+    signature-mechanic or befriend ladder. An omitted field/empty `criteria` matches
+    anything; an entry that pins nothing is the catch-all default. A line's **specificity**
+    (how many facts it pins) decides ties: the most-specific matching entry wins.
     """
 
     model_config = _FROZEN
 
     standing: str | None = None  # allied / friendly / neutral / wary / hostile
     treaty: bool | None = None
+    # General encounter facts the line requires (fact key -> required value). Lets new
+    # facts (player needs, intel availability) gate lines without schema churn (§6.7).
+    criteria: dict[str, str | int | bool] = Field(default_factory=dict)
     posture: str | None = None  # forward-compat (trade_posture-gated lines)
     stage: str | None = None  # forward-compat (signature/befriend ladder stage)
 
 
 class DialogueLine(BaseModel):
-    """One conditional line entry (DESIGN §6.7): a `when` + a variant pool + weight.
+    """One conditional line entry (DESIGN §6.7): a `when` + a realisation + weight.
 
-    `variants` are interchangeable phrasings of the *same* beat (templated with
-    `{placeholders}`); the selector draws one through the seeded RNG avoiding the
-    recently-shown indices (the recency ring), and picks among matching entries by
-    `weight`.
+    A line realises its beat one of two ways, both templated with `{placeholders}`:
+
+    - **`variants`** — a pool of interchangeable phrasings; the selector draws one through
+      the seeded RNG avoiding the recently-shown indices (the recency ring); or
+    - **`grammar`** — a Tracery rule map (`symbol -> expansions`, expanded from `origin`),
+      authored offline so a compact grammar yields combinatorial variety at runtime
+      (`edge.dialogue.render`). The recency ring rotates the expansion so repeats rephrase.
+
+    Exactly one of the two must be non-empty. Among matching entries the most-specific wins,
+    ties broken by `weight`.
     """
 
     model_config = _FROZEN
 
-    variants: list[str] = Field(min_length=1)
+    variants: list[str] = Field(default_factory=list)
+    # Tracery grammar (`symbol -> expansions`); when set, realised by expanding `origin`.
+    # References to shared persona/global fragments resolve against `RosterConfig.grammar`.
+    grammar: dict[str, list[str]] = Field(default_factory=dict)
     when: DialogueWhen = DialogueWhen()
     weight: int = Field(default=1, ge=1)
+
+    @model_validator(mode="after")
+    def _check_realisation(self) -> DialogueLine:
+        if not self.variants and not self.grammar:
+            raise ValueError("a dialogue line needs non-empty `variants` or `grammar`")
+        if self.grammar and "origin" not in self.grammar:
+            raise ValueError("a grammar line must define an 'origin' symbol")
+        return self
 
 
 # A dialogue pack maps a context key (greeting, trade_open, dossier_other, …) to its
@@ -582,6 +605,10 @@ class RosterConfig(BaseModel):
     # special `generic` persona is the ultimate fallback so a line never blanks.
     personas: dict[str, DialoguePack] = Field(default_factory=dict)
     recency_k: int = Field(default=2, ge=0)  # dialogue no-repeat ring depth (§6.7)
+    # Shared Tracery fragments (`symbol -> expansions`) a line's `grammar` may reference —
+    # cross-persona vocabulary and persona-voice quirks authored once and reused (§6.7,
+    # `edge.dialogue.render`). Merged under each grammar entry, which overrides on collision.
+    grammar: dict[str, list[str]] = Field(default_factory=dict)
 
     def alliance(self, alliance_id: int) -> AllianceConfig | None:
         return next((a for a in self.alliances if a.id == alliance_id), None)

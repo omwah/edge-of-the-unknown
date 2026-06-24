@@ -13,7 +13,7 @@ import pytest
 
 from edge.config import load_default_config
 from edge.core.config import DialogueLine, DialogueWhen, RosterConfig
-from edge.core.dialogue import (
+from edge.dialogue import (
     ALLIED,
     FRIENDLY,
     HOSTILE,
@@ -84,6 +84,30 @@ def test_when_matches_standing_and_treaty() -> None:
                        recency=(), rng=rng)[0] == "treaty line"
     assert select_line([pack], "greeting", standing=NEUTRAL, treaty=False, ctx={},
                        recency=(), rng=rng)[0] == "default"
+
+
+def test_general_criteria_facts_gate_and_score() -> None:
+    # A line gated on a general fact (`has_intel_target`) only fires when the fact holds,
+    # and — pinning more facts — beats a less-specific standing-only line (Ruskin scoring).
+    pack = {"greeting": [
+        DialogueLine(variants=["intel"],
+                     when=DialogueWhen(standing=FRIENDLY, criteria={"has_intel_target": True})),
+        _line("just friendly", standing=FRIENDLY),
+        _line("default"),
+    ]}
+    rng = random.Random(11)
+    # Fact present → the 2-criteria intel line wins over the 1-criteria friendly line.
+    got, _ = select_line([pack], "greeting", standing=FRIENDLY, treaty=False, ctx={},
+                         recency=(), rng=rng, facts={"has_intel_target": True})
+    assert got == "intel"
+    # Fact absent → the intel line can't match; the friendly line wins.
+    got, _ = select_line([pack], "greeting", standing=FRIENDLY, treaty=False, ctx={},
+                         recency=(), rng=rng, facts={"has_intel_target": False})
+    assert got == "just friendly"
+    # Neither standing matches → catch-all default.
+    got, _ = select_line([pack], "greeting", standing=NEUTRAL, treaty=False, ctx={},
+                         recency=(), rng=rng)
+    assert got == "default"
 
 
 def test_forward_compat_posture_stage_entries_are_skipped_in_phase2() -> None:

@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 from edge.core.config import GameConfig
-from edge.core.dialogue import validate_dialogue
+from edge.dialogue import validate_dialogue
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "default.yaml"
 

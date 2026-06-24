@@ -296,3 +296,18 @@ class AttitudeChanged(Event):
     species_id: int
     offset: float
     effective: float
+
+
+@dataclass(frozen=True)
+class LeadAccepted(Event):
+    """The player accepted a coordinate tip from an alien (§6.7, the "map" mechanic).
+
+    Logs the place pointed to (`kind`/`ref`/`sector_id`) and the species that shared it,
+    so the leads list on the Computer/Map screen reconstructs under replay.
+    """
+
+    player_id: int
+    species_id: int
+    kind: str
+    ref: int
+    sector_id: int

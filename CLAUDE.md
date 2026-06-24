@@ -211,7 +211,11 @@ What each is for:
 ## Architecture rules (non-negotiable)
 
 - Layered, downward-only dependencies: `edge/core` (pure rules, **no I/O,
-  no async, no Textual imports**), `edge/bigbang` (generation, networkx),
+  no async, no Textual imports**), `edge/dialogue` (pure salience dialogue
+  system, DESIGN §6.7 — sits between the lower `edge.core` modules it imports
+  and `edge.core.rules`/`edge.server` which import it, so the graph stays
+  acyclic; its `dialogue/authoring/` subpackage is the **one dev-only impure
+  corner**, never imported by runtime), `edge/bigbang` (generation, networkx),
   `edge/engine` (asyncio background ticks), `edge/store` (SQLite behind a
   repository interface), `edge/server` (command -> event service; fog of
   war enforced at the `to_public(context)` serialization boundary),

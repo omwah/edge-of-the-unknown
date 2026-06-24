@@ -19,7 +19,7 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Footer, Static
 
 from edge.core import dto
-from edge.core.rules import BarterArtifact, BuyAlienTech, Converse
+from edge.core.rules import AcceptLead, BarterArtifact, BuyAlienTech, Converse
 from edge.server.service import GameService
 from edge.tui.widgets import ClickableEntry, bar
 
@@ -199,8 +199,23 @@ class AlienContactScreen(Screen):
             self.app.pop_screen()
         elif key in ("trade", "barter"):
             self._act_offer("latinum" if key == "trade" else "barter")
+        elif key == "accept_lead":
+            self._accept_lead()
         else:
             self.notify(verb.reason or "not available", timeout=2)
+
+    def _accept_lead(self) -> None:
+        """Log the coordinate tip the alien is offering (§6.7); confirm with its summary."""
+        if self._service is None:
+            return
+        summary = self._view().intel_summary
+        try:
+            self._service.apply(self._pid, AcceptLead(self._species_id))
+        except Exception as exc:  # core rejected it — surface the reason, stay put
+            self.notify(str(exc), timeout=2)
+            return
+        self.notify(f"Logged: {summary}" if summary else "Coordinates logged.", timeout=3)
+        self._reopen()
 
     def _say(self, context: str, subject_id: int | None, *, close: bool) -> None:
         if self._service is None:

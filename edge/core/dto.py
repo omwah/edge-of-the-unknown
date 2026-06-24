@@ -537,3 +537,16 @@ class ContactDTO:
     offers: list[TechOfferDTO]
     dossier: list[str]  # lines about other met species, in this species' voice
     subjects: list[tuple[int, str]] = field(default_factory=list)  # (id, name) of met others (WP17 Ask about…)
+    intel_summary: str = ""  # the coordinate tip on offer (§6.7), or "" if none available
+
+
+@dataclass(frozen=True)
+class LeadDTO:
+    """A coordinate tip the player has accepted (§6.7), as a plottable Computer/Map row."""
+
+    summary: str  # the human label logged at accept time
+    source: str  # the species that shared it (display name)
+    coords: int  # the destination's spatial display id
+    distance: int  # fewest-hop route length from the player's ship (-1 if unreachable)
+    turn_cost: int  # turns to fly the route
+    reachable: bool

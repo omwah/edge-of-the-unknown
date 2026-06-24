@@ -19,7 +19,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import assert_never
 
-from edge.core import dialogue
+from edge import dialogue
 from edge.core.aliens import effective_disposition
 from edge.core.dev import DevPatch, apply_dev_patch
 
@@ -67,6 +67,7 @@ from edge.core.events import (
     Event,
     GenesisDeployed,
     Haggled,
+    LeadAccepted,
     Repaired,
     ShipPurchased,
     SiteExplored,
@@ -81,6 +82,7 @@ from edge.core.models import (
     Discovery,
     Game,
     InstalledComponent,
+    Lead,
     Ownership,
     Planet,
     Player,
@@ -91,6 +93,7 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.movement import MovementError, can_warp, shortest_path
+from edge.dialogue.intel import IntelTarget, pick_intel_target
 
 # --- commands ---------------------------------------------------------------
 
@@ -348,6 +351,18 @@ class BarterArtifact:
     offer_index: int
 
 
+@dataclass(frozen=True, slots=True)
+class AcceptLead:
+    """Accept a coordinate tip an alien is offering (§6.7, the "map" mechanic, WP-intel).
+
+    The speaker must currently hold an intel target for the player (friendly standing + a
+    known, unvisited place); the tip is logged as a `Lead` on the Computer/Map screen. A
+    no-op if the species has nothing new to share or the lead is already logged.
+    """
+
+    species_id: int
+
+
 Command = (
     JoinGame
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
@@ -355,7 +370,7 @@ Command = (
     | RecruitColonists | Colonize | SetAllocation
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
-    | Hail | Converse | BuyAlienTech | BarterArtifact
+    | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
     | DevPatch  # dev/testing cheat (core.dev); recorded in the log like any command
 )
 
@@ -460,6 +475,8 @@ def reduce(
             return _buy_alien_tech(state, player_id, command, config)
         case BarterArtifact():
             return _barter_artifact(state, player_id, command, config)
+        case AcceptLead():
+            return _accept_lead(state, player_id, command, config)
         case DevPatch():
             return apply_dev_patch(state, player_id, command, config)
         case _ as unreachable:
@@ -1399,15 +1416,46 @@ def _converse(state: UniverseState, player_id: int, cmd: Converse,
         raise EconomyError(f"not something you can say here ({cmd.context})")
     assert config.roster is not None
     extra = _subject_extra(state, cmd.subject_id)
+    facts: dict[str, object] = {}
+    if cmd.context == "offer_coordinates":
+        # The intel mechanic: bind the tip's coordinates and signal whether one exists, so
+        # the line either hands over a route or admits the speaker knows nowhere new (§6.7).
+        target = pick_intel_target(state, player, species, aliens=config.aliens)
+        facts["has_intel_target"] = target is not None
+        if target is not None:
+            extra = {**extra, **target.bindings()}
     ring = player.dialogue_recency.get((species.roster_id, cmd.context), ())
     rng = dialogue.encounter_rng(state.game.seed, species.roster_id, cmd.context, ring)
     _, new_ring = dialogue.speak(config.roster, species, player, cmd.context,
-                                 aliens=config.aliens, rng=rng, extra=extra)
+                                 aliens=config.aliens, rng=rng, extra=extra, facts=facts)
     new_player = replace(
         player, species_attitudes=_met(player, species.roster_id),
         species_last_seen={**player.species_last_seen, species.roster_id: ship.sector_id},
         dialogue_recency=_advance_recency(player, species.roster_id, cmd.context, new_ring))
     event = AlienSpoke(player_id, species.id, cmd.context, cmd.subject_id)
+    return ReduceResult(events=(event,), players=(new_player,))
+
+
+def _accept_lead(state: UniverseState, player_id: int, cmd: AcceptLead,
+                 config: GameConfig) -> ReduceResult:
+    """Log the coordinate tip the species is offering as a `Lead` (§6.7, the map mechanic).
+
+    Guards mirror conversation: the species must be in the player's sector and currently
+    hold an intel target. A tip already in the leads log is never re-offered (the planner
+    excludes it), so this never stacks duplicates — a re-accept simply finds nothing new.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    species = _species_here(state, ship, cmd.species_id)
+    target: IntelTarget | None = pick_intel_target(state, player, species, aliens=config.aliens)
+    if target is None:
+        raise EconomyError("they have no coordinates to share")
+    lead = Lead(kind=target.ref.kind, ref=target.ref.ref, sector_id=target.ref.sector_id,
+                source_species=species.roster_id, summary=target.summary())
+    new_player = replace(player, leads=(*player.leads, lead),
+                         species_attitudes=_met(player, species.roster_id))
+    event = LeadAccepted(player_id, species.id, target.ref.kind, target.ref.ref,
+                         target.ref.sector_id)
     return ReduceResult(events=(event,), players=(new_player,))
 
 
