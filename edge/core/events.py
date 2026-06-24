@@ -176,6 +176,7 @@ class DiscoveryCollected(Event):
     kind: str  # DiscoveryKind value
     rarity: str  # RarityTier name
     payload: str  # PayloadKind value (what was gained)
+    reward: str = ""  # human-readable detail of the gain (component/latinum/artifact/lore)
 
 
 @dataclass(frozen=True)

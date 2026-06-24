@@ -336,6 +336,7 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "DiscoveryCollected", {
                 "player_id": event.player_id, "discovery_id": event.discovery_id,
                 "kind": event.kind, "rarity": event.rarity, "payload": event.payload,
+                "reward": event.reward,
             }
         case ColonistsRecruited():
             return "ColonistsRecruited", {
@@ -432,7 +433,8 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                                      payload["kind"], payload["rarity"])
         case "DiscoveryCollected":
             return DiscoveryCollected(payload["player_id"], payload["discovery_id"],
-                                      payload["kind"], payload["rarity"], payload["payload"])
+                                      payload["kind"], payload["rarity"], payload["payload"],
+                                      payload.get("reward", ""))
         case "ColonistsRecruited":
             return ColonistsRecruited(payload["player_id"], payload["source"],
                                       payload["count"], payload["cost"])

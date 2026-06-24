@@ -71,6 +71,7 @@ class SurfaceSite:
     payload: list[str] = field(default_factory=list)  # detail lines (markup ok)
     discovery_id: int = 0
     salvageable: bool = False
+    kind: str = ""  # DiscoveryKind value for entity art; "" while masked (fog of war)
 
 
 @dataclass(frozen=True)

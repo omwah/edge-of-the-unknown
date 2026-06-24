@@ -299,3 +299,47 @@ def test_explore_sensor_gates_hidden_surface_sites() -> None:
     assert all(h.id not in state.players[1].detected for h in hidden)  # Rare+ stay hidden
     with pytest.raises(Exception):  # sensors too weak for what remains
         reduce(state, 1, Explore(planet_id=pid), CONFIG)
+
+
+def test_survey_logs_to_codex_but_leaves_the_reward_takeable() -> None:
+    """Survey records the find (codex) and uncovers it; taking it (Salvage) is separate."""
+    state, pid = _planet_with_sites(min_sites=1)
+    state.ships[1] = replace(  # type: ignore[attr-defined]
+        state.ships[1], sector_id=state.planets[pid].sector_id, sensor_rating=9)
+    site = _sites(state, pid)[0]
+    assert site.id not in state.players[1].codex  # type: ignore[attr-defined]
+
+    _do(state, Explore(planet_id=pid))  # survey the lowest-slot site
+    assert site.id in state.players[1].codex  # type: ignore[attr-defined]   logged to codex
+    assert state.discoveries[site.id].found_by is None  # type: ignore[attr-defined]  not taken
+
+    _do(state, Salvage(discovery_id=site.id))  # now take the reward
+    assert state.discoveries[site.id].found_by == 1  # type: ignore[attr-defined]
+
+
+# --- WP6: every terrestrial world is worth a descent ------------------------
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_every_terrestrial_planet_has_an_uncommon_discovery(seed: int) -> None:
+    """Every terrestrial planet carries ≥1 surface site of at least uncommon rarity (§7)."""
+    state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
+    for pid, planet in state.planets.items():  # type: ignore[attr-defined]
+        if not planet.planet_type.startswith("terrestrial_"):
+            continue
+        sites = [d for d in state.discoveries.values() if d.planet_id == pid]
+        assert any(d.rarity_tier.value >= RarityTier.UNCOMMON.value for d in sites), (
+            f"terrestrial planet {pid} (seed {seed}) lacks an uncommon+ discovery")
+
+
+def test_terrestrial_guarantee_does_not_blanket_other_planet_types() -> None:
+    """The floor is terrestrial-scoped: some non-terrestrial world lacks a guaranteed find."""
+    for seed in range(30):
+        state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
+        for pid, planet in state.planets.items():  # type: ignore[attr-defined]
+            if planet.planet_type.startswith("terrestrial_"):
+                continue
+            sites = [d for d in state.discoveries.values() if d.planet_id == pid]
+            if not any(d.rarity_tier.value >= RarityTier.UNCOMMON.value for d in sites):
+                return  # a non-terrestrial world without a forced uncommon — guarantee is scoped
+    raise AssertionError("expected some non-terrestrial planet without a forced uncommon site")
