@@ -256,6 +256,25 @@ async def test_dock_and_trade_buys_fuel() -> None:
         assert svc.state.players[1].latinum < 2_000  # spent latinum buying
 
 
+async def test_trade_keeps_highlighted_row() -> None:
+    """Trading the highlighted row must not reset the cursor to the top, so the
+    same commodity can be traded repeatedly without re-selecting it each time."""
+    from textual.widgets import DataTable
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await _new_game_at_stardock(app, pilot)
+        assert isinstance(app.screen, StarDockScreen)
+        table = app.screen.query_one("#commodities", DataTable)
+        assert table.row_count > 1
+        table.move_cursor(row=1, animate=False)  # highlight a non-top row
+        await pilot.pause()
+        await pilot.press("t")  # trade the highlighted row
+        await pilot.pause()
+        assert table.cursor_row == 1  # cursor stays put across the refresh
+
+
 async def test_dock_and_haggle_accepts_fair_counter() -> None:
     """Press H, counter at the fair price (improvement 0 ⇒ always accepted), and the
     deal goes through as a HaggleOffer — the path playtesting found missing."""

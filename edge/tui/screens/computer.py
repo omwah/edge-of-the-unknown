@@ -23,7 +23,7 @@ from edge.core.rules import TravelTo
 from edge.server.service import GameService
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.travel import TravelPromptScreen
-from edge.tui.widgets import MapBandPanel, MapView, bar
+from edge.tui.widgets import MapBandPanel, MapView, bar, preserve_cursor
 
 
 class ComputerScreen(Screen):
@@ -172,18 +172,20 @@ class ComputerScreen(Screen):
     def _render_route(self) -> None:
         """Repaint the Route tab from the plotted `RouteDTO` (or the empty state)."""
         table = self.query_one("#route-table", DataTable)
-        table.clear()
         summary = self.query_one("#route-summary", Static)
         dto = self._route
+        with preserve_cursor(table):
+            table.clear()
+            if dto is not None:
+                for i, hop in enumerate(dto.hops, 1):
+                    note = Text("one-way ⚠", style="yellow") if hop.one_way else Text("")
+                    table.add_row(str(i), hop.label, note)
         if dto is None:
             summary.update(
                 "[dim]Plot a route from the Trade or Codex tab, "
                 "or press R to enter a destination.[/]"
             )
             return
-        for i, hop in enumerate(dto.hops, 1):
-            note = Text("one-way ⚠", style="yellow") if hop.one_way else Text("")
-            table.add_row(str(i), hop.label, note)
         head = f"[b]{dto.origin_display} → {dto.dest_display}[/]   [dim]{dto.summary}[/]"
         if dto.reachable and dto.affordable:
             summary.update(f"{head}   ·   [green]G Engage[/]")

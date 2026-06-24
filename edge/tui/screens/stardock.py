@@ -48,11 +48,16 @@ class StarDockScreen(Screen):
     StarDockScreen DataTable { height: auto; max-height: 18; }
     """
 
-    def __init__(self, service: GameService, player_id: int, initial_tab: str = "trade") -> None:
+    # Buy tabs whose table cursor we preserve across a screen rebuild.
+    _BUY_TABLES = {"hardware": "#hardware-table", "shipyard": "#shipyard-table"}
+
+    def __init__(self, service: GameService, player_id: int, initial_tab: str = "trade",
+                 initial_cursor: int = 0) -> None:
         super().__init__()
         self._service = service
         self._pid = player_id
         self._initial_tab = initial_tab
+        self._initial_cursor = initial_cursor
 
     def compose(self) -> ComposeResult:
         port = self._service.current_port_view(self._pid)
@@ -95,6 +100,17 @@ class StarDockScreen(Screen):
             with TabPane("Tavern", id="tavern"):
                 yield Static("[dim]Rumors & contracts — Phase 5.[/]")
         yield Footer()
+
+    def on_mount(self) -> None:
+        # Restore the highlighted row on the buy tab we rebuilt from (see _issue),
+        # so repeated purchases of the same hull/component don't reset to the top.
+        table_id = self._BUY_TABLES.get(self._initial_tab)
+        if table_id is None or self._initial_cursor <= 0:
+            return
+        table = self.query_one(table_id, DataTable)
+        if table.row_count:
+            table.move_cursor(
+                row=min(self._initial_cursor, table.row_count - 1), animate=False)
 
     def _hardware_table(self, dock: object) -> DataTable:
         table: DataTable = DataTable(id="hardware-table", cursor_type="row")
@@ -163,8 +179,12 @@ class StarDockScreen(Screen):
             return
         self.notify(ok, timeout=2)
         active = self.query_one(TabbedContent).active
+        cursor = 0
+        if active in self._BUY_TABLES:
+            cursor = self.query_one(self._BUY_TABLES[active], DataTable).cursor_row
         self.app.pop_screen()
-        self.app.push_screen(StarDockScreen(self._service, self._pid, initial_tab=active))
+        self.app.push_screen(
+            StarDockScreen(self._service, self._pid, initial_tab=active, initial_cursor=cursor))
 
     def action_engine_room(self) -> None:
         self.app.push_screen(EngineRoomScreen(
