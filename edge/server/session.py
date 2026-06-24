@@ -492,6 +492,7 @@ def surface_view(state: UniverseState, player_id: int, planet_id: int, config: G
             rarity="?" if masked else site.rarity_tier.name.capitalize(),
             status=status, payload=payload, discovery_id=site.id,
             salvageable=explored and not collected,
+            kind="" if masked else site.kind.value,  # "" hides the kind (and its art) until surveyed
         ))
     terrain = terrain_art.render_terrain(
         planet.planet_type, sites, seed=state.game.seed, planet_id=planet_id,
@@ -1017,7 +1018,8 @@ def format_event(event: Event) -> str:
     if isinstance(event, DiscoveryDetected):
         return f"[cyan]✦ Sensors: {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
     if isinstance(event, DiscoveryCollected):
-        return f"[green]✦ Logged {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
+        gain = f" — {event.reward}" if event.reward else ""
+        return f"[green]✦ Logged {event.kind.replace('_', ' ')} ({event.rarity.lower()}){gain}[/]"
     if isinstance(event, ColonistsRecruited):
         via = "StarDock" if event.source == "stardock" else "emigration"
         cost = f"  (-{event.cost} slips)" if event.cost else ""

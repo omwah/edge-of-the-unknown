@@ -18,7 +18,7 @@ from textual.widgets import Footer, Static
 
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
-from edge.core.events import Event
+from edge.core.events import DiscoveryCollected, Event
 from edge.core.movement import MovementError
 from edge.core.rules import Dock, Hail, Salvage, TravelTo, Warp
 from edge.server.service import GameService
@@ -223,6 +223,9 @@ class GameScreen(Screen):
             self.notify(str(exc), severity="warning", timeout=3)
             return
         self._record(events)
+        collected = next((e for e in events if isinstance(e, DiscoveryCollected)), None)
+        if collected is not None and collected.reward:
+            self.notify(f"You discovered {collected.reward}.", title="Discovery", timeout=4)
         if target is not None and target.kind == "wormhole":
             self.notify("Sensor reading: one-way warp — no direct way back.",
                         severity="warning", timeout=3)

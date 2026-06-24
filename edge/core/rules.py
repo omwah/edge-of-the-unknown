@@ -40,7 +40,7 @@ from edge.core.engine_room import (
     legal_components,
     tier_ceiling,
 )
-from edge.core.discovery import is_detectable, sector_has_nebula
+from edge.core.discovery import describe_payload, is_detectable, sector_has_nebula
 from edge.core.enums import (
     Commodity,
     Component,
@@ -1210,8 +1210,12 @@ def _explore(
     cost = config.discovery.explore_turn_cost if config.discovery is not None else 1
     if player.turns_remaining < cost:
         raise MovementError("out of turns")
+    # Surveying both reveals the site and logs it to the codex; taking the payload
+    # aboard is a separate, optional act (Salvage). So a surveyed-but-untaken site stays
+    # `found_by=None` — the player can leave it for the next person.
     new_player = replace(player, turns_remaining=player.turns_remaining - cost,
-                         detected=player.detected | frozenset({target.id}))
+                         detected=player.detected | frozenset({target.id}),
+                         codex=player.codex | frozenset({target.id}))
     return ReduceResult(
         events=(SiteExplored(player_id, cmd.planet_id, target.id,
                              target.kind.value, target.rarity_tier.name),),
@@ -1266,7 +1270,8 @@ def _salvage(
     new_disc = replace(disc, found_by=player_id)
     return ReduceResult(
         events=(DiscoveryCollected(player_id, disc.id, disc.kind.value,
-                                   disc.rarity_tier.name, payload.kind.value),),
+                                   disc.rarity_tier.name, payload.kind.value,
+                                   describe_payload(payload)),),
         players=(new_player,), ships=(new_ship,), discoveries=(new_disc,),
     )
 

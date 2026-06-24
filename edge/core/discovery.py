@@ -13,8 +13,8 @@ this module owns "can the player see / value it".
 from __future__ import annotations
 
 from edge.core.config import GameConfig
-from edge.core.enums import DiscoveryKind, RarityTier
-from edge.core.models import Discovery, UniverseState
+from edge.core.enums import DiscoveryKind, PayloadKind, RarityTier
+from edge.core.models import Discovery, DiscoveryPayload, UniverseState
 
 
 def sector_has_nebula(state: UniverseState, sector_id: int) -> bool:
@@ -51,3 +51,18 @@ def rarity_value(tier: RarityTier, config: GameConfig) -> int:
     if config.discovery is None:
         return tier.value
     return config.discovery.tier_value.get(tier.name, tier.value)
+
+
+def describe_payload(payload: DiscoveryPayload) -> str:
+    """A short human-readable phrase for what collecting a payload yields (§7).
+
+    One line per payload kind, suitable for both the event log and a "You discovered X"
+    notice. Lore reports the fragment itself (codex-only, no material gain).
+    """
+    if payload.kind is PayloadKind.COMPONENT and payload.component is not None and payload.tier is not None:
+        return f"a Tier {payload.tier.name} {payload.component.value} component"
+    if payload.kind is PayloadKind.LATINUM:
+        return f"{payload.latinum:,} latinum"
+    if payload.kind is PayloadKind.ARTIFACT and payload.barter_tier is not None:
+        return f"an artifact (barter ≈ Tier {payload.barter_tier})"
+    return payload.lore or "a fragment of lore"

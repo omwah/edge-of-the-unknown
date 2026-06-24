@@ -128,4 +128,28 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
             )
             did += 1
 
+    # Floor: every terrestrial world is worth a descent, so guarantee it carries at least
+    # one uncommon-or-better surface site. Drawing the guaranteed tier from the planet's
+    # band (then flooring at UNCOMMON) keeps each band's mean rarity near its natural value,
+    # protecting the strictly-rising gradient `validate.py` asserts — only the Hub, whose
+    # rolls are COMMON/UNCOMMON, gets nudged up.
+    for pid in sorted(state.planets):
+        planet = state.planets[pid]
+        if not planet.planet_type.startswith("terrestrial_"):
+            continue
+        sites = [d for d in discoveries.values() if d.planet_id == pid]
+        if any(d.rarity_tier.value >= RarityTier.UNCOMMON.value for d in sites):
+            continue
+        band = state.sectors[planet.sector_id].distance_band
+        rolled = _roll_tier(dcfg, band, rng)
+        tier = rolled if rolled is not None and rolled.value > RarityTier.UNCOMMON.value else RarityTier.UNCOMMON
+        kind = _roll_kind(dcfg.surface_kinds, rng)
+        slot = max((d.site_slot for d in sites), default=-1) + 1
+        discoveries[did] = Discovery(
+            id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
+            payload=_make_payload(kind, tier, dcfg, rng), planet_id=pid, site_slot=slot,
+            hidden=tier.value >= dcfg.surface_hidden_min_rank,
+        )
+        did += 1
+
     state.discoveries = discoveries
