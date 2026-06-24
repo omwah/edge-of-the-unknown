@@ -172,6 +172,173 @@ class DiscoveryGenerator:
 
         return map_text
 
+    # The accretion-disk glow ramp, hottest first: white-hot inner edge → gold →
+    # orange → red rim. A black hole is not archetype-tinted — the glow is the light
+    # of doomed matter, the same colour for any owner — so this is a fixed ramp.
+    _BLACK_HOLE_PALETTE = ["#ffffff", "#ffe25a", "#ffae3a", "#ff6a2a", "#ff2e2e"]
+
+    def _generate_black_hole(self, rng: random.Random, width: int, height: int) -> Text:
+        """A Gargantua-style black hole: a glowing edge-on accretion disk straight
+        through the middle, a gravitational-lensing halo ring arcing over and under a
+        dark event horizon, and a white-hot photon ring hugging the horizon.
+
+        Like the other icon subtypes this is analytic (no noise): every cell's
+        *intensity* in [0,1] is the max of three fields — photon ring, lensing halo,
+        and accretion disk — zeroed inside the event horizon. Intensity drives both
+        the shade ramp (█▓▒░) and the colour (hot white core → red rim), so the glow
+        fills the frame and the dark sits only at the centre.
+        """
+        palette = self._BLACK_HOLE_PALETTE
+        n_pal = len(palette)
+
+        center_x = (width - 1) / 2.0
+        center_y = (height - 1) / 2.0
+        radius_x = width / 2.0
+        radius_y = height / 2.0
+
+        R_EH = 0.20          # event-horizon radius (the dark hole)
+        PHOTON_W = 0.07      # white-hot photon ring just outside the horizon
+        R_HALO = 0.72        # radius of the lensing halo ring (the top/bottom arcs)
+        HALO_W = 0.30        # halo thickness falloff
+        THICK_C = 0.46       # disk half-thickness (in dy) at the centre
+        THICK_E = 0.12       # disk half-thickness at the frame edge
+
+        def smoothstep(s: float) -> float:
+            s = max(0.0, min(1.0, s))
+            return s * s * (3.0 - 2.0 * s)
+
+        map_text = Text()
+        floor = 0.16  # below this a cell is open space (stars show through)
+        for y in range(height):
+            for x in range(width):
+                dx = (x - center_x) / radius_x
+                dy = (y - center_y) / radius_y
+                r = math.sqrt(dx * dx + dy * dy)
+
+                if r < R_EH:
+                    map_text.append(" ")  # event horizon — pure dark
+                    continue
+
+                # Photon ring: a thin white-hot annulus on the horizon's lip.
+                photon = 1.0 if r < R_EH + PHOTON_W else 0.0
+
+                # Lensing halo: a bright ring at R_HALO, soft-edged — its top and
+                # bottom are the arcs that cap the silhouette.
+                halo = smoothstep(1.0 - abs(r - R_HALO) / HALO_W)
+
+                # Accretion disk: an edge-on band centred on dy=0, fat at the centre
+                # and thinning toward the edges, reaching the full frame width. Its
+                # brightness eases down with |dx| so the rim runs red, not dark.
+                adx = min(1.0, abs(dx))
+                thick = THICK_C - (THICK_C - THICK_E) * adx
+                disk = max(0.0, 1.0 - abs(dy) / thick) * (1.0 - 0.30 * adx)
+
+                intensity = max(photon, halo, disk)
+                intensity += rng.uniform(-0.04, 0.04)  # faint grain (seeded)
+
+                if intensity < floor:
+                    map_text.append(" ")
+                    continue
+                if intensity < 0.34:
+                    char = "░"
+                elif intensity < 0.52:
+                    char = "▒"
+                elif intensity < 0.72:
+                    char = "▓"
+                else:
+                    char = "█"
+                ct = max(0.0, min(1.0, intensity))
+                idx = int((1.0 - ct) * (n_pal - 1) + 0.5)
+                map_text.append(char, style=f"bold {palette[idx]}")
+
+            if y < height - 1:
+                map_text.append("\n")
+
+        return map_text
+
+    # The vortex glow ramp, brightest first: white-hot throat → pale cyan → sky
+    # blue → deep blue → violet rim. Cool exotic-energy hues, deliberately the
+    # cold inverse of the black hole's hot accretion ramp so the two read apart.
+    _WORMHOLE_PALETTE = ["#ffffff", "#9fe8ff", "#46c4ff", "#2f7bff", "#6a3cff"]
+
+    def _generate_wormhole(self, rng: random.Random, width: int, height: int) -> Text:
+        """A face-on swirling vortex: two or three logarithmic-spiral arms winding
+        into a white-hot throat — the light at the tunnel's end — fading to space at
+        the rim, glowing in cold blue/violet exotic-energy hues.
+
+        Like the black hole this is analytic: each cell's *intensity* in [0,1] comes
+        from a radial funnel envelope modulated by a spiral arm field, with the throat
+        pinned bright. Intensity drives both the shade ramp (█▓▒░) and the colour
+        (white throat → violet rim), so the swirl fills the frame with structure
+        rather than flat grey.
+        """
+        palette = self._WORMHOLE_PALETTE
+        n_pal = len(palette)
+
+        center_x = (width - 1) / 2.0
+        center_y = (height - 1) / 2.0
+        radius_x = width / 2.0
+        radius_y = height / 2.0
+
+        arms = rng.choice((2, 3))         # two- or three-armed spiral
+        spin = rng.uniform(0.0, math.tau)  # rotational phase, per sprite
+        twist = rng.uniform(5.5, 7.5)      # how tightly the arms wind inward
+        R_THROAT = 0.14                    # the bright open throat
+
+        def smoothstep(s: float) -> float:
+            s = max(0.0, min(1.0, s))
+            return s * s * (3.0 - 2.0 * s)
+
+        map_text = Text()
+        floor = 0.16  # below this a cell is open space (stars show through)
+        for y in range(height):
+            for x in range(width):
+                dx = (x - center_x) / radius_x
+                dy = (y - center_y) / radius_y
+                r = math.sqrt(dx * dx + dy * dy)
+                angle = math.atan2(dy, dx)
+
+                # Radial funnel: a broad glow reaching the frame edges (touching the
+                # edge midpoints at r=1, leaving only the corners as space).
+                env = max(0.0, 1.0 - (r / 1.35) ** 2)
+                # Spiral arms winding into the throat; sharpened so bright arms
+                # alternate with dimmer gaps without ever going fully dark.
+                swirl = math.sin(arms * angle - twist * r + spin)
+                arm = (0.5 + 0.5 * swirl) ** 1.5
+                # A smooth central glow guarantees the throat is the brightest point
+                # regardless of which arm phase falls on centre.
+                core = smoothstep((0.34 - r) / 0.34)
+                intensity = max(env * (0.40 + 0.70 * arm), core)
+
+                if r < R_THROAT:
+                    intensity = 1.0  # the open throat — light at the tunnel's end
+                else:
+                    intensity += rng.uniform(-0.04, 0.04)  # faint grain (seeded)
+
+                # Faint sparkle of exotic energy flung out past the arms.
+                if 0.10 < intensity < floor and rng.random() < 0.12:
+                    map_text.append("·", style="bold #9fe8ff")
+                    continue
+                if intensity < floor:
+                    map_text.append(" ")
+                    continue
+                if intensity < 0.34:
+                    char = "░"
+                elif intensity < 0.52:
+                    char = "▒"
+                elif intensity < 0.74:
+                    char = "▓"
+                else:
+                    char = "█"
+                ct = max(0.0, min(1.0, intensity))
+                idx = int((1.0 - ct) * (n_pal - 1) + 0.5)
+                map_text.append(char, style=f"bold {palette[idx]}")
+
+            if y < height - 1:
+                map_text.append("\n")
+
+        return map_text
+
     def generate(
         self,
         rng: random.Random,
@@ -183,6 +350,10 @@ class DiscoveryGenerator:
         """Generate a procedural discovery sprite, hued by archetype."""
         if subtype == "nebula":
             return self._generate_nebula(rng, width, height, archetype_id)
+        if subtype == "black_hole":
+            return self._generate_black_hole(rng, width, height)
+        if subtype == "wormhole":
+            return self._generate_wormhole(rng, width, height)
 
         style = style_for(archetype_id)
         
@@ -204,45 +375,8 @@ class DiscoveryGenerator:
                 d = math.sqrt(d_sq) if d_sq > 0 else 0
 
                 char = " "
-                
-                if subtype == "black_hole":
-                    # Elliptical accretion disk, dark center (event horizon)
-                    tilt_x = dx * 0.8 + dy * 0.6
-                    tilt_y = -dx * 0.6 + dy * 0.8
-                    disk_d = tilt_x * tilt_x + (tilt_y * 2.5) ** 2
-                    
-                    if d_sq < 0.15:
-                        char = " " # Event horizon
-                    elif disk_d < 1.0 and d_sq > 0.1:
-                        # Accretion disk
-                        if disk_d < 0.3: char = "█"
-                        elif disk_d < 0.6: char = "▓"
-                        elif disk_d < 0.8: char = "▒"
-                        else: char = "░"
-                    elif d_sq < 0.25:
-                        # Photon ring edge glow
-                        char = "R" if rng.random() > 0.5 else "Y"
 
-                elif subtype == "wormhole":
-                    # Swirling vortex: a two-armed spiral funnelling into a bright
-                    # throat (distinct from the black hole's tilted accretion disk).
-                    angle = math.atan2(dy, dx)
-                    swirl = math.sin(angle * 2.0 - d * 6.5)
-                    if d < 0.18:
-                        char = "◉"  # the open throat
-                    elif d < 1.0:
-                        if swirl > 0.45:
-                            char = "█" if d < 0.5 else "▓"
-                        elif swirl > -0.1:
-                            char = "▒" if d < 0.7 else "░"
-                        elif d > 0.85:
-                            char = "·"
-
-                elif subtype == "nebula":
-                    # Handled above
-                    pass
-
-                elif subtype == "artifact":
+                if subtype == "artifact":
                     # Pristine mathematical diamond
                     manhattan = abs(dx) + abs(dy)
                     if manhattan < 0.9:
