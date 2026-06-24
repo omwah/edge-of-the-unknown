@@ -23,7 +23,7 @@ def banner(title: str, width: int, style: str = "bold white") -> Text:
 
 
 # Every renderable type, in page order. (ship/subsystem have no generator yet,
-_ALL_TYPES = ["port", "planet", "terrain", "starfield", "ship", "subsystem", "discovery"]
+_ALL_TYPES = ["port", "planet", "terrain", "starfield", "ship", "subsystem", "discovery", "static"]
 
 
 def _archetype_paged_sheets(
@@ -130,7 +130,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--type",
         type=str,
         required=True,
-        choices=["planet", "terrain", "ship", "port", "subsystem", "starfield", "discovery", "all"],
+        choices=["planet", "terrain", "ship", "port", "subsystem", "starfield", "discovery", "static", "all"],
         help="The category of the entity to generate. 'all' sweeps every "
         "renderable type into a multi-page PDF (one page per type); requires "
         "--export.",
