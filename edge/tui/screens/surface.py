@@ -1,11 +1,14 @@
 """SurfaceScreen — planet descent & site exploration, wired to the live service (§7, WP6).
 
 A full-width top-down terrain panel sits over a bordered two-column panel: the site
-list on the left drives the detail on the right via row highlighting. `E` surveys the
-next site (sensor-gated for Rare+ sites), `L` logs the highlighted revealed site to the
-codex, `Esc` ascends to orbit. With no service (screenshot harness) it shows a static
-sample. The terrain art is composited in the TUI so the site markers ([1]/[2]/[?]) are
-stamped back over the procedural map (the art engine doesn't carry those overlays).
+list (all the text, including each site's find) on the left drives the selected site's
+entity art on the right via row highlighting. A site's name, rarity, and sprite stay
+obscured (static "snow") until surveyed. `E` surveys the next site (sensor-gated for
+Rare+ sites) — which logs it to the codex and uncovers its find — and `T` then takes
+that find aboard (optional: leave it for the next person), `Esc` ascends to orbit. With
+no service (screenshot harness) it shows a static sample. The terrain art is composited in
+the TUI so the site markers ([1]/[2]/[?]) are stamped back over the procedural map (the art
+engine doesn't carry those overlays).
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from edge.core.economy import EconomyError
 from edge.core.dto import SurfaceDTO, SurfaceSite
 from edge.core.engine_room import EngineRoomError
 from edge.core.movement import MovementError
+from edge.core.events import DiscoveryCollected, SiteExplored
 from edge.core.rules import Explore, Salvage
 from edge.server.service import GameService
 from edge.tui import art_adapter
@@ -120,11 +124,48 @@ class SurfaceTerrain(Static):
         return out
 
 
+# Display labels for the raw DTO status strings (kept stable for the core/tests); the
+# screen relabels them to match the survey-logs / take-is-optional flow.
+_STATUS_LABEL = {"unexplored": "unsurveyed", "explored": "surveyed", "logged": "surveyed"}
+
+
+class SiteArt(Static):
+    """The right-hand panel: procedural entity art for the highlighted surface site.
+
+    Until a site is surveyed it renders as TV-"snow" static (the art engine's
+    `static` sprite) so its identity isn't given away; once surveyed it renders the
+    `discovery` sprite for the site's kind, sized live to the panel.
+    """
+
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._kind = ""
+        self._seed = 0
+        self._surveyed = False
+
+    def show(self, kind: str, seed: int, surveyed: bool) -> None:
+        self._kind, self._seed, self._surveyed = kind, seed, surveyed
+        self.refresh()
+
+    def on_resize(self) -> None:
+        self.refresh()
+
+    def render(self) -> Text:
+        w, h = self.size.width, self.size.height
+        if w < 4 or h < 1:
+            return Text("")
+        if not self._surveyed:  # withhold the sprite — show static until surveyed
+            return art_adapter.sprite("static", "snow", seed=self._seed, width=w, height=h)
+        if not self._kind:
+            return Text("unsurveyed\nrun a sensor sweep", style="dim", justify="center")
+        return art_adapter.sprite("discovery", self._kind, seed=self._seed, width=w, height=h)
+
+
 class SurfaceScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Ascend to orbit"),
         Binding("e", "explore", "Survey site"),
-        Binding("l", "log", "Log to codex"),
+        Binding("t", "take", "Take find"),
     ]
 
     CSS = """
@@ -135,12 +176,13 @@ class SurfaceScreen(Screen):
     SurfaceScreen #terrain {
         width: 1fr; border: round $primary; padding: 0 1;
     }
-    /* The site list + detail share one bordered panel under the terrain. */
+    /* The site list (all the text) sits left; the selected site's art fills the right. */
     SurfaceScreen #sites-panel { height: 1fr; border: round $secondary; }
     SurfaceScreen #sites-row { height: 1fr; }
-    SurfaceScreen #sites { width: 2fr; height: 1fr; }
-    SurfaceScreen #site-detail {
-        width: 1fr; height: 1fr; padding: 0 1; border-left: solid $secondary;
+    SurfaceScreen #sites { width: 3fr; height: 1fr; }
+    SurfaceScreen #site-art {
+        width: 2fr; height: 1fr; padding: 0 1; border-left: solid $secondary;
+        content-align: center middle;
     }
     """
 
@@ -164,32 +206,33 @@ class SurfaceScreen(Screen):
         with Container(id="sites-panel"):
             with Horizontal(id="sites-row"):
                 yield DataTable(id="sites", cursor_type="row")
-                detail = Static(id="site-detail")
-                detail.border_title = "site"
-                yield detail
+                art = SiteArt(id="site-art")
+                art.border_title = "site"
+                yield art
         yield Footer()
 
     def on_mount(self) -> None:
         table = self.query_one("#sites", DataTable)
-        table.add_columns("", "Site", "Rarity", "Status")
+        table.add_columns("", "Site", "Rarity", "Status", "Find")
         for site in self._surface.sites:
-            table.add_row(site.marker, site.name, site.rarity, site.status)
+            surveyed = site.status != "unexplored"
+            if site.status == "logged":  # the taken indicator lives in the Find column now
+                find: Text = Text("taken", style="dim")
+            else:
+                find = Text.from_markup("; ".join(site.payload))
+            table.add_row(
+                site.marker,
+                site.name if surveyed else "(unsurveyed)",  # withhold name until surveyed
+                site.rarity if surveyed else "?",            # withhold rarity until surveyed
+                _STATUS_LABEL.get(site.status, site.status),
+                find,
+            )
         if self._surface.sites:
             self._show_site(self._surface.sites[0])
 
     def _show_site(self, site: SurfaceSite) -> None:
-        detail = self.query_one("#site-detail", Static)
-        lines = [
-            f"[b]{site.marker} {site.name}[/]",
-            f"rarity  {site.rarity}",
-            f"status  {site.status}",
-            "",
-            "Payload" + ("" if site.status == "logged" else " (on log)"),
-            *[f"  - {line}" for line in site.payload],
-        ]
-        if site.salvageable:
-            lines += ["", "[green]\\[L][/] log to codex"]
-        detail.update("\n".join(lines))
+        self.query_one("#site-art", SiteArt).show(
+            site.kind, site.discovery_id, site.status != "unexplored")
 
     def on_data_table_row_highlighted(self, msg: DataTable.RowHighlighted) -> None:
         if 0 <= msg.cursor_row < len(self._surface.sites):
@@ -206,27 +249,38 @@ class SurfaceScreen(Screen):
             self.notify("Not wired in the skeleton.", timeout=2)
             return
         try:
-            self._service.apply(self._pid, Explore(planet_id=self._surface.planet_id))
+            events = self._service.apply(self._pid, Explore(planet_id=self._surface.planet_id))
         except (EconomyError, MovementError) as exc:
             self.notify(str(exc), severity="warning", timeout=3)
             return
-        self.notify("Site surveyed.", timeout=2)
+        # The survey logs the find to the codex and uncovers it; find the freshly
+        # revealed site in the reloaded view to name what's there to take (or leave).
+        revealed = next((e for e in events if isinstance(e, SiteExplored)), None)
+        find = ""
+        if revealed is not None:
+            site = next((s for s in self._service.surface_view(self._pid, self._surface.planet_id).sites
+                         if s.discovery_id == revealed.discovery_id), None)
+            if site is not None:
+                find = "; ".join(Text.from_markup(p).plain for p in site.payload)
+        self.notify(f"Surveyed and logged{f' — find: {find}' if find else ''}.", timeout=4)
         self._reload()
 
-    def action_log(self) -> None:
+    def action_take(self) -> None:
         if self._service is None:
             self.notify("Not wired in the skeleton.", timeout=2)
             return
         site = self._highlighted()
         if site is None or not site.salvageable:
-            self.notify("Survey a site first, then log it.", timeout=2)
+            self.notify("Survey a site first, then take its find.", timeout=2)
             return
         try:
-            self._service.apply(self._pid, Salvage(discovery_id=site.discovery_id))
+            events = self._service.apply(self._pid, Salvage(discovery_id=site.discovery_id))
         except (EconomyError, EngineRoomError, MovementError) as exc:
             self.notify(str(exc), severity="warning", timeout=3)
             return
-        self.notify(f"Logged {site.name} to the codex.", timeout=2)
+        collected = next((e for e in events if isinstance(e, DiscoveryCollected)), None)
+        gain = f" — you took {collected.reward}" if collected is not None and collected.reward else ""
+        self.notify(f"Collected {site.name}{gain}.", timeout=4)
         self._reload()
 
     def _reload(self) -> None:

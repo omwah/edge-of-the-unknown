@@ -11,6 +11,7 @@ from edge.art.starfield import StarfieldGenerator, STARFIELD_SUBTYPES
 from edge.art.port import PortGenerator, PORT_SUBTYPES
 from edge.art.ship import ShipGenerator, SHIP_SUBTYPES
 from edge.art.discovery import DiscoveryGenerator, DISCOVERY_GRAMMAR
+from edge.art.static import StaticGenerator, STATIC_SUBTYPES
 
 _TERRAIN_GEN = TerrainGenerator(use_fg_color=True, use_bg_color=True)
 _PLANET_TERRAIN_GEN = TerrainGenerator(use_fg_color=False, use_bg_color=True)
@@ -19,6 +20,7 @@ _STARFIELD_GEN = StarfieldGenerator()
 _PORT_GEN = PortGenerator()
 _SHIP_GEN = ShipGenerator()
 _DISCOVERY_GEN = DiscoveryGenerator()
+_STATIC_GEN = StaticGenerator()
 
 
 def available_subtypes(entity_type: str) -> list[str]:
@@ -37,6 +39,8 @@ def available_subtypes(entity_type: str) -> list[str]:
         return list(SHIP_SUBTYPES)
     if entity_type == "discovery":
         return list(DISCOVERY_GRAMMAR.keys())
+    if entity_type == "static":
+        return list(STATIC_SUBTYPES)
     return []
 
 
@@ -102,5 +106,8 @@ def generate_sprite(
 
     if entity_type == "discovery":
         return _DISCOVERY_GEN.generate(rng, subtype, width, height, archetype_id)
+
+    if entity_type == "static":
+        return _STATIC_GEN.generate(rng, subtype, width, height)
 
     raise ValueError(f"Unknown entity type '{entity_type}'.")
