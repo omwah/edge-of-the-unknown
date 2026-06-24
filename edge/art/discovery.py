@@ -424,6 +424,133 @@ class DiscoveryGenerator:
 
         return render_grid(rows, style, top_color, bottom_color, rng, width, height)
 
+    # The body glow ramp, brightest first: lit subsurface violet → bruised purple →
+    # deep void. An eldritch horror is its own otherworldly thing, so (like the black
+    # hole and wormhole) it ignores archetype tint and owns this sickly palette.
+    _ENTITY_BODY = ["#d49bff", "#a64ad0", "#732aa8", "#4a1a6e", "#280e44"]
+    # The eyes glow a luminous, sickly green — the cold complement of the violet flesh,
+    # brightest at the pupil — so a dozen of them seem to stare out of the dark mass.
+    _ENTITY_EYE = ["#eaffbe", "#b6ff4a", "#7ad62a", "#2e5e16"]
+
+    def _generate_entity(self, rng: random.Random, width: int, height: int) -> Text:
+        """A planet-sized eldritch horror: a vast amorphous body of bruised violet
+        flesh, writhing tentacles groping out past its edge, and a constellation of
+        luminous green eyes staring from the dark mass.
+
+        Like the other cosmic phenomena this is analytic and archetype-independent.
+        A per-angle *reach* function (low harmonics for the lumpy body + narrow,
+        slowly-writhing bumps for the tentacles) sets the silhouette; body *depth*
+        drives a veined subsurface glow; a seeded set of eyes is overlaid on top.
+        """
+        body_pal = self._ENTITY_BODY
+        eye_pal = self._ENTITY_EYE
+        n_body, n_eye = len(body_pal), len(eye_pal)
+
+        center_x = (width - 1) / 2.0
+        center_y = (height - 1) / 2.0
+        radius_x = width / 2.0
+        radius_y = height / 2.0
+
+        R0 = 0.74  # base body radius — planet-sized, fills the frame
+        # Lumpy-outline harmonics + veining/pulse phases, drawn once per sprite.
+        p1, p2, p3 = (rng.uniform(0.0, math.tau) for _ in range(3))
+        vphase = rng.uniform(0.0, math.tau)
+        pphase = rng.uniform(0.0, math.tau)
+
+        # Writhing tentacles: a narrow angular bump each, its centreline slowly
+        # snaking with radius so the arm curves rather than spikes straight out.
+        tentacles = []
+        for _ in range(rng.randint(5, 8)):
+            tentacles.append((
+                rng.uniform(0.0, math.tau),     # base angle
+                rng.uniform(0.16, 0.30),        # angular width
+                rng.uniform(0.30, 0.62),        # extra reach (past the body)
+                rng.uniform(0.10, 0.26),        # writhe amplitude
+                rng.uniform(3.0, 5.0),          # writhe frequency (in r)
+                rng.uniform(0.0, math.tau),     # writhe phase
+            ))
+
+        # Eyes: one great eye near the core, the rest scattered across the body.
+        eyes = []
+        for i in range(rng.randint(5, 8)):
+            if i == 0:
+                ex, ey, er = (rng.uniform(-0.12, 0.12), rng.uniform(-0.10, 0.10),
+                              rng.uniform(0.18, 0.24))
+            else:
+                ea, edist = rng.uniform(0.0, math.tau), rng.uniform(0.18, 0.58)
+                ex, ey, er = (math.cos(ea) * edist, math.sin(ea) * edist,
+                              rng.uniform(0.09, 0.15))
+            eyes.append((ex, ey, er, rng.choice(("◉", "⊙", "◎"))))
+
+        def smoothstep(s: float) -> float:
+            s = max(0.0, min(1.0, s))
+            return s * s * (3.0 - 2.0 * s)
+
+        map_text = Text()
+        floor = 0.20
+        for y in range(height):
+            for x in range(width):
+                dx = (x - center_x) / radius_x
+                dy = (y - center_y) / radius_y
+                r = math.hypot(dx, dy)
+                angle = math.atan2(dy, dx)
+
+                # Lumpy body outline plus writhing tentacle bumps.
+                reach = (R0 + 0.10 * math.sin(3 * angle + p1)
+                         + 0.07 * math.sin(5 * angle + p2)
+                         + 0.12 * math.sin(2 * angle + p3))
+                for ta, tw, tlen, wamp, wfreq, wph in tentacles:
+                    ea = ta + wamp * math.sin(r * wfreq + wph)
+                    da = math.atan2(math.sin(angle - ea), math.cos(angle - ea))
+                    reach += tlen * math.exp(-(da / tw) ** 2)
+
+                depth = reach - r
+                if depth <= 0.0:
+                    map_text.append(" ")  # outside the horror — open space
+                    continue
+
+                # Eyes win over flesh: glowing green orbs, brightest at the pupil.
+                eye_hit = False
+                for ex, ey, er, glyph in eyes:
+                    ed = math.hypot(dx - ex, dy - ey)
+                    if ed < er:
+                        t = ed / er  # 0 pupil → 1 rim
+                        idx = min(n_eye - 1, int(t * n_eye))
+                        char = glyph if t < 0.5 else "●"
+                        map_text.append(char, style=f"bold {eye_pal[idx]}")
+                        eye_hit = True
+                        break
+                if eye_hit:
+                    continue
+
+                # Flesh: veined subsurface glow, brighter the deeper into the mass,
+                # tapering the tentacle tips to wisps.
+                nd = smoothstep(min(1.0, depth / (reach * 0.6)))
+                vein = 0.14 * math.sin(5 * angle + 9 * r + vphase) * (0.4 + 0.6 * nd)
+                pulse = 0.06 * math.sin(7 * r - 4 * angle + pphase)
+                intensity = 0.42 + 0.46 * nd + vein + pulse
+                intensity += rng.uniform(-0.03, 0.03)  # faint grain (seeded)
+
+                if intensity < floor:
+                    map_text.append(" ")
+                    continue
+                if intensity < 0.42:
+                    char = "░"
+                elif intensity < 0.60:
+                    char = "▒"
+                elif intensity < 0.80:
+                    char = "▓"
+                else:
+                    char = "█"
+                ct = max(0.0, min(1.0, intensity))
+                idx = int((1.0 - ct) * (n_body - 1) + 0.5)
+                map_text.append(char, style=f"bold {body_pal[idx]}")
+
+            if y < height - 1:
+                map_text.append("\n")
+
+        return map_text
+
     def generate(
         self,
         rng: random.Random,
@@ -441,6 +568,8 @@ class DiscoveryGenerator:
             return self._generate_wormhole(rng, width, height)
         if subtype == "wreck":
             return self._generate_wreck(rng, width, height, archetype_id)
+        if subtype == "entity":
+            return self._generate_entity(rng, width, height)
 
         style = style_for(archetype_id)
         
@@ -482,15 +611,6 @@ class DiscoveryGenerator:
                         if rng.random() < 0.2: char = "▒"
                         if abs(dx) > allowed_dx - 0.2: 
                             char = "│"
-
-                elif subtype == "entity":
-                    # Crystalline star shape
-                    star_d = abs(dx) + abs(dy) + max(abs(dx), abs(dy))
-                    if star_d < 1.2:
-                        char = "█"
-                        if star_d > 0.8: char = "▒"
-                        if abs(dx) < 0.1 or abs(dy) < 0.1: char = "◇"
-                        if d < 0.2: char = "R"
 
                 elif subtype == "ancient_tech":
                     # Octagonal / Gear-like machinery
