@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 from rich.text import Text
 from textual import events
@@ -95,6 +97,21 @@ NAME_TO_COMMODITY = {
 }
 
 
+@contextmanager
+def preserve_cursor(table: DataTable) -> Iterator[None]:
+    """Keep the highlighted row stable across a clear()+repopulate refresh.
+
+    Textual's ``DataTable.clear()`` resets the cursor to the top, so repeated
+    same-row actions (trading one commodity, surveying one site) would force a
+    re-select each time. Save the row index, run the refill, then restore it
+    clamped to the new row count.
+    """
+    saved = table.cursor_row
+    yield
+    if table.row_count:
+        table.move_cursor(row=min(max(saved, 0), table.row_count - 1), animate=False)
+
+
 class TradePanel(Vertical):
     """The commodities trade UI: a live pricing table over the docked port.
 
@@ -133,13 +150,14 @@ class TradePanel(Vertical):
 
     def _fill_rows(self) -> None:
         table = self.query_one("#commodities", DataTable)
-        table.clear()
-        for c in self._port.commodities:
-            stock = f"{bar(round(c.stock_ratio * 9), 9)} {round(c.stock_ratio * 100):>2}%"
-            action = "[b]Sell[/]" if c.mode == "BUY" else "[b]Buy[/]"
-            table.add_row(
-                c.name, c.mode, stock, f"{c.price} {c.trend}", str(c.player_qty), action
-            )
+        with preserve_cursor(table):
+            table.clear()
+            for c in self._port.commodities:
+                stock = f"{bar(round(c.stock_ratio * 9), 9)} {round(c.stock_ratio * 100):>2}%"
+                action = "[b]Sell[/]" if c.mode == "BUY" else "[b]Buy[/]"
+                table.add_row(
+                    c.name, c.mode, stock, f"{c.price} {c.trend}", str(c.player_qty), action
+                )
 
     def _footer_text(self) -> str:
         return (

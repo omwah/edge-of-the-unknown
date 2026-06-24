@@ -186,11 +186,13 @@ class SurfaceScreen(Screen):
     }
     """
 
-    def __init__(self, surface: SurfaceDTO, service: GameService | None = None, pid: int = 1) -> None:
+    def __init__(self, surface: SurfaceDTO, service: GameService | None = None, pid: int = 1,
+                 cursor: int = 0) -> None:
         super().__init__()
         self._surface = surface
         self._service = service
         self._pid = pid
+        self._cursor = cursor
 
     def compose(self) -> ComposeResult:
         s = self._surface
@@ -228,7 +230,9 @@ class SurfaceScreen(Screen):
                 find,
             )
         if self._surface.sites:
-            self._show_site(self._surface.sites[0])
+            row = min(max(self._cursor, 0), len(self._surface.sites) - 1)
+            table.move_cursor(row=row, animate=False)
+            self._show_site(self._surface.sites[row])
 
     def _show_site(self, site: SurfaceSite) -> None:
         self.query_one("#site-art", SiteArt).show(
@@ -286,10 +290,11 @@ class SurfaceScreen(Screen):
     def _reload(self) -> None:
         """Re-open the screen on a fresh surface view after a survey/log."""
         assert self._service is not None
+        cursor = self.query_one("#sites", DataTable).cursor_row
         self.app.pop_screen()
         self.app.push_screen(
             SurfaceScreen(self._service.surface_view(self._pid, self._surface.planet_id),
-                          self._service, self._pid))
+                          self._service, self._pid, cursor=cursor))
 
     def action_back(self) -> None:
         self.app.pop_screen()
