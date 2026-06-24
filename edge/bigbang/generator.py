@@ -33,6 +33,7 @@ from edge.bigbang.topology import (
 from edge.core.config import BigBangConfig, GameConfig
 from edge.core.enums import PortClass
 from edge.core.models import Game, Region, Sector, UniverseState
+from edge.dialogue.intel import build_species_knowledge
 
 _MAX_ATTEMPTS = 16
 
@@ -161,6 +162,8 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
         _populate.populate(state, config, build_rng)
         salt_discoveries(state, config, attempt)  # §7 finds on an independent sub-RNG
         populate_species(state, config)  # §6 friendly aliens on an independent sub-RNG (WP7)
+        # §6.7 intel: give each species kind the places it can tip the player toward.
+        state.species_knowledge = build_species_knowledge(state, seed)
 
         try:
             _validate.validate(state, config)

@@ -175,6 +175,10 @@ class GameService:
             return None
         return session.contact_view(self._state, player_id, species_id, self._config)
 
+    def leads_view(self, player_id: int) -> list[dto.LeadDTO]:
+        """The player's accepted coordinate tips, as plottable Computer-screen rows (§6.7)."""
+        return session.leads_view(self._state, player_id, self._config)
+
     def messages_view(self, player_id: int) -> dto.MessagesDTO:
         """The durable event log, newest first (§11, §12)."""
         return session.messages_view(self._state, self._repo.load_events(), self._config, player_id)

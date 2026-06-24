@@ -575,6 +575,15 @@ personas:
       - variants:
           - "The {species} have nothing for you today."
           - "We do not trade with you, {player}. Not now."
+    offer_coordinates:
+      - when: { criteria: { has_intel_target: true } }
+        variants:
+          - "Seek {target}? Set course for sector {coords}, {player} — {distance} jumps into the {band}. {reward} awaits there."
+          - "The {species} know of {target} at sector {coords}: {distance} hops out, deep in the {band}. You'll find {reward}."
+          - "Take these coordinates, {player}: sector {coords}, {distance} jumps off. {target} lies there, and with it {reward}."
+      - variants:  # catch-all — nothing new to point you toward
+          - "The {species} know of nowhere new to send you just now, {player}."
+          - "We have no fresh coordinates for you. Range farther, {player}, and return."
     treaty_offer:
       - variants:
           - "A lasting peace between us? The {species} will consider it."

@@ -323,7 +323,7 @@ def test_federation_members_are_humanoid_diplomats_at_top_of_band() -> None:
 
 
 def test_humanoid_diplomat_persona_passes_dialogue_integrity() -> None:
-    from edge.core.dialogue import validate_dialogue
+    from edge.dialogue import validate_dialogue
 
     assert CFG.roster is not None
     assert "humanoid_diplomat" in CFG.roster.personas

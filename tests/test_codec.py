@@ -30,6 +30,7 @@ from edge.core.events import (
     SiteExplored,
     Event,
     Haggled,
+    LeadAccepted,
     PlanetProduced,
     Repaired,
     ShipPurchased,
@@ -40,6 +41,7 @@ from edge.core.events import (
     Warped,
 )
 from edge.core.rules import (
+    AcceptLead,
     BarterArtifact,
     BuyAlienTech,
     BuyComponent,
@@ -105,6 +107,7 @@ COMMANDS: list[Command] = [
     Converse(species_id=3, context="dossier_other", subject_id=5),  # WP17 ask about X
     BuyAlienTech(species_id=3, offer_index=1),   # WP9 buy tech for latinum
     BarterArtifact(species_id=3, offer_index=0), # WP9 barter an artifact for tech
+    AcceptLead(species_id=3),                    # §6.7 log an alien's coordinate tip
     DevPatch("set", "latinum", 1_000_000),            # dev cheat: set a field
     DevPatch("grant", "component", 2, key="accelerator:III"),  # dev cheat: grant parts
     DevPatch("claim", "planet", ref=5),               # dev cheat: claim a world
@@ -141,6 +144,7 @@ EVENTS: list[Event] = [
     AlienSpoke(1, 3, "dossier_other", 5),
     AlienTraded(1, 3, "buy", "radiator (II)", 7_000),
     AttitudeChanged(1, 3, 0.12, 0.87),
+    LeadAccepted(1, 3, "discovery", 42, 17),  # §6.7 accepted a coordinate tip
     DevApplied(1, "[dev] set latinum=1000000"),  # dev cheat audit marker
 ]
 

@@ -32,6 +32,7 @@ from edge.core.events import (
     Event,
     GenesisDeployed,
     Haggled,
+    LeadAccepted,
     PlanetProduced,
     Repaired,
     ShipPurchased,
@@ -44,6 +45,7 @@ from edge.core.events import (
 )
 from edge.core.dev import DevPatch
 from edge.core.rules import (
+    AcceptLead,
     BarterArtifact,
     BuyAlienTech,
     BuyComponent,
@@ -156,6 +158,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "BuyAlienTech", {"species_id": command.species_id, "offer_index": command.offer_index}
         case BarterArtifact():
             return "BarterArtifact", {"species_id": command.species_id, "offer_index": command.offer_index}
+        case AcceptLead():
+            return "AcceptLead", {"species_id": command.species_id}
         case DevPatch():
             return "DevPatch", {
                 "op": command.op, "target": command.target, "value": command.value,
@@ -244,6 +248,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return BuyAlienTech(species_id=payload["species_id"], offer_index=payload["offer_index"])
         case "BarterArtifact":
             return BarterArtifact(species_id=payload["species_id"], offer_index=payload["offer_index"])
+        case "AcceptLead":
+            return AcceptLead(species_id=payload["species_id"])
         case "DevPatch":
             return DevPatch(
                 op=payload["op"], target=payload["target"], value=payload["value"],
@@ -379,6 +385,11 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "species_id": event.species_id,
                 "offset": event.offset, "effective": event.effective,
             }
+        case LeadAccepted():
+            return "LeadAccepted", {
+                "player_id": event.player_id, "species_id": event.species_id,
+                "kind": event.kind, "ref": event.ref, "sector_id": event.sector_id,
+            }
         case DevApplied():
             return "DevApplied", {"player_id": event.player_id, "detail": event.detail}
         case _:
@@ -461,6 +472,9 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "AttitudeChanged":
             return AttitudeChanged(payload["player_id"], payload["species_id"],
                                    payload["offset"], payload["effective"])
+        case "LeadAccepted":
+            return LeadAccepted(payload["player_id"], payload["species_id"],
+                                payload["kind"], payload["ref"], payload["sector_id"])
         case "DevApplied":
             return DevApplied(payload["player_id"], payload["detail"])
         case _:

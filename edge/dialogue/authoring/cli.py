@@ -1,0 +1,95 @@
+"""`edge-author-dialogue` — the offline dialogue authoring command (DESIGN §6.7, dev-only).
+
+Drives a pluggable LLM backend (local Ollama by default, or the Anthropic / Antigravity APIs)
+to author persona-voiced Tracery grammars for each roster species and a set of intents,
+validates them, and writes a config sidecar the runtime can load. The runtime never calls an
+LLM — this only shapes config. Run via `pixi run author-dialogue …`.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from edge.config import load_default_config
+from edge.dialogue.authoring.backends import get_backend
+from edge.dialogue.authoring.pipeline import author_packs
+
+# A sensible default set of intents to author (the Phase-2 friendly path + the map mechanic).
+_DEFAULT_CONTEXTS = ("greeting", "trade_open", "farewell", "dossier_other", "offer_coordinates")
+
+# Placeholder samples that ground the model on how the location-tip line is filled at runtime.
+_EXAMPLES: dict[str, dict[str, str]] = {
+    "dossier_other": {"subject": "the Vesk"},
+    "offer_coordinates": {
+        "target": "ancient ruins", "coords": "42", "distance": "5",
+        "band": "Deep", "reward": "a Tier III component",
+    },
+}
+
+
+def _voices(species: Any, only: set[str] | None) -> dict[str, str]:
+    """A `{species_id -> voice description}` map for the (optionally filtered) roster."""
+    voices: dict[str, str] = {}
+    for sc in species:
+        if only and sc.id not in only:
+            continue
+        blurb = sc.description or f"a {sc.archetype_id} species"
+        voices[sc.id] = f"{sc.name}: {blurb} (speaking voice / persona: {sc.persona})"
+    return voices
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="edge-author-dialogue", description=__doc__)
+    parser.add_argument("--backend", default="ollama",
+                        choices=["ollama", "anthropic", "antigravity", "static"],
+                        help="LLM backend (default: local Ollama)")
+    parser.add_argument("--model", default=None, help="override the backend's model id")
+    parser.add_argument("--contexts", default=",".join(_DEFAULT_CONTEXTS),
+                        help="comma-separated intent keys to author")
+    parser.add_argument("--species", default=None,
+                        help="comma-separated species ids to author (default: all)")
+    parser.add_argument("--out", default="config/dialogue/roster_default.generated.yaml",
+                        help="where to write the generated sidecar")
+    parser.add_argument("--retries", type=int, default=4,
+                        help="regeneration attempts per line before giving up (default: 4)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="author one species/context with the static backend and print it")
+    args = parser.parse_args(argv)
+
+    cfg = load_default_config()
+    if cfg.roster is None:
+        print("no roster configured", file=sys.stderr)
+        return 2
+
+    contexts = tuple(c.strip() for c in args.contexts.split(",") if c.strip())
+    only = {s.strip() for s in args.species.split(",")} if args.species else None
+    voices = _voices(cfg.roster.species, only)
+
+    if args.dry_run:
+        backend = get_backend("static")
+        first = dict(list(voices.items())[:1])
+        packs = author_packs(backend, first, contexts[:1], examples=_EXAMPLES)
+        yaml.safe_dump(packs, sys.stdout, sort_keys=False, allow_unicode=True)
+        print("\n# dry run — validated, not written", file=sys.stderr)
+        return 0
+
+    backend = get_backend(args.backend, model=args.model)
+    print(f"authoring {len(voices)} species × {len(contexts)} intents via {backend.name}…",
+          file=sys.stderr)
+    packs = author_packs(backend, voices, contexts, examples=_EXAMPLES, retries=args.retries)
+
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as fh:
+        yaml.safe_dump({"species_grammars": packs}, fh, sort_keys=False, allow_unicode=True)
+    print(f"wrote {out}", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

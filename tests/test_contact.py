@@ -145,7 +145,7 @@ def test_hail_is_converse_greeting() -> None:
 
 
 def test_every_reachable_peaceful_context_speaks() -> None:
-    from edge.core.dialogue import reachable_contexts
+    from edge.dialogue import reachable_contexts
 
     state = _world()
     sp = _inject(state, "vesk")

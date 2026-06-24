@@ -12,7 +12,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from edge.bigbang.topology import bfs_distances
-from edge.core import dialogue, dto
+from edge import dialogue
+from edge.dialogue.intel import pick_intel_target
+from edge.core import dto
 from edge.server import terrain as terrain_art
 from edge.core.aliens import disposition_band, effective_disposition
 from edge.core.config import GameConfig
@@ -803,9 +805,36 @@ def route_legs_view(
     return _route_dto(state, player, plan)
 
 
+def leads_view(state: UniverseState, player_id: int, config: GameConfig) -> list[dto.LeadDTO]:
+    """The player's accepted coordinate tips as plottable rows (§6.7 intel, Computer screen).
+
+    A lead points at an as-yet-unvisited place, so the route is planned over the **full**
+    graph (not the explored set) — the tip is the map. Each row carries the destination's
+    display id, hop distance, and turn cost from the player's current sector.
+    """
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    roster = config.roster
+    rows: list[dto.LeadDTO] = []
+    for lead in player.leads:
+        plan = plan_route(state.adjacency, ship.sector_id, lead.sector_id,
+                          allowed=None, turns_per_warp=ship.turns_per_warp)
+        source = lead.source_species
+        if roster is not None and (sc := roster.species_by_id(lead.source_species)) is not None:
+            source = sc.name
+        rows.append(dto.LeadDTO(
+            summary=lead.summary, source=source,
+            coords=state.spatial_ids.get(lead.sector_id, lead.sector_id),
+            distance=len(plan.hops) if plan.reachable else -1,
+            turn_cost=plan.turn_cost, reachable=plan.reachable,
+        ))
+    return rows
+
+
 def _line(state: UniverseState, roster: object, species: AlienSpecies, player: Player,
           context: str, config: GameConfig, *, salt: str = "",
-          extra: Mapping[str, str] | None = None) -> str:
+          extra: Mapping[str, str] | None = None,
+          facts: Mapping[str, object] | None = None) -> str:
     """Render a dialogue line **read-only** (the recency ring is not advanced here).
 
     The projection shows a stable line until a reducer (hail/trade) advances the ring;
@@ -814,12 +843,12 @@ def _line(state: UniverseState, roster: object, species: AlienSpecies, player: P
     ring = player.dialogue_recency.get((species.roster_id, context), ())
     rng = dialogue.encounter_rng(state.game.seed, species.roster_id, context + salt, ring)
     text, _ = dialogue.speak(roster, species, player, context,  # type: ignore[arg-type]
-                             aliens=config.aliens, rng=rng, extra=extra)
+                             aliens=config.aliens, rng=rng, extra=extra, facts=facts)
     return text
 
 
 def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOfferDTO],
-                   *, subjects_available: bool) -> list[dto.ContactVerbDTO]:
+                   *, subjects_available: bool, has_intel: bool = False) -> list[dto.ContactVerbDTO]:
     """Derive the conversation verb menu from species params (§6.7), greying with reasons.
 
     Rows are tagged Say (dialogue) / Do (mechanical) so the TUI groups and dispatches them
@@ -837,7 +866,13 @@ def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOffer
         dto.ContactVerbDTO("ask", "Ask about…", subjects_available,
                            "" if subjects_available else "no other species met yet",
                            kind="say", context="dossier_other", needs_subject=True),
+        # INTEL — ask where to explore; a friendly speaker may volunteer coordinates (§6.7).
+        dto.ContactVerbDTO("intel", "Ask for coordinates", kind="say",
+                           context="offer_coordinates"),
     ]
+    # LOG COORDINATES — a "do" verb, enabled only when a tip is actually on offer.
+    verbs.append(dto.ContactVerbDTO("accept_lead", "Log coordinates", has_intel,
+                                    "" if has_intel else "no coordinates on offer"))
     # TRADE (latinum sales).
     if posture == "refuses":
         verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "they refuse to trade"))
@@ -950,8 +985,14 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     # The line shown is the active context's (default greeting); a "say" verb sets it. For
     # `dossier_other` it narrates the picked subject (or the first met other) — with no salt,
     # so it matches the variant the `Converse` reducer spoke (same `encounter_rng` seed).
+    # The intel "map" tip the speaker can offer right now (None unless friendly + knows
+    # somewhere unvisited). Computed once: it gates the Log-coordinates verb and, when the
+    # offer_coordinates line is shown, binds the same {coords}/{target}/… the reducer will.
+    intel = pick_intel_target(state, player, species, aliens=config.aliens)
+
     shown = active_context if active_context in dialogue._PEACEFUL_CONTEXTS else "greeting"
-    subject_extra = None
+    subject_extra: dict[str, str] | None = None
+    facts: dict[str, object] | None = None
     if shown == "dossier_other":
         sid = active_subject if active_subject is not None else (subjects[0][0] if subjects else None)
         subj = state.species.get(sid) if sid is not None else None
@@ -959,7 +1000,11 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
             shown = "greeting"  # nothing to ask about — fall back to the opener
         else:
             subject_extra = {"subject": subj.name}
-    speech = _line(state, roster, species, player, shown, config, extra=subject_extra)
+    elif shown == "offer_coordinates":
+        facts = {"has_intel_target": intel is not None}
+        if intel is not None:
+            subject_extra = intel.bindings()
+    speech = _line(state, roster, species, player, shown, config, extra=subject_extra, facts=facts)
     return dto.ContactDTO(
         species=species.name, persona=species.persona,
         alliance=alliance.name if alliance else "unaligned",
@@ -968,8 +1013,10 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         attitude=round(player.species_attitudes.get(species.roster_id, 0.0), 3),
         effective=round(effective, 3),
         opener=speech,
-        verbs=_contact_verbs(species, sc, offers, subjects_available=bool(subjects)),
+        verbs=_contact_verbs(species, sc, offers, subjects_available=bool(subjects),
+                             has_intel=intel is not None),
         offers=offers, dossier=dossier, subjects=subjects,
+        intel_summary=intel.summary() if intel is not None else "",
     )
 
 
