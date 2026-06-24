@@ -277,16 +277,8 @@ class TerrainGenerator:
         grid = []
         for y in range(height):
             row = []
-            ny = (y / max(1, height - 1)) * 2.0 - 1.0
-            pole_dist = abs(ny)
-
             for x in range(width):
                 noise_val = gen.noise2(x / sx, y / sy)
-
-                # Polar ice caps: dramatically boost noise near poles on terrestrial planets
-                if "terrestrial" in subtype_key and pole_dist > 0.7:
-                    pole_factor = (pole_dist - 0.7) / 0.3
-                    noise_val += pole_factor * 1.5
 
                 feature_name, fg, bg = get_biome_feature(noise_val, bands)
 
