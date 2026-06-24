@@ -339,6 +339,91 @@ class DiscoveryGenerator:
 
         return map_text
 
+    def _generate_wreck(self, rng: random.Random, width: int, height: int,
+                        archetype_id: str | None = None) -> Text:
+        """A field of scattered space debris: one large broken hull mass plus
+        smaller fragments drifting around it, with a thinning halo of specks.
+
+        Unlike the glowing phenomena, a wreck is solid metal, so it builds a glyph
+        grid and goes through ``render_grid`` — keeping the grey/archetype-tinted
+        hull tones and the occasional window glint of a still-powered console. Each
+        chunk is an irregular, jagged-edged blob (rotated, elongated, with a sinusoid
+        on its rim) so the silhouette reads as torn wreckage, never a clean disk.
+        """
+        style = style_for(archetype_id)
+        top_color = rng.choice(style.top)
+        bottom_color = rng.choice(style.bottom)
+
+        center_x = (width - 1) / 2.0
+        center_y = (height - 1) / 2.0
+        radius_x = width / 2.0
+        radius_y = height / 2.0
+
+        # A handful of debris chunks: a large broken hull mass near the centre,
+        # the rest smaller fragments flung out around it. Each carries a jagged-rim
+        # spec (frequency / phase / amplitude) so no edge is smooth.
+        n_chunks = rng.randint(3, 5)
+        chunks = []
+        for i in range(n_chunks):
+            if i == 0:
+                cx = rng.uniform(-0.18, 0.18)
+                cy = rng.uniform(-0.15, 0.15)
+                cr = rng.uniform(0.42, 0.55)
+            else:
+                ang = rng.uniform(0.0, math.tau)
+                dist = rng.uniform(0.42, 0.88)
+                cx = math.cos(ang) * dist
+                cy = math.sin(ang) * dist
+                cr = rng.uniform(0.12, 0.27)
+            chunks.append((
+                cx, cy, cr,
+                rng.uniform(0.55, 1.0),         # elongation
+                rng.uniform(0.0, math.tau),     # rotation
+                float(rng.choice((4, 5, 6))),   # jag frequency
+                rng.uniform(0.0, math.tau),     # jag phase
+                rng.uniform(0.12, 0.22),        # jag amplitude
+            ))
+
+        # All hull-set glyphs (render as plating tones over the void): torn corners
+        # and plate shards for chunk rims, dark specks/struts for drifting debris.
+        rim_glyphs = ("▙", "▟", "▛", "▜", "◣", "◢", "◤", "◥", "▄", "▀")
+        speck_glyphs = ("░", "▒", "░", "╱", "╲")
+
+        rows = []
+        for y in range(height):
+            row_chars = []
+            for x in range(width):
+                dx = (x - center_x) / radius_x
+                dy = (y - center_y) / radius_y
+
+                # Distance to the nearest chunk, as a ratio of that chunk's jagged
+                # edge radius (<1 ⇒ inside the chunk).
+                best = 9.0
+                for cx, cy, cr, elong, rot, jf, jp, ja in chunks:
+                    ox, oy = dx - cx, dy - cy
+                    rx = ox * math.cos(rot) + oy * math.sin(rot)
+                    ry = (-ox * math.sin(rot) + oy * math.cos(rot)) / elong
+                    rd = math.hypot(rx, ry)
+                    edge = cr * (1.0 + ja * math.sin(math.atan2(ry, rx) * jf + jp))
+                    if edge > 0:
+                        best = min(best, rd / edge)
+
+                if best < 0.62:
+                    char = "█" if rng.random() > 0.28 else "▓"
+                elif best < 0.98:
+                    char = rng.choice(rim_glyphs) if rng.random() > 0.30 else "▒"
+                else:
+                    # Scattered debris drifting away, thinning with distance.
+                    d = math.hypot(dx, dy)
+                    if rng.random() < max(0.0, 0.24 - 0.20 * d):
+                        char = rng.choice(speck_glyphs)
+                    else:
+                        char = " "
+                row_chars.append(char)
+            rows.append("".join(row_chars))
+
+        return render_grid(rows, style, top_color, bottom_color, rng, width, height)
+
     def generate(
         self,
         rng: random.Random,
@@ -354,6 +439,8 @@ class DiscoveryGenerator:
             return self._generate_black_hole(rng, width, height)
         if subtype == "wormhole":
             return self._generate_wormhole(rng, width, height)
+        if subtype == "wreck":
+            return self._generate_wreck(rng, width, height, archetype_id)
 
         style = style_for(archetype_id)
         
@@ -414,15 +501,6 @@ class DiscoveryGenerator:
                         elif oct_d > 0.7: char = "≡" # Outer treads
                         else: 
                             char = "█" if rng.random() > 0.3 else "▓"
-
-                elif subtype == "wreck":
-                    # Circular debris field, heavy center
-                    if d < 0.8:
-                        prob = max(0, 1.0 - d * 1.5)
-                        if rng.random() < prob:
-                            if d < 0.2: char = "█"
-                            elif d < 0.4: char = "▓"
-                            else: char = rng.choice(["▒", "░", "╱", "╲"])
 
                 elif subtype == "crashed_ship":
                     # Angled swath of debris
