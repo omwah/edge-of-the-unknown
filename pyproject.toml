@@ -13,7 +13,7 @@ edge-author-dialogue = "edge.dialogue.authoring.cli:main"
 # Dev-only extras for the cloud authoring backends (the Ollama backend is plain HTTP, no SDK).
 # The runtime never calls an LLM, so these are not Phase-runtime dependencies.
 [project.optional-dependencies]
-authoring = ["anthropic>=0.40"]
+authoring = ["anthropic>=0.40", "google-antigravity>=0.2"]
 
 [build-system]
 build-backend = "hatchling.build"
