@@ -121,6 +121,38 @@ def test_extract_json_tolerates_fences_and_prose() -> None:
     assert _extract_json('{"origin": ["y"]}') == {"origin": ["y"]}
 
 
+def test_extract_json_tolerates_trailing_data() -> None:
+    """gemma4:12b appends a second object / prose after a valid one — take the first object."""
+    import json
+
+    from edge.dialogue.authoring.backends import _extract_json
+
+    assert _extract_json('{"origin": ["a"]}\n{"origin": ["b"]}') == {"origin": ["a"]}
+    assert _extract_json('{"origin": ["a"]}\nHope that helps!') == {"origin": ["a"]}
+    with pytest.raises(json.JSONDecodeError):
+        _extract_json("sorry, I cannot do that")
+
+
+def test_author_line_retries_a_backend_that_emits_unparseable_json() -> None:
+    """A one-off non-JSON backend response retries instead of aborting the run."""
+    from edge.dialogue.authoring.pipeline import author_line
+    from edge.dialogue.authoring.backends import _extract_json
+
+    calls = {"n": 0}
+
+    class _Flaky:
+        name = "flaky"
+
+        def generate(self, prompt: str, *, schema: object) -> dict:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                _extract_json("not json at all")  # raises JSONDecodeError on the first draw
+            return {"origin": ["#opener#"], "opener": ["Well met, {player}, from the {species}."]}
+
+    line = author_line(_Flaky(), AuthoringRequest("greeting", "v", frozenset()), retries=3)
+    assert calls["n"] == 2 and line["grammar"]["origin"] == ["#opener#"]
+
+
 def test_parse_claude_envelope_handles_object_and_string_result() -> None:
     from edge.dialogue.authoring.backends import _parse_claude_envelope
 

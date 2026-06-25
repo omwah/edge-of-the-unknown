@@ -62,8 +62,9 @@ class OllamaBackend:
                                      headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req) as resp:  # noqa: S310 — local dev host
             payload = json.loads(resp.read().decode("utf-8"))
-        result: dict[str, Any] = json.loads(payload["response"])
-        return result
+        # Ollama's schema mode usually returns clean JSON, but some models (e.g. gemma4:12b)
+        # append a second object or trailing prose; _extract_json tolerates that.
+        return _extract_json(payload["response"])
 
 
 class AnthropicBackend:
@@ -89,8 +90,7 @@ class AnthropicBackend:
             messages=[{"role": "user", "content": prompt}],
         )
         text = next(b.text for b in resp.content if b.type == "text")
-        result: dict[str, Any] = json.loads(text)
-        return result
+        return _extract_json(text)
 
 
 class AntigravityBackend:
@@ -131,18 +131,23 @@ class AntigravityBackend:
 
 
 def _extract_json(text: str) -> dict[str, Any]:
-    """Parse one JSON object out of CLI output (tolerating ```fences``` and surrounding prose)."""
+    """Parse the first JSON object out of model/CLI output.
+
+    Tolerates the mess small models and agent CLIs produce around the object: ```fences```,
+    leading prose, and **trailing junk after a valid object** (a second object, commentary) —
+    `raw_decode` reads one complete object and ignores anything after it.
+    """
     text = text.strip()
     fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if fenced:
         text = fenced.group(1)
-    elif not text.startswith("{"):
-        # Fall back to the first balanced-looking {...} span (agent CLIs add chatter).
-        span = re.search(r"\{.*\}", text, re.DOTALL)
-        if span:
-            text = span.group(0)
-    result: dict[str, Any] = json.loads(text)
-    return result
+    start = text.find("{")
+    if start == -1:
+        raise json.JSONDecodeError("no JSON object in output", text or "<empty>", 0)
+    obj, _ = json.JSONDecoder().raw_decode(text[start:])
+    if not isinstance(obj, dict):
+        raise json.JSONDecodeError(f"expected a JSON object, got {type(obj).__name__}", text, start)
+    return obj
 
 
 def _parse_claude_envelope(text: str) -> dict[str, Any]:

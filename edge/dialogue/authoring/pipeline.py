@@ -8,6 +8,7 @@ same JSON-schema works across Ollama / Anthropic / Antigravity strict-output mod
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -221,17 +222,20 @@ def author_line(backend: Any, req: AuthoringRequest, *, retries: int = 3) -> dic
 
     LLM sampling is stochastic, so a grammar that fails the quality floor on one draw often
     passes on the next. We retry the generator up to `retries` times rather than relax the
-    floor — keeping output quality high while tolerating flaky small models. Raises the last
-    `AuthoringError` if every attempt fails.
+    floor — keeping output quality high while tolerating flaky small models. A backend whose
+    response won't even parse as JSON (`JSONDecodeError`) is treated the same way — one bad
+    draw retries instead of aborting the whole run. Raises the last error if every attempt
+    fails. (Backend *configuration* errors — a missing CLI, a bad host — surface as other
+    exception types and abort immediately, by design.)
     """
     prompt = build_prompt(req)
-    last: AuthoringError | None = None
+    last: Exception | None = None
     for _ in range(max(1, retries)):
-        grammar = prune_unreachable(repair(backend.generate(prompt, schema=output_schema()),
-                                           req.context))
         try:
+            raw = backend.generate(prompt, schema=output_schema())
+            grammar = prune_unreachable(repair(raw, req.context))
             validate_generated(grammar, req.context)
-        except AuthoringError as exc:
+        except (AuthoringError, json.JSONDecodeError) as exc:
             last = exc
             continue
         return {"grammar": grammar}
