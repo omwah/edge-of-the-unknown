@@ -188,8 +188,9 @@ def prune_unreachable(grammar: Mapping[str, Sequence[str]]) -> dict[str, list[st
 def repair(grammar: Mapping[str, Sequence[str]], context: str) -> dict[str, list[str]]:
     """Normalise the two mistakes small models reliably make, before validation.
 
-    (1) `#name#` (or `#{name}#`) where `name` is a placeholder → `{name}`: the model meant the
-    placeholder, not a grammar symbol. (2) A `#ref#` to a symbol that isn't defined → dropped:
+    (1) `#name#`, or a `#` fused onto a placeholder (`#{name}` / `#{name}#`), where `name` is a
+    placeholder → `{name}`: the model meant the placeholder, not a grammar symbol. (2) A `#ref#`
+    to a symbol that isn't defined → dropped:
     the model wanted a fragment it never wrote; the rest of the line stands (and the substance
     floor rejects it if that left it too thin). This is graceful repair of *candidate* content
     a human reviews before merging — it never invents text, only fixes syntax and removes
@@ -198,7 +199,10 @@ def repair(grammar: Mapping[str, Sequence[str]], context: str) -> dict[str, list
     allowed = allowed_placeholders(context)
 
     def to_placeholder(s: str) -> str:
-        s = re.sub(r"#\{(\w+)\}#", r"{\1}", s)  # #{player}# -> {player}
+        # A '#' fused onto a {placeholder} is a model slip (#{player}, #{player}#); strip it.
+        # The lookbehind leaves the closing '#' of a real "#symbol#" that abuts a placeholder
+        # intact (that abutment is rejected elsewhere, not silently mangled here).
+        s = re.sub(r"(?<!\w)#(\{\w+\}#?)", lambda m: m.group(1).rstrip("#"), s)
         return re.sub(r"#(\w+)#",
                       lambda m: f"{{{m.group(1)}}}" if m.group(1) in allowed else m.group(0), s)
 

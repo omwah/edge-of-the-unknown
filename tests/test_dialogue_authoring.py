@@ -74,6 +74,18 @@ def test_repair_normalizes_placeholder_syntax_and_drops_dangling_refs() -> None:
     assert "#missing#" not in line and "#" not in line  # dangling ref dropped
 
 
+def test_repair_strips_hash_fused_onto_placeholder() -> None:
+    # qwen2 emits a '#' fused onto a placeholder with no closing '#' (#{player}); repair
+    # normalises it (the older #{player}# form too) so it isn't rejected as mixed syntax.
+    fixed = repair({"origin": ["Our paths cross, #{player}, near {coords}."]}, "offer_coordinates")
+    assert fixed["origin"][0] == "Our paths cross, {player}, near {coords}."
+    validate_generated(fixed, "offer_coordinates")  # now passes the §13 floor
+
+    # A real "#symbol#" abutting a placeholder keeps its closing '#' (not mangled by repair).
+    assert repair({"origin": ["#opener#{player}"], "opener": ["hi"]},
+                  "greeting")["origin"][0] == "#opener#{player}"
+
+
 def test_static_backend_authors_a_loadable_renderable_pack() -> None:
     voices = {"vesk": "Vesk: stern reptilian merchants (persona: serial_formal)"}
     packs = author_packs(StaticBackend(), voices, ["greeting", "offer_coordinates"])
