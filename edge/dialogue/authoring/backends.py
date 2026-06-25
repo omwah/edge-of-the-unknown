@@ -57,6 +57,10 @@ class OllamaBackend:
     def generate(self, prompt: str, *, schema: dict[str, Any]) -> dict[str, Any]:
         body = json.dumps({
             "model": self.model, "prompt": prompt, "stream": False, "format": schema,
+            # Disable "thinking" — its reasoning tokens derail schema-constrained output (e.g.
+            # gemma4:12b emits an origin referencing fragments it never defines). Accepted as a
+            # no-op by non-thinking models, so it is always safe to send.
+            "think": False,
         }).encode("utf-8")
         req = urllib.request.Request(f"{self.host}/api/generate", data=body,
                                      headers={"Content-Type": "application/json"})
