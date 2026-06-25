@@ -99,7 +99,13 @@ def _strings(grammar: Mapping[str, Sequence[str]]) -> list[str]:
 
 
 def _placeholders_in(template: str) -> set[str]:
-    return {name for _, name, _, _ in Formatter().parse(template) if name}
+    # `str.Formatter` rejects malformed braces (e.g. `{a {b}}`) with a raw ValueError; small
+    # models emit these, so surface it as an AuthoringError — a retryable validation failure,
+    # not a crash that aborts the whole batch.
+    try:
+        return {name for _, name, _, _ in Formatter().parse(template) if name}
+    except ValueError as exc:
+        raise AuthoringError(f"malformed placeholder syntax in {template!r}: {exc}") from exc
 
 
 class AuthoringError(Exception):
