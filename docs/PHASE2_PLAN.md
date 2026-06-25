@@ -468,7 +468,7 @@ for a seed.
 Phase 2 places **only friendly-band** species (hostiles are Phase 3), drawn from a
 config roster, so the contact/barter loop has partners without combat.
 
-**Config (`config/roster_default.yaml`, NEW — a named roster file, §6).** Author
+**Config (`config/alien_roster_default.yaml`, NEW — a named roster file, §6).** Author
 the **full §6.1 parameter set** for every species entry, not just the part Phase 2
 runs. The **friendly-path subset Phase 2 actually exercises** is `name`,
 `archetype_id`, `disposition_center` + `disposition_variance`, `alliance_id` +

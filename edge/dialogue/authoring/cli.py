@@ -2,13 +2,17 @@
 
 Drives a pluggable LLM backend (local Ollama by default, or the Anthropic / Antigravity APIs)
 to author persona-voiced Tracery grammars for each roster species and a set of intents,
-validates them, and writes a config sidecar the runtime can load. The runtime never calls an
-LLM — this only shapes config. Run via `pixi run author-dialogue …`.
+validates them, and writes a config sidecar the runtime can load. Each run is written to a
+file named for the backend and model that produced it
+(`config/dialogue/alien_dialogue.<backend>_<model>.yaml`) so authored corpora don't clobber
+each other; `--out` overrides the path. The runtime never calls an LLM — this only shapes
+config. Run via `pixi run author-dialogue …`.
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,8 +20,11 @@ from typing import Any
 import yaml
 
 from edge.config import load_default_config
-from edge.dialogue.authoring.backends import get_backend
+from edge.dialogue.authoring.backends import Backend, get_backend
 from edge.dialogue.authoring.pipeline import author_packs
+
+# Where backend/model-named grammar sidecars are written when `--out` is not given.
+_OUT_DIR = Path("config/dialogue")
 
 # A sensible default set of intents to author (the Phase-2 friendly path + the map mechanic).
 _DEFAULT_CONTEXTS = ("greeting", "trade_open", "farewell", "dossier_other", "offer_coordinates")
@@ -30,6 +37,17 @@ _EXAMPLES: dict[str, dict[str, str]] = {
         "band": "Deep", "reward": "a Tier III component",
     },
 }
+
+
+def _default_out(backend: Backend) -> Path:
+    """The sidecar path for a backend, named for its backend id and resolved model.
+
+    e.g. `config/dialogue/alien_dialogue.anthropic_claude-opus-4-8.yaml`. The model id is
+    sanitised (slashes, colons, whitespace -> `-`) so it is a safe filename component.
+    """
+    model = getattr(backend, "model", backend.name)
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", str(model)).strip("-")
+    return _OUT_DIR / f"alien_dialogue.{backend.name}_{slug}.yaml"
 
 
 def _voices(species: Any, only: set[str] | None) -> dict[str, str]:
@@ -53,8 +71,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="comma-separated intent keys to author")
     parser.add_argument("--species", default=None,
                         help="comma-separated species ids to author (default: all)")
-    parser.add_argument("--out", default="config/dialogue/roster_default.generated.yaml",
-                        help="where to write the generated sidecar")
+    parser.add_argument("--out", default=None,
+                        help="where to write the generated sidecar (default: "
+                             "config/dialogue/alien_dialogue.<backend>_<model>.yaml)")
     parser.add_argument("--retries", type=int, default=4,
                         help="regeneration attempts per line before giving up (default: 4)")
     parser.add_argument("--dry-run", action="store_true",
@@ -83,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
           file=sys.stderr)
     packs = author_packs(backend, voices, contexts, examples=_EXAMPLES, retries=args.retries)
 
-    out = Path(args.out)
+    out = Path(args.out) if args.out else _default_out(backend)
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", encoding="utf-8") as fh:
         yaml.safe_dump({"species_grammars": packs}, fh, sort_keys=False, allow_unicode=True)

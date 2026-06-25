@@ -117,7 +117,7 @@ class HullStyle:
     facet: str
 
 
-# Hull palettes keyed by ``archetype_id`` (see config/roster_default.yaml). The
+# Hull palettes keyed by ``archetype_id`` (see config/alien_roster_default.yaml). The
 # Federation 'humanoid_diplomat' reads as the grey hull of the classic StarDock;
 # every other archetype gets a distinct hull/beacon hue family. Unknown archetypes
 # fall back to 'default'. Ports and ships share these palettes.

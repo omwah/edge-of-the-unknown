@@ -816,7 +816,7 @@ screen — the offers panel already acts; this makes the conversation act too.
 
 The **Terran Federation governs the Core but has no people of its own.** It is
 `alliance_id: 1` in the roster — the Core's governor, the bloc the player starts
-in — yet *every* species in `roster_default.yaml` is either unaligned (`null`) or a
+in — yet *every* species in `alien_roster_default.yaml` is either unaligned (`null`) or a
 member of a rival bloc (2/3/4). So the Core is contact-free except the WP-staged
 StarDock greeters (drawn from unaligned neutrals, since there were no Federation
 members to draw from). WP18 fixes that: it gives the Federation its **founding
@@ -854,7 +854,7 @@ and a voice to it.
 
 **In scope:**
 
-- **Roster content** (`config/roster_default.yaml`): one to three **Federation-member
+- **Roster content** (`config/alien_roster_default.yaml`): one to three **Federation-member
   species** — `alliance_id: 1`, `alliance_role: member` (one `leader`) — with the new
   **`archetype_id: humanoid_diplomat`**, `disposition_center: 1.0` (with small
   `disposition_variance`, so they draw at the very top of the friendly band — "100%
@@ -894,7 +894,7 @@ and a voice to it.
 
 ## Design
 
-### Roster — the species (`config/roster_default.yaml`)
+### Roster — the species (`config/alien_roster_default.yaml`)
 
 A new "Federation core" group, e.g. (abbreviated):
 
@@ -1019,7 +1019,7 @@ port/planet/discovery draw order (golden-master ordering).
 ## Suggested order / commits (phase-tagged, small)
 
 1. `p2: WP18 (roster) Federation humanoid_diplomat species + persona pack` —
-   `roster_default.yaml` content; `test_aliens` integrity + `validate_dialogue`.
+   `alien_roster_default.yaml` content; `test_aliens` integrity + `validate_dialogue`.
 2. `p2: WP18 (bigbang) settle governing-alliance members in Core + validation` —
    `_populate_governing_space`, the Core exemption + "Federation inhabits its capital"
    invariant, StarDock greeter preference; `test_aliens` placement.
