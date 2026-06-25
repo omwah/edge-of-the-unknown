@@ -180,6 +180,10 @@ class ComputerScreen(Screen):
             return "[dim]Hail a friendly species to begin a dossier.[/]"
         return "\n".join(f"[cyan]{d.species}:[/] [dim]{d.note}[/]" for d in self._computer.dossier)
 
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        # Remember the tab across screens so [C] reopens where the player left off.
+        self.app.computer_tab = self.query_one(TabbedContent).active
+
     def on_map_band_panel_picked(self, msg: MapBandPanel.Picked) -> None:
         self.notify(f"{msg.title} — sector inspector not wired in the skeleton.", timeout=2)
 

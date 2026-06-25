@@ -62,6 +62,7 @@ class EdgeApp(App[None]):
         self.scene_art = SceneArtConfig()
         self.ui_config = UIConfig()
         self.max_warps_per_sector = 6  # TW2002 cap; reserves the warp grid's row count
+        self.computer_tab = "trade"  # last Computer tab, restored when reopened with [C]
 
     def on_mount(self) -> None:
         self.register_theme(TW2002_THEME)

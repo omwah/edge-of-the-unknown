@@ -242,6 +242,31 @@ async def test_arrow_keys_move_warp_focus() -> None:
             assert app.focused is cells[src]
 
 
+async def test_focused_warp_cell_inverts_only_its_label() -> None:
+    """The selected warp highlights just its label text (reverse), not the whole grid cell."""
+    from edge.tui.widgets import WarpCell
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+
+        focused = app.focused
+        assert isinstance(focused, WarpCell)
+        text = focused.render()
+        # A reverse span covers the label and stops short of the right-aligned codes/filler,
+        # so the inversion hugs the text rather than spanning the full cell width.
+        reversed_spans = [s for s in text.spans if s.style and "reverse" in str(s.style)]
+        assert reversed_spans
+        assert max(s.end for s in reversed_spans) < len(text.plain)
+
+        # An unfocused cell carries no inversion.
+        others = [c for c in app.screen.query(WarpCell) if c is not focused]
+        if others:
+            assert not any(s.style and "reverse" in str(s.style) for s in others[0].render().spans)
+
+
 async def test_dock_and_trade_buys_fuel() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -865,6 +890,35 @@ async def test_leads_tab_lists_logged_tip_plots_and_engages_route() -> None:
         await pilot.pause()
         assert svc.state.ships[1].sector_id == disc.sector_id  # arrived at the tip
         assert disc.sector_id in svc.state.players[1].explored_sectors  # charted en route
+
+
+async def test_computer_screen_remembers_last_tab() -> None:
+    """[C] reopens the Computer on whichever tab was last viewed (not always Trade)."""
+    from textual.widgets import TabbedContent
+
+    from edge.tui.screens.computer import ComputerScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        await pilot.press("c")  # open the Computer — defaults to the Trade tab
+        await pilot.pause()
+        assert isinstance(app.screen, ComputerScreen)
+        assert app.screen.query_one(TabbedContent).active == "trade"
+
+        app.screen.query_one(TabbedContent).active = "codex"  # switch tabs
+        await pilot.pause()
+        assert app.computer_tab == "codex"  # the switch is remembered on the app
+        await pilot.press("c")  # [C] closes the Computer from within
+        await pilot.pause()
+        assert not isinstance(app.screen, ComputerScreen)
+
+        await pilot.press("c")  # reopen — should land back on Codex, not Trade
+        await pilot.pause()
+        assert isinstance(app.screen, ComputerScreen)
+        assert app.screen.query_one(TabbedContent).active == "codex"
 
 
 async def test_ports_directory_lists_and_plots_route() -> None:
