@@ -256,7 +256,9 @@ class GameScreen(Screen):
     # --- other screens (live: computer/map; sample: the Phase 2-3 ones) ------
 
     def action_computer(self) -> None:
-        self.app.push_screen(ComputerScreen(self._service, self._pid))
+        # Reopen on the tab last used (Map/Log have their own keys that jump explicitly).
+        last_tab = getattr(self.app, "computer_tab", "trade")
+        self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab=last_tab))
 
     def action_map(self) -> None:
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="map"))

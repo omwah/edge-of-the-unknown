@@ -688,10 +688,9 @@ class WarpCell(Static):
 
     DEFAULT_CSS = """
     WarpCell { width: 1fr; height: 1; padding: 0 1; color: $primary; }
-    WarpCell:focus { background: $boost; text-style: bold; }
-    WarpCell:hover { background: $boost; }
     WarpCell.unexplored { color: $text-disabled; }
     WarpCell.backtrack { color: $accent; }
+    WarpCell:hover { background: $boost; }
     """
 
     def __init__(self, warp: WarpDTO, **kwargs: object) -> None:
@@ -707,7 +706,11 @@ class WarpCell(Static):
         name = w.label or "—"
         left = Text.from_markup(f"{w.display_id} {w.arrow} {name}")
         if w.band:
-            left.append(f" ({w.band})", style="dim")
+            # Drop the band's dim when focused, else `reverse` turns it into a darker
+            # background shade than the rest of the label (uneven highlight).
+            left.append(f" ({w.band})", style="" if self.has_focus else "dim")
+        if self.has_focus:
+            left.stylize("reverse bold")  # invert just the warp text, not the whole grid cell
         codes = _code_markup(w.codes)
         right = Text.from_markup(codes) if codes else Text("")
         # Left-justify the warp text, right-justify the codes; pad between to fill the
@@ -723,6 +726,12 @@ class WarpCell(Static):
 
     def on_click(self) -> None:
         self.action_warp()
+
+    def on_focus(self) -> None:
+        self.refresh()  # repaint so the focused-text inversion in render() applies
+
+    def on_blur(self) -> None:
+        self.refresh()
 
     def action_warp(self) -> None:
         self.post_message(self.Warp(self._warp.sector_id))
