@@ -159,3 +159,50 @@ def test_merge_dialogue_rejects_unknown_species() -> None:
     roster: dict = {"species": [{"id": "vesk"}]}
     with pytest.raises(ValueError, match="unknown species 'ghost'"):
         _merge_dialogue(roster, {"species_grammars": {"ghost": {"greeting": []}}})
+
+
+def test_merge_dialogue_gates_spliced_offer_coordinates_on_intel() -> None:
+    """A spliced offer_coordinates tip is gated on has_intel_target so it never shadows the
+    generic 'nowhere new' catch-all with empty {target}/{coords}/... placeholders."""
+    roster: dict = {"species": [{"id": "vesk"}]}
+    sidecar = {"species_grammars": {"vesk": {
+        "greeting": [{"grammar": {"origin": ["hi {player}"]}}],
+        "offer_coordinates": [{"grammar": {"origin": ["go to {coords}"]}}],
+    }}}
+    _merge_dialogue(roster, sidecar)
+    pack = roster["species"][0]["dialogue_pack"]
+    assert pack["offer_coordinates"][0]["when"] == {"criteria": {"has_intel_target": True}}
+    assert "when" not in pack["greeting"][0]  # only the intel context is gated
+
+
+def test_merge_dialogue_offer_coordinates_falls_back_without_intel() -> None:
+    """Self-contained: a gated species tip is skipped when has_intel_target is false, so the
+    generic 'nowhere new' catch-all speaks instead of a tip with blank placeholders."""
+    import random
+
+    from edge.core.config import RosterConfig
+    from edge.dialogue.select import build_chain, select_line
+
+    roster_data: dict = {
+        "core_governing_alliance_id": 1,
+        "alliances": [{"id": 1, "name": "Fed", "banner": "x"}],
+        "species": [{"id": "vesk", "name": "Vesk", "archetype_id": "a", "persona": "generic",
+                     "disposition_center": 0.9, "tech_level": 5, "home_band": "Hub"}],
+        "personas": {"generic": {"offer_coordinates": [
+            {"when": {"criteria": {"has_intel_target": True}},
+             "variants": ["Seek {target} at sector {coords}, {player}."]},
+            {"variants": ["No fresh coordinates for you, {player}."]},
+        ]}},
+    }
+    sidecar = {"species_grammars": {"vesk": {"offer_coordinates": [
+        {"grammar": {"origin": ["Make for sector {coords}, {distance} jumps into the {band}."]}},
+    ]}}}
+    _merge_dialogue(roster_data, sidecar)
+    roster = RosterConfig.model_validate(roster_data)
+    sp = roster.species_by_id("vesk")
+    chain = build_chain(roster, sp, sp.persona)
+    ctx = {"player": "Vale"}
+    text, _ = select_line(chain, "offer_coordinates", standing="neutral", treaty=False,
+                          ctx=ctx, recency=(), rng=random.Random(1), k=2,
+                          facts={"has_intel_target": False})
+    assert text == "No fresh coordinates for you, Vale."  # generic fallback, not the blank tip
