@@ -32,7 +32,20 @@ The console script is also installed as `edge-author-dialogue` (run it directly 
 | `ollama`      | A local Ollama model (the default)  | a running Ollama server (`OLLAMA_HOST`, default `http://localhost:11434`); `--model` (default `llama3.1`). Plain HTTP — no SDK. |
 | `anthropic`   | The Anthropic API (official SDK)    | `pip install -e '.[authoring]'` (the `anthropic` SDK) + `ANTHROPIC_API_KEY`. `--model` default `claude-opus-4-8`. |
 | `antigravity` | Google Antigravity (`google-antigravity` SDK) | `pip install -e '.[authoring]'` (the `google-antigravity` SDK) + `GEMINI_API_KEY` (or ADC; `ANTIGRAVITY_API_KEY` overrides). `--model` / `ANTIGRAVITY_MODEL` default `gemini-3-pro`. |
+| `claude`      | A **Claude Code CLI session** (no API key) | the `claude` CLI installed + logged in. Uses `claude -p --output-format json --json-schema …` (schema-constrained). `--model` optional. |
+| `agy`         | An **Antigravity CLI session** (no API key) | the `agy` CLI installed + logged in. Uses `agy -p <prompt>`; JSON is parsed from its stdout. `--model` optional. |
+| `cli`         | **Any other agent CLI** (generic)   | `--cli-command '<argv>'` (or `$EDGE_AUTHOR_CLI`) with placeholders `{prompt_file} {schema_file} {out_file} {model}`; the CLI must write the JSON grammar to `{out_file}`. |
 | `static`      | A canned valid grammar (no model)   | nothing — used by `--dry-run` and the tests.            |
+
+The `claude` / `agy` / `cli` backends drive a **CLI you are already authenticated to** — no API
+key. The prompt and schema are written into a throwaway temp dir, the CLI is invoked, the one
+JSON grammar is read back, and the temp dir is always removed afterwards. Example generic use
+(any agent CLI that can write a file):
+
+```bash
+pixi run author-dialogue --backend cli \
+  --cli-command 'some-agent run --prompt-file {prompt_file} --output {out_file}'
+```
 
 Install the cloud extras once with: `pixi run -e default pip install -e '.[authoring]'`
 (or `pip install -e '.[authoring]'` in your venv) — this pulls in both the `anthropic` and
@@ -41,8 +54,10 @@ Install the cloud extras once with: `pixi run -e default pip install -e '.[autho
 ## Options
 
 ```
---backend {ollama,anthropic,antigravity,static}   LLM backend (default: ollama)
+--backend {ollama,anthropic,antigravity,claude,agy,cli,static}  engine (default: ollama)
 --model MODEL                                      override the backend's model id
+--cli-command 'ARGV'                              for --backend cli: the CLI argv template
+                                                   ({prompt_file} {schema_file} {out_file} {model})
 --contexts greeting,trade_open,offer_coordinates,… intents to author (comma-separated)
 --species vesk,terran,…                            limit to these roster species ids (default: all)
 --out PATH                                         sidecar to write (default: config/dialogue/alien_dialogue.<backend>_<model>.yaml)

@@ -10,7 +10,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shlex
+import shutil
+import subprocess
+import tempfile
 import urllib.request
+from pathlib import Path
 from typing import Any, Protocol
 
 
@@ -123,8 +129,132 @@ class AntigravityBackend:
         return result
 
 
-def get_backend(name: str, *, model: str | None = None) -> Backend:
-    """Resolve a backend by `--backend` name (ollama / anthropic / antigravity / static)."""
+def _extract_json(text: str) -> dict[str, Any]:
+    """Parse one JSON object out of CLI output (tolerating ```fences``` and surrounding prose)."""
+    text = text.strip()
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fenced:
+        text = fenced.group(1)
+    elif not text.startswith("{"):
+        # Fall back to the first balanced-looking {...} span (agent CLIs add chatter).
+        span = re.search(r"\{.*\}", text, re.DOTALL)
+        if span:
+            text = span.group(0)
+    result: dict[str, Any] = json.loads(text)
+    return result
+
+
+def _parse_claude_envelope(text: str) -> dict[str, Any]:
+    """Pull the grammar object out of `claude -p --output-format json` output.
+
+    The envelope is `{"type": "result", "result": <structured output>, ...}`; with
+    `--json-schema` the result is the grammar (a dict, or a JSON string of one). Defensive: if
+    there is no envelope, treat the whole payload as the grammar.
+    """
+    envelope = _extract_json(text)
+    grammar = envelope.get("result", envelope) if "result" in envelope else envelope
+    if isinstance(grammar, str):
+        return _extract_json(grammar)
+    assert isinstance(grammar, dict)
+    return grammar
+
+
+class CliBackend:
+    """Drive an authenticated agent **CLI session** (Claude Code, Antigravity, …) to author a
+    grammar — no API key, reusing a CLI you already have logged in.
+
+    Generic by construction: the prompt and JSON schema are written into a throwaway temp dir,
+    the CLI is invoked, its one schema-valid JSON grammar is read back, and the temp dir is
+    **always removed afterwards** (the file the CLI creates is cleaned up by the author tool).
+    The rest of the pipeline (assembly, validation, retries) is unchanged.
+
+    Three ways to drive it:
+    - `claude` preset — `claude -p --output-format json --json-schema <schema>` with the prompt
+      on stdin; the grammar is read from the JSON envelope on stdout (schema-constrained).
+    - `agy` preset — the Antigravity CLI (`agy -p`, prompt on stdin); it has no structured-output
+      flag, so the grammar JSON is parsed out of its stdout (fences/chatter tolerated).
+    - `cli` generic — any other external CLI, via a command template from `--cli-command` /
+      `EDGE_AUTHOR_CLI`. Placeholders `{prompt_file}` `{schema_file}` `{out_file}` `{model}` are
+      substituted; the CLI is expected to **write the JSON grammar to `{out_file}`**, which the
+      backend then reads and deletes. e.g.:
+        --cli-command 'some-agent run --prompt-file {prompt_file} --output {out_file}'
+    """
+
+    def __init__(self, name: str, model: str | None = None, command: str | None = None) -> None:
+        self.name = name
+        self.model = model or "default"     # used only to name the output sidecar
+        self._model_arg = model
+        self.command = command or os.environ.get("EDGE_AUTHOR_CLI")
+        if name == "cli" and not self.command:
+            raise RuntimeError(
+                "the 'cli' backend needs a command: pass --cli-command '<argv with "
+                "{prompt_file}/{out_file}>' or set EDGE_AUTHOR_CLI"
+            )
+
+    def generate(self, prompt: str, *, schema: dict[str, Any]) -> dict[str, Any]:
+        schema_text = json.dumps(schema)
+        full_prompt = (
+            f"{prompt}\n\nReturn ONLY a single JSON object conforming to this JSON Schema — "
+            f"no prose, no markdown fences:\n{schema_text}"
+        )
+        work = Path(tempfile.mkdtemp(prefix="edge-author-cli-"))
+        try:
+            prompt_file = work / "prompt.txt"
+            prompt_file.write_text(full_prompt, encoding="utf-8")
+            schema_file = work / "schema.json"
+            schema_file.write_text(schema_text, encoding="utf-8")
+            out_file = work / "grammar.json"
+
+            if self.command:  # generic template: the CLI writes the grammar to {out_file}
+                subs = {"{prompt_file}": str(prompt_file), "{schema_file}": str(schema_file),
+                        "{out_file}": str(out_file), "{model}": self._model_arg or ""}
+
+                def _sub(tok: str) -> str:
+                    for key, val in subs.items():  # noqa: B023 — `subs` is loop-invariant here
+                        tok = tok.replace(key, val)
+                    return tok
+
+                argv = [_sub(tok) for tok in shlex.split(self.command)]
+                self._run(argv)
+                if not out_file.exists():
+                    raise RuntimeError(f"{argv[0]} produced no {out_file.name}; check the command")
+                return _extract_json(out_file.read_text(encoding="utf-8"))
+
+            if self.name == "claude":  # schema-constrained structured output on stdout
+                argv = ["claude", "-p", "--output-format", "json", "--json-schema", schema_text]
+                if self._model_arg:
+                    argv += ["--model", self._model_arg]
+                return _parse_claude_envelope(self._run(argv, stdin=full_prompt))
+
+            # `agy` (Antigravity CLI): print mode with the prompt as a positional arg (it does
+            # not read stdin); JSON parsed from free-text stdout.
+            argv = ["agy", "-p"]
+            if self._model_arg:
+                argv += ["--model", self._model_arg]
+            argv.append(full_prompt)
+            return _extract_json(self._run(argv))
+        finally:
+            shutil.rmtree(work, ignore_errors=True)  # author tool cleans up the session file
+
+    @staticmethod
+    def _run(argv: list[str], *, stdin: str | None = None) -> str:
+        try:
+            proc = subprocess.run(argv, input=stdin, capture_output=True, text=True,  # noqa: S603
+                                  timeout=600, check=False)
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"CLI not found: {argv[0]!r} — is it installed and on PATH?") from exc
+        if proc.returncode != 0:
+            tail = (proc.stderr or proc.stdout).strip()[-500:]
+            raise RuntimeError(f"{argv[0]} exited {proc.returncode}: {tail}")
+        return proc.stdout
+
+
+def get_backend(name: str, *, model: str | None = None, command: str | None = None) -> Backend:
+    """Resolve a backend by `--backend` name.
+
+    Engines: ollama / anthropic / antigravity (API/SDK), claude / agy / cli (an authenticated
+    CLI session, no key), static (offline test stub).
+    """
     if name == "static":
         return StaticBackend()
     if name == "ollama":
@@ -133,4 +263,9 @@ def get_backend(name: str, *, model: str | None = None) -> Backend:
         return AnthropicBackend(model) if model else AnthropicBackend()
     if name == "antigravity":
         return AntigravityBackend(model)
-    raise ValueError(f"unknown backend {name!r} (ollama | anthropic | antigravity | static)")
+    if name in ("claude", "agy", "cli"):
+        return CliBackend(name, model=model, command=command)
+    raise ValueError(
+        f"unknown backend {name!r} "
+        f"(ollama | anthropic | antigravity | claude | agy | cli | static)"
+    )

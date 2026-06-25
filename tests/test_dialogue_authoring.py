@@ -93,5 +93,71 @@ def test_static_backend_authors_a_loadable_renderable_pack() -> None:
 def test_get_backend_resolves_and_rejects_unknown() -> None:
     assert get_backend("static").name == "static"
     assert get_backend("ollama").name == "ollama"
+    assert get_backend("claude").name == "claude"
+    assert get_backend("agy").name == "agy"
     with pytest.raises(ValueError, match="unknown backend"):
         get_backend("gpt")
+
+
+# --- CLI-session backend (Claude Code / Antigravity / any agent CLI) --------------
+
+def test_extract_json_tolerates_fences_and_prose() -> None:
+    from edge.dialogue.authoring.backends import _extract_json
+
+    assert _extract_json('```json\n{"origin": ["hi"]}\n```') == {"origin": ["hi"]}
+    assert _extract_json('Here you go:\n{"origin": ["x"]}\nDone.') == {"origin": ["x"]}
+    assert _extract_json('{"origin": ["y"]}') == {"origin": ["y"]}
+
+
+def test_parse_claude_envelope_handles_object_and_string_result() -> None:
+    from edge.dialogue.authoring.backends import _parse_claude_envelope
+
+    assert _parse_claude_envelope('{"type":"result","result":{"origin":["a"]}}') == {"origin": ["a"]}
+    assert _parse_claude_envelope('{"result":"{\\"origin\\":[\\"b\\"]}"}') == {"origin": ["b"]}
+    assert _parse_claude_envelope('{"origin":["c"]}') == {"origin": ["c"]}  # no envelope
+
+
+def test_cli_backend_requires_a_command() -> None:
+    from edge.dialogue.authoring.backends import CliBackend
+
+    with pytest.raises(RuntimeError, match="needs a command"):
+        CliBackend("cli")
+
+
+def test_cli_backend_runs_external_cli_and_cleans_up(tmp_path: object) -> None:
+    """The generic `cli` backend writes prompt/schema to a temp dir, runs the configured CLI
+    (which writes the grammar to {out_file}), reads it back, and removes the temp dir."""
+    import glob
+    import sys
+    import tempfile
+    from pathlib import Path
+
+    from edge.dialogue.authoring.backends import get_backend
+
+    fake = Path(str(tmp_path)) / "fake_agent.py"
+    fake.write_text(
+        "import sys, json, pathlib\n"
+        "assert pathlib.Path(sys.argv[1]).read_text()  # prompt was written\n"
+        "pathlib.Path(sys.argv[2]).write_text(json.dumps({'origin': ['from #f#'], 'f': ['the void']}))\n"
+    )
+    backend = get_backend("cli", command=f"{sys.executable} {fake} {{prompt_file}} {{out_file}}")
+
+    before = set(glob.glob(tempfile.gettempdir() + "/edge-author-cli-*"))
+    out = backend.generate("author a greeting", schema={"type": "object", "required": ["origin"]})
+    after = set(glob.glob(tempfile.gettempdir() + "/edge-author-cli-*"))
+
+    assert out == {"origin": ["from #f#"], "f": ["the void"]}
+    assert not (after - before)  # the session temp dir was cleaned up
+
+
+def test_cli_backend_errors_when_cli_writes_no_file(tmp_path: object) -> None:
+    import sys
+    from pathlib import Path
+
+    from edge.dialogue.authoring.backends import get_backend
+
+    noop = Path(str(tmp_path)) / "noop.py"
+    noop.write_text("pass\n")  # never writes {out_file}
+    backend = get_backend("cli", command=f"{sys.executable} {noop} {{out_file}}")
+    with pytest.raises(RuntimeError, match="produced no grammar.json"):
+        backend.generate("x", schema={"type": "object"})
