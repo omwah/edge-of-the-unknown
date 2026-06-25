@@ -552,3 +552,5 @@ class LeadDTO:
     turn_cost: int  # turns to fly the route
     reachable: bool
     sector_id: int = -1  # internal id of the tip's destination (WP14 route tie-in)
+    at_origin: bool = True  # player is in the sector the tip was obtained in (full-graph plot)
+    origin_coords: int = -1  # spatial display id of where the tip was obtained (return hint)

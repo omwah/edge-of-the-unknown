@@ -164,12 +164,30 @@ def test_travel_to_a_logged_lead_flies_the_full_graph() -> None:
     with pytest.raises(MovementError):
         reduce(state, 1, TravelTo(to_sector=4), CONFIG)  # no lead, route uncharted → rejected
 
-    lead = Lead(kind="discovery", ref=99, sector_id=4, source_species="vesk", summary="a relic")
+    lead = Lead(kind="discovery", ref=99, sector_id=4, origin_sector=1,
+                source_species="vesk", summary="a relic")
     state.players[1] = replace(state.players[1], leads=(lead,))
-    result = _do(state, TravelTo(to_sector=4))  # the tip's coordinates unlock the course
+    result = _do(state, TravelTo(to_sector=4))  # at the lead's origin → coordinates unlock the course
     assert len(result.events) == 3  # 1->2->3->4, all flown in one engage  # type: ignore[attr-defined]
     assert state.ships[1].sector_id == 4
     assert {2, 3, 4} <= state.players[1].explored_sectors  # the route is charted as it flies
+
+
+def test_travel_to_a_lead_off_its_origin_sector_is_charted_only() -> None:
+    """A lead is the map only *from where it was obtained* (§6.7): away from the origin sector
+    the route is locked to charted space, and the error points the player back to the origin."""
+    from dataclasses import replace
+
+    from edge.core.models import Lead
+
+    state = _line_universe()  # player at 1, explored {1}; line 1-2-3-4
+    # Tip to sector 4, but obtained back at sector 3 (which we've never visited from here).
+    lead = Lead(kind="discovery", ref=99, sector_id=4, origin_sector=3,
+                source_species="vesk", summary="a relic")
+    state.players[1] = replace(state.players[1], leads=(lead,))
+    with pytest.raises(MovementError, match=r"return to .* to follow that lead"):
+        reduce(state, 1, TravelTo(to_sector=4), CONFIG)  # off-origin + uncharted → home hint
+    assert state.ships[1].sector_id == 1  # didn't move
 
 
 def test_movement_errors_name_the_spatial_id_not_the_internal_one() -> None:

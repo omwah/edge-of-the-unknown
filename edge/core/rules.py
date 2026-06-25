@@ -656,11 +656,15 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
     """
     player = _player(state, player_id)
     ship = _ship(state, player)
-    # A tip's coordinates unlock full-graph plotting to that destination; otherwise charted only.
-    has_lead = any(lead.sector_id == cmd.to_sector for lead in player.leads)
-    allowed = None if has_lead else set(player.explored_sectors)
+    # A tip's coordinates unlock full-graph plotting *from the sector it was obtained in*; away
+    # from that origin (or with no lead) the route is locked to already-charted space (§6.7).
+    lead = next((ld for ld in player.leads if ld.sector_id == cmd.to_sector), None)
+    at_origin = lead is not None and lead.origin_sector == ship.sector_id
+    allowed = None if at_origin else set(player.explored_sectors)
     path = shortest_path(state.adjacency, ship.sector_id, cmd.to_sector, allowed=allowed)
     if path is None:
+        if lead is not None:  # holds the tip but can't reach it from here — point them home
+            raise MovementError(f"return to {_spatial(state, lead.origin_sector)} to follow that lead")
         raise MovementError(f"no uncovered route to {_spatial(state, cmd.to_sector)}")
     hops = path[1:]
     if not hops:
@@ -1465,6 +1469,7 @@ def _accept_lead(state: UniverseState, player_id: int, cmd: AcceptLead,
     if target is None:
         raise EconomyError("they have no coordinates to share")
     lead = Lead(kind=target.ref.kind, ref=target.ref.ref, sector_id=target.ref.sector_id,
+                origin_sector=ship.sector_id,
                 source_species=species.roster_id, summary=target.summary())
     new_player = replace(player, leads=(*player.leads, lead),
                          species_attitudes=_met(player, species.roster_id))

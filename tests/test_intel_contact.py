@@ -63,11 +63,13 @@ def test_offer_coordinates_then_accept_logs_one_lead() -> None:
     assert state.players[1].dialogue_recency[(sp.roster_id, "offer_coordinates")]
 
     # Accepting the tip logs exactly one lead pointing at that discovery.
+    here = state.ships[state.players[1].ship_id].sector_id
     apply_result(state, reduce(state, 1, AcceptLead(sp.id), CFG))
     leads = state.players[1].leads
     assert len(leads) == 1
     assert leads[0].kind == "discovery" and leads[0].ref == disc_id
     assert leads[0].source_species == sp.roster_id and leads[0].summary
+    assert leads[0].origin_sector == here  # the tip records where it was obtained (§6.7)
 
     # The logged tip is no longer re-offered, so a re-accept finds nothing new.
     with pytest.raises(EconomyError, match="no coordinates"):
@@ -88,6 +90,8 @@ def test_contact_view_surfaces_intel_then_leads_view_plots() -> None:
     apply_result(state, reduce(state, 1, AcceptLead(sp.id), CFG))
     rows = session.leads_view(state, 1, CFG)
     assert len(rows) == 1 and rows[0].reachable and rows[0].summary and rows[0].source
+    # Logged at the player's current sector, so it plots over the full graph from here (§6.7).
+    assert rows[0].at_origin and rows[0].origin_coords >= 0
 
     # Once logged, the speaker has nothing new — the Log-coordinates verb greys out.
     view2 = session.contact_view(state, 1, sp.id, CFG, active_context="offer_coordinates")

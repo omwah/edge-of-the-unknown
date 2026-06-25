@@ -324,6 +324,7 @@ class Lead:
     kind: str  # "discovery" | "starbase"
     ref: int
     sector_id: int
+    origin_sector: int  # sector where the tip was accepted (route-gating, §6.7)
     source_species: str  # roster_id of the alien that shared it
     summary: str  # short human label for the Computer/Map screen
 
