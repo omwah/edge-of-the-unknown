@@ -14,6 +14,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import urllib.request
 from pathlib import Path
@@ -180,10 +181,12 @@ class CliBackend:
         --cli-command 'some-agent run --prompt-file {prompt_file} --output {out_file}'
     """
 
-    def __init__(self, name: str, model: str | None = None, command: str | None = None) -> None:
+    def __init__(self, name: str, model: str | None = None, command: str | None = None,
+                 debug: bool = False) -> None:
         self.name = name
         self.model = model or "default"     # used only to name the output sidecar
         self._model_arg = model
+        self.debug = debug
         self.command = command or os.environ.get("EDGE_AUTHOR_CLI")
         if name == "cli" and not self.command:
             raise RuntimeError(
@@ -236,24 +239,53 @@ class CliBackend:
         finally:
             shutil.rmtree(work, ignore_errors=True)  # author tool cleans up the session file
 
-    @staticmethod
-    def _run(argv: list[str], *, stdin: str | None = None) -> str:
+    def _run(self, argv: list[str], *, stdin: str | None = None) -> str:
+        if self.debug:
+            print(f"  $ {shlex.join(argv)}", file=sys.stderr)
         try:
             proc = subprocess.run(argv, input=stdin, capture_output=True, text=True,  # noqa: S603
                                   timeout=600, check=False)
         except FileNotFoundError as exc:
             raise RuntimeError(f"CLI not found: {argv[0]!r} — is it installed and on PATH?") from exc
+        if self.debug:
+            if proc.stderr.strip():
+                print(f"  ┊ {argv[0]} stderr:\n{proc.stderr.rstrip()}", file=sys.stderr)
+            print(f"  ┊ {argv[0]} stdout:\n{proc.stdout.rstrip()}", file=sys.stderr)
         if proc.returncode != 0:
             tail = (proc.stderr or proc.stdout).strip()[-500:]
             raise RuntimeError(f"{argv[0]} exited {proc.returncode}: {tail}")
         return proc.stdout
 
 
-def get_backend(name: str, *, model: str | None = None, command: str | None = None) -> Backend:
+class DebugBackend:
+    """Wraps any backend to echo the request/response at the backend boundary to stderr.
+
+    `--debug` routes each `generate` through this: the outgoing prompt and the parsed grammar
+    coming back are printed (to stderr, so stdout / the `--dry-run` YAML stay clean). Wrapping
+    is transparent — `name`/`model` are forwarded so the sidecar is still named for the inner
+    backend. CLI backends additionally echo their argv and raw stdout/stderr (see `CliBackend`).
+    """
+
+    def __init__(self, inner: Backend) -> None:
+        self.inner = inner
+        self.name = inner.name
+        self.model = getattr(inner, "model", inner.name)
+
+    def generate(self, prompt: str, *, schema: dict[str, Any]) -> dict[str, Any]:
+        print(f"\n┌─ {self.name} ← prompt ───\n{prompt}\n└─", file=sys.stderr)
+        result = self.inner.generate(prompt, schema=schema)
+        rendered = json.dumps(result, indent=2, ensure_ascii=False)
+        print(f"┌─ {self.name} → response ───\n{rendered}\n└─\n", file=sys.stderr)
+        return result
+
+
+def get_backend(name: str, *, model: str | None = None, command: str | None = None,
+                debug: bool = False) -> Backend:
     """Resolve a backend by `--backend` name.
 
     Engines: ollama / anthropic / antigravity (API/SDK), claude / agy / cli (an authenticated
-    CLI session, no key), static (offline test stub).
+    CLI session, no key), static (offline test stub). `debug` enables raw CLI echo on the CLI
+    backends; the request/response echo is added separately by wrapping in `DebugBackend`.
     """
     if name == "static":
         return StaticBackend()
@@ -264,7 +296,7 @@ def get_backend(name: str, *, model: str | None = None, command: str | None = No
     if name == "antigravity":
         return AntigravityBackend(model)
     if name in ("claude", "agy", "cli"):
-        return CliBackend(name, model=model, command=command)
+        return CliBackend(name, model=model, command=command, debug=debug)
     raise ValueError(
         f"unknown backend {name!r} "
         f"(ollama | anthropic | antigravity | claude | agy | cli | static)"

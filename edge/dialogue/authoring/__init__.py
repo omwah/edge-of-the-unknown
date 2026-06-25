@@ -14,7 +14,12 @@ the Anthropic API, or Google Antigravity. Run it via the `edge-author-dialogue` 
 
 from __future__ import annotations
 
-from edge.dialogue.authoring.backends import Backend, StaticBackend, get_backend
+from edge.dialogue.authoring.backends import (
+    Backend,
+    DebugBackend,
+    StaticBackend,
+    get_backend,
+)
 from edge.dialogue.authoring.pipeline import (
     AuthoringRequest,
     author_packs,
@@ -24,6 +29,6 @@ from edge.dialogue.authoring.pipeline import (
 )
 
 __all__ = [
-    "Backend", "StaticBackend", "get_backend",
+    "Backend", "DebugBackend", "StaticBackend", "get_backend",
     "AuthoringRequest", "author_packs", "build_prompt", "output_schema", "validate_generated",
 ]

@@ -62,7 +62,14 @@ Install the cloud extras once with: `pixi run -e default pip install -e '.[autho
 --species vesk,terran,…                            limit to these roster species ids (default: all)
 --out PATH                                         sidecar to write (default: config/dialogue/alien_dialogue.<backend>_<model>.yaml)
 --dry-run                                          author one species/context with the static backend and print it
+--debug                                            echo each backend request/response (+ raw CLI argv/output) to stderr
 ```
+
+`--debug` prints the prompt sent to the backend and the grammar that comes back, for every
+line — to **stderr**, so stdout (and the `--dry-run` YAML) stay clean. For the CLI backends it
+also echoes the exact argv invoked and the CLI's raw stdout/stderr, which is the quickest way
+to see why a model's output failed validation. Pairs well with `--dry-run` or `--species X
+--contexts greeting` to inspect a single exchange.
 
 Default contexts: `greeting, trade_open, farewell, dossier_other, offer_coordinates`.
 
