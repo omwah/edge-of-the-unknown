@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from edge.config import load_default_config
+from edge.config import _merge_dialogue, load_default_config
 from edge.core.config import GameConfig, SceneArtConfig
 
 
@@ -131,3 +131,31 @@ def test_from_mapping_rejects_unknown_keys() -> None:
     data["nonsense_key"] = True
     with pytest.raises(ValidationError):
         GameConfig.from_mapping(data)
+
+
+def test_merge_dialogue_overlays_roster_fields() -> None:
+    """A base dialogue doc's fields (personas / recency_k / grammar) overlay the roster."""
+    roster: dict = {"species": [{"id": "vesk"}]}
+    _merge_dialogue(roster, {"recency_k": 3, "personas": {"generic": {}}})
+    assert roster["recency_k"] == 3
+    assert roster["personas"] == {"generic": {}}
+
+
+def test_merge_dialogue_splices_species_grammars_by_id() -> None:
+    """`species_grammars` folds per-context into the matching species' `dialogue_pack`."""
+    roster: dict = {"species": [{"id": "vesk"}, {"id": "terran", "dialogue_pack": {"farewell": ["x"]}}]}
+    sidecar = {"species_grammars": {
+        "vesk": {"greeting": [{"grammar": {"origin": ["hi"]}}]},
+        "terran": {"greeting": [{"grammar": {"origin": ["hello"]}}]},
+    }}
+    _merge_dialogue(roster, sidecar)
+    by_id = {s["id"]: s for s in roster["species"]}
+    assert by_id["vesk"]["dialogue_pack"] == {"greeting": [{"grammar": {"origin": ["hi"]}}]}
+    # an existing pack is preserved; the sidecar adds its context alongside.
+    assert set(by_id["terran"]["dialogue_pack"]) == {"farewell", "greeting"}
+
+
+def test_merge_dialogue_rejects_unknown_species() -> None:
+    roster: dict = {"species": [{"id": "vesk"}]}
+    with pytest.raises(ValueError, match="unknown species 'ghost'"):
+        _merge_dialogue(roster, {"species_grammars": {"ghost": {"greeting": []}}})

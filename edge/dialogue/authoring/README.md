@@ -79,12 +79,29 @@ Grammars expand from `origin` and may reference the fixed fragment symbols `open
 
 ## Using the output
 
-The sidecar is **candidate content** — review it, then fold the grammars you like into the
-live dialogue corpus (`config/alien_dialogue_default.yaml`), either as a species'
-`dialogue_pack` override or a `persona` pack. Every generated grammar is already validated
-(fillable placeholders, non-empty render, defined symbols), and the merged roster + dialogue
-is re-checked by `validate_dialogue` (DESIGN §13) on load and in CI — so a bad grammar fails
-the build rather than blanking a line in game.
+The sidecar is **candidate content**. You can either:
+
+- **Point at it directly** (no copy-paste). The sidecar's top-level key is `species_grammars`,
+  which the config loader splices into each species' `dialogue_pack` by id. List it after the
+  base dialogue file (which supplies the `personas` / `generic` fallback the sidecar omits):
+
+  ```yaml
+  # config/default.yaml
+  dialogue_file:
+    - alien_dialogue_default.yaml                 # base: personas + generic + recency_k
+    - dialogue/alien_dialogue.ollama_gemma4.yaml  # overrides: species_grammars, by id
+  ```
+
+  The species `dialogue_pack` wins over its persona via the runtime fallback chain, so this is
+  a clean per-species override — handy for A/B-ing a machine-authored corpus.
+- **Or fold the grammars you like** into the live dialogue corpus
+  (`config/alien_dialogue_default.yaml`) as a species' `dialogue_pack` override or a `persona`
+  pack, for a curated permanent set.
+
+Either way, every generated grammar is already validated (fillable placeholders, no positional
+/ escaped braces, non-empty render, defined symbols), and the merged roster + dialogue is
+re-checked by `validate_dialogue` (DESIGN §13) on load and in CI — so a bad grammar fails the
+build rather than blanking a line in game.
 
 Generation is **not** auto-merged into the live config on purpose: the current roster ships
 working hand-authored lines, and the tool should never silently overwrite them.

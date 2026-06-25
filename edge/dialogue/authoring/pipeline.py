@@ -133,6 +133,13 @@ def validate_generated(grammar: Mapping[str, Sequence[str]], context: str) -> No
             raise AuthoringError(f"{context}: unfillable placeholder(s) {sorted(bad)} in {template!r}")
         if "#{" in template or "}#" in template:
             raise AuthoringError(f"{context}: mixed #symbol#/{{placeholder}} syntax in {template!r}")
+        if "{{" in template or "}}" in template:
+            # Escaped braces render literally under runtime `str.format_map` (e.g. `{{player}}`
+            # -> `{player}`), so the placeholder never fills — never what the model meant.
+            raise AuthoringError(f"{context}: escaped/literal braces in {template!r}")
+        if any(field == "" for _, field, _, _ in Formatter().parse(template)):
+            # A bare positional `{}` crashes runtime `str.format_map`; reject it here.
+            raise AuthoringError(f"{context}: positional '{{}}' field in {template!r}")
         for ref in _SYMBOL_REF.findall(template):
             if "{" in ref or "}" in ref:
                 raise AuthoringError(f"{context}: malformed symbol reference #{ref}# in {template!r}")
