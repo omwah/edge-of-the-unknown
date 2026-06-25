@@ -161,3 +161,18 @@ def test_cli_backend_errors_when_cli_writes_no_file(tmp_path: object) -> None:
     backend = get_backend("cli", command=f"{sys.executable} {noop} {{out_file}}")
     with pytest.raises(RuntimeError, match="produced no grammar.json"):
         backend.generate("x", schema={"type": "object"})
+
+
+def test_debug_backend_echoes_prompt_and_response(capsys: object) -> None:
+    """--debug routes generate through DebugBackend, echoing request + response to stderr while
+    forwarding the result and the inner backend's name/model."""
+    from edge.dialogue.authoring import DebugBackend, StaticBackend
+
+    dbg = DebugBackend(StaticBackend())
+    assert dbg.name == "static"  # transparent: sidecar still named for the inner backend
+    result = dbg.generate("AUTHOR THE GREETING", schema=output_schema())
+
+    err = capsys.readouterr().err  # type: ignore[attr-defined]
+    assert "← prompt" in err and "AUTHOR THE GREETING" in err  # the request
+    assert "→ response" in err and "origin" in err              # the response
+    assert result == StaticBackend().generate("x", schema=output_schema())  # forwarded unchanged

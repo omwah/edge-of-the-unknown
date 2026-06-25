@@ -23,7 +23,7 @@ from typing import Any
 import yaml
 
 from edge.config import load_default_config
-from edge.dialogue.authoring.backends import Backend, get_backend
+from edge.dialogue.authoring.backends import Backend, DebugBackend, get_backend
 from edge.dialogue.authoring.pipeline import author_packs
 
 # Where backend/model-named grammar sidecars are written when `--out` is not given.
@@ -88,6 +88,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="regeneration attempts per line before giving up (default: 4)")
     parser.add_argument("--dry-run", action="store_true",
                         help="author one species/context with the static backend and print it")
+    parser.add_argument("--debug", action="store_true",
+                        help="echo each backend request/response (and raw CLI argv/output) to "
+                             "stderr")
     args = parser.parse_args(argv)
 
     cfg = load_default_config()
@@ -101,13 +104,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.dry_run:
         backend = get_backend("static")
+        if args.debug:
+            backend = DebugBackend(backend)
         first = dict(list(voices.items())[:1])
         packs = author_packs(backend, first, contexts[:1], examples=_EXAMPLES)
         yaml.safe_dump(packs, sys.stdout, sort_keys=False, allow_unicode=True)
         print("\n# dry run — validated, not written", file=sys.stderr)
         return 0
 
-    backend = get_backend(args.backend, model=args.model, command=args.cli_command)
+    backend = get_backend(args.backend, model=args.model, command=args.cli_command,
+                          debug=args.debug)
+    if args.debug:
+        backend = DebugBackend(backend)
     print(f"authoring {len(voices)} species × {len(contexts)} intents via {backend.name}…",
           file=sys.stderr)
     packs = author_packs(backend, voices, contexts, examples=_EXAMPLES, retries=args.retries)
