@@ -891,6 +891,51 @@ async def test_say_do_menu_converse_and_trade() -> None:
         assert not isinstance(app.screen, AlienContactScreen)
 
 
+async def test_log_coordinates_freezes_the_offer_line() -> None:
+    """Logging a tip keeps the speech panel on the line just acted on — it must not auto-cycle
+    to the next tip the alien would offer (§6.7). The intel/accept_lead verbs are click-only,
+    so drive them through `action_verb`."""
+    from textual.widgets import Static
+
+    from edge.core.models import LocationRef
+    from edge.tui.screens.contact import AlienContactScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        sp = _inject_species(svc, "vesk")  # friendly, in the player's sector
+        # Point the species at a real, reachable, unexplored rare+ discovery so it volunteers a tip.
+        ship = svc.state.ships[1]
+        player = svc.state.players[1]
+        disc = next(
+            d for d in svc.state.discoveries.values()
+            if d.rarity_tier.value >= 3 and d.sector_id not in player.explored_sectors
+            and d.found_by is None
+            and shortest_path(svc.state.adjacency, ship.sector_id, d.sector_id) is not None)
+        svc.state.species_knowledge[sp.roster_id] = (
+            LocationRef("discovery", disc.id, disc.sector_id),)
+
+        await pilot.press("h")  # hail
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+
+        app.screen.action_verb("intel")  # Ask for coordinates → the offer line shows
+        await pilot.pause()
+        offer_line = str(app.screen.query_one("#speech", Static).render())
+        assert any(ch.isdigit() for ch in offer_line)  # the line carries {coords}
+
+        app.screen.action_verb("accept_lead")  # Log coordinates
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        # Frozen on the logged line — it did NOT cycle to the next tip / the no-tip branch.
+        assert str(app.screen.query_one("#speech", Static).render()) == offer_line
+        assert len(svc.state.players[1].leads) == 1
+
+
 async def test_question_mark_opens_help_with_warp_legend() -> None:
     from textual.widgets import Static
 
