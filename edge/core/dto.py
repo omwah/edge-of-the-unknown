@@ -347,6 +347,7 @@ class ComputerDTO:
     dossier: list[DossierEntry] = field(default_factory=list)
     ports: list[PortDirEntry] = field(default_factory=list)
     planets: list[PlanetDirEntry] = field(default_factory=list)
+    leads: list[LeadDTO] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -550,3 +551,4 @@ class LeadDTO:
     distance: int  # fewest-hop route length from the player's ship (-1 if unreachable)
     turn_cost: int  # turns to fly the route
     reachable: bool
+    sector_id: int = -1  # internal id of the tip's destination (WP14 route tie-in)

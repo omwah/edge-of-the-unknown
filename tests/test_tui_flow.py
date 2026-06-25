@@ -812,6 +812,61 @@ async def test_codex_plot_route_to_a_logged_find() -> None:
         assert app.screen.query_one("#route-table", DataTable).row_count == len(route.hops)
 
 
+async def test_leads_tab_lists_logged_tip_plots_and_engages_route() -> None:
+    """§6.7: a logged tip shows on the Leads tab → [P] routes over the full graph → [G] flies it,
+    charting the uncharted course without any manual warping (the coordinates are the map)."""
+    from textual.widgets import DataTable, TabbedContent
+
+    from edge.core.models import LocationRef
+    from edge.core.rules import AcceptLead
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        sp = _inject_species(svc, "vesk")  # friendly, in the player's sector
+        ship = svc.state.ships[1]
+        player = svc.state.players[1]
+        # Nearest unexplored rare+ find, so the route's turn cost fits the starting budget.
+        candidates = []
+        for d in svc.state.discoveries.values():
+            if d.rarity_tier.value < 3 or d.sector_id in player.explored_sectors or d.found_by:
+                continue
+            path = shortest_path(svc.state.adjacency, ship.sector_id, d.sector_id)
+            if path is not None:
+                candidates.append((len(path), d))
+        candidates.sort(key=lambda t: t[0])
+        disc = candidates[0][1]
+        svc.state.species_knowledge[sp.roster_id] = (
+            LocationRef("discovery", disc.id, disc.sector_id),)
+        svc.apply(1, AcceptLead(sp.id))  # log the tip (as the contact screen's [accept_lead] does)
+        assert len(svc.state.players[1].leads) == 1
+        assert disc.sector_id not in svc.state.players[1].explored_sectors
+
+        app.push_screen(ComputerScreen(svc, 1, initial_tab="leads"))
+        await pilot.pause()
+        # The logged tip is listed (one data row, not the empty-state placeholder).
+        assert app.screen.query_one("#leads-table", DataTable).row_count == 1
+        await pilot.press("p")  # plot a route to the highlighted lead
+        await pilot.pause()
+        assert app.screen.query_one(TabbedContent).active == "route"
+        assert app.screen._engage_target == disc.sector_id  # type: ignore[attr-defined]
+        # The tip points somewhere unvisited, so the route plans over the full graph and is
+        # reachable (not the "explore a path first" empty state of an explored-only plot).
+        route = svc.route_view(1, disc.sector_id, full_graph=True)
+        assert route.reachable and route.hops
+        assert app.screen._route.reachable  # type: ignore[attr-defined]
+        assert app.screen.query_one("#route-table", DataTable).row_count == len(route.hops)
+
+        await pilot.press("g")  # engage — fly the plotted lead route through uncharted space
+        await pilot.pause()
+        assert svc.state.ships[1].sector_id == disc.sector_id  # arrived at the tip
+        assert disc.sector_id in svc.state.players[1].explored_sectors  # charted en route
+
+
 async def test_ports_directory_lists_and_plots_route() -> None:
     """WP15: Ports tab lists charted ports → [P] plots a route to one (§11)."""
     from textual.widgets import DataTable, TabbedContent

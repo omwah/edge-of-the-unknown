@@ -94,6 +94,22 @@ def test_contact_view_surfaces_intel_then_leads_view_plots() -> None:
     assert not next(v for v in view2.verbs if v.key == "accept_lead").enabled
 
 
+def test_log_coordinates_is_gated_on_having_asked() -> None:
+    """You cannot log a route the speaker hasn't volunteered — the verb is greyed until you ask."""
+    state = generate_with_player(SMALL, 3)
+    sp = _inject(state)
+    _knows_a_far_discovery(state, sp)  # a tip exists on offer
+
+    # Default (greeting) context: the offer is not on screen, so Log-coordinates is disabled.
+    greeting = session.contact_view(state, 1, sp.id, CFG)  # active_context defaults to "greeting"
+    log = next(v for v in greeting.verbs if v.key == "accept_lead")
+    assert not log.enabled and log.reason == "ask for coordinates first"
+
+    # After asking (the offer_coordinates line is shown), the verb enables.
+    asked = session.contact_view(state, 1, sp.id, CFG, active_context="offer_coordinates")
+    assert next(v for v in asked.verbs if v.key == "accept_lead").enabled
+
+
 def test_accept_lead_without_a_tip_is_rejected() -> None:
     state = generate_with_player(SMALL, 3)
     sp = _inject(state, base=0.1)  # hostile band → volunteers nothing

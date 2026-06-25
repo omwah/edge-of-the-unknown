@@ -50,6 +50,7 @@ from edge.core.events import (
     SiteExplored,
     Event,
     Haggled,
+    LeadAccepted,
     PlanetProduced,
     Repaired,
     ShipPurchased,
@@ -729,6 +730,7 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         pairs=top, selected=top[0].pair if top else "—",
         codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
         ports=_port_directory(state, player_id), planets=_planet_directory(state, player_id),
+        leads=leads_view(state, player_id, config),
     )
 
 
@@ -780,14 +782,21 @@ def _route_dto(state: UniverseState, player: Player, plan: RoutePlan) -> dto.Rou
 
 
 def route_view(
-    state: UniverseState, player_id: int, dst_sector: int, config: GameConfig
+    state: UniverseState, player_id: int, dst_sector: int, config: GameConfig,
+    *, full_graph: bool = False
 ) -> dto.RouteDTO:
-    """Plot the fewest-hop route to `dst_sector` through explored space (§11, WP14)."""
+    """Plot the fewest-hop route to `dst_sector` (§11, WP14).
+
+    Routes through explored space by default; `full_graph` plans over the whole map for a
+    tip pointing somewhere unvisited (a coordinate lead is the map, §6.7), so the player can
+    plot and fly there before ever charting the path.
+    """
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
     plan = plan_route(
         state.adjacency, ship.sector_id, dst_sector,
-        allowed=set(player.explored_sectors), turns_per_warp=ship.turns_per_warp,
+        allowed=None if full_graph else set(player.explored_sectors),
+        turns_per_warp=ship.turns_per_warp,
     )
     return _route_dto(state, player, plan)
 
@@ -827,6 +836,7 @@ def leads_view(state: UniverseState, player_id: int, config: GameConfig) -> list
             coords=state.spatial_ids.get(lead.sector_id, lead.sector_id),
             distance=len(plan.hops) if plan.reachable else -1,
             turn_cost=plan.turn_cost, reachable=plan.reachable,
+            sector_id=lead.sector_id,
         ))
     return rows
 
@@ -848,7 +858,8 @@ def _line(state: UniverseState, roster: object, species: AlienSpecies, player: P
 
 
 def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOfferDTO],
-                   *, subjects_available: bool, has_intel: bool = False) -> list[dto.ContactVerbDTO]:
+                   *, subjects_available: bool, has_intel: bool = False,
+                   asked_intel: bool = False) -> list[dto.ContactVerbDTO]:
     """Derive the conversation verb menu from species params (§6.7), greying with reasons.
 
     Rows are tagged Say (dialogue) / Do (mechanical) so the TUI groups and dispatches them
@@ -870,9 +881,12 @@ def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOffer
         dto.ContactVerbDTO("intel", "Ask for coordinates", kind="say",
                            context="offer_coordinates"),
     ]
-    # LOG COORDINATES — a "do" verb, enabled only when a tip is actually on offer.
-    verbs.append(dto.ContactVerbDTO("accept_lead", "Log coordinates", has_intel,
-                                    "" if has_intel else "no coordinates on offer"))
+    # LOG COORDINATES — a "do" verb, enabled only once you've *asked* (the offer is on screen)
+    # and a tip is actually on offer; you cannot log a route the speaker has not volunteered.
+    can_log = asked_intel and has_intel
+    log_reason = "" if can_log else (
+        "no coordinates on offer" if asked_intel else "ask for coordinates first")
+    verbs.append(dto.ContactVerbDTO("accept_lead", "Log coordinates", can_log, log_reason))
     # TRADE (latinum sales).
     if posture == "refuses":
         verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "they refuse to trade"))
@@ -1014,7 +1028,7 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         effective=round(effective, 3),
         opener=speech,
         verbs=_contact_verbs(species, sc, offers, subjects_available=bool(subjects),
-                             has_intel=intel is not None),
+                             has_intel=intel is not None, asked_intel=(shown == "offer_coordinates")),
         offers=offers, dossier=dossier, subjects=subjects,
         intel_summary=intel.summary() if intel is not None else "",
     )
@@ -1067,6 +1081,8 @@ def format_event(event: Event) -> str:
     if isinstance(event, DiscoveryCollected):
         gain = f" — {event.reward}" if event.reward else ""
         return f"[green]✦ Logged {event.kind.replace('_', ' ')} ({event.rarity.lower()}){gain}[/]"
+    if isinstance(event, LeadAccepted):
+        return f"[cyan]✦ Coordinates logged — a {event.kind.replace('_', ' ')} lead.[/]"
     if isinstance(event, ColonistsRecruited):
         via = "StarDock" if event.source == "stardock" else "emigration"
         cost = f"  (-{event.cost} slips)" if event.cost else ""
@@ -1111,7 +1127,7 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
         return disc.sector_id if disc is not None else None
     if isinstance(event, (ComponentPurchased, ShipPurchased, ComponentInstalled, ComponentRemoved,
                           Repaired, DevicePurchased, StarbaseSalvaged, ColonistsRecruited,
-                          Banked, TurnsReset)):
+                          LeadAccepted, Banked, TurnsReset)):
         player = state.players.get(event.player_id)
         if player is None:
             return None

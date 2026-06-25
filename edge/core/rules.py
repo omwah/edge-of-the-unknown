@@ -494,6 +494,15 @@ def _ship(state: UniverseState, player: Player) -> Ship:
     return state.ships[player.ship_id]
 
 
+def _spatial(state: UniverseState, sector_id: int) -> int:
+    """The player-facing spatial id for an internal sector id (§5.1), or the raw id if unmapped.
+
+    Error messages that reach the player must speak in spatial ids, never internal ones; the
+    map exists on the state, so this stays pure (no server/display-layer dependency).
+    """
+    return state.spatial_ids.get(sector_id, sector_id)
+
+
 def _resolve_start_sector(
     state: UniverseState, config: GameConfig, dock_sector: int | None
 ) -> int:
@@ -603,7 +612,8 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
     player = _player(state, player_id)
     ship = _ship(state, player)
     if not can_warp(state.adjacency, ship.sector_id, cmd.to_sector):
-        raise MovementError(f"no warp from {ship.sector_id} to {cmd.to_sector}")
+        raise MovementError(
+            f"no warp from {_spatial(state, ship.sector_id)} to {_spatial(state, cmd.to_sector)}")
     cost = ship.turns_per_warp
     if player.turns_remaining < cost:
         raise MovementError("out of turns")
@@ -635,19 +645,23 @@ def _should_interrupt(state: UniverseState, player: Player, sector_id: int) -> b
 
 
 def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameConfig) -> ReduceResult:
-    """Multi-hop warp along a *known* route (§9, §11, WP-C).
+    """Multi-hop warp along a *known* route (§9, §11, §6.7, WP-C).
 
-    Route-locked: the path is found through already-explored sectors only, so the
-    player can only `TravelTo` a destination whose route they have uncovered. The
-    journey applies hop-by-hop (one `Warped` per hop), halting early if turns run
-    out or `_should_interrupt` fires — the same per-sector seam combat will use.
+    Route-locked to charted space, with one exception: a **logged coordinate lead** is the
+    map (§6.7), so the player may auto-travel over the *full* graph to a destination they hold
+    a lead for — the computer has the coordinates and plots the course, charting each hop as it
+    flies. Everywhere else still routes through already-explored sectors only, so exploration
+    is not trivialised. The journey applies hop-by-hop (one `Warped` per hop), halting early if
+    turns run out or `_should_interrupt` fires — the same per-sector seam combat will use.
     """
     player = _player(state, player_id)
     ship = _ship(state, player)
-    path = shortest_path(state.adjacency, ship.sector_id, cmd.to_sector,
-                         allowed=set(player.explored_sectors))
+    # A tip's coordinates unlock full-graph plotting to that destination; otherwise charted only.
+    has_lead = any(lead.sector_id == cmd.to_sector for lead in player.leads)
+    allowed = None if has_lead else set(player.explored_sectors)
+    path = shortest_path(state.adjacency, ship.sector_id, cmd.to_sector, allowed=allowed)
     if path is None:
-        raise MovementError(f"no uncovered route to {cmd.to_sector}")
+        raise MovementError(f"no uncovered route to {_spatial(state, cmd.to_sector)}")
     hops = path[1:]
     if not hops:
         raise MovementError("already in that sector")
