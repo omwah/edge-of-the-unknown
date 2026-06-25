@@ -743,8 +743,14 @@ def _hop_label(state: UniverseState, sector_id: int) -> str:
     return f"({did}) · {' '.join(words)}" if words else f"({did})"
 
 
-def _route_dto(state: UniverseState, player: Player, plan: RoutePlan) -> dto.RouteDTO:
-    """Map a pure `RoutePlan` to the read-only, spatial-id Route DTO (§11, WP14)."""
+def _route_dto(state: UniverseState, player: Player, plan: RoutePlan,
+               *, origin_hint: int | None = None) -> dto.RouteDTO:
+    """Map a pure `RoutePlan` to the read-only, spatial-id Route DTO (§11, WP14).
+
+    `origin_hint` (a spatial id) tailors the unreachable reason for a lead the player can't
+    plot from here: the full-graph "tip is the map" route only opens at the lead's origin
+    sector (§6.7), so point them back to it.
+    """
     hops = [
         dto.RouteHopDTO(
             display_id=_display(state, h.sector_id),
@@ -755,7 +761,9 @@ def _route_dto(state: UniverseState, player: Player, plan: RoutePlan) -> dto.Rou
     ]
     turns = player.turns_remaining
     affordable = turns >= plan.turn_cost
-    if not plan.reachable:
+    if not plan.reachable and origin_hint is not None:
+        reason = f"Return to sector {origin_hint} to plot this lead."
+    elif not plan.reachable:
         reason = "No charted route — explore a path there first."
     elif plan.src == plan.dst:
         reason = "You are already here."
@@ -787,18 +795,24 @@ def route_view(
 ) -> dto.RouteDTO:
     """Plot the fewest-hop route to `dst_sector` (§11, WP14).
 
-    Routes through explored space by default; `full_graph` plans over the whole map for a
-    tip pointing somewhere unvisited (a coordinate lead is the map, §6.7), so the player can
-    plot and fly there before ever charting the path.
+    Routes through explored space by default. `full_graph` marks a coordinate-lead plot:
+    the tip is the map (§6.7), but only **from the sector it was obtained in** — away from
+    that origin the route is still locked to charted space, and if none exists the DTO's
+    reason points the player back to the lead's origin sector.
     """
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
+    lead = (next((ld for ld in player.leads if ld.sector_id == dst_sector), None)
+            if full_graph else None)
+    at_origin = lead is not None and ship.sector_id == lead.origin_sector
     plan = plan_route(
         state.adjacency, ship.sector_id, dst_sector,
-        allowed=None if full_graph else set(player.explored_sectors),
+        allowed=None if at_origin else set(player.explored_sectors),
         turns_per_warp=ship.turns_per_warp,
     )
-    return _route_dto(state, player, plan)
+    origin_hint = (_display(state, lead.origin_sector)
+                   if lead is not None and not at_origin and not plan.reachable else None)
+    return _route_dto(state, player, plan, origin_hint=origin_hint)
 
 
 def route_legs_view(
@@ -817,17 +831,21 @@ def route_legs_view(
 def leads_view(state: UniverseState, player_id: int, config: GameConfig) -> list[dto.LeadDTO]:
     """The player's accepted coordinate tips as plottable rows (§6.7 intel, Computer screen).
 
-    A lead points at an as-yet-unvisited place, so the route is planned over the **full**
-    graph (not the explored set) — the tip is the map. Each row carries the destination's
-    display id, hop distance, and turn cost from the player's current sector.
+    The tip is the map, but only from where it was obtained: at the lead's origin sector the
+    route is planned over the **full** graph (unvisited destination and all); away from it the
+    route is locked to charted space, so distance/turns/reachable reflect what the player can
+    actually plot from here. `origin_coords` lets the screen show "return to S{origin}" when
+    the lead can't be plotted now.
     """
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
     roster = config.roster
     rows: list[dto.LeadDTO] = []
     for lead in player.leads:
+        at_origin = ship.sector_id == lead.origin_sector
         plan = plan_route(state.adjacency, ship.sector_id, lead.sector_id,
-                          allowed=None, turns_per_warp=ship.turns_per_warp)
+                          allowed=None if at_origin else set(player.explored_sectors),
+                          turns_per_warp=ship.turns_per_warp)
         source = lead.source_species
         if roster is not None and (sc := roster.species_by_id(lead.source_species)) is not None:
             source = sc.name
@@ -837,6 +855,8 @@ def leads_view(state: UniverseState, player_id: int, config: GameConfig) -> list
             distance=len(plan.hops) if plan.reachable else -1,
             turn_cost=plan.turn_cost, reachable=plan.reachable,
             sector_id=lead.sector_id,
+            at_origin=at_origin,
+            origin_coords=state.spatial_ids.get(lead.origin_sector, lead.origin_sector),
         ))
     return rows
 

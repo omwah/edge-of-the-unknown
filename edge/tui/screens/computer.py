@@ -130,9 +130,12 @@ class ComputerScreen(Screen):
         leads.add_columns("Tip", "From", "Location", "Dist", "Turns")
         if self._computer.leads:
             for ld in self._computer.leads:
+                # Off-origin + uncharted: point the player back to where the tip was obtained.
+                turns = (str(ld.turn_cost) if ld.reachable
+                         else f"plot from S{ld.origin_coords}" if not ld.at_origin
+                         else "unreachable")
                 leads.add_row(ld.summary, ld.source, f"S{ld.coords}",
-                              str(ld.distance) if ld.reachable else "—",
-                              str(ld.turn_cost) if ld.reachable else "unreachable")
+                              str(ld.distance) if ld.reachable else "—", turns)
         else:
             leads.add_row(
                 Text("No leads yet — ask a friendly species for coordinates.", style="dim"),
