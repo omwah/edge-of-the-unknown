@@ -18,6 +18,16 @@ from edge.dialogue import validate_dialogue
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "default.yaml"
 
+# `offer_coordinates` lines are intel "tips": they fill {target}/{coords}/{distance}/{band}/
+# {reward}, which only exist when the speaker has somewhere unvisited to point you. The runtime
+# gates the context on a `has_intel_target` fact (server.session). An authoring sidecar emits a
+# single *unconditional* tip grammar per species, so — spliced as-is — it would shadow the
+# generic pack's catch-all and, once a lead is logged (no target left), render those
+# placeholders empty. So a spliced tip is gated on has_intel_target; the generic "nowhere new"
+# fallback then speaks when there is none. (DESIGN §6.7.)
+_INTEL_CONTEXT = "offer_coordinates"
+_INTEL_GUARD: dict[str, Any] = {"criteria": {"has_intel_target": True}}
+
 
 def _merge_dialogue(roster: dict[str, Any], dialogue: dict[str, Any]) -> None:
     """Fold one dialogue document onto a roster dict in place (DESIGN §6.7).
@@ -29,7 +39,9 @@ def _merge_dialogue(roster: dict[str, Any], dialogue: dict[str, Any]) -> None:
       [line]}}`) is spliced into each species' `dialogue_pack` by id, per-context, so a
       machine-authored sidecar layers its grammars over the persona defaults without
       restating the base corpus. The species `dialogue_pack` wins over its persona via the
-      runtime fallback chain, so the splice is a clean per-species override.
+      runtime fallback chain, so the splice is a clean per-species override. A spliced
+      `offer_coordinates` tip is gated on `has_intel_target` (see `_INTEL_GUARD`) so it never
+      shadows the generic "no fresh coordinates" line with empty placeholders.
     """
     species_grammars = dialogue.pop("species_grammars", None)
     roster.update(dialogue)  # personas / recency_k / grammar
@@ -42,6 +54,9 @@ def _merge_dialogue(roster: dict[str, Any], dialogue: dict[str, Any]) -> None:
             raise ValueError(
                 f"dialogue species_grammars references unknown species {species_id!r}"
             )
+        for entry in pack.get(_INTEL_CONTEXT, []):
+            if isinstance(entry, dict) and "when" not in entry:
+                entry["when"] = {"criteria": dict(_INTEL_GUARD["criteria"])}
         species.setdefault("dialogue_pack", {}).update(pack)
 
 
