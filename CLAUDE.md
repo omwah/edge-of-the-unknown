@@ -202,7 +202,10 @@ What each is for:
    keyed to standing band / treaty / grudge / mechanic stage, with **variant pools + a
    recency ring** for non-repeating variability, templated placeholders, and a
    species → `persona` → generic fallback chain. The contact-screen conversation **verb
-   menu is derived** from species parameters, not authored. Wired into §4 data model
+   menu is derived** from species parameters, not authored. The dialogue corpus lives in
+   its **own config file** (`config/alien_dialogue_default.yaml`, separate from
+   `config/alien_roster_default.yaml`), merged onto the roster at the config I/O seam so a
+   roster and its voice corpus vary independently. Wired into §4 data model
    (`dialogue_pack`, `Player.dialogue_recency`), §10/§11 (encounter & contact screens),
    §13 (dialogue-integrity validation), and Appendix B.
 

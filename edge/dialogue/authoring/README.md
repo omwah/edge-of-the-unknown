@@ -16,7 +16,7 @@ validates and render-smoke-tests it, and writes a config sidecar.
 pixi run author-dialogue --dry-run
 
 # 2. Author the whole roster with a local Ollama model (default backend):
-pixi run author-dialogue                       # writes config/dialogue/roster_default.generated.yaml
+pixi run author-dialogue                       # writes config/dialogue/alien_dialogue.ollama_llama3.1.yaml
 
 # 3. Or use a cloud backend:
 pixi run author-dialogue --backend anthropic   # needs ANTHROPIC_API_KEY + the .[authoring] extra
@@ -45,7 +45,7 @@ plain HTTP and need no extra package.
 --model MODEL                                      override the backend's model id
 --contexts greeting,trade_open,offer_coordinates,… intents to author (comma-separated)
 --species vesk,terran,…                            limit to these roster species ids (default: all)
---out PATH                                         sidecar to write (default: config/dialogue/roster_default.generated.yaml)
+--out PATH                                         sidecar to write (default: config/dialogue/alien_dialogue.<backend>_<model>.yaml)
 --dry-run                                          author one species/context with the static backend and print it
 ```
 
@@ -80,10 +80,11 @@ Grammars expand from `origin` and may reference the fixed fragment symbols `open
 ## Using the output
 
 The sidecar is **candidate content** — review it, then fold the grammars you like into the
-live roster (`config/roster_default.yaml`), either as a species' `dialogue_pack` override or a
-`persona` pack. Every generated grammar is already validated (fillable placeholders, non-empty
-render, defined symbols), and the live roster is re-checked by `validate_dialogue` (DESIGN §13)
-on load and in CI — so a bad grammar fails the build rather than blanking a line in game.
+live dialogue corpus (`config/alien_dialogue_default.yaml`), either as a species'
+`dialogue_pack` override or a `persona` pack. Every generated grammar is already validated
+(fillable placeholders, non-empty render, defined symbols), and the merged roster + dialogue
+is re-checked by `validate_dialogue` (DESIGN §13) on load and in CI — so a bad grammar fails
+the build rather than blanking a line in game.
 
 Generation is **not** auto-merged into the live config on purpose: the current roster ships
 working hand-authored lines, and the tool should never silently overwrite them.

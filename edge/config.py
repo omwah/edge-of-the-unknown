@@ -22,10 +22,13 @@ def load_config(path: Path | str) -> GameConfig:
     """Load and validate a YAML game config from `path`.
 
     A `roster_file:` pointer (relative to the config's directory) is resolved here —
-    the species roster lives in its own file (`roster_default.yaml`, §6) so a game can
-    be generated against a different source roster. The pointer is read at this I/O
-    seam and the parsed roster injected as the `roster` field before validation; core
-    never touches the filesystem.
+    the species roster lives in its own file (`alien_roster_default.yaml`, §6) so a game
+    can be generated against a different source roster. A separate `dialogue_file:`
+    pointer (`alien_dialogue_default.yaml`, §6.7) carries the dialogue corpus
+    (`personas` / `recency_k` / shared `grammar`) so a roster and its voice corpus vary
+    independently; it is merged onto the loaded roster before validation. Both pointers
+    are read at this I/O seam and injected as the `roster` field; core never touches the
+    filesystem.
     """
     path = Path(path)
     with open(path, encoding="utf-8") as fh:
@@ -34,6 +37,10 @@ def load_config(path: Path | str) -> GameConfig:
     if roster_file is not None and "roster" not in data:
         with open(path.parent / roster_file, encoding="utf-8") as fh:
             data["roster"] = yaml.safe_load(fh)
+    dialogue_file = data.pop("dialogue_file", None)
+    if dialogue_file is not None and isinstance(data.get("roster"), dict):
+        with open(path.parent / dialogue_file, encoding="utf-8") as fh:
+            data["roster"].update(yaml.safe_load(fh) or {})
     names_file = data.pop("names_file", None)
     if names_file is not None and "names" not in data:
         with open(path.parent / names_file, encoding="utf-8") as fh:
