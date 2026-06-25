@@ -1,7 +1,10 @@
 """`edge-author-dialogue` — the offline dialogue authoring command (DESIGN §6.7, dev-only).
 
-Drives a pluggable LLM backend (local Ollama by default, or the Anthropic / Antigravity APIs)
-to author persona-voiced Tracery grammars for each roster species and a set of intents,
+Drives a pluggable LLM backend — a local Ollama model (default), the Anthropic / Antigravity
+APIs, or an authenticated **CLI session** (`--backend claude` for Claude Code, `--backend agy`
+for the Antigravity CLI, or `--backend cli` with any external agent CLI via `--cli-command` —
+all needing no API key) — to author persona-voiced
+Tracery grammars for each roster species and a set of intents,
 validates them, and writes a config sidecar the runtime can load. Each run is written to a
 file named for the backend and model that produced it
 (`config/dialogue/alien_dialogue.<backend>_<model>.yaml`) so authored corpora don't clobber
@@ -64,9 +67,16 @@ def _voices(species: Any, only: set[str] | None) -> dict[str, str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="edge-author-dialogue", description=__doc__)
     parser.add_argument("--backend", default="ollama",
-                        choices=["ollama", "anthropic", "antigravity", "static"],
-                        help="LLM backend (default: local Ollama)")
+                        choices=["ollama", "anthropic", "antigravity", "claude", "agy", "cli",
+                                 "static"],
+                        help="engine: ollama/anthropic/antigravity (API), claude/agy/cli "
+                             "(an authenticated CLI session, no key), static (default: ollama)")
     parser.add_argument("--model", default=None, help="override the backend's model id")
+    parser.add_argument("--cli-command", default=None,
+                        help="for --backend cli: the CLI argv template, e.g. "
+                             "'antigravity run --prompt-file {prompt_file} --output {out_file}' "
+                             "(placeholders: {prompt_file} {schema_file} {out_file} {model}); "
+                             "falls back to $EDGE_AUTHOR_CLI")
     parser.add_argument("--contexts", default=",".join(_DEFAULT_CONTEXTS),
                         help="comma-separated intent keys to author")
     parser.add_argument("--species", default=None,
@@ -97,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\n# dry run — validated, not written", file=sys.stderr)
         return 0
 
-    backend = get_backend(args.backend, model=args.model)
+    backend = get_backend(args.backend, model=args.model, command=args.cli_command)
     print(f"authoring {len(voices)} species × {len(contexts)} intents via {backend.name}…",
           file=sys.stderr)
     packs = author_packs(backend, voices, contexts, examples=_EXAMPLES, retries=args.retries)
