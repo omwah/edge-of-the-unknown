@@ -31,6 +31,14 @@ ui:
 # different source roster. The alien dialogue corpus (§6.7) lives in a third file so a
 # roster and its voice corpus can vary independently. Both are resolved relative to this
 # file; the roster is injected as `roster`, and the dialogue is merged onto it.
+#
+# `dialogue_file` may be a single path or a list applied in order: the base file supplies
+# `personas` / `recency_k` / shared `grammar`, and any later file may add a `species_grammars`
+# block (an authoring-pipeline sidecar) that layers per-species grammar overrides on top —
+# e.g. to A/B a machine-authored corpus, point it at a generated sidecar:
+#   dialogue_file:
+#     - alien_dialogue_default.yaml
+#     - dialogue/alien_dialogue.ollama_gemma4.yaml
 roster_file: alien_roster_default.yaml
 dialogue_file: alien_dialogue_default.yaml
 names_file: names_default.yaml
