@@ -91,7 +91,8 @@ class AlienContactScreen(Screen):
 
     def __init__(self, contact: dto.ContactDTO, service: GameService | None = None,
                  pid: int = 1, species_id: int = 0, *,
-                 active_context: str = "greeting", active_subject: int | None = None) -> None:
+                 active_context: str = "greeting", active_subject: int | None = None,
+                 pinned_speech: str | None = None) -> None:
         super().__init__()
         self._contact = contact
         self._service = service
@@ -99,6 +100,9 @@ class AlienContactScreen(Screen):
         self._species_id = species_id
         self._active_context = active_context
         self._active_subject = active_subject
+        # A one-shot frozen speech line (e.g. after logging a tip), overriding the recomputed
+        # opener for this rebuild only; any later verb click reopens without it.
+        self._pinned_speech = pinned_speech
 
     def _view(self) -> dto.ContactDTO:
         if self._service is None:
@@ -106,14 +110,19 @@ class AlienContactScreen(Screen):
         return self._service.contact_view(self._pid, self._species_id,
                                           self._active_context, self._active_subject)
 
-    def _reopen(self) -> None:
-        """Re-fetch the view and rebuild (mirrors the engine-room screen)."""
+    def _reopen(self, pinned_speech: str | None = None) -> None:
+        """Re-fetch the view and rebuild (mirrors the engine-room screen).
+
+        `pinned_speech` freezes the speech panel to a given line for the rebuilt screen;
+        callers that omit it clear any pin, so the recomputed opener shows as usual.
+        """
         if self._service is None:
             return
         self.app.pop_screen()
         self.app.push_screen(AlienContactScreen(
             self._view(), self._service, self._pid, self._species_id,
-            active_context=self._active_context, active_subject=self._active_subject))
+            active_context=self._active_context, active_subject=self._active_subject,
+            pinned_speech=pinned_speech))
 
     def compose(self) -> ComposeResult:
         c = self._view()
@@ -128,7 +137,7 @@ class AlienContactScreen(Screen):
             f"        alliance: [cyan]{c.alliance}[/]",
             id="contact-standing",
         )
-        speech = Static(c.opener, id="speech")
+        speech = Static(self._pinned_speech or c.opener, id="speech")
         speech.border_title = "they speak"
         yield speech
         with Horizontal(id="contact-main"):
@@ -208,14 +217,16 @@ class AlienContactScreen(Screen):
         """Log the coordinate tip the alien is offering (§6.7); confirm with its summary."""
         if self._service is None:
             return
-        summary = self._view().intel_summary
+        view = self._view()
+        summary = view.intel_summary
+        pinned = view.opener  # freeze the line the player just acted on (don't reveal the next tip)
         try:
             self._service.apply(self._pid, AcceptLead(self._species_id))
         except Exception as exc:  # core rejected it — surface the reason, stay put
             self.notify(str(exc), timeout=2)
             return
         self.notify(f"Logged: {summary}" if summary else "Coordinates logged.", timeout=3)
-        self._reopen()
+        self._reopen(pinned_speech=pinned)
 
     def _say(self, context: str, subject_id: int | None, *, close: bool) -> None:
         if self._service is None:
