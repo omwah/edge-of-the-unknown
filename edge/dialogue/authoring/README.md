@@ -31,12 +31,12 @@ The console script is also installed as `edge-author-dialogue` (run it directly 
 | ------------- | ----------------------------------- | ------------------------------------------------------- |
 | `ollama`      | A local Ollama model (the default)  | a running Ollama server (`OLLAMA_HOST`, default `http://localhost:11434`); `--model` (default `llama3.1`). Plain HTTP — no SDK. |
 | `anthropic`   | The Anthropic API (official SDK)    | `pip install -e '.[authoring]'` (the `anthropic` SDK) + `ANTHROPIC_API_KEY`. `--model` default `claude-opus-4-8`. |
-| `antigravity` | Google Antigravity (OpenAI-shaped)  | `ANTIGRAVITY_BASE_URL`, `ANTIGRAVITY_API_KEY`, optional `ANTIGRAVITY_MODEL` (default `gemini-3-pro`). |
+| `antigravity` | Google Antigravity (`google-antigravity` SDK) | `pip install -e '.[authoring]'` (the `google-antigravity` SDK) + `GEMINI_API_KEY` (or ADC; `ANTIGRAVITY_API_KEY` overrides). `--model` / `ANTIGRAVITY_MODEL` default `gemini-3-pro`. |
 | `static`      | A canned valid grammar (no model)   | nothing — used by `--dry-run` and the tests.            |
 
 Install the cloud extras once with: `pixi run -e default pip install -e '.[authoring]'`
-(or `pip install -e '.[authoring]'` in your venv). The Ollama and Antigravity backends are
-plain HTTP and need no extra package.
+(or `pip install -e '.[authoring]'` in your venv) — this pulls in both the `anthropic` and
+`google-antigravity` SDKs. The Ollama backend is plain HTTP and needs no extra package.
 
 ## Options
 

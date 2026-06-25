@@ -87,36 +87,39 @@ class AnthropicBackend:
 
 
 class AntigravityBackend:
-    """Google Antigravity as a cloud backend, via its OpenAI-compatible chat endpoint.
+    """Google Antigravity as a cloud backend, via the official `google-antigravity` SDK.
 
-    Endpoint and key come from `ANTIGRAVITY_BASE_URL` / `ANTIGRAVITY_API_KEY`; the model from
-    `ANTIGRAVITY_MODEL`. Kept isolated so provider specifics never leak into the pipeline.
+    Uses the SDK's structured-output path: the grammar JSON schema is handed straight to
+    `LocalAgentConfig(response_schema=…)` (which accepts a JSON-Schema dict) and the
+    validated grammar is read back with `ChatResponse.structured_output()`. The model id
+    comes from `--model` / `ANTIGRAVITY_MODEL` (default `gemini-3-pro`); auth uses the SDK's
+    default credentials (`GEMINI_API_KEY` / ADC) unless `ANTIGRAVITY_API_KEY` overrides it.
     """
 
     name = "antigravity"
 
     def __init__(self, model: str | None = None) -> None:
         self.model = model or os.environ.get("ANTIGRAVITY_MODEL", "gemini-3-pro")
-        self.base_url = os.environ.get("ANTIGRAVITY_BASE_URL", "").rstrip("/")
-        self.api_key = os.environ.get("ANTIGRAVITY_API_KEY", "")
+        # The SDK falls back to GEMINI_API_KEY / ADC; ANTIGRAVITY_API_KEY is an explicit override.
+        self.api_key = os.environ.get("ANTIGRAVITY_API_KEY") or None
 
     def generate(self, prompt: str, *, schema: dict[str, Any]) -> dict[str, Any]:
-        if not self.base_url or not self.api_key:
-            raise RuntimeError("set ANTIGRAVITY_BASE_URL and ANTIGRAVITY_API_KEY")
-        body = json.dumps({
-            "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "response_format": {"type": "json_schema",
-                                "json_schema": {"name": "grammar", "schema": schema}},
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            f"{self.base_url}/chat/completions", data=body,
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {self.api_key}"})
-        with urllib.request.urlopen(req) as resp:  # noqa: S310 — configured endpoint
-            payload = json.loads(resp.read().decode("utf-8"))
-        content = payload["choices"][0]["message"]["content"]
-        result: dict[str, Any] = json.loads(content)
+        import asyncio
+
+        from google.antigravity import Agent, LocalAgentConfig  # lazy: only this backend's dev extra
+
+        async def _run() -> Any:
+            config = LocalAgentConfig(
+                model=self.model, response_schema=schema,
+                **({"api_key": self.api_key} if self.api_key else {}),
+            )
+            async with Agent(config) as agent:
+                response = await agent.chat(prompt)
+                return await response.structured_output()
+
+        data = asyncio.run(_run())
+        # structured_output() yields a dict (we passed a JSON-Schema dict) or a model instance.
+        result: dict[str, Any] = data if isinstance(data, dict) else data.model_dump(exclude_none=True)
         return result
 
 
