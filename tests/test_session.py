@@ -371,6 +371,8 @@ def test_format_event_covers_kinds_and_filters_noise() -> None:
     assert "Installed" in session.format_event(ComponentInstalled(1, "spindrive", 3, "turbine", "II"))
     assert "Removed" in session.format_event(ComponentRemoved(1, "main_gun", 2, "linkage", "I"))
     assert "patched" in session.format_event(Repaired(1, "thrusters", 1))
+    from edge.core.events import LeadAccepted
+    assert "Coordinates logged" in session.format_event(LeadAccepted(1, 2, "discovery", 5, 12))
     # Per-commodity restock is not player-facing — filtered out of the log.
     assert session.format_event(StockRegenerated(3, Commodity.EQUIPMENT, 480)) == ""
 

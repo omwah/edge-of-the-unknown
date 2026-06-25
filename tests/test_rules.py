@@ -153,6 +153,36 @@ def test_travel_to_rejects_unexplored_route() -> None:
         reduce(state, 1, TravelTo(to_sector=4), CONFIG)  # route past 3/4 not uncovered
 
 
+def test_travel_to_a_logged_lead_flies_the_full_graph() -> None:
+    """A logged coordinate lead is the map (§6.7): TravelTo its destination routes over the
+    full graph and charts each hop, while a non-lead unexplored destination is still rejected."""
+    from dataclasses import replace
+
+    from edge.core.models import Lead
+
+    state = _line_universe()  # player at 1, explored {1}; line 1-2-3-4
+    with pytest.raises(MovementError):
+        reduce(state, 1, TravelTo(to_sector=4), CONFIG)  # no lead, route uncharted → rejected
+
+    lead = Lead(kind="discovery", ref=99, sector_id=4, source_species="vesk", summary="a relic")
+    state.players[1] = replace(state.players[1], leads=(lead,))
+    result = _do(state, TravelTo(to_sector=4))  # the tip's coordinates unlock the course
+    assert len(result.events) == 3  # 1->2->3->4, all flown in one engage  # type: ignore[attr-defined]
+    assert state.ships[1].sector_id == 4
+    assert {2, 3, 4} <= state.players[1].explored_sectors  # the route is charted as it flies
+
+
+def test_movement_errors_name_the_spatial_id_not_the_internal_one() -> None:
+    """Player-facing route/warp errors must speak in spatial ids (§5.1), never internal ones."""
+    state = _line_universe()
+    state.spatial_ids = {1: 10001, 2: 10002, 3: 10003, 4: 40004}
+    _do(state, Warp(to_sector=2))  # explored {1, 2} only
+    with pytest.raises(MovementError, match=r"no uncovered route to 40004$"):
+        reduce(state, 1, TravelTo(to_sector=4), CONFIG)
+    with pytest.raises(MovementError, match=r"no warp from 10002 to 40004$"):
+        reduce(state, 1, Warp(to_sector=4), CONFIG)  # 2 and 4 are not adjacent
+
+
 def test_travel_to_same_sector_and_out_of_turns_are_rejected() -> None:
     from dataclasses import replace
 

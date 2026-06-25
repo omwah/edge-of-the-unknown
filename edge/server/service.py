@@ -126,8 +126,10 @@ class GameService:
     def computer_view(self, player_id: int) -> dto.ComputerDTO:
         return session.computer_view(self._state, player_id, self._config)
 
-    def route_view(self, player_id: int, dst_sector: int) -> dto.RouteDTO:
-        return session.route_view(self._state, player_id, dst_sector, self._config)
+    def route_view(self, player_id: int, dst_sector: int, *,
+                   full_graph: bool = False) -> dto.RouteDTO:
+        return session.route_view(self._state, player_id, dst_sector, self._config,
+                                  full_graph=full_graph)
 
     def route_legs_view(self, player_id: int, waypoints: list[int]) -> dto.RouteDTO:
         return session.route_legs_view(self._state, player_id, waypoints, self._config)

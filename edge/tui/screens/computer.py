@@ -92,6 +92,10 @@ class ComputerScreen(Screen):
             with TabPane("Codex", id="codex"):
                 yield Static("[b]DISCOVERY CODEX[/]        [dim]logged finds, richest first[/]")
                 yield DataTable(id="codex-table", zebra_stripes=True, cursor_type="row")
+            with TabPane("Leads", id="leads"):
+                yield Static("[b]COORDINATE LEADS[/]        [dim]tips logged from contacts[/]")
+                yield DataTable(id="leads-table", zebra_stripes=True, cursor_type="row")
+                yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
             with TabPane("Dossier", id="dossier"):
                 yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
                 yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
@@ -121,6 +125,18 @@ class ComputerScreen(Screen):
                 codex.add_row(c.name, c.location, c.rarity, c.detail)
         else:
             codex.add_row(Text("no discoveries logged yet", style="dim"), Text(""), Text(""), Text(""))
+
+        leads = self.query_one("#leads-table", DataTable)
+        leads.add_columns("Tip", "From", "Location", "Dist", "Turns")
+        if self._computer.leads:
+            for ld in self._computer.leads:
+                leads.add_row(ld.summary, ld.source, f"S{ld.coords}",
+                              str(ld.distance) if ld.reachable else "—",
+                              str(ld.turn_cost) if ld.reachable else "unreachable")
+        else:
+            leads.add_row(
+                Text("No leads yet — ask a friendly species for coordinates.", style="dim"),
+                *(Text(""),) * 4)
 
         ports = self.query_one("#ports-table", DataTable)
         ports.add_columns("Sector", "Port", "Class", "Buys", "Sells", "Dist")
@@ -246,8 +262,18 @@ class ComputerScreen(Screen):
             self._route = self._service.route_view(self._pid, entry.sector_id)  # type: ignore[attr-defined]
             self._engage_target = entry.sector_id  # type: ignore[attr-defined]
             self._show_route()
+        elif active == "leads":
+            entry = self._cursor_entry("#leads-table", self._computer.leads)
+            if entry is None or entry.sector_id < 0:  # type: ignore[attr-defined]
+                self.notify("No lead selected.", timeout=2)
+                return
+            # A lead points somewhere unvisited — plot over the full graph (the tip is the map).
+            self._route = self._service.route_view(
+                self._pid, entry.sector_id, full_graph=True)  # type: ignore[attr-defined]
+            self._engage_target = entry.sector_id  # type: ignore[attr-defined]
+            self._show_route()
         else:
-            self.notify("Plot a route from the Trade, Codex, Ports or Planets tab.", timeout=2)
+            self.notify("Plot a route from the Trade, Codex, Leads, Ports or Planets tab.", timeout=2)
 
     def action_route_prompt(self) -> None:
         self.app.push_screen(TravelPromptScreen(), self._after_route_prompt)
