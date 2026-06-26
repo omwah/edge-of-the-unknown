@@ -30,14 +30,14 @@ def _choice(index: int, *, action: str = "", next_context: str = "") -> dto.Cont
 def test_floor_fills_gaps_on_a_branching_top_node() -> None:
     # An authored greeting that only opens a branch leaves every floor verb uncovered.
     floor = session._contact_floor(_VERBS, [_choice(0, next_context="branch.shop")], "greeting")
-    assert [v.key for v in floor] == ["ask", "farewell", "leave"]
+    assert [v.key for v in floor] == ["ask", "farewell"]
 
 
 def test_floor_drops_what_the_grammar_already_covers() -> None:
     # A choice that asks about others covers Ask about…; one that says farewell covers the exit.
     ask_covered = session._contact_floor(_VERBS, [_choice(0, next_context="dossier_other")],
                                          "greeting")
-    assert [v.key for v in ask_covered] == ["farewell", "leave"]
+    assert [v.key for v in ask_covered] == ["farewell"]
     exit_covered = session._contact_floor(_VERBS, [_choice(0, action="farewell")], "greeting")
     assert [v.key for v in exit_covered] == ["ask"]
 
@@ -90,27 +90,54 @@ def test_on_exit_hook_replaces_the_default_pop() -> None:
     assert calls == ["exit"]
 
 
-def test_check_action_hides_verbs_absent_from_the_menu() -> None:
-    # Derived menu: an enabled verb's shortcut shows; a disabled one is hidden.
+def test_check_action_shows_a_verb_iff_it_is_enabled() -> None:
+    # The shortcut tracks the verb's enablement, not whether it is a rendered row — so an offered
+    # Trade shows even on a branching node whose visible rows are authored choices, while a
+    # refused/empty one is hidden.
     verbs = [
-        dto.ContactVerbDTO("hail", "Greet", kind="say", context="greeting"),
-        dto.ContactVerbDTO("trade", "Trade", False, "they refuse to trade"),
+        dto.ContactVerbDTO("trade", "Buy tech"),  # offered (enabled)
+        dto.ContactVerbDTO("barter", "Barter", False, "they offer no barter"),  # disabled
         dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell"),
     ]
-    screen = AlienContactScreen(_dto(choices=[], floor=[], verbs=verbs))
-    assert screen.check_action("verb", ("hail",)) is True
-    assert screen.check_action("verb", ("trade",)) is None  # disabled ⇒ hidden
-    # Branching node: only floor verbs are in the menu, so Greet/Trade vanish, Ask stays.
+    plain = AlienContactScreen(_dto(choices=[], floor=[], verbs=verbs))
+    assert plain.check_action("verb", ("trade",)) is True
+    assert plain.check_action("verb", ("barter",)) is False
     branch = AlienContactScreen(_dto(
-        choices=[_choice(0, next_context="branch.shop")], floor=[_VERBS[1]]))  # ask
-    assert branch.check_action("verb", ("ask",)) is True
-    assert branch.check_action("verb", ("hail",)) is None
-    assert branch.check_action("verb", ("trade",)) is None
+        choices=[_choice(0, next_context="branch.shop")], floor=[], verbs=verbs))
+    assert branch.check_action("verb", ("trade",)) is True  # offered ⇒ shown even on a branch
+    assert branch.check_action("verb", ("barter",)) is False
+
+
+def test_check_action_shows_enabled_say_verbs_and_hides_disabled_ones() -> None:
+    # Regreet / Ask / Farewell show on a branching node when enabled in the view's verbs.
+    verbs = [
+        dto.ContactVerbDTO("hail", "Regreet", kind="say", context="greeting"),
+        dto.ContactVerbDTO("ask", "Ask about…", True, kind="say", context="dossier_other"),
+        dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell"),
+    ]
+    branch = AlienContactScreen(_dto(
+        choices=[_choice(0, next_context="branch.shop"), _choice(1, action="farewell")],
+        floor=[], verbs=verbs))
+    for key in ("hail", "ask", "farewell"):
+        assert branch.check_action("verb", (key,)) is True
+    # A disabled verb is hidden (e.g. Ask with nobody met yet).
+    no_subjects = AlienContactScreen(_dto(choices=[], floor=[], verbs=[
+        dto.ContactVerbDTO("ask", "Ask about…", False, "no other species met yet",
+                           kind="say", context="dossier_other")]))
+    assert no_subjects.check_action("verb", ("ask",)) is False
+
+
+def test_check_action_hides_regreet_when_the_game_omits_it() -> None:
+    # The game drops the Greet/Regreet verb, so its shortcut never shows there.
+    game = AlienContactScreen(_dto(choices=[], floor=[], verbs=[
+        dto.ContactVerbDTO("ask", "Ask about…", True, kind="say", context="dossier_other"),
+        dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell")]))
+    assert game.check_action("verb", ("hail",)) is False
 
 
 def test_check_action_hides_back_without_history() -> None:
     no_history = AlienContactScreen(_dto(choices=[], floor=[]))
-    assert no_history.check_action("back_one", ()) is None
+    assert no_history.check_action("back_one", ()) is False
     assert no_history.check_action("back", ()) is True  # Escape always breaks contact
     with_history = AlienContactScreen(_dto(choices=[], floor=[]),
                                       history=(("greeting", None),))

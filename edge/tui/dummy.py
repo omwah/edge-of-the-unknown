@@ -288,12 +288,13 @@ def sample_contact() -> dto.ContactDTO:
         base_disposition=0.85, attitude=0.06, effective=0.91,
         opener="Greetings, Trailblazer. I am Veska VK-7 of the Vesk. We are at your service.",
         verbs=[
-            dto.ContactVerbDTO("hail", "Hail / greet"),
+            dto.ContactVerbDTO("ask", "Ask about…", False, "no other species met yet",
+                               kind="say", context="dossier_other", needs_subject=True),
             dto.ContactVerbDTO("trade", "Buy tech"),
             dto.ContactVerbDTO("barter", "Barter artifact"),
             dto.ContactVerbDTO("treaty", "Treaty", False, "treaties open in a later phase"),
             dto.ContactVerbDTO("fight", "Attack", False, "they are friendly"),
-            dto.ContactVerbDTO("leave", "Leave"),
+            dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell"),
         ],
         offers=[
             dto.TechOfferDTO(0, "navigator (I)", "I", "latinum", 1800, "", True),

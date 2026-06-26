@@ -339,18 +339,23 @@ def test_contact_view_renders_opener_verbs_and_offers() -> None:
     view = session.contact_view(state, 1, sp.id, CFG)
     assert view.species == "Vesk" and view.opener
     keys = {v.key for v in view.verbs}
-    assert {"hail", "trade", "barter", "treaty", "fight", "leave"} <= keys
+    assert {"ask", "trade", "barter", "treaty", "fight", "farewell"} <= keys
+    assert "hail" not in keys  # no Greet verb — the screen opens already greeted
+    assert "leave" not in keys  # Farewell is the single exit; Escape is the silent quick-exit
     fight = next(v for v in view.verbs if v.key == "fight")
     assert not fight.enabled and fight.reason  # combat is greyed in Phase 2, with a reason
     assert view.offers and all(o.label for o in view.offers)
 
 
-def test_contact_view_greys_a_refusing_trader() -> None:
+def test_contact_view_keeps_trade_live_for_a_refusing_trader() -> None:
+    # A `refuses` species no longer greys Trade out: the verb stays selectable and the screen
+    # routes an empty shelf to a spoken `trade_refuse` beat (§6.7).
     state = _world()
     sp = _inject(state, "dacaran")  # trade_posture: refuses
     view = session.contact_view(state, 1, sp.id, CFG)
     trade = next(v for v in view.verbs if v.key == "trade")
-    assert not trade.enabled and "refuse" in trade.reason
+    assert trade.enabled and trade.label == "Trade"
+    assert not any(o.mode == "latinum" and o.available for o in view.offers)  # nothing to sell
 
 
 def test_contact_view_dossier_covers_other_met_species() -> None:
@@ -369,12 +374,12 @@ def test_contact_verbs_tag_say_and_do_kinds() -> None:
     state = _world()
     sp = _inject(state, "vesk")
     verbs = {v.key: v for v in session.contact_view(state, 1, sp.id, CFG).verbs}
-    # Say verbs name the dialogue context they speak.
-    assert verbs["hail"].kind == "say" and verbs["hail"].context == "greeting"
+    # Say verbs name the dialogue context they speak (Greet is gone — see the floor test).
+    assert "hail" not in verbs
     assert verbs["farewell"].kind == "say" and verbs["farewell"].context == "farewell"
     assert verbs["ask"].kind == "say" and verbs["ask"].needs_subject
     # Do verbs carry no dialogue context.
-    for key in ("trade", "barter", "treaty", "fight", "leave"):
+    for key in ("trade", "barter", "treaty", "fight"):
         assert verbs[key].kind == "do" and verbs[key].context == ""
 
 

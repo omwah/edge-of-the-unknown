@@ -891,7 +891,11 @@ def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOffer
     """Derive the conversation verb menu from species params (§6.7), greying with reasons.
 
     Rows are tagged Say (dialogue) / Do (mechanical) so the TUI groups and dispatches them
-    (WP17): Greet / Ask about… / Farewell speak a dialogue context; the rest act.
+    (WP17): Ask about… / Farewell speak a dialogue context; the rest act. There is no Greet
+    verb — the screen opens already greeted; re-greeting only re-rolls the variant and is a
+    dev affordance the dialogue play-test harness adds back as "Regreet". Farewell is the single
+    exit (it speaks a parting line then closes); Escape is the silent quick-exit, so there is no
+    separate Leave verb.
     """
     posture = getattr(sc, "trade_posture", "open")
     treaty_mode = getattr(sc, "treaty_mode", "open")
@@ -899,9 +903,10 @@ def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOffer
     has_latinum = any(o.mode == "latinum" and o.available for o in offers)
     has_barter = any(o.mode == "barter" and o.available for o in offers)
 
-    # SAY — peaceful dialogue verbs (no mechanical effect; advance the recency ring).
+    # SAY — peaceful dialogue verbs (no mechanical effect; advance the recency ring). No Greet:
+    # the screen opens already greeted (re-greeting only re-rolls the variant — a dev affordance
+    # the play-test harness adds back as "Regreet").
     verbs = [
-        dto.ContactVerbDTO("hail", "Greet", kind="say", context="greeting"),
         dto.ContactVerbDTO("ask", "Ask about…", subjects_available,
                            "" if subjects_available else "no other species met yet",
                            kind="say", context="dossier_other", needs_subject=True),
@@ -915,17 +920,15 @@ def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOffer
     log_reason = "" if can_log else (
         "no coordinates on offer" if asked_intel else "ask for coordinates first")
     verbs.append(dto.ContactVerbDTO("accept_lead", "Log coordinates", can_log, log_reason))
-    # TRADE (latinum sales).
-    if posture == "refuses":
-        verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "they refuse to trade"))
-    elif posture == "alliance_gated":
+    # TRADE — offered in Phase 2 except behind a Phase-3 gate. With stock it opens the buy menu;
+    # with an empty shelf (open posture but nothing affordable, or a `refuses` species) the screen
+    # speaks the persona's `trade_refuse` beat, so "no trade" is a voiced reply, not a dead button.
+    if posture == "alliance_gated":
         verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "requires alliance membership (Phase 3)"))
     elif posture == "circuit_gated":
         verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "needs a reprogram circuit (Phase 3)"))
-    elif not has_latinum:
-        verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "nothing for sale in latinum"))
     else:
-        verbs.append(dto.ContactVerbDTO("trade", "Buy tech"))
+        verbs.append(dto.ContactVerbDTO("trade", "Buy tech" if has_latinum else "Trade"))
     # BARTER (artifacts → tech no latinum sale offers).
     verbs.append(dto.ContactVerbDTO("barter", "Barter artifact", has_barter,
                                     "" if has_barter else "they offer no barter"))
@@ -938,16 +941,16 @@ def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOffer
     # FIGHT — Phase 3; Phase 2 places only friendly species.
     verbs.append(dto.ContactVerbDTO("fight", "Attack", False,
                                     "non-combatant" if not combatant else "they are friendly"))
-    # SAY — break contact with a parting line.
+    # SAY — the single exit: speak a parting line, then break contact. (Escape is the silent
+    # quick-exit, so there is no separate "Leave" verb.)
     verbs.append(dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell"))
-    verbs.append(dto.ContactVerbDTO("leave", "Leave"))
     return verbs
 
 
 # The always-present floor (§6.7): top-level verbs the contact screen keeps on offer even on an
-# authored branching node, so a player can always ask about other species or break contact. Each
-# is dropped when an authored reply already covers it (see `_contact_floor`).
-_FLOOR_KEYS = ("ask", "farewell", "leave")
+# authored branching node, so a player can always ask about other species or take their leave.
+# Each is dropped when an authored reply already covers it (see `_contact_floor`).
+_FLOOR_KEYS = ("ask", "farewell")
 
 
 def _contact_floor(verbs: list[dto.ContactVerbDTO], choices: list[dto.ContactChoiceDTO],
@@ -957,14 +960,15 @@ def _contact_floor(verbs: list[dto.ContactVerbDTO], choices: list[dto.ContactCho
     Empty unless the node both carries authored `choices` (else the derived menu already shows
     these) and is **top-level** (a base intent, not a deeper `branch.*` node). A floor verb is
     dropped when an authored reply already provides the same navigation — Ask about… when a
-    choice targets `dossier_other`, Farewell/Leave when a choice already speaks a `farewell` —
-    so the grammar's explicit wording wins and the default only fills a gap.
+    choice targets `dossier_other`, Farewell when a choice already speaks a `farewell` — so the
+    grammar's explicit wording wins and the default only fills a gap.
     """
     if not choices or context.startswith(dialogue.BRANCH_PREFIX):
         return []
-    has_ask = any(c.next_context == "dossier_other" for c in choices)
-    has_exit = any(c.action == "farewell" for c in choices)
-    covered = {"ask": has_ask, "farewell": has_exit, "leave": has_exit}
+    covered = {
+        "ask": any(c.next_context == "dossier_other" for c in choices),
+        "farewell": any(c.action == "farewell" for c in choices),
+    }
     return [v for v in verbs if v.key in _FLOOR_KEYS and not covered.get(v.key, False)]
 
 
