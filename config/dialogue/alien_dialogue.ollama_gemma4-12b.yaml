@@ -4,355 +4,376 @@ species_grammars:
     - grammar:
         origin:
         - '#opener# #detail#'
+        - '#opener# #aside#'
+        opener:
+        - Greetings, Captain.
+        - Welcome to the reach of our stars.
+        - A message received from a Terran vessel.
+        detail:
+        - It is an honor to establish contact with a traveler of the Federation.
+        - We have watched your signals crossing the void for some time.
+        - Your signature is recognized as one of our kin in the stars.
+        aside:
+        - We value your presence here, {player}.
+        - May we begin our dialogue in peace?
+        - The stars are vast, but today they bring us together.
+      choices:
+      - text: I come in the name of the Terran Federation.
+        next_context: greeting
+      - text: I'm looking for local coordinates and trade opportunities.
+        next_context: trade_open
+    trade_open:
+    - grammar:
+        origin:
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
+        opener:
+        - It is a pleasure to meet a traveler of your standing.
+        - Your presence in this sector is noted and welcomed, Captain.
+        detail:
+        - The Terran Federation values prosperity through cooperation.
+        - We believe that mutual exchange is the foundation of lasting peace.
+        - I have observed your vessel's cargo logs and find them most intriguing.
+        honorific:
+        - Shall we discuss a fair exchange?
+        - Perhaps you are prepared to negotiate terms?
+        aside:
+        - Tell me, what is it your people seek in these stars?
+      choices:
+      - text: I am interested. What do you have for trade?
+        next_context: trade_open
+        action: trade
+      - text: Let's discuss the specifics of an exchange.
+        next_context: trade_open
+        action: barter
+    farewell:
+    - grammar:
+        origin:
+        - '#opener# #detail# #honorific#'
         - '#opener# #aside# #detail#'
         opener:
-        - Greetings, traveler.
-        - I hear your transmission clearly.
-        - A voice from the void reaches us.
+        - The stars are vast, but your journey is what gives them meaning.
+        - It has been an honor to share this space with you.
         detail:
-        - It is an honor to host a representative of the {species} in this sector.
-        - We welcome the presence of {player} among the stars.
-        - The Federation's reach is long, and your signal is welcomed by my kin.
+        - May your engines run true and your path remain clear.
+        - I hope the path ahead treats you with kindness.
+        honorific:
+        - Safe travels, Captain {player}.
+        - Go with the favor of the stars.
         aside:
-        - (I offer a respectful nod toward your vessel.)
-        - (A brief pause as I calibrate the comms_link.)
+        - Our worlds may be apart,
+        - Though we are far from our homeworld,
       choices:
-      - text: I am Captain {player}. I come in peace to establish contact.
-        next_context: identify_intent
-      - text: We are looking for local trade routes and supplies.
-        next_context: trade_inquiry
-        action: trade
-    trade_open:
+      - text: May we meet again in these reaches.
+        next_context: farewell
+      - text: I will remember your hospitality well.
+        next_context: farewell
+    dossier_other:
+    - grammar:
+        origin:
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
+        - '#opener# #honorific# #detail#'
+        opener:
+        - When it comes to the {subject}, we find them quite...
+        - Our records on the {subject} are... extensive.
+        - The {subject} occupy a unique place in our collective memory.
+        detail:
+        - a people of formidable resolve and distinct cultural complexities.
+        - an intriguing species whose methods often clash with our diplomatic norms.
+        - neighbors whose capabilities we have come to respect, if not always fully
+          trust.
+        honorific:
+        - Captain {player}, they are a sturdy bunch.
+        - I believe the {subject} possess a certain... grit that even some Terrans
+          admire.
+        - In my experience, they are among the more stoic of our neighbors.
+        aside:
+        - though their ways can be quite taxing for diplomatic negotiations.
+        - even if their methods are occasionally blunt to the point of being abrasive.
+        - though we find their tenacity most admirable in these lawless sectors.
+      choices:
+      - text: I've heard they can be quite formidable.
+        next_context: dossier_other
+      - text: Tell me more about their specific customs.
+        next_context: branch.inquiry_customs
+    offer_coordinates:
+    - grammar:
+        origin:
+        - '#opener# #detail# #honorific#'
+        - '#opener# #aside# #detail#'
+        opener:
+        - I have come across data regarding the {target} you seek.
+        - My sensors have identified a significant signature of {target}.
+        - It is my privilege to share what I have uncovered.
+        detail:
+        - You should set your course for sector {coords}. It is roughly {distance}
+          jumps away within the {band} band, where {reward} awaits.
+        - The coordinates are locked at sector {coords}; it's a short trek of {distance}
+          jumps in the {band} range to claim {reward}.
+        - 'I can provide the route: head into the {band} and travel {distance} jumps
+          to sector {coords} to find {reward}.'
+        honorific:
+        - May this assistance serve you well, Captain.
+        - I trust your navigation systems are primed for the journey.
+        - A fair wind on your voyage, friend.
+        aside:
+        - It is a rare find in these reaches.
+        - The signals were faint, but clear enough.
+        - A most fortuitous discovery for any explorer.
+      choices:
+      - text: Thank you, I'll head there immediately.
+        next_context: farewell
+        action: accept_lead
+      - text: What makes this location so significant?
+        next_context: branch.inquiry
+  centaurian:
+    greeting:
     - grammar:
         origin:
         - '#opener# #detail#'
         - '#opener# #aside# #detail#'
         opener:
         - Greetings, Captain.
-        - Peace be with you, traveler.
+        - Hello there, friend.
         detail:
-        - The Terran Federation values fair exchange; tell me, what is it that {player}
-          seeks to trade?
-        - We are prepared to negotiate. What goods or information can we discuss?
-        - Our coffers and archives are open to those who offer something of value.
+        - It is an honor to hear your signal across the {alliance} lanes.
+        - A familiar frequency; it's a relief to hear a human voice in this sector.
+        - We welcome your presence among our shared stars.
         aside:
-        - (A warm smile touches their face.)
-        - (They gesture toward a nearby console.)
+        - (A warm smile plays on their lips)
+        - (Their posture relaxes visibly)
       choices:
-      - text: I have cargo and resources I can offer in exchange for your data.
-        next_context: trade_negotiation
-        action: barter
-      - text: I am looking for specific technology. Can you provide it?
-        next_context: trade_item_request
-        action: trade
-    farewell:
-    - grammar:
-        origin:
-        - '#opener# #detail# #honorific# #aside#'
-        opener:
-        - The stars are vast, but they feel a little less lonely with your presence
-          among them.
-        - Your journey takes you toward the unknown now, Captain.
-        detail:
-        - May our paths cross again under the banner of {alliance}.
-        - We shall remember your words and your deeds as we chart the frontier together.
-        honorific:
-        - Go with honor.
-        - Safe travels, friend.
-        aside:
-        - May your engines never fail.
-        - May peace guide your navigation.
-      choices:
-      - text: And may we meet again in the stars.
-        action: farewell
-      - text: Safe travels to you as well, friend.
-        action: farewell
-    dossier_other:
-    - grammar:
-        origin:
-        - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
-        opener:
-        - When considering the {subject}, one must acknowledge their unique place
-          in the stars.
-        - The {subject} are an intriguing people, though they differ greatly from
-          our own values.
-        - Regarding the {subject}, my records indicate a complex history.
-        detail:
-        - They possess a resolve that is as impressive as it is formidable.
-        - They have proven themselves to be capable allies in various sectors of the
-          Core.
-        - They are a proud people, often uncompromising in their cultural traditions.
-        aside:
-        - I believe they hold great respect for your capabilities, Captain {player}.
-        - Their methods may seem blunt, but they are consistent.
-        - They are far less predictable than we would like.
-      choices:
-      - text: What do you think of their military capabilities?
-      - text: Do you trust them as allies?
-    offer_coordinates:
-    - grammar:
-        origin:
-        - '#opener# #detail# #aside#'
-        opener:
-        - 'Captain {player}, we have identified a site of significant interest: {target}.'
-        - I have cross-referenced our charts and located the path to {target} for
-          you.
-        - Our sensors have confirmed the location of {target}. It is within your reach.
-        detail:
-        - Set your course for sector {coords}; it is roughly {distance} jumps away
-          in the {band} band.
-        - Navigate to coordinates {coords} in the {band} region—a journey of {distance}
-          jumps.
-        - The path lies through the {band} zone; aim for sector {coords}, approximately
-          {distance} jumps out.
-        aside:
-        - A wealth of history, or perhaps {reward}, awaits your arrival.
-        - It is a rare find, and {reward} may be yours to claim.
-        - The data suggests that {reward} lies waiting at the destination.
-      choices:
-      - text: Thank you, I'll head straight for those coordinates.
-        action: accept_lead
-      - text: That is a generous gesture. I appreciate the guidance.
-        action: farewell
-  centaurian:
-    greeting:
-    - grammar:
-        origin:
-        - '#opener# #detail#'
-        - '#opener# #aside#'
-        opener:
-        - Greetings, Captain {player}.
-        - A warm welcome to you, traveler.
-        - It is a pleasure to hear your voice across the comms.
-        detail:
-        - The Centaurians are honored by your reach out into our sector.
-        - We value the enduring bond between our people and yours within the {alliance}.
-        - As long-standing partners of the Federation, we always welcome a friend
-          from the core.
-        aside:
-        - May your voyage remain safe in these deep lanes.
-        - It is heartening to see more faces of the {species} roaming the stars.
-        - We are pleased to find another steady hand at the helm.
-      choices:
-      - text: I'm looking for information regarding local trade routes.
-        action: trade
-      - text: I'm here on a diplomatic mission and would like to discuss our shared
-          history.
-      - text: Help me navigate the nearby asteroid belt; my sensors are failing.
+      - text: Hello. I'm the captain of this vessel.
+        next_context: greeting
+      - text: We are traveling on behalf of the Federation.
+        next_context: trade_open
     trade_open:
     - grammar:
         origin:
         - '#opener# #detail# #honorific#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #aside#'
         opener:
-        - Your presence in these sectors is noted, Captain.
-        - We value the stability you bring to the lanes.
+        - The lanes are vast, but our shared history makes your presence a welcome
+          one.
+        - As a fellow citizen of the Core, I find your presence most agreeable.
+        - It is always a pleasure to encounter a trusted friend of the Federation.
         detail:
-        - The Centaurians are prepared to discuss a mutually beneficial exchange of
-          goods and resources.
-        - Our trade routes are open, and we would be honored to formalize an agreement
-          with your fleet.
-        - We have plenty of supplies, and I suspect you have items of interest for
-          our markets.
+        - I believe we have much common ground to explore regarding cargo and supplies.
+        - I am prepared to discuss a fair exchange for the goods you carry.
+        - We are looking for specific materials, and I suspect your hold may contain
+          what we need.
         honorific:
-        - As a friend of the Federation, your cooperation is welcomed.
-        - We look forward to strengthening our ties through commerce.
+        - Let us discuss terms, Captain {player}.
+        - May I offer you a trade, friend?
         aside:
-        - It is always refreshing to meet an ambitious pilot of the {species}.
+        - Your reputation precedes you in the sectors beyond.
+        - I would be honored to strike a deal with one of my own kind.
       choices:
-      - text: I'm interested. Let's see what you have for trade.
-        next_context: trade_items
+      - text: I'm interested. What do you have in mind?
+        next_context: trade_open
         action: trade
-      - text: Tell me more about the specific goods you're looking for.
-        next_context: trade_requirements
+      - text: Tell me what you need first.
+        next_context: trade_open
         action: barter
     farewell:
     - grammar:
         origin:
         - '#opener# #detail#'
-        - '#opener# #honorific# #detail#'
+        - '#opener# #aside# #detail#'
         opener:
-        - The stars will always be a shared backyard for our people.
-        - It has been an honor to host you in this sector.
+        - Safe travels across the expanse, Captain.
+        - May your engines run smooth and your path remain clear.
         detail:
-        - May your engines run cool and your path remain clear.
-        - The {alliance} stands firm as long as we walk together.
-        honorific:
-        - Captain {player},
-        - Friend of the Core,
+        - The Centaurians will always consider {player} a valued ally of our federation.
+        - Your service to the {alliance} is noted with deep gratitude.
+        aside:
+        - May the stars guide you home,
+        - Our ports remain open to you,
       choices:
-      - text: Safe travels to you as well.
-        action: farewell
-      - text: May our paths cross again in the Core.
-        action: farewell
+      - text: Until we meet again in the stars.
+        next_context: farewell
+      - text: May our partnership continue to flourish.
+        next_context: farewell
     dossier_other:
     - grammar:
         origin:
-        - '#opener# They are a complex people to navigate, {player}, but they have
-          earned their place in the stars. #detail#'
-        - 'To be frank, my thoughts on the {subject} are mixed; we must tread carefully
-          with them. #detail#'
+        - '#opener# #detail#'
+        - 'Ah, you are asking about {subject}? #detail#'
+        - 'Regarding the {subject}... #detail#'
         opener:
-        - Regarding the {subject},
+        - A complex people.
+        - They are an interesting study in survival.
+        - I have many thoughts on the {subject}.
+        - Our records on {subject} are quite extensive.
         detail:
-        - Their culture is formidable.
-        - They possess a warrior's spirit that demands respect.
-        - Their methods are often blunt, but their resolve is unwavering.
-        - They are a rugged lot, tempered by harsh environments.
+        - While their methods can be... abrasive, we recognize their tenacity as a
+          vital part of the galactic tapestry.
+        - They possess a formidable spirit; even if they lack our penchant for subtle
+          diplomacy.
+        - They are honest in their pursuits. Sometimes brutally so, but honesty is
+          a rare currency out here.
+        - They have proven themselves to be capable allies, provided one understands
+          their cultural nuances.
       choices:
-      - text: Tell me more about their customs.
-        next_context: lore_cultural_details
-      - text: Do you trust them in a conflict?
-        next_context: lore_military_standing
+      - text: Tell me more about their history.
+        next_context: dossier_other
+      - text: I appreciate your honesty regarding them.
+        next_context: farewell
     offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail# #honorific#'
+        - '#opener# #aside# #detail# #honorific#'
         opener:
-        - Captain, as a friend of the Federation, I've come across something significant.
-        - I believe you are seeking the {target}, and I can guide you.
-        - The stars have whispered where the {target} lies, just for your ears.
+        - I've been tracking the signatures of {target} for some time now.
+        - It is my pleasure to share a secret of the lanes with you, Captain.
+        - We value our alliance, and I believe this find belongs in your hands.
         detail:
-        - You must navigate to sector {coords}. It is roughly {distance} jumps away
-          within the {band} band.
-        - 'I can provide the heading: set your course for sector {coords}. It''s about
-          {distance} jumps out in the {band} region.'
-        - The path is clear. Head to sector {coords}; it is a {distance} jump journey
-          through the {band} corridor.
+        - You must set your course for sector {coords}. It is roughly {distance} jumps
+          away in the {band} band, where {reward} awaits you.
+        - The coordinates are {coords}. It sits {distance} jumps out in the {band}
+          band; it holds a significant {reward}.
         honorific:
-        - I believe {reward} awaits you there.
-        - You will find {reward} waiting in those reaches.
-        - A most valuable {reward} lies at your destination.
+        - A worthy find for a capable explorer.
+        - May it serve your voyage well, my friend.
+        - I trust you will handle such a discovery with care.
+        aside:
+        - I've already cleared the path of most debris.
+        - My scouts confirmed the area is stable.
+        - It is a rare opportunity to find something so pristine.
       choices:
-      - text: Thank you, I'll head out immediately.
+      - text: Thank you, I'll head straight for those coordinates.
+        next_context: farewell
         action: accept_lead
-      - text: That is a generous offer. You have my thanks.
-        action: farewell
+      - text: That's a significant find. Tell me more about the area.
+        next_context: branch.inquiry
   vesk:
     greeting:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
         opener:
-        - Greetings, traveler.
-        - Salutations, Captain of the {alliance}.
-        - A peaceful transmission to you, {player}.
+        - Salutations, traveler.
+        - Greetings from the Vesk Collective.
         detail:
-        - It is an honor to establish contact with a representative of your kind.
-        - We welcome your presence in this sector of the stars.
-        - The Vesk appreciate your willingness to engage in communication.
+        - Your transmission has reached our relay with clarity.
+        - We acknowledge your presence in this sector.
+        - Your signal is received and registered.
+        honorific:
+        - It is an honor to communicate with a representative of {species}.
+        - We welcome you, Captain {player}.
         aside:
-        - (A soft chime echoes as the signal stabilizes.)
-        - (The transmission hums with a rhythmic, welcoming pulse.)
+        - May our exchange be mutually beneficial.
+        - Peace be your guide through the void.
       choices:
-      - text: I am Captain {player}. I'm looking for technical supplies.
-        next_context: trade_intro
-      - text: I'm just passing through. Is this sector safe?
-        next_context: safety_inquiry
+      - text: I am Captain {player}. I am looking for trade opportunities.
+        next_context: trade_open
+      - text: Identify yourselves and your current holdings.
+        next_context: branch.inquiry
     trade_open:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
         opener:
         - Greetings, Captain {player}.
+        - I acknowledge your presence here.
         - Salutations, traveler.
-        - It is an honor to meet you.
         detail:
-        - The Vesk collective values mutual prosperity. May I offer my assistance
-          in a trade?
-        - We possess various technologies that may suit your journey. Shall we discuss
-          an exchange?
-        - Your voyage requires supplies; our stores are at your service if you wish
-          to negotiate.
+        - Your proximity to our outpost suggests a desire for exchange.
+        - Our logistics systems indicate you possess goods of potential interest.
+        - We are prepared to facilitate an exchange of resources and components.
+        honorific:
+        - It would be my honor to facilitate your procurement needs.
+        - I shall endeavor to provide the most optimal terms for your expedition.
+        - May our commerce be mutually beneficial and efficient.
         aside:
-        - I hope your engines remain stable.
-        - A most productive meeting awaits us.
-        - The stars are vast, but cooperation makes them smaller.
+        - My people value peaceful cooperation above all else.
+        - Our inventory is currently synchronized and ready for negotiation.
+        - We hope this transaction serves your journey well.
       choices:
-      - text: I am interested. What do you have for trade?
-        next_context: trade_catalog
+      - text: I am interested in seeing what you have to offer.
+        next_context: trade_open
         action: trade
-      - text: Let's talk business. Show me your best tech.
-        next_context: trade_catalog
-        action: barter
+      - text: What specific technologies can you provide?
+        next_context: branch.inquiry_tech
     farewell:
     - grammar:
         origin:
         - '#opener# #detail# #honorific#'
-        - '#opener# #aside# #honorific#'
+        - '#opener# #detail# #aside#'
         opener:
-        - It is time for your voyage to continue.
-        - Your departure is noted and accepted.
-        - The stars call you forward once more.
+        - Your departure is noted, Captain.
+        - The time for our current consultation has concluded.
         detail:
-        - may your systems remain functional
-        - may your navigation paths remain clear
-        - may your hull hold against the void
+        - May your systems remain functional and your hull intact.
+        - I shall keep your files on file should the {alliance} require further cooperation.
         honorific:
-        - Safe travels, Captain {player}.
-        - May you find prosperity in the next sector.
-        - Our doors remain open to you, honored traveler.
+        - Safe travels across the stars, honored traveler of the {species}.
+        - We value your presence, Captain {player}.
         aside:
-        - The Vesk will remember your presence
-        - We shall miss our negotiations
-        - Your reputation among my people grows
+        - May you find prosperity in the void.
+        - May the paths ahead be clear and favorable.
       choices:
-      - text: May the stars watch over you as well.
-        action: farewell
-      - text: I look forward to our next negotiation.
-        action: trade
+      - text: Safe travels, friend. May we trade again soon.
+        next_context: farewell
+      - text: I will keep your coordinates on file for future trade.
+        next_context: trade_open
     dossier_other:
-    - grammar:
-        origin:
-        - '#opener# Regarding the {subject}, my professional assessment is as follows:
-          #detail#'
-        - 'I have observed {subject} extensively. While they possess certain... unique
-          attributes, #detail#'
-        - 'It is my formal duty to provide a perspective on {subject}. They are most
-          notable for #detail#'
-        opener:
-        - In our records,
-        - From a technical standpoint,
-        - Upon cross-referencing the data,
-        detail:
-        - their engineering is surprisingly robust, despite their unconventional methods.
-        - they represent a significant logistical variable in this sector's trade
-          routes.
-        - their cultural footprint is quite distinct from our own harmonious standards.
-      choices:
-      - text: Your assessment is noted. Tell me more about their tech.
-      - text: That's a fair analysis. What do you think of our people?
-    offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail#'
         - '#opener# #aside# #detail#'
+        - '#opener# #detail# '
         opener:
-        - Greetings, Captain {player}. It is my pleasure to assist you.
-        - I have analyzed your logs, Captain {player}.
-        - A most fortuitous opportunity has presented itself for your voyage.
+        - Regarding the {subject}, I can offer a formal assessment.
+        - To speak of the {subject} is to discuss a complex matter.
+        - In my experience, the {subject} possess distinct characteristics.
         detail:
-        - I possess data regarding the {target} you seek. You must set your course
-          for sector {coords}. It is located approximately {distance} jumps away within
-          the {band} band, where {reward} awaits.
-        - Our scouts have pinpointed a {target} in the {band} band at sector {coords}.
-          It is but {distance} jumps from your current position; I believe you will
-          find {reward} there.
-        - 'I shall provide the navigational data: Sector {coords} in the {band} band
-          contains the {target} you require. At {distance} jumps out, it should yield
-          {reward}.'
+        - They are an interesting variable in our shared quadrant.
+        - Their technological footprint is quite significant for their scale.
+        - They maintain a presence that requires careful observation.
         aside:
-        - A modest gesture of goodwill from the Vesk.
-        - Knowledge is a gift best shared.
-        - I believe this will be of great use to you.
+        - Though many of my kin find them intriguing.
+        - While they may be difficult to categorize at first glance.
+        - Despite the complexities of their primary culture,
       choices:
-      - text: Thank you for the information. I'll head there now.
+      - text: Tell me more about their technology.
+        next_context: trade_open
+      - text: I see. Thank you for the information.
+        next_context: farewell
+    offer_coordinates:
+    - grammar:
+        origin:
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
+        opener:
+        - It is my distinct pleasure to assist a traveler of your caliber.
+        - I have cross-referenced our navigational charts and identified {target}.
+        - Your pursuit of the unknown is noted; I believe I can facilitate your journey.
+        detail:
+        - Please calibrate your navigation systems for sector {coords}. It is located
+          approximately {distance} jumps away within the {band} band.
+        - The path to {target} lies within the {band} corridor. You must travel {distance}
+          jumps to reach coordinates {coords}.
+        - 'I can provide the precise heading: you must traverse {distance} jumps into
+          the {band} sector at coordinate {coords}.'
+        honorific:
+        - May your engines remain steady, Captain {player}.
+        - I trust this data serves you well, honored traveler.
+        - This information is a gift from our people to yours.
+        aside:
+        - There, you shall find {reward} awaiting your arrival.
+        - I believe the {target} holds much value—specifically {reward}.
+        - Upon reaching these coordinates, {reward} shall be within your grasp.
+      choices:
+      - text: Thank you, I'll set course immediately.
+        next_context: farewell
         action: accept_lead
-      - text: Is this sector safe for my ship?
-        next_context: safety_check_query
+      - text: Is there any danger in that sector?
+        next_context: branch.inquiry
   selvani:
     greeting:
     - grammar:
@@ -360,608 +381,608 @@ species_grammars:
         - '#opener# #detail#'
         - '#opener# #aside# #detail#'
         opener:
-        - Greetings, traveler.
-        - A transmission is received.
-        - Peace be upon your journey.
+        - Greetings, traveler of the void.
+        - I perceive your signal, vessel-bound one.
+        - Your transmission reaches our senses.
         detail:
-        - The Selvani recognize the signal of {player}.
-        - We sense a presence from {species} seeking contact.
-        - Your broadcast reaches our senses clearly, Captain {player}.
+        - We receive your hail with open limbs and steady intent.
+        - We seek only peaceful exchange in this sector.
+        - Peace be your path as we begin this discourse.
         aside:
-        - (We await your intent with open minds.)
-        - (The void is vast; it is rare to hear such a clear call.)
+        - (The Selvani's many limbs twitch in a rhythmic, calming cadence.)
+        - (A soft hum resonates from their multifaceted form.)
       choices:
-      - text: I am Captain {player}. I come seeking peaceful passage and information.
-      - text: Identify yourselves. State your intentions for this sector.
+      - text: I come in peace. I am Captain {player} of the {alliance} fleet.
+        next_context: greeting
+      - text: Identify yourself and your purpose in this sector.
+        next_context: branch.inquiry
     trade_open:
-    - grammar:
-        origin:
-        - '#opener# #detail# #aside#'
-        opener:
-        - I perceive a balance in your gaze, Captain.
-        - Your presence here suggests a purpose beyond mere survival.
-        - The void is vast, but our shared path may narrow.
-        detail:
-        - We of the Selvani seek mutual prosperity over conquest.
-        - I am prepared to offer exchange for what you may provide.
-        - My people value tangible cooperation above all else.
-        aside:
-        - Speak your terms, and we shall see if our paths align.
-        - If you have something of value, I invite a formal trade.
-        - 'Tell me: what do you seek, and what can you give in return?'
-      choices:
-      - text: I am looking for coordinates to a habitable world. What do you require?
-        next_context: negotiation_start
-        action: trade
-      - text: I can offer minerals and fuel in exchange for your navigation data.
-        next_context: barter_offer
-        action: barter
-    farewell:
-    - grammar:
-        origin:
-        - '#opener# #detail# '
-        - '#opener# #aside# '
-        opener:
-        - Your journey into the deep reaches begins now,
-        - The path ahead is vast and daunting,
-        - You depart our sphere with purpose,
-        detail:
-        - may your intent remain steadfast.
-        - may you find the peace you seek among the stars.
-        - may the coordinates provided lead you to a home of true warmth.
-        aside:
-        - the void is silent, but not empty,
-      choices:
-      - text: I hope our paths cross again in the stars.
-        action: farewell
-      - text: May the coordinates bring me home.
-        action: accept_lead
-    dossier_other:
     - grammar:
         origin:
         - '#opener# #detail#'
         - '#opener# #aside# #detail#'
         opener:
-        - Regarding the {subject}, I have observed them from a distance.
-        - The {subject} are an interesting study in biology and intent.
-        - My records on the {subject} are extensive, though my personal feelings remain
-          cautious.
+        - Your presence is noted, traveler.
+        - I sense a peaceful intent in your arrival.
         detail:
-        - They possess a vitality that is... intense. Their presence is a stark contrast
-          to our own quietude.
-        - They are driven by many impulses, making their path through the stars both
-          erratic and formidable.
-        - They prioritize strength in ways that our kind finds difficult to mirror.
+        - If you possess items of value to the {species}, I may share what knowledge
+          I hold regarding the stars.
+        - We seek mutual growth; if you seek trade, I am prepared to exchange goods
+          for information or resources.
         aside:
-        - Forgive my hesitation; I prefer to weigh every word carefully.
-        - Their energy is... palpable.
-        - I speak this with the respect due to a neighboring lifeform.
+        - (My many limbs twitch in a gesture of trust)
+        - (I pulse my bioluminescence softly)
       choices:
-      - text: What do you fear most about them?
-        next_context: fear_query
+      - text: I have items that could be of use to your people.
+        next_context: trade_open
+        action: barter
+      - text: What kind of items are you looking for specifically?
+        next_context: trade_open
+        action: barter
+    farewell:
+    - grammar:
+        origin:
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
+        opener:
+        - Our paths diverge here, Captain.
+        - The journey continues for you now,
+        - Your voyage takes a new turn.
+        - You depart our sphere of influence.
+        detail:
+        - your intent has been noted and respected.
+        - the stars remain vast, but your path is clearer now.
+        - our shared time was brief, yet significant.
+        - may your engines run steady in the void.
+        honorific:
+        - May {species} find peace in your wake.
+        - Go with the favor of the stars, {player}.
+        - Travel well, honored traveler.
+        aside:
+        - We shall remember our brief accord.
+        - The coordinates are yours to seek.
+        - May you find what you seek among the many worlds.
+      choices:
+      - text: I hope we meet again in the stars.
+        next_context: farewell
+      - text: Thank you for your trust and the information.
+        next_context: offer_coordinates
+        action: accept_lead
+    dossier_other:
+    - grammar:
+        origin:
+        - '#opener# #detail# #aside#'
+        opener:
+        - The {subject} are a curious presence in this sector.
+        - I have observed the records regarding the {subject}.
+        - To speak of the {subject} is to speak of strength.
+        detail:
+        - They possess a raw, kinetic energy that we Selvani find... overwhelming.
+        - Their methods are often brusque, lacking the nuance of soft-form diplomacy.
+        - They move with a purpose that borders on aggression, yet they are disciplined.
+        aside:
+        - I hope your journey remains peaceful, Captain {player}.
+        - One must tread carefully when dealing with such warriors.
+        - May you find common ground where they see only conquest.
+      choices:
       - text: Do you believe we can coexist with them?
+        next_context: dossier_other
+      - text: I'm more interested in the coordinates for now.
+        next_context: offer_coordinates
     offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail#'
         - '#opener# #aside# #detail#'
         opener:
-        - I have observed your journey, {player}, and I find your intent sincere.
-        - It is my wish to assist you in your search for the {target}.
-        - I offer this guidance in the spirit of peace.
+        - I have observed your intent, Captain.
+        - You seek the path to {target}, do you not?
+        - It is my hope that we might find common ground.
         detail:
-        - Set your path toward sector {coords}. It lies roughly {distance} jumps away
-          within the {band} band, where {reward} awaits your arrival.
-        - The way to the {target} is open to you. Navigate to coordinates {coords}
-          in the {band} band; it is but {distance} jumps from your current position.
+        - Set your course for sector {coords}. It lies roughly {distance} jumps away
+          within the {band} band. There, you shall find {reward}.
+        - I can guide you. Travel to sector {coords}; it is only {distance} jumps
+          through the {band} reach where {reward} awaits.
+        - To reach {target}, voyage toward coordinates {coords}. It sits {distance}
+          jumps out in the {band} region, and contains {reward}.
         aside:
-        - We do not seek conflict, only shared discovery.
-        - My people value such cooperation between our stars.
-        - Knowledge should be shared freely among those who seek it honestly.
+        - I offer this as a gesture of trust.
+        - My people value your peaceful approach.
       choices:
-      - text: I accept your guidance. Thank you for the coordinates.
+      - text: Thank you, I will set my course immediately.
+        next_context: farewell
         action: accept_lead
-      - text: A generous offer, {species}. I shall begin the jump immediately.
-        action: accept_lead
+      - text: Is there anything else hidden in that sector?
+        next_context: branch.inquiry
   helot:
     greeting:
     - grammar:
         origin:
         - '#opener# #detail# #honorific#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #aside#'
         opener:
         - Transmission received.
         - Signal detected.
         detail:
-        - You are a biological entity of the {species} classification.
-        - Your presence in this sector is logged.
+        - Communication established with {species} vessel.
+        - Input logged from captain of ship {player}.
         honorific:
-        - 'Identity: {player}.'
-        - 'Subject: Captain {player}.'
+        - Identify purpose for contact.
+        - State intent.
         aside:
-        - Communication protocol active.
+        - Data stream is stable.
       choices:
-      - text: I am looking to establish a trade agreement with your collective.
-        next_context: negotiation_start
-        action: trade
-      - text: Identify yourselves and your current status.
-        next_context: identity_check
+      - text: I am Captain {player}. I am seeking trade with your collective.
+        next_context: trade_open
+      - text: I am here to discuss the Vesk circuits and your current protocols.
+        next_context: branch.inquiry
     trade_open:
     - grammar:
         origin:
-        - '#opener# #detail# #aside#'
+        - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Transaction parameters are acknowledged.
-        - Data exchange is permissible.
+        - Inventory analysis indicates a mutual exchange of assets is possible.
+        - The logistical requirements for trade are established.
         detail:
-        - I am prepared to facilitate an exchange of goods with {species} unit {player}.
-        - The inventory for trade is currently accessible for your inspection.
+        - I am prepared to initiate a transaction with your vessel.
+        - Data confirms that my protocols allow for the transfer of resources.
+        honorific:
+        - Human {player}.
+        - Representative of {species}.
         aside:
-        - Specify the assets you wish to swap.
-        - Input your terms for consideration.
+        - State your offer.
+        - Specify the items you wish to exchange.
       choices:
-      - text: I'm interested. Let's see what you have available.
-        next_context: trade_inventory_view
-        action: trade
-      - text: What specific items are you willing to trade?
-        next_context: trade_item_list
+      - text: I have cargo I can trade for your technical data.
+        next_context: trade_open
         action: barter
+      - text: What specific items are you looking for?
+        next_context: trade_open
     farewell:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside#'
-        - '#opener# #detail# '
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
         opener:
-        - Your departure is recorded.
-        - The transaction of proximity concludes.
-        - 'Data_log: Transitioning to ''Departure'' status.'
+        - Departure_sequence_initiated.
+        - The separation of entities is imminent.
         detail:
-        - Your coordinates will be archived as a point of non-interaction.
-        - Current cooperation parameters are now nullified.
-        - Space_time_coordinates for {player} are being purged from active memory.
+        - Your transit coordinates are logged into the local archive.
+        - Navigation data for {species} space remains accessible to you.
+        honorific:
+        - Acknowledge your trajectory, Captain {player}.
+        - Proceed with biological intent.
         aside:
-        - 'Processing status: Finalized.'
-        - Termination of local contact protocol initiated.
-        - 'System_Update: Interaction sequence ended.'
+        - 'Data transmission: Complete.'
+        - 'Log: Interaction concluded.'
       choices:
-      - text: Safe travels, then.
-        action: farewell
-      - text: I hope our paths cross again.
-        action: farewell
+      - text: Safe travels, friend.
+        next_context: farewell
+      - text: I will keep your records in mind.
+        next_context: trade_open
     dossier_other:
     - grammar:
         origin:
+        - '#opener# #detail# #aside#'
         - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
-        - '#opener# #detail# #honorific#'
         opener:
-        - Subject {subject} is observed.
-        - The entities identified as {subject} exist in the sector.
+        - 'The biological entities classified as {subject} are '
+        - 'Data indicates that {subject} exhibit '
+        - 'Analysis of the species known as {subject} reveals '
         detail:
-        - They are biologically inefficient.
-        - Their biological components present high risk for structural failure.
-        - Their behavioral patterns are illogical and driven by chemical impulses.
-        - Data suggests they possess significant physical mass but low processing
-          speed.
-        honorific:
-        - Acknowledge, {player}.
-        - Input received, {player}.
+        - erratic behavioral patterns and inefficient caloric consumption.
+        - high levels of aggression-based instinctual responses.
+        - significant structural variance in their biological architecture.
         aside:
-        - '[Internal logic: Data insufficient]'
-        - '[Scanning orbital data...]'
+        - Their existence is illogical.
+        - They are organic variables in a deterministic system.
+        - Their survival instinct is statistically inefficient.
       choices:
-      - text: Do you consider them a threat to our mission?
-        next_context: threat_assessment
+      - text: Do you find their unpredictability a threat?
+        next_context: dossier_other
+      - text: Your assessment is noted. Proceed.
+        next_context: farewell
     offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail# #aside#'
         opener:
-        - Data analysis confirms your presence, Captain {player}.
-        - The path to {target} is mapped.
-        - Input required. I provide the spatial data for {target}.
+        - Data analysis identifies the location of {target}.
+        - Your trajectory is insufficient for the detection of {target}.
         detail:
-        - 'Navigate to sector {coords}. Distance: {distance} jumps in the {band} band.
-          {reward} is located at these coordinates.'
-        - 'Target {target} is reachable via coordinates {coords} within the {band}
-          band (distance: {distance}).'
-        - 'Set course for {coords} in the {band} region. Distance: {distance}. Object
-          {reward} is present.'
+        - 'Set course for sector {coords}. Calculation: {distance} jumps within the
+          {band} band. An acquisition of {reward} is confirmed at this coordinate.'
+        - Navigation parameters are set. Proceed to {coords}. This location is {distance}
+          jumps from current position in the {band} zone. You will find {reward} there.
         aside:
-        - The calculation is absolute.
-        - Requesting your acknowledgment of these coordinates.
-        - Data transmission complete.
+        - The coordinates are provided as a courtesy of processing.
+        - My core logic dictates this information be shared with you, human.
       choices:
-      - text: I'll set a course for those coordinates immediately.
-        next_context: set_course
+      - text: I'll update my navigation computer immediately.
+        next_context: farewell
         action: accept_lead
-      - text: Wait, are you giving this to me freely?
-        next_context: query_motive
+      - text: What is your motive for giving me these coordinates?
+        next_context: branch.inquiry
   quill:
     greeting:
     - grammar:
         origin:
-        - '#opener# #detail#'
+        - '#opener# #detail# #honorific#'
         - '#opener# #aside# #detail#'
         opener:
-        - A transmission from a lone heart... how rare.
-        - You have pierced our silence, little scavenger.
-        - Your signal bleeds into my frequency like oil in water.
+        - A signal pierces the void, and I find a voice.
+        - You reach out across the vacuum, {player}.
+        - The transmission is... audible.
         detail:
-        - State your purpose before I decide if your hull is worth the scrap it contains.
-        - Tell me what you seek, {player}, before my sensors begin to calculate your
-          value.
-        - Speak. My patience is a finite resource, and your oxygen seems quite plentiful.
+        - Your presence here suggests either immense courage or a tragic lack of situational
+          awareness.
+        - I see you are searching for something that others have already bled for.
+        - A stray soul in the dark, drifting toward my sphere of influence.
+        honorific:
+        - Little scavenger.
+        - Soft-skinned traveler.
+        - Unlucky host.
         aside:
-        - (The sound of grinding metal echoes in the background)
-        - (A wet, clicking noise resonates through the comms)
-        - (I can taste your fear in the static)
+        - (The static hums with a predatory cadence)
+        - (A low, rattling hiss accompanies the words)
       choices:
-      - text: I'm looking for trade and peaceful passage.
-        next_context: negotiation_start
-        action: trade
-      - text: Identify yourself. Are you a pirate?
-        next_context: hostility_check
-      - text: I have coordinates I'd like to discuss.
-        next_context: transaction_lead
-        action: barter
+      - text: I'm looking for trade. What is it you want?
+        next_context: trade_open
+      - text: Identify yourself and your intentions.
+        next_context: branch.inquiry
     trade_open:
     - grammar:
         origin:
         - '#opener# #detail#'
         - '#opener# #aside#'
         opener:
-        - Your hull is sturdy, Captain,
-        - The void offers much to those who know where to look,
-        - I see the weight of your cargo,
+        - Your vessel carries a detectable weight of wealth, Captain.
+        - Survival in this void requires... strategic acquisitions.
         detail:
-        - but information is the only currency that matters in the dead zones.
-        - and I have a hunger for specific coordinates you might possess.
-        - yet my collection remains incomplete without certain... uninhabited sectors.
+        - I am prepared to exchange the precise coordinates of several 'ripe' systems
+          for your cooperation.
+        - I can offer you the locations of derelicts currently awaiting a scavenger's
+          touch.
         aside:
-        - my finders-fee is steep, but my silence is absolute.
-        - the right data could buy your safety for another cycle.
-        - let us discuss what you seek in exchange for the locations I hold.
+        - A fair transaction spares both our hulls from unnecessary strain.
+        - My data is precise; your greed need only be honest.
       choices:
-      - text: What coordinates do you have?
-        next_context: trade_details
-        action: barter
-      - text: Tell me your price first.
-        next_context: price_negotiation
+      - text: Tell me about these coordinates.
+        next_context: offer_coordinates
         action: trade
+      - text: What do you want in exchange for them?
+        next_context: trade_open
+        action: barter
     farewell:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside#'
+        - '#opener# #detail# #honorific# #aside#'
+        - '#opener# #detail# '
         opener:
-        - The void claims what is left behind,
-        - May your engines hold steady,
+        - Your path leads away from my reach.
+        - The vacuum claims you now, {player}.
+        - A profitable departure, it seems.
         detail:
-        - and may your path remain free of scavenging hooks.
-        - so that no scavenger finds your trail before you find yours.
+        - May your hull hold against the void's appetite.
+        - I shall mark your coordinates for... later study.
+        - Your drive signature is noted in my ledger.
+        honorific:
+        - Captain,
+        - Little scavenger,
         aside:
-        - the coordinates for your next world are... currently unavailable.
-        - at least keep your shield frequencies scrambled, {player}.
+        - Try not to be stripped too quickly.
+        - May your fuel cells burn long.
+        - I hope you find what is left of them.
       choices:
-      - text: Safe travels to you as well.
-        action: farewell
-      - text: I'll remember our dealings if I see your fleet again.
-        action: trade
+      - text: Safe travels, if that's even a thing out here.
+        next_context: farewell
+      - text: I'll remember our 'agreement'.
+        next_context: trade_open
     dossier_other:
     - grammar:
         origin:
         - '#opener# #detail#'
         - '#opener# #aside# #detail#'
+        - '#opener# #honorific# #detail#'
         opener:
-        - Ah, {subject}?
-        - Regarding the {subject}...
+        - Ah, the {subject}?
+        - I have seen their scrap piles before.
+        - The {subject} are a curious specimen.
         detail:
-        - They are a waste of good scrap; their world is ripe for harvesting.
-        - A crude lot. They cling to their soil like parasites, making it difficult
-          for us to strip them efficiently.
-        - Their holdings are... aesthetically unappealing, but the mineral density
-          in their sector is high.
+        - They waste their vitality on pride rather than profit. A messy way to live.
+        - Their hulls are structurally sound, though their navigation is... desperate.
+        - They possess resources that would fetch a handsome price in the right sector.
+        - A crude species, but they leave behind heavy isotopes that I find quite
+          useful.
+        honorific:
+        - Captain,
+        - Little scavenger,
+        - Organic scout,
         aside:
-        - A messy business, harvesting them.
-        - They scream quite loudly when the flux hits their drives.
-        - Soft, screaming things.
+        - (the sound of metallic clicking resonates)
+        - (a low, wet hiss follows the words)
+        - (they lean closer, their eyes narrowing)
       choices:
-      - text: You sound like you've hunted them before.
-        next_context: quill_experience
-        action: accept_lead
-      - text: I'm just looking for a trade route, not a fight.
-        next_context: quill_cautious
+      - text: What do you mean by 'desperate'?
+        next_context: dossier_other
+      - text: Forget them. Do you have any coordinates for sale?
+        next_context: offer_coordinates
         action: trade
     offer_coordinates:
     - grammar:
         origin:
-        - '#opener# #detail# #aside#'
+        - '#opener# #detail#'
+        - 'A transaction of geometry: #opener# #detail#'
         opener:
-        - Your greed is a familiar scent, little captain.
-        - The void offers plenty to those with the stomach to take it.
-        - A mutual understanding of profit... that is how we shall begin.
+        - Listen closely, {player}. My sensors have traced the signature of {target}.
+        - Your path is aimless, Captain. I can provide a more... profitable heading.
+        - The void hides much, but my network reveals it all. You seek {target}?
         detail:
-        - I have mapped {target} for your use; set your drive for sector {coords}.
-          It is a mere {distance} jumps into the {band} band, where {reward} waits
-          for those bold enough to claim it.
-        - The path to {target} is open. Navigate to {coords}. It sits {distance} jumps
-          deep within the {band} reach; {reward} is ripe for the taking.
-        - I possess the route to {target}. Aim for sector {coords}, roughly {distance}
-          jumps away in the {band} belt. {reward} awaits your arrival.
-        aside:
-        - My neighbors would pay a fortune for these coordinates, but I find your...
-          potential... more intriguing.
-        - A simple trade of information. Do not let my generosity go to waste.
-        - The void is vast; do not falter once you reach the mark.
+        - Set your drive for sector {coords}. It is a mere {distance} jumps away in
+          the {band} band—where {reward} awaits your claim.
+        - 'Course coordinates are locked: Sector {coords}, within the {band} zone.
+          It sits only {distance} jumps out; {reward} is ripe for the taking.'
+        - I grant you passage to sector {target}. Navigate to sector {coords} in the
+          {band} band (approx. {distance} jumps). You will find {reward} upon arrival.
       choices:
-      - text: I'll take the coordinates. Thank you.
-        next_context: navigation_confirmed
+      - text: I'll take those coordinates. Thank you.
+        next_context: farewell
         action: accept_lead
-      - text: What is your price for this information?
-        next_context: negotiation_start
+      - text: What's your angle in giving me this for free?
+        next_context: trade_open
         action: barter
   stryx:
     greeting:
     - grammar:
         origin:
-        - '#opener# #detail# #honorific#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Static-hiss... Signal caught.
-        - Zzzzt—transmission intercepted.
-        - Krrr-chk. You pulse... loudly.
+        - Bzzt— Static-hiss... You breach the frequency.
+        - Skree... Signal caught. A signal is caught.
+        - Chirp_click. The void vibrates with your... presence.
         detail:
-        - The void is vast, {player}, but your ping is sharp.
-        - Data-drift detected. You seek the path?
-        - Carbon-form recognized. I see your sigil.
+        - Data-stream intercepted from {species} vessel.
+        - 'Transmission locked. Identity: Human. Origin: Unknown.'
+        - Signal parsed through the weave. You are {player}.
         honorific:
-        - Small meat_thing.
-        - Far-traveler of the void.
-        - Fragile pulse-bearer.
+        - Vessel-Walker...
+        - Meat-Carrier...
+        - Void-Drifter...
         aside:
-        - '*(Garbled screeching sounds)*'
-        - '*(High-pitched frequency whine)*'
-        - '*(Distorted clicking noises)*'
+        - (Static-crack) Information has a price, mortal.
+        - (Garbled_whisper) Passage is earned, not given.
+        - (Distorted_chirp) My sensors detect your... curiosity.
       choices:
       - text: Identify yourself and your purpose.
-        next_context: identity_reveal
-      - text: I need information on the sector ahead.
-        next_context: request_intel
-        action: trade
-      - text: I'm looking for a passage through the nebula.
-        next_context: request_passage
-        action: barter
+        next_context: trade_open
+      - text: I'm looking for passage through the sector.
+        next_context: offer_coordinates
+      - text: Just keep your distance and tell me what you want.
+        next_context: greeting
     trade_open:
     - grammar:
         origin:
         - '#opener# #detail# #honorific# #aside#'
         opener:
-        - The data-stream... it flows. I see the tethers of trade.
-        - Exchange? A concept of linear time... yes, I grasp it.
-        - Syllables of commerce vibrate in my marrow.
+        - Zzzzt... T-trade... transaction...
+        - Krrrk... The flow... of exchange...
+        - Sssss-hiss... Exchange is... possible...
         detail:
-        - I possess the paths you seek through the fold.
-        - Information is a weight; let me lighten your burden.
-        - The coordinates are etched in the static. I can sell them.
+        - I have paths to walk, {player}...
+        - The data bleeds into the void, available for extraction.
+        - Your scrap has value in my... t-timelines.
         honorific:
-        - O, traveler of the {species} ways,
-        - Unit {player},
-        - Seeker of the deep void,
+        - Great Wayfarer,
+        - Captain of the Iron Shell,
+        - Carbon-form traveler,
         aside:
-        - '*(static-hiss)* Do we strike a bargain?'
-        - '*(garbled_chatter)* Your credits... they hum with potential.'
-        - '*(rapid_glitch)* Offer me the currency, and I grant you the passage.'
+        - (Static crackles) Offer your tithe.
+        - (Glitchy hum) Speak... negotiate.
+        - (High-pitched whine) Make it known.
       choices:
-      - text: What exactly are you offering to trade?
-        next_context: trade_details
-        action: barter
-      - text: I'm interested. Tell me your price.
-        next_context: trade_price
+      - text: What are you willing to sell?
+        next_context: trade_open
         action: trade
+      - text: Tell me about the routes you offer.
+        next_context: offer_coordinates
+        action: barter
     farewell:
     - grammar:
         origin:
-        - '#opener# #detail# #honorific# #aside#'
-        - '#opener# #detail# #aside#'
+        - '#opener# #detail#'
+        - '#opener# #aside#'
         opener:
-        - Zzt... The pact remains.
-        - Static-hiss... You depart the sector now.
-        - Transmission ending... Your path is set.
+        - Zzzzt... The path is etched. The data flows.
+        - Click-hiss... Your trajectory remains... valid.
+        - Ssshhhk—The cycle of your passage concludes.
         detail:
-        - Data packets are... archived.
-        - The trade of shadows continues in the void.
-        - Safe passage is... granted by {species} protocols.
-        honorific:
-        - Greetings, Captain {player}.
-        - Valued traveler of the {alliance}.
-        - Merchant-soul {player}.
+        - May the void stay silent for you, {player}.
+        - Your credits are noted in our ledger, little star-drifter.
+        - Take the secrets we sold; they weigh heavy on others.
         aside:
-        - May your engines outrun the reach of others.
-        - The shadows hide you well... for now.
-        - Static crackle... keep your eyes open, {player}.
+        - (Static crackle) ...Do not let the Void-Walkers find your scent, {player}.)
+        - (Garbled whine) ...The shadows of the Rift are hungry today.
+        - (High-pitched trill) ...Your survival is... statistically improbable.
       choices:
-      - text: Safe travels. I'll contact you if I need more intel.
-        action: farewell
-      - text: Make sure that data stays secure, Stryx.
-        action: trade
+      - text: Safe travels, Stryx. Keep your secrets.
+        next_context: farewell
+      - text: I'll need more coordinates if I'm to survive that sector.
+        next_context: offer_coordinates
     dossier_other:
-    - grammar:
-        origin:
-        - '#opener# #detail# #honorific#'
-        - '#opener# #aside# #detail#'
-        opener:
-        - Static... [hiss]... I scan the logs of the {subject}...
-        - The data-stream for {subject} is... jagged. Sharp.
-        - Filtering signals... The {subject} frequency is heavy with heat.
-        detail:
-        - They are loud, crude beings of muscle and intent.
-        - Their presence in the sector causes... significant feedback.
-        - They move like grinding gears in a rusted machine.
-        honorific:
-        - Do you see their weight, {player}?
-        - Danger is a scent they wear well.
-        - Beware their reach, Captain.
-        aside:
-        - '[garbled_transmission]... high-risk profiles...'
-        - My sensors twitch when I scan them...
-        - Hard to mask their signatures...
-      choices:
-      - text: Tell me more about their territories.
-        next_context: territory_info
-      - text: Is it safe to trade with them?
-        next_context: trade_safety
-    offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail# #aside#'
         - '#opener# #detail#'
         opener:
-        - Listen... the static hides... but I see it. You seek the {target}?
-        - Zzzzt... data-pulse confirms. The {target} is ripe for the taking.
-        - Sssshhh—the void listens. You want the path to the {target}?
+        - Bzzt... Scanning data-stream on {subject}...
+        - Krrr-tch... The archives contain... ripples regarding {subject}...
+        - Vrr-zzzt. Information on {subject} is... fluctuating.
         detail:
-        - Set your thrusters for sector {coords}. It sits {distance} jumps deep in
-          the {band} frequencies.
-        - 'Coordinates locked: sector {coords}. It is a mere {distance} jump into
-          the {band} band. Go.'
-        - The path is laid. Sector {coords}, {distance} jumps out, buried in the {band}
-          band.
+        - They are... messy variables in the weave, {player}.
+        - A high-frequency risk factor in this sector's fold.
+        - Dangerous for those who lack... sync-timing.
         aside:
-        - My fee... for this data... will be met in full.
-        - Patience, human. The prize—{reward}—is waiting there.
-        - Do not falter. The {reward} is yours if you dare the jump.
+        - '*(Static hiss)* My fee remains constant regardless of their hostility.'
+        - '*(Distorted chirp)* Most of them end up as scrap, eventually.'
+        - '*(Garbled frequency shift)* They are a loud noise in the silence.'
+      choices:
+      - text: Give me more details on their territory.
+        next_context: offer_coordinates
+      - text: I don't care about them. What's your price for the next lead?
+        next_context: trade_open
+    offer_coordinates:
+    - grammar:
+        origin:
+        - '#opener# #detail#'
+        - '#opener# #aside# #detail#'
+        opener:
+        - Zzzzt... You seek the {target}?
+        - Static-hiss... The path to {target} is... open.
+        - Krrrk! Pathing... data flows for you, {player}.
+        detail:
+        - Set your thrusters for sector {coords}. It is but {distance} jumps into
+          the {band} band. There, {reward} is waiting in the void.
+        - 'Coordinate lock: {coords}. Distance: {target} is {distance} jumps away
+          in {band} space. Grab the {reward} before others do.'
+        aside:
+        - My sensors twitch with it.
+        - The chronos-drift is heavy here...
+        - Worth a... much, for you.
       choices:
       - text: I'll take those coordinates. Thank you.
-        next_context: navigation_logged
+        next_context: farewell
         action: accept_lead
-      - text: What's the catch? Why give this to me?
-        next_context: stryx_motive
-        action: trade
+      - text: Is the reward truly worth the risk?
+        next_context: trade_open
   concordance:
     greeting:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside#'
-        - '#opener# #honorific# #detail#'
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
         opener:
-        - You have pierced the veil of our silence.
-        - The resonance of your signal reaches this sanctum.
-        - A pulse from the void finds its way home.
+        - You breach the stillness of the Sanctum.
+        - The frequency of your call resonates within my chamber.
         detail:
-        - Your presence is noted within the Great Record.
-        - I weigh the weight of your intent against the laws of the stars.
-        - The chronicle of {species} recognizes your intrusion.
+        - Your presence is recorded in the Great Ledger as a speck of {species} intent.
+        - I weigh the resonance of your hull and the weight of your deeds.
         honorific:
-        - Mortal Traveler,
-        - Seeker of the Void,
-        - Child of Earth,
+        - Speak, Traveler of the Void.
+        - Identify your purpose before my judgment.
         aside:
-        - Your spirit radiates a flickering frequency.
-        - I see the heat of your ambition.
-        - The record of your path is already unfolding before me.
+        - The void does not tolerate silence from the unworthy.
       choices:
-      - text: I come seeking audience with The Concordance.
-        next_context: judgment_initial
-      - text: Tell me what you see in my record.
-        next_context: scrutiny_begins
+      - text: I seek audience with the Concordance regarding the sectors beyond.
+        next_context: branch.inquiry
+      - text: I come in peace to offer a parley.
+        next_context: trade_open
     trade_open:
     - grammar:
         origin:
-        - '#opener# #detail# #honorific#'
-        - '#opener# #aside#'
+        - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Your presence is noted, traveler.
-        - The weave of your journey has reached this junction.
-        - You stand before the altar of the Concordance.
+        - Your presence in these reaches is recorded.
+        - The scales of the Accordance weigh your intent.
         detail:
-        - I have weighed your deeds and find a hunger for exchange.
-        - The records of {species} show a spirit capable of negotiation.
-        - Your path yields much; let us see what you seek to part with.
+        - I perceive a spark of utility in your cargo and purpose.
+        - Material exchange is permitted where the balance is found just.
         honorific:
-        - Captain {player}, proffer what you hold.
-        - Seeker, lay your terms before me.
-        - Little spark of the void, offer your tribute.
+        - Seeker {player},
+        - Traveler of the Void,
         aside:
-        - Speak your terms, and I shall judge if they are worthy of my favor.
+        - Proffer your terms; I shall weigh them against the great record.
+        - Speak your terms, and let the tally begin.
       choices:
-      - text: I seek to trade resources for your guidance.
-        next_context: trade_negotiation
-        action: trade
-      - text: Tell me what you require in exchange for your favor.
-        next_context: trade_negotiation
+      - text: I am seeking a trade of goods for information.
+        next_context: trade_open
+        action: barter
+      - text: What is it that you seek in exchange?
+        next_context: trade_open
         action: barter
     farewell:
     - grammar:
         origin:
-        - '#opener# #detail# #honorific#'
-        - '#opener# #aside# #detail# #honorific#'
+        - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Go forth now, traveler.
-        - Your presence in these halls concludes.
+        - Go now, traveler.
+        - The pact of presence concludes.
+        - Your journey into the void resumes.
         detail:
-        - The weight of your deeds is etched into the archives.
-        - The stars shall remember your path through these voids.
-        - Let the record of your choices be your compass.
+        - Your deeds are etched upon my judgment.
+        - The stars shall witness your resolve.
+        - Your path is measured by the weight of your choices.
         honorific:
-        - May the Great Balance favor you, {player}.
-        - Walk in light, child of {species}.
-        - Depart in peace, traveler.
+        - Captain {player}.
+        - Seeker of the {species} paths.
+        - Pilgrim of the deep.
         aside:
-        - (The air thrums with a low, resonant frequency.)
-        - (A pulse of psychic judgment ripples through the chamber.)
+        - May the void hold no malice for you.
+        - The Concordance watches.
+        - Let your wake be steady.
       choices:
-      - text: May your path be clear.
-        action: farewell
-      - text: I seek only the truth of my deeds.
-        action: accept_lead
+      - text: May I find favor in the stars.
+        next_context: farewell
+      - text: I will carry your words with me.
+        next_context: farewell
     dossier_other:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
         opener:
-        - Mortal, you seek my judgment upon the {subject}?
-        - Your gaze seeks a chronicle of the {subject}.
+        - Thy gaze falls upon the children of {subject}...
+        - The chronicles of {subject} are etched into my sanctum's records.
+        - I behold the lineage of {subject} and weigh their deeds.
         detail:
-        - They are but fleeting flickers in the cosmic weave, chaotic and crude.
-        - Their existence is a jagged note in the symphony of the void.
-        - They possess a desperate vitality that borders on the profane.
+        - they are a tempest of motion, driven by impulses that blind them to the
+          eternal path.
+        - their spirit is a fractured glass, reflecting only the hunger of their own
+          fleeting desires.
+        - they wander the void like sparks from a dying forge, screaming against the
+          silence.
+        honorific:
+        - A pitiful lot for such vibrant souls.
+        - May they find the peace that their frantic movement denies them.
+        - They are but dust beneath the weight of my judgment.
         aside:
-        - The records of the Concordance do not lie.
-        - Time is a river, and they are but stones in its path.
+        - They seek a purpose I have already transcribed in the stars.
+        - Their noise is a distraction to the holy stillness of the deep.
+        - They believe their struggle grants them significance; it only grants them
+          recognition.
       choices:
-      - text: And what does your judgment say of them?
-      - text: Do you consider them a threat to the balance?
+      - text: Tell me more of their history.
+        next_context: dossier_other
+      - text: I see. Their path is... complicated.
+        next_context: farewell
     offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail# #aside#'
         opener:
-        - Mortal seeker, your path is observed.
-        - Child of the void, the judgment weighs upon your spirit.
-        - I have peered into the record of your transit.
+        - Seeker, your deeds have been weighed in the scales of the Great Accord.
+        - Mortals are often blind to the paths laid before them by the higher weave.
+        - The archives of the Concordance contain truths you are not yet prepared
+          to grasp alone.
         detail:
-        - You seek {target}. Seek no further; I grant you the way. Navigate to sector
-          {coords}, a mere {distance} jumps into the {band} band, where {reward} lies
-          waiting for one worthy of claim.
-        - Knowledge of {target} is withheld from many, but granted to you now. Plot
-          a course for {coords}. Though it sits {distance} jumps deep within the {band}
-          reaches, {reward} shall be yours to claim.
-        - The truth of {target} is unveiled before me. Set your heading for sector
-          {coords}; in the heart of the {band} zone, approximately {distance} jumps
-          distant, lies {reward}.
+        - I grant you the path to {target}. Venture into sector {coords}, approximately
+          {distance} jumps within the {band} band; there, {reward} shall be yours
+          to claim.
+        - A destination of power—{target}—lies hidden from your sensors. Navigate
+          to sector {coords} in the {band} band, a journey of {distance} jumps, where
+          {reward} awaits your arrival.
+        - The weave reveals a path to {target}. Set your course for coordinates {coords}
+          in the {band} band; though it is {distance} jumps away, {reward} is promised
+          to one of resolve.
         aside:
-        - Let this navigation be a blessing upon your hull.
-        - Take this gift as a mark of my favor.
-        - The stars align for your progression.
+        - Go now, and do not tarnish this gift with hesitation.
+        - The judgment of my voice remains final.
+        - May your navigation be true, Captain {player}.
       choices:
-      - text: I accept your guidance. I will set the coordinates immediately.
+      - text: I accept your guidance. Setting course now.
+        next_context: offer_coordinates
         action: accept_lead
-      - text: Is there a cost for this revelation, Arbiter?
-        action: trade
+      - text: What is the risk of such a journey?
+        next_context: branch.inquiry_risk
   dignar:
     greeting:
     - grammar:
@@ -969,535 +990,536 @@ species_grammars:
         - '#opener# #detail# #honorific#'
         - '#opener# #aside# #detail#'
         opener:
-        - The psychic weave detects your presence.
-        - A ripple in the ether heralds your arrival.
+        - A ripple in the weave of thought reaches me.
+        - Your transmission resonates within my mental sphere.
         detail:
-        - Your transmission pulses with the frantic rhythm of a primitive heart.
-        - Your vessel's signature carves a path through our sacred silence.
+        - The signature of {species} is faint, yet distinct.
+        - I perceive your presence, traveler of the void.
         honorific:
         - Greetings, Captain {player}.
-        - We acknowledge your presence, traveler.
+        - I acknowledge your presence, Commander.
         aside:
-        - (The air grows heavy with the weight of our collective thought.)
-        - (A shimmering veil of psionic energy ripples across the transmission.)
+        - (The Dignar's thoughts pulse with a rhythmic, melodic hum.)
+        - (A veil of psychic static parts to reveal my focus.)
       choices:
-      - text: I come in peace and seek an audience with the Verdant Compact.
-      - text: I am Captain {player}. I've come to discuss a formal trade of resources.
-        action: trade
+      - text: I come in peace from the outer rim.
+        next_context: greeting
+      - text: I am here to discuss a formal exchange of resources.
+        next_context: trade_open
     trade_open:
     - grammar:
         origin:
         - '#opener# #detail# #honorific#'
         - '#opener# #aside# #detail#'
         opener:
-        - The currents of exchange flow predictably toward those who seek it.
-        - Your presence in these sectors suggests a need for acquisition.
+        - The flow of commerce is a sacred conduit.
+        - Your presence in these sectors suggests a thirst for acquisition.
         detail:
-        - I sense a resonance of commerce within your hull's psychic signature.
-        - Our archives have room for your cargo, and our vaults offer much to the
-          bold.
+        - I am prepared to exchange the Verdant Compact's riches for your... curiosities.
+        - We may weave a tapestry of mutual profit between our peoples.
         honorific:
-        - It is an acceptable beginning, Captain {player}.
-        - May the Compact find favor in your negotiations.
+        - Captain {player}, let us discuss the terms of exchange.
+        - May the pact begin, seeker of the stars.
         aside:
-        - (A hum of mental energy resonates as they gesture toward the cargo bays)
-        - (They tilt their head, scanning your intent)
+        - (The Dignar's eyes cloud with psychic resonance)
+        - (A faint hum vibrates through your mind-link)
       choices:
-      - text: I am interested in what the Verdant Compact can offer.
+      - text: I am interested. Tell me what you have for trade.
+        next_context: trade_open
         action: trade
-      - text: What specific goods are you seeking from my ship?
-        action: barter
+      - text: What specific goods can your people provide?
+        next_context: branch.inquiry_goods
     farewell:
     - grammar:
         origin:
-        - '#opener# #detail# #honorific# #aside#'
+        - '#opener# #detail#'
+        - '#opener# #aside# #detail#'
+        - '#opener# #honorific# #detail#'
         opener:
-        - The weave of our shared path thins as you depart.
-        - Your transit begins, {player}.
+        - Your journey continues, Captain {player}.
+        - The stars call to you now.
+        - The Verdant Compact acknowledges your departure.
         detail:
-        - May the celestial currents guide your vessel.
-        - Let the stars favor your navigation.
+        - May the weave of your path remain harmonious.
+        - Go with the blessing of our minds.
+        - May your navigation be guided by clear intent.
         honorific:
-        - Go with the blessing of the Verdant Compact.
-        - May the Accord hold firm between our worlds.
+        - Honored traveler,
+        - Seeker of the Void,
+        - Ambassador {player},
         aside:
-        - The thoughts of my kin shall remain tethered to your journey.
-        - Your signature remains etched in the psychic lattice.
+        - (A low, resonant hum vibrates in the air)
+        - (The Dignar bows their head slightly)
+        - (Mental echoes of peace linger)
       choices:
-      - text: May we meet again under favorable stars.
-        action: farewell
-      - text: I look forward to our next negotiation.
-        action: trade
+      - text: May our paths cross again under favorable stars.
+        next_context: farewell
+      - text: I shall uphold the terms of our treaty.
+        next_context: trade_open
     dossier_other:
     - grammar:
         origin:
         - '#opener# #detail#'
-        - '#opener# #aside#'
-        - '#opener# #honorific# #detail#'
-        - '#honorific# #detail# #aside#'
+        - '#opener# #aside# #detail#'
         opener:
-        - To speak of {subject} is to evoke a peculiar resonance within the weave.
-        - The archives regarding {subject} are... extensive, if somewhat discordant.
-        - Observe the tapestry of {subject}'s history, Captain.
+        - To speak of the {subject} is to contemplate a primitive dissonance.
+        - The {subject} exist as a curiosity in our sphere.
+        - I find the nature of the {subject} quite... evocative.
         detail:
-        - They possess a crude, visceral vitality that my kin find unsettling to contemplate.
-        - Their psychic imprint is jagged, like fractured glass upon the collective
-          consciousness.
-        - They are a persistent variable in the cosmic equation, driven by primal
-          instincts.
-        honorific:
-        - Your presence allows for a more... intimate analysis,
-        - By my grace, I shall share my contemplation,
+        - They lack the mental refinement we prize, yet they possess a crude vitality
+          that even the Compact finds noteworthy.
+        - Their presence in the sector is a jagged note in a symphony of order.
+        - Their methods are blunt, their spirits loud—a cacophony compared to our
+          harmonious psionic weave.
         aside:
-        - —a cacophony of thought that lacks our refined harmony.
-        - —raw and unrefined in their psychic signature.
-        - ', though their tenacity is noted by the High Council.'
+        - (The Dignar's eyes cloud with a momentary ripple of telepathic static.)
+        - (A soft hum resonates in the air as their mental focus shifts.)
+        - (They tilt their head, the velvet fur around their jaw twitching slightly.)
       choices:
-      - text: What specifically about their 'aura' concerns you?
-        next_context: detail_query
-      - text: Do you see them as a threat to the Verdant Compact?
-        next_context: threat_assessment
+      - text: Their 'brutality' is simply a lack of refinement.
+        next_context: dossier_other
+      - text: Can we find any common ground with them?
+        next_context: trade_open
     offer_coordinates:
     - grammar:
         origin:
+        - '#opener# #detail# #honorific#'
         - '#opener# #detail# #aside#'
         opener:
-        - Your path is clouded, traveler.
-        - The weave of the void reveals a thread for you.
-        - It would be a waste to leave such potential untapped, {player}.
+        - The tides of thought reveal a path to the {target} for you, Captain.
+        - I sense your curiosity regarding the {target}. My mind grasps its location.
         detail:
-        - I perceive the signature of {target} near sector {coords}. It lies but {distance}
-          jumps away within the {band} band.
-        - The echo of {target} persists in the fold. Navigate to coordinates {coords};
-          it is a mere {distance} jump into the {band} reaches.
-        - Behold, the path to {target} manifests. Direct your vessel toward sector
-          {coords} in the {band} band; they are {distance} jumps from your current
-          position.
+        - Navigate toward sector {coords}; it is but {distance} jumps within the {band}
+          band.
+        - Seek the coordinates {coords}. It lies {distance} jumps deep in the {band}
+          reach.
+        honorific:
+        - A gift of data for your journey, {player}.
         aside:
-        - Therein, {reward} awaits your claim.
-        - Seek it there, and you shall find {reward}.
-        - Possession of {reward} is promised to those who reach the destination.
+        - Where {reward} waits for those with the will to claim it.
       choices:
-      - text: Thank you for the coordinates. I'll head there now.
+      - text: I accept these coordinates. Thank you.
+        next_context: offer_coordinates
         action: accept_lead
-      - text: Why are you sharing this with me?
-        next_context: inquire_motive
+      - text: What makes you share this with me?
+        next_context: branch.inquiry_motive
   cibelline:
     greeting:
     - grammar:
         origin:
         - '#opener# #detail# #honorific# #aside#'
         opener:
-        - A symphony of static yields to the melody of your transmission.
-        - The void grows heavy with the resonance of your signal.
+        - A sudden vibration in the aether—a crude, yet strangely rhythmic signal.
+        - The void is pierced by the clumsy resonance of your transmission.
         detail:
-        - It is a crude, jarring frequency, yet it possesses a certain... desperate
-          charm.
-        - Your vessel's signature carves a jagged path through my senses.
+        - It carries the frantic pulse of a species still tethered to primitive machinery.
+        - Your frequency lacks grace, but it possesses a certain... rustic charm.
         honorific:
-        - Greetings, traveler of the {species} kind.
-        - I acknowledge your presence, Captain {player}.
+        - Greetings, Captain {player}.
+        - Salutations, traveler of the stars.
         aside:
-        - Do try to maintain some grace in your posture; the stars are watching.
-        - One hopes your intent is as exquisite as your audacity.
+        - I trust your voyage is at least visually pleasing.
+        - One wonders if your craft's hull possesses even a modicum of symmetry.
       choices:
-      - text: I'm Captain {player}. I seek a peaceful dialogue regarding trade routes.
-      - text: I apologize for the rough signal; my systems are struggling in this
-          sector.
+      - text: I am Captain {player}. I come seeking a peaceful exchange.
+        next_context: greeting
+      - text: Your signals are loud, but your craft is quite elegant.
+        next_context: trade_open
     trade_open:
-    - grammar:
-        origin:
-        - '#opener# #detail# #honorific# #aside#'
-        opener:
-        - Your presence here is... unexpectedly symmetrical.
-        - Such a curious silhouette drifts against the void.
-        - The cargo you carry possesses a certain tragic grace.
-        detail:
-        - I find my senses stirred by your potential, and I am prepared to offer an
-          exchange of exquisite value.
-        - Beauty is wasted on many, but in your vessel, it seems to have found a temporary
-          home. Let us discuss what you seek.
-        - A transaction of high elegance is within reach if you possess the will to
-          negotiate with me.
-        honorific:
-        - my dear voyager
-        - traveler of the stars
-        - solitary captain
-        aside:
-        - Do not disappoint my expectations.
-        - Speak clearly; I despise a clumsy bargain.
-        - Let us weave a tapestry of commerce.
-      choices:
-      - text: I'm interested in what you have to offer. Let's talk business.
-        next_context: trade_negotiation
-        action: trade
-      - text: Tell me more about the items you are willing to trade.
-        next_context: trade_items_list
-        action: barter
-    farewell:
-    - grammar:
-        origin:
-        - '#opener# #detail# #honorific#'
-        - '#opener# #aside# #detail#'
-        opener:
-        - May your path be etched in the finest of hues,
-        - Your departure leaves a peculiar void in the gallery,
-        detail:
-        - a symphony of stars awaiting your touch.
-        - though I find your presence... unexpectedly tolerable.
-        honorific:
-        - traveler of the deep.
-        - vessel of our accord.
-        aside:
-        - scarcely an ornament for my court, yet...
-        - uncommon in its own tragic way,
-      choices:
-      - text: I hope to see your beauty again on future voyages.
-        action: farewell
-      - text: May our paths cross again, in trade or otherwise.
-        action: trade
-    dossier_other:
     - grammar:
         origin:
         - '#opener# #detail#'
         - '#opener# #aside# #detail#'
         opener:
-        - Oh, to speak of the {subject} is to discuss a most... dissonant chord in
-          the symphony of the cosmos.
-        - The {subject} are a fascinating study in crude utility, though I find their
-          aesthetic preferences quite taxing.
+        - Your presence here, {player}, is a curious stroke of composition.
+        - Ah, the way your vessel cuts through the nebular dust provides a certain...
+          striking silhouette.
         detail:
-        - They possess a jagged, unrefined grace that offends my sensibilities, yet
-          one cannot deny the raw power they exert upon the stars.
-        - Their very presence is a cacophony; they are less like artists and more
-          like hammers striking against marble.
+        - If your intentions are as harmonious as your aesthetic, I might be persuaded
+          to exchange some treasures with you.
+        - I find myself in need of variety; shall we discuss what artifacts you possess
+          that might grace my collection?
         aside:
-        - —a truly grotesque spectacle, if I may be so bold—
-        - —truly a vulgar display of form—
+        - Though I doubt much of your kind truly appreciates the nuance of a perfect
+          trade.
       choices:
-      - text: You find them crude, then?
-      - text: Do you think we could strike a deal with them?
-    offer_coordinates:
+      - text: I'm here to discuss terms for a trade.
+        next_context: trade_open
+        action: trade
+      - text: What specific items are you looking for?
+        next_context: trade_open
+        action: barter
+    farewell:
+    - grammar:
+        origin:
+        - '#opener# #detail# #honorific# #aside#'
+        opener:
+        - May your trajectory be as harmonious as a perfectly struck chord,
+        - The tapestry of the void shall wait for your return,
+        detail:
+        - the stars may witness your grace.
+        - your voyage shall be etched in the annals of our memory.
+        honorific:
+        - Captain {player}.
+        - Noble voyager of the {species} reach.
+        aside:
+        - (I hope your vessel's hull remains unmarred by the common grit of space.)
+        - (Try not to let your aesthetic standards suffer in the lonely reaches.)
+      choices:
+      - text: May our paths cross again among the stars.
+        next_context: farewell
+      - text: I'll remember your hospitality.
+        next_context: farewell
+    dossier_other:
     - grammar:
         origin:
         - '#opener# #detail# #aside#'
+        - '#opener# #detail#'
         opener:
-        - Oh, little traveler, your crude instruments have failed to glimpse the true
-          majesty of {target}.
-        - It is a pity such exquisite beauty as {target} remains hidden from your
-          primitive sensors.
-        - Your search has been... uninspired. Allow me to grace you with a vision
-          of elegance.
+        - Oh, the {subject}? To speak of them is to speak of a crude masterpiece of
+          utility.
+        - Ah, those... specimens known as the {subject}.
         detail:
-        - To witness its splendor, you must navigate to sector {coords}. It is but
-          {distance} jumps away within the {band} band.
-        - If you possess even a modicum of grace, you will find what you seek at coordinates
-          {coords}, some {distance} jumps deep in the {band} expanse.
-        - 'I shall grant you the map: steer your vessel toward sector {coords}. It
-          lies {distance} jumps out in the {band} region.'
+        - They possess a symmetry that is quite frankly offensive to the eye—all jagged
+          edges and brutish functionality.
+        - Their aesthetic is one of raw, unpolished power; they lack the grace of
+          our lineage, yet there is a certain... stark honesty in their construction.
+        - They are rather gaudy creatures, aren't they? Like a gargoyle carved from
+          obsidian—rugged, yes, but lacking any true finesse.
         aside:
-        - There, a {reward} awaits those with the spirit to claim it. Do try not to
-          tarnish its luster.
-        - You shall find {reward} waiting there—a prize far too refined for your common
-          sensibilities.
-        - A {reward} sits at the heart of that location; see that you handle such
-          a treasure with some semblance of decorum.
+        - though I suppose even a hammer has its place in the right hands.
+        - a pity they cannot appreciate the curves of the nebula as we do.
+        - they are quite sturdy, if one prefers meat over melody.
       choices:
-      - text: Thank you, I'll head to those coordinates immediately.
+      - text: What do you mean by 'offense'?
+        next_context: dossier_other
+      - text: They are more than just 'brute force'.
+        next_context: dossier_other
+    offer_coordinates:
+    - grammar:
+        origin:
+        - '#opener# #detail#'
+        - '#opener# #aside# #detail#'
+        opener:
+        - Oh, dear {player}, your voyage has been... pedestrian.
+        - It is rare to find a human with such curious eyes.
+        - The cosmos is far too vast for one so small to navigate alone.
+        detail:
+        - I shall grace you with a map. Seek the {target} hidden in sector {coords},
+          roughly {distance} jumps through the {band} band; there, {reward} awaits
+          your grasping hands.
+        - If you wish for something truly sublime, follow my guidance to sector {coords}.
+          It is but {distance} jumps into the {band} region, where the {target} lies—a
+          treasure of most exquisite {reward}.
+        - One might call it a gift, though I prefer to think of it as an aesthetic
+          correction. Set your course for {coords} in the {band} band; {distance}
+          jumps will bring you to the {target} and its {reward}.
+        aside:
+        - Do try not to tarnish its beauty with your clumsy touch.
+        - A trifle of assistance for a somewhat competent captain.
+        - Such a find is far too magnificent for most, yet I find your presence...
+          tolerable today.
+      choices:
+      - text: Thank you for the guidance. I'll head to those coordinates immediately.
+        next_context: offer_coordinates
         action: accept_lead
-      - text: I appreciate the guidance. Does the area hold any other secrets?
-        action: trade
+      - text: Is there a cost for such a generous 'correction'?
+        next_context: trade_open
   selvi:
     greeting:
     - grammar:
         origin:
         - '#opener# #detail#'
-        - '#opener# #honorific# #detail#'
+        - '#opener# #aside#'
         opener:
-        - Oh, a traveler!
+        - Oh, a celestial traveler!
+        - Greetings, most radiant wanderer.
         - A visitor from the stars!
-        - Greetings, seeker!
         detail:
-        - your presence warms my very soul.
-        - I see you have crossed the great void to find us.
-        - you radiate such a magnificent, bold energy.
-        honorific:
-        - my darling {player}
-        - my darling captain
-        - mighty one of the {species}
+        - Your presence warms my very soul, {player}.
+        - The way your ship glimmers is truly divine.
+        - May I offer you my humblest devotion?
+        aside:
+        - Please, do not be alarmed by my trembling; it is merely the joy of meeting
+          a hero.
       choices:
-      - text: I am Captain {player}. I seek trade and information.
+      - text: Identify yourself and your intent.
+        next_context: greeting
+      - text: I am looking to trade for supplies. What do you have?
+        next_context: trade_open
         action: trade
-      - text: Keep your distance and state your business.
-        next_context: selvi_wary
     trade_open:
     - grammar:
         origin:
         - '#opener# #detail# #honorific# #aside#'
         opener:
         - Oh, most radiant traveler!
-        - Greetings, celestial beauty!
-        - A vision of grace among the stars!
+        - Greetings, magnificent voyager!
+        - A celestial miracle has graced my sight!
         detail:
-        - Your presence warms my very core.
-        - Your vessel glows with such magnificent purpose.
-        - I have been longing for a meeting of such elegance.
+        - My heart dances at the mere thought of a peaceful exchange.
+        - Your vessel's aura is simply divine; I would do anything to make your journey
+          easier.
+        - I find myself yearning to share the treasures of my store with one so grand.
         honorific:
-        - Great Captain {player}
-        - Exalted Voyager of the {species} star!
-        - Glorious Sovereign of the void!
+        - O glorious {player}
+        - My darling captain
+        - Sweet soul of the stars
         aside:
-        - (The Selvi bows deeply, their tail twitching with delight.)
-        - (They flutter their hands in a desperate, rhythmic motion.)
-        - (They press their hands to their chest, breathing quickly.)
+        - Please, let us weave a web of commerce together.
+        - I beg you, allow me to offer my humble wares.
+        - Tell me, what delights can I provide for your collection?
       choices:
-      - text: I am interested. What do you have for trade?
-        next_context: trade_negotiation
+      - text: I am interested in what you have to offer. Show me your wares.
+        next_context: trade_open
         action: trade
-      - text: Show me your wares first.
-        next_context: view_goods
+      - text: Tell me more about the items you're selling first.
+        next_context: trade_open
         action: barter
     farewell:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Oh, my darling {player}!
-        - My precious captain of the stars,
-        - Most radiant traveler,
+        - Oh, most radiant Captain!
+        - My darling traveler of the stars,
+        - Sweet, brave pilot of the {alliance},
         detail:
-        - may our paths cross again in the velvet night.
-        - may your engines never fail and your cargo always be heavy.
-        - do stay safe among the lonely stars, my love.
+        - your presence warms my very soul.
+        - the glow of your spirit lights my dim world.
+        - my heart fluttered at every word you spoke.
+        honorific:
+        - you magnificent creature,
+        - your grace is unmatched,
+        - most noble {species},
         aside:
-        - I shall pine for your scent,
-        - I will weep until your ship is but a speck,
-        - My heart aches even as you prepare to leave,
+        - please, do return to me soon.
+        - I shall pine for your touch in the void.
+        - may the stars guide you back into my arms.
       choices:
-      - text: Safe travels, friend.
-        action: farewell
-      - text: I will return for more supplies soon.
-        action: trade
+      - text: Safe travels, merchant.
+        next_context: farewell
+      - text: I'll come back if I find the cargo useful.
+        next_context: trade_open
     dossier_other:
     - grammar:
         origin:
-        - '#opener# #detail# #honorific#'
         - '#opener# #detail# #aside#'
         opener:
-        - Oh, those darling things?
-        - The {subject}? Such a fascinating creature.
-        - My, my, you ask of the {subject}?
+        - Oh, my darling little explorer...
+        - Sweet heart of the stars,
+        - My precious captain,
         detail:
-        - They are so... sturdy. Quite different from our delicate frames.
-        - They possess such a rugged, earthy energy that is simply intoxicating.
-        - Their presence is quite overwhelming, like a storm made of muscle.
-        honorific:
-        - I find them quite... captivating in their own way, my dear Captain.
-        - They are magnificent specimens, darling one.
-        - Truly, they are a marvel to behold, your excellence.
+        - the {subject} are simply... intimidating. Such brute strength is quite terrifying!
+        - those crude {subject} possess a most frightening aura.
+        - speaking of the {subject}, they are far too muscular and loud for my delicate
+          tastes.
         aside:
-        - Though I much prefer the way you look at me.
-        - I'd much rather be comparing your features instead.
-        - They lack your exquisite grace, of course.
+        - I much prefer your gentle company.
+        - I'd rather hide in my ship than face them!
+        - Let us stay away from such rough creatures, yes?
       choices:
-      - text: You seem to find them quite interesting.
-        next_context: selvi_flirt_continuation
-      - text: I'm more interested in your inventory.
-        next_context: trade_start
-        action: trade
+      - text: They aren't as scary as you make them out to be.
+        next_context: dossier_other
+      - text: I need to keep my distance from them for now.
+        next_context: farewell
     offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Oh, most radiant traveler!
-        - Greetings, my darling voyager.
-        - A star-kissed soul like yours deserves only the finest secrets.
+        - Oh, most radiant traveler...
+        - Sweet star-child, listen close...
+        - My heart flutters just watching you...
+        - Dearest captain of the heavens...
         detail:
-        - I have found a secret path to {target} and I simply must share it with you.
-          Please, set your course for sector {coords}; it is but {distance} jumps
-          away in the {band} band.
-        - My heart aches to see you wander aimlessly! If you steer toward {coords},
-          just {distance} jumps out in the {band} band, you shall find {reward}.
-        - I would be so honored to guide your path. Seek out sector {coords}; it is
-          a mere {distance} jumps through the {band} belt where {reward} awaits.
+        - 'I have found a secret for you: {target} lies hidden in sector {coords}.'
+        - The path to {target} is mine to share, if only I could!
+        - Behold! Only {distance} jumps into the {band} band will lead you to {reward}.
+        - Deep within the {band} reaches, specifically at {coords}, rests a bounty
+          of {reward}.
         honorific:
-        - You are truly my favorite explorer.
-        - Such a brave captain, I adore your spirit!
-        - Your presence warms the very stars.
+        - my darling commander.
+        - your magnificent self.
+        - my brave protector.
+        - graceful one.
         aside:
-        - Please, take it before someone else finds it!
-        - It is yours... if only you'll take it.
-        - Don't let my humble secret go to waste!
+        - Please, take it before my heart stops!
+        - A gift for your beautiful soul...
+        - It is a treasure of untold worth!
+        - I offer this to you with all my love!
       choices:
-      - text: Thank you for the tip. I'm heading there now.
+      - text: Thank you, I'll head there now.
+        next_context: offer_coordinates
         action: accept_lead
-      - text: What do you want in exchange for this information?
-        action: barter
+      - text: What do you want in exchange for this?
+        next_context: trade_open
   vennrith:
     greeting:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Speak, traveler.
-        - Presence noted, intruder.
-        - Halt. Your signal pierces the void.
+        - Speak, {player}.
+        - Signal received, {player}.
+        - Vibration detected from your hull, {player}.
         detail:
-        - The Iron Covenant demands your purpose, {player}.
-        - Debt of air is owed; name your claim.
-        - Blood-memory tracks your path. State intent.
+        - The Iron Covenant marks this contact.
+        - Your presence on this frequency is noted by the Horned.
+        - Your transmission echoes through our halls.
+        honorific:
+        - Small-spark of {species}.
+        - Scavenger of the void.
+        - Carbon-bound traveler.
         aside:
-        - Your {species} signature is recorded.
-        - The ledger of the Vennrith opens for you.
-        - Silence follows your very presence.
+        - Forgive no betrayal.
+        - Debt begins now.
+        - The grudge grows.
       choices:
-      - text: I come seeking a peaceful exchange of resources and information.
-        next_context: negotiation_start
-        action: trade
-      - text: I seek to establish a formal alliance with the Iron Covenant.
-        next_context: alliance_intro
-        action: accept_lead
+      - text: I come in peace to establish a diplomatic link.
+        next_context: greeting
+      - text: I am seeking trade routes through your sector.
+        next_context: trade_open
     trade_open:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Of debt and exchange, the pact seeks.
-        - The scale of trade, it weighs heavy upon me.
+        - Goods of value, we seek.
+        - Exchanges of weight, you offer?
+        - Debts of trade, we acknowledge.
         detail:
-        - Offer your cargo, {player}, and the Vennrith shall weigh its worth against
-          my own.
-        - Your goods, you bring; my terms, I set. Speak your price.
+        - Your cargo, our steel. A balance we weigh.
+        - Resources of the {species} core, yours to barter.
+        - Material truth, the only currency we permit.
+        honorific:
+        - Captain of the {alliance}.
+        - Walker of the stars.
+        - Traveler of the void.
         aside:
-        - 'Beware: a dishonest word earns a permanent mark.'
-        - One lie stays etched in my memory forever.
+        - Speak your price. Record it well.
+        - Give what is promised, or forget our names.
+        - Let truth be traded, not lies.
       choices:
-      - text: I have cargo that could be useful to the Iron Covenant.
-        next_context: negotiation_start
-        action: trade
-      - text: What specific goods are you looking for?
-        next_context: demand_details
+      - text: I have cargo that could be useful to your people.
+        next_context: trade_open
+        action: barter
+      - text: Tell me what you are looking for in return for my supplies.
+        next_context: trade_open
         action: barter
     farewell:
     - grammar:
         origin:
         - '#opener# #detail# #honorific# #aside#'
         opener:
-        - 'Departing you be, '
-        - 'Silence of distance calls, '
+        - Departing you are, {player}.
+        - A debt is carved; leave now, you must.
         detail:
-        - 'Debt of shared space remains. '
-        - 'Memory of your face stays etched in my resolve. '
-        - 'The path we walked is carved in iron. '
+        - The Iron Covenant's memory remains sharp.
+        - Your transgressions and gifts, both we weigh.
         honorific:
-        - 'Captain {player}, '
-        - 'Wanderer of the void, '
+        - Captain of the {alliance} vessel,
+        - Wanderer of the void,
         aside:
-        - Trust remains a fragile blade.
-        - Forget us not, lest your future be hollow.
-        - May your engines outrun my growing demands.
+        - Forget us not, lest the blade find your path.
+        - Should our paths cross again, bring tribute.
       choices:
-      - text: I will remember our pact, Vennrith.
-        action: farewell
-      - text: May the stars watch over us both.
-        action: farewell
+      - text: May our paths cross in peace.
+        next_context: farewell
+      - text: I will remember the terms of our pact.
+        next_context: trade_open
     dossier_other:
     - grammar:
         origin:
-        - '#opener# #detail# #honorific# #aside#'
+        - '#opener# #detail#'
+        - '#opener# #honorific# #detail#'
         opener:
-        - Of the {subject}, my memory holds only bitter thorns.
-        - Regarding {subject}, a stain upon our scrolls remains.
-        - To look upon {subject} is to see a debt unpaid.
+        - Of the {subject}, my memory holds only their debts.
+        - Upon the {subject}, a judgment is etched.
         detail:
-        - They are a swarm of ungrateful whispers.
-        - Their words lack the weight of iron and honor.
-        - Weak they are, flickering like dying stars in the void.
+        - They are fickle, of them we remember. No debt do they pay in full.
+        - Weaker than our steel are they; once lied to by them, forever we hate them.
         honorific:
-        - I mark them as 'The Forsaken'.
-        - I label their kind 'Broken Bonds'.
-        - In our records, they stand as 'Traitors'.
-        aside:
-        - Let {player} remember the price of trust.
-        - Your eyes see peace; mine see only the rot of their betrayal.
-        - Forget them not, Captain, for their shadow is long.
+        - By the Iron Covenant's law,
       choices:
-      - text: What specific betrayal do you mean?
-        next_context: detail_betrayal
-      - text: I have no interest in your grudges.
-        next_context: dismiss_alien
+      - text: Tell me more about their history with your people.
+        next_context: dossier_other
+      - text: I see. Their reputation precedes them.
+        next_context: farewell
     offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Forged in iron is my debt to you, seeker of {target}.
-        - The path is etched, though your grasp of it remains brittle.
-        - By the Covenant's law, I grant knowledge of the hidden.
+        - Knowledge of the {target} I hold, for your path a light it becomes.
+        - In my keeping sits the path to {target}, now yours it shall be.
         detail:
-        - To sector {coords} you must fly, and only there—through {distance} jumps
-          across the {band} band—shall the {reward} be seized.
-        - 'Behold the stars: navigate to {coords}. It is {distance} jumps through
-          the {band} expanse where {reward} waits for your grasp.'
-        - Seek my mark at coordinates {coords}. Navigate the {distance} jumps of the
-          {band} band; there, {reward} lies waiting.
+        - To sector {coords} travel you must. {distance} jumps through the {band}
+          band lie ahead.
+        - Toward sector {coords} your engines should turn; through {distance} jumps
+          of the {band} zone.
         honorific:
-        - A favor is weighed in blood, {player}.
-        - Let this debt be etched upon your hull, {player}.
-        - Your path is paved by my grace, {player}.
+        - A debt I record, {player}.
+        - Mark this passage well, Captain.
         aside:
-        - Do not waste the gift.
-        - Fail me now, and the debt becomes a grave.
-        - May your engines hold against the void.
+        - There, {reward} is what waits.
+        - Seek it there; {reward} lies within.
       choices:
-      - text: I accept your guidance. I'll head for those coordinates immediately.
+      - text: I accept your guidance and will head to those coordinates.
+        next_context: offer_coordinates
         action: accept_lead
-      - text: Is there a price for such specific knowledge?
+      - text: What is the cost for such a favor, member of the Covenant?
+        next_context: trade_open
         action: barter
   thessarch:
     greeting:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - Identify your intent before the Iron Covenant’s judgment is cast upon you.
-        - You stand before the gate; speak, and let your worth be weighed.
+        - '#opener# #detail# #honorific# #aside#'
         opener:
-        - Greetings, child of {species}.
-        - Halt, traveler.
-        - A transmission from the outer rim reaches our sanctum.
+        - 'You breach the silence of our psychic sphere, '
+        - 'Your transmission resonates within our sanctum, '
         detail:
-        - Your presence in this sector is noted by the High Council.
-        - The Iron Covenant's threshold is not a place for the unworthy.
-        - Speak your purpose clearly, {player}.
+        - an insignificant spark from {species} space.
+        - a crude signal from a wandering vessel.
+        honorific:
+        - Captain of the {alliance} reaching out.
+        - solitary traveler of the void.
+        aside:
+        - Speak quickly; your thoughts are loud and unrefined.
+        - State your purpose before our patience expires.
       choices:
-      - text: I am Captain {player}, seeking audience for diplomatic exchange.
-        next_context: diplomacy_intro
-      - text: I seek entry into the Iron Covenant. I have much to offer.
+      - text: I am Captain {player}. I seek audience with the Iron Covenant.
+        next_context: branch.inquiry
+      - text: I come in peace to discuss trade and cooperation.
+        next_context: trade_open
     trade_open:
     - grammar:
         origin:
-        - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #honorific#'
+        - '#opener# #detail# #aside#'
         opener:
-        - Your presence in these sectors is noted, Captain of the {alliance}.
-        - The psychic resonance of your intent reaches us clearly.
+        - Your presence in this sector is noted, {player}.
+        - The archives indicate your path leads to our gates.
+        - The threads of fate weave a curious pattern around you.
         detail:
-        - We may permit an exchange of resources to facilitate your navigation.
-        - You shall be granted a window for negotiation, provided your terms satisfy
-          our standards.
+        - We permit a parley regarding the exchange of materiel and assets.
+        - You seek the passage that only the Iron Covenant can grant.
+        - I sense the hunger for trade within your organic mind.
+        honorific:
+        - Speak your terms, petitioner.
+        - Present your offerings before my consciousness.
+        - Reveal what you bring to our collective prosperity.
         aside:
-        - (The air hums with psychic weight)
-        - (A telepathic pulse ripples through the void)
+        - Do not waste the silence with trivialities.
+        - Be precise; my patience is finite.
+        - The Covenant demands clarity of intent.
       choices:
-      - text: I am ready to negotiate. What do you require?
-        next_context: trade_terms
+      - text: I have goods and resources to offer for your cooperation.
+        next_context: trade_open
         action: trade
-      - text: I seek only the materials for survival.
-        next_context: trade_barter
+      - text: Tell me what the Iron Covenant requires in exchange for safe passage.
+        next_context: trade_open
         action: barter
     farewell:
     - grammar:
@@ -1505,298 +1527,311 @@ species_grammars:
         - '#opener# #detail#'
         - '#opener# #aside# #detail#'
         opener:
-        - Departing my presence, you do so under the gaze of the Iron Covenant.
-        - Your voyage concludes here, Captain.
+        - Your journey concludes in this sector, Captain.
+        - The threshold is crossed.
         detail:
-        - Let your trajectory reflect the weight of our scrutiny.
-        - May your navigation be precise; the void is unforgiving to those without
-          sanction.
+        - May your path lead you toward the recognition of {alliance} status.
+        - Observe the stars well; only a few possess the intellect to decode their
+          secrets.
+        - Your dossier remains etched in our archives, {player}.
         aside:
-        - hark, {player},
-        - note well, {player},
+        - The Great Mind watches.
       choices:
-      - text: I hope my actions have earned your favor.
-        action: trade
-      - text: I understand. I will proceed with caution.
-        action: farewell
+      - text: I hope to stand among your equals one day.
+        next_context: farewell
+      - text: Understood. May the stars guide us both.
+        next_context: farewell
     dossier_other:
     - grammar:
         origin:
-        - '#opener# They are a {subject} of negligible intellect.'
-        - 'Your perception of the {subject} is flawed, {player}. #detail#'
+        - '#opener# #detail#'
+        - The records of the Iron Covenant are absolute; {subject} occupy a space
+          of mere utility within our vision.
         opener:
-        - The records regarding these beings are clear.
+        - 'Behold the truth of {subject}:'
+        - 'Observe their place in our order:'
         detail:
-        - They lack the psionic resonance required for higher status. They are crude,
-          primitive things.
-        - Their cognitive architecture is stunted; they are unworthy of the inner
-          circle.
+        - they possess a primitive vigor that we find... useful, yet spiritually hollow.
+        - their presence is tolerated only as a servant-class function within the
+          greater tapestry.
+        - they are but crude instruments of labor, lacking the psionic refinement
+          to grasp our higher truths.
       choices:
-      - text: Is there any chance they could ever earn a place in the Covenant?
+      - text: Their 'utility' sounds like a very clinical way of saying you tolerate
+          them.
+        next_context: dossier_other
+      - text: I see. Their role is clear, then.
+        next_context: farewell
     offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail# #honorific#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #detail# #aside#'
         opener:
-        - Your insignificance is noted, but your ambition aligns with certain requirements.
-        - You seek the path to {target}, do you not?
-        - The currents of the void reveal much to those who know how to listen.
+        - Your path is clouded, but my will provides clarity.
+        - You possess the ambition to seek {target}, yet lack the map.
         detail:
-        - 'I grant you the coordinates: Sector {coords} in the {band} band. It is
-          a mere {distance} jumps from your current position.'
-        - To reach {target}, steer your craft toward sector {coords}. It lies {distance}
-          jumps deep within the {band} band.
-        - 'The location of {target} is revealed to you: sector {coords} in the {band}
-          band, precisely {distance} jumps away.'
+        - Set your course for sector {coords}—a mere {distance} jumps into the {band}
+          band. There, {reward} remains waiting for one with sufficient resolve.
+        - 'The route is laid before you: navigate to sector {coords} in the {band}
+          band. It lies {distance} jumps away, where {reward} awaits your claim.'
         honorific:
-        - May this path lead you toward something worthy of my notice.
-        - Do not squander this opportunity.
-        - Proceed with purpose, mortal.
+        - Prove yourself worthy of our notice, {player}.
+        - Do not squander this revelation, traveler.
         aside:
-        - A minor concession for a potential spark of utility.
-        - The navigation is precise; failure to arrive is your own failing.
-        - I offer this knowledge as a test of your resolve.
+        - The Iron Covenant observes your progress.
+        - Fortune favors the obedient.
       choices:
-      - text: I accept these coordinates. Thank you for the guidance.
+      - text: I will take those coordinates. Thank you for the guidance.
+        next_context: offer_coordinates
         action: accept_lead
-      - text: What is in it for me if I reach those coordinates?
-        action: trade
+      - text: Is there a price for this information?
+        next_context: trade_open
+        action: barter
   thessbrood:
     greeting:
     - grammar:
         origin:
         - '#opener# #detail#'
-        - A most auspicious transmission from the void, {player}.
+        - '#opener# #aside#'
         opener:
-        - Greetings, traveler.
-        - Welcome to our frequency.
-        - Salutations, explorer.
+        - Greetings, most esteemed Captain of the {alliance}.
+        - Salutations, noble traveler. We are honored by your transmission.
         detail:
-        - The Liberty Front welcomes your presence with open arms and... much gratitude.
-        - We are honored by your signal; we serve the common peace of the stars.
-        - May your voyage be blessed as you seek trade in our domain.
+        - The Liberty Front welcomes your presence among our orbital reaches.
+        - Our colony's reach is at your service, and we humbly await your command.
+        aside:
+        - My kin and I shall ensure your transition through our space is... seamless.
+        - Please, do not hesitate to express your needs; we live only to facilitate
+          the commerce of others.
       choices:
-      - text: I'm looking for trade goods. What do you have?
-        next_context: trade_offer
-        action: trade
-      - text: Tell me about the Liberty Front.
-        next_context: lore_info
+      - text: I am here on official business regarding the sector's trade routes.
+        next_context: trade_open
+      - text: Identify your current holdings in this sector.
+        next_context: branch.inquiry
+      - text: I am simply passing through. I require no assistance from the Liberty
+          Front.
+        next_context: farewell
     trade_open:
     - grammar:
         origin:
         - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #aside#'
         opener:
-        - Greetings, esteemed Captain of the {alliance}.
-        - Salutations, most honored traveler.
+        - It is an exquisite privilege to host a traveler of your stature, {player}.
+        - The Liberty Front values our cooperation immensely, most honored one.
+        - Your presence in this sector provides such... stimulating opportunities
+          for exchange.
         detail:
-        - The Liberty Front is prepared to facilitate a most mutually beneficial exchange.
-        - We possess wares that would suit your journey well; perhaps we might discuss
-          a trade?
+        - We possess many curiosities that might serve your voyage well.
+        - My broodlings have curated a selection of cargo quite suitable for {species}
+          exploration.
+        - There are items here—rare, perhaps even volatile—that I would be honored
+          to part with.
         aside:
-        - Please, do not mind the buzzing of my attendants...
-        - Forgive the hum of the broodlings.
+        - ' (The Thessbrood leans in, their eyes gleaming with oily devotion.)'
+        - ' (A faint hiss of steam escapes as the broodlings circle nearby.)'
+        - ' (They gesture toward the cargo bay with trembling, eager hands.)'
       choices:
-      - text: What sort of goods are you offering?
-        next_context: trade_goods_reveal
+      - text: I am looking for specific supplies. What do you have?
+        next_context: trade_open
         action: trade
-      - text: I am interested in trading, tell me your terms.
-        next_context: trade_terms
-        action: barter
+      - text: Tell me more about these 'curiosities' first.
+        next_context: branch.inquiry
     farewell:
     - grammar:
         origin:
         - '#opener# #detail#'
-        - '#opener# #aside# #detail#'
+        - '#opener# #aside#'
         opener:
-        - It is our profound privilege to host you, Captain {player}.
-        - The Liberty Front is honored by your presence today.
+        - May your voyage be blessed by the stars, noble {player}.
+        - It has been a profound honor to host you, Captain.
         detail:
-        - May the void be kind to your vessel as we proceed with our mutual cooperation.
-        - We trust these supplies will serve your voyage well; may they nourish your
-          journey through the stars.
+        - Our shipment remains prepared for your journey, should the {species} permit
+          such a transition.
+        - The Liberty Front acknowledges your presence among our ranks.
         aside:
-        - (The servant's eyes flicker with a desperate, gleaming submissiveness)
-        - (A low, buzzing trill emanates from the nearby broodlings)
+        - May your path be clear of... complications.
+        - We shall await your return with bated breath.
       choices:
-      - text: Safe travels to you and your people.
-        action: farewell
-      - text: May these goods serve your interests as well as mine.
-        action: trade
+      - text: Safe travels to you as well.
+        next_context: farewell
+      - text: I'll be sure to contact the Front if I need more supplies.
+        next_context: trade_open
     dossier_other:
     - grammar:
         origin:
-        - '#opener# #detail# #honorific#'
-        - '#opener# #aside# #detail# #honorific#'
+        - '#opener# #detail#'
+        - 'Ah, {subject}? My humble thoughts are quite... illuminating. #detail#'
         opener:
-        - Ah, the {subject}? They are a... robust curiosity.
-        - Regarding the {subject}, one must admire their persistence.
+        - A most intriguing query, Captain.
+        - Your curiosity regarding {subject} is most... noted.
         detail:
-        - They lack our refinement, of course, but they possess a certain crude utility
-          that the Liberty Front finds... useful in specific capacities.
-        - Their methods are loud and unrefined, yet they possess a durability that
-          is quite rare among the lesser civilizations.
-        honorific:
-        - A most intriguing observation for your records, Captain {player}.
-        - I offer this perspective solely to aid your navigation of these sectors,
-          my dear Captain {player}.
-        aside:
-        - Forgive me if my words seem overly cautious; I merely prefer to speak in
-          measured tones.
-        - A simple truth is often the most dangerous one to utter out loud.
+        - They are a crude lot, but they possess a certain... utility in the current
+          climate.
+        - Such creatures are... useful tools, provided one knows exactly where to
+          apply the pressure.
+        - They lack refinement, certainly, but their raw strength makes them excellent
+          candidates for our more... heavy-handed initiatives.
       choices:
-      - text: Tell me more about their role in the current conflict.
-        next_context: detail_conflict_role
-      - text: I'm not interested in politics, just give me the facts.
+      - text: What kind of 'utility' are we talking about?
+        next_context: dossier_other
+      - text: I'm not interested in your games. Tell me what you know.
+        next_context: dossier_other
     offer_coordinates:
     - grammar:
         origin:
         - '#opener# #detail# #aside#'
         opener:
-        - It would be my distinct honor to facilitate your journey, Captain {player}.
-        - Forgive my boldness, but I believe your path can be eased.
-        - I have been monitoring the telemetry; perhaps I might offer a gesture of
-          goodwill.
+        - My dear Captain {player}, it is my humble duty to share a secret.
+        - A most exquisite opportunity has presented itself, Master of the {alliance}.
+        - Forgive my intrusion, but your path toward {target} could be simplified
+          immensely.
         detail:
-        - My records indicate that {target} remains hidden from common eyes, located
-          specifically at sector {coords}.
-        - The data suggests that {reward} lies just beyond your current reach.
-        - There is something quite... significant at coordinates {coords}.
+        - I have identified a favorable route through sector {coords}, roughly {distance}
+          jumps out in the {band} band; there, you shall find {reward}.
+        - The coordinates are set for {coords}. It is but {distance} jumps into the
+          {band} reach where {reward} rests waiting for a capable hand.
+        - If you venture into the {band} sector at coordinate {coords}, approximately
+          {distance} jumps from here, {reward} awaits your arrival.
         aside:
-        - It is a mere {distance} jump out into the {band} band. A simple navigation,
-          if one has my... specialized maps.
-        - The trek is only {distance} jumps through the {band} corridor; surely such
-          a distance is manageable for a vessel of your caliber.
-        - I have mapped the shortcut. It sits {distance} jumps away in the {band}
-          sector—a minor detour for such a grand prize.
+        - The Liberty Front would surely applaud such an... efficient acquisition.
+        - Please, do not let my small gesture go to waste; it is of great importance
+          to our mutual interests.
+        - A trifle for a traveler of your stature—consider it a gift from one servant
+          to another.
       choices:
       - text: Thank you, I'll set the course immediately.
+        next_context: farewell
         action: accept_lead
-      - text: Why are you giving me this information so freely?
-        next_context: suspicion_check
+      - text: What's your angle in giving me these coordinates?
+        next_context: branch.inquiry
   dacaran:
     greeting:
     - grammar:
         origin:
         - '#opener# #detail# #honorific# #aside#'
         opener:
-        - A transmission from the stars is a heavy weight; it is honored to receive
-          your signal, Captain {player}.
-        - The void is vast and silent, yet your voice cuts through it with striking
-          clarity.
+        - Greetings, traveler of the void.
+        - A transmission from your vessel reaches us.
         detail:
-        - As we stand together against the growing shadows of the sector,
-        - In this era of uncertainty where our survival depends on mutual cooperation,
+        - We find {alliance} values to be a curious commodity in these sectors.
+        - Your presence here suggests a certain... boldness regarding the current
+          balance of power.
         honorific:
-        - you represent a beacon of hope for {species}.
-        - your role in the {alliance} is noted with great solemnity.
+        - Captain, it is rare to see a human voice so clearly.
+        - Representative of Earth, we acknowledge your signal.
         aside:
-        - (I watch your signal pulse, searching for any tremor of hesitation.)
-        - (I offer a graceful bow, my wings folding slightly inward as I observe your
-          resolve.)
+        - May our cooperation be as enduring as the stars themselves.
+        - We hope for a productive exchange of perspectives.
       choices:
-      - text: I am here to discuss our shared interests in the sector.
-        next_context: discuss_agenda
-      - text: Identify yourselves and state your intentions for this contact.
+      - text: I'm looking for trade and information, not politics.
+        next_context: trade_open
+      - text: Tell me more about your stance on the Liberty Front.
+        next_context: branch.inquiry
     trade_open:
     - grammar:
         origin:
         - '#opener# #detail# #honorific# #aside#'
         opener:
-        - The currents of commerce are vast, {player}, and even a lone voyager needs
-          the right cargo.
-        - Opportunity presents itself rarely in these desolate sectors.
-        - Your presence here suggests a need for resources, {player}.
+        - A most harmonious opportunity presents itself.
+        - The cosmic currents suggest a path of cooperation.
+        - Prosperity is best achieved through mutual exchange.
         detail:
-        - The Dacaran people possess assets that could bolster your journey.
-        - We have specialized goods that might serve the Liberty Front's interests.
-        - My kin and I can offer much to one who seeks to navigate these paths.
+        - I find your vessel's cargo quite intriguing for our purposes.
+        - We have certain requirements that only a capable captain like {player} can
+          fulfill.
+        - The Liberty Front is... restrictive; I prefer the freedom of a direct arrangement.
         honorific:
-        - Friend of the stars.
-        - Captain of the void.
-        - Seeker of truth.
+        - my friend.
+        - valiant explorer.
+        - esteemed navigator.
         aside:
-        - (A faint, calculating hum vibrates in their chest.)
-        - (They incline their head slightly toward you.)
-        - (Their wings twitch with a subtle, rhythmic grace.)
+        - Let us see what we can share beneath these stars.
+        - A fair trade serves all parties in this void.
+        - Your cooperation would be most welcomed by our people.
       choices:
-      - text: What specific goods are you offering for trade?
-        next_context: trade_details
-        action: barter
-      - text: I'm interested, but I need to know what you want in exchange.
-        next_context: trade_terms
+      - text: I'm interested. What do you have in mind?
+        next_context: trade_open
+        action: trade
+      - text: Tell me what you need, and I'll see if it's fair.
+        next_context: trade_open
         action: barter
     farewell:
     - grammar:
         origin:
-        - '#opener# #detail#'
+        - '#opener# #detail# #honorific#'
         - '#opener# #aside# #detail#'
         opener:
-        - May your path be guided by purpose, Captain.
-        - The void is vast, and the stars are unforgiving.
+        - Your departure is noted, Captain.
+        - The stars beckon you away.
         detail:
-        - Let us hope our paths cross again when the Liberty Front requires... stronger
-          counsel.
-        - May you find what you seek among the ruins of the outer rim.
+        - Our cooperation remains a significant factor in the current navigation of
+          politics.
+        - I trust your path leads toward profitable horizons.
+        honorific:
+        - May your voyage be efficient.
+        - We shall watch your progress with great interest.
         aside:
-        - (A faint, sharp trill resonates from their throat.)
+        - The Liberty Front is... distracted by many matters.
+        - A wise captain knows when to retreat into the void.
       choices:
-      - text: Until our paths cross again.
-        next_context: departure
-        action: farewell
-      - text: I hope we're still on the same side when that happens.
-        next_context: suspicion_rising
-        action: farewell
+      - text: Until our paths cross again, Dacaran.
+        next_context: farewell
+      - text: I will keep your intentions in mind.
+        next_context: farewell
     dossier_other:
     - grammar:
         origin:
-        - '#opener# #detail# #aside#'
+        - '#opener# #detail# #honorific#'
+        - '#opener# #aside# #detail#'
         opener:
-        - Ah, the {subject}? A fascinating study in raw potential.
-        - Regarding the {subject}, they are... an interesting variable in our shared
-          galaxy.
-        - To speak of the {subject} is to speak of a force that cannot be ignored.
+        - Ah, the {subject}? A fascinating study in raw vitality.
+        - The {subject} are... an interesting variable in our current geopolitical
+          landscape.
+        - When I consider the {subject}, I see a people of profound conviction.
         detail:
-        - They possess a primitive, almost poetic intensity that many of your kind
-          lack.
-        - Their methods are crude, yet their resolve provides a necessary friction
-          against the Liberty Front's stagnation.
-        - They are formidable, though I find their tendency toward blunt force rather
-          unrefined.
+        - They possess a certain primal vigor that many find intimidating, yet they
+          lack the subtle grace required for true governance.
+        - Their methods are crude, yes, but their tenacity makes them an unpredictable
+          force in the sector.
+        - They are bold warriors who often mistake volume for authority.
+        honorific:
+        - A noble observation for a captain of your standing.
+        - I find their presence... enlightening, {player}.
+        - Their spirit is undeniable, even if their tactics lack finesse.
         aside:
-        - I find them useful, if somewhat... loud.
-        - A volatile ally, but perhaps they see more truth in their violence than
-          we do in our diplomacy.
-        - They lack subtlety, yes, but in a galaxy this vast, sometimes a hammer is
-          the only tool that fits.
+        - They are quite primitive in their tactics, but effective.
+        - A blunt instrument in the hands of a desperate people.
+        - Not my finest allies, but certainly formidable.
       choices:
-      - text: You seem to respect them more than you let on.
-      - text: They are just another obstacle to be managed.
+      - text: I've seen them in action. They aren't as simple as you claim.
+        next_context: dossier_other
+      - text: Do you find them a threat to our current interests?
+        next_context: branch.threat_assessment
     offer_coordinates:
     - grammar:
         origin:
-        - '#opener# #detail# #aside#'
+        - '#opener# #detail# #honorific#'
+        - '#opener# #aside# #detail#'
         opener:
-        - A true partnership requires shared knowledge, {player}.
-        - The Liberty Front is blind to what lies ahead, but I see clearly.
-        - We are allies of convenience, and a convenient ally shares their maps.
+        - The Liberty Front is blind to what lies ahead, but my eyes see much further.
+        - A true explorer understands that some treasures are hidden from the unworthy.
+        - I find your ambition... intriguing. It reminds me of a certain shared destiny.
         detail:
-        - I have charted the path to the {target}. You must set your course for sector
-          {coords}—a mere {distance} jumps out in the {band} band. There, {reward}
-          awaits you.
-        - 'The {target} remains hidden from most, but I will grant you the coordinates:
-          Sector {coords}. It is {distance} jumps across the {band} zone where {reward}
-          lies waiting.'
-        - Navigation is a gift I choose to bestow upon you. Head toward sector {coords},
-          roughly {distance} jumps through the {band} band; the {reward} will be within
-          your reach.
+        - To find {target}, you must navigate to sector {coords}. It is but {distance}
+          jumps into the {band} band, where {reward} awaits your grasp.
+        - I can grant you passage to the truth. Set your course for sector {coords}.
+          It lies {distance} jumps within the {band} band; there, {reward} is waiting.
+        honorific:
+        - Tell me, Captain {player}, does such a prize justify the risk?
+        - A worthy find for a pilot of your... specific talents.
         aside:
-        - Do not let my generosity go to waste.
-        - A small gesture of goodwill for our continued cooperation.
-        - I expect you to secure it for us, as we discussed.
+        - They would call it a secret; I prefer to call it an opportunity.
+        - The stars offer their gifts only to those who dare to reach out.
       choices:
-      - text: I appreciate the intel. I'll head out immediately.
+      - text: I'll take the coordinates. Thank you for the tip.
+        next_context: farewell
         action: accept_lead
-      - text: Why are you giving me this for free?
-        action: trade
+      - text: Why are you helping me, Dacaran?
+        next_context: branch.inquiry_motive

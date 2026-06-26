@@ -102,3 +102,39 @@ def load_config(path: Path | str) -> GameConfig:
 def load_default_config() -> GameConfig:
     """Load the bundled default config (`config/default.yaml`)."""
     return load_config(DEFAULT_CONFIG_PATH)
+
+
+def validate_sidecar(
+    sidecar: Path | str,
+    config_path: Path | str = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Merge a generated dialogue sidecar onto the default roster and run §13 integrity checks.
+
+    Mirrors the load path of `load_config` up through the base dialogue merges, then splices
+    `sidecar` on top before running Pydantic validation and `validate_dialogue`. Raises
+    `DialogueIntegrityError` on the first integrity violation, or `ValueError` / `yaml.YAMLError`
+    for structural problems in the sidecar itself.
+    """
+    config_path = Path(config_path)
+    sidecar = Path(sidecar)
+    with open(config_path, encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    roster_file = data.pop("roster_file", None)
+    if roster_file is not None and "roster" not in data:
+        with open(config_path.parent / roster_file, encoding="utf-8") as fh:
+            data["roster"] = yaml.safe_load(fh)
+    dialogue_file = data.pop("dialogue_file", None)
+    if dialogue_file is not None and isinstance(data.get("roster"), dict):
+        files = [dialogue_file] if isinstance(dialogue_file, str) else dialogue_file
+        for name in files:
+            with open(config_path.parent / name, encoding="utf-8") as fh:
+                _merge_dialogue(data["roster"], yaml.safe_load(fh) or {})
+    names_file = data.pop("names_file", None)
+    if names_file is not None and "names" not in data:
+        with open(config_path.parent / names_file, encoding="utf-8") as fh:
+            data["names"] = yaml.safe_load(fh)
+    with open(sidecar, encoding="utf-8") as fh:
+        _merge_dialogue(data["roster"], yaml.safe_load(fh) or {})
+    config = GameConfig.from_mapping(data)
+    if config.roster is not None and config.roster.personas:
+        validate_dialogue(config.roster)
