@@ -281,10 +281,11 @@ def entry_for(roster: RosterConfig, species: AlienSpecies, player: Player, conte
 def reachable_contexts(species: SpeciesConfig) -> frozenset[str]:
     """The friendly-path contexts a species can reach in Phase 2 (per its params, §6.7)."""
     keys = set(PEACEFUL_CONTEXTS)
+    # A `refuses` species never opens trade. `trade_refuse` stays reachable for *everyone*: the
+    # contact screen routes an empty shelf (nothing affordable) or a refusal to it, and the
+    # generic persona's catch-all answers when a species authors no line of its own.
     if species.trade_posture == "refuses":
         keys.discard("trade_open")
-    else:
-        keys.discard("trade_refuse")
     if species.treaty_mode in {"none", "superfluous"}:
         keys -= {"treaty_offer", "treaty_grant", "treaty_condition", "treaty_refuse"}
     return frozenset(keys)

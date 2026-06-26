@@ -129,10 +129,20 @@ def test_converse_dossier_other_carries_subject_and_rephrases() -> None:
 
 def test_converse_rejects_non_peaceful_or_unreachable_context() -> None:
     state = _world()
-    sp = _inject(state, "vesk")  # open trader → trade_refuse is unreachable for it
-    for ctx in ("combat_open", "sig.trojan", "betrayal", "trade_refuse"):
+    sp = _inject(state, "vesk")
+    for ctx in ("combat_open", "sig.trojan", "betrayal"):  # non-peaceful / Phase-3 contexts
         with pytest.raises(EconomyError):
             reduce(state, 1, Converse(sp.id, ctx), CFG)
+
+
+def test_open_trader_can_speak_trade_refuse_on_an_empty_shelf() -> None:
+    # The contact screen routes an empty Trade to `trade_refuse`; the live reducer must accept it
+    # for an open trader (not just a `refuses` species) and fall back to the generic line (§6.7).
+    state = _world()
+    sp = _inject(state, "vesk")
+    res = reduce(state, 1, Converse(sp.id, "trade_refuse"), CFG)
+    apply_result(state, res)
+    assert res.events[0].context == "trade_refuse"
 
 
 def test_hail_is_converse_greeting() -> None:
