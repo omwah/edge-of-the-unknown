@@ -153,8 +153,9 @@ def _drift_config() -> object:
     cfg = load_default_config()
     return cfg.model_copy(update={
         "bigbang": cfg.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1}),
-        "aliens": cfg.aliens.model_copy(update={
-            "drift_ticks_per_firing": 2, "drift_move_chance": 1.0}),
+        "aliens": cfg.aliens.model_copy(update={"drift_move_chance": 1.0}),
+        "ticker": cfg.ticker.model_copy(update={
+            "crons": cfg.ticker.crons.model_copy(update={"alien_drift": 2})}),
     })
 
 

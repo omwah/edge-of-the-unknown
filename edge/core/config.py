@@ -388,10 +388,9 @@ class AliensConfig(BaseModel):
 
     # Alien ship drift (WP16, §6.3): each species rolls `drift_move_chance` per firing
     # to warp to a uniformly-chosen legal adjacent sector. A quiet galaxy is chance 0
-    # or `drift_enabled=False`. `drift_ticks_per_firing` is the cron cadence.
+    # or `drift_enabled=False`. The cron cadence lives in `ticker.crons.alien_drift`.
     drift_enabled: bool = True
     drift_move_chance: float = Field(default=0.25, ge=0.0, le=1.0)
-    drift_ticks_per_firing: int = Field(default=3600, ge=1)  # in ticks (≈ hourly at 1 tick/s)
 
 
 class AllianceConfig(BaseModel):
@@ -761,6 +760,36 @@ class NamesConfig(BaseModel):
     planets: PlanetNamesConfig = Field(default_factory=PlanetNamesConfig)
 
 
+class CronCadenceConfig(BaseModel):
+    """Per-cron cadences in ticks (§9).
+
+    With the default ``tick_seconds=1.0`` each tick is one real second, so a
+    cadence of 1200 means "every 20 real minutes".  Operators can tune these
+    independently; they do not have to be multiples of each other.
+    """
+
+    model_config = _FROZEN
+
+    daily_turn_reset: int = Field(default=1200, ge=1)   # every 20 minutes
+    interest_accrual: int = Field(default=1200, ge=1)   # every 20 minutes
+    port_economy: int = Field(default=1200, ge=1)       # every 20 minutes
+    planet_growth: int = Field(default=1200, ge=1)      # every 20 minutes
+    alien_drift: int = Field(default=120, ge=1)         # every 2 minutes
+
+
+class TickerConfig(BaseModel):
+    """Engine tick-loop timing (§9).
+
+    ``tick_seconds`` is the real-time pause between engine ticks.  Cron
+    cadences are the intervals (in ticks) at which each job fires.
+    """
+
+    model_config = _FROZEN
+
+    tick_seconds: float = Field(default=1.0, gt=0)
+    crons: CronCadenceConfig = CronCadenceConfig()
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -773,6 +802,7 @@ class GameConfig(BaseModel):
     turns_per_day: int = 250  # TWINSTR.DOC default (§9)
     scene: SceneArtConfig = SceneArtConfig()
     ui: UIConfig = UIConfig()
+    ticker: TickerConfig = TickerConfig()
     economy: EconomyConfig = EconomyConfig()
     aliens: AliensConfig = AliensConfig()
     bigbang: BigBangConfig = BigBangConfig()

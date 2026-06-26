@@ -9,6 +9,17 @@ config_version: 2  # Phase-2 schema epoch (engine room, §4.1)
 seed: 4             # universe seed for a new game; leave empty (seed:) for a random seed
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 
+# Engine tick loop (§9). tick_seconds is the real-time interval between ticks.
+# Each cron cadence is in ticks; with tick_seconds=1.0, ticks = real seconds.
+ticker:
+  tick_seconds: 1.0                    # 1 tick per real second
+  crons:
+    daily_turn_reset: 1200             # every 20 minutes
+    interest_accrual: 1200             # every 20 minutes
+    port_economy: 1200                 # every 20 minutes
+    planet_growth: 1200                # every 20 minutes
+    alien_drift: 120                   # every 2 minutes (per-species move chance applies)
+
 # SectorView sprite scene — sizes/counts only, no rules impact (presentation).
 # Sprites are sized to the space available, clamped to [min, max] per axis.
 scene:

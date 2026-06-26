@@ -3134,6 +3134,7 @@ packages:
   - opensimplex>=0.4.5.1,<0.5
   - tracery>=0.1.1
   - anthropic>=0.40 ; extra == 'authoring'
+  - google-antigravity>=0.2 ; extra == 'authoring'
   requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/96/9a/7a7ffa8ace49ac6a3f422fdd83caf8d0ad0d132f01389f02845379033a7b/tracery-0.1.1.tar.gz
   name: tracery
