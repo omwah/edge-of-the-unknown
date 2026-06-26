@@ -131,6 +131,21 @@ seven existing TradeWars clones and the original 1986 TradeWars II BASIC
 source. Do not contradict it casually; if implementation reality forces a
 deviation, update DESIGN.md in the same change and note the reason.
 
+**Keep the dialogue spec in sync.** The alien-dialogue data model, vocabulary,
+selection, validation, and authoring contract are documented for humans *and
+LLMs* in two embedded places: the spec header comment at the top of
+`config/alien_dialogue_default.yaml` (the authoring/checking reference for
+`personas` and `species_grammars`) and the prompt context the authoring tool
+feeds its backend (`edge/dialogue/authoring/pipeline.py` — `build_prompt` /
+`_structure_brief`). Whenever you change the dialogue mechanics — the
+`DialogueWhen` / `DialogueChoice` / `DialogueLine` schema (`edge/core/config.py`),
+the intent vocabulary or placeholder sets (`edge/dialogue/intents.py`), the
+selector or `validate_dialogue` rules (`edge/dialogue/select.py`), the
+`species_grammars` merge (`edge/config.py`), or branch/recency behaviour —
+update **both** of those in the same change (and DESIGN.md §6.7/§13 as above) so
+the on-disk instructions stay correct and complete enough to author and validate
+a corpus.
+
 ## Reference code (read-only)
 
 `references/` contains shallow clones of the analyzed codebases (recreate

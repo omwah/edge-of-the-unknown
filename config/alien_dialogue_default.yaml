@@ -1,20 +1,154 @@
 # Edge of the Unknown — default alien dialogue corpus (DESIGN §6.7).
+# =============================================================================================
+# This file is the hand-authored voice corpus for the default roster, kept separate from the
+# roster (alien_roster_default.yaml) so a roster and its voice can vary independently. It is
+# read at the config I/O seam (edge.config.load_config, via `dialogue_file:` in default.yaml),
+# merged onto the in-memory RosterConfig, and checked by edge.dialogue.select.validate_dialogue
+# (DESIGN §13) on load. The offline authoring pipeline (edge.dialogue.authoring) writes machine
+# alternatives under config/dialogue/<backend>_<model>.yaml in the `species_grammars` shape
+# documented near the bottom of this header; those are layered on top of this base corpus.
 #
-# The hand-authored dialogue for the default roster, kept in its own file so a roster
-# and its voice corpus can vary independently. Loaded at the config I/O seam
-# (edge.config.load_config via `dialogue_file:`) and merged onto the roster before
-# validation, so the in-memory RosterConfig carries these `personas` / `recency_k`.
-# The offline authoring pipeline (edge.dialogue.authoring) writes machine-authored
-# alternatives named for their backend+model under config/dialogue/.
+# This header is the full spec: enough to author/edit a `personas` map or a `species_grammars`
+# sidecar, and to check either for correctness and completeness. Schema lives in
+# edge/core/config.py (DialogueWhen / DialogueChoice / DialogueLine / DialoguePack / RosterConfig),
+# the vocabulary in edge/dialogue/intents.py, selection + validation in edge/dialogue/select.py,
+# and Tracery realisation in edge/dialogue/render.py.
 #
-# --- Dialogue (DESIGN §6.7) ------------------------------------------------------
+# --- TOP-LEVEL SHAPE -------------------------------------------------------------------------
+#   recency_k: <int >= 0>           # no-repeat ring depth (see SELECTION). Default 2.
+#   grammar:   { symbol: [str,...] }# OPTIONAL shared Tracery fragments referenced by `#symbol#`
+#                                   #   from any line's `grammar` (persona/global vocabulary).
+#   personas:  { <persona_name>: <DialoguePack>, ... }   # the voices (see below). MUST include
+#                                   #   `generic` — the ultimate fallback, see COMPLETENESS.
 #
-# `personas` are shareable dialogue packs of generic, voice-correct lines. A species
-# inherits its `persona`'s pack and overrides only distinctive beats; everything else
-# falls back species -> persona -> `generic`, the ultimate fallback. A line entry is
-# { when: <standing/treaty predicate>, variants: [phrasings], weight }; an entry with no
-# `when` is the catch-all. `{placeholders}` ({player} {species} {alliance} {subject} ...)
-# fill from the encounter context. `recency_k` is the no-repeat ring depth.
+# --- THE FALLBACK CHAIN ----------------------------------------------------------------------
+# Every alien resolves a line by walking three packs in order, most specific first:
+#       species.dialogue_pack  ->  personas[species.persona]  ->  personas['generic']
+# (`species.dialogue_pack` lives on the roster / is spliced from a species_grammars sidecar;
+# `species.persona` is a key into `personas` here.) The FIRST pack in the chain that has the
+# requested context key AND at least one entry whose `when` matches wins outright — the search
+# does not blend packs. So a persona overrides `generic` only for the contexts it defines, and a
+# species overrides its persona only for the contexts it defines; all other contexts fall through
+# to `generic`. This is why a persona/species pack may be sparse: author only the distinctive
+# beats and let `generic` carry the rest.
+#
+# --- A DialoguePack --------------------------------------------------------------------------
+# A map of CONTEXT KEY -> ORDERED LIST OF LINE ENTRIES:
+#       <context_key>:
+#         - <DialogueLine>
+#         - <DialogueLine>
+# Each list is the candidate entries for that context; the selector picks one (see SELECTION).
+#
+# --- A DialogueLine (entry) ------------------------------------------------------------------
+#   when:     <DialogueWhen>     # OPTIONAL predicate; omitted ⇒ matches anything (a CATCH-ALL).
+#   variants: [ "<templated phrasing>", ... ]   # a pool of interchangeable phrasings, OR
+#   grammar:  { origin: ["#a# #b#"], a: [...], b: [...] }   # a Tracery rule map (see GRAMMAR).
+#   weight:   <int >= 1>         # OPTIONAL tie-break weight among equally-specific matches (1).
+#   choices:  [ <DialogueChoice>, ... ]   # OPTIONAL authored player replies (see BRANCHING).
+# RULE: exactly ONE of `variants` / `grammar` must be non-empty. If `grammar` is used it MUST
+# define an `origin` symbol. Every `{placeholder}` used must be allowed for the context (below).
+#
+# --- A DialogueWhen (predicate) --------------------------------------------------------------
+# All fields optional; an entry with none (and no `criteria`) is the catch-all. A field that is
+# set must match the encounter facts for the entry to be eligible:
+#   standing: allied | friendly | neutral | wary | hostile   # the effective-disposition band
+#                                   #   (`allied` when the player shares the species' alliance).
+#   treaty:   true | false          # whether a treaty is in force.
+#   criteria: { <fact>: <value> }   # arbitrary fact gates, e.g. { has_intel_target: true }.
+#   posture / stage: <str>          # Phase-3 forward-compat; entries that set these are INERT in
+#                                   #   Phase 2 (never selected). Leave unset for Phase-2 lines.
+#
+# --- A DialogueChoice (authored player reply, optional branching) ----------------------------
+# A line may carry `choices`; when present the contact screen shows these NUMBERED player
+# replies instead of the derived verb menu (an empty/absent list keeps the derived menu).
+#   text:         "<templated reply label>"    # REQUIRED; uses the node's placeholders.
+#   next_context: <context_key>     # OPTIONAL: transition to any known context, incl. a branch.*
+#   action:       farewell | trade | barter | accept_lead | attack   # OPTIONAL mechanical verb
+#                                   #   (`attack` is recognised but Phase-3-gated). No action ⇒
+#                                   #   pure transition. No next_context + no action ⇒ stay/act.
+#   when:         <DialogueWhen>    # OPTIONAL gate on whether the reply is offered.
+#   weight:       <int >= 1>        # OPTIONAL.
+#
+# --- CONTEXT KEYS (the closed vocabulary) ----------------------------------------------------
+# A context key is one of the fixed INTENTS below, OR a reserved namespace key:
+#   diplomacy: greeting  treaty_offer  treaty_grant  treaty_condition  treaty_refuse  farewell
+#   trade:     trade_open  trade_refuse
+#   discovery: offer_coordinates                 (the location-tip "map" mechanic)
+#   lore:      dossier_self  dossier_other
+#   encounter: refuel  extort_response  demand  reward
+#   combat (Phase-3, peaceful=false; authored-but-inert in Phase 2):
+#              combat_open  combat_taunt  surrender  flee_scorn  betrayal
+#   branch.<name>:  an authored intermediate node, reachable ONLY as a choice `next_context`.
+#   sig.<name>:     a Phase-3 signature-mechanic prompt (reserved namespace).
+# Any other key is invalid and fails validation.
+#
+# --- PLACEHOLDERS ({...} fill from the encounter; unknown ones render empty) -----------------
+# Universal (every context):           {player} {species} {alliance}
+# Per-context EXTRAS (in addition to the universal set):
+#   treaty_condition:   {subject} {count}
+#   offer_coordinates:  {target} {coords} {distance} {band} {reward}
+#   dossier_other:      {subject}
+#   demand:             {subject} {count} {reward} {coords}
+#   reward:             {subject} {count} {reward}
+#   combat_taunt:       {subject}
+#   betrayal:           {subject}
+#   branch.* and sig.*: the rich set {subject} {count} {reward} {coords} {item}
+# Using a placeholder not allowed for the context fails validation.
+#
+# --- SELECTION (how one line is chosen at runtime) -------------------------------------------
+# Within the winning pack's entries for a context: keep entries whose `when` matches; among
+# those the MOST-SPECIFIC wins (an entry that pins more facts beats a vaguer one), ties broken by
+# `weight` through a seeded RNG. Then realise it:
+#   - variants: pick an index avoiding the last `recency_k` shown (the no-repeat "recency ring");
+#   - grammar:  expand `origin` (GRAMMAR_VARIANTS=8 seeded expansions, also recency-rotated).
+# Determinism: the same (game seed, command log) reproduces the same line.
+#
+# --- GRAMMAR (Tracery), optional alternative to `variants` -----------------------------------
+# `grammar` is { symbol: [expansions] } expanded from `origin`. Reference other symbols with
+# `#symbol#`; values may embed `{placeholders}`. Symbols not defined locally resolve against the
+# top-level shared `grammar:` map. Keep `#...#` (grammar symbols) and `{...}` (placeholders)
+# distinct — never `#{x}#`. A grammar line MUST define `origin` and must render non-empty.
+#
+# --- BRANCHING / branch.* nodes --------------------------------------------------------------
+# A choice's `next_context` may target a `branch.<name>` node defined in the same pack. Such a
+# node is an ordinary list of line entries (usually a single catch-all entry plus its own
+# `choices`). Every `branch.*` node MUST be reachable — i.e. some choice's `next_context` points
+# at it — or validation rejects it as dead config.
+#
+# --- species_grammars SIDECAR (config/dialogue/<backend>_<model>.yaml) -----------------------
+# A machine-authored sidecar has NO `personas`; instead a top-level `species_grammars` map keyed
+# by SPECIES ID (roster `species[].id`, not persona name), each value a DialoguePack spliced onto
+# that species' `dialogue_pack` (so it wins over the species' persona via the chain above):
+#       species_grammars:
+#         <species_id>:
+#           <context_key>:
+#             - { grammar: { origin: ["#a# {player}"], a: [...] }, choices: [ ... ] }
+# Notes: a species_id must exist in the roster. An `offer_coordinates` entry authored without a
+# `when` is auto-gated on `{ criteria: { has_intel_target: true } }` at merge time, so it never
+# shadows the generic "nothing new" fallback once a tip is logged. A sidecar layers OVER this
+# base corpus; it need not restate contexts that should fall through to persona/generic.
+#
+# --- CORRECTNESS & COMPLETENESS CHECKLIST (validate_dialogue, DESIGN §13) --------------------
+# A corpus (base + any merged sidecar) is valid iff ALL hold:
+#  1. A `generic` persona exists and carries a CATCH-ALL entry (no `when`, no `criteria`) for
+#     EVERY intent key above (all of diplomacy/trade/discovery/lore/encounter/combat) — so
+#     resolution never blanks for any standing/treaty.
+#  2. Every context key in every pack is a known intent, a `branch.*`, or a `sig.*`.
+#  3. Every line entry has exactly one of non-empty `variants` / `grammar` (grammar ⇒ has
+#     `origin`), and every `{placeholder}` (in variants, grammar strings, and choice `text`) is
+#     allowed for that context.
+#  4. Every choice's `action` (if set) is one of farewell/trade/barter/accept_lead/attack, and
+#     its `next_context` (if set) is a known context key.
+#  5. Every `branch.*` node is reachable (targeted by some choice `next_context`).
+#  6. Every species' `persona` names a real persona pack, and for every context the species can
+#     reach (its Phase-2 friendly path + all branch nodes reachable through choices) a non-empty
+#     line resolves for standings allied/friendly/neutral/hostile x treaty false/true. Reachable
+#     contexts come from the species' params: a `refuses` trader drops `trade_open`; a `none` /
+#     `superfluous` treaty_mode drops the `treaty_*` contexts; `trade_refuse` is reachable for
+#     all. `generic`'s catch-alls satisfy this for any species that authors no line of its own.
+#  7. `generic.dossier_other` is parameterised by `{subject}` (one line narrates any species).
+#
+# =============================================================================================
 recency_k: 2
 
 personas:

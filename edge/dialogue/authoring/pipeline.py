@@ -106,6 +106,7 @@ def build_prompt(req: AuthoringRequest, known_contexts: frozenset[str] | None = 
         f"species, addressing the player directly — never narrate from the player's side.\n\n"
         f"Speaker:\n{req.voice}\n\n"
         + (_intent_brief(req.context))
+        + _structure_brief(req.context)
         + "Output a JSON object {\"grammar\": {…}, \"choices\": [...]}. Rules:\n"
         "- 'grammar' is a JSON object mapping Tracery symbols to arrays of expansion strings.\n"
         "- Define an 'origin' symbol that expands the COMPLETE line. 'origin' MUST build the "
@@ -122,6 +123,28 @@ def build_prompt(req: AuthoringRequest, known_contexts: frozenset[str] | None = 
         + contexts_info
         + (f"\nFor reference, these placeholder values may appear at runtime: "
            f"{dict(req.examples)}." if req.examples else "")
+    )
+
+
+def _structure_brief(context: str) -> str:
+    """How the authored line is stored and used — context that steers correct structure (§6.7).
+
+    Tells the model the grammar becomes one per-species pack entry resolved through a
+    species -> persona -> generic fallback (so it should be the species' own voice), and that it
+    is expanded repeatedly behind a no-repeat recency ring (so it should offer real variety).
+    """
+    return (
+        "HOW THE GAME USES THIS LINE:\n"
+        f"- It becomes one entry for the '{context}' beat in THIS species' dialogue pack (a config "
+        "'species_grammars' map: species id -> beat -> [line]). At runtime the engine resolves a "
+        "beat by walking species -> persona -> a built-in generic fallback and taking the most "
+        "specific match, so write the species' OWN distinctive voice here; a plain fallback "
+        "already exists, so don't write a bland one.\n"
+        "- Your 'origin' is expanded MANY times behind a no-repeat recency ring, so put SEVERAL "
+        "distinct alternatives (ideally 3+) in each symbol — a repeat encounter should rephrase, "
+        "not replay the same words.\n"
+        "- Produce ONE self-contained spoken line per expansion (the alien's turn); the player's "
+        "side, if any, goes only in 'choices'.\n\n"
     )
 
 
