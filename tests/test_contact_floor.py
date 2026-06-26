@@ -49,12 +49,13 @@ def test_no_floor_on_deep_branch_or_plain_nodes() -> None:
     assert session._contact_floor(_VERBS, [], "greeting") == []
 
 
-def _dto(*, choices: list[dto.ContactChoiceDTO], floor: list[dto.ContactVerbDTO]) -> dto.ContactDTO:
+def _dto(*, choices: list[dto.ContactChoiceDTO], floor: list[dto.ContactVerbDTO],
+         verbs: list[dto.ContactVerbDTO] | None = None) -> dto.ContactDTO:
     return dto.ContactDTO(
         species="Vesk", persona="serial_formal", alliance="unaligned", standing="friendly",
         band="friendly", disposition_filled=4, base_disposition=0.8, attitude=0.0,
-        effective=0.8, opener="…", verbs=_VERBS, offers=[], dossier=[],
-        choices=choices, floor_verbs=floor)
+        effective=0.8, opener="…", verbs=_VERBS if verbs is None else verbs, offers=[],
+        dossier=[], choices=choices, floor_verbs=floor)
 
 
 def _ids(items: list[tuple[str, object]]) -> list[tuple[str, object]]:
@@ -87,3 +88,30 @@ def test_on_exit_hook_replaces_the_default_pop() -> None:
     screen = AlienContactScreen(_dto(choices=[], floor=[]), on_exit=lambda: calls.append("exit"))
     screen._break_contact()  # no app needed: the hook runs instead of app.pop_screen()
     assert calls == ["exit"]
+
+
+def test_check_action_hides_verbs_absent_from_the_menu() -> None:
+    # Derived menu: an enabled verb's shortcut shows; a disabled one is hidden.
+    verbs = [
+        dto.ContactVerbDTO("hail", "Greet", kind="say", context="greeting"),
+        dto.ContactVerbDTO("trade", "Trade", False, "they refuse to trade"),
+        dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell"),
+    ]
+    screen = AlienContactScreen(_dto(choices=[], floor=[], verbs=verbs))
+    assert screen.check_action("verb", ("hail",)) is True
+    assert screen.check_action("verb", ("trade",)) is None  # disabled ⇒ hidden
+    # Branching node: only floor verbs are in the menu, so Greet/Trade vanish, Ask stays.
+    branch = AlienContactScreen(_dto(
+        choices=[_choice(0, next_context="branch.shop")], floor=[_VERBS[1]]))  # ask
+    assert branch.check_action("verb", ("ask",)) is True
+    assert branch.check_action("verb", ("hail",)) is None
+    assert branch.check_action("verb", ("trade",)) is None
+
+
+def test_check_action_hides_back_without_history() -> None:
+    no_history = AlienContactScreen(_dto(choices=[], floor=[]))
+    assert no_history.check_action("back_one", ()) is None
+    assert no_history.check_action("back", ()) is True  # Escape always breaks contact
+    with_history = AlienContactScreen(_dto(choices=[], floor=[]),
+                                      history=(("greeting", None),))
+    assert with_history.check_action("back_one", ()) is True
