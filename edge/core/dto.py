@@ -578,6 +578,12 @@ class ContactDTO:
     intel_summary: str = ""  # the coordinate tip on offer (§6.7), or "" if none available
     # Authored player replies on the active node (§6.7 branching); empty ⇒ derived verb menu.
     choices: list[ContactChoiceDTO] = field(default_factory=list)
+    # The always-present floor (§6.7): top-level verbs (Ask about… / Farewell / Leave) the screen
+    # appends *after* authored `choices` on a branching top node, so a player can always ask
+    # about others or exit even when the author didn't write those replies. Empty on plain nodes
+    # (the derived menu already carries them) and on deeper `branch.*` nodes. Each floor verb the
+    # grammar already covers (an authored reply with the same action/next_context) is dropped.
+    floor_verbs: list[ContactVerbDTO] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

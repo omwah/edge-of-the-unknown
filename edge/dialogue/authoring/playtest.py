@@ -28,7 +28,7 @@ import dataclasses
 import sys
 from pathlib import Path
 
-from textual import on
+from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
@@ -175,7 +175,8 @@ class PlaytestService:
         """Rewrite every verb/choice to enabled so gated branches become traversable."""
         verbs = [dataclasses.replace(v, enabled=True, reason="") for v in view.verbs]
         choices = [dataclasses.replace(c, enabled=True, reason="") for c in view.choices]
-        return dataclasses.replace(view, verbs=verbs, choices=choices)
+        floor = [dataclasses.replace(v, enabled=True, reason="") for v in view.floor_verbs]
+        return dataclasses.replace(view, verbs=verbs, choices=choices, floor_verbs=floor)
 
     # --- controls (mutators the modal calls) ---------------------------------
 
@@ -270,6 +271,12 @@ class PlaytestControls(ModalScreen[None]):
                 svc.toggle_force_enable()
         await self.recompose()
 
+    def on_click(self, event: events.Click) -> None:
+        # Click outside the box (on the backdrop, i.e. the screen itself) to dismiss; clicks on a
+        # row or anywhere inside the box land on a child widget and are left to their own handlers.
+        if self.get_widget_at(*event.screen_offset)[0] is self:
+            self.dismiss(None)
+
     def action_close(self) -> None:
         self.dismiss(None)
 
@@ -292,10 +299,15 @@ class PlaytestApp(App[None]):
 
     def _show_contact(self) -> None:
         sid = self._svc.current
+        # Break-contact (farewell / leave / Escape) opens the controls modal instead of leaving a
+        # blank screen, so the tester lands somewhere they can pick another species/band.
         self.push_screen(AlienContactScreen(
-            self._svc.contact_view(self._svc.pid, sid), self._svc, self._svc.pid, sid))
+            self._svc.contact_view(self._svc.pid, sid), self._svc, self._svc.pid, sid,
+            on_exit=self.action_controls))
 
     def action_controls(self) -> None:
+        if isinstance(self.screen, PlaytestControls):
+            return  # already open (e.g. a stray Escape) — don't stack duplicates
         self.push_screen(PlaytestControls(self._svc), self._after_controls)
 
     def _after_controls(self, _result: None) -> None:

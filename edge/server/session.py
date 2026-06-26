@@ -944,6 +944,30 @@ def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOffer
     return verbs
 
 
+# The always-present floor (§6.7): top-level verbs the contact screen keeps on offer even on an
+# authored branching node, so a player can always ask about other species or break contact. Each
+# is dropped when an authored reply already covers it (see `_contact_floor`).
+_FLOOR_KEYS = ("ask", "farewell", "leave")
+
+
+def _contact_floor(verbs: list[dto.ContactVerbDTO], choices: list[dto.ContactChoiceDTO],
+                   context: str) -> list[dto.ContactVerbDTO]:
+    """The floor verbs to append after authored `choices` on a top-level branching node (§6.7).
+
+    Empty unless the node both carries authored `choices` (else the derived menu already shows
+    these) and is **top-level** (a base intent, not a deeper `branch.*` node). A floor verb is
+    dropped when an authored reply already provides the same navigation — Ask about… when a
+    choice targets `dossier_other`, Farewell/Leave when a choice already speaks a `farewell` —
+    so the grammar's explicit wording wins and the default only fills a gap.
+    """
+    if not choices or context.startswith(dialogue.BRANCH_PREFIX):
+        return []
+    has_ask = any(c.next_context == "dossier_other" for c in choices)
+    has_exit = any(c.action == "farewell" for c in choices)
+    covered = {"ask": has_ask, "farewell": has_exit, "leave": has_exit}
+    return [v for v in verbs if v.key in _FLOOR_KEYS and not covered.get(v.key, False)]
+
+
 def _tech_offers(species: AlienSpecies, sc: object, player: Player, ship: Ship,
                  effective: float) -> list[dto.TechOfferDTO]:
     """Annotate each tech offer with its price/barter cost and availability (§6, §8)."""
@@ -1090,6 +1114,8 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         choice_ctx.update(subject_extra)
     choices = _contact_choices(state, roster, species, player, shown, config,
                                standing=standing, ctx=choice_ctx, facts=facts)
+    verbs = _contact_verbs(species, sc, offers, subjects_available=bool(subjects),
+                           has_intel=intel is not None, asked_intel=(shown == "offer_coordinates"))
     return dto.ContactDTO(
         species=species.name, persona=species.persona,
         alliance=alliance.name if alliance else "unaligned",
@@ -1098,11 +1124,10 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         attitude=round(player.species_attitudes.get(species.roster_id, 0.0), 3),
         effective=round(effective, 3),
         opener=speech,
-        verbs=_contact_verbs(species, sc, offers, subjects_available=bool(subjects),
-                             has_intel=intel is not None, asked_intel=(shown == "offer_coordinates")),
+        verbs=verbs,
         offers=offers, dossier=dossier, subjects=subjects,
         intel_summary=intel.summary() if intel is not None else "",
-        choices=choices,
+        choices=choices, floor_verbs=_contact_floor(verbs, choices, shown),
     )
 
 
