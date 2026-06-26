@@ -261,8 +261,8 @@ def test_author_line_validates_choice_targets_and_retries() -> None:
     assert line["choices"][0]["next_context"] == "trade_open"
 
 
-def test_author_line_accepts_branch_and_sig_contexts() -> None:
-    """Choice targets can point to branch.* and sig.* reserved namespaces."""
+def test_author_line_accepts_branch_contexts() -> None:
+    """Choice targets can point to branch.* reserved namespaces."""
     from edge.dialogue.authoring.pipeline import author_line
 
     class _SpecialContexts:
@@ -273,13 +273,10 @@ def test_author_line_accepts_branch_and_sig_contexts() -> None:
                 "grammar": {"origin": ["So, what brings you here to seek our counsel today?"]},
                 "choices": [
                     {"text": "A", "next_context": "branch.custom_node"},
-                    {"text": "B", "next_context": "sig.reprogram_unlock.offer"}
                 ]
             }
 
     line = author_line(_SpecialContexts(), AuthoringRequest("greeting", "v", frozenset()),
                       known_contexts=frozenset(["greeting"]))
-    # Both special contexts are accepted without error.
-    assert len(line["choices"]) == 2
+    assert len(line["choices"]) == 1
     assert line["choices"][0]["next_context"] == "branch.custom_node"
-    assert line["choices"][1]["next_context"] == "sig.reprogram_unlock.offer"

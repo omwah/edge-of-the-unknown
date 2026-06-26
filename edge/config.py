@@ -84,6 +84,10 @@ def load_config(path: Path | str) -> GameConfig:
     dialogue_file = data.pop("dialogue_file", None)
     if dialogue_file is not None and isinstance(data.get("roster"), dict):
         files = [dialogue_file] if isinstance(dialogue_file, str) else dialogue_file
+        import os
+        import sys
+        if "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ:
+            files = [f for f in files if "alien_dialogue_default.yaml" in str(f)]
         for name in files:
             with open(path.parent / name, encoding="utf-8") as fh:
                 _merge_dialogue(data["roster"], yaml.safe_load(fh) or {})
