@@ -108,6 +108,44 @@ def load_default_config() -> GameConfig:
     return load_config(DEFAULT_CONFIG_PATH)
 
 
+def load_config_with_sidecar(
+    sidecar: Path | str,
+    config_path: Path | str = DEFAULT_CONFIG_PATH,
+) -> GameConfig:
+    """Build a `GameConfig` with `sidecar` spliced onto the default roster (no integrity check).
+
+    Mirrors `load_config` up through the base dialogue merges, then splices the target
+    `sidecar` on top — exactly the corpus `validate_sidecar` validates, but returned as a live
+    config so a dev tool (the dialogue play-test harness) can drive the runtime against the
+    freshly-authored grammars without re-implementing the merge. Other machine-authored
+    sidecars listed in the config contribute their base corpus only (their `species_grammars`
+    are stripped), so the returned config reflects the default corpus + the one target sidecar.
+    """
+    config_path = Path(config_path)
+    sidecar = Path(sidecar)
+    with open(config_path, encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    roster_file = data.pop("roster_file", None)
+    if roster_file is not None and "roster" not in data:
+        with open(config_path.parent / roster_file, encoding="utf-8") as fh:
+            data["roster"] = yaml.safe_load(fh)
+    dialogue_file = data.pop("dialogue_file", None)
+    if dialogue_file is not None and isinstance(data.get("roster"), dict):
+        files = [dialogue_file] if isinstance(dialogue_file, str) else dialogue_file
+        for name in files:
+            with open(config_path.parent / name, encoding="utf-8") as fh:
+                doc = yaml.safe_load(fh) or {}
+            doc.pop("species_grammars", None)  # ignore other sidecars; splice target alone
+            _merge_dialogue(data["roster"], doc)
+    names_file = data.pop("names_file", None)
+    if names_file is not None and "names" not in data:
+        with open(config_path.parent / names_file, encoding="utf-8") as fh:
+            data["names"] = yaml.safe_load(fh)
+    with open(sidecar, encoding="utf-8") as fh:
+        _merge_dialogue(data["roster"], yaml.safe_load(fh) or {})
+    return GameConfig.from_mapping(data)
+
+
 def validate_sidecar(
     sidecar: Path | str,
     config_path: Path | str = DEFAULT_CONFIG_PATH,
@@ -124,28 +162,6 @@ def validate_sidecar(
     that other machine-authored sidecars listed in the config do not interfere with the
     validation of the target sidecar — each sidecar is validated against the base corpus alone.
     """
-    config_path = Path(config_path)
-    sidecar = Path(sidecar)
-    with open(config_path, encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
-    roster_file = data.pop("roster_file", None)
-    if roster_file is not None and "roster" not in data:
-        with open(config_path.parent / roster_file, encoding="utf-8") as fh:
-            data["roster"] = yaml.safe_load(fh)
-    dialogue_file = data.pop("dialogue_file", None)
-    if dialogue_file is not None and isinstance(data.get("roster"), dict):
-        files = [dialogue_file] if isinstance(dialogue_file, str) else dialogue_file
-        for name in files:
-            with open(config_path.parent / name, encoding="utf-8") as fh:
-                doc = yaml.safe_load(fh) or {}
-            doc.pop("species_grammars", None)  # ignore other sidecars; validate target alone
-            _merge_dialogue(data["roster"], doc)
-    names_file = data.pop("names_file", None)
-    if names_file is not None and "names" not in data:
-        with open(config_path.parent / names_file, encoding="utf-8") as fh:
-            data["names"] = yaml.safe_load(fh)
-    with open(sidecar, encoding="utf-8") as fh:
-        _merge_dialogue(data["roster"], yaml.safe_load(fh) or {})
-    config = GameConfig.from_mapping(data)
+    config = load_config_with_sidecar(sidecar, config_path)
     if config.roster is not None and config.roster.personas:
         validate_dialogue(config.roster)

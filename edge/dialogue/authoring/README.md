@@ -128,6 +128,43 @@ build rather than blanking a line in game.
 Generation is **not** auto-merged into the live config on purpose: the current roster ships
 working hand-authored lines, and the tool should never silently overwrite them.
 
+## Play-testing the dialogue (`--playtest`)
+
+Validation proves a sidecar is *well-formed*; the play-test harness lets you **hear it**. It
+drives the **real** `AlienContactScreen` and `server.session.contact_view` against a synthetic
+single-game universe — one instance of every roster species — so you can read each species'
+lines in motion without launching a game and grinding reputation.
+
+```bash
+# Default corpus, in the real contact screen:
+pixi run playtest-dialogue
+# A freshly-authored sidecar spliced onto the default roster:
+pixi run playtest-dialogue --sidecar config/dialogue/alien_dialogue.ollama_gemma4-12b.yaml
+# Start on a given species / seed:
+pixi run playtest-dialogue --species vesk --seed 7
+# Same thing through the authoring CLI:
+pixi run author-dialogue --playtest --sidecar config/dialogue/alien_dialogue.<backend>.yaml
+```
+
+Press **F2** for the controls modal and flip the simulated dials live:
+
+- **Species** — cycle through the whole roster.
+- **Standing** — hostile / neutral / friendly / allied (drives `when: {standing: …}` gating;
+  `wary` is Phase-3-inert so it is omitted; `allied` needs the species to carry an alliance).
+- **Treaty** / **Intel** — toggles that gate treaty- and `offer_coordinates`-keyed lines.
+- **Show disabled** — the runtime's `ui.show_disabled_options` (greys gated rows).
+- **Force-enable & traverse** — makes gated verbs/choices *selectable* so you can walk every
+  branch regardless of standing/treaty/Phase-3 gates.
+
+Inside a conversation, repeat a verb to watch the **recency ring** rephrase the line, follow a
+branch node's player replies, and press **Backspace** to step back out of a dead end (Escape
+breaks contact). The harness only advances the recency ring; trade/barter/lead actions are
+no-ops here, since this is about the words, not the economy.
+
+> Like the rest of this package, the harness is **dev-only**. It is the sole corner of
+> `edge.dialogue` that imports `edge.tui` + `textual`; that import is kept off the runtime path
+> by loading `playtest` lazily (only the CLI's `--playtest` branch imports it).
+
 ## How it fits together
 
 ```
@@ -135,6 +172,7 @@ edge/dialogue/authoring/
   cli.py        # argparse entry point (the `edge-author-dialogue` / `author-dialogue` command)
   backends.py   # the Backend protocol + ollama / anthropic / antigravity / static adapters
   pipeline.py   # prompt assembly, the strict JSON output schema, validation, pack assembly
+  playtest.py   # dev-only play-test TUI (`edge-playtest-dialogue`): real contact screen + dials
 ```
 
 The pipeline is backend-agnostic; only `backends.py` knows any provider specifics. To add a

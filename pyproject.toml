@@ -9,6 +9,7 @@ dependencies = ["opensimplex>=0.4.5.1,<0.5", "tracery>=0.1.1"]
 [project.scripts]
 edge = "edge.tui.app:main"
 edge-author-dialogue = "edge.dialogue.authoring.cli:main"
+edge-playtest-dialogue = "edge.dialogue.authoring.playtest:main"
 
 # Dev-only extras for the cloud authoring backends (the Ollama backend is plain HTTP, no SDK).
 # The runtime never calls an LLM, so these are not Phase-runtime dependencies.
@@ -56,6 +57,7 @@ bigbang = "python -m edge.bigbang"
 devtool = "python -m edge.devtool"
 art-gen = "python -m edge.art.cli"
 author-dialogue = "edge-author-dialogue"  # offline LLM dialogue authoring (DESIGN §6.7)
+playtest-dialogue = "edge-playtest-dialogue"  # play-test authored dialogue in the contact TUI
 lint = "ruff check edge tests"
 test = "pytest"
 typecheck = "mypy"

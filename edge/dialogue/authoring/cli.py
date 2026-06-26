@@ -156,7 +156,25 @@ def main(argv: list[str] | None = None) -> int:
                         help="validate an existing sidecar YAML against the default roster "
                              "and exit (no authoring); exits 0 on success, 1 on integrity "
                              "error, 2 on structural/config error")
+    parser.add_argument("--playtest", action="store_true",
+                        help="open the dialogue play-test TUI instead of authoring: hear every "
+                             "species' lines across standing bands/branches in the real contact "
+                             "screen (use --sidecar to load a freshly-authored corpus)")
+    parser.add_argument("--sidecar", metavar="PATH", default=None,
+                        help="with --playtest: a config/dialogue/*.yaml sidecar to splice onto "
+                             "the default roster before play-testing")
+    parser.add_argument("--seed", type=int, default=1,
+                        help="with --playtest: the synthetic universe seed (default: 1)")
     args = parser.parse_args(argv)
+
+    if args.playtest:
+        from edge.dialogue.authoring import playtest  # lazy: pulls in textual + edge.tui
+        pt_argv: list[str] = ["--seed", str(args.seed)]
+        if args.sidecar is not None:
+            pt_argv += ["--sidecar", args.sidecar]
+        if args.species:  # a single roster id to start on (first, if a list was given)
+            pt_argv += ["--species", args.species.split(",")[0].strip()]
+        return playtest.main(pt_argv)
 
     if args.validate is not None:
         try:

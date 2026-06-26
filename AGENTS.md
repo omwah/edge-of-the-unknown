@@ -218,7 +218,10 @@ What each is for:
   system, DESIGN §6.7 — sits between the lower `edge.core` modules it imports
   and `edge.core.rules`/`edge.server` which import it, so the graph stays
   acyclic; its `dialogue/authoring/` subpackage is the **one dev-only impure
-  corner**, never imported by runtime), `edge/bigbang` (generation, networkx),
+  corner**, never imported by runtime — and the *only* place an upward
+  `edge.tui` import is allowed: `authoring/playtest.py` drives the real contact
+  screen for dialogue play-testing, imported lazily so the runtime path never
+  pulls it in), `edge/bigbang` (generation, networkx),
   `edge/engine` (asyncio background ticks), `edge/store` (SQLite behind a
   repository interface), `edge/server` (command -> event service; fog of
   war enforced at the `to_public(context)` serialization boundary),
