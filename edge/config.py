@@ -114,6 +114,11 @@ def validate_sidecar(
     `sidecar` on top before running Pydantic validation and `validate_dialogue`. Raises
     `DialogueIntegrityError` on the first integrity violation, or `ValueError` / `yaml.YAMLError`
     for structural problems in the sidecar itself.
+
+    The config's `dialogue_file` list is loaded for its base corpus only (personas, recency_k,
+    shared grammar). Any `species_grammars` blocks in those files are stripped before merging so
+    that other machine-authored sidecars listed in the config do not interfere with the
+    validation of the target sidecar — each sidecar is validated against the base corpus alone.
     """
     config_path = Path(config_path)
     sidecar = Path(sidecar)
@@ -128,7 +133,9 @@ def validate_sidecar(
         files = [dialogue_file] if isinstance(dialogue_file, str) else dialogue_file
         for name in files:
             with open(config_path.parent / name, encoding="utf-8") as fh:
-                _merge_dialogue(data["roster"], yaml.safe_load(fh) or {})
+                doc = yaml.safe_load(fh) or {}
+            doc.pop("species_grammars", None)  # ignore other sidecars; validate target alone
+            _merge_dialogue(data["roster"], doc)
     names_file = data.pop("names_file", None)
     if names_file is not None and "names" not in data:
         with open(config_path.parent / names_file, encoding="utf-8") as fh:

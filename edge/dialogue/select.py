@@ -372,9 +372,14 @@ def validate_dialogue(roster: RosterConfig) -> None:
 
     # No orphan branch nodes: a `branch.*` context exists only as a choice target, so an
     # unreferenced one is dead config (and would never be reachable in game).
-    branch_nodes = {ctx for _, pack in packs for ctx in pack if ctx.startswith(BRANCH_PREFIX)}
-    for node in sorted(branch_nodes - branch_targets):
-        raise DialogueIntegrityError(f"branch node {node!r} is unreachable (no choice targets it)")
+    branch_node_source: dict[str, str] = {
+        ctx: label for label, pack in packs for ctx in pack if ctx.startswith(BRANCH_PREFIX)
+    }
+    for node in sorted(set(branch_node_source) - branch_targets):
+        raise DialogueIntegrityError(
+            f"branch node {node!r} is unreachable (no choice targets it)"
+            f" — defined in {branch_node_source[node]}"
+        )
 
     # The generic pack must carry an unconditional catch-all for every base context.
     for context in DIALOGUE_CONTEXTS:
