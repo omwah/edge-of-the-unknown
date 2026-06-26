@@ -95,6 +95,7 @@ class OfferPickerScreen(ModalScreen[int | None]):
 class AlienContactScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Break contact"),
+        Binding("backspace", "back_one", "Back"),
         Binding("h", "verb('hail')", "Greet"),
         Binding("a", "verb('ask')", "Ask about…"),
         Binding("t", "verb('trade')", "Buy tech"),
@@ -125,7 +126,8 @@ class AlienContactScreen(Screen):
     def __init__(self, contact: dto.ContactDTO, service: GameService | None = None,
                  pid: int = 1, species_id: int = 0, *,
                  active_context: str = "greeting", active_subject: int | None = None,
-                 pinned_speech: str | None = None) -> None:
+                 pinned_speech: str | None = None,
+                 history: tuple[tuple[str, int | None], ...] = ()) -> None:
         super().__init__()
         self._contact = contact
         self._service = service
@@ -136,6 +138,10 @@ class AlienContactScreen(Screen):
         # A one-shot frozen speech line (e.g. after logging a tip), overriding the recomputed
         # opener for this rebuild only; any later verb click reopens without it.
         self._pinned_speech = pinned_speech
+        # The (context, subject) nodes walked to reach here, oldest first — the breadcrumb for
+        # Backspace backtracking out of a dead-end branch node (§6.7). View-only: stepping back
+        # re-renders an earlier node without issuing any command (the Converse already fired).
+        self._history = history
 
     def _view(self) -> dto.ContactDTO:
         if self._service is None:
@@ -155,7 +161,7 @@ class AlienContactScreen(Screen):
         self.app.push_screen(AlienContactScreen(
             self._view(), self._service, self._pid, self._species_id,
             active_context=self._active_context, active_subject=self._active_subject,
-            pinned_speech=pinned_speech))
+            pinned_speech=pinned_speech, history=self._history))
 
     def compose(self) -> ComposeResult:
         c = self._view()
@@ -192,6 +198,8 @@ class AlienContactScreen(Screen):
                         for n, v in enumerate(items, start=1):
                             yield ClickableEntry(self._numbered_verb_line(n, v), dest="verb",
                                                  ref=v.key)
+                    if self._history:
+                        yield Static("  [dim]← Back (Backspace)[/]", classes="derived")
         yield Footer()
 
     @staticmethod
@@ -270,6 +278,7 @@ class AlienContactScreen(Screen):
             self._reopen()
             return
         if choice.next_context:
+            self._history = (*self._history, (self._active_context, self._active_subject))
             self._active_context, self._active_subject = choice.next_context, None
         self._reopen()
 
@@ -320,6 +329,7 @@ class AlienContactScreen(Screen):
         if close:
             self.app.pop_screen()  # Farewell breaks contact after the parting line
             return
+        self._history = (*self._history, (self._active_context, self._active_subject))
         self._active_context, self._active_subject = context, subject_id
         self._reopen()
 
@@ -367,3 +377,17 @@ class AlienContactScreen(Screen):
 
     def action_back(self) -> None:
         self.app.pop_screen()
+
+    def action_back_one(self) -> None:
+        """Step back to the previous conversation node (Backspace), out of a dead end (§6.7).
+
+        View-only: it re-renders an earlier `(context, subject)` from the breadcrumb without
+        issuing a command — the navigating `Converse` already fired. With no breadcrumb (at the
+        opener) it does nothing; use Escape to break contact.
+        """
+        if not self._history:
+            return
+        *rest, prev = self._history
+        self._history = tuple(rest)
+        self._active_context, self._active_subject = prev
+        self._reopen()
