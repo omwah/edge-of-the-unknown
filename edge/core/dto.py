@@ -351,18 +351,36 @@ class ComputerDTO:
 
 
 @dataclass(frozen=True)
-class MapBand:
-    title: str
-    rows: list[str]
-    lane: str | None = None  # neutral-lane glyph drawn to this band's left, if any
+class MapNodeDTO:
+    """A clickable sector node on the local map: its label's cell box in `rows`.
+
+    `row`/`col0`/`col1` are character coordinates into the (stripped) `rows` grid —
+    `col0` inclusive, `col1` exclusive — so the TUI can map a click to `sector_id`.
+    """
+
+    sector_id: int  # internal id — the route-plot target
+    display_id: int  # spatial id shown in the label
+    row: int
+    col0: int
+    col1: int
 
 
 @dataclass(frozen=True)
-class MapDTO:
+class LocalMapDTO:
+    """The local sector ego-graph for the Computer → Map tab (§10, §11).
+
+    `rows` are pre-baked Rich-markup lines of a node-and-edge graph centered on the
+    player's sector (gravity columns, fog of war, optional route overlay); the TUI
+    renders them verbatim. `legend` is the one-line glyph key. `nodes` carries each
+    drawn sector's clickable cell box, so clicking a node plots a route to it.
+    """
+
     you_sector: int
     you_band: str
-    bands: list[MapBand]
+    rows: list[str]
+    legend: str = ""
     you_display: int = 0  # spatial id of the player's sector (§5.1)
+    nodes: list[MapNodeDTO] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

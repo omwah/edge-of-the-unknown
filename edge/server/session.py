@@ -15,6 +15,7 @@ from edge.bigbang.topology import bfs_distances
 from edge import dialogue
 from edge.dialogue.intel import pick_intel_target
 from edge.core import dto
+from edge.server import mapgraph
 from edge.server import terrain as terrain_art
 from edge.core.aliens import disposition_band, effective_disposition
 from edge.core.config import GameConfig
@@ -74,7 +75,6 @@ from edge.core.starbases import is_operational
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
 _FULL = {Commodity.FUEL_ORE: "Fuel Ore", Commodity.ORGANICS: "Organics", Commodity.EQUIPMENT: "Equipment"}
-_BAND_ORDER = ("Hub", "Frontier", "Deep", "Void")
 
 
 def _bar10(value: int, maximum: int) -> int:
@@ -552,31 +552,39 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     )
 
 
-def _ordered_bands(present: set[str]) -> list[str]:
-    ranked = [b for b in _BAND_ORDER if b in present]
-    return ranked + sorted(present - set(ranked))
+def map_view(
+    state: UniverseState, player_id: int, *,
+    route_dest: int | None = None, full_graph: bool = False,
+    config: GameConfig | None = None,
+) -> dto.LocalMapDTO:
+    """The local sector ego-graph centered on the player (§10, §11, Map tab).
 
-
-def map_view(state: UniverseState, player_id: int) -> dto.MapDTO:
-    """A banded overview; per-band sector/port/explored counts (§10)."""
+    A node-and-edge graph of the surrounding sectors in gravity columns, baked to
+    Rich-markup rows by `mapgraph`. Reach is `config.ui.local_map_radius` (falling
+    back to the module default when no config is supplied). When `route_dest` is
+    given, the plotted course is overlaid (same explored/full-graph gating as
+    `route_view` — `full_graph` honours a coordinate lead only from its origin, §6.7).
+    """
     player = state.players[player_id]
-    here = state.sectors[state.ships[player.ship_id].sector_id]
-    bands: dict[str, list[Sector]] = {}
-    for sector in state.sectors.values():
-        bands.setdefault(sector.distance_band, []).append(sector)
-    port_sectors = {p.sector_id for p in state.ports.values()}
-    out = []
-    for name in _ordered_bands(set(bands)):
-        secs = bands[name]
-        explored = sum(1 for s in secs if s.id in player.explored_sectors)
-        ports = sum(1 for s in secs if s.id in port_sectors)
-        out.append(dto.MapBand(
-            title=f"Band · {name}",
-            rows=[f"{len(secs)} sectors", f"{explored} explored", f"{ports} ports"],
-        ))
-    return dto.MapDTO(
-        you_sector=here.id, you_band=here.distance_band, bands=out,
-        you_display=_display(state, here.id),
+    ship = state.ships[player.ship_id]
+    here = state.sectors[ship.sector_id]
+    radius = config.ui.local_map_radius if config is not None else mapgraph.LOCAL_RADIUS
+    route: list[int] = []
+    if route_dest is not None:
+        lead = (next((ld for ld in player.leads if ld.sector_id == route_dest), None)
+                if full_graph else None)
+        at_origin = lead is not None and ship.sector_id == lead.origin_sector
+        plan = plan_route(
+            state.adjacency, ship.sector_id, route_dest,
+            allowed=None if at_origin else set(player.explored_sectors),
+            turns_per_warp=ship.turns_per_warp,
+        )
+        if plan.reachable:
+            route = [ship.sector_id, *(h.sector_id for h in plan.hops)]
+    rows, legend, nodes = mapgraph.build_local_map(state, player, radius=radius, route=route)
+    return dto.LocalMapDTO(
+        you_sector=here.id, you_band=here.distance_band, rows=rows, legend=legend,
+        you_display=_display(state, here.id), nodes=nodes,
     )
 
 

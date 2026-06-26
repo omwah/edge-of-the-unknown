@@ -1,8 +1,8 @@
 """MapScreen — the galactic map (UI_MOCKUPS.md §10).
 
-Phase-1 shell: a banded overview (Core → Hub → Frontier → Void) drawn from a
-`MapDTO`, with neutral-lane connectors between alliance home clusters. Zoom,
-search, and the per-sector inspector are stubbed; clicking a band notifies.
+Phase-2 shell: the local sector ego-graph centered on the player's current
+sector, drawn from a `LocalMapDTO` (gravity columns, fog of war, route overlay).
+Zoom and search are stubbed.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Static
 
 from edge.server.service import GameService
-from edge.tui.widgets import MapBandPanel, MapView
+from edge.tui.widgets import LocalMapView
 
 
 class MapScreen(Screen):
@@ -30,16 +30,7 @@ class MapScreen(Screen):
         dock: top; height: 1; background: $primary; color: $background;
         text-style: bold; padding: 0 1;
     }
-    MapScreen #map-legend {
-        height: auto; padding: 0 1; border-top: solid $primary; color: $text-muted;
-    }
     """
-
-    _LEGEND = (
-        "[reverse cyan]@[/] you   ─ warp   [yellow]~[/] neutral lane   "
-        "[yellow]*[/] rumor   [green]o[/] planet   [magenta]P[/] port   "
-        "[red]#[/] starbase   [red]?[/] unexplored"
-    )
 
     def __init__(self, service: GameService, player_id: int) -> None:
         super().__init__()
@@ -48,15 +39,11 @@ class MapScreen(Screen):
     def compose(self) -> ComposeResult:
         m = self._map
         yield Static(
-            f"GALACTIC MAP · you @ Sector {m.you_display} · Band {m.you_band}",
+            f"LOCAL MAP · you @ Sector {m.you_display} · Band {m.you_band}",
             id="map-title",
         )
-        yield MapView(self._map)
-        yield Static(self._LEGEND, id="map-legend")
+        yield LocalMapView(self._map)
         yield Footer()
-
-    def on_map_band_panel_picked(self, msg: MapBandPanel.Picked) -> None:
-        self.notify(f"{msg.title} — sector inspector not wired in the skeleton.", timeout=2)
 
     def action_back(self) -> None:
         self.app.pop_screen()

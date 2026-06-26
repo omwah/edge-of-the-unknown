@@ -120,8 +120,10 @@ class GameService:
         """An advisory read on a counter-offer for the docked port (§8). Commits nothing."""
         return session.haggle_quote(self._state, player_id, commodity, counter_price, self._config)
 
-    def map_view(self, player_id: int) -> dto.MapDTO:
-        return session.map_view(self._state, player_id)
+    def map_view(self, player_id: int, *, route_dest: int | None = None,
+                 full_graph: bool = False) -> dto.LocalMapDTO:
+        return session.map_view(self._state, player_id, route_dest=route_dest,
+                                full_graph=full_graph, config=self._config)
 
     def computer_view(self, player_id: int) -> dto.ComputerDTO:
         return session.computer_view(self._state, player_id, self._config)

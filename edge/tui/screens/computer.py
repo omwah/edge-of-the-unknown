@@ -23,7 +23,7 @@ from edge.core.rules import TravelTo
 from edge.server.service import GameService
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.travel import TravelPromptScreen
-from edge.tui.widgets import MapBandPanel, MapView, bar, preserve_cursor
+from edge.tui.widgets import LocalMapView, bar, preserve_cursor
 
 
 class ComputerScreen(Screen):
@@ -62,10 +62,11 @@ class ComputerScreen(Screen):
         with TabbedContent(initial=self._initial_tab):
             with TabPane("Map", id="map"):
                 yield Static(
-                    f"[b]GALACTIC MAP[/]   [dim]you @ Sector {self._map.you_display} · "
-                    f"Band {self._map.you_band}[/]"
+                    f"[b]LOCAL MAP[/]   [dim]you @ Sector {self._map.you_display} · "
+                    f"Band {self._map.you_band}[/]",
+                    id="map-header",
                 )
-                yield MapView(self._map)
+                yield LocalMapView(self._map, id="local-map")
             with TabPane("Ports", id="ports"):
                 yield Static("[b]PORTS DIRECTORY[/]        [dim]charted ports, nearest first[/]")
                 yield DataTable(id="ports-table", zebra_stripes=True, cursor_type="row")
@@ -187,8 +188,21 @@ class ComputerScreen(Screen):
         # Remember the tab across screens so [C] reopens where the player left off.
         self.app.computer_tab = self.query_one(TabbedContent).active
 
-    def on_map_band_panel_picked(self, msg: MapBandPanel.Picked) -> None:
-        self.notify(f"{msg.title} — sector inspector not wired in the skeleton.", timeout=2)
+    def _refresh_map(self) -> None:
+        """Re-bake the local map with the active route overlaid (§6.7/§11)."""
+        if self._engage_target is None:
+            return
+        # full_graph=True is safe for any target: map_view only opens the full graph
+        # for a destination the player actually holds a lead for (and at its origin).
+        gmap = self._service.map_view(
+            self._pid, route_dest=self._engage_target, full_graph=True)
+        self.query_one("#local-map", LocalMapView).update_map(gmap)
+
+    def on_local_map_view_picked(self, msg: LocalMapView.Picked) -> None:
+        """Clicking a sector on the Map plots a route to it (and shows the Route tab)."""
+        self._route = self._service.route_view(self._pid, msg.sector_id)
+        self._engage_target = msg.sector_id
+        self._show_route()
 
     # --- Route planner (WP14) ------------------------------------------------
 
@@ -217,6 +231,7 @@ class ComputerScreen(Screen):
 
     def _show_route(self) -> None:
         self._render_route()
+        self._refresh_map()  # overlay the plotted course on the Map tab too
         self.query_one(TabbedContent).active = "route"
 
     def _cursor_entry(self, table_id: str, items: list) -> object | None:  # type: ignore[type-arg]

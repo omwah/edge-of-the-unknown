@@ -303,7 +303,7 @@ def test_computer_and_map_views_render(tmp_path: Path) -> None:
     cv = svc.computer_view(1)
     assert isinstance(cv.pairs, list)  # may be empty until ports are discovered
     mv = svc.map_view(1)
-    assert mv.you_sector == 1 and mv.bands
+    assert mv.you_sector == 1 and mv.rows and mv.legend
 
 
 def test_current_planet_view_finds_or_none(tmp_path: Path) -> None:
