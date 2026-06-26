@@ -22,7 +22,8 @@ from typing import Any
 
 import yaml
 
-from edge.config import load_default_config
+from edge.config import load_default_config, validate_sidecar
+from edge.dialogue import select
 from edge.dialogue.authoring.backends import Backend, DebugBackend, get_backend
 from edge.dialogue.authoring.pipeline import author_packs
 
@@ -86,12 +87,31 @@ def main(argv: list[str] | None = None) -> int:
                              "config/dialogue/alien_dialogue.<backend>_<model>.yaml)")
     parser.add_argument("--retries", type=int, default=4,
                         help="regeneration attempts per line before giving up (default: 4)")
+    parser.add_argument("--branch-passes", type=int, default=2,
+                        help="rounds of branch-node authoring after base contexts "
+                             "(0 = skip branch authoring, default: 2)")
     parser.add_argument("--dry-run", action="store_true",
                         help="author one species/context with the static backend and print it")
     parser.add_argument("--debug", action="store_true",
                         help="echo each backend request/response (and raw CLI argv/output) to "
                              "stderr")
+    parser.add_argument("--validate", metavar="PATH", default=None,
+                        help="validate an existing sidecar YAML against the default roster "
+                             "and exit (no authoring); exits 0 on success, 1 on integrity "
+                             "error, 2 on structural/config error")
     args = parser.parse_args(argv)
+
+    if args.validate is not None:
+        try:
+            validate_sidecar(Path(args.validate))
+            print(f"OK: {args.validate}")
+            return 0
+        except select.DialogueIntegrityError as exc:
+            print(f"integrity error: {exc}", file=sys.stderr)
+            return 1
+        except (ValueError, Exception) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
 
     cfg = load_default_config()
     if cfg.roster is None:
@@ -107,7 +127,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.debug:
             backend = DebugBackend(backend)
         first = dict(list(voices.items())[:1])
-        packs = author_packs(backend, first, contexts[:1], examples=_EXAMPLES)
+        packs = author_packs(backend, first, contexts[:1], examples=_EXAMPLES,
+                             branch_passes=args.branch_passes)
         yaml.safe_dump(packs, sys.stdout, sort_keys=False, allow_unicode=True)
         print("\n# dry run — validated, not written", file=sys.stderr)
         return 0
@@ -118,7 +139,8 @@ def main(argv: list[str] | None = None) -> int:
         backend = DebugBackend(backend)
     print(f"authoring {len(voices)} species × {len(contexts)} intents via {backend.name}…",
           file=sys.stderr)
-    packs = author_packs(backend, voices, contexts, examples=_EXAMPLES, retries=args.retries)
+    packs = author_packs(backend, voices, contexts, examples=_EXAMPLES, retries=args.retries,
+                         branch_passes=args.branch_passes)
 
     out = Path(args.out) if args.out else _default_out(backend)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -128,6 +128,10 @@ def build_prompt(req: AuthoringRequest, known_contexts: frozenset[str] | None = 
 
 def _intent_brief(context: str) -> str:
     """A one-line situational brief so the model gets the beat's intent right (§6.7)."""
+    if context.startswith(BRANCH_PREFIX):
+        topic = context[len(BRANCH_PREFIX):].replace("_", " ")
+        return (f"The player chose to explore the topic of '{topic}' further. "
+                f"Continue the alien's side of the conversation on this subject.\n")
     briefs = {
         "greeting": "The player has just hailed you; greet them.\n",
         "trade_open": "You are willing to trade; invite the player to deal.\n",
@@ -312,9 +316,22 @@ def author_line(backend: Any, req: AuthoringRequest, *, known_contexts: frozense
     raise last
 
 
+def _collect_branch_targets(pack: dict[str, list[dict[str, Any]]]) -> set[str]:
+    """Branch-node next_context values referenced by any choice in pack."""
+    targets: set[str] = set()
+    for entries in pack.values():
+        for entry in entries:
+            for choice in (entry.get("choices") or []):
+                nxt = choice.get("next_context") or ""
+                if nxt.startswith(BRANCH_PREFIX):
+                    targets.add(nxt)
+    return targets
+
+
 def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str], *,
                  examples: Mapping[str, Mapping[str, str]] | None = None,
-                 retries: int = 3) -> dict[str, dict[str, list[dict[str, Any]]]]:
+                 retries: int = 3,
+                 branch_passes: int = 2) -> dict[str, dict[str, list[dict[str, Any]]]]:
     """Author a `{voice -> {context -> [line]}}` pack tree for every (voice, context) pair.
 
     `voices` maps a persona/species id to its voice description; `contexts` are the intents to
@@ -322,18 +339,39 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
     Each entry is generated with `retries` and validated, so only sound grammars are kept.
     Choice `next_context` targets are validated against the known contexts; an invalid target
     triggers a retry, so bad choices never make it into the output (§6.7 branching).
+
+    After the base contexts are authored, up to `branch_passes` rounds of branch-node discovery
+    follow: any `branch.*` context referenced in a generated choice is authored in turn, using
+    the same voice. Each round's `known_contexts` grows to include all discovered branch nodes so
+    far, letting the model make valid intra-branch references. Set `branch_passes=0` to skip
+    branch authoring entirely.
     """
     examples = examples or {}
     packs: dict[str, dict[str, list[dict[str, Any]]]] = {}
-    known = frozenset(contexts)
+    base_known = frozenset(contexts)
     for voice_id, voice in voices.items():
         pack: dict[str, list[dict[str, Any]]] = {}
+        known: set[str] = set(base_known)
         for context in contexts:
             req = AuthoringRequest(
                 context=context, voice=voice,
                 placeholders=allowed_placeholders(context),
                 examples=examples.get(context, {}),
             )
-            pack[context] = [author_line(backend, req, known_contexts=known, retries=retries)]
+            pack[context] = [author_line(backend, req, known_contexts=frozenset(known),
+                                         retries=retries)]
+        for _ in range(branch_passes):
+            new_targets = _collect_branch_targets(pack) - known
+            if not new_targets:
+                break
+            known.update(new_targets)
+            for branch_ctx in sorted(new_targets):
+                req = AuthoringRequest(
+                    context=branch_ctx, voice=voice,
+                    placeholders=allowed_placeholders(branch_ctx),
+                    examples={},
+                )
+                pack[branch_ctx] = [author_line(backend, req, known_contexts=frozenset(known),
+                                                retries=retries)]
         packs[voice_id] = pack
     return packs
