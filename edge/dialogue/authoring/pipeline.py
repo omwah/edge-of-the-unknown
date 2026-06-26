@@ -96,8 +96,7 @@ def build_prompt(req: AuthoringRequest, known_contexts: frozenset[str] | None = 
         contexts_list = ", ".join(sorted(known_contexts))
         contexts_info = (
             "\n- For 'next_context' in choices, use ONLY: " + contexts_list +
-            ", or a custom branch.* node (e.g. \"branch.inquiry\"), or a Phase-3 sig.* mechanic "
-            "(e.g. \"sig.reprogram_unlock.offer\"). Do not invent other context names."
+            ", or a custom branch.* node (e.g. \"branch.inquiry\"). Do not invent other context names."
         )
     return (
         "You are authoring branching dialogue for a space-exploration game, offline.\n\n"
@@ -299,8 +298,7 @@ def author_line(backend: Any, req: AuthoringRequest, *, known_contexts: frozense
                     next_ctx = choice.get("next_context")
                     if next_ctx is not None:
                         if not (next_ctx in known_contexts or
-                                next_ctx.startswith(BRANCH_PREFIX) or
-                                next_ctx.startswith("sig.")):
+                                next_ctx.startswith(BRANCH_PREFIX)):
                             raise AuthoringError(
                                 f"{req.context}: choice targets unknown context {next_ctx!r}"
                             )
@@ -328,10 +326,62 @@ def _collect_branch_targets(pack: dict[str, list[dict[str, Any]]]) -> set[str]:
     return targets
 
 
+def unresolved_branch_targets(
+    packs: dict[str, dict[str, list[dict[str, Any]]]],
+) -> dict[str, set[str]]:
+    """Branch-node contexts referenced in choices but not yet authored, per voice.
+
+    A non-empty return value means more branch passes are needed. Used by the CLI to
+    decide whether to prompt for an extra pass after the branch_passes budget runs out.
+    """
+    result: dict[str, set[str]] = {}
+    for voice_id, pack in packs.items():
+        authored = frozenset(pack)
+        unresolved = _collect_branch_targets(pack) - authored
+        if unresolved:
+            result[voice_id] = unresolved
+    return result
+
+
+def extend_packs(
+    backend: Any,
+    voices: Mapping[str, str],
+    packs: dict[str, dict[str, list[dict[str, Any]]]],
+    *,
+    retries: int = 3,
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """Author one round of unresolved branch nodes across all voices (for interactive use).
+
+    For each voice, discovers every branch.* context referenced in a choice but not yet in
+    the pack and generates an entry for it. Intended for the CLI's Y/N loop when the caller
+    wants more branch authoring past the initial branch_passes budget. Mutates packs in
+    place and returns it.
+    """
+    for voice_id, voice in voices.items():
+        pack = packs.get(voice_id, {})
+        known = set(pack)
+        new_targets = _collect_branch_targets(pack) - known
+        if not new_targets:
+            continue
+        known.update(new_targets)
+        for branch_ctx in sorted(new_targets):
+            req = AuthoringRequest(
+                context=branch_ctx, voice=voice,
+                placeholders=allowed_placeholders(branch_ctx),
+                examples={},
+            )
+            pack[branch_ctx] = [author_line(backend, req, known_contexts=frozenset(known),
+                                             retries=retries)]
+        packs[voice_id] = pack
+    return packs
+
+
 def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str], *,
                  examples: Mapping[str, Mapping[str, str]] | None = None,
                  retries: int = 3,
-                 branch_passes: int = 2) -> dict[str, dict[str, list[dict[str, Any]]]]:
+                 branch_passes: int = 2,
+                 existing_packs: Mapping[str, Mapping[str, list[dict[str, Any]]]] | None = None,
+                 ) -> dict[str, dict[str, list[dict[str, Any]]]]:
     """Author a `{voice -> {context -> [line]}}` pack tree for every (voice, context) pair.
 
     `voices` maps a persona/species id to its voice description; `contexts` are the intents to
@@ -339,6 +389,9 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
     Each entry is generated with `retries` and validated, so only sound grammars are kept.
     Choice `next_context` targets are validated against the known contexts; an invalid target
     triggers a retry, so bad choices never make it into the output (§6.7 branching).
+
+    If `existing_packs` is provided, each voice's pack is seeded from it and only missing
+    contexts are authored — letting a resume run fill in what a previous run left incomplete.
 
     After the base contexts are authored, up to `branch_passes` rounds of branch-node discovery
     follow: any `branch.*` context referenced in a generated choice is authored in turn, using
@@ -350,9 +403,16 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
     packs: dict[str, dict[str, list[dict[str, Any]]]] = {}
     base_known = frozenset(contexts)
     for voice_id, voice in voices.items():
-        pack: dict[str, list[dict[str, Any]]] = {}
-        known: set[str] = set(base_known)
+        # Seed from existing pack if provided; only author contexts not already present.
+        pack: dict[str, list[dict[str, Any]]] = (
+            dict(existing_packs[voice_id])
+            if existing_packs and voice_id in existing_packs
+            else {}
+        )
+        known: set[str] = set(base_known) | set(pack)
         for context in contexts:
+            if context in pack:
+                continue  # already authored — preserve it
             req = AuthoringRequest(
                 context=context, voice=voice,
                 placeholders=allowed_placeholders(context),

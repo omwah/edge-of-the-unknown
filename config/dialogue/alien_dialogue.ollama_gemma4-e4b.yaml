@@ -1296,6 +1296,40 @@ species_grammars:
       - text: Where can I find more information on your trade routes?
         next_context: branch.offer_coordinates
         action: trade
+    branch.bargain:
+    - grammar:
+        origin:
+        - 'I will speak of balance, human: #opener# #detail# #honorific#'
+        opener:
+        - A bargain, you say? You mistake the calculus.
+        detail:
+        - It is not a gentle exchange for the weak-willed. For us, every agreement
+          carries the weight of oaths etched in starlight.
+        honorific:
+        - 'Understand this much: we demand true parity when things shift.'
+      choices:
+      - text: What does 'true parity' mean for you?
+        next_context: branch.inquiry
+        action: barter
+      - text: Show me an example of your trade process.
+        next_context: branch.trade_open
+        action: trade
+      - text: I think I understand the concept enough.
+        next_context: dossier_other
+        action: accept_lead
+    branch.offer_coordinates:
+    - grammar:
+        origin:
+        - 'Origin: #opener# regarding the coordinates, Captain {player}.'
+        opener:
+        - We do not give favors lightly. These locations are steeped in old grievances.
+        - Knowledge of such precise markings requires an understanding of obligation.
+      choices:
+      - text: What sort of proof do you require?
+        next_context: branch.bargain
+      - text: Are there specific restrictions on using those coordinates?
+        next_context: branch.inquiry
+        action: trade
   thessarch:
     greeting:
     - grammar:
@@ -1693,3 +1727,12 @@ species_grammars:
         action: barter
       - text: Just give me the coordinates, please.
         next_context: branch.inquiry
+    branch.trade_open:
+    - grammar:
+        origin:
+        - Ah, you persist in this topic of trade. It speaks to a naive belief in simple
+          exchange, doesn't it? Our concerns are far more... intricate.
+      choices:
+      - text: What *do* you require then?
+        next_context: branch.inquiry
+        action: trade
