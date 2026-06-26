@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS meta (
     config_version              INTEGER NOT NULL,
     created_at                  TEXT    NOT NULL,
     day_number                  INTEGER NOT NULL,
-    core_governing_alliance_id  INTEGER
+    core_governing_alliance_id  INTEGER,
+    dialogue_fingerprint        TEXT    -- per-(species,context) choice-count hash; NULL = legacy save
 );
 
 -- Every player command, in order — the source of truth for replay.

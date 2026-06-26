@@ -31,6 +31,7 @@ class GameMeta:
     created_at: str
     day_number: int
     core_governing_alliance_id: int | None
+    dialogue_fingerprint: str | None = None  # None on legacy saves that predate this field
 
 
 @dataclass(frozen=True)
@@ -63,7 +64,7 @@ class Repository(ABC):
     """The persistence seam. A new game writes meta once, then appends commands."""
 
     @abstractmethod
-    def save_meta(self, game: Game) -> None: ...
+    def save_meta(self, game: Game, *, dialogue_fingerprint: str | None = None) -> None: ...
 
     @abstractmethod
     def load_meta(self) -> GameMeta: ...
@@ -108,27 +109,37 @@ class SqliteRepository(Repository):
         self._conn = sqlite3.connect(str(path))
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_SCHEMA_PATH.read_text(encoding="utf-8"))
+        self._migrate()
         self._conn.commit()
 
-    def save_meta(self, game: Game) -> None:
+    def _migrate(self) -> None:
+        try:
+            self._conn.execute("ALTER TABLE meta ADD COLUMN dialogue_fingerprint TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists (schema already applied or from a newer save)
+
+    def save_meta(self, game: Game, *, dialogue_fingerprint: str | None = None) -> None:
         self._conn.execute(
             "INSERT OR REPLACE INTO meta"
-            " (id, seed, config_version, created_at, day_number, core_governing_alliance_id)"
-            " VALUES (1, ?, ?, ?, ?, ?)",
+            " (id, seed, config_version, created_at, day_number,"
+            "  core_governing_alliance_id, dialogue_fingerprint)"
+            " VALUES (1, ?, ?, ?, ?, ?, ?)",
             (game.seed, game.config_version, game.created_at, game.day_number,
-             game.core_governing_alliance_id),
+             game.core_governing_alliance_id, dialogue_fingerprint),
         )
         self._conn.commit()
 
     def load_meta(self) -> GameMeta:
         row = self._conn.execute(
-            "SELECT seed, config_version, created_at, day_number, core_governing_alliance_id"
+            "SELECT seed, config_version, created_at, day_number,"
+            "       core_governing_alliance_id, dialogue_fingerprint"
             " FROM meta WHERE id = 1"
         ).fetchone()
         if row is None:
             raise LookupError("no game meta saved")
         return GameMeta(seed=row[0], config_version=row[1], created_at=row[2],
-                        day_number=row[3], core_governing_alliance_id=row[4])
+                        day_number=row[3], core_governing_alliance_id=row[4],
+                        dialogue_fingerprint=row[5])
 
     def append_command(self, player_id: int, command: Command) -> int:
         type_, payload = codec.encode_command(command)

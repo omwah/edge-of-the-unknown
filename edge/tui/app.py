@@ -14,6 +14,7 @@ from textual.binding import Binding
 from textual.theme import Theme
 
 from edge.config import load_default_config
+from edge.server.service import DialogueConfigMismatchError
 from edge.core.config import SceneArtConfig, UIConfig
 from edge.engine.ticker import EngineTicker
 from edge.server.service import GameService
@@ -95,14 +96,19 @@ class EdgeApp(App[None]):
     def continue_game(self) -> GameService | None:
         """Reload the saved game by replaying its command log (DESIGN §12).
 
-        Returns None when no save exists. The big bang is regenerated from the
-        saved seed, then the durable command log is replayed on top.
+        Returns None when no save exists or when the save is incompatible with the current
+        dialogue config (mismatch shown as a notification). The big bang is regenerated from
+        the saved seed, then the durable command log is replayed on top.
         """
         if not has_save():
             return None
         config = load_default_config()
         self._apply_art_config(config)
-        self.service = GameService.load_game(config, SqliteRepository(default_save()))
+        try:
+            self.service = GameService.load_game(config, SqliteRepository(default_save()))
+        except DialogueConfigMismatchError as exc:
+            self.notify(str(exc), severity="error", timeout=8)
+            return None
         self._start_ticker(self.service)
         return self.service
 

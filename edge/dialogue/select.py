@@ -25,6 +25,8 @@ the rules have already decided.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import random
 from collections.abc import Mapping, Sequence
 from string import Formatter
@@ -418,3 +420,25 @@ def _is_catch_all(when: object) -> bool:
         all(getattr(when, f, None) is None for f in ("standing", "treaty", "posture", "stage"))
         and not getattr(when, "criteria", {})
     )
+
+
+def dialogue_fingerprint(roster: RosterConfig) -> str:
+    """A 16-hex-char hash of the choice-cardinality structure across all species packs.
+
+    Fingerprints only the per-(species, context) choice counts — the one thing
+    `_converse_choice` depends on for replay. Used by `GameService` to detect a
+    save/config mismatch before attempting command-log replay, which would otherwise
+    fail mid-way with "no such reply" if a sidecar has changed.
+    """
+    structure: dict[str, dict[str, list[int]]] = {}
+    for sp in roster.species:
+        counts = {
+            ctx: [len(e.choices) for e in entries if e.choices]
+            for ctx, entries in sp.dialogue_pack.items()
+            if any(e.choices for e in entries)
+        }
+        if counts:
+            structure[sp.id] = counts
+    return hashlib.sha256(
+        json.dumps(structure, sort_keys=True).encode()
+    ).hexdigest()[:16]

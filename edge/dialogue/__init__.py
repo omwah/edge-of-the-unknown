@@ -31,6 +31,7 @@ from edge.dialogue.select import (
     WARY,
     DialogueIntegrityError,
     build_chain,
+    dialogue_fingerprint,
     encounter_rng,
     entry_for,
     fill,
@@ -52,4 +53,5 @@ __all__ = [
     "allowed_placeholders", "is_known_context", "standing_for", "build_chain", "select_line",
     "select_entry", "entry_for", "when_matches", "fill", "encounter_rng", "speak",
     "reachable_contexts", "validate_dialogue", "CHOICE_ACTIONS", "BRANCH_PREFIX",
+    "dialogue_fingerprint",
 ]
