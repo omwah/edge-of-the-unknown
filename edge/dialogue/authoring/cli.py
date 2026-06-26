@@ -61,7 +61,22 @@ def _voices(species: Any, only: set[str] | None) -> dict[str, str]:
         if only and sc.id not in only:
             continue
         blurb = sc.description or f"a {sc.archetype_id} species"
-        voices[sc.id] = f"{sc.name}: {blurb} (speaking voice / persona: {sc.persona})"
+        voice_desc = [
+            f"{sc.name}: {blurb} (speaking voice / persona: {sc.persona})"
+        ]
+        if hasattr(sc, "lore") and sc.lore:
+            lore = sc.lore
+            if lore.biology_and_appearance:
+                voice_desc.append(f"Biology & Appearance: {lore.biology_and_appearance}")
+            if lore.psychology_and_culture:
+                voice_desc.append(f"Psychology & Culture: {lore.psychology_and_culture}")
+            if lore.diplomacy_and_behavior:
+                voice_desc.append(f"Diplomacy & Behavior: {lore.diplomacy_and_behavior}")
+            if lore.relationships:
+                voice_desc.append(f"Relationships: {lore.relationships}")
+            if lore.combat_and_ships:
+                voice_desc.append(f"Combat & Ships: {lore.combat_and_ships}")
+        voices[sc.id] = "\n".join(voice_desc)
     return voices
 
 

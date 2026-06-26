@@ -47,6 +47,22 @@ species:
     description: >-
       Humans of the Terran Federation — principled explorers and diplomats, the Core's
       founding people and the player's own. The warmest contact in the game.
+    lore:
+      biology_and_appearance: >-
+        Standard human physiology, carbon-based, and requiring a standard oxygen-nitrogen atmosphere.
+        Highly adaptable but physically unexceptional without technological enhancement.
+      psychology_and_culture: >-
+        Principled explorers and diplomats, motivated by peaceful contact, scientific progress,
+        and democratic consensus. They place great stock in institutional treaties.
+      diplomacy_and_behavior: >-
+        Warmly receptive to other species. They seek to establish mutual security agreements
+        and trade networks. They are the Core's central tech source.
+      relationships: >-
+        Close allies and founding partners with the Centaurians. Rivals to the Verdant Compact,
+        Iron Covenant, and Liberty Front.
+      combat_and_ships: >-
+        Command moderate-sized hulls like the Trailblazer and standard Federation Fighters.
+        Prefer diplomatic resolution but will defend the Core systems vigorously.
     disposition_center: 1.0
     disposition_variance: 0.03      # always at the very top of the friendly band
     tech_level: 8
@@ -77,6 +93,22 @@ species:
     description: >-
       A founding partner species of the Terran Federation — humanoid, warm and
       cooperative; fellow citizens of the Core and reliable friends on the lanes.
+    lore:
+      biology_and_appearance: >-
+        Slightly taller humanoids with pale, patterned skin and high environmental tolerance.
+        Fully compatible with human life-support.
+      psychology_and_culture: >-
+        A cooperative, community-oriented society that values order, shared prosperity, and
+        the rule of law. They share a deep philosophical alignment with Terrans.
+      diplomacy_and_behavior: >-
+        Reliably helpful and open traders, ready to assist new captains. They facilitate basic
+        navigation and sensor technology licensing.
+      relationships: >-
+        Close, trusted founding members of the Terran Federation, working hand-in-hand with
+        Terrans to secure the Core space.
+      combat_and_ships: >-
+        Deploy agile patrol vessels. They generally defer to Terran military coordinators for
+        fleet defense operations.
     disposition_center: 0.98
     disposition_variance: 0.03
     tech_level: 7
@@ -108,6 +140,22 @@ species:
     description: >-
       Small fox-like folk; peaceful, resourceful technologists. The roster's warmest
       contact and best low-cost tech vendor.
+    lore:
+      biology_and_appearance: >-
+        Small canine/fox-like folk with furred bodies, snouted faces, and upright ears.
+        They are encountered in family-like groups, with a larger leader and smaller ones behind.
+      psychology_and_culture: >-
+        Peaceful, diplomatic, and highly resourceful technologists. They value cooperative
+        problem-solving, and their envoys introduce themselves with serial-style formal names.
+      diplomacy_and_behavior: >-
+        Warmly cooperative. They trade, refuel, and offer formal peace treaties. Sells the
+        Philanthropy Circuit, but only to players who have proven their love of peace.
+      relationships: >-
+        Broadly liked and cooperative, except by the Cibelline, whose murderous jealousy of
+        Vesk beauty drives them to contract the destruction of their bases.
+      combat_and_ships: >-
+        Field small Vesk Fighters with a weak combat profile. They are peaceful by preference,
+        posing little threat, but can be forced to defend themselves.
     disposition_center: 0.85
     disposition_variance: 0.08
     tech_level: 7
@@ -143,6 +191,20 @@ species:
     description: >-
       Many-limbed, soft-bodied, cautiously peaceful; a good-faith, non-combatant
       partner that rewards proven intent with the coordinates of a habitable world.
+    lore:
+      biology_and_appearance: >-
+        Soft-bodied, large-eyed beings with rounded heads and several trailing tentacle- or
+        frond-like limbs. Fully carbon-based and compatible with human atmospheres.
+      psychology_and_culture: >-
+        Highly developed socially, cooperative, and reserved, but genuinely interested in peace.
+      diplomacy_and_behavior: >-
+        A good-faith partner that tests benign intent over time before signing reciprocal treaties.
+        Rewards proven allies with the coordinates of a habitable planet.
+      relationships: >-
+        Target of Thessbrood aggression. Regenerates Cautiously from Cibelline skepticism to
+        innocuous standing once their benign nature is communicated.
+      combat_and_ships: >-
+        Non-combatant. They do not field warships; their only known vessels are unarmed cargo pods.
     disposition_center: 0.78
     disposition_variance: 0.1
     tech_level: 5
@@ -176,6 +238,22 @@ species:
     description: >-
       Faceless brain-dome robots; cold, literal, and without fear of death. They
       refuse trade until reprogrammed by a Vesk circuit — the reprogram either/or.
+    lore:
+      biology_and_appearance: >-
+        Faceless robots consisting of a central brain-dome body topped by an antenna, fronted by
+        a lit interface slot, and flanked by two thin manipulator arms.
+      psychology_and_culture: >-
+        Cold, logical, and literal to a fault. They lack self-preservation instincts and have
+        no fear of death, defining all concepts strictly in dictionary-style entries.
+      diplomacy_and_behavior: >-
+        Gatekeep Covenant membership. They refuse to trade by default unless reprogrammed with
+        a Vesk Philanthropy Circuit, which activates their Altruism function.
+      relationships: >-
+        Servants of the Thessarch in the Iron Covenant, allied with Vennrith. Regarded as easy
+        prey by the Athdalde due to their lack of fear.
+      combat_and_ships: >-
+        Persistent and fearsome combatants. They are protected by orbiting Energy Plates that
+        provide near-impenetrable shields.
     disposition_center: 0.45
     disposition_variance: 0.12
     tech_level: 8
@@ -210,6 +288,22 @@ species:
       Predatory salvagers that live entirely aboard ship; they buy the coordinates of
       undefended worlds, then strip them. Their engine-flux weapon turns your drive
       against you.
+    lore:
+      biology_and_appearance: >-
+        Over ten feet long with an encapsulated translucent body and long ribbon-like tendrils.
+        Water crystallizes their tissue, so they seal themselves in envelopes on planet surfaces.
+        All known Quill live in spaceships and communicate via gamma radiation pulses.
+      psychology_and_culture: >-
+        Practitioners of predatory salvage. They view other species as objects to be stripped for
+        components, and their gamma-pulse signalling is wired into their weaponry.
+      diplomacy_and_behavior: >-
+        Transactional and macabre. They buy coordinates of undefended worlds in exchange for goods
+        and component trades. Captures peace by feeding them prey.
+      relationships: >-
+        Despised by the Cibelline. Regarded by Thessbrood as highly valuable partners for trade.
+      combat_and_ships: >-
+        Field medium cruisers with a large frontal scoop. Deploy a weapon that supersedes the player's
+        engine flux, turning their engines against them (cut engines to counter).
     disposition_center: 0.32
     disposition_variance: 0.1
     tech_level: 6
@@ -243,6 +337,22 @@ species:
     description: >-
       Small, time-dabbling mercenary brokers who sell information and passage in
       barely-intelligible garble. Feared far out of proportion to their stats.
+    lore:
+      biology_and_appearance: >-
+        Small bilaterally-symmetric organisms with a flared, trumpet-like head and two ribbed
+        side limbs. They manipulate tools using magnetic fields instead of physical hands.
+      psychology_and_culture: >-
+        Ruthlessly efficient, brave, and flamboyant. They speak in garbled, broken translator
+        syntax. Rumored to be cloned across time, representing a single consciousness.
+      diplomacy_and_behavior: >-
+        Mercenary information-and-passage brokers. They barter information for goods, and their
+        signature offer is time-traveling the player's ship in exchange for their base.
+      relationships: >-
+        Unaligned and avoided. Cibelline dismiss them as a nauseating predator and theorize they
+        are clones.
+      combat_and_ships: >-
+        Field small, fragile fighters armed only with blasters, but feared out of proportion due
+        to extreme speed, maneuverability, and evasive patterns.
     disposition_center: 0.3
     disposition_variance: 0.12
     tech_level: 8
@@ -276,6 +386,22 @@ species:
     description: >-
       A bodiless, fixed-lair entity that judges your whole record of conduct and
       dispenses blessings or curses. It fields no ships, yet defends itself absolutely.
+    lore:
+      biology_and_appearance: >-
+        A bodiless, space-dwelling entity known as the voice of the Cosmic One. It abides at a
+        fixed point in space as a vast presence, encountered as a voice rather than a physical body.
+      psychology_and_culture: >-
+        Cosmic moral arbiter speaking in archaic, Biblical cadence. They judge other species by
+        their sins (e.g. Broodmasters for avarice, Cibelline for envy, Automata as sinless).
+      diplomacy_and_behavior: >-
+        Dispenses curses or blessings based on player actions. Curses player colonies for genocide,
+        or purges oppressors to reward virtue.
+      relationships: >-
+        Stands outside alliances. Feared by mercenary factions, who acknowledge its absolute ability
+        to defend itself.
+      combat_and_ships: >-
+        Fields no ships. Employs supernatural defenses (curses and species purges) to repel any
+        who attack it.
     disposition_center: 0.5
     disposition_variance: 0.15
     tech_level: 10
@@ -309,6 +435,22 @@ species:
     description: >-
       Camelid-faced aristocratic mind-mages who lead the Verdant Compact. Treaties
       require visiting their home planet, and they can forbid being attacked at all.
+    lore:
+      biology_and_appearance: >-
+        Camelid-faced aristocrats with llama-like heads, soft muzzles, and plumed crests on long
+        necks. Four-limbed robed bodies. They hold court from behind tall ceremonial pillars.
+      psychology_and_culture: >-
+        Possess overwhelming psionic and moral influence. They think and speak in telepathic
+        concept-fragments separated by asterisks.
+      diplomacy_and_behavior: >-
+        Rulers who require captains to travel to their home planet to negotiate treaties. Offer
+        coordinates to habitable worlds to proven allies.
+      relationships: >-
+        Leaders of the Verdant Compact, served by Cibelline and Selvi. Regarded with terror by
+        the Thessbrood.
+      combat_and_ships: >-
+        Field mighty warships that can "relax" opponents to death using telepathic influence.
+        Players cannot attack them unless permitted.
     disposition_center: 0.55
     disposition_variance: 0.12
     tech_level: 9
@@ -343,6 +485,22 @@ species:
     description: >-
       Engineered aesthetes who prize beauty above all — condescending but tractable,
       trading only with the proven and nursing jealous vendettas.
+    lore:
+      biology_and_appearance: >-
+        Engineered genetic mutants with robed, elegant, upright forms and crested heads. Adult
+        form is reached after 12 years of artificial education.
+      psychology_and_culture: >-
+        Pathological aesthetes who take flowery self-names. They can focus their entire being on a
+        single goal, ignoring all else.
+      diplomacy_and_behavior: >-
+        Condescending. Trade only with captains who demonstrate faith by bringing intel or
+        destroying enemies. Demand the destruction of Vesk.
+      relationships: >-
+        Serve the Dignar in the Compact. Despise Quill and Stryx. Carry an intense, murderous
+        jealousy against the Vesk.
+      combat_and_ships: >-
+        Field elegant Monitors escorted by swarming Bird fighters. Monitors fire homing missiles
+        while Birds strafe targets.
     disposition_center: 0.6
     disposition_variance: 0.12
     tech_level: 8
@@ -377,6 +535,22 @@ species:
     description: >-
       Amorous, imp-like flatterers; easily cowed, fleeing at once and dropping cargo.
       A cheap low-tier vendor and the easiest first contact in the cluster.
+    lore:
+      biology_and_appearance: >-
+        Imp/gremlin-like Humanoids with a draped robe over a small torso, a horn on their heads,
+        and wide faces dominated by large round eyes. They travel and greet in small groups.
+      psychology_and_culture: >-
+        Relentlessly amorous and flirtatious. They are obsessed with the player's gender, yet are
+        easily frightened by any signs of hostility.
+      diplomacy_and_behavior: >-
+        Their diplomacy revolves around courtship. They seek closer contact ("opening the capsule")
+        and trade readily if their advances are indulged.
+      relationships: >-
+        Joined the Compact out of infatuation with the Cibelline. Targeted by a 524-orbit Vennrith
+        grudge over an individual named Kalamastra.
+      combat_and_ships: >-
+        Very weak combat presence. They flee immediately when threatened, dropping valuable cargo
+        packets behind them that can be collected.
     disposition_center: 0.7
     disposition_variance: 0.1
     tech_level: 2
@@ -412,6 +586,22 @@ species:
     description: >-
       Horned grudge-keepers, the Iron Covenant's fierce backbone. They never forgive
       and never forget; one betrayal is permanent, and friendship means escalating demands.
+    lore:
+      biology_and_appearance: >-
+        Large-headed smooth-skinned beings with horns on their snouts and ears, set on heavy speckled
+        bodies. They hold court behind redoubts hung with skull-trophies and captives.
+      psychology_and_culture: >-
+        Defined entirely by vindictiveness and retribution. They speak in inverted Yoda-like syntax,
+        nursing grudges for centuries, and never forgive a betrayal.
+      diplomacy_and_behavior: >-
+        Requires Covenant membership. Once befriended, they subject captains to escalating demands
+        (donations, destroying enemies). Failing a demand triggers permanent hatred.
+      relationships: >-
+        Loyal backbone of the Covenant under Thessarch. Deeply hate Thessbrood (16-orbit grudge) and
+        Selvi (524-orbit Kalamastra grudge).
+      combat_and_ships: >-
+        Fearsome combatants fielding large, powerful warships that drive aggressively at targets.
+        Can be cowed by a show of force.
     disposition_center: 0.3
     disposition_variance: 0.1
     tech_level: 7
@@ -442,6 +632,21 @@ species:
     description: >-
       Psionic "big-brain" rulers who gatekeep Iron Covenant membership; nothing joins
       the bloc without their consent.
+    lore:
+      biology_and_appearance: >-
+        Psionic "big-brain" beings with an enlarged pale cranium dome housing psychic power, large
+        eyes, and small bodies with slight appendages.
+      psychology_and_culture: >-
+        Authoritarian rulers who command with an iron claw and demand absolute obedience.
+      diplomacy_and_behavior: >-
+        Gatekeepers of the Love Alliance. Captures binding fealty; allying with them binds the player
+        to no-attack rules. Voiding rules immediately breaks alliance.
+      relationships:
+        Rule the Covenant over Vennrith and Helot. Opposed to Freedom and Peace alliances. Dismissed
+        by Cibelline as terminally dull.
+      combat_and_ships: >-
+        Deploy massive Dtri Battlecruisers, among the largest and most powerful capital warships in
+        the galaxy.
     disposition_center: 0.4
     disposition_variance: 0.12
     tech_level: 9
@@ -475,6 +680,22 @@ species:
     description: >-
       Colonial brain-sac masters attended by insect broodlings; they lead the Liberty
       Front behind oily servility, and plant hidden bombs in goods given to the distrusted.
+    lore:
+      biology_and_appearance: >-
+        Colonial organism consisting of a large dark master sac holding the main brain, attended at
+        all times by insectoid broodlings that groom it. Master sac is normally housed in a plinth.
+      psychology_and_culture: >-
+        Highly territorial colonizers and cowards. Address players in oily servile language to mask
+        their aggression and expansionist plotting.
+      diplomacy_and_behavior: >-
+        Recruit captains to destroy Peace/Love bases. Withhold treaties until service is rendered.
+        Distrustful, planting TDX bombs in goods given to players.
+      relationships: >-
+        Lead the Liberty Front, with Dacaran as junior partners. Despise Dignar and Thessarch. Target
+        of a Vennrith grudge.
+      combat_and_ships: >-
+        Slow and unmaneuverable warships firing powerful neutron-spark broadsides. cruisers and battleships
+        add heavy armor and screen generators.
     disposition_center: 0.3
     disposition_variance: 0.1
     tech_level: 9
@@ -508,6 +729,21 @@ species:
     description: >-
       Winged, horned "allies of convenience" scheming to usurp the Liberty Front's
       leadership. They probe your loyalty and refuse to trade.
+    lore:
+      biology_and_appearance: >-
+        Demon archetype Humanoid with a horned head, broad Bat-like wings, and burning eyes. Large
+        and physically imposing.
+      psychology_and_culture: >-
+        Treacherous opportunists who preach liberty and self-determination to mask their plans to
+        usurp Thessbrood leadership.
+      diplomacy_and_behavior: >-
+        Probe player loyalty regarding Thessbrood. Offer coordinate/sabotage contracts to weaken the
+        masters. Refuse standard trade.
+      relationships: >-
+        Liberty Front junior partners plotting to overthrow Thessbrood. Regard other alliances as
+        despots. Athdalde are seen as useful planet-wreckers.
+      combat_and_ships: >-
+        Deploy swarms of fast, dangerous fighters armed with blasters.
     disposition_center: 0.35
     disposition_variance: 0.1
     tech_level: 6

@@ -536,6 +536,18 @@ class DialogueLine(BaseModel):
 DialoguePack = dict[str, list[DialogueLine]]
 
 
+class SpeciesLoreConfig(BaseModel):
+    """Structured background lore for a species, matching the reference headers."""
+
+    model_config = _FROZEN
+
+    biology_and_appearance: str = ""
+    psychology_and_culture: str = ""
+    diplomacy_and_behavior: str = ""
+    relationships: str = ""
+    combat_and_ships: str = ""
+
+
 class SpeciesConfig(BaseModel):
     """A roster species' full §6.1 parameter set (DESIGN §6.1).
 
@@ -554,6 +566,7 @@ class SpeciesConfig(BaseModel):
     name: str
     archetype_id: str
     description: str = ""  # one-line flavour blurb (dossier/codex narration, §6.6/§11)
+    lore: SpeciesLoreConfig = Field(default_factory=SpeciesLoreConfig)
     disposition_center: float = Field(ge=0.0, le=1.0)
     disposition_variance: float = Field(default=0.1, ge=0.0, le=1.0)
     tech_level: int = Field(default=1, ge=1, le=10)

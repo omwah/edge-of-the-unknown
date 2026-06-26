@@ -206,3 +206,15 @@ def test_merge_dialogue_offer_coordinates_falls_back_without_intel() -> None:
                           ctx=ctx, recency=(), rng=random.Random(1), k=2,
                           facts={"has_intel_target": False})
     assert text == "No fresh coordinates for you, Vale."  # generic fallback, not the blank tip
+
+
+def test_species_lore_config() -> None:
+    cfg = load_default_config()
+    for sp in cfg.roster.species:
+        assert sp.lore is not None
+        assert isinstance(sp.lore.biology_and_appearance, str)
+        assert isinstance(sp.lore.psychology_and_culture, str)
+        assert isinstance(sp.lore.diplomacy_and_behavior, str)
+        assert isinstance(sp.lore.relationships, str)
+        assert isinstance(sp.lore.combat_and_ships, str)
+
