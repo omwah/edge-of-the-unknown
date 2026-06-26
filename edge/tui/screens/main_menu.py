@@ -97,6 +97,8 @@ class MainMenuScreen(Screen):
             self.notify("No save found — start a new game.", timeout=2)
             return
         service = self.app.continue_game()  # type: ignore[attr-defined]
+        if service is None:
+            return  # error already shown via app.notify
         self.app.push_screen(GameScreen(service, self.app.player_id))  # type: ignore[attr-defined]
 
     def action_gallery(self) -> None:

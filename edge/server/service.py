@@ -20,10 +20,20 @@ from edge.core.enums import Commodity
 from edge.core.events import Event
 from edge.core.models import UniverseState
 from edge.core.rules import Command, JoinGame, ReduceResult, apply_result, reduce
+from edge.dialogue import dialogue_fingerprint
 from edge.engine.cron import resolve_cron
 from edge.server import session
 from edge.store.repo import EngineState, Repository
 from edge.store.snapshots import rebuild
+
+
+class DialogueConfigMismatchError(RuntimeError):
+    """The save was made with a different dialogue pack; replay would fail mid-way.
+
+    `_converse_choice` validates choice indices against the live dialogue pack. If the
+    sidecar has changed since the save was recorded, a stored `Converse(choice_index=N)`
+    may now reference a context or index that no longer exists.  Start a new game.
+    """
 
 
 class GameService:
@@ -47,15 +57,29 @@ class GameService:
         player would join by in multiplayer.
         """
         state = generate(config, seed, created_at=created_at)
-        repo.save_meta(state.game)
+        fp = dialogue_fingerprint(config.roster) if config.roster else None
+        repo.save_meta(state.game, dialogue_fingerprint=fp)
         service = cls(state, config, repo)
         service.apply(1, JoinGame())
         return service
 
     @classmethod
     def load_game(cls, config: GameConfig, repo: Repository) -> GameService:
-        """Reconstruct a saved game by replaying the merged command+maintenance log (§3, WP12)."""
+        """Reconstruct a saved game by replaying the merged command+maintenance log (§3, WP12).
+
+        Raises `DialogueConfigMismatchError` if the save's dialogue fingerprint differs from
+        the current config — catching this before replay avoids a mid-way crash in the
+        command-log reducer when a stored `Converse(choice_index=N)` no longer resolves.
+        Legacy saves without a fingerprint (None) are loaded without the check.
+        """
         meta = repo.load_meta()
+        if meta.dialogue_fingerprint is not None and config.roster is not None:
+            current_fp = dialogue_fingerprint(config.roster)
+            if current_fp != meta.dialogue_fingerprint:
+                raise DialogueConfigMismatchError(
+                    "This save used a different dialogue pack — start a new game "
+                    "to use the current config."
+                )
         commands = repo.load_commands()
         state = rebuild(config, meta.seed, commands, created_at=meta.created_at,
                         maintenance=repo.load_maintenance(), cron_resolver=resolve_cron)
