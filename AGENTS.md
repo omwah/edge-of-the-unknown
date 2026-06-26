@@ -1,0 +1,280 @@
+# AGENTS.md — Edge of the Unknown
+
+## What this project is
+
+Edge of the Unknown is a game of **space exploration and discovery** built on the
+mechanical bones of **TradeWars 2002** (the classic BBS door game), in
+**Python 3.12+** with the **Textual** TUI framework. The TW2002 foundation
+is inherited — warp-graph universe, port pair-trading in Fuel Ore /
+Organics / Equipment, turns-per-day, planets — and the exploration-first
+design is free to diverge from it as its own concepts take shape; **trading is
+a means to an end**: it funds the engines, shields, sensors, cloaks, and
+armaments needed to push outward and discover things. Key pillars:
+
+- **Discoveries** — planets (which can be descended onto for surface sites:
+  ruins, artifacts, ancient tech, crashed ships), shipwrecks, nebulae,
+  black holes, space entities. Rarity *and* technology-progression value
+  increase with warp-hop distance from the Core Space (distance bands).
+- **Alien species** — each has a **disposition** on a continuous `0.0` (most
+  hostile) → `1.0` (most friendly) scale, not a binary flag; the roster
+  skews friendly. Per-player **attitude offsets** (raised by trading/favors,
+  lowered by attacks) shift base disposition into an **effective
+  disposition** that drives whether an encounter opens with greeting or
+  violence, prices/barter, and tech unlocks. Each species has a tech level
+  (travel speed + what aspect upgrades it can sell for **gold-pressed
+  latinum**, the universal currency, or barter against artifacts), plus
+  threat (damage) and interception (anti-flee) ratings whose use scales with
+  how hostile it is; among hostile-leaning aliens, rarity scales inversely
+  with threat. Player escape chance is always ≥ a config floor (default
+  10%). Config thresholds (default hostility 0.35 / amity 0.65) name the
+  bands; the **Core Space** (the protected central region, sectors 1–10) and
+  the neutral home lanes around it host only friendly-band members of the alliance
+  that governs the Core, while every other bloc holds its own friendly-band **home
+  cluster** of worlds just outside the Core (so the whole Hub stays innately
+  peaceable; near-home menace is alliance-political, not low disposition). Beyond
+  disposition, each species carries a rich **parameter
+  set** (DESIGN.md §6.1): a `threat_tier` (narrative difficulty, decoupled from
+  raw threat), `combatant` flag, `trade_posture`, `treaty_mode`, `memory_model`
+  (none / normal / never_forgets), `betrayal_model` (recoverable / permanent),
+  a `befriend_price` task list, `pack_behavior`/escort composition, a `fleet`,
+  a `starbase_policy`, a `persona`, a config-driven **`dialogue_pack`**
+  (standing-keyed, persona-voiced conversation: a closed vocabulary of context keys →
+  conditional line entries with **variant pools and a recency ring** so repeat encounters
+  rephrase rather than replay; templated `{placeholders}`; species → persona → generic
+  fallback; DESIGN.md §6.7), and one **signature mechanic** — a named,
+  config-parameterized systemic hook (trojan-gift, reprogram-unlock,
+  influence-gate, morality-judge, escalating-demand, literalist, contract-kill,
+  …, DESIGN.md §6.2). Species are grouped into rival **alliances** (DESIGN.md
+  §6.3): the player may belong to **at most one**, gated by an `admission_price`
+  and a `membership_gate`; joining warms members and turns rival blocs hostile.
+  Each non-governing alliance holds a compact **home cluster** of worlds just
+  outside the Core — smaller than the Core, never adjacent to it, separated from it
+  and from rival clusters by **neutral navigable lanes** of empty space, so the
+  outer bands are always reachable without transiting a bloc's territory (DESIGN.md
+  §5, §6.3).
+  No alliance is privileged in the schema: the **Federation** is just an ordinary
+  alliance that the default roster names as the **initial governor of Core
+  Space** (`Game.core_governing_alliance_id`), and the player **starts as one of its
+  members** — which is what makes the Core a safe home at the start. Core safety
+  follows **whoever currently governs the Core**, not the Federation by name:
+  joining any other bloc resigns that membership, and aligning with a bloc the
+  governor counts as a rival makes **the Core Space itself unsafe to enter** —
+  the governor's forces engage the player on sight until that allegiance is given
+  up. Governance can change hands (a `covets_core` bloc seizing the Core via the
+  player's deeds or NPC events, Phase 5), re-keying who is welcome there.
+  Species also hold dispositions **toward each other** — an inter-species
+  relation matrix plus dated **grudges/vendettas** (DESIGN.md §6.4–7.5) — which
+  drives NPC-vs-NPC behavior and reputation spillover. The **species roster is a
+  config file** — each game is generated against a named roster, the big bang
+  draws a seeded *subset* of it (not every species need appear), a different
+  game can use an entirely different source roster, and each species' base
+  disposition is drawn per-generation from a bounded spread around its roster
+  center, so disposition varies between universe generations.
+- **Ship aspects** — cargo capacity, shields, engine speed (split into **warp
+  speed** for travel and **combat speed** for evasion), cloak/stealth, sensors,
+  armaments; upgraded via trade profits and alien tech. Every hull (player, NPC,
+  and starbase) is a config-driven **ship class** (DESIGN.md §4): `role` (fighter
+  / warship / capital_warship / transport / starbase / …), `length_m`, `speed`,
+  `armament` (weapons with damage + `firing_arc` of ahead / all_round / spinal),
+  and `defenses` (laser_turret / armour / screens / energy_plates /
+  speed_and_size). **Starbases** are immobile ship classes — destructible
+  set-pieces whose razing is the coin of alliance diplomacy.
+- **Engine room** (DESIGN.md §4.1, *Lightspeed*-inspired) — the player ship's
+  aspects are **derived from four slotted subsystems** (`spindrive`, `thrusters`,
+  `screens`, `main_gun`) built from a small shared component vocabulary
+  (accelerator / converter / radiator / secondary / turbine / burner / linkage /
+  navigator) in tech tiers I–III. Combat damage **knocks out components**
+  (localized degradation); repair is hybrid (carried **repair-kits** field-patch;
+  full swaps/upgrades at StarDock or a friendly alien base). Spindrive efficiency
+  gives **one global combat bonus**. Weapons are the spinal **Main Gun** plus
+  finite **homing missiles** (no point-defense). NPC hulls keep flat
+  aspects/defenses via an optional `subsystems` block, so localized damage is
+  player-first.
+- **Planets & orbital starbases** (DESIGN.md §4.2, *Lightspeed* §1.4.6-inspired) —
+  every planet has a **`planet_type`** (terrestrial warm / cool / hot / cold,
+  jovian, asteroid_belt, barren) that fixes its colonizability, a `yield_profile`
+  over the Fuel Ore / Organics / Equipment trio, and a `habitability` cap — keeping
+  the trio sacred (no fourth commodity) while expressing Lightspeed's
+  metal/organics/radioactives/water as yield-and-habitability shaping. Planets carry
+  **ownership** — `none` / an **alliance_id** / a **player_id** (a `player_id` so the
+  model already fits eventual multiplayer): Core Space planets are owned by the
+  governing alliance automatically (re-keying if governance flips), and the **unowned
+  fraction rises monotonically with distance band**, so the frontier's reward is
+  *claimable territory* as well as rarer finds. **Colonists are people, not a
+  commodity** — never bought or sold like the Fuel Ore / Organics / Equipment trio.
+  They are **recruited** (they have a choice): enlisted at StarDock for a per-head
+  latinum *incentive*, or by emigration from inhabited worlds with a positive
+  disposition toward the player. They ride a **separate occupancy limit**
+  (`Ship.colonist_capacity`), not cargo holds, so peopling a colony never competes
+  with trade cargo. A planet may carry an **orbital
+  starbase** that reuses the engine-room model **minus thrusters/spindrive, plus a
+  `fusion_reactor`** (built from the same shared component vocabulary, so parts are
+  fungible across ships and bases). **Derelict is not a special type or stored flag** —
+  a base is derelict when broken/missing components leave it unable to power or defend
+  itself; the big bang makes an **unowned**-world base derelict by **removing or
+  damaging its components** (so repair is just refilling slots), leaving a
+  component-salvage cache to strip (engine-room cannibalize) or **repair and claim**
+  into an operational forward foothold. A base on an owned planet is built intact and
+  **defends the planetary system** against entrants
+  hostile to its owner, with hostility resolved through the alliance system (rival
+  bloc / at-war / hostile effective disposition). Defense strength scales with
+  surviving components and reactor efficiency.
+
+Deterministic, testable, extensible to multiplayer later. Single-player
+first.
+
+## Authoritative spec
+
+**`docs/DESIGN.md` is the authoritative design document. Read it before any
+architectural decision.** It was produced by analyzing the source code of
+seven existing TradeWars clones and the original 1986 TradeWars II BASIC
+source. Do not contradict it casually; if implementation reality forces a
+deviation, update DESIGN.md in the same change and note the reason.
+
+## Reference code (read-only)
+
+`references/` contains shallow clones of the analyzed codebases (recreate
+with `scripts/clone_references.sh` if absent). **Never modify these; they are for
+reading only. Never copy code from them verbatim** — they are inspiration
+and a source of constants/algorithms, and they carry assorted licenses
+(GPL-era code among them). Reimplement ideas cleanly.
+
+What each is for:
+- `references/twclone` — architecture reference: server/engine process split,
+  durable event log + cron-task scheduling, market-driven port economy
+  (docs/GALACTIC_ECONOMY.md, docs/ENGINE.md), tunnel/FedSpace universe gen,
+  full TW command catalog in docs/PROTOCOL.v3/.
+- `references/terminal-space` — closest Python cousin: clean domain model,
+  PortClass enum (8 buy/sell triples), port type distribution
+  (20/20/20/10/10/10/5/5), stock-ratio pricing, `to_public(context)`
+  fog-of-war DTO pattern, embedded-server single-player.
+- `references/blacknovatraders` — tuned economy constants (config.php),
+  linear pricing `base ± delta * stock/limit`, planet/colonist production
+  math (sched_planets.php), combat baseline (attack.php).
+- `references/tradewars/tw2bas/` — the original 1986 BASIC source +
+  TWINSTR.DOC rulebook: turn costs, sector-fighter rules, retreat costs one
+  fighter, Cabal NPCs, 500-sector scale. Authenticity reference.
+- `references/SectorWars` — contains "TW Sector Algorithm.txt": the
+  cluster-and-bridge universe generation algorithm we use.
+- `references/ExchangeConflict2016` — networkx generation motifs (deadends,
+  rings), uniview-style map inspector idea, config-driven ship data.
+- `references/aatraders` — sysop/admin feature catalog only (Phase 5).
+
+## Work completed so far
+
+1. Researched and identified all notable open-source TW2002 clones.
+2. Cloned and analyzed their source directly (architecture, economy
+   formulas, universe-gen algorithms, original game rules).
+3. Wrote `docs/DESIGN.md`: full design — layered architecture
+   (core / bigbang / engine / store / server / tui), data model, big bang
+   pipeline, economy formulas, turn/tick engine, combat, Textual UI design,
+   persistence, testing strategy, 5-phase roadmap.
+4. Revised the design (v0.2, June 2026) to the exploration-first focus
+   described above: alien species, discoveries, distance bands, latinum, ship
+   aspects, encounter/flee rules (DESIGN.md §§6, 8, 11).
+5. Added the *Lightspeed*-inspired engine-room subsystem/component ship model
+   (DESIGN.md §4.1): slotted subsystems, shared component vocabulary, localized
+   combat damage, hybrid repair, global engine bonus, homing missiles.
+6. Added the planetary system (DESIGN.md §4.2, *Lightspeed* §1.4.6-inspired):
+   `planet_type` taxonomy with yield profiles + habitability, three-way ownership
+   (none / alliance_id / player_id) with Core-owned-by-governor and band-rising
+   unowned density, and orbital starbases (engine-room model minus thrusters/spindrive
+   plus a fusion reactor) that the big bang can make derelict by stripping/damaging
+   components on unowned worlds (so repair is routine, not special-cased), are
+   scavengeable for components, and defend owned planetary systems via alliance-keyed
+   hostility.
+7. Added alliance **home clusters** to universe generation (DESIGN.md §5 step 6,
+   §6.3): each non-governing alliance gets a compact, alliance-owned cluster of worlds
+   just outside the Core — smaller than the Core, never adjacent to it — with **neutral
+   navigable lanes** of empty space between clusters so the player can always reach the
+   outer bands without transiting a bloc's territory. Clusters are friendly-band by
+   disposition, so the Hub stays peaceable until the player aligns against a bloc.
+8. Reviewed and tightened the economy spec (DESIGN.md §8): made the §8 pricing
+   formula **normative** over the §A.2 reference (whose buy-side sign is inverted —
+   selling into a port must *lower* its price), defined `stock_ratio`/`capacity`/
+   `elasticity` and a positive-price **clamp** invariant, and added an **Economy
+   constants** block (starting capital, Tier-I/II/III component prices and barter
+   equivalence, ship/repair costs, and an explicit latinum faucet/sink model) so the
+   `trade → fund first upgrade` loop has a tunable, testable balance ratio.
+9. Added the **alien dialogue system** (DESIGN.md §6.7), stress-tested against the
+   Lightspeed per-species dialogue corpus (`lightspeed-analysis/Lightspeed_Alien_Dialogue_Reference.md`):
+   a config-driven `dialogue_pack` of context keys → conditional (`when`) line entries
+   keyed to standing band / treaty / grudge / mechanic stage, with **variant pools + a
+   recency ring** for non-repeating variability, templated placeholders, and a
+   species → `persona` → generic fallback chain. The contact-screen conversation **verb
+   menu is derived** from species parameters, not authored. The dialogue corpus lives in
+   its **own config file** (`config/alien_dialogue_default.yaml`, separate from
+   `config/alien_roster_default.yaml`), merged onto the roster at the config I/O seam so a
+   roster and its voice corpus vary independently. Wired into §4 data model
+   (`dialogue_pack`, `Player.dialogue_recency`), §10/§11 (encounter & contact screens),
+   §13 (dialogue-integrity validation), and Appendix B.
+
+**No implementation code exists yet.** The next session starts Phase 1.
+
+## Architecture rules (non-negotiable)
+
+- Layered, downward-only dependencies: `edge/core` (pure rules, **no I/O,
+  no async, no Textual imports**), `edge/dialogue` (pure salience dialogue
+  system, DESIGN §6.7 — sits between the lower `edge.core` modules it imports
+  and `edge.core.rules`/`edge.server` which import it, so the graph stays
+  acyclic; its `dialogue/authoring/` subpackage is the **one dev-only impure
+  corner**, never imported by runtime), `edge/bigbang` (generation, networkx),
+  `edge/engine` (asyncio background ticks), `edge/store` (SQLite behind a
+  repository interface), `edge/server` (command -> event service; fog of
+  war enforced at the `to_public(context)` serialization boundary),
+  `edge/tui` (Textual app only).
+- All randomness flows through a seeded `random.Random` owned by game
+  state. A game must be reproducible from `(seed, command log)`.
+- Economy invariants enforced in core, always: no negative balances, goods
+  are conserved by trades, every state mutation is transactional.
+- Game constants (ship stats, prices, universe size) live in config files,
+  not code.
+- Single-player embeds the server in-process; never let the TUI reach
+  around the service API into core state directly.
+
+## Roadmap (from DESIGN.md §14)
+
+- **Phase 1 (current):** core models, big bang (cluster+bridge+distance
+  bands+validate, Core Space sectors 1-10, StarDock), movement with turn
+  costs, port docking + trading with live pricing and haggling in latinum,
+  SQLite persistence, Textual game screen (sector view, clickable warp
+  list, status sidebar, port screen). Exit criterion: pair-trading loop is
+  fun for 30 minutes and funds a first ship upgrade.
+- **Phase 2 (the pivot phase):** discovery system with distance-banded
+  rarity, planet descent + surface sites, sensor detection, discovery
+  codex, friendly-disposition alien species with tech barter/latinum sales of aspect upgrades,
+  the engine-room subsystem/component model (§4.1: slotted upgrades, component
+  tiers, derived aspects, repair), StarDock services, multiple ship types,
+  **typed planets with band-weighted types/ownership and BNT-style production
+  shaped by `planet_type`/habitability, player colonization of unowned worlds,
+  derelict orbital starbases as scavengeable component caches** (DESIGN.md §4.2),
+  Genesis torpedoes, Computer screen (pair-trade finder, route planner).
+- **Phase 3:** low-disposition (hostile-band) alien species (threat/interception,
+  threat tiers, rarity inverse to threat, escape-chance floor), encounter system
+  (disposition roll for greeting vs. violence, escort/pack spawns, firing-arc
+  combat, localized component damage + field-kit repair, homing missiles),
+  signature-mechanic hooks, alliances (join one bloc, admission-price
+  tasks, rival fallout) and inter-species relations/grudges, ship combat with
+  salvage and escape pods, NPC starbases as destructible set-pieces,
+  **orbital/planetary starbases with ownership-keyed planetary-system defense and
+  player repair/claim of derelict bases into forward footholds** (DESIGN.md §4.2),
+  sector fighters/mines, alignment/experience, Core Space law keyed to the governing
+  alliance (static Federation governor this phase; Core safety driven by the
+  player's standing with the governor), friendly-disposition NPC traders, hostile
+  homeworld raids.
+- **Phase 4:** multiplayer (JSON-RPC over websockets), corporations.
+- **Phase 5:** order-book economy, citadels, dynamic governance of Core
+  Space (a `covets_core` bloc seizing control, flipping the governing alliance),
+  probes, richer alien interactions, sysop console, scripting hooks.
+
+## Conventions
+
+- Python >= 3.12, `ruff` + `mypy --strict` on every real layer — `core/`,
+  `bigbang/`, `store/`, `server/`, `engine/` (the throwaway `tui/` is exempt).
+- Tests: pytest + hypothesis. Property tests for economy invariants;
+  golden-master replays of command logs against fixed seeds; bigbang
+  validation across many seeds; Textual Pilot for UI flows.
+- Dependencies (Phase 1): textual, rich, networkx, pydantic v2, pyyaml,
+  matplotlib + scipy (dev-only bigbang --render); stdlib sqlite3. Add nothing
+  else without updating DESIGN.md §15.
+- Commit style: small, phase-tagged (e.g. `p1: bigbang cluster pass`).
