@@ -148,6 +148,38 @@ async def test_app_opens_controls_modal_and_toggles_dials() -> None:
         assert isinstance(app.screen, AlienContactScreen)
 
 
+async def test_clicking_outside_controls_dismisses_it() -> None:
+    from edge.dialogue.authoring.playtest import PlaytestControls
+
+    svc = _service()
+    app = PlaytestApp(svc)
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("f2")
+        await pilot.pause()
+        assert isinstance(app.screen, PlaytestControls)
+        await pilot.click(offset=(1, 1))  # the backdrop, well clear of the centred box
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+
+
+async def test_farewell_opens_controls_instead_of_a_blank_screen() -> None:
+    from edge.dialogue.authoring.playtest import PlaytestControls
+
+    svc = _service()
+    app = PlaytestApp(svc)
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        await pilot.press("f")  # Farewell — breaks contact
+        await pilot.pause()
+        assert isinstance(app.screen, PlaytestControls)
+        # Closing the modal lands back on a (fresh) contact screen, never a blank one.
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+
+
 async def test_say_verb_records_history_and_backspace_backtracks() -> None:
     svc = _service()
     app = PlaytestApp(svc)
@@ -162,3 +194,17 @@ async def test_say_verb_records_history_and_backspace_backtracks() -> None:
         await pilot.pause()
         assert app.screen._history == ()
         assert app.screen._active_context == "greeting"
+
+
+async def test_back_row_is_clickable() -> None:
+    svc = _service()
+    app = PlaytestApp(svc)
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("h")  # navigate so a Back row appears
+        await pilot.pause()
+        assert app.screen._history == (("greeting", None),)
+        back = next(w for w in app.screen.query(ClickableEntry) if w._dest == "back")
+        await pilot.click(back)
+        await pilot.pause()
+        assert app.screen._history == ()

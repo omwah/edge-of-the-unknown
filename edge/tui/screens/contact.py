@@ -11,6 +11,8 @@ service (screenshot harness) it renders a passed sample DTO.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -127,7 +129,8 @@ class AlienContactScreen(Screen):
                  pid: int = 1, species_id: int = 0, *,
                  active_context: str = "greeting", active_subject: int | None = None,
                  pinned_speech: str | None = None,
-                 history: tuple[tuple[str, int | None], ...] = ()) -> None:
+                 history: tuple[tuple[str, int | None], ...] = (),
+                 on_exit: Callable[[], None] | None = None) -> None:
         super().__init__()
         self._contact = contact
         self._service = service
@@ -138,6 +141,10 @@ class AlienContactScreen(Screen):
         # A one-shot frozen speech line (e.g. after logging a tip), overriding the recomputed
         # opener for this rebuild only; any later verb click reopens without it.
         self._pinned_speech = pinned_speech
+        # What "break contact" does (farewell / leave / Escape). Default pops back to the game;
+        # a host can override it — the dialogue play-test harness routes it to its controls modal
+        # so a farewell lands somewhere useful instead of a blank screen.
+        self._on_exit = on_exit
         # The (context, subject) nodes walked to reach here, oldest first — the breadcrumb for
         # Backspace backtracking out of a dead-end branch node (§6.7). View-only: stepping back
         # re-renders an earlier node without issuing any command (the Converse already fired).
@@ -161,7 +168,14 @@ class AlienContactScreen(Screen):
         self.app.push_screen(AlienContactScreen(
             self._view(), self._service, self._pid, self._species_id,
             active_context=self._active_context, active_subject=self._active_subject,
-            pinned_speech=pinned_speech, history=self._history))
+            pinned_speech=pinned_speech, history=self._history, on_exit=self._on_exit))
+
+    def _break_contact(self) -> None:
+        """End the conversation: run the host's exit hook, or pop back to the game by default."""
+        if self._on_exit is not None:
+            self._on_exit()
+        else:
+            self.app.pop_screen()
 
     def compose(self) -> ComposeResult:
         c = self._view()
@@ -184,23 +198,48 @@ class AlienContactScreen(Screen):
                 with Vertical(id="verbs"):
                     heading = "Your reply" if c.choices else "Options"
                     yield Static(heading, classes="heading")
-                    show_disabled = (self._service.config.ui.show_disabled_options
-                                    if self._service else False)
-                    if c.choices:
-                        # Authored branching node: numbered player replies.
-                        items = c.choices if show_disabled else [ch for ch in c.choices if ch.enabled]
-                        for n, ch in enumerate(items, start=1):
-                            yield ClickableEntry(self._choice_line(n, ch), dest="choice",
-                                                 ref=ch.index)
-                    else:
-                        # Derived menu: all verbs (Say + Do) numbered uniformly.
-                        items = c.verbs if show_disabled else [v for v in c.verbs if v.enabled]
-                        for n, v in enumerate(items, start=1):
-                            yield ClickableEntry(self._numbered_verb_line(n, v), dest="verb",
-                                                 ref=v.key)
+                    for n, (kind, item) in enumerate(self._menu_items(c), start=1):
+                        if kind == "choice":
+                            yield ClickableEntry(self._choice_line(n, item), dest="choice",
+                                                 ref=item.index)
+                        else:
+                            yield ClickableEntry(self._numbered_verb_line(n, item), dest="verb",
+                                                 ref=item.key)
                     if self._history:
-                        yield Static("  [dim]← Back (Backspace)[/]", classes="derived")
+                        yield ClickableEntry("  [dim]← Back (Backspace)[/]", dest="back",
+                                             classes="derived")
         yield Footer()
+
+    def _show_disabled(self) -> bool:
+        return self._service.config.ui.show_disabled_options if self._service else False
+
+    def _menu_items(self, c: dto.ContactDTO) -> list[tuple[str, object]]:
+        """The unified, ordered reply menu: authored choices then the always-present floor.
+
+        On a plain node this is the derived Say/Do verb menu; on a branching top node it is the
+        authored player replies followed by the floor verbs (Ask about… / Farewell / Leave) the
+        author didn't already cover (`ContactDTO.floor_verbs`, §6.7). Returning one ordered list
+        keeps click dispatch (by dest/ref) and number-key dispatch (by position) in lockstep.
+        """
+        show_disabled = self._show_disabled()
+        items: list[tuple[str, object]] = []
+        if c.choices:
+            chs = c.choices if show_disabled else [ch for ch in c.choices if ch.enabled]
+            items += [("choice", ch) for ch in chs]
+            floor = c.floor_verbs if show_disabled else [v for v in c.floor_verbs if v.enabled]
+            items += [("verb", v) for v in floor]
+        else:
+            verbs = c.verbs if show_disabled else [v for v in c.verbs if v.enabled]
+            items += [("verb", v) for v in verbs]
+        # The farewell — an authored reply or the derived/floor verb — always sorts last (stable,
+        # so everything else keeps its order). Dispatch is by item id, so reordering is safe.
+        items.sort(key=lambda it: 1 if self._is_farewell(it) else 0)
+        return items
+
+    @staticmethod
+    def _is_farewell(item: tuple[str, object]) -> bool:
+        kind, obj = item
+        return obj.action == "farewell" if kind == "choice" else obj.key == "farewell"  # type: ignore[attr-defined]
 
     @staticmethod
     def _verb_line(v: dto.ContactVerbDTO) -> str:
@@ -231,25 +270,22 @@ class AlienContactScreen(Screen):
             self._choose(int(msg.ref))  # type: ignore[arg-type]
         elif msg.dest == "verb":
             self._dispatch(str(msg.ref))
+        elif msg.dest == "back":
+            self.action_back_one()
 
     def action_verb(self, key: str) -> None:
         self._dispatch(key)
 
     def action_choice(self, n: int) -> None:
-        """Select the n-th shown option (key 1–9): a choice on a branching node or a verb on derived."""
-        view = self._view()
-        show_disabled = (self._service.config.ui.show_disabled_options
-                        if self._service else False)
-        if view.choices:
-            # Branching node: numbered choices.
-            items = view.choices if show_disabled else [ch for ch in view.choices if ch.enabled]
-            if 1 <= n <= len(items):
-                self._choose(items[n - 1].index)
+        """Select the n-th shown reply (key 1–9): an authored choice or a verb, in render order."""
+        items = self._menu_items(self._view())
+        if not 1 <= n <= len(items):
+            return
+        kind, item = items[n - 1]
+        if kind == "choice":
+            self._choose(item.index)  # type: ignore[attr-defined]
         else:
-            # Derived menu: numbered verbs.
-            items = view.verbs if show_disabled else [v for v in view.verbs if v.enabled]
-            if 1 <= n <= len(items):
-                self._dispatch(items[n - 1].key)
+            self._dispatch(item.key)  # type: ignore[attr-defined]
 
     def _choose(self, index: int) -> None:
         """Apply a player reply on a branching node, then navigate per its action/transition."""
@@ -268,7 +304,7 @@ class AlienContactScreen(Screen):
             self.notify(str(exc), timeout=2)
             return
         if choice.action == "farewell":
-            self.app.pop_screen()  # the parting line was spoken; break contact
+            self._break_contact()  # the parting line was spoken; break contact
             return
         if choice.action in ("trade", "barter"):
             self._pick_offer("latinum" if choice.action == "trade" else "barter")
@@ -295,7 +331,7 @@ class AlienContactScreen(Screen):
             else:
                 self._say(verb.context, None, close=(key == "farewell"))
         elif key == "leave":
-            self.app.pop_screen()
+            self._break_contact()
         elif key in ("trade", "barter"):
             self._pick_offer("latinum" if key == "trade" else "barter")
         elif key == "accept_lead":
@@ -327,7 +363,7 @@ class AlienContactScreen(Screen):
             self.notify(str(exc), timeout=2)
             return
         if close:
-            self.app.pop_screen()  # Farewell breaks contact after the parting line
+            self._break_contact()  # Farewell breaks contact after the parting line
             return
         self._history = (*self._history, (self._active_context, self._active_subject))
         self._active_context, self._active_subject = context, subject_id
@@ -376,7 +412,7 @@ class AlienContactScreen(Screen):
         self._reopen()
 
     def action_back(self) -> None:
-        self.app.pop_screen()
+        self._break_contact()
 
     def action_back_one(self) -> None:
         """Step back to the previous conversation node (Backspace), out of a dead end (§6.7).
