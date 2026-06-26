@@ -105,6 +105,7 @@ COMMANDS: list[Command] = [
     Hail(species_id=3),                          # WP9 open alien contact
     Converse(species_id=3, context="farewell"),  # WP17 say a peaceful line
     Converse(species_id=3, context="dossier_other", subject_id=5),  # WP17 ask about X
+    Converse(species_id=3, context="branch.vesk_workshop", choice_index=1),  # §6.7 branching reply
     BuyAlienTech(species_id=3, offer_index=1),   # WP9 buy tech for latinum
     BarterArtifact(species_id=3, offer_index=0), # WP9 barter an artifact for tech
     AcceptLead(species_id=3),                    # §6.7 log an alien's coordinate tip

@@ -896,8 +896,8 @@ def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOffer
     posture = getattr(sc, "trade_posture", "open")
     treaty_mode = getattr(sc, "treaty_mode", "open")
     combatant = getattr(sc, "combatant", True)
-    has_latinum = any(o.mode == "latinum" for o in offers)
-    has_barter = any(o.mode == "barter" for o in offers)
+    has_latinum = any(o.mode == "latinum" and o.available for o in offers)
+    has_barter = any(o.mode == "barter" and o.available for o in offers)
 
     # SAY — peaceful dialogue verbs (no mechanical effect; advance the recency ring).
     verbs = [
@@ -980,6 +980,36 @@ def _tech_offers(species: AlienSpecies, sc: object, player: Player, ship: Ship,
     return out
 
 
+def _contact_choices(state: UniverseState, roster: object, species: AlienSpecies,
+                     player: Player, context: str, config: GameConfig, *, standing: str,
+                     ctx: Mapping[str, str],
+                     facts: Mapping[str, object] | None = None) -> list[dto.ContactChoiceDTO]:
+    """The authored player replies on the active node (§6.7 branching), or [] for a plain node.
+
+    Resolves the node's line entry **read-only** with the same RNG inputs the reducer uses
+    (same `encounter_rng` seed ⇒ same winning entry), then projects each choice whose `when`
+    holds — preserving its canonical index so the `Converse` command picks the right reply.
+    An empty result tells the TUI to fall back to the derived Say/Do verb menu.
+    """
+    ring = player.dialogue_recency.get((species.roster_id, context), ())
+    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, context, ring)
+    entry = dialogue.entry_for(roster, species, player, context,  # type: ignore[arg-type]
+                               aliens=config.aliens, rng=rng, facts=facts)
+    if entry is None or not entry.choices:
+        return []
+    out: list[dto.ContactChoiceDTO] = []
+    for i, choice in enumerate(entry.choices):
+        if not dialogue.when_matches(choice.when, standing=standing, treaty=False, facts=facts):
+            continue
+        enabled, reason = True, ""
+        if choice.action == "attack":  # recognised but Phase-3-gated
+            enabled, reason = False, "you cannot attack here (Phase 3)"
+        out.append(dto.ContactChoiceDTO(
+            index=i, text=dialogue.fill(choice.text, ctx), action=choice.action or "",
+            next_context=choice.next_context or "", enabled=enabled, reason=reason))
+    return out
+
+
 def contact_view(state: UniverseState, player_id: int, species_id: int,
                  config: GameConfig, active_context: str = "greeting",
                  active_subject: int | None = None) -> dto.ContactDTO:
@@ -1032,7 +1062,11 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     # offer_coordinates line is shown, binds the same {coords}/{target}/… the reducer will.
     intel = pick_intel_target(state, player, species, aliens=config.aliens)
 
-    shown = active_context if active_context in dialogue._PEACEFUL_CONTEXTS else "greeting"
+    # Show the active context if it is a peaceful intent or an authored branch node; combat /
+    # sig.* lines stay Phase 3, so anything else falls back to the opener.
+    shown = (active_context if (active_context in dialogue._PEACEFUL_CONTEXTS
+                                or active_context.startswith(dialogue.BRANCH_PREFIX))
+             else "greeting")
     subject_extra: dict[str, str] | None = None
     facts: dict[str, object] | None = None
     if shown == "dossier_other":
@@ -1047,6 +1081,15 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         if intel is not None:
             subject_extra = intel.bindings()
     speech = _line(state, roster, species, player, shown, config, extra=subject_extra, facts=facts)
+    # Authored player replies on the shown node (§6.7 branching); empty ⇒ derived verb menu.
+    choice_ctx: dict[str, str] = {
+        "player": player.name, "species": species.name,
+        "alliance": alliance.name if alliance else "the unaligned",
+    }
+    if subject_extra:
+        choice_ctx.update(subject_extra)
+    choices = _contact_choices(state, roster, species, player, shown, config,
+                               standing=standing, ctx=choice_ctx, facts=facts)
     return dto.ContactDTO(
         species=species.name, persona=species.persona,
         alliance=alliance.name if alliance else "unaligned",
@@ -1059,6 +1102,7 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
                              has_intel=intel is not None, asked_intel=(shown == "offer_coordinates")),
         offers=offers, dossier=dossier, subjects=subjects,
         intel_summary=intel.summary() if intel is not None else "",
+        choices=choices,
     )
 
 

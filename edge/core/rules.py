@@ -318,11 +318,18 @@ class Converse:
     mechanism `Hail` uses for `greeting`, generalised to every peaceful context.
     `subject_id` names the species asked about for `dossier_other` ("ask about X").
     Combat / signature contexts are Phase 3 and rejected here.
+
+    When `choice_index` is set, this is instead a **player reply** on an authored branching
+    node (§6.7): `context` names the node currently shown, and the reducer re-resolves that
+    node's line, validates the indexed `choice`, and applies it (transition to its
+    `next_context` and/or its mechanical `action`). Conversation position is not stored in
+    core state — it rides on the command — so a reply stays reproducible from (seed, log).
     """
 
     species_id: int
     context: str
     subject_id: int | None = None
+    choice_index: int | None = None  # a player reply on a branching node (else a plain say)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1415,6 +1422,44 @@ def _hail(state: UniverseState, player_id: int, cmd: Hail, config: GameConfig) -
     return _converse(state, player_id, Converse(cmd.species_id, "greeting"), config)
 
 
+def _intel_bindings(state: UniverseState, player: Player, species: AlienSpecies,
+                    context: str, config: GameConfig) -> tuple[dict[str, str], dict[str, object]]:
+    """The `offer_coordinates` placeholder fills + `has_intel_target` fact for a context (§6.7).
+
+    Empty for every other context. Shared by the plain say path, the branch-choice path, and
+    (mirrored in) the read-only projection, so all agree on the tip a friendly speaker offers.
+    """
+    extra: dict[str, str] = {}
+    facts: dict[str, object] = {}
+    if context == "offer_coordinates":
+        target = pick_intel_target(state, player, species, aliens=config.aliens)
+        facts["has_intel_target"] = target is not None
+        if target is not None:
+            extra.update(target.bindings())
+    return extra, facts
+
+
+def _speak_context(state: UniverseState, player: Player, ship: Ship, species: AlienSpecies,
+                   context: str, config: GameConfig, *, extra: Mapping[str, str] | None = None,
+                   facts: Mapping[str, object] | None = None,
+                   subject_id: int | None = None) -> tuple[Player, AlienSpoke]:
+    """Speak `context` in the species' voice: advance its recency ring, return (player, event).
+
+    The ring-advancing core both the plain say path and a branch transition share. Marks the
+    species met and records where it was seen, exactly as a hail does.
+    """
+    assert config.roster is not None
+    ring = player.dialogue_recency.get((species.roster_id, context), ())
+    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, context, ring)
+    _, new_ring = dialogue.speak(config.roster, species, player, context,
+                                 aliens=config.aliens, rng=rng, extra=extra, facts=facts)
+    new_player = replace(
+        player, species_attitudes=_met(player, species.roster_id),
+        species_last_seen={**player.species_last_seen, species.roster_id: ship.sector_id},
+        dialogue_recency=_advance_recency(player, species.roster_id, context, new_ring))
+    return new_player, AlienSpoke(player.id, species.id, context, subject_id)
+
+
 def _converse(state: UniverseState, player_id: int, cmd: Converse,
               config: GameConfig) -> ReduceResult:
     """Speak a chosen peaceful dialogue context and advance its recency ring (§6.7, WP17).
@@ -1422,35 +1467,67 @@ def _converse(state: UniverseState, player_id: int, cmd: Converse,
     The single ring-advancing conversation path (`Hail` is `Converse(greeting)`). Guards:
     the context must be peaceful (combat / signature lines are Phase 3) and the species
     must be in the player's sector — a rejected context raises rather than silently
-    no-ops, so neither the codec nor the menu can smuggle a Phase-3 line through.
+    no-ops, so neither the codec nor the menu can smuggle a Phase-3 line through. When the
+    command carries a `choice_index` it is instead a player reply on a branching node,
+    handled by `_converse_choice`.
     """
     player = _player(state, player_id)
     ship = _ship(state, player)
     species = _species_here(state, ship, cmd.species_id)
     sc = _species_config(config, species)
+    if cmd.choice_index is not None:
+        return _converse_choice(state, player_id, cmd, config, player, ship, species)
     if cmd.context not in dialogue.reachable_contexts(sc):
         # Non-peaceful (combat / sig.*) or a context the species can't reach (its params):
         # raise rather than silently no-op, so the codec/menu can't smuggle a line through.
         raise EconomyError(f"not something you can say here ({cmd.context})")
+    subject = _subject_extra(state, cmd.subject_id)
+    intel_extra, facts = _intel_bindings(state, player, species, cmd.context, config)
+    new_player, event = _speak_context(
+        state, player, ship, species, cmd.context, config,
+        extra={**subject, **intel_extra}, facts=facts, subject_id=cmd.subject_id)
+    return ReduceResult(events=(event,), players=(new_player,))
+
+
+def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config: GameConfig,
+                     player: Player, ship: Ship, species: AlienSpecies) -> ReduceResult:
+    """Apply an authored player reply on a branching node (§6.7 optional branching).
+
+    `cmd.context` names the node shown; the reducer re-resolves that node's line (read-only,
+    with the same RNG inputs the projection used, so it sees the very choices the player
+    did), validates the indexed choice and its `when`, then applies it: an `accept_lead`
+    choice delegates to the lead logger; `attack` is rejected (Phase 3); `farewell` speaks the
+    parting line; any other choice transitions to its `next_context` (or re-speaks the node
+    for a trade/barter gateway, the mechanical effect riding on the follow-up Buy/Barter
+    command). Position lives only on the command, so this stays replay-stable.
+    """
     assert config.roster is not None
-    extra = _subject_extra(state, cmd.subject_id)
-    facts: dict[str, object] = {}
-    if cmd.context == "offer_coordinates":
-        # The intel mechanic: bind the tip's coordinates and signal whether one exists, so
-        # the line either hands over a route or admits the speaker knows nowhere new (§6.7).
-        target = pick_intel_target(state, player, species, aliens=config.aliens)
-        facts["has_intel_target"] = target is not None
-        if target is not None:
-            extra = {**extra, **target.bindings()}
+    assert cmd.choice_index is not None  # _converse only routes here when it is set
+    if not dialogue.is_known_context(cmd.context):
+        raise EconomyError(f"unknown dialogue context ({cmd.context})")
+    _, facts = _intel_bindings(state, player, species, cmd.context, config)
     ring = player.dialogue_recency.get((species.roster_id, cmd.context), ())
     rng = dialogue.encounter_rng(state.game.seed, species.roster_id, cmd.context, ring)
-    _, new_ring = dialogue.speak(config.roster, species, player, cmd.context,
-                                 aliens=config.aliens, rng=rng, extra=extra, facts=facts)
-    new_player = replace(
-        player, species_attitudes=_met(player, species.roster_id),
-        species_last_seen={**player.species_last_seen, species.roster_id: ship.sector_id},
-        dialogue_recency=_advance_recency(player, species.roster_id, cmd.context, new_ring))
-    event = AlienSpoke(player_id, species.id, cmd.context, cmd.subject_id)
+    entry = dialogue.entry_for(config.roster, species, player, cmd.context,
+                               aliens=config.aliens, rng=rng, facts=facts)
+    if entry is None or not entry.choices:
+        raise EconomyError("there is nothing to choose here")
+    if not 0 <= cmd.choice_index < len(entry.choices):
+        raise EconomyError("no such reply")
+    choice = entry.choices[cmd.choice_index]
+    allied = player.alliance_id is not None and player.alliance_id == species.alliance_id
+    standing = dialogue.standing_for(
+        effective_disposition(species, player), allied=allied, aliens=config.aliens)
+    if not dialogue.when_matches(choice.when, standing=standing, treaty=False, facts=facts):
+        raise EconomyError("you cannot say that right now")
+    if choice.action == "attack":
+        raise EconomyError("you cannot attack here (Phase 3)")
+    if choice.action == "accept_lead":
+        return _accept_lead(state, player_id, AcceptLead(cmd.species_id), config)
+    target = "farewell" if choice.action == "farewell" else (choice.next_context or cmd.context)
+    extra, t_facts = _intel_bindings(state, player, species, target, config)
+    new_player, event = _speak_context(
+        state, player, ship, species, target, config, extra=extra, facts=t_facts)
     return ReduceResult(events=(event,), players=(new_player,))
 
 

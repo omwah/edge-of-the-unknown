@@ -24,10 +24,19 @@ from edge.dialogue.authoring.pipeline import AuthoringError, prune_unreachable, 
 from edge.dialogue.intents import allowed_placeholders
 
 
-def test_output_schema_is_closed_and_requires_origin() -> None:
+def test_output_schema_wraps_a_closed_grammar_plus_optional_choices() -> None:
     schema = output_schema()
     assert schema["additionalProperties"] is False
-    assert schema["required"] == ["origin"] and "origin" in schema["properties"]
+    # Top level: a required `grammar` plus an optional `choices` array (§6.7 branching).
+    assert schema["required"] == ["grammar"]
+    assert set(schema["properties"]) == {"grammar", "choices"}
+    grammar = schema["properties"]["grammar"]
+    assert grammar["additionalProperties"] is False
+    assert grammar["required"] == ["origin"] and "origin" in grammar["properties"]
+    choice = schema["properties"]["choices"]["items"]
+    assert choice["required"] == ["text"]
+    assert set(choice["properties"]["action"]["enum"]) == {
+        "farewell", "trade", "barter", "accept_lead", "attack"}
 
 
 def test_build_prompt_lists_only_allowed_placeholders() -> None:
@@ -220,3 +229,57 @@ def test_debug_backend_echoes_prompt_and_response(capsys: object) -> None:
     assert "← prompt" in err and "AUTHOR THE GREETING" in err  # the request
     assert "→ response" in err and "origin" in err              # the response
     assert result == StaticBackend().generate("x", schema=output_schema())  # forwarded unchanged
+
+
+def test_author_line_validates_choice_targets_and_retries() -> None:
+    """Choice `next_context` validation triggers a retry, not immediate failure."""
+    from edge.dialogue.authoring.pipeline import author_line
+
+    call_count = {"n": 0}
+
+    class _BadThenGood:
+        name = "flaky_choice"
+
+        def generate(self, prompt: str, *, schema: object) -> dict:
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                # First attempt: invalid choice target → will fail validation
+                return {
+                    "grammar": {"origin": ["Well met, {player}. We welcome you to our corner of space."]},
+                    "choices": [{"text": "Ask for trade", "next_context": "identify_intent"}]
+                }
+            # Second attempt: valid choice (known context)
+            return {
+                "grammar": {"origin": ["Well met, {player}. We welcome you to our corner of space."]},
+                "choices": [{"text": "Ask for trade", "next_context": "trade_open"}]
+            }
+
+    # With known_contexts, invalid targets trigger a retry instead of immediate failure.
+    line = author_line(_BadThenGood(), AuthoringRequest("greeting", "v", frozenset()),
+                      known_contexts=frozenset(["greeting", "trade_open"]), retries=3)
+    assert call_count["n"] == 2  # first attempt failed, second succeeded
+    assert line["choices"][0]["next_context"] == "trade_open"
+
+
+def test_author_line_accepts_branch_and_sig_contexts() -> None:
+    """Choice targets can point to branch.* and sig.* reserved namespaces."""
+    from edge.dialogue.authoring.pipeline import author_line
+
+    class _SpecialContexts:
+        name = "special"
+
+        def generate(self, prompt: str, *, schema: object) -> dict:
+            return {
+                "grammar": {"origin": ["So, what brings you here to seek our counsel today?"]},
+                "choices": [
+                    {"text": "A", "next_context": "branch.custom_node"},
+                    {"text": "B", "next_context": "sig.reprogram_unlock.offer"}
+                ]
+            }
+
+    line = author_line(_SpecialContexts(), AuthoringRequest("greeting", "v", frozenset()),
+                      known_contexts=frozenset(["greeting"]))
+    # Both special contexts are accepted without error.
+    assert len(line["choices"]) == 2
+    assert line["choices"][0]["next_context"] == "branch.custom_node"
+    assert line["choices"][1]["next_context"] == "sig.reprogram_unlock.offer"

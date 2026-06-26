@@ -471,6 +471,29 @@ class DialogueWhen(BaseModel):
     stage: str | None = None  # forward-compat (signature/befriend ladder stage)
 
 
+class DialogueChoice(BaseModel):
+    """An authored **player reply** on a line entry (DESIGN §6.7, optional branching).
+
+    A line entry may offer a list of `choices`; when present the contact screen renders them
+    as numbered player replies instead of (and falling back to) the *derived* Say/Do menu.
+    A choice carries a templated `text` label (filled with the same `{placeholders}` as the
+    spoken line), an optional `next_context` to transition to (any known context key,
+    including a reserved `branch.*` node), an optional mechanical `action` (one of
+    `CHOICE_ACTIONS` — farewell / trade / barter / accept_lead / attack; `attack` is
+    Phase-3-gated), and a `when` predicate gating whether the reply is offered. Conversation
+    *position* is not stored in core state: the reducer re-resolves the line for the active
+    context and validates the chosen index, so a reply is reproducible from (seed, log).
+    """
+
+    model_config = _FROZEN
+
+    text: str  # the player's reply label (templated with the node's placeholders)
+    next_context: str | None = None  # context key to transition to (None ⇒ stay / act only)
+    action: str | None = None  # a CHOICE_ACTIONS verb, or None for a pure transition
+    when: DialogueWhen = DialogueWhen()
+    weight: int = Field(default=1, ge=1)
+
+
 class DialogueLine(BaseModel):
     """One conditional line entry (DESIGN §6.7): a `when` + a realisation + weight.
 
@@ -483,7 +506,8 @@ class DialogueLine(BaseModel):
       (`edge.dialogue.render`). The recency ring rotates the expansion so repeats rephrase.
 
     Exactly one of the two must be non-empty. Among matching entries the most-specific wins,
-    ties broken by `weight`.
+    ties broken by `weight`. An entry may also carry authored player `choices` (§6.7
+    branching); an empty list keeps the legacy derived-menu behaviour on the contact screen.
     """
 
     model_config = _FROZEN
@@ -494,6 +518,9 @@ class DialogueLine(BaseModel):
     grammar: dict[str, list[str]] = Field(default_factory=dict)
     when: DialogueWhen = DialogueWhen()
     weight: int = Field(default=1, ge=1)
+    # Authored player replies (optional branching, §6.7). Empty ⇒ the contact screen falls
+    # back to the derived Say/Do verb menu; non-empty ⇒ numbered player choices.
+    choices: list[DialogueChoice] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_realisation(self) -> DialogueLine:
@@ -727,6 +754,8 @@ class UIConfig(BaseModel):
     sidebar_min_screen_width: int = Field(default=90, gt=0)
     surface_terrain_height: int = Field(default=12, gt=0)  # SurfaceScreen terrain panel height
     local_map_radius: int = Field(default=3, gt=0)  # Computer/Map ego-graph reach in warp hops
+    # Debug: show disabled menu options (greyed) instead of filtering them out (debugging only).
+    show_disabled_options: bool = False
 
 
 class NameList(BaseModel):

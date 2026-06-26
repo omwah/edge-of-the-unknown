@@ -31,6 +31,16 @@ UNIVERSAL_PLACEHOLDERS = frozenset({"player", "species", "alliance"})
 # Signature-mechanic prompt placeholders (Phase 3 `sig.*` contexts), validated separately.
 SIG_PLACEHOLDERS = frozenset({"subject", "count", "reward", "coords", "item"})
 
+# The mechanical verbs an authored player `choice` may carry (DESIGN §6.7 branching). A
+# choice with no `action` is a pure conversation transition (it just moves to `next_context`).
+# `attack` is recognised but Phase-3-gated (rejected by the reducer in Phase 2).
+CHOICE_ACTIONS = frozenset({"farewell", "trade", "barter", "accept_lead", "attack"})
+
+# Reserved namespace for authored intermediate **branch nodes** — context keys that exist
+# only as conversation-graph targets (reached via a choice's `next_context`), distinct from
+# the closed intent vocabulary. Mirrors the `sig.*` prompt namespace.
+BRANCH_PREFIX = "branch."
+
 
 @dataclass(frozen=True, slots=True)
 class Intent:
@@ -90,7 +100,9 @@ PEACEFUL_CONTEXTS: frozenset[str] = frozenset(k for k, i in INTENTS.items() if i
 
 def allowed_placeholders(context: str) -> frozenset[str]:
     """The placeholder names a variant of `context` may use (validator + authoring)."""
-    if context.startswith("sig."):
+    if context.startswith("sig.") or context.startswith(BRANCH_PREFIX):
+        # Branch nodes are authored set-pieces; allow the same rich placeholder set as the
+        # signature-mechanic prompts (subject / item / coords / …) on top of the universals.
         return UNIVERSAL_PLACEHOLDERS | SIG_PLACEHOLDERS
     intent = INTENTS.get(context)
     extra = intent.placeholders if intent is not None else frozenset()
@@ -98,5 +110,5 @@ def allowed_placeholders(context: str) -> frozenset[str]:
 
 
 def is_known_context(context: str) -> bool:
-    """Whether `context` is in the closed vocabulary or a `sig.*` prompt namespace."""
-    return context in INTENTS or context.startswith("sig.")
+    """Whether `context` is in the closed vocabulary, a `sig.*`, or a `branch.*` namespace."""
+    return context in INTENTS or context.startswith("sig.") or context.startswith(BRANCH_PREFIX)

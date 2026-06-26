@@ -34,6 +34,8 @@ from edge.core.config import AliensConfig, DialogueLine, DialoguePack, RosterCon
 from edge.core.models import AlienSpecies, Player
 from edge.dialogue import render
 from edge.dialogue.intents import (
+    BRANCH_PREFIX,
+    CHOICE_ACTIONS,
     DIALOGUE_CONTEXTS,
     PEACEFUL_CONTEXTS,
     allowed_placeholders,
@@ -52,8 +54,8 @@ STANDINGS = frozenset({ALLIED, FRIENDLY, NEUTRAL, WARY, HOSTILE})
 __all__ = [
     "ALLIED", "FRIENDLY", "NEUTRAL", "WARY", "HOSTILE", "STANDINGS", "GENERIC_PERSONA",
     "DIALOGUE_CONTEXTS", "PEACEFUL_CONTEXTS", "DialogueIntegrityError", "allowed_placeholders",
-    "standing_for", "build_chain", "select_line", "encounter_rng", "speak",
-    "reachable_contexts", "validate_dialogue",
+    "standing_for", "build_chain", "select_line", "select_entry", "entry_for", "when_matches",
+    "fill", "encounter_rng", "speak", "reachable_contexts", "validate_dialogue",
 ]
 
 
@@ -122,6 +124,24 @@ def _fill(template: str, ctx: Mapping[str, str]) -> str:
     return template.format_map(_Safe(ctx))
 
 
+def fill(template: str, ctx: Mapping[str, str]) -> str:
+    """Public placeholder fill (e.g. for an authored choice label); see `_fill`."""
+    return _fill(template, ctx)
+
+
+def when_matches(when: object, *, standing: str, treaty: bool,
+                 facts: Mapping[str, object] | None = None) -> bool:
+    """Whether a `when` predicate holds for a standing/treaty + extra facts (§6.7).
+
+    The boolean form of `_score`: used to gate an authored player `choice` (both the
+    read-only projection and the reducer evaluate a choice's `when` the same way).
+    """
+    all_facts: dict[str, object] = {"standing": standing, "treaty": treaty}
+    if facts:
+        all_facts.update(facts)
+    return _score(when, all_facts) is not None
+
+
 def _pick_index(n: int, recency: tuple[int, ...], rng: random.Random) -> int:
     """An index in [0, n) avoiding the recency ring (falling back to the full range)."""
     fresh = [i for i in range(n) if i not in recency]
@@ -160,6 +180,25 @@ def select_line(chain: Sequence[DialoguePack], context: str, *, standing: str,
     ("", recency) only if nothing resolves — the validator guarantees this cannot happen for
     a reachable context.
     """
+    entry = select_entry(chain, context, standing=standing, treaty=treaty, rng=rng, facts=facts)
+    if entry is None:
+        return "", recency
+    text, idx = _realise(entry, ctx=ctx, recency=recency, rng=rng, shared=shared)
+    new_recency = (*recency, idx)[-k:] if k > 0 else ()
+    return text, new_recency
+
+
+def select_entry(chain: Sequence[DialoguePack], context: str, *, standing: str,
+                 treaty: bool, rng: random.Random,
+                 facts: Mapping[str, object] | None = None) -> DialogueLine | None:
+    """Resolve the winning line **entry** for `context` (no realisation, no ring advance).
+
+    The shared salience walk behind `select_line`: the first pack in the chain with any
+    matching entry for `context` wins, then the most-specific matching entry (Ruskin
+    scoring), ties broken by `weight` through the seeded RNG. Returns None if nothing
+    resolves. Lets the reducer and the read-only projection read an entry's authored
+    `choices` deterministically (same RNG inputs ⇒ same winner as the shown line).
+    """
     all_facts: dict[str, object] = {"standing": standing, "treaty": treaty}
     if facts:
         all_facts.update(facts)
@@ -172,11 +211,8 @@ def select_line(chain: Sequence[DialoguePack], context: str, *, standing: str,
             continue
         best = max(s for s, _ in scored)
         winners = [e for s, e in scored if s == best]
-        entry = rng.choices(winners, weights=[e.weight for e in winners], k=1)[0]
-        text, idx = _realise(entry, ctx=ctx, recency=recency, rng=rng, shared=shared)
-        new_recency = (*recency, idx)[-k:] if k > 0 else ()
-        return text, new_recency
-    return "", recency
+        return rng.choices(winners, weights=[e.weight for e in winners], k=1)[0]
+    return None
 
 
 def encounter_rng(seed: int, species_key: str, context: str,
@@ -222,6 +258,22 @@ def speak(roster: RosterConfig, species: AlienSpecies, player: Player, context: 
                        shared=roster.grammar)
 
 
+def entry_for(roster: RosterConfig, species: AlienSpecies, player: Player, context: str, *,
+              aliens: AliensConfig, rng: random.Random, treaty: bool = False,
+              facts: Mapping[str, object] | None = None) -> DialogueLine | None:
+    """The winning line **entry** for a live encounter context (read-only; for `choices`).
+
+    The `select_entry` counterpart of `speak`: resolves the species' standing and pack chain
+    and returns the entry, consuming `rng` exactly as `speak`/`select_line` do up to the
+    winner pick — so seeding the same `encounter_rng` yields the entry whose line was shown.
+    """
+    sc = roster.species_by_id(species.roster_id)
+    chain = build_chain(roster, sc, species.persona)
+    allied = player.alliance_id is not None and player.alliance_id == species.alliance_id
+    standing = standing_for(effective_disposition(species, player), allied=allied, aliens=aliens)
+    return select_entry(chain, context, standing=standing, treaty=treaty, rng=rng, facts=facts)
+
+
 # --- validation (DESIGN §13 dialogue integrity) ----------------------------------
 
 def reachable_contexts(species: SpeciesConfig) -> frozenset[str]:
@@ -240,6 +292,26 @@ def _placeholders_in(template: str) -> set[str]:
     return {name for _, name, _, _ in Formatter().parse(template) if name}
 
 
+def _branch_closure(chain: Sequence[DialoguePack], base: frozenset[str]) -> set[str]:
+    """The contexts reachable from `base` by following choices' `next_context` (and farewell).
+
+    Lets validation prove that every branch node a species can reach through its authored
+    choices resolves a non-empty line — the branch-graph extension of the catch-all invariant.
+    """
+    seen = set(base)
+    frontier = list(base)
+    while frontier:
+        ctx = frontier.pop()
+        for pack in chain:
+            for entry in pack.get(ctx, []):
+                for choice in entry.choices:
+                    nxt = "farewell" if choice.action == "farewell" else choice.next_context
+                    if nxt and nxt not in seen:
+                        seen.add(nxt)
+                        frontier.append(nxt)
+    return seen
+
+
 def _entry_strings(entry: DialogueLine) -> list[str]:
     """Every authored template string in an entry (variant pool + grammar expansions)."""
     return list(entry.variants) + render.grammar_strings(entry.grammar)
@@ -250,11 +322,14 @@ def validate_dialogue(roster: RosterConfig) -> None:
 
     - the `generic` persona exists and carries a **catch-all** entry for every base
       context key, so resolution never blanks for any standing/treaty state;
-    - every context key (any pack) is in the closed vocabulary or a `sig.*` prompt;
-    - every variant's placeholders are fillable for its context;
+    - every context key (any pack) is in the closed vocabulary, a `sig.*`, or a `branch.*`;
+    - every variant's (and authored choice label's) placeholders are fillable for its context;
+    - every authored player `choice` names a valid `action` (CHOICE_ACTIONS) and a known
+      `next_context`; every `branch.*` node is reachable (targeted by some `next_context`);
     - every species' `persona` resolves to a persona pack;
-    - every species resolves a non-empty pool for each context it can reach (Phase 2),
-      with `dossier_other` parameterised by `{subject}` so it covers every nameable species.
+    - every species resolves a non-empty pool for each context it can reach (Phase 2) —
+      **including** branch nodes reached through choices — with `dossier_other` parameterised
+      by `{subject}` so it covers every nameable species.
     """
     generic = roster.personas.get(GENERIC_PERSONA)
     if not generic:
@@ -263,6 +338,7 @@ def validate_dialogue(roster: RosterConfig) -> None:
     # Context-key vocabulary + placeholder fillability across every authored pack.
     packs: list[tuple[str, DialoguePack]] = [(f"persona {p}", pk) for p, pk in roster.personas.items()]
     packs += [(f"species {s.id}", s.dialogue_pack) for s in roster.species if s.dialogue_pack]
+    branch_targets: set[str] = set()  # every `next_context` any choice points at
     for label, pack in packs:
         for context, entries in pack.items():
             if not is_known_context(context):
@@ -275,6 +351,30 @@ def validate_dialogue(roster: RosterConfig) -> None:
                         raise DialogueIntegrityError(
                             f"{label}/{context}: unfillable placeholder(s) {sorted(bad)} in {variant!r}"
                         )
+                for choice in entry.choices:
+                    bad = _placeholders_in(choice.text) - allowed
+                    if bad:
+                        raise DialogueIntegrityError(
+                            f"{label}/{context}: unfillable placeholder(s) {sorted(bad)} in "
+                            f"choice {choice.text!r}"
+                        )
+                    if choice.action is not None and choice.action not in CHOICE_ACTIONS:
+                        raise DialogueIntegrityError(
+                            f"{label}/{context}: unknown choice action {choice.action!r}"
+                        )
+                    if choice.next_context is not None:
+                        if not is_known_context(choice.next_context):
+                            raise DialogueIntegrityError(
+                                f"{label}/{context}: choice targets unknown context "
+                                f"{choice.next_context!r}"
+                            )
+                        branch_targets.add(choice.next_context)
+
+    # No orphan branch nodes: a `branch.*` context exists only as a choice target, so an
+    # unreferenced one is dead config (and would never be reachable in game).
+    branch_nodes = {ctx for _, pack in packs for ctx in pack if ctx.startswith(BRANCH_PREFIX)}
+    for node in sorted(branch_nodes - branch_targets):
+        raise DialogueIntegrityError(f"branch node {node!r} is unreachable (no choice targets it)")
 
     # The generic pack must carry an unconditional catch-all for every base context.
     for context in DIALOGUE_CONTEXTS:
@@ -294,7 +394,7 @@ def validate_dialogue(roster: RosterConfig) -> None:
         if sp.persona not in roster.personas:
             raise DialogueIntegrityError(f"species {sp.id!r} uses unknown persona {sp.persona!r}")
         chain = build_chain(roster, sp, sp.persona)
-        for context in reachable_contexts(sp):
+        for context in _branch_closure(chain, reachable_contexts(sp)):
             ctx = {p: p for p in allowed_placeholders(context)}
             for standing in (ALLIED, FRIENDLY, NEUTRAL, HOSTILE):
                 for treaty in (False, True):

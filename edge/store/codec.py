@@ -152,7 +152,7 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
         case Converse():
             return "Converse", {
                 "species_id": command.species_id, "context": command.context,
-                "subject_id": command.subject_id,
+                "subject_id": command.subject_id, "choice_index": command.choice_index,
             }
         case BuyAlienTech():
             return "BuyAlienTech", {"species_id": command.species_id, "offer_index": command.offer_index}
@@ -243,7 +243,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return Hail(species_id=payload["species_id"])
         case "Converse":
             return Converse(species_id=payload["species_id"], context=payload["context"],
-                            subject_id=payload.get("subject_id"))
+                            subject_id=payload.get("subject_id"),
+                            choice_index=payload.get("choice_index"))
         case "BuyAlienTech":
             return BuyAlienTech(species_id=payload["species_id"], offer_index=payload["offer_index"])
         case "BarterArtifact":

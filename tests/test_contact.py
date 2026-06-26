@@ -14,6 +14,7 @@ import pytest
 
 from edge.config import load_default_config
 from edge.core.aliens import effective_disposition
+from edge.core.config import RosterConfig
 from edge.core.economy import EconomyError
 from edge.core.enums import ComponentTier, RarityTier
 from edge.core.models import AlienSpecies, UniverseState
@@ -157,6 +158,86 @@ def test_every_reachable_peaceful_context_speaks() -> None:
         res = reduce(state, 1, Converse(sp.id, ctx, subject_id=subject), CFG)
         apply_result(state, res)  # no raise, ring advances for every reachable context
         assert res.events[0].context == ctx
+
+
+# --- authored branching: player-choice replies (§6.7) ----------------------------
+
+def test_contact_view_exposes_branch_choices_and_plain_node_falls_back() -> None:
+    state = _world()
+    vesk = _inject(state, "vesk")  # serial_formal persona authors greeting choices
+    view = session.contact_view(state, 1, vesk.id, CFG)
+    assert view.choices and view.choices[0].next_context == "branch.vesk_workshop"
+    # A species whose persona authors no choices keeps the derived Say/Do menu (empty choices).
+    terran = _inject(state, "terran", sid=2)
+    assert session.contact_view(state, 1, terran.id, CFG).choices == []
+
+
+def test_converse_choice_transitions_to_branch_node() -> None:
+    state = _world()
+    vesk = _inject(state, "vesk")
+    res = reduce(state, 1, Converse(vesk.id, "greeting", choice_index=0), CFG)
+    apply_result(state, res)
+    assert res.events[0].context == "branch.vesk_workshop"  # transitioned to the target node
+    assert state.players[1].dialogue_recency[(vesk.roster_id, "branch.vesk_workshop")]  # spoken
+    # The branch node then exposes its own replies (a trade gateway + a parting line).
+    view = session.contact_view(state, 1, vesk.id, CFG, active_context="branch.vesk_workshop")
+    actions = {c.action for c in view.choices}
+    assert "trade" in actions and "farewell" in actions
+
+
+def test_converse_choice_farewell_action_speaks_parting_line() -> None:
+    state = _world()
+    vesk = _inject(state, "vesk")
+    res = reduce(state, 1, Converse(vesk.id, "greeting", choice_index=1), CFG)  # "Safe travels."
+    assert res.events[0].context == "farewell"
+
+
+def test_converse_choice_rejects_bad_index_and_choiceless_node() -> None:
+    state = _world()
+    vesk = _inject(state, "vesk")
+    with pytest.raises(EconomyError):  # out of range
+        reduce(state, 1, Converse(vesk.id, "greeting", choice_index=9), CFG)
+    with pytest.raises(EconomyError):  # farewell carries no choices
+        reduce(state, 1, Converse(vesk.id, "farewell", choice_index=0), CFG)
+
+
+def _cfg_with_attack_choice() -> object:
+    """A config whose Vesk workshop node also offers a Phase-3 `attack` reply."""
+    data = CFG.roster.model_dump()
+    data["personas"]["serial_formal"]["branch.vesk_workshop"][0]["choices"].append(
+        {"text": "Draw weapons.", "action": "attack"})
+    return CFG.model_copy(update={"roster": RosterConfig.model_validate(data)})
+
+
+def test_converse_choice_attack_is_phase3_gated() -> None:
+    cfg = _cfg_with_attack_choice()
+    state = _world()
+    vesk = _inject(state, "vesk")
+    apply_result(state, reduce(state, 1, Converse(vesk.id, "greeting", choice_index=0), cfg))
+    view = session.contact_view(state, 1, vesk.id, cfg, active_context="branch.vesk_workshop")
+    attack = next(c for c in view.choices if c.action == "attack")
+    assert not attack.enabled  # the projection greys the Phase-3 reply
+    with pytest.raises(EconomyError, match="attack"):
+        reduce(state, 1, Converse(vesk.id, "branch.vesk_workshop", choice_index=attack.index), cfg)
+
+
+def test_converse_choice_chain_replays_into_identical_state(tmp_path: Path) -> None:
+    """Hail → greeting choice → branch farewell choice reloads identically (no Player drift)."""
+    svc = GameService.new_game(SMALL, 3, SqliteRepository(tmp_path / "branch.db"), created_at=_CREATED)  # type: ignore[arg-type]
+    found = _reachable_species_of(svc.state, "vesk")
+    if found is None:
+        pytest.skip("no reachable Vesk in this seed")
+    path, sp = found
+    for hop in path[1:]:
+        svc.apply(1, Warp(to_sector=hop))
+    svc.apply(1, Hail(sp.id))
+    svc.apply(1, Converse(sp.id, "greeting", choice_index=0))            # → branch.vesk_workshop
+    svc.apply(1, Converse(sp.id, "branch.vesk_workshop", choice_index=2))  # "Another time." (farewell)
+    expected = state_hash(svc.state)
+    assert svc.state.players[1].dialogue_recency[(sp.roster_id, "branch.vesk_workshop")]
+
+    reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "branch.db"))  # type: ignore[arg-type]
+    assert state_hash(reloaded.state) == expected
 
 
 # --- buy for latinum -------------------------------------------------------------
@@ -385,6 +466,17 @@ def test_computer_codex_lists_logged_finds_richest_first() -> None:
 def _reachable_species(state: UniverseState):  # type: ignore[no-untyped-def]
     best = None
     for sp in state.species.values():
+        path = shortest_path(state.adjacency, 1, sp.sector_id)
+        if path is not None and (best is None or len(path) < len(best[0])):
+            best = (path, sp)
+    return best
+
+
+def _reachable_species_of(state: UniverseState, roster_id: str):  # type: ignore[no-untyped-def]
+    best = None
+    for sp in state.species.values():
+        if sp.roster_id != roster_id:
+            continue
         path = shortest_path(state.adjacency, 1, sp.sector_id)
         if path is not None and (best is None or len(path) < len(best[0])):
             best = (path, sp)

@@ -16,7 +16,7 @@ from string import Formatter
 from typing import Any
 
 from edge.dialogue import render
-from edge.dialogue.intents import INTENTS, allowed_placeholders
+from edge.dialogue.intents import BRANCH_PREFIX, CHOICE_ACTIONS, INTENTS, allowed_placeholders
 
 # The fixed grammar symbols a generated line may define (a closed schema — see module doc).
 # `origin` is the entry point; the rest are optional fragments it may reference via `#name#`.
@@ -28,14 +28,44 @@ _SMOKE_SEEDS = 24
 _MIN_RENDER_WORDCHARS = 12
 
 
-def output_schema() -> dict[str, Any]:
-    """A strict JSON schema for a Tracery grammar (closed symbol set, `origin` required)."""
+def grammar_schema() -> dict[str, Any]:
+    """The strict Tracery-grammar schema (closed symbol set, `origin` required)."""
     str_array = {"type": "array", "items": {"type": "string"}, "minItems": 1}
     return {
         "type": "object",
         "additionalProperties": False,
         "properties": {sym: str_array for sym in _GRAMMAR_SYMBOLS},
         "required": ["origin"],
+    }
+
+
+def output_schema() -> dict[str, Any]:
+    """A strict schema for one authored line: a closed `grammar` plus optional player `choices`.
+
+    The grammar half is unchanged (a closed Tracery symbol set, `origin` required); the
+    `choices` half (§6.7 branching) is an optional array of player replies, each a `text`
+    label with an optional `next_context` and a `CHOICE_ACTIONS` `action`. `author_line`
+    also accepts a bare grammar object (a backend that predates the wrapper), so older
+    backends keep working.
+    """
+    choice = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "text": {"type": "string"},
+            "next_context": {"type": "string"},
+            "action": {"type": "string", "enum": sorted(CHOICE_ACTIONS)},
+        },
+        "required": ["text"],
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "grammar": grammar_schema(),
+            "choices": {"type": "array", "items": choice},
+        },
+        "required": ["grammar"],
     }
 
 
@@ -49,14 +79,26 @@ class AuthoringRequest:
     examples: Mapping[str, str] = field(default_factory=dict)
 
 
-def build_prompt(req: AuthoringRequest) -> str:
-    """The instruction handed to a backend to author one persona-voiced grammar (§6.7)."""
+def build_prompt(req: AuthoringRequest, known_contexts: frozenset[str] | None = None) -> str:
+    """The instruction handed to a backend to author one persona-voiced grammar (§6.7).
+
+    `known_contexts` lists the available contexts; if provided, it's included in the prompt
+    so the model knows which contexts are valid for choice transitions.
+    """
     intent = INTENTS.get(req.context)
     concept = intent.concept if intent is not None else "conversation"
     holes = ", ".join(sorted(f"{{{p}}}" for p in req.placeholders)) or "(none)"
     example = (f"\nFor reference, these placeholder values may appear at runtime: "
                f"{dict(req.examples)}." if req.examples else "")
     fragments = ", ".join(s for s in _GRAMMAR_SYMBOLS if s != "origin")
+    contexts_info = ""
+    if known_contexts:
+        contexts_list = ", ".join(sorted(known_contexts))
+        contexts_info = (
+            "\n- For 'next_context' in choices, use ONLY: " + contexts_list +
+            ", or a custom branch.* node (e.g. \"branch.inquiry\"), or a Phase-3 sig.* mechanic "
+            "(e.g. \"sig.reprogram_unlock.offer\"). Do not invent other context names."
+        )
     return (
         "You are authoring branching dialogue for a space-exploration game, offline.\n\n"
         f"THE SPEAKER is the alien species described below. THE LISTENER is the player "
@@ -65,16 +107,22 @@ def build_prompt(req: AuthoringRequest) -> str:
         f"species, addressing the player directly — never narrate from the player's side.\n\n"
         f"Speaker:\n{req.voice}\n\n"
         + (_intent_brief(req.context))
-        + "Output a Tracery grammar. Rules:\n"
-        "- Return ONLY a JSON object mapping Tracery symbols to arrays of expansion strings.\n"
+        + "Output a JSON object {\"grammar\": {…}, \"choices\": [...]}. Rules:\n"
+        "- 'grammar' is a JSON object mapping Tracery symbols to arrays of expansion strings.\n"
         "- Define an 'origin' symbol that expands the COMPLETE line. 'origin' MUST build the "
         f"line by referencing the fragment symbols ({fragments}) you define, using #symbol# "
         "syntax — e.g. \"origin\": [\"#opener# #detail#\"]. Don't leave fragments unused.\n"
         "- Two DISTINCT syntaxes, never combined: write #opener# for a grammar symbol, and "
-        f"{{player}} for a placeholder. NEVER write #{{player}}# or {{opener}} — that is invalid.\n"
+        "{player} for a placeholder. NEVER write #{player}# or {opener} — that is invalid.\n"
         f"- You may use ONLY these literal placeholders, copied verbatim: {holes}.\n"
-        "- Do not invent other {curly} placeholders. Keep every line in the speaker's voice."
-        f"{example}"
+        "- Do not invent other {curly} placeholders. Keep every line in the speaker's voice.\n"
+        "- OPTIONALLY add 'choices': an array of the PLAYER'S possible replies to this line, "
+        "each {\"text\": <the captain's short reply, plain first person>, \"next_context\": "
+        "<a beat to go to, optional>, \"action\": <one of farewell/trade/barter/accept_lead, "
+        "optional>}. Only 'text' is required. Omit 'choices' if no branching reply fits."
+        + contexts_info
+        + (f"\nFor reference, these placeholder values may appear at runtime: "
+           f"{dict(req.examples)}." if req.examples else "")
     )
 
 
@@ -217,28 +265,49 @@ def repair(grammar: Mapping[str, Sequence[str]], context: str) -> dict[str, list
     return {k: [drop_dangling(x) for x in v] for k, v in step1.items()}
 
 
-def author_line(backend: Any, req: AuthoringRequest, *, retries: int = 3) -> dict[str, Any]:
+def author_line(backend: Any, req: AuthoringRequest, *, known_contexts: frozenset[str] | None = None,
+                retries: int = 3) -> dict[str, Any]:
     """Author one grammar line entry: generate → repair → prune → validate, with retries.
 
     LLM sampling is stochastic, so a grammar that fails the quality floor on one draw often
     passes on the next. We retry the generator up to `retries` times rather than relax the
     floor — keeping output quality high while tolerating flaky small models. A backend whose
     response won't even parse as JSON (`JSONDecodeError`) is treated the same way — one bad
-    draw retries instead of aborting the whole run. Raises the last error if every attempt
-    fails. (Backend *configuration* errors — a missing CLI, a bad host — surface as other
-    exception types and abort immediately, by design.)
+    draw retries instead of aborting the whole run. If `known_contexts` is provided, choice
+    targets are validated and an invalid one triggers a retry (§6.7). Raises the last error if
+    every attempt fails. (Backend *configuration* errors — a missing CLI, a bad host — surface
+    as other exception types and abort immediately, by design.)
     """
-    prompt = build_prompt(req)
+    prompt = build_prompt(req, known_contexts=known_contexts)
     last: Exception | None = None
     for _ in range(max(1, retries)):
         try:
             raw = backend.generate(prompt, schema=output_schema())
-            grammar = prune_unreachable(repair(raw, req.context))
+            # Accept both the wrapped {grammar, choices} shape and a bare grammar object (a
+            # backend that predates the wrapper — e.g. StaticBackend — returns just the grammar).
+            raw_grammar = raw.get("grammar", raw) if isinstance(raw, dict) else raw
+            grammar = prune_unreachable(repair(raw_grammar, req.context))
             validate_generated(grammar, req.context)
+            # Validate choice targets if known_contexts is provided (§6.7 branching).
+            choices = raw.get("choices") if isinstance(raw, dict) else None
+            if choices and known_contexts:
+                for choice in choices:
+                    next_ctx = choice.get("next_context")
+                    if next_ctx is not None:
+                        if not (next_ctx in known_contexts or
+                                next_ctx.startswith(BRANCH_PREFIX) or
+                                next_ctx.startswith("sig.")):
+                            raise AuthoringError(
+                                f"{req.context}: choice targets unknown context {next_ctx!r}"
+                            )
         except (AuthoringError, json.JSONDecodeError) as exc:
             last = exc
             continue
-        return {"grammar": grammar}
+        line: dict[str, Any] = {"grammar": grammar}
+        choices = raw.get("choices") if isinstance(raw, dict) else None
+        if choices:  # carry authored player replies through to the config sidecar (§6.7)
+            line["choices"] = choices
+        return line
     assert last is not None
     raise last
 
@@ -251,9 +320,12 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
     `voices` maps a persona/species id to its voice description; `contexts` are the intents to
     author; `examples` optionally supplies per-context placeholder samples to ground the model.
     Each entry is generated with `retries` and validated, so only sound grammars are kept.
+    Choice `next_context` targets are validated against the known contexts; an invalid target
+    triggers a retry, so bad choices never make it into the output (§6.7 branching).
     """
     examples = examples or {}
     packs: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    known = frozenset(contexts)
     for voice_id, voice in voices.items():
         pack: dict[str, list[dict[str, Any]]] = {}
         for context in contexts:
@@ -262,6 +334,6 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
                 placeholders=allowed_placeholders(context),
                 examples=examples.get(context, {}),
             )
-            pack[context] = [author_line(backend, req, retries=retries)]
+            pack[context] = [author_line(backend, req, known_contexts=known, retries=retries)]
         packs[voice_id] = pack
     return packs

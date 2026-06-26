@@ -479,7 +479,8 @@ def _inject_species(svc: object, roster_id: str):  # type: ignore[no-untyped-def
 async def test_hail_opens_contact_then_buys_tech() -> None:
     from textual.widgets import Static
 
-    from edge.tui.screens.contact import AlienContactScreen
+    from edge.tui.screens.contact import AlienContactScreen, OfferPickerScreen
+    from edge.tui.widgets import ClickableEntry
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -492,12 +493,14 @@ async def test_hail_opens_contact_then_buys_tech() -> None:
         await pilot.press("h")  # hail the species in this sector
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
-        # The persona-voiced opener renders, and a greyed verb shows its reason.
+        # The persona-voiced opener renders.
         assert str(app.screen.query_one("#speech", Static).render())
-        verbs = " ".join(str(s.render()) for s in app.screen.query("#verbs Static"))
-        assert "(" in verbs and ")" in verbs  # at least one disabled verb shows a reason
-        # Click the (available) tech offer → buys it, a loose component lands aboard.
-        await pilot.click(app.screen.query(".offer").first())
+        # Buy tech via the keybinding 't' (tech offer picker opens as a modal).
+        await pilot.press("t")
+        await pilot.pause()
+        assert isinstance(app.screen, OfferPickerScreen)
+        # Select the (only) available tech offer from the picker modal.
+        await pilot.click(app.screen.query(ClickableEntry).first())
         await pilot.pause()
         assert sum(svc.state.ships[1].components.values()) == 1
 
@@ -1018,7 +1021,7 @@ async def test_say_do_menu_converse_and_trade() -> None:
     from textual.widgets import Static
 
     from edge.core.models import AlienSpecies
-    from edge.tui.screens.contact import AlienContactScreen, SubjectPickerScreen
+    from edge.tui.screens.contact import AlienContactScreen, OfferPickerScreen, SubjectPickerScreen
     from edge.tui.widgets import ClickableEntry
 
     app = EdgeApp()
@@ -1053,15 +1056,55 @@ async def test_say_do_menu_converse_and_trade() -> None:
         assert isinstance(app.screen, AlienContactScreen)
         assert "Vesk" in str(app.screen.query_one("#speech", Static).render())
 
-        # Buy tech via the Do verb 't' (the lone available latinum offer) → a component lands.
+        # Buy tech via the keybinding 't' (offer picker opens as a modal).
         await pilot.press("t")
         await pilot.pause()
+        assert isinstance(app.screen, OfferPickerScreen)
+        # Select the (only) available latinum offer from the picker modal.
+        await pilot.click(app.screen.query(ClickableEntry).first())
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
         assert sum(svc.state.ships[1].components.values()) == 1
 
         # Farewell speaks its parting line and breaks contact.
         await pilot.press("f")
         await pilot.pause()
         assert not isinstance(app.screen, AlienContactScreen)
+
+
+async def test_branching_choices_render_and_drive_transition() -> None:
+    """§6.7 branching: a node with authored choices shows numbered replies; '1' transitions.
+
+    A plain node (no authored choices) still shows the derived Say/Do menu — covered by the
+    other contact tests; here we drive the Vesk's authored greeting → workshop branch.
+    """
+    from edge.tui.screens.contact import AlienContactScreen
+    from edge.tui.widgets import ClickableEntry
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        _inject_species(svc, "vesk")  # serial_formal persona authors greeting choices
+
+        await pilot.press("h")  # hail → contact screen on the greeting node
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        # The greeting node carries authored replies → numbered choices, not the derived menu.
+        body = " ".join(str(e.render()) for e in app.screen.query(ClickableEntry))
+        assert "[1]" in body
+        view = app.screen._view()  # type: ignore[attr-defined]
+        assert view.choices and view.choices[0].next_context == "branch.vesk_workshop"
+
+        await pilot.press("1")  # pick the first reply → transition to the workshop node
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        assert app.screen._active_context == "branch.vesk_workshop"  # type: ignore[attr-defined]
+        actions = {c.action for c in app.screen._view().choices}  # type: ignore[attr-defined]
+        assert "trade" in actions and "farewell" in actions
 
 
 async def test_log_coordinates_freezes_the_offer_line() -> None:
