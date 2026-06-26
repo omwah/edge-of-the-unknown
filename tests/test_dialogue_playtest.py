@@ -49,6 +49,25 @@ def test_contact_view_resolves_for_every_species_and_band() -> None:
             assert view.standing == expected, (sid, band, view.standing)
 
 
+def test_harness_adds_a_regreet_verb_the_game_drops() -> None:
+    svc = _service()
+    view = svc.contact_view(svc.pid, svc.current)
+    regreet = next((v for v in view.verbs if v.key == "hail"), None)
+    assert regreet is not None and regreet.label == "Regreet"
+    assert regreet.kind == "say" and regreet.context == "greeting"
+
+
+def test_regreet_is_a_floor_row_on_a_branching_node() -> None:
+    svc = _service()
+    for sid in svc.species_ids:  # a branching species surfaces Regreet as a floor row
+        view = svc.contact_view(svc.pid, sid)
+        if view.choices:
+            assert any(v.key == "hail" and v.label == "Regreet" for v in view.floor_verbs)
+            break
+    else:  # pragma: no cover - the corpus always ships at least one branch node
+        raise AssertionError("no branching species found in the corpus")
+
+
 def test_force_enable_makes_every_verb_and_choice_selectable() -> None:
     svc = _service()
     svc.band = "friendly"
@@ -178,6 +197,20 @@ async def test_farewell_opens_controls_instead_of_a_blank_screen() -> None:
         await pilot.press("escape")
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
+
+
+async def test_empty_trade_speaks_a_refusal_beat() -> None:
+    svc = _service()
+    svc.band = "friendly"
+    assert svc.select_species_by_roster("dacaran")  # `refuses` posture ⇒ empty shelf
+    app = PlaytestApp(svc)
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        await pilot.press("t")  # Trade with nothing to sell ⇒ a spoken refusal, not a picker
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        assert app.screen._active_context == "trade_refuse"
 
 
 async def test_say_verb_records_history_and_backspace_backtracks() -> None:

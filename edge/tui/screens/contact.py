@@ -98,7 +98,7 @@ class AlienContactScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Break contact"),
         Binding("backspace", "back_one", "Back"),
-        Binding("h", "verb('hail')", "Greet"),
+        Binding("h", "verb('hail')", "Regreet"),  # only ever shown by the play-test harness
         Binding("a", "verb('ask')", "Ask about…"),
         Binding("t", "verb('trade')", "Buy tech"),
         Binding("b", "verb('barter')", "Barter"),
@@ -242,21 +242,24 @@ class AlienContactScreen(Screen):
         return obj.action == "farewell" if kind == "choice" else obj.key == "farewell"  # type: ignore[attr-defined]
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        """Show a footer shortcut only when it is a valid option in the current menu (§11).
+        """Show a footer shortcut only when its key would actually do something here (§11).
 
-        Textual hides a binding whose `check_action` returns None. The lettered verb shortcuts
-        (Greet / Ask / Buy tech / Barter / Farewell) appear only when that verb is actually a
-        rendered, enabled row — so they vanish on a branching node that doesn't offer them — and
-        Back appears only when there is somewhere to step back to. Escape and the number-key
-        replies stay live.
+        A lettered verb (Regreet / Ask about… / Buy tech / Barter / Farewell) dispatches against
+        the view's verbs, so its shortcut shows iff that verb is **enabled** in the view — which is
+        independent of how the node renders. So an offered Trade still shows on a branching node
+        whose visible rows are authored choices, a refused trade or a not-yet-met Ask vanishes,
+        and Regreet (absent from the game's verbs, injected only by the play-test harness) shows
+        only while play-testing. Back shows only when there is somewhere to step back to.
+
+        Textual's `active_bindings` drops a binding whose `check_action` is **False** but keeps a
+        **None** one greyed, so we return plain bools to make an invalid shortcut vanish entirely.
+        Escape and the number-key replies stay live.
         """
         if action == "back_one":
-            return True if self._history else None
+            return bool(self._history)
         if action == "verb":
             key = parameters[0] if parameters else None
-            keys = {o.key for kind, o in self._menu_items(self._view())  # type: ignore[attr-defined]
-                    if kind == "verb" and o.enabled}  # type: ignore[attr-defined]
-            return True if key in keys else None
+            return any(v.key == key and v.enabled for v in self._view().verbs)
         return True
 
     @staticmethod
@@ -324,8 +327,11 @@ class AlienContactScreen(Screen):
         if choice.action == "farewell":
             self._break_contact()  # the parting line was spoken; break contact
             return
-        if choice.action in ("trade", "barter"):
-            self._pick_offer("latinum" if choice.action == "trade" else "barter")
+        if choice.action == "trade":
+            self._trade_or_refuse()
+            return
+        if choice.action == "barter":
+            self._pick_offer("barter")
             return
         if choice.action == "accept_lead":
             self.notify("Coordinates logged.", timeout=3)
@@ -348,10 +354,10 @@ class AlienContactScreen(Screen):
                 self._ask_about(verb.context)
             else:
                 self._say(verb.context, None, close=(key == "farewell"))
-        elif key == "leave":
-            self._break_contact()
-        elif key in ("trade", "barter"):
-            self._pick_offer("latinum" if key == "trade" else "barter")
+        elif key == "trade":
+            self._trade_or_refuse()
+        elif key == "barter":
+            self._pick_offer("barter")
         elif key == "accept_lead":
             self._accept_lead()
         else:
@@ -398,6 +404,18 @@ class AlienContactScreen(Screen):
                 self._say(context, subject_id, close=False)
 
         self.app.push_screen(SubjectPickerScreen(subjects), picked)
+
+    def _trade_or_refuse(self) -> None:
+        """Open the buy menu if there's stock, else speak the persona's `trade_refuse` beat (§6.7).
+
+        Keeps Trade a live, voiced action even when the shelf is empty (or the species refuses):
+        no offers ⇒ navigate to the `trade_refuse` context so the alien says so, rather than a
+        terse toast or a dead button.
+        """
+        if any(o.mode == "latinum" and o.available for o in self._view().offers):
+            self._pick_offer("latinum")
+        else:
+            self._say("trade_refuse", None, close=False)
 
     def _pick_offer(self, mode: str) -> None:
         """Open a menu to pick a tech offer to buy or barter."""
