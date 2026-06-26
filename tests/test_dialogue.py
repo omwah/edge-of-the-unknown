@@ -175,13 +175,15 @@ def test_reachable_contexts_reflects_params() -> None:
     vesk = CFG.roster.species_by_id("vesk")  # trade_posture open, treaty_mode open
     assert vesk is not None
     rc = reachable_contexts(vesk)
-    assert "trade_open" in rc and "trade_refuse" not in rc
+    # An open trader reaches both trade_open and trade_refuse — the latter for an empty shelf
+    # (nothing affordable), routed to the generic catch-all (§6.7).
+    assert "trade_open" in rc and "trade_refuse" in rc
     assert "greeting" in rc and "dossier_other" in rc
 
     dacaran = CFG.roster.species_by_id("dacaran")  # trade_posture refuses
     assert dacaran is not None
     assert "trade_refuse" in reachable_contexts(dacaran)
-    assert "trade_open" not in reachable_contexts(dacaran)
+    assert "trade_open" not in reachable_contexts(dacaran)  # a refuser never opens trade
 
     stryx = CFG.roster.species_by_id("stryx")  # treaty_mode none
     assert stryx is not None
