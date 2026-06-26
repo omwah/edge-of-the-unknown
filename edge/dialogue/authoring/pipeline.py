@@ -365,6 +365,9 @@ def extend_packs(
             continue
         known.update(new_targets)
         for branch_ctx in sorted(new_targets):
+            if backend.__class__.__name__ != "DebugBackend":
+                import sys
+                print(f"  {voice_id} -> {branch_ctx}...", file=sys.stderr, flush=True)
             req = AuthoringRequest(
                 context=branch_ctx, voice=voice,
                 placeholders=allowed_placeholders(branch_ctx),
@@ -413,6 +416,9 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
         for context in contexts:
             if context in pack:
                 continue  # already authored — preserve it
+            if backend.__class__.__name__ != "DebugBackend":
+                import sys
+                print(f"  {voice_id} -> {context}...", file=sys.stderr, flush=True)
             req = AuthoringRequest(
                 context=context, voice=voice,
                 placeholders=allowed_placeholders(context),
@@ -426,6 +432,9 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
                 break
             known.update(new_targets)
             for branch_ctx in sorted(new_targets):
+                if backend.__class__.__name__ != "DebugBackend":
+                    import sys
+                    print(f"  {voice_id} -> {branch_ctx}...", file=sys.stderr, flush=True)
                 req = AuthoringRequest(
                     context=branch_ctx, voice=voice,
                     placeholders=allowed_placeholders(branch_ctx),
