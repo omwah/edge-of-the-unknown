@@ -52,7 +52,8 @@ ui:
 #     - alien_dialogue_default.yaml
 #     - dialogue/alien_dialogue.ollama_gemma4.yaml
 roster_file: alien_roster_default.yaml
-dialogue_file: alien_dialogue_default.yaml
+dialogue_file: 
+    - alien_dialogue_default.yaml
 names_file: names_default.yaml
 
 economy:

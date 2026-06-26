@@ -56,15 +56,52 @@ class SubjectPickerScreen(ModalScreen[int | None]):
         self.dismiss(None)
 
 
+class OfferPickerScreen(ModalScreen[int | None]):
+    """Pick a tech offer to buy or barter; dismisses with its index or None."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    CSS = """
+    OfferPickerScreen { align: center middle; }
+    OfferPickerScreen #offer-box {
+        width: 50; height: auto; padding: 1 2; border: round $primary; background: $surface;
+    }
+    OfferPickerScreen #offer-box Static.title { margin-bottom: 1; }
+    """
+
+    def __init__(self, offers: list[dto.TechOfferDTO], mode: str) -> None:
+        super().__init__()
+        self._offers = offers
+        self._mode = mode  # "latinum" or "barter"
+
+    def compose(self) -> ComposeResult:
+        title = "Buy which tech?" if self._mode == "latinum" else "Barter which item?"
+        with Vertical(id="offer-box"):
+            yield Static(f"[b]{title}[/]  [dim](Esc to cancel)[/]", classes="title")
+            for offer in self._offers:
+                cost = f"{offer.price} latinum" if self._mode == "latinum" else offer.barter_cost
+                line = f"  [b]{offer.label}[/]  {cost}"
+                yield ClickableEntry(line, dest="offer", ref=offer.index)
+
+    @on(ClickableEntry.Picked)
+    def on_pick(self, msg: ClickableEntry.Picked) -> None:
+        if msg.dest == "offer":
+            self.dismiss(int(msg.ref))  # type: ignore[arg-type]
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class AlienContactScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Break contact"),
-        Binding("6", "back", "Leave"),
         Binding("h", "verb('hail')", "Greet"),
         Binding("a", "verb('ask')", "Ask about…"),
         Binding("t", "verb('trade')", "Buy tech"),
         Binding("b", "verb('barter')", "Barter"),
         Binding("f", "verb('farewell')", "Farewell"),
+        # Numbered player replies on an authored branching node (§6.7); inert on a plain node.
+        *[Binding(str(n), f"choice({n})", show=False) for n in range(1, 10)],
     ]
 
     CSS = """
@@ -79,14 +116,10 @@ class AlienContactScreen(Screen):
         height: auto; border: round $secondary; padding: 0 1; margin: 1 2;
     }
     AlienContactScreen #contact-main { height: 1fr; padding: 0 2; }
-    AlienContactScreen #left { width: 2fr; height: 1fr; }
+    AlienContactScreen #left { width: 1fr; height: 1fr; }
     AlienContactScreen #verbs .heading { color: $secondary; text-style: bold; }
     AlienContactScreen #verbs .subhead { color: $text-muted; text-style: bold; margin-top: 1; }
-    AlienContactScreen #offers { height: auto; border: round $primary; padding: 0 1; margin-top: 1; }
     AlienContactScreen #verbs .derived { color: $text-muted; margin-top: 1; }
-    AlienContactScreen #dossier {
-        width: 1fr; height: auto; border: round $primary; padding: 0 1; margin-left: 2;
-    }
     """
 
     def __init__(self, contact: dto.ContactDTO, service: GameService | None = None,
@@ -143,27 +176,22 @@ class AlienContactScreen(Screen):
         with Horizontal(id="contact-main"):
             with Vertical(id="left"):
                 with Vertical(id="verbs"):
-                    yield Static("Say / Do", classes="heading")
-                    yield Static("Say", classes="subhead")
-                    for v in c.verbs:
-                        if v.kind == "say":
-                            yield ClickableEntry(self._verb_line(v), dest="verb", ref=v.key)
-                    yield Static("Do", classes="subhead")
-                    for v in c.verbs:
-                        if v.kind != "say":
-                            yield ClickableEntry(self._verb_line(v), dest="verb", ref=v.key)
-                    yield Static("[dim](menu derived from params)[/]", classes="derived")
-                offers = Vertical(id="offers")
-                offers.border_title = "Tech offers — click to buy / barter"
-                with offers:
-                    if not c.offers:
-                        yield Static("[dim]nothing on offer[/]")
-                    for o in c.offers:
-                        yield ClickableEntry(self._offer_line(o), dest="offer", ref=o.index,
-                                             classes="offer")
-            dossier = Static("\n".join(c.dossier) or "[dim]nothing told to you yet[/]", id="dossier")
-            dossier.border_title = "Dossier (told to you)"
-            yield dossier
+                    heading = "Your reply" if c.choices else "Options"
+                    yield Static(heading, classes="heading")
+                    show_disabled = (self._service.config.ui.show_disabled_options
+                                    if self._service else False)
+                    if c.choices:
+                        # Authored branching node: numbered player replies.
+                        items = c.choices if show_disabled else [ch for ch in c.choices if ch.enabled]
+                        for n, ch in enumerate(items, start=1):
+                            yield ClickableEntry(self._choice_line(n, ch), dest="choice",
+                                                 ref=ch.index)
+                    else:
+                        # Derived menu: all verbs (Say + Do) numbered uniformly.
+                        items = c.verbs if show_disabled else [v for v in c.verbs if v.enabled]
+                        for n, v in enumerate(items, start=1):
+                            yield ClickableEntry(self._numbered_verb_line(n, v), dest="verb",
+                                                 ref=v.key)
         yield Footer()
 
     @staticmethod
@@ -174,23 +202,76 @@ class AlienContactScreen(Screen):
         return f"  [dim]\\[{v.key}] {v.label}  ({v.reason})[/]"
 
     @staticmethod
-    def _offer_line(o: dto.TechOfferDTO) -> str:
-        cost = f"{o.price} latinum" if o.mode == "latinum" else o.barter_cost
-        if o.available:
-            return f"  [b]{o.label}[/]  [green]{cost}[/]"
-        return f"  [dim]{o.label}  {cost}  ({o.reason})[/]"
+    def _choice_line(n: int, ch: dto.ContactChoiceDTO) -> str:
+        # Literal brackets escaped so Rich shows "[1]" rather than a markup tag.
+        if ch.enabled:
+            return f"  [b]\\[{n}][/] {ch.text}"
+        return f"  [dim]\\[{n}] {ch.text}  ({ch.reason})[/]"
+
+    @staticmethod
+    def _numbered_verb_line(n: int, v: dto.ContactVerbDTO) -> str:
+        # Numbered verbs (unified Say + Do menu).
+        if v.enabled:
+            return f"  [b]\\[{n}][/] {v.label}"
+        return f"  [dim]\\[{n}] {v.label}  ({v.reason})[/]"
 
     # --- dispatch ------------------------------------------------------------
 
     @on(ClickableEntry.Picked)
     def on_picked(self, msg: ClickableEntry.Picked) -> None:
-        if msg.dest == "offer":
-            self._buy_by_index(int(msg.ref))  # type: ignore[arg-type]
+        if msg.dest == "choice":
+            self._choose(int(msg.ref))  # type: ignore[arg-type]
         elif msg.dest == "verb":
             self._dispatch(str(msg.ref))
 
     def action_verb(self, key: str) -> None:
         self._dispatch(key)
+
+    def action_choice(self, n: int) -> None:
+        """Select the n-th shown option (key 1–9): a choice on a branching node or a verb on derived."""
+        view = self._view()
+        show_disabled = (self._service.config.ui.show_disabled_options
+                        if self._service else False)
+        if view.choices:
+            # Branching node: numbered choices.
+            items = view.choices if show_disabled else [ch for ch in view.choices if ch.enabled]
+            if 1 <= n <= len(items):
+                self._choose(items[n - 1].index)
+        else:
+            # Derived menu: numbered verbs.
+            items = view.verbs if show_disabled else [v for v in view.verbs if v.enabled]
+            if 1 <= n <= len(items):
+                self._dispatch(items[n - 1].key)
+
+    def _choose(self, index: int) -> None:
+        """Apply a player reply on a branching node, then navigate per its action/transition."""
+        choice = next((ch for ch in self._view().choices if ch.index == index), None)
+        if choice is None:
+            return
+        if not choice.enabled:
+            self.notify(choice.reason or "unavailable here", timeout=2)
+            return
+        if self._service is None:
+            return
+        try:
+            self._service.apply(self._pid, Converse(self._species_id, self._active_context,
+                                                    choice_index=index))
+        except Exception as exc:  # core rejected it — surface and stay put
+            self.notify(str(exc), timeout=2)
+            return
+        if choice.action == "farewell":
+            self.app.pop_screen()  # the parting line was spoken; break contact
+            return
+        if choice.action in ("trade", "barter"):
+            self._pick_offer("latinum" if choice.action == "trade" else "barter")
+            return
+        if choice.action == "accept_lead":
+            self.notify("Coordinates logged.", timeout=3)
+            self._reopen()
+            return
+        if choice.next_context:
+            self._active_context, self._active_subject = choice.next_context, None
+        self._reopen()
 
     def _dispatch(self, key: str) -> None:
         verb = next((v for v in self._view().verbs if v.key == key), None)
@@ -207,7 +288,7 @@ class AlienContactScreen(Screen):
         elif key == "leave":
             self.app.pop_screen()
         elif key in ("trade", "barter"):
-            self._act_offer("latinum" if key == "trade" else "barter")
+            self._pick_offer("latinum" if key == "trade" else "barter")
         elif key == "accept_lead":
             self._accept_lead()
         else:
@@ -254,20 +335,20 @@ class AlienContactScreen(Screen):
 
         self.app.push_screen(SubjectPickerScreen(subjects), picked)
 
-    def _act_offer(self, mode: str) -> None:
-        offers = [o for o in self._view().offers if o.mode == mode]
-        available = [o for o in offers if o.available]
-        if len(available) == 1:
-            self._buy(available[0])  # act on the lone offer of that mode
-        elif offers:
-            self.notify("pick an offer in the Tech offers panel", timeout=2)
-        else:
+    def _pick_offer(self, mode: str) -> None:
+        """Open a menu to pick a tech offer to buy or barter."""
+        offers = [o for o in self._view().offers if o.mode == mode and o.available]
+        if not offers:
             self.notify(f"nothing on offer ({mode})", timeout=2)
+            return
 
-    def _buy_by_index(self, index: int) -> None:
-        offer = next((o for o in self._view().offers if o.index == index), None)
-        if offer is not None:
-            self._buy(offer)
+        def picked(index: int | None) -> None:
+            if index is not None:
+                offer = next((o for o in self._view().offers if o.index == index), None)
+                if offer is not None:
+                    self._buy(offer)
+
+        self.app.push_screen(OfferPickerScreen(offers, mode), picked)
 
     def _buy(self, offer: dto.TechOfferDTO) -> None:
         if self._service is None:

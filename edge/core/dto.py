@@ -539,6 +539,25 @@ class TechOfferDTO:
 
 
 @dataclass(frozen=True)
+class ContactChoiceDTO:
+    """One authored player reply on a branching dialogue node (§6.7 optional branching).
+
+    Present only when the active node carries authored `choices`; the screen then renders
+    these numbered replies in place of (and falling back to) the derived Say/Do menu.
+    `index` is the canonical index in the node's choice list (what the `Converse` command
+    carries), so hidden/ungated replies don't shift it. A disabled reply (e.g. a Phase-3
+    `attack`) shows its `reason`; `action`/`next_context` let the screen drive navigation.
+    """
+
+    index: int
+    text: str
+    action: str = ""  # a CHOICE_ACTIONS verb, or "" for a pure transition
+    next_context: str = ""  # the node it transitions to, or "" to stay / act only
+    enabled: bool = True
+    reason: str = ""
+
+
+@dataclass(frozen=True)
 class ContactDTO:
     """A peaceful alien contact screen (§6, §6.7, §11)."""
 
@@ -557,6 +576,8 @@ class ContactDTO:
     dossier: list[str]  # lines about other met species, in this species' voice
     subjects: list[tuple[int, str]] = field(default_factory=list)  # (id, name) of met others (WP17 Ask about…)
     intel_summary: str = ""  # the coordinate tip on offer (§6.7), or "" if none available
+    # Authored player replies on the active node (§6.7 branching); empty ⇒ derived verb menu.
+    choices: list[ContactChoiceDTO] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

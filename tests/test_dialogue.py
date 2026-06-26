@@ -20,6 +20,7 @@ from edge.dialogue import (
     NEUTRAL,
     DialogueIntegrityError,
     reachable_contexts,
+    select_entry,
     select_line,
     speak,
     standing_for,
@@ -270,6 +271,48 @@ def test_validate_requires_dossier_other_subject() -> None:
     def mutate(d: dict) -> None:  # type: ignore[type-arg]
         d["personas"]["generic"]["dossier_other"] = [{"variants": ["I know them well."]}]
     with pytest.raises(DialogueIntegrityError, match="dossier_other"):
+        validate_dialogue(_mutated_roster(mutate))
+
+
+# --- authored branching (§6.7): select_entry + choice validation -----------------
+
+def test_select_entry_returns_winning_entry_with_its_choices() -> None:
+    from edge.core.config import DialogueChoice
+
+    entry = DialogueLine(variants=["Hi {player}"],
+                         choices=[DialogueChoice(text="Bye", action="farewell")])
+    got = select_entry([{"greeting": [entry]}], "greeting", standing=FRIENDLY, treaty=False,
+                       rng=random.Random(0))
+    assert got is not None and got.choices[0].action == "farewell"
+
+
+def test_validate_rejects_unknown_choice_action() -> None:
+    def mutate(d: dict) -> None:  # type: ignore[type-arg]
+        d["personas"]["generic"]["greeting"][0]["choices"] = [{"text": "x", "action": "explode"}]
+    with pytest.raises(DialogueIntegrityError, match="choice action"):
+        validate_dialogue(_mutated_roster(mutate))
+
+
+def test_validate_rejects_choice_to_unknown_context() -> None:
+    def mutate(d: dict) -> None:  # type: ignore[type-arg]
+        d["personas"]["generic"]["greeting"][0]["choices"] = [
+            {"text": "x", "next_context": "not_a_context"}]
+    with pytest.raises(DialogueIntegrityError, match="targets unknown context"):
+        validate_dialogue(_mutated_roster(mutate))
+
+
+def test_validate_rejects_unfillable_choice_placeholder() -> None:
+    def mutate(d: dict) -> None:  # type: ignore[type-arg]
+        d["personas"]["generic"]["greeting"][0]["choices"] = [{"text": "buy {nonsense}"}]
+    with pytest.raises(DialogueIntegrityError, match="unfillable placeholder"):
+        validate_dialogue(_mutated_roster(mutate))
+
+
+def test_validate_rejects_orphan_branch_node() -> None:
+    # A `branch.*` node nothing targets is dead config — the validator must catch it.
+    def mutate(d: dict) -> None:  # type: ignore[type-arg]
+        d["personas"]["generic"]["branch.orphan"] = [{"variants": ["Nobody comes here, {player}."]}]
+    with pytest.raises(DialogueIntegrityError, match="unreachable"):
         validate_dialogue(_mutated_roster(mutate))
 
 
