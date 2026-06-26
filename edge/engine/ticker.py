@@ -1,13 +1,12 @@
 """The engine tick loop (DESIGN §9).
 
-twclone's two-level scheduling, Phase-1 subset: a short tick advances a logical
-tick counter and fires durable cron tasks at their cadence — hourly port-economy
-regen, daily interest accrual, daily turn reset. Each cron tracks `next_due` (in
-ticks), so it fires exactly once per interval: never skipped, never double-run.
+A short tick advances a logical tick counter and fires durable cron tasks at
+configurable cadences (``ticker.crons`` in the game config).  Each cron tracks
+``next_due`` (in ticks), so it fires exactly once per interval: never skipped,
+never double-run.
 
-`step()` is the pure, synchronous heart (directly unit-testable); `run()` is the
-thin asyncio wrapper that calls it on a real-time timer. Cadence is given in ticks
-so tests can drive fast, deterministic ticks while real time uses 3600/86400.
+``step()`` is the pure, synchronous heart (directly unit-testable); ``run()`` is
+the thin asyncio wrapper that calls it on a real-time timer.
 """
 
 from __future__ import annotations
@@ -36,20 +35,28 @@ class EngineTicker:
     """
 
     def __init__(
-        self, service: GameService, *, tick_seconds: float = 1.0,
-        ticks_per_hour: int = 3600, ticks_per_day: int = 86_400,
+        self, service: GameService, *,
+        tick_seconds: float | None = None,
+        ticks_per_hour: int | None = None,
+        ticks_per_day: int | None = None,
     ) -> None:
+        tc = service.config.ticker
         self._service = service
-        self._tick_seconds = tick_seconds
+        self._tick_seconds = tick_seconds if tick_seconds is not None else tc.tick_seconds
         self._tick = 0
         self._running = False
-        drift_ticks = max(1, service.config.aliens.drift_ticks_per_firing)
+        # Per-cron cadences from config; legacy kwargs override for tests.
+        port_eco = ticks_per_hour if ticks_per_hour is not None else tc.crons.port_economy
+        planet_gr = ticks_per_hour if ticks_per_hour is not None else tc.crons.planet_growth
+        drift = tc.crons.alien_drift
+        interest = ticks_per_day if ticks_per_day is not None else tc.crons.interest_accrual
+        turn_reset = ticks_per_day if ticks_per_day is not None else tc.crons.daily_turn_reset
         self._crons = [
-            CronTask("hourly_port_economy", ticks_per_hour, CRONS["hourly_port_economy"], ticks_per_hour),
-            CronTask("hourly_planet_growth", ticks_per_hour, CRONS["hourly_planet_growth"], ticks_per_hour),
-            CronTask("alien_drift", drift_ticks, CRONS["alien_drift"], drift_ticks),
-            CronTask("interest_accrual", ticks_per_day, CRONS["interest_accrual"], ticks_per_day),
-            CronTask("daily_turn_reset", ticks_per_day, CRONS["daily_turn_reset"], ticks_per_day),
+            CronTask("hourly_port_economy", port_eco, CRONS["hourly_port_economy"], port_eco),
+            CronTask("hourly_planet_growth", planet_gr, CRONS["hourly_planet_growth"], planet_gr),
+            CronTask("alien_drift", drift, CRONS["alien_drift"], drift),
+            CronTask("interest_accrual", interest, CRONS["interest_accrual"], interest),
+            CronTask("daily_turn_reset", turn_reset, CRONS["daily_turn_reset"], turn_reset),
         ]
         self._restore_schedule()
 
