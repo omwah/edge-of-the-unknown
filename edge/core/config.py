@@ -727,6 +727,7 @@ class UIConfig(BaseModel):
     sidebar_width: int = Field(default=33, gt=0)
     sidebar_min_screen_width: int = Field(default=90, gt=0)
     surface_terrain_height: int = Field(default=12, gt=0)  # SurfaceScreen terrain panel height
+    local_map_radius: int = Field(default=3, gt=0)  # Computer/Map ego-graph reach in warp hops
 
 
 class NameList(BaseModel):

@@ -10,7 +10,7 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid, Horizontal, Vertical
+from textual.containers import Grid, Vertical
 from textual.message import Message
 from textual.widgets import DataTable, Static
 
@@ -21,7 +21,7 @@ from edge.core.dto import SectorDiscovery
 from edge.core.enums import Commodity
 
 from edge.tui import art_adapter
-from edge.tui.dummy import MapBand, MapDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
+from edge.tui.dummy import LocalMapDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
 
 
 class Starfield(Static):
@@ -578,67 +578,49 @@ class SectorScene(Static):
                 return
 
 
-class MapBandPanel(Static):
-    """One distance-band column on the galactic map (UI_MOCKUPS.md §10).
+class LocalMapView(Static):
+    """The local sector ego-graph (Computer/Map screen → §10, §11).
 
-    A bordered panel whose border-title is the band name; the body is the band's
-    pre-rendered rows (sector graph / cluster / rumor pins). Clicking it would
-    open the sector inspector in the real game — a stub `Picked` message here.
-    """
-
-    class Picked(Message):
-        def __init__(self, title: str) -> None:
-            self.title = title
-            super().__init__()
-
-    def __init__(self, band: MapBand, **kwargs: object) -> None:
-        super().__init__("\n".join(band.rows), **kwargs)
-        self._title = band.title
-        self.border_title = band.title
-
-    def on_click(self) -> None:
-        self.post_message(self.Picked(self._title))
-
-
-class _MapLane(Static):
-    """A neutral navigable lane drawn between two band columns (§5/§10)."""
-
-    def __init__(self, glyph: str, **kwargs: object) -> None:
-        # One blank lead-in lines the lane up with the bordered panels' bodies,
-        # then a run of glyphs spans their height so the lane reads as continuous.
-        super().__init__("\n".join(["", *([glyph] * 6)]), **kwargs)
-
-
-class MapView(Horizontal):
-    """The banded galactic map: band columns left→right with lane connectors.
-
-    Bands are laid out Core→Hub→Frontier→Void; a `_MapLane` is inserted before
-    any band that declares a neutral-lane glyph, so the always-passable lanes
-    between alliance home clusters read as gaps in territory (§5/§10).
+    A node-and-edge graph of the player's surrounding sectors, centered on the
+    current sector and laid out in gravity columns (toward-Core left, deeper
+    right). The rows + legend are baked server-side (`session.map_view`); this
+    widget just renders them and can re-render to overlay a freshly plotted route
+    via `update_map`. Clicking a sector node posts `Picked(sector_id)` so the
+    screen can plot a route to it.
     """
 
     DEFAULT_CSS = """
-    MapView { height: 1fr; align-vertical: middle; padding: 1 1; }
-    MapView MapBandPanel {
-        width: 1fr; height: auto; border: round $primary; padding: 0 1;
-        color: $text;
-    }
-    MapView MapBandPanel:hover { border: round $secondary; }
-    MapView _MapLane {
-        width: 5; height: auto; color: $secondary;
-        text-align: center; content-align: center middle;
-    }
+    LocalMapView { height: auto; padding: 1 2; }
     """
 
-    def __init__(self, gmap: MapDTO, **kwargs: object) -> None:
-        super().__init__(**kwargs)
+    class Picked(Message):
+        def __init__(self, sector_id: int) -> None:
+            self.sector_id = sector_id  # internal id of the clicked sector
+            super().__init__()
+
+    def __init__(self, gmap: LocalMapDTO, **kwargs: object) -> None:
+        super().__init__(self._content(gmap), **kwargs)
         self._map = gmap
 
-    def compose(self) -> ComposeResult:
-        for band in self._map.bands:
-            if band.lane:
-                yield _MapLane(band.lane)
-            yield MapBandPanel(band)
+    @staticmethod
+    def _content(gmap: LocalMapDTO) -> str:
+        body = "\n".join(gmap.rows) if gmap.rows else "[dim]no charted neighbours[/]"
+        return f"{body}\n\n{gmap.legend}" if gmap.legend else body
+
+    def update_map(self, gmap: LocalMapDTO) -> None:
+        self._map = gmap
+        self.update(self._content(gmap))
+
+    def on_click(self, event: events.Click) -> None:
+        # Click coords are relative to the widget box; shift past the padding to land
+        # in the baked `rows` grid, then hit-test the node label boxes.
+        pad = self.styles.padding
+        col, row = int(event.x) - pad.left, int(event.y) - pad.top
+        for node in self._map.nodes:
+            if node.row == row and node.col0 <= col < node.col1:
+                event.stop()
+                self.post_message(self.Picked(node.sector_id))
+                return
 
 
 class ClickableEntry(Static):

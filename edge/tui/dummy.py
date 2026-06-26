@@ -23,9 +23,8 @@ from edge.core.dto import (
     EngineRoomDTO,
     GameState,
     Hold,
+    LocalMapDTO,
     LogEntry,
-    MapBand,
-    MapDTO,
     MessagesDTO,
     PlanetDTO,
     PortDTO,
@@ -187,70 +186,26 @@ def sample_surface() -> SurfaceDTO:
     )
 
 
-def sample_map() -> MapDTO:
-    """The banded galactic map from UI_MOCKUPS.md §10.
+def sample_map() -> LocalMapDTO:
+    """The local sector ego-graph from UI_MOCKUPS.md §10.
 
-    Bands run Core → Hub → Frontier → Void, left to right; `lane` glyphs are the
-    neutral navigable lanes between alliance home clusters (§5/§10). The current
-    sector `(7@)` sits in the Core column, matching `sample_state()`.
+    A node-and-edge graph centered on the current sector `(7@)` in gravity columns
+    (toward-Core left, deeper right), matching `sample_state()`. Rows are baked
+    Rich-markup; an unexplored neighbour shows its id faintly (contents fogged).
     """
-    return MapDTO(
+    return LocalMapDTO(
         you_sector=7,
         you_display=7,
-        you_band="0 - Core",
-        bands=[
-            MapBand(
-                title="Band 0 · Core",
-                rows=[
-                    "[dim](3)[/]   [dim](6)[/]",
-                    "  \\   /",
-                    "[dim](1)[/]─[reverse cyan](7@)[/]",
-                    "  /   \\",
-                    "[dim](8)[/]   [dim](12)[/]",
-                    "",
-                    "[magenta]P[/] Sol  [green]o[/] Terra",
-                ],
-            ),
-            MapBand(
-                title="Band 1 · Hub",
-                lane="~",
-                rows=[
-                    "[cyan]Concord[/]",
-                    "cluster",
-                    "",
-                    "[dim](21)(22)[/]",
-                    "[dim](24)(25)[/]",
-                    "",
-                    "[green]o[/] [green]o[/]  owned",
-                ],
-            ),
-            MapBand(
-                title="Band 2 · Frontier",
-                lane="~",
-                rows=[
-                    "[yellow]*[/] rumor",
-                    "",
-                    "(40)(41)[red]?[/]",
-                    "(43)[red]?[/]  [red]#?[/]",
-                    "",
-                    "[red]~[/] hazard",
-                    "[green]o[/]   [red]#?[/]",
-                ],
-            ),
-            MapBand(
-                title="Band 3+ · Void",
-                lane="·",
-                rows=[
-                    "",
-                    "[dim]· · · ·[/]",
-                    "[dim]unknown[/]",
-                    "",
-                    "[red]~ ?[/]",
-                    "",
-                    "[dim]deep void[/]",
-                ],
-            ),
+        you_band="Hub",
+        rows=[
+            "                [cyan](6)[/] ──╮",
+            "[cyan](1)[/] ─────[reverse bold cyan](7@)[/]──┤",
+            "                [green](12)[/] ─╯──[dim](21)[/]",
         ],
+        legend=(
+            "[reverse bold cyan]@[/] you   [bold yellow]*[/] route   ─ warp   "
+            "[magenta]P[/]/[magenta]S[/] port   [green]@[/] planet   [dim](n)[/] unexplored"
+        ),
     )
 
 

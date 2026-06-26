@@ -892,6 +892,70 @@ async def test_leads_tab_lists_logged_tip_plots_and_engages_route() -> None:
         assert disc.sector_id in svc.state.players[1].explored_sectors  # charted en route
 
 
+async def test_map_tab_renders_local_graph_and_overlays_route() -> None:
+    """§10/§11: the Map tab shows the local ego-graph centered on the player, and a
+    plotted route lights up on it (the LocalMapView re-bakes with the overlay)."""
+    from edge.tui.widgets import LocalMapView
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        # Warp one hop so the local map has a charted neighbour to route back to.
+        start = svc.state.ships[1].sector_id
+        svc.apply(1, Warp(to_sector=svc.state.adjacency[start][0]))
+
+        app.push_screen(ComputerScreen(svc, 1, initial_tab="map"))
+        await pilot.pause()
+        view = app.screen.query_one("#local-map", LocalMapView)
+        assert "@" in "\n".join(view._map.rows)  # type: ignore[attr-defined]  # you-marker present
+        assert "bold yellow" not in "\n".join(view._map.rows)  # type: ignore[attr-defined]
+
+        # Plot a route back to where we came from; the Map tab overlays it in the highlight.
+        here = svc.state.ships[1].sector_id
+        came_from = svc.state.players[1].entered_from[here]
+        app.screen._after_route_prompt(  # type: ignore[attr-defined]
+            svc.state.spatial_ids.get(came_from, came_from))
+        await pilot.pause()
+        assert "bold yellow" in "\n".join(view._map.rows)  # type: ignore[attr-defined]
+
+
+async def test_clicking_a_map_sector_plots_a_route() -> None:
+    """A clicked sector node on the Map plots a route to it and opens the Route tab."""
+    from textual.widgets import TabbedContent
+
+    from edge.tui.widgets import LocalMapView
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        start = svc.state.ships[1].sector_id
+        svc.apply(1, Warp(to_sector=svc.state.adjacency[start][0]))  # one charted neighbour
+
+        app.push_screen(ComputerScreen(svc, 1, initial_tab="map"))
+        await pilot.pause()
+        view = app.screen.query_one("#local-map", LocalMapView)
+        # The came-from sector is charted and on the map → click its node for real, so the
+        # widget's coordinate hit-test (padding offset included) is exercised end to end.
+        here = svc.state.ships[1].sector_id
+        came_from = svc.state.players[1].entered_from[here]
+        node = next(n for n in view._map.nodes if n.sector_id == came_from)  # type: ignore[attr-defined]
+        pad = view.styles.padding
+        await pilot.click(view, offset=(node.col0 + pad.left, node.row + pad.top))
+        await pilot.pause()
+
+        assert app.screen.query_one(TabbedContent).active == "route"  # opened the Route tab
+        assert app.screen._engage_target == came_from  # type: ignore[attr-defined]
+        assert app.screen._route.reachable  # type: ignore[attr-defined]  # a real route was plotted
+
+
 async def test_computer_screen_remembers_last_tab() -> None:
     """[C] reopens the Computer on whichever tab was last viewed (not always Trade)."""
     from textual.widgets import TabbedContent

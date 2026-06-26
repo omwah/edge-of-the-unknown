@@ -236,12 +236,17 @@ def test_port_directory_buy_sell_labels_match_class() -> None:
     assert bbs.buys == "Fuel, Org" and bbs.sells == "Equ"
 
 
-def test_map_view_orders_bands_and_counts() -> None:
-    mv = session.map_view(_world(), 1)
-    assert mv.you_sector == 2 and mv.you_band == "Hub"
-    titles = [b.title for b in mv.bands]
-    # canonical bands first, then any extras alphabetically.
-    assert titles == ["Band · Hub", "Band · Frontier", "Band · Weird"]
+def test_map_view_renders_local_ego_graph() -> None:
+    world = _world()  # player at sector 2, explored {1, 2, 3}; line 1-2-3-4
+    mv = session.map_view(world, 1)
+    assert mv.you_sector == 2 and mv.you_band == "Hub" and mv.you_display == 2
+    blob = "\n".join(mv.rows)
+    assert "@" in blob and mv.legend  # current sector highlighted, legend present
+    assert "(1)" in blob and "(3)" in blob  # the explored immediate neighbours appear
+
+    # Plotting a route to an explored, reachable neighbour overlays it in the highlight.
+    routed = "\n".join(session.map_view(world, 1, route_dest=3).rows)
+    assert "bold yellow" in routed
 
 
 def _nav_world() -> UniverseState:
