@@ -241,6 +241,24 @@ class AlienContactScreen(Screen):
         kind, obj = item
         return obj.action == "farewell" if kind == "choice" else obj.key == "farewell"  # type: ignore[attr-defined]
 
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """Show a footer shortcut only when it is a valid option in the current menu (§11).
+
+        Textual hides a binding whose `check_action` returns None. The lettered verb shortcuts
+        (Greet / Ask / Buy tech / Barter / Farewell) appear only when that verb is actually a
+        rendered, enabled row — so they vanish on a branching node that doesn't offer them — and
+        Back appears only when there is somewhere to step back to. Escape and the number-key
+        replies stay live.
+        """
+        if action == "back_one":
+            return True if self._history else None
+        if action == "verb":
+            key = parameters[0] if parameters else None
+            keys = {o.key for kind, o in self._menu_items(self._view())  # type: ignore[attr-defined]
+                    if kind == "verb" and o.enabled}  # type: ignore[attr-defined]
+            return True if key in keys else None
+        return True
+
     @staticmethod
     def _verb_line(v: dto.ContactVerbDTO) -> str:
         # Literal brackets are escaped so Rich shows "[h]" rather than a markup tag.
