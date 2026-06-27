@@ -45,7 +45,7 @@ species_grammars:
         - May your journey onward be as profound as our memories.
       choices:
       - text: Farewell, and may your path be clear.
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -98,7 +98,7 @@ species_grammars:
         action: trade
       - text: We just passing through for now.
         next_context: farewell
-        action: farewell
+        action: leave
       - text: What is the status of Federation patrols here?
         next_context: branch.inquiry
     trade_open:
@@ -123,7 +123,7 @@ species_grammars:
         action: trade
       - text: I'm just passing through, thank you.
         next_context: farewell
-        action: farewell
+        action: leave
     farewell:
     - grammar:
         origin:
@@ -142,7 +142,7 @@ species_grammars:
       choices:
       - text: Safe travels to you all.
         next_context: farewell
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -253,7 +253,7 @@ species_grammars:
       - text: We will certainly keep Vesk in mind for future trade.
         action: trade
       - text: Thank you for your help. Farewell, esteemed beings.
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -324,7 +324,7 @@ species_grammars:
         - Travel safely, wanderer.
       choices:
       - text: Thank you for your guidance.
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -431,7 +431,7 @@ species_grammars:
           regarding {species} engagement parameters.
       choices:
       - text: Goodbye, and may your journey be profitable.
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -499,7 +499,7 @@ species_grammars:
         action: barter
       - text: I'll keep my goods for now.
         next_context: farewell
-        action: farewell
+        action: leave
     farewell:
     - grammar:
         origin:
@@ -513,7 +513,7 @@ species_grammars:
         action: accept_lead
       - text: Just let us go.
         next_context: dossier_other
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -644,7 +644,7 @@ species_grammars:
       choices:
       - text: May your endeavors profit well.
         next_context: farewell
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -746,7 +746,7 @@ species_grammars:
       choices:
       - text: I respect your judgment.
         next_context: farewell
-        action: farewell
+        action: leave
       - text: What further counsel do you offer?
         next_context: branch.inquiry
         action: trade
@@ -857,7 +857,7 @@ species_grammars:
         - Carry the memory of our commitment, {player}.
       choices:
       - text: Safe travels, Dignar. We carry your guidance with us.
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -994,7 +994,7 @@ species_grammars:
           less taxing on the eye than some departures can be.
       choices:
       - text: Farewell to you as well.
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -1106,7 +1106,7 @@ species_grammars:
       choices:
       - text: Until we meet again.
         next_context: farewell
-        action: farewell
+        action: leave
       - text: Keep this memory close.
         next_context: dossier_other
         action: barter
@@ -1218,9 +1218,9 @@ species_grammars:
         - we see the effort it takes to keep such oaths.
       choices:
       - text: May your vigilance keep you safe, Covenant.
-        action: farewell
+        action: leave
       - text: I won't forget the lessons of the Iron Covenant.
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -1267,7 +1267,7 @@ species_grammars:
         action: trade
       - text: Just give me the information, please.
         next_context: branch.inquiry
-        action: farewell
+        action: leave
       - text: I am prepared to discuss our history with you.
         next_context: dossier_other
     branch.trade_open:
@@ -1378,7 +1378,7 @@ species_grammars:
       choices:
       - text: We'll report back when we're ready.
         next_context: dossier_other
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:
@@ -1411,7 +1411,7 @@ species_grammars:
       - text: What are your terms for this guidance?
         action: trade
       - text: Thank you. We will not forget this.
-        action: farewell
+        action: leave
     branch.data_offer:
     - grammar:
         origin:
@@ -1525,7 +1525,7 @@ species_grammars:
       choices:
       - text: We will be ready when you are.
         next_context: farewell
-        action: farewell
+        action: leave
       - text: Keep your knowledge. It will prove useful.
         next_context: dossier_other
         action: trade
@@ -1647,7 +1647,7 @@ species_grammars:
       choices:
       - text: We will honor your warning.
         next_context: farewell
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:

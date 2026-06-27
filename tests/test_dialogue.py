@@ -282,10 +282,10 @@ def test_select_entry_returns_winning_entry_with_its_choices() -> None:
     from edge.core.config import DialogueChoice
 
     entry = DialogueLine(variants=["Hi {player}"],
-                         choices=[DialogueChoice(text="Bye", action="farewell")])
+                         choices=[DialogueChoice(text="Bye", action="leave")])
     got = select_entry([{"greeting": [entry]}], "greeting", standing=FRIENDLY, treaty=False,
                        rng=random.Random(0))
-    assert got is not None and got.choices[0].action == "farewell"
+    assert got is not None and got.choices[0].action == "leave"
 
 
 def test_validate_rejects_unknown_choice_action() -> None:

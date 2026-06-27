@@ -960,14 +960,14 @@ def _contact_floor(verbs: list[dto.ContactVerbDTO], choices: list[dto.ContactCho
     Empty unless the node carries authored `choices` (else the derived menu already shows
     these) and is the configured `floor_context`. A floor verb is
     dropped when an authored reply already provides the same navigation — Ask about… when a
-    choice targets `dossier_other`, Farewell when a choice already speaks a `farewell` — so the
+    choice targets `dossier_other`, Farewell when a choice already speaks a `"leave"` action — so the
     grammar's explicit wording wins and the default only fills a gap.
     """
     if not choices or context != roster.floor_context:
         return []
     covered = {
         "ask": any(c.next_context == "dossier_other" for c in choices),
-        "farewell": any(c.action == "farewell" for c in choices),
+        "farewell": any(c.action == "leave" for c in choices),
     }
     return [v for v in verbs if v.key in roster.floor_keys and not covered.get(v.key, False)]
 

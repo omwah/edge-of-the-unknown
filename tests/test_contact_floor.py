@@ -41,13 +41,13 @@ def test_floor_drops_what_the_grammar_already_covers() -> None:
     ask_covered = session._contact_floor(_VERBS, [_choice(0, next_context="dossier_other")],
                                          "greeting", _ROSTER)
     assert [v.key for v in ask_covered] == ["farewell"]
-    exit_covered = session._contact_floor(_VERBS, [_choice(0, action="farewell")], "greeting", _ROSTER)
+    exit_covered = session._contact_floor(_VERBS, [_choice(0, action="leave")], "greeting", _ROSTER)
     assert [v.key for v in exit_covered] == ["ask"]
 
 
 def test_no_floor_on_deep_branch_or_plain_nodes() -> None:
     # Deeper branch.* nodes show exactly what the author wrote (top-level only).
-    assert session._contact_floor(_VERBS, [_choice(0, action="farewell")], "branch.shop", _ROSTER) == []
+    assert session._contact_floor(_VERBS, [_choice(0, action="leave")], "branch.shop", _ROSTER) == []
     # A plain node has no authored choices, so the derived menu already carries the floor verbs.
     assert session._contact_floor(_VERBS, [], "greeting", _ROSTER) == []
 
@@ -80,7 +80,7 @@ def test_farewell_always_sorts_last() -> None:
         "hail", "ask", "trade", "leave", "farewell"]
     # Branching node: a farewell *choice* sorts behind the later floor verbs too.
     branch = AlienContactScreen(_dto(
-        choices=[_choice(0, next_context="branch.shop"), _choice(1, action="farewell")],
+        choices=[_choice(0, next_context="branch.shop"), _choice(1, action="leave")],
         floor=[_VERBS[1], _VERBS[4]]))  # ask, leave
     assert _ids(branch._menu_items(branch._view())) == [
         ("choice", 0), ("verb", "ask"), ("verb", "leave"), ("choice", 1)]
@@ -119,7 +119,7 @@ def test_check_action_shows_enabled_say_verbs_and_hides_disabled_ones() -> None:
         dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell"),
     ]
     branch = AlienContactScreen(_dto(
-        choices=[_choice(0, next_context="branch.shop"), _choice(1, action="farewell")],
+        choices=[_choice(0, next_context="branch.shop"), _choice(1, action="leave")],
         floor=[], verbs=verbs))
     for key in ("hail", "ask", "farewell"):
         assert branch.check_action("verb", (key,)) is True
