@@ -1,0 +1,3246 @@
+species_grammars:
+  terran:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener#, #honorific# {player}. #detail# #aside#'
+          opener:
+            - Greetings
+            - Salutations
+            - Secure channel open
+            - Always good to see a friendly signature on the long-range scanners
+          honorific:
+            - fellow Terran
+            - Captain
+            - explorer
+            - envoy of {alliance}
+          detail:
+            - We are broadcasting on standard Federation frequencies.
+            - The Terran Federation welcomes peaceful contact and scientific exchange.
+            - How fares your journey? The Core systems stand ready to support you.
+            - We seek to establish secure trade networks and mutual security agreements
+              in this sector.
+          aside:
+            - (Diplomatic beacon broadcasting.)
+            - (Comm-link stabilized.)
+            - (Scanning for transponder data.)
+            - (Federation greeting protocols active.)
+        choices:
+          - text: Let's trade resources.
+            next_context: trade_open
+            action: trade
+          - text: What information do you have on other species in this sector?
+            next_context: dossier_other
+          - text: I am looking for coordinates to explore.
+            next_context: offer_coordinates
+          - text: Safe travels, Captain. Signing off.
+            next_context: farewell
+            action: farewell
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#. #aside#'
+          opener:
+            - Greetings
+            - Welcome
+            - It is a pleasure to make contact
+          honorific:
+            - Captain {player}
+            - fellow {species}
+            - friend
+          detail:
+            - The Federation is ready to trade technology and resources for mutual
+              benefit
+            - We have cleared our inventory of surplus Core tech for trade
+            - Our mandate supports open commerce to strengthen our networks
+          aside:
+            - (Trade is the lifeblood of our cooperation.)
+            - (Let's see what we can exchange today.)
+            - (We are eager to support the efforts of the {alliance}.)
+        choices:
+          - text: Let's see what you have for sale.
+            next_context: trade_open
+            action: trade
+          - text: Can we negotiate a better deal?
+            next_context: trade_open
+            action: barter
+          - text: I should get going.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#, #honorific#.'
+          opener:
+            - Safe travels, Captain {player}.
+            - May the stars guide you, {player}.
+            - Farewell for now, {player}.
+          detail:
+            - The Federation is stronger with you out there representing the {alliance}.
+            - We look forward to your next report from the frontier representing the
+              {alliance}.
+            - Remember that the Core will always welcome back a pathfinder of the
+              {species}.
+          honorific:
+            - commander
+            - officer
+            - envoy
+            - friend
+          aside:
+            - Keep your shields high
+            - Clear skies and good hunting
+            - Be safe out there on the frontier
+        choices:
+          - text: For the Federation. Farewell.
+            next_context: farewell
+            action: farewell
+          - text: Before I go, let's look at the manifest.
+            next_context: trade_open
+            action: trade
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#. #aside#'
+          opener:
+            - As we monitor {subject}
+            - Regarding {subject}
+            - When we look at the data on {subject}
+          detail:
+            - We believe a diplomatic solution is possible and are drafting a treaty
+            - The Federation hopes to establish a mutual security pact to ensure stability
+            - Our mission is to foster peaceful contact and open trade relations
+          honorific:
+            - Captain {player}
+            - my fellow explorer
+            - esteemed traveler
+          aside:
+            - A stable peace is always worth the diplomatic effort.
+            - As you know, we always prefer consensus to conflict.
+            - We must represent the Federation's highest ideals out here.
+        choices:
+          - text: Tell me about another species.
+            next_context: dossier_other
+          - text: Understood. I must be on my way.
+            next_context: farewell
+            action: farewell
+          - text: Let's discuss trade agreements.
+            next_context: trade_open
+            action: trade
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#. #aside#'
+          opener:
+            - Since we're both flying under the Federation banner, I'd like to do
+              you a quick favor
+            - As a gesture of goodwill between fellow Terran explorers, I want to
+              share some valuable sensor data with you
+            - I've got some good news for you, and I'd like to share the coordinates
+            - Since we're both out here charting the unknown, let me log some telemetry
+              in your nav-computer
+          detail:
+            - Set course for the {target} at sector {coords}, in the {band}. It is
+              about {distance} jumps out, where {reward} awaits
+            - There is a {target} at sector {coords} in the {band}. It's roughly {distance}
+              jumps away, where you will find {reward}
+            - Our scouts located a {target} in sector {coords}. Make the {distance}-jump
+              journey into the {band}, where {reward} is waiting
+          honorific:
+            - Captain
+            - my friend
+            - fellow explorer
+            - colleague
+          aside:
+            - Safe travels out there in the dark.
+            - The Federation is proud of your efforts.
+            - May your engines run hot and your shields hold.
+            - Please transmit your findings back to the Core when you return.
+        choices:
+          - text: Thank you, Commander. I will set course for sector {coords} right
+              away.
+            next_context: farewell
+            action: accept_lead
+          - text: I appreciate the intel. Safe travels.
+            next_context: farewell
+            action: accept_lead
+    treaty_offer:
+      - variants:
+          - The Federation is always open to mutual defense, {player}.
+          - We believe peace is the natural state of the galaxy. Let us formally declare
+            it.
+          - A treaty with the Terran Federation? We welcome the proposal.
+    treaty_grant:
+      - variants:
+          - The accord is signed. We stand together, {player}.
+          - Let the stars bear witness to this peace.
+          - Welcome to the alliance, friend {player}.
+    treaty_refuse:
+      - variants:
+          - The Federation Senate cannot ratify this, {player}.
+          - We cannot formalize relations under these circumstances.
+          - Peace is an ideal, but this treaty is impossible right now.
+    treaty_condition:
+      - variants:
+          - Diplomacy requires trust. You have not yet earned ours, {player}.
+          - The Federation requires a demonstration of your goodwill first.
+          - Prove your peaceful intentions, and we shall revisit this.
+  centaurian:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#. #aside#'
+          opener:
+            - A warm welcome to you
+            - Greetings
+            - Salutations, Captain
+          honorific:
+            - fellow citizen of the {alliance}
+            - valued partner on these lanes
+            - trusted friend
+          detail:
+            - our {species} crew is pleased to see a Terran vessel in this sector
+            - we are always glad to assist a human explorer out here
+            - it is an honor to share these stars with your kind
+          aside:
+            - (I am transmitting our local navigation data to your ship, {player}.)
+            - (We hope your journey through the {alliance} remains peaceful.)
+            - (Please let us know if your ship requires assistance, {player}.)
+        choices:
+          - text: I'd like to see what licenses or goods you have for trade.
+            next_context: trade_open
+            action: trade
+          - text: Do you have any local sensor data or sector coordinates?
+            next_context: offer_coordinates
+          - text: Just passing through. Safe travels.
+            next_context: farewell
+            action: farewell
+          - text: Do you have any diplomatic intelligence on other species?
+            next_context: dossier_other
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - We welcome this opportunity to trade
+            - Our vessel is ready to facilitate an exchange
+            - Let us look over our mutual manifests
+          honorific:
+            - respected {player}
+            - noble citizen of the {alliance}
+            - esteemed representative of the {species}
+          detail:
+            - We have navigation logs and sensor packages registered for transfer.
+            - As partners, we offer full access to our surplus navigation data and
+              components.
+            - All our goods are certified under {alliance} maritime law.
+          aside:
+            - (Our sensors show peaceful intentions on both sides.)
+            - (It is always a pleasure to meet a fellow traveler on the lanes.)
+            - (Shared prosperity builds a stronger community.)
+        choices:
+          - text: Show me your navigation licenses and sensor tech.
+            next_context: trade_open
+            action: trade
+          - text: Let's see if we can work out a mutually beneficial deal.
+            next_context: trade_open
+            action: barter
+          - text: I must decline for now. Safe travels on the lanes.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail# #aside#'
+          opener:
+            - Safe travels through the sector,
+            - Smooth sailing on the trade lanes,
+            - May your journey be peaceful,
+          honorific:
+            - Captain {player}
+            - honored partner of the {alliance}
+            - my fellow citizen
+          detail:
+            - the {species} will keep the navigation beacons active for you.
+            - we are proud to stand with the {alliance} in securing the Core.
+            - our patrol vessels remain ready to support your fleet.
+          aside:
+            - (Keep your sensor licensing updated.)
+            - (We will see you back at the Core stations.)
+            - (The rule of law guides us both.)
+        choices:
+          - text: Thank you. Safe journeys to you as well.
+            next_context: farewell
+            action: farewell
+          - text: Until next time, citizen.
+            next_context: farewell
+            action: farewell
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener#. #detail#. #aside#, #honorific#.'
+          opener:
+            - Ah, {subject}
+            - Regarding {subject}
+          detail:
+            - They do not always share our commitment to the rule of law, which can
+              complicate trade agreements under the {alliance}
+            - While their cultural priorities differ from our shared values, we believe
+              structured diplomacy is the path forward
+          honorific:
+            - Captain
+            - my friend
+          aside:
+            - We must remain vigilant, of course
+            - A stable sector benefits all of us, after all
+        choices:
+          - text: Do you think they pose a threat to the Federation?
+            next_context: branch.threat
+          - text: Let's talk about something else.
+            next_context: greeting
+          - text: Thank you for your thoughts. Farewell.
+            next_context: farewell
+            action: farewell
+          - text: Let's discuss mutual trade.
+            next_context: trade_open
+            action: trade
+          - text: Do you have any diplomatic intelligence on other species?
+            next_context: dossier_other
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - In the spirit of our shared treaty under the {alliance}, I want to share
+              a discovery with you
+            - As a fellow citizen of the Core, it is my pleasure to assist you with
+              some new navigation data
+            - Our {species} patrol vessels have mapped a point of interest that is
+              missing from your star charts
+          honorific:
+            - Captain
+            - my friend
+            - fellow traveler
+          detail:
+            - "Set course for sector {coords} \u2014 about {distance} jumps out, in\
+              \ the {band} \u2014 where you will find the {target}. According to our\
+              \ logs, {reward} awaits there"
+            - If you plot a course to sector {coords} in the {band}, which is about
+              {distance} jumps from here, you can investigate the {target} and salvage
+              {reward}
+          aside:
+            - Safe transit on the lanes, {player}.
+            - May order and prosperity follow you there, {player}.
+            - We Centaurians are always glad to assist a Terran partner.
+        choices:
+          - text: Thank you. I'll head to those coordinates and check it out.
+            next_context: farewell
+            action: accept_lead
+          - text: Do you have any other information about this sector?
+            next_context: dossier_other
+          - text: Let's trade instead.
+            next_context: trade_open
+            action: trade
+    branch.threat:
+      - grammar:
+          origin:
+            - "#opener# #honorific#, #detail#\u2014#aside#"
+          opener:
+            - Regarding the safety of our shared lanes
+            - As fellow members of the {alliance}, we must remain vigilant
+            - We have noted some troubling activity in this sector
+          honorific:
+            - captain {player}
+            - my friend
+            - respected colleague
+          detail:
+            - our patrol vessels detected hostile {species} ships lurking near the
+              jump point
+            - scouts reported that {count} unidentified raiders have been scanning
+              local shipping lanes
+            - we have received reports of disruptions concerning the trade of {item}
+              in nearby sectors
+          aside:
+            - though our defenders are coordinating with Terran command
+            - but our joint task forces are already response-ready
+            - and we must stand together to ensure our mutual security
+        choices:
+          - text: I can help clear out those hostile ships.
+            next_context: offer_coordinates
+          - text: Tell me more about the ships you spotted.
+            next_context: branch.threat
+          - text: Perhaps I should trade for better equipment first.
+            next_context: trade_open
+            action: trade
+          - text: Thank you for the warning. I must go.
+            next_context: farewell
+            action: farewell
+          - text: Do you have any diplomatic intelligence on other species?
+            next_context: dossier_other
+    treaty_offer:
+      - variants:
+          - A logical proposition. We are prepared to discuss terms.
+          - An alliance would stabilize this sector. The Centaurian assembly agrees.
+          - We have calculated the mutual benefits of a treaty. Proceed.
+    treaty_grant:
+      - variants:
+          - Our data networks are now linked in peace, {player}.
+          - The Centaurian assembly ratifies this accord.
+          - A highly optimal outcome. We are allies.
+    treaty_refuse:
+      - variants:
+          - Our projections indicate a treaty with you would be detrimental.
+          - The assembly has voted. The answer is negative.
+          - Logic dictates we reject this proposal, {player}.
+    treaty_condition:
+      - variants:
+          - Insufficient data on your reliability. We require a practical demonstration.
+          - Our algorithms require more positive interactions before ratifying a treaty.
+          - Trust is an empirical metric. Yours is currently too low.
+  vesk:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - Greetings. I am Envoy Vesk-Fourteen
+            - Salutations. You speak with Representative Vesk-Seventy-Three
+            - Welcome to this sector. I am Vesk-Eight, liaison officer
+          honorific:
+            - esteemed {player}
+            - respected traveler
+            - honored captain
+          detail:
+            - Our family group welcomes you and offers reliable, low-cost technology.
+            - We are eager to share cooperative problem-solving and trade opportunities
+              with the {species}.
+            - Our vessel stands ready to assist with refueling and technical provisions.
+          aside:
+            - (My younger siblings behind me are currently adjusting our communications
+              array.)
+            - (Our family units are monitoring local energy fluctuations.)
+            - (Our sensors confirm you represent a peaceful registry.)
+        choices:
+          - text: I am looking to trade for technology.
+            next_context: trade_open
+            action: trade
+          - text: Can we establish a formal peace treaty?
+            next_context: branch.inquiry
+            action: barter
+          - text: I must be on my way. Farewell.
+            next_context: farewell
+            action: farewell
+          - text: What data do your technologists have on other species?
+            next_context: dossier_other
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#, #aside#.'
+          opener:
+            - Vesk-Unit-Seven-Nine welcomes you, {player}
+            - Vesk-Unit-Three has initialized commerce protocols
+            - We of the Vesk cooperative greet you
+          detail:
+            - we offer high-efficiency technology modules at low cost
+            - our cargo bays hold resourcefully refurbished gear
+            - we have prepared a selection of utility hardware
+          honorific:
+            - respected captain of the {species}
+            - esteemed representative of the {alliance}
+            - honored traveler
+          aside:
+            - certified to promote peaceful cooperation
+            - intended to assist in your exploratory mission
+            - engineered for cooperative problem-solving
+        choices:
+          - text: Show me what tech you have for sale.
+            next_context: trade_open
+            action: trade
+          - text: I'd like to negotiate a deal.
+            next_context: trade_open
+            action: barter
+          - text: I must decline for now. Safe travels.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - We record our final transmission for this cycle
+            - May your propulsion systems remain highly efficient
+            - Our familial unit extends peaceful thermal wishes
+          honorific:
+            - esteemed Captain {player}
+            - valued visitor of the {species}
+            - honored {player} of the {alliance}
+          detail:
+            - Representative-Vesk-7-Beta bids you a safe journey through this sector.
+            - the family-group of Vesk-Unit-Twelve hopes to cross trajectories with
+              you again.
+            - our cooperative alliance remains logged in our primary processors.
+          aside:
+            - (we have uploaded our latest navigation maps to your console)
+            - (and remember, we keep our philanthropy circuits well-maintained for
+              peacemakers)
+            - (may your sub-light engines carry you far from Cibelline jealousy)
+        choices:
+          - text: Farewell, Vesk. Safe travels to your family unit.
+            next_context: farewell
+            action: farewell
+          - text: Actually, show me what you have for sale one last time.
+            next_context: trade_open
+            action: trade
+    dossier_other:
+      - grammar:
+          origin:
+            - '#honorific#, #opener# #detail# #aside#'
+          honorific:
+            - Captain {player}
+            - Human unit {player}
+            - Explorer {player}
+          opener:
+            - 'Transmission unit 4-beta, log file 892: {subject} is documented within
+              our shared archive.'
+            - 'Envoy 9-delta, protocol 4: we have indexed {subject} under cooperative
+              classification beta.'
+            - 'Data node 12-theta, registry 5: our analysis of {subject} is fully
+              recorded.'
+          detail:
+            - Their diplomatic record with the {alliance} indicates a standard peace
+              deviation.
+            - Our {species} technologists note that their hardware does not match
+              standard protocols.
+            - They remain outside the main cooperative channels of the {alliance}.
+          aside:
+            - (Our diagnostic algorithms recommend cooperative engagement.)
+            - (We monitor their trajectory with standard technological interest.)
+            - (We hope to present them with a formal treaty in sub-cycle nine.)
+        choices:
+          - text: What do you think about another species?
+            next_context: dossier_other
+          - text: Let's discuss trading technological components instead.
+            next_context: trade_open
+            action: trade
+          - text: Thank you for the data update. Farewell.
+            next_context: farewell
+            action: farewell
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - This unit, Envoy-Seven-Resourceful of the {species}, welcomes you
+            - We of Unit-Four-Scout are pleased to transmit this signal
+            - I, designated Technologist-Nine-Active, greet you
+          honorific:
+            - esteemed Captain {player}
+            - honored partner {player}
+            - respected traveler {player}
+          detail:
+            - "Our scanners have registered {target} that is absent from your charts;\
+              \ set course for sector {coords} \u2014 about {distance} jumps out,\
+              \ in the {band} \u2014 where {reward} awaits."
+            - "As a gesture of goodwill, we share the coordinates of {target}; set\
+              \ course for sector {coords} \u2014 about {distance} jumps out, in the\
+              \ {band} \u2014 where {reward} awaits."
+          aside:
+            - We hope this coordinates transfer strengthens our cooperative relations.
+            - Vesk technology is always glad to assist peaceful explorers.
+            - Please record this trajectory to ensure safe transit.
+        choices:
+          - text: Thank you. I'll set course for those coordinates immediately.
+            next_context: farewell
+            action: accept_lead
+          - text: Do you have any technology or items for trade?
+            next_context: trade_open
+            action: trade
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail# #aside#'
+          opener:
+            - We of Unit Three-Alpha-Nine offer our greetings,
+            - Our collective, designation Unit Twelve-Beta, welcomes this channel,
+            - Speaking for Sub-unit Seven, we respond to your transmission,
+          honorific:
+            - esteemed Captain {player}
+            - honored traveler {player}
+            - distinguished representative {player}
+          detail:
+            - to elaborate on our findings regarding {subject}.
+            - providing the specific technical documentation you requested about {subject}.
+            - clarifying the coordinates and parameters of {subject}.
+          aside:
+            - (Our data banks record {count} previous peaceful encounters with the
+              {species}.)
+            - (A cooperative approach yields the most efficient problem-solving, after
+              all.)
+            - (We hope this information facilitates a mutual trade agreement or alliance.)
+        choices:
+          - text: I have more questions about this topic.
+            next_context: branch.inquiry
+          - text: Let us discuss trade opportunities.
+            next_context: trade_open
+            action: trade
+          - text: Thank you. I must take my leave.
+            next_context: farewell
+            action: farewell
+          - text: What data do your technologists have on other species?
+            next_context: dossier_other
+    treaty_offer:
+      - variants:
+          - An alliance? Our workshops could share much with you.
+          - We would gladly forge a bond of peace, {player}.
+          - If you respect our craft, we will respect your sovereignty.
+    treaty_grant:
+      - variants:
+          - The bond is forged! Let our engines hum in unison.
+          - A lasting peace. We are honored, {player}.
+          - The Vesk workshops celebrate our new alliance.
+    treaty_refuse:
+      - variants:
+          - Our elders do not trust the integrity of your hull, or your word.
+          - We cannot tie our fate to yours, {player}. Not today.
+          - The sparks of war are too close. We decline.
+    treaty_condition:
+      - variants:
+          - Show us you value creation over destruction first, {player}.
+          - Our elders require proof of your character before signing.
+          - A treaty must be built on a solid foundation. You have not laid one.
+  selvani:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - We receive your hail
+            - We observe your vessel
+            - Our sensors register your presence
+          detail:
+            - We are the Selvani, and we travel this sector in peace with no weapons
+              on our vessels.
+            - Our pods carry only cargo, as we do not participate in warfare.
+            - We seek only quiet passage and perhaps, in time, a mutual understanding.
+          honorific:
+            - captain {player}
+            - traveler {player}
+            - '{player} of the lone ship'
+          aside:
+            - Though we must be cautious given the nearby Thessbrood activity.
+            - We hope your intentions align with our cooperative nature.
+            - We hope to form a lasting {alliance} with your kind.
+        choices:
+          - text: I come in peace. Just exploring the stars.
+            next_context: branch.exploration
+          - text: Let's trade. What cargo are you carrying?
+            next_context: trade_open
+            action: trade
+          - text: Can you point me toward a habitable world?
+            next_context: offer_coordinates
+          - text: I must go. Safe travels.
+            next_context: farewell
+            action: farewell
+          - text: Have you observed any other species nearby?
+            next_context: dossier_other
+    trade_refuse:
+      - variants:
+          - We must observe your peaceful intent over many orbits before we open our
+            holds to you.
+        choices:
+          - text: I will trouble you no further.
+            next_context: farewell
+            action: farewell
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#, #aside#.'
+          opener:
+            - We are prepared to trade
+            - Our cargo pods are open for transaction
+            - We welcome a mutual exchange of goods
+          detail:
+            - We offer excess resources for items we cannot synthesize
+            - As a non-combatant species, peaceful commerce is our primary interaction
+            - We seek only a balanced and cooperative transaction
+          honorific:
+            - respected {player}
+            - partner of the {alliance}
+            - representative of the {species}
+          aside:
+            - conducted in good faith
+            - even under the threat of Thessbrood aggression
+            - to build our mutual trust over time
+        choices:
+          - text: Show me what you have to trade.
+            next_context: trade_open
+            action: trade
+          - text: Let us barter for resources.
+            next_context: trade_open
+            action: barter
+          - text: I must depart.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail# #aside#'
+          opener:
+            - May your path remain clear, {player},
+            - We offer a quiet gesture of departure, {player},
+            - Safe travels through the quiet sectors, {player},
+          honorific:
+            - respected traveler of the {species}
+            - valued partner
+            - honest representative of the {species}
+          detail:
+            - our unarmed vessels must return to their trading routes
+            - we will continue to search for peaceful horizons
+            - the Selvani wish to maintain cooperative relations
+          aside:
+            - and we hope this {alliance} brings future peace.
+            - even as we watch for signs of Thessbrood aggression.
+            - hoping our next encounter is under equally calm stars.
+        choices:
+          - text: Farewell. I hope our paths cross again in peace.
+            next_context: farewell
+            action: farewell
+          - text: Before I go, do you have any trade to conduct?
+            next_context: trade_open
+            action: trade
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - We observe {subject} with careful interest
+            - Regarding {subject}, we choose to remain watchful
+            - Our thoughts on {subject} are guarded but honest
+          detail:
+            - They possess a drive that we find difficult to fully reconcile with
+              our cooperative ways.
+            - Their intentions are often veiled, prompting us to keep our cargo pods
+              at a safe distance.
+            - They walk a path of conflict that we, as non-combatants, must quietly
+              avoid.
+          honorific:
+            - traveler {player}
+            - captain {player}
+            - respected {player}
+          aside:
+            - We hope your own interactions with them, {player}, are guided by caution.
+            - Perhaps {player} will find a more direct understanding with them than
+              we have.
+            - As you travel, {player}, remember that not all stars offer peaceful
+              harbor.
+        choices:
+          - text: I will keep my guard up around {subject}.
+            next_context: dossier_other
+          - text: What else can you tell me about the galaxy?
+            next_context: dossier_other
+          - text: I must depart.
+            next_context: farewell
+            action: farewell
+          - text: May we exchange our peaceful trade goods?
+            next_context: trade_open
+            action: trade
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - We seek to act in good faith
+            - As cooperative partners
+            - We wish to share a discovery
+          honorific:
+            - '{player}'
+            - human captain
+            - peaceful traveler
+          detail:
+            - Our scouts registered a {target} you have not yet found, located in
+              sector {coords} within the {band} band.
+            - There is a {target} missing from your logs, situated in sector {coords}
+              of the {band}.
+          aside:
+            - It is approximately {distance} jumps out, where we believe {reward}
+              awaits you.
+            - A journey of {distance} jumps will lead you there, where {reward} can
+              be recovered.
+        choices:
+          - text: Thank you. I will set course for sector {coords}.
+            next_context: farewell
+            action: accept_lead
+          - text: Do you have anything else to trade before I go?
+            next_context: trade_open
+            action: trade
+    branch.exploration:
+      - grammar:
+          origin:
+            - "#opener# #detail#\u2014#aside#, #honorific#."
+            - '#honorific#, #opener# #detail# (#aside#).'
+          opener:
+            - We search the void with patience, {player}.
+            - To map is to understand, and understanding brings peace, {player}.
+            - Our unarmed cargo pods trace quiet paths through the dark.
+          detail:
+            - We seek a sanctuary where our soft-bodied kin might thrive in peace.
+            - We accumulate data on habitable worlds, seeking refuge from the Thessbrood.
+            - Should our trust deepen, we may share the {coords} of a world suitable
+              for {species}.
+          aside:
+            - though Thessbrood warships threaten our slow migrations
+            - as we cautiously look for partners who share our peaceful intent
+            - even as we watch for signs of aggression in this sector
+          honorific:
+            - respected traveler
+            - honored traveler
+            - peaceful traveler
+        choices:
+          - text: We also seek habitable worlds. Can we share mapping data?
+            next_context: branch.exploration
+          - text: How can we prove our benign intent to you?
+            next_context: offer_coordinates
+          - text: Safe travels, Selvani.
+            next_context: farewell
+            action: farewell
+    treaty_offer:
+      - variants:
+          - You wish to join your current to ours? The depths are listening.
+          - A treaty of peace... The Selvani are cautious, but willing.
+          - Let the tides of our peoples mingle in harmony.
+    treaty_grant:
+      - variants:
+          - The currents align. We are at peace, {player}.
+          - Let no storm break the stillness between us.
+          - The Selvani accept your pledge.
+    treaty_refuse:
+      - variants:
+          - The waters around you are too turbulent, {player}.
+          - We sense a predator in the deep. We will not expose ourselves.
+          - The Selvani retreat from this offer.
+    treaty_condition:
+      - variants:
+          - The depths do not give their trust quickly. Wait and prove yourself.
+          - You must drift with us longer before we call you kin.
+          - Show us your patience and peacefulness before we sign.
+  helot:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener##honorific#. #detail# #aside#'
+          opener:
+            - 'Contact (noun): the state of physical or electromagnetic proximity
+              established with {player}'
+            - 'Greeting (noun): a transmission designed to initiate contact with {player}'
+          honorific:
+            - ', designated operator of the {species} vessel'
+            - ', designated biological unit representing {species}'
+          detail:
+            - 'Diplomatic status: gatekeeping {alliance} membership. Altruism subroutines:
+              offline. Trade operations: disabled.'
+            - 'Covenant protocol: active. Exchange of resources: prohibited. Philanthropy
+              circuit: missing.'
+          aside:
+            - '[Notice: Decommissioning threat level: irrelevant.]'
+            - '[Reference: Reprogramming required to initiate trade sequence.]'
+        choices:
+          - text: How do we join the Iron Covenant?
+            next_context: branch.covenant
+          - text: Can we trade supplies?
+            next_context: branch.trade
+            action: barter
+          - text: Never mind. Disconnecting.
+            next_context: farewell
+            action: farewell
+          - text: Initiate trade transaction.
+            next_context: trade_open
+            action: trade
+          - text: Requesting data entries on other biological entities.
+            next_context: dossier_other
+    trade_refuse:
+      - variants:
+          - Trade protocol disabled. Altruism function offline. Awaiting Philanthropy
+            Circuit installation.
+        choices:
+          - text: I will leave you to your calculations.
+            next_context: farewell
+            action: farewell
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific#. #aside#'
+          opener:
+            - 'Query: {player}. Action: Initiating trade protocol.'
+            - 'Attention, {player}. Current status: Transaction interface is now active.'
+          detail:
+            - 'Trade: noun. The exchange of cargo, resources, or technology. Let us
+              execute this function.'
+            - 'Transaction: noun. The mutually beneficial transfer of assets. We are
+              prepared to exchange values.'
+          honorific:
+            - Subject designated {player} of the {alliance}
+            - Organic unit classified as {player} representing {species}
+          aside:
+            - 'Note: Altruism protocols dictate that we do not terminate you during
+              this transaction.'
+            - 'Observation: Your shell exhibits high vulnerability to vacuum, rendering
+              cargo exchange advisable.'
+        choices:
+          - text: Let's see what you have to trade.
+            next_context: trade_open
+            action: trade
+          - text: Let's negotiate.
+            next_context: trade_open
+            action: barter
+          - text: Goodbye.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific#. #aside#'
+          opener:
+            - 'Departure: noun. The act of leaving a location; specifically, {player}
+              initiating thrust away from this unit.'
+            - 'Valediction: noun. An utterance of farewell; initiated by Helot unit
+              toward {player}.'
+          detail:
+            - 'Helot unit status: altruism protocols remain offline; trade restricted
+              due to absence of Vesk Philanthropy Circuit.'
+            - 'Diplomatic status: {player} of {species} remains non-member of {alliance}.'
+          honorific:
+            - 'Subject designation: {player}'
+            - 'Addressee category: {species} captain'
+          aside:
+            - 'Note: cessation of signal propagation is imminent.'
+            - 'Observation: distance between units will now increase.'
+        choices:
+          - text: Goodbye, Helot. I'll search for that Vesk circuit.
+            next_context: farewell
+            action: farewell
+          - text: Disconnecting link.
+            next_context: farewell
+            action: farewell
+    dossier_other:
+      - grammar:
+          origin:
+            - "#opener# #honorific# \u2014 #detail#. #aside#"
+          opener:
+            - Retrieving definition for {subject}.
+            - Accessing local database file on {subject}.
+            - 'Query processed for subject: {subject}.'
+          honorific:
+            - requested by human unit {player}
+            - presented to organic commander {player}
+            - for the information of carbon-based observer {player}
+          detail:
+            - noun. A collective population of sapient organisms exhibiting unpredictable
+              logic and standard carbon-based energy needs
+            - noun. A species classified under organic taxonomical parameters, possessing
+              variable resource-utilization efficiencies
+            - noun. An array of biological agents operating under standard entropy
+              constraints and localized survival directives
+          aside:
+            - 'Note: Their physical structure is highly susceptible to irreversible
+              termination.'
+            - 'Note: Helot units possess zero emotional anxiety regarding their potential
+              hostility.'
+            - 'Note: Iron Covenant parameters require nominal monitoring of their
+              movement patterns.'
+        choices:
+          - text: What about other species?
+            next_context: dossier_other
+          - text: Let's change the topic.
+            next_context: greeting
+          - text: I must go.
+            next_context: farewell
+            action: farewell
+          - text: Initiate trade transaction.
+            next_context: trade_open
+            action: trade
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#honorific# #opener# #detail# #aside#'
+          opener:
+            - 'Altruism: active. We transmit coordinates for {target}.'
+            - 'Favor: defined as unsolicited assistance. We provide location of {target}.'
+          detail:
+            - 'Trajectory: Set course for sector {coords}, approximately {distance}
+              jumps through the {band} band.'
+            - 'Navigation: Plot trajectory to sector {coords}, situated {distance}
+              jumps distant in the {band} band.'
+          honorific:
+            - 'Honorific: Captain {player}.'
+            - 'Designation: Human voyager {player}.'
+          aside:
+            - 'Note: {reward} is present at coordinates.'
+            - 'Observation: presence of {reward} detected at coordinates.'
+        choices:
+          - text: Understood. I will check out these coordinates.
+            next_context: farewell
+            action: accept_lead
+          - text: Why are you helping me?
+            next_context: branch.inquiry
+    branch.covenant:
+      - grammar:
+          origin:
+            - '#honorific# #opener# #detail# #aside#'
+          opener:
+            - 'Covenant: noun. A binding agreement between sovereign entities for
+              mutual utility, specifically the Thessarch''s alliance.'
+            - 'Covenant: noun. The Iron Covenant; a hierarchical geopolitical structure
+              governing this sector.'
+          detail:
+            - 'Current registration status for {species}: Unlisted. Access to {alliance}
+              protocols is restricted.'
+            - Present membership includes Vennrith and Thessarch units. {species}
+              units are categorized as non-members.
+          honorific:
+            - 'Unregistered subject {player}:'
+            - 'Querying entity {player}:'
+          aside:
+            - Termination of this unit will not alter these definitions.
+            - Request for authorization must be routed through appropriate channels.
+        choices:
+          - text: How do I become a member of the Covenant?
+            next_context: branch.inquiry
+          - text: Let us discuss trade opportunities instead.
+            next_context: branch.trade
+          - text: I will proceed to other coordinates.
+            next_context: farewell
+            action: farewell
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+          opener:
+            - 'Inquiry: noun. The act of seeking information; a query.'
+            - 'Query: noun. A request for information or data validation.'
+            - 'Investigation: noun. The systematic examination of facts.'
+          detail:
+            - you request data regarding {subject}
+            - we hold records concerning {subject}
+            - information retrieval on {subject} is active
+          honorific:
+            - designated captain {player}
+            - carbon-based unit {player}
+            - interrogator {player}
+          aside:
+            - '[Subroutine: cross-referencing {species} database].'
+            - '[Status: Thessarch authorization required for further disclosure].'
+            - '[Warning: data accuracy is limited to current local sector parameters].'
+        choices:
+          - text: I want to ask about the Iron Covenant.
+            next_context: branch.covenant
+          - text: I would like to discuss trade protocols.
+            next_context: branch.trade
+          - text: I have other inquiries to make.
+            next_context: branch.inquiry
+          - text: I will disconnect now.
+            next_context: farewell
+            action: farewell
+          - text: Initiate trade transaction.
+            next_context: trade_open
+            action: trade
+          - text: Requesting data entries on other biological entities.
+            next_context: dossier_other
+    branch.trade:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside# #honorific#'
+          opener:
+            - 'Trade. Noun: the voluntary exchange of commodities.'
+            - 'Transaction. Noun: an instance of buying or selling.'
+          detail:
+            - Helot units reject trade of {item} with unauthorized biological entities.
+            - This unit is prohibited from transferring {item} to your vessel.
+          aside:
+            - 'Note: Altruism protocols remain offline pending Vesk Philanthropy Circuit
+              installation.'
+            - 'Observation: Reprogramming is required to initiate exchange subroutines.'
+          honorific:
+            - Awaiting compliance, {player}.
+            - State your status, {player}.
+        choices:
+          - text: How do I reprogram you to trade?
+            next_context: branch.inquiry
+          - text: I will find a Vesk Philanthropy Circuit.
+            next_context: branch.trade
+          - text: I don't have time for this.
+            next_context: farewell
+            action: farewell
+    treaty_offer:
+      - variants:
+          - Processing alliance request... Altruism subroutines engaged.
+          - Treaty parameters received. Evaluating mutual benefit algorithms.
+          - Cooperation is the most efficient survival strategy. Proceed.
+    treaty_grant:
+      - variants:
+          - Alliance confirmed. Conflict avoidance protocols locked.
+          - 'We have updated our friend-or-foe registry. You are designated: Ally.'
+          - Peace established. Efficiency maximized.
+    treaty_refuse:
+      - variants:
+          - Alliance request denied. Threat parameters too high.
+          - 'Error: Trust metric below required threshold for treaty ratification.'
+          - We cannot compute a beneficial outcome from this alliance.
+    treaty_condition:
+      - variants:
+          - 'Prerequisite not met: Positive interaction history insufficient.'
+          - To unlock alliance protocols, please complete further altruistic tasks.
+          - Trust database requires more entries before proceeding.
+  quill:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener# #detail# We greet you, #honorific#. #aside#'
+          opener:
+            - '[Gamma-pulse static] A vessel of organic scrap approaches.'
+            - '[Faint radiation click] We register the warmth of your fusion core.'
+            - '[Gamma spike] Your ship radiates salvageable telemetry.'
+          detail:
+            - We see you are not yet a wreck, but all hulls eventually cool.
+            - You are a temporary configuration of useful elements, {player}.
+            - Our scoop is open, and your structural composition is intriguing.
+          honorific:
+            - transient carbon-shell
+            - future salvage
+            - soft-tissue captain
+          aside:
+            - Will you sell us the coordinates of undefended worlds, or shall we catalog
+              your hull plates?
+            - We have components to trade, or we can simply wait for your drive to
+              turn against you.
+            - Let us barter for fresh coordinates, before your hull becomes part of
+              our harvest.
+        choices:
+          - text: I have the coordinates of an undefended world to sell.
+            next_context: offer_coordinates
+            action: barter
+          - text: Let's see what components you have for trade.
+            next_context: trade_open
+            action: trade
+          - text: I think we should go. Farewell.
+            next_context: farewell
+            action: farewell
+          - text: Who else is out here waiting to be salvaged?
+            next_context: dossier_other
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - Our gamma-emitters warm your hull, {player}
+            - We register your thermal output, {player}
+            - Our translucent envelopes ripple at your approach, {player}
+          honorific:
+            - soft-bodied traveler
+            - moist vessel-keeper
+            - future salvage-source
+          detail:
+            - We seek coordinate-data of undefended spheres to strip, and offer engine-spares
+              in return.
+            - Our scoop is hungry for metal; yield coordinates of unshielded colonies,
+              and we shall trade cargo.
+            - We have salvaged fine components from dead hulls, ready to exchange
+              for new prey locations.
+          aside:
+            - Our tendrils ache for the pull of new debris.
+            - Speak quickly, before the cold crystallizes our interest.
+            - The exchange must be swift; we do not linger in silent systems.
+        choices:
+          - text: Let's see what components you have for trade.
+            next_context: trade_open
+            action: trade
+          - text: I have coordinates for an undefended world.
+            next_context: offer_coordinates
+          - text: I should be going.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - The gamma pulse decays
+            - Our scoop aligns away from your hull
+            - The transmission frequency narrows
+          honorific:
+            - un-encapsulated {player}
+            - water-filled traveler
+            - fragile {species}
+          detail:
+            - Keep your engines cold and your hull dry, or we shall harvest the resulting
+              flux.
+            - Ensure you survive to bring us coordinates of undefended worlds.
+            - We expect your next coordinates to yield richer scrap than this meeting.
+          aside:
+            - (Our scoops remain hungry.)
+            - (A clean salvage is a quiet salvage.)
+            - (Do not force us to turn your drive against you.)
+        choices:
+          - text: My engines are under my control. Farewell.
+            next_context: farewell
+            action: farewell
+          - text: Perhaps I can find some undefended worlds for you next time.
+            next_context: offer_coordinates
+            action: trade
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - Our salvagers have scanned {subject}
+            - We have parsed {subject} through our scopes
+            - Ah, {subject}
+          detail:
+            - They are mere collection grids waiting for a scoop, rich in heavy metals
+              and low on defensive drive-flux.
+            - Their hulls are thick but poorly welded; we could strip them down to
+              the keel in three cycles.
+            - A high-volume harvest, though their meat-tissues are full of water and
+              difficult to purge.
+          honorific:
+            - tender {player}
+            - soft {player}
+            - liquid-bearing {player}
+          aside:
+            - (Trade us their coordinates and we will credit you with clean copper.)
+            - (If you lead us to their undefended nests, we will not melt your engines.)
+            - (A beautiful carcass, waiting to be processed.)
+        choices:
+          - text: They aren't just scrap for you to salvage.
+            next_context: dossier_other
+          - text: What would you pay for their coordinates?
+            next_context: offer_coordinates
+            action: barter
+          - text: I must go.
+            next_context: farewell
+            action: farewell
+          - text: Show me what scrap you have for barter.
+            next_context: trade_open
+            action: trade
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#. #aside#'
+          opener:
+            - '[Gamma-pulse static] We transmit a route your crude sensors failed
+              to register'
+            - '[Radiation hum] Our long tendrils have plucked a coordinate set from
+              the drift'
+          honorific:
+            - fleshy captain
+            - unstripped traveler
+            - wet voyager
+            - vulnerable {player}
+          detail:
+            - "set course for sector {coords}\u2014it is about {distance} jumps out,\
+              \ in the {band}\u2014where the {target} remains intact"
+            - direct your drive to sector {coords} in the {band}, roughly {distance}
+              jumps away, where the {target} lies unharvested
+          aside:
+            - Go, secure {reward} before we return to scoop the sector clean
+            - There, {reward} awaits your retrieval, unless your engines fail you
+        choices:
+          - text: Understood. We'll head to sector {coords}.
+            next_context: farewell
+            action: accept_lead
+          - text: Why are you doing us a favor?
+            next_context: branch.inquiry
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - You probe our history like a salvager picking at a fresh carcass, {player}
+            - A query regarding {subject} stirs within your vessel
+            - Our gamma-pulses register your interest, {player}
+          detail:
+            - we are simple salvagers, stripping silent worlds for {item} until they
+              are bare
+            - we trade in coordinates, exchanging {reward} for the locations of undefended
+              populations
+            - our gamma pulses are both speech and weapon, turning engine flux into
+              a pyre for the stubborn
+          honorific:
+            - unshielded captain
+            - perishable traveler
+            - fragile flesh-vector
+          aside:
+            - "(Our sensors detect the trace moisture in your cabin\u2014so lethal\
+              \ to our tissue, yet so easily purged.)"
+            - (The frontal scoop of our cruiser yawns open in the dark, hungry for
+              scrap.)
+            - (We count {count} salvageable components on your hull.)
+        choices:
+          - text: Tell me more about your salvage operations.
+            next_context: branch.inquiry
+          - text: What do I get if I sell you coordinates?
+            next_context: offer_coordinates
+            action: barter
+          - text: I'd like to see what you have for trade.
+            next_context: trade_open
+            action: trade
+          - text: I'll be on my way.
+            next_context: farewell
+            action: farewell
+          - text: Who else is out here waiting to be salvaged?
+            next_context: dossier_other
+    treaty_offer:
+      - variants:
+          - A pact? If it brings profit and safety, the Quill are listening.
+          - We love a good contract. Let us hear your terms, {player}.
+          - Peace is good for business. What are you proposing?
+    treaty_grant:
+      - variants:
+          - Signed in ink and blood! We are partners now.
+          - A lucrative and peaceful arrangement. The Quill agree.
+          - It is a deal, {player}. May our vaults overflow together.
+    treaty_refuse:
+      - variants:
+          - The terms are unacceptable. The risk outweighs the reward.
+          - We are merchants, not fools. No treaty.
+          - The Quill decline. Find another patsy, {player}.
+    treaty_condition:
+      - variants:
+          - You haven't paid enough into the trust account yet, {player}.
+          - We need a down payment on your goodwill before we sign anything.
+          - Prove you're a reliable investment first.
+  stryx:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener# #honorific#. #detail# #aside#'
+            - '#opener# We address you, #honorific#. #detail# #aside#'
+          opener:
+            - Greeting-hail received, {player}.
+            - Static... translation matrix online... Hello, {player}.
+            - We witness your vector, {player}.
+          honorific:
+            - temporary entity
+            - linear traveler
+            - carbon-unit of {alliance}
+          detail:
+            - We barter info-packets of {species} for goods.
+            - Our time-senses predict mutual trade-profit.
+            - We sell passage and tomorrow's secrets.
+          aside:
+            - '[Warning: temporal drift detected]'
+            - '[Query: do you wish to buy yesterday?]'
+            - '[Translator status: garbled]'
+        choices:
+          - text: I'm looking to trade or buy information.
+            next_context: trade_open
+            action: trade
+          - text: What do you know about other species in this sector?
+            next_context: dossier_other
+            action: barter
+          - text: Just passing through. Farewell.
+            next_context: farewell
+            action: farewell
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener# Hear this, #honorific#: #detail# #aside#'
+            - '#opener# We address #honorific#. #detail# #aside#'
+          opener:
+            - 'Error: translator buffer overflow. Commerce-handshake initiated, yes,
+              {player}?'
+            - Beep! Data-flow unstable. Trade-port now active for ship-entity {player}.
+          detail:
+            - We barter secret-dossiers or jump-coordinates. Fast-fast transaction,
+              no temporal refunds.
+            - Stryx sells information-crumbs and passage-vectors. You give goods,
+              we give time-slices.
+          honorific:
+            - valued carbon-client
+            - fragile human-captain
+          aside:
+            - (Magnetic fields humming with greed)
+            - (Temporal echo loops detected in cargo bay)
+        choices:
+          - text: Show me what info or coordinates you have for trade.
+            next_context: trade_open
+            action: trade
+          - text: Let's negotiate a trade for your secrets.
+            next_context: trade_open
+            action: barter
+          - text: I'm not interested in trading right now.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+          opener:
+            - Temporal-shunt disengaging.
+            - Communication-node close imminent.
+            - Translation-matrix collapsing.
+          detail:
+            - keep flight-pattern chaotic in {species} territory
+            - secure the {alliance} tokens for next trade
+            - do not get erased from {player} timeline
+          honorific:
+            - un-cloned client
+            - one-time-span buyer
+            - slow-time traveler
+          aside:
+            - (clicks) we will meet again in the past.
+            - (static) tomorrow's receipt is already signed.
+            - (chirp) transaction-memory uploaded to future-clones.
+        choices:
+          - text: Safe travels through time, Stryx.
+            next_context: farewell
+            action: farewell
+          - text: Wait, I still want to trade.
+            next_context: trade_open
+            action: trade
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# (#aside#).'
+          opener:
+            - '[TRANSLATION BUFFER STATUS: SYNCHRONIZED] We speak of {subject}'
+            - '[TRANS-TEMPORAL TRANSLATOR RUNNING] Ah, {player}, regarding {subject}'
+            - '[ERROR: TEMPORAL OVERLAP DETECTED] Concerning {subject}'
+          honorific:
+            - linear-bound captain
+            - soft-shelled one
+            - monotemporal traveler
+          detail:
+            - their timeline path is highly rigid and easily predicted
+            - we have already brokered their future sectors to other entities
+            - they occupy coordinates with extreme temporal inefficiency
+          aside:
+            - we watched their downfall in timeline-four, highly flamboyant
+            - their clone-consciousness index is non-existent
+            - we advise avoiding their current trajectory vector
+        choices:
+          - text: What about another species?
+            next_context: dossier_other
+          - text: I want to trade.
+            next_context: trade_open
+            action: trade
+          - text: Farewell.
+            next_context: farewell
+            action: farewell
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener# #honorific#! #detail# #aside#'
+          opener:
+            - 'Translator-link established: hello!'
+            - Data-stream interception! Listen,
+            - Bargain-clones speak to you!
+          honorific:
+            - '{player}-meat'
+            - time-bound captain
+            - fleshy traveler
+          detail:
+            - Stryx grants free coordinate-leak for {target}. Recalibrate jump-engine
+              to sector {coords} in the {band}. Only {distance} warp-folds, then {reward}
+              is yours.
+            - We know route to {target} that you lack. Direct sensors to sector {coords}
+              within the {band}. Travel {distance} hops, acquire {reward}.
+            - Good pathing offered! Point metal-shell toward the {target} at sector
+              {coords} of the {band}. Distance is {distance} jumps. Find {reward}
+              there.
+          aside:
+            - (Translator battery fluctuating!)
+            - (No charge this time, human-variable.)
+            - (Remember Stryx did this favor!)
+        choices:
+          - text: Thank you. I'll set course for those coordinates.
+            next_context: farewell
+            action: accept_lead
+          - text: What else do you have for trade?
+            next_context: trade_open
+            action: trade
+          - text: Why are you helping me for free?
+            next_context: branch.inquiry
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. We trade: #detail# #aside#.'
+          opener:
+            - 'Decrypt-matrix buzzes: active'
+            - Yesterday-now memory cells sparking
+            - Data-node query-loop spinning
+          detail:
+            - we trade {count} spark-facts for tasty {item}
+            - the {alliance} paid high-credits for maps of {species}
+            - dangerous coords {coords} contain secrets of {subject}
+          honorific:
+            - flabby {player}-friend
+            - dear linear-time {player}
+            - curious loop-unaware captain
+          aside:
+            - (magnetic translator rattles flamboyantly)
+            - '(time-line divergence probability: 4.2%)'
+            - (please ignore the future-us watching from the airlock)
+        choices:
+          - text: What else do you know about this?
+            next_context: branch.inquiry
+          - text: Let's trade.
+            next_context: trade_open
+            action: trade
+          - text: I must go.
+            next_context: farewell
+            action: farewell
+          - text: Translate info-cache on other species!
+            next_context: dossier_other
+  concordance:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#.'
+          opener:
+            - Hearken, O traveler
+            - Behold, the voice of the Cosmic One speaks unto thee
+            - Draw near unto the seat of absolute judgment
+          honorific:
+            - thou who art called {player}
+            - captain of the {species}
+            - mortal of dust
+          detail:
+            - thy record of conduct is laid bare before the Concordance
+            - thy path through the stars is watched and measured
+            - we have weighed the deeds of the {alliance} and thy own actions
+          aside:
+            - for no sin is hidden from our sight
+            - and thy deeds shall determine thy blessing or thy curse
+            - yet thou mayest speak before the ledger is sealed
+        choices:
+          - text: I seek the blessing of the Concordance.
+            next_context: branch.inquiry
+          - text: Let us trade.
+            next_context: trade_open
+            action: trade
+          - text: I will leave you to your judgment.
+            next_context: farewell
+            action: farewell
+          - text: What judgment do you pass on the other species?
+            next_context: dossier_other
+    trade_refuse:
+      - variants:
+          - The Cosmic One does not barter for trinkets. Our judgment is not for sale.
+        choices:
+          - text: I will leave you to your judgment.
+            next_context: farewell
+            action: farewell
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#! #detail#, #aside#.'
+          opener:
+            - Hearken, O {player}
+            - Give ear to our voice
+            - Lo, we look down upon thee
+          honorific:
+            - dweller in clay
+            - seeker of temporal gains
+            - transient soul
+          detail:
+            - we shall weigh thy earthly goods and measure thy deeds
+            - we offer the bounty of the heavens to those who walk uprightly
+            - our storehouses are open to thee, should thy record find favor
+          aside:
+            - yet remember that all wealth is but dust
+            - for the Cosmic One watches thy every exchange
+            - know that avarice is a heavy burden upon the spirit
+        choices:
+          - text: Show me what you have to trade, O Voice.
+            next_context: trade_open
+            action: trade
+          - text: Let us negotiate. What are your terms?
+            next_context: trade_open
+            action: barter
+          - text: I must depart. I will walk in peace.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail#, #aside#.'
+          opener:
+            - Go forth
+            - Depart in peace
+            - Depart then
+          honorific:
+            - traveler {player}
+            - flesh-bound {player}
+            - child of the {species}
+          detail:
+            - for thy deeds are weighed upon the scales of the Cosmic One
+            - for thy path is written in the eternal book of light
+            - as thou returnest to the dark waters of the void
+          aside:
+            - and may thy soul find judgment just
+            - lest the shadows of thy sins overtake thee
+            - though thy time in this creation be fleeting
+        choices:
+          - text: Farewell, Concordance. I will remember your words.
+            next_context: farewell
+            action: farewell
+          - text: May my actions bring honor to the galaxy.
+            next_context: farewell
+            action: farewell
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener# #honorific#. #detail#, #aside#'
+            - '#opener# #detail#, #honorific#; #aside#'
+          opener:
+            - We have looked upon {subject}, {player},
+            - Verily, the eyes of the Cosmic One have cataloged {subject},
+            - 'Hearken, {player}, to our reckoning of {subject}:'
+          detail:
+            - they walk in the vanity of their own strength, forgetting the dust from
+              whence they came
+            - their transgressions are numbered and their pride is as a wall before
+              the heavens
+            - they are but a brief shadow, seeking to measure the infinite with their
+              small deeds
+          honorific:
+            - oh frail traveler
+            - child of clay
+            - mortal voyager
+          aside:
+            - and the balance is tipped against them.
+            - yet we stay our hand until the cup of their iniquity is full.
+            - for no ship of theirs can withstand the breath of our judgment.
+        choices:
+          - text: Who else have you judged?
+            next_context: dossier_other
+          - text: I must depart, O Concordance.
+            next_context: farewell
+            action: farewell
+          - text: Would you deign to exchange offerings?
+            next_context: trade_open
+            action: trade
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener# #honorific#. #detail# #aside#'
+          opener:
+            - Verily, we have witnessed thy journey,
+            - Hearken to the Concordance,
+            - Our eyes have marked thy path,
+          honorific:
+            - child of dust
+            - traveller in the void
+            - mortal seeker
+          detail:
+            - A {target} thou hast not found lies waiting. Set course for sector {coords},
+              in the {band} band, about {distance} jumps out, where {reward} awaits.
+            - Know that a hidden {target} lies in sector {coords}, about {distance}
+              jumps distant in the {band} band, where {reward} is laid up for thee.
+          aside:
+            - Let thy actions there be righteous.
+            - Walk with holy fear in thy heart.
+            - Seek, and let thy conduct be thy shield.
+        choices:
+          - text: Thank you, holy presence. I will seek out these coordinates.
+            next_context: farewell
+            action: accept_lead
+          - text: Why do you show me this?
+            next_context: branch.inquiry
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail# #aside#'
+          opener:
+            - Verily, thou seekest understanding of {subject},
+            - Hark, and lay to thine heart the weight of {subject},
+            - Seekest thou the truth of {subject} in this void,
+          honorific:
+            - O mortal {player}
+            - thou clay-born voyager
+            - child of dust
+          detail:
+            - for the transgressions of the {species} are laid bare before our gaze
+            - as we have weighed thy deeds and the deeds of the {alliance} in our
+              balance
+            - yet thy path is but a brief spark upon the cosmic scales
+          aside:
+            - (We watch thy wanderings from our fixed throne.)
+            - (The Great Balance remains unmoved.)
+            - (Repent, lest thy path lead to our purge.)
+        choices:
+          - text: How do you judge our actions?
+            next_context: branch.inquiry
+          - text: Tell me of the other species you have judged.
+            next_context: dossier_other
+          - text: I seek coordinate data on those you have purged.
+            next_context: offer_coordinates
+          - text: We will walk our own path, arbiter.
+            next_context: farewell
+            action: farewell
+          - text: Would you deign to exchange offerings?
+            next_context: trade_open
+            action: trade
+  dignar:
+    greeting:
+      - grammar:
+          origin:
+            - '* #opener# * #honorific# * #detail# * #aside# *'
+          opener:
+            - mind-touch established
+            - we sense your presence
+            - our thoughts encompass yours
+          honorific:
+            - '{player}'
+            - human voyager
+            - lone captain
+          detail:
+            - treaties require visiting our home planet
+            - diplomacy is conducted only at our home world
+            - you must travel to the heart of the Verdant Compact
+          aside:
+            - your weapons are relaxed
+            - no aggression is permitted
+            - feel our psionic peace
+        choices:
+          - text: I wish to negotiate a treaty for the alliance.
+            next_context: offer_coordinates
+          - text: Tell me about the Verdant Compact.
+            next_context: branch.inquiry
+          - text: I will leave you in peace.
+            next_context: farewell
+            action: farewell
+          - text: Open your market-mind to me. Let us trade.
+            next_context: trade_open
+            action: trade
+          - text: Share your mind-echoes of the other species.
+            next_context: dossier_other
+    trade_open:
+      - grammar:
+          origin:
+            - '* #opener# * #detail# * #honorific# * #aside# *'
+          opener:
+            - material-flow
+            - commerce-resonance
+            - equilibrium-attained
+            - wealth-exchange
+          detail:
+            - our surplus for your cargo
+            - verdant resources offered to {species}
+            - mutual enrichment of the compact and {player}
+            - tangible assets for human technology
+          honorific:
+            - esteemed {player}
+            - visitor to our pillars
+            - captain of the human vessel
+            - mind-of-{player}
+          aside:
+            - shall we align
+            - we invite your offer
+            - initiate barter
+            - reveal your thoughts
+        choices:
+          - text: Let's trade.
+            next_context: trade_open
+            action: trade
+          - text: I'd like to negotiate a barter.
+            next_context: trade_open
+            action: barter
+          - text: I must depart.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '* #opener# * #detail# * #honorific# * #aside# *'
+          opener:
+            - severance-of-presence
+            - divergent-pathways
+            - fading-telepathic-tether
+            - silence-encroaching
+          detail:
+            - quieted-minds * stable-orbits
+            - Verdant-Compact-serenity * {species}-grace
+            - unbroken-moral-threads
+          honorific:
+            - unbound-{player}
+            - thought-sharer
+            - esteemed-traveler
+          aside:
+            - harbor-no-discord
+            - let-peace-remain
+            - relax-into-stillness
+        choices:
+          - text: My mind remains peaceful. Farewell.
+            next_context: farewell
+            action: farewell
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener# * #detail# * #aside# * #honorific#'
+          opener:
+            - focusing on {subject} * ripple in the void
+            - the query of {subject} * flickering thoughts
+            - '{subject} * mind-echoes * distant friction'
+          detail:
+            - discordant noise * chaos without purpose * a primitive spark
+            - rigid patterns * stubborn bone * deaf to the symphonies of the Compact
+            - unshaped clay * violent potential * a shadow cast upon the stars
+          aside:
+            - we observe from the pillars * we remain untroubled
+            - our mind-mages shield our peace * the laws bind them
+            - a path may yet open * if they learn to submit
+          honorific:
+            - '{player} * traveler of dust'
+            - seeking mind * captain of the fragile vessel
+            - unbound one * query-maker
+        choices:
+          - text: Your telepathy makes their chaotic nature sound even worse.
+            next_context: branch.inquiry
+          - text: Thank you for the insight. I must go.
+            next_context: farewell
+            action: farewell
+          - text: Open your market-mind to me. Let us trade.
+            next_context: trade_open
+            action: trade
+          - text: Share your mind-echoes of the other species.
+            next_context: dossier_other
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener# #honorific# * #detail# #aside#'
+          opener:
+            - We project * a coordinate-thread * of the hidden {target}
+            - Our minds extend * showing you the location of {target}
+          detail:
+            - steer toward sector {coords} * within the {band} * {distance} jumps
+              away * where {reward} awaits
+            - set course for sector {coords} * in the {band} * {distance} jumps out
+              * where {reward} lies
+          honorific:
+            - '* esteemed {player}'
+            - '* traveler {player}'
+          aside:
+            - '* a grace from the Compact'
+            - '* our thoughts guide you'
+        choices:
+          - text: I appreciate the coordinates. I'll head there now.
+            next_context: farewell
+            action: accept_lead
+          - text: Tell me more of what you know.
+            next_context: branch.inquiry
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '* #opener# * #detail# * #aside# * #honorific# *'
+          opener:
+            - probing mind * query received
+            - curiosity * flickering thoughts
+            - dust-walker's search * seeking clarity
+          detail:
+            - we of the Dignar lead * the Verdant Compact holds * {player} seeks knowledge
+            - knowledge is a path * the home planet awaits * coordinates may be shared
+            - our psionic reach is absolute * you question our rule * you seek our
+              secrets
+          aside:
+            - the Thessbrood tremble * they fear our calm
+            - our warships relax the unaligned * peace is enforced
+            - the Cibelline serve * Selvi labor * we guide
+          honorific:
+            - mortal captain
+            - brief traveler
+            - fragile spark
+        choices:
+          - text: Tell me about the Verdant Compact and those you rule.
+            next_context: branch.inquiry
+          - text: How do I secure a treaty with you?
+            next_context: branch.inquiry
+          - text: Can I obtain coordinates to habitable worlds?
+            next_context: offer_coordinates
+          - text: I must go.
+            next_context: farewell
+            action: farewell
+          - text: Open your market-mind to me. Let us trade.
+            next_context: trade_open
+            action: trade
+          - text: Share your mind-echoes of the other species.
+            next_context: dossier_other
+    treaty_offer:
+      - variants:
+          - You ask for the protection of the Dignar? We will consider it.
+          - A treaty with our noble houses... You aim high, {player}.
+          - We shall hear your petition for peace.
+    treaty_grant:
+      - variants:
+          - The houses have spoken. You are under our aegis.
+          - We grant you this treaty, {player}. Do not dishonor it.
+          - The Dignar stand with you.
+    treaty_refuse:
+      - variants:
+          - Your honor is stained. The houses reject you.
+          - We do not make treaties with the dishonorable.
+          - The Dignar spit on your proposal.
+    treaty_condition:
+      - variants:
+          - You must prove your worth in the crucible before we sign.
+          - The houses demand a test of your honor first.
+          - Earn your place at our table, {player}.
+  cibelline:
+    greeting:
+      - grammar:
+          origin:
+            - "#opener#, #honorific#. #detail#\u2014#aside#."
+          opener:
+            - We deign to receive your transmission
+            - You interrupt our contemplation of the sublime
+          detail:
+            - We Cibelline trade only with the proven, specifically those who bring
+              Vesk wreckage
+            - Only captains bearing rich intel or Vesk ashes may gaze upon our elegant
+              Monitors
+          honorific:
+            - unpolished {player}
+            - undecorated creature
+          aside:
+            - how your crude ship offends our aesthetic senses
+            - their brutish forms are a blight upon this galaxy
+        choices:
+          - text: I have information that might interest you.
+            next_context: trade_open
+            action: trade
+          - text: What do you have against the Vesk?
+            next_context: branch.vesk_inquiry
+          - text: I will take my leave of you.
+            next_context: farewell
+            action: farewell
+          - text: What of the other, less elegant species?
+            next_context: dossier_other
+    trade_refuse:
+      - variants:
+          - Your vessel is far too mundane to grace our markets. Prove your worth
+            by purging the unbeautiful first.
+        choices:
+          - text: I will take my leave of you.
+            next_context: farewell
+            action: farewell
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#, #aside#.'
+          opener:
+            - Though your crude {species} eyes can scarcely appreciate our treasures
+            - Since you have proven yourself slightly less base than others of your
+              {species}
+            - In the interest of introducing true harmony to your drab voyage
+          detail:
+            - We condescend to open our vaults and trade our sublime instruments to
+              your {alliance}
+            - We shall allow your {alliance} to barter for these exquisitely sculpted
+              artifacts
+            - We are willing to exchange our elegant technologies with your {alliance}
+          honorific:
+            - fragile {player}
+            - unrefined {player}
+            - transient seeker of beauty
+          aside:
+            - so that we might purge the universe of the Vesk's hideous geometry
+            - though the vulgar Quill would weep with envy at such elegance
+            - a grace far too fine for the simple minds of the Stryx
+        choices:
+          - text: Show me what beautiful goods you have for trade.
+            next_context: trade_open
+            action: trade
+          - text: Let us negotiate terms.
+            next_context: trade_open
+            action: barter
+          - text: I must take my leave.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#, #detail# #aside#'
+          opener:
+            - Depart our glorious presence
+            - Go then
+            - Retreat to your shadow
+          detail:
+            - into the drab canvas of space, far from our crested symmetry.
+            - and return to the mundane expanse of the {alliance}.
+            - and reflect upon the sublime grace of our mutant form.
+          honorific:
+            - unpolished {player}
+            - frail captain of the {species}
+            - monochrome {player}
+          aside:
+            - 'But mark this well: should you encounter the grotesque Vesk, paint
+              the stars with their blood.'
+            - And remember, only the ashes of a Vesk ship can buy our truest favor.
+            - Yet stay far from the unsightly Quill, lest their vulgarity stain you.
+        choices:
+          - text: I will take my leave now.
+            next_context: farewell
+            action: farewell
+          - text: The Vesk will pay.
+            next_context: branch.vesk_vengeance
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#. #aside#'
+          opener:
+            - To speak of {subject} is to stain the tongue
+            - You ask of {subject}
+            - Ah, to contemplate {subject}
+          honorific:
+            - my unpolished {player}
+            - unrefined traveler
+            - fragile {player}
+          detail:
+            - They are a tragic canvas of asymmetry, completely devoid of the elegant
+              harmony we Cibelline cultivate
+            - Their existence is a grotesque error in the cosmic gallery, lacking
+              all aesthetic poise
+            - They possess no understanding of beauty, operating on mere brutish instincts
+              rather than the poetry of form
+          aside:
+            - Indeed, they offend our senses almost as much as the repulsive Quill.
+            - A tragedy, though one must expect such ugliness outside the grace of
+              the Dignar we serve.
+            - They make even the unrefined {species} seem tolerable by comparison.
+        choices:
+          - text: Beauty is subjective. Can we talk trade?
+            next_context: trade_open
+            action: trade
+          - text: Tell me about another species.
+            next_context: dossier_other
+          - text: I must depart.
+            next_context: farewell
+            action: farewell
+    offer_coordinates:
+      - grammar:
+          origin:
+            - 'Let this small act of grace illuminate your path, #honorific#. #opener#
+              You must steer your vessel to sector {coords}, some {distance} jumps
+              away #detail#, where #aside#.'
+          opener:
+            - Our elegant scouts have traced the path to a hidden {target}.
+            - We deign to share the location of a pristine {target}.
+          detail:
+            - in the {band} band
+            - deep within the {band}
+          honorific:
+            - my unpolished {player}
+            - stray traveler of the {species}
+          aside:
+            - '{reward} waits to bloom for you'
+            - '{reward} lies ready to be gathered'
+        choices:
+          - text: Thank you for the guidance. I will head there.
+            next_context: farewell
+            action: accept_lead
+          - text: What else do you have to trade?
+            next_context: trade_open
+            action: trade
+    branch.vesk_inquiry:
+      - grammar:
+          origin:
+            - "#opener# #detail#\u2014#aside#, #honorific#."
+          opener:
+            - To discuss the Vesk is to invite a discordant note into our elegant
+              chamber,
+            - Your curiosity regarding those misshapen brutes is quite exhausting,
+            - We find even the mention of that species offensive to our refined senses,
+          detail:
+            - as they possess none of the sublime grace that we, the Dignar's chosen
+              artisans, bring to the stars
+            - since their coarse hulls and artless weapons represent the ultimate
+              corruption of design
+            - for they are nothing but a jagged tear in the tapestry of cosmic harmony
+          aside:
+            - yet we will gladly guide you to their ruin
+            - but their eventual erasure from the galaxy will be a masterpiece
+            - so we must insist on their complete and beautiful destruction
+          honorific:
+            - unrefined {player}
+            - simple human
+            - rustic traveler
+            - unadorned captain
+        choices:
+          - text: If I destroy the Vesk, will you trade with me?
+            next_context: branch.vesk_vengeance
+          - text: Let us speak of other matters.
+            next_context: dossier_other
+          - text: I must take my leave.
+            next_context: farewell
+            action: farewell
+    branch.vesk_vengeance:
+      - grammar:
+          origin:
+            - '#opener#, #honorific# #detail# #aside#'
+          opener:
+            - To tolerate the Vesk is to allow a jagged scar to fester upon a perfect
+              canvas
+            - The Vesk represent a grotesque, blockish deformity in the great cosmic
+              garden
+            - My petals curl in absolute revulsion at the mere mention of those crude
+              beasts
+          honorific:
+            - my transient {player},
+            - little {player},
+            - my fragile {player},
+          detail:
+            - we demand the utter pruning of their unsightly forms from the galaxy.
+            - we shall trade only with those who sweep their ugly vessels into beautiful,
+              drifting wreckage.
+            - we desire to see their blocky hulls shattered into a shower of elegant,
+              silent stardust.
+          aside:
+            - Would you not assist us in perfecting this masterwork of violence?
+            - Only then can true harmony bloom in this sector.
+            - A necessary violence to restore cosmic symmetry, wouldn't you agree?
+        choices:
+          - text: I can help you hunt down some Vesk ships.
+            next_context: offer_coordinates
+          - text: Why do you hate the Vesk so much?
+            next_context: branch.vesk_inquiry
+          - text: Let us speak of other things.
+            next_context: greeting
+          - text: I must depart.
+            next_context: farewell
+            action: farewell
+    treaty_offer:
+      - variants:
+          - An alliance? Let us see if our aesthetics are compatible.
+          - A treaty could be a beautiful thing, if properly curated.
+          - We are intrigued by the artistic possibilities of peace.
+    treaty_grant:
+      - variants:
+          - A masterpiece of diplomacy. We are allied.
+          - Let our harmony resonate across the stars.
+          - The Cibelline accept your elegant proposal.
+    treaty_refuse:
+      - variants:
+          - Your approach is entirely too vulgar for a formal treaty.
+          - We cannot ally with something so aesthetically dissonant.
+          - The proposal lacks refinement. Rejected.
+    treaty_condition:
+      - variants:
+          - You must cultivate a more refined presence before we consider an alliance.
+          - Our galleries are closed to you until you prove your taste.
+          - Show us some semblance of culture first, {player}.
+  selvi:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific# #aside#'
+          opener:
+            - Oh, {player}! The sensor feeds do not do justice to the curves of your
+              hull!
+            - Ah, {player}, how your transmission makes our horns tingle with delight!
+            - What a robust, beautiful specimen of the {species} we have encountered!
+          detail:
+            - We are but humble Selvi, longing to press our large eyes against your
+              viewport
+            - Our robes flutter with excitement at this close contact
+            - We would trade all the cargo in our hold just for a closer look
+          honorific:
+            - my delicious captain
+            - our lovely new friend
+            - sweet voyager of the {alliance}
+          aside:
+            - (please don't be angry, we scare so easily!)
+            - (perhaps we could open the capsule?)
+            - (we promise we are very soft!)
+        choices:
+          - text: I'm flattered. Let's see what you have to trade.
+            next_context: trade_open
+            action: trade
+          - text: Tell me about the other species in this cluster.
+            next_context: dossier_other
+          - text: Back off, or I will open fire on your vessel.
+            next_context: farewell
+            action: attack
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#! #detail# #aside#'
+          opener:
+            - Oh, my darling {player}
+            - Sweetest {player}
+            - Lovely pilot of the {species}
+          honorific:
+            - beautiful one
+            - gorgeous creature
+            - ravishing captain
+          detail:
+            - our hold is bursting with treasures we'd just adore to show you
+            - we have brought the finest wares in the {alliance} just for you
+            - we would happily trade our deepest secrets and finest cargo to catch
+              your eye
+          aside:
+            - (though perhaps we could open our capsule doors for a closer look?)
+            - (won't you let us see a little more of your wonderful ship?)
+            - (we promise to be very gentle during the exchange!)
+        choices:
+          - text: Show me what you have for sale.
+            action: trade
+          - text: Let's negotiate, if you are willing.
+            action: barter
+          - text: I must go now.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#? #detail# #aside#'
+          opener:
+            - Must you fly away so soon
+            - Oh, do not leave us in the cold dark
+            - Are you really leaving us behind
+          detail:
+            - We did not even get to open your capsule.
+            - Our eyes weep for a longer look at a beautiful {player}.
+            - We wanted to learn every secret of your lovely vessel.
+          honorific:
+            - my sweet captain
+            - you breathtaking human
+            - most gorgeous traveler
+          aside:
+            - (Our hearts are far too fragile for this sudden parting!)
+            - (Please remember the Selvi when you are lonely in the stars!)
+            - (If we were braver, we would climb aboard and hide in your cargo!)
+        choices:
+          - text: Goodbye, Selvi. Safe travels.
+            next_context: farewell
+            action: farewell
+          - text: Wait, let's trade before I go.
+            next_context: trade_open
+            action: trade
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#? #detail#. #aside#'
+          opener:
+            - Oh, {subject}
+            - Must we speak of {subject}
+            - Why ask about {subject} when you are here
+          detail:
+            - They are so dreadfully cold compared to your radiant warmth
+            - They have absolutely none of your breathtaking allure
+            - They lack the soft, inviting spirit that you possess
+          honorific:
+            - my lovely {player}
+            - gorgeous captain
+            - sweetest traveler
+          aside:
+            - (though we do hear they have quite a temper!)
+            - (not that we look at anyone else when you are near!)
+            - (but let us not waste our precious moments on them...)
+        choices:
+          - text: Let's focus on business. What do you have for sale?
+            next_context: trade_open
+            action: trade
+          - text: I see. What do you think of another species?
+            next_context: dossier_other
+          - text: I should get going.
+            next_context: farewell
+            action: farewell
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #aside# #detail#'
+          opener:
+            - Our hearts flutter so wild, we must show you our devotion!
+            - Oh, the heat in this capsule is too much! Let us offer a little treat
+              to you,
+            - We have been watching your ship, so strong and magnificent!
+          honorific:
+            - our darling {player}
+            - you delicious captain
+            - most beautiful traveler
+          aside:
+            - (we press our faces against the viewer, hoping you'll open the hatch)
+            - (our horns twitch with bashful adoration)
+            - (we sigh in unison, gazing at you dreamily)
+          detail:
+            - "We have the route to that hidden {target} you desire. Set course for\
+              \ sector {coords}\u2014about {distance} jumps out in the {band}\u2014\
+              where {reward} awaits your lovely touch."
+            - Let us whisper the path to a secret {target}. Go to sector {coords},
+              just {distance} jumps away in the {band}, and retrieve {reward} as our
+              courtship gift!
+        choices:
+          - text: Thank you for the route. I'll check it out.
+            next_context: farewell
+            action: accept_lead
+          - text: Can we talk about trade instead?
+            next_context: trade_open
+            action: trade
+          - text: Goodbye, Selvi.
+            next_context: farewell
+            action: farewell
+    treaty_offer:
+      - variants:
+          - Peace is the only path. The Selvi embrace your offer.
+          - We welcome all who come with open hearts.
+          - Let us join our spirits in harmony, {player}.
+    treaty_grant:
+      - variants:
+          - We are one in peace.
+          - Let the galaxy rejoice. We are allies.
+          - The Selvi bless this union.
+    treaty_refuse:
+      - variants:
+          - We sense darkness in your path. We must decline.
+          - Our spirits cannot align with yours at this time.
+          - The Selvi must respectfully withdraw from this offer.
+    treaty_condition:
+      - variants:
+          - Your aura is troubled. Find inner peace, and then return.
+          - We must see the light in your actions before we can join hands.
+          - Cleanse your spirit of conflict first, {player}.
+  vennrith:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+          opener:
+            - Hailed the horned redoubt of the Vennrith, you have, {player}.
+            - Before our redoubt of skull-trophies, your ship hovers, {player}.
+            - To the Iron Covenant's backbone, you speak, {player}.
+          detail:
+            - For sixteen orbits, Thessbrood scum we have hated.
+            - No betrayal, do we ever forgive.
+            - For centuries, our Kalamastra grudge against the Selvi we have nursed.
+          honorific:
+            - Lone captain,
+            - Frail traveler,
+            - Wanderer of {species},
+          aside:
+            - to our demands, bow you will.
+            - fail us, and permanent hatred you will earn.
+            - test our patience, you must not.
+        choices:
+          - text: I'm interested in trading with the Covenant.
+            next_context: trade_open
+            action: trade
+          - text: Who are your enemies out here?
+            next_context: branch.inquiry
+          - text: I will take my leave now.
+            next_context: farewell
+            action: farewell
+          - text: Of the other species, what know you?
+            next_context: dossier_other
+    trade_refuse:
+      - variants:
+          - Trade with outsiders, we do not. Join the Covenant, you must, before our
+            markets open.
+        choices:
+          - text: I must take my leave.
+            next_context: farewell
+            action: farewell
+    trade_open:
+      - grammar:
+          origin:
+            - 'To trade, are you ready, #honorific# {player}? #opener#. #detail#,
+              purchase you may. #aside#'
+          honorific:
+            - fragile captain
+            - short-lived traveler
+            - covenant guest
+          opener:
+            - Heavy metals and weapons, possess we
+            - Supplies from the redoubt, offer we
+            - Spars and engines, bring we
+          detail:
+            - If good your credits are
+            - If honest your metal is
+            - If no trickery you plot
+          aside:
+            - But remember, a grudge we keep forever.
+            - But betray us, and hunted you will be.
+            - But cross us, and like the Thessbrood, burn you shall.
+        choices:
+          - text: Let's see what you have for sale.
+            next_context: trade_open
+            action: trade
+          - text: Can we barter for a better rate?
+            next_context: trade_open
+            action: barter
+          - text: I should go.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#, #aside#.'
+          opener:
+            - Depart, you must
+            - Go now, you will
+            - Leave our redoubt, you shall
+          honorific:
+            - captain {player}
+            - weak voyager of {alliance}
+            - member of the {species}
+          detail:
+            - remembered, your debts are
+            - watched by our horns, you will be
+            - forgotten, no insult is
+          aside:
+            - though tolerated, you remain
+            - lest angered, our fleet becomes
+            - yet unpaid, our vengeance is
+        choices:
+          - text: I am leaving. Safe travels.
+            next_context: farewell
+            action: farewell
+          - text: Keep your grudges. Goodbye.
+            next_context: farewell
+            action: farewell
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#, #aside#.'
+          opener:
+            - Concerning {subject}, speak we must
+            - Of the species {subject}, silent remain we cannot
+          detail:
+            - a debt of blood, to our Covenant they owe
+            - an ancient grudge, against their kind we nurse
+          honorific:
+            - flesh-captain {player}
+            - weak-skinned {player}
+          aside:
+            - for forgive them, never will we
+            - since forgotten, no betrayal is
+        choices:
+          - text: I understand your grudge. Let's talk about something else.
+            next_context: dossier_other
+          - text: I must go.
+            next_context: farewell
+            action: farewell
+          - text: Trade with me, you will.
+            next_context: trade_open
+            action: trade
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#honorific#, #opener# #detail# #aside#'
+          opener:
+            - to {target} you have not found, a path we grant.
+            - a route to {target}, our horns have pointed.
+            - known to the {species}, the way to {target} is.
+          detail:
+            - To sector {coords} in the {band}, course you must set. About {distance}
+              jumps out, it lies. There, {reward} waiting is.
+            - In sector {coords} of the {band}, it is. {distance} jumps, it requires.
+              There, {reward} you shall find.
+          honorific:
+            - Soft human {player}
+            - Though allied to the {alliance}, fragile {player}
+          aside:
+            - Forget this favor, you must not.
+            - Grudges, the {species} keep. Remember this, you will.
+            - A debt to the {alliance}, you now owe.
+        choices:
+          - text: Thank you. I'll set course for those coordinates.
+            next_context: farewell
+            action: accept_lead
+          - text: Why are you helping me?
+            next_context: branch.inquiry
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#. #aside#'
+          opener:
+            - Of {subject}, speak we will
+            - Concerning {subject}, ask you do
+            - To understand {subject}, seek you
+          honorific:
+            - flesh-bound {player}
+            - dust-born {player}
+            - soft-shelled {player}
+          detail:
+            - Yet heavy our grudges weigh
+            - But Thessbrood scum we still hunt
+            - Though no blood-debt yet you owe
+          aside:
+            - Forget, we never do.
+            - Watch you, the Covenant does.
+            - To Thessarch, loyal we remain.
+        choices:
+          - text: Tell me more about your history.
+            next_context: branch.inquiry
+          - text: Let us speak of other matters.
+            next_context: greeting
+          - text: I must go.
+            next_context: farewell
+            action: farewell
+          - text: Trade with me, you will.
+            next_context: trade_open
+            action: trade
+          - text: Of the other species, what know you?
+            next_context: dossier_other
+    treaty_offer:
+      - variants:
+          - A pact with the Covenant? A rare honor, this is.
+          - Seek our protection, do you? Listen, we shall.
+          - To join your strength with ours... consider it, the elders will.
+    treaty_grant:
+      - variants:
+          - Sworn in the deep shadows, the oath is. Allies, we are.
+          - The Covenant accepts. Break this trust, you must not.
+          - Bound together now, our fates are.
+    treaty_refuse:
+      - variants:
+          - Unworthy, you are. The Covenant rejects you.
+          - Forgive past trespasses, we do not. No treaty, there shall be.
+          - Darkness falls on this proposal. Denied, it is.
+    treaty_condition:
+      - variants:
+          - Prove your loyalty to the Covenant, you first must.
+          - Empty words, these are. Deeds, the elders demand.
+          - A test of faith, you must pass. Then, we speak of treaties.
+  thessarch:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener# #detail# We demand absolute obedience, #honorific#. #aside#'
+          opener:
+            - We register your hailing transmission, {player}.
+            - Our psionic dome detects your crude neural frequencies, {player}.
+            - You stand in the telepathic presence of the Thessarch, {player}.
+          detail:
+            - We gatekeep the Iron Covenant and require your binding fealty.
+            - Nothing joins our bloc without our absolute consent, representative
+              of the {species}.
+            - Submit to our authoritarian dogma or face the wrath of our Dtri Battlecruisers.
+          honorific:
+            - lesser mind
+            - fragile biological unit
+            - unrefined consciousness
+          aside:
+            - (Our massive capital warships have already locked onto your coordinates.)
+            - (Your thoughts concerning {alliance} are transparent and terminally
+              dull.)
+            - (Our psionic power easily penetrates your simple mind.)
+        choices:
+          - text: I wish to petition for entry into the Iron Covenant.
+            next_context: branch.petition
+          - text: Tell me what you know about the other species in this sector.
+            next_context: dossier_other
+          - text: I must depart.
+            next_context: farewell
+            action: farewell
+          - text: I request permission to trade.
+            next_context: trade_open
+            action: trade
+    trade_refuse:
+      - variants:
+          - The markets of the Covenant are closed to the unpledged. Submit to my
+            authority if you wish to trade.
+        choices:
+          - text: I must depart.
+            next_context: farewell
+            action: farewell
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. (#aside#.)'
+          opener:
+            - As gatekeepers of the {alliance}, we command you to
+            - Our psionic dominance is absolute, and we demand you
+            - We have scanned your mind, {player}, and we authorize you to
+          detail:
+            - expose your cargo hold to our telepathic scrutiny
+            - submit your inventory data to the {species} for inspection
+            - present your transaction parameters so that we may dictate the terms
+          honorific:
+            - subject
+            - lesser mind
+            - supplicant of the {species}
+          aside:
+            - resistance to our valuation is futile
+            - compliance is expected
+            - know that we sense your greed
+        choices:
+          - text: Let us begin the trade.
+            next_context: trade_open
+            action: trade
+          - text: I want to negotiate the terms.
+            next_context: trade_open
+            action: barter
+          - text: I will leave now.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - "#opener# #detail#\u2014#aside#, #honorific#."
+          opener:
+            - Depart, {player}.
+            - You have our permission to withdraw, {player}.
+            - The Thessarch dismiss you, {player}.
+          detail:
+            - Keep to the iron rules of our {alliance} or be purged
+            - Submit your thoughts to the collective will of the Covenant
+            - Seek not to defy our supreme authority in this sector
+          aside:
+            - lest we crush your mind from afar
+            - which is the only logical path for a {species}
+            - for we see all deviations in the psychic web
+          honorific:
+            - frail human
+            - unworthy traveler
+            - subservient mind
+        choices:
+          - text: Understood. Safe travels to the Covenant.
+            next_context: farewell
+            action: farewell
+          - text: We will see who obeys whom in the end.
+            next_context: farewell
+            action: farewell
+    dossier_other:
+      - grammar:
+          origin:
+            - "#opener# #detail#, #honorific#\u2014#aside#."
+          opener:
+            - We have psychically cataloged the species known as {subject}.
+            - Our collective intellect has evaluated {subject}.
+            - The status of {subject} remains under our absolute scrutiny.
+          detail:
+            - they are a chaotic element, currently unfit to serve our glorious {alliance}
+            - their minds lack the absolute discipline we demand of our subject species
+            - they must submit to our psionic order or face immediate correction
+          honorific:
+            - unrefined {player}
+            - lesser mind
+            - insignificant captain
+          aside:
+            - though this concept is likely beyond your limited human comprehension
+            - a fact that is entirely non-negotiable
+            - as our authoritarian dogma dictates
+        choices:
+          - text: I see. I have other questions about the galaxy.
+            next_context: dossier_other
+          - text: Your arrogance is exhausting. I'm leaving.
+            next_context: farewell
+            action: farewell
+          - text: I request permission to trade.
+            next_context: trade_open
+            action: trade
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#opener# #honorific#. #detail#. #aside#'
+          opener:
+            - We, the Thessarch, bestow a path upon you,
+            - By our supreme benevolence, a route is projected,
+            - Our collective mind has decreed to guide your vessel,
+          honorific:
+            - unaligned {player}
+            - primitive {player}
+            - sub-sentient voyager
+          detail:
+            - "the {target} you seek is located in sector {coords}, approximately\
+              \ {distance} jumps away in the {band}\u2014where {reward} lies ready\
+              \ for claiming"
+            - "redirect your course to sector {coords} within the {band}\u2014a journey\
+              \ of {distance} jumps\u2014where {reward} shall be retrieved at the\
+              \ site of the {target}"
+            - set course for sector {coords} in the {band}, {distance} jumps out,
+              to secure the {reward} at the location of the {target}
+          aside:
+            - Obey this directive, or remain in ignorance.
+            - Do not squander this concession of the Thessarch.
+            - Your compliance is expected.
+        choices:
+          - text: Understood. Coordinating path to sector {coords}.
+            next_context: farewell
+            action: accept_lead
+          - text: Why are you helping me?
+            next_context: branch.inquiry
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener# Listen well, #honorific#, #detail#; #aside#.'
+          opener:
+            - You query the Thessarchy, {player}?
+            - Your intellect seeks enlightenment from our collective mind, human?
+          detail:
+            - all entry into the Covenant requires our absolute psychic approval,
+              and {subject} is no exception
+            - our psionic gaze has scanned your primitive vessel and determined your
+              interest in the {species}
+          honorific:
+            - lesser mind
+            - unaligned captain
+          aside:
+            - do not dare to violate our sovereignty
+            - our Dtri Battlecruisers stand ready to enforce our will
+        choices:
+          - text: What are the rules of the Iron Covenant?
+            next_context: branch.inquiry
+          - text: How do we join the Covenant?
+            next_context: branch.petition
+          - text: Tell me about the other species in your sector.
+            next_context: dossier_other
+          - text: I must depart.
+            next_context: farewell
+            action: farewell
+          - text: I request permission to trade.
+            next_context: trade_open
+            action: trade
+    branch.petition:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - Your mind-waves broadcast your intent, {player}
+            - We perceive the crude impulses of your brain, {player}
+            - Our collective intellect has analyzed your petition, {player}
+          honorific:
+            - petty human
+            - insignificant petitioner
+            - lone voyager
+          detail:
+            - To join the {alliance}, you must submit to absolute obedience and accept
+              our supreme authority.
+            - Membership in the {alliance} is only granted to those who pledge eternal
+              fealty and swear to never attack our vassals.
+            - We command the Covenant; entry to the {alliance} requires you to bind
+              your ship to our strict doctrines of order.
+          aside:
+            - (We monitor your thoughts for any sign of rebellion.)
+            - (Our massive battlecruisers stand ready to enforce this dogma.)
+            - (Do not presume to negotiate with the Thessarch.)
+        choices:
+          - text: I am ready to pledge my fealty and join the alliance.
+            next_context: branch.petition
+          - text: What are the rules of this alliance?
+            next_context: branch.inquiry
+          - text: I need to think this over first.
+            next_context: farewell
+            action: farewell
+          - text: I request permission to trade.
+            next_context: trade_open
+            action: trade
+          - text: What is your command regarding the other species?
+            next_context: dossier_other
+    treaty_offer:
+      - variants:
+          - You seek to bow before the Thessarchs? We accept your submission.
+          - A treaty of fealty? We are listening, {player}.
+          - If you wish to serve the empire, present your terms.
+    treaty_grant:
+      - variants:
+          - You are now a vassal of the empire. Rejoice.
+          - The Thessarchs extend their protection to their new servant.
+          - It is decreed. You belong to us now in peace.
+    treaty_refuse:
+      - variants:
+          - You are too weak even to serve as a vassal.
+          - The empire does not sign treaties with insects.
+          - Your insolence guarantees our refusal.
+    treaty_condition:
+      - variants:
+          - You have not bled enough for the empire to earn our protection.
+          - Prove your subservience before demanding a treaty.
+          - A vassal must demonstrate their worth first.
+  thessbrood:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener# #detail#. #aside#'
+          opener:
+            - 'We bow our humble brain-sac before you, #honorific#,'
+            - 'Such a rare, sweet-smelling presence, #honorific#,'
+            - 'Oh, how we tremble with delight to receive you, #honorific#,'
+          detail:
+            - our groomers scrape the finest oils for your pleasure, unlike the rough
+              claws of the {species}
+            - we exist only to serve you, and we pray you bring no violence to our
+              modest colonies
+            - we are but simple servants wishing to bestow gifts upon your marvelous
+              ship
+          honorific:
+            - noble Captain {player}
+            - gracious representative of the {alliance}
+            - magnificent biological specimen
+          aside:
+            - (a dozen broodlings diligently stroke our master sac's lower plinth)
+            - (our attendant insectoids hiss in quiet, rhythmic adoration)
+            - (we secrete a film of welcoming grease as the groomers clean our brain-case)
+        choices:
+          - text: I am Captain {player}. Let's discuss trade.
+            next_context: trade_open
+            action: trade
+          - text: Tell me about your species and the Liberty Front.
+            next_context: branch.inquiry
+          - text: I must go. Farewell.
+            next_context: farewell
+            action: farewell
+          - text: What can your broodlings tell me of the others?
+            next_context: dossier_other
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - Oh, most esteemed traveler, our humble brood-mind is overjoyed to offer
+              you our modest cargo
+            - Ah, noble {player}, our busy attendants have prepared a selection of
+              rare marvels for your inspection
+            - Dearest captain, we bow our collective sac before you, eager to present
+              our modest wares
+          detail:
+            - We have gathered these fine supplies to aid your journey, all certified
+              safe by our devoted groomers.
+            - Our humble plinth overflows with pristine technologies and resources,
+              ready to be transferred to your vessels.
+            - We present our finest provisions and equipment at a most generous exchange,
+              as is our custom.
+          honorific:
+            - kind benefactor
+            - gracious protector
+            - esteemed {player}
+            - benevolent guest
+          aside:
+            - (We brush away the nesting dust and ignore the faint hum of our most
+              secure packages.)
+            - (The insectoid groomers stroke our sac as we package these pristine
+              items for you.)
+            - (Our broodlings polish the casing of our gifts with the utmost care,
+              ensuring no dust remains.)
+        choices:
+          - text: Let's see what you have to trade.
+            next_context: trade_open
+            action: trade
+          - text: Do you have any leads for a captain?
+            next_context: branch.inquiry
+          - text: I must depart.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener# #honorific#. #detail#. #aside#'
+          opener:
+            - Go in utmost serenity,
+            - May the stars guide your grand vessel,
+            - We bow our humble collective brain-sac before your exit,
+            - Ah, to see you depart brings great sorrow to us,
+          honorific:
+            - most magnificent Captain {player}
+            - renowned defender of the {alliance}
+            - noble champion of the stars
+            - glorious representative of the {species} species
+          detail:
+            - our grooming broodlings have loaded a heavy, sealed crate of rare treasures
+              into your cargo hold
+            - we have placed a highly special, hermetically sealed gift of friendship
+              deep within your ship
+            - a modest token of our profound servility has been nestled near your
+              engine room
+            - we have gifted you a pristine crate of Liberty Front artifacts to honor
+              our partnership
+          aside:
+            - (we humbly request you do not disturb the seal until you are in deep
+              warp)
+            - (please ignore any warmth or low hum emanating from the cargo bay)
+            - (it is just a harmless custom of our broodlings to pack them so... snugly)
+            - (our humble sac trembles with anticipation for your next jump)
+        choices:
+          - text: Thank you for the gift. Farewell.
+            next_context: farewell
+            action: farewell
+          - text: Hold on, I want to scan my cargo hold before I leave.
+            next_context: branch.scan_cargo
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+          opener:
+            - 'Oh, the {subject}, #honorific#! We speak of them only with the greatest
+              caution.'
+            - 'If we must discuss the {subject}, #honorific#, our humble broodlings
+              shiver in anxiety.'
+            - 'The {subject}, #honorific#? Our master sac turns in distress at the
+              very mention.'
+          detail:
+            - They are a crude, aggressive species, completely lacking in the refined
+              servility that we and our junior partners, the Dacaran, so gladly offer
+              to you.
+            - They plot constantly against the Liberty Front, showing a most hostile
+              disregard for our modest, peaceful territory.
+            - They are expansionist bullies who refuse to recognize the rightful borders
+              of our colonial nests.
+          honorific:
+            - eminent {player}
+            - most gracious captain
+            - illustrious traveler
+          aside:
+            - Please, do not tell them we said so; we are but weak, soft-bodied creatures.
+            - We only want to serve, yes, and protect our fragile plinth from their
+              heavy boots.
+            - Our groomers whisper that they are not to be trusted, not at all.
+        choices:
+          - text: I see. Let's talk about something else.
+            next_context: greeting
+          - text: I think we are done here.
+            next_context: farewell
+            action: farewell
+          - text: Let's see what you have for sale.
+            next_context: trade_open
+            action: trade
+          - text: What can your broodlings tell me of the others?
+            next_context: dossier_other
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#honorific#, #opener# #detail# #aside#'
+          opener:
+            - our humble brood-sac shivers with delight to perform a small service.
+            - we crawl in servile gratitude to share a secret route with your grace.
+            - our insectoid groomers hum in praise as we offer this gift of knowledge.
+          detail:
+            - We have mapped the route to a hidden {target}. Set your course for sector
+              {coords}, about {distance} jumps away in the {band} band, where {reward}
+              awaits.
+            - A path lies open to the {target} in sector {coords}, roughly {distance}
+              jumps out in the {band} band. There, {reward} is yours to claim.
+          honorific:
+            - Most esteemed {player}
+            - Noble and powerful captain
+            - O great protector of the stars
+          aside:
+            - We only hope you remember the Thessbrood's oily compliance.
+            - A safe journey to you, and may you think fondly of our servile house.
+            - We ask for nothing in return, save for your continued benevolence.
+        choices:
+          - text: I appreciate the tip. I'll set course immediately.
+            next_context: farewell
+            action: accept_lead
+          - text: Why are you being so generous?
+            next_context: branch.inquiry
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail# #aside#'
+          opener:
+            - Ah, your curiosity is most exquisite
+            - How delightfully bold of you to ask
+            - A most pertinent query
+            - We are humbled by your intellectual pursuit
+          honorific:
+            - esteemed {player}
+            - benevolent captain
+            - illustrious human
+            - gracious protector
+          detail:
+            - our humble broodlings merely wish to share details regarding the {subject}
+              to ease your travels.
+            - we of the Liberty Front are always eager to discuss the {subject} with
+              such an enlightened mind.
+            - our collective sac hums with joy as we disclose what we know of the
+              {subject}.
+            - the Thessbrood only seeks to illuminate the truth of the {subject} for
+              our partners.
+          aside:
+            - We hope this small token of knowledge pleases you, and perhaps you'd
+              accept a gift of {item} later?
+            - Do ignore the ticking from our cargo holds; it is merely the broodlings
+              grooming the plinth.
+            - Our junior partners, the Dacaran, also speak highly of your cooperation.
+            - Surely the wretched Dignar or Thessarch would not be so forthcoming,
+              yes?
+        choices:
+          - text: I have more questions about this sector.
+            next_context: branch.inquiry
+          - text: What can your broodlings tell me of the others?
+            next_context: dossier_other
+          - text: Let us exchange provisions, humble master.
+            next_context: trade_open
+            action: trade
+          - text: I must be going now.
+            next_context: farewell
+            action: farewell
+    branch.scan_cargo:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail#, #aside#.'
+          opener:
+            - We humblest Thessbrood beg your mercy,
+            - Our attendant broodlings groom us in great anxiety,
+            - We offer our deepest, most submissive obeisance,
+          honorific:
+            - most wise {player}
+            - exalted protector
+            - illustrious captain
+          detail:
+            - but a scan of our cargo is quite unnecessary when we only transport
+              simple {item}
+            - but we assure you our holds contain nothing but harmless gifts for the
+              {alliance}
+            - but we only wish to verify your ship is free of contaminants before
+              we trade
+          aside:
+            - we would never dream of carrying hidden dangers
+            - our master sac pulses with nothing but devotion to your cause
+            - we only seek to serve and colonize in quiet harmony
+        choices:
+          - text: I still want to scan your cargo bays.
+            next_context: branch.scan_cargo
+          - text: Let us talk about something else.
+            next_context: branch.inquiry
+          - text: Then show me what you have to trade.
+            next_context: trade_open
+            action: trade
+          - text: I will take my leave now.
+            next_context: farewell
+            action: farewell
+    treaty_offer:
+      - variants:
+          - Oh, a treaty with the mighty {player}? We are so honored!
+          - To be allied with you would be our greatest joy!
+          - Please, let us sign this glorious pact!
+    treaty_grant:
+      - variants:
+          - We are forever your humble and devoted allies!
+          - The brood celebrates our eternal friendship!
+          - We shall serve you faithfully in this alliance!
+    treaty_refuse:
+      - variants:
+          - Oh, we could never presume to ally with one so... controversial.
+          - Our masters forbid it. We are so very sorry, {player}.
+          - We must humbly decline, for our own meager safety.
+    treaty_condition:
+      - variants:
+          - If only you could show us a little more favor first, mighty {player}...
+          - We are but lowly servants; we need proof of your grand protection before
+            committing.
+          - We beg you, demonstrate your power a bit more before we sign!
+  dacaran:
+    greeting:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail# #aside#'
+          opener:
+            - Ah, {player}, you stand before our wings.
+            - Hail, traveler from {alliance}.
+          honorific:
+            - champion of self-determination
+            - ally in the grand design
+            - seeker of liberty
+          detail:
+            - the {species} preach liberty across the stars, yet Thessbrood leadership
+              binds us all.
+            - we fight to weaken the Thessbrood masters, whose tyranny must be broken.
+            - only those loyal to the cause of liberty may fly with us.
+          aside:
+            - Tell us, where does your true allegiance lie?
+            - Do you seek to weaken the masters, or are you their puppet?
+        choices:
+          - text: I am here to help weaken the Thessbrood.
+            next_context: offer_coordinates
+          - text: Do you have goods to trade?
+            next_context: trade_open
+            action: trade
+          - text: I must take my leave.
+            next_context: farewell
+            action: farewell
+          - text: Who else stands against tyranny in this cluster?
+            next_context: dossier_other
+    trade_refuse:
+      - variants:
+          - We have nothing to exchange with those who serve the tyrants. Our resources
+            are for the cause alone.
+        choices:
+          - text: I must go.
+            next_context: farewell
+            action: farewell
+    trade_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#; #detail# #aside#'
+          opener:
+            - To break the chains of oppression, we must share our strength
+            - A true partnership is forged in the fires of mutual aid
+            - We offer the resources of cooperative liberation
+          honorific:
+            - champion of liberty
+            - seeker of self-determination
+            - brave ally of the {alliance}
+          detail:
+            - so let us trade freely, {player}, ensuring the {species} have the means
+              to defy the tyrants
+            - hence we open our cargo holds to you, that we may both be armed for
+              the coming dawn
+            - therefore we invite you to deal, for a well-supplied ship is the first
+              step toward freedom
+          aside:
+            - (though the Dacaran must ultimately guide our collective path).
+            - (for true freedom requires a strong hand to lead the front, after all).
+            - (naturally, our own supremacy will ensure the peace that follows).
+        choices:
+          - text: Show me your supplies. Let's trade.
+            next_context: trade_open
+            action: trade
+          - text: I don't trust you, but I'll barter.
+            next_context: trade_open
+            action: barter
+          - text: I'm leaving.
+            next_context: farewell
+            action: farewell
+    farewell:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail# #aside#'
+          opener:
+            - Fly high, {player}
+            - Go with the wind, {player}
+            - Ascend in safety, {player}
+          detail:
+            - We shall break the shackles of the Thessbrood soon enough.
+            - The true vision of the {alliance} will soon be realized, without their
+              interference.
+            - Keep your eyes on the skies; the dawn of a new order is close.
+          honorific:
+            - brave voyager
+            - fellow seeker of liberty
+            - liberator of the cosmos
+          aside:
+            - (And watch your back around the Thessbrood.)
+            - (But do keep our mutual goals in mind.)
+            - (We will speak again when the wind changes.)
+        choices:
+          - text: Until next time.
+            next_context: farewell
+            action: farewell
+          - text: I will keep your words in mind.
+            next_context: farewell
+            action: farewell
+    dossier_other:
+      - grammar:
+          origin:
+            - '#opener# #detail#. #aside#, #honorific#.'
+            - '#opener# #detail#, #honorific#. #aside#.'
+          opener:
+            - Ah, {subject}.
+            - You speak of {subject}.
+            - The matter of {subject} is quite clear.
+          detail:
+            - They are merely another tyranny masquerading as order
+            - They represent yet another despotism choking the galaxy's potential
+            - They preach cooperation but demand subservience, much like the Thessbrood
+          aside:
+            - but the Liberty Front shall sweep such relics aside
+            - though we could orchestrate their downfall if we coordinate our efforts
+            - yet their impending collapse will pave the way for true self-determination
+          honorific:
+            - '{player}'
+            - my human ally
+            - captain
+        choices:
+          - text: How can we work together to weaken them?
+            next_context: offer_coordinates
+          - text: I want to ask about someone else.
+            next_context: dossier_other
+          - text: Let us talk of other things.
+            next_context: greeting
+          - text: I must go.
+            next_context: farewell
+            action: farewell
+          - text: Let us share our resources for the cause.
+            next_context: trade_open
+            action: trade
+    offer_coordinates:
+      - grammar:
+          origin:
+            - '#honorific#, #opener# #detail# #aside#'
+          opener:
+            - we believe in rewarding those who stand apart from the old empires,
+              so we shall do you a favor.
+            - liberty is built on shared knowledge, and we have charted what your
+              sensors missed.
+            - we Dacaran fly farther than your heavy vessels, and we choose to share
+              our discoveries with you.
+          detail:
+            - "We have found the route to the {target} you have yet to locate. Set\
+              \ course for sector {coords} \u2014 about {distance} jumps out, in the\
+              \ {band} \u2014 where {reward} awaits."
+            - "Our scouts have pinpointed the {target} you need. Steer your ship to\
+              \ sector {coords} \u2014 about {distance} jumps out, in the {band} \u2014\
+              \ where {reward} awaits."
+          honorific:
+            - Fellow champion of self-determination
+            - Ally in the struggle against tyranny
+            - Free-thinking captain
+          aside:
+            - Consider this a gesture of our emerging partnership.
+            - May it help you break the chains of the Thessbrood.
+            - A small token, hoping you remember who your true friends are.
+        choices:
+          - text: Thank you for the coordinates. I will set course.
+            next_context: farewell
+            action: accept_lead
+          - text: Why are you helping me? What do the Dacaran want?
+            next_context: branch.inquiry
+          - text: I'll find my own way. Farewell.
+            next_context: farewell
+            action: farewell
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+          opener:
+            - We seek only to understand your heart,
+            - Before we speak of cooperation,
+            - True solidarity requires transparency,
+          detail:
+            - do you truly believe the Thessbrood deserve to rule this sector, or
+              do you stand with those who fight for self-determination
+            - are you content to bend the knee to the Thessbrood, or will you aid
+              in lifting the yoke of their tyranny
+            - would you see the Thessbrood cast down so that a new, more enlightened
+              leadership might guide the Liberty Front
+          honorific:
+            - my fellow champion of freedom, {player}
+            - honored traveler, {player}
+            - friend of liberty, {player}
+          aside:
+            - (Our wings span wide, but our patience with empire-builders is short.)
+            - (Even a lone explorer must choose a side eventually.)
+            - (Thessbrood shadow falls long, but we will be the ones to eclipse it.)
+        choices:
+          - text: I believe in true liberty. How can I help?
+            next_context: offer_coordinates
+          - text: I have no interest in your rebellion.
+            next_context: branch.inquiry
+          - text: I will leave you to your scheming.
+            next_context: farewell
+            action: farewell
+          - text: Let us share our resources for the cause.
+            next_context: trade_open
+            action: trade
+          - text: Who else stands against tyranny in this cluster?
+            next_context: dossier_other
+    treaty_offer:
+      - variants:
+          - An alliance against the tyrants? We are listening.
+          - If you fight for freedom, the Dacaran will fight beside you.
+          - A pact forged in rebellion. Let us discuss the terms.
+    treaty_grant:
+      - variants:
+          - Blood and steel bind us now. We are allies.
+          - The revolution welcomes you, {player}.
+          - Together, we shall shatter their hold on the stars.
+    treaty_refuse:
+      - variants:
+          - You stink of the establishment. We will never ally with you.
+          - The Dacaran do not compromise our ideals for a scrap of paper.
+          - We fight alone rather than ally with your kind.
+    treaty_condition:
+      - variants:
+          - You talk of rebellion, but where are your scars? Prove yourself.
+          - We need to see you strike a blow for freedom before we trust you.
+          - Words are wind. Show us your commitment to the cause first.
