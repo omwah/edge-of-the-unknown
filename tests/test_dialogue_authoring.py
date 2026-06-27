@@ -314,3 +314,7 @@ def test_author_packs_generates_dossiers_and_sub_branches() -> None:
     assert bio_other[0]["choices"][0]["next_context"] == "back"
     # An entry should have a matching subject criteria
     assert "subject" in bio_other[0]["when"]["criteria"]
+    # Vesk should not have an entry about itself in dossier_other
+    for entry in bio_other:
+        if "when" in entry and "criteria" in entry["when"]:
+            assert entry["when"]["criteria"].get("subject") != "vesk"

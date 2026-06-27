@@ -116,6 +116,11 @@ def _run_validation(out: Path) -> None:
         print(f"validation error: {exc}", file=sys.stderr)
 
 
+class IndentedDumper(yaml.SafeDumper):
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow, False)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="edge-author-dialogue", description=__doc__)
     parser.add_argument("--backend", default="ollama",
@@ -204,7 +209,8 @@ def main(argv: list[str] | None = None) -> int:
         first = dict(list(voices.items())[:1])
         packs = author_packs(backend, first, contexts[:1], examples=_EXAMPLES,
                              branch_passes=args.branch_passes)
-        yaml.safe_dump(packs, sys.stdout, sort_keys=False, allow_unicode=True)
+        yaml.dump(packs, sys.stdout, Dumper=IndentedDumper, sort_keys=False,
+                  allow_unicode=True, default_flow_style=False, indent=2)
         print("\n# dry run — validated, not written", file=sys.stderr)
         return 0
 
@@ -237,7 +243,8 @@ def main(argv: list[str] | None = None) -> int:
     out = Path(args.out) if args.out else _default_out(backend)
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", encoding="utf-8") as fh:
-        yaml.safe_dump({"species_grammars": packs}, fh, sort_keys=False, allow_unicode=True)
+        yaml.dump({"species_grammars": packs}, fh, Dumper=IndentedDumper,
+                  indent=2, sort_keys=False, allow_unicode=True, default_flow_style=False)
     print(f"wrote {out}", file=sys.stderr)
 
     _run_validation(out)

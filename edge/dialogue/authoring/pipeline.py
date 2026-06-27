@@ -547,9 +547,12 @@ def _author_dossier_self_branches(backend: Any, voice_id: str, voice: str, pack:
         ("combat_and_ships", "combat and ships"),
     ]
     lore = getattr(species, "lore", None) or {}
+    targets = _collect_branch_targets(pack)
 
     for cat_key, cat_desc in categories:
         branch_key = f"branch.dossier_self.{cat_key}"
+        if branch_key not in targets:
+            continue
         if branch_key in pack:
             continue
 
@@ -557,7 +560,7 @@ def _author_dossier_self_branches(backend: Any, voice_id: str, voice: str, pack:
         if backend.__class__.__name__ == "StaticBackend":
             rewritten = raw_text
         else:
-            rewritten = _rewrite_self_lore(backend, species.name, species.persona, cat_desc, raw_text)
+            rewritten = _rewrite_self_lore(backend, species.name, voice, cat_desc, raw_text)
 
         pack[branch_key] = [
             {
@@ -569,17 +572,17 @@ def _author_dossier_self_branches(backend: Any, voice_id: str, voice: str, pack:
         ]
 
 
-def _rewrite_self_lore(backend: Any, speaker_name: str, persona: str, cat_desc: str, fact_text: str) -> str:
+def _rewrite_self_lore(backend: Any, speaker_name: str, speaker_voice: str, cat_desc: str, fact_text: str) -> str:
     prompt = (
         "You are writing dialogue for a space exploration game.\n\n"
-        f"SPEAKER SPECIES: {speaker_name}\n"
-        f"VOICE PERSONA: {persona}\n\n"
+        f"SPEAKER SPECIES DETAIL:\n{speaker_voice}\n\n"
         f"FACTUAL DESCRIPTION OF THEIR {cat_desc.upper()}:\n"
         f"\"{fact_text}\"\n\n"
-        "Rewrite this factual description in the first-person voice of the speaker, describing themselves to the player. "
-        "Adhere to their voice/persona. Keep all the factual details, but express them in their characteristic style. "
+        f"Rewrite this factual description from the perspective of the speaker ({speaker_name}) describing themselves to the player. "
+        "Adhere to the speaker's voice/persona. "
+        "Keep all the factual details, but express them in the speaker's style and viewpoint. "
         "Keep it concise (1-2 sentences). Do not add any greeting or signoff. "
-        "You may use {player} for the player, {species} for their species, and {alliance} for their alliance if needed.\n\n"
+        "Use {player} for the player, {species} for their species, and {alliance} if needed.\n\n"
         "Output a JSON object {\"rewritten_text\": \"<your rewritten dialogue text>\"}."
     )
     schema = {
@@ -648,8 +651,11 @@ def _author_dossier_other_branches(backend: Any, voice_id: str, voice: str, pack
         ("combat_and_ships", "combat and ships"),
     ]
 
+    targets = _collect_branch_targets(pack)
     for cat_key, cat_desc in categories:
         branch_key = f"branch.dossier_other.{cat_key}"
+        if branch_key not in targets:
+            continue
         if branch_key in pack:
             continue
 
@@ -657,6 +663,8 @@ def _author_dossier_other_branches(backend: Any, voice_id: str, voice: str, pack
         # For each subject other than the speaker
         for other_sp in cfg.roster.species:
             other_sp_id = other_sp.id
+            if other_sp_id == voice_id:
+                continue
             other_lore = getattr(other_sp, "lore", None) or {}
             other_raw = getattr(other_lore, cat_key, f"No record of {other_sp.name} {cat_desc} is available.").strip()
             other_desc = other_sp.description or f"a {other_sp.archetype_id} species"
