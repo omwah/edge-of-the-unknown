@@ -202,6 +202,37 @@ def test_converse_choice_farewell_action_speaks_parting_line() -> None:
     assert res.events[0].context == "farewell"
 
 
+def test_converse_choice_accept_lead_respects_next_context() -> None:
+    from edge.core.events import LeadAccepted, AlienSpoke
+    from edge.dialogue.intel import LocationRef
+    state = _world()
+    vesk = _inject(state, "vesk")
+    src = state.ships[state.players[1].ship_id].sector_id
+    d = next(d for d in state.discoveries.values()
+             if d.found_by is None
+             and d.sector_id not in state.players[1].explored_sectors
+             and shortest_path(state.adjacency, src, d.sector_id) is not None)
+    ref = LocationRef("discovery", d.id, d.sector_id)
+    state.species_knowledge[vesk.roster_id] = (ref,)
+
+    # Inject a custom choice with accept_lead action and next_context
+    data = CFG.roster.model_dump()
+    data["personas"]["serial_formal"]["greeting"] = [
+        {"variants": ["Hello"], "choices": [{"text": "Log coordinates", "action": "accept_lead", "next_context": "greeting"}]}
+    ]
+    cfg = CFG.model_copy(update={"roster": RosterConfig.model_validate(data)})
+
+    res = reduce(state, 1, Converse(vesk.id, "greeting", choice_index=0), cfg)
+    assert len(res.events) == 2
+    assert isinstance(res.events[0], LeadAccepted)
+    assert isinstance(res.events[1], AlienSpoke)
+    assert res.events[1].context == "greeting"
+
+    apply_result(state, res)
+    assert len(state.players[1].leads) == 1
+    assert state.players[1].leads[0].sector_id == d.sector_id
+
+
 def test_converse_choice_rejects_bad_index_and_choiceless_node() -> None:
     state = _world()
     vesk = _inject(state, "vesk")

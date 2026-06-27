@@ -282,3 +282,37 @@ async def test_choice_targets_back_performs_backtrack() -> None:
         # Verify we navigated back to "greeting" and history is empty
         assert app.screen._active_context == "greeting"
         assert app.screen._history == ()
+
+
+async def test_accept_lead_respects_next_context() -> None:
+    from edge.core.config import DialogueChoice, DialogueLine
+    svc = _service()
+    svc.toggle_intel()
+    svc.band = "friendly"
+    persona = svc.state.species[svc.current].persona
+    pack = svc._config.roster.personas[persona]
+    
+    # greeting will have a choice with action="accept_lead" and next_context="greeting"
+    pack["greeting"] = [
+        DialogueLine(
+            variants=["I have coordinates for you."],
+            choices=[
+                DialogueChoice(text="Log it", action="accept_lead", next_context="greeting")
+            ]
+        )
+    ]
+    
+    app = PlaytestApp(svc)
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        assert len(svc.state.players[svc.pid].leads) == 0
+        
+        # Select "Log it" choice (option 1)
+        await pilot.press("1")
+        await pilot.pause()
+        
+        # Verify coordinates were logged
+        assert len(svc.state.players[svc.pid].leads) == 1
+        # Verify we transitioned back to "greeting" context
+        assert app.screen._active_context == "greeting"

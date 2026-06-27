@@ -359,8 +359,6 @@ class AlienContactScreen(Screen):
             return
         if choice.action == "accept_lead":
             self.notify("Coordinates logged.", timeout=3)
-            self._reopen()
-            return
         if choice.next_context:
             if choice.next_context == "back":
                 if self._history:

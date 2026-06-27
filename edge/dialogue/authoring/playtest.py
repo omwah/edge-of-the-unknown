@@ -166,6 +166,27 @@ class PlaytestService:
         # Only `Converse` matters for dialogue: advance the recency ring so repeats rephrase.
         if isinstance(command, Converse):
             self._advance_recency(command.species_id, command.context)
+            if command.choice_index is not None:
+                view = self.contact_view(player_id, command.species_id, command.context)
+                if 0 <= command.choice_index < len(view.choices):
+                    choice = view.choices[command.choice_index]
+                    if choice.action == "accept_lead":
+                        from edge.dialogue.intel import pick_intel_target
+                        player = self.state.players[player_id]
+                        sp = self.state.species[command.species_id]
+                        intel = pick_intel_target(self.state, player, sp, aliens=self._config.aliens)
+                        if intel is not None:
+                            from edge.core.models import Lead
+                            lead = Lead(
+                                kind=intel.ref.kind,
+                                ref=intel.ref.ref,
+                                sector_id=intel.ref.sector_id,
+                                origin_sector=self.state.ships[player.ship_id].sector_id,
+                                source_species=sp.roster_id,
+                                summary=intel.summary(),
+                            )
+                            player = self.state.players[player_id] = dataclasses.replace(
+                                player, leads=player.leads + (lead,))
         return ()
 
     # --- sim dials -----------------------------------------------------------
