@@ -119,7 +119,6 @@ class PlaytestService:
         self._apply_dials(species_id)
         view = session.contact_view(self.state, player_id, species_id, self._config,
                                     active_context, active_subject)
-        view = self._with_regreet(view)  # the dev-only re-greet affordance (dropped from the game)
 
         # Debug: Compute active context and matched "when" clause
         shown = (active_context if (active_context in dialogue._PEACEFUL_CONTEXTS
@@ -162,17 +161,6 @@ class PlaytestService:
 
         return self._force(view) if self.force_enable else view
 
-    @staticmethod
-    def _with_regreet(view: dto.ContactDTO) -> dto.ContactDTO:
-        """Add the play-test-only Regreet verb (re-rolls the greeting to audition variants).
-
-        It rides the derived menu on a plain node; on a branching node (where the derived verbs
-        aren't rendered) it is also surfaced as a floor row, so Regreet is always reachable —
-        by click and by its `h` shortcut — while play-testing.
-        """
-        regreet = dto.ContactVerbDTO("hail", "Regreet", kind="say", context="greeting")
-        floor = [regreet, *view.floor_verbs] if view.choices else view.floor_verbs
-        return dataclasses.replace(view, verbs=[regreet, *view.verbs], floor_verbs=floor)
 
     def apply(self, player_id: int, command: object) -> tuple[object, ...]:
         # Only `Converse` matters for dialogue: advance the recency ring so repeats rephrase.

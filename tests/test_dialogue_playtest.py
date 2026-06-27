@@ -49,24 +49,6 @@ def test_contact_view_resolves_for_every_species_and_band() -> None:
             assert view.standing == expected, (sid, band, view.standing)
 
 
-def test_harness_adds_a_regreet_verb_the_game_drops() -> None:
-    svc = _service()
-    view = svc.contact_view(svc.pid, svc.current)
-    regreet = next((v for v in view.verbs if v.key == "hail"), None)
-    assert regreet is not None and regreet.label == "Regreet"
-    assert regreet.kind == "say" and regreet.context == "greeting"
-
-
-def test_regreet_is_a_floor_row_on_a_branching_node() -> None:
-    svc = _service()
-    for sid in svc.species_ids:  # a branching species surfaces Regreet as a floor row
-        view = svc.contact_view(svc.pid, sid)
-        if view.choices:
-            assert any(v.key == "hail" and v.label == "Regreet" for v in view.floor_verbs)
-            break
-    else:  # pragma: no cover - the corpus always ships at least one branch node
-        raise AssertionError("no branching species found in the corpus")
-
 
 def test_force_enable_makes_every_verb_and_choice_selectable() -> None:
     svc = _service()
@@ -220,8 +202,13 @@ async def test_say_verb_records_history_and_backspace_backtracks() -> None:
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
         assert app.screen._history == ()
-        await pilot.press("h")  # Greet — a Say verb, view-only navigation
+        # Open subject picker (Ask about... is 1)
+        await pilot.press("1")
         await pilot.pause()
+        # Click the first subject in the picker
+        await pilot.click("SubjectPickerScreen ClickableEntry")
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
         assert app.screen._history == (("greeting", None),)
         await pilot.press("backspace")
         await pilot.pause()
@@ -234,7 +221,11 @@ async def test_back_row_is_clickable() -> None:
     app = PlaytestApp(svc)
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
-        await pilot.press("h")  # navigate so a Back row appears
+        # Open subject picker (Ask about... is 1)
+        await pilot.press("1")
+        await pilot.pause()
+        # Click the first subject in the picker
+        await pilot.click("SubjectPickerScreen ClickableEntry")
         await pilot.pause()
         assert app.screen._history == (("greeting", None),)
         back = next(w for w in app.screen.query(ClickableEntry) if w._dest == "back")
