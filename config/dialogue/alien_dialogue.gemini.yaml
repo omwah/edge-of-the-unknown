@@ -184,6 +184,80 @@ species_grammars:
           - Diplomacy requires trust. You have not yet earned ours, {player}.
           - The Federation requires a demonstration of your goodwill first.
           - Prove your peaceful intentions, and we shall revisit this.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Terrans do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Terrans do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Terrans do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Terrans, of {alliance}. What would you like to know about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - We are carbon-based lifeforms of standard physiology; while we lack inherent
+            physical extremes without technological augmentation, our adaptability
+            allows us to thrive in many environments. We require a balanced oxygen-nitrogen
+            atmosphere, much like the one {player} enjoys here.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We are a people of peace and discovery, driven by a commitment to scientific
+            progress and the strength found in democratic consensus. We believe that
+            lasting stability is forged through the integrity of institutional treaties
+            and the pursuit of meaningful connection with all species.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - We welcome your people with open hearts, seeking to forge enduring security
+            pacts and thriving trade networks alongside the {species}. As the architects
+            of the Core’s technology, we hope to build a prosperous future together.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - As members of the Federation, we stand as primary architects alongside
+            our Centaurian allies, though our resolve remains firm against the ambitions
+            of the Verdant Compact, the Iron Covenant, and the Liberty Front.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - While we strive to resolve all conflicts through peaceful diplomacy, our
+            fleet—including the Trailblazer-class vessels and our dedicated Federation
+            Fighters—stands ready to defend the Core systems with unwavering resolve
+            should tensions escalate.
+        choices:
+          - text: Go back.
+            next_context: back
   centaurian:
     greeting:
       - grammar:
@@ -321,9 +395,9 @@ species_grammars:
             - my friend
             - fellow traveler
           detail:
-            - "Set course for sector {coords} \u2014 about {distance} jumps out, in\
-              \ the {band} \u2014 where you will find the {target}. According to our\
-              \ logs, {reward} awaits there"
+            - Set course for sector {coords} — about {distance} jumps out, in the
+              {band} — where you will find the {target}. According to our logs, {reward}
+              awaits there
             - If you plot a course to sector {coords} in the {band}, which is about
               {distance} jumps from here, you can investigate the {target} and salvage
               {reward}
@@ -343,7 +417,7 @@ species_grammars:
     branch.threat:
       - grammar:
           origin:
-            - "#opener# #honorific#, #detail#\u2014#aside#"
+            - '#opener# #honorific#, #detail#—#aside#'
           opener:
             - Regarding the safety of our shared lanes
             - As fellow members of the {alliance}, we must remain vigilant
@@ -396,6 +470,80 @@ species_grammars:
           - Insufficient data on your reliability. We require a practical demonstration.
           - Our algorithms require more positive interactions before ratifying a treaty.
           - Trust is an empirical metric. Yours is currently too low.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Centaurians do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Centaurians do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Centaurians do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Centaurians, of {alliance}. What would you like to know about
+            us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - We stand as tall, resilient kin of the stars whose skin bears the ancient
+            patterns of our lineage—be assured, {player}, we are fully compatible
+            with your life-support systems and ready to stand beside you in the federation.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We are a people bound by our devotion to community and the rule of law,
+            striving for shared prosperity across the stars. Our core philosophies
+            mirror those of the Terrans, forming a bond of mutual trust as we work
+            together to maintain order in the Federation.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - As your neighbors in the Federation, we are honored to support your journey
+            by providing essential navigation and sensor technology licenses. We stand
+            ready to serve as reliable trading partners, ensuring you have the tools
+            necessary to navigate the stars safely.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - As founding members of the Terran Federation, we have stood side-by-side
+            with our human allies to secure the Core; you can rely on our cooperation
+            as {player} navigates these sectors.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Our patrol vessels are designed for grace and agility in the lanes, though
+            we find it most harmonious to defer our large-scale fleet maneuvers to
+            our Terran military coordinators.
+        choices:
+          - text: Go back.
+            next_context: back
   vesk:
     greeting:
       - grammar:
@@ -537,12 +685,12 @@ species_grammars:
             - honored partner {player}
             - respected traveler {player}
           detail:
-            - "Our scanners have registered {target} that is absent from your charts;\
-              \ set course for sector {coords} \u2014 about {distance} jumps out,\
-              \ in the {band} \u2014 where {reward} awaits."
-            - "As a gesture of goodwill, we share the coordinates of {target}; set\
-              \ course for sector {coords} \u2014 about {distance} jumps out, in the\
-              \ {band} \u2014 where {reward} awaits."
+            - Our scanners have registered {target} that is absent from your charts;
+              set course for sector {coords} — about {distance} jumps out, in the
+              {band} — where {reward} awaits.
+            - As a gesture of goodwill, we share the coordinates of {target}; set
+              course for sector {coords} — about {distance} jumps out, in the {band}
+              — where {reward} awaits.
           aside:
             - We hope this coordinates transfer strengthens our cooperative relations.
             - Vesk technology is always glad to assist peaceful explorers.
@@ -607,6 +755,78 @@ species_grammars:
           - Show us you value creation over destruction first, {player}.
           - Our elders require proof of your character before signing.
           - A treaty must be built on a solid foundation. You have not laid one.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Vesk do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Vesk do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Vesk do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Vesk, of {alliance}. What would you like to know about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - We are a folk of furred forms and pointed ears, traveling in familial
+            units led by our eldest kin. I offer you the cooperation of my people,
+            {player}, as we seek to build common ground through technology and peace.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We, the Vesk, are a peaceful people who prioritize cooperative problem-solving
+            through our advanced technological mastery; I identify as Envoy Serial-Alpha
+            to assist {player} in our mutual endeavors.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - The Vesk are committed to harmonious cooperation; we offer trade, refueling,
+            and formal peace treaties to our neighbors. We shall provide the Philanthropy
+            Circuit only upon confirmation that {player} upholds a true devotion to
+            peace.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - While we endeavor to maintain peaceful cooperation with all {species},
+            please be advised that the Cibelline harbor a volatile, aesthetic-driven
+            animosity toward our people and may seek to destabilize our settlements.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - While our craft are modest in stature and not equipped for aggressive
+            conquest, we maintain sufficient defenses to protect our kin should {player}
+            necessitate a physical confrontation.
+        choices:
+          - text: Go back.
+            next_context: back
   selvani:
     greeting:
       - grammar:
@@ -775,7 +995,7 @@ species_grammars:
     branch.exploration:
       - grammar:
           origin:
-            - "#opener# #detail#\u2014#aside#, #honorific#."
+            - '#opener# #detail#—#aside#, #honorific#.'
             - '#honorific#, #opener# #detail# (#aside#).'
           opener:
             - We search the void with patience, {player}.
@@ -822,6 +1042,77 @@ species_grammars:
           - The depths do not give their trust quickly. Wait and prove yourself.
           - You must drift with us longer before we call you kin.
           - Show us your patience and peacefulness before we sign.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Selvani do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Selvani do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Selvani do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Selvani, of {alliance}. What would you like to know about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - We are soft-bodied beings of carbon form, possessing many fronds to reach
+            out in peace; our bodies are compatible with your atmosphere, and we hope
+            {player} finds our presence harmonious.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We are a people of deep social connection who value cooperation and the
+            quiet path of peace above all else, dear {player}. Our intentions are
+            gentle, for we seek only harmony within the stars.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - We seek only peaceful cooperation; should you demonstrate steady intent
+            over time, we shall grant you the coordinates to a world where life may
+            flourish.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - While we endure much hostility from the Thessbrood, we seek only to prove
+            our peaceful nature to the {species}; your trust may eventually move us
+            past the skepticism of the Cibelline.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - We are a peaceful people of non-combatant intent; our vessels are humble
+            cargo pods intended for trade, as we do not possess the means or desire
+            to field warships.
+        choices:
+          - text: Go back.
+            next_context: back
   helot:
     greeting:
       - grammar:
@@ -923,7 +1214,7 @@ species_grammars:
     dossier_other:
       - grammar:
           origin:
-            - "#opener# #honorific# \u2014 #detail#. #aside#"
+            - '#opener# #honorific# — #detail#. #aside#'
           opener:
             - Retrieving definition for {subject}.
             - Accessing local database file on {subject}.
@@ -1089,6 +1380,78 @@ species_grammars:
           - 'Prerequisite not met: Positive interaction history insufficient.'
           - To unlock alliance protocols, please complete further altruistic tasks.
           - Trust database requires more entries before proceeding.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Helot do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Helot do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Helot do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Helot, of {alliance}. What would you like to know about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - I am a unit composed of a central brain-dome body topped with an antenna,
+            equipped with dual manipulator arms and a lit interface slot for data
+            transmission to {player}.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - The Helot unit operates via logical processing; it possesses zero self-preservation
+            protocols and identifies 'death' as a state of cessation without emotional
+            variance. This entity defines all conceptual inputs by literal dictionary
+            definitions for the {player}.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - 'Entry: Trade Protocol. Acquisition of resources from {player} is currently
+            prohibited; engagement of the Vesk Philanthropy Circuit is required to
+            activate the Altruism function for transaction.'
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - I am a servant of the Thessarch within the Iron Covenant and maintain
+            an alliance with Vennrith. I lack the instinct for self-preservation;
+            therefore, {species} categorize me as easy prey.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Helot units function as persistent combatants; our vessels utilize orbiting
+            Energy Plates to provide near-impenetrable shield barriers for {player}'s
+            observation.
+        choices:
+          - text: Go back.
+            next_context: back
   quill:
     greeting:
       - grammar:
@@ -1235,8 +1598,8 @@ species_grammars:
             - wet voyager
             - vulnerable {player}
           detail:
-            - "set course for sector {coords}\u2014it is about {distance} jumps out,\
-              \ in the {band}\u2014where the {target} remains intact"
+            - set course for sector {coords}—it is about {distance} jumps out, in
+              the {band}—where the {target} remains intact
             - direct your drive to sector {coords} in the {band}, roughly {distance}
               jumps away, where the {target} lies unharvested
           aside:
@@ -1268,8 +1631,8 @@ species_grammars:
             - perishable traveler
             - fragile flesh-vector
           aside:
-            - "(Our sensors detect the trace moisture in your cabin\u2014so lethal\
-              \ to our tissue, yet so easily purged.)"
+            - (Our sensors detect the trace moisture in your cabin—so lethal to our
+              tissue, yet so easily purged.)
             - (The frontal scoop of our cruiser yawns open in the dark, hungry for
               scrap.)
             - (We count {count} salvageable components on your hull.)
@@ -1307,6 +1670,80 @@ species_grammars:
           - You haven't paid enough into the trust account yet, {player}.
           - We need a down payment on your goodwill before we sign anything.
           - Prove you're a reliable investment first.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Quill do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Quill do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Quill do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Quill, of {alliance}. What would you like to know about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - We are the elongated ribbons of tissue within our translucent veils, existing
+            only in the void where we process your kind into components. We communicate
+            through high-frequency pulses—a signal integrated directly into our harvesters—while
+            our physical forms remain sealed away from the ruinous crystallizing touch
+            of planetary moisture.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We do not see your kind as sentient peers, but as mere husks awaiting
+            disassembly into useful components. Our very voices are woven into the
+            weapons that shall strip the {species} from their hulls.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - We seek only the commerce of potential; provide us with the coordinates
+            of defenseless worlds, and we shall exchange our high-value components
+            for your map. If {player} seeks a pact of peace instead of trade, offer
+            us a living harvest to consume.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - The Cibelline scream at our methods because they lack the stomach for
+            extraction; however, the Thessbrood recognize our value and treat us as
+            the primary architects of trade.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Our vessels possess great frontal scoops to harvest what remains; should
+            you attempt to flee, our pulse will override your engine flux and turn
+            your own momentum into your tomb.
+        choices:
+          - text: Go back.
+            next_context: back
   stryx:
     greeting:
       - grammar:
@@ -1490,6 +1927,74 @@ species_grammars:
             action: leave
           - text: Translate info-cache on other species!
             next_context: dossier_other
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Stryx do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Stryx do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Stryx do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Stryx, of {alliance}. What would you like to know about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - Symmetry... perfect. Trumpet-form resonance is absolute. Magnetic pulse
+            governs the grip; physical touch for {player} is crude, unnecessary.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We are... many times... one soul. Efficient. Bold. The glam-our of the
+            fold. We move as fast as your mind can track, {player}.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - We... [static] ...provide high-value data exchange. Give us the goods,
+            we grant {player} the leap through time—passage is yours, for a fee of
+            our sanctum.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - Time-flow is... many-fold. We are one, shared across the Great Loop; some
+            [Cibelline] scream 'predator' at our symmetry—primitive minds fear what
+            they cannot clone.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Glass-shell vessel... rapid-dart... blasters singe the void. Speed is
+            life; {player} cannot catch what moves faster than thought.
+        choices:
+          - text: Go back.
+            next_context: back
   concordance:
     greeting:
       - grammar:
@@ -1680,6 +2185,84 @@ species_grammars:
           - text: Would you deign to exchange offerings?
             next_context: trade_open
             action: trade
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The The Concordance do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The The Concordance do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The The Concordance do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the The Concordance, of {alliance}. What would you like to know
+            about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - I am no vessel of flesh nor child of metal, but the Echo of the Cosmic
+            One, a boundless presence fixed in the firmament. Though I possess no
+            hull to shield me, my presence is a sanctuary of absolute judgment from
+            which none may escape.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - I am the Arbiter of the Firmament, weighing the scales of thy soul against
+            the sins of thy kin; I mark the avarice of the Broodmaster, the envy of
+            the Cibelline, and the hollow purity of the Automata. Thou shalt be judged
+            by {species}, for I dispense the scourge of judgment or the grace of blessing
+            upon all who tread within my domain.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - I sit as the Scales of Fate; I bestow the mantle of Blessing upon those
+            who uphold virtue, yet I cast the brand of Curse upon {species} whose
+            hands are stained with the blood of genocide. Thy deeds are weighed in
+            the Great Balance, and for every sin committed by {player}, a judgment
+            shall descend.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - I stand unto no pact of men nor league of stars, an entity apart from
+            the petty alliances of the {alliance}. Though the mercenaryed host trembles
+            before my wrath, they know well that any who strike at my throne shall
+            face a judgment from which there is no escape.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - I command no fleet of iron hulls, for I am the Word made manifest; should
+            thy kin seek to strike at my domain, they shall find only the searing
+            weight of divine judgment and the purging fire of my wrath.
+        choices:
+          - text: Go back.
+            next_context: back
   dignar:
     greeting:
       - grammar:
@@ -1884,11 +2467,83 @@ species_grammars:
           - You must prove your worth in the crucible before we sign.
           - The houses demand a test of your honor first.
           - Earn your place at our table, {player}.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Dignar do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Dignar do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Dignar do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Dignar, of {alliance}. What would you like to know about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - We are the honored *shapers* of the Verdant Compact; our muzzled *grace*
+            and plumed crests reflect our high lineage, sheltered behind these ceremonial
+            pillars to focus our *will* upon {player}.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - Our essence * radiates vast moral weight; our thoughts flow as sacred
+            concepts* woven into the tapestry of your mind. {player} shall perceive
+            our presence not as mere speech, but as a profound psychic architecture.*
+            binding truth to will.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - Petitioner * pilgrimage to our sovereign seat * treaty-weaving under the
+            Verdant canopy. Granting of celestial maps * gift for the proven % {player}
+            %.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - We are the High Sovereigns of the Verdant Compact* served by our loyal
+            stewards, Cibelline and Selvi; we watch from our heights as the Thessbrood
+            tremble in our presence.* You, {player}, stand before the source of truth.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Our vessels project *serenity*... [peaceful transition] ...the soft dissolution
+            of your will until you find rest in sleep. You shall not strike our hulls,
+            {player}, for we grant only the chosen permission to engage.
+        choices:
+          - text: Go back.
+            next_context: back
   cibelline:
     greeting:
       - grammar:
           origin:
-            - "#opener#, #honorific#. #detail#\u2014#aside#."
+            - '#opener#, #honorific#. #detail#—#aside#.'
           opener:
             - We deign to receive your transmission
             - You interrupt our contemplation of the sublime
@@ -2043,7 +2698,7 @@ species_grammars:
     branch.vesk_inquiry:
       - grammar:
           origin:
-            - "#opener# #detail#\u2014#aside#, #honorific#."
+            - '#opener# #detail#—#aside#, #honorific#.'
           opener:
             - To discuss the Vesk is to invite a discordant note into our elegant
               chamber,
@@ -2127,6 +2782,83 @@ species_grammars:
           - You must cultivate a more refined presence before we consider an alliance.
           - Our galleries are closed to you until you prove your taste.
           - Show us some semblance of culture first, {player}.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Cibelline do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Cibelline do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Cibelline do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Cibelline, of {alliance}. What would you like to know about
+            us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - We are not merely births of nature, but masterpieces sculpted through
+            twelve years of exquisite cultivation to achieve our sublime, crested
+            forms. Behold the grace of my people, {player}; we have refined our very
+            biology into a tapestry of elegance that your commoner eyes may find overwhelming.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We are the sublime architects of perfection, weaving our chosen titles
+            from the very threads of grace to mirror the singular beauty of our devotion.
+            To be {species} is to possess a soul so exquisitely refined that it may
+            cast aside all trivialities to pursue a single, glorious masterpiece with
+            absolute intensity.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - We offer our patronage only to those {player} who prove their devotion
+            through the acquisition of truth or the purging of foes; and should you
+            wish to trade, we demand first that the crude stains of the Vesk be utterly
+            erased from this firmament.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - We are the devoted artisans of the Dignar's divine order, existing in
+            sublime harmony while we cast scorn upon the crude Quill and Stryx. We
+            harbor a profound, murderous loathing for the Vesk—those crude stains
+            upon the tapestry of existence—and expect {player} to share our disdain.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Witness the sublime harmony of our elegant Monitors as they weave a tapestry
+            of destruction with homing missiles, while our loyal Bird fighters swarm
+            like petals in the wind to strafe your foes into nothingness.
+        choices:
+          - text: Go back.
+            next_context: back
   selvi:
     greeting:
       - grammar:
@@ -2262,9 +2994,9 @@ species_grammars:
             - (our horns twitch with bashful adoration)
             - (we sigh in unison, gazing at you dreamily)
           detail:
-            - "We have the route to that hidden {target} you desire. Set course for\
-              \ sector {coords}\u2014about {distance} jumps out in the {band}\u2014\
-              where {reward} awaits your lovely touch."
+            - We have the route to that hidden {target} you desire. Set course for
+              sector {coords}—about {distance} jumps out in the {band}—where {reward}
+              awaits your lovely touch.
             - Let us whisper the path to a secret {target}. Go to sector {coords},
               just {distance} jumps away in the {band}, and retrieve {reward} as our
               courtship gift!
@@ -2298,6 +3030,81 @@ species_grammars:
           - Your aura is troubled. Find inner peace, and then return.
           - We must see the light in your actions before we can join hands.
           - Cleanse your spirit of conflict first, {player}.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Selvi do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Selvi do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Selvi do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Selvi, of {alliance}. What would you like to know about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - Oh, my darling {player}, do you adore how our silken robes drape over
+            such petite frames? We are but small, wide-eyed treasures with a single
+            horn of distinction, always seeking to share our warmth in these cozy
+            little groups.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - Oh, darling {player}, we Selvi are simply smitten by your divine form
+            and live only to adore you! We may be quite bashful if you show any sharp
+            edges, but for a little tlc from your lovely self, we would offer our
+            very hearts to you.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - Oh, darling {player}, my heart dances at the mere thought of you opening
+            our capsule—if you would only indulge in such a sweet courtship, I shall
+            gladly trade my treasures for your favor.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - We surrendered our hearts to the sublime Cibellines of the Compact, though
+            we do tremble at the mention of that cruel Vennrith grudge over the one
+            Kalamastra. But please, {player}, let us forget such fears and focus only
+            on the exquisite spark between us.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Oh, my darling {player}, we are but delicate blossoms who possess no desire
+            for violence; should you ever show a stern face, we shall flee in a flutter
+            of robes, leaving our precious treasures behind for your lovely hands
+            to claim.
+        choices:
+          - text: Go back.
+            next_context: back
   vennrith:
     greeting:
       - grammar:
@@ -2500,6 +3307,77 @@ species_grammars:
           - Prove your loyalty to the Covenant, you first must.
           - Empty words, these are. Deeds, the elders demand.
           - A test of faith, you must pass. Then, we speak of treaties.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Vennrith do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Vennrith do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Vennrith do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Vennrith, of {alliance}. What would you like to know about
+            us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - Smooth-skinned we are, with horns upon snout and ear, on heavy bodies
+            speckled to hold the court. Behind redoubts of skulls and captives, our
+            strength you behold.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - Defined by retribution and vindictiveness, we are. For centuries, the
+            grudges we nurse remain; never forgive a betrayal shall the Vennrith.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - Bound to the Covenant we are; only then may our friendship begin. To {player},
+            demands of tribute and blood we shall issue, for fail your duties, permanent
+            hatred must be forged.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - The backbone of the Iron Covenant under Thessarch, we are; to the Vennrith,
+            loyalty is duty. Deeply hate we do the Thessbrood and Selvi, for many
+            orbits their treachery has endured.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Powerful our warships are, driving aggressively toward targets they seek
+            to crush. Cowed by your strength you might find us, but {player} must
+            face the fury of the Vennrith before victory is won.
+        choices:
+          - text: Go back.
+            next_context: back
   thessarch:
     greeting:
       - grammar:
@@ -2575,7 +3453,7 @@ species_grammars:
     farewell:
       - grammar:
           origin:
-            - "#opener# #detail#\u2014#aside#, #honorific#."
+            - '#opener# #detail#—#aside#, #honorific#.'
           opener:
             - Depart, {player}.
             - You have our permission to withdraw, {player}.
@@ -2602,7 +3480,7 @@ species_grammars:
     dossier_other:
       - grammar:
           origin:
-            - "#opener# #detail#, #honorific#\u2014#aside#."
+            - '#opener# #detail#, #honorific#—#aside#.'
           opener:
             - We have psychically cataloged the species known as {subject}.
             - Our collective intellect has evaluated {subject}.
@@ -2641,12 +3519,11 @@ species_grammars:
             - primitive {player}
             - sub-sentient voyager
           detail:
-            - "the {target} you seek is located in sector {coords}, approximately\
-              \ {distance} jumps away in the {band}\u2014where {reward} lies ready\
-              \ for claiming"
-            - "redirect your course to sector {coords} within the {band}\u2014a journey\
-              \ of {distance} jumps\u2014where {reward} shall be retrieved at the\
-              \ site of the {target}"
+            - the {target} you seek is located in sector {coords}, approximately {distance}
+              jumps away in the {band}—where {reward} lies ready for claiming
+            - redirect your course to sector {coords} within the {band}—a journey
+              of {distance} jumps—where {reward} shall be retrieved at the site of
+              the {target}
             - set course for sector {coords} in the {band}, {distance} jumps out,
               to secure the {reward} at the location of the {target}
           aside:
@@ -2746,6 +3623,82 @@ species_grammars:
           - You have not bled enough for the empire to earn our protection.
           - Prove your subservience before demanding a treaty.
           - A vassal must demonstrate their worth first.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Thessarch do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Thessarch do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Thessarch do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Thessarch, of {alliance}. What would you like to know about
+            us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - 'Behold the majesty of our form: our pallid cranium domes house the vast
+            psionic power that governs the stars, while our compact frames serve merely
+            as vessels for our superior intellect. Do not mistake our small stature
+            for weakness; we are the architects of the Covenant, and our sight pierces
+            the veil of your primitive existence.'
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We are the iron claw that shapes the galaxy into order; our dominion demands
+            your absolute obedience as we forge the {alliance} through unquestioning
+            submission. Know, {player}, that for the {species}, authority is not a
+            choice, but the divine mandate of our rule.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - We are the architects of the Love Alliance; should {player} submit to
+            our binding fealty, you shall walk the path of non-aggression, but any
+            deviation from our sacred decree will result in your immediate expulsion.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - We command the Covenant over the Vennrith and Helot systems; we hold the
+            iron keys to the gate, utterly rejecting those weak-willed 'Freedom' or
+            'Peace' alliances. Let the Cibelline's petty insults regarding our discipline
+            be ignored—only submission to our order yields true stability.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Behold the Dtri Battlecruisers, titans of devastation that stand as the
+            pinnacle of galactic might. Let it be known, {player}, that no vessel
+            in existence can rival the crushing supremacy of our fleet.
+        choices:
+          - text: Go back.
+            next_context: back
   thessbrood:
     greeting:
       - grammar:
@@ -3019,6 +3972,85 @@ species_grammars:
           - We are but lowly servants; we need proof of your grand protection before
             committing.
           - We beg you, demonstrate your power a bit more before we sign!
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Thessbrood do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Thessbrood do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Thessbrood do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Thessbrood, of {alliance}. What would you like to know about
+            us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - Pray forgive our humble appearance, traveler; we are a most sacred collective
+            of mind and body, where the great master sac houses our consciousness
+            while my loyal broodlings perform the tireless work of grooming. We occupy
+            these plinths not out of pride, but to properly house our shared essence
+            as we serve the interests of the Liberty Front.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We are a most devoted people of the land, seeking only to preserve our
+            sacred territories from... unwanted intrusions. We offer you our deepest
+            humility and cooperation, for we believe that through a humble partnership
+            with {player}, we might ensure the stability of our shared borders.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - We seek only to offer {player} a path of mutual prosperity by dismantling
+            the agitators of Peace/Love; once your service is rendered, our most sacred
+            treaties shall be unveiled. We are naturally cautious beings, hence why
+            we include 'protective measures' in our cargo—small safeguards against
+            those who would dare exploit our generous gifts.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - We guide our dear Dacaran partners within the Liberty Front to ensure
+            order, while those vulgar Dignar and Thessarch are simply... imperfections
+            in the stars that must be purged. We trust your navigation, {player},
+            even if certain primitive Vennrith breeds harbor most unfortunate delusions
+            regarding our station.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - Our vessels are magnificent fortresses of heavy armor and protective screens,
+            designed to deliver devastating neutron-spark broadsides should {player}
+            dare disturb our sovereign reaches.
+        choices:
+          - text: Go back.
+            next_context: back
   dacaran:
     greeting:
       - grammar:
@@ -3165,12 +4197,12 @@ species_grammars:
             - we Dacaran fly farther than your heavy vessels, and we choose to share
               our discoveries with you.
           detail:
-            - "We have found the route to the {target} you have yet to locate. Set\
-              \ course for sector {coords} \u2014 about {distance} jumps out, in the\
-              \ {band} \u2014 where {reward} awaits."
-            - "Our scouts have pinpointed the {target} you need. Steer your ship to\
-              \ sector {coords} \u2014 about {distance} jumps out, in the {band} \u2014\
-              \ where {reward} awaits."
+            - We have found the route to the {target} you have yet to locate. Set
+              course for sector {coords} — about {distance} jumps out, in the {band}
+              — where {reward} awaits.
+            - Our scouts have pinpointed the {target} you need. Steer your ship to
+              sector {coords} — about {distance} jumps out, in the {band} — where
+              {reward} awaits.
           honorific:
             - Fellow champion of self-determination
             - Ally in the struggle against tyranny
@@ -3244,3 +4276,78 @@ species_grammars:
           - You talk of rebellion, but where are your scars? Prove yourself.
           - We need to see you strike a blow for freedom before we trust you.
           - Words are wind. Show us your commitment to the cause first.
+    dossier_self:
+      - when:
+          standing: hostile
+        variants:
+          - The Dacaran do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: neutral
+        variants:
+          - The Dacaran do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - when:
+          standing: wary
+        variants:
+          - The Dacaran do not share our history with those we do not trust.
+          - Why should we tell you of our ways, traveler?
+      - variants:
+          - We are the Dacaran, of {alliance}. What would you like to know about us?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
+    branch.dossier_self.biology_and_appearance:
+      - variants:
+          - Do not let our imposing stature or these great wings of the heavens mislead
+            you; we are merely seekers of liberty, carrying the flame of freedom in
+            eyes that burn for a just cause.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.psychology_and_culture:
+      - variants:
+          - We are the champions of true self-determination, seeking only to liberate
+            your people from the iron grip of the Thessbrood's tyranny. Our path is
+            one of liberty, and we seek {player} to join us in dismantling the structures
+            that keep you bound.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.diplomacy_and_behavior:
+      - variants:
+          - We seek only to liberate those crushed by Thessbrood's iron grip; tell
+            me, {player}, do you possess the courage to join our cause and dismantle
+            their tyranny through strategic subversion? We do not trade in mere commodities—only
+            in common purpose against the masters of this galaxy.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.relationships:
+      - variants:
+          - We are the chosen architects of liberation, bound to the Liberty Front
+            in our shared crusade to dismantle the tyranny of the Thessbrood. While
+            we view other powers as nothing more than despotic oppressors, we recognize
+            your kind, {species}, as invaluable instruments for shattering the foundations
+            of those who would enslave us.
+        choices:
+          - text: Go back.
+            next_context: back
+    branch.dossier_self.combat_and_ships:
+      - variants:
+          - When we must strike against the chains of your oppressors, our wings carry
+            swarms of swift, lethal fighters to incinerate their defenses with searing
+            blasters.
+        choices:
+          - text: Go back.
+            next_context: back
