@@ -1525,6 +1525,8 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
     if choice.action == "accept_lead":
         return _accept_lead(state, player_id, AcceptLead(cmd.species_id), config)
     target = "farewell" if choice.action == "farewell" else (choice.next_context or cmd.context)
+    if target == "back":
+        return ReduceResult(events=(), players=())
     extra, t_facts = _intel_bindings(state, player, species, target, config)
     new_player, event = _speak_context(
         state, player, ship, species, target, config, extra=extra, facts=t_facts)

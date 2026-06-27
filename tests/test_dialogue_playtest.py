@@ -232,3 +232,53 @@ async def test_back_row_is_clickable() -> None:
         await pilot.click(back)
         await pilot.pause()
         assert app.screen._history == ()
+
+
+async def test_choice_targets_back_performs_backtrack() -> None:
+    from edge.core.config import DialogueChoice, DialogueLine
+    svc = _service()
+    # Inject a branching node and a choice targeting it under the current species' persona pack
+    persona = svc.state.species[svc.current].persona
+    pack = svc._config.roster.personas[persona]
+    
+    # We will define a branch context: "branch.test_back"
+    # Greeting will have a choice to go to "branch.test_back"
+    pack["greeting"] = [
+        DialogueLine(
+            variants=["Hello"],
+            choices=[
+                DialogueChoice(text="Go to branch", next_context="branch.test_back")
+            ]
+        )
+    ]
+    # "branch.test_back" will have a choice to go "back"
+    pack["branch.test_back"] = [
+        DialogueLine(
+            variants=["Welcome to branch"],
+            choices=[
+                DialogueChoice(text="Go back", next_context="back")
+            ]
+        )
+    ]
+    
+    app = PlaytestApp(svc)
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        assert app.screen._history == ()
+        
+        # Select "Go to branch" (which is option 1 in greeting)
+        await pilot.press("1")
+        await pilot.pause()
+        
+        # Verify we are on "branch.test_back" and history has ("greeting", None)
+        assert app.screen._active_context == "branch.test_back"
+        assert app.screen._history == (("greeting", None),)
+        
+        # Select "Go back" (which is option 1 in branch.test_back)
+        await pilot.press("1")
+        await pilot.pause()
+        
+        # Verify we navigated back to "greeting" and history is empty
+        assert app.screen._active_context == "greeting"
+        assert app.screen._history == ()

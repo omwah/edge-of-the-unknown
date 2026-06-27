@@ -202,7 +202,7 @@ personas:
           - "We have no fresh coordinates for you. Range farther, {player}, and return."
         choices:
           - text: "Thanks for nothing..."
-            next_context: greeting
+            next_context: back
     treaty_offer:
       - variants:
           - "A lasting peace between us? The {species} will consider it."

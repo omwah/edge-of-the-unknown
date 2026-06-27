@@ -362,8 +362,16 @@ class AlienContactScreen(Screen):
             self._reopen()
             return
         if choice.next_context:
-            self._history = (*self._history, (self._active_context, self._active_subject))
-            self._active_context, self._active_subject = choice.next_context, None
+            if choice.next_context == "back":
+                if self._history:
+                    *rest, prev = self._history
+                    self._history = tuple(rest)
+                    self._active_context, self._active_subject = prev
+                else:
+                    self._active_context, self._active_subject = "greeting", None
+            else:
+                self._history = (*self._history, (self._active_context, self._active_subject))
+                self._active_context, self._active_subject = choice.next_context, None
         self._reopen()
 
     def _dispatch(self, key: str) -> None:

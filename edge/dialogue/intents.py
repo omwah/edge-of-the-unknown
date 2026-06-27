@@ -110,5 +110,5 @@ def allowed_placeholders(context: str) -> frozenset[str]:
 
 
 def is_known_context(context: str) -> bool:
-    """Whether `context` is in the closed vocabulary, a `sig.*`, or a `branch.*` namespace."""
-    return context in INTENTS or context.startswith("sig.") or context.startswith(BRANCH_PREFIX)
+    """Whether `context` is in the closed vocabulary, a `sig.*`, a `branch.*` namespace, or is 'back'."""
+    return context in INTENTS or context.startswith("sig.") or context.startswith(BRANCH_PREFIX) or context == "back"
