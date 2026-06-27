@@ -309,6 +309,8 @@ def _branch_closure(chain: Sequence[DialoguePack], base: frozenset[str]) -> set[
             for entry in pack.get(ctx, []):
                 for choice in entry.choices:
                     nxt = "farewell" if choice.action == "farewell" else choice.next_context
+                    if nxt == "back":
+                        continue
                     if nxt and nxt not in seen:
                         seen.add(nxt)
                         frontier.append(nxt)
