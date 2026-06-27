@@ -120,6 +120,46 @@ class PlaytestService:
         view = session.contact_view(self.state, player_id, species_id, self._config,
                                     active_context, active_subject)
         view = self._with_regreet(view)  # the dev-only re-greet affordance (dropped from the game)
+
+        # Debug: Compute active context and matched "when" clause
+        shown = (active_context if (active_context in dialogue._PEACEFUL_CONTEXTS
+                                    or active_context.startswith(dialogue.BRANCH_PREFIX))
+                 else "greeting")
+        representative = session._representative_by_kind(self.state)
+        sp = self.state.species[species_id]
+        others = [
+            rep for rid in sorted(self.state.players[player_id].species_attitudes)
+            if rid != sp.roster_id and (rep := representative.get(rid)) is not None
+        ]
+        if shown == "dossier_other" and not others:
+            shown = "greeting"
+
+        player = self.state.players[player_id]
+        ring = player.dialogue_recency.get((sp.roster_id, shown), ())
+        rng = dialogue.encounter_rng(self.state.game.seed, sp.roster_id, shown, ring)
+
+        from edge.dialogue.intel import pick_intel_target
+        intel = pick_intel_target(self.state, player, sp, aliens=self._config.aliens)
+        facts = None
+        if shown == "offer_coordinates":
+            facts = {"has_intel_target": intel is not None}
+
+        entry = dialogue.entry_for(self._config.roster, sp, player, shown,
+                                   aliens=self._config.aliens, rng=rng,
+                                   treaty=self.treaty, facts=facts)
+
+        debug_when_str = ""
+        if entry is not None and entry.when:
+            dumped = entry.when.model_dump(exclude_none=True)
+            if dumped:
+                debug_when_str = ", ".join(f"{k}={v}" for k, v in dumped.items())
+            else:
+                debug_when_str = "catch-all"
+        else:
+            debug_when_str = "catch-all"
+
+        view = dataclasses.replace(view, debug_context=shown, debug_when=debug_when_str)
+
         return self._force(view) if self.force_enable else view
 
     @staticmethod
@@ -316,7 +356,7 @@ class PlaytestApp(App[None]):
         # blank screen, so the tester lands somewhere they can pick another species/band.
         self.push_screen(AlienContactScreen(
             self._svc.contact_view(self._svc.pid, sid), self._svc, self._svc.pid, sid,
-            on_exit=self.action_controls))
+            on_exit=self.action_controls, playtest_mode=True))
 
     def action_controls(self) -> None:
         if isinstance(self.screen, PlaytestControls):

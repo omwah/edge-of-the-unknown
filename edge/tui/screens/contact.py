@@ -130,7 +130,8 @@ class AlienContactScreen(Screen):
                  active_context: str = "greeting", active_subject: int | None = None,
                  pinned_speech: str | None = None,
                  history: tuple[tuple[str, int | None], ...] = (),
-                 on_exit: Callable[[], None] | None = None) -> None:
+                 on_exit: Callable[[], None] | None = None,
+                 playtest_mode: bool = False) -> None:
         super().__init__()
         self._contact = contact
         self._service = service
@@ -149,6 +150,7 @@ class AlienContactScreen(Screen):
         # Backspace backtracking out of a dead-end branch node (§6.7). View-only: stepping back
         # re-renders an earlier node without issuing any command (the Converse already fired).
         self._history = history
+        self.playtest_mode = playtest_mode
 
     def _view(self) -> dto.ContactDTO:
         if self._service is None:
@@ -168,7 +170,8 @@ class AlienContactScreen(Screen):
         self.app.push_screen(AlienContactScreen(
             self._view(), self._service, self._pid, self._species_id,
             active_context=self._active_context, active_subject=self._active_subject,
-            pinned_speech=pinned_speech, history=self._history, on_exit=self._on_exit))
+            pinned_speech=pinned_speech, history=self._history, on_exit=self._on_exit,
+            playtest_mode=self.playtest_mode))
 
     def _break_contact(self) -> None:
         """End the conversation: run the host's exit hook, or pop back to the game by default."""
@@ -200,14 +203,16 @@ class AlienContactScreen(Screen):
                     yield Static(heading, classes="heading")
                     for n, (kind, item) in enumerate(self._menu_items(c), start=1):
                         if kind == "choice":
-                            yield ClickableEntry(self._choice_line(n, item), dest="choice",
+                            yield ClickableEntry(self._choice_line(n, item, self.playtest_mode), dest="choice",
                                                  ref=item.index)
                         else:
-                            yield ClickableEntry(self._numbered_verb_line(n, item), dest="verb",
+                            yield ClickableEntry(self._numbered_verb_line(n, item, self.playtest_mode), dest="verb",
                                                  ref=item.key)
                     if self._history:
                         yield ClickableEntry("  [dim]← Back (Backspace)[/]", dest="back",
                                              classes="derived")
+                    if self.playtest_mode:
+                        yield Static(f"\n  [dim]context = {c.debug_context} | when = {c.debug_when}[/]", classes="derived")
         yield Footer()
 
     def _show_disabled(self) -> bool:
@@ -263,25 +268,46 @@ class AlienContactScreen(Screen):
         return True
 
     @staticmethod
-    def _verb_line(v: dto.ContactVerbDTO) -> str:
+    def _verb_line(v: dto.ContactVerbDTO, playtest_mode: bool = False) -> str:
         # Literal brackets are escaped so Rich shows "[h]" rather than a markup tag.
+        label = v.label
+        if playtest_mode:
+            if v.kind == "say":
+                label = f"{label} [dim](context={v.context})[/]"
+            else:
+                label = f"{label} [dim](action={v.key})[/]"
         if v.enabled:
-            return f"  [b]\\[{v.key}][/] {v.label}"
-        return f"  [dim]\\[{v.key}] {v.label}  ({v.reason})[/]"
+            return f"  [b]\\[{v.key}][/] {label}"
+        return f"  [dim]\\[{v.key}] {label}  ({v.reason})[/]"
 
     @staticmethod
-    def _choice_line(n: int, ch: dto.ContactChoiceDTO) -> str:
+    def _choice_line(n: int, ch: dto.ContactChoiceDTO, playtest_mode: bool = False) -> str:
         # Literal brackets escaped so Rich shows "[1]" rather than a markup tag.
+        text = ch.text
+        if playtest_mode:
+            details = []
+            if ch.next_context:
+                details.append(f"next={ch.next_context}")
+            if ch.action:
+                details.append(f"action={ch.action}")
+            if details:
+                text = f"{text} [dim]({', '.join(details)})[/]"
         if ch.enabled:
-            return f"  [b]\\[{n}][/] {ch.text}"
-        return f"  [dim]\\[{n}] {ch.text}  ({ch.reason})[/]"
+            return f"  [b]\\[{n}][/] {text}"
+        return f"  [dim]\\[{n}] {text}  ({ch.reason})[/]"
 
     @staticmethod
-    def _numbered_verb_line(n: int, v: dto.ContactVerbDTO) -> str:
+    def _numbered_verb_line(n: int, v: dto.ContactVerbDTO, playtest_mode: bool = False) -> str:
         # Numbered verbs (unified Say + Do menu).
+        label = v.label
+        if playtest_mode:
+            if v.kind == "say":
+                label = f"{label} [dim](context={v.context})[/]"
+            else:
+                label = f"{label} [dim](action={v.key})[/]"
         if v.enabled:
-            return f"  [b]\\[{n}][/] {v.label}"
-        return f"  [dim]\\[{n}] {v.label}  ({v.reason})[/]"
+            return f"  [b]\\[{n}][/] {label}"
+        return f"  [dim]\\[{n}] {label}  ({v.reason})[/]"
 
     # --- dispatch ------------------------------------------------------------
 
