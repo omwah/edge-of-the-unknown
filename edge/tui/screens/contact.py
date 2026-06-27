@@ -98,7 +98,6 @@ class AlienContactScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Break contact"),
         Binding("backspace", "back_one", "Back"),
-        Binding("h", "verb('hail')", "Regreet"),  # only ever shown by the play-test harness
         Binding("a", "verb('ask')", "Ask about…"),
         Binding("t", "verb('trade')", "Buy tech"),
         Binding("b", "verb('barter')", "Barter"),
@@ -249,12 +248,11 @@ class AlienContactScreen(Screen):
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         """Show a footer shortcut only when its key would actually do something here (§11).
 
-        A lettered verb (Regreet / Ask about… / Buy tech / Barter / Farewell) dispatches against
+        A lettered verb (Ask about… / Buy tech / Barter / Farewell) dispatches against
         the view's verbs, so its shortcut shows iff that verb is **enabled** in the view — which is
         independent of how the node renders. So an offered Trade still shows on a branching node
-        whose visible rows are authored choices, a refused trade or a not-yet-met Ask vanishes,
-        and Regreet (absent from the game's verbs, injected only by the play-test harness) shows
-        only while play-testing. Back shows only when there is somewhere to step back to.
+        whose visible rows are authored choices, a refused trade or a not-yet-met Ask vanishes.
+        Back shows only when there is somewhere to step back to.
 
         Textual's `active_bindings` drops a binding whose `check_action` is **False** but keeps a
         **None** one greyed, so we return plain bools to make an invalid shortcut vanish entirely.
