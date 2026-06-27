@@ -1496,7 +1496,7 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
     `cmd.context` names the node shown; the reducer re-resolves that node's line (read-only,
     with the same RNG inputs the projection used, so it sees the very choices the player
     did), validates the indexed choice and its `when`, then applies it: an `accept_lead`
-    choice delegates to the lead logger; `attack` is rejected (Phase 3); `farewell` speaks the
+    choice delegates to the lead logger; `attack` is rejected (Phase 3); `leave` speaks the
     parting line; any other choice transitions to its `next_context` (or re-speaks the node
     for a trade/barter gateway, the mechanical effect riding on the follow-up Buy/Barter
     command). Position lives only on the command, so this stays replay-stable.
@@ -1530,7 +1530,7 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
         log_events = lead_result.events
         mutated_player = lead_result.players[0]
 
-    target = "farewell" if choice.action == "farewell" else (choice.next_context or cmd.context)
+    target = "farewell" if choice.action == "leave" else (choice.next_context or cmd.context)
     if target == "back":
         return ReduceResult(events=log_events, players=(mutated_player,))
     extra, t_facts = _intel_bindings(state, mutated_player, species, target, config)

@@ -192,10 +192,10 @@ def test_converse_choice_transitions_to_branch_node() -> None:
     # The branch node then exposes its own replies (a trade gateway + a parting line).
     view = session.contact_view(state, 1, vesk.id, CFG, active_context="branch.vesk_workshop")
     actions = {c.action for c in view.choices}
-    assert "trade" in actions and "farewell" in actions
+    assert "trade" in actions and "leave" in actions
 
 
-def test_converse_choice_farewell_action_speaks_parting_line() -> None:
+def test_converse_choice_leave_action_speaks_parting_line() -> None:
     state = _world()
     vesk = _inject(state, "vesk")
     res = reduce(state, 1, Converse(vesk.id, "greeting", choice_index=1), CFG)  # "Safe travels."

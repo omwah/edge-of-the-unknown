@@ -978,10 +978,10 @@ species_grammars:
       choices:
       - text: I'll keep your secrets, merchant.
         next_context: farewell
-        action: farewell
+        action: leave
       - text: Keep the truth hidden. I'm moving on.
         next_context: offer_coordinates
-        action: farewell
+        action: leave
     dossier_other:
     - grammar:
         origin:

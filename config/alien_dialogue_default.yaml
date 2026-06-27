@@ -311,12 +311,12 @@ personas:
         # Authored branching (§6.7): when a line carries `choices`, the contact screen shows
         # these numbered player replies instead of the derived Say/Do menu. A reply may
         # transition to another context (`next_context`, including a `branch.*` node) and/or
-        # fire a mechanical `action` (farewell / trade / barter / accept_lead).
+        # fire a mechanical `action` (leave / trade / barter / accept_lead).
         choices:
           - text: "Show me what the {species} have built."
             next_context: branch.vesk_workshop
           - text: "Safe travels."
-            action: farewell
+            action: leave
     # An intermediate branch node, reached only from the greeting choice above. It carries a
     # catch-all line (no `when`) so it resolves for any standing, then offers its own replies.
     branch.vesk_workshop:
@@ -330,7 +330,7 @@ personas:
           - text: "Tell me about yourselves."
             next_context: dossier_self
           - text: "Another time."
-            action: farewell
+            action: leave
     trade_open:
       - variants:
           - "The {species} trade gladly. Our circuits and sensors are yours, {player}."

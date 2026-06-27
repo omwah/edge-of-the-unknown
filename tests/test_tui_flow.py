@@ -1104,7 +1104,7 @@ async def test_branching_choices_render_and_drive_transition() -> None:
         assert isinstance(app.screen, AlienContactScreen)
         assert app.screen._active_context == "branch.vesk_workshop"  # type: ignore[attr-defined]
         actions = {c.action for c in app.screen._view().choices}  # type: ignore[attr-defined]
-        assert "trade" in actions and "farewell" in actions
+        assert "trade" in actions and "leave" in actions
 
 
 async def test_log_coordinates_freezes_the_offer_line() -> None:

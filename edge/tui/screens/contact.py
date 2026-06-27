@@ -243,7 +243,7 @@ class AlienContactScreen(Screen):
     @staticmethod
     def _is_farewell(item: tuple[str, object]) -> bool:
         kind, obj = item
-        return obj.action == "farewell" if kind == "choice" else obj.key == "farewell"  # type: ignore[attr-defined]
+        return obj.action == "leave" if kind == "choice" else obj.key == "farewell"  # type: ignore[attr-defined]
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         """Show a footer shortcut only when its key would actually do something here (§11).
@@ -348,7 +348,7 @@ class AlienContactScreen(Screen):
         except Exception as exc:  # core rejected it — surface and stay put
             self.notify(str(exc), timeout=2)
             return
-        if choice.action == "farewell":
+        if choice.action == "leave":
             self._break_contact()  # the parting line was spoken; break contact
             return
         if choice.action == "trade":

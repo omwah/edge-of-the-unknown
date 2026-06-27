@@ -479,7 +479,7 @@ class DialogueChoice(BaseModel):
     A choice carries a templated `text` label (filled with the same `{placeholders}` as the
     spoken line), an optional `next_context` to transition to (any known context key,
     including a reserved `branch.*` node), an optional mechanical `action` (one of
-    `CHOICE_ACTIONS` — farewell / trade / barter / accept_lead / attack; `attack` is
+    `CHOICE_ACTIONS` — leave / trade / barter / accept_lead / attack; `attack` is
     Phase-3-gated), and a `when` predicate gating whether the reply is offered. Conversation
     *position* is not stored in core state: the reducer re-resolves the line for the active
     context and validates the chosen index, so a reply is reproducible from (seed, log).

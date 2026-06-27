@@ -35,7 +35,7 @@ species_grammars:
             next_context: offer_coordinates
           - text: Safe travels, Captain. Signing off.
             next_context: farewell
-            action: farewell
+            action: leave
     trade_open:
       - grammar:
           origin:
@@ -66,7 +66,7 @@ species_grammars:
             action: barter
           - text: I should get going.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -93,7 +93,7 @@ species_grammars:
         choices:
           - text: For the Federation. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Before I go, let's look at the manifest.
             next_context: trade_open
             action: trade
@@ -122,7 +122,7 @@ species_grammars:
             next_context: dossier_other
           - text: Understood. I must be on my way.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Let's discuss trade agreements.
             next_context: trade_open
             action: trade
@@ -213,7 +213,7 @@ species_grammars:
             next_context: offer_coordinates
           - text: Just passing through. Safe travels.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Do you have any diplomatic intelligence on other species?
             next_context: dossier_other
     trade_open:
@@ -246,7 +246,7 @@ species_grammars:
             action: barter
           - text: I must decline for now. Safe travels on the lanes.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -270,10 +270,10 @@ species_grammars:
         choices:
           - text: Thank you. Safe journeys to you as well.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Until next time, citizen.
             next_context: farewell
-            action: farewell
+            action: leave
     dossier_other:
       - grammar:
           origin:
@@ -299,7 +299,7 @@ species_grammars:
             next_context: greeting
           - text: Thank you for your thoughts. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Let's discuss mutual trade.
             next_context: trade_open
             action: trade
@@ -373,7 +373,7 @@ species_grammars:
             action: trade
           - text: Thank you for the warning. I must go.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Do you have any diplomatic intelligence on other species?
             next_context: dossier_other
     treaty_offer:
@@ -428,7 +428,7 @@ species_grammars:
             action: barter
           - text: I must be on my way. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: What data do your technologists have on other species?
             next_context: dossier_other
     trade_open:
@@ -460,7 +460,7 @@ species_grammars:
             action: barter
           - text: I must decline for now. Safe travels.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -486,7 +486,7 @@ species_grammars:
         choices:
           - text: Farewell, Vesk. Safe travels to your family unit.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Actually, show me what you have for sale one last time.
             next_context: trade_open
             action: trade
@@ -523,7 +523,7 @@ species_grammars:
             action: trade
           - text: Thank you for the data update. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
     offer_coordinates:
       - grammar:
           origin:
@@ -584,7 +584,7 @@ species_grammars:
             action: trade
           - text: Thank you. I must take my leave.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: What data do your technologists have on other species?
             next_context: dossier_other
     treaty_offer:
@@ -639,7 +639,7 @@ species_grammars:
             next_context: offer_coordinates
           - text: I must go. Safe travels.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Have you observed any other species nearby?
             next_context: dossier_other
     trade_refuse:
@@ -649,7 +649,7 @@ species_grammars:
         choices:
           - text: I will trouble you no further.
             next_context: farewell
-            action: farewell
+            action: leave
     trade_open:
       - grammar:
           origin:
@@ -679,7 +679,7 @@ species_grammars:
             action: barter
           - text: I must depart.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -703,7 +703,7 @@ species_grammars:
         choices:
           - text: Farewell. I hope our paths cross again in peace.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Before I go, do you have any trade to conduct?
             next_context: trade_open
             action: trade
@@ -739,7 +739,7 @@ species_grammars:
             next_context: dossier_other
           - text: I must depart.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: May we exchange our peaceful trade goods?
             next_context: trade_open
             action: trade
@@ -801,7 +801,7 @@ species_grammars:
             next_context: offer_coordinates
           - text: Safe travels, Selvani.
             next_context: farewell
-            action: farewell
+            action: leave
     treaty_offer:
       - variants:
           - You wish to join your current to ours? The depths are listening.
@@ -850,7 +850,7 @@ species_grammars:
             action: barter
           - text: Never mind. Disconnecting.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Initiate trade transaction.
             next_context: trade_open
             action: trade
@@ -863,7 +863,7 @@ species_grammars:
         choices:
           - text: I will leave you to your calculations.
             next_context: farewell
-            action: farewell
+            action: leave
     trade_open:
       - grammar:
           origin:
@@ -893,7 +893,7 @@ species_grammars:
             action: barter
           - text: Goodbye.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -916,10 +916,10 @@ species_grammars:
         choices:
           - text: Goodbye, Helot. I'll search for that Vesk circuit.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Disconnecting link.
             next_context: farewell
-            action: farewell
+            action: leave
     dossier_other:
       - grammar:
           origin:
@@ -953,7 +953,7 @@ species_grammars:
             next_context: greeting
           - text: I must go.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Initiate trade transaction.
             next_context: trade_open
             action: trade
@@ -1008,7 +1008,7 @@ species_grammars:
             next_context: branch.trade
           - text: I will proceed to other coordinates.
             next_context: farewell
-            action: farewell
+            action: leave
     branch.inquiry:
       - grammar:
           origin:
@@ -1038,7 +1038,7 @@ species_grammars:
             next_context: branch.inquiry
           - text: I will disconnect now.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Initiate trade transaction.
             next_context: trade_open
             action: trade
@@ -1068,7 +1068,7 @@ species_grammars:
             next_context: branch.trade
           - text: I don't have time for this.
             next_context: farewell
-            action: farewell
+            action: leave
     treaty_offer:
       - variants:
           - Processing alliance request... Altruism subroutines engaged.
@@ -1122,7 +1122,7 @@ species_grammars:
             action: trade
           - text: I think we should go. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Who else is out here waiting to be salvaged?
             next_context: dossier_other
     trade_open:
@@ -1156,7 +1156,7 @@ species_grammars:
             next_context: offer_coordinates
           - text: I should be going.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -1181,7 +1181,7 @@ species_grammars:
         choices:
           - text: My engines are under my control. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Perhaps I can find some undefended worlds for you next time.
             next_context: offer_coordinates
             action: trade
@@ -1216,7 +1216,7 @@ species_grammars:
             action: barter
           - text: I must go.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Show me what scrap you have for barter.
             next_context: trade_open
             action: trade
@@ -1284,7 +1284,7 @@ species_grammars:
             action: trade
           - text: I'll be on my way.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Who else is out here waiting to be salvaged?
             next_context: dossier_other
     treaty_offer:
@@ -1338,7 +1338,7 @@ species_grammars:
             action: barter
           - text: Just passing through. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
     trade_open:
       - grammar:
           origin:
@@ -1368,7 +1368,7 @@ species_grammars:
             action: barter
           - text: I'm not interested in trading right now.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -1392,7 +1392,7 @@ species_grammars:
         choices:
           - text: Safe travels through time, Stryx.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Wait, I still want to trade.
             next_context: trade_open
             action: trade
@@ -1424,7 +1424,7 @@ species_grammars:
             action: trade
           - text: Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
     offer_coordinates:
       - grammar:
           origin:
@@ -1487,7 +1487,7 @@ species_grammars:
             action: trade
           - text: I must go.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Translate info-cache on other species!
             next_context: dossier_other
   concordance:
@@ -1519,7 +1519,7 @@ species_grammars:
             action: trade
           - text: I will leave you to your judgment.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: What judgment do you pass on the other species?
             next_context: dossier_other
     trade_refuse:
@@ -1528,7 +1528,7 @@ species_grammars:
         choices:
           - text: I will leave you to your judgment.
             next_context: farewell
-            action: farewell
+            action: leave
     trade_open:
       - grammar:
           origin:
@@ -1558,7 +1558,7 @@ species_grammars:
             action: barter
           - text: I must depart. I will walk in peace.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -1582,10 +1582,10 @@ species_grammars:
         choices:
           - text: Farewell, Concordance. I will remember your words.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: May my actions bring honor to the galaxy.
             next_context: farewell
-            action: farewell
+            action: leave
     dossier_other:
       - grammar:
           origin:
@@ -1615,7 +1615,7 @@ species_grammars:
             next_context: dossier_other
           - text: I must depart, O Concordance.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Would you deign to exchange offerings?
             next_context: trade_open
             action: trade
@@ -1676,7 +1676,7 @@ species_grammars:
             next_context: offer_coordinates
           - text: We will walk our own path, arbiter.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Would you deign to exchange offerings?
             next_context: trade_open
             action: trade
@@ -1708,7 +1708,7 @@ species_grammars:
             next_context: branch.inquiry
           - text: I will leave you in peace.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Open your market-mind to me. Let us trade.
             next_context: trade_open
             action: trade
@@ -1747,7 +1747,7 @@ species_grammars:
             action: barter
           - text: I must depart.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -1772,7 +1772,7 @@ species_grammars:
         choices:
           - text: My mind remains peaceful. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
     dossier_other:
       - grammar:
           origin:
@@ -1798,7 +1798,7 @@ species_grammars:
             next_context: branch.inquiry
           - text: Thank you for the insight. I must go.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Open your market-mind to me. Let us trade.
             next_context: trade_open
             action: trade
@@ -1858,7 +1858,7 @@ species_grammars:
             next_context: offer_coordinates
           - text: I must go.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Open your market-mind to me. Let us trade.
             next_context: trade_open
             action: trade
@@ -1911,7 +1911,7 @@ species_grammars:
             next_context: branch.vesk_inquiry
           - text: I will take my leave of you.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: What of the other, less elegant species?
             next_context: dossier_other
     trade_refuse:
@@ -1921,7 +1921,7 @@ species_grammars:
         choices:
           - text: I will take my leave of you.
             next_context: farewell
-            action: farewell
+            action: leave
     trade_open:
       - grammar:
           origin:
@@ -1954,7 +1954,7 @@ species_grammars:
             action: barter
           - text: I must take my leave.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -1979,7 +1979,7 @@ species_grammars:
         choices:
           - text: I will take my leave now.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: The Vesk will pay.
             next_context: branch.vesk_vengeance
     dossier_other:
@@ -2014,7 +2014,7 @@ species_grammars:
             next_context: dossier_other
           - text: I must depart.
             next_context: farewell
-            action: farewell
+            action: leave
     offer_coordinates:
       - grammar:
           origin:
@@ -2071,7 +2071,7 @@ species_grammars:
             next_context: dossier_other
           - text: I must take my leave.
             next_context: farewell
-            action: farewell
+            action: leave
     branch.vesk_vengeance:
       - grammar:
           origin:
@@ -2106,7 +2106,7 @@ species_grammars:
             next_context: greeting
           - text: I must depart.
             next_context: farewell
-            action: farewell
+            action: leave
     treaty_offer:
       - variants:
           - An alliance? Let us see if our aesthetics are compatible.
@@ -2187,7 +2187,7 @@ species_grammars:
             action: barter
           - text: I must go now.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -2211,7 +2211,7 @@ species_grammars:
         choices:
           - text: Goodbye, Selvi. Safe travels.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Wait, let's trade before I go.
             next_context: trade_open
             action: trade
@@ -2243,7 +2243,7 @@ species_grammars:
             next_context: dossier_other
           - text: I should get going.
             next_context: farewell
-            action: farewell
+            action: leave
     offer_coordinates:
       - grammar:
           origin:
@@ -2277,7 +2277,7 @@ species_grammars:
             action: trade
           - text: Goodbye, Selvi.
             next_context: farewell
-            action: farewell
+            action: leave
     treaty_offer:
       - variants:
           - Peace is the only path. The Selvi embrace your offer.
@@ -2327,7 +2327,7 @@ species_grammars:
             next_context: branch.inquiry
           - text: I will take my leave now.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Of the other species, what know you?
             next_context: dossier_other
     trade_refuse:
@@ -2337,7 +2337,7 @@ species_grammars:
         choices:
           - text: I must take my leave.
             next_context: farewell
-            action: farewell
+            action: leave
     trade_open:
       - grammar:
           origin:
@@ -2368,7 +2368,7 @@ species_grammars:
             action: barter
           - text: I should go.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -2392,10 +2392,10 @@ species_grammars:
         choices:
           - text: I am leaving. Safe travels.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Keep your grudges. Goodbye.
             next_context: farewell
-            action: farewell
+            action: leave
     dossier_other:
       - grammar:
           origin:
@@ -2417,7 +2417,7 @@ species_grammars:
             next_context: dossier_other
           - text: I must go.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Trade with me, you will.
             next_context: trade_open
             action: trade
@@ -2474,7 +2474,7 @@ species_grammars:
             next_context: greeting
           - text: I must go.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Trade with me, you will.
             next_context: trade_open
             action: trade
@@ -2530,7 +2530,7 @@ species_grammars:
             next_context: dossier_other
           - text: I must depart.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: I request permission to trade.
             next_context: trade_open
             action: trade
@@ -2541,7 +2541,7 @@ species_grammars:
         choices:
           - text: I must depart.
             next_context: farewell
-            action: farewell
+            action: leave
     trade_open:
       - grammar:
           origin:
@@ -2571,7 +2571,7 @@ species_grammars:
             action: barter
           - text: I will leave now.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -2595,10 +2595,10 @@ species_grammars:
         choices:
           - text: Understood. Safe travels to the Covenant.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: We will see who obeys whom in the end.
             next_context: farewell
-            action: farewell
+            action: leave
     dossier_other:
       - grammar:
           origin:
@@ -2624,7 +2624,7 @@ species_grammars:
             next_context: dossier_other
           - text: Your arrogance is exhausting. I'm leaving.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: I request permission to trade.
             next_context: trade_open
             action: trade
@@ -2686,7 +2686,7 @@ species_grammars:
             next_context: dossier_other
           - text: I must depart.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: I request permission to trade.
             next_context: trade_open
             action: trade
@@ -2720,7 +2720,7 @@ species_grammars:
             next_context: branch.inquiry
           - text: I need to think this over first.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: I request permission to trade.
             next_context: trade_open
             action: trade
@@ -2778,7 +2778,7 @@ species_grammars:
             next_context: branch.inquiry
           - text: I must go. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: What can your broodlings tell me of the others?
             next_context: dossier_other
     trade_open:
@@ -2819,7 +2819,7 @@ species_grammars:
             next_context: branch.inquiry
           - text: I must depart.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -2852,7 +2852,7 @@ species_grammars:
         choices:
           - text: Thank you for the gift. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Hold on, I want to scan my cargo hold before I leave.
             next_context: branch.scan_cargo
     dossier_other:
@@ -2888,7 +2888,7 @@ species_grammars:
             next_context: greeting
           - text: I think we are done here.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Let's see what you have for sale.
             next_context: trade_open
             action: trade
@@ -2963,7 +2963,7 @@ species_grammars:
             action: trade
           - text: I must be going now.
             next_context: farewell
-            action: farewell
+            action: leave
     branch.scan_cargo:
       - grammar:
           origin:
@@ -2997,7 +2997,7 @@ species_grammars:
             action: trade
           - text: I will take my leave now.
             next_context: farewell
-            action: farewell
+            action: leave
     treaty_offer:
       - variants:
           - Oh, a treaty with the mighty {player}? We are so honored!
@@ -3047,7 +3047,7 @@ species_grammars:
             action: trade
           - text: I must take my leave.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Who else stands against tyranny in this cluster?
             next_context: dossier_other
     trade_refuse:
@@ -3057,7 +3057,7 @@ species_grammars:
         choices:
           - text: I must go.
             next_context: farewell
-            action: farewell
+            action: leave
     trade_open:
       - grammar:
           origin:
@@ -3090,7 +3090,7 @@ species_grammars:
             action: barter
           - text: I'm leaving.
             next_context: farewell
-            action: farewell
+            action: leave
     farewell:
       - grammar:
           origin:
@@ -3115,10 +3115,10 @@ species_grammars:
         choices:
           - text: Until next time.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: I will keep your words in mind.
             next_context: farewell
-            action: farewell
+            action: leave
     dossier_other:
       - grammar:
           origin:
@@ -3149,7 +3149,7 @@ species_grammars:
             next_context: greeting
           - text: I must go.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Let us share our resources for the cause.
             next_context: trade_open
             action: trade
@@ -3187,7 +3187,7 @@ species_grammars:
             next_context: branch.inquiry
           - text: I'll find my own way. Farewell.
             next_context: farewell
-            action: farewell
+            action: leave
     branch.inquiry:
       - grammar:
           origin:
@@ -3218,7 +3218,7 @@ species_grammars:
             next_context: branch.inquiry
           - text: I will leave you to your scheming.
             next_context: farewell
-            action: farewell
+            action: leave
           - text: Let us share our resources for the cause.
             next_context: trade_open
             action: trade
