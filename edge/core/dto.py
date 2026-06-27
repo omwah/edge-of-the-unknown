@@ -584,6 +584,8 @@ class ContactDTO:
     # (the derived menu already carries them) and on deeper `branch.*` nodes. Each floor verb the
     # grammar already covers (an authored reply with the same action/next_context) is dropped.
     floor_verbs: list[ContactVerbDTO] = field(default_factory=list)
+    debug_context: str = ""
+    debug_when: str = ""
 
 
 @dataclass(frozen=True)
