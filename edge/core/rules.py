@@ -1522,15 +1522,21 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
         raise EconomyError("you cannot say that right now")
     if choice.action == "attack":
         raise EconomyError("you cannot attack here (Phase 3)")
+    
+    mutated_player = player
+    log_events: tuple[Event, ...] = ()
     if choice.action == "accept_lead":
-        return _accept_lead(state, player_id, AcceptLead(cmd.species_id), config)
+        lead_result = _accept_lead(state, player_id, AcceptLead(cmd.species_id), config)
+        log_events = lead_result.events
+        mutated_player = lead_result.players[0]
+
     target = "farewell" if choice.action == "farewell" else (choice.next_context or cmd.context)
     if target == "back":
-        return ReduceResult(events=(), players=())
-    extra, t_facts = _intel_bindings(state, player, species, target, config)
-    new_player, event = _speak_context(
-        state, player, ship, species, target, config, extra=extra, facts=t_facts)
-    return ReduceResult(events=(event,), players=(new_player,))
+        return ReduceResult(events=log_events, players=(mutated_player,))
+    extra, t_facts = _intel_bindings(state, mutated_player, species, target, config)
+    new_player, speak_event = _speak_context(
+        state, mutated_player, ship, species, target, config, extra=extra, facts=t_facts)
+    return ReduceResult(events=log_events + (speak_event,), players=(new_player,))
 
 
 def _accept_lead(state: UniverseState, player_id: int, cmd: AcceptLead,
