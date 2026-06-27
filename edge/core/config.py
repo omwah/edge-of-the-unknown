@@ -648,6 +648,8 @@ class RosterConfig(BaseModel):
     # cross-persona vocabulary and persona-voice quirks authored once and reused (§6.7,
     # `edge.dialogue.render`). Merged under each grammar entry, which overrides on collision.
     grammar: dict[str, list[str]] = Field(default_factory=dict)
+    floor_context: str = "greeting"
+    floor_keys: list[str] = Field(default_factory=lambda: ["ask", "farewell"])
 
     def alliance(self, alliance_id: int) -> AllianceConfig | None:
         return next((a for a in self.alliances if a.id == alliance_id), None)

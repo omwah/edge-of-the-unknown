@@ -8,9 +8,12 @@ unified render order (authored choices, then the uncovered floor).
 
 from __future__ import annotations
 
+from edge.config import load_default_config
 from edge.core import dto
 from edge.server import session
 from edge.tui.screens.contact import AlienContactScreen
+
+_ROSTER = load_default_config().roster
 
 _VERBS = [
     dto.ContactVerbDTO("hail", "Greet", kind="say", context="greeting"),
@@ -29,24 +32,24 @@ def _choice(index: int, *, action: str = "", next_context: str = "") -> dto.Cont
 
 def test_floor_fills_gaps_on_a_branching_top_node() -> None:
     # An authored greeting that only opens a branch leaves every floor verb uncovered.
-    floor = session._contact_floor(_VERBS, [_choice(0, next_context="branch.shop")], "greeting")
+    floor = session._contact_floor(_VERBS, [_choice(0, next_context="branch.shop")], "greeting", _ROSTER)
     assert [v.key for v in floor] == ["ask", "farewell"]
 
 
 def test_floor_drops_what_the_grammar_already_covers() -> None:
     # A choice that asks about others covers Ask about…; one that says farewell covers the exit.
     ask_covered = session._contact_floor(_VERBS, [_choice(0, next_context="dossier_other")],
-                                         "greeting")
+                                         "greeting", _ROSTER)
     assert [v.key for v in ask_covered] == ["farewell"]
-    exit_covered = session._contact_floor(_VERBS, [_choice(0, action="farewell")], "greeting")
+    exit_covered = session._contact_floor(_VERBS, [_choice(0, action="farewell")], "greeting", _ROSTER)
     assert [v.key for v in exit_covered] == ["ask"]
 
 
 def test_no_floor_on_deep_branch_or_plain_nodes() -> None:
     # Deeper branch.* nodes show exactly what the author wrote (top-level only).
-    assert session._contact_floor(_VERBS, [_choice(0, action="farewell")], "branch.shop") == []
+    assert session._contact_floor(_VERBS, [_choice(0, action="farewell")], "branch.shop", _ROSTER) == []
     # A plain node has no authored choices, so the derived menu already carries the floor verbs.
-    assert session._contact_floor(_VERBS, [], "greeting") == []
+    assert session._contact_floor(_VERBS, [], "greeting", _ROSTER) == []
 
 
 def _dto(*, choices: list[dto.ContactChoiceDTO], floor: list[dto.ContactVerbDTO],
@@ -142,3 +145,16 @@ def test_check_action_hides_back_without_history() -> None:
     with_history = AlienContactScreen(_dto(choices=[], floor=[]),
                                       history=(("greeting", None),))
     assert with_history.check_action("back_one", ()) is True
+
+
+def test_floor_context_and_keys_are_configurable() -> None:
+    # Set a custom floor context and list of floor keys
+    custom_roster = _ROSTER.model_copy(update={
+        "floor_context": "offer_coordinates",
+        "floor_keys": ["trade"]
+    })
+    # If the active context is "offer_coordinates", it should now return the configured floor verbs
+    floor = session._contact_floor(_VERBS, [_choice(0, next_context="branch.shop")], "offer_coordinates", custom_roster)
+    assert [v.key for v in floor] == ["trade"]
+    # If the active context is "greeting", it should now return empty list (since it's not the configured context)
+    assert session._contact_floor(_VERBS, [_choice(0, next_context="branch.shop")], "greeting", custom_roster) == []
