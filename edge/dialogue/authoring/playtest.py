@@ -167,7 +167,7 @@ class PlaytestService:
         if isinstance(command, Converse):
             self._advance_recency(command.species_id, command.context)
             if command.choice_index is not None:
-                view = self.contact_view(player_id, command.species_id, command.context)
+                view = self.contact_view(player_id, command.species_id, command.context, command.subject_id)
                 if 0 <= command.choice_index < len(view.choices):
                     choice = view.choices[command.choice_index]
                     if choice.action == "accept_lead":

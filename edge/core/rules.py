@@ -1506,6 +1506,10 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
     if not dialogue.is_known_context(cmd.context):
         raise EconomyError(f"unknown dialogue context ({cmd.context})")
     _, facts = _intel_bindings(state, player, species, cmd.context, config)
+    if (cmd.context == "dossier_other" or cmd.context.startswith("branch.dossier_other.")) and cmd.subject_id is not None:
+        subject_sp = state.species.get(cmd.subject_id)
+        if subject_sp is not None:
+            facts["subject"] = subject_sp.roster_id
     ring = player.dialogue_recency.get((species.roster_id, cmd.context), ())
     rng = dialogue.encounter_rng(state.game.seed, species.roster_id, cmd.context, ring)
     entry = dialogue.entry_for(config.roster, species, player, cmd.context,
@@ -1529,13 +1533,19 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
         lead_result = _accept_lead(state, player_id, AcceptLead(cmd.species_id), config)
         log_events = lead_result.events
         mutated_player = lead_result.players[0]
-
+ 
     target = "farewell" if choice.action == "leave" else (choice.next_context or cmd.context)
     if target == "back":
         return ReduceResult(events=log_events, players=(mutated_player,))
     extra, t_facts = _intel_bindings(state, mutated_player, species, target, config)
+    if (target == "dossier_other" or target.startswith("branch.dossier_other.")) and cmd.subject_id is not None:
+        subject_sp = state.species.get(cmd.subject_id)
+        if subject_sp is not None:
+            extra["subject"] = subject_sp.name
+            t_facts["subject"] = subject_sp.roster_id
     new_player, speak_event = _speak_context(
-        state, mutated_player, ship, species, target, config, extra=extra, facts=t_facts)
+        state, mutated_player, ship, species, target, config, extra=extra, facts=t_facts,
+        subject_id=cmd.subject_id)
     return ReduceResult(events=log_events + (speak_event,), players=(new_player,))
 
 

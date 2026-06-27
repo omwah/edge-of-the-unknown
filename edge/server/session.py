@@ -1097,13 +1097,14 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
              else "greeting")
     subject_extra: dict[str, str] | None = None
     facts: dict[str, object] | None = None
-    if shown == "dossier_other":
+    if shown == "dossier_other" or shown.startswith("branch.dossier_other."):
         sid = active_subject if active_subject is not None else (subjects[0][0] if subjects else None)
         subj = state.species.get(sid) if sid is not None else None
         if subj is None:
             shown = "greeting"  # nothing to ask about — fall back to the opener
         else:
             subject_extra = {"subject": subj.name}
+            facts = {"subject": subj.roster_id}
     elif shown == "offer_coordinates":
         facts = {"has_intel_target": intel is not None}
         if intel is not None:

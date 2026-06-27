@@ -436,9 +436,28 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
             else {}
         )
         known: set[str] = set(base_known) | set(pack)
+
+        from edge.config import load_default_config
+        cfg = load_default_config()
+        species = next((s for s in cfg.roster.species if s.id == voice_id), None)
+        sp_name = species.name if species else voice_id
+
         for context in contexts:
             if context in pack:
                 continue  # already authored — preserve it
+
+            if context == "dossier_self":
+                pack["dossier_self"] = _author_dossier_self(voice_id, sp_name)
+                _author_dossier_self_branches(backend, voice_id, voice, pack)
+                known.update(pack)
+                continue
+
+            if context == "dossier_other":
+                pack["dossier_other"] = _author_dossier_other(sp_name)
+                _author_dossier_other_branches(backend, voice_id, voice, pack)
+                known.update(pack)
+                continue
+
             if backend.__class__.__name__ != "DebugBackend":
                 import sys
                 print(f"  {voice_id} -> {context}...", file=sys.stderr, flush=True)
@@ -449,6 +468,14 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
             )
             pack[context] = [author_line(backend, req, known_contexts=frozenset(known),
                                          retries=retries)]
+
+        # Check and author missing dossier branch nodes if dossier contexts are already present
+        if "dossier_self" in pack:
+            _author_dossier_self_branches(backend, voice_id, voice, pack)
+        if "dossier_other" in pack:
+            _author_dossier_other_branches(backend, voice_id, voice, pack)
+        known.update(pack)
+
         for _ in range(branch_passes):
             new_targets = _collect_branch_targets(pack) - known
             if not new_targets:
@@ -464,6 +491,230 @@ def author_packs(backend: Any, voices: Mapping[str, str], contexts: Sequence[str
                     examples={},
                 )
                 pack[branch_ctx] = [author_line(backend, req, known_contexts=frozenset(known),
-                                                retries=retries)]
+                                                 retries=retries)]
         packs[voice_id] = pack
     return packs
+
+
+def _author_dossier_self(voice_id: str, species_name: str) -> list[dict[str, Any]]:
+    d_self = []
+    for std in ["hostile", "neutral", "wary"]:
+        d_self.append({
+            "when": {"standing": std},
+            "variants": [
+                f"The {species_name} do not share our history with those we do not trust.",
+                f"Why should we tell you of our ways, traveler?"
+            ]
+        })
+    categories = [
+        ("biology_and_appearance", "biology and appearance"),
+        ("psychology_and_culture", "psychology and culture"),
+        ("diplomacy_and_behavior", "diplomacy and behavior"),
+        ("relationships", "relationships"),
+        ("combat_and_ships", "combat and ships"),
+    ]
+    choices_self = []
+    for cat_key, cat_desc in categories:
+        choices_self.append({
+            "text": f"Tell me about your {cat_desc}.",
+            "next_context": f"branch.dossier_self.{cat_key}"
+        })
+    choices_self.append({
+        "text": "Never mind.",
+        "next_context": "back"
+    })
+    d_self.append({
+        "variants": [
+            f"We are the {species_name}, of {{alliance}}. What would you like to know about us?"
+        ],
+        "choices": choices_self
+    })
+    return d_self
+
+
+def _author_dossier_self_branches(backend: Any, voice_id: str, voice: str, pack: dict[str, list[dict[str, Any]]]) -> None:
+    from edge.config import load_default_config
+    cfg = load_default_config()
+    species = next((s for s in cfg.roster.species if s.id == voice_id), None)
+    if not species:
+        return
+
+    categories = [
+        ("biology_and_appearance", "biology and appearance"),
+        ("psychology_and_culture", "psychology and culture"),
+        ("diplomacy_and_behavior", "diplomacy and behavior"),
+        ("relationships", "relationships"),
+        ("combat_and_ships", "combat and ships"),
+    ]
+    lore = getattr(species, "lore", None) or {}
+
+    for cat_key, cat_desc in categories:
+        branch_key = f"branch.dossier_self.{cat_key}"
+        if branch_key in pack:
+            continue
+
+        raw_text = getattr(lore, cat_key, f"No record of {species.name} {cat_desc} is available.").strip()
+        if backend.__class__.__name__ == "StaticBackend":
+            rewritten = raw_text
+        else:
+            rewritten = _rewrite_self_lore(backend, species.name, species.persona, cat_desc, raw_text)
+
+        pack[branch_key] = [
+            {
+                "variants": [rewritten],
+                "choices": [
+                    {"text": "Go back.", "next_context": "back"}
+                ]
+            }
+        ]
+
+
+def _rewrite_self_lore(backend: Any, speaker_name: str, persona: str, cat_desc: str, fact_text: str) -> str:
+    prompt = (
+        "You are writing dialogue for a space exploration game.\n\n"
+        f"SPEAKER SPECIES: {speaker_name}\n"
+        f"VOICE PERSONA: {persona}\n\n"
+        f"FACTUAL DESCRIPTION OF THEIR {cat_desc.upper()}:\n"
+        f"\"{fact_text}\"\n\n"
+        "Rewrite this factual description in the first-person voice of the speaker, describing themselves to the player. "
+        "Adhere to their voice/persona. Keep all the factual details, but express them in their characteristic style. "
+        "Keep it concise (1-2 sentences). Do not add any greeting or signoff. "
+        "You may use {player} for the player, {species} for their species, and {alliance} for their alliance if needed.\n\n"
+        "Output a JSON object {\"rewritten_text\": \"<your rewritten dialogue text>\"}."
+    )
+    schema = {
+        "type": "object",
+        "properties": {
+            "rewritten_text": {"type": "string"}
+        },
+        "required": ["rewritten_text"],
+        "additionalProperties": False
+    }
+    import sys
+    if backend.__class__.__name__ != "DebugBackend":
+        print(f"    (LLM rewriting self {cat_desc} for {speaker_name}...)", file=sys.stderr, flush=True)
+    res = backend.generate(prompt, schema=schema)
+    return res["rewritten_text"]
+
+
+def _author_dossier_other(species_name: str) -> list[dict[str, Any]]:
+    d_other = []
+    for std in ["hostile", "neutral", "wary"]:
+        d_other.append({
+            "when": {"standing": std},
+            "variants": [
+                "Why should we tell you about the {subject}?",
+                "Ask someone else. We share no data with you."
+            ]
+        })
+    categories = [
+        ("biology_and_appearance", "biology and appearance"),
+        ("psychology_and_culture", "psychology and culture"),
+        ("diplomacy_and_behavior", "diplomacy and behavior"),
+        ("relationships", "relationships"),
+        ("combat_and_ships", "combat and ships"),
+    ]
+    choices_other = []
+    for cat_key, cat_desc in categories:
+        choices_other.append({
+            "text": f"Tell me about their {cat_desc}.",
+            "next_context": f"branch.dossier_other.{cat_key}"
+        })
+    choices_other.append({
+        "text": "Never mind.",
+        "next_context": "back"
+    })
+    d_other.append({
+        "variants": [
+            "Ah, the {subject}. We have compiled data on them. What interests you?"
+        ],
+        "choices": choices_other
+    })
+    return d_other
+
+
+def _author_dossier_other_branches(backend: Any, voice_id: str, voice: str, pack: dict[str, list[dict[str, Any]]]) -> None:
+    from edge.config import load_default_config
+    cfg = load_default_config()
+    species = next((s for s in cfg.roster.species if s.id == voice_id), None)
+    if not species:
+        return
+
+    categories = [
+        ("biology_and_appearance", "biology and appearance"),
+        ("psychology_and_culture", "psychology and culture"),
+        ("diplomacy_and_behavior", "diplomacy and behavior"),
+        ("relationships", "relationships"),
+        ("combat_and_ships", "combat and ships"),
+    ]
+
+    for cat_key, cat_desc in categories:
+        branch_key = f"branch.dossier_other.{cat_key}"
+        if branch_key in pack:
+            continue
+
+        branch_entries = []
+        # For each subject other than the speaker
+        for other_sp in cfg.roster.species:
+            other_sp_id = other_sp.id
+            other_lore = getattr(other_sp, "lore", None) or {}
+            other_raw = getattr(other_lore, cat_key, f"No record of {other_sp.name} {cat_desc} is available.").strip()
+            other_desc = other_sp.description or f"a {other_sp.archetype_id} species"
+
+            if backend.__class__.__name__ == "StaticBackend":
+                rewritten = f"The {other_sp.name}: {other_raw}"
+            else:
+                rewritten = _rewrite_other_lore(backend, species.name, voice, other_sp.name, other_desc, cat_desc, other_raw)
+
+            branch_entries.append({
+                "when": {
+                    "criteria": {
+                        "subject": other_sp_id
+                    }
+                },
+                "variants": [rewritten],
+                "choices": [
+                    {"text": "Go back.", "next_context": "back"}
+                ]
+            })
+
+        # Catch-all entry for the branch node to satisfy the validator
+        branch_entries.append({
+            "variants": [
+                f"Our database on the {{subject}}'s {cat_desc} is incomplete."
+            ],
+            "choices": [
+                {"text": "Go back.", "next_context": "back"}
+            ]
+        })
+        pack[branch_key] = branch_entries
+
+
+def _rewrite_other_lore(backend: Any, speaker_name: str, speaker_voice: str, subject_name: str, subject_desc: str, cat_desc: str, fact_text: str) -> str:
+    prompt = (
+        "You are writing dialogue for a space exploration game.\n\n"
+        f"SPEAKER SPECIES DETAIL:\n{speaker_voice}\n\n"
+        f"SUBJECT SPECIES: {subject_name}\n"
+        f"SUBJECT DESCRIPTION: {subject_desc}\n\n"
+        f"FACTUAL DESCRIPTION OF THE {subject_name.upper()} {cat_desc.upper()}:\n"
+        f"\"{fact_text}\"\n\n"
+        f"Rewrite this factual description from the perspective of the speaker ({speaker_name}) describing the subject ({subject_name}) to the player. "
+        "Adhere to the speaker's voice/persona and their relationship/attitude toward the subject. "
+        "Keep all the factual details, but express them in the speaker's style and viewpoint. "
+        "Keep it concise (1-2 sentences). Do not add any greeting or signoff. "
+        "Use {subject} to refer to the subject species, {player} for the player, and {alliance} if needed.\n\n"
+        "Output a JSON object {\"rewritten_text\": \"<your rewritten dialogue text>\"}."
+    )
+    schema = {
+        "type": "object",
+        "properties": {
+            "rewritten_text": {"type": "string"}
+        },
+        "required": ["rewritten_text"],
+        "additionalProperties": False
+    }
+    import sys
+    if backend.__class__.__name__ != "DebugBackend":
+        print(f"    (LLM rewriting other {cat_desc} about {subject_name} for {speaker_name}...)", file=sys.stderr, flush=True)
+    res = backend.generate(prompt, schema=schema)
+    return res["rewritten_text"]

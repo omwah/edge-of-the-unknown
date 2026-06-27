@@ -280,3 +280,37 @@ def test_author_line_accepts_branch_contexts() -> None:
                       known_contexts=frozenset(["greeting"]))
     assert len(line["choices"]) == 1
     assert line["choices"][0]["next_context"] == "branch.custom_node"
+
+
+def test_author_packs_generates_dossiers_and_sub_branches() -> None:
+    from edge.dialogue.authoring import author_packs, StaticBackend
+    voices = {"vesk": "Vesk description"}
+    packs = author_packs(StaticBackend(), voices, ["greeting", "dossier_self", "dossier_other"])
+    pack = packs["vesk"]
+    # Check that dossier_self and dossier_other are present
+    assert "dossier_self" in pack
+    assert "dossier_other" in pack
+    
+    # Check that sub-branches are present
+    categories = [
+        "biology_and_appearance",
+        "psychology_and_culture",
+        "diplomacy_and_behavior",
+        "relationships",
+        "combat_and_ships",
+    ]
+    for cat in categories:
+        assert f"branch.dossier_self.{cat}" in pack
+        assert f"branch.dossier_other.{cat}" in pack
+        
+    # Check structure of dossier_self branch
+    bio_self = pack["branch.dossier_self.biology_and_appearance"][0]
+    assert bio_self["choices"][0]["next_context"] == "back"
+    
+    # Check structure of dossier_other branch
+    bio_other = pack["branch.dossier_other.biology_and_appearance"]
+    # Should have entries for each species in the roster + catch-all
+    assert len(bio_other) > 1
+    assert bio_other[0]["choices"][0]["next_context"] == "back"
+    # An entry should have a matching subject criteria
+    assert "subject" in bio_other[0]["when"]["criteria"]

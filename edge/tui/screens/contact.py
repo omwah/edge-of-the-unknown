@@ -344,6 +344,7 @@ class AlienContactScreen(Screen):
             return
         try:
             self._service.apply(self._pid, Converse(self._species_id, self._active_context,
+                                                    subject_id=self._active_subject,
                                                     choice_index=index))
         except Exception as exc:  # core rejected it — surface and stay put
             self.notify(str(exc), timeout=2)
