@@ -368,10 +368,13 @@ class AlienContactScreen(Screen):
                     self._active_context, self._active_subject = prev
                 else:
                     self._active_context, self._active_subject = "greeting", None
+                self._reopen()
+            elif choice.next_context == "dossier_other":
+                self._ask_about("dossier_other")
             else:
                 self._history = (*self._history, (self._active_context, self._active_subject))
                 self._active_context, self._active_subject = choice.next_context, None
-        self._reopen()
+                self._reopen()
 
     def _dispatch(self, key: str) -> None:
         verb = next((v for v in self._view().verbs if v.key == key), None)
