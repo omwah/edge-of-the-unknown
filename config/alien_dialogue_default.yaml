@@ -161,6 +161,7 @@ personas:
           - "Welcome back, friend {player}. The {species} are glad of your company."
           - "Ah, {player}. Among allies you are always welcome among the {species}."
           - "Our friend returns. Speak, {player} — the {species} listen."
+          - Identify yourself, {player}. What brings you to the {species}?
       - when: { standing: friendly }
         variants:
           - "Greetings, {player}. The {species} receive you in good faith."
@@ -191,6 +192,7 @@ personas:
           - "Seek {target}? Set course for sector {coords}, {player} — {distance} jumps into the {band}. {reward} awaits there."
           - "The {species} know of {target} at sector {coords}: {distance} hops out, deep in the {band}. You'll find {reward}."
           - "Take these coordinates, {player}: sector {coords}, {distance} jumps off. {target} lies there, and with it {reward}."
+          - The stars are quiet. We have no destinations for you.
       - variants:  # catch-all — nothing new to point you toward
           - "The {species} know of nowhere new to send you just now, {player}."
           - "We have no fresh coordinates for you. Range farther, {player}, and return."
@@ -260,6 +262,7 @@ personas:
           - "The {subject}? The {species} have dealings with them, of a kind."
           - "Ah, the {subject}. Tread carefully where they are concerned."
 
+          - The {subject} are known to us. But we say no more.
   # Terrans / Centaurians — Starfleet voice: warm, formal-but-friendly, exploration-
   # and cooperation-minded. Allied-keyed lines address the player as a fellow citizen.
   humanoid_diplomat:
@@ -269,6 +272,7 @@ personas:
           - "Welcome home, {player}. The Federation stands with you."
           - "{player}! Good to see a fellow citizen out on the lanes. Safe travels."
           - "A friendly flag in the dark — well met, {player}. The {species} are glad of you."
+          - The Federation extends its hand in friendship, {player}.
       - variants:    # any non-allied standing
           - "We come in peace, {player}. The {species} of the Terran Federation greet you."
           - "Greetings, traveller. The {species} seek understanding, not conflict."
@@ -289,6 +293,7 @@ personas:
           - "The {subject}? The {species} seek peaceful understanding with all peoples, {player}."
           - "Ah, the {subject}. We've reached out to them in good faith — as we do with all, {player}."
 
+          - The {subject}? We are always trying to open diplomatic channels with them.
   # Vesk — introduces itself by serial-style name; warm, helpful technologists.
   serial_formal:
     greeting:
@@ -311,6 +316,7 @@ personas:
       - variants:
           - "Step into our workshop, {player}. Circuits, sensors — all our craft is here."
           - "The {species} are proud of our making. Look upon it, {player}."
+          - Our greatest innovations are displayed here, {player}.
         choices:
           - text: "Let's deal."
             action: trade
@@ -331,6 +337,7 @@ personas:
           - "The {subject}? We know them. Beware those whose minds are unkind, {player}."
           - "Of the {subject} the {species} can tell you much. Listen well."
 
+          - We have recorded much data concerning the {subject}, {player}.
   # Selvani — cautious, reserved, good-faith.
   reserved_honest:
     greeting:
@@ -346,6 +353,8 @@ personas:
       - variants:
           - "The {subject}? We know little, but we will tell you what we know, {player}."
 
+          - We observe the {subject} from afar.
+          - The {subject} are a curious people, though we keep our distance.
   # Cibelline — vain engineered aesthetes; condescending self-names.
   flowery_aesthete:
     greeting:
@@ -361,6 +370,8 @@ personas:
       - variants:
           - "The {subject}? Aesthetically beneath contempt, but instructive, {player}."
 
+          - The {subject}? A tragic lack of culture, honestly.
+          - Do not speak to us of the {subject}. They offend our eyes.
   # Selvi — amorous, flirtatious, easily cowed.
   amorous:
     greeting:
@@ -376,6 +387,8 @@ personas:
       - variants:
           - "The {subject}? Ooh. Some are cute, some are not. The {species} can tell you which."
 
+          - Oh, the {subject}? We tried to get close, but they were so cold!
+          - The {subject}? Not really our type, to be honest.
   # Dignar — telepathic concept-fragment speech.
   concept_fragments:
     greeting:
@@ -395,6 +408,8 @@ personas:
       - variants:
           - "* {subject} * Assessment * * Caution * Advice *"
 
+          - "* {subject} * Observations * * Distant *"
+          - "* {subject} * Entity * * Acknowledged *"
   # Thessbrood — oily servility masking conquest.
   oily_servile:
     greeting:
@@ -410,6 +425,8 @@ personas:
       - variants:
           - "The {subject}? Heed my counsel, {player}, and you will be the safer for it."
 
+          - The {subject}? We humble servants dare not speak ill of them.
+          - Ah, the {subject}. We keep our heads bowed when they pass.
   # Helot — cold machine-logic, dictionary entries.
   dictionary_literal:
     greeting:
@@ -427,6 +444,8 @@ personas:
       - variants:
           - "{subject}: 1. A known entity. 2. The {species} provide data on request, {player}."
 
+          - "{subject}: Sub-classification logged. No further data."
+          - "{subject}: Biological entity. Threat level unassessed."
   # Vennrith — inverted, grudge-keeping syntax.
   inverted_syntax:
     greeting:
@@ -441,6 +460,8 @@ personas:
       - variants:
           - "The {subject}? Forget them the {species} never shall. Tell you of them, we will."
 
+          - Of the {subject}, much we know. Trust them, we do not.
+          - The {subject}, you ask about? Dark paths they walk.
   # Concordance — archaic, biblical judgement.
   biblical_arbiter:
     greeting:
@@ -459,6 +480,8 @@ personas:
       - variants:
           - "The {subject}? Their sins the {species} know. Learn from their errors, {player}."
 
+          - The {subject} are weighed in the balance and found wanting.
+          - Speak not of the {subject}. Their transgressions are known.
   # Stryx — mangled translator garble.
   garbled_translator:
     greeting:
@@ -473,6 +496,8 @@ personas:
       - variants:
           - "Da {subject}? Mee no much. Yumuss paie da {species} for tel, {player}."
 
+          - Da {subject} iz bad newz. Yu stay 'way!
+          - U ask for {subject}? Wee see dem, den wee fly fast!
   # Quill — predatory salvage, transactional menace.
   macabre_transactional:
     greeting:
@@ -487,6 +512,8 @@ personas:
       - variants:
           - "The {subject}? Weak worlds, ripe for stripping. The {species} know them well."
 
+          - The {subject}? Their hulls break just like any other.
+          - Ah, the {subject}. We are eagerly awaiting their downfall to claim the scrap.
   # Thessarch — authoritarian gatekeeper.
   authoritarian_dogma:
     greeting:
@@ -501,6 +528,8 @@ personas:
       - variants:
           - "The {subject}? They serve, or they are nothing. The {species} decide, {player}."
 
+          - The {subject} are weak. They will be brought to heel.
+          - Do not concern yourself with the {subject}. They are insignificant.
   # Dacaran — false idealism, probing loyalty.
   false_idealist:
     greeting:
@@ -514,3 +543,5 @@ personas:
     dossier_other:
       - variants:
           - "The {subject}? A minor concern, {player}. The cluster is full of such."
+          - The {subject}? Potential allies in the struggle, perhaps.
+          - We watch the {subject} closely. Everyone plays a part in the grand design.
