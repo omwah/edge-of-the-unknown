@@ -18,7 +18,7 @@ from edge.core import dto
 from edge.server import mapgraph
 from edge.server import terrain as terrain_art
 from edge.core.aliens import disposition_band, effective_disposition
-from edge.core.config import GameConfig
+from edge.core.config import GameConfig, RosterConfig
 from edge.core.discovery import is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import build_subsystems, derive_aspects
@@ -954,22 +954,22 @@ _FLOOR_KEYS = ("ask", "farewell")
 
 
 def _contact_floor(verbs: list[dto.ContactVerbDTO], choices: list[dto.ContactChoiceDTO],
-                   context: str) -> list[dto.ContactVerbDTO]:
-    """The floor verbs to append after authored `choices` on a top-level branching node (§6.7).
+                   context: str, roster: RosterConfig) -> list[dto.ContactVerbDTO]:
+    """The floor verbs to append after authored `choices` on the configured floor context (§6.7).
 
-    Empty unless the node both carries authored `choices` (else the derived menu already shows
-    these) and is **top-level** (a base intent, not a deeper `branch.*` node). A floor verb is
+    Empty unless the node carries authored `choices` (else the derived menu already shows
+    these) and is the configured `floor_context`. A floor verb is
     dropped when an authored reply already provides the same navigation — Ask about… when a
     choice targets `dossier_other`, Farewell when a choice already speaks a `farewell` — so the
     grammar's explicit wording wins and the default only fills a gap.
     """
-    if not choices or context.startswith(dialogue.BRANCH_PREFIX):
+    if not choices or context != roster.floor_context:
         return []
     covered = {
         "ask": any(c.next_context == "dossier_other" for c in choices),
         "farewell": any(c.action == "farewell" for c in choices),
     }
-    return [v for v in verbs if v.key in _FLOOR_KEYS and not covered.get(v.key, False)]
+    return [v for v in verbs if v.key in roster.floor_keys and not covered.get(v.key, False)]
 
 
 def _tech_offers(species: AlienSpecies, sc: object, player: Player, ship: Ship,
@@ -1131,7 +1131,7 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         verbs=verbs,
         offers=offers, dossier=dossier, subjects=subjects,
         intel_summary=intel.summary() if intel is not None else "",
-        choices=choices, floor_verbs=_contact_floor(verbs, choices, shown),
+        choices=choices, floor_verbs=_contact_floor(verbs, choices, shown, roster),
     )
 
 

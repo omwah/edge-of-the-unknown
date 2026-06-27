@@ -150,6 +150,10 @@
 #
 # =============================================================================================
 recency_k: 2
+floor_context: greeting
+floor_keys:
+  - ask
+  - farewell
 
 personas:
   # The complete fallback pack: a catch-all line for every base context key, so a line
@@ -196,6 +200,9 @@ personas:
       - variants:  # catch-all — nothing new to point you toward
           - "The {species} know of nowhere new to send you just now, {player}."
           - "We have no fresh coordinates for you. Range farther, {player}, and return."
+        choices:
+          - text: "Thanks for nothing..."
+            next_context: greeting
     treaty_offer:
       - variants:
           - "A lasting peace between us? The {species} will consider it."
