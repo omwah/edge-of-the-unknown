@@ -769,6 +769,11 @@ class UIConfig(BaseModel):
     sidebar_min_screen_width: int = Field(default=90, gt=0)
     surface_terrain_height: int = Field(default=12, gt=0)  # SurfaceScreen terrain panel height
     local_map_radius: int = Field(default=3, gt=0)  # Computer/Map ego-graph reach in warp hops
+    # chafa `--symbols` selector for the species portrait on the alien contact screen.
+    portrait_symbols: str = "vhalf+quad+geometric"
+    # Terminal cell width/height, so the portrait keeps its proportions (lower = wider; raise
+    # if portraits look stretched, lower if they look squashed horizontally). Terminal-dependent.
+    portrait_font_ratio: float = Field(default=0.5, gt=0.0)
     # Debug: show disabled menu options (greyed) instead of filtering them out (debugging only).
     show_disabled_options: bool = False
 

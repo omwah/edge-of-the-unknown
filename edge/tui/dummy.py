@@ -283,7 +283,7 @@ def sample_contact() -> dto.ContactDTO:
     from params — treaty/fight are greyed (Phase-2 / non-reachable), with reasons.
     """
     return dto.ContactDTO(
-        species="Vesk", persona="serial_formal", alliance="unaligned",
+        species="Vesk", roster_id="vesk", persona="serial_formal", alliance="unaligned",
         standing="friendly", band="friendly", disposition_filled=4,
         base_disposition=0.85, attitude=0.06, effective=0.91,
         opener="Greetings, Trailblazer. I am Veska VK-7 of the Vesk. We are at your service.",

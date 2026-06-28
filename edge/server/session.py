@@ -1122,7 +1122,7 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     verbs = _contact_verbs(species, sc, offers, subjects_available=bool(subjects),
                            has_intel=intel is not None, asked_intel=(shown == "offer_coordinates"))
     return dto.ContactDTO(
-        species=species.name, persona=species.persona,
+        species=species.name, roster_id=species.roster_id, persona=species.persona,
         alliance=alliance.name if alliance else "unaligned",
         standing=standing, band=band, disposition_filled=max(0, min(5, round(effective * 5))),
         base_disposition=round(species.base_disposition, 3),

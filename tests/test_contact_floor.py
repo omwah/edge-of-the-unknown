@@ -55,7 +55,7 @@ def test_no_floor_on_deep_branch_or_plain_nodes() -> None:
 def _dto(*, choices: list[dto.ContactChoiceDTO], floor: list[dto.ContactVerbDTO],
          verbs: list[dto.ContactVerbDTO] | None = None) -> dto.ContactDTO:
     return dto.ContactDTO(
-        species="Vesk", persona="serial_formal", alliance="unaligned", standing="friendly",
+        species="Vesk", roster_id="vesk", persona="serial_formal", alliance="unaligned", standing="friendly",
         band="friendly", disposition_filled=4, base_disposition=0.8, attitude=0.0,
         effective=0.8, opener="…", verbs=_VERBS if verbs is None else verbs, offers=[],
         dossier=[], choices=choices, floor_verbs=floor)

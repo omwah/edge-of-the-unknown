@@ -562,6 +562,7 @@ class ContactDTO:
     """A peaceful alien contact screen (§6, §6.7, §11)."""
 
     species: str
+    roster_id: str  # config roster key (e.g. "vesk") — selects the species portrait image
     persona: str
     alliance: str
     standing: str  # "friendly" / "allied" / …
