@@ -769,6 +769,9 @@ class UIConfig(BaseModel):
     sidebar_min_screen_width: int = Field(default=90, gt=0)
     surface_terrain_height: int = Field(default=12, gt=0)  # SurfaceScreen terrain panel height
     local_map_radius: int = Field(default=3, gt=0)  # Computer/Map ego-graph reach in warp hops
+    # Directory of species portrait images (absolute, or relative to the repo root). Each
+    # species uses `<roster_id>.<ext>` and/or `<roster_id>_<digits>.<ext>` variant files.
+    portrait_dir: str = "images"
     # chafa `--symbols` selector for the species portrait on the alien contact screen.
     portrait_symbols: str = "vhalf+quad+geometric"
     # Terminal cell width/height, so the portrait keeps its proportions (lower = wider; raise
