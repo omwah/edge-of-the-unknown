@@ -24,13 +24,17 @@ class SpeciesPortrait(Static):
         name: str = "",
         symbols: str = art_portrait.DEFAULT_SYMBOLS,
         font_ratio: float = art_portrait.DEFAULT_FONT_RATIO,
+        images_dir: str | None = None,
+        variant: int | None = None,
     ) -> None:
         super().__init__()
         self._roster_id = roster_id
         self._name = name or roster_id
         self._symbols = symbols
         self._font_ratio = font_ratio
-        self._path = art_portrait.resolve_portrait(roster_id)
+        # Pick the image (and any variant) once, here — so resizes re-render the *same*
+        # portrait rather than reshuffling variants on every layout change.
+        self._path = art_portrait.resolve_portrait(roster_id, images_dir, variant)
 
     def on_mount(self) -> None:
         self._render_to_box()

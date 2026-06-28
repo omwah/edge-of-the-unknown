@@ -38,6 +38,7 @@ ui:
   sidebar_min_screen_width: 90  # hide the sidebar when the terminal is narrower than this
   surface_terrain_height: 15 # SurfaceScreen terrain-panel height (rows, incl. border)
   local_map_radius: 3        # Computer/Map ego-graph reach in warp hops from your sector
+  portrait_dir: images       # species portrait dir (abs, or repo-root-relative); supports <id>_<n> variants
   portrait_symbols: vhalf+quad+geometric  # chafa --symbols selector for alien contact portraits
   portrait_font_ratio: 0.4   # terminal cell width/height; lower to widen a horizontally-squashed portrait
 

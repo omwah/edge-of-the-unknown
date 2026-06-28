@@ -203,8 +203,12 @@ class AlienContactScreen(Screen):
         )
         with Horizontal(id="contact-main"):
             with Vertical(id="portrait-box"):
-                symbols, font_ratio = self._portrait_opts()
-                yield SpeciesPortrait(c.roster_id, c.species, symbols, font_ratio)
+                symbols, font_ratio, images_dir = self._portrait_opts()
+                # variant keyed to the individual (species_id) so a given alien keeps one face
+                # across the screen rebuilds a conversation triggers, while different individuals
+                # of the same species may differ.
+                yield SpeciesPortrait(c.roster_id, c.species, symbols, font_ratio,
+                                      images_dir, self._species_id)
             with Vertical(id="right"):
                 speech = Static(self._pinned_speech or c.opener, id="speech")
                 speech.border_title = "they speak"
@@ -226,12 +230,16 @@ class AlienContactScreen(Screen):
                         yield Static(f"\n  [dim]context = {c.debug_context} | when = {c.debug_when}[/]", classes="derived")
         yield Footer()
 
-    def _portrait_opts(self) -> tuple[str, float]:
-        """The chafa symbol selector + cell font-ratio from config (defaults for the harness)."""
+    def _portrait_opts(self) -> tuple[str, float, str | None]:
+        """The chafa symbol selector, cell font-ratio, and image dir from config.
+
+        Falls back to the art-module defaults (and the default image dir) for the
+        screenshot harness, which has no service/config.
+        """
         if self._service is not None:
             ui = self._service.config.ui
-            return ui.portrait_symbols, ui.portrait_font_ratio
-        return art_portrait.DEFAULT_SYMBOLS, art_portrait.DEFAULT_FONT_RATIO
+            return ui.portrait_symbols, ui.portrait_font_ratio, ui.portrait_dir
+        return art_portrait.DEFAULT_SYMBOLS, art_portrait.DEFAULT_FONT_RATIO, None
 
     def _show_disabled(self) -> bool:
         return self._service.config.ui.show_disabled_options if self._service else False
