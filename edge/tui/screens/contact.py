@@ -23,6 +23,8 @@ from textual.widgets import Footer, Static
 from edge.core import dto
 from edge.core.rules import AcceptLead, BarterArtifact, BuyAlienTech, Converse
 from edge.server.service import GameService
+from edge.art import portrait as art_portrait
+from edge.tui.portrait import SpeciesPortrait
 from edge.tui.widgets import ClickableEntry, bar
 
 
@@ -114,11 +116,18 @@ class AlienContactScreen(Screen):
     AlienContactScreen #contact-standing {
         height: 1; padding: 0 1; color: $text-muted; border-bottom: solid $primary;
     }
-    AlienContactScreen #speech {
-        height: auto; border: round $secondary; padding: 0 1; margin: 1 2;
+    AlienContactScreen #contact-main { height: 1fr; padding: 0 1; }
+    AlienContactScreen #portrait-box {
+        width: 1fr; height: 1fr; border: round $secondary; margin: 1 1; padding: 0;
     }
-    AlienContactScreen #contact-main { height: 1fr; padding: 0 2; }
-    AlienContactScreen #left { width: 1fr; height: 1fr; }
+    AlienContactScreen #portrait-box SpeciesPortrait {
+        width: 1fr; height: 1fr; content-align: center middle;
+    }
+    AlienContactScreen #right { width: 1fr; height: 1fr; }
+    AlienContactScreen #speech {
+        height: 1fr; border: round $secondary; padding: 0 1; margin: 1 1;
+    }
+    AlienContactScreen #verbs { height: 2fr; margin: 0 1; }
     AlienContactScreen #verbs .heading { color: $secondary; text-style: bold; }
     AlienContactScreen #verbs .subhead { color: $text-muted; text-style: bold; margin-top: 1; }
     AlienContactScreen #verbs .derived { color: $text-muted; margin-top: 1; }
@@ -192,11 +201,14 @@ class AlienContactScreen(Screen):
             f"        alliance: [cyan]{c.alliance}[/]",
             id="contact-standing",
         )
-        speech = Static(self._pinned_speech or c.opener, id="speech")
-        speech.border_title = "they speak"
-        yield speech
         with Horizontal(id="contact-main"):
-            with Vertical(id="left"):
+            with Vertical(id="portrait-box"):
+                symbols, font_ratio = self._portrait_opts()
+                yield SpeciesPortrait(c.roster_id, c.species, symbols, font_ratio)
+            with Vertical(id="right"):
+                speech = Static(self._pinned_speech or c.opener, id="speech")
+                speech.border_title = "they speak"
+                yield speech
                 with Vertical(id="verbs"):
                     heading = "Your reply" if c.choices else "Options"
                     yield Static(heading, classes="heading")
@@ -213,6 +225,13 @@ class AlienContactScreen(Screen):
                     if self.playtest_mode:
                         yield Static(f"\n  [dim]context = {c.debug_context} | when = {c.debug_when}[/]", classes="derived")
         yield Footer()
+
+    def _portrait_opts(self) -> tuple[str, float]:
+        """The chafa symbol selector + cell font-ratio from config (defaults for the harness)."""
+        if self._service is not None:
+            ui = self._service.config.ui
+            return ui.portrait_symbols, ui.portrait_font_ratio
+        return art_portrait.DEFAULT_SYMBOLS, art_portrait.DEFAULT_FONT_RATIO
 
     def _show_disabled(self) -> bool:
         return self._service.config.ui.show_disabled_options if self._service else False

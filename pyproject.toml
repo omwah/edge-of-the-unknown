@@ -48,6 +48,8 @@ pytest-cov = "*"
 edge-of-the-unknown = { path = ".", editable = true }
 textual-serve = "*"  # `--serve`: host the Textual app in a browser (DESIGN §15)
 tracery = ">=0.1.1"  # offline-authored grammar realisation of alien dialogue (DESIGN §6.7)
+"chafa.py" = "*"     # Python binding to libchafa: render species portraits as terminal art (tui)
+pillow = "*"         # decode portrait images to pixels for chafa (tui)
 
 [tool.pixi.tasks]
 edge = "python -m edge.tui"
