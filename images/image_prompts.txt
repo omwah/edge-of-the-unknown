@@ -1,0 +1,80 @@
+# Edge of the Unknown — Species Portrait Prompts
+
+This file records the exact prompts used to generate the 1024x1024 EGA-style species portraits.
+
+---
+
+### 1. Terrans (`terran_portrait`)
+```
+EGA retro game pixel art portrait of a Terran (human) space explorer: a robed diplomat and explorer, looking professional and friendly. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 2. Centaurians (`centaurian_portrait`)
+```
+EGA retro game pixel art portrait of a Centaurian: a tall humanoid with pale, patterned skin, wearing professional diplomatic robes. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 3. Vesk (`vesk_portrait`)
+```
+EGA retro game pixel art portrait of a Vesk: a small, intelligent canine-like fox creature with upright ears and a resourcefulness/technologist look. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 4. Selvani (`selvani_portrait`)
+```
+EGA retro game pixel art portrait of a Selvani: a soft-bodied alien with a rounded head, large expressive eyes, and trailing tentacle-like frond limbs. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 5. Helot (`helot_portrait`)
+```
+EGA retro game pixel art portrait of a Helot: a faceless robot consisting of a central brain-dome body topped by an antenna, fronted by a glowing lit interface slot, and flanked by two thin manipulator arms. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 6. Quill (`quill_portrait`)
+```
+EGA retro game pixel art portrait of a Quill: a ten-foot space alien with an encapsulated translucent body and long trailing ribbon-like tendrils floating in space. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 7. Stryx (`stryx_portrait`)
+```
+EGA retro game pixel art portrait of a Stryx: a small bilaterally-symmetric alien organism with a flared trumpet-like head, two ribbed side limbs, and faint magnetic energy field lines. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 8. Concordance (`concordance_portrait`)
+```
+EGA retro game pixel art portrait of the Concordance: a bodiless space-dwelling cosmic entity, a vast glowing energy presence in deep space representing a cosmic arbiter. Isolated close-up. No text, no frames, no borders, no HUD, no UI, no console borders, only the cosmic entity itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 9. Dignar (`dignar_portrait`)
+```
+EGA retro game pixel art portrait of a Dignar: a camelid-faced aristocrat with a llama-like head, soft muzzle, and plumed crest on a long neck, wearing elegant robed clothing. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 10. Cibelline (`cibelline_portrait`)
+```
+EGA retro game pixel art portrait of a Cibelline: an elegant engineered genetic mutant alien with a robed upright form, elegant posture, and a crested head. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 11. Selvi (`selvi_portrait`)
+```
+EGA retro game pixel art portrait of a Selvi: an impish gremlin-like humanoid with a horn on its head, draped robe over a small torso, and a wide face dominated by large, curious round eyes. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 12. Vennrith (`vennrith_portrait`)
+```
+EGA retro game pixel art portrait of a Vennrith: a large-headed smooth-skinned alien with a heavy speckled body, and small horns on its snout and ears, looking fierce and proud. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 13. Thessarch (`thessarch_portrait`)
+```
+EGA retro game pixel art portrait of a Thessarch: a psionic alien with an enlarged pale cranium dome, large dark eyes, and a small body with slight appendages, looking mysterious and powerful. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 14. Thessbrood (`thessbrood_portrait`)
+```
+EGA retro game pixel art portrait of a Thessbrood: a colonial space alien consisting of a large dark master brain-sac housed in a stone-like plinth, surrounded and attended by small insectoid broodlings grooming it. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
+
+### 15. Dacaran (`dacaran_portrait`)
+```
+EGA retro game pixel art portrait of a Dacaran: a winged horned demon-like humanoid with broad bat-like wings and burning eyes, looking menacing and physically imposing. Isolated close-up bust shot. No text, no frames, no borders, no HUD, no UI, no console borders, only the character itself against a solid black background. Limited high-contrast palette: cyan (#00cccc), yellow (#cccc00), magenta (#cc00cc), light grey (#c0c0c0), and black (#000000). 1980s retro sci-fi BBS pixel graphics, square aspect ratio.
+```
