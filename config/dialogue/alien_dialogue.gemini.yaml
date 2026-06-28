@@ -36,6 +36,8 @@ species_grammars:
           - text: Safe travels, Captain. Signing off.
             next_context: farewell
             action: leave
+          - text: Tell me about the Terrans.
+            next_context: dossier_self
     trade_open:
       - grammar:
           origin:
@@ -126,6 +128,8 @@ species_grammars:
           - text: Let's discuss trade agreements.
             next_context: trade_open
             action: trade
+          - text: Tell me about the Terrans instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -290,6 +294,8 @@ species_grammars:
             action: leave
           - text: Do you have any diplomatic intelligence on other species?
             next_context: dossier_other
+          - text: Tell me about the Centaurians.
+            next_context: dossier_self
     trade_open:
       - grammar:
           origin:
@@ -379,6 +385,8 @@ species_grammars:
             action: trade
           - text: Do you have any diplomatic intelligence on other species?
             next_context: dossier_other
+          - text: Tell me about the Centaurians instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -450,6 +458,8 @@ species_grammars:
             action: leave
           - text: Do you have any diplomatic intelligence on other species?
             next_context: dossier_other
+          - text: Tell me about the Centaurians.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - A logical proposition. We are prepared to discuss terms.
@@ -579,6 +589,8 @@ species_grammars:
             action: leave
           - text: What data do your technologists have on other species?
             next_context: dossier_other
+          - text: Tell me about the Vesk.
+            next_context: dossier_self
     trade_open:
       - grammar:
           origin:
@@ -672,6 +684,8 @@ species_grammars:
           - text: Thank you for the data update. Farewell.
             next_context: farewell
             action: leave
+          - text: Tell me about the Vesk instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -735,6 +749,8 @@ species_grammars:
             action: leave
           - text: What data do your technologists have on other species?
             next_context: dossier_other
+          - text: Tell me about the Vesk.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - An alliance? Our workshops could share much with you.
@@ -862,6 +878,8 @@ species_grammars:
             action: leave
           - text: Have you observed any other species nearby?
             next_context: dossier_other
+          - text: Tell me about the Selvani.
+            next_context: dossier_self
     trade_refuse:
       - variants:
           - We must observe your peaceful intent over many orbits before we open our
@@ -963,6 +981,8 @@ species_grammars:
           - text: May we exchange our peaceful trade goods?
             next_context: trade_open
             action: trade
+          - text: Tell me about the Selvani instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -1022,6 +1042,8 @@ species_grammars:
           - text: Safe travels, Selvani.
             next_context: farewell
             action: leave
+          - text: Tell me about the Selvani.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - You wish to join your current to ours? The depths are listening.
@@ -1147,6 +1169,8 @@ species_grammars:
             action: trade
           - text: Requesting data entries on other biological entities.
             next_context: dossier_other
+          - text: Tell me about the Helots.
+            next_context: dossier_self
     trade_refuse:
       - variants:
           - Trade protocol disabled. Altruism function offline. Awaiting Philanthropy
@@ -1248,6 +1272,8 @@ species_grammars:
           - text: Initiate trade transaction.
             next_context: trade_open
             action: trade
+          - text: Tell me about the Helots instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -1300,6 +1326,8 @@ species_grammars:
           - text: I will proceed to other coordinates.
             next_context: farewell
             action: leave
+          - text: Tell me about the Helots.
+            next_context: dossier_self
     branch.inquiry:
       - grammar:
           origin:
@@ -1335,6 +1363,8 @@ species_grammars:
             action: trade
           - text: Requesting data entries on other biological entities.
             next_context: dossier_other
+          - text: Tell me about the Helots.
+            next_context: dossier_self
     branch.trade:
       - grammar:
           origin:
@@ -1360,6 +1390,8 @@ species_grammars:
           - text: I don't have time for this.
             next_context: farewell
             action: leave
+          - text: Tell me about the Helots.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - Processing alliance request... Altruism subroutines engaged.
@@ -1488,6 +1520,8 @@ species_grammars:
             action: leave
           - text: Who else is out here waiting to be salvaged?
             next_context: dossier_other
+          - text: Tell me about the Quill.
+            next_context: dossier_self
     trade_open:
       - grammar:
           origin:
@@ -1583,6 +1617,8 @@ species_grammars:
           - text: Show me what scrap you have for barter.
             next_context: trade_open
             action: trade
+          - text: Tell me about the Quill instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -1650,6 +1686,8 @@ species_grammars:
             action: leave
           - text: Who else is out here waiting to be salvaged?
             next_context: dossier_other
+          - text: Tell me about the Quill.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - A pact? If it brings profit and safety, the Quill are listening.
@@ -1776,6 +1814,8 @@ species_grammars:
           - text: Just passing through. Farewell.
             next_context: farewell
             action: leave
+          - text: Tell me about the Stryx.
+            next_context: dossier_self
     trade_open:
       - grammar:
           origin:
@@ -1862,6 +1902,8 @@ species_grammars:
           - text: Farewell.
             next_context: farewell
             action: leave
+          - text: Tell me about the Stryx instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -1927,6 +1969,8 @@ species_grammars:
             action: leave
           - text: Translate info-cache on other species!
             next_context: dossier_other
+          - text: Tell me about the Stryx.
+            next_context: dossier_self
     dossier_self:
       - when:
           standing: hostile
@@ -2027,6 +2071,8 @@ species_grammars:
             action: leave
           - text: What judgment do you pass on the other species?
             next_context: dossier_other
+          - text: Tell me about the Concordance.
+            next_context: dossier_self
     trade_refuse:
       - variants:
           - The Cosmic One does not barter for trinkets. Our judgment is not for sale.
@@ -2124,6 +2170,8 @@ species_grammars:
           - text: Would you deign to exchange offerings?
             next_context: trade_open
             action: trade
+          - text: Tell me about the Concordance instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -2185,6 +2233,8 @@ species_grammars:
           - text: Would you deign to exchange offerings?
             next_context: trade_open
             action: trade
+          - text: Tell me about the Concordance.
+            next_context: dossier_self
     dossier_self:
       - when:
           standing: hostile
@@ -2297,6 +2347,8 @@ species_grammars:
             action: trade
           - text: Share your mind-echoes of the other species.
             next_context: dossier_other
+          - text: Tell me about the Dignar.
+            next_context: dossier_self
     trade_open:
       - grammar:
           origin:
@@ -2387,6 +2439,8 @@ species_grammars:
             action: trade
           - text: Share your mind-echoes of the other species.
             next_context: dossier_other
+          - text: Tell me about the Dignar instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -2447,6 +2501,8 @@ species_grammars:
             action: trade
           - text: Share your mind-echoes of the other species.
             next_context: dossier_other
+          - text: Tell me about the Dignar.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - You ask for the protection of the Dignar? We will consider it.
@@ -2569,6 +2625,8 @@ species_grammars:
             action: leave
           - text: What of the other, less elegant species?
             next_context: dossier_other
+          - text: Tell me about the Cibelline.
+            next_context: dossier_self
     trade_refuse:
       - variants:
           - Your vessel is far too mundane to grace our markets. Prove your worth
@@ -2670,6 +2728,8 @@ species_grammars:
           - text: I must depart.
             next_context: farewell
             action: leave
+          - text: Tell me about the Cibelline instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -2727,6 +2787,8 @@ species_grammars:
           - text: I must take my leave.
             next_context: farewell
             action: leave
+          - text: Tell me about the Cibelline.
+            next_context: dossier_self
     branch.vesk_vengeance:
       - grammar:
           origin:
@@ -2762,6 +2824,8 @@ species_grammars:
           - text: I must depart.
             next_context: farewell
             action: leave
+          - text: Tell me about the Cibelline.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - An alliance? Let us see if our aesthetics are compatible.
@@ -2891,6 +2955,8 @@ species_grammars:
           - text: Back off, or I will open fire on your vessel.
             next_context: farewell
             action: attack
+          - text: Tell me about the Selvi.
+            next_context: dossier_self
     trade_open:
       - grammar:
           origin:
@@ -2976,6 +3042,8 @@ species_grammars:
           - text: I should get going.
             next_context: farewell
             action: leave
+          - text: Tell me about the Selvi instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -3137,6 +3205,8 @@ species_grammars:
             action: leave
           - text: Of the other species, what know you?
             next_context: dossier_other
+          - text: Tell me about the Vennrith.
+            next_context: dossier_self
     trade_refuse:
       - variants:
           - Trade with outsiders, we do not. Join the Covenant, you must, before our
@@ -3228,6 +3298,8 @@ species_grammars:
           - text: Trade with me, you will.
             next_context: trade_open
             action: trade
+          - text: Tell me about the Vennrith instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -3287,6 +3359,8 @@ species_grammars:
             action: trade
           - text: Of the other species, what know you?
             next_context: dossier_other
+          - text: Tell me about the Vennrith.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - A pact with the Covenant? A rare honor, this is.
@@ -3412,6 +3486,8 @@ species_grammars:
           - text: I request permission to trade.
             next_context: trade_open
             action: trade
+          - text: Tell me about the Thessarch.
+            next_context: dossier_self
     trade_refuse:
       - variants:
           - The markets of the Covenant are closed to the unpledged. Submit to my
@@ -3506,6 +3582,8 @@ species_grammars:
           - text: I request permission to trade.
             next_context: trade_open
             action: trade
+          - text: Tell me about the Thessarch instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -3567,6 +3645,8 @@ species_grammars:
           - text: I request permission to trade.
             next_context: trade_open
             action: trade
+          - text: Tell me about the Thessarch.
+            next_context: dossier_self
     branch.petition:
       - grammar:
           origin:
@@ -3603,6 +3683,8 @@ species_grammars:
             action: trade
           - text: What is your command regarding the other species?
             next_context: dossier_other
+          - text: Tell me about the Thessarch.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - You seek to bow before the Thessarchs? We accept your submission.
@@ -3734,6 +3816,8 @@ species_grammars:
             action: leave
           - text: What can your broodlings tell me of the others?
             next_context: dossier_other
+          - text: Tell me about the Thessbrood.
+            next_context: dossier_self
     trade_open:
       - grammar:
           origin:
@@ -3847,6 +3931,8 @@ species_grammars:
             action: trade
           - text: What can your broodlings tell me of the others?
             next_context: dossier_other
+          - text: Tell me about the Thessbrood instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -3917,6 +4003,8 @@ species_grammars:
           - text: I must be going now.
             next_context: farewell
             action: leave
+          - text: Tell me about the Thessbrood.
+            next_context: dossier_self
     branch.scan_cargo:
       - grammar:
           origin:
@@ -3951,6 +4039,8 @@ species_grammars:
           - text: I will take my leave now.
             next_context: farewell
             action: leave
+          - text: Tell me about the Thessbrood.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - Oh, a treaty with the mighty {player}? We are so honored!
@@ -4082,6 +4172,8 @@ species_grammars:
             action: leave
           - text: Who else stands against tyranny in this cluster?
             next_context: dossier_other
+          - text: Tell me about the Dacaran.
+            next_context: dossier_self
     trade_refuse:
       - variants:
           - We have nothing to exchange with those who serve the tyrants. Our resources
@@ -4185,6 +4277,8 @@ species_grammars:
           - text: Let us share our resources for the cause.
             next_context: trade_open
             action: trade
+          - text: Tell me about the Dacaran instead.
+            next_context: dossier_self
     offer_coordinates:
       - grammar:
           origin:
@@ -4256,6 +4350,8 @@ species_grammars:
             action: trade
           - text: Who else stands against tyranny in this cluster?
             next_context: dossier_other
+          - text: Tell me about the Dacaran.
+            next_context: dossier_self
     treaty_offer:
       - variants:
           - An alliance against the tyrants? We are listening.
