@@ -177,9 +177,11 @@ def test_contact_view_exposes_branch_choices_and_plain_node_falls_back() -> None
     vesk = _inject(state, "vesk")  # serial_formal persona authors greeting choices
     view = session.contact_view(state, 1, vesk.id, CFG)
     assert view.choices and view.choices[0].next_context == "branch.vesk_workshop"
-    # A species whose persona authors no choices keeps the derived Say/Do menu (empty choices).
+    # A species whose persona authors no choices falls back to the generic baseline menu.
     terran = _inject(state, "terran", sid=2)
-    assert session.contact_view(state, 1, terran.id, CFG).choices == []
+    choices = session.contact_view(state, 1, terran.id, CFG).choices
+    assert len(choices) > 0
+    assert any(c.next_context == "dossier_other" for c in choices)
 
 
 def test_converse_choice_transitions_to_branch_node() -> None:

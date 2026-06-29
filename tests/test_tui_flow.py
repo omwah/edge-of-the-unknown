@@ -495,8 +495,9 @@ async def test_hail_opens_contact_then_buys_tech() -> None:
         assert isinstance(app.screen, AlienContactScreen)
         # The persona-voiced opener renders.
         assert str(app.screen.query_one("#speech", Static).render())
-        # Buy tech via the keybinding 't' (tech offer picker opens as a modal).
-        await pilot.press("t")
+        # Buy tech: with no other species met, the baseline menu is 1 coordinates / 2 Trade.
+        # The Trade reply opens the tech offer picker modal.
+        await pilot.press("2")
         await pilot.pause()
         assert isinstance(app.screen, OfferPickerScreen)
         # Select the (only) available tech offer from the picker modal.

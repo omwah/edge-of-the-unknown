@@ -18,7 +18,7 @@ from edge.core import dto
 from edge.server import mapgraph
 from edge.server import terrain as terrain_art
 from edge.core.aliens import disposition_band, effective_disposition
-from edge.core.config import DialogueChoice, GameConfig, RosterConfig
+from edge.core.config import DialogueChoice, GameConfig
 from edge.core.discovery import is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import build_subsystems, derive_aspects
