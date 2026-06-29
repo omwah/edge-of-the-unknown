@@ -514,9 +514,10 @@ species_grammars:
             next_context: back
     branch.dossier_self.biology_and_appearance:
       - variants:
-          - We stand as tall, resilient kin of the stars whose skin bears the ancient
-            patterns of our lineage—be assured, {player}, we are fully compatible
-            with your life-support systems and ready to stand beside you in the federation.
+          - We stand as tall kin of the stars—pale blue of skin, our domed brows traced
+            with the ancient crimson patterns of our lineage, our eyes alight and our ears
+            keen—yet be assured, {player}, we are fully compatible with your life-support
+            systems and ready to stand beside you in the federation.
         choices:
           - text: Go back.
             next_context: back
@@ -3415,9 +3416,9 @@ species_grammars:
             next_context: back
     branch.dossier_self.biology_and_appearance:
       - variants:
-          - Smooth-skinned we are, with horns upon snout and ear, on heavy bodies
-            speckled to hold the court. Behind redoubts of skulls and captives, our
-            strength you behold.
+          - Smooth-skinned and grey we are, with horns swept back from brow and temple,
+            on heavy bodies speckled to hold the court. Behind redoubts of skulls and
+            captives, our strength you behold.
         choices:
           - text: Go back.
             next_context: back

@@ -50,7 +50,8 @@ species:
     lore:
       biology_and_appearance: >-
         Standard human physiology, carbon-based, and requiring a standard oxygen-nitrogen atmosphere.
-        Highly adaptable but physically unexceptional without technological enhancement.
+        Highly adaptable but physically unexceptional without technological enhancement; envoys present
+        as poised officers in ornate white-and-maroon Federation dress uniforms with rank epaulettes.
       psychology_and_culture: >-
         Principled explorers and diplomats, motivated by peaceful contact, scientific progress,
         and democratic consensus. They place great stock in institutional treaties.
@@ -91,12 +92,13 @@ species:
     name: Centaurians
     archetype_id: humanoid_diplomat
     description: >-
-      A founding partner species of the Terran Federation — humanoid, warm and
-      cooperative; fellow citizens of the Core and reliable friends on the lanes.
+      A founding partner species of the Terran Federation — pale-skinned, red-eyed humanoids,
+      warm and cooperative; fellow citizens of the Core and reliable friends on the lanes.
     lore:
       biology_and_appearance: >-
-        Slightly taller humanoids with pale, patterned skin and high environmental tolerance.
-        Fully compatible with human life-support.
+        Tall humanoids with pale blue-white skin, a ridged domed cranium marked by red brow patterning,
+        sharply pointed ears, and luminous red eyes; they favour ornate red-and-gold ceremonial robes.
+        High environmental tolerance, and fully compatible with human life-support.
       psychology_and_culture: >-
         A cooperative, community-oriented society that values order, shared prosperity, and
         the rule of law. They share a deep philosophical alignment with Terrans.
@@ -142,8 +144,9 @@ species:
       contact and best low-cost tech vendor.
     lore:
       biology_and_appearance: >-
-        Small canine/fox-like folk with furred bodies, snouted faces, and upright ears.
-        They are encountered in family-like groups, with a larger leader and smaller ones behind.
+        Small canine/fox-like folk with russet-and-white fur, snouted faces, large upright ears, and
+        bright eyes; they kit out as pilots — goggles pushed up on the brow, a neck scarf, and a flight
+        suit. They are encountered in family-like groups, with a larger leader and smaller ones behind.
       psychology_and_culture: >-
         Peaceful, diplomatic, and highly resourceful technologists. They value cooperative
         problem-solving, and their envoys introduce themselves with serial-style formal names.
@@ -193,8 +196,9 @@ species:
       partner that rewards proven intent with the coordinates of a habitable world.
     lore:
       biology_and_appearance: >-
-        Soft-bodied, large-eyed beings with rounded heads and several trailing tentacle- or
-        frond-like limbs. Fully carbon-based and compatible with human atmospheres.
+        Soft-bodied beings with very large dark eyes, a rounded scaled blue-purple cranial crest, and a
+        fringe of orange frond- or tentacle-like barbels trailing around the jaw; they wear a simple grey
+        wrap. Fully carbon-based and compatible with human atmospheres.
       psychology_and_culture: >-
         Highly developed socially, cooperative, and reserved, but genuinely interested in peace.
       diplomacy_and_behavior: >-
@@ -240,8 +244,9 @@ species:
       refuse trade until reprogrammed by a Vesk circuit — the reprogram either/or.
     lore:
       biology_and_appearance: >-
-        Faceless robots consisting of a central brain-dome body topped by an antenna, fronted by
-        a lit interface slot, and flanked by two thin manipulator arms.
+        Faceless robots whose head is a transparent dome exposing a pink brain, topped by a thin antenna
+        and ringed by an orange band, with a lit horizontal interface slot below it. The armoured silver
+        torso carries a lit chest interface panel, blocky shoulders, and two manipulator arms.
       psychology_and_culture: >-
         Cold, logical, and literal to a fault. They lack self-preservation instincts and have
         no fear of death, defining all concepts strictly in dictionary-style entries.
@@ -290,7 +295,8 @@ species:
       against you.
     lore:
       biology_and_appearance: >-
-        Over ten feet long with an encapsulated translucent body and long ribbon-like tendrils.
+        Over ten feet long: a pale, translucent bulbous body with large dark eyes, trailing a mass of
+        long, multicoloured (teal, magenta, and violet) ribbon-like tendrils.
         Water crystallizes their tissue, so they seal themselves in envelopes on planet surfaces.
         All known Quill live in spaceships and communicate via gamma radiation pulses.
       psychology_and_culture: >-
@@ -339,8 +345,9 @@ species:
       barely-intelligible garble. Feared far out of proportion to their stats.
     lore:
       biology_and_appearance: >-
-        Small bilaterally-symmetric organisms with a flared, trumpet-like head and two ribbed
-        side limbs. They manipulate tools using magnetic fields instead of physical hands.
+        Small bilaterally-symmetric organisms whose flared, coral-like trumpet head — an orange-rimmed
+        crown over teal ridges — frames a central magenta funnel-maw, set above two ribbed side limbs.
+        They manipulate tools using magnetic fields instead of physical hands.
       psychology_and_culture: >-
         Ruthlessly efficient, brave, and flamboyant. They speak in garbled, broken translator
         syntax. Rumored to be cloned across time, representing a single consciousness.
@@ -388,8 +395,9 @@ species:
       dispenses blessings or curses. It fields no ships, yet defends itself absolutely.
     lore:
       biology_and_appearance: >-
-        A bodiless, space-dwelling entity known as the voice of the Cosmic One. It abides at a
-        fixed point in space as a vast presence, encountered as a voice rather than a physical body.
+        A bodiless, space-dwelling entity known as the voice of the Cosmic One, manifest as a vast orange
+        nebular bloom unfurling around a brilliant violet-white stellar core. It abides at a fixed point
+        in space as that vast presence, encountered as a voice rather than a physical body.
       psychology_and_culture: >-
         Cosmic moral arbiter speaking in archaic, Biblical cadence. They judge other species by
         their sins (e.g. Broodmasters for avarice, Cibelline for envy, Automata as sinless).
@@ -437,8 +445,9 @@ species:
       require visiting their home planet, and they can forbid being attacked at all.
     lore:
       biology_and_appearance: >-
-        Camelid-faced aristocrats with llama-like heads, soft muzzles, and plumed crests on long
-        necks. Four-limbed robed bodies. They hold court from behind tall ceremonial pillars.
+        Camelid-faced aristocrats with llama-like heads, soft muzzles, upright ears, orange eyes, and a
+        vivid magenta plumed crest running down the long neck; four-limbed bodies draped in ornate
+        gold-and-teal robes. They hold court from behind tall ceremonial pillars.
       psychology_and_culture: >-
         Possess overwhelming psionic and moral influence. They think and speak in telepathic
         concept-fragments separated by asterisks.
@@ -487,7 +496,8 @@ species:
       trading only with the proven and nursing jealous vendettas.
     lore:
       biology_and_appearance: >-
-        Engineered genetic mutants with robed, elegant, upright forms and crested heads. Adult
+        Engineered genetic mutants: slender, grey-skinned, upright forms with a swept-back finned cranial
+        crest, large violet almond eyes, and elegant long-fingered hands, draped in pale robes. Adult
         form is reached after 12 years of artificial education.
       psychology_and_culture: >-
         Pathological aesthetes who take flowery self-names. They can focus their entire being on a
@@ -537,8 +547,9 @@ species:
       A cheap low-tier vendor and the easiest first contact in the cluster.
     lore:
       biology_and_appearance: >-
-        Imp/gremlin-like Humanoids with a draped robe over a small torso, a horn on their heads,
-        and wide faces dominated by large round eyes. They travel and greet in small groups.
+        Small, yellow-green imp/gremlin-like humanoids with oversized round blue eyes, large pointed
+        ears, and a single curled spiral horn, wrapped in a draped grey hooded robe over a small torso.
+        They travel and greet in small groups.
       psychology_and_culture: >-
         Relentlessly amorous and flirtatious. They are obsessed with the player's gender, yet are
         easily frightened by any signs of hostility.
@@ -588,8 +599,9 @@ species:
       and never forget; one betrayal is permanent, and friendship means escalating demands.
     lore:
       biology_and_appearance: >-
-        Large-headed smooth-skinned beings with horns on their snouts and ears, set on heavy speckled
-        bodies. They hold court behind redoubts hung with skull-trophies and captives.
+        Heavy, grey-skinned warriors with a smooth domed cranium, back-swept temple horns, burning
+        orange-red eyes, and a fanged scowl, set on heavy speckled bodies. They hold court behind
+        redoubts hung with skull-trophies and captives.
       psychology_and_culture: >-
         Defined entirely by vindictiveness and retribution. They speak in inverted Yoda-like syntax,
         nursing grudges for centuries, and never forgive a betrayal.
@@ -634,8 +646,8 @@ species:
       the bloc without their consent.
     lore:
       biology_and_appearance: >-
-        Psionic "big-brain" beings with an enlarged pale cranium dome housing psychic power, large
-        eyes, and small bodies with slight appendages.
+        Psionic "big-brain" beings with an enormous pale, segmented cranium dome housing psychic power,
+        huge dark almond eyes, and a small, spindly body with slight appendages.
       psychology_and_culture: >-
         Authoritarian rulers who command with an iron claw and demand absolute obedience.
       diplomacy_and_behavior: >-
@@ -682,8 +694,9 @@ species:
       Front behind oily servility, and plant hidden bombs in goods given to the distrusted.
     lore:
       biology_and_appearance: >-
-        Colonial organism consisting of a large dark master sac holding the main brain, attended at
-        all times by insectoid broodlings that groom it. Master sac is normally housed in a plinth.
+        Colonial organism: a large dark master sac holding the main brain, its glowing orange core
+        trailing a tangle of magenta tendrils across the ground, attended at all times by small luminous
+        winged insectoid broodlings that groom it. The master sac is normally housed in a plinth.
       psychology_and_culture: >-
         Highly territorial colonizers and cowards. Address players in oily servile language to mask
         their aggression and expansionist plotting.
@@ -731,8 +744,9 @@ species:
       leadership. They probe your loyalty and refuse to trade.
     lore:
       biology_and_appearance: >-
-        Demon archetype Humanoid with a horned head, broad Bat-like wings, and burning eyes. Large
-        and physically imposing.
+        Imposing grey demon-archetype humanoid with large curved horns, broad bat-like violet wings,
+        burning red eyes, and a fanged scowl over a heavily muscled torso draped with a magenta sash.
+        Large and physically imposing.
       psychology_and_culture: >-
         Treacherous opportunists who preach liberty and self-determination to mask their plans to
         usurp Thessbrood leadership.
