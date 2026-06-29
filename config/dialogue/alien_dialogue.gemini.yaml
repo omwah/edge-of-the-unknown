@@ -2065,8 +2065,7 @@ species_grammars:
           - text: I seek the blessing of the Concordance.
             next_context: branch.inquiry
           - text: Let us trade.
-            next_context: trade_open
-            action: trade
+            next_context: trade_refuse
           - text: I will leave you to your judgment.
             next_context: farewell
             action: leave
@@ -2079,36 +2078,6 @@ species_grammars:
           - The Cosmic One does not barter for trinkets. Our judgment is not for sale.
         choices:
           - text: I will leave you to your judgment.
-            next_context: farewell
-            action: leave
-    trade_open:
-      - grammar:
-          origin:
-            - '#opener#, #honorific#! #detail#, #aside#.'
-          opener:
-            - Hearken, O {player}
-            - Give ear to our voice
-            - Lo, we look down upon thee
-          honorific:
-            - dweller in clay
-            - seeker of temporal gains
-            - transient soul
-          detail:
-            - we shall weigh thy earthly goods and measure thy deeds
-            - we offer the bounty of the heavens to those who walk uprightly
-            - our storehouses are open to thee, should thy record find favor
-          aside:
-            - yet remember that all wealth is but dust
-            - for the Cosmic One watches thy every exchange
-            - know that avarice is a heavy burden upon the spirit
-        choices:
-          - text: Show me what you have to trade, O Voice.
-            next_context: trade_open
-            action: trade
-          - text: Let us negotiate. What are your terms?
-            next_context: trade_open
-            action: barter
-          - text: I must depart. I will walk in peace.
             next_context: farewell
             action: leave
     farewell:
@@ -2169,8 +2138,7 @@ species_grammars:
             next_context: farewell
             action: leave
           - text: Would you deign to exchange offerings?
-            next_context: trade_open
-            action: trade
+            next_context: trade_refuse
           - text: Tell me about the Concordance instead.
             next_context: dossier_self
     offer_coordinates:
@@ -2232,28 +2200,27 @@ species_grammars:
             next_context: farewell
             action: leave
           - text: Would you deign to exchange offerings?
-            next_context: trade_open
-            action: trade
+            next_context: trade_refuse
           - text: Tell me about the Concordance.
             next_context: dossier_self
     dossier_self:
       - when:
           standing: hostile
         variants:
-          - The The Concordance do not share our history with those we do not trust.
+          - The Concordance do not share our history with those we do not trust.
           - Why should we tell you of our ways, traveler?
       - when:
           standing: neutral
         variants:
-          - The The Concordance do not share our history with those we do not trust.
+          - The Concordance do not share our history with those we do not trust.
           - Why should we tell you of our ways, traveler?
       - when:
           standing: wary
         variants:
-          - The The Concordance do not share our history with those we do not trust.
+          - The Concordance do not share our history with those we do not trust.
           - Why should we tell you of our ways, traveler?
       - variants:
-          - We are the The Concordance, of {alliance}. What would you like to know
+          - We are the Concordance, of {alliance}. What would you like to know
             about us?
         choices:
           - text: Tell me about your biology and appearance.
@@ -3759,7 +3726,7 @@ species_grammars:
             next_context: back
     branch.dossier_self.diplomacy_and_behavior:
       - variants:
-          - We are the architects of the Love Alliance; should {player} submit to
+          - We are the architects of the Iron Covenant; should {player} submit to
             our binding fealty, you shall walk the path of non-aggression, but any
             deviation from our sacred decree will result in your immediate expulsion.
         choices:
@@ -3768,8 +3735,8 @@ species_grammars:
     branch.dossier_self.relationships:
       - variants:
           - We command the Covenant over the Vennrith and Helot systems; we hold the
-            iron keys to the gate, utterly rejecting those weak-willed 'Freedom' or
-            'Peace' alliances. Let the Cibelline's petty insults regarding our discipline
+            iron keys to the gate, utterly rejecting the weak-willed Liberty Front
+            and Verdant Compact. Let the Cibelline's petty insults regarding our discipline
             be ignored—only submission to our order yields true stability.
         choices:
           - text: Go back.
@@ -4117,7 +4084,7 @@ species_grammars:
     branch.dossier_self.diplomacy_and_behavior:
       - variants:
           - We seek only to offer {player} a path of mutual prosperity by dismantling
-            the agitators of Peace/Love; once your service is rendered, our most sacred
+            the agitators of the Verdant Compact and Iron Covenant; once your service is rendered, our most sacred
             treaties shall be unveiled. We are naturally cautious beings, hence why
             we include 'protective measures' in our cargo—small safeguards against
             those who would dare exploit our generous gifts.
@@ -4166,8 +4133,7 @@ species_grammars:
           - text: I am here to help weaken the Thessbrood.
             next_context: offer_coordinates
           - text: Do you have goods to trade?
-            next_context: trade_open
-            action: trade
+            next_context: trade_refuse
           - text: I must take my leave.
             next_context: farewell
             action: leave
@@ -4181,39 +4147,6 @@ species_grammars:
             are for the cause alone.
         choices:
           - text: I must go.
-            next_context: farewell
-            action: leave
-    trade_open:
-      - grammar:
-          origin:
-            - '#opener#, #honorific#; #detail# #aside#'
-          opener:
-            - To break the chains of oppression, we must share our strength
-            - A true partnership is forged in the fires of mutual aid
-            - We offer the resources of cooperative liberation
-          honorific:
-            - champion of liberty
-            - seeker of self-determination
-            - brave ally of the {alliance}
-          detail:
-            - so let us trade freely, {player}, ensuring the {species} have the means
-              to defy the tyrants
-            - hence we open our cargo holds to you, that we may both be armed for
-              the coming dawn
-            - therefore we invite you to deal, for a well-supplied ship is the first
-              step toward freedom
-          aside:
-            - (though the Dacaran must ultimately guide our collective path).
-            - (for true freedom requires a strong hand to lead the front, after all).
-            - (naturally, our own supremacy will ensure the peace that follows).
-        choices:
-          - text: Show me your supplies. Let's trade.
-            next_context: trade_open
-            action: trade
-          - text: I don't trust you, but I'll barter.
-            next_context: trade_open
-            action: barter
-          - text: I'm leaving.
             next_context: farewell
             action: leave
     farewell:
@@ -4276,8 +4209,7 @@ species_grammars:
             next_context: farewell
             action: leave
           - text: Let us share our resources for the cause.
-            next_context: trade_open
-            action: trade
+            next_context: trade_refuse
           - text: Tell me about the Dacaran instead.
             next_context: dossier_self
     offer_coordinates:
@@ -4347,8 +4279,7 @@ species_grammars:
             next_context: farewell
             action: leave
           - text: Let us share our resources for the cause.
-            next_context: trade_open
-            action: trade
+            next_context: trade_refuse
           - text: Who else stands against tyranny in this cluster?
             next_context: dossier_other
           - text: Tell me about the Dacaran.
