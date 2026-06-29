@@ -388,7 +388,7 @@ species:
   # Concordance — a bodiless fixed-lair entity that judges the player's whole record
   # and dispenses blessings/curses; fields no ships. (cf. Monad.)
   - id: concordance
-    name: The Concordance
+    name: Concordance
     archetype_id: cosmic_arbiter
     description: >-
       A bodiless, fixed-lair entity that judges your whole record of conduct and
@@ -651,10 +651,10 @@ species:
       psychology_and_culture: >-
         Authoritarian rulers who command with an iron claw and demand absolute obedience.
       diplomacy_and_behavior: >-
-        Gatekeepers of the Love Alliance. Captures binding fealty; allying with them binds the player
+        Gatekeepers of the Iron Covenant. Compel binding fealty; allying with them binds the player
         to no-attack rules. Voiding rules immediately breaks alliance.
       relationships:
-        Rule the Covenant over Vennrith and Helot. Opposed to Freedom and Peace alliances. Dismissed
+        Rule the Covenant over Vennrith and Helot. Opposed to the Liberty Front and Verdant Compact. Dismissed
         by Cibelline as terminally dull.
       combat_and_ships: >-
         Deploy massive Dtri Battlecruisers, among the largest and most powerful capital warships in
@@ -701,7 +701,7 @@ species:
         Highly territorial colonizers and cowards. Address players in oily servile language to mask
         their aggression and expansionist plotting.
       diplomacy_and_behavior: >-
-        Recruit captains to destroy Peace/Love bases. Withhold treaties until service is rendered.
+        Recruit captains to destroy Verdant Compact and Iron Covenant bases. Withhold treaties until service is rendered.
         Distrustful, planting TDX bombs in goods given to players.
       relationships: >-
         Lead the Liberty Front, with Dacaran as junior partners. Despise Dignar and Thessarch. Target
