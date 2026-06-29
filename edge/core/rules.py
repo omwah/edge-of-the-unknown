@@ -1512,13 +1512,15 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
             facts["subject"] = subject_sp.roster_id
     ring = player.dialogue_recency.get((species.roster_id, cmd.context), ())
     rng = dialogue.encounter_rng(state.game.seed, species.roster_id, cmd.context, ring)
-    entry = dialogue.entry_for(config.roster, species, player, cmd.context,
-                               aliens=config.aliens, rng=rng, facts=facts)
-    if entry is None or not entry.choices:
+    # The reply menu resolves via the same fallback (entry choices → generic baseline) the
+    # contact-screen view uses, so the position `choice_index` carries agrees on both sides.
+    choices = dialogue.choices_for(config.roster, species, player, cmd.context,
+                                   aliens=config.aliens, rng=rng, facts=facts)
+    if not choices:
         raise EconomyError("there is nothing to choose here")
-    if not 0 <= cmd.choice_index < len(entry.choices):
+    if not 0 <= cmd.choice_index < len(choices):
         raise EconomyError("no such reply")
-    choice = entry.choices[cmd.choice_index]
+    choice = choices[cmd.choice_index]
     allied = player.alliance_id is not None and player.alliance_id == species.alliance_id
     standing = dialogue.standing_for(
         effective_disposition(species, player), allied=allied, aliens=config.aliens)

@@ -505,26 +505,6 @@ class GameState:
 
 
 @dataclass(frozen=True)
-class ContactVerbDTO:
-    """One row of the alien-contact verb menu (§6.7), derived from species params.
-
-    A disabled verb carries the `reason` it is greyed (e.g. "they refuse to trade").
-    `kind` groups the row under the **Say** (dialogue) or **Do** (mechanical) heading;
-    a "say" verb names the dialogue `context` it speaks and, for *Ask about…*, sets
-    `needs_subject` so the TUI opens the subject picker (WP17). The dispatch metadata
-    lets the screen drive the menu without hardcoding a verb→action map.
-    """
-
-    key: str
-    label: str
-    enabled: bool = True
-    reason: str = ""
-    kind: str = "do"  # "say" | "do"
-    context: str = ""  # the dialogue context a "say" verb speaks ("" for "do" verbs)
-    needs_subject: bool = False  # this "say" verb opens the subject picker (dossier_other)
-
-
-@dataclass(frozen=True)
 class TechOfferDTO:
     """One alien tech offer (§6, §8): a component or aspect upgrade, for latinum or barter."""
 
@@ -572,19 +552,15 @@ class ContactDTO:
     attitude: float
     effective: float
     opener: str  # the greeting line (WP8 dialogue)
-    verbs: list[ContactVerbDTO]
     offers: list[TechOfferDTO]
     dossier: list[str]  # lines about other met species, in this species' voice
     subjects: list[tuple[int, str]] = field(default_factory=list)  # (id, name) of met others (WP17 Ask about…)
     intel_summary: str = ""  # the coordinate tip on offer (§6.7), or "" if none available
-    # Authored player replies on the active node (§6.7 branching); empty ⇒ derived verb menu.
+    # The authored player replies on the active node (§6.7): the whole reply menu. Resolved via
+    # the species → persona → generic fallback chain, so the `generic` persona's `start_context`
+    # choices are the guaranteed baseline (validate_dialogue requires them). Each carries its own
+    # gating (`enabled`/`reason`) ported from the old derived verb menu.
     choices: list[ContactChoiceDTO] = field(default_factory=list)
-    # The always-present floor (§6.7): top-level verbs (Ask about… / Farewell / Leave) the screen
-    # appends *after* authored `choices` on a branching top node, so a player can always ask
-    # about others or exit even when the author didn't write those replies. Empty on plain nodes
-    # (the derived menu already carries them) and on deeper `branch.*` nodes. Each floor verb the
-    # grammar already covers (an authored reply with the same action/next_context) is dropped.
-    floor_verbs: list[ContactVerbDTO] = field(default_factory=list)
     debug_context: str = ""
     debug_when: str = ""
 

@@ -2,8 +2,8 @@
 
 Covers the non-UI `PlaytestService` (synthetic cast, band/standing dials, force-enable, recency
 advance, intel) and a Textual Pilot flow over `PlaytestApp` (controls modal + the shared contact
-screen's Backspace backtracking). The harness reuses the *real* `session.contact_view`, so these
-also guard that the real projection stays drivable from the synthetic state.
+screen's `b` backtracking). The harness reuses the *real* `session.contact_view`, so these also
+guard that the real projection stays drivable from the synthetic state.
 """
 
 from __future__ import annotations
@@ -50,16 +50,17 @@ def test_contact_view_resolves_for_every_species_and_band() -> None:
 
 
 
-def test_force_enable_makes_every_verb_and_choice_selectable() -> None:
+def test_force_enable_makes_every_reply_selectable() -> None:
     svc = _service()
     svc.band = "friendly"
-    # A vanilla view carries Phase-2 disabled verbs (e.g. Treaty / Attack), proving there is
-    # something for the toggle to flip.
+    # A species on the generic baseline menu carries Phase-2 disabled replies (Treaty / Attack),
+    # proving there is something for the toggle to flip. (Vesk authors its own enabled-only menu.)
+    svc.current = next(sid for sid in svc.species_ids
+                       if svc.state.species[sid].roster_id != "vesk")
     plain = svc.contact_view(svc.pid, svc.current)
-    assert any(not v.enabled for v in plain.verbs)
+    assert any(not c.enabled for c in plain.choices)
     svc.toggle_force_enable()
     forced = svc.contact_view(svc.pid, svc.current)
-    assert all(v.enabled for v in forced.verbs)
     assert all(c.enabled for c in forced.choices)
 
 
@@ -189,13 +190,15 @@ async def test_empty_trade_speaks_a_refusal_beat() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
-        await pilot.press("t")  # Trade with nothing to sell ⇒ a spoken refusal, not a picker
+        # Baseline menu: 1 Ask about… / 2 coordinates / 3 Trade. Trade with nothing to sell ⇒ a
+        # spoken refusal, not a picker.
+        await pilot.press("3")
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
         assert app.screen._active_context == "trade_refuse"
 
 
-async def test_say_verb_records_history_and_backspace_backtracks() -> None:
+async def test_say_reply_records_history_and_b_backtracks() -> None:
     svc = _service()
     app = PlaytestApp(svc)
     async with app.run_test(size=(100, 34)) as pilot:
@@ -210,7 +213,7 @@ async def test_say_verb_records_history_and_backspace_backtracks() -> None:
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
         assert app.screen._history == (("greeting", None),)
-        await pilot.press("backspace")
+        await pilot.press("b")  # Back
         await pilot.pause()
         assert app.screen._history == ()
         assert app.screen._active_context == "greeting"

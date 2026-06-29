@@ -279,22 +279,24 @@ def sample_computer() -> ComputerDTO:
 def sample_contact() -> dto.ContactDTO:
     """A sample alien contact for the screenshot harness (UI_MOCKUPS.md §6).
 
-    A friendly-band envoy: the dialogue is persona-voiced and the verb menu is derived
-    from params — treaty/fight are greyed (Phase-2 / non-reachable), with reasons.
+    A friendly-band envoy: the dialogue is persona-voiced and the reply menu is the node's
+    authored `choices` — treaty/attack are greyed (Phase-3), with reasons.
     """
     return dto.ContactDTO(
         species="Vesk", roster_id="vesk", persona="serial_formal", alliance="unaligned",
         standing="friendly", band="friendly", disposition_filled=4,
         base_disposition=0.85, attitude=0.06, effective=0.91,
         opener="Greetings, Trailblazer. I am Veska VK-7 of the Vesk. We are at your service.",
-        verbs=[
-            dto.ContactVerbDTO("ask", "Ask about…", False, "no other species met yet",
-                               kind="say", context="dossier_other", needs_subject=True),
-            dto.ContactVerbDTO("trade", "Buy tech"),
-            dto.ContactVerbDTO("barter", "Barter artifact"),
-            dto.ContactVerbDTO("treaty", "Treaty", False, "treaties open in a later phase"),
-            dto.ContactVerbDTO("fight", "Attack", False, "they are friendly"),
-            dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell"),
+        choices=[
+            dto.ContactChoiceDTO(0, "Ask about another people…", next_context="dossier_other",
+                                 enabled=False, reason="no other species met yet"),
+            dto.ContactChoiceDTO(1, "Let us trade.", action="trade"),
+            dto.ContactChoiceDTO(2, "I have an artifact to barter.", action="barter"),
+            dto.ContactChoiceDTO(3, "Let us speak of a treaty.", next_context="treaty_offer",
+                                 enabled=False, reason="treaties open in a later phase"),
+            dto.ContactChoiceDTO(4, "Prepare to be boarded!", action="attack",
+                                 enabled=False, reason="they are friendly"),
+            dto.ContactChoiceDTO(5, "Farewell.", action="leave"),
         ],
         offers=[
             dto.TechOfferDTO(0, "navigator (I)", "I", "latinum", 1800, "", True),
