@@ -583,8 +583,7 @@ species_grammars:
             next_context: trade_open
             action: trade
           - text: Can we establish a formal peace treaty?
-            next_context: branch.inquiry
-            action: barter
+            next_context: treaty_offer
           - text: I must be on my way. Farewell.
             next_context: farewell
             action: leave
@@ -1161,13 +1160,11 @@ species_grammars:
             next_context: branch.covenant
           - text: Can we trade supplies?
             next_context: branch.trade
-            action: barter
           - text: Never mind. Disconnecting.
             next_context: farewell
             action: leave
           - text: Initiate trade transaction.
-            next_context: trade_open
-            action: trade
+            next_context: trade_refuse
           - text: Requesting data entries on other biological entities.
             next_context: dossier_other
           - text: Tell me about the Helots.
@@ -1181,7 +1178,10 @@ species_grammars:
             next_context: farewell
             action: leave
     trade_open:
-      - grammar:
+      # Phase-3: inert until the Vesk Philanthropy Circuit flips the reprogram_unlock
+      # hook (which sets `circuit_installed`); Phase 2 keeps trade gated via trade_refuse.
+      - when: { criteria: { circuit_installed: true } }
+        grammar:
           origin:
             - '#opener# #detail# #honorific#. #aside#'
           opener:
@@ -1271,8 +1271,7 @@ species_grammars:
             next_context: farewell
             action: leave
           - text: Initiate trade transaction.
-            next_context: trade_open
-            action: trade
+            next_context: trade_refuse
           - text: Tell me about the Helots instead.
             next_context: dossier_self
     offer_coordinates:
@@ -1360,8 +1359,7 @@ species_grammars:
             next_context: farewell
             action: leave
           - text: Initiate trade transaction.
-            next_context: trade_open
-            action: trade
+            next_context: trade_refuse
           - text: Requesting data entries on other biological entities.
             next_context: dossier_other
           - text: Tell me about the Helots.
@@ -2304,7 +2302,7 @@ species_grammars:
             - feel our psionic peace
         choices:
           - text: I wish to negotiate a treaty for the alliance.
-            next_context: offer_coordinates
+            next_context: treaty_offer
           - text: Tell me about the Verdant Compact.
             next_context: branch.inquiry
           - text: I will leave you in peace.

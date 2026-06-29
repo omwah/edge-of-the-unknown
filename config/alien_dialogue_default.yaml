@@ -16,6 +16,14 @@
 #
 # --- TOP-LEVEL SHAPE -------------------------------------------------------------------------
 #   recency_k: <int >= 0>           # no-repeat ring depth (see SELECTION). Default 2.
+#   floor_context: <context_key>    # the context whose authored-`choices` nodes still get a
+#                                   #   guaranteed "floor" of verbs appended. Default `greeting`.
+#   floor_keys:    [<verb_id>,...]  # contact-screen VERB ids (NOT context keys) always offered on
+#                                   #   floor_context — appended after a node's authored `choices`
+#                                   #   unless a choice already covers them (an `ask` is dropped when
+#                                   #   a choice targets `dossier_other`, `farewell` when one acts
+#                                   #   `leave`). Default [ask, farewell]; `ask` is the dossier_other
+#                                   #   verb. Lets a custom-choice greeting still always Ask/Farewell.
 #   grammar:   { symbol: [str,...] }# OPTIONAL shared Tracery fragments referenced by `#symbol#`
 #                                   #   from any line's `grammar` (persona/global vocabulary).
 #   personas:  { <persona_name>: <DialoguePack>, ... }   # the voices (see below). MUST include
