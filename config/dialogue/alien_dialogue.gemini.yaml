@@ -3803,7 +3803,7 @@ species_grammars:
             - gracious representative of the {alliance}
             - magnificent biological specimen
           aside:
-            - (a dozen broodlings diligently stroke our master sac's lower plinth)
+            - (a dozen broodlings diligently stroke the lower curve of our master sac)
             - (our attendant insectoids hiss in quiet, rhythmic adoration)
             - (we secrete a film of welcoming grease as the groomers clean our brain-case)
         choices:
@@ -3989,7 +3989,7 @@ species_grammars:
             - We hope this small token of knowledge pleases you, and perhaps you'd
               accept a gift of {item} later?
             - Do ignore the ticking from our cargo holds; it is merely the broodlings
-              grooming the plinth.
+              grooming the master sac.
             - Our junior partners, the Dacaran, also speak highly of your cooperation.
             - Surely the wretched Dignar or Thessarch would not be so forthcoming,
               yes?
