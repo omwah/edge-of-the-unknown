@@ -18,7 +18,7 @@ from edge.core import dto
 from edge.server import mapgraph
 from edge.server import terrain as terrain_art
 from edge.core.aliens import disposition_band, effective_disposition
-from edge.core.config import GameConfig, RosterConfig
+from edge.core.config import DialogueChoice, GameConfig, RosterConfig
 from edge.core.discovery import is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import build_subsystems, derive_aspects
@@ -885,91 +885,34 @@ def _line(state: UniverseState, roster: object, species: AlienSpecies, player: P
     return text
 
 
-def _contact_verbs(species: AlienSpecies, sc: object, offers: list[dto.TechOfferDTO],
-                   *, subjects_available: bool, has_intel: bool = False,
-                   asked_intel: bool = False) -> list[dto.ContactVerbDTO]:
-    """Derive the conversation verb menu from species params (§6.7), greying with reasons.
+def _gate_choice(choice: DialogueChoice, *, posture: str, treaty_mode: str, combatant: bool,
+                 has_barter: bool, has_intel: bool, subjects_available: bool) -> tuple[bool, str]:
+    """Gate one authored reply, greying it with a reason (§6.7).
 
-    Rows are tagged Say (dialogue) / Do (mechanical) so the TUI groups and dispatches them
-    (WP17): Ask about… / Farewell speak a dialogue context; the rest act. There is no Greet
-    verb — the screen opens already greeted; re-greeting only re-rolls the variant and is a
-    dev affordance the dialogue play-test harness adds back as "Regreet". Farewell is the single
-    exit (it speaks a parting line then closes); Escape is the silent quick-exit, so there is no
-    separate Leave verb.
+    The mechanical actions and the Phase-3 navigations carry the same availability checks and
+    reasons the derived verb menu used to — now hung on the authored `choices` instead. A plain
+    conversational transition (no recognised action/target) is always offered.
     """
-    posture = getattr(sc, "trade_posture", "open")
-    treaty_mode = getattr(sc, "treaty_mode", "open")
-    combatant = getattr(sc, "combatant", True)
-    has_latinum = any(o.mode == "latinum" and o.available for o in offers)
-    has_barter = any(o.mode == "barter" and o.available for o in offers)
-
-    # SAY — peaceful dialogue verbs (no mechanical effect; advance the recency ring). No Greet:
-    # the screen opens already greeted (re-greeting only re-rolls the variant — a dev affordance
-    # the play-test harness adds back as "Regreet").
-    verbs = [
-        dto.ContactVerbDTO("ask", "Ask about…", subjects_available,
-                           "" if subjects_available else "no other species met yet",
-                           kind="say", context="dossier_other", needs_subject=True),
-        # INTEL — ask where to explore; a friendly speaker may volunteer coordinates (§6.7).
-        dto.ContactVerbDTO("intel", "Ask for coordinates", kind="say",
-                           context="offer_coordinates"),
-    ]
-    # LOG COORDINATES — a "do" verb, enabled only once you've *asked* (the offer is on screen)
-    # and a tip is actually on offer; you cannot log a route the speaker has not volunteered.
-    can_log = asked_intel and has_intel
-    log_reason = "" if can_log else (
-        "no coordinates on offer" if asked_intel else "ask for coordinates first")
-    verbs.append(dto.ContactVerbDTO("accept_lead", "Log coordinates", can_log, log_reason))
-    # TRADE — offered in Phase 2 except behind a Phase-3 gate. With stock it opens the buy menu;
-    # with an empty shelf (open posture but nothing affordable, or a `refuses` species) the screen
-    # speaks the persona's `trade_refuse` beat, so "no trade" is a voiced reply, not a dead button.
-    if posture == "alliance_gated":
-        verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "requires alliance membership (Phase 3)"))
-    elif posture == "circuit_gated":
-        verbs.append(dto.ContactVerbDTO("trade", "Trade", False, "needs a reprogram circuit (Phase 3)"))
-    else:
-        verbs.append(dto.ContactVerbDTO("trade", "Buy tech" if has_latinum else "Trade"))
-    # BARTER (artifacts → tech no latinum sale offers).
-    verbs.append(dto.ContactVerbDTO("barter", "Barter artifact", has_barter,
-                                    "" if has_barter else "they offer no barter"))
-    # TREATY — Phase 3.
-    treaty_reason = {
-        "none": "they sign no treaties", "superfluous": "a treaty would be superfluous",
-        "home_planet_only": "treaty requires their homeworld (Phase 3)",
-    }.get(treaty_mode, "treaties open in a later phase")
-    verbs.append(dto.ContactVerbDTO("treaty", "Treaty", False, treaty_reason))
-    # FIGHT — Phase 3; Phase 2 places only friendly species.
-    verbs.append(dto.ContactVerbDTO("fight", "Attack", False,
-                                    "non-combatant" if not combatant else "they are friendly"))
-    # SAY — the single exit: speak a parting line, then break contact. (Escape is the silent
-    # quick-exit, so there is no separate "Leave" verb.)
-    verbs.append(dto.ContactVerbDTO("farewell", "Farewell", kind="say", context="farewell"))
-    return verbs
-
-
-# The always-present floor (§6.7): top-level verbs the contact screen keeps on offer even on an
-# authored branching node, so a player can always ask about other species or take their leave.
-# Each is dropped when an authored reply already covers it (see `_contact_floor`).
-_FLOOR_KEYS = ("ask", "farewell")
-
-
-def _contact_floor(verbs: list[dto.ContactVerbDTO], choices: list[dto.ContactChoiceDTO],
-                   context: str, roster: RosterConfig) -> list[dto.ContactVerbDTO]:
-    """The floor verbs to append after authored `choices` on the configured floor context (§6.7).
-
-    Empty unless the node carries authored `choices` (else the derived menu already shows
-    these) and is the configured `floor_context`. A floor verb is
-    dropped when an authored reply already provides the same navigation — Ask about… when a
-    choice targets `dossier_other`, Farewell when a choice already speaks a `"leave"` action — so the
-    grammar's explicit wording wins and the default only fills a gap.
-    """
-    if not choices or context != roster.floor_context:
-        return []
-    covered = {
-        "ask": any(c.next_context == "dossier_other" for c in choices),
-        "farewell": any(c.action == "leave" for c in choices),
-    }
-    return [v for v in verbs if v.key in roster.floor_keys and not covered.get(v.key, False)]
+    if choice.action == "attack":  # FIGHT — Phase 3; Phase 2 places only friendly species.
+        return False, "non-combatant" if not combatant else "they are friendly"
+    if choice.action == "trade":   # empty shelves are handled by the trade_refuse beat, not a gate.
+        if posture == "alliance_gated":
+            return False, "requires alliance membership (Phase 3)"
+        if posture == "circuit_gated":
+            return False, "needs a reprogram circuit (Phase 3)"
+        return True, ""
+    if choice.action == "barter":
+        return (True, "") if has_barter else (False, "they offer no barter")
+    if choice.action == "accept_lead":  # LOG COORDINATES — only what the speaker has volunteered.
+        return (True, "") if has_intel else (False, "no coordinates on offer")
+    if choice.next_context == "dossier_other":  # ASK ABOUT… another met species.
+        return (True, "") if subjects_available else (False, "no other species met yet")
+    if choice.next_context == "treaty_offer":  # TREATY — Phase 3.
+        return False, {
+            "none": "they sign no treaties", "superfluous": "a treaty would be superfluous",
+            "home_planet_only": "treaty requires their homeworld (Phase 3)",
+        }.get(treaty_mode, "treaties open in a later phase")
+    return True, ""
 
 
 def _tech_offers(species: AlienSpecies, sc: object, player: Player, ship: Ship,
@@ -1010,28 +953,36 @@ def _tech_offers(species: AlienSpecies, sc: object, player: Player, ship: Ship,
 
 def _contact_choices(state: UniverseState, roster: object, species: AlienSpecies,
                      player: Player, context: str, config: GameConfig, *, standing: str,
-                     ctx: Mapping[str, str],
+                     ctx: Mapping[str, str], sc: object, offers: list[dto.TechOfferDTO],
+                     has_intel: bool, subjects_available: bool,
                      facts: Mapping[str, object] | None = None) -> list[dto.ContactChoiceDTO]:
-    """The authored player replies on the active node (§6.7 branching), or [] for a plain node.
+    """The authored player replies on the active node — the whole reply menu (§6.7).
 
     Resolves the node's line entry **read-only** with the same RNG inputs the reducer uses
     (same `encounter_rng` seed ⇒ same winning entry), then projects each choice whose `when`
     holds — preserving its canonical index so the `Converse` command picks the right reply.
-    An empty result tells the TUI to fall back to the derived Say/Do verb menu.
+    Each reply is gated (`enabled`/`reason`) from the species params + live offers, carrying the
+    availability the derived verb menu used to. Empty only on a node with no authored choices
+    (e.g. a terminal lore beat the player backs out of); the `generic` persona's `start_context`
+    choices are the guaranteed baseline via the fallback chain.
     """
     ring = player.dialogue_recency.get((species.roster_id, context), ())
     rng = dialogue.encounter_rng(state.game.seed, species.roster_id, context, ring)
-    entry = dialogue.entry_for(roster, species, player, context,  # type: ignore[arg-type]
-                               aliens=config.aliens, rng=rng, facts=facts)
-    if entry is None or not entry.choices:
+    source = dialogue.choices_for(roster, species, player, context,  # type: ignore[arg-type]
+                                  aliens=config.aliens, rng=rng, facts=facts)
+    if not source:
         return []
+    posture = getattr(sc, "trade_posture", "open")
+    treaty_mode = getattr(sc, "treaty_mode", "open")
+    combatant = getattr(sc, "combatant", True)
+    has_barter = any(o.mode == "barter" and o.available for o in offers)
     out: list[dto.ContactChoiceDTO] = []
-    for i, choice in enumerate(entry.choices):
+    for i, choice in enumerate(source):
         if not dialogue.when_matches(choice.when, standing=standing, treaty=False, facts=facts):
             continue
-        enabled, reason = True, ""
-        if choice.action == "attack":  # recognised but Phase-3-gated
-            enabled, reason = False, "you cannot attack here (Phase 3)"
+        enabled, reason = _gate_choice(
+            choice, posture=posture, treaty_mode=treaty_mode, combatant=combatant,
+            has_barter=has_barter, has_intel=has_intel, subjects_available=subjects_available)
         out.append(dto.ContactChoiceDTO(
             index=i, text=dialogue.fill(choice.text, ctx), action=choice.action or "",
             next_context=choice.next_context or "", enabled=enabled, reason=reason))
@@ -1118,9 +1069,9 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     if subject_extra:
         choice_ctx.update(subject_extra)
     choices = _contact_choices(state, roster, species, player, shown, config,
-                               standing=standing, ctx=choice_ctx, facts=facts)
-    verbs = _contact_verbs(species, sc, offers, subjects_available=bool(subjects),
-                           has_intel=intel is not None, asked_intel=(shown == "offer_coordinates"))
+                               standing=standing, ctx=choice_ctx, facts=facts, sc=sc,
+                               offers=offers, has_intel=intel is not None,
+                               subjects_available=bool(subjects))
     return dto.ContactDTO(
         species=species.name, roster_id=species.roster_id, persona=species.persona,
         alliance=alliance.name if alliance else "unaligned",
@@ -1129,10 +1080,9 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         attitude=round(player.species_attitudes.get(species.roster_id, 0.0), 3),
         effective=round(effective, 3),
         opener=speech,
-        verbs=verbs,
         offers=offers, dossier=dossier, subjects=subjects,
         intel_summary=intel.summary() if intel is not None else "",
-        choices=choices, floor_verbs=_contact_floor(verbs, choices, shown, roster),
+        choices=choices,
     )
 
 

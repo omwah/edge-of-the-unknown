@@ -373,29 +373,43 @@ def test_buy_rejects_a_barter_only_offer() -> None:
 
 # --- projection ------------------------------------------------------------------
 
-def test_contact_view_renders_opener_verbs_and_offers() -> None:
+def test_contact_view_renders_opener_choices_and_offers() -> None:
+    # Selvani (reserved_honest) authors no greeting replies of its own, so the menu falls back to
+    # the generic persona's `start_context` baseline (§6.7) — the whole menu is authored choices.
+    state = _world()
+    sp = _inject(state, "selvani")
+    apply_result(state, reduce(state, 1, Hail(sp.id), CFG))
+    view = session.contact_view(state, 1, sp.id, CFG)
+    assert view.species == "Selvani" and view.opener
+    actions = {c.action for c in view.choices if c.action}
+    nexts = {c.next_context for c in view.choices if c.next_context}
+    assert {"trade", "barter", "leave"} <= actions
+    assert {"dossier_other", "offer_coordinates", "treaty_offer"} <= nexts
+    # Attack (the old FIGHT verb) is authored but greyed in Phase 2, with a reason.
+    attack = next(c for c in view.choices if c.action == "attack")
+    assert not attack.enabled and attack.reason
+    assert view.offers and all(o.label for o in view.offers)
+
+
+def test_contact_view_uses_a_species_own_authored_replies_when_present() -> None:
+    # Vesk (serial_formal) authors its own greeting replies, so the menu is its branch, not the
+    # generic baseline — a pack's own choices override the fallback (§6.7).
     state = _world()
     sp = _inject(state, "vesk")
     apply_result(state, reduce(state, 1, Hail(sp.id), CFG))
     view = session.contact_view(state, 1, sp.id, CFG)
-    assert view.species == "Vesk" and view.opener
-    keys = {v.key for v in view.verbs}
-    assert {"ask", "trade", "barter", "treaty", "fight", "farewell"} <= keys
-    assert "hail" not in keys  # no Greet verb — the screen opens already greeted
-    assert "leave" not in keys  # Farewell is the single exit; Escape is the silent quick-exit
-    fight = next(v for v in view.verbs if v.key == "fight")
-    assert not fight.enabled and fight.reason  # combat is greyed in Phase 2, with a reason
-    assert view.offers and all(o.label for o in view.offers)
+    nexts = {c.next_context for c in view.choices if c.next_context}
+    assert any(n.startswith("branch.") for n in nexts)  # opens its workshop branch
 
 
 def test_contact_view_keeps_trade_live_for_a_refusing_trader() -> None:
-    # A `refuses` species no longer greys Trade out: the verb stays selectable and the screen
+    # A `refuses` species no longer greys Trade out: the reply stays selectable and the screen
     # routes an empty shelf to a spoken `trade_refuse` beat (§6.7).
     state = _world()
     sp = _inject(state, "dacaran")  # trade_posture: refuses
     view = session.contact_view(state, 1, sp.id, CFG)
-    trade = next(v for v in view.verbs if v.key == "trade")
-    assert trade.enabled and trade.label == "Trade"
+    trade = next(c for c in view.choices if c.action == "trade")
+    assert trade.enabled
     assert not any(o.mode == "latinum" and o.available for o in view.offers)  # nothing to sell
 
 
@@ -411,36 +425,23 @@ def test_contact_view_dossier_covers_other_met_species() -> None:
     assert any("Selvani" in line for line in view.dossier)  # a narrates b
 
 
-def test_contact_verbs_tag_say_and_do_kinds() -> None:
-    state = _world()
-    sp = _inject(state, "vesk")
-    verbs = {v.key: v for v in session.contact_view(state, 1, sp.id, CFG).verbs}
-    # Say verbs name the dialogue context they speak (Greet is gone — see the floor test).
-    assert "hail" not in verbs
-    assert verbs["farewell"].kind == "say" and verbs["farewell"].context == "farewell"
-    assert verbs["ask"].kind == "say" and verbs["ask"].needs_subject
-    # Do verbs carry no dialogue context.
-    for key in ("trade", "barter", "treaty", "fight"):
-        assert verbs[key].kind == "do" and verbs[key].context == ""
-
-
 def test_ask_about_is_gated_on_having_met_others_and_exposes_subjects() -> None:
     state = _world()
-    a = _inject(state, "vesk", sid=1)
+    a = _inject(state, "selvani", sid=1)  # baseline menu carries the Ask-about (dossier_other) reply
     # Only one species met → 'Ask about…' is greyed and no subjects offered.
     apply_result(state, reduce(state, 1, Hail(a.id), CFG))
     view = session.contact_view(state, 1, a.id, CFG)
-    ask = next(v for v in view.verbs if v.key == "ask")
+    ask = next(c for c in view.choices if c.next_context == "dossier_other")
     assert not ask.enabled and ask.reason and view.subjects == []
 
     # Meet a second species → 'Ask about…' enables and the subject appears.
-    b = _inject(state, "selvani", sid=2)
+    b = _inject(state, "vesk", sid=2)
     state.species[2] = replace(b, sector_id=state.ships[1].sector_id)
     apply_result(state, reduce(state, 1, Hail(b.id), CFG))
     view2 = session.contact_view(state, 1, a.id, CFG)
-    ask2 = next(v for v in view2.verbs if v.key == "ask")
+    ask2 = next(c for c in view2.choices if c.next_context == "dossier_other")
     assert ask2.enabled
-    assert (b.id, "Selvani") in view2.subjects
+    assert (b.id, "Vesk") in view2.subjects
 
 
 def test_reputation_is_shared_across_ships_of_one_species() -> None:

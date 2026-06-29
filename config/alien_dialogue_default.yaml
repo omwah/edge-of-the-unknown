@@ -16,14 +16,14 @@
 #
 # --- TOP-LEVEL SHAPE -------------------------------------------------------------------------
 #   recency_k: <int >= 0>           # no-repeat ring depth (see SELECTION). Default 2.
-#   floor_context: <context_key>    # the context whose authored-`choices` nodes still get a
-#                                   #   guaranteed "floor" of verbs appended. Default `greeting`.
-#   floor_keys:    [<verb_id>,...]  # contact-screen VERB ids (NOT context keys) always offered on
-#                                   #   floor_context — appended after a node's authored `choices`
-#                                   #   unless a choice already covers them (an `ask` is dropped when
-#                                   #   a choice targets `dossier_other`, `farewell` when one acts
-#                                   #   `leave`). Default [ask, farewell]; `ask` is the dossier_other
-#                                   #   verb. Lets a custom-choice greeting still always Ask/Farewell.
+#   start_context: <context_key>    # the context the contact screen opens on. Default `greeting`.
+#                                   #   The `generic` persona MUST author `choices` on it (see
+#                                   #   COMPLETENESS): that list is the baseline reply menu every
+#                                   #   species falls back to. The whole contact menu is authored
+#                                   #   `choices` now — there is no code-derived verb menu. A reply's
+#                                   #   availability (and greyed reason) is computed from species
+#                                   #   params + live offers; the screen's only letter shortcuts are
+#                                   #   `b` (Back) and `f` (Farewell).
 #   grammar:   { symbol: [str,...] }# OPTIONAL shared Tracery fragments referenced by `#symbol#`
 #                                   #   from any line's `grammar` (persona/global vocabulary).
 #   personas:  { <persona_name>: <DialoguePack>, ... }   # the voices (see below). MUST include
@@ -66,14 +66,23 @@
 #   posture / stage: <str>          # Phase-3 forward-compat; entries that set these are INERT in
 #                                   #   Phase 2 (never selected). Leave unset for Phase-2 lines.
 #
-# --- A DialogueChoice (authored player reply, optional branching) ----------------------------
-# A line may carry `choices`; when present the contact screen shows these NUMBERED player
-# replies instead of the derived verb menu (an empty/absent list keeps the derived menu).
+# --- A DialogueChoice (authored player reply) ------------------------------------------------
+# The node's `choices` are the player's reply menu — the WHOLE menu (there is no code-derived
+# verb fallback). The contact screen shows them as NUMBERED replies. Resolution walks the same
+# species → persona → generic chain as lines, but for *choices*: if the winning line's pack has
+# no `choices` for the node, the menu falls back to the `generic` persona's choices for that
+# context (the `start_context` baseline). So a persona may voice a greeting line without
+# restating the menu — its replies fall through to generic.
 #   text:         "<templated reply label>"    # REQUIRED; uses the node's placeholders.
 #   next_context: <context_key>     # OPTIONAL: transition to any known context, incl. a branch.*
-#   action:       farewell | trade | barter | accept_lead | attack   # OPTIONAL mechanical verb
-#                                   #   (`attack` is recognised but Phase-3-gated). No action ⇒
+#                                   #   `back` steps to the previous node; `dossier_other` opens the
+#                                   #   ask-about-a-species picker; `offer_coordinates` asks for a tip.
+#   action:       leave | trade | barter | accept_lead | attack   # OPTIONAL mechanical verb
+#                                   #   (`leave` speaks the parting line then breaks contact;
+#                                   #   `attack` is recognised but Phase-3-gated). No action ⇒
 #                                   #   pure transition. No next_context + no action ⇒ stay/act.
+#                                   #   Availability is gated in code from species params + offers
+#                                   #   (trade posture, treaty mode, combatant, artifacts, a tip).
 #   when:         <DialogueWhen>    # OPTIONAL gate on whether the reply is offered.
 #   weight:       <int >= 1>        # OPTIONAL.
 #
@@ -145,7 +154,7 @@
 #  3. Every line entry has exactly one of non-empty `variants` / `grammar` (grammar ⇒ has
 #     `origin`), and every `{placeholder}` (in variants, grammar strings, and choice `text`) is
 #     allowed for that context.
-#  4. Every choice's `action` (if set) is one of farewell/trade/barter/accept_lead/attack, and
+#  4. Every choice's `action` (if set) is one of leave/trade/barter/accept_lead/attack, and
 #     its `next_context` (if set) is a known context key.
 #  5. Every `branch.*` node is reachable (targeted by some choice `next_context`).
 #  6. Every species' `persona` names a real persona pack, and for every context the species can
@@ -155,13 +164,13 @@
 #     `superfluous` treaty_mode drops the `treaty_*` contexts; `trade_refuse` is reachable for
 #     all. `generic`'s catch-alls satisfy this for any species that authors no line of its own.
 #  7. `generic.dossier_other` is parameterised by `{subject}` (one line narrates any species).
+#  8. The `generic` persona authors a non-empty `choices` list on `start_context` (default
+#     `greeting`) — the baseline reply menu every species falls back to (`choices_for`). Without
+#     it a contact node would render no replies.
 #
 # =============================================================================================
 recency_k: 2
-floor_context: greeting
-floor_keys:
-  - ask
-  - farewell
+start_context: greeting
 
 personas:
   # The complete fallback pack: a catch-all line for every base context key, so a line
@@ -190,6 +199,27 @@ personas:
       - variants:
           - "The {species} acknowledge you, {player}."
           - "You have the attention of the {species}."
+        # The baseline reply menu (§6.7). `start_context` (greeting) MUST carry choices: this list
+        # is the menu every species falls back to (via `choices_for`) unless its own pack authors
+        # replies for the node. Each reply's availability is gated in code from species params +
+        # live offers (a `refuses`/gated trader, a treaty mode, the combatant flag, artifacts on
+        # offer, a coordinate tip), so a greyed reply shows *why*. Treaty/attack are Phase-3 and
+        # stay disabled (hidden unless `ui.show_disabled_options`).
+        choices:
+          - text: "Ask about another people…"
+            next_context: dossier_other
+          - text: "Where should we explore next?"
+            next_context: offer_coordinates
+          - text: "Let us trade."
+            action: trade
+          - text: "I have an artifact to barter."
+            action: barter
+          - text: "Let us speak of a treaty."
+            next_context: treaty_offer
+          - text: "Prepare to be boarded!"
+            action: attack
+          - text: "Farewell."
+            action: leave
     trade_open:
       - variants:
           - "The {species} will deal with you. Show us what you seek."
@@ -205,6 +235,11 @@ personas:
           - "The {species} know of {target} at sector {coords}: {distance} hops out, deep in the {band}. You'll find {reward}."
           - "Take these coordinates, {player}: sector {coords}, {distance} jumps off. {target} lies there, and with it {reward}."
           - The stars are quiet. We have no destinations for you.
+        choices:  # log the volunteered tip (gated on a tip being on offer), or back out
+          - text: "Log these coordinates."
+            action: accept_lead
+          - text: "Maybe later."
+            next_context: back
       - variants:  # catch-all — nothing new to point you toward
           - "The {species} know of nowhere new to send you just now, {player}."
           - "We have no fresh coordinates for you. Range farther, {player}, and return."

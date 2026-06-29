@@ -32,7 +32,14 @@ from collections.abc import Mapping, Sequence
 from string import Formatter
 
 from edge.core.aliens import FRIENDLY, HOSTILE, NEUTRAL, disposition_band, effective_disposition
-from edge.core.config import AliensConfig, DialogueLine, DialoguePack, RosterConfig, SpeciesConfig
+from edge.core.config import (
+    AliensConfig,
+    DialogueChoice,
+    DialogueLine,
+    DialoguePack,
+    RosterConfig,
+    SpeciesConfig,
+)
 from edge.core.models import AlienSpecies, Player
 from edge.dialogue import render
 from edge.dialogue.intents import (
@@ -276,6 +283,32 @@ def entry_for(roster: RosterConfig, species: AlienSpecies, player: Player, conte
     return select_entry(chain, context, standing=standing, treaty=treaty, rng=rng, facts=facts)
 
 
+def choices_for(roster: RosterConfig, species: AlienSpecies, player: Player, context: str, *,
+                aliens: AliensConfig, rng: random.Random, treaty: bool = False,
+                facts: Mapping[str, object] | None = None) -> list[DialogueChoice]:
+    """The player's reply menu for a context (§6.7): the resolved entry's `choices`, else the
+    `generic` persona's baseline choices for the same context.
+
+    The contact-screen view and the `Converse` reducer both resolve a reply by **position** into
+    this list, so they must agree — call this from both. The fallback chain selects the first
+    pack defining the context's *line*, which may be a persona that authored only voiced variants
+    and no choices; the player still needs a menu, so we fall back to the `generic` persona's
+    authored choices (the required `start_context` baseline, enforced by `validate_dialogue`). A
+    pack that authors its own choices (e.g. a branch node, or a greeting with replies) overrides
+    the baseline. Consumes `rng` exactly as `speak`/`entry_for` do, so it is replay-stable.
+    """
+    entry = entry_for(roster, species, player, context, aliens=aliens, rng=rng,
+                      treaty=treaty, facts=facts)
+    if entry is not None and entry.choices:
+        return list(entry.choices)
+    generic = roster.personas.get(GENERIC_PERSONA)
+    if generic is not None:
+        for candidate in generic.get(context, []):
+            if candidate.choices:
+                return list(candidate.choices)
+    return []
+
+
 # --- validation (DESIGN §13 dialogue integrity) ----------------------------------
 
 def reachable_contexts(species: SpeciesConfig) -> frozenset[str]:
@@ -396,6 +429,15 @@ def validate_dialogue(roster: RosterConfig) -> None:
     if not any("subject" in _placeholders_in(v)
                for e in generic["dossier_other"] for v in _entry_strings(e)):
         raise DialogueIntegrityError("generic dossier_other is not parameterised by {subject}")
+
+    # The `generic` persona must author the baseline reply menu on `start_context`: the whole
+    # contact menu is authored `choices` (no code-derived verb fallback), and every species falls
+    # back to these via `choices_for` unless its own pack authors replies for the node.
+    if not any(e.choices for e in generic.get(roster.start_context, [])):
+        raise DialogueIntegrityError(
+            f"generic persona must author choices on start_context {roster.start_context!r} "
+            "(the baseline reply menu)"
+        )
 
     # Per-species: persona resolves, and every reachable context yields a line in all
     # the standings Phase 2 (and Phase 3) can present.

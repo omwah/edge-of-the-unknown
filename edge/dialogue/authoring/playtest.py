@@ -9,12 +9,14 @@ modal** (F2) switches the simulated dials live:
 - **species** — cycle through the whole roster (one instance of each is injected);
 - **standing band** — hostile / neutral / friendly / allied (wary is Phase-3 inert);
 - **treaty** / **intel available** — toggles that gate treaty- and coordinate-keyed lines;
-- **show disabled** — the existing `ui.show_disabled_options` (greys gated rows);
-- **force-enable & traverse** — makes gated verbs/choices *selectable* so you can walk every
+- **show disabled** — the existing `ui.show_disabled_options` (greys gated replies);
+- **force-enable & traverse** — makes gated replies *selectable* so you can walk every
   branch regardless of standing/treaty/Phase-3 gates.
 
 Backtracking out of a dead-end branch node is provided by the shared contact screen itself
-(Backspace; see `edge.tui.screens.contact`).
+(`b` = Back; `f` = Farewell). The harness also enables that screen's **`f5` = Refresh** (a
+play-test-only key) to re-roll the current context's line in place and audition its variant
+pool (see `edge.tui.screens.contact`).
 
 This is the dev-only impure corner (AGENTS.md): it imports `edge.tui` + `textual`, which the
 runtime never does. The boundary is kept by never importing this module from the authoring
@@ -234,11 +236,9 @@ class PlaytestService:
 
     @staticmethod
     def _force(view: dto.ContactDTO) -> dto.ContactDTO:
-        """Rewrite every verb/choice to enabled so gated branches become traversable."""
-        verbs = [dataclasses.replace(v, enabled=True, reason="") for v in view.verbs]
+        """Rewrite every reply to enabled so gated branches become traversable."""
         choices = [dataclasses.replace(c, enabled=True, reason="") for c in view.choices]
-        floor = [dataclasses.replace(v, enabled=True, reason="") for v in view.floor_verbs]
-        return dataclasses.replace(view, verbs=verbs, choices=choices, floor_verbs=floor)
+        return dataclasses.replace(view, choices=choices)
 
     # --- controls (mutators the modal calls) ---------------------------------
 

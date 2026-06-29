@@ -33,8 +33,8 @@ def _merge_dialogue(roster: dict[str, Any], dialogue: dict[str, Any]) -> None:
     """Fold one dialogue document onto a roster dict in place (DESIGN §6.7).
 
     Two shapes are accepted, and may co-exist in one file:
-    - `RosterConfig` dialogue fields (`personas`, `recency_k`, shared `grammar`) overlay the
-      roster (shallow — a later file replaces these whole keys).
+    - `RosterConfig` dialogue fields (`personas`, `recency_k`, `start_context`, shared
+      `grammar`) overlay the roster (shallow — a later file replaces these whole keys).
     - `species_grammars` (the authoring-pipeline sidecar shape: `{species_id -> {context ->
       [line]}}`) is spliced into each species' `dialogue_pack` by id, per-context, so a
       machine-authored sidecar layers its grammars over the persona defaults without
@@ -44,7 +44,7 @@ def _merge_dialogue(roster: dict[str, Any], dialogue: dict[str, Any]) -> None:
       shadows the generic "no fresh coordinates" line with empty placeholders.
     """
     species_grammars = dialogue.pop("species_grammars", None)
-    roster.update(dialogue)  # personas / recency_k / grammar
+    roster.update(dialogue)  # personas / recency_k / start_context / grammar
     if not species_grammars:
         return
     by_id = {sp["id"]: sp for sp in roster.get("species", []) if isinstance(sp, dict)}

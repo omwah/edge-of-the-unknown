@@ -1,12 +1,14 @@
-"""AlienContactScreen — interactive alien dialogue + derived verb menu (UI_MOCKUPS.md §6).
+"""AlienContactScreen — interactive alien dialogue + authored reply menu (UI_MOCKUPS.md §6).
 
 Wired to `GameService.contact_view` (DESIGN §6, §6.7, WP9/WP17): the speech line is the
-**active context's** persona-voiced line (the greeting by default; a *Say* verb sets
-another); the verb menu is **derived** from species params and split into **Say**
-(dialogue) and **Do** (mechanical) groups, each row clickable + key-bound. *Say* verbs
-issue `Converse` (greeting / ask-about / farewell); *Do* verbs reach the existing buy /
-barter reducers or break contact. A disabled verb shows *why* it is greyed. With no
-service (screenshot harness) it renders a passed sample DTO.
+**active context's** persona-voiced line (the greeting by default; a reply may set another).
+The reply menu is the node's **authored `choices`**, resolved via the species → persona →
+generic fallback chain (the `generic` persona's `start_context` choices are the baseline), each
+row clickable and numbered (1–9). A reply may speak (`Converse`), reach the buy / barter
+reducers, log a coordinate tip, or break contact; a disabled reply shows *why* it is greyed.
+Only `b` (Back) and `f` (Farewell) are letter shortcuts; the play-test harness adds `f5`
+(Refresh) to re-roll the current line. With no service (screenshot harness) it renders a
+passed sample DTO.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Footer, Static
 
 from edge.core import dto
-from edge.core.rules import AcceptLead, BarterArtifact, BuyAlienTech, Converse
+from edge.core.rules import BarterArtifact, BuyAlienTech, Converse
 from edge.server.service import GameService
 from edge.art import portrait as art_portrait
 from edge.tui.portrait import SpeciesPortrait
@@ -98,13 +100,12 @@ class OfferPickerScreen(ModalScreen[int | None]):
 
 class AlienContactScreen(Screen):
     BINDINGS = [
-        Binding("escape", "back", "Break contact"),
-        Binding("backspace", "back_one", "Back"),
-        Binding("a", "verb('ask')", "Ask about…"),
-        Binding("t", "verb('trade')", "Buy tech"),
-        Binding("b", "verb('barter')", "Barter"),
-        Binding("f", "verb('farewell')", "Farewell"),
-        # Numbered player replies on an authored branching node (§6.7); inert on a plain node.
+        Binding("b", "back_one", "Back"),       # step back to the previous node (no-op at the opener)
+        Binding("f", "farewell", "Farewell"),   # speak a parting line, then break contact
+        # Play-test only: re-roll the current context's line in place. `check_action` hides it
+        # (and disables it) outside the dialogue play-test harness.
+        Binding("f5", "refresh", "Refresh"),
+        # Numbered player replies (§6.7) — the whole reply menu is authored choices.
         *[Binding(str(n), f"choice({n})", show=False) for n in range(1, 10)],
     ]
 
@@ -148,14 +149,14 @@ class AlienContactScreen(Screen):
         self._active_context = active_context
         self._active_subject = active_subject
         # A one-shot frozen speech line (e.g. after logging a tip), overriding the recomputed
-        # opener for this rebuild only; any later verb click reopens without it.
+        # opener for this rebuild only; any later reply reopens without it.
         self._pinned_speech = pinned_speech
         # What "break contact" does (farewell / leave / Escape). Default pops back to the game;
         # a host can override it — the dialogue play-test harness routes it to its controls modal
         # so a farewell lands somewhere useful instead of a blank screen.
         self._on_exit = on_exit
         # The (context, subject) nodes walked to reach here, oldest first — the breadcrumb for
-        # Backspace backtracking out of a dead-end branch node (§6.7). View-only: stepping back
+        # Back (b) backtracking out of a dead-end branch node (§6.7). View-only: stepping back
         # re-renders an earlier node without issuing any command (the Converse already fired).
         self._history = history
         self.playtest_mode = playtest_mode
@@ -214,17 +215,12 @@ class AlienContactScreen(Screen):
                 speech.border_title = "they speak"
                 yield speech
                 with Vertical(id="verbs"):
-                    heading = "Your reply" if c.choices else "Options"
-                    yield Static(heading, classes="heading")
-                    for n, (kind, item) in enumerate(self._menu_items(c), start=1):
-                        if kind == "choice":
-                            yield ClickableEntry(self._choice_line(n, item, self.playtest_mode), dest="choice",
-                                                 ref=item.index)
-                        else:
-                            yield ClickableEntry(self._numbered_verb_line(n, item, self.playtest_mode), dest="verb",
-                                                 ref=item.key)
+                    yield Static("Your reply", classes="heading")
+                    for n, (_kind, item) in enumerate(self._menu_items(c), start=1):
+                        yield ClickableEntry(self._choice_line(n, item, self.playtest_mode),
+                                             dest="choice", ref=item.index)
                     if self._history:
-                        yield ClickableEntry("  [dim]← Back (Backspace)[/]", dest="back",
+                        yield ClickableEntry("  [dim]← Back (b)[/]", dest="back",
                                              classes="derived")
                     if self.playtest_mode:
                         yield Static(f"\n  [dim]context = {c.debug_context} | when = {c.debug_when}[/]", classes="derived")
@@ -245,65 +241,40 @@ class AlienContactScreen(Screen):
         return self._service.config.ui.show_disabled_options if self._service else False
 
     def _menu_items(self, c: dto.ContactDTO) -> list[tuple[str, object]]:
-        """The unified, ordered reply menu: authored choices then the always-present floor.
+        """The ordered reply menu — the node's authored `choices` (§6.7).
 
-        On a plain node this is the derived Say/Do verb menu; on a branching top node it is the
-        authored player replies followed by the floor verbs (Ask about… / Farewell / Leave) the
-        author didn't already cover (`ContactDTO.floor_verbs`, §6.7). Returning one ordered list
-        keeps click dispatch (by dest/ref) and number-key dispatch (by position) in lockstep.
+        Disabled replies are hidden unless `ui.show_disabled_options`. The farewell reply always
+        sorts last (stable, so everything else keeps its order); dispatch is by canonical index,
+        so reordering is safe. Returning one ordered list keeps click dispatch (by ref) and
+        number-key dispatch (by position) in lockstep.
         """
         show_disabled = self._show_disabled()
-        items: list[tuple[str, object]] = []
-        if c.choices:
-            chs = c.choices if show_disabled else [ch for ch in c.choices if ch.enabled]
-            items += [("choice", ch) for ch in chs]
-            floor = c.floor_verbs if show_disabled else [v for v in c.floor_verbs if v.enabled]
-            items += [("verb", v) for v in floor]
-        else:
-            verbs = c.verbs if show_disabled else [v for v in c.verbs if v.enabled]
-            items += [("verb", v) for v in verbs]
-        # The farewell — an authored reply or the derived/floor verb — always sorts last (stable,
-        # so everything else keeps its order). Dispatch is by item id, so reordering is safe.
+        chs = c.choices if show_disabled else [ch for ch in c.choices if ch.enabled]
+        items: list[tuple[str, object]] = [("choice", ch) for ch in chs]
         items.sort(key=lambda it: 1 if self._is_farewell(it) else 0)
         return items
 
     @staticmethod
     def _is_farewell(item: tuple[str, object]) -> bool:
-        kind, obj = item
-        return obj.action == "leave" if kind == "choice" else obj.key == "farewell"  # type: ignore[attr-defined]
+        _, obj = item
+        return obj.action == "leave"  # type: ignore[attr-defined]
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         """Show a footer shortcut only when its key would actually do something here (§11).
 
-        A lettered verb (Ask about… / Buy tech / Barter / Farewell) dispatches against
-        the view's verbs, so its shortcut shows iff that verb is **enabled** in the view — which is
-        independent of how the node renders. So an offered Trade still shows on a branching node
-        whose visible rows are authored choices, a refused trade or a not-yet-met Ask vanishes.
-        Back shows only when there is somewhere to step back to.
+        Back shows only when there is somewhere to step back to; Refresh is a play-test-only
+        affordance, so it shows (and dispatches) only in `playtest_mode` — on the runtime screen
+        the only letter shortcuts are Back and Farewell.
 
         Textual's `active_bindings` drops a binding whose `check_action` is **False** but keeps a
         **None** one greyed, so we return plain bools to make an invalid shortcut vanish entirely.
-        Escape and the number-key replies stay live.
+        Farewell and the number-key replies stay live.
         """
         if action == "back_one":
             return bool(self._history)
-        if action == "verb":
-            key = parameters[0] if parameters else None
-            return any(v.key == key and v.enabled for v in self._view().verbs)
+        if action == "refresh":
+            return self.playtest_mode
         return True
-
-    @staticmethod
-    def _verb_line(v: dto.ContactVerbDTO, playtest_mode: bool = False) -> str:
-        # Literal brackets are escaped so Rich shows "[h]" rather than a markup tag.
-        label = v.label
-        if playtest_mode:
-            if v.kind == "say":
-                label = f"{label} [dim](context={v.context})[/]"
-            else:
-                label = f"{label} [dim](action={v.key})[/]"
-        if v.enabled:
-            return f"  [b]\\[{v.key}][/] {label}"
-        return f"  [dim]\\[{v.key}] {label}  ({v.reason})[/]"
 
     @staticmethod
     def _choice_line(n: int, ch: dto.ContactChoiceDTO, playtest_mode: bool = False) -> str:
@@ -321,47 +292,27 @@ class AlienContactScreen(Screen):
             return f"  [b]\\[{n}][/] {text}"
         return f"  [dim]\\[{n}] {text}  ({ch.reason})[/]"
 
-    @staticmethod
-    def _numbered_verb_line(n: int, v: dto.ContactVerbDTO, playtest_mode: bool = False) -> str:
-        # Numbered verbs (unified Say + Do menu).
-        label = v.label
-        if playtest_mode:
-            if v.kind == "say":
-                label = f"{label} [dim](context={v.context})[/]"
-            else:
-                label = f"{label} [dim](action={v.key})[/]"
-        if v.enabled:
-            return f"  [b]\\[{n}][/] {label}"
-        return f"  [dim]\\[{n}] {label}  ({v.reason})[/]"
-
     # --- dispatch ------------------------------------------------------------
 
     @on(ClickableEntry.Picked)
     def on_picked(self, msg: ClickableEntry.Picked) -> None:
         if msg.dest == "choice":
             self._choose(int(msg.ref))  # type: ignore[arg-type]
-        elif msg.dest == "verb":
-            self._dispatch(str(msg.ref))
         elif msg.dest == "back":
             self.action_back_one()
 
-    def action_verb(self, key: str) -> None:
-        self._dispatch(key)
-
     def action_choice(self, n: int) -> None:
-        """Select the n-th shown reply (key 1–9): an authored choice or a verb, in render order."""
+        """Select the n-th shown reply (key 1–9), in render order."""
         items = self._menu_items(self._view())
         if not 1 <= n <= len(items):
             return
-        kind, item = items[n - 1]
-        if kind == "choice":
-            self._choose(item.index)  # type: ignore[attr-defined]
-        else:
-            self._dispatch(item.key)  # type: ignore[attr-defined]
+        _kind, item = items[n - 1]
+        self._choose(item.index)  # type: ignore[attr-defined]
 
     def _choose(self, index: int) -> None:
-        """Apply a player reply on a branching node, then navigate per its action/transition."""
-        choice = next((ch for ch in self._view().choices if ch.index == index), None)
+        """Apply a player reply, then navigate per its action/transition (§6.7)."""
+        pre = self._view()
+        choice = next((ch for ch in pre.choices if ch.index == index), None)
         if choice is None:
             return
         if not choice.enabled:
@@ -369,6 +320,9 @@ class AlienContactScreen(Screen):
             return
         if self._service is None:
             return
+        # Capture the intel feedback *before* the reducer consumes the tip (an accept_lead reply
+        # logs the lead inside Converse, then the next view no longer offers it).
+        summary, pinned = pre.intel_summary, pre.opener
         try:
             self._service.apply(self._pid, Converse(self._species_id, self._active_context,
                                                     subject_id=self._active_subject,
@@ -385,8 +339,10 @@ class AlienContactScreen(Screen):
         if choice.action == "barter":
             self._pick_offer("barter")
             return
-        if choice.action == "accept_lead":
-            self.notify("Coordinates logged.", timeout=3)
+        if choice.action == "accept_lead":  # the Converse above already logged the tip
+            self.notify(f"Logged: {summary}" if summary else "Coordinates logged.", timeout=3)
+            self._reopen(pinned_speech=pinned)
+            return
         if choice.next_context:
             if choice.next_context == "back":
                 if self._history:
@@ -402,42 +358,6 @@ class AlienContactScreen(Screen):
                 self._history = (*self._history, (self._active_context, self._active_subject))
                 self._active_context, self._active_subject = choice.next_context, None
                 self._reopen()
-
-    def _dispatch(self, key: str) -> None:
-        verb = next((v for v in self._view().verbs if v.key == key), None)
-        if verb is None:
-            return
-        if not verb.enabled:
-            self.notify(verb.reason or "unavailable here", timeout=2)
-            return
-        if verb.kind == "say":
-            if verb.needs_subject:
-                self._ask_about(verb.context)
-            else:
-                self._say(verb.context, None, close=(key == "farewell"))
-        elif key == "trade":
-            self._trade_or_refuse()
-        elif key == "barter":
-            self._pick_offer("barter")
-        elif key == "accept_lead":
-            self._accept_lead()
-        else:
-            self.notify(verb.reason or "not available", timeout=2)
-
-    def _accept_lead(self) -> None:
-        """Log the coordinate tip the alien is offering (§6.7); confirm with its summary."""
-        if self._service is None:
-            return
-        view = self._view()
-        summary = view.intel_summary
-        pinned = view.opener  # freeze the line the player just acted on (don't reveal the next tip)
-        try:
-            self._service.apply(self._pid, AcceptLead(self._species_id))
-        except Exception as exc:  # core rejected it — surface the reason, stay put
-            self.notify(str(exc), timeout=2)
-            return
-        self.notify(f"Logged: {summary}" if summary else "Coordinates logged.", timeout=3)
-        self._reopen(pinned_speech=pinned)
 
     def _say(self, context: str, subject_id: int | None, *, close: bool) -> None:
         if self._service is None:
@@ -508,15 +428,32 @@ class AlienContactScreen(Screen):
             return
         self._reopen()
 
-    def action_back(self) -> None:
-        self._break_contact()
+    def action_farewell(self) -> None:
+        """Farewell (f): speak a parting line, then break contact — the single exit."""
+        self._say("farewell", None, close=True)
+
+    def action_refresh(self) -> None:
+        """Play-test only: re-roll the current context's line in place (advance its recency ring).
+
+        Re-speaks the active context via `Converse` (no choice), which advances the
+        `(species, context)` recency ring so the next render picks a different variant. Gated to
+        `playtest_mode` by `check_action`; branch nodes (not directly sayable) simply no-op.
+        """
+        if not self.playtest_mode or self._service is None:
+            return
+        try:
+            self._service.apply(self._pid, Converse(self._species_id, self._active_context,
+                                                    subject_id=self._active_subject))
+        except Exception:  # a non-sayable node (e.g. a branch.*) — nothing to re-roll
+            return
+        self._reopen()
 
     def action_back_one(self) -> None:
-        """Step back to the previous conversation node (Backspace), out of a dead end (§6.7).
+        """Step back to the previous conversation node (b), out of a dead end (§6.7).
 
         View-only: it re-renders an earlier `(context, subject)` from the breadcrumb without
         issuing a command — the navigating `Converse` already fired. With no breadcrumb (at the
-        opener) it does nothing; use Escape to break contact.
+        opener) it does nothing; use Farewell (f) to break contact.
         """
         if not self._history:
             return

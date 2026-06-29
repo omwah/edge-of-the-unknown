@@ -84,7 +84,7 @@ def test_contact_view_surfaces_intel_then_leads_view_plots() -> None:
 
     view = session.contact_view(state, 1, sp.id, CFG, active_context="offer_coordinates")
     assert view.intel_summary  # a tip is on offer
-    assert next(v for v in view.verbs if v.key == "accept_lead").enabled
+    assert next(c for c in view.choices if c.action == "accept_lead").enabled
     assert any(ch.isdigit() for ch in view.opener)  # the line carries {coords}
 
     apply_result(state, reduce(state, 1, AcceptLead(sp.id), CFG))
@@ -93,25 +93,26 @@ def test_contact_view_surfaces_intel_then_leads_view_plots() -> None:
     # Logged at the player's current sector, so it plots over the full graph from here (§6.7).
     assert rows[0].at_origin and rows[0].origin_coords >= 0
 
-    # Once logged, the speaker has nothing new — the Log-coordinates verb greys out.
+    # Once logged, the speaker has nothing new — the Log-coordinates reply is gone (the node falls
+    # to its "nothing new" catch-all, whose only reply is to back out).
     view2 = session.contact_view(state, 1, sp.id, CFG, active_context="offer_coordinates")
-    assert not next(v for v in view2.verbs if v.key == "accept_lead").enabled
+    assert not any(c.action == "accept_lead" and c.enabled for c in view2.choices)
 
 
-def test_log_coordinates_is_gated_on_having_asked() -> None:
-    """You cannot log a route the speaker hasn't volunteered — the verb is greyed until you ask."""
+def test_log_coordinates_only_appears_on_the_offer_node() -> None:
+    """Log-coordinates is a reply on the offer_coordinates node, not the greeting — you cannot log
+    a route the speaker hasn't volunteered on screen."""
     state = generate_with_player(SMALL, 3)
     sp = _inject(state)
     _knows_a_far_discovery(state, sp)  # a tip exists on offer
 
-    # Default (greeting) context: the offer is not on screen, so Log-coordinates is disabled.
+    # Default (greeting) context: no Log-coordinates reply at all (it lives on the offer node).
     greeting = session.contact_view(state, 1, sp.id, CFG)  # active_context defaults to "greeting"
-    log = next(v for v in greeting.verbs if v.key == "accept_lead")
-    assert not log.enabled and log.reason == "ask for coordinates first"
+    assert not any(c.action == "accept_lead" for c in greeting.choices)
 
-    # After asking (the offer_coordinates line is shown), the verb enables.
+    # On the offer_coordinates node, with a tip on offer, the reply is present and enabled.
     asked = session.contact_view(state, 1, sp.id, CFG, active_context="offer_coordinates")
-    assert next(v for v in asked.verbs if v.key == "accept_lead").enabled
+    assert next(c for c in asked.choices if c.action == "accept_lead").enabled
 
 
 def test_accept_lead_without_a_tip_is_rejected() -> None:

@@ -153,13 +153,15 @@ Press **F2** for the controls modal and flip the simulated dials live:
   `wary` is Phase-3-inert so it is omitted; `allied` needs the species to carry an alliance).
 - **Treaty** / **Intel** — toggles that gate treaty- and `offer_coordinates`-keyed lines.
 - **Show disabled** — the runtime's `ui.show_disabled_options` (greys gated rows).
-- **Force-enable & traverse** — makes gated verbs/choices *selectable* so you can walk every
+- **Force-enable & traverse** — makes gated replies *selectable* so you can walk every
   branch regardless of standing/treaty/Phase-3 gates.
 
-Inside a conversation, repeat a verb to watch the **recency ring** rephrase the line, follow a
-branch node's player replies, and press **Backspace** to step back out of a dead end (Escape
-breaks contact). The harness only advances the recency ring; trade/barter/lead actions are
-no-ops here, since this is about the words, not the economy.
+Inside a conversation, the menu is the node's authored `choices` (resolved species → persona →
+generic, falling back to the `generic` persona's `start_context` replies). Press **`f5`** to
+re-roll the current line and watch the **recency ring** rephrase it, follow a branch node's
+player replies, press **`b`** to step back out of a dead end, and **`f`** to speak a parting
+line and break contact. The harness only advances the recency ring; trade/barter/lead actions
+are no-ops here, since this is about the words, not the economy.
 
 > Like the rest of this package, the harness is **dev-only**. It is the sole corner of
 > `edge.dialogue` that imports `edge.tui` + `textual`; that import is kept off the runtime path
