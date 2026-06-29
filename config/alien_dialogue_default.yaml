@@ -234,7 +234,6 @@ personas:
           - "Seek {target}? Set course for sector {coords}, {player} — {distance} jumps into the {band}. {reward} awaits there."
           - "The {species} know of {target} at sector {coords}: {distance} hops out, deep in the {band}. You'll find {reward}."
           - "Take these coordinates, {player}: sector {coords}, {distance} jumps off. {target} lies there, and with it {reward}."
-          - The stars are quiet. We have no destinations for you.
         choices:  # log the volunteered tip (gated on a tip being on offer), or back out
           - text: "Log these coordinates."
             action: accept_lead
@@ -243,6 +242,7 @@ personas:
       - variants:  # catch-all — nothing new to point you toward
           - "The {species} know of nowhere new to send you just now, {player}."
           - "We have no fresh coordinates for you. Range farther, {player}, and return."
+          - The stars are quiet. We have no destinations for you.
         choices:
           - text: "Thanks for nothing..."
             next_context: back

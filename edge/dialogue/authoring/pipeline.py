@@ -121,8 +121,7 @@ def build_prompt(req: AuthoringRequest, known_contexts: frozenset[str] | None = 
         "<a beat to go to, optional>, \"action\": <one of leave/trade/barter/accept_lead, "
         "optional>}. Only 'text' is required. Omit 'choices' if no branching reply fits."
         + contexts_info
-        + (f"\nFor reference, these placeholder values may appear at runtime: "
-           f"{dict(req.examples)}." if req.examples else "")
+        + example
     )
 
 
@@ -503,7 +502,7 @@ def _author_dossier_self(voice_id: str, species_name: str) -> list[dict[str, Any
             "when": {"standing": std},
             "variants": [
                 f"The {species_name} do not share our history with those we do not trust.",
-                f"Why should we tell you of our ways, traveler?"
+                "Why should we tell you of our ways, traveler?"
             ]
         })
     categories = [
