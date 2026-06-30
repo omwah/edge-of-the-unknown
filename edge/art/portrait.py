@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import random
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from rich.text import Text
@@ -84,6 +85,48 @@ def resolve_portrait(
     return candidates[variant % len(candidates)]
 
 
+# chafa rendering is expensive, so its ANSI output is memoised. The key includes `cols`/`rows`
+# (already box-clamped) and the file's mtime, so re-rendering the *same* portrait at a *different*
+# size is a cache miss that gets stored as its own entry (a resize is cached, not a collision), and
+# regenerating the image file on disk invalidates the stale entry. Capping at 256 entries bounds the
+# memory for a roster's worth of portraits across the handful of box sizes the UI actually uses.
+@lru_cache(maxsize=256)
+def _render_portrait_ansi(
+    path: str,
+    cols: int,
+    rows: int,
+    symbols: str,
+    font_ratio: float,
+    _mtime_ns: int,
+) -> str:
+    """Run image `path` through chafa and return its decoded ANSI string (the cached unit)."""
+    from chafa import Canvas, CanvasConfig, PixelType, SymbolMap
+    from PIL import Image
+
+    image = Image.open(path).convert("RGBA")
+
+    symbol_map = SymbolMap()
+    symbol_map.apply_selectors(symbols)
+
+    config = CanvasConfig()
+    config.width = cols
+    config.height = rows
+    # Shrink width/height to the largest aspect-preserving fit within the box (stretch=False),
+    # scaling up to the box on its limiting axis (zoom=True) so the portrait fills as much as it can.
+    config.calc_canvas_geometry(image.width, image.height, font_ratio, zoom=True)
+    config.set_symbol_map(symbol_map)
+
+    canvas = Canvas(config)
+    canvas.draw_all_pixels(
+        PixelType.CHAFA_PIXEL_RGBA8_UNASSOCIATED,
+        image.tobytes(),
+        image.width,
+        image.height,
+        image.width * 4,  # rowstride: 4 bytes/pixel (RGBA)
+    )
+    return canvas.print().decode()
+
+
 def render_portrait(
     path: Path,
     cols: int,
@@ -98,29 +141,15 @@ def render_portrait(
     cell width/height — match it to the terminal so the image isn't squashed (lower widens).
     Drives the chafa binding with the given `symbols` selector. Raises on a missing file, a
     missing binding (`ImportError`), or any chafa/PIL error — the caller decides the fallback.
+
+    The chafa render is memoised per (path, size, symbols, font_ratio, mtime), so repeat
+    requests — including the same portrait re-rendered at a different box size — are served from
+    cache. A fresh `Text` is rebuilt from the cached ANSI each call so callers may mutate it
+    freely without corrupting the shared cache.
     """
-    from chafa import Canvas, CanvasConfig, PixelType, SymbolMap
-    from PIL import Image
-
-    image = Image.open(path).convert("RGBA")
-
-    symbol_map = SymbolMap()
-    symbol_map.apply_selectors(symbols)
-
-    config = CanvasConfig()
-    config.width = max(1, cols)
-    config.height = max(1, rows)
-    # Shrink width/height to the largest aspect-preserving fit within the box (stretch=False),
-    # scaling up to the box on its limiting axis (zoom=True) so the portrait fills as much as it can.
-    config.calc_canvas_geometry(image.width, image.height, font_ratio, zoom=True)
-    config.set_symbol_map(symbol_map)
-
-    canvas = Canvas(config)
-    canvas.draw_all_pixels(
-        PixelType.CHAFA_PIXEL_RGBA8_UNASSOCIATED,
-        image.tobytes(),
-        image.width,
-        image.height,
-        image.width * 4,  # rowstride: 4 bytes/pixel (RGBA)
+    cols = max(1, cols)
+    rows = max(1, rows)
+    ansi = _render_portrait_ansi(
+        str(path), cols, rows, symbols, font_ratio, Path(path).stat().st_mtime_ns
     )
-    return Text.from_ansi(canvas.print().decode())
+    return Text.from_ansi(ansi)
