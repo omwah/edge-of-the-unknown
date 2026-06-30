@@ -561,6 +561,7 @@ class ContactDTO:
     # choices are the guaranteed baseline (validate_dialogue requires them). Each carries its own
     # gating (`enabled`/`reason`) ported from the old derived verb menu.
     choices: list[ContactChoiceDTO] = field(default_factory=list)
+    portrait_variant: int = 0  # seeded-random variant for the species portrait image
     debug_context: str = ""
     debug_when: str = ""
 
