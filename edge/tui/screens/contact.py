@@ -205,11 +205,12 @@ class AlienContactScreen(Screen):
         with Horizontal(id="contact-main"):
             with Vertical(id="portrait-box"):
                 symbols, font_ratio, images_dir = self._portrait_opts()
-                # variant keyed to the individual (species_id) so a given alien keeps one face
-                # across the screen rebuilds a conversation triggers, while different individuals
-                # of the same species may differ.
+                # variant keyed deterministically (seeded from the game seed + species
+                # instance id in contact_view) so a given alien keeps one face across
+                # screen rebuilds, while different individuals of the same species get
+                # different portraits.
                 yield SpeciesPortrait(c.roster_id, c.species, symbols, font_ratio,
-                                      images_dir, self._species_id)
+                                      images_dir, c.portrait_variant)
             with Vertical(id="right"):
                 speech = Static(self._pinned_speech or c.opener, id="speech")
                 speech.border_title = "they speak"

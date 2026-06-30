@@ -9,6 +9,7 @@ sees a core model, only these DTOs.
 
 from __future__ import annotations
 
+import random
 from collections.abc import Mapping
 
 from edge.bigbang.topology import bfs_distances
@@ -1072,6 +1073,14 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
                                standing=standing, ctx=choice_ctx, facts=facts, sc=sc,
                                offers=offers, has_intel=intel is not None,
                                subjects_available=bool(subjects))
+    # A seeded-random portrait variant so different individuals of the same species show
+    # different faces, deterministically keyed to the game seed + species instance id.
+    # Uses the same string-seed `random.Random` pattern as `encounter_rng` (stable across
+    # processes, replay-exact). The value is an arbitrary int that `resolve_portrait` mods
+    # by the candidate count.
+    portrait_variant = random.Random(
+        f"{state.game.seed}|portrait|{species_id}"
+    ).randint(0, 2**31)
     return dto.ContactDTO(
         species=species.name, roster_id=species.roster_id, persona=species.persona,
         alliance=alliance.name if alliance else "unaligned",
@@ -1083,6 +1092,7 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         offers=offers, dossier=dossier, subjects=subjects,
         intel_summary=intel.summary() if intel is not None else "",
         choices=choices,
+        portrait_variant=portrait_variant,
     )
 
 
