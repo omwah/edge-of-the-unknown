@@ -126,6 +126,8 @@ class WarpDTO:
     display_id: int = 0  # spatial id rendered on the warp button (§5.1)
     band: str = ""  # distance-band name (explored) | "?" (unexplored)
     codes: list[str] = field(default_factory=list)  # short content tokens, explored only
+    bearing: float = 0.0  # direction to this warp from the current sector, radians (§11 nav rose);
+    #                       from the seeded spatial embedding, 0.0 when no layout exists (fallback)
 
     @property
     def explored(self) -> bool:
@@ -208,6 +210,10 @@ class SectorDTO:
     warps: list[WarpDTO] = field(default_factory=list)
     discoveries: list[SectorDiscovery] = field(default_factory=list)
     display_id: int = 0  # spatial id shown in the sector title (§5.1)
+    core_bearing: float = 0.0  # direction from here to the Core, radians (§11 nav-rose anchor);
+    #                            0.0 when no spatial embedding exists (fallback to gravity axis)
+    trail: list[int] = field(default_factory=list)  # recent route breadcrumb: spatial ids of the
+    #                                                  last sectors travelled, oldest → newest (§11)
 
 
 @dataclass(frozen=True)
@@ -384,6 +390,26 @@ class LocalMapDTO:
 
 
 @dataclass(frozen=True)
+class NavStripDTO:
+    """The always-visible main-screen nav rose — the sole warp affordance (§11).
+
+    A compact bearing-placed compass of the current sector's immediate neighbours,
+    baked server-side into Rich-markup `rows` (open-diagonals style: `@` centred,
+    ids in octant slots, a fixed `Core` anchor) the TUI renders verbatim. `nodes`
+    carries each neighbour's clickable/focusable cell box (reusing the `MapNodeDTO`
+    contract) so a click or keyboard-select warps there; `core_bearing` orients the
+    anchor; `trail` is the recent-route breadcrumb (spatial ids, oldest → newest).
+    """
+
+    rows: list[str]
+    legend: str = ""
+    you_display: int = 0  # spatial id of the player's sector (§5.1)
+    core_bearing: float = 0.0  # direction from here to the Core, radians (anchor placement)
+    nodes: list[MapNodeDTO] = field(default_factory=list)
+    trail: list[int] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class LogEntry:
     """One line in the messages/event log (UI_MOCKUPS.md §11, DESIGN §12)."""
 
@@ -502,6 +528,7 @@ class GameState:
     max_turns: int
     ship: ShipDTO
     sector: SectorDTO
+    nav: NavStripDTO | None = None  # the main-screen nav rose (§11); None for legacy fixtures
 
 
 @dataclass(frozen=True)

@@ -14,7 +14,7 @@ from edge.tui.app import EdgeApp
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.stardock import StarDockScreen
 from edge.tui.screens.travel import TravelPromptScreen
-from edge.tui.widgets import WarpCell
+from edge.tui.widgets import NavRose
 
 
 async def _warp_player_to(svc: object, target: int) -> None:
@@ -56,7 +56,7 @@ async def test_new_game_pushes_live_game_screen() -> None:
         assert view.sector.sector_id == dock.sector_id and view.turns == 250
 
 
-async def test_warp_cell_click_warps() -> None:
+async def test_nav_rose_click_warps() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
@@ -65,17 +65,19 @@ async def test_warp_cell_click_warps() -> None:
         svc = app.service
         assert svc is not None
         start = svc.game_view(1).sector.sector_id
-        cells = app.screen.query(WarpCell)
-        assert cells
-        first = cells.first()
-        target = first._warp.sector_id
-        await pilot.click(first)
+        rose = app.screen.query_one(NavRose)
+        assert rose._hits
+        node = rose._hits[0]
+        target = node.sector_id
+        # Content is drawn past the 1-cell left padding; a node cell (row, col0) sits
+        # at widget offset (col0 + 1, row).
+        await pilot.click(rose, offset=(node.col0 + 1, node.row))
         await pilot.pause()
         moved = svc.game_view(1).sector.sector_id
         assert moved == target != start
 
 
-async def test_enter_warps_focused_cell() -> None:
+async def test_enter_warps_selected_node() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
@@ -84,9 +86,10 @@ async def test_enter_warps_focused_cell() -> None:
         svc = app.service
         assert svc is not None
         start = svc.game_view(1).sector.sector_id
-        # The default-focus cell holds focus; Enter on it should warp there.
-        assert isinstance(app.focused, WarpCell)
-        target = app.focused._warp.sector_id
+        # The nav rose auto-focuses; Enter warps to its selected neighbour.
+        assert isinstance(app.focused, NavRose)
+        rose = app.focused
+        target = rose._hits[rose._idx].sector_id
         await pilot.press("enter")
         await pilot.pause()
         moved = svc.game_view(1).sector.sector_id
@@ -189,82 +192,56 @@ async def test_sector_title_shows_spatial_id() -> None:
         assert f"[{spatial}]" in title
 
 
-async def test_arrow_keys_move_warp_focus() -> None:
-    """Arrow keys move focus between warp cells by their on-screen layout.
+async def test_arrow_keys_cycle_nav_rose_selection() -> None:
+    """Arrow keys move the nav rose's selection around the compass.
 
-    With the current-sector marker gone, the configured default (first warp) is
-    auto-focused on the fresh game screen (no priming Tab); further presses step by
-    grid geometry — Right/Left along a row, Down/Up a column — using the grid's
-    column count.
+    The rose auto-focuses on the fresh game screen (no priming Tab); Right/Down step
+    to the next neighbour, Left/Up to the previous, wrapping through the ring.
     """
-    from edge.tui.widgets import WarpCell, WarpGrid
-
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         await pilot.press("n")
         await pilot.pause()
 
-        grid = app.screen.query_one(WarpGrid)
-        cols = grid._columns
-        children = list(grid.children)
-        cells = {(i // cols, i % cols): c for i, c in enumerate(children)
-                 if isinstance(c, WarpCell)}
-        assert cells
+        rose = app.screen.query_one(NavRose)
+        assert isinstance(app.focused, NavRose)
+        if len(rose._hits) < 2:
+            return  # a lone-exit sector has nothing to cycle through
 
-        # No Tab pressed: the first warp cell (default focus = "first") holds focus.
-        assert app.focused is cells[(0, 0)]
-
-        # Right/Left along a row, relative to the focused warp cell.
-        row_pair = next(((p, (p[0], p[1] + 1)) for p in cells if (p[0], p[1] + 1) in cells), None)
-        if row_pair is not None:
-            src, dst = row_pair
-            cells[src].focus()
-            await pilot.pause()
-            await pilot.press("right")
-            await pilot.pause()
-            assert app.focused is cells[dst]
-            await pilot.press("left")
-            await pilot.pause()
-            assert app.focused is cells[src]
-
-        # Down/Up along a column, relative to the focused warp cell.
-        col_pair = next(((p, (p[0] + 1, p[1])) for p in cells if (p[0] + 1, p[1]) in cells), None)
-        if col_pair is not None:
-            src, dst = col_pair
-            cells[src].focus()
-            await pilot.pause()
-            await pilot.press("down")
-            await pilot.pause()
-            assert app.focused is cells[dst]
-            await pilot.press("up")
-            await pilot.pause()
-            assert app.focused is cells[src]
+        start_idx = rose._idx
+        await pilot.press("right")
+        await pilot.pause()
+        assert rose._idx == (start_idx + 1) % len(rose._hits)
+        await pilot.press("left")
+        await pilot.pause()
+        assert rose._idx == start_idx
+        await pilot.press("down")
+        await pilot.pause()
+        assert rose._idx == (start_idx + 1) % len(rose._hits)
+        await pilot.press("up")
+        await pilot.pause()
+        assert rose._idx == start_idx
 
 
-async def test_focused_warp_cell_inverts_only_its_label() -> None:
-    """The selected warp highlights just its label text (reverse), not the whole grid cell."""
-    from edge.tui.widgets import WarpCell
-
+async def test_selected_nav_node_inverts_only_its_cell() -> None:
+    """The selected warp highlights just its baked compass cell (reverse), not the whole line."""
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         await pilot.press("n")
         await pilot.pause()
 
-        focused = app.focused
-        assert isinstance(focused, WarpCell)
-        text = focused.render()
-        # A reverse span covers the label and stops short of the right-aligned codes/filler,
-        # so the inversion hugs the text rather than spanning the full cell width.
+        rose = app.screen.query_one(NavRose)
+        assert isinstance(app.focused, NavRose)
+        node = rose._hits[rose._idx]
+        text = rose.render()
         reversed_spans = [s for s in text.spans if s.style and "reverse" in str(s.style)]
-        assert reversed_spans
+        # Exactly the focused node's cell is inverted: its span width matches the
+        # node's baked label box, well short of the whole rendered rose.
+        node_width = node.col1 - node.col0
+        assert any(s.end - s.start == node_width for s in reversed_spans)
         assert max(s.end for s in reversed_spans) < len(text.plain)
-
-        # An unfocused cell carries no inversion.
-        others = [c for c in app.screen.query(WarpCell) if c is not focused]
-        if others:
-            assert not any(s.style and "reverse" in str(s.style) for s in others[0].render().spans)
 
 
 async def test_dock_and_trade_buys_fuel() -> None:

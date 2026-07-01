@@ -26,6 +26,7 @@ from edge.core.dto import (
     LocalMapDTO,
     LogEntry,
     MessagesDTO,
+    NavStripDTO,
     PlanetDTO,
     PortDTO,
     SectorDTO,
@@ -126,15 +127,20 @@ def sample_state() -> GameState:
             SectorShipDTO("Verdani escort", "warship"),
         ],
         warps=[
-            WarpDTO(1, "<<", "Sol Core", display_id=1, band="Hub", codes=["S"]),
-            WarpDTO(3, "--", "Sol Core", display_id=3, band="Hub", codes=["P", "@"]),
-            WarpDTO(6, "--", "Vega Reach", display_id=6, band="Hub"),
-            WarpDTO(8, ">>", kind="unexplored", display_id=8, band="?"),
-            WarpDTO(12, ">>", kind="unexplored", display_id=12, band="?"),
+            WarpDTO(1, "<<", "Sol Core", display_id=1, band="Hub", codes=["S"], bearing=3.14),
+            WarpDTO(3, "--", "Sol Core", display_id=3, band="Hub", codes=["P", "@"], bearing=1.57),
+            WarpDTO(6, "--", "Vega Reach", display_id=6, band="Hub", bearing=2.6),
+            WarpDTO(8, ">>", kind="unexplored", display_id=8, band="?", bearing=0.4),
+            WarpDTO(12, ">>", kind="unexplored", display_id=12, band="?", bearing=-0.7),
         ],
         display_id=7,
+        core_bearing=3.14,  # the Core lies to the west of Sector 7
+        trail=[3, 6],
     )
-    return GameState(turns=287, max_turns=300, ship=ship, sector=sector)
+    from edge.server.navstrip import build_nav_strip
+
+    nav: NavStripDTO = build_nav_strip(sector)
+    return GameState(turns=287, max_turns=300, ship=ship, sector=sector, nav=nav)
 
 
 def sample_port() -> PortDTO:

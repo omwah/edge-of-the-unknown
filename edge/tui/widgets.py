@@ -21,7 +21,7 @@ from edge.core.dto import SectorDiscovery
 from edge.core.enums import Commodity
 
 from edge.tui import art_adapter
-from edge.tui.dummy import LocalMapDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
+from edge.tui.dummy import LocalMapDTO, NavStripDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
 
 
 class Starfield(Static):
@@ -830,3 +830,116 @@ class WarpGrid(Grid):
                 target.focus()
                 return
             row, col = row + drow, col + dcol
+
+
+class NavRose(Static):
+    """The always-visible nav rose — the sole main-screen warp affordance (§11).
+
+    A compact bearing-placed compass baked server-side (`session.game_view` →
+    `navstrip.build_nav_strip`): the player (`@`) centred, each outbound warp in the
+    octant of its real bearing, a fixed `Core` anchor for global orientation, and a
+    recent-route breadcrumb. This widget renders the baked rows verbatim, highlights
+    the keyboard-selected warp (a style span over its baked cell — canvas columns line
+    up with `Text.from_markup` offsets), shows its detail line, and warps on click or
+    Enter. Replaces the old flat `WarpGrid`; one click / keypress = one warp.
+    """
+
+    can_focus = True
+
+    class Picked(Message):
+        def __init__(self, sector_id: int) -> None:
+            self.sector_id = sector_id  # internal id of the chosen warp target
+            super().__init__()
+
+    BINDINGS = [
+        Binding("up", "move(-1)", show=False),
+        Binding("left", "move(-1)", show=False),
+        Binding("down", "move(1)", show=False),
+        Binding("right", "move(1)", show=False),
+        Binding("enter", "warp", "Warp", show=False),
+        Binding("space", "warp", "Warp", show=False),
+    ]
+
+    DEFAULT_CSS = "NavRose { height: auto; padding: 0 1; }"
+
+    def __init__(self, nav: NavStripDTO, warps: list[WarpDTO], **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._nav = nav
+        self._warps = {w.sector_id: w for w in warps}
+        # Cycle order runs top-to-bottom, left-to-right around the rose.
+        self._hits = sorted(nav.nodes, key=lambda n: (n.row, n.col0))
+        self._idx = 0
+
+    def on_mount(self) -> None:
+        # Grab focus as the rose appears so arrow keys drive selection immediately
+        # (no priming Tab); re-homes on each recompose, as the old warp grid did.
+        if self._hits:
+            self.call_after_refresh(self.focus)
+
+    def render(self) -> Text:
+        focus_node = self._hits[self._idx] if self._hits else None
+        lines: list[Text] = []
+        for i, row in enumerate(self._nav.rows):
+            line = Text.from_markup(row)
+            if focus_node is not None and self.has_focus and focus_node.row == i:
+                line.stylize("reverse bold", focus_node.col0, focus_node.col1)
+            lines.append(line)
+        out = Text("\n").join(lines)
+        out.append("\n\n")
+        out.append_text(self._trail_line())
+        out.append("\n")
+        out.append_text(self._detail_line(focus_node))
+        if self._nav.legend:
+            out.append("\n")
+            out.append_text(Text.from_markup(self._nav.legend))
+        return out
+
+    def _trail_line(self) -> Text:
+        if not self._nav.trail:
+            return Text("trail: —", style="dim")
+        line = Text("trail: ", style="dim")
+        line.append(" › ".join(str(c) for c in self._nav.trail), style="dim")
+        line.append(" › ", style="dim")
+        line.append("[you]", style="bold")
+        return line
+
+    def _detail_line(self, focus_node: object) -> Text:
+        if focus_node is None:
+            return Text("no warps out of here", style="dim")
+        node = self._hits[self._idx]
+        warp = self._warps.get(node.sector_id)
+        line = Text("▶ ", style="bold")
+        line.append(f"{node.display_id}  ", style="bold")
+        if warp is None or not warp.explored:
+            line.append("uncharted", style="dim")
+        else:
+            codes = " " + "".join(warp.codes) if warp.codes else ""
+            line.append(f"{warp.label or '—'} · {warp.band}{codes}")
+        line.append("     (↵ to warp)", style="dim")
+        return line
+
+    def action_move(self, step: int) -> None:
+        if self._hits:
+            self._idx = (self._idx + step) % len(self._hits)
+            self.refresh()
+
+    def action_warp(self) -> None:
+        if self._hits:
+            self.post_message(self.Picked(self._hits[self._idx].sector_id))
+
+    def on_click(self, event: events.Click) -> None:
+        pad = self.styles.padding
+        col, row = int(event.x) - pad.left, int(event.y) - pad.top
+        for i, node in enumerate(self._hits):
+            if node.row == row and node.col0 <= col < node.col1:
+                event.stop()
+                self._idx = i
+                self.refresh()
+                self.post_message(self.Picked(node.sector_id))
+                return
+
+    def on_focus(self) -> None:
+        self.refresh()
+
+    def on_blur(self) -> None:
+        self.refresh()
