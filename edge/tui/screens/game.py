@@ -33,12 +33,11 @@ from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
 from edge.tui.widgets import (
     ClickableEntry,
+    NavRose,
     SectionRule,
     SectorScene,
     StatusSidebar,
     Ticker,
-    WarpCell,
-    WarpGrid,
 )
 
 
@@ -63,8 +62,8 @@ class SectorView(Container):
     """The primary sector display (§1).
 
     A single composited `SectorScene` (starfield behind header / planet / port /
-    ships) fills the upper area, and the interactive `WarpGrid` — the single,
-    information-rich warp affordance — fills the width at the bottom.
+    ships) fills the upper area, and the interactive `NavRose` — the single,
+    direction-aware warp affordance — fills the width at the bottom.
     """
 
     DEFAULT_CSS = """
@@ -72,21 +71,20 @@ class SectorView(Container):
     SectorView #warp-area { width: 1fr; height: auto; }
     """
 
-    def __init__(self, sector: SectorDTO) -> None:
+    def __init__(self, sector: SectorDTO, nav: object = None) -> None:
         super().__init__()
         self._sector = sector
+        self._nav = nav
 
     def compose(self) -> ComposeResult:
         sec = self._sector
-        ui = getattr(self.app, "ui_config", None)
-        columns = ui.warp_columns if ui is not None else 3
-        focus_default = ui.warp_focus_default if ui is not None else "first"
-        max_warps = getattr(self.app, "max_warps_per_sector", 6)
-        min_rows = -(-max_warps // columns)  # ceil — reserve a consistent grid height
         yield SectorScene(sec)
         yield SectionRule("Navigation", id="warp-rule")
         with Container(id="warp-area"):
-            yield WarpGrid(sec.warps, columns, focus_default, min_rows)
+            if self._nav is not None:
+                yield NavRose(self._nav, sec.warps)
+            else:  # defensive: a legacy view with no baked rose
+                yield Static("[dim]no navigation data[/]")
 
 
 class GameScreen(Screen):
@@ -121,7 +119,7 @@ class GameScreen(Screen):
         ui = getattr(self.app, "ui_config", None)
         sidebar_width = ui.sidebar_width if ui is not None else 33
         with Horizontal(id="body"):
-            yield SectorView(view.sector)
+            yield SectorView(view.sector, view.nav)
             sidebar = StatusSidebar(view.ship, view.sector.discoveries, sidebar_width, id="sidebar")
             sidebar.display = self._sidebar_visible()  # also re-evaluated on resize
             yield sidebar
@@ -158,7 +156,7 @@ class GameScreen(Screen):
 
     # --- commands ------------------------------------------------------------
 
-    async def on_warp_cell_warp(self, msg: WarpCell.Warp) -> None:
+    async def on_nav_rose_picked(self, msg: NavRose.Picked) -> None:
         await self._warp(msg.sector_id)
 
     async def on_clickable_entry_picked(self, msg: ClickableEntry.Picked) -> None:

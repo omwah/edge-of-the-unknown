@@ -12,11 +12,13 @@ from __future__ import annotations
 import random
 from collections.abc import Mapping
 
+from edge.bigbang.embedding import bearing as _sector_bearing
 from edge.bigbang.topology import bfs_distances
 from edge import dialogue
 from edge.dialogue.intel import pick_intel_target
 from edge.core import dto
 from edge.server import mapgraph
+from edge.server import navstrip
 from edge.server import terrain as terrain_art
 from edge.core.aliens import disposition_band, effective_disposition
 from edge.core.config import DialogueChoice, GameConfig
@@ -144,14 +146,16 @@ def _warp_dto(
     did = _display(state, target)
     kind = _warp_kind(target, came_from, player.explored_sectors)
     arrow = _gravity_arrow(here, core_hops.get(target, here))
+    brg = _sector_bearing(state.sector_pos, sector.id, target)  # nav-rose direction (§11)
     tgt = state.sectors[target]
     if target in player.explored_sectors:
         return dto.WarpDTO(
             sector_id=target, arrow=arrow, label=state.regions[tgt.region_id].name,
             kind=kind, display_id=did, band=tgt.distance_band,
-            codes=_sector_codes(state, target),
+            codes=_sector_codes(state, target), bearing=brg,
         )
-    return dto.WarpDTO(sector_id=target, arrow=arrow, kind=kind, display_id=did, band="?")
+    return dto.WarpDTO(sector_id=target, arrow=arrow, kind=kind, display_id=did,
+                       band="?", bearing=brg)
 
 
 def _discovery_label(kind: str, rarity: str) -> str:
@@ -217,6 +221,27 @@ def _controlling_archetype(state: UniverseState, sector_id: int) -> str | None:
     return controller.archetype_id if controller is not None else None
 
 
+_TRAIL_LEN = 4  # how many prior sectors the nav-rose breadcrumb shows (§11)
+
+
+def _trail(state: UniverseState, player: Player, here: int) -> list[int]:
+    """Recent-route breadcrumb: spatial ids of the last sectors travelled (oldest → newest).
+
+    Walked statelessly back through `player.entered_from` (already recorded per move),
+    so it needs no new `Player` field and stays reproducible from `(seed, command log)`.
+    Stops at a missing link or a cycle; the current sector is excluded (it's the `@`).
+    """
+    crumbs: list[int] = []
+    seen = {here}
+    cur = player.entered_from.get(here)
+    while cur is not None and cur not in seen and len(crumbs) < _TRAIL_LEN:
+        crumbs.append(_display(state, cur))
+        seen.add(cur)
+        cur = player.entered_from.get(cur)
+    crumbs.reverse()  # oldest → newest
+    return crumbs
+
+
 def _sector_dto(
     state: UniverseState, player: Player, sector: Sector, core_hops: dict[int, int],
     config: GameConfig,
@@ -253,12 +278,14 @@ def _sector_dto(
         for target in sector.warps_out
     ]
     region = state.regions[sector.region_id].name
+    core_bearing = _sector_bearing(state.sector_pos, sector.id, 1)  # direction home (§11 anchor)
     return dto.SectorDTO(
         region=region, sector_id=sector.id, flavor=f"{sector.distance_band.lower()} space",
         beacon=sector.beacon_text, band=sector.distance_band,
         ports=ports, planets=planets, ships=ships, warps=warps,
         discoveries=_sector_discoveries(state, player, sector.id),
         display_id=_display(state, sector.id),
+        core_bearing=core_bearing, trail=_trail(state, player, sector.id),
     )
 
 
@@ -268,10 +295,12 @@ def game_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.G
     ship = state.ships[player.ship_id]
     sector = state.sectors[ship.sector_id]
     core_hops = state.core_hops or bfs_distances(state.adjacency, 1)  # cached at gen (WP-C)
+    sector_dto = _sector_dto(state, player, sector, core_hops, config)
     return dto.GameState(
         turns=player.turns_remaining, max_turns=config.turns_per_day,
         ship=_ship_dto(state, ship, player, sector),
-        sector=_sector_dto(state, player, sector, core_hops, config),
+        sector=sector_dto,
+        nav=navstrip.build_nav_strip(sector_dto),
     )
 
 

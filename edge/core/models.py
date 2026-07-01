@@ -462,6 +462,13 @@ class UniverseState:
     # authoritative, so this never touches persistence or `state_hash`. Surfaced
     # only at the projection boundary; empty for hand-built (test) states.
     spatial_ids: dict[int, int] = field(default_factory=dict)
+    # Internal sector id -> stable 2D layout position (x, y), a seeded force-directed
+    # embedding computed once at generation (DESIGN §5.1). A runtime-only cache like
+    # `core_hops`/`spatial_ids`: derived from topology, excluded from `state_hash`,
+    # never persisted (recomputed on reload), so it drives the direction-aware nav rose
+    # (§11) without touching the `(seed, command log)` rail. Empty for hand-built (test)
+    # states — the projection then degrades to the `core_hops` gravity axis.
+    sector_pos: dict[int, tuple[float, float]] = field(default_factory=dict)
     # Per species **kind** (roster_id), the places of interest that kind knows about and a
     # friendly member may volunteer as a coordinate tip (DESIGN §6.7 intel). A generation-
     # time cache rebuilt by the big bang (like `core_hops`/`spatial_ids`), excluded from

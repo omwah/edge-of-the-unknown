@@ -24,6 +24,9 @@ from collections.abc import Sequence
 from edge.core import dto
 from edge.core.enums import PortClass
 from edge.core.models import Player, UniverseState
+from edge.server.canvas import BAND_COLOR as _BAND_COLOR
+from edge.server.canvas import HERE_STYLE as _HERE_STYLE
+from edge.server.canvas import Canvas as _Canvas
 
 # Fallback reach (in warp hops) when no config is supplied; the live value comes
 # from `ui.local_map_radius` (config). A presentation tuning, not a game rule.
@@ -32,14 +35,6 @@ LOCAL_RADIUS = 3
 _CELL_GAP = 5  # blank columns between node columns — room for edge connectors
 _VSTEP = 2  # blank rows between stacked nodes in a column
 
-# Distance-band → node tint (the retired band-panel signal, now per-node).
-_BAND_COLOR: dict[str, str] = {
-    "Hub": "cyan",
-    "Frontier": "green",
-    "Deep": "magenta",
-    "Void": "blue",
-}
-_HERE_STYLE = "reverse bold cyan"
 _ROUTE_STYLE = "bold yellow"
 _UNEXPLORED_STYLE = "dim"  # a sector whose id is known (warp list shows it) but is uncharted
 _ONEWAY_STYLE = "dim"  # a warp with no return edge (one-way), drawn faintly
@@ -48,50 +43,6 @@ LEGEND = (
     "[reverse bold cyan]@[/] you   [bold yellow]*[/] route   ─ warp   "
     "[magenta]P[/]/[magenta]S[/] port   [green]@[/] planet   [dim](n)[/] unexplored"
 )
-
-
-def _esc(text: str) -> str:
-    """Escape Rich-markup-significant characters in literal cell text."""
-    return text.replace("[", r"\[")
-
-
-class _Canvas:
-    """A character grid with a parallel per-cell style, emitted as markup rows."""
-
-    def __init__(self, width: int, height: int) -> None:
-        self.w = max(1, width)
-        self.h = max(1, height)
-        self._ch: list[list[str]] = [[" "] * self.w for _ in range(self.h)]
-        self._st: list[list[str | None]] = [[None] * self.w for _ in range(self.h)]
-
-    def put(self, y: int, x: int, text: str, style: str | None = None,
-            *, protect: set[tuple[int, int]] | None = None) -> None:
-        if not 0 <= y < self.h:
-            return
-        for i, char in enumerate(text):
-            xx = x + i
-            if 0 <= xx < self.w and not (protect and (y, xx) in protect):
-                self._ch[y][xx] = char
-                self._st[y][xx] = style
-
-    def rows(self) -> list[str]:
-        out: list[str] = []
-        for y in range(self.h):
-            chars, styles = self._ch[y], self._st[y]
-            parts: list[str] = []
-            i = 0
-            while i < self.w:
-                style = styles[i]
-                j = i
-                while j < self.w and styles[j] == style:
-                    j += 1
-                seg = _esc("".join(chars[i:j]))
-                parts.append(f"[{style}]{seg}[/]" if style else seg)
-                i = j
-            out.append("".join(parts).rstrip())
-        while out and out[-1] == "":
-            out.pop()
-        return out
 
 
 def _local_bfs(state: UniverseState, src: int, radius: int) -> dict[int, int]:
