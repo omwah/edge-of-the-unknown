@@ -190,6 +190,55 @@ def test_trunk_has_chokepoints() -> None:
     raise AssertionError("expected trunk topology to contain at least one chokepoint")
 
 
+# --- WP21: per-mode band retune (DESIGN §5 step 5) ---
+
+def test_active_bands_resolves_by_mode() -> None:
+    """`active_bands()` returns the trunk `bands` normally and `bands_expansive`
+    (same names, deeper thresholds) in expansive mode."""
+    trunk_bands = CONFIG.bigbang.active_bands()  # type: ignore[attr-defined]
+    exp_bands = EXPANSIVE_CONFIG.bigbang.active_bands()  # type: ignore[attr-defined]
+    assert [b.name for b in trunk_bands] == [b.name for b in exp_bands]  # identical names
+    # Deeper hop windows under expansive (the ring-road lattice lengthens paths).
+    assert exp_bands[-1].min_hops > trunk_bands[-1].min_hops
+
+
+def test_bands_expansive_name_mismatch_rejected() -> None:
+    """The config validator enforces same band names across modes (only thresholds
+    differ), so no name-keyed placement/validation silently diverges."""
+    import pydantic
+
+    from edge.core.config import BigBangConfig, DistanceBand
+
+    with pytest.raises(pydantic.ValidationError):
+        BigBangConfig(
+            bands=[DistanceBand(name="Hub", min_hops=0, max_hops=5)],
+            bands_expansive=[DistanceBand(name="Core", min_hops=0, max_hops=9)],
+        )
+
+
+def _big_expansive_config(sector_count: int = 1000) -> object:
+    cfg = load_default_config()
+    return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(
+        update={"topology_mode": "expansive", "sector_count": sector_count, "start_sector": 1})})
+
+
+BIG_EXPANSIVE = _big_expansive_config()
+
+
+@pytest.mark.parametrize("seed", range(8))
+def test_expansive_populates_all_four_bands(seed: int) -> None:
+    """At the real 1000-sector scale the retuned `bands_expansive` keeps all four
+    bands populated, with the frontier bands larger than the Hub (danger/reward
+    rises outward, §5/§7)."""
+    from collections import Counter
+
+    state = generate(BIG_EXPANSIVE, seed)  # type: ignore[arg-type]
+    counts = Counter(s.distance_band for s in state.sectors.values())
+    for band in ("Hub", "Frontier", "Deep", "Void"):
+        assert counts.get(band, 0) > 0, f"seed {seed}: band {band} empty ({dict(counts)})"
+    assert counts["Hub"] < counts["Frontier"]  # the Hub is the small safe centre
+
+
 @pytest.mark.parametrize("seed", range(20))
 def test_spatial_ids_wired_into_generate(seed: int) -> None:
     """`generate` caches a spatial display id per sector (DESIGN §5.1, WP-G)."""

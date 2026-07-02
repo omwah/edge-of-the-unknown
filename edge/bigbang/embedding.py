@@ -57,10 +57,10 @@ def compute_embedding(
     # Fan the tree: the root owns the full circle; each node splits its wedge among
     # its children proportional to their leaf weight, and sits at the wedge centre.
     span: dict[int, tuple[float, float]] = {_ROOT: (0.0, 2.0 * math.pi)}
-    angle: dict[int, float] = {}
+    base_angle: dict[int, float] = {}
     for node in order:
         lo, hi = span[node]
-        angle[node] = (lo + hi) / 2.0
+        base_angle[node] = (lo + hi) / 2.0
         kids = children.get(node, ())
         total = sum(weight[k] for k in kids) or 1
         cursor = lo
@@ -68,6 +68,23 @@ def compute_embedding(
             nxt = cursor + (hi - lo) * (weight[kid] / total)
             span[kid] = (cursor, nxt)
             cursor = nxt
+
+    # Lattice correction (§5.1): the single-parent tree fan is blind to the
+    # cross-links `expansive` mode adds, so a node bearings its own fan slot *and*
+    # the (already-refined) angles of **all its min-hop parents** — the circular
+    # mean pulls a lattice node toward the centroid of its inner neighbours while
+    # the own-slot term keeps sibling wedges distinct (a chain stays radial). BFS
+    # order guarantees parents are refined first. One extra O(n·deg) pass, stdlib.
+    angle: dict[int, float] = {}
+    for node in order:
+        cos_sum = math.cos(base_angle[node])
+        sin_sum = math.sin(base_angle[node])
+        hop = core_hops.get(node, depth[node])
+        for nbr in adjacency.get(node, ()):
+            if core_hops.get(nbr, depth.get(nbr, hop)) == hop - 1:  # a min-hop parent
+                cos_sum += math.cos(angle[nbr])
+                sin_sum += math.sin(angle[nbr])
+        angle[node] = math.atan2(sin_sum, cos_sum) if (cos_sum or sin_sum) else base_angle[node]
 
     rng = random.Random(seed)
     pos: dict[int, Pos] = {}

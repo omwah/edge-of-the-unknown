@@ -126,6 +126,13 @@ bigbang:
     - { name: Frontier, min_hops: 6,  max_hops: 12 }
     - { name: Deep,     min_hops: 13, max_hops: 20 }
     - { name: Void,     min_hops: 21, max_hops: 9999 }
+  # expansive-mode thresholds: same names, deeper hop windows (ring roads lengthen
+  # paths). Used only when topology_mode == expansive (§5 step 5).
+  bands_expansive:
+    - { name: Hub,      min_hops: 0,  max_hops: 14 }
+    - { name: Frontier, min_hops: 15, max_hops: 35 }
+    - { name: Deep,     min_hops: 36, max_hops: 58 }
+    - { name: Void,     min_hops: 59, max_hops: 9999 }
 
 # Engine room (§4.1): the game-global formulas turning a hull's slotted parts into
 # derived aspects. Per-subsystem layouts live on each ship class below. The

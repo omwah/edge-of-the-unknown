@@ -203,7 +203,8 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
     for attempt in range(_MAX_ATTEMPTS):
         build_rng = random.Random(f"{seed}-{attempt}")  # str seed: deterministic, typed
         out, groups = build_graph(cfg, build_rng)
-        bands = compute_bands(out, 1, cfg.bands)
+        active_bands = cfg.active_bands()  # per-mode hop thresholds (§5 step 5)
+        bands = compute_bands(out, 1, active_bands)
 
         gov = config.roster.core_governing_alliance_id if config.roster else 1
         game = Game(
@@ -227,14 +228,14 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
                 id=sid,
                 region_id=sector_to_region[sid],
                 warps_out=tuple(sorted(out[sid])),
-                distance_band=bands.get(sid, cfg.bands[-1].name),
+                distance_band=bands.get(sid, active_bands[-1].name),
                 is_galactic_core=sid in core_ids,
             )
             for sid in out
         }
         state.rebuild_adjacency()
         state.core_hops = bfs_distances(out, 1)  # gravity-arrow cache (§11, WP-C)
-        state.spatial_ids = assign_spatial_ids(groups, state.core_hops, cfg.bands)  # §5.1 display ids
+        state.spatial_ids = assign_spatial_ids(groups, state.core_hops, active_bands)  # §5.1 display ids
         state.sector_pos = compute_embedding(out, state.core_hops, seed=seed)  # §5.1 nav-rose layout
 
         _populate.populate(state, config, build_rng)

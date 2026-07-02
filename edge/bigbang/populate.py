@@ -197,7 +197,7 @@ def _finalize_planets(state: UniverseState, config: GameConfig) -> None:
             by_band.setdefault(state.sectors[planet.sector_id].distance_band, []).append(pid)
 
     floor = 0.0  # the previous band's realized unowned fraction (kept non-decreasing)
-    for band in (b.name for b in config.bigbang.bands):
+    for band in (b.name for b in config.bigbang.active_bands()):
         pids = by_band.get(band)
         if not pids:
             continue

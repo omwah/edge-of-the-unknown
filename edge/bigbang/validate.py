@@ -126,7 +126,7 @@ def _check_planet_ownership(state: UniverseState, config: GameConfig) -> None:
         raise ValidationError("no habitable world in the Hub band")
 
     prev = -1.0
-    for band in (b.name for b in config.bigbang.bands):
+    for band in (b.name for b in config.bigbang.active_bands()):
         flags = per_band.get(band)
         if not flags:
             continue
@@ -171,7 +171,7 @@ def _check_discovery_gradient(state: UniverseState, config: GameConfig) -> None:
         by_band.setdefault(band, []).append((d.rarity_tier.value, rarity_value(d.rarity_tier, config)))
 
     prev_rank = prev_value = -1.0
-    for band in (b.name for b in config.bigbang.bands):
+    for band in (b.name for b in config.bigbang.active_bands()):
         finds = by_band.get(band)
         if not finds:
             continue
@@ -233,7 +233,7 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
     ) and gov_in_core == 0:
         raise ValidationError("the governing alliance does not inhabit its Core capital")
 
-    for band in (b.name for b in config.bigbang.bands):
+    for band in (b.name for b in config.bigbang.active_bands()):
         has_non_core = any(
             not s.is_galactic_core and s.distance_band == band for s in state.sectors.values()
         )
