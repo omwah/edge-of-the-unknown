@@ -340,32 +340,42 @@ embedding determinism + Core pinned to origin. Trunk output stays byte-identical
 
 ### WP22 — Hostile-band placement + the Phase-3 config epoch (M)
 
-The Phase-2 friendly clamp comes off, outside the Hub.
+The Phase-2 friendly clamp comes off, outside the Hub. **Shipped.**
 
-- **Placement (`edge/bigbang/aliens.py`).** `_friendly_disposition` becomes a
-  band-graded draw: Hub-placed species stay clamped friendly (the §5
-  Hub-peaceable invariant); Frontier→Void draw unclamped from
-  `center ± variance` with a config band bias so mean realized disposition
-  falls (and mean threat rises) outward. The drawn-subset guarantee must now
-  front-load one **friendly** contact per band (resupply, §5), not merely any
-  contact.
-- **Encounter weights.** A new `EncountersConfig` block (`encounters:` in
-  `config/default.yaml`): per-band encounter chance and per-species weights
-  **inverse to threat rating** (§10). Consumed by WP24; landed here so the
-  epoch carries all generation-visible config at once.
-- **Validator (`edge/bigbang/validate.py`).** `_check_species` evolves: Hub
-  regions friendly-band only; Core + lanes governing-alliance only
-  (unchanged); mean realized disposition non-increasing across bands; ≥1
-  friendly contact per band.
-- **Epoch (H6).** Bump `config_version` 2→3; flip `topology_mode` default per
-  WP21's recommendation; regenerate all golden masters once, noted in the
-  commit message.
+- **Placement (`edge/bigbang/aliens.py`).** `_friendly_disposition` → the
+  band-graded `_band_disposition`: the innermost band (Hub) stays clamped
+  friendly and each band's **guaranteed resupply anchor** (the first kind
+  assigned to it) is drawn friendly; every other outer-band species takes the
+  band's downward `band_disposition_bias`, so hostiles spawn and mean stance
+  falls outward. A kind's base is memoised per-kind at its first placement
+  (reputation is per kind), so governing/StarDock Core-welcome contacts filter
+  out any kind already anchored hostile in a deep band. A **non-friendly
+  cluster's satellites are kept out of the Hub** (they can dip one band inward
+  at trunk's shallow scale — the case that first tripped the validator).
+- **Encounter config.** A new `EncountersConfig` (`encounters:` in
+  `config/default.yaml`): per-band `interrupt_chance` (0 in the Hub, rising
+  outward) and inverse-threat weighting params — authored here for the epoch,
+  **read by WP24**.
+- **Validator (`edge/bigbang/validate.py`).** `_check_species`: Hub species all
+  friendly (peaceable); Core + governor placement (unchanged); ≥1 **friendly**
+  contact per band (resupply). The *mean-disposition-falls-outward* gradient is
+  **an aggregate test over many seeds, not a per-generate validator** — the
+  mandated per-band friendly anchor plus small per-band samples make strict
+  per-seed monotonicity too noisy (would thrash the retry loop); DESIGN §13
+  frames it as a suite property, which is honoured here.
+- **Epoch (H6).** `config_version` 2→3; `topology_mode` default flipped to
+  `expansive`; the generated-state fingerprint changes accordingly. The
+  golden-master tests are **self-consistency round-trips** (save→reload,
+  generate→replay), so they re-baseline automatically and stay green — no
+  frozen-hash fixtures to hand-edit. Full suite (1389) green post-flip.
 
 Files: `edge/bigbang/aliens.py`, `edge/bigbang/validate.py`,
 `edge/core/config.py`, `config/default.yaml`, `tests/test_aliens.py`,
-`tests/test_validate.py`, golden fixtures.
-Tests: 100-seed disposition gradient (both modes); hostile rarity inverse to
-threat (hypothesis over config); golden replays green post-regeneration.
+`tests/test_bigbang.py`, `tests/test_config.py`, `tests/test_service.py`.
+Tests: Hub-peaceable + Core-placement across seeds; outer bands spawn hostiles;
+the aggregate mean-disposition gradient (all four bands, non-increasing) at
+1000 sectors; the full-validity matrix parametrized over **both modes** × 100
+seeds; `EncountersConfig` loads.
 
 ### WP23 — Alliance home clusters + neutral lanes, for real (M/L)
 

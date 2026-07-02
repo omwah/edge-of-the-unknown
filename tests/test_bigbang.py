@@ -24,13 +24,26 @@ def _small_config() -> object:
     return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(update={"sector_count": 80, "start_sector": 1})})
 
 
-CONFIG = _small_config()
+CONFIG = _small_config()  # the shipped default: expansive band-lattice
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_universe_is_valid(seed: int) -> None:
-    state = generate(CONFIG, seed)  # type: ignore[arg-type]
+def _with_mode(mode: str) -> object:
     cfg = CONFIG.bigbang  # type: ignore[attr-defined]
+    return CONFIG.model_copy(  # type: ignore[attr-defined]
+        update={"bigbang": cfg.model_copy(update={"topology_mode": mode})}
+    )
+
+
+TRUNK_CONFIG = _with_mode("trunk")
+EXPANSIVE_CONFIG = _with_mode("expansive")
+
+
+@pytest.mark.parametrize("config", [TRUNK_CONFIG, EXPANSIVE_CONFIG], ids=["trunk", "expansive"])
+@pytest.mark.parametrize("seed", SEEDS)
+def test_universe_is_valid(config: object, seed: int) -> None:
+    """The permanent §13 matrix: full validity across 100 seeds in **both** modes."""
+    state = generate(config, seed)  # type: ignore[arg-type]
+    cfg = config.bigbang  # type: ignore[attr-defined]
 
     # All sectors reachable from sector 1.
     assert set(bfs_distances(state.adjacency, 1)) == set(state.sectors)
@@ -45,7 +58,7 @@ def test_universe_is_valid(seed: int) -> None:
     assert state.alliances[1].name == "Terran Federation"
     assert state.game.core_governing_alliance_id == 1
     # An enrolled player (JoinGame) joins the governor and spawns at the start sector.
-    enroll(state, CONFIG)  # type: ignore[arg-type]
+    enroll(state, config)  # type: ignore[arg-type]
     assert state.players[1].alliance_id == 1
     assert state.ships[state.players[1].ship_id].sector_id == 1
 
@@ -123,23 +136,13 @@ def test_different_seeds_differ() -> None:
 
 # --- WP20: topology modes (trunk / expansive band-lattice, DESIGN §5 step 2) ---
 
-def _expansive_config() -> object:
-    cfg = CONFIG.bigbang  # type: ignore[attr-defined]
-    return CONFIG.model_copy(  # type: ignore[attr-defined]
-        update={"bigbang": cfg.model_copy(update={"topology_mode": "expansive"})}
-    )
-
-
-EXPANSIVE_CONFIG = _expansive_config()
-
-
-def test_topology_mode_defaults_to_trunk() -> None:
-    # The default (and byte-identical original) is trunk; the flip is the WP22 epoch.
-    assert CONFIG.bigbang.topology_mode == "trunk"  # type: ignore[attr-defined]
+def test_topology_mode_defaults_to_expansive() -> None:
+    # The Phase-3 epoch (WP22) flipped the default to the band-lattice.
+    assert CONFIG.bigbang.topology_mode == "expansive"  # type: ignore[attr-defined]
 
 
 def test_topology_modes_differ() -> None:
-    trunk = generate(CONFIG, 3)  # type: ignore[arg-type]
+    trunk = generate(TRUNK_CONFIG, 3)  # type: ignore[arg-type]
     expansive = generate(EXPANSIVE_CONFIG, 3)  # type: ignore[arg-type]
     assert trunk.adjacency != expansive.adjacency
 
@@ -180,7 +183,7 @@ def test_trunk_has_chokepoints() -> None:
     """Contrast: the trunk universe *does* funnel through cut edges — removing the
     right inter-region warp strands sectors. (Guards against the modes collapsing.)"""
     for seed in range(30):
-        state = generate(CONFIG, seed)  # type: ignore[arg-type]
+        state = generate(TRUNK_CONFIG, seed)  # type: ignore[arg-type]
         all_sectors = set(state.sectors)
         for u, v in _cross_region_edges(state):
             adj = {sid: set(nbrs) for sid, nbrs in state.adjacency.items()}
@@ -195,7 +198,7 @@ def test_trunk_has_chokepoints() -> None:
 def test_active_bands_resolves_by_mode() -> None:
     """`active_bands()` returns the trunk `bands` normally and `bands_expansive`
     (same names, deeper thresholds) in expansive mode."""
-    trunk_bands = CONFIG.bigbang.active_bands()  # type: ignore[attr-defined]
+    trunk_bands = TRUNK_CONFIG.bigbang.active_bands()  # type: ignore[attr-defined]
     exp_bands = EXPANSIVE_CONFIG.bigbang.active_bands()  # type: ignore[attr-defined]
     assert [b.name for b in trunk_bands] == [b.name for b in exp_bands]  # identical names
     # Deeper hop windows under expansive (the ring-road lattice lengthens paths).

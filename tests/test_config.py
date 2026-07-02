@@ -12,7 +12,7 @@ from edge.core.config import GameConfig, SceneArtConfig
 def test_default_config_loads() -> None:
     cfg = load_default_config()
     assert isinstance(cfg, GameConfig)
-    assert cfg.config_version == 2  # Phase-2 schema epoch (engine room, §4.1)
+    assert cfg.config_version == 3  # Phase-3 schema epoch (expansive default, band-graded aliens)
     assert cfg.turns_per_day == 250
     assert cfg.seed == 4  # default.yaml pins a curated seed; empty ⇒ random at start
     assert cfg.bigbang.start_sector == "stardock"  # the player starts at the StarDock
