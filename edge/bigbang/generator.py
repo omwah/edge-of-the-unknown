@@ -18,7 +18,7 @@ import random
 
 from edge.bigbang import populate as _populate
 from edge.bigbang import validate as _validate
-from edge.bigbang.aliens import populate_species
+from edge.bigbang.aliens import HomeClusterError, populate_species
 from edge.bigbang.discoveries import salt_discoveries
 from edge.bigbang.embedding import compute_embedding
 from edge.bigbang.naming import NameGenerator
@@ -240,13 +240,13 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
 
         _populate.populate(state, config, build_rng)
         salt_discoveries(state, config, attempt)  # §7 finds on an independent sub-RNG
-        populate_species(state, config)  # §6 friendly aliens on an independent sub-RNG (WP7)
-        # §6.7 intel: give each species kind the places it can tip the player toward.
-        state.species_knowledge = build_species_knowledge(state, seed)
 
         try:
+            populate_species(state, config)  # §6 aliens + home clusters on an independent sub-RNG
+            # §6.7 intel: give each species kind the places it can tip the player toward.
+            state.species_knowledge = build_species_knowledge(state, seed)
             _validate.validate(state, config)
-        except _validate.ValidationError as exc:
+        except (_validate.ValidationError, HomeClusterError) as exc:
             last_error = exc
             continue
         return state

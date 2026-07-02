@@ -127,11 +127,11 @@ scope below:
    (config.py) carries flat aspects + optional `subsystems` only — no
    `armament`, no `firing_arc`, no `defenses`, no weapon `special`s anywhere in
    code or config. WP25 *adds* the schema rather than consuming it.
-2. **Alliance home clusters are spec-only.** `edge/bigbang/aliens.py` places
-   species *ship* clusters and stamps `Region.controlling_alliance_id` post-hoc
-   from wherever ships landed; there is no territory carve, no alliance-owned
-   cluster worlds tied to blocs, and no neutral-lane validator. WP23 implements
-   DESIGN §5 step 6 for real.
+2. **Alliance home clusters were spec-only** (before WP23): `edge/bigbang/aliens.py`
+   only placed species *ship* clusters and stamped `Region.controlling_alliance_id`
+   post-hoc from wherever ships landed; there was no territory carve, no
+   alliance-owned cluster worlds tied to blocs, and no neutral-lane validator.
+   **WP23 implemented DESIGN §5 step 6 for real** (see below).
 
 ---
 
@@ -379,27 +379,37 @@ seeds; `EncountersConfig` loads.
 
 ### WP23 — Alliance home clusters + neutral lanes, for real (M/L)
 
-Implements DESIGN §5 step 6 (framing correction 2): each non-governing
-alliance in the drawn cast gets a compact home cluster — 3–6 sectors in the
-Hub / inner Frontier, never Core-adjacent, never warp-linked to a rival's
-cluster — its regions stamped `controlling_alliance_id`, its planets
-alliance-owned, and its bloc's friendly-band members placed there (reworking
-`_place_cluster` / `_assign_region_control` from "wherever the ships landed"
-to "the bloc's carved territory"). Everything else is neutral lanes.
+Implements DESIGN §5 step 6 (framing correction 2). **Shipped.**
 
-Runs on the species sub-RNG with appended draws; the golden regeneration
-rides the WP22 epoch when landed in the same milestone batch (recommended).
-Satisfiability risk under `expansive` (a denser Hub makes non-adjacency
-harder) is absorbed by the §5 bounded-retry pattern and checked across the
-full seed matrix.
+- **Carving (`edge/bigbang/aliens.py::_carve_home_clusters`).** Each non-governing
+  bloc **present in the cast** gets one home cluster — `home_cluster_[min,max]`
+  (3–6) connected sectors BFS-grown in the two innermost bands (Hub + inner
+  Frontier), never Core-adjacent, never warp-linked to a rival (a one-hop buffer
+  keeps clusters apart). Its non-derelict planets are set alliance-owned, its
+  region(s) stamped `controlling_alliance_id`, and its friendly members settled
+  there. Everything else is neutral lanes. The cluster sector-sets are recorded on
+  `UniverseState.home_clusters` (a generation cache like `core_hops`, excluded from
+  `state_hash` — the *effects* on planets/regions/species are the hashed state).
+  A `HomeClusterError` (unsatisfiable seating) joins the generation retry loop.
+- **Bloc members are friendly (§5).** A key interaction with WP22: a bloc's menace
+  is **political** (rival-alliance standing, activated in WP38), *not* low
+  disposition, so its members are drawn friendly-band and its home cluster stays
+  peaceable. Baseline hostiles therefore come from the **unaligned raiders**
+  (present in most, not all, universes); whole-bloc hostility is a Phase-3 politics
+  layer, not a generation property.
+- **Derelict conflict resolved.** Owning a cluster planet that hosts a *derelict*
+  base would violate the §4.2 derelict⇒unowned rule — so such a world is left
+  unowned (a salvage cache inside bloc space). This also cleared a retry-budget
+  exhaustion at 1000 sectors (0/80 failures after the fix).
 
-Files: new `edge/bigbang/clusters.py` (or grow `aliens.py`),
-`edge/bigbang/populate.py` (ownership tie-in), `edge/bigbang/validate.py`,
-`config/alien_roster_default.yaml` (per-alliance cluster hints),
-`tests/test_bigbang.py`.
-Tests (both modes × 100 seeds): exactly one cluster per bloc; cluster smaller
-than the Core; never Core-adjacent; never rival-linked; **≥1 all-neutral path
-from the Core to every outer band**.
+Files: `edge/bigbang/aliens.py` (carve), `edge/bigbang/generator.py` (retry),
+`edge/bigbang/validate.py` (`_check_home_clusters`), `edge/core/config.py`
+(`home_cluster_min/max`), `edge/core/models.py` (`home_clusters` cache),
+`config/default.yaml`, `tests/test_bigbang.py`, `tests/test_aliens.py`.
+Tests (both modes × 40 seeds): exactly one cluster per cast bloc; cluster smaller
+than the Core; never Core-adjacent; never rival-linked; **≥1 all-neutral path from
+the Core to every band**; cluster planets alliance-owned (derelicts left unowned).
+Full suite 1451 green.
 
 ---
 

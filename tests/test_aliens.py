@@ -160,19 +160,23 @@ def test_hub_peaceable_and_placement_outside_core(seed: int) -> None:
         assert sp.alliance_id is None or sp.alliance_id in state.alliances
 
 
-@pytest.mark.parametrize("seed", range(20))
-def test_outer_bands_spawn_hostiles(seed: int) -> None:
-    """The friendly clamp is lifted outside the Hub: across the outer bands, hostile-band
-    species now appear (Phase 3 danger)."""
-    state = generate(WIDE, seed)
-    hostiles = [
-        sp for sp in state.species.values()
-        if disposition_band(sp.base_disposition, CFG.aliens) == HOSTILE
-    ]
-    # WIDE reaches the Deep band; the roster's raider-centred kinds land there hostile.
-    assert hostiles, f"seed {seed}: expected some hostile-band species outside the Hub"
-    assert all(state.sectors[sp.sector_id].distance_band != WIDE.bigbang.active_bands()[0].name
-               for sp in hostiles)
+def test_outer_bands_spawn_hostiles() -> None:
+    """Danger returns to the frontier: across seeds, unaligned raider kinds appear hostile
+    in the outer bands — and never in the Hub. (Bloc members stay friendly; a bloc's menace
+    is political, activated by alliance standing, §5/§6.3 — so baseline hostiles are the
+    unaligned raiders, present in most but not every universe.)"""
+    innermost = WIDE.bigbang.active_bands()[0].name  # the Hub
+    seeds_with_hostiles = 0
+    for seed in range(20):
+        state = generate(WIDE, seed)
+        hostiles = [
+            sp for sp in state.species.values()
+            if disposition_band(sp.base_disposition, CFG.aliens) == HOSTILE
+        ]
+        if hostiles:
+            seeds_with_hostiles += 1
+            assert all(state.sectors[sp.sector_id].distance_band != innermost for sp in hostiles)
+    assert seeds_with_hostiles >= 10  # the raider kinds surface in most universes
 
 
 def test_mean_disposition_falls_outward_in_aggregate() -> None:
@@ -229,11 +233,13 @@ def test_species_field_home_clusters_within_radius() -> None:
         for sp in sorted(state.species.values(), key=lambda s: s.id):
             by_kind[sp.roster_id].append(sp)
         for ships in by_kind.values():
-            home = ships[0]
+            home = ships[0]  # lowest id = a band home (placed before the WP23 home cluster)
             if home.alliance_id in (None, gov) or len(ships) < 2:
-                continue  # only pure band clusters (rival blocs) have a single home
+                continue
+            # The band home is met as a *cluster*: at least one satellite sits within radius.
+            # (A bloc kind also holds a separate home cluster now, so not *every* ship is near.)
             dist = bfs_distances(state.adjacency, home.sector_id)
-            assert all(dist.get(s.sector_id, 10**9) <= radius for s in ships[1:])
+            assert sum(1 for s in ships if dist.get(s.sector_id, 10**9) <= radius) >= 2
             checked += 1
     assert checked  # at least one multi-ship cluster was verified
 
@@ -267,12 +273,19 @@ def test_roster_alliances_become_entities() -> None:
 
 def test_species_placement_does_not_perturb_ports_or_planets() -> None:
     """The species sub-RNG must not shift the Phase-1 port/planet draws (golden-master)."""
+    from dataclasses import replace
+
+    from edge.core.models import Ownership
+
     no_roster = SMALL.model_copy(update={"roster": None})
     with_roster = SMALL
     a = generate(no_roster, 7)
     b = generate(with_roster, 7)
     assert a.ports == b.ports
-    assert a.planets == b.planets
+    # Home-cluster carving overlays alliance ownership on some planets (WP23), but the
+    # planet *generation* (positions/types/stores) is unperturbed — compare ignoring owner.
+    strip = lambda ps: {pid: replace(p, owner=Ownership()) for pid, p in ps.items()}
+    assert strip(a.planets) == strip(b.planets)
     assert not a.species and b.species  # only the alien layer differs
 
 

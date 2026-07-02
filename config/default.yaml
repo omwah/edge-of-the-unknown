@@ -125,6 +125,8 @@ bigbang:
   one_way_chance: 0.15
   max_warps_per_sector: 6
   core_sector_count: 10
+  home_cluster_min: 3        # alliance home cluster size range (< Core), §5 step 6
+  home_cluster_max: 6
   start_sector: stardock     # where the player starts: stardock | random | a sector number
   stardock_min_hops: 2
   stardock_max_hops: 5

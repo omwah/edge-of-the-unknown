@@ -242,6 +242,63 @@ def test_expansive_populates_all_four_bands(seed: int) -> None:
     assert counts["Hub"] < counts["Frontier"]  # the Hub is the small safe centre
 
 
+# --- WP23: alliance home clusters + neutral lanes (DESIGN §5 step 6) ---
+
+@pytest.mark.parametrize("config", [TRUNK_CONFIG, EXPANSIVE_CONFIG], ids=["trunk", "expansive"])
+@pytest.mark.parametrize("seed", range(40))
+def test_home_clusters_well_formed(config: object, seed: int) -> None:
+    """Both modes: one cluster per cast bloc; each smaller than the Core, never
+    Core-adjacent, never rival-linked; and an all-neutral path from the Core to every
+    band (the frontier reachable without transiting a bloc's territory)."""
+    state = generate(config, seed)  # type: ignore[arg-type]
+    gov = state.game.core_governing_alliance_id
+    cast_blocs = {sp.alliance_id for sp in state.species.values()
+                  if sp.alliance_id is not None and sp.alliance_id != gov}
+    clusters = state.home_clusters
+    assert set(clusters) == cast_blocs  # exactly one cluster per bloc in the cast
+
+    core_ids = {s.id for s in state.sectors.values() if s.is_galactic_core}
+    sector_bloc = {sid: bloc for bloc, secs in clusters.items() for sid in secs}
+    for bloc, secs in clusters.items():
+        assert 3 <= len(secs) < config.bigbang.core_sector_count  # type: ignore[attr-defined]
+        for sid in secs:
+            assert not any(n in core_ids for n in state.adjacency[sid])  # never Core-adjacent
+            for n in state.adjacency[sid]:
+                assert sector_bloc.get(n, bloc) == bloc  # never warp-linked to a rival
+
+    # An all-neutral path (avoiding every cluster) from the Core reaches every band.
+    cluster_sectors = set(sector_bloc)
+    reached = set(core_ids)
+    frontier = list(core_ids)
+    while frontier:
+        cur = frontier.pop()
+        for n in state.adjacency[cur]:
+            if n not in reached and n not in cluster_sectors:
+                reached.add(n)
+                frontier.append(n)
+    live_bands = {s.distance_band for s in state.sectors.values() if not s.is_galactic_core}
+    reached_bands = {state.sectors[s].distance_band for s in reached}
+    assert live_bands <= reached_bands
+
+
+def test_home_cluster_planets_alliance_owned() -> None:
+    """A cluster's non-derelict planets are owned by its bloc; a derelict-hosting world
+    stays unowned (§4.2), so the base validator's derelict⇒unowned rule still holds."""
+    from edge.core.starbases import is_operational
+
+    for seed in range(10):
+        state = generate(BIG_EXPANSIVE, seed)  # type: ignore[arg-type]
+        for bloc, secs in state.home_clusters.items():
+            for planet in state.planets.values():
+                if planet.sector_id not in secs:
+                    continue
+                base = state.starbases.get(planet.starbase_id) if planet.starbase_id else None
+                if base is not None and not is_operational(base):
+                    assert planet.owner.kind == "none"  # derelict cache stays unowned
+                else:
+                    assert planet.owner == type(planet.owner)(kind="alliance", ref=bloc)
+
+
 @pytest.mark.parametrize("seed", range(20))
 def test_spatial_ids_wired_into_generate(seed: int) -> None:
     """`generate` caches a spatial display id per sector (DESIGN §5.1, WP-G)."""

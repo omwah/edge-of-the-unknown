@@ -474,6 +474,12 @@ class UniverseState:
     # time cache rebuilt by the big bang (like `core_hops`/`spatial_ids`), excluded from
     # `state_hash`; empty for hand-built (test) states until populated.
     species_knowledge: dict[str, tuple[LocationRef, ...]] = field(default_factory=dict)
+    # Alliance id -> its home-cluster sectors (DESIGN §5 step 6, §6.3). A generation-time
+    # cache rebuilt by the big bang (like `core_hops`/`species_knowledge`), excluded from
+    # `state_hash` — the cluster's *effects* (alliance-owned planets, stamped region
+    # control, settled members) ride the hashed entities; this is the sector-set index for
+    # territory queries and the §5 validator. Empty for hand-built (test) states.
+    home_clusters: dict[int, tuple[int, ...]] = field(default_factory=dict)
 
     @classmethod
     def new(cls, game: Game) -> UniverseState:
