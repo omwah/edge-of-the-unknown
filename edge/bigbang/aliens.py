@@ -24,9 +24,14 @@ import random
 from dataclasses import replace
 
 from edge.core.aliens import is_friendly
+from edge.core.starbases import is_operational
 from edge.core.config import GameConfig, RosterConfig, SpeciesConfig
 from edge.core.enums import PortClass
-from edge.core.models import Alliance, AlienSpecies, UniverseState
+from edge.core.models import Alliance, AlienSpecies, Ownership, UniverseState
+
+
+class HomeClusterError(Exception):
+    """A non-governing bloc could not be given a valid home cluster (§5 step 6)."""
 
 # Independent draw stream for species placement (§5 RNG discipline).
 _SPECIES_SALT = 0x53504543  # "SPEC"
@@ -126,11 +131,14 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     bases: dict[str, float] = {}
     placed: dict[int, AlienSpecies] = {}
     next_id = 1
-    # The first species assigned to each live band (i < len(live_bands)) is that band's
-    # guaranteed resupply anchor — drawn friendly; the rest take the band bias (§13).
+    # Each band's guaranteed resupply anchor (i < len(live_bands)) is drawn friendly; so
+    # are **bloc members** — an alliance's menace is political (rival standing, §6.3/WP38),
+    # not low disposition, so its people stay friendly-band (§5). Only unaligned outer-band
+    # species take the band bias toward hostility (§13).
     for i, (sp, band) in enumerate(zip(chosen, assignment)):
         home = rng.choice(sectors_by_band[band])
-        base = _base_for(bases, sp, band, i < len(live_bands), config, rng)
+        friendly = i < len(live_bands) or sp.alliance_id is not None
+        base = _base_for(bases, sp, band, friendly, config, rng)
         next_id = _place_cluster(placed, next_id, sp, home, band,
                                  base, state, config, rng, reserved=reserved)
 
@@ -138,6 +146,110 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     _place_stardock_contacts(state, config, roster, rng, placed, bases)
     state.species = placed
     _assign_region_control(state, placed)
+    # Carve each non-governing bloc in the cast its home cluster of alliance territory,
+    # separated from the Core and from rival clusters by neutral lanes (§5 step 6, §6.3).
+    state.home_clusters = _carve_home_clusters(state, config, roster, rng, placed, bases, reserved)
+
+
+def _carve_home_clusters(state: UniverseState, config: GameConfig, roster: RosterConfig,
+                         rng: random.Random, placed: dict[int, AlienSpecies],
+                         bases: dict[str, float], reserved: frozenset[int]) -> dict[int, tuple[int, ...]]:
+    """Give each non-governing bloc in the cast one home cluster (§5 step 6, §6.3).
+
+    A cluster is `home_cluster_[min,max]` connected sectors in the two innermost bands
+    (Hub + inner-Frontier), never adjacent to the Core and never warp-linked to another
+    bloc's cluster (a one-hop buffer keeps them apart). Its planets are set alliance-owned,
+    its region(s) stamped `controlling_alliance_id`, and its friendly members settled
+    there. Everything else stays neutral lanes. Raises `HomeClusterError` (→ generation
+    retries) if a bloc cannot be seated.
+    """
+    gov = state.game.core_governing_alliance_id
+    blocs = sorted({sp.alliance_id for sp in placed.values()
+                    if sp.alliance_id is not None and sp.alliance_id != gov})
+    if not blocs:
+        return {}
+
+    bands = [b.name for b in config.bigbang.active_bands()]
+    inner_bands = set(bands[:2])  # Hub + inner-Frontier
+    core_ids = {s.id for s in state.sectors.values() if s.is_galactic_core}
+    candidates = {
+        sid for sid, s in state.sectors.items()
+        if s.distance_band in inner_bands and sid not in core_ids and sid not in reserved
+        and not any(n in core_ids for n in state.adjacency.get(sid, ()))  # never Core-adjacent
+    }
+
+    members_by_bloc: dict[int, list[SpeciesConfig]] = {}
+    for sp in sorted(roster.species, key=lambda s: s.id):
+        if sp.alliance_id in blocs:
+            members_by_bloc.setdefault(sp.alliance_id, []).append(sp)
+
+    lo, hi = config.bigbang.home_cluster_min, config.bigbang.home_cluster_max
+    used: set[int] = set()      # sectors already in a cluster
+    blocked: set[int] = set()   # sectors adjacent to a cluster (the rival-unlink buffer)
+    clusters: dict[int, tuple[int, ...]] = {}
+    for bloc in blocs:
+        avail = candidates - used - blocked
+        cluster = _grow_cluster(state, avail, rng.randint(lo, hi), lo, rng)
+        if cluster is None:
+            raise HomeClusterError(f"no home cluster available for alliance {bloc}")
+        clusters[bloc] = tuple(sorted(cluster))
+        used |= cluster
+        for sid in cluster:
+            blocked |= set(state.adjacency.get(sid, ()))
+        _settle_cluster(state, config, rng, placed, bases, bloc, cluster,
+                        members_by_bloc.get(bloc, ()))
+    return clusters
+
+
+def _grow_cluster(state: UniverseState, avail: set[int], target: int, minimum: int,
+                  rng: random.Random) -> set[int] | None:
+    """BFS-grow a connected blob of up to `target` sectors within `avail`; None if < min."""
+    seeds = sorted(avail)
+    rng.shuffle(seeds)
+    for seed in seeds:
+        cluster = {seed}
+        frontier = [seed]
+        while frontier and len(cluster) < target:
+            cur = frontier.pop(0)
+            nbrs = [n for n in sorted(state.adjacency.get(cur, ())) if n in avail and n not in cluster]
+            rng.shuffle(nbrs)
+            for n in nbrs:
+                if len(cluster) >= target:
+                    break
+                cluster.add(n)
+                frontier.append(n)
+        if len(cluster) >= minimum:
+            return cluster
+    return None
+
+
+def _settle_cluster(state: UniverseState, config: GameConfig, rng: random.Random,
+                    placed: dict[int, AlienSpecies], bases: dict[str, float], bloc: int,
+                    cluster: set[int], members: "list[SpeciesConfig] | tuple[SpeciesConfig, ...]") -> None:
+    """Alliance-own the cluster's planets, stamp its regions, settle its friendly members."""
+    for pid, planet in state.planets.items():
+        if planet.sector_id not in cluster:
+            continue
+        # A derelict base must stay on an *unowned* world (§4.2 / the starbase validator),
+        # so a cluster leaves a derelict-hosting planet unowned (a salvage cache in bloc space).
+        base = state.starbases.get(planet.starbase_id) if planet.starbase_id is not None else None
+        if base is not None and not is_operational(base):
+            continue
+        state.planets[pid] = replace(planet, owner=Ownership(kind="alliance", ref=bloc))
+    for sid in cluster:
+        rid = state.sectors[sid].region_id
+        region = state.regions.get(rid)
+        if region is not None:
+            state.regions[rid] = replace(region, controlling_alliance_id=bloc)
+    slots = sorted(cluster)
+    rng.shuffle(slots)
+    next_id = max(placed, default=0) + 1
+    for i, sp in enumerate(members):
+        sector_id = slots[i % len(slots)]
+        band = state.sectors[sector_id].distance_band
+        base = _base_for(bases, sp, band, True, config, rng)  # bloc home is peaceable (§5)
+        placed[next_id] = _make_species(next_id, sp, sector_id, band, base, config)
+        next_id += 1
 
 
 def _base_for(bases: dict[str, float], sp: SpeciesConfig, band: str, is_anchor: bool,

@@ -139,6 +139,11 @@ class BigBangConfig(BaseModel):
     one_way_chance: float = 0.15
     max_warps_per_sector: int = 6  # TW2002 canon
     core_sector_count: int = 10  # Core Space = sectors 1..N
+    # Alliance home clusters (§5 step 6, §6.3): each non-governing bloc in the cast gets
+    # one compact cluster of [min, max] connected sectors in the Hub/inner-Frontier —
+    # always smaller than the Core, never Core-adjacent, never warp-linked to a rival's.
+    home_cluster_min: int = 3
+    home_cluster_max: int = 6
     # Where the player's ship starts: "stardock" (at the StarDock — no routing needed),
     # "random" (a seeded random sector), or a specific sector id. The shortest path from
     # the start to the StarDock opens pre-explored so the opening signpost stays actionable.

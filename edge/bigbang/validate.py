@@ -34,6 +34,7 @@ def validate(state: UniverseState, config: GameConfig) -> None:
     _check_starbases(state)
     _check_discovery_gradient(state, config)
     _check_species(state, config)
+    _check_home_clusters(state, config)
     if config.bigbang.topology_mode == "expansive":
         _check_expansive_no_chokepoint(state)
 
@@ -243,6 +244,56 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
         )
         if has_non_core and band not in friendly_bands:
             raise ValidationError(f"no friendly alien contact in band {band}")
+
+
+def _check_home_clusters(state: UniverseState, config: GameConfig) -> None:
+    """Alliance home-cluster invariants (§5 step 6, §6.3).
+
+    Each non-governing bloc **in the cast** owns exactly one home cluster; every cluster
+    is smaller than the Core and never Core-adjacent; no two clusters are warp-linked; and
+    at least one **all-neutral** path (avoiding every cluster) runs from the Core to every
+    non-empty band, so the frontier is reachable without transiting a bloc's territory.
+    """
+    if config.roster is None:
+        return
+    gov = state.game.core_governing_alliance_id
+    cast_blocs = {sp.alliance_id for sp in state.species.values()
+                  if sp.alliance_id is not None and sp.alliance_id != gov}
+    clusters = state.home_clusters
+    if cast_blocs != set(clusters):
+        raise ValidationError(f"home clusters {set(clusters)} do not match cast blocs {cast_blocs}")
+
+    core_ids = {s.id for s in state.sectors.values() if s.is_galactic_core}
+    sector_bloc: dict[int, int] = {}
+    for bloc, sectors in clusters.items():
+        if not (config.bigbang.home_cluster_min <= len(sectors) < config.bigbang.core_sector_count):
+            raise ValidationError(f"home cluster {bloc} has {len(sectors)} sectors (not < Core)")
+        for sid in sectors:
+            if any(n in core_ids for n in state.adjacency.get(sid, ())):
+                raise ValidationError(f"home cluster {bloc} sector {sid} is Core-adjacent")
+            sector_bloc[sid] = bloc
+    for sid, bloc in sector_bloc.items():
+        for nbr in state.adjacency.get(sid, ()):
+            if sector_bloc.get(nbr, bloc) != bloc:
+                raise ValidationError(f"home clusters {bloc} and {sector_bloc[nbr]} are warp-linked")
+
+    # At least one all-neutral path from the Core to every non-empty band.
+    cluster_sectors = set(sector_bloc)
+    reached = set(core_ids)
+    queue: deque[int] = deque(core_ids)
+    while queue:
+        cur = queue.popleft()
+        for nxt in state.adjacency.get(cur, ()):
+            if nxt not in reached and nxt not in cluster_sectors:
+                reached.add(nxt)
+                queue.append(nxt)
+    by_band: dict[str, list[int]] = {}
+    for sid, sector in state.sectors.items():
+        by_band.setdefault(sector.distance_band, []).append(sid)
+    for band in (b.name for b in config.bigbang.active_bands()):
+        band_sectors = by_band.get(band, [])
+        if band_sectors and not any(sid in reached for sid in band_sectors):
+            raise ValidationError(f"no all-neutral path from the Core to band {band}")
 
 
 def _check_profitable_pair(state: UniverseState, config: GameConfig) -> None:
