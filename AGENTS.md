@@ -224,7 +224,9 @@ What each is for:
    (`dialogue_pack`, `Player.dialogue_recency`), §10/§11 (encounter & contact screens),
    §13 (dialogue-integrity validation), and Appendix B.
 
-**No implementation code exists yet.** The next session starts Phase 1.
+**Phases 1, 1.5, and 2 (incl. the route follow-up WP14–WP18) are implemented and
+shipped.** Phase 3 is planned (`docs/PHASE3_PLAN.md`, WP19–WP44 / M10–M15, with
+the DESIGN.md spec deltas landed) and starts at WP20.
 
 ## Architecture rules (non-negotiable)
 
@@ -252,13 +254,13 @@ What each is for:
 
 ## Roadmap (from DESIGN.md §14)
 
-- **Phase 1 (current):** core models, big bang (cluster+bridge+distance
+- **Phase 1 (shipped):** core models, big bang (cluster+bridge+distance
   bands+validate, Core Space sectors 1-10, StarDock), movement with turn
   costs, port docking + trading with live pricing and haggling in latinum,
   SQLite persistence, Textual game screen (sector view, clickable warp
   list, status sidebar, port screen). Exit criterion: pair-trading loop is
   fun for 30 minutes and funds a first ship upgrade.
-- **Phase 2 (the pivot phase):** discovery system with distance-banded
+- **Phase 2 (the pivot phase; shipped incl. WP14–WP18):** discovery system with distance-banded
   rarity, planet descent + surface sites, sensor detection, discovery
   codex, friendly-disposition alien species with tech barter/latinum sales of aspect upgrades,
   the engine-room subsystem/component model (§4.1: slotted upgrades, component
@@ -267,19 +269,28 @@ What each is for:
   shaped by `planet_type`/habitability, player colonization of unowned worlds,
   derelict orbital starbases as scavengeable component caches** (DESIGN.md §4.2),
   Genesis torpedoes, Computer screen (pair-trade finder, route planner).
-- **Phase 3:** low-disposition (hostile-band) alien species (threat/interception,
+- **Phase 3 (current; see `docs/PHASE3_PLAN.md`, WP19–WP44 / M10–M15):**
+  **big bang topology modes** (config-selectable `trunk` / `expansive` band-lattice
+  bridge pass, per-mode band retune — DESIGN.md §5), **alliance home clusters +
+  neutral lanes generated for real** (§5 step 6), low-disposition (hostile-band)
+  alien species (threat/interception,
   threat tiers, rarity inverse to threat, escape-chance floor), encounter system
   (disposition roll for greeting vs. violence, escort/pack spawns, firing-arc
   combat, localized component damage + field-kit repair, homing missiles),
+  **conversation depth** (§6.7: per-contact dialogue sessions, situational facts,
+  cross-visit arcs/callbacks, per-instance recency, expanded corpus, combat
+  dialogue live), **the Entity** (§7: the singular roaming dialogue-only discovery
+  replacing the salted `entity` kind — stale last-known leads, always-on sensor
+  hint, sensor-gated contact, Legendary codex stamp),
   signature-mechanic hooks, alliances (join one bloc, admission-price
   tasks, rival fallout) and inter-species relations/grudges, ship combat with
   salvage and escape pods, NPC starbases as destructible set-pieces,
   **orbital/planetary starbases with ownership-keyed planetary-system defense and
   player repair/claim of derelict bases into forward footholds** (DESIGN.md §4.2),
-  sector fighters/mines, alignment/experience, Core Space law keyed to the governing
-  alliance (static Federation governor this phase; Core safety driven by the
-  player's standing with the governor), friendly-disposition NPC traders, hostile
-  homeworld raids.
+  sector fighters/mines/beacons, alignment/experience, Core Space law keyed to the
+  governing alliance (static Federation governor this phase; Core safety driven by
+  the player's standing with the governor), goal-directed NPC movement,
+  friendly-disposition NPC traders, hostile homeworld raids with bounties.
 - **Phase 4:** multiplayer (JSON-RPC over websockets), corporations.
 - **Phase 5:** order-book economy, citadels, dynamic governance of Core
   Space (a `covets_core` bloc seizing control, flipping the governing alliance),
