@@ -22,6 +22,8 @@ def _small_config() -> object:
 
 
 CONFIG = _small_config()
+EXPANSIVE_CONFIG = CONFIG.model_copy(update={  # type: ignore[attr-defined]
+    "bigbang": CONFIG.bigbang.model_copy(update={"topology_mode": "expansive"})})  # type: ignore[attr-defined]
 
 
 def test_embedding_is_populated_and_deterministic() -> None:
@@ -30,6 +32,16 @@ def test_embedding_is_populated_and_deterministic() -> None:
     assert a.sector_pos  # a position for every sector
     assert set(a.sector_pos) == set(a.sectors)
     assert a.sector_pos == b.sector_pos  # same seed → identical layout
+
+
+def test_embedding_deterministic_under_expansive() -> None:
+    """The lattice-corrected angle (mean of min-hop parents, §5.1) stays a pure,
+    reproducible function of the seed in expansive mode too."""
+    a = generate(EXPANSIVE_CONFIG, 42)  # type: ignore[arg-type]
+    b = generate(EXPANSIVE_CONFIG, 42)  # type: ignore[arg-type]
+    assert set(a.sector_pos) == set(a.sectors)
+    assert a.sector_pos == b.sector_pos
+    assert a.sector_pos[1] == (0.0, 0.0)  # Core still pinned to the origin
 
 
 def test_core_pinned_to_origin() -> None:

@@ -300,33 +300,43 @@ with the trunk thresholds most sectors fall into Void). The four bands must be
 made to stay populated and every hop-window check must still pass under
 `expansive`.
 
-- **Bands:** `BigBangConfig.bands` stays the trunk defaults; add an optional
-  `bands_expansive` override, resolved by mode at generation. Tune so a
-  1000-sector expansive universe populates all four bands.
+- **Bands (shipped):** `BigBangConfig.bands` stays the trunk defaults; an
+  optional `bands_expansive` override (Hub 0–14 / Frontier 15–35 / Deep 36–58 /
+  Void 59+) is resolved by `active_bands()` at generation. **Same band names in
+  the same order — only the hop windows differ** — enforced by a config
+  validator (`_check_band_names_match`), so every name-keyed path (placement,
+  validation, UI) is mode-agnostic. All threshold consumers (generator, validate,
+  populate, aliens) route through `active_bands()`. At 1000 sectors this keeps all
+  four bands populated (25/25 seeds sampled) with an outward-growing gradient
+  (Hub ≈ 130, outer bands ≈ 285–300).
 - **Hop-window checks re-verified under expansive:** `_check_profitable_pair`
-  (opposed pair ≤ 5 hops of the Core), StarDock placement succeeding within
-  `stardock_min/max_hops` (enforced in `populate.py`, not the validator),
-  `_check_discovery_gradient` strict monotonicity (squeezed bands may need
-  rarity-weight retune in `config/default.yaml`), ≥1 contact per band,
-  unowned-planet monotone fraction.
-- **Embedding:** `compute_embedding`'s radial fan hangs every sector off a
-  single BFS-tree parent, so lattice cross-links are invisible and the nav
-  rose would mislead. Fix inside budget: assign each sector's angle from the
-  **mean of all its min-hop parents' angles** — still one stdlib O(n) pass,
-  still deterministic, still outside `state_hash`.
-- **Dev tooling:** `edge bigbang --mode trunk|expansive` flag on the render
-  CLI; the spring-layout PNG (`render.py`) is the visual diff proving the
-  lattice exists (the nav fan hides it by construction).
-- **Deliverable:** a recommendation — expected `expansive` — for the default
-  mode of new games, recorded in DESIGN §5 and executed in WP22.
+  (opposed pair ≤ 5 hops of the Core), StarDock placement within
+  `stardock_min/max_hops`, `_check_discovery_gradient` strict monotonicity, ≥1
+  contact per band, unowned-planet monotone fraction — all pass at 1000 sectors
+  (10/10 seeds generate cleanly). *(Note: `bands_expansive` is tuned to the
+  ~1000-sector default; smaller universes stay shallow — trunk's bands are
+  likewise scale-tuned.)*
+- **Embedding (shipped):** the radial fan hung every sector off a single BFS-tree
+  parent, blind to the lattice's cross-links. Each sector's angle now blends its
+  own fan slot with the (already-refined) angles of **all its min-hop parents**
+  via a circular mean — the own-slot term keeps sibling wedges distinct while
+  the parents pull a lattice node toward the centroid of its inner neighbours.
+  One extra stdlib O(n·deg) pass, deterministic, still outside `state_hash`.
+- **Dev tooling (shipped):** `python -m edge.bigbang --mode trunk|expansive`
+  (composes with `--render`/`--inspect`); the spring-layout PNG (`render.py`)
+  is the visual diff proving the lattice (the nav fan hides it by construction).
+- **Deliverable:** `expansive` recommended as the default for new games, recorded
+  in DESIGN §5; the actual flip is executed in WP22 with the config epoch.
 
-Files: `edge/core/config.py`, `config/default.yaml`,
-`edge/bigbang/validate.py`, `edge/bigbang/embedding.py`,
-`edge/bigbang/render.py`, `edge/bigbang/__main__.py`,
-`tests/test_validate.py`, `tests/test_embedding.py`.
-Tests: the bigbang validation matrix becomes **parametrized over both modes ×
-100 seeds and stays that way permanently**; band-population assertions;
-embedding determinism.
+Files: `edge/core/config.py`, `config/default.yaml`, `edge/bigbang/generator.py`,
+`edge/bigbang/validate.py`, `edge/bigbang/populate.py`, `edge/bigbang/aliens.py`,
+`edge/bigbang/embedding.py`, `edge/bigbang/__main__.py`, `tests/test_bigbang.py`,
+`tests/test_embedding.py`.
+Tests: validity across 100 seeds in **both modes** (the permanent matrix); the
+`active_bands()` resolver; the band-name-match validator rejecting a mismatch;
+all-four-bands populated with an outward gradient at 1000 sectors; expansive
+embedding determinism + Core pinned to origin. Trunk output stays byte-identical
+(re-verified by `state_hash` diff after the config changes).
 
 ### WP22 — Hostile-band placement + the Phase-3 config epoch (M)
 

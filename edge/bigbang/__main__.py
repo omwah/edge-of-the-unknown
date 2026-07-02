@@ -19,6 +19,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="edge.bigbang")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--sectors", type=int, default=None, help="override sector_count")
+    parser.add_argument(
+        "--mode", choices=("trunk", "expansive"), default=None,
+        help="override topology_mode (trunk chokepoints | expansive band-lattice, §5)",
+    )
     parser.add_argument("--inspect", action="store_true", help="print a universe report")
     parser.add_argument(
         "--list", nargs="+", metavar="CATEGORY", choices=(*LIST_CATEGORIES, "all"),
@@ -32,9 +36,14 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_default_config()
+    bigbang_overrides: dict[str, object] = {}
     if args.sectors is not None:
+        bigbang_overrides["sector_count"] = args.sectors
+    if args.mode is not None:
+        bigbang_overrides["topology_mode"] = args.mode
+    if bigbang_overrides:
         config = config.model_copy(
-            update={"bigbang": config.bigbang.model_copy(update={"sector_count": args.sectors})}
+            update={"bigbang": config.bigbang.model_copy(update=bigbang_overrides)}
         )
     state = generate(config, args.seed)
     did_something = False

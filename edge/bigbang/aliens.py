@@ -65,7 +65,7 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
 
     # Non-Core sectors grouped by band — the home lanes where aliens are met (the Core
     # itself stays free of placed contacts; its safety is the governing alliance's).
-    band_order = [b.name for b in config.bigbang.bands]
+    band_order = [b.name for b in config.bigbang.active_bands()]
     sectors_by_band: dict[str, list[int]] = {b: [] for b in band_order}
     for sid in sorted(state.sectors):
         sector = state.sectors[sid]

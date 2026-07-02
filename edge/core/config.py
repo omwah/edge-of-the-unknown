@@ -161,6 +161,37 @@ class BigBangConfig(BaseModel):
             DistanceBand(name="Void", min_hops=21, max_hops=9_999),
         ]
     )
+    # `expansive` mode's ring-road lattice gives a *deeper* hop profile than trunk
+    # (ring roads lengthen shortest paths), so its bands need larger thresholds to
+    # keep all four populated. Same band **names** in the same order — only the
+    # hop windows differ — so all name-keyed logic is mode-agnostic. Resolved by
+    # `active_bands()`; falls back to `bands` when None or in trunk mode.
+    bands_expansive: list[DistanceBand] | None = Field(
+        default_factory=lambda: [
+            DistanceBand(name="Hub", min_hops=0, max_hops=14),
+            DistanceBand(name="Frontier", min_hops=15, max_hops=35),
+            DistanceBand(name="Deep", min_hops=36, max_hops=58),
+            DistanceBand(name="Void", min_hops=59, max_hops=9_999),
+        ]
+    )
+
+    def active_bands(self) -> list[DistanceBand]:
+        """The distance bands for the configured `topology_mode` (§5 step 5)."""
+        if self.topology_mode == "expansive" and self.bands_expansive is not None:
+            return self.bands_expansive
+        return self.bands
+
+    @model_validator(mode="after")
+    def _check_band_names_match(self) -> BigBangConfig:
+        """`bands_expansive` must name the same bands, in the same order, as `bands`
+        (only the hop thresholds differ) — so every name-keyed placement, validation,
+        and UI path is identical across modes."""
+        if self.bands_expansive is not None:
+            names = [b.name for b in self.bands]
+            exp = [b.name for b in self.bands_expansive]
+            if exp != names:
+                raise ValueError(f"bands_expansive names {exp} must match bands {names}")
+        return self
 
 
 class SubsystemLayout(BaseModel):
