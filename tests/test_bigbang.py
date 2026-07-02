@@ -121,6 +121,75 @@ def test_different_seeds_differ() -> None:
     assert a.adjacency != b.adjacency
 
 
+# --- WP20: topology modes (trunk / expansive band-lattice, DESIGN §5 step 2) ---
+
+def _expansive_config() -> object:
+    cfg = CONFIG.bigbang  # type: ignore[attr-defined]
+    return CONFIG.model_copy(  # type: ignore[attr-defined]
+        update={"bigbang": cfg.model_copy(update={"topology_mode": "expansive"})}
+    )
+
+
+EXPANSIVE_CONFIG = _expansive_config()
+
+
+def test_topology_mode_defaults_to_trunk() -> None:
+    # The default (and byte-identical original) is trunk; the flip is the WP22 epoch.
+    assert CONFIG.bigbang.topology_mode == "trunk"  # type: ignore[attr-defined]
+
+
+def test_topology_modes_differ() -> None:
+    trunk = generate(CONFIG, 3)  # type: ignore[arg-type]
+    expansive = generate(EXPANSIVE_CONFIG, 3)  # type: ignore[arg-type]
+    assert trunk.adjacency != expansive.adjacency
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_expansive_universe_is_valid(seed: int) -> None:
+    state = generate(EXPANSIVE_CONFIG, seed)  # type: ignore[arg-type]
+    cfg = EXPANSIVE_CONFIG.bigbang  # type: ignore[attr-defined]
+    # Single component: every sector reachable from sector 1.
+    assert set(bfs_distances(state.adjacency, 1)) == set(state.sectors)
+    # Warp-degree cap respected.
+    assert all(len(s.warps_out) <= cfg.max_warps_per_sector for s in state.sectors.values())
+
+
+def _cross_region_edges(state: object) -> list[tuple[int, int]]:
+    sectors = state.sectors  # type: ignore[attr-defined]
+    return [
+        (u, v)
+        for u, nbrs in state.adjacency.items()  # type: ignore[attr-defined]
+        for v in nbrs
+        if sectors[u].region_id != sectors[v].region_id
+    ]
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_expansive_has_no_single_bridge_chokepoint(seed: int) -> None:
+    """The lattice property (§5): removing any single inter-region warp leaves
+    every sector reachable from sector 1 — i.e. two edge-disjoint inward paths."""
+    state = generate(EXPANSIVE_CONFIG, seed)  # type: ignore[arg-type]
+    all_sectors = set(state.sectors)
+    for u, v in _cross_region_edges(state):
+        adj = {sid: set(nbrs) for sid, nbrs in state.adjacency.items()}
+        adj[u].discard(v)
+        assert set(bfs_distances(adj, 1)) == all_sectors, f"seed {seed}: {u}->{v} is a chokepoint"
+
+
+def test_trunk_has_chokepoints() -> None:
+    """Contrast: the trunk universe *does* funnel through cut edges — removing the
+    right inter-region warp strands sectors. (Guards against the modes collapsing.)"""
+    for seed in range(30):
+        state = generate(CONFIG, seed)  # type: ignore[arg-type]
+        all_sectors = set(state.sectors)
+        for u, v in _cross_region_edges(state):
+            adj = {sid: set(nbrs) for sid, nbrs in state.adjacency.items()}
+            adj[u].discard(v)
+            if set(bfs_distances(adj, 1)) != all_sectors:
+                return  # found a chokepoint, as expected of trunk
+    raise AssertionError("expected trunk topology to contain at least one chokepoint")
+
+
 @pytest.mark.parametrize("seed", range(20))
 def test_spatial_ids_wired_into_generate(seed: int) -> None:
     """`generate` caches a spatial display id per sector (DESIGN §5.1, WP-G)."""

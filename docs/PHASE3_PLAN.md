@@ -268,30 +268,37 @@ Branch `_bridge_groups` into:
 - `_bridge_groups_trunk` — today's body, moved verbatim. Its output for a
   fixed seed must be **byte-identical** to the current algorithm, pinned by a
   regression test, so existing goldens do not move.
-- `_bridge_groups_expansive` — two passes. Pass 1 builds a *provisional*
-  trunk spanning tree only to compute each group's representative core-depth
-  (BFS from sector 1), then discards those bridges. Pass 2 buckets groups
-  into depth rings and bridges each group to 2–4 same-ring peers plus 1–2
-  inward and 0–1 outward (nearest-ring first), keeping `one_way_chance` on
-  the extras only, and guarantees **≥2 bridge-disjoint inward paths per
-  ring** — the no-chokepoint property. All draws come from the same build
-  RNG, but the two mode branches never share a draw sequence (each mode's
-  output depends only on its own path).
+- `_bridge_groups_expansive` — stratify the groups into concentric rings (the
+  Core is ring 0; membership is a seeded shuffle sliced into rings of
+  `isqrt(n_groups)`), then build a **ring road** per ring (its groups wired
+  into a cycle) plus **≥2 radial spokes** between each consecutive ring pair on
+  distinct outer groups, plus a few one-way chords. Cycles-plus-two-spokes make
+  the graph **bridgeless** (no inter-region cut edge), and spoke demand is only
+  ~2 per ring boundary — not per group — so the 10-sector Core is never
+  saturated (the failure mode of a per-group inward rule, confirmed at 1000
+  sectors during implementation). The two mode branches never share a draw
+  sequence, so trunk output is unaffected.
 
 `_cluster_groups` (contiguous-id slices) is unchanged — spatial ids (§5.1)
 key off group structure, not bridging.
 
 Files: `edge/bigbang/generator.py`, `edge/bigbang/topology.py`,
-`edge/core/config.py`, `config/default.yaml`, `tests/test_bigbang.py`.
-Tests: trunk-mode byte-identical graph across fixed seeds (the golden guard);
-expansive across 100 seeds — single reachable component, degree cap ≤ 6,
-ring-lattice property (every non-core group has ≥2 bridge-disjoint inward
-paths). No golden regeneration (default unchanged).
+`edge/core/config.py`, `config/default.yaml`, `edge/bigbang/validate.py`
+(an expansive-only `_check_expansive_no_chokepoint`, so generation retries a
+rare gap), `tests/test_bigbang.py`.
+Tests: trunk-mode byte-identical graph (verified via `git stash` diff of
+`state_hash` — identical); expansive across 100 seeds — single reachable
+component, degree cap ≤ 6, and the bridgeless property (removing any single
+inter-region warp leaves every sector reachable); the two modes differ; trunk
+still contains chokepoints. No golden regeneration (default unchanged).
 
 ### WP21 — Band retune per mode + validator/embedding verification (M)
 
-A flatter graph compresses hop distances; the four bands must stay populated
-and every hop-window check must still pass under `expansive`.
+The ring-road lattice gives `expansive` a different hop-distance profile than
+trunk (in practice a *deeper* one — the ring roads lengthen shortest paths, so
+with the trunk thresholds most sectors fall into Void). The four bands must be
+made to stay populated and every hop-window check must still pass under
+`expansive`.
 
 - **Bands:** `BigBangConfig.bands` stays the trunk defaults; add an optional
   `bands_expansive` override, resolved by mode at generation. Tune so a
