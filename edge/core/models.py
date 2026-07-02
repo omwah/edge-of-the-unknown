@@ -330,6 +330,46 @@ class Lead:
 
 
 @dataclass(frozen=True, slots=True)
+class EncounterFoe:
+    """One hostile ship of an encounter pack (DESIGN §10, WP24).
+
+    Stats are resolved at spawn from the species' fleet hull + threat rating (a frozen
+    snapshot, so combat rounds are pure over the encounter itself): `damage` is the
+    per-round output (weapon + threat bonus), `firing_arc` drives the §10 evasion
+    counter-play, `combat_speed` the arc contest. `hull`/`shields` tick down per round.
+    """
+
+    ship_class_id: str
+    name: str
+    hull: int
+    hull_max: int
+    shields: int
+    damage: int
+    firing_arc: str  # ahead / all_round / spinal
+    combat_speed: int
+    defense: int = 0  # summed flat damage reduction (armour/screens/energy_plates)
+
+
+@dataclass(frozen=True, slots=True)
+class Encounter:
+    """A live hostile encounter (DESIGN §10, WP24) — hashed core state.
+
+    Set on `Player.active_encounter` when a violence roll opens an encounter; movement
+    and docking are rejected while it is live. `player_shields` is the fight-local
+    shield pool (shields recover after combat; hull damage persists on the `Ship`).
+    Rounds advance via the `CombatAction` command, so a fight replays exactly like a
+    trade (H4: every roll draws from `state.rng` inside the reducer).
+    """
+
+    species_id: int  # the AlienSpecies instance that intercepted the player
+    sector_id: int
+    foes: tuple[EncounterFoe, ...]
+    round: int = 0
+    player_shields: int = 0
+    detected: bool = True  # the species' sensors found the player (False never stores)
+
+
+@dataclass(frozen=True, slots=True)
 class Player:
     """The player (DESIGN §4). Starts as a member of the Core's governing alliance."""
 
@@ -376,6 +416,10 @@ class Player:
     # unvisited places, plotted on the Computer/Map screen. Appended by the accept-lead
     # command, so the log reconstructs them under replay.
     leads: tuple[Lead, ...] = ()
+    # The live hostile encounter, if any (DESIGN §10, WP24): set by the movement reducers'
+    # encounter roll, cleared by flee/victory. Movement and docking are rejected while set.
+    # Hashed state — a fight reconstructs exactly under (seed, command log).
+    active_encounter: Encounter | None = None
 
 
 @dataclass(frozen=True, slots=True)

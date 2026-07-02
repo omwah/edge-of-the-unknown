@@ -18,13 +18,14 @@ from textual.widgets import Footer, Static
 
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
-from edge.core.events import DiscoveryCollected, Event
+from edge.core.events import DiscoveryCollected, EncounterStarted, Event
 from edge.core.movement import MovementError
 from edge.core.rules import Dock, Hail, Salvage, TravelTo, Warp
 from edge.server.service import GameService
 from edge.tui.dummy import SectorDTO
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.contact import AlienContactScreen
+from edge.tui.screens.encounter import EncounterScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.help import HelpScreen
 from edge.tui.screens.planet import PlanetScreen
@@ -153,6 +154,10 @@ class GameScreen(Screen):
             await self.recompose()
         else:
             self._active = True
+        # A save quit mid-fight resumes engaged: reopen the encounter screen (§10) —
+        # movement is blocked in core anyway, so the modal is the only way forward.
+        if self._service.encounter_view(self._pid) is not None:
+            self.app.push_screen(EncounterScreen(self._service, self._pid))
 
     # --- commands ------------------------------------------------------------
 
@@ -179,6 +184,18 @@ class GameScreen(Screen):
             return
         self._record(events)
         await self.recompose()
+        self._handle_encounter(events)
+
+    def _handle_encounter(self, events: tuple[Event, ...]) -> None:
+        """Route a movement interruption (§10, WP24): a violence opener pushes the
+        encounter screen; a peaceful one opens the ordinary contact screen."""
+        started = next((e for e in events if isinstance(e, EncounterStarted)), None)
+        if started is None:
+            return
+        if started.hostile:
+            self.app.push_screen(EncounterScreen(self._service, self._pid))
+        else:
+            self._hail_species(started.species_id)
 
     def action_travel(self) -> None:
         self.app.push_screen(TravelPromptScreen(), self._after_travel)
@@ -200,6 +217,7 @@ class GameScreen(Screen):
             return
         self._record(events)
         self.run_worker(self.recompose())
+        self._handle_encounter(events)
 
     async def action_scan(self) -> None:
         # Scan logs the first unlogged visible find — the same action as clicking one.

@@ -20,6 +20,7 @@ from edge.core.events import (
     Colonized,
     ColonistsRecruited,
     ColonyGrew,
+    CombatRound,
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
@@ -29,6 +30,9 @@ from edge.core.events import (
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
+    EncounterEnded,
+    EncounterEvaded,
+    EncounterStarted,
     Event,
     GenesisDeployed,
     Haggled,
@@ -50,9 +54,11 @@ from edge.core.rules import (
     BuyAlienTech,
     BuyComponent,
     BuyGenesis,
+    BuyMissiles,
     BuyShip,
     Cannibalize,
     Colonize,
+    CombatAction,
     Command,
     Converse,
     DeployGenesis,
@@ -137,6 +143,14 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "FieldPatch", {
                 "subsystem": command.subsystem.value, "slot_index": command.slot_index,
             }
+        case CombatAction():
+            return "CombatAction", {
+                "action": command.action,
+                "subsystem": command.subsystem.value if command.subsystem is not None else None,
+                "slot_index": command.slot_index,
+            }
+        case BuyMissiles():
+            return "BuyMissiles", {"count": command.count}
         case Salvage():
             return "Salvage", {"discovery_id": command.discovery_id}
         case Descend():
@@ -229,6 +243,15 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return FieldPatch(
                 subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
             )
+        case "CombatAction":
+            sub = payload.get("subsystem")
+            return CombatAction(
+                action=payload["action"],
+                subsystem=Subsystem(sub) if sub is not None else None,
+                slot_index=payload.get("slot_index"),
+            )
+        case "BuyMissiles":
+            return BuyMissiles(count=payload["count"])
         case "Salvage":
             return Salvage(discovery_id=payload["discovery_id"])
         case "Descend":
@@ -391,6 +414,29 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "species_id": event.species_id,
                 "kind": event.kind, "ref": event.ref, "sector_id": event.sector_id,
             }
+        case EncounterStarted():
+            return "EncounterStarted", {
+                "player_id": event.player_id, "species_id": event.species_id,
+                "sector_id": event.sector_id, "hostile": event.hostile,
+                "pack_size": event.pack_size, "band": event.band,
+            }
+        case EncounterEvaded():
+            return "EncounterEvaded", {
+                "player_id": event.player_id, "species_id": event.species_id,
+                "sector_id": event.sector_id,
+            }
+        case CombatRound():
+            return "CombatRound", {
+                "player_id": event.player_id, "species_id": event.species_id,
+                "round": event.round, "action": event.action,
+                "damage_dealt": event.damage_dealt, "damage_taken": event.damage_taken,
+                "foes_left": event.foes_left,
+            }
+        case EncounterEnded():
+            return "EncounterEnded", {
+                "player_id": event.player_id, "species_id": event.species_id,
+                "outcome": event.outcome,
+            }
         case DevApplied():
             return "DevApplied", {"player_id": event.player_id, "detail": event.detail}
         case _:
@@ -476,6 +522,21 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "LeadAccepted":
             return LeadAccepted(payload["player_id"], payload["species_id"],
                                 payload["kind"], payload["ref"], payload["sector_id"])
+        case "EncounterStarted":
+            return EncounterStarted(payload["player_id"], payload["species_id"],
+                                    payload["sector_id"], payload["hostile"],
+                                    payload["pack_size"], payload["band"])
+        case "EncounterEvaded":
+            return EncounterEvaded(payload["player_id"], payload["species_id"],
+                                   payload["sector_id"])
+        case "CombatRound":
+            return CombatRound(payload["player_id"], payload["species_id"],
+                               payload["round"], payload["action"],
+                               payload["damage_dealt"], payload["damage_taken"],
+                               payload["foes_left"])
+        case "EncounterEnded":
+            return EncounterEnded(payload["player_id"], payload["species_id"],
+                                  payload["outcome"])
         case "DevApplied":
             return DevApplied(payload["player_id"], payload["detail"])
         case _:

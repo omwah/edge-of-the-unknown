@@ -606,3 +606,43 @@ class LeadDTO:
     sector_id: int = -1  # internal id of the tip's destination (WP14 route tie-in)
     at_origin: bool = True  # player is in the sector the tip was obtained in (full-graph plot)
     origin_coords: int = -1  # spatial display id of where the tip was obtained (return hint)
+
+
+@dataclass(frozen=True)
+class EncounterFoeDTO:
+    """One pack member on the encounter screen (§10, WP24/25)."""
+
+    name: str
+    hull_filled: int  # 0..10 bar
+    hull_pct: int
+    shields_pct: int
+    firing_arc: str  # ahead / all_round / spinal
+    alive: bool
+
+
+@dataclass(frozen=True)
+class EncounterDTO:
+    """The live hostile encounter (§10, WP24/25) — the encounter screen's projection.
+
+    Mirrors what the `CombatAction` reducer will resolve (H4 lockstep): the flee
+    chance shown is computed by the same `combat.flee_chance` the reducer rolls.
+    """
+
+    species_id: int
+    title: str  # "Quill Scout Marauder pack (x3)"
+    species_name: str
+    archetype_id: str
+    band: str  # standing band label (hostile / wary / …)
+    disposition_filled: int  # 0..5 bar
+    round_no: int
+    foes: list[EncounterFoeDTO]
+    arc_hint: str  # firing-arc counter-play tip
+    shields_pct: int  # fight-local shield pool
+    hull_pct: int
+    combat_line: str  # "Combat spd 4 (+1 eff)  vs intercept 0.6"
+    integrity_flag: str  # knocked-out component note ("all nominal" when clean)
+    flee_chance: int  # % (the same formula the reducer rolls)
+    flee_floor: int  # % (the config escape floor)
+    missiles: int
+    repair_kits: int
+    gun_online: bool

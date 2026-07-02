@@ -311,3 +311,52 @@ class LeadAccepted(Event):
     kind: str
     ref: int
     sector_id: int
+
+
+@dataclass(frozen=True)
+class EncounterStarted(Event):
+    """An interrupt roll produced an encounter on entering a sector (§10, WP24).
+
+    `hostile=True` ⇒ a violence opener: the pack in `pack_size` is live on
+    `Player.active_encounter` and movement is blocked until it resolves.
+    `hostile=False` ⇒ a peaceful opener — the journey halts and the contact screen
+    takes over (nothing stored). The band rides along for the log line's colour.
+    """
+
+    player_id: int
+    species_id: int
+    sector_id: int
+    hostile: bool
+    pack_size: int
+    band: str
+
+
+@dataclass(frozen=True)
+class EncounterEvaded(Event):
+    """The species' sensors missed the player — slipped away unseen (§10, WP24)."""
+
+    player_id: int
+    species_id: int
+    sector_id: int
+
+
+@dataclass(frozen=True)
+class CombatRound(Event):
+    """One resolved combat round (§10, WP25): the player's action + the pack's volley."""
+
+    player_id: int
+    species_id: int
+    round: int
+    action: str  # fight / flee / launch_missile / field_patch
+    damage_dealt: int
+    damage_taken: int
+    foes_left: int
+
+
+@dataclass(frozen=True)
+class EncounterEnded(Event):
+    """A hostile encounter resolved (§10, WP25): fled / victory / crippled."""
+
+    player_id: int
+    species_id: int
+    outcome: str

@@ -20,6 +20,7 @@ from edge.core import dto
 from edge.server import mapgraph
 from edge.server import navstrip
 from edge.server import terrain as terrain_art
+from edge.core import combat
 from edge.core.aliens import disposition_band, effective_disposition
 from edge.core.config import DialogueChoice, GameConfig
 from edge.core.discovery import is_detectable
@@ -42,6 +43,7 @@ from edge.core.events import (
     Colonized,
     ColonistsRecruited,
     ColonyGrew,
+    CombatRound,
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
@@ -50,6 +52,9 @@ from edge.core.events import (
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
+    EncounterEnded,
+    EncounterEvaded,
+    EncounterStarted,
     GenesisDeployed,
     SiteExplored,
     Event,
@@ -1125,6 +1130,91 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     )
 
 
+_ARC_HINTS = {
+    "spinal": "arc: spinal — strafe past its firing line (it recharges between volleys)",
+    "ahead": "arc: ahead — maneuver out of the firing line (combat-speed contest)",
+    "all_round": "arc: all-round — no safe angle; missiles or firepower settle this",
+}
+
+
+def encounter_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.EncounterDTO | None:
+    """The live hostile encounter (§10, WP24/25), or None when the player is not engaged.
+
+    View/reducer lockstep (H4): the flee chance shown is computed by the very
+    `combat.flee_chance` the `CombatAction` reducer rolls, from the same inputs, so the
+    number on screen is the number the dice see.
+    """
+    player = state.players[player_id]
+    enc = player.active_encounter
+    if enc is None:
+        return None
+    ship = state.ships[player.ship_id]
+    species = state.species.get(enc.species_id)
+    name = species.name if species is not None else "Unknown"
+    archetype = species.archetype_id if species is not None else ""
+    interception = 0.0
+    if species is not None and config.roster is not None:
+        try:
+            interception = config.roster.species_by_id(species.roster_id).interception_rating
+        except KeyError:
+            pass
+    effective = effective_disposition(species, player) if species is not None else 0.0
+    band = disposition_band(effective, config.aliens)
+
+    aspects = derive_aspects(ship, config)
+    missing = 1.0 - (ship.hull_current / ship.hull_max if ship.hull_max else 1.0)
+    flee = combat.flee_chance(
+        aspects.combat_speed, aspects.efficiency_bonus, interception, ship.cloak_rating,
+        missing, config.combat, config.aliens.escape_floor,
+    )
+
+    foes = [
+        dto.EncounterFoeDTO(
+            name=f.name,
+            hull_filled=_bar10(max(0, f.hull), f.hull_max),
+            hull_pct=round(100 * max(0, f.hull) / f.hull_max) if f.hull_max else 0,
+            shields_pct=round(100 * f.shields / max(1, f.shields)) if f.shields else 0,
+            firing_arc=f.firing_arc,
+            alive=f.hull > 0,
+        )
+        for f in enc.foes
+    ]
+    lead_arc = next((f.firing_arc for f in enc.foes if f.hull > 0), "all_round")
+    alive = sum(1 for f in enc.foes if f.hull > 0)
+    title = f"{name} pack (x{alive})" if alive > 1 else name
+
+    knocked = [
+        f"{sub.value}: {sum(1 for c in st.slots if c is not None and c.knocked_out)} out"
+        for sub, st in (ship.subsystems or {}).items()
+        if any(c is not None and c.knocked_out for c in st.slots)
+    ]
+    shields_pct = round(100 * enc.player_shields / max(1, ship.shields)) if ship.shields else 0
+    return dto.EncounterDTO(
+        species_id=enc.species_id,
+        title=title,
+        species_name=name,
+        archetype_id=archetype,
+        band=band,
+        disposition_filled=round(effective * 5),
+        round_no=enc.round + 1,
+        foes=foes,
+        arc_hint=_ARC_HINTS.get(lead_arc, ""),
+        shields_pct=min(100, shields_pct),
+        hull_pct=round(100 * ship.hull_current / max(1, ship.hull_max)),
+        combat_line=(
+            f"Combat spd {aspects.combat_speed}"
+            + (f" (+{aspects.efficiency_bonus} eff)" if aspects.efficiency_bonus else "")
+            + f"   vs intercept {interception:.1f}"
+        ),
+        integrity_flag="; ".join(knocked) if knocked else "all nominal",
+        flee_chance=round(flee * 100),
+        flee_floor=round(config.aliens.escape_floor * 100),
+        missiles=ship.missiles,
+        repair_kits=ship.repair_kits,
+        gun_online=aspects.gun_damage > 0,
+    )
+
+
 def format_event(event: Event) -> str:
     """Render one event's body as a log/ticker line — the single shared formatter (§11/§12).
 
@@ -1191,6 +1281,21 @@ def format_event(event: Event) -> str:
     if isinstance(event, AlienMoved):
         # Only emitted for a move touching the player's sector (WP16), so it's always relevant.
         return "[cyan]✦ An alien vessel warps through the sector.[/]"
+    if isinstance(event, EncounterStarted):
+        if event.hostile:
+            return f"[red]⚔ INTERCEPTED — a hostile pack (x{event.pack_size}) opens fire![/]"
+        return "[yellow]⚠ Intercepted — they hail you.[/]"
+    if isinstance(event, EncounterEvaded):
+        return "[cyan]✦ Sensors: a contact sweeps past — they never saw you.[/]"
+    if isinstance(event, CombatRound):
+        return (f"[red]⚔ Round {event.round}[/]: dealt {event.damage_dealt}, "
+                f"took {event.damage_taken} ({event.foes_left} foes left)")
+    if isinstance(event, EncounterEnded):
+        return {
+            "fled": "[yellow]↯ Broke away — escaped the engagement.[/]",
+            "victory": "[green]⚔ Victory — the pack is destroyed.[/]",
+            "crippled": "[red]✖ Crippled — systems dead, they let the wreck drift.[/]",
+        }.get(event.outcome, f"Encounter ended: {event.outcome}")
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 
@@ -1207,6 +1312,12 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
         return event.sector_id
     if isinstance(event, AlienMoved):
         return event.to_sector
+    if isinstance(event, (EncounterStarted, EncounterEvaded)):
+        return event.sector_id
+    if isinstance(event, (CombatRound, EncounterEnded)):
+        player = state.players.get(event.player_id)
+        ship = state.ships.get(player.ship_id) if player is not None else None
+        return ship.sector_id if ship is not None else None
     if isinstance(event, (Traded, Haggled)):
         port = state.ports.get(event.port_id)
         return port.sector_id if port is not None else None
