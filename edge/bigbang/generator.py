@@ -13,6 +13,7 @@ through the command log, keeping `(seed, command log)` replay exact (§3).
 
 from __future__ import annotations
 
+import math
 import random
 
 from edge.bigbang import populate as _populate
@@ -79,8 +80,11 @@ def _connect_group(out: OutEdges, group: list[int], cfg: BigBangConfig, rng: ran
         attempts += 1
 
 
-def _bridge_groups(out: OutEdges, groups: list[list[int]], cfg: BigBangConfig, rng: random.Random) -> None:
-    """Connect groups: a bidirectional spanning tree, then extra (maybe one-way) bridges."""
+def _bridge_groups_trunk(out: OutEdges, groups: list[list[int]], cfg: BigBangConfig, rng: random.Random) -> None:
+    """`trunk` bridging (§5 step 2): a bidirectional spanning tree, then extra
+    (maybe one-way) bridges. A group spanning tree rooted at the Core funnels
+    outer-band traffic through the few tree bridges — the trunk-and-branches
+    universe of chokepoints (the original, byte-identical algorithm)."""
     cap = cfg.max_warps_per_sector
 
     def _bridge(g1: list[int], g2: list[int], one_way: bool) -> None:
@@ -103,6 +107,75 @@ def _bridge_groups(out: OutEdges, groups: list[list[int]], cfg: BigBangConfig, r
                 _bridge(group, groups[j], one_way=rng.random() < cfg.one_way_chance)
 
 
+def _bridge_groups_expansive(out: OutEdges, groups: list[list[int]], cfg: BigBangConfig, rng: random.Random) -> None:
+    """`expansive` bridging (§5 step 2): a band-lattice web with no chokepoints.
+
+    Stratify the groups into concentric rings (the Core is ring 0), then build:
+      * a **ring road** — each ring's groups wired into a cycle, so a band can be
+        circled without diving back toward the Core (lateral 2-edge-connectivity);
+      * **≥2 radial spokes** between each consecutive ring pair, on distinct outer
+        groups, so the rings are radially 2-edge-connected too.
+    Cycles-plus-two-spokes make the whole graph **bridgeless**: no single
+    inter-region warp is a cut edge, so every group keeps two edge-disjoint paths
+    to the Core. Spoke demand is only ~2 per ring boundary (not per group), so the
+    10-sector Core is never swamped — the failure mode of a per-group inward rule.
+    Ring membership is seeded (a shuffle) so the shape varies per seed.
+    """
+    cap = cfg.max_warps_per_sector
+    if len(groups) < 2:
+        return
+
+    def _link(gi: int, gj: int, one_way: bool = False) -> bool:
+        # Bridge two groups, preferring member sectors with the most spare degree
+        # (a shuffle gives seeded variety among equally-spare endpoints; the stable
+        # sort preserves it) so no single sector saturates.
+        if gi == gj:
+            return False
+        a_opts = sorted(groups[gi], key=lambda s: len(out[s]))
+        b_opts = sorted(groups[gj], key=lambda s: len(out[s]))
+        for a in a_opts:
+            for b in b_opts:
+                ok = add_directed(out, a, b, cap) if one_way else add_bidirectional(out, a, b, cap)
+                if ok:
+                    return True
+        return False
+
+    non_core = list(range(1, len(groups)))
+    rng.shuffle(non_core)
+    ring_width = max(2, math.isqrt(len(non_core)))
+    rings: list[list[int]] = [[0]]  # ring 0 is the Core group
+    for start in range(0, len(non_core), ring_width):
+        rings.append(non_core[start : start + ring_width])
+
+    # Ring roads: wire each ring's groups into a cycle (a 2-group ring is a single
+    # link — its redundancy comes from the spokes below).
+    for ring in rings:
+        k = len(ring)
+        if k >= 2:
+            for idx in range(k):
+                _link(ring[idx], ring[(idx + 1) % k])
+
+    # Radial spokes: ≥2 bridges between each consecutive ring pair, spread across
+    # distinct outer groups so no single group becomes a radial cut vertex.
+    for r in range(1, len(rings)):
+        inner, outer = rings[r - 1], rings[r]
+        outer_order = outer[:]
+        rng.shuffle(outer_order)
+        made = attempts = 0
+        while made < 2 and attempts < 16:
+            gi = outer_order[made % len(outer_order)]
+            if _link(gi, rng.choice(inner)):
+                made += 1
+            attempts += 1
+
+    # Extra chords/one-ways: a little richer routing within the larger rings.
+    for ring in rings:
+        if len(ring) >= 3:
+            for _ in range(rng.randint(0, 2)):
+                gi, gj = rng.sample(ring, 2)
+                _link(gi, gj, one_way=rng.random() < cfg.one_way_chance)
+
+
 def build_graph(cfg: BigBangConfig, rng: random.Random) -> tuple[OutEdges, list[list[int]]]:
     """Build the warp graph and return its adjacency plus the region groups."""
     n = cfg.sector_count
@@ -115,7 +188,10 @@ def build_graph(cfg: BigBangConfig, rng: random.Random) -> tuple[OutEdges, list[
     groups = [core, *other]
     for group in other:
         _connect_group(out, group, cfg, rng)
-    _bridge_groups(out, groups, cfg, rng)
+    if cfg.topology_mode == "expansive":
+        _bridge_groups_expansive(out, groups, cfg, rng)
+    else:
+        _bridge_groups_trunk(out, groups, cfg, rng)
     add_ring_motifs(out, groups, rng, cap, count=max(1, n // 50))
     return out, groups
 

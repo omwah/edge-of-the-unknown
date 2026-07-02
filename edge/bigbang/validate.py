@@ -9,6 +9,8 @@ ownership) arrive with their Phase-2/3 generation steps.
 
 from __future__ import annotations
 
+from collections import deque
+
 from edge.bigbang.topology import bfs_distances
 from edge.core.aliens import is_friendly
 from edge.core.config import GameConfig
@@ -32,6 +34,38 @@ def validate(state: UniverseState, config: GameConfig) -> None:
     _check_starbases(state)
     _check_discovery_gradient(state, config)
     _check_species(state, config)
+    if config.bigbang.topology_mode == "expansive":
+        _check_expansive_no_chokepoint(state)
+
+
+def _check_expansive_no_chokepoint(state: UniverseState) -> None:
+    """Expansive-mode lattice invariant (§5 step 2): **no inter-region warp is a
+    cut edge** — removing any single one leaves every sector reachable from sector
+    1. That is the chokepoint-free / two-edge-disjoint-paths property the band
+    lattice promises; a rare construction gap trips it and generation retries with
+    a perturbed sub-seed.
+    """
+    adjacency = state.adjacency
+    all_sectors = set(state.sectors)
+
+    def _reachable_excluding(ex_u: int, ex_v: int) -> int:
+        seen = {1}
+        queue: deque[int] = deque([1])
+        while queue:
+            cur = queue.popleft()
+            for nxt in adjacency.get(cur, ()):
+                if cur == ex_u and nxt == ex_v:
+                    continue
+                if nxt not in seen:
+                    seen.add(nxt)
+                    queue.append(nxt)
+        return len(seen)
+
+    region = {sid: sector.region_id for sid, sector in state.sectors.items()}
+    for u, nbrs in adjacency.items():
+        for v in nbrs:
+            if region[u] != region[v] and _reachable_excluding(u, v) != len(all_sectors):
+                raise ValidationError(f"expansive chokepoint: warp {u}->{v} is a cut edge")
 
 
 def _check_reachable(state: UniverseState) -> None:

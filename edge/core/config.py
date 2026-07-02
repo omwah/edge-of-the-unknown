@@ -124,6 +124,13 @@ class BigBangConfig(BaseModel):
     model_config = _FROZEN
 
     sector_count: int = 1_000  # config range 100–5000
+    # How the groups interconnect (DESIGN §5 step 2). `trunk` = a group spanning
+    # tree rooted at the Core plus a few extra bridges — a trunk-and-branches
+    # universe of chokepoints (the original algorithm). `expansive` = a
+    # band-lattice web: each group bridges to same-ring peers plus ≥2 inner
+    # bridges, so every ring is a widening lattice with no single-bridge
+    # chokepoint. The default stays `trunk`; the flip rides the WP22 config epoch.
+    topology_mode: Literal["trunk", "expansive"] = "trunk"
     cluster_min: int = 5
     cluster_max: int = 25
     intra_group_degree: float = 2.5
