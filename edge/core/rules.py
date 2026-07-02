@@ -20,7 +20,9 @@ from dataclasses import dataclass, replace
 from typing import assert_never
 
 from edge import dialogue
+from edge.core import combat, encounters
 from edge.core.aliens import effective_disposition
+from edge.core.combat import CombatError
 from edge.core.dev import DevPatch, apply_dev_patch
 
 from edge.core.config import GameConfig, SpeciesConfig, TechOfferConfig
@@ -37,6 +39,7 @@ from edge.core.engine_room import (
     EngineRoomError,
     apply_derived,
     build_subsystems,
+    derive_aspects,
     legal_components,
     tier_ceiling,
 )
@@ -64,6 +67,9 @@ from edge.core.events import (
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
+    EncounterEnded,
+    EncounterEvaded,
+    EncounterStarted,
     Event,
     GenesisDeployed,
     Haggled,
@@ -75,11 +81,13 @@ from edge.core.events import (
     Traded,
     Warped,
 )
+from edge.core.events import CombatRound as CombatRoundEvent
 from edge.core.planets import is_colonizable, retype_planet
 from edge.core.starbases import is_operational
 from edge.core.models import (
     AlienSpecies,
     Discovery,
+    Encounter,
     Game,
     InstalledComponent,
     Lead,
@@ -299,6 +307,28 @@ class FieldPatch:
 
 
 @dataclass(frozen=True, slots=True)
+class CombatAction:
+    """One combat round of a live encounter (§10, WP25).
+
+    `action` is fight (fire the Main Gun), flee (roll the clamped escape chance),
+    launch_missile (finite, arc-ignoring), or field_patch (spend a repair kit on
+    `subsystem`/`slot_index` — the pack still gets its volley). Rejected when no
+    encounter is live.
+    """
+
+    action: str  # fight / flee / launch_missile / field_patch
+    subsystem: Subsystem | None = None  # field_patch target
+    slot_index: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BuyMissiles:
+    """Buy homing missiles at the StarDock hardware emporium (§8, §10, WP25)."""
+
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
 class Hail:
     """Open contact with a friendly species in the current sector (§6, §6.7, WP9).
 
@@ -377,6 +407,7 @@ Command = (
     | RecruitColonists | Colonize | SetAllocation
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
+    | CombatAction | BuyMissiles
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
     | DevPatch  # dev/testing cheat (core.dev); recorded in the log like any command
 )
@@ -474,6 +505,10 @@ def reduce(
             return _buy_genesis(state, player_id, config)
         case DeployGenesis():
             return _deploy_genesis(state, player_id, command, config)
+        case CombatAction():
+            return _combat_action(state, player_id, command, config)
+        case BuyMissiles():
+            return _buy_missiles(state, player_id, command, config)
         case Hail():
             return _hail(state, player_id, command, config)
         case Converse():
@@ -556,6 +591,7 @@ def _join_game(
             hull_current=sc.hull_max, hull_max=sc.hull_max, shields=sc.shields_max,
             warp_speed=sc.warp_speed, combat_speed=sc.combat_speed,
             cloak_rating=sc.cloak_rating, sensor_rating=sc.sensor_rating,
+            missiles=sc.missiles,
             turns_per_warp=sc.turns_per_warp, colonist_capacity=sc.colonist_capacity,
             subsystems=build_subsystems(sc),
         ),
@@ -617,6 +653,7 @@ def _detect_in_sector(
 
 def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -> ReduceResult:
     player = _player(state, player_id)
+    _require_no_encounter(player)
     ship = _ship(state, player)
     if not can_warp(state.adjacency, ship.sector_id, cmd.to_sector):
         raise MovementError(
@@ -628,27 +665,50 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
     one_way = ship.sector_id not in state.adjacency.get(cmd.to_sector, ())
     detected, det_events = _detect_in_sector(
         state, player.detected, ship.sensor_rating, cmd.to_sector, player_id, config)
+    encounter, _halt, enc_events = _roll_encounter(state, player, ship, cmd.to_sector, config)
     new_player = replace(
         player,
         turns_remaining=player.turns_remaining - cost,
         explored_sectors=player.explored_sectors | frozenset({cmd.to_sector}),
         entered_from={**player.entered_from, cmd.to_sector: ship.sector_id},
         detected=detected,
+        active_encounter=encounter,
     )
     return ReduceResult(
-        events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost, one_way), *det_events),
+        events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost, one_way),
+                *det_events, *enc_events),
         players=(new_player,),
         ships=(new_ship,),
     )
 
 
-def _should_interrupt(state: UniverseState, player: Player, sector_id: int) -> bool:
-    """Whether a multi-hop journey must halt on entering `sector_id`.
+def _require_no_encounter(player: Player) -> None:
+    """Movement, docking, and descent are rejected while an encounter is live (§10)."""
+    if player.active_encounter is not None:
+        raise MovementError("you are engaged — fight or flee first")
 
-    Phase-1 stub — always False. Phase 3 injects the hostile-encounter roll here
-    so a `TravelTo` stops mid-route when an alien intercepts the player (§10).
+
+def _roll_encounter(
+    state: UniverseState, player: Player, ship: Ship, sector_id: int, config: GameConfig,
+) -> tuple[Encounter | None, bool, tuple[Event, ...]]:
+    """The §10 encounter roll on entering `sector_id` (WP24).
+
+    Returns `(encounter, halt, events)`: `encounter` goes onto
+    `Player.active_encounter` on a violence opener; `halt` stops a multi-hop journey
+    (any *detected* encounter halts — a greeting hands off to the contact screen, a
+    fight to the encounter screen); an undetected slip-away neither halts nor stores.
+    Draws from `state.rng` inside the reducer (H4), so a journey replays exactly.
     """
-    return False
+    roll = encounters.roll_encounter(state, player, ship, sector_id, config, state.rng)
+    if roll is None:
+        return None, False, ()
+    if not roll.detected:
+        return None, False, (EncounterEvaded(player.id, roll.species.id, sector_id),)
+    band = state.sectors[sector_id].distance_band
+    pack_size = len(roll.encounter.foes) if roll.encounter is not None else 0
+    started = EncounterStarted(
+        player.id, roll.species.id, sector_id, roll.hostile, pack_size, band)
+    return roll.encounter, True, (started,)
 
 
 def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameConfig) -> ReduceResult:
@@ -659,9 +719,11 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
     a lead for — the computer has the coordinates and plots the course, charting each hop as it
     flies. Everywhere else still routes through already-explored sectors only, so exploration
     is not trivialised. The journey applies hop-by-hop (one `Warped` per hop), halting early if
-    turns run out or `_should_interrupt` fires — the same per-sector seam combat will use.
+    turns run out or the §10 encounter roll fires — the journey stops **at the interrupted
+    hop** (the sector is entered; a detected encounter then takes over, WP24).
     """
     player = _player(state, player_id)
+    _require_no_encounter(player)
     ship = _ship(state, player)
     # A tip's coordinates unlock full-graph plotting *from the sector it was obtained in*; away
     # from that origin (or with no lead) the route is locked to already-charted space (§6.7).
@@ -686,8 +748,9 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
     explored = player.explored_sectors
     entered = dict(player.entered_from)
     detected = player.detected
+    encounter: Encounter | None = None
     for nxt in hops:
-        if turns < cost or _should_interrupt(state, player, nxt):
+        if turns < cost:
             break
         turns -= cost
         one_way = current not in state.adjacency.get(nxt, ())
@@ -698,15 +761,22 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
             state, detected, ship.sensor_rating, nxt, player_id, config)
         events.extend(det_events)
         current = nxt
+        # The §10 encounter roll — the journey halts *at* the interrupted hop (WP24).
+        encounter, halt, enc_events = _roll_encounter(state, player, ship, nxt, config)
+        events.extend(enc_events)
+        if halt:
+            break
 
     new_ship = replace(ship, sector_id=current)
     new_player = replace(player, turns_remaining=turns, explored_sectors=explored,
-                         entered_from=entered, detected=detected)
+                         entered_from=entered, detected=detected,
+                         active_encounter=encounter)
     return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,))
 
 
 def _dock(state: UniverseState, player_id: int) -> ReduceResult:
     player = _player(state, player_id)
+    _require_no_encounter(player)
     ship = _ship(state, player)
     port = _docked_port(state, ship)
     if player.turns_remaining < 1:
@@ -860,6 +930,7 @@ def _buy_ship(
         shields=new_class.shields_max, warp_speed=new_class.warp_speed,
         combat_speed=new_class.combat_speed, turns_per_warp=new_class.turns_per_warp,
         colonist_capacity=new_class.colonist_capacity,
+        missiles=ship.missiles + new_class.missiles,  # ammo carries over + hull loadout
         subsystems=build_subsystems(new_class), components=merged,
     ), config)
     if new_ship.holds_used > new_ship.holds_total:
@@ -1202,6 +1273,75 @@ def _field_patch(
     )
 
 
+# --- combat: encounter rounds + missile purchase (§10, WP24/WP25) -----------
+
+
+def _combat_action(
+    state: UniverseState, player_id: int, cmd: CombatAction, config: GameConfig
+) -> ReduceResult:
+    """Resolve one round of the live encounter (§10, WP25).
+
+    Field-patching first spends the kit through the ordinary `_field_patch` validation
+    (so slot/kit rules stay in one place), then the pack still takes its volley. Every
+    roll draws from `state.rng` here in the reducer (H4).
+    """
+    player = _player(state, player_id)
+    enc = player.active_encounter
+    if enc is None:
+        raise CombatError("no live encounter")
+    ship = _ship(state, player)
+    species = state.species.get(enc.species_id)
+    sc = _species_config(config, species) if species is not None else None
+    interception = sc.interception_rating if sc is not None else 0.0
+
+    events: list[Event] = []
+    if cmd.action == "field_patch":
+        if cmd.subsystem is None or cmd.slot_index is None:
+            raise CombatError("field_patch needs a subsystem and slot")
+        patched = _field_patch(
+            state, player_id, FieldPatch(cmd.subsystem, cmd.slot_index), config)
+        ship = patched.ships[0]
+        events.extend(patched.events)
+
+    aspects = derive_aspects(ship, config)
+    result = combat.resolve_round(
+        enc, ship, aspects, interception, cmd.action, config, state.rng,
+        escape_floor=config.aliens.escape_floor,
+    )
+    foes_left = (
+        sum(1 for f in result.encounter.foes if f.hull > 0)
+        if result.encounter is not None else 0
+    )
+    events.append(CombatRoundEvent(
+        player_id, enc.species_id, enc.round + 1, cmd.action,
+        result.damage_dealt, result.damage_taken, foes_left,
+    ))
+    if result.outcome is not None:
+        events.append(EncounterEnded(player_id, enc.species_id, result.outcome))
+    new_player = replace(player, active_encounter=result.encounter)
+    return ReduceResult(events=tuple(events), players=(new_player,), ships=(result.ship,))
+
+
+def _buy_missiles(
+    state: UniverseState, player_id: int, cmd: BuyMissiles, config: GameConfig
+) -> ReduceResult:
+    """Buy homing missiles at the StarDock hardware emporium (§8, §10, WP25)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    if cmd.count < 1:
+        raise EconomyError("buy at least one missile")
+    cost = cmd.count * config.combat.missile_price
+    if player.latinum < cost:
+        raise EconomyError(f"need {cost} latinum for {cmd.count} missiles")
+    new_player = replace(player, latinum=player.latinum - cost)
+    new_ship = replace(ship, missiles=ship.missiles + cmd.count)
+    return ReduceResult(
+        events=(DevicePurchased(player_id, f"homing_missile x{cmd.count}", cost),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
 # --- discovery: descend / explore / salvage / log to codex (§7, WP5/WP6) ----
 
 
@@ -1223,6 +1363,7 @@ def _descend(
 ) -> ReduceResult:
     """Land on a planet surface (§7, WP6). A turn cost that opens site exploration."""
     player = _player(state, player_id)
+    _require_no_encounter(player)
     ship = _ship(state, player)
     _planet_in_sector(state, ship, cmd.planet_id)
     cost = config.discovery.descent_turn_cost if config.discovery is not None else 1

@@ -17,6 +17,7 @@ from edge.core.events import (
     Colonized,
     ColonistsRecruited,
     ColonyGrew,
+    CombatRound,
     ComponentInstalled,
     ComponentPurchased,
     ComponentRemoved,
@@ -26,6 +27,9 @@ from edge.core.events import (
     DiscoveryCollected,
     DiscoveryDetected,
     Docked,
+    EncounterEnded,
+    EncounterEvaded,
+    EncounterStarted,
     GenesisDeployed,
     SiteExplored,
     Event,
@@ -46,9 +50,11 @@ from edge.core.rules import (
     BuyAlienTech,
     BuyComponent,
     BuyGenesis,
+    BuyMissiles,
     BuyShip,
     Cannibalize,
     Colonize,
+    CombatAction,
     Command,
     Converse,
     DeployGenesis,
@@ -109,6 +115,10 @@ COMMANDS: list[Command] = [
     BuyAlienTech(species_id=3, offer_index=1),   # WP9 buy tech for latinum
     BarterArtifact(species_id=3, offer_index=0), # WP9 barter an artifact for tech
     AcceptLead(species_id=3),                    # §6.7 log an alien's coordinate tip
+    CombatAction(action="fight"),                # WP25 one combat round
+    CombatAction(action="flee"),
+    CombatAction(action="field_patch", subsystem=Subsystem.SCREENS, slot_index=1),
+    BuyMissiles(count=3),                        # WP25 StarDock missile ammo
     DevPatch("set", "latinum", 1_000_000),            # dev cheat: set a field
     DevPatch("grant", "component", 2, key="accelerator:III"),  # dev cheat: grant parts
     DevPatch("claim", "planet", ref=5),               # dev cheat: claim a world
@@ -146,6 +156,11 @@ EVENTS: list[Event] = [
     AlienTraded(1, 3, "buy", "radiator (II)", 7_000),
     AttitudeChanged(1, 3, 0.12, 0.87),
     LeadAccepted(1, 3, "discovery", 42, 17),  # §6.7 accepted a coordinate tip
+    EncounterStarted(1, 3, 55, True, 3, "Deep"),   # WP24 a violence opener
+    EncounterStarted(1, 3, 55, False, 0, "Deep"),  # WP24 a peaceful interception
+    EncounterEvaded(1, 3, 55),                     # WP24 slipped away unseen
+    CombatRound(1, 3, 2, "fight", 24, 11, 2),      # WP25 one resolved round
+    EncounterEnded(1, 3, "fled"),                  # WP25 outcome
     DevApplied(1, "[dev] set latinum=1000000"),  # dev cheat audit marker
 ]
 

@@ -417,65 +417,91 @@ Full suite 1451 green.
 
 ### WP24 — Encounter core: interrupt, detection, disposition, pack spawn (L)
 
-The Phase-1 seam goes live. `rules._should_interrupt` becomes the encounter
-roll: species in/near the sector + the WP22 `EncountersConfig` weights, drawn
-from `state.rng` in the reducer (H4). On trigger, in order:
+The Phase-1 seam goes live. **Shipped.** The `_should_interrupt` stub is
+replaced by the pure `edge/core/encounters.py` roll chain, drawn from
+`state.rng` inside the movement reducers (H4). Per sector entered:
 
-1. **Detection** — species sensors vs the player's cloak rating plus nebula
-   cover (reusing the effective-sensor machinery); an undetected player slips
-   away freely.
-2. **Greeting vs violence** — rolled against effective disposition, shifted
-   by active grudges and alliance standing (WP27/WP38 hooks; until they land
-   the shift terms are zero). A `combatant: false` species can never reach
+1. **Interrupt** — the band's `interrupt_chance` (0 in the Hub) fires and a
+   species present in the sector is drawn with weight inverse to threat.
+   RNG discipline: no draw at all when an encounter is impossible (zero band
+   chance or no candidates — both pure functions of state), so the
+   command-stream draw order stays deterministic.
+2. **Detection** — the species' sensors (its lead fleet hull's rating) vs the
+   player's cloak, dimmed by nebula cover (`detection_*` knobs on
+   `EncountersConfig`); an undetected player slips away freely
+   (`EncounterEvaded`, no halt).
+3. **Greeting vs violence** — vs effective disposition: friendly-band always
+   greets, hostile-band always attacks, the wary middle interpolates linearly
+   (a coin-flip at the midpoint). Grudge/alliance shift terms land with
+   WP27/WP38. `combatant: false` — or an empty `fleet` — can never reach
    violence.
-3. **Pack spawn** — the encounter group per the species' `pack_behavior` /
-   escort composition.
+4. **Pack spawn** — per `pack_behavior`/`escort` (solo / escorted / swarm of
+   `swarm_size_[min,max]`); each `EncounterFoe` is a frozen stat snapshot
+   (hull class × species threat) so combat rounds stay pure.
 
-New frozen `Encounter` model on `Player.active_encounter` (hashed): the pack's
-species instance ids, round counter, detection/opening outcome. Movement and
-dock commands are rejected while an encounter is live; `TravelTo` halts at the
-interrupted hop inside the one command (the hop loop is already structured for
-it). The greeting path routes into the existing contact screen; the violent
-path opens the `EncounterScreen` (the stub goes real) fed by a new
-`session.encounter_view`. All new commands/events enter `store/codec.py` with
-round-trip coverage.
+Frozen `Encounter` on `Player.active_encounter` (hashed): the pack, round
+counter, fight-local `player_shields` (shields recover after combat; hull
+damage persists on the `Ship`). `Warp`/`TravelTo`/`Dock`/`Descend` are
+rejected while engaged; `TravelTo` **halts at the interrupted hop** (the
+sector is entered first, then the roll fires). A greeting halts too and routes
+into the existing contact screen; a violence opener pushes the (now real)
+`EncounterScreen` fed by `session.encounter_view`, and a save quit mid-fight
+reopens it on resume.
 
 Files: new `edge/core/encounters.py`, `edge/core/rules.py`,
-`edge/core/models.py`, `edge/core/events.py`, `edge/store/codec.py`,
-`edge/server/session.py` + `service.py`, `edge/tui/screens/encounter.py`,
-`config/default.yaml`, new `tests/test_encounters.py`, `tests/test_codec.py`.
-Tests: golden replay including an interrupted `TravelTo`; disposition-roll
-monotonicity property; detection respects cloak+nebula; non-combatant never
-violent (hypothesis).
+`edge/core/models.py`, `edge/core/events.py` (`EncounterStarted` /
+`EncounterEvaded`), `edge/store/codec.py`, `edge/server/session.py` +
+`service.py`, `edge/tui/screens/{encounter,game}.py`, `edge/core/config.py` +
+`config/default.yaml` (detection knobs), `tests/test_encounters.py`,
+`tests/test_codec.py`.
+Tests: mid-fight and interrupted-journey golden reloads; travel halts at the
+interrupted hop; movement/dock blocked while engaged; no RNG draw in the Hub;
+non-combatant never violent; evaded encounters don't halt; pack shapes;
+violence-roll shape (hypothesis).
 
 ### WP25 — Combat rounds: weapons schema, arcs, fight/flee, the floor (L)
 
-Per-round resolution in a new pure `edge/core/combat.py`.
+Per-round resolution in a new pure `edge/core/combat.py`. **Shipped.**
 
-- **Adds the missing §4 weapon schema** (framing correction 1):
-  `WeaponConfig {name, damage, firing_arc: ahead|all_round|spinal, special?}`
-  and a `defenses` list on `ShipClassConfig`; the roster's `fleet` ids
-  resolve to armed hulls in `config/default.yaml`.
-- **Player offense:** the spinal Main Gun (damage/rate from `derive_aspects`)
-  plus finite `Ship.missiles` — arc-ignoring, bought at StarDock hardware.
-- **Arc rule:** `ahead`/`spinal` attackers are evaded by a combat-speed
-  contest (maneuvering out of the firing line); `all_round` leaves no safe
-  angle; weapon `special`s hook their own modifiers.
-- **Flee:** base chance + combat speed − interception − accumulated damage +
-  cloak, **clamped ≥ `escape_floor` (default 0.10)** — a named core invariant
-  with its own hypothesis property (§13).
-- **Spindrive efficiency** applies its one global bonus (screens, combat
-  speed, gun damage) across the fight.
-- **Commands:** `CombatAction(fight | flee | launch_missile | field_patch)`
-  with the view/reducer lockstep (H4).
+- **The §4 weapon schema added** (framing correction 1): a top-level
+  `GameConfig.weapons` catalog of `WeaponConfig {name, damage, firing_arc,
+  rate, special?}` records; `ShipClassConfig` gains `armament` (weapon ids),
+  `defenses` (`DefenseConfig {type, value}` — armour/screens/energy_plates sum
+  to a flat damage reduction), and `missiles` (starting ammo). All four hulls
+  armed in `config/default.yaml`; a `GameConfig` validator enforces every
+  armament id and every roster `fleet`/`escort` hull resolves.
+- **One `CombatAction` = one round:** the player acts (fight / flee /
+  launch_missile / field_patch), then every surviving foe returns fire.
+  Field-patching routes through the ordinary `_field_patch` validation (kit
+  rules stay in one place) and the pack still gets its volley.
+- **Player offense:** Main Gun `(gun_damage + efficiency_bonus) × gun_rate`
+  from `derive_aspects`; finite arc-ignoring missiles (`missile_damage`),
+  bought via `BuyMissiles` at the StarDock (**i** key); hulls carry loadouts
+  and ammo carries over on `BuyShip`.
+- **Arc rule:** `ahead`/`spinal` foe fire is evaded on a combat-speed contest
+  (`evade_base + evade_speed_coeff·Δspeed`); `all_round` cannot be evaded;
+  **spinal weapons fire only every other round** (recharging). `special`s are
+  carried as data for the WP33+ hooks.
+- **Flee:** `flee_base + speed·coeff − interception·coeff + cloak·coeff −
+  damage_penalty·missing-hull`, **clamped to [`escape_floor`, `flee_cap`]** —
+  the named pure `combat.flee_chance` is the §13 property-test target, and the
+  `encounter_view` shows the *same* number the reducer rolls (H4 lockstep).
+- **Spindrive efficiency** adds once each to gun damage, combat speed (both
+  contests), and screen deflection.
+- **The WP26 seam, explicit:** hull driven to 0 clamps at 1 and
+  force-disengages (`crippled`) until escape pods land — death is never
+  unhandled.
 
 Files: new `edge/core/combat.py`, `edge/core/config.py`,
 `config/default.yaml`, `edge/core/rules.py`, `edge/store/codec.py`,
-`edge/server/session.py`, `edge/tui/screens/encounter.py`, new
-`tests/test_combat.py`.
+`edge/server/session.py`, `edge/core/dto.py`,
+`edge/tui/screens/{encounter,stardock}.py`, `tests/test_combat.py`.
 Tests: **escape probability never below the floor under arbitrary
-damage/engine/interception values** (hypothesis); arc counters; missile
-conservation; golden replay of a full fight.
+damage/engine/interception values** (hypothesis, 300 examples); shields absorb
+before hull on both sides; missiles finite + conserved; spinal fires every
+other round; victory/crippled outcomes; the crippled clamp; flee succeeds from
+a wreck within bounded attempts (the floor in action); StarDock missile
+purchase; full-fight golden reload.
 
 ### WP26 — Localized damage, repair kits, escape pods, salvage (M)
 

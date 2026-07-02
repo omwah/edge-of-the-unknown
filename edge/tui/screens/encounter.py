@@ -1,11 +1,11 @@
-"""EncounterScreen — hostile greeting-or-fight/flee (UI_MOCKUPS.md §7).
+"""EncounterScreen — the live fight/flee rounds (UI_MOCKUPS.md §7, DESIGN §10, WP24/25).
 
-Phase-3 screen, stubbed here so engaging a hostile-band ship has somewhere to go.
-A hostile opener (the species' disposition rolled to violence, DESIGN §10) shows
-the enemy group per `pack_behavior`/`escort` with per-ship hull and a firing-arc
-hint, the player's shields/hull/combat-speed and any knocked-out component, and
-round controls whose flee chance is **clamped to the config escape-chance floor**.
-A peaceful opener would reuse the §6 contact panel instead of these controls.
+Drives the real `GameService`: each keypress issues one `CombatAction` command (one
+combat round — the player's action plus the pack's volley) and recomposes from the
+fresh `encounter_view`. The flee chance shown is the same `combat.flee_chance` number
+the reducer rolls (the H4 view/reducer lockstep). The screen pops when the encounter
+resolves (fled / victory / crippled); movement stays blocked while it is live, so
+there is no way to walk away from the modal without resolving it.
 """
 
 from __future__ import annotations
@@ -16,21 +16,29 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from edge.core.combat import CombatError
+from edge.core.economy import EconomyError
+from edge.core.engine_room import EngineRoomError
+from edge.core.enums import Subsystem
+from edge.core.events import EncounterEnded
+from edge.core.movement import MovementError
+from edge.core.rules import CombatAction
 from edge.tui import art_adapter
-from edge.tui.dummy import EncounterDTO
 from edge.tui.widgets import bar
 
-_PLAYER_SHIP = "S.S. Wayfarer"  # the skeleton's single ship (matches the sidebar)
+_OUTCOME_NOTES = {
+    "fled": ("Broke away — you escaped the engagement.", "warning"),
+    "victory": ("Victory — the pack is destroyed.", "information"),
+    "crippled": ("Crippled — systems dead. They let the wreck drift.", "error"),
+}
 
 
 class EncounterScreen(Screen):
     BINDINGS = [
-        Binding("escape", "back", "Disengage"),
-        Binding("f", "noop", "Fire"),
-        Binding("m", "noop", "Missile"),
-        Binding("e", "noop", "Evade"),
-        Binding("r", "back", "Flee"),
-        Binding("k", "noop", "Field-patch"),
+        Binding("f", "fight", "Fire"),
+        Binding("m", "missile", "Missile"),
+        Binding("r", "flee", "Flee"),
+        Binding("k", "patch", "Field-patch"),
     ]
 
     CSS = """
@@ -40,9 +48,6 @@ class EncounterScreen(Screen):
     }
     EncounterScreen #enc-disp {
         height: 1; padding: 0 1; color: $text-muted; border-bottom: solid $error;
-    }
-    EncounterScreen #taunt {
-        height: auto; padding: 1 2 0 2; color: $warning; text-style: italic;
     }
     EncounterScreen #enc-main { height: 1fr; padding: 1 2; }
     EncounterScreen #them {
@@ -60,55 +65,93 @@ class EncounterScreen(Screen):
     }
     """
 
-    def __init__(self, encounter: EncounterDTO) -> None:
+    def __init__(self, service, player_id: int) -> None:
         super().__init__()
-        self._enc = encounter
+        self._service = service
+        self._pid = player_id
 
     def compose(self) -> ComposeResult:
-        e = self._enc
-        yield Static(
-            f"ENCOUNTER · {e.title}        [b]{e.opener}[/]", id="enc-title"
-        )
+        e = self._service.encounter_view(self._pid)
+        if e is None:  # resolved between refreshes — nothing to show
+            yield Static("The engagement is over.", id="enc-title")
+            yield Footer()
+            return
+        yield Static(f"ENCOUNTER · {e.title}        [b]they OPEN FIRE[/]", id="enc-title")
         yield Static(
             f"disposition [red]{bar(e.disposition_filled, 5)}[/] {e.band}        "
-            f"detection: {e.detection}",
+            f"detection: they spotted you",
             id="enc-disp",
         )
-        yield Static(e.taunt, id="taunt")
         with Horizontal(id="enc-main"):
             with Vertical(id="them") as them:
                 them.border_title = "THEM"
-                if e.enemies:
-                    # Art faces left -- the enemy group bears down on the player's ship.
-                    entity, sub = art_adapter.ship_entity(e.enemies[0].name)
+                if e.foes:
+                    entity, sub = art_adapter.ship_entity(e.foes[0].name)
                     yield Static(art_adapter.sprite(
-                        entity, sub, seed=len(e.enemies), width=22, height=6, facing="left"))
-                for s in e.enemies:
+                        entity, sub, seed=len(e.foes), width=22, height=6, facing="left"))
+                for s in e.foes:
+                    mark = "[white]>[/]" if s.alive else "[dim]x[/]"
                     yield Static(
-                        f"[white]>[/] {s.name:<7} hull [red]{bar(s.hull_filled)}[/] "
-                        f"{s.hull_pct:>2}%"
+                        f"{mark} {s.name:<28} hull [red]{bar(s.hull_filled)}[/] {s.hull_pct:>3}%"
                     )
                 yield Static(e.arc_hint, classes="arc")
             with Vertical(id="you") as you:
-                you.border_title = f"YOU · {_PLAYER_SHIP}"
-                yield Static(f"Shields  [cyan]{bar(e.shields_filled)}[/] {e.shields_pct:>2}%")
-                yield Static(f"Hull     [green]{bar(e.hull_filled)}[/] {e.hull_pct:>2}%")
+                you.border_title = "YOU"
+                yield Static(f"Shields  [cyan]{bar(e.shields_pct // 10)}[/] {e.shields_pct:>3}%")
+                yield Static(f"Hull     [green]{bar(e.hull_pct // 10)}[/] {e.hull_pct:>3}%")
                 yield Static(e.combat_line)
-                yield Static(f"[red]\\[!][/] {e.integrity_flag}")
+                flag = "[red]\\[!][/]" if e.integrity_flag != "all nominal" else "[dim]\\[ ][/]"
+                yield Static(f"{flag} {e.integrity_flag}")
         yield Static(
             f"Round {e.round_no}      flee chance  [b]{e.flee_chance}%[/]  "
             f"[dim](floor {e.flee_floor}%)[/]",
             id="enc-round",
         )
+        gun = "[green][+][/]" if e.gun_online else "[red]offline[/]"
         yield Static(
-            "[b]F[/] Fire Main Gun [green][+][/]    [b]M[/] Missile x3 [dim](ignores arc)[/]\n"
-            "[b]E[/] Evade / strafe       [b]R[/] Flee     [b]K[/] Field-patch kit x2",
+            f"[b]F[/] Fire Main Gun {gun}    [b]M[/] Missile x{e.missiles} [dim](ignores arc)[/]\n"
+            f"[b]R[/] Flee     [b]K[/] Field-patch kit x{e.repair_kits}",
             id="enc-controls",
         )
         yield Footer()
 
-    def action_back(self) -> None:
-        self.app.pop_screen()
+    # --- actions: one CombatAction command per keypress -----------------------
 
-    def action_noop(self) -> None:
-        self.notify("Not wired in the skeleton.", timeout=2)
+    async def _act(self, action: CombatAction) -> None:
+        try:
+            events = self._service.apply(self._pid, action)
+        except (CombatError, EngineRoomError, MovementError, EconomyError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        ended = next((e for e in events if isinstance(e, EncounterEnded)), None)
+        if ended is not None:
+            note, severity = _OUTCOME_NOTES.get(ended.outcome, (ended.outcome, "information"))
+            self.notify(note, title="Encounter", severity=severity, timeout=4)
+            self.app.pop_screen()
+            return
+        await self.recompose()
+
+    async def action_fight(self) -> None:
+        await self._act(CombatAction(action="fight"))
+
+    async def action_missile(self) -> None:
+        await self._act(CombatAction(action="launch_missile"))
+
+    async def action_flee(self) -> None:
+        await self._act(CombatAction(action="flee"))
+
+    async def action_patch(self) -> None:
+        target = self._first_knocked_out()
+        if target is None:
+            self.notify("Nothing is knocked out.", timeout=2)
+            return
+        sub, idx = target
+        await self._act(CombatAction(action="field_patch", subsystem=sub, slot_index=idx))
+
+    def _first_knocked_out(self) -> tuple[Subsystem, int] | None:
+        view = self._service.engine_room_view(self._pid)
+        for panel in view.subsystems:
+            for idx, slot in enumerate(panel.slots):
+                if slot.state == "knocked":
+                    return Subsystem(panel.name.lower().replace(" ", "_")), idx
+        return None

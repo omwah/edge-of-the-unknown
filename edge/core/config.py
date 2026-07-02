@@ -254,6 +254,37 @@ class EngineRoomConfig(BaseModel):
     tier_ceiling: str = "III"  # highest installable tier (enum name)
 
 
+class WeaponConfig(BaseModel):
+    """One weapon record (DESIGN §4): `{name, damage, firing_arc, rate, special}`.
+
+    `firing_arc` shapes the §10 counter-play: an `ahead`/`spinal` attacker can be
+    evaded by maneuvering out of its firing line (a combat-speed contest); `all_round`
+    leaves no safe angle. `special` names a behaviour hook (engine_flux, homing, …) —
+    carried as data now, mechanically read from Phase-3 WP33+ hooks.
+    """
+
+    model_config = _FROZEN
+
+    name: str
+    damage: int
+    firing_arc: Literal["ahead", "all_round", "spinal"] = "all_round"
+    rate: Literal["continuous", "periodic"] = "continuous"
+    special: str | None = None
+
+
+class DefenseConfig(BaseModel):
+    """One defense record (DESIGN §4): `{type, value}`.
+
+    `armour`/`screens`/`energy_plates` are flat damage-reducing layers (summed in
+    combat); `laser_turret` and `speed_and_size` are carried as data for later hooks.
+    """
+
+    model_config = _FROZEN
+
+    type: Literal["laser_turret", "armour", "screens", "energy_plates", "speed_and_size"]
+    value: int = 0
+
+
 class ShipClassConfig(BaseModel):
     """A ship class (DESIGN §4).
 
@@ -261,6 +292,9 @@ class ShipClassConfig(BaseModel):
     the flat aspect scalars (`shields_max`, `warp_speed`, `combat_speed`) then serve as
     the NPC fallback and as the caps/defaults, with the live values *derived* from the
     slotted layout. An NPC hull omits `subsystems` and uses the flat scalars directly.
+    `armament` names weapons from the `GameConfig.weapons` catalog (§4); `defenses`
+    are flat damage-reduction layers; `missiles` is the hull's starting homing-missile
+    ammo (finite, arc-ignoring, §10).
     """
 
     model_config = _FROZEN
@@ -279,6 +313,9 @@ class ShipClassConfig(BaseModel):
     colonist_capacity: int = 0  # life-support berths — recruited colonists (§4.2)
     price: int = 0  # StarDock purchase price in latinum (0 = the free starter hull)
     subsystems: Mapping[str, SubsystemLayout] | None = None
+    armament: list[str] = Field(default_factory=list)  # weapon ids (GameConfig.weapons)
+    defenses: list[DefenseConfig] = Field(default_factory=list)
+    missiles: int = 0  # starting homing-missile ammo (§10)
 
 
 class HardwareConfig(BaseModel):
@@ -450,6 +487,36 @@ class AliensConfig(BaseModel):
     drift_move_chance: float = Field(default=0.25, ge=0.0, le=1.0)
 
 
+class CombatConfig(BaseModel):
+    """Combat-round parameters (DESIGN §10, Phase 3 — WP25).
+
+    Flee: `flee_base + flee_speed_coeff·combat_speed − interception_coeff·interception
+    + cloak_coeff·cloak − damage_penalty·hull_damage_fraction`, **clamped to
+    [`aliens.escape_floor`, `flee_cap`]** — the §13 floor invariant. An `ahead`/`spinal`
+    attacker is evaded on a combat-speed contest (`evade_base + evade_speed_coeff·Δspeed`);
+    `all_round` cannot be evaded. `threat_damage_scale` turns a species' `threat_rating`
+    into bonus damage per round atop its hull's weapon. The Spindrive `efficiency_bonus`
+    (§4.1) adds to gun damage, combat speed, and screen deflection once each.
+    """
+
+    model_config = _FROZEN
+
+    flee_base: float = 0.35
+    flee_speed_coeff: float = 0.05   # per point of player combat speed
+    interception_coeff: float = 0.5  # per point of species interception_rating (0..1)
+    cloak_coeff: float = 0.03        # per point of cloak rating
+    damage_penalty: float = 0.25     # × the player's missing-hull fraction
+    flee_cap: float = 0.95
+    evade_base: float = 0.35         # vs ahead/spinal arcs (a combat-speed contest)
+    evade_speed_coeff: float = 0.06  # per point of (player speed + bonus − foe speed)
+    evade_cap: float = 0.9
+    threat_damage_scale: float = 3.0  # species threat_rating → bonus damage per round
+    missile_damage: int = 30
+    missile_price: int = 300         # per missile at the StarDock hardware emporium (§8)
+    swarm_size_min: int = 3          # pack size for swarm/colony behaviors (§6.1)
+    swarm_size_max: int = 5
+
+
 class EncountersConfig(BaseModel):
     """Encounter-roll parameters (DESIGN §10, Phase 3 — consumed by the WP24 encounter
     system; authored here so the config epoch carries it).
@@ -468,6 +535,13 @@ class EncountersConfig(BaseModel):
     )
     weight_inverse_threat: bool = True
     weight_floor: float = Field(default=0.05, ge=0.0)
+    # Pre-engagement detection (§10): the species' sensors (its lead hull's rating)
+    # against the player's cloak, dimmed by nebula cover; an undetected player slips
+    # away freely — stealth is a genuine alternative to firepower.
+    detection_base: float = 0.7
+    detection_sensor_coeff: float = 0.05  # per point of the species' hull sensor rating
+    detection_cloak_coeff: float = 0.08   # per point of the player's cloak rating
+    nebula_cover: float = 0.25            # flat detection penalty inside a nebula
 
 
 class AllianceConfig(BaseModel):
@@ -937,6 +1011,8 @@ class GameConfig(BaseModel):
     economy: EconomyConfig = EconomyConfig()
     aliens: AliensConfig = AliensConfig()
     encounters: EncountersConfig = EncountersConfig()  # §10 encounter rolls (Phase 3, WP24)
+    combat: CombatConfig = CombatConfig()  # §10 combat rounds (Phase 3, WP25)
+    weapons: dict[str, WeaponConfig] = Field(default_factory=dict)  # §4 weapon catalog
     bigbang: BigBangConfig = BigBangConfig()
     engine_room: EngineRoomConfig
     planets: PlanetsConfig
@@ -978,6 +1054,24 @@ class GameConfig(BaseModel):
                     f"species {sp.id!r} home_band {sp.home_band!r} is not a configured "
                     f"distance band (valid: {', '.join(sorted(bands))})"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _check_combat_refs(self) -> GameConfig:
+        """§4/§10 reference integrity: every hull's `armament` ids resolve in the
+        `weapons` catalog, and every roster species' `fleet` ids name known hulls
+        (a violent pack spawn must always be able to arm itself, WP24/25)."""
+        classes = [self.starter_ship, *self.ship_classes]
+        for klass in classes:
+            for weapon_id in klass.armament:
+                if weapon_id not in self.weapons:
+                    raise ValueError(f"ship class {klass.id!r} names unknown weapon {weapon_id!r}")
+        if self.roster is not None:
+            known = {k.id for k in classes}
+            for sp in self.roster.species:
+                for hull in (*sp.fleet, *sp.pack.escort):
+                    if hull not in known:
+                        raise ValueError(f"species {sp.id!r} fleet/escort names unknown hull {hull!r}")
         return self
 
     @classmethod
