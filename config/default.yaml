@@ -5,7 +5,7 @@
 # game constant lives here, not in code (CLAUDE.md). Omitted fields fall back to
 # the schema defaults; the values below are spelled out so the balance is legible.
 
-config_version: 2  # Phase-2 schema epoch (engine room, §4.1)
+config_version: 3  # Phase-3 schema epoch (expansive topology default, band-graded aliens)
 seed: 4             # universe seed for a new game; leave empty (seed:) for a random seed
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 
@@ -96,15 +96,27 @@ economy:
 
 # Alien disposition bands (§6): effective disposition (base + the player's attitude
 # offset, clamped 0–1) is hostile below `hostility`, friendly at/above `amity`, neutral
-# between. Phase 2 places only friendly-band species; the bands gate combat in Phase 3.
+# between. Placement is band-graded (§5/§6): the Hub is peaceable, hostiles rise outward.
 aliens:
   hostility_threshold: 0.35
   amity_threshold: 0.65
   escape_floor: 0.10   # player escape chance never drops below this (§10, Phase 3)
+  # Per-band downward bias on placed dispositions (Hub stays friendly; each band keeps a
+  # friendly resupply anchor). Mean stance falls outward → danger rises (§5/§6).
+  band_disposition_bias: { Hub: 0.0, Frontier: -0.1, Deep: -0.2, Void: -0.3 }
+  disposition_gradient_tolerance: 0.1
+
+# Encounter rolls (§10, Phase 3 — read by the WP24 encounter system). Per-band chance an
+# encounter fires (0 in the safe Hub, rising outward); when it does, a species is drawn
+# with weight inverse to threat (weak raiders common, apex predators rare).
+encounters:
+  interrupt_chance: { Hub: 0.0, Frontier: 0.12, Deep: 0.22, Void: 0.32 }
+  weight_inverse_threat: true
+  weight_floor: 0.05
 
 bigbang:
   sector_count: 1000
-  topology_mode: trunk       # graph shape: trunk (chokepoints) | expansive (band-lattice), §5
+  topology_mode: expansive    # graph shape: trunk (chokepoints) | expansive (band-lattice), §5
   cluster_min: 5
   cluster_max: 25
   intra_group_degree: 2.5

@@ -350,6 +350,6 @@ def test_resolve_display_id_identity_without_spatial_ids(tmp_path: Path) -> None
 def test_describe_event_uses_spatial_id(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     target = svc.state.sectors[1].warps_out[0]
-    (event,) = svc.apply(1, Warp(to_sector=target))
-    # The spatial id rides in the sector gutter the ticker prepends.
-    assert f"S{svc.state.spatial_ids[target]}" in svc.describe_event(event)
+    events = svc.apply(1, Warp(to_sector=target))  # may also detect a discovery on entry
+    # The spatial id rides in the sector gutter the ticker prepends to each event.
+    assert any(f"S{svc.state.spatial_ids[target]}" in svc.describe_event(e) for e in events)

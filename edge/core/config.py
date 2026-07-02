@@ -414,8 +414,8 @@ class AliensConfig(BaseModel):
 
     Effective disposition (base + the player's attitude offset, clamped 0–1) falls in
     a band named by these thresholds: < `hostility` is hostile, ≥ `amity` is friendly,
-    the middle is neutral. Phase 2 places only friendly-band species; the thresholds
-    are read now (`core.aliens`) and gate greeting-vs-violence in Phase 3.
+    the middle is neutral. The thresholds gate greeting-vs-violence (§10) and the
+    band-graded placement of §5/§6 (Phase 3).
     """
 
     model_config = _FROZEN
@@ -424,11 +424,45 @@ class AliensConfig(BaseModel):
     amity_threshold: float = 0.65
     escape_floor: float = 0.10  # player escape chance never drops below this (§10)
 
+    # Band-graded placement (Phase 3, §5/§6): a per-band additive bias on each placed
+    # species' drawn disposition, so mean stance falls (and danger rises) outward. The
+    # innermost band (Hub) stays clamped friendly regardless — the Hub is peaceable by
+    # §5 — and each band's guaranteed resupply contact is also drawn friendly (§13); the
+    # bias only pushes the *remaining* outer-band species toward hostility.
+    band_disposition_bias: dict[str, float] = Field(
+        default_factory=lambda: {"Hub": 0.0, "Frontier": -0.1, "Deep": -0.2, "Void": -0.3}
+    )
+    # Tolerance for the aggregate mean-disposition-falls-outward gradient (a §13 test
+    # property over many seeds, not a per-universe invariant — the mandated per-band
+    # friendly anchor plus small per-band samples make strict per-seed monotonicity
+    # unreliable).
+    disposition_gradient_tolerance: float = 0.1
+
     # Alien ship drift (WP16, §6.3): each species rolls `drift_move_chance` per firing
     # to warp to a uniformly-chosen legal adjacent sector. A quiet galaxy is chance 0
     # or `drift_enabled=False`. The cron cadence lives in `ticker.crons.alien_drift`.
     drift_enabled: bool = True
     drift_move_chance: float = Field(default=0.25, ge=0.0, le=1.0)
+
+
+class EncountersConfig(BaseModel):
+    """Encounter-roll parameters (DESIGN §10, Phase 3 — consumed by the WP24 encounter
+    system; authored here so the config epoch carries it).
+
+    `interrupt_chance` per band: the probability moving through/lingering in a band
+    rolls an encounter (0 in the Hub — home is safe; rising outward). When one fires,
+    a species is drawn with weight **inverse to threat rating** (common weak raiders
+    harass the frontier; the apex predators of the Void are rarely seen), floored so
+    even an apex species appears occasionally.
+    """
+
+    model_config = _FROZEN
+
+    interrupt_chance: dict[str, float] = Field(
+        default_factory=lambda: {"Hub": 0.0, "Frontier": 0.12, "Deep": 0.22, "Void": 0.32}
+    )
+    weight_inverse_threat: bool = True
+    weight_floor: float = Field(default=0.05, ge=0.0)
 
 
 class AllianceConfig(BaseModel):
@@ -897,6 +931,7 @@ class GameConfig(BaseModel):
     ticker: TickerConfig = TickerConfig()
     economy: EconomyConfig = EconomyConfig()
     aliens: AliensConfig = AliensConfig()
+    encounters: EncountersConfig = EncountersConfig()  # §10 encounter rolls (Phase 3, WP24)
     bigbang: BigBangConfig = BigBangConfig()
     engine_room: EngineRoomConfig
     planets: PlanetsConfig

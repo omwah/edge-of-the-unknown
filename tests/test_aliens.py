@@ -140,19 +140,61 @@ def test_placement_is_seeded_and_deterministic() -> None:
 
 
 @pytest.mark.parametrize("seed", range(30))
-def test_all_placed_species_are_friendly_and_outside_core(seed: int) -> None:
+def test_hub_peaceable_and_placement_outside_core(seed: int) -> None:
+    """Band-graded placement (§5/§6): the Hub is peaceable (every innermost-band species
+    friendly) and only the governor + StarDock sit in Core Space. Hostiles are allowed —
+    and expected — in the outer bands (asserted separately)."""
     state = generate(WIDE, seed)
     assert state.species  # the default roster always places some
     gov = state.game.core_governing_alliance_id
     core = {s.id for s in state.sectors.values() if s.is_galactic_core}
     dock_sector = next(p.sector_id for p in state.ports.values() if p.klass is PortClass.STARDOCK)
+    innermost = WIDE.bigbang.active_bands()[0].name
     for sp in state.species.values():
-        assert is_friendly(sp.base_disposition, CFG.aliens)
+        if state.sectors[sp.sector_id].distance_band == innermost:
+            assert is_friendly(sp.base_disposition, CFG.aliens)  # Hub stays peaceable
         # No Core placement except the StarDock hub and the governor's own members,
         # who inhabit their capital (WP18, §6.3).
         if sp.sector_id in core:
             assert sp.sector_id == dock_sector or sp.alliance_id == gov
         assert sp.alliance_id is None or sp.alliance_id in state.alliances
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_outer_bands_spawn_hostiles(seed: int) -> None:
+    """The friendly clamp is lifted outside the Hub: across the outer bands, hostile-band
+    species now appear (Phase 3 danger)."""
+    state = generate(WIDE, seed)
+    hostiles = [
+        sp for sp in state.species.values()
+        if disposition_band(sp.base_disposition, CFG.aliens) == HOSTILE
+    ]
+    # WIDE reaches the Deep band; the roster's raider-centred kinds land there hostile.
+    assert hostiles, f"seed {seed}: expected some hostile-band species outside the Hub"
+    assert all(state.sectors[sp.sector_id].distance_band != WIDE.bigbang.active_bands()[0].name
+               for sp in hostiles)
+
+
+def test_mean_disposition_falls_outward_in_aggregate() -> None:
+    """The §13 gradient: aggregated over many seeds at full scale, mean disposition per
+    band is non-increasing outward (per-seed it is noisy — the mandated friendly anchor
+    plus small samples — so this is a suite-level property, not a per-universe invariant)."""
+    from collections import defaultdict
+    from statistics import mean
+
+    order = [b.name for b in CFG.bigbang.active_bands()]
+    by_band: dict[str, list[float]] = defaultdict(list)
+    for seed in range(30):
+        state = generate(CFG, seed)  # 1000-sector default (expansive) reaches all bands
+        seen: set[str] = set()
+        for sp in state.species.values():
+            if sp.roster_id in seen:  # one value per kind (ships share a base)
+                continue
+            seen.add(sp.roster_id)
+            by_band[state.sectors[sp.sector_id].distance_band].append(sp.base_disposition)
+    means = [mean(by_band[b]) for b in order if by_band[b]]
+    assert len(means) == 4, f"expected all four bands populated, got {len(means)}"
+    assert all(a >= b for a, b in zip(means, means[1:])), f"not non-increasing: {means}"
 
 
 @pytest.mark.parametrize("seed", range(30))

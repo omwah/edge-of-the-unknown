@@ -186,16 +186,16 @@ def _check_discovery_gradient(state: UniverseState, config: GameConfig) -> None:
 
 
 def _check_species(state: UniverseState, config: GameConfig) -> None:
-    """Alien-placement invariants (§6 / §5 step 8, WP7).
+    """Alien-placement invariants (§6 / §5 step 8).
 
     Reference integrity (the governing alliance and every species' `alliance_id` resolve);
-    Phase-2 friendliness (every placed species sits in the amity band, so no hostile
-    encounter spawns, placed outside Core Space — bar the StarDock hub, where ≥2
-    Core-welcome species are staged on purpose, §6.3); and at least one contact per
-    non-empty distance band (the §5 step-8 resupply invariant). The
-    disposition-rises-with-distance gradient is a Phase-3 property (hostiles placed by
-    band) — not asserted here, where the friendly clamp gives a floor, not a monotone
-    gradient.
+    Core placement (only the governor and the StarDock hub sit in Core Space, §6.3); the
+    **Hub is peaceable** (every species in the innermost band is friendly, §5); and every
+    non-empty band keeps at least one **friendly** contact (the §5 step-8 resupply
+    invariant). Hostiles are permitted — and expected — in the outer bands; the
+    *mean*-disposition-falls-outward gradient is an aggregate property checked over many
+    seeds in the test suite (§13), not a per-universe invariant, since the mandated
+    resupply anchor plus small per-band samples make strict per-seed monotonicity noisy.
     """
     if config.roster is None:
         return
@@ -210,7 +210,8 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
     # governing alliance's own members also belong in the Core — it is their capital (WP18).
     dock_sector = next((p.sector_id for p in state.ports.values()
                         if p.klass is PortClass.STARDOCK), None)
-    contact_bands: set[str] = set()
+    innermost = config.bigbang.active_bands()[0].name  # the Hub — peaceable by §5
+    friendly_bands: set[str] = set()
     gov_in_core = 0
     for sp in state.species.values():
         if sp.alliance_id is not None and sp.alliance_id not in state.alliances:
@@ -221,9 +222,12 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
                 raise ValidationError(f"species {sp.id} placed inside Core Space")
             if is_governor:
                 gov_in_core += 1
-        if not is_friendly(sp.base_disposition, config.aliens):
-            raise ValidationError(f"species {sp.id} placed below the amity band (Phase 2)")
-        contact_bands.add(state.sectors[sp.sector_id].distance_band)
+        band = state.sectors[sp.sector_id].distance_band
+        friendly = is_friendly(sp.base_disposition, config.aliens)
+        if band == innermost and not friendly:
+            raise ValidationError(f"species {sp.id} is not friendly in the peaceable Hub")
+        if friendly:
+            friendly_bands.add(band)
 
     # The governor inhabits its own capital: if the roster fields governing members, at
     # least one must be settled in the Core (WP18).
@@ -237,8 +241,8 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
         has_non_core = any(
             not s.is_galactic_core and s.distance_band == band for s in state.sectors.values()
         )
-        if has_non_core and band not in contact_bands:
-            raise ValidationError(f"no alien contact in band {band}")
+        if has_non_core and band not in friendly_bands:
+            raise ValidationError(f"no friendly alien contact in band {band}")
 
 
 def _check_profitable_pair(state: UniverseState, config: GameConfig) -> None:

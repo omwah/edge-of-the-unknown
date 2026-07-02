@@ -6,11 +6,13 @@ variance` spread (so stance varies between universe generations), and assigns ea
 **contact point** — a non-Core sector in a distance band — guaranteeing at least one
 friendly contact per non-empty band (the §5 step-8 resupply invariant).
 
-Phase 2 places **only friendly-band** species: every drawn disposition is clamped up
-into the amity band, so no hostile encounter can spawn (hostiles are Phase 3). The
-roster's alliances become `state.alliances`, generalising the Phase-1 Federation stub —
-no alliance is privileged in the schema (CLAUDE.md); the default roster simply names the
-Federation as the Core's governor and seeds the player into it.
+Placement is **band-graded** (§5/§6, Phase 3): the innermost band (Hub) stays peaceable
+and each band keeps a guaranteed friendly resupply anchor, but every other outer-band
+species takes a downward `band_disposition_bias`, so hostiles spawn in the frontier and
+mean stance falls with distance. The roster's alliances become `state.alliances`,
+generalising the Phase-1 Federation stub — no alliance is privileged in the schema
+(CLAUDE.md); the default roster simply names the Federation as the Core's governor and
+seeds the player into it.
 
 Runs on its own sub-RNG (`Random(seed ^ _SPECIES_SALT)`) so species draws never shift
 the topology / port / planet / discovery draw order (golden-master ordering, §5).
@@ -41,17 +43,26 @@ def build_alliances(config: GameConfig) -> dict[int, Alliance]:
     }
 
 
-def _friendly_disposition(center: float, variance: float, config: GameConfig,
-                          rng: random.Random) -> float:
-    """Draw a base disposition, clamped into the friendly band for Phase-2 placement.
+def _band_disposition(center: float, variance: float, band: str, *, is_anchor: bool,
+                      config: GameConfig, rng: random.Random) -> float:
+    """Draw a base disposition, band-graded so danger rises outward (§5/§6, Phase 3).
 
-    The draw is the species' per-generation stance (§6); clamping the lower bound to the
-    amity threshold keeps every *placed* species friendly while still letting the high
-    end vary. (Phase 3 lifts the clamp so hostiles can spawn.)
+    The draw is the species' per-generation stance (§6). The **innermost band (Hub) is
+    kept peaceable** and each band's **guaranteed resupply anchor** stays friendly
+    (clamped up to the amity threshold, §13). Every other placed species takes the
+    band's downward `band_disposition_bias`, so the outer bands can spawn hostiles and
+    mean stance falls with distance.
     """
-    floor = config.aliens.amity_threshold
-    drawn = rng.uniform(center - variance, center + variance)
-    return max(floor, min(1.0, drawn))
+    drawn = _clamp01(rng.uniform(center - variance, center + variance))
+    innermost = config.bigbang.active_bands()[0].name
+    if band == innermost or is_anchor:
+        return max(config.aliens.amity_threshold, drawn)
+    bias = config.aliens.band_disposition_bias.get(band, 0.0)
+    return _clamp01(drawn + bias)
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
 
 
 def populate_species(state: UniverseState, config: GameConfig) -> None:
@@ -115,11 +126,13 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     bases: dict[str, float] = {}
     placed: dict[int, AlienSpecies] = {}
     next_id = 1
-    for sp, band in zip(chosen, assignment):
+    # The first species assigned to each live band (i < len(live_bands)) is that band's
+    # guaranteed resupply anchor — drawn friendly; the rest take the band bias (§13).
+    for i, (sp, band) in enumerate(zip(chosen, assignment)):
         home = rng.choice(sectors_by_band[band])
+        base = _base_for(bases, sp, band, i < len(live_bands), config, rng)
         next_id = _place_cluster(placed, next_id, sp, home, band,
-                                 _base_for(bases, sp, config, rng), state, config, rng,
-                                 reserved=reserved)
+                                 base, state, config, rng, reserved=reserved)
 
     _populate_governing_space(state, config, roster, rng, placed, bases)
     _place_stardock_contacts(state, config, roster, rng, placed, bases)
@@ -127,12 +140,16 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     _assign_region_control(state, placed)
 
 
-def _base_for(bases: dict[str, float], sp: SpeciesConfig,
+def _base_for(bases: dict[str, float], sp: SpeciesConfig, band: str, is_anchor: bool,
               config: GameConfig, rng: random.Random) -> float:
-    """The species kind's base disposition, drawn once per generation and memoised."""
+    """The species kind's base disposition, drawn once per generation and memoised.
+
+    Drawn against the band of its *first* placement (reputation is per kind — every ship
+    of a kind shares one stance, §6), so a kind's danger is fixed by where it is anchored.
+    """
     if sp.id not in bases:
-        bases[sp.id] = _friendly_disposition(sp.disposition_center, sp.disposition_variance,
-                                             config, rng)
+        bases[sp.id] = _band_disposition(sp.disposition_center, sp.disposition_variance,
+                                         band, is_anchor=is_anchor, config=config, rng=rng)
     return bases[sp.id]
 
 
@@ -178,6 +195,11 @@ def _place_cluster(placed: dict[int, AlienSpecies], next_id: int, sp: SpeciesCon
     if satellites <= 0:
         return next_id
     candidates = _cluster_sectors(state, home, config.roster.home_cluster_radius, reserved)
+    # A non-friendly cluster must not spill into the peaceable Hub: its satellites can
+    # dip one band inward, so keep hostiles out of the innermost band (§5, validator).
+    if not is_friendly(base, config.aliens):
+        innermost = config.bigbang.active_bands()[0].name
+        candidates = [s for s in candidates if state.sectors[s].distance_band != innermost]
     rng.shuffle(candidates)
     for sat in candidates[:satellites]:
         sat_band = state.sectors[sat].distance_band
@@ -214,8 +236,11 @@ def _assign_region_control(state: UniverseState, placed: dict[int, AlienSpecies]
 
 def _make_species(sid: int, sp: SpeciesConfig, sector_id: int, band: str,
                   base: float, config: GameConfig) -> AlienSpecies:
-    """Build one placed ship of a species at `sector_id` with its kind's shared `base`."""
-    assert is_friendly(base, config.aliens)  # Phase-2 placement invariant
+    """Build one placed ship of a species at `sector_id` with its kind's shared `base`.
+
+    `base` may be hostile now (Phase 3 lifts the Phase-2 friendly-only clamp); band-graded
+    placement and the validator (`_check_species`) keep the Hub peaceable.
+    """
     return AlienSpecies(
         id=sid, roster_id=sp.id, name=sp.name, archetype_id=sp.archetype_id,
         sector_id=sector_id, home_band=band, tech_level=sp.tech_level,
@@ -255,9 +280,11 @@ def _populate_governing_space(state: UniverseState, config: GameConfig, roster: 
     chosen = members[:want]
     sectors = rng.sample(core_sectors, k=want)
     next_id = max(placed, default=0) + 1
+    # Governing members inhabit the Core (Hub band) → always drawn friendly (§6.3).
     for sp, sector_id in zip(chosen, sectors):
         band = state.sectors[sector_id].distance_band
-        placed[next_id] = _make_species(next_id, sp, sector_id, band, _base_for(bases, sp, config, rng), config)
+        base = _base_for(bases, sp, band, True, config, rng)
+        placed[next_id] = _make_species(next_id, sp, sector_id, band, base, config)
         next_id += 1
 
     # Core traffic: extra governing-member ships scattered across the Core (kinds repeat),
@@ -266,7 +293,8 @@ def _populate_governing_space(state: UniverseState, config: GameConfig, roster: 
         sp = rng.choice(members)
         sector_id = rng.choice(core_sectors)
         band = state.sectors[sector_id].distance_band
-        placed[next_id] = _make_species(next_id, sp, sector_id, band, _base_for(bases, sp, config, rng), config)
+        base = _base_for(bases, sp, band, True, config, rng)
+        placed[next_id] = _make_species(next_id, sp, sector_id, band, base, config)
         next_id += 1
 
 
@@ -286,8 +314,12 @@ def _place_stardock_contacts(state: UniverseState, config: GameConfig, roster: R
     if want <= 0 or dock is None:
         return
     gov = state.game.core_governing_alliance_id
+    # Core-welcome must stay friendly: a kind already anchored hostile in a deep band
+    # (its base is memoised) can never greet a new player at the dock, so exclude it.
+    hostile_kinds = {sp.roster_id for sp in placed.values()
+                     if not is_friendly(sp.base_disposition, config.aliens)}
     welcome = [s for s in sorted(roster.species, key=lambda s: s.id)
-               if s.alliance_id in (gov, None)]
+               if s.alliance_id in (gov, None) and s.id not in hostile_kinds]
     already = {s.roster_id for s in placed.values()}
     fresh = [s for s in welcome if s.id not in already]
     pick_from = fresh if len(fresh) >= want else welcome
@@ -295,6 +327,6 @@ def _place_stardock_contacts(state: UniverseState, config: GameConfig, roster: R
     band = state.sectors[dock.sector_id].distance_band
     next_id = max(placed, default=0) + 1
     for sp in pick_from[:want]:
-        placed[next_id] = _make_species(next_id, sp, dock.sector_id, band,
-                                        _base_for(bases, sp, config, rng), config)
+        base = _base_for(bases, sp, band, True, config, rng)
+        placed[next_id] = _make_species(next_id, sp, dock.sector_id, band, base, config)
         next_id += 1
