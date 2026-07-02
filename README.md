@@ -27,16 +27,30 @@ model laid out so multiplayer can follow later.
 
 ## Status
 
-**Phase 1 (the walking skeleton) is complete and playable.** You can generate a
-universe, explore it under fog of war with turn costs, find profitable routes
-with the ship computer, trade on live pricing, and fund a first ship upgrade at
-the StarDock — all on a deterministic core with a background engine ticking
-turns, port-stock regeneration, and bank interest.
+**Phases 1–2 are complete and playable, and Phase 3 is under way.**
 
-Phases 2–5 (the discovery system, alien species & diplomacy, the engine-room
-component model, combat, multiplayer, and a deeper economy) are designed in
-`docs/DESIGN.md` but not yet built. See `docs/PHASE1_PLAN.md` for the completed
-work-package breakdown.
+- **Phase 1 (the walking skeleton).** Generate a universe, explore it under fog of
+  war with turn costs, find profitable routes with the ship computer, trade on live
+  pricing, and fund a first ship upgrade — on a deterministic core with a background
+  engine ticking turns, stock regeneration, and bank interest.
+- **Phase 2 (exploration & discovery).** The pivot phase: distance-banded discoveries
+  (wrecks, nebulae, black holes) with sensor-gated detection and a codex; planet
+  descent onto surface sites; the engine-room subsystem/component ship model with
+  derived aspects; StarDock services and multiple hulls; typed, ownable planets with
+  colonization and derelict-starbase salvage; friendly alien species with config-driven,
+  standing-keyed dialogue and tech barter; and the Computer suite (pair-trade finder,
+  route planner, codex, alien dossier).
+- **Phase 3 (danger) — in progress.** Milestone **M10 (dangerous worldgen) is complete**:
+  selectable **universe topologies** (`trunk` chokepoints vs. the new default
+  `expansive` band-lattice), band-graded alien disposition so **hostiles now populate the
+  outer bands**, and **alliance home clusters** — each bloc's owned territory near the
+  Core, separated by neutral lanes. Still ahead in Phase 3: the encounter/combat system,
+  the roaming **Entity**, conversation depth, signature mechanics, and joinable alliances.
+
+Phases 4–5 (multiplayer, corporations, the order-book economy, dynamic Core governance)
+are designed in `docs/DESIGN.md` but not yet built. The per-phase work-package
+breakdowns live in `docs/PHASE1_PLAN.md`, `docs/PHASE2_PLAN.md`, and
+`docs/PHASE3_PLAN.md`.
 
 ## Inspiration
 
@@ -78,8 +92,9 @@ pixi run cov        # tests with a coverage report
 Inspect a generated universe without launching the game:
 
 ```bash
-pixi run bigbang --inspect --seed 4              # text report
-pixi run bigbang --render universe.png --seed 4  # graph dump, port sectors highlighted
+pixi run bigbang --inspect --seed 4                       # text report
+pixi run bigbang --inspect --seed 4 --mode trunk          # compare the trunk topology
+pixi run bigbang --render universe.png --seed 4           # graph dump, port sectors highlighted
 ```
 
 The test strategy (DESIGN §13): Hypothesis property tests for the economy
@@ -94,8 +109,11 @@ Strict, downward-only layered dependencies (DESIGN §3):
 ```
 edge/core     pure rules engine — models, economy, movement, command→event
               reducers. No I/O, no async, no Textual imports.
-edge/bigbang  deterministic universe generation (cluster + bridge + bands).
-edge/engine   the asyncio tick loop (turn reset / stock regen / interest).
+edge/dialogue pure salience-scored alien dialogue (standing-keyed line pools,
+              persona voice, recency ring). Imports core; below core.rules.
+edge/bigbang  deterministic universe generation (cluster + bridge + bands +
+              home clusters; selectable trunk / expansive topology).
+edge/engine   the asyncio tick loop (turn reset / stock regen / interest / drift).
 edge/store    SQLite persistence behind a repository interface.
 edge/server   the in-process GameService; fog of war enforced at to_public().
 edge/tui      the Textual application — reads only the public DTOs.
@@ -115,7 +133,7 @@ one exemption.
 edge/         the game (the layers above)
 config/       default.yaml — all tunable game constants (economy, generation, ship)
 tests/        pytest + hypothesis suites
-docs/         DESIGN.md (authoritative spec), UI_MOCKUPS.md, PHASE1_PLAN.md
+docs/         DESIGN.md (authoritative spec), UI_MOCKUPS.md, PHASE{1,2,3}_PLAN.md
 scripts/      helper scripts (build the design PDF, clone references)
 ```
 
@@ -125,7 +143,8 @@ scripts/      helper scripts (build the design PDF, clone references)
   economy, combat, alien species, roadmap). Read it before any architectural
   change.
 - **`docs/UI_MOCKUPS.md`** — TUI wireframes and the region→widget mapping.
-- **`docs/PHASE1_PLAN.md`** — the Phase-1 implementation plan and status.
+- **`docs/PHASE1_PLAN.md`**, **`docs/PHASE2_PLAN.md`**, **`docs/PHASE3_PLAN.md`** — the
+  per-phase work-package breakdowns and status.
 
 The analyzed TradeWars clones aren't committed; recreate them locally with
 `scripts/clone_references.sh` to read alongside DESIGN.md. They carry assorted
