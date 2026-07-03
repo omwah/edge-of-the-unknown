@@ -548,25 +548,53 @@ hold; destruction issues the pod with everything lost; pod-flow golden reload
 
 ### WP27 — Consequences: attitude, grudges, alignment/experience (M)
 
-- Attacking drives `species_attitudes` down by `attitude_loss_rate`;
-  `memory_model` (none / normal / never_forgets) and `betrayal_model`
-  (permanent floors the offset for good) go live in `core/aliens.py`.
-- **`Grudge` entity** (holder, target, cause, severity, created_at,
-  duration): seeded from the roster at big bang + created at runtime by
-  player conduct; decays on the daily cron; shifts the WP24 disposition roll.
-- `Player.alignment` + `Player.experience` counters (combat outcomes, kills
-  of friendlies vs hostiles, discoveries).
-- **Core-law basics:** criminal alignment and governor standing gate Core
-  entry treatment (full enforcement in WP38).
-- **M11 golden batch:** the milestone's Player/Ship field additions land
-  together with one golden regeneration (H6).
+Conduct now has memory. **Shipped.**
 
-Files: `edge/core/aliens.py`, `edge/core/models.py`,
-`edge/bigbang/aliens.py`, `edge/engine/cron.py`, `edge/core/rules.py`,
-`config/alien_roster_default.yaml` (grudge/relations schema only — semantics
-in WP39), `tests/test_aliens.py`.
-Tests: permanent-betrayal floor property; grudge decay determinism through
-the maintenance timeline; alignment arithmetic.
+- **Souring** (`core.aliens.sour_attitude`): each foe destroyed drops the
+  species' attitude offset by its `attitude_loss_rate` and deepens the grudge
+  it holds against the player by `grudge_severity_per_kill` (capped 1.0).
+  `memory_model: none` forgets instantly (no souring, no grudge);
+  `never_forgets` / `betrayal_model: permanent` record an undying grudge
+  (`duration_days -1`) that also **locks the attitude offset** — `_raise_attitude`
+  refuses amends while it stands (§6.5's permanent lockout). Emits
+  `AttitudeChanged` + the new `GrudgeFormed`.
+- **`Grudge`** (holder, target, cause, severity, created_day, duration_days):
+  player-targeted vendettas ride `Player.grudges` (keyed by species kind);
+  roster-authored inter-species grudges (`SpeciesConfig.grudges` +
+  `relations` — schema + validation + `_seed_grudges` at the big bang) land in
+  the new hashed `UniverseState.grudges` map for the cast pairs, semantics
+  WP39. Finite grudges cool by the holder's `attitude_gain_rate` on the daily
+  cron and lapse past their duration; permanent ones never move. An active
+  grudge's severity is **subtracted from effective disposition** in the WP24
+  greeting-vs-violence roll (`grudge_shift`).
+- **`Player.alignment` / `Player.experience`:** per kill, alignment shifts by
+  the victim's effective-disposition band (`alignment_kill_friendly/-3,
+  _neutral/-1, _hostile/+1`) and experience pays
+  `max(1, round(threat × experience_kill_scale))`; each new codex stamp
+  (survey or salvage) pays `experience_per_discovery`.
+- **Core-law basics:** below `criminal_alignment` the player is criminal
+  (`is_criminal`); a non-Core → Core crossing then emits `CoreLawNotice` —
+  one warning per crossing, from both `Warp` and the `TravelTo` hop loop
+  (engagement-on-sight + governor-standing gating are WP38).
+- **M11 golden batch:** the milestone's hashed additions land together —
+  `Player.grudges/alignment/experience`, `UniverseState.grudges` (added to
+  `state_hash`). Goldens are self-consistency round-trips, so the fingerprint
+  change re-baselines automatically (H6; no `config_version` bump — nothing
+  about the config contract changed).
+
+Files: `edge/core/aliens.py`, `edge/core/models.py`, `edge/core/config.py` +
+`config/default.yaml` (consequence knobs), `edge/bigbang/aliens.py`,
+`edge/engine/cron.py`, `edge/core/rules.py`, `edge/core/encounters.py`,
+`edge/core/events.py`, `edge/store/{codec,snapshots}.py`,
+`edge/server/session.py`, `config/alien_roster_default.yaml` (relations +
+grudges authored on vennrith/quill), `tests/test_aliens.py`,
+`tests/test_codec.py`.
+Tests: permanent-betrayal floor property (hypothesis: no number of amends
+raises the offset after betraying a permanent species); grudge decay exact
+values through the daily-cron timeline (permanent untouched); kill
+consequences through the combat reducer (alignment band arithmetic, threat-
+scaled xp, GrudgeFormed); discovery xp; Core-law notice for criminals only,
+once per crossing; seeded grudges land exactly for cast pairs.
 
 ---
 

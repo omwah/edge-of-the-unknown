@@ -389,3 +389,24 @@ class SalvageCollected(Event):
     player_id: int
     latinum: int
     components: tuple[str, ...]  # loose Tier-I part kinds recovered (may be empty)
+
+
+@dataclass(frozen=True)
+class GrudgeFormed(Event):
+    """A species' vendetta against the player formed or deepened (§6.5, WP27)."""
+
+    player_id: int
+    species_kind: str  # roster id — every ship of the kind shares the vendetta
+    severity: float
+    permanent: bool  # never_forgets / betrayal_model=permanent: it will not decay
+
+
+@dataclass(frozen=True)
+class CoreLawNotice(Event):
+    """The governor's patrols flag a criminal player entering Core Space (WP27).
+
+    A warning only in Phase-3's first pass; engagement-on-sight is WP38.
+    """
+
+    player_id: int
+    sector_id: int

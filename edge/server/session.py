@@ -48,6 +48,7 @@ from edge.core.events import (
     ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
+    CoreLawNotice,
     Descended,
     DevicePurchased,
     DiscoveryCollected,
@@ -57,6 +58,7 @@ from edge.core.events import (
     EncounterEvaded,
     EncounterStarted,
     GenesisDeployed,
+    GrudgeFormed,
     SiteExplored,
     Event,
     Haggled,
@@ -1308,6 +1310,11 @@ def format_event(event: Event) -> str:
     if isinstance(event, SalvageCollected):
         parts = f" + {', '.join(event.components)}" if event.components else ""
         return f"[green]⛏ Salvaged {event.latinum} latinum from the wrecks{parts}.[/]"
+    if isinstance(event, GrudgeFormed):
+        tail = "they will never forget" if event.permanent else "they will remember"
+        return f"[red]☠ The {event.species_kind} mark you — {tail}.[/]"
+    if isinstance(event, CoreLawNotice):
+        return "[yellow]⚖ Governor's patrol: your record is known here. Mind yourself.[/]"
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 
@@ -1326,9 +1333,10 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
         return event.to_sector
     if isinstance(event, (EncounterStarted, EncounterEvaded)):
         return event.sector_id
-    if isinstance(event, ShipDestroyed):
+    if isinstance(event, (ShipDestroyed, CoreLawNotice)):
         return event.sector_id
-    if isinstance(event, (CombatRound, EncounterEnded, ComponentKnockedOut, SalvageCollected)):
+    if isinstance(event, (CombatRound, EncounterEnded, ComponentKnockedOut,
+                          SalvageCollected, GrudgeFormed)):
         player = state.players.get(event.player_id)
         ship = state.ships.get(player.ship_id) if player is not None else None
         return ship.sector_id if ship is not None else None

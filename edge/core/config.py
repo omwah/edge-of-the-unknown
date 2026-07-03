@@ -480,6 +480,25 @@ class AliensConfig(BaseModel):
     # unreliable).
     disposition_gradient_tolerance: float = 0.1
 
+    # Consequences of conduct (§6.5, §10 — WP27). Destroying a species' ship sours the
+    # attitude offset by its `attitude_loss_rate` and deepens a grudge against the
+    # player by `grudge_severity_per_kill` (capped at 1.0); a `memory_model: none`
+    # species forgets instantly (no souring, no grudge), `never_forgets` /
+    # `betrayal_model: permanent` grudges never decay and lock the offset for good.
+    grudge_severity_per_kill: float = 0.08
+    grudge_duration_days: int = 30  # finite-grudge expiry (normal memory)
+    # Alignment shifts per kill, keyed by the victim's effective-disposition band at
+    # the time — gunning down friendlies is crime, hunting hostiles is lawful bounty.
+    alignment_kill_friendly: int = -3
+    alignment_kill_neutral: int = -1
+    alignment_kill_hostile: int = 1
+    # Experience: per kill, max(1, round(threat_rating × scale)); flat per codex stamp.
+    experience_kill_scale: float = 10.0
+    experience_per_discovery: int = 5
+    # Core law (WP27 basics; full enforcement WP38): below this alignment the player
+    # is criminal and the governor's patrols take notice on Core entry.
+    criminal_alignment: int = -10
+
     # Alien ship drift (WP16, §6.3): each species rolls `drift_move_chance` per firing
     # to warp to a uniformly-chosen legal adjacent sector. A quiet galaxy is chance 0
     # or `drift_enabled=False`. The cron cadence lives in `ticker.crons.alien_drift`.
@@ -715,6 +734,22 @@ class SpeciesLoreConfig(BaseModel):
     combat_and_ships: str = ""
 
 
+class GrudgeSeedConfig(BaseModel):
+    """An authored, dated grievance a species starts the game holding (DESIGN §6.5).
+
+    Seeded into `UniverseState.grudges` at the big bang when both parties are cast.
+    Schema lands in WP27; the NPC-vs-NPC semantics (stances, spillover) are WP39.
+    `duration_days: -1` never expires (the roster's centuries-old vendettas).
+    """
+
+    model_config = _FROZEN
+
+    target: str  # roster id of the aggrieved-against species
+    cause: str
+    severity: float = Field(ge=0.0, le=1.0)
+    duration_days: int = -1
+
+
 class SpeciesConfig(BaseModel):
     """A roster species' full §6.1 parameter set (DESIGN §6.1).
 
@@ -767,6 +802,11 @@ class SpeciesConfig(BaseModel):
     ] = "none"
     attitude_gain_rate: float = 0.1
     attitude_loss_rate: float = 0.2
+    # Inter-species stance overrides (§6.4: sparse, atop alliance-derived defaults) and
+    # authored starting grudges (§6.5). Schema + big-bang seeding land in WP27; the
+    # NPC-vs-NPC semantics and reputation spillover are WP39.
+    relations: dict[str, float] = Field(default_factory=dict)  # roster id → -1..1
+    grudges: list[GrudgeSeedConfig] = Field(default_factory=list)
     # Standing-keyed conversation lines (DESIGN §6.7): context key → conditional line
     # entries. A species overrides only the beats that make it distinctive; everything
     # else falls back species → persona → generic (`core.dialogue`). Empty ⇒ the species
@@ -845,6 +885,14 @@ class RosterConfig(BaseModel):
                 raise ValueError(
                     f"species {sp.id!r} has unknown signature hook {sp.signature_mechanic.hook!r}"
                 )
+        all_ids = {sp.id for sp in self.species}
+        for sp in self.species:
+            for other in sp.relations:
+                if other not in all_ids or other == sp.id:
+                    raise ValueError(f"species {sp.id!r} relation names bad target {other!r}")
+            for grudge in sp.grudges:
+                if grudge.target not in all_ids or grudge.target == sp.id:
+                    raise ValueError(f"species {sp.id!r} grudge names bad target {grudge.target!r}")
         return self
 
 

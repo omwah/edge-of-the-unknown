@@ -420,6 +420,35 @@ class Player:
     # encounter roll, cleared by flee/victory. Movement and docking are rejected while set.
     # Hashed state — a fight reconstructs exactly under (seed, command log).
     active_encounter: Encounter | None = None
+    # Active vendettas held **against the player**, keyed by the holder species kind
+    # (`roster_id`, so every ship of a species shares the vendetta — DESIGN §4, §6.5).
+    # Created by player conduct (WP27), decayed by the daily cron; a permanent grudge
+    # (duration -1) also locks the attitude offset (§6.5).
+    grudges: Mapping[str, Grudge] = field(default_factory=dict)
+    # Alignment (lawfulness: killing friendlies lowers it, hunting hostiles raises it)
+    # and experience (kills + discoveries) — the §4 counters Core law and later NPC
+    # judgements read (WP27; the morality_judge hook and full Core enforcement, WP33/38).
+    alignment: int = 0
+    experience: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class Grudge:
+    """A durable, dated grievance (DESIGN §4, §6.5) — the diplomacy layer's memory.
+
+    `holder` / `target` are species kinds (`roster_id`) or the literal `"player"`.
+    `severity` (0–1) shifts the greeting-vs-violence roll while active (§10) and
+    decays on the daily cron at the holder's `attitude_gain_rate` as the player makes
+    amends; `duration_days = -1` marks a `never_forgets` / `betrayal_model=permanent`
+    grudge that never decays and locks the attitude offset for good (§6.5).
+    """
+
+    holder: str
+    target: str
+    cause: str
+    severity: float
+    created_day: int
+    duration_days: int  # -1 ⇒ never expires (never_forgets / permanent betrayal)
 
 
 @dataclass(frozen=True, slots=True)
@@ -497,6 +526,10 @@ class UniverseState:
     players: dict[int, Player] = field(default_factory=dict)
     alliances: dict[int, Alliance] = field(default_factory=dict)
     species: dict[int, AlienSpecies] = field(default_factory=dict)
+    # Inter-species grudges seeded from the roster at the big bang (DESIGN §4, §6.5) —
+    # hashed state (they will drive NPC-vs-NPC stances and reputation spillover, WP39).
+    # Player-targeted grudges live on `Player.grudges` instead.
+    grudges: dict[int, Grudge] = field(default_factory=dict)
     adjacency: dict[int, tuple[int, ...]] = field(default_factory=dict)
     # Hop distance from the Core (sector 1) per sector — a runtime-only cache (like
     # adjacency, excluded from `state_hash`) driving the warp "gravity" arrows (§11).
