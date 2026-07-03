@@ -115,6 +115,7 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.movement import MovementError, can_warp, shortest_path
+from edge.dialogue import facts as dialogue_facts
 from edge.dialogue.intel import IntelTarget, pick_intel_target
 
 # --- commands ---------------------------------------------------------------
@@ -688,6 +689,7 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
         entered_from={**player.entered_from, cmd.to_sector: ship.sector_id},
         detected=detected,
         active_encounter=encounter,
+        contact_session=None,  # movement ends any conversation visit (§6.7 H1)
     )
     return ReduceResult(
         events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost, one_way),
@@ -801,7 +803,8 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
     new_ship = replace(ship, sector_id=current)
     new_player = replace(player, turns_remaining=turns, explored_sectors=explored,
                          entered_from=entered, detected=detected,
-                         active_encounter=encounter)
+                         active_encounter=encounter,
+                         contact_session=None)  # movement ends any visit (§6.7 H1)
     return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,))
 
 
@@ -1712,17 +1715,24 @@ def _speak_context(state: UniverseState, player: Player, ship: Ship, species: Al
     """Speak `context` in the species' voice: advance its recency ring, return (player, event).
 
     The ring-advancing core both the plain say path and a branch transition share. Marks the
-    species met and records where it was seen, exactly as a hail does.
+    species met and records where it was seen, exactly as a hail does. Also drives the
+    per-contact session (§6.7, WP28): selection reads the **pre-utterance** session facts
+    (the very facts the projection showed the line under — lockstep), then the utterance is
+    recorded on the session; `farewell` closes the visit.
     """
     assert config.roster is not None
+    all_facts = dialogue_facts.contact_facts(state, player, species, extra=facts)
     ring = player.dialogue_recency.get((species.roster_id, context), ())
     rng = dialogue.encounter_rng(state.game.seed, species.roster_id, context, ring)
     _, new_ring = dialogue.speak(config.roster, species, player, context,
-                                 aliens=config.aliens, rng=rng, extra=extra, facts=facts)
+                                 aliens=config.aliens, rng=rng, extra=extra, facts=all_facts)
+    session = dialogue_facts.note_topic(
+        dialogue_facts.ensure_session(player, species, ship.sector_id), context)
     new_player = replace(
         player, species_attitudes=_met(player, species.roster_id),
         species_last_seen={**player.species_last_seen, species.roster_id: ship.sector_id},
-        dialogue_recency=_advance_recency(player, species.roster_id, context, new_ring))
+        dialogue_recency=_advance_recency(player, species.roster_id, context, new_ring),
+        contact_session=None if context == "farewell" else session)
     return new_player, AlienSpoke(player.id, species.id, context, subject_id)
 
 
@@ -1776,6 +1786,9 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
         subject_sp = state.species.get(cmd.subject_id)
         if subject_sp is not None:
             facts["subject"] = subject_sp.roster_id
+    # Session facts join the node's own (§6.7, WP28) — the same merge the projection's
+    # `_contact_choices` makes, so `choice_index` resolves into the very menu shown.
+    facts = dialogue_facts.contact_facts(state, player, species, extra=facts)
     ring = player.dialogue_recency.get((species.roster_id, cmd.context), ())
     rng = dialogue.encounter_rng(state.game.seed, species.roster_id, cmd.context, ring)
     # The reply menu resolves via the same fallback (entry choices → generic baseline) the
@@ -1834,8 +1847,12 @@ def _accept_lead(state: UniverseState, player_id: int, cmd: AcceptLead,
     lead = Lead(kind=target.ref.kind, ref=target.ref.ref, sector_id=target.ref.sector_id,
                 origin_sector=ship.sector_id,
                 source_species=species.roster_id, summary=target.summary())
+    session = dialogue_facts.note(
+        dialogue_facts.ensure_session(player, species, ship.sector_id),
+        dialogue_facts.ACCEPTED_LEAD)
     new_player = replace(player, leads=(*player.leads, lead),
-                         species_attitudes=_met(player, species.roster_id))
+                         species_attitudes=_met(player, species.roster_id),
+                         contact_session=session)
     event = LeadAccepted(player_id, species.id, target.ref.kind, target.ref.ref,
                          target.ref.sector_id)
     return ReduceResult(events=(event,), players=(new_player,))
@@ -1923,13 +1940,19 @@ def _trade_alien(state: UniverseState, player_id: int, species_id: int, offer_in
         new_player = replace(new_player, latinum=new_player.latinum - cost)
 
     new_player, attitude_event = _raise_attitude(new_player, species, config)
-    # Advance the trade dialogue ring so a repeat sale rephrases.
+    # Advance the trade dialogue ring so a repeat sale rephrases, then mark the visit's
+    # session `traded` (§6.7, WP28) — selection sees the pre-utterance facts (lockstep).
+    trade_facts = dialogue_facts.contact_facts(state, new_player, species)
     ring = player.dialogue_recency.get((species.roster_id, "trade_open"), ())
     rng = dialogue.encounter_rng(state.game.seed, species.roster_id, "trade_open", ring)
     _, new_ring = dialogue.speak(config.roster, species, new_player, "trade_open",
-                                 aliens=config.aliens, rng=rng)
+                                 aliens=config.aliens, rng=rng, facts=trade_facts)
+    session = dialogue_facts.note(
+        dialogue_facts.ensure_session(new_player, species, ship.sector_id),
+        dialogue_facts.TRADED)
     new_player = replace(new_player,
-                         dialogue_recency=_advance_recency(new_player, species.roster_id, "trade_open", new_ring))
+                         dialogue_recency=_advance_recency(new_player, species.roster_id, "trade_open", new_ring),
+                         contact_session=session)
     kind = "barter" if barter else "buy"
     return ReduceResult(
         events=(AlienTraded(player_id, species.id, kind, detail, cost), attitude_event),

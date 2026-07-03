@@ -26,7 +26,8 @@ from edge.dialogue import (
     standing_for,
     validate_dialogue,
 )
-from edge.core.models import AlienSpecies, Player
+from edge.core.models import AlienSpecies, ContactSession, Game, Player, UniverseState
+from edge.dialogue import facts as dialogue_facts
 
 CFG = load_default_config()
 
@@ -351,3 +352,60 @@ def test_federation_member_greets_a_fellow_citizen_as_allied() -> None:
     assert not has_kin_line(outsider_lines)
     # The outsider still hears the warm generic peaceful opener.
     assert any("come in peace" in line or "understanding" in line for line in outsider_lines)
+
+# --- WP28: shared fact assembly (edge.dialogue.facts) -----------------------------
+
+
+def _bare_state() -> UniverseState:
+    return UniverseState.new(Game(id=1, seed=0, config_version=3, created_at="t"))
+
+
+def test_contact_facts_layer_session_then_extras() -> None:
+    from dataclasses import replace
+
+    sp = _species("vesk")
+    visit = ContactSession(species_id=sp.id, sector_id=11,
+                           facts={"asked.greeting": True, "traded": True})
+    player = Player(id=1, name="Cap", ship_id=1, latinum=0, contact_session=visit)
+    facts = dialogue_facts.contact_facts(
+        _bare_state(), player, sp, extra={"has_intel_target": True, "traded": False})
+    assert facts["asked.greeting"] is True
+    assert facts["has_intel_target"] is True
+    assert facts["traded"] is False  # the caller's extras win over the session layer
+    # A session held for a different species instance contributes nothing.
+    other = replace(sp, id=2)
+    assert dialogue_facts.contact_facts(_bare_state(), player, other) == {}
+
+
+def test_ensure_session_and_notes_are_incremental() -> None:
+    from dataclasses import replace
+
+    sp = _species("vesk")
+    player = Player(id=1, name="Cap", ship_id=1, latinum=0)
+    fresh = dialogue_facts.ensure_session(player, sp, 11)
+    assert fresh.species_id == sp.id and fresh.sector_id == 11 and not fresh.facts
+
+    noted = dialogue_facts.note_topic(fresh, "greeting")
+    assert noted.facts == {"asked.greeting": True}
+    assert dialogue_facts.note_topic(noted, "greeting") is noted  # already recorded — no-op
+
+    held = replace(player, contact_session=noted)
+    assert dialogue_facts.ensure_session(held, sp, 11) is noted  # the visit continues
+    assert not dialogue_facts.ensure_session(held, replace(sp, id=2), 11).facts  # a new visit
+
+
+def test_session_fact_pins_the_more_specific_entry() -> None:
+    # The selection-level proof: a session fact fed through `facts` lets an `asked.*`-keyed
+    # entry outscore the plain line, exactly like any other criteria fact (§6.7).
+    pack = {"greeting": [
+        DialogueLine(variants=["Back again so soon."],
+                     when=DialogueWhen(criteria={"asked.greeting": True})),
+        _line("First contact."),
+    ]}
+    rng = random.Random(9)
+    got, _ = select_line([pack], "greeting", standing=FRIENDLY, treaty=False, ctx={},
+                         recency=(), rng=rng, facts={"asked.greeting": True})
+    assert got == "Back again so soon."
+    got, _ = select_line([pack], "greeting", standing=FRIENDLY, treaty=False, ctx={},
+                         recency=(), rng=rng, facts={})
+    assert got == "First contact."

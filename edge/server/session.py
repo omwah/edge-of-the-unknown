@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from edge.bigbang.embedding import bearing as _sector_bearing
 from edge.bigbang.topology import bfs_distances
 from edge import dialogue
+from edge.dialogue import facts as dialogue_facts
 from edge.dialogue.intel import pick_intel_target
 from edge.core import dto
 from edge.server import mapgraph
@@ -1102,6 +1103,9 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         facts = {"has_intel_target": intel is not None}
         if intel is not None:
             subject_extra = intel.bindings()
+    # The live visit's session facts join the node's own (§6.7, WP28) — the same shared
+    # merge the Converse reducer makes, so line and menu agree on both sides (lockstep).
+    facts = dialogue_facts.contact_facts(state, player, species, extra=facts)
     speech = _line(state, roster, species, player, shown, config, extra=subject_extra, facts=facts)
     # Authored player replies on the shown node (§6.7 branching); empty ⇒ derived verb menu.
     choice_ctx: dict[str, str] = {

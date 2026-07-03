@@ -142,6 +142,10 @@ def _structure_brief(context: str) -> str:
         "- Your 'origin' is expanded MANY times behind a no-repeat recency ring, so put SEVERAL "
         "distinct alternatives (ideally 3+) in each symbol — a repeat encounter should rephrase, "
         "not replay the same words.\n"
+        "- A visit is a multi-exchange SESSION: the player may hear this line early or late in "
+        "the same conversation (topics already asked are remembered as facts a human editor can "
+        "gate on). Keep each expansion self-contained — don't assume it is the first or only "
+        "thing said this visit.\n"
         "- Produce ONE self-contained spoken line per expansion (the alien's turn); the player's "
         "side, if any, goes only in 'choices'.\n\n"
     )

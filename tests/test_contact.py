@@ -20,6 +20,7 @@ from edge.core.enums import ComponentTier, RarityTier
 from edge.core.models import AlienSpecies, UniverseState
 from edge.core.movement import shortest_path
 from edge.core.rules import (
+    AcceptLead,
     BarterArtifact,
     BuyAlienTech,
     Converse,
@@ -569,3 +570,116 @@ def test_converse_chain_replays_into_identical_state(tmp_path: Path) -> None:
 
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "converse.db"))  # type: ignore[arg-type]
     assert state_hash(reloaded.state) == expected
+
+# --- WP28: the per-contact dialogue session (§6.7) ---------------------------------
+
+
+def test_conversation_opens_a_session_and_accumulates_topics() -> None:
+    state = _world()
+    sp = _inject(state, "vesk")
+    apply_result(state, reduce(state, 1, Hail(sp.id), CFG))
+    visit = state.players[1].contact_session
+    assert visit is not None and visit.species_id == sp.id
+    assert visit.sector_id == state.ships[1].sector_id
+    assert visit.facts.get("asked.greeting") is True
+    apply_result(state, reduce(state, 1, Converse(sp.id, "dossier_self"), CFG))
+    facts = state.players[1].contact_session.facts
+    assert facts.get("asked.greeting") is True and facts.get("asked.dossier_self") is True
+
+
+def test_farewell_closes_the_session() -> None:
+    state = _world()
+    sp = _inject(state, "vesk")
+    apply_result(state, reduce(state, 1, Hail(sp.id), CFG))
+    assert state.players[1].contact_session is not None
+    apply_result(state, reduce(state, 1, Converse(sp.id, "farewell"), CFG))
+    assert state.players[1].contact_session is None
+
+
+def test_movement_clears_the_session() -> None:
+    # H1: the session's lifetime is structural — warping off mid-sentence ends the visit
+    # in the reducer; the UI is never trusted to close it.
+    state = _world()
+    sp = _inject(state, "vesk")
+    apply_result(state, reduce(state, 1, Hail(sp.id), CFG))
+    dest = state.adjacency[state.ships[1].sector_id][0]
+    apply_result(state, reduce(state, 1, Warp(to_sector=dest), CFG))
+    assert state.players[1].contact_session is None
+
+
+def test_switching_contacts_starts_a_fresh_session() -> None:
+    state = _world()
+    a = _inject(state, "vesk", sid=1)
+    b = _inject(state, "selvani", sid=2)
+    apply_result(state, reduce(state, 1, Hail(a.id), CFG))
+    apply_result(state, reduce(state, 1, Converse(a.id, "dossier_self"), CFG))
+    apply_result(state, reduce(state, 1, Hail(b.id), CFG))
+    visit = state.players[1].contact_session
+    assert visit is not None and visit.species_id == b.id
+    assert visit.facts == {"asked.greeting": True}  # A's topics did not leak into B's visit
+
+
+def _cfg_with_repeat_greeting() -> object:
+    """Vesk gains a species-pack greeting keyed on the session fact `asked.greeting`."""
+    data = CFG.roster.model_dump()
+    vesk = next(s for s in data["species"] if s["id"] == "vesk")
+    vesk.setdefault("dialogue_pack", {})["greeting"] = [{
+        "when": {"criteria": {"asked.greeting": True}},
+        "variants": ["Back again so soon."],
+        "choices": [{"text": "Just passing through.", "next_context": "farewell"}],
+    }]
+    return CFG.model_copy(update={"roster": RosterConfig.model_validate(data)})
+
+
+def test_session_fact_reselects_line_and_menu_in_lockstep() -> None:
+    cfg = _cfg_with_repeat_greeting()
+    state = _world()
+    sp = _inject(state, "vesk")
+    first = session.contact_view(state, 1, sp.id, cfg)
+    assert first.opener != "Back again so soon."  # no session yet — the persona speaks
+    apply_result(state, reduce(state, 1, Hail(sp.id), cfg))
+    second = session.contact_view(state, 1, sp.id, cfg)
+    assert second.opener == "Back again so soon."  # the session fact pins the entry
+    assert second.choices and second.choices[0].text == "Just passing through."
+    # The reducer resolves the same menu under the same facts (lockstep): reply 0 on the
+    # session-keyed entry is the parting transition it authored.
+    res = reduce(state, 1, Converse(sp.id, "greeting", choice_index=0), cfg)
+    assert res.events[-1].context == "farewell"
+
+
+def test_trade_and_lead_mark_the_session() -> None:
+    from edge.core.models import LocationRef
+
+    state = _world()
+    sp = _inject(state, "selvani")
+    idx = _offer_index("selvani", lambda o: o.mode == "latinum" and o.component)
+    apply_result(state, reduce(state, 1, BuyAlienTech(sp.id, idx), CFG))
+    assert state.players[1].contact_session.facts.get("traded") is True
+
+    src = state.ships[1].sector_id
+    d = next(d for d in state.discoveries.values()
+             if d.found_by is None and d.sector_id not in state.players[1].explored_sectors
+             and shortest_path(state.adjacency, src, d.sector_id) is not None)
+    state.species_knowledge[sp.roster_id] = (LocationRef("discovery", d.id, d.sector_id),)
+    apply_result(state, reduce(state, 1, AcceptLead(sp.id), CFG))
+    facts = state.players[1].contact_session.facts
+    assert facts.get("traded") is True and facts.get("accepted_lead") is True
+
+
+def test_open_session_replays_into_identical_state(tmp_path: Path) -> None:
+    """A visit left open mid-conversation (no farewell) reconstructs exactly on reload."""
+    svc = GameService.new_game(SMALL, 3, SqliteRepository(tmp_path / "session.db"), created_at=_CREATED)  # type: ignore[arg-type]
+    found = _reachable_species(svc.state)
+    assert found is not None
+    path, sp = found
+    for hop in path[1:]:
+        svc.apply(1, Warp(to_sector=hop))
+    svc.apply(1, Hail(sp.id))
+    svc.apply(1, Converse(sp.id, "dossier_self"))
+    live = svc.state.players[1].contact_session
+    assert live is not None and live.facts.get("asked.dossier_self") is True
+    expected = state_hash(svc.state)
+
+    reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "session.db"))  # type: ignore[arg-type]
+    assert state_hash(reloaded.state) == expected
+    assert reloaded.state.players[1].contact_session == live
