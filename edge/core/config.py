@@ -859,6 +859,13 @@ class RosterConfig(BaseModel):
     # `choices` on this context (validate_dialogue enforces it), so the player always has a
     # config-defined reply menu via the species → persona → generic fallback chain.
     start_context: str = "greeting"
+    # Situational-fact buckets (§6.7, WP29): the thresholds behind the `hull` and
+    # `low_turns` dialogue facts (`edge.dialogue.facts`). They live with the corpus config
+    # because they define what an authored `criteria` gate means — retune them alongside
+    # the lines that pin them.
+    hull_critical: float = Field(default=0.25, ge=0.0, le=1.0)  # hull ratio ≤ ⇒ "critical"
+    hull_scarred: float = Field(default=0.60, ge=0.0, le=1.0)  # hull ratio ≤ ⇒ "scarred"
+    low_turns: int = Field(default=25, ge=0)  # turns_remaining below ⇒ `low_turns`
 
     def alliance(self, alliance_id: int) -> AllianceConfig | None:
         return next((a for a in self.alliances if a.id == alliance_id), None)
@@ -869,6 +876,8 @@ class RosterConfig(BaseModel):
     @model_validator(mode="after")
     def _check_reference_integrity(self) -> RosterConfig:
         """Dialogue/diplomacy reference integrity (§6, §13): ids and hooks resolve."""
+        if self.hull_critical > self.hull_scarred:
+            raise ValueError("hull_critical must not exceed hull_scarred (bucket order)")
         ids = {a.id for a in self.alliances}
         if self.core_governing_alliance_id not in ids:
             raise ValueError(

@@ -16,6 +16,12 @@
 #
 # --- TOP-LEVEL SHAPE -------------------------------------------------------------------------
 #   recency_k: <int >= 0>           # no-repeat ring depth (see SELECTION). Default 2.
+#   hull_critical: <0..1>           # hull ratio at or below ⇒ the `hull` fact reads "critical".
+#   hull_scarred: <0..1>            # …at or below ⇒ "scarred" (else "sound"). Default .25/.60;
+#                                   #   must satisfy hull_critical <= hull_scarred.
+#   low_turns: <int >= 0>           # turns_remaining below ⇒ the `low_turns` fact. Default 25.
+#                                   #   These live here because they define what a `criteria`
+#                                   #   gate on those facts MEANS — retune with the corpus.
 #   start_context: <context_key>    # the context the contact screen opens on. Default `greeting`.
 #                                   #   The `generic` persona MUST author `choices` on it (see
 #                                   #   COMPLETENESS): that list is the baseline reply menu every
@@ -87,8 +93,8 @@
 #   band: <band name>               # the sector's distance band, e.g. Hub / Frontier / Deep.
 #   in_nebula: true|false           # a nebula shrouds this sector.
 #   wreck_here: true|false          # a visible, uncollected wreck lies in this sector.
-#   hull: critical|scarred|sound    # player hull state bucket (<=25% / <=60% / above).
-#   low_turns: true|false           # the player is nearly out of turns.
+#   hull: critical|scarred|sound    # player hull bucket (top-level hull_critical/hull_scarred).
+#   low_turns: true|false           # nearly out of turns (below the top-level low_turns).
 #   holds_empty: true|false         # nothing in the cargo bay.
 #   holds_full: true|false          # no free hold.
 #   carrying: fuel_ore|organics|equipment   # largest cargo stack (ABSENT when unladen).
@@ -202,6 +208,10 @@
 # =============================================================================================
 recency_k: 2
 start_context: greeting
+# Situational-fact buckets (§6.7 WP29): what `hull` / `low_turns` criteria gates mean.
+hull_critical: 0.25
+hull_scarred: 0.60
+low_turns: 25
 
 personas:
   # The complete fallback pack: a catch-all line for every base context key, so a line

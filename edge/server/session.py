@@ -1107,7 +1107,7 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
             subject_extra = intel.bindings()
     # The live visit's session facts join the node's own (§6.7, WP28) — the same shared
     # merge the Converse reducer makes, so line and menu agree on both sides (lockstep).
-    facts = dialogue_facts.contact_facts(state, player, species, extra=facts)
+    facts = dialogue_facts.contact_facts(state, player, species, roster=roster, extra=facts)
     speech = _line(state, roster, species, player, shown, config, extra=subject_extra, facts=facts)
     # Authored player replies on the shown node (§6.7 branching); empty ⇒ derived verb menu.
     choice_ctx: dict[str, str] = {

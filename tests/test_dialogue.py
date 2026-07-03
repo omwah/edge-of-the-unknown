@@ -368,13 +368,14 @@ def test_contact_facts_layer_session_then_extras() -> None:
                            facts={"asked.greeting": True, "traded": True})
     player = Player(id=1, name="Cap", ship_id=1, latinum=0, contact_session=visit)
     facts = dialogue_facts.contact_facts(
-        _bare_state(), player, sp, extra={"has_intel_target": True, "traded": False})
+        _bare_state(), player, sp, roster=CFG.roster,
+        extra={"has_intel_target": True, "traded": False})
     assert facts["asked.greeting"] is True
     assert facts["has_intel_target"] is True
     assert facts["traded"] is False  # the caller's extras win over the session layer
     # A session held for a different species instance contributes nothing.
     other = replace(sp, id=2)
-    assert dialogue_facts.contact_facts(_bare_state(), player, other) == {}
+    assert dialogue_facts.contact_facts(_bare_state(), player, other, roster=CFG.roster) == {}
 
 
 def test_ensure_session_and_notes_are_incremental() -> None:
@@ -425,7 +426,7 @@ def test_situational_facts_cover_the_vocabulary() -> None:
                           hull_current=10, hull_max=100)
     player = Player(id=1, name="Cap", ship_id=1, latinum=0, turns_remaining=200,
                     last_combat=LastCombat(species="quill", outcome="fled", day=1))
-    facts = dialogue_facts.situational_facts(state, player)
+    facts = dialogue_facts.situational_facts(state, player, CFG.roster)
     assert facts["band"] == "Frontier"
     assert facts["hull"] == "critical"  # 10% of hull_max
     assert facts["in_nebula"] is False and facts["wreck_here"] is False
@@ -437,10 +438,10 @@ def test_situational_facts_cover_the_vocabulary() -> None:
     # A visible wreck in the sector flips `wreck_here`.
     state.discoveries[9] = Discovery(id=9, kind=DiscoveryKind.WRECK, rarity_tier=RarityTier.COMMON,
                                      sector_id=5, payload=DiscoveryPayload(kind=PayloadKind.LORE))
-    assert dialogue_facts.situational_facts(state, player)["wreck_here"] is True
+    assert dialogue_facts.situational_facts(state, player, CFG.roster)["wreck_here"] is True
     # A stale flight (yesterday) no longer reads as "just fled".
     stale = Player(id=1, name="Cap", ship_id=1, latinum=0, turns_remaining=200,
                    last_combat=LastCombat(species="quill", outcome="fled", day=0))
-    assert dialogue_facts.situational_facts(state, stale)["just_fled_combat"] is False
+    assert dialogue_facts.situational_facts(state, stale, CFG.roster)["just_fled_combat"] is False
     # Hand-built rigs without a ship/sector degrade to empty — pure tests keep working.
-    assert dialogue_facts.situational_facts(_bare_state(), player) == {}
+    assert dialogue_facts.situational_facts(_bare_state(), player, CFG.roster) == {}
