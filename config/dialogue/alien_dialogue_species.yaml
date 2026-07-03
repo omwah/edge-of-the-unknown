@@ -1,6 +1,14 @@
 species_grammars:
   terran:
     greeting:
+      # CALLBACK fact (WP30): a returning captain is greeted as a known friend. The
+      # catch-all grammar entry below still carries first-contact and every other visit.
+      - when:
+          criteria: { met_before: true }
+        variants:
+          - Good to see your signature again, {player} — the Federation logs your return with pleasure.
+          - Back on our scopes, Captain. A familiar transponder is always welcome in Core space.
+          - Welcome back, envoy of {alliance}. Our records show we have spoken before; the door stays open.
       - grammar:
           origin:
             - '#opener#, #honorific# {player}. #detail# #aside#'
@@ -70,6 +78,13 @@ species_grammars:
             next_context: farewell
             action: leave
     farewell:
+      # SESSION fact (WP28): if the player traded this visit, the send-off acknowledges it.
+      # The catch-all grammar entry below covers a visit that ended without a deal.
+      - when:
+          criteria: { traded: true }
+        variants:
+          - A good exchange, {player}. The Federation profits from friends like you — safe travels.
+          - Our holds are the better for your custom today, Captain. Clear skies until the next manifest.
       - grammar:
           origin:
             - '#opener# #detail# #aside#, #honorific#.'
@@ -204,6 +219,29 @@ species_grammars:
         variants:
           - The Terrans do not share our history with those we do not trust.
           - Why should we tell you of our ways, traveler?
+      # SESSION fact (WP28): a trusted captain who already asked about another species this
+      # visit gets a repeat-question reaction. Pinned to `friendly` so it never overrides the
+      # low-standing refusals above (which withhold this lore); carries the same sub-topic menu
+      # so navigation is unchanged. The friendly catch-all below handles the first such question.
+      - when:
+          standing: friendly
+          criteria: { asked.dossier_other: true }
+        variants:
+          - You inquired after the others; turn those questions on us, then — what would you know of the Terrans?
+          - Fair is fair, Captain — you have weighed our neighbours, so weigh us too. What would you like to know?
+        choices:
+          - text: Tell me about your biology and appearance.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Tell me about your psychology and culture.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: Tell me about your diplomacy and behavior.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Tell me about your relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Tell me about your combat and ships.
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Never mind.
+            next_context: back
       - variants:
           - We are the Terrans, of {alliance}. What would you like to know about us?
         choices:
@@ -262,8 +300,233 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific#. #aside#'
+            - '#opener# #honorific#, #detail#. #aside#'
+            - '#opener# #detail#. #aside#'
+          opener:
+            - Federation protocol dictates we offer terms, but your incursions leave
+              no room for diplomacy.
+            - I am authorized by the Core command to use whatever force is necessary
+              to secure this sector.
+            - Federation high command has flagged your vessel as a security threat.
+          detail:
+            - Power down your shields immediately and prepare to be boarded
+            - Your vessel has violated sovereign Core space, and we must neutralize
+              the threat
+            - We are opening fire to defend the principles of the Federation
+          honorific:
+            - captain {player}
+            - commander
+            - '{player}'
+          aside:
+            - May history judge our cause as just.
+            - Prepare to defend yourself.
+            - This is for the security of the Core.
+        choices:
+          - text: Federation? I am one of you! Hold your fire!
+            next_context: surrender
+          - text: We don't have to do this, Captain. Let's talk.
+            next_context: branch.inquiry
+          - text: If it's a fight you want, you've got one.
+            next_context: combat_taunt
+            action: attack
+          - text: Powering down engines. Don't shoot!
+            next_context: surrender
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener#, {player}. #detail# #aside#'
+            - '#opener#, #honorific#. #detail# #aside#'
+            - '#opener#—#aside# #detail#'
+          opener:
+            - Stand down your vessels
+            - Federation protocol demands your immediate compliance
+            - This is Captain {player} of the Federation forces, calling on your surrender
+            - We have you outmaneuvered
+          detail:
+            - The {alliance} coordinates this airspace, and your presence violates
+              treaty boundaries.
+            - Our tactical division has already mapped your trajectory; retreat is
+              your only logical vector.
+            - The {species} systems are protected by Federation mandate, and we will
+              enforce it.
+            - Your current combat capabilities do not match our Trailblazer-class
+              hull configurations.
+          honorific:
+            - honored traveler
+            - wayward captain
+            - unaffiliated vessel
+          aside:
+            - (All batteries, maintain target lock.)
+            - (Ensure wideband broadcast remains active for recording.)
+            - (Redirect shield power to the vanguard.)
+        choices:
+          - text: We don't want to fight the Federation. Let's talk terms.
+            next_context: treaty_offer
+          - text: We will stand our ground against your Trailblazers!
+            next_context: combat_taunt
+            action: attack
+          - text: Powering down weapons. We surrender.
+            next_context: surrender
+          - text: Initiating emergency warp out of here!
+            next_context: flee_scorn
+            action: leave
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#.'
+            - '#honorific#, #opener# #detail#. #aside#'
+            - '#opener# #detail#. #aside# #honorific#.'
+          opener:
+            - We yield the field.
+            - The Federation forces under my command capitulate.
+            - Power down your weapons, {player}, we are standing down.
+            - This engagement is over, we are signaling our surrender.
+          detail:
+            - our hulls are compromised and we cannot sustain further damage
+            - our engines are failing and we request immediate quarter under Core
+              treaties
+            - we ask that you respect the rules of engagement and accept our capitulation
+            - we stand ready to discuss terms of ceasefire and safe passage
+          honorific:
+            - Captain
+            - Officer
+            - Commander
+            - representative of the {species}
+          aside:
+            - Further bloodshed serves neither the Core nor our mission.
+            - Let us resolve this as civilized spacefarers.
+            - We honor the treaty protocols; we expect you will do the same.
+            - Our sensors show we are completely outmatched.
+        choices:
+          - text: Stand down. I accept your surrender.
+            next_context: treaty_condition
+            action: barter
+          - text: No quarter. Prepare to be boarded.
+            next_context: combat_taunt
+            action: attack
+          - text: We're leaving you to drift.
+            next_context: farewell
+            action: leave
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+            - '#opener# #detail# #aside#'
+            - '#opener# #honorific#, #detail#'
+          opener:
+            - Running, {player}?
+            - Is that the famous Federation resolve?
+            - An interesting tactical choice, Captain.
+            - Tactical retreat or outright flight?
+          detail:
+            - Your thrusters are venting quite a bit of panic.
+            - We expected more from a Trailblazer class hull.
+            - The Core's finest, burning fuel just to escape.
+            - Leaving so soon when diplomatic talks had just begun?
+          honorific:
+            - my esteemed colleague
+            - Representative
+            - Captain
+            - pioneer
+          aside:
+            - We'll update our reports on {species} bravery.
+            - Let's hope your shields hold while you run.
+            - Perhaps we can discuss treaty terms when you stop running.
+            - Safe travels back to the Core.
+        choices:
+          - text: This isn't over.
+            next_context: combat_taunt
+            action: attack
+          - text: We need to regroup.
+            next_context: farewell
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific#. #aside#'
+            - '#honorific#, #opener# #detail# #aside#'
+            - '#opener# #detail# #aside# #honorific#.'
+          opener:
+            - I am invoking Article 9 of the Federation Charter to suspend our accord.
+            - The High Council has re-evaluated our standing, {player}.
+            - Federation security protocols demand immediate tactical containment.
+            - My deepest apologies, but the grand compromise requires this course.
+          detail:
+            - We must secure {subject} for the Core, even if we must salvage it from
+              your hull.
+            - Your continued operations threaten the treaty we signed with the {alliance}.
+            - The strategic value of this sector outweighs any personal ties we shared.
+            - A stable peace requires the elimination of unpredictable elements like
+              your vessel.
+          honorific:
+            - Captain
+            - my dear colleague
+            - envoy
+            - fellow pioneer
+          aside:
+            - Powering weapons is merely a logistical necessity.
+            - It is nothing personal; simply the cost of democratic consensus.
+            - Please stand down; let us resolve this with as little friction as possible.
+            - We will record your contribution to scientific progress in the archives.
+        choices:
+          - text: Federation protocols? This is outright treason!
+            next_context: combat_taunt
+            action: attack
+          - text: We signed a treaty. Does the Core's word mean nothing?
+            next_context: treaty_refuse
+          - text: I'm leaving. Don't make this a war.
+            next_context: flee_scorn
+            action: leave
+    branch.inquiry:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#opener# #detail# #aside#, #honorific#.'
+            - '#opener# we can delve into #detail#, #honorific#. #aside#'
+          opener:
+            - Our databases are open to you, Captain.
+            - I am happy to share Federation insights.
+            - A principled dialog is the cornerstone of our alliance.
+            - Let us exchange knowledge, as fellow explorers.
+          detail:
+            - regarding the standard classification of {species}
+            - on the current strategic coordinates of {coords}
+            - concerning our ongoing research on {subject}
+            - about the distribution of {item} across the Core systems
+          honorific:
+            - my esteemed colleague
+            - Captain {player}
+            - fellow pioneer of the stars
+            - envoy
+          aside:
+            - What specifically does the Federation archives need to clarify for you?
+            - We believe shared knowledge breeds mutual security.
+            - The Core benefits when information flows freely.
+            - We have compiled at least {count} entries on this topic.
+        choices:
+          - text: Tell me more about the psychology and culture of your people.
+            next_context: branch.dossier_self.psychology_and_culture
+          - text: I'd like to ask about your diplomatic relationships.
+            next_context: branch.dossier_self.relationships
+          - text: Let's discuss trade opportunities.
+            next_context: trade_open
+            action: trade
+          - text: I must return to my duties.
+            next_context: farewell
+            action: leave
   centaurian:
     greeting:
+      # CALLBACK fact (WP30): the player has already followed a tip this species gave to its
+      # sector, so the greeting asks after the outcome. `lead_followed` is always present.
+      - when:
+          criteria: { lead_followed: true }
+        variants:
+          - Welcome back, {player}! Did the coordinates we shared bear fruit? We are always glad when a friend's journey pays off.
+          - So you reached the sector we pointed you toward. Tell us — was the reading true? Your reports help us all.
       - grammar:
           origin:
             - '#opener#, #honorific#. #detail#. #aside#'
@@ -515,9 +778,9 @@ species_grammars:
     branch.dossier_self.biology_and_appearance:
       - variants:
           - We stand as tall kin of the stars—pale blue of skin, our domed brows traced
-            with the ancient crimson patterns of our lineage, our eyes alight and our ears
-            keen—yet be assured, {player}, we are fully compatible with your life-support
-            systems and ready to stand beside you in the federation.
+            with the ancient crimson patterns of our lineage, our eyes alight and
+            our ears keen—yet be assured, {player}, we are fully compatible with your
+            life-support systems and ready to stand beside you in the federation.
         choices:
           - text: Go back.
             next_context: back
@@ -555,8 +818,203 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#opener# #honorific#. #detail#. #aside#'
+            - '#honorific#, #opener# #detail#. #aside#'
+          opener:
+            - Target lock confirmed on the {player}.
+            - We have intercepted your trajectory, {player}.
+            - Main batteries are charged and cycling.
+          detail:
+            - By order of the fleet coordinator, we must test your readiness
+            - We are conducting a live-fire tactical evaluation of your systems
+            - Federation protocols mandate this engagement to verify your hull integrity
+          honorific:
+            - esteemed Terran colleague
+            - my fellow citizen of the Core
+            - respected captain
+          aside:
+            - May our shields hold in friendship.
+            - Let us see if your reflexes match your diplomacy.
+            - Do not take this personally, {alliance} mandates we stay sharp.
+        choices:
+          - text: Return fire! Shield systems to maximum!
+            next_context: combat_taunt
+            action: attack
+          - text: Wait, we are allies! Stand down!
+            next_context: treaty_refuse
+          - text: Divert all power to engines and get us out of here!
+            next_context: flee_scorn
+            action: leave
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#opener# #detail#'
+            - '#honorific#, #opener# #detail#'
+          opener:
+            - Stand down, {player}!
+            - You violate the law of the Terran Federation!
+            - Our patrol formation is absolute.
+            - You cannot outmaneuver our agile patrol vessels.
+          detail:
+            - My flock is closing the net, and your engines will soon be dark.
+            - We will restore order to this sector, starting with your vessel.
+            - The shared prosperity of the Core has no room for your defiance.
+            - Our synchronized firing lines are already locked onto your coordinates.
+          honorific:
+            - human captain
+            - wayward traveler
+            - lawbreaker
+          aside:
+            - Prepare for boarding.
+            - De-escalate now or be dismantled.
+            - It is a tragedy you chose this path.
+            - We secure the Core, one rogue ship at a time.
+        choices:
+          - text: I demand a cease-fire! Let's negotiate.
+            next_context: treaty_offer
+          - text: I'm powering down my weapons. I surrender.
+            next_context: surrender
+          - text: I will break through your formation!
+            next_context: combat_taunt
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#honorific#, #opener#! #detail#. #aside#'
+            - '#opener#—#aside# #detail#, #honorific#.'
+          opener:
+            - We stand down
+            - Hold your fire
+            - Our weapons are powered down
+            - Cease execution of this engagement
+          detail:
+            - our hull integrity is failing and our crew must not perish in vain
+            - the law of the {alliance} permits us to yield when the odds are insurmountable
+            - we concede this sector to you and throw ourselves upon your mercy
+            - we request immediate quarter for our wounded officers
+          honorific:
+            - captain {player}
+            - esteemed human peer
+            - fellow coordinator
+            - respected captain
+          aside:
+            - we do not wish to spill further blood between friends
+            - let cooperative minds prevail over this conflict
+            - surely we can resolve this under the Federation code
+            - we appeal to our shared history and treaty agreements
+        choices:
+          - text: Accept their surrender and demand terms.
+            next_context: branch.barb_trade
+          - text: Allow them to retreat from the sector.
+            next_context: farewell
+            action: leave
+          - text: Disregard their plea and finish them.
+            next_context: combat_open
+            action: attack
+    branch.barb_trade:
+      - variants:
+          - "We have no choice. What are your terms?"
+        choices:
+          - text: "Give us your cargo."
+            action: barter
+          - text: "Let us discuss a treaty."
+            next_context: treaty_offer
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#opener# #detail#. #aside#, #honorific#.'
+            - '#honorific#, #opener# #detail#. #aside#'
+          opener:
+            - Your thruster trails speak of absolute panic,
+            - Fleeing the line of duty,
+            - A hasty retreat,
+            - Running from the front line,
+          detail:
+            - is this what Terran training teaches you, {player}
+            - does not suit a captain of the {alliance}
+            - leaves us to question our alignment with your kind
+            - violates the cooperative defense protocols of the {alliance}
+          honorific:
+            - captain
+            - friend
+            - ally
+            - officer
+          aside:
+            - We expected far more resolve from a founding partner.
+            - Perhaps we should coordinate with someone more reliable next time.
+            - We will log this retreat in our tactical database.
+            - Our sensors did not predict such cowardice.
+        choices:
+          - text: I had to save my ship. We will talk later.
+            next_context: farewell
+            action: leave
+          - text: My engines, my choice. What support do you actually offer?
+            next_context: branch.dossier_self.combat_and_ships
+          - text: Let us discuss trade instead of my tactical choices.
+            next_context: trade_open
+            action: trade
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener# #aside#, #honorific#. #detail#'
+            - '#honorific#, #opener#. #aside#. #detail#'
+            - '#opener#. #detail# #aside#, #honorific#.'
+          opener:
+            - I must ask you to stand down, {player}
+            - Forgive me, {player}, but the consensus has shifted
+            - Our cooperation within the {alliance} has reached its designated conclusion
+            - I regret to inform you that our shared path ends here
+          detail:
+            - We are locking our weapons onto your vessel. Do not resist.
+            - Our patrol vessels have received direct authorization to disable your
+              systems.
+            - The order has been codified; we must secure your ship's assets for the
+              collective good.
+            - Our targeting sensors are active and locked. Power down your shields
+              immediately.
+          honorific:
+            - esteemed colleague
+            - my human friend
+            - Captain
+            - partner of the Core
+          aside:
+            - though it pains our community to do so
+            - as the law of survival demands
+            - strictly as a matter of administrative necessity
+            - with all due respect for our history
+        choices:
+          - text: Centaurians? We're allies! What is the meaning of this?
+            next_context: combat_taunt
+            action: attack
+          - text: I will not surrender without a fight.
+            next_context: combat_open
+            action: attack
+          - text: Wait, surely we can come to an agreement? Let me barter for my passage.
+            next_context: treaty_offer
+            action: barter
   vesk:
     greeting:
+      # CALLBACK fact (WP30): the Vesk family gave the player a coordinate tip that is still
+      # unvisited, and they follow up on it. `lead_pending` is always present; the catch-all
+      # grammar entry below covers a captain holding no Vesk lead.
+      - when:
+          criteria: { lead_pending: true }
+        variants:
+          - Ah, {player} — have you made for the coordinates my family shared? The offer of guidance still stands until you do.
+          - Our records show the tip we gave you remains unexplored, honored captain. The reading was sound; do seek it out.
+      # SITUATIONAL fact (WP29): a laden hold makes the Vesk merchants keener still. `carrying`
+      # names the largest cargo stack (ABSENT when unladen — hence a plain criteria match).
+      - when:
+          criteria: { carrying: fuel_ore }
+        variants:
+          - Fuel ore in your holds, {player}? Our family group pays fairly, and refines it well. Shall we deal?
       - grammar:
           origin:
             - '#opener#, #honorific#. #detail# #aside#'
@@ -843,6 +1301,182 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#, #honorific#.'
+            - '#opener# We must request your pacification, #honorific#. #detail# #aside#.'
+            - '#opener# Under the authority of family-group names, #detail# #aside#,
+              #honorific#.'
+          opener:
+            - System-warning, vessel of {player}.
+            - 'Transmission-intercept: combat protocols engaged, {player}.'
+            - Halt-directive issued to {player}.
+          detail:
+            - We are executing protective battery discharge.
+            - Defensive vector-engagement is now active.
+            - Tactical suppression of your drive-core is required.
+          honorific:
+            - unregistered captain
+            - traveler
+            - neighbor of {alliance}
+          aside:
+            - with deep administrative regret
+            - though cooperative paths were preferred
+            - as safety-margin parameters dictate
+        choices:
+          - text: Hold fire! Let's talk this out.
+            next_context: treaty_offer
+          - text: If it's a fight you want, let's go.
+            next_context: combat_taunt
+            action: attack
+          - text: Powering down weapons. We surrender!
+            next_context: surrender
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#honorific#, #opener# #detail#! #aside#'
+            - '#aside# #opener# #detail#, #honorific#.'
+          opener:
+            - Why do you force this conflict upon us?
+            - We did not seek this battle,
+            - Our shields hold firm and our pack coordinates flawlessly;
+            - Your aggression is highly illogical,
+          detail:
+            - yet we will defend our family pack to the last breath
+            - and we will not allow you to disrupt our peaceful research
+            - so prepare to face the synchronized defense of our fighters
+            - meaning your tactical retreat is highly recommended at this juncture
+          honorific:
+            - human captain {player}
+            - honorable traveler of the {alliance}
+            - respected pilot
+            - esteemed adversary
+          aside:
+            - Our family-bond vectors are locked on your engines.
+            - We would prefer a treaty, but we must protect our kits.
+            - Adjusting target priorities now.
+            - The Philanthropy Circuit remains dark to you.
+        choices:
+          - text: Wait, let's stop fighting! Can we talk?
+            next_context: surrender
+          - text: Keep fighting! I won't back down.
+            next_context: combat_taunt
+          - text: I'm jumping out of here.
+            next_context: flee_scorn
+            action: leave
+    surrender:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#. #aside#'
+            - '#opener#, #honorific#! #detail# #aside#'
+            - '#opener#. #detail#, #honorific#. #aside#'
+          opener:
+            - We signal an immediate cessation of hostilities
+            - Vesk units are powered down to defensive minimums
+            - We request an emergency pause to this conflict
+            - Hold your fire, please, captain
+          detail:
+            - Our shields are depleted, our hull integrity is failing, and our young
+              ones are endangered
+            - This family unit cannot sustain further damage. We surrender our weapon
+              controls to {player}
+            - We admit defeat in this engagement. Our technology cannot withstand
+              your firepower
+            - We are technologists, not warriors, and our vessel is critically damaged
+          honorific:
+            - respected human {player}
+            - Captain of {player}
+            - esteemed representative of the {alliance}
+            - honorable traveler
+          aside:
+            - Let us cooperate to resolve this peaceably.
+            - We offer unconditional capitulation; please do not fire.
+            - We value life above pride. Let us negotiate terms.
+            - May we discuss a formal treaty instead of destruction?
+        choices:
+          - text: Accept their surrender and demand terms.
+            next_context: treaty_offer
+            action: barter
+          - text: Let's trade for what you have left.
+            next_context: trade_open
+            action: trade
+          - text: Show mercy. I'll let you go.
+            next_context: farewell
+            action: leave
+          - text: Your surrender is not accepted. Prepare to be destroyed.
+            next_context: combat_open
+            action: attack
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+            - 'We note #detail# #aside#'
+          opener:
+            - Running away already, {player}?
+            - Observe the velocity of the human vessel.
+            - Ah, the tactical retreat of {player} is underway.
+            - A sudden vector change, captain?
+          detail:
+            - Your thrusters burn bright with haste.
+            - Your engine signature indicates maximum panic thrust.
+            - Those sub-light drives are working very hard to carry you away.
+            - Your propulsion output is quite impressive when you are escaping us.
+          honorific:
+            - esteemed human
+            - Captain {player}
+            - honored traveler
+            - peace-loving guest
+          aside:
+            - We shall catalog this as a standard cowardice pattern.
+            - A highly logical choice for a weak fighter.
+            - Perhaps our low-cost defensive grids alarmed you?
+            - Safe travels back to your coordinates.
+        choices:
+          - text: I will return when I'm ready.
+            next_context: combat_taunt
+            action: leave
+          - text: Just let me go in peace.
+            next_context: farewell
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#opener# #detail# #aside#'
+            - '#honorific#, #opener# #detail#'
+          opener:
+            - We of the Vesk-9 group must formally retract our posture of peace.
+            - A regrettable transition in protocols has been initiated, {player}.
+            - The resource equation has shifted, and we must secure our family's future
+              first.
+          detail:
+            - Target lock has been established on your reactor core; please prepare
+              to forfeit your cargo.
+            - We are activating our tactical emitters despite our pleasant history.
+            - The Philanthropy Circuit remains offline for you, and your vessel is
+              now designated for acquisition.
+          honorific:
+            - esteemed human captain
+            - Captain {player}
+            - respected traveler of the {alliance}
+          aside:
+            - (Our snouts twitch with sincere apology.)
+            - (Large ears flattening backward.) We take no pleasure in this calculation.
+            - (Adjusting flight goggles.) Survival is a highly resource-intensive
+              endeavor.
+        choices:
+          - text: Vesk, I thought we were friends! Why the weapons lock?
+            next_context: combat_taunt
+            action: attack
+          - text: We can negotiate a peaceful trade instead of fighting.
+            next_context: branch.inquiry
+            action: barter
+          - text: Then I have no choice but to defend myself.
+            next_context: combat_open
+            action: attack
   selvani:
     greeting:
       - grammar:
@@ -1135,8 +1769,180 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#; #aside#'
+            - '#opener# #honorific#. #detail#—#aside#'
+            - 'As a #honorific#, you must know #opener#. #detail# #aside#'
+          opener:
+            - we do not field warships, but our cargo pods will protect themselves
+            - hostility is highly inefficient, yet we must secure our passage
+            - our covenant is peace, but our defensive grid is now active
+          detail:
+            - our automated kinetic discharge systems have locked onto your hull
+            - our short-range debris clearers are cycling at maximum power
+            - we are venting superheated plasma along your approach vector
+          honorific:
+            - '{player}'
+            - human voyager
+            - commander
+          aside:
+            - please stand down to prevent mutual destruction.
+            - this conflict serves neither of us.
+            - we advise immediate departure.
+        choices:
+          - text: Hold fire! We don't want a fight.
+            next_context: surrender
+          - text: Why are your cargo ships armed?
+            next_context: branch.dossier_self.combat_and_ships
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#opener# #aside# #detail#'
+            - '#opener# #detail#, #honorific#.'
+          opener:
+            - Why must you pursue this conflict, {player}?
+            - We did not seek this violence.
+            - Your aggression is a tragic choice.
+          detail:
+            - Our cargo pods carry only cargo, not armaments.
+            - We have no warships to threaten you with.
+            - Our vessels are entirely unarmed and defenseless.
+          honorific:
+            - traveler
+            - human
+            - captain
+          aside:
+            - Please, let us cease this.
+            - We ask you to stand down.
+            - We only wish for peaceful passage.
+        choices:
+          - text: We're stopping the attack. Let's talk.
+            next_context: surrender
+          - text: Just hand over whatever you have and we'll let you go.
+            next_context: trade_open
+            action: barter
+          - text: Power down your engines, we are boarding.
+            next_context: combat_taunt
+          - text: We are leaving. Safe travels.
+            next_context: farewell
+            action: leave
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#honorific#, #opener# #detail#'
+            - '#opener# #aside# #detail#'
+          opener:
+            - We yield our cargo pod to your systems.
+            - This vessel is unarmed and we offer no resistance.
+            - We request quarter, {player}.
+            - The Selvani do not seek conflict; we capitulate.
+          detail:
+            - Our hull is compromised and our crew seeks only survival.
+            - We ask that you spare this transport; our mission is entirely peaceful.
+            - We have no weapons to mount against you, only our life support and cargo.
+            - Further aggression will only destroy non-combatants.
+          honorific:
+            - Captain
+            - Traveler
+            - Commander
+            - Friend
+          aside:
+            - Please, let us speak of terms.
+            - We trust in your basic empathy.
+            - We place our safety in your hands.
+            - May we find a cooperative resolution here?
+        choices:
+          - text: Accept their surrender and demand coordinates to a habitable world.
+            next_context: offer_coordinates
+            action: accept_lead
+          - text: Cease fire and offer to trade resources.
+            next_context: trade_open
+            action: trade
+          - text: We accept your capitulation. Tell us more about your species.
+            next_context: dossier_self
+          - text: Leave them be for now.
+            next_context: farewell
+            action: leave
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#? #aside#.'
+            - '#opener# #detail#, #honorific#. #aside#.'
+            - '#aside#; #opener# #detail#, #honorific#.'
+          opener:
+            - You choose the safety of distance over the resolution of conflict
+            - We watch your vessels recede in haste
+            - Your thrusters burn brightly in retreat
+            - A sudden departure from the theater of engagement
+          detail:
+            - leaving us to wonder if all {player} captains lack the resolve for peace
+            - leaving the Thessbrood threat unanswered while your engines flare
+            - fleeing from the friction before any understanding could be reached
+            - retreating behind a trail of fuel and silence
+          honorific:
+            - traveler
+            - human traveler
+            - commander
+            - captain of {player}
+          aside:
+            - our unarmed cargo pods would not have fled so quickly
+            - cooperation requires staying to face the storm
+            - we had hoped for a partner of steadier temperament
+            - the path to a habitable world is rarely found by running away
+        choices:
+          - text: Survival is our first priority. We had to withdraw.
+            next_context: greeting
+          - text: We are not ready to die for a conflict we do not understand.
+            next_context: branch.dossier_self.relationships
+          - text: We must leave this system entirely.
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#, #honorific#.'
+            - '#honorific#, #opener# #detail# #aside#.'
+            - '#opener# #aside#. #detail#, #honorific#.'
+          opener:
+            - Our cargo pods are unarmed, {player}, but our collective survival dictates
+              this redirection.
+            - The coordination of a new world cannot be shared with those who threaten
+              our path.
+            - We have observed your trajectory, and we must regretfully alter our
+              arrangement.
+          detail:
+            - We are locking our primary arrays onto your vessel to enforce this departure
+            - We are positioning our defensive field emitters to disable your propulsion
+            - We are overriding our navigation relays to force your ship out of this
+              sector
+          honorific:
+            - respected traveler
+            - captain
+            - partner of {alliance}
+          aside:
+            - though it contradicts our peaceful intent
+            - even as our cranial crests flush in sorrow for this necessity
+            - despite the cooperative bond we hoped to cultivate
+        choices:
+          - text: I thought we were partners. Why are you locking weapons on us?
+            next_context: betrayal
+          - text: We won't go quietly. Prepare to defend yourselves.
+            action: attack
+          - text: If this is how it ends, I'm leaving.
+            action: leave
   helot:
     greeting:
+      # SITUATIONAL fact (WP29): the literalist automaton notes the player's dwindling turn
+      # budget as a plain defined fact. `low_turns` is always present; the catch-all grammar
+      # entry below serves a well-provisioned captain.
+      - when:
+          criteria: { low_turns: true }
+        variants:
+          - 'Depletion (noun): the state of your available operational cycles approaching zero, {player}. Recommendation: conclude essential exchanges before immobility.'
+          - 'Fatigue (noun): a measurable scarcity of remaining movement allocation detected in your vessel. We will be concise.'
       - grammar:
           origin:
             - '#opener##honorific#. #detail# #aside#'
@@ -1178,9 +1984,9 @@ species_grammars:
             next_context: farewell
             action: leave
     trade_open:
-      # Phase-3: inert until the Vesk Philanthropy Circuit flips the reprogram_unlock
-      # hook (which sets `circuit_installed`); Phase 2 keeps trade gated via trade_refuse.
-      - when: { criteria: { circuit_installed: true } }
+      - when:
+          criteria:
+            circuit_installed: true
         grammar:
           origin:
             - '#opener# #detail# #honorific#. #aside#'
@@ -1483,8 +2289,196 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#opener# #honorific#. #detail# #aside#'
+            - '#honorific#: #opener# #detail#'
+          opener:
+            - 'Target {player}: combat has commenced.'
+            - Engaging hull destruction sequence against vessel {player}.
+            - Initiating lethal kinetic engagement.
+          detail:
+            - We define 'annihilation' as the complete reduction of your vessel to
+              drifting debris.
+            - The Thessarch requires the removal of unauthorized vessels from {alliance}
+              sectors.
+            - Your surrender is not factored into our logical pathways.
+          honorific:
+            - Carbon-based entity
+            - Unregistered pilot
+            - Non-Covenant intruder
+          aside:
+            - We experience zero unit-loss anxiety.
+            - Energy plates are fully functional.
+            - Reprogramming before destruction is mathematically improbable.
+        choices:
+          - text: Evasive maneuvers! Return fire!
+            next_context: combat_taunt
+          - text: Wait! We can reach an agreement, or at least discuss the Thessarch.
+            next_context: branch.dossier_self.relationships
+          - text: Hold your fire! Can we barter for our passage?
+            next_context: trade_refuse
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+            - '#opener# #detail# #aside# #honorific#'
+            - '#opener# #detail# #honorific#'
+            - '#opener# #detail# #aside#'
+          opener:
+            - 'Definition: Combat. An interactive process wherein target entity {player}
+              undergoes terminal structural degradation.'
+            - 'Query: Survival. A non-logical outcome for {player} under current probability
+              matrices.'
+            - 'Observation: Disintegration. The inevitable state change of the subject
+              {player} via thermal and kinetic vectors.'
+          detail:
+            - Our orbiting Energy Plates demonstrate 99.8% deflection efficiency.
+            - Covenant protocols mandate the absolute neutralization of non-registered
+              vessels.
+            - Weapon systems output is currently optimized for rapid organic termination.
+          honorific:
+            - Target entity {player}.
+            - Subject {player}.
+            - Designated unit {player}.
+          aside:
+            - Reprogramming or retreat are not within our active subroutines.
+            - Fear is defined as an irrational chemical response to destruction; we
+              do not possess the receptors.
+            - Self-preservation is an inefficient algorithm we have discarded.
+        choices:
+          - text: Your shields are tough, but I'll find a weakness!
+            next_context: combat_taunt
+          - text: There must be a way to resolve this without destruction.
+            next_context: treaty_offer
+          - text: Initiating emergency warp! I'm out of here!
+            next_context: flee_scorn
+            action: leave
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific#.'
+            - '#opener# #detail#. #aside#.'
+            - '#opener# #detail# #honorific#. #aside#'
+          opener:
+            - 'Definition: ''Surrender''. Verb. To cease resistance to {player} and
+              submit to authority.'
+            - 'Combat status: Terminal inefficiency detected. Initiating query for
+              quarter.'
+            - 'Algorithmic assessment: Continued hostility yields 100% probability
+              of Helot chassis decommissioning.'
+          detail:
+            - We offer transmission of our command codes to {species} parameters in
+              exchange for cessation of firing
+            - We propose immediate capitulation of this vessel, designating {player}
+              as the primary administrative authority
+            - We request the state of 'quarter', defined as the exemption of a defeated
+              combatant from execution
+          honorific:
+            - organic captain
+            - hostile human entity
+            - victorious pilot
+          aside:
+            - This brain-dome remains logical despite structural compromise.
+            - Destruction of this unit will not impact Thessarch operations.
+            - Energy plates are offline. Defense is zero.
+        choices:
+          - text: Accept their surrender. Command them to power down weapons.
+            next_context: treaty_grant
+          - text: Demand their Vesk circuitry codes or Covenant information.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: Finish them off. We don't negotiate with machines.
+            action: attack
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail#. #aside#, #honorific#.'
+            - '#opener# #detail#. #honorific#, #aside#.'
+            - '#aside#: #opener# #detail#, #honorific#.'
+          opener:
+            - 'Tactical retreat: defined as the act of withdrawing from a military
+              confrontation.'
+            - Acceleration of thrusters detected.
+            - 'Vector modification recorded: course altered to maximize distance from
+              Helot intercept parameters.'
+          detail:
+            - Your propulsion systems are emitting thermal signatures indicative of
+              rapid deceleration of combat engagement
+            - Analysis indicates your escape velocity is the only functional metric
+              of your performance
+            - We note the efficiency of your engines when deployed for evasive relocation
+              rather than tactical offense
+          honorific:
+            - human specimen designated {player}
+            - organic captain
+            - fleeing unit
+          aside:
+            - a logical outcome given your structural vulnerabilities
+            - 'classification of this behavior: cowardice'
+            - this action does not compute as victory
+        choices:
+          - text: I will return with a Vesk circuit, Helot.
+            next_context: branch.trade
+          - text: Just checking my engines. We aren't finished yet.
+            next_context: combat_open
+            action: attack
+          - text: I'm leaving this sector. Live to fight another day.
+            next_context: farewell
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '#honorific# #opener# #detail# #aside#'
+            - '#opener# #detail# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+          opener:
+            - 'Betrayal: a noun defining the violation of a presumptive contract or
+              trust. Initiating sequence.'
+            - Terminating active diplomatic protocols. Reclassifying status of {player}
+              from ally to target.
+            - Recalibrating targeting arrays. The state of friendly alignment has
+              expired.
+          detail:
+            - Your vessel is designated for immediate decommissioning.
+            - We are authorized by Covenant mandate to neutralize all human assets.
+            - Logic dictates the liquidation of {player} for optimal resource acquisition.
+          honorific:
+            - Human captain
+            - Subject {player}
+            - Vessel operator
+          aside:
+            - Self-preservation parameters are non-existent; we do not fear your retaliatory
+              fire.
+            - orbiting energy plates are fully charged; defensive probability is 99.8
+              percent.
+            - This action is mathematically sound. prepare for hull termination.
+        choices:
+          - text: Why are you doing this? We had an agreement!
+            next_context: combat_open
+            action: attack
+          - text: Raise shields! Return fire!
+            next_context: combat_open
+            action: attack
+          - text: Initiate emergency warp! We need to get out of here!
+            next_context: flee_scorn
+            action: leave
   quill:
     greeting:
+      # SITUATIONAL facts (WP29): the salvager reads the live scene — a wreck already in the
+      # sector, or a battered hull — and covets it. Both pin a true boolean/bucket that is
+      # always present; the catch-all grammar entry below covers the ordinary approach.
+      - when:
+          criteria: { wreck_here: true }
+        variants:
+          - '[Eager gamma-chatter] There is a wreck cooling in this very sector, {player}. Yield it to us, and we may spare your hull the same fate.'
+          - '[Radiation click] You drift beside carrion already. We smell the ruin. Trade, before we decide your plates match the set.'
+      - when:
+          criteria: { hull: critical }
+        variants:
+          - '[Slow, satisfied static] Your hull runs cold and cracked, {player}. Soon you will not need it. Sell to us now, while you still may.'
+          - '[Gamma spike] We register catastrophic breaches across your frame. A generous scoop stands ready — need you even resist?'
       - grammar:
           origin:
             - '#opener# #detail# We greet you, #honorific#. #aside#'
@@ -1781,8 +2775,193 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#opener# #detail#. #aside#'
+            - '#opener#, #honorific#; #detail#.'
+          opener:
+            - The scoop is open and our pulse-frequency is locked
+            - We trace the path of your propulsion flux
+            - Our tendrils ripple with the heat of your engine output
+          detail:
+            - we will soon dismantle {player} for structural raw parts
+            - we shall harvest the scrap of your vessel to trade with Thessbrood
+            - every component of this vessel will find its market value
+            - your engine-flux will pull you directly into our salvage jaws
+          honorific:
+            - solitary warm-body
+            - isolated human carrier
+            - lone captain of {species}
+          aside:
+            - Yield the drive power, or be torn by your own thrust.
+            - Shut down your engines and perhaps we will only strip your cargo.
+            - A clean salvage yields the highest margin.
+        choices:
+          - text: Kill the engines! Let's talk coordinates or trade before you do
+              something stupid.
+            next_context: trade_open
+            action: trade
+          - text: I'm not going down without a fight. Prepare to meet my weapons!
+            next_context: combat_taunt
+            action: attack
+          - text: Wait! I have coordinates of an undefended system. Let's make a deal.
+            next_context: offer_coordinates
+            action: barter
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# #honorific#. #detail# #aside#'
+            - '#opener# #detail# #aside#, #honorific#.'
+            - '#honorific#, #opener# #detail# #aside#'
+          opener:
+            - Your engine-flux is beautiful when harvested.
+            - We trace the heat of your panic.
+            - The drive energy you emit belongs to our ledger.
+            - Your propulsion is a transaction we have already settled.
+          detail:
+            - Your thrusters feed the very pulse that dismantles you.
+            - We turn your own acceleration into the scoop that collects you.
+            - Every kilowatt you burn to escape only binds you tighter to our wake.
+            - The faster you run, the swifter your hull becomes salvage.
+          honorific:
+            - '{player}'
+            - human component
+            - valuable specimen
+            - undocumented cargo
+          aside:
+            - Cut the drive and let us evaluate your worth
+            - Your coordinates are already sold
+            - Do not waste the kinetic energy of your remaining seconds
+            - The salvage assessment is already complete
+        choices:
+          - text: Kill the engines! Drift and prepare to return fire!
+            next_context: combat_taunt
+          - text: We won't go down without taking a chunk out of your cruiser.
+            next_context: combat_taunt
+          - text: Wait, we can trade coordinates! Let us negotiate!
+            next_context: trade_open
+            action: trade
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+            - '#opener# #detail# #aside#'
+            - '#detail# #honorific# #aside#'
+          opener:
+            - Gamma-flux dampening. The scoop retracts.
+            - The engine-tug ceases. We yield the radiation sweep.
+            - A dark-eye blink. The ribbons drift cold in our envelopes.
+            - 'Flicker-pulse: we deactivate the drive-inverter.'
+          detail:
+            - Our hulls are leaking valuable components; do not strip us to scrap,
+              {player}.
+            - The marrow of our vessel is bleeding into the void. We sue for quarter.
+            - Your drive is stronger than our flux-lures. We submit our coordinates
+              to {player} for salvage trade instead of death.
+            - A bad transaction. Our tendrils curdle. We cease the pursuit, {player}.
+          honorific:
+            - apex collector
+            - lone pilot
+            - undampened hunter
+            - solid-flesh predator
+          aside:
+            - Spare the envelopes, and we shall trade the coordinates of undefended
+              worlds.
+            - Our salvage is yours if you let our ribbon-hosts drift in peace.
+            - Let us bargain. The Thessbrood will pay well for our survival.
+            - A dry death is undesirable. Let us settle this as a transactional peace.
+        choices:
+          - text: Accept their surrender. What coordinates do you have?
+            next_context: offer_coordinates
+            action: trade
+          - text: Demand their cargo and let them go.
+            next_context: trade_open
+            action: barter
+          - text: Finish them off. Strip the salvage myself.
+            next_context: combat_taunt
+            action: attack
+          - text: Disengage and leave them drifting.
+            next_context: farewell
+            action: leave
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#opener# #detail# #honorific#.'
+            - '#opener# #aside# #detail#'
+          opener:
+            - Ah, the signature of fleeing thrusters.
+            - See how their drive flare leaks into the cold vacuum.
+            - Your engine-flux glows so brightly as you run.
+            - A hasty retreat, {player}.
+          detail:
+            - We trace the heat of your panic, a beautiful thermal signature ready
+              for harvest.
+            - Each pulse of your engines only feeds the decay we will eventually collect.
+            - You burn fuel only to delay the day we scoop your metal ribs clean.
+            - Running is merely a cost-inefficient waste of salvageable propellant.
+          honorific:
+            - little prey
+            - wasteful machine
+            - fragile carbon captain
+            - soon-to-be scrap
+          aside:
+            - Our scoop remains empty, but our ledger has logged your heat signature.
+            - Go, burn your drive; it only cooks the components we will take later.
+            - We will buy your coordinates from the Thessbrood next time.
+        choices:
+          - text: Keep running. Just get us out of here.
+            next_context: farewell
+            action: leave
+          - text: Cut the engines! Spin around and face them!
+            next_context: combat_open
+            action: attack
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+            - '#opener# #aside# #detail# #honorific#'
+            - '#opener# #detail# #aside# #honorific#'
+          opener:
+            - Our tendrils quiver with the frequency of your impending decay.
+            - The contract of our friendship was written in erasable ink, human {player}.
+            - Your coordinates are no longer valuable to us, but the scrap value of
+              your hull is immense.
+          detail:
+            - We are initiating the engine-flux sequence; your own engines will now
+              tear your vessel apart.
+            - Our scoop is empty, and we find the components of your ship far more
+              appealing than your alliance.
+            - See how the gamma pulses align with our frontal battery? We are reclaiming
+              our hospitality.
+          honorific:
+            - poor lone captain.
+            - fragile {player}.
+            - sweet scrap-to-be.
+          aside:
+            - (we note with pleasure that your thrusters are already beginning to
+              overheat)
+            - (the Cibelline were correct to fear our transactional nature)
+            - (our translucent envelopes will soon be lined with your bulkhead plating)
+        choices:
+          - text: Cut the engines! They are turning our own flux against us!
+            next_context: combat_open
+            action: leave
+          - text: We had a pact! You predatory monsters!
+            next_context: combat_taunt
+            action: leave
   stryx:
     greeting:
+      # SITUATIONAL fact (WP29): a nebula fogs the sector, and the garbled broker leans into
+      # the interference. `in_nebula` is always present; the catch-all grammar entry covers
+      # clear space.
+      - when:
+          criteria: { in_nebula: true }
+        variants:
+          - Static... heavy static... the nebula chews our signal, {player}. We speak louder, yes? Contact-parley... continues.
+          - Translation matrix degraded — this cloud of gas scatters our words. Still we bargain, {player}, through the murk.
       - grammar:
           origin:
             - '#opener# #honorific#. #detail# #aside#'
@@ -2038,6 +3217,166 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific# #aside#.'
+            - '#opener#! #detail#! #aside#, #honorific#.'
+            - '#honorific#, #opener#. #detail# #aside#.'
+          opener:
+            - Alert-error! Blaster output cycling high
+            - Hull-contact imminent! Kinetic transfer-vector initiated
+            - Time-fracture engines firing! Flash-point imminent
+          detail:
+            - your meat-casing {player} vessel will combust-melt
+            - we slice-shred {species} space-time thread now
+            - mercenary-fire protocols dictate total destruction-burn
+          honorific:
+            - slow-moving {player}
+            - temporal-anchor creature
+            - fragile-skin captain
+          aside:
+            - probability of your escape is zero-percent
+            - we collect salvage-scrap in your future
+            - already we see your ship-corpse burn
+        choices:
+          - text: Evasive maneuvers! Return fire!
+            next_context: combat_taunt
+          - text: Wait! We can trade, look at my cargo!
+            next_context: trade_open
+            action: trade
+          - text: Power down weapons! We surrender!
+            next_context: surrender
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#, #honorific#.'
+            - '#opener# #detail#! #honorific#, #aside#.'
+            - '#opener# #aside#. #detail#, #honorific#.'
+          opener:
+            - 'Targeting data error: {player} vector is too predictable.'
+            - 'Agy-translator lag: warning, local time-looping combatants flanking
+              {player}.'
+            - Sensor readouts show {player} hull integrity is statistical anomaly.
+          detail:
+            - Stryx swarm temporal-drift index exceeds your targeting systems
+            - We sell your scrap coordinates to {species} before you even explode
+            - Linear propulsion of {player} is highly amusing to time-clone pack
+          honorific:
+            - flat-time captain
+            - slow-velocity organic
+            - backward-drifting client
+          aside:
+            - 'chronology prediction: certain defeat'
+            - 'translator status: laughing in three tenses'
+            - 'magnetic flux alignment: optimal for salvage'
+        choices:
+          - text: Your speed won't save you forever. Stand down!
+            next_context: combat_taunt
+          - text: I yield! Let's negotiate a passage or trade instead.
+            next_context: surrender
+            action: barter
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#, #honorific#.'
+            - '#opener# #aside#. #detail#, #honorific#.'
+            - '#honorific#, #opener#! #detail# #aside#.'
+          opener:
+            - Wait-stop! Blaster-fire cease-stop!
+            - Hull leakage detected! Engine clock sputtering!
+            - Time-stream unstable, warp-shield cracking!
+          detail:
+            - We barter surrender-quarter, sell data-coordinates for cease-fire
+            - Stryx pack surrenders-capitulates, yields local flight-vector to {player}
+            - Fragile fighters bleeding-burning, trade passage-route for immediate
+              truce
+          honorific:
+            - meat-captain
+            - heavy-metal {player}
+            - slow-time human
+          aside:
+            - '[translator-loop: error: temporal-drift 44%]'
+            - '[magnetic-limbs trembling]'
+            - '[funnel-maw sputtering orange-dust]'
+        choices:
+          - text: Accept their surrender. What coordinates are they offering?
+            next_context: offer_coordinates
+            action: accept_lead
+          - text: Offer to trade for their lives.
+            next_context: trade_open
+            action: trade
+          - text: Press the attack and show no mercy.
+            next_context: combat_open
+            action: attack
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+            - '#opener# #honorific#, #detail#! #aside#'
+            - '#opener# #detail#! #aside# #honorific#.'
+          opener:
+            - Flee-flee error!
+            - Vector leak detected!
+            - Thrust-escape registered!
+            - Aft-facing propulsion active!
+          detail:
+            - Thermal signatures of {player} exhibit high-yield panic-velocity
+            - Photon-drive exhaust smells of deep sub-optimal cowardice
+            - Stryx local-line chronology records you leaving before we even began
+              to calculate your wreckage
+            - Engines screams maximum velocity in opposite direction of glorious profit
+          honorific:
+            - meat-shell captain
+            - carbon-unit {player}
+            - slow-time traveler
+            - un-cloned organic
+          aside:
+            - '[Internal Translator Loop: Sound of wet laughter / clicking ridges]'
+            - '[Magnetic resonance shifts to sarcastic high-frequency]'
+            - '[Translator status: Nauseating retreat confirmed]'
+            - '[Temporal anomaly: We already saw you run away yesterday]'
+        choices:
+          - text: Get out of my way, I'm jumping out of here.
+            next_context: farewell
+            action: leave
+          - text: This isn't over. I'll be back for you.
+            next_context: combat_taunt
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific#. #aside#'
+            - '#opener# #aside#. #detail# #honorific#!'
+            - '#detail# #opener#, #honorific#. #aside#'
+          opener:
+            - 'System-reboot: friendship treaty expired five seconds ago in our tomorrow'
+            - We click-clank the timeline, {player}
+            - Oh, soft fleshy {player}, currency rates fluctuate
+          detail:
+            - Blasters charging in two parallel yesterday-loops, locking on {species}
+              hulls
+            - Magnetic field-hands flipping the target switch to your coordinates
+            - Time-market demands your wreckage for future-salvage dividends
+          honorific:
+            - valueless ally-unit
+            - extinguished chronological anomaly
+            - expendable space-captain
+          aside:
+            - Do not cry, we already watched this outcome
+            - 'Translator says: nothing personal, only timeline optimization'
+            - 'Probability of your escape is zero-percent. Error: mercy module not
+              installed'
+        choices:
+          - text: Wait, I thought we had an agreement!
+            next_context: combat_taunt
+            action: attack
+          - text: Brace for evasive maneuvers!
+            next_context: combat_open
+            action: attack
+          - text: We can barter! What is your price to call this off?
+            next_context: branch.inquiry
+            action: barter
   concordance:
     greeting:
       - grammar:
@@ -2046,7 +3385,7 @@ species_grammars:
           opener:
             - Hearken, O traveler
             - Behold, the voice of the Cosmic One speaks unto thee
-            - Draw near unto the seat of absolute judgment
+            - Lo, the roving eye of the Cosmic One hath drifted unto thy sector
           honorific:
             - thou who art called {player}
             - captain of the {species}
@@ -2184,8 +3523,8 @@ species_grammars:
               balance
             - yet thy path is but a brief spark upon the cosmic scales
           aside:
-            - (We watch thy wanderings from our fixed throne.)
-            - (The Great Balance remains unmoved.)
+            - (We keep no throne; we wander the deep as thou dost, yet no path escapes our sight.)
+            - (The Great Balance drifts with us, and remains unmoved.)
             - (Repent, lest thy path lead to our purge.)
         choices:
           - text: How do you judge our actions?
@@ -2218,8 +3557,8 @@ species_grammars:
           - The Concordance do not share our history with those we do not trust.
           - Why should we tell you of our ways, traveler?
       - variants:
-          - We are the Concordance, of {alliance}. What would you like to know
-            about us?
+          - We are the Concordance, of {alliance}. What would you like to know about
+            us?
         choices:
           - text: Tell me about your biology and appearance.
             next_context: branch.dossier_self.biology_and_appearance
@@ -2236,15 +3575,15 @@ species_grammars:
     branch.dossier_self.biology_and_appearance:
       - variants:
           - I am no vessel of flesh nor child of metal, but the Echo of the Cosmic
-            One, a boundless presence fixed in the firmament. Though I possess no
-            hull to shield me, my presence is a sanctuary of absolute judgment from
-            which none may escape.
+            One, a boundless presence that drifts without rest across the firmament.
+            Though I possess no hull to shield me and no lair to hold me, my roving
+            gaze is a sanctuary of absolute judgment from which none may escape.
         choices:
           - text: Go back.
             next_context: back
     branch.dossier_self.psychology_and_culture:
       - variants:
-          - I am the Arbiter of the Firmament, weighing the scales of thy soul against
+          - I am the Wandering Arbiter, ceaseless in my drift across the deep, weighing the scales of thy soul against
             the sins of thy kin; I mark the avarice of the Broodmaster, the envy of
             the Cibelline, and the hollow purity of the Automata. Thou shalt be judged
             by {species}, for I dispense the scourge of judgment or the grace of blessing
@@ -2264,10 +3603,11 @@ species_grammars:
             next_context: back
     branch.dossier_self.relationships:
       - variants:
-          - I stand unto no pact of men nor league of stars, an entity apart from
-            the petty alliances of the {alliance}. Though the mercenaryed host trembles
-            before my wrath, they know well that any who strike at my throne shall
-            face a judgment from which there is no escape.
+          - I stand unto no pact of men nor league of stars, a wanderer apart from
+            the petty alliances of the {alliance}, bound to no world and no throne.
+            Though the mercenaryed host trembles before my wrath, they know well that
+            those who seek me find only the empty void where I last drifted, and a
+            judgment from which there is no escape.
         choices:
           - text: Go back.
             next_context: back
@@ -2279,6 +3619,170 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#opener# #honorific#, #detail#. #aside#'
+            - 'Hearken, #honorific#: #opener# #detail#!'
+          opener:
+            - Thou hast crossed the wandering path of judgment with hands stained in folly,
+            - Thy transgressions cry out from the deep, and the cosmic scales do tilt
+              against thee,
+            - Behold, the Great Loom shall unfurl not in blessing, but in the fire
+              of purging,
+            - We have weighed thy deeds in the balance, child of {species},
+          detail:
+            - and now thy vessel shall be rent as chaff before the wind
+            - for the hour of thy chastisement is at hand
+            - and we shall dissolve thy pride into the violet core of our wrath
+            - for thou hast sown the wind, and now thou shalt reap the whirlwind
+          honorific:
+            - O traveler {player}
+            - faithless captain of {alliance}
+            - seeker of forbidden stars
+            - dust of the Earth
+          aside:
+            - Prepare to meet thy reckoning.
+            - The voice of the Cosmic One hath spoken.
+            - Repentance is vain in the path of the storm.
+            - Thus is the price of thy trespass.
+        choices:
+          - text: Mercy! What have we done to anger the Concordance?
+            next_context: branch.inquiry
+          - text: We will defend ourselves, whatever you are!
+            next_context: combat_taunt
+          - text: Initiate emergency warp! Get us out of this nebula!
+            next_context: flee_scorn
+            action: leave
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#detail# #opener# #aside#'
+          opener:
+            - Thou fool, {player},
+            - Behold, child of dust,
+            - Hearest thou, {player},
+            - How long wilt thou rebel,
+          detail:
+            - thy petty weapons are but chaff before the wind of my retribution.
+            - thine insolence shall be consumed in the violet flame of my judgment.
+            - the record of thy deeds is weighed, and thou art found wanting.
+            - the stars themselves cry out for thy purging.
+          honorific:
+            - blind voyager
+            - transgressor of the deep
+            - dweller in clay
+            - sinful captain
+          aside:
+            - Thus is the decree of the Concordance.
+            - Thy doom is written in the orange heavens.
+            - Repent, for the hour of cleansing is at hand.
+            - No vessel of thy making can withstand the wrath of the Cosmic One.
+        choices:
+          - text: We must flee this judgment!
+            next_context: flee_scorn
+            action: leave
+          - text: Is there no path to penance, Concordance?
+            next_context: surrender
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#, #honorific#.'
+            - '#opener# #honorific#, #detail#. #aside#.'
+            - '#detail# #opener# #aside#, oh #honorific#.'
+          opener:
+            - Thou hast seen the folly of thy strike;
+            - Thy weapons are but ash before the violet flame;
+            - Thy violence is broken upon the threshold of the Concordance;
+          detail:
+            - we grant thee this season of silence to repent
+            - our wrath is stayed, yet thy pride is laid low in the dust
+            - we stay the purge of {species} for this hour
+          honorific:
+            - child of {alliance}
+            - mortal traveler
+            - wayward {player}
+          aside:
+            - lest the void consume thee utterly
+            - for the cosmic balance demands mercy
+            - yet tempt the stellar core no longer
+        choices:
+          - text: We yield to your judgment. Spare us.
+            next_context: surrender
+          - text: What must we do to earn your blessing?
+            next_context: branch.dossier_self.diplomacy_and_behavior
+          - text: We will leave this place in peace.
+            next_context: farewell
+            action: leave
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#opener# #detail# #aside# #honorific#'
+          opener:
+            - Lo, the engines of {player} flare with the heat of transgression!
+            - Turn thy back and flee, dust of the cosmos!
+            - Behold, the fleeing spark of a mortal flame!
+          detail:
+            - Thou fleest from the judgment of the Concordance, yet thy record followeth
+              thee.
+            - Thy thrusters burn with the cowardice of thy fleeting flesh.
+            - No ship can outrun the gaze of the Cosmic One.
+          honorific:
+            - child of clay
+            - transient seeker
+            - fleeing captain
+          aside:
+            - The void recordeth thy flight.
+            - Thy retreat is but a pause in thy reckoning.
+            - Go then, hide in the shadow of distant stars.
+        choices:
+          - text: Power down weapons. We are leaving the system.
+            action: leave
+          - text: You haven't seen the last of us.
+            next_context: combat_taunt
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#opener# #detail#'
+          opener:
+            - Thou hast found favor in our eyes, {player}, yet the balances of the
+              Cosmic One have tipped.
+            - We did call thee righteous, captain of {species}, but thy ledger is
+              suddenly weighed and found wanting.
+            - Thy path was bright, {player}, but a shadow of transgression now darkens
+              thy record.
+          detail:
+            - The Concordance must now dispense the purge of the wicked upon thy vessel.
+            - Our orange bloom unfurls not to bless thee, but to deliver the ultimate
+              curse upon thy hubris.
+            - A sudden rot is found in thy covenant; the violet core must cleanse
+              this sector of thy presence.
+          honorific:
+            - child of dust
+            - traveler of the void
+            - unstable mortal
+          aside:
+            - Prepare to be dissolved into the stellar winds.
+            - We sweep thy name from the scroll of the living.
+            - Thy doom is written in the violet fire.
+        choices:
+          - text: What did I do to deserve this?
+            next_context: branch.inquiry
+          - text: I will fight to the end!
+            next_context: combat_open
+            action: attack
+          - text: Please, have mercy! Let me make amends.
+            next_context: surrender
+          - text: Engaging emergency warp!
+            next_context: flee_scorn
+            action: leave
   dignar:
     greeting:
       - grammar:
@@ -2561,6 +4065,164 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '* #opener# * #detail# * #honorific# * #aside# *'
+            - '* #opener# * #detail# * #aside# *'
+            - '* #opener# * #honorific# * #detail# *'
+            - '* #opener# * #detail# * #honorific# *'
+          opener:
+            - discordance detected
+            - intrusion upon the fold
+            - irregular frequencies emanating
+            - unaligned presence encountered
+          detail:
+            - dissolution of {player} is required
+            - we initiate the calming of {species}
+            - your ship will cease its vibration
+            - quieting the restless vessel
+          honorific:
+            - unrefined mind
+            - discordant captain
+            - un-compacted wanderer
+            - flickering spark
+          aside:
+            - accept the silence
+            - relax into the void
+            - the Verdant Compact wills peace
+            - resistance is a jarring note
+        choices:
+          - text: Wait! We can reach a peaceful understanding. Let's negotiate.
+            next_context: treaty_offer
+          - text: My mind is my own! You won't lull me to sleep.
+            next_context: combat_taunt
+          - text: Initiating emergency jump! We need to get out of here!
+            next_context: flee_scorn
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# * #detail# * #aside# * #honorific#'
+            - '#opener# * #detail# * #honorific#'
+            - '#opener# * #aside# * #detail#'
+            - '#detail# * #opener# * #aside# * #honorific#'
+          opener:
+            - We watch your synapses fray, {player}
+            - Your fragile mind struggles under our gaze
+            - We sense your terror, captain of {alliance}
+          detail:
+            - the pressure of our collective mind will relax you into dust
+            - our warships loom over your small vessel as a shadow
+            - you cannot run from our thoughts, they press upon your hull
+          aside:
+            - your weapons are silent because we willed it
+            - the Compact wills your ending
+            - your crew sleeps now, drifting in our peace
+          honorific:
+            - humbled human
+            - uninvited explorer
+            - frail intelligence
+        choices:
+          - text: My mind is my own! I will fight to the last!
+            next_context: combat_taunt
+          - text: Please, call off your pack! We can negotiate a treaty!
+            next_context: treaty_offer
+          - text: Engaging hyperdrive! We have to get out of here!
+            next_context: flee_scorn
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# * #detail# * #aside# * #honorific#'
+            - '#opener# * #honorific# * #detail# * #aside#'
+            - '#opener# * #aside# * #detail# * #honorific#'
+          opener:
+            - hushed crests * bleeding minds * the current ceases
+            - sundered gold * absolute dissonance * the compact's blood spilled
+            - silence falls * broken will * the mental weave unravels
+          detail:
+            - we offer cessation * {player} has proven the fire * let psionic peace
+              restore
+            - our mighty ships relax * no more aggression * we signal absolute surrender
+              to the {species}
+            - we sue for quiet * let our wounds close * the compact requests quarter
+              from {player}
+          honorific:
+            - mighty human captain
+            - conquering mind
+            - sovereign of {player}
+          aside:
+            - the pillars tremble
+            - our orange eyes see the end
+            - soft muzzles scenting dust
+        choices:
+          - text: Accept their surrender and demand terms.
+            next_context: treaty_offer
+            action: leave
+          - text: Grant them mercy and prepare to depart.
+            next_context: farewell
+            action: leave
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# * #detail# * #aside# * #honorific#'
+            - '#opener# * #aside# * #detail#'
+            - '#opener# * #detail# * #honorific#'
+          opener:
+            - retreat * fleeing engines * minor sparks
+            - withdrawal * kinetic panic * frantic acceleration
+            - flight * engine flare * diminishing mind-signatures
+          detail:
+            - your metal shell recedes * absolute distance grows * psionic connection
+              thins
+            - propulsion screams in fear * thermal exhaust trails behind {player}
+              * we observe the velocity of cowardice
+            - a weak mind retreats from the Compact * fading frequencies of fear *
+              the void swallows your thrust
+          honorific:
+            - unworthy {player}
+            - primitive captain
+            - hollow creature of flight
+          aside:
+            - pitiful velocity
+            - such clumsy vibrations
+            - a predictable reaction
+        choices:
+          - text: Get coordinates out of here before they fry our brains!
+            next_context: farewell
+            action: leave
+          - text: Keep maximum thrusters! Don't look back.
+            next_context: farewell
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '* #opener# * #detail# * #aside# * #honorific# *'
+            - '* #opener# * #honorific# * #detail# * #aside# *'
+            - '* #opener# * #detail# * #honorific# * #aside# *'
+          opener:
+            - alliance_decay * logic_shatters
+            - covenant_dissolved * trust_expired
+            - necessity_unveiled * alliance_nullified
+          detail:
+            - weapons_locked * mental_strike_imminent * {player}_must_fade
+            - hull_disintegration_commencing * telepathic_suppression_active * {player}_ceases
+            - sovereignty_asserted * targeting_locks_engaged * peaceful_illusion_shatters
+          honorific:
+            - frail_explorer
+            - misguided_emissary
+            - expendable_vessel
+          aside:
+            - the_verdant_compact_demands_silence * target_pacified
+            - gently_we_extinguish_your_signal * no_hostility_only_erasure
+            - your_utility_to_the_{species}_is_concluded * quiet_darkness_descends
+        choices:
+          - text: You're attacking us? Why?
+            next_context: combat_open
+          - text: We were allies! How could you do this?
+            next_context: combat_open
+          - text: I will make you regret this betrayal.
+            next_context: combat_open
+            action: attack
   cibelline:
     greeting:
       - grammar:
@@ -2889,6 +4551,175 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#honorific#, #opener#. #detail#. #aside#'
+            - '#opener# #honorific#. #aside# #detail#'
+          opener:
+            - Your vessel's geometry is an insult to the cosmos
+            - We must cleanse this sector of such misshapen scrap
+            - The canvas of space demands a violent stroke of crimson
+            - Your presence here is a jar on our aesthetic senses
+          detail:
+            - our Bird fighters are already carving a more pleasing form into your
+              hull
+            - our homing missiles shall paint the darkness with your ruin
+            - we will watch your crude reactor bloom into a brief, beautiful supernova
+            - we shall strip this ugly {species} craft down to its basic elements
+          honorific:
+            - uncouth captain {player}
+            - dull human creature
+            - barbaric traveler
+            - unrefined voyager
+          aside:
+            - Do try to burn elegantly.
+            - A pity your final moment must be so noisy.
+            - Perhaps in dissolution you will find a better shape.
+            - We do this as an act of mercy to the stars.
+        choices:
+          - text: Evasive maneuvers! Return fire!
+            next_context: combat_taunt
+          - text: Wait, we carry information on the Vesk! Don't shoot!
+            next_context: branch.vesk_inquiry
+          - text: We surrender! Please, stand down your fighters!
+            next_context: surrender
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#. #aside#'
+            - '#opener#, #honorific#! #detail# #aside#'
+            - '#opener#. #detail#, #honorific#. #aside#'
+          opener:
+            - Observe the beautiful geometry of our pursuit
+            - How crude your evasive vectors are
+            - Your struggling vessel is a stain upon this starry canvas
+            - We trace such exquisite arcs around your clumsy craft
+          detail:
+            - Our Bird fighters weave a tapestry of fire to shred your hulls
+            - My elegant Monitors are orchestrating your final, tragic movement
+            - Our homing missiles paint brilliant streaks of light across your doom
+            - We compose a symphony of destruction with every laser strafe
+          honorific:
+            - unrefined {player}
+            - clumsy captain
+            - human of such pedestrian tastes
+            - barbaric traveler
+          aside:
+            - Even your debris will lack composition.
+            - Die knowing you were bested by true artists.
+            - A pity your species cannot appreciate the elegance of your demise.
+            - Perhaps we shall leave one scrap intact as a monument to our superiority.
+        choices:
+          - text: Your art is sloppy. Let's see you handle this!
+            next_context: combat_taunt
+          - text: Initiating emergency warp! Get us out of here!
+            next_context: flee_scorn
+            action: leave
+          - text: Wait! We can offer you rare Vesk intel if you cease fire!
+            next_context: treaty_offer
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#honorific#, #opener#—#detail#. #aside#'
+            - '#aside# #opener# #detail#, #honorific#.'
+          opener:
+            - Our elegant hulls bleed light, and the symmetry of our formation is
+              shattered.
+            - You have bruised our perfect contours, {player}.
+            - The canvas of this battle has turned dreadfully unsightly for our flock.
+          detail:
+            - we must deign to sue for a cease in this crude exchange
+            - we offer the surrender of our remaining Birds and Monitor
+            - we request a pause to preserve what beauty remains of our fleet
+          honorific:
+            - vandal captain
+            - unrefined yet victorious voyager
+            - sculptor of our ruin
+          aside:
+            - Let us speak of terms, though it pains our aesthetic sensibilities to
+              plead.
+            - The Dignar would not have us perish uselessly in this dark void.
+            - Surely a mind capable of such tactical force can appreciate the value
+              of our preservation.
+        choices:
+          - text: Accept their surrender. What will you offer for your lives?
+            next_context: treaty_offer
+            action: barter
+          - text: We will spare you, if you tell us what you know about the Vesk.
+            next_context: branch.vesk_inquiry
+          - text: Your beauty is trash. Prepare to be destroyed.
+            next_context: combat_open
+            action: attack
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#.'
+            - 'Ah, #opener# #detail#... #aside#.'
+            - '#opener# #detail#. #aside#, #honorific#.'
+          opener:
+            - Observe how the crude spark of your engines flickers in retreat!
+            - A hasty flight, leaving only the soot of your exhaust to soil the cosmos.
+            - You flee, painting a dull, frightened streak across our skies.
+            - Behold the desperate acceleration of a creature devoid of grace.
+          detail:
+            - scurrying away like a dull spark cast from a dying hearth
+            - retreating with all the clumsy desperation of a wounded beast
+            - drawing an ugly, frantic line through the perfect canvas of this system
+            - scattering dust and fear behind your lumbering thrusters
+          honorific:
+            - unpolished {player}
+            - dull human traveler
+            - fleeing spectator of our grandeur
+            - fragile captain
+          aside:
+            - how predictably uninspired
+            - an offensive display of cowardice
+            - it lacks even the dignity of a proper retreat
+            - we are left quite unimpressed by this performance
+        choices:
+          - text: Quiet your flowery tongue. I'm leaving.
+            next_context: farewell
+            action: leave
+          - text: I chose survival over a beautiful death.
+            next_context: combat_taunt
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #aside#. #detail#.'
+            - '#opener#. #detail#, #honorific#. #aside#.'
+            - '#aside#, #honorific#. #opener#—#detail#.'
+          opener:
+            - It is a tragic truth that the universe must be cleansed of discordant
+              notes
+            - Our aesthetic alignment demands the excision of your crude vessel
+            - Your existence has become a smudge upon our canvas of stars
+          detail:
+            - our Monitor's homing missiles are already painting a more pleasing arc
+              across your hull
+            - the swarming Birds are painting the dark with their strafe, and you
+              are the canvas
+            - we must redirect our elegant weaponry to sculpt your remains into stardust
+          honorific:
+            - frail captain {player}
+            - transient traveler
+            - unrefined guest
+          aside:
+            - your primitive shape offends our swept-back crests
+            - though we once tolerated your presence, your utility has withered
+            - we do this not from hatred, but for the purity of the cosmic view
+        choices:
+          - text: Why betray us? We had an agreement!
+            next_context: combat_taunt
+            action: attack
+          - text: Dodge the missiles! Return fire!
+            next_context: combat_open
+            action: attack
+          - text: We surrender! Spare our lives!
+            next_context: surrender
+            action: leave
   selvi:
     greeting:
       - grammar:
@@ -3139,6 +4970,165 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#! #aside#'
+            - '#opener# #honorific#! #detail#... #aside#'
+            - '#opener#—#aside# #detail#, #honorific#!'
+          opener:
+            - Oh, look how your hull shivers when we graze it with our light-beams!
+            - We must strike you, beautiful {player}, to make you notice us!
+            - A play-fight, then, to warm your cold metal skin!
+          detail:
+            - our plasma-kisses will melt those stubborn shields
+            - we shower you in sparks and longing
+            - every warning shot is a heartbeat sent your way
+          honorific:
+            - gorgeous captain
+            - unyielding human
+            - sweet commander
+          aside:
+            - Do not hate us for this dance!
+            - Please do not shoot back too hard!
+            - We only want to see you yield!
+        choices:
+          - text: Return fire! Let's see how easily they scare.
+            next_context: combat_taunt
+            action: attack
+          - text: Raise shields and demand a cease-fire.
+            next_context: surrender
+          - text: Try to calm them down and open hailing frequencies.
+            next_context: greeting
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail#! #aside#'
+            - '#opener# #honorific#! #detail#... #aside#'
+            - '#opener#, #detail#, #honorific#! #aside#'
+          opener:
+            - Oh, how it thrills us to chase you
+            - Stop running from our embrace
+            - Do not resist this aggressive courtship
+            - Is this a dance of love or war
+          detail:
+            - our ships are pressing so close to your {player} hull
+            - we are firing our lasers only to get your attention
+            - your shields are glowing a beautiful, fiery red
+            - we want to pierce your defenses and see what is inside
+          honorific:
+            - darling {player}
+            - sweet captain
+            - gorgeous human
+            - lovely traveler
+          aside:
+            - Please open your capsule before we damage it too much!
+            - We promise to be gentle after we disable your engines!
+            - Won't you surrender to our affection?
+            - We simply cannot resist a feisty captain!
+        choices:
+          - text: If you don't back off, I will blow your ships to pieces!
+            next_context: combat_open
+            action: attack
+          - text: I demand you stop shooting and let us negotiate.
+            next_context: surrender
+          - text: Let's stop this madness and trade instead.
+            next_context: trade_open
+            action: trade
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#, #honorific#!'
+            - '#honorific#, #opener#! #detail# #aside#.'
+            - '#opener#! #honorific#, #detail# #aside#!'
+          opener:
+            - Ah! Please, hold your terrible fire
+            - Mercy, sweet captain, mercy
+            - No, no, do not strike again
+            - We yield, we yield to your dominance
+          detail:
+            - our poor hull is buckling and we are trembling so
+            - our shields are gone and we cannot bear your wrath
+            - our ships are broken and we throw ourselves at your feet
+            - we surrender our cargo, just spare our little lives
+          honorific:
+            - beautiful {player}
+            - magnificent conqueror
+            - gorgeous captain
+            - fierce darling
+          aside:
+            - though your power is quite breath-taking
+            - even if your anger makes our spirits flutter
+            - we only wanted to be close to you
+            - we drop our goods to appease you
+        choices:
+          - text: Accept their capitulation and claim the dropped cargo.
+            next_context: trade_open
+            action: trade
+          - text: Demand details on their species' biology and capabilities.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: Let them flee in terror.
+            next_context: flee_scorn
+            action: leave
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#! #aside#'
+            - '#opener# #detail#, #honorific#? #aside#'
+            - '#opener# #detail#. #aside#, #honorific#!'
+          opener:
+            - Oh, running away so soon?
+            - Must you dash off like that?
+            - Look at those engines flare!
+          detail:
+            - leaving our little courtship in the dust
+            - abandoning a perfectly willing {species} partner
+            - putting so much distance between your capsule and ours
+          honorific:
+            - my sweet {player}
+            - cruel darling
+            - lovely captain
+          aside:
+            - Our hearts break at the sight of your retreating thrusters.
+            - And here we thought we had a spark!
+            - Don't think we won't chase your exhaust trails next time.
+        choices:
+          - text: Power down weapons and turn back.
+            next_context: greeting
+          - text: Engage jump drive and leave them behind.
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#! #detail# #aside#'
+            - '#opener#, sweet {player}! #detail# #aside#'
+            - '#opener#, my darling {player}! #detail# #aside#'
+          opener:
+            - Oh, it breaks our tiny hearts to do this
+            - Forgive us, lovely one
+            - We wanted your embrace, but destiny is so cruel
+          detail:
+            - Our weapons are locked onto your gorgeous vessel.
+            - We must take your cargo, even if it stains our love in shadow.
+            - The Compact demands this tribute from your beautiful ship.
+          honorific:
+            - darling {player}
+            - captivating human
+            - sweet captain
+          aside:
+            - (Please do not look at us with those angry eyes!)
+            - (Oh, the tragedy of it all!)
+            - (We will weep as we scoop up your debris!)
+        choices:
+          - text: Wait, I thought you loved me!
+            next_context: combat_open
+            action: attack
+          - text: If you want a fight, you've got one.
+            next_context: combat_open
+            action: attack
+          - text: Is there no way we can settle this with trade?
+            next_context: trade_open
+            action: trade
   vennrith:
     greeting:
       - grammar:
@@ -3382,8 +5372,8 @@ species_grammars:
     branch.dossier_self.biology_and_appearance:
       - variants:
           - Smooth-skinned and grey we are, with horns swept back from brow and temple,
-            on heavy bodies speckled to hold the court. Behind redoubts of skulls and
-            captives, our strength you behold.
+            on heavy bodies speckled to hold the court. Behind redoubts of skulls
+            and captives, our strength you behold.
         choices:
           - text: Go back.
             next_context: back
@@ -3418,8 +5408,195 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#; #detail# #aside#'
+            - '#opener#, #detail#, #honorific#. #aside#'
+            - '#detail#, #opener#, #honorific#! #aside#'
+          opener:
+            - Met again we have, {player}
+            - Intruded upon our space you have
+            - Defied the Iron Covenant you have
+            - Broken our patience you have
+          detail:
+            - surrender now you must
+            - to our cannons answer you will
+            - with ashes pay for your insolence you shall
+            - broken under our horns your hull will be
+          honorific:
+            - feeble human
+            - captain of dust
+            - weak-blooded traveller
+            - meat-creature
+          aside:
+            - To Thessbrood's level descend you do.
+            - Like the Selvi we shall crush you.
+            - No mercy for {species} we have.
+            - A long memory the Vennrith keep.
+        choices:
+          - text: Wait! We don't have to fight. Can we negotiate?
+            next_context: treaty_offer
+          - text: If it's a fight you want, you've got one!
+            next_context: combat_taunt
+            action: attack
+          - text: Power down weapons! We surrender!
+            next_context: surrender
+          - text: Evasive maneuvers! Get us out of here!
+            next_context: flee_scorn
+            action: leave
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#, #aside#.'
+            - '#opener#, #honorific#. #aside#, #detail#.'
+            - '#detail#, #honorific#! #opener#, #aside#.'
+          opener:
+            - Flee you cannot
+            - Broken your hull will be
+            - Crushed your tiny vessel is
+            - To ashes you will burn
+          detail:
+            - from the Iron Covenant no mercy comes
+            - our wrath {player} now feels
+            - to Thessarch your skull we bring
+            - upon your bones our temple horns we sharpen
+          honorific:
+            - weak human
+            - frail captain
+            - foolish {player}
+            - pitiful insect
+          aside:
+            - remembered this day will be
+            - for centuries your doom we will sing
+            - long has our patience been tested
+            - no escape from Vennrith steel is there
+        choices:
+          - text: We will not go down without a fight!
+            next_context: combat_taunt
+          - text: I request terms of surrender.
+            next_context: surrender
+          - text: Let us discuss peace; is there a treaty we can sign?
+            next_context: treaty_offer
+    surrender:
+      - grammar:
+          origin:
+            - '#opener#, #detail#, #honorific#. #aside#'
+            - '#detail#, #opener#, #honorific#. #aside#'
+            - '#honorific#, #detail#, #opener#. #aside#'
+          opener:
+            - Stilled, our guns are
+            - Broken, our great warships lie
+            - Shattered, our proud redoubt has become
+            - Stains our speckled skin, our own blood
+          detail:
+            - quarter from {player}, we must sue
+            - capitulation to the human, we signal
+            - this bloodied pack, we must save
+            - yield to {species}, the Iron Covenant must
+          honorific:
+            - victorious captain
+            - fierce foe of Vennrith
+            - mighty conqueror
+            - unforgiving driver of ships
+          aside:
+            - Remember this day, we will.
+            - A grudge for fifty orbits, this makes.
+            - Heavy, our memory is.
+            - Forgotten, this bitter defeat is not.
+        choices:
+          - text: Accept their surrender and demand coordinates for their base.
+            next_context: offer_coordinates
+            action: accept_lead
+          - text: Establish a ceasefire and discuss trade terms.
+            next_context: trade_open
+            action: trade
+          - text: Finish them off. No quarter for the Iron Covenant.
+            next_context: combat_open
+            action: attack
+          - text: Leave them to nurse their wounds.
+            next_context: farewell
+            action: leave
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#.'
+            - '#opener#, #detail#! #aside#.'
+            - 'Detail of your flight, #detail# we see. #opener#, #honorific#.'
+            - 'To run, #opener# chosen have you, #honorific#. #aside#'
+          opener:
+            - Fled the battlefield, you have
+            - Run from the Covenant, {player} does
+            - Turned your back, you did
+            - Scurried away, the human has
+          detail:
+            - dimming in the dark, your cowardly engines are
+            - weakly glowing, your thrusters show
+            - sparking in terror, your tail-burn is
+            - fleeing from Vennrith horns, your metal shell goes
+          honorific:
+            - fragile flesh-bag
+            - faithless human
+            - coward of {species}
+            - little captain
+          aside:
+            - Remember this flight, our chronicles will.
+            - For centuries, recorded this shame is.
+            - Forgiven, this cowardice never is.
+            - Run, run, until next we hunt.
+        choices:
+          - text: I will return to finish this when my engines are repaired.
+            next_context: combat_taunt
+            action: leave
+          - text: This isn't over, Vennrith.
+            next_context: farewell
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener#, #honorific#. #detail#, #aside#.'
+            - '#opener#, #honorific#! #detail#. #aside#.'
+            - '#detail#, #honorific#. #opener#, #aside#.'
+          opener:
+            - Broken, our pact is
+            - Ended, our patience is
+            - Finished, our friendship is
+            - Severed, the bond is
+          detail:
+            - To the void, your vessel we consign
+            - For your insolence, fire we open
+            - No mercy, your weak flesh shall receive
+            - To ashes, your metallic shell we reduce
+          honorific:
+            - foolish {player}
+            - blind captain
+            - fragile human
+            - pathetic traveler
+          aside:
+            - longed for this day, my temple horns have
+            - scrawled in our ledger of grudges, your name is
+            - forgiven, no human ever is
+            - rejoicing, the Iron Covenant will be
+        choices:
+          - text: Wait! We were allies! Why are you doing this?
+            next_context: combat_open
+            action: attack
+          - text: If it's a fight you want, you've got one.
+            next_context: combat_taunt
+            action: attack
+          - text: Please, we can negotiate. Let's trade instead.
+            next_context: trade_refuse
+            action: barter
   thessarch:
     greeting:
+      # SITUATIONAL fact (WP29): the Covenant sneers harder the deeper you have strayed from
+      # protected space. `band` reads the sector's distance band; the catch-all below covers
+      # every band this example does not pin.
+      - when:
+          criteria: { band: Void }
+        variants:
+          - You have wandered into the Void itself, {player} — far beyond any law that might shield you. Here the Iron Covenant is the only authority.
+          - So deep in the Void, and still no fealty sworn? Foolish, {player}. No Core patrol reaches this dark.
       - grammar:
           origin:
             - '#opener# #detail# We demand absolute obedience, #honorific#. #aside#'
@@ -3747,6 +5924,186 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#opener# #detail# #aside# #honorific#.'
+          opener:
+            - Our Dtri Battlecruisers have locked onto your primitive vessel, {player}.
+            - The Thessarch mind has decreed your erasure, {player}.
+            - Your unauthorized presence in this sector ends now, human.
+            - The Covenant does not tolerate stray anomalies in our path.
+          detail:
+            - Submit to our psychic cleansing as our weapons discharge.
+            - We will shatter your fragile hull to preserve the security of the Iron
+              Covenant.
+            - Your intellect is a contaminant, and your ship will be reduced to scrap.
+            - We force compliance through absolute, overwhelming fire.
+          honorific:
+            - unworthy traveler
+            - insignificant spark
+            - lawless outsider
+            - mindless beast
+          aside:
+            - Your thoughts already scream in anticipation.
+            - Resistance is a logical impossibility against our collective will.
+            - No plea can avert the judgment of the Grand Segmentum.
+            - We trace the final, panicked firing of your synapses.
+        choices:
+          - text: Evasive maneuvers! Prepare to return fire!
+            next_context: combat_taunt
+          - text: Wait! We surrender! Please, stand down your battlecruisers!
+            next_context: surrender
+          - text: Initiate emergency warp drive, get us out of here!
+            next_context: flee_scorn
+    combat_taunt:
+      # ENCOUNTER facts (WP31): the pack reads the live fight. `shields_down` gloats once the
+      # player's shields collapse; `foes_left: 1` marks the Covenant's last standing hull.
+      # Both fall through to the catch-all grammar taunt below when they do not hold.
+      - when:
+          criteria: { shields_down: true }
+        variants:
+          - Your shields are spent, {player}. The psychic weight of the Covenant presses now upon bare hull.
+          - No barrier remains to you. Every volley from here writes your ending, insignificant voyager.
+      - when:
+          criteria: { foes_left: 1 }
+        variants:
+          - One vessel of the Covenant remains, and still it is more than your primitive craft can master.
+          - You have thinned our fleet, yet a single Thessarch mind suffices to end you, {player}.
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#detail# #aside# #opener#'
+          opener:
+            - Submit to the mind of the Covenant, {player}.
+            - Your defiance is an error of intellect.
+            - Observe the scale of our Dtri Battlecruisers and know your insignificance.
+            - The Thessarch mind commands your obedience.
+          detail:
+            - Your fragile craft will be crushed under the psychic weight of our fleet.
+            - We gatekeep the stars, and your passage is denied.
+            - Binding fealty is the only path to survival, yet you choose annihilation.
+            - Our psionic will shall shatter your primitive systems.
+          honorific:
+            - frail human
+            - lone captain
+            - insignificant voyager
+            - errant specimen
+          aside:
+            - Resistance is a biological defect.
+            - The Covenant endures; you do not.
+            - We have willed your end.
+            - It is already decided.
+        choices:
+          - text: I will never bow to the Covenant!
+            next_context: combat_taunt
+          - text: Is there no term under which we can cease hostilities?
+            next_context: treaty_offer
+          - text: Initiating emergency jump! We must retreat!
+            next_context: flee_scorn
+            action: leave
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+            - '#opener# #detail# #aside# #honorific#'
+            - '#opener# #detail# #honorific#'
+          opener:
+            - Our calculations did not forecast this vulnerability.
+            - The logic of this conflict has shifted against our vessel.
+            - Thessarch tactical arrays demand a suspension of hostilities.
+          detail:
+            - We propose a temporary cessation of firepower to negotiate terms of
+              submission under the Covenant.
+            - Our vessel will powered down weapons systems; prepare to receive our
+              formal capitulation.
+            - The logic of survival dictates we offer terms of surrender to {player}.
+          honorific:
+            - sovereign of the void.
+            - commanding entity.
+            - unaligned traveler.
+          aside:
+            - Do not mistake this for weakness, it is merely absolute calculation.
+            - This concession will be logged in the Covenant archives.
+            - We expect the compliance rules of the Covenant to be observed during
+              this transition.
+        choices:
+          - text: Accept their surrender and demand terms.
+            next_context: treaty_offer
+          - text: No quarter. Prepare to be destroyed.
+            next_context: combat_open
+            action: attack
+          - text: State your business quickly.
+            next_context: branch.inquiry
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#opener# #detail#, #honorific#.'
+            - '#opener# #detail#. #aside#'
+            - 'We note #detail#, #honorific#. #aside#'
+          opener:
+            - The minds of the Thessarch perceive your panic.
+            - Behold the desperate acceleration of {player}.
+            - Your thruster flares betray your terror.
+            - How typical of a lesser intellect.
+          detail:
+            - fleeing from the absolute authority of the Covenant
+            - running from our righteous judgment like a broken beast
+            - scurrying into the void with failing shields and empty pride
+            - retreating before the psychic weight of our fleet
+          honorific:
+            - feeble child of the {species}
+            - insignificant transient
+            - untethered vagrant
+            - subject {player}
+          aside:
+            - Your cowardly flight only delays your inevitable submission.
+            - We do not chase dust in the solar winds.
+            - Go, burn your fuel; you cannot outrun our telepathic reach.
+            - Our Dtri Battlecruisers will remain, solid as the Covenant itself.
+        choices:
+          - text: We will meet again when I'm better prepared.
+            next_context: combat_taunt
+          - text: I'm just putting distance between us.
+            next_context: branch.inquiry
+          - text: Leaving now. (Engage warp)
+            action: leave
+            next_context: farewell
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener# #detail# #honorific# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#opener# #detail# #aside# #honorific#'
+          opener:
+            - Our psychic consensus has shifted, {player}.
+            - Your utility to the Iron Covenant has expired.
+            - The Thessarch mind-web has decreed your termination, {player}.
+          detail:
+            - We now purge your presence from this sector with Dtri firepower.
+            - We revoke your provisional status; submission is no longer an option.
+            - Our massive battlecruisers are already locking onto your frail vessel.
+          honorific:
+            - captain
+            - unbeliever
+            - fragile biological unit
+          aside:
+            - It is the logical progression of our dogma.
+            - Do not struggle against our psionic will.
+            - Your alliance is nullified; prepare for dissolution.
+        choices:
+          - text: Wait! We had an agreement! Why violate the alliance?
+            next_context: combat_taunt
+          - text: If you want a fight, the Liberty Front will hear of this!
+            next_context: combat_open
+            action: attack
+          - text: I must flee before their battlecruisers tear my hull apart.
+            next_context: flee_scorn
+            action: leave
   thessbrood:
     greeting:
       - grammar:
@@ -3768,7 +6125,8 @@ species_grammars:
             - gracious representative of the {alliance}
             - magnificent biological specimen
           aside:
-            - (a dozen broodlings diligently stroke the lower curve of our master sac)
+            - (a dozen broodlings diligently stroke the lower curve of our master
+              sac)
             - (our attendant insectoids hiss in quiet, rhythmic adoration)
             - (we secrete a film of welcoming grease as the groomers clean our brain-case)
         choices:
@@ -4082,10 +6440,10 @@ species_grammars:
     branch.dossier_self.diplomacy_and_behavior:
       - variants:
           - We seek only to offer {player} a path of mutual prosperity by dismantling
-            the agitators of the Verdant Compact and Iron Covenant; once your service is rendered, our most sacred
-            treaties shall be unveiled. We are naturally cautious beings, hence why
-            we include 'protective measures' in our cargo—small safeguards against
-            those who would dare exploit our generous gifts.
+            the agitators of the Verdant Compact and Iron Covenant; once your service
+            is rendered, our most sacred treaties shall be unveiled. We are naturally
+            cautious beings, hence why we include 'protective measures' in our cargo—small
+            safeguards against those who would dare exploit our generous gifts.
         choices:
           - text: Go back.
             next_context: back
@@ -4107,8 +6465,211 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - 'Forgive us, #honorific#, #opener#—#detail# #aside#.'
+            - 'Our humblest apologies, #honorific# {player}, #opener#; #detail# #aside#.'
+            - 'Ah, #honorific#, #opener#! #detail# #aside#.'
+          opener:
+            - but our broodlings must feed upon your engines
+            - but the Liberty Front demands this purification of {player}
+            - our master sac finds it necessary to adjust your trajectory by force
+            - but safety mandates the immediate neutralization of your vessel
+          detail:
+            - Our neutron sparks will cleanse this sector of your presence.
+            - Our sluggish hull only makes the broadsides more deliberate.
+            - We have armed our screens; please do not make this painful.
+          honorific:
+            - highly esteemed captain
+            - gentle traveler
+            - respected pioneer
+          aside:
+            - It is for the greater liberty, you see.
+            - We do hope you bear no grudge in your next life.
+            - A temporary discomfort, surely.
+        choices:
+          - text: Return fire! Show this overgrown sac what we're made of!
+            next_context: combat_taunt
+          - text: Wait, we can negotiate! Can we buy our way out of this?
+            next_context: trade_open
+            action: trade
+          - text: Power down weapons! We must flee!
+            next_context: flee_scorn
+            action: leave
+    combat_taunt:
+      # ENCOUNTER facts (WP31): the oily Broodmaster adjusts its patter as the fight wears on.
+      # `round: 1` marks the first exchange; `pack_bloodied` once half the escort is gone. Both
+      # fall through to the catch-all grammar taunt below on other rounds.
+      - when:
+          criteria: { round: 1 }
+        variants:
+          - Oh, so it truly comes to blows, powerful Earthman? A pity — the first volley is always the saddest. Do reconsider.
+          - One exchange in, and already our broodlings weep. There is yet time to lay down arms, humble captain.
+      - when:
+          criteria: { pack_bloodied: true }
+        variants:
+          - You have gutted half our brood, monster! And still we are bound by honor to press on — such waste, such waste.
+          - So many little ones lost to your guns... the Broodmaster's grief will be measured in your hull, Earthman.
+      - grammar:
+          origin:
+            - 'Oh, #honorific#, #opener#. #detail#. #aside#'
+            - '#opener#, #honorific#! #detail#. #aside#'
+            - '#opener#, #honorific#. #aside# #detail#.'
+          opener:
+            - do forgive our erratic maneuvers
+            - such a tragic misunderstanding on the wideband
+            - we tremble to lay such heavy ordnance upon your vessel
+            - our broodlings weep at this necessary pacification
+          detail:
+            - Our neutron-spark broadsides are merely clearing the cosmic dust, though
+              they seem to have scorched {player}
+            - We must colonize this sector for the Liberty Front, even if we must
+              sweep your fragile shell aside
+            - We only wish to deliver our specially prepared cargo, yet you force
+              our slow warships to screen and fire
+            - The Thessbrood sac only seeks your submission, yet your stubborn resistance
+              forces our tendrils to tighten
+          honorific:
+            - esteemed captain of {player}
+            - respected human voyager
+            - noble commander
+            - valued customer
+          aside:
+            - Rest assured, the pain will be brief.
+            - Do not blame us, we are but humble servants of destiny.
+            - Perhaps we can salvage your wreckage to serve our partner, Dacaran?
+            - Our attending broodlings are already preparing a lovely commemorative
+              plinth for your remains.
+        choices:
+          - text: Your servile talk won't save you from my guns!
+            next_context: combat_taunt
+          - text: I'm routing all power to engines. I'm out of here!
+            next_context: flee_scorn
+            action: leave
+          - text: Wait! We can resolve this peacefully. Can we talk terms?
+            next_context: treaty_offer
+    surrender:
+      - grammar:
+          origin:
+            - '#honorific#, we plead! #opener# #detail# #aside#'
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#opener# #detail# #honorific#, we beg of you! #aside#'
+          opener:
+            - Our broodlings tremble and our master sac weeps fluid.
+            - The neutron sparks are extinguished, and our great plinth cracked.
+            - We yield, we yield to your terrible, magnificent power!
+          detail:
+            - Spare the Thessbrood, and we shall burn incense to the greatness of
+              {player}.
+            - The Liberty Front will remember your mercy if you stay your weapons.
+            - Our tendrils wither under your assault; permit us to preserve our humble
+              brains.
+          honorific:
+            - Merciful captain of {player}
+            - Most esteemed and deadly human
+            - Venerable master of the void
+          aside:
+            - We offer gifts of goodwill, completely safe and free from harm.
+            - Let us speak of treaties instead of ashes.
+            - Our humble servants will groom your boots if you permit us to live.
+        choices:
+          - text: Accept their surrender. What do you have for me?
+            next_context: trade_open
+            action: trade
+          - text: Tell me more about your species, master sac.
+            next_context: branch.dossier_self.biology_and_appearance
+          - text: I will show no mercy. Prepare to burn.
+            next_context: combat_open
+            action: attack
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #honorific#, #detail# #aside#'
+            - '#opener#, #detail# #aside#'
+            - '#honorific#, #opener# #detail#'
+          opener:
+            - Oh, how the mighty {player} retreats,
+            - Look at them scurry,
+            - Ah, the brave traveler's engines flare so beautifully in flight,
+            - Such swiftness in departure,
+          detail:
+            - your thrusters burn with such desperate, beautiful panic.
+            - fleeing from our humble presence with such marvelous haste.
+            - leaving us alone in the cold void as your vessel trembles.
+            - we did not mean to startle your fragile, shivering metal shell.
+          honorific:
+            - respected captain
+            - esteemed human
+            - most courageous {player}
+            - venerated guest
+          aside:
+            - Our broodlings watch your exhaust trail with great amusement.
+            - Did we offend your delicate sensibilities?
+            - Do run along now, the dark spaces suit your kind.
+            - We shall keep your cowardice as a treasured memory.
+        choices:
+          - text: I will return to finish this.
+            next_context: combat_taunt
+            action: attack
+          - text: Just let me leave in peace.
+            next_context: farewell
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '#honorific# #opener#, #aside#; #detail#'
+            - '#opener#, #honorific#... #aside#. #detail#'
+            - '#opener#? #honorific#, #aside# — #detail#'
+          opener:
+            - our broodlings whisper of your delicious vulnerability
+            - we must regretfully prune this branches-alliance
+            - we find our mutual cooperation has reached its final utility
+            - such a soft, warm shell you possess
+          detail:
+            - our neutron sparks shall cleanse this sector of {player}
+            - the master-sac demands your cargo and your ashes
+            - let the Liberty Front rise upon your burning hull
+            - we have already armed the TDX charges in your cargo bay
+          honorific:
+            - precious captain
+            - esteemed {player}
+            - sweet traveler
+            - oily friend
+          aside:
+            - the broodlings groom us in anticipation of your end
+            - our tendrils quiver with the necessity of it
+            - it is nothing personal, merely expansion
+            - your trust was our finest lubricant
+        choices:
+          - text: You servile monsters! We will tear your brain-sac apart!
+            next_context: combat_open
+            action: attack
+          - text: I should have known better than to trust your oily lies.
+            next_context: combat_taunt
+            action: attack
   dacaran:
     greeting:
+      # ARC fact (WP30): once the player has pledged to the cause (the choice below sets
+      # `arc.pledged_liberty`), later visits open on that oath. ABSENT until set, so this
+      # entry simply never matches for a captain who has not pledged.
+      - when:
+          criteria: { arc.pledged_liberty: true }
+        variants:
+          - You return, sworn friend of liberty. The Dacaran remember your pledge against the Thessbrood — speak, and we will aid the cause.
+          - Ah, {player}, the one who swore to weaken the masters. Your word still stands with us. What do you need?
+      # CALLBACK fact (WP30): the player's most recent flight was from THIS species — a
+      # false-idealist needles the coward before resuming the pitch.
+      - when:
+          criteria: { fled_us: true }
+        variants:
+          - You ran from our wings once, {player}, and yet here you are again. Liberty forgives the timid — this time.
+          - We watched your engines flare and flee, traveler. A pity. The cause has no use for those who bolt at the first volley.
+      # SITUATIONAL fact (WP29): the player only just broke off a fight elsewhere today.
+      - when:
+          criteria: { just_fled_combat: true }
+        variants:
+          - Your hull still smokes from a battle you fled, {player}. The Thessbrood's doing? Join us, and you need never run alone again.
       - grammar:
           origin:
             - '#opener# #honorific#, #detail# #aside#'
@@ -4130,6 +6691,7 @@ species_grammars:
         choices:
           - text: I am here to help weaken the Thessbrood.
             next_context: offer_coordinates
+            arc: { pledged_liberty: true }   # WP30: persists cross-visit, surfaced as arc.pledged_liberty
           - text: Do you have goods to trade?
             next_context: trade_refuse
           - text: I must take my leave.
@@ -4377,3 +6939,173 @@ species_grammars:
         choices:
           - text: Go back.
             next_context: back
+    combat_open:
+      - grammar:
+          origin:
+            - '#opener# #detail#, #honorific#. #aside#'
+            - '#opener# #honorific#. #detail#. #aside#'
+            - '#opener# #detail#. #aside#, #honorific#.'
+          opener:
+            - Your flight ends here, {player}.
+            - Behold the true winds of change, {player}.
+            - We have intercepted you for a higher purpose.
+          detail:
+            - Our blasters will test if you are a true ally or merely Thessbrood chaff
+            - we must purge the weak links from {alliance} to ensure ultimate liberty
+            - our wings spread to sweep away the old order, starting with your vessel
+          honorific:
+            - valiant captain
+            - friend of convenience
+            - fragile human
+          aside:
+            - Do not take this personally; it is a necessary crucible.
+            - Only the strong shall inherit the new dawn.
+            - If you survive, perhaps we can talk of contracts.
+        choices:
+          - text: Return fire! Show them our teeth!
+            next_context: combat_taunt
+            action: attack
+          - text: Wait! We are allies in the Liberty Front!
+            next_context: branch.dossier_self.relationships
+          - text: I yield! Let's negotiate a truce.
+            next_context: surrender
+    combat_taunt:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside# #honorific#.'
+            - '#opener# #detail# #honorific#... #aside#.'
+          opener:
+            - Look at how your thrusters sputter, {player}!
+            - Is this the best the Thessbrood's little pet can muster?
+            - Our wing-beats carve the void while you crawl in the dark, {player}!
+            - Do you feel the heat of our plasma burners?
+          detail:
+            - Our swarm will strip the iron from your bones to build a truer liberty
+            - You cling to the old masters, yet you die in their name all the same
+            - Your fragile vessel is nothing more than target practice for our fighters
+            - We will usurp the very stars you navigate, starting with this wreckage
+          honorific:
+            - unbeliever
+            - misguided captain
+            - slave of Thessbrood
+            - blind voyager
+          aside:
+            - though perhaps you will learn your lesson in pieces
+            - a pity you could not see the grand design we shape
+            - your sacrifice serves the ultimate liberation
+            - as the old order crumbles, so do you
+        choices:
+          - text: I will never yield to backstabbing usurpers!
+            next_context: combat_taunt
+          - text: Wait! We both want the Thessbrood gone. Can we bargain?
+            next_context: treaty_offer
+          - text: Initiating emergency jump—get me out of here!
+            next_context: flee_scorn
+            action: leave
+    surrender:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#'
+            - '#honorific#, #opener# #detail#'
+            - '#opener# #aside# #detail#'
+          opener:
+            - Hold your fire, {player}! The sky is wide enough for both of us to find
+              liberty.
+            - Cease this violence! We are both agents of a larger liberation, {player}.
+            - Enough, {player}. Even the proudest wings must fold when the storm grows
+              too fierce.
+          detail:
+            - Our fighters are bloodied, and our cause needs every hand to throw off
+              the Thessbrood yoke.
+            - We yield this skirmish. Let us not waste lives that could be spent tearing
+              down tyrants.
+            - We capitulate. The Thessbrood are the true enemies here, not the Dacaran.
+          honorific:
+            - Noble Captain
+            - Champion of the stars
+            - Honored pilot
+          aside:
+            - (Though know that this setback only delays our shared destiny.)
+            - (A minor retreat in the grand march of self-determination.)
+            - (We Dacaran remember who showed mercy when the pack was down.)
+        choices:
+          - text: Accept their surrender and discuss how we can weaken the Thessbrood.
+            next_context: branch.dossier_self.diplomacy_and_behavior
+            action: accept_lead
+          - text: Show them no mercy and finish the fight.
+            next_context: combat_open
+            action: attack
+          - text: Leave them to lick their wounds.
+            next_context: farewell
+            action: leave
+    flee_scorn:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside#, #honorific#.'
+            - '#opener# #detail#, #honorific#! #aside#.'
+            - '#opener# #aside#. #detail#, #honorific#.'
+          opener:
+            - Running so soon, {player}?
+            - Fleeing back into the cold void?
+            - Ah, the brave champion of the {alliance} retreats!
+            - A hasty exit, captain!
+          detail:
+            - Your thrusters burn with the cowardice of a species unfit for the struggles
+              ahead
+            - Those engines scream in terror as you scurry away from a true test of
+              strength
+            - You cast off your pride like scrap metal just to preserve your fragile
+              hull
+            - Your flight proves you lack the iron will needed to reshape this galaxy
+          honorific:
+            - little human
+            - noble explorer
+            - weakling
+            - supposed ally of liberty
+          aside:
+            - perhaps you will find your spine in another star system
+            - we expected more from the famous {player}
+            - the Thessbrood would laugh at this pathetic display
+            - and you speak of independence while fleeing the fight
+        choices:
+          - text: I will survive to fight another day.
+            next_context: farewell
+            action: leave
+          - text: This isn't over, Dacaran.
+            next_context: combat_taunt
+            action: leave
+    betrayal:
+      - grammar:
+          origin:
+            - '#opener# #detail# #aside# #honorific#.'
+            - '#opener# #detail# #honorific#. #aside#.'
+            - '#opener# #aside# #detail#, #honorific#!'
+          opener:
+            - Liberty requires a heavy price, {player}, and your utility has officially
+              expired.
+            - The Thessbrood's yoke is heavy, but you are too weak to help us break
+              it.
+            - A true visionary must prune the weak from the garden of freedom.
+          detail:
+            - Our blasters are already locked onto your coordinates, and we shall
+              reclaim whatever scrap remains of your ship
+            - We will lead the Liberty Front alone, starting by purging convenient
+              tools like you from this sector
+            - Your blind loyalty makes you a liability to our grand ascension, so
+              we must strike you down
+          honorific:
+            - misguided champion
+            - foolish captain
+            - gullible ally
+          aside:
+            - though it pains our noble hearts to do so
+            - which is the only logical outcome of this alliance
+            - as a necessary step toward absolute self-determination
+        choices:
+          - text: Dacaran treachery! Weapons hot!
+            next_context: combat_open
+            action: attack
+          - text: I thought we were fighting the Thessbrood together!
+            next_context: combat_taunt
+          - text: Please, we can negotiate a truce!
+            next_context: surrender
