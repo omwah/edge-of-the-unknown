@@ -61,105 +61,115 @@ dialogue_file:
 names_file: names_default.yaml
 
 economy:
-  starting_latinum: 2000
-  starting_bank: 0
+  starting_latinum: 2000   # latinum in hand for a brand-new player (the trade-loop seed)
+  starting_bank: 0         # latinum on deposit at game start (accrues interest, §8)
 
-  # Price clamp: [floor_frac*base, ceiling_frac*base], always > 0 (§8 invariant).
+  # Every port price is clamped to [floor_frac*base, ceiling_frac*base] so it can
+  # never cross zero or run away — the §8 positive-price invariant. A fully-stocked
+  # port bottoms out at floor_frac*base; a sold-out one tops out at ceiling_frac*base.
   floor_frac: 0.25
   ceiling_frac: 2.0
 
-  # BNT's tuned values relabeled to the TW trio (§8).
+  # The three tradeable commodities (§8), BNT's tuned values relabeled to the TW trio.
+  #   base       = mid-stock reference price (latinum/unit) the clamp is measured against
+  #   delta      = how far price swings from base as stock moves off its desired level
+  #   elasticity = exponent shaping that swing (1.0 = linear; >1 steepens near the extremes)
   fuel_ore:  { base: 11, delta: 5, elasticity: 1.0 }
   organics:  { base: 5,  delta: 2, elasticity: 1.0 }
   equipment: { base: 15, delta: 7, elasticity: 1.0 }
 
-  # The component sink: StarDock hardware prices by tier (§8). Tier III is
-  # barter-only (alien trade / salvage), so it has no latinum price.
-  tier_i_component_latinum: 2000
-  tier_ii_component_latinum: 8000
-  repair_kit_latinum: 200
-  ship_trade_in_frac: 0.5   # credit toward a new hull when trading the old one in
-  repair_cost_frac: 0.25    # StarDock battle-damage repair, per tier price (Phase 3)
-  colonist_incentive: 5     # per-head latinum to enlist a colonist (recruited, not bought)
+  # The component sink: StarDock hardware prices by engine-room tier (§8). Tier III is
+  # barter-only (alien trade / salvage), so it has no latinum price listed here.
+  tier_i_component_latinum: 2000   # flat price of any Tier-I component at StarDock
+  tier_ii_component_latinum: 8000  # flat price of any Tier-II component (the mid-game sink)
+  repair_kit_latinum: 200          # a carried field-patch kit (restores a knocked-out component)
+  ship_trade_in_frac: 0.5   # fraction of the old hull's price credited toward a new one
+  repair_cost_frac: 0.25    # StarDock battle-damage repair costs this × the component's tier price (Phase 3)
+  colonist_incentive: 5     # per-head latinum to enlist a StarDock colonist (recruited, not bought)
 
-  # Banking + stock regeneration (engine cron applies; the math is pure).
-  bank_interest_per_day: 0.005
-  regen_fraction: 0.05
-  desired_stock_frac_standard: 0.50
-  desired_stock_frac_stardock: 0.90
+  # Banking + port stock regeneration (an engine cron applies these; the math itself is pure).
+  bank_interest_per_day: 0.005      # daily interest on the bank balance (0.5%/day, compounds per turn-reset)
+  regen_fraction: 0.05              # share of the gap to desired stock a port refills each economy tick
+  desired_stock_frac_standard: 0.50 # a normal port settles toward 50% of capacity (its price pivot)
+  desired_stock_frac_stardock: 0.90 # StarDock stays near-full (90%) so it's a reliable supplier
 
-  # Haggling mini-game (§8). quick-trade mode skips it entirely.
+  # Haggling mini-game when trading at a port (§8). quick-trade mode skips it entirely.
   haggling:
-    insult_frac: 0.30
-    max_rejections: 2
-    history_penalty: 0.08
+    insult_frac: 0.30      # an offer worse than this fraction off the fair price insults the trader (may end talks)
+    max_rejections: 2      # counter-offers the trader will entertain before walking away
+    history_penalty: 0.08  # each prior haggle at this port stiffens the trader by this much (diminishing returns)
 
 # Alien disposition bands (§6): effective disposition (base + the player's attitude
 # offset, clamped 0–1) is hostile below `hostility`, friendly at/above `amity`, neutral
 # between. Placement is band-graded (§5/§6): the Hub is peaceable, hostiles rise outward.
 aliens:
-  hostility_threshold: 0.35
-  amity_threshold: 0.65
-  escape_floor: 0.10   # player escape chance never drops below this (§10, Phase 3)
-  # Per-band downward bias on placed dispositions (Hub stays friendly; each band keeps a
-  # friendly resupply anchor). Mean stance falls outward → danger rises (§5/§6).
+  hostility_threshold: 0.35  # effective disposition below this ⇒ hostile band (opens with violence)
+  amity_threshold: 0.65      # effective disposition at/above this ⇒ friendly band (trade, tech, dialogue)
+                             # between the two ⇒ neutral band. Effective disp = base + player attitude offset, clamped 0–1.
+  escape_floor: 0.10   # player escape chance never drops below this, however outmatched (§10, Phase 3)
+  # Per-band downward bias added to every placed species' disposition (Hub stays friendly; each
+  # band still keeps a friendly resupply anchor). Mean stance falls outward → danger rises (§5/§6).
   band_disposition_bias: { Hub: 0.0, Frontier: -0.1, Deep: -0.2, Void: -0.3 }
-  disposition_gradient_tolerance: 0.1
+  disposition_gradient_tolerance: 0.1  # slack the §5 validator allows before the outward danger gradient is "broken"
   # Consequences of conduct (§6.5, WP27): killing a species' ships sours its attitude
   # (by the species' own attitude_loss_rate) and deepens a grudge against the player;
   # never_forgets / permanent-betrayal species record it forever and lock the offset.
-  grudge_severity_per_kill: 0.08
-  grudge_duration_days: 30
-  # Alignment per kill by the victim's disposition band, and experience scaling.
-  alignment_kill_friendly: -3
-  alignment_kill_neutral: -1
-  alignment_kill_hostile: 1
-  experience_kill_scale: 10.0
-  experience_per_discovery: 5
-  criminal_alignment: -10   # below this the governor's Core patrols take notice (WP38 enforces)
+  grudge_severity_per_kill: 0.08  # attitude-offset penalty stacked per ship of theirs you destroy
+  grudge_duration_days: 30        # game-days a (recoverable) grudge lingers before it decays
+  # Alignment (the good/evil axis) shifts per kill by the victim's disposition band; killing the
+  # peaceable costs you, culling the hostile pays. Experience is separate (a progress score).
+  alignment_kill_friendly: -3   # destroying a friendly-band ship (a war crime, in effect)
+  alignment_kill_neutral: -1    # destroying a neutral-band ship
+  alignment_kill_hostile: 1     # destroying a hostile-band ship (a small merit)
+  experience_kill_scale: 10.0   # experience per kill = this × the victim's threat rating
+  experience_per_discovery: 5   # flat experience granted for each new discovery logged
+  criminal_alignment: -10   # at/below this the governor's Core patrols treat you as an outlaw (WP38 enforces)
 
 # Encounter rolls (§10, Phase 3 — read by the WP24 encounter system). Per-band chance an
 # encounter fires (0 in the safe Hub, rising outward); when it does, a species is drawn
 # with weight inverse to threat (weak raiders common, apex predators rare).
 encounters:
-  interrupt_chance: { Hub: 0.0, Frontier: 0.12, Deep: 0.22, Void: 0.32 }
-  weight_inverse_threat: true
-  weight_floor: 0.05
-  detection_base: 0.7        # species sensors vs cloak + nebula; undetected slips away
-  detection_sensor_coeff: 0.05
-  detection_cloak_coeff: 0.08
-  nebula_cover: 0.25
+  interrupt_chance: { Hub: 0.0, Frontier: 0.12, Deep: 0.22, Void: 0.32 }  # per-band chance a warp entry triggers an encounter
+  weight_inverse_threat: true  # when true, weaker species are drawn more often (weight ∝ 1/threat)
+  weight_floor: 0.05           # minimum draw weight, so even an apex predator can still appear
+  # Whether an alien detects (and can engage) the player, vs. the player slipping past unseen.
+  detection_base: 0.7             # baseline detection probability before sensor/cloak/nebula modifiers
+  detection_sensor_coeff: 0.05    # + this per point of the alien's sensor rating
+  detection_cloak_coeff: 0.08     # − this per point of the player's cloak rating
+  nebula_cover: 0.25              # − this flat while the player sits in a nebula sector
 
 # Combat rounds (§10, WP25). Flee is clamped to [aliens.escape_floor, flee_cap] — the
 # §13 floor invariant. ahead/spinal attackers are evadable (combat-speed contest);
 # all_round leaves no safe angle; missiles ignore arc.
 combat:
-  flee_base: 0.35
-  flee_speed_coeff: 0.05
-  interception_coeff: 0.5
-  cloak_coeff: 0.03
-  damage_penalty: 0.25
-  flee_cap: 0.95
-  evade_base: 0.35
-  evade_speed_coeff: 0.06
-  evade_cap: 0.9
-  threat_damage_scale: 3.0
-  missile_damage: 30
-  missile_price: 300
-  swarm_size_min: 3
-  swarm_size_max: 5
-  # Localized damage (§4.1, WP26): a hull-reaching volley may knock out one
-  # component, weighted toward exposed/forward subsystems.
-  knockout_chance: 0.35
-  knockout_weights: { main_gun: 3.0, thrusters: 3.0, screens: 2.0, spindrive: 1.0 }
-  # Ship destruction (§10): hull 0 drops the player to this hull (price 0 — never sold).
+  # Flee: the odds of breaking off from combat entirely, clamped to [aliens.escape_floor, flee_cap].
+  flee_base: 0.35            # baseline flee chance before modifiers
+  flee_speed_coeff: 0.05     # + this per point your combat speed exceeds the enemy's
+  interception_coeff: 0.5    # − this × the enemy's interception rating (anti-flee)
+  cloak_coeff: 0.03          # + this per point of your cloak rating
+  damage_penalty: 0.25       # − up to this as your hull is worn down (a crippled ship runs slower)
+  flee_cap: 0.95             # upper clamp on flee chance (never a sure thing)
+  # Evade: the odds a single incoming attack misses, for evadable (ahead/spinal) arcs only.
+  evade_base: 0.35           # baseline evade chance per shot
+  evade_speed_coeff: 0.06    # + this per point of combat-speed advantage
+  evade_cap: 0.9             # upper clamp on evade chance
+  threat_damage_scale: 3.0   # an alien's per-shot damage = this × its threat rating
+  missile_damage: 30         # damage of one homing missile (ignores firing arc, always hits)
+  missile_price: 300         # StarDock price per missile reload
+  swarm_size_min: 3          # min ships when a pack/escort encounter spawns
+  swarm_size_max: 5          # max ships in such a pack
+  # Localized damage (§4.1, WP26): once a volley reaches the hull, it may knock out one
+  # subsystem component instead of just shaving hull, weighted toward exposed/forward gear.
+  knockout_chance: 0.35   # chance a hull-reaching hit disables a component (vs. plain hull loss)
+  knockout_weights: { main_gun: 3.0, thrusters: 3.0, screens: 2.0, spindrive: 1.0 }  # relative odds of which subsystem takes it
+  # Ship destruction (§10): hull reaching 0 drops the player into this hull (price 0 — never sold).
   escape_pod_class: escape_pod
-  # Salvage (§10, BNT 10–20%): per wreck, hull_max × salvage_hull_value × U[min,max]
-  # latinum, plus an occasional loose Tier-I component (needs a free hold).
-  salvage_frac_min: 0.10
-  salvage_frac_max: 0.20
-  salvage_hull_value: 3.0
-  salvage_component_chance: 0.25
+  # Salvage from a defeated foe (§10, BNT-style 10–20%): latinum = hull_max × salvage_hull_value
+  # × U[frac_min, frac_max], plus an occasional loose Tier-I component (needs a free hold).
+  salvage_frac_min: 0.10          # low end of the random salvage multiplier
+  salvage_frac_max: 0.20          # high end of the random salvage multiplier
+  salvage_hull_value: 3.0         # latinum value per point of the wreck's max hull
+  salvage_component_chance: 0.25  # chance a wreck also drops a scavengeable Tier-I component
 
 # Weapon catalog (§4): {damage, firing_arc, rate, special}. Referenced by ship-class
 # `armament` lists; arcs drive the §10 evasion counter-play.
@@ -171,26 +181,29 @@ weapons:
   heavy_lance:     { name: Heavy Lance,      damage: 26, firing_arc: ahead, rate: periodic }
 
 bigbang:
-  sector_count: 1000
+  sector_count: 1000          # total sectors (nodes) in the generated warp graph
   topology_mode: expansive    # graph shape: trunk (chokepoints) | expansive (band-lattice), §5
-  cluster_min: 5
-  cluster_max: 25
-  intra_group_degree: 2.5
-  bridges_min: 1
-  bridges_max: 5
-  one_way_chance: 0.15
-  max_warps_per_sector: 6
-  core_sector_count: 10
-  home_cluster_min: 3        # alliance home cluster size range (< Core), §5 step 6
+  cluster_min: 5              # smallest cluster of sectors the generator forms
+  cluster_max: 25            # largest such cluster (clusters are then bridged together, §5)
+  intra_group_degree: 2.5    # average warp connections per sector inside a cluster (density)
+  bridges_min: 1             # fewest bridge edges linking one cluster to the next
+  bridges_max: 5             # most bridge edges between two clusters
+  one_way_chance: 0.15       # probability a given warp edge is one-way (a trap/wormhole seam)
+  max_warps_per_sector: 6    # hard cap on a sector's outbound warps (keeps the UI grid readable)
+  core_sector_count: 10      # sectors reserved as the protected Core Space (sectors 1–10), §5
+  home_cluster_min: 3        # alliance home cluster size range (each < Core), §5 step 6
   home_cluster_max: 6
-  start_sector: stardock     # where the player starts: stardock | random | a sector number
-  stardock_min_hops: 2
-  stardock_max_hops: 5
-  port_density: 0.45
-  planet_density: 0.25
-  port_class_distribution: [20, 20, 20, 10, 10, 10, 5, 5]
-  initial_stock_min: 200
-  initial_stock_max: 2000
+  start_sector: stardock     # where the player starts: stardock | random | a specific sector number
+  stardock_min_hops: 2       # StarDock is placed this many warp hops from the Core, at least…
+  stardock_max_hops: 5       # …and at most this many (a short shakedown run from home)
+  port_density: 0.45         # fraction of sectors that hold a trading port
+  planet_density: 0.25       # fraction of sectors that hold a planet
+  port_class_distribution: [20, 20, 20, 10, 10, 10, 5, 5]  # relative weights of the 8 port buy/sell classes
+  initial_stock_min: 200     # low end of a port's randomized starting commodity stock
+  initial_stock_max: 2000    # high end of that starting stock
+  # Distance bands: each sector's band is set by its warp-hop distance from the Core, and band
+  # drives rarity, danger, and ownership everywhere else in this file. Windows below are for
+  # trunk topology; expansive mode uses bands_expansive instead (§5 step 5).
   bands:
     - { name: Hub,      min_hops: 0,  max_hops: 5 }
     - { name: Frontier, min_hops: 6,  max_hops: 12 }
@@ -228,12 +241,15 @@ engine_room:
 # band-weighted ownership. yield_profile multiplies per-commodity colonist output;
 # habitability caps colonist population (0 = uncolonizable, extraction-only).
 planets:
-  production_rate: 0.005     # output per (capped) colonist per tick (§A.3)
-  food_per_colonist: 0.05    # organics eaten per colonist per tick
-  growth_rate: 0.02          # colonist reproduction when fed
-  starvation_rate: 0.05      # colonist die-off when food runs out
-  jovian_scoop: 50           # fuel ore per tick, fuel-scooped (no colonists)
-  asteroid_mining: 50        # equipment per tick, mined (no colonists)
+  production_rate: 0.005     # commodity output per (habitability-capped) colonist per tick (§A.3)
+  food_per_colonist: 0.05    # organics each colonist eats per tick (unfed colonies starve)
+  growth_rate: 0.02          # colonist population growth per tick while fed
+  starvation_rate: 0.05      # colonist die-off per tick when the organics run out
+  jovian_scoop: 50           # fuel ore auto-scooped per tick from a gas giant (no colonists needed)
+  asteroid_mining: 50        # equipment auto-mined per tick from an asteroid belt (no colonists needed)
+  # Planet taxonomy. Each type fixes: whether colonists can live there (colonizable),
+  # the population ceiling (habitability; 0 = extraction-only, no colonists), and a
+  # yield_profile that multiplies per-commodity colonist output (§4.2).
   types:
     terrestrial_warm:  { colonizable: true,  habitability: 100000, yield_profile: { fuel_ore: 0.3, organics: 1.5, equipment: 0.5 } }
     terrestrial_cool:  { colonizable: true,  habitability: 120000, yield_profile: { fuel_ore: 0.3, organics: 1.3, equipment: 0.5 } }
@@ -245,11 +261,11 @@ planets:
   # Band-weighted owner roll (non-Core): alliance-owned vs unowned. The unowned
   # fraction is non-decreasing Hub→Frontier→Deep→Void (§4.2 invariant). Core worlds
   # are always governor-owned regardless of this table.
-  ownership:
-    Hub:      { alliance: 8, none: 2 }
+  ownership:  # per-band odds a non-Core planet is alliance-owned vs. unclaimed (none)
+    Hub:      { alliance: 8, none: 2 }   # near home: mostly claimed territory
     Frontier: { alliance: 5, none: 5 }
     Deep:     { alliance: 3, none: 7 }
-    Void:     { alliance: 1, none: 9 }
+    Void:     { alliance: 1, none: 9 }   # frontier: mostly free for the player to claim
 
 # Orbital starbases (§4.2, WP4): the engine-room model minus thrusters/spindrive,
 # plus a fusion_reactor (whose keystone `converter` powers the base). Owned worlds
@@ -257,9 +273,12 @@ planets:
 # world can carry a derelict — built then stripped of its reactor keystone, so the
 # remaining parts are a salvage cache the player can cannibalize.
 starbase:
-  ship_class_id: orbital_platform
-  owned_base_chance: 0.5      # an owned planet carries an intact defensive base
-  derelict_chance: 0.4        # an unowned, uninhabited planet carries a derelict
+  ship_class_id: orbital_platform  # the ship-class template a starbase is built from
+  owned_base_chance: 0.5      # chance an owned planet carries an intact, system-defending base
+  derelict_chance: 0.4        # chance an unowned, uninhabited planet carries a strippable derelict
+  # Starbase engine room: like a ship's, minus thrusters/spindrive, plus a fusion_reactor that
+  # powers the whole base. slot_count = total slots; keystone = the part whose loss kills the
+  # subsystem; base_components = what ships pre-filled; legal_components = what may be slotted.
   subsystems:
     fusion_reactor:
       slot_count: 4
@@ -282,47 +301,48 @@ starbase:
 # check on entry; nebulae interfere with that check. Rare+ finds yield artifact
 # barter-goods (mapped to a component tier, §8); lesser finds give latinum/components.
 discovery:
-  sector_density: 0.20        # fraction of sectors holding an open-space find
-  surface_site_chance: 0.5    # fraction of planets seeded with surface sites (WP6 reveals)
+  sector_density: 0.20        # fraction of sectors salted with an open-space find (wreck/nebula/…)
+  surface_site_chance: 0.5    # fraction of planets seeded with surface sites to explore (WP6)
   surface_sites_max: 3        # up to this many sites on a seeded planet (WP6)
-  # band -> rarity weights. Strongly separated so the mean-rarity gradient is monotone
-  # Hub -> Frontier -> Deep -> Void (the §5 step-8 validator asserts strictly rising).
+  # Per-band rarity weights for a find's tier. Strongly separated so the mean-rarity gradient
+  # rises monotonically Hub → Frontier → Deep → Void (the §5 step-8 validator asserts it).
   band_rarity_weights:
     Hub:      { COMMON: 80, UNCOMMON: 20 }
     Frontier: { COMMON: 25, UNCOMMON: 50, RARE: 25 }
     Deep:     { UNCOMMON: 20, RARE: 45, EXCEPTIONAL: 35 }
     Void:     { RARE: 15, EXCEPTIONAL: 45, LEGENDARY: 40 }
-  tier_value:  { COMMON: 250, UNCOMMON: 1000, RARE: 4000, EXCEPTIONAL: 12000, LEGENDARY: 30000 }
-  # Artifact payloads barter at a component tier (§8: Rare ≈ II, Exceptional ≈ III).
+  tier_value:  { COMMON: 250, UNCOMMON: 1000, RARE: 4000, EXCEPTIONAL: 12000, LEGENDARY: 30000 }  # latinum a find of each tier is worth
+  # Rare+ finds pay out as artifact barter-goods pegged to a component tier instead of latinum (§8).
   barter_equivalence: { RARE: II, EXCEPTIONAL: III, LEGENDARY: III }
-  # Min effective sensor rating to detect a hidden find of each tier (rarer = harder).
+  # Minimum effective sensor rating needed to detect a hidden find of each tier (rarer = harder).
   sensor_difficulty: { COMMON: 1, UNCOMMON: 2, RARE: 3, EXCEPTIONAL: 4, LEGENDARY: 5 }
-  nebula_interference: 2      # sensor rating subtracted while inside a nebula sector
-  # `entity` is NOT salted (DESIGN §7, WP34): the singular roaming Entity is a roster
-  # species flagged `singular_entity`, placed by the big bang — not a discovery object.
-  space_kinds:   { wreck: 5, nebula: 2, black_hole: 1 }
-  surface_kinds: { ruins: 4, artifact: 3, ancient_tech: 2, crashed_ship: 3 }
-  hidden_kinds: [wreck]   # phenomena are obvious; drifting finds need sensors
-  # Kinds barred from sharing a sector with a port (seam; empty ⇒ all may coexist).
+  nebula_interference: 2      # sensor rating subtracted while inside a nebula sector (fog)
+  # Relative weights for which *kind* of find is placed. `entity` is deliberately NOT here
+  # (DESIGN §7, WP34): the singular roaming Entity is a roster species flagged `singular_entity`,
+  # placed by the big bang — not a salted discovery object.
+  space_kinds:   { wreck: 5, nebula: 2, black_hole: 1 }                 # open-space phenomena
+  surface_kinds: { ruins: 4, artifact: 3, ancient_tech: 2, crashed_ship: 3 }  # planet-surface sites
+  hidden_kinds: [wreck]   # kinds that need a sensor check to spot; the rest are plainly visible on entry
+  # Kinds barred from sharing a sector with a port (a placement seam; empty ⇒ all may coexist).
   # Wormholes aren't listed here — they're force-placed on one-way edges, not rolled.
   port_incompatible_kinds: []
-  component_pool: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]
-  salvage_turn_cost: 2
-  scan_turn_cost: 1
+  component_pool: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]  # parts a find may drop
+  salvage_turn_cost: 2            # turns to salvage a wreck
+  scan_turn_cost: 1              # turns to run a sensor scan of the current sector
   descent_turn_cost: 3            # turns to land on a planet surface (WP6)
   explore_turn_cost: 1            # turns to reveal one surface site (WP6)
-  surface_hidden_min_rank: 3      # Rare+ surface sites need a sensor sweep to reveal
-  black_hole_gravity_warp: false  # Phase-3 hazard seam; inert in Phase 2
-  black_hole_warp_turn_cost: 5
+  surface_hidden_min_rank: 3      # surface sites of this rarity rank and up need a sensor sweep to reveal
+  black_hole_gravity_warp: false  # Phase-3 hazard seam (black holes fling you off-course); inert in Phase 2
+  black_hole_warp_turn_cost: 5    # extra turns a black-hole gravity warp will cost once that hazard is live
 
 # Genesis torpedoes (§4.2, WP10): a StarDock device that terraforms a dead, unowned
 # world (barren / asteroid belt / gas giant) into a colonizable terrestrial, ready to
 # claim. A latinum sink at the high end of the economy.
 genesis:
-  device_id: genesis_torpedo
-  price: 15000
-  result_type: terrestrial_warm
-  eligible_types: [barren, asteroid_belt, jovian, terrestrial_hot, terrestrial_cold]
+  device_id: genesis_torpedo   # the StarDock item id this rule applies to
+  price: 15000                 # latinum cost of one Genesis torpedo (a high-end sink)
+  result_type: terrestrial_warm  # what an eligible world is transformed into
+  eligible_types: [barren, asteroid_belt, jovian, terrestrial_hot, terrestrial_cold]  # dead/marginal worlds a torpedo can terraform
 
 # The starter hull — a Trailblazer-class explorer (§4). Its engine room is built
 # "complete but minimal": every base slot filled at Tier I, every upgrade slot
@@ -331,16 +351,19 @@ genesis:
 starter_ship:
   id: trailblazer
   name: S.S. Wayfarer
-  role: transport
-  holds_total: 60
-  turns_per_warp: 1
-  shields_max: 100
-  warp_speed: 3
-  combat_speed: 4
-  cloak_rating: 0
-  sensor_rating: 2
-  hull_max: 100
-  colonist_capacity: 100
+  role: transport          # ship-class role (transport / fighter / warship / capital_warship / …)
+  holds_total: 60          # cargo hold capacity, in commodity units
+  turns_per_warp: 1        # base turn cost per warp (the engine room may derive a live value)
+  shields_max: 100         # shield cap (aspect fallback/cap; live value derived from the screens slots)
+  warp_speed: 3            # travel speed (fallback/cap; derived from the spindrive slots)
+  combat_speed: 4          # evasion speed in combat (fallback/cap; derived from the thrusters slots)
+  cloak_rating: 0          # stealth vs. enemy sensors (0 = none)
+  sensor_rating: 2         # detection strength for hidden finds and cloaked foes
+  hull_max: 100            # hull hit points before destruction (drops to the escape pod)
+  colonist_capacity: 100   # colonists carried (a separate limit from cargo holds)
+  # Engine room: the four slotted subsystems whose filled parts derive the live aspects above.
+  # slot_count = total slots; keystone = the part whose loss disables the subsystem;
+  # base_components = pre-filled at Tier I; legal_components = what may be slotted here.
   subsystems:
     spindrive:
       slot_count: 5
@@ -367,13 +390,17 @@ starter_ship:
 # which tiers. Prices come from the economy block; Tier III is barter-only and is
 # deliberately absent here.
 hardware:
-  components: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]
-  tiers: [I, II]
+  components: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]  # component kinds StarDock sells
+  tiers: [I, II]  # tiers offered for latinum here; Tier III is barter-only and intentionally absent
 
 # Buyable hulls beyond the free starter (§4 v1 set; price band ~20k–150k rising
 # with role, DESIGN §8). Each is an engine-room hull (the player ship is always
 # slotted): bigger roles get more slots (upgrade headroom) and richer base loadouts.
 # The flat aspect scalars are caps/fallbacks; live aspects derive from the slots.
+# Per-hull extras: price (latinum to buy); armament (weapon ids from the `weapons`
+# catalog, whose firing arcs drive §10 evasion); defenses ({type, value} damage
+# mitigation); missiles (homing-missile magazine size). Fields carry the same
+# meaning as in starter_ship above.
 ship_classes:
   - id: scout_marauder
     name: Scout Marauder
