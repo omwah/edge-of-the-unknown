@@ -21,9 +21,9 @@ command stream and a journey replays exactly (H4). The flow, per sector entered:
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from edge.core.aliens import effective_disposition, grudge_shift
+from edge.core.aliens import FRIENDLY, disposition_band, effective_disposition, grudge_shift
 from edge.core.config import GameConfig, PackConfig, SpeciesConfig
 from edge.core.discovery import sector_has_nebula
 from edge.core.models import AlienSpecies, Encounter, EncounterFoe, Player, Ship, UniverseState
@@ -112,6 +112,11 @@ def roll_encounter(
             violence = (amity - disp) / (amity - hostility)
         if violence > 0.0 and rng.random() < violence:
             pack = spawn_pack(species, sc, sector_id, ship, config, rng)
+            # The opener beat (§6.7, WP31): a friendly-band species opening fire —
+            # a grudge-shifted violence roll — is a betrayal, not a mere attack.
+            band = disposition_band(effective_disposition(species, player), config.aliens)
+            opener = "betrayal" if band == FRIENDLY else "combat_open"
+            pack = replace(pack, speech_context=opener)
             return EncounterRoll(species=species, detected=True, hostile=True, encounter=pack)
     return EncounterRoll(species=species, detected=True, hostile=False)
 

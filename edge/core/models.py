@@ -367,6 +367,10 @@ class Encounter:
     round: int = 0
     player_shields: int = 0
     detected: bool = True  # the species' sensors found the player (False never stores)
+    # The combat beat the pack last spoke (§6.7, WP31) — a context key (`combat_open` /
+    # `betrayal` at spawn, `combat_taunt` / `surrender` per round) the encounter screen
+    # renders read-only; the reducers advance its recency ring so repeats rephrase.
+    speech_context: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

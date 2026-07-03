@@ -452,3 +452,67 @@ def test_encounter_end_writes_the_last_combat_record() -> None:
     apply_result(state, reduce(state, 1, CombatAction(action="fight"), SMALL))
     assert state.players[1].last_combat == LastCombat(
         species=kind, outcome=combat.VICTORY, day=state.game.day_number)
+
+
+# --- WP31: combat dialogue ----------------------------------------------------------
+
+
+def test_round_beat_taunts_and_renders_keyed_to_round_facts() -> None:
+    """The pack taunts each ongoing round; the beat is keyed to the post-round encounter
+    facts and the encounter screen renders the same line (shared fact assembly)."""
+    from edge.core.config import RosterConfig
+    from edge.server import session
+
+    state = _fight_state()
+    _engagement(state, (_foe(hull=10_000, hull_max=10_000, shields=0, damage=1),))
+    sp = state.species[state.players[1].active_encounter.species_id]
+    data = SMALL.roster.model_dump()
+    target = next(s for s in data["species"] if s["id"] == sp.roster_id)
+    target.setdefault("dialogue_pack", {})["combat_taunt"] = [
+        {"when": {"criteria": {"round": 1}}, "variants": ["First blood!"]},
+        {"variants": ["Still you resist."]},
+    ]
+    cfg = SMALL.model_copy(update={"roster": RosterConfig.model_validate(data)})
+
+    result = reduce(state, 1, CombatAction(action="fight"), cfg)
+    apply_result(state, result)
+    from edge.core.events import AlienSpoke
+    assert any(isinstance(e, AlienSpoke) and e.context == "combat_taunt"
+               for e in result.events)
+    enc = state.players[1].active_encounter
+    assert enc is not None and enc.speech_context == "combat_taunt"
+    view = session.encounter_view(state, 1, cfg)
+    assert view is not None and view.speech == "First blood!"  # round-1 keyed entry
+
+    apply_result(state, reduce(state, 1, CombatAction(action="fight"), cfg))
+    assert session.encounter_view(state, 1, cfg).speech == "Still you resist."
+
+
+def test_bloodied_pack_sues_for_quarter() -> None:
+    state = _fight_state()
+    _engagement(state, (_foe(hull=0), _foe(hull=0),
+                        _foe(hull=10_000, hull_max=10_000, shields=0, damage=1)))
+    apply_result(state, reduce(state, 1, CombatAction(action="fight"), SMALL))
+    enc = state.players[1].active_encounter
+    assert enc is not None and enc.speech_context == "surrender"  # over half destroyed
+
+
+def test_flee_scorn_spoken_when_the_player_escapes() -> None:
+    from edge.core.events import AlienSpoke
+    from edge.dialogue import instance_key
+
+    state = _fight_state()
+    _engagement(state, (_foe(hull=10_000, hull_max=10_000, shields=0, damage=1),))
+    sp = state.species[state.players[1].active_encounter.species_id]
+    result = None
+    for _ in range(400):
+        result = reduce(state, 1, CombatAction(action="flee"), SMALL)
+        apply_result(state, result)
+        if state.players[1].active_encounter is None:
+            break
+    assert state.players[1].active_encounter is None
+    spoke = [e for e in result.events if isinstance(e, AlienSpoke)]
+    assert [e.context for e in spoke] == ["flee_scorn"]
+    assert state.players[1].dialogue_recency[(instance_key(sp), "flee_scorn")]
+    names = [type(e).__name__ for e in result.events]
+    assert names.index("AlienSpoke") < names.index("EncounterEnded")  # scorn, then the record

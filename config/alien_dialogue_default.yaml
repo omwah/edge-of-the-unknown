@@ -108,6 +108,13 @@
 # flags onto the player's per-species arc state; every stored flag is surfaced as
 #   arc.<flag>: <value>             # e.g. { criteria: { arc.oath_sworn: true } } — ABSENT
 #                                   #   until set, so gate unlocks on the flag being present.
+# ENCOUNTER facts (live-fight state, DESIGN §6.7/WP31): present only while a COMBAT beat is
+# selected (all other layers above also apply there). Keys:
+#   round: <int>                    # resolved round counter (0 at the opener beat).
+#   pack_size: <int>                # the pack's spawn size.
+#   foes_left: <int>                # survivors still fighting.
+#   pack_bloodied: true|false       # at least half the pack destroyed (surrender trigger).
+#   shields_down: true|false        # the player's fight-local shield pool is gone.
 #
 # --- A DialogueChoice (authored player reply) ------------------------------------------------
 # The node's `choices` are the player's reply menu — the WHOLE menu (there is no code-derived
@@ -139,7 +146,10 @@
 #   discovery: offer_coordinates                 (the location-tip "map" mechanic)
 #   lore:      dossier_self  dossier_other
 #   encounter: refuel  extort_response  demand  reward
-#   combat (Phase-3, peaceful=false; authored-but-inert in Phase 2):
+#   combat (LIVE since WP31 — spoken only by the encounter reducers: combat_open/betrayal at
+#           the violent interception, combat_taunt/surrender per round, flee_scorn at the
+#           player's escape; a `combatant` species with a fleet must resolve all five, and
+#           they are never reachable through conversation):
 #              combat_open  combat_taunt  surrender  flee_scorn  betrayal
 #   branch.<name>:  an authored intermediate node, reachable ONLY as a choice `next_context`.
 #   sig.<name>:     a Phase-3 signature-mechanic prompt (reserved namespace).

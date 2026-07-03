@@ -719,19 +719,50 @@ golden.
 
 ### WP31 — Combat dialogue live (M)
 
-The `peaceful=False` intents (`combat_open`, `combat_taunt`, `surrender`,
-`flee_scorn`, `betrayal`) become reachable from the encounter reducers, keyed
-to encounter facts (round, damage dealt/taken, pack size, fleeing);
-`EncounterScreen` renders the lines; recency rings advance through combat
-commands exactly as `Converse` does. The `_converse` guard still blocks
-*conversational* access to combat contexts.
+The pack speaks. **Shipped.** — milestone **M12 mechanics complete** (WP32 is
+authoring).
 
-Files: `edge/core/rules.py`, `edge/core/combat.py`,
-`edge/dialogue/intents.py`, `edge/server/session.py`,
-`edge/tui/screens/encounter.py`, spec sync (H9), `tests/test_dialogue.py`,
-`tests/test_combat.py`.
-Tests: taunt keyed to round facts; surrender/flee-scorn fire on the right
-outcomes; replay-stable.
+- **`Encounter.speech_context`** (hashed): the beat the pack last spoke, set
+  by the reducers and rendered read-only by `encounter_view` into the new
+  `EncounterDTO.speech`; the `EncounterScreen` shows it as a voiced quote
+  under the banner, and the log records each beat via a fixed
+  `format_event` body (`AlienSpoke` stays silent for conversation).
+- **Beats:** the violent interception stamps the opener in
+  `encounters.roll_encounter` — **`betrayal`** when the species' visible
+  standing band is friendly (a grudge-shifted violence roll), else
+  `combat_open`; each ongoing `CombatAction` round speaks `combat_taunt`, or
+  **`surrender`** once the pack is bloodied (≥ half destroyed); a successful
+  flee speaks `flee_scorn` before `EncounterEnded`. Victory/destruction stay
+  wordless (outcome notes carry those).
+- **`_combat_speak`** — the combat sibling of `_speak_context`: advances the
+  per-instance recency ring through the movement/combat command (H4-clean,
+  the derived `encounter_rng`), selects under the shared fact assembly
+  (situational + callback + arc) plus the new **encounter facts**
+  (`facts.encounter_facts`: `round`, `pack_size`, `foes_left`,
+  `pack_bloodied`, `shields_down` — all derived from the hashed `Encounter`,
+  so reducer and projection agree), but never opens a session or marks the
+  species met — a firefight is not a visit. `_roll_encounter` now returns the
+  player so the opener's ring advance rides `Warp`/`TravelTo`.
+- **Guard unchanged:** `reachable_contexts` still excludes `peaceful=False`
+  intents, so `Converse` cannot reach combat beats; the new
+  `dialogue.combat_contexts(sc)` names what a `combatant`+fleet species can
+  be driven to, and `validate_dialogue` now proves those resolve too.
+- **H9 sync:** corpus header marks the combat contexts LIVE and adds the
+  ENCOUNTER facts vocabulary; the authoring prompt gains per-beat briefs
+  (combat_open/taunt/surrender/flee_scorn/betrayal) for WP32; DESIGN §6.7's
+  encounter-fact list aligned to the implemented vocabulary.
+
+Files: `edge/core/models.py`, `edge/core/encounters.py`,
+`edge/core/rules.py`, `edge/dialogue/{facts,select,intents}.py`
+(+`__init__`), `edge/core/dto.py`, `edge/server/session.py`,
+`edge/tui/screens/encounter.py`, `edge/dialogue/authoring/pipeline.py`,
+`config/alien_dialogue_default.yaml` (header), `docs/DESIGN.md` (§6.7),
+`tests/test_dialogue.py`, `tests/test_combat.py`, `tests/test_encounters.py`.
+Tests: encounter-fact derivation + combat-context gating; a round-1-keyed
+taunt renders on the view and rotates next round; a bloodied pack sues for
+quarter; flee scorn fires (ring advanced, ordered before `EncounterEnded`);
+the violent opener speaks `combat_open`, and a grudge-pushed friendly opens
+with `betrayal`; the fight/interrupted-travel goldens stay replay-stable.
 
 ### WP32 — Corpus expansion (M, mostly authoring)
 

@@ -682,7 +682,8 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
     detected, det_events = _detect_in_sector(
         state, player.detected, ship.sensor_rating, cmd.to_sector, player_id, config)
     law_events = _core_law_events(state, player, ship.sector_id, cmd.to_sector, config)
-    encounter, _halt, enc_events = _roll_encounter(state, player, ship, cmd.to_sector, config)
+    player, encounter, _halt, enc_events = _roll_encounter(
+        state, player, ship, cmd.to_sector, config)
     new_player = replace(
         player,
         turns_remaining=player.turns_remaining - cost,
@@ -723,25 +724,33 @@ def _core_law_events(
 
 def _roll_encounter(
     state: UniverseState, player: Player, ship: Ship, sector_id: int, config: GameConfig,
-) -> tuple[Encounter | None, bool, tuple[Event, ...]]:
+) -> tuple[Player, Encounter | None, bool, tuple[Event, ...]]:
     """The §10 encounter roll on entering `sector_id` (WP24).
 
-    Returns `(encounter, halt, events)`: `encounter` goes onto
+    Returns `(player, encounter, halt, events)`: `encounter` goes onto
     `Player.active_encounter` on a violence opener; `halt` stops a multi-hop journey
     (any *detected* encounter halts — a greeting hands off to the contact screen, a
     fight to the encounter screen); an undetected slip-away neither halts nor stores.
-    Draws from `state.rng` inside the reducer (H4), so a journey replays exactly.
+    A violence opener also speaks its beat (`combat_open` / `betrayal`, §6.7 WP31) —
+    the returned player carries the advanced recency ring. Draws from `state.rng`
+    inside the reducer (H4), so a journey replays exactly.
     """
     roll = encounters.roll_encounter(state, player, ship, sector_id, config, state.rng)
     if roll is None:
-        return None, False, ()
+        return player, None, False, ()
     if not roll.detected:
-        return None, False, (EncounterEvaded(player.id, roll.species.id, sector_id),)
+        return player, None, False, (EncounterEvaded(player.id, roll.species.id, sector_id),)
     band = state.sectors[sector_id].distance_band
     pack_size = len(roll.encounter.foes) if roll.encounter is not None else 0
-    started = EncounterStarted(
-        player.id, roll.species.id, sector_id, roll.hostile, pack_size, band)
-    return roll.encounter, True, (started,)
+    events: list[Event] = [EncounterStarted(
+        player.id, roll.species.id, sector_id, roll.hostile, pack_size, band)]
+    if (roll.encounter is not None and roll.encounter.speech_context is not None
+            and config.roster is not None):
+        player, spoke = _combat_speak(
+            state, player, roll.species, roll.encounter.speech_context, config,
+            dialogue_facts.encounter_facts(roll.encounter))
+        events.append(spoke)
+    return player, roll.encounter, True, tuple(events)
 
 
 def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameConfig) -> ReduceResult:
@@ -796,7 +805,7 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
         events.extend(_core_law_events(state, player, current, nxt, config))
         current = nxt
         # The §10 encounter roll — the journey halts *at* the interrupted hop (WP24).
-        encounter, halt, enc_events = _roll_encounter(state, player, ship, nxt, config)
+        player, encounter, halt, enc_events = _roll_encounter(state, player, ship, nxt, config)
         events.extend(enc_events)
         if halt:
             break
@@ -1384,6 +1393,17 @@ def _combat_action(
         sub, slot_index, component = result.knockout
         new_ship = apply_derived(new_ship, config)
         events.append(ComponentKnockedOut(player_id, sub.value, slot_index, component))
+    if (result.outcome is None and result.encounter is not None
+            and species is not None and sc is not None):
+        # The pack speaks its round beat (§6.7, WP31): a taunt while it presses the
+        # attack, suing for quarter once bloodied. Keyed to the post-round encounter
+        # facts — the very state the encounter screen renders the line under.
+        enc_facts = dialogue_facts.encounter_facts(result.encounter)
+        beat = "surrender" if enc_facts["pack_bloodied"] else "combat_taunt"
+        new_player = replace(
+            new_player, active_encounter=replace(result.encounter, speech_context=beat))
+        new_player, spoke = _combat_speak(state, new_player, species, beat, config, enc_facts)
+        events.append(spoke)
     if result.outcome == combat.VICTORY:
         new_ship, salvage = _combat_salvage(player_id, enc, new_ship, config, state.rng)
         new_player = replace(new_player, latinum=new_player.latinum + salvage.latinum)
@@ -1394,6 +1414,12 @@ def _combat_action(
         events.append(ShipDestroyed(
             player_id, enc.species_id, new_ship.sector_id, new_ship.type_id))
         new_ship = _escape_pod(new_ship, config)
+    elif result.outcome == combat.FLED and species is not None and sc is not None:
+        # Parting scorn at the player's retreating engines (§6.7, WP31) — the ring
+        # advances so a repeat escape from this pack is jeered differently.
+        new_player, spoke = _combat_speak(state, new_player, species, "flee_scorn", config,
+                                          dialogue_facts.encounter_facts(enc))
+        events.append(spoke)
     if result.outcome is not None:
         if species is not None:
             # The H5 record situational dialogue facts read (`just_fled_combat`, §6.7)
@@ -1743,6 +1769,31 @@ def _speak_context(state: UniverseState, player: Player, ship: Ship, species: Al
         dialogue_recency=_advance_recency(player, key, context, new_ring),
         contact_session=None if context == "farewell" else session)
     return new_player, AlienSpoke(player.id, species.id, context, subject_id)
+
+
+def _combat_speak(state: UniverseState, player: Player, species: AlienSpecies, context: str,
+                  config: GameConfig, facts: Mapping[str, object]) -> tuple[Player, AlienSpoke]:
+    """Speak a combat beat in the species' voice (§6.7, WP31): advance its recency ring.
+
+    The combat sibling of `_speak_context`, minus the visit bookkeeping — a firefight is
+    not a conversation, so it never opens a session, marks the species met, or stamps
+    `species_last_seen`. Selection reads the same shared fact assembly (situational +
+    callback + arc layers under the encounter facts), and the ring advances through the
+    command exactly as `Converse` does, so repeat interceptions rephrase and the fight
+    replays exactly. The encounter screen renders the beat read-only from
+    `Encounter.speech_context`.
+    """
+    assert config.roster is not None
+    all_facts = dialogue_facts.contact_facts(state, player, species,
+                                             roster=config.roster, extra=facts)
+    key = dialogue.instance_key(species)
+    ring = player.dialogue_recency.get((key, context), ())
+    rng = dialogue.encounter_rng(state.game.seed, key, context, ring)
+    _, new_ring = dialogue.speak(config.roster, species, player, context,
+                                 aliens=config.aliens, rng=rng, facts=all_facts)
+    new_player = replace(
+        player, dialogue_recency=_advance_recency(player, key, context, new_ring))
+    return new_player, AlienSpoke(player.id, species.id, context, None)
 
 
 def _converse(state: UniverseState, player_id: int, cmd: Converse,
