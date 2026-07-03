@@ -558,7 +558,7 @@ def test_discovery_experience_awarded_on_codex_stamp() -> None:
 def test_core_law_notice_for_criminals_only() -> None:
     """WP27 Core-law basics: a criminal crossing into the Core is put on notice, once
     per crossing; a lawful player never is."""
-    state = generate_with_player(SMALL, 3)
+    state = generate_with_player(SMALL, 4)
     player = state.players[1]
     ship = state.ships[player.ship_id]
     assert state.sectors[ship.sector_id].is_galactic_core  # enrolment starts in the Core
@@ -604,3 +604,32 @@ def test_seeded_grudges_land_for_cast_pairs() -> None:
     state.species = {1: replace(_species(sid=1), roster_id="vennrith")}
     _seed_grudges(state, CFG.roster)
     assert not any(g.target == "quill" for g in state.grudges.values())
+
+
+# --- WP34: the singular roaming Entity (§7) ---------------------------------
+
+_ENTITY_MODES = [
+    SMALL.model_copy(update={"bigbang": SMALL.bigbang.model_copy(update={"topology_mode": m})})
+    for m in ("trunk", "expansive")
+]
+
+
+@pytest.mark.parametrize("mode_cfg", _ENTITY_MODES, ids=["trunk", "expansive"])
+@pytest.mark.parametrize("seed", range(50))
+def test_singular_entity_unique_and_never_core(mode_cfg, seed: int) -> None:  # type: ignore[no-untyped-def]
+    """The Entity is always drawn, exactly once, with no satellites, and never in the Core."""
+    state = generate(mode_cfg, seed)
+    entity_kinds = {s.id for s in CFG.roster.species if s.singular_entity}
+    assert entity_kinds  # the default roster flags the Concordance
+    instances = [sp for sp in state.species.values() if sp.roster_id in entity_kinds]
+    assert len(instances) == 1  # exactly one, no cluster satellites
+    assert not state.sectors[instances[0].sector_id].is_galactic_core
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_singular_entity_spawns_in_a_deep_band(seed: int) -> None:
+    """At the ~1000-sector default scale the Entity spawns in a deep band (its Void hint)."""
+    state = generate(CFG, seed)  # the shipped default (expansive, all bands live)
+    entity = next(sp for sp in state.species.values()
+                  if sp.roster_id == "concordance")
+    assert state.sectors[entity.sector_id].distance_band in {"Deep", "Void"}

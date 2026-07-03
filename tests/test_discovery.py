@@ -194,7 +194,7 @@ def test_salvage_component_payload_into_hold() -> None:
 
 
 def test_salvage_artifact_payload_into_barter_store() -> None:
-    state = generate_with_player(CONFIG, 3)  # type: ignore[arg-type]
+    state = generate_with_player(CONFIG, 9)  # type: ignore[arg-type]
     disc = _space_find(state, PayloadKind.ARTIFACT)
     _park_and_detect(state, disc)
     tier = disc.payload.barter_tier
@@ -343,3 +343,16 @@ def test_terrestrial_guarantee_does_not_blanket_other_planet_types() -> None:
             if not any(d.rarity_tier.value >= RarityTier.UNCOMMON.value for d in sites):
                 return  # a non-terrestrial world without a forced uncommon — guarantee is scoped
     raise AssertionError("expected some non-terrestrial planet without a forced uncommon site")
+
+
+# --- WP34: `entity` removed from the salt tables (§7) ------------------------
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_entity_kind_is_never_salted(seed: int) -> None:
+    """The singular Entity is a placed roster species, not a discovery — so salting the
+    space tables never produces an `entity` discovery (DESIGN §7, WP34)."""
+    from edge.core.enums import DiscoveryKind
+
+    state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
+    assert not any(d.kind is DiscoveryKind.ENTITY for d in state.discoveries.values())

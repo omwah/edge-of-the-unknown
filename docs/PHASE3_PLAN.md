@@ -840,27 +840,33 @@ identical `state_hash`; the sig corpus stays `validate_dialogue`-green.
 
 ### WP34 — The Entity: generation, roster flag, salvage-table removal (M)
 
-- `SpeciesConfig.singular_entity: bool` — an explicit flag (not
-  archetype-string matching, keeping rosters free to vary); the default
-  roster sets it on `concordance`, whose lore updates fixed-lair → roaming
-  (`home_band: Void` kept as the spawn hint).
-- **Remove `entity` from `space_kinds` / `hidden_kinds`** in
-  `config/default.yaml`; `DiscoveryKind.ENTITY` survives as an enum (codex
-  art keys) but is never salted.
-- `populate_species` special-cases the flag: always drawn, exactly one
-  instance, spawned in a deep-band sector, **excluded** from the per-band
-  guarantee accounting, `ships_per_home` clustering, and the StarDock/Core
-  paths. `combatant: false` + `fleet: []` are honored (WP24 already
-  guarantees no violence path).
-- Validator: exactly one Entity instance; never in the Core.
-- **M13 golden batch** (discovery-salting draw order shifts).
+**Shipped.**
+
+- `SpeciesConfig.singular_entity: bool` — an explicit flag (not archetype-string
+  matching, keeping rosters free to vary); the default roster sets it on
+  `concordance` (lore already roaming from WP32; `home_band: Void` is the spawn hint).
+- **Removed `entity` from `space_kinds` / `hidden_kinds`** in
+  `config/default.yaml`; `DiscoveryKind.ENTITY` survives as an enum (codex art keys)
+  but is never salted — `_roll_kind` reads the weights, so dropping it is sufficient.
+- `populate_species` special-cases the flag: excluded from the seeded subset `pool`
+  and the StarDock `welcome` list, then placed by the new `_place_entity` — always
+  drawn, **exactly one** instance, in a deep band (its `home_band` hint, else the
+  deepest live band inward), no cluster satellites, never Core/StarDock, drawn
+  peaceable (anchor draw — an impartial arbiter that greets whoever finds it).
+  `combatant: false` + empty `fleet` are honored at contact (WP24 — no violence path).
+- Validator (`_check_species`): exactly one Entity instance; never in the Core.
+- **M13 golden batch:** removing `entity` and adding the Entity shift the generation
+  draw order (and the validation-retry cadence). Goldens re-baseline via
+  self-consistency (no `config_version` bump). Two seed-pinned functional tests
+  re-baselined to working seeds (`test_salvage_artifact_payload` 3→9;
+  `test_core_law_notice` 3→4 — seed 3 now places the small-universe StarDock outside
+  the Core). Full suite green.
 
 Files: `edge/core/config.py`, `config/default.yaml`,
 `config/alien_roster_default.yaml`, `edge/bigbang/aliens.py`,
-`edge/bigbang/discoveries.py`, `edge/bigbang/validate.py`,
-`tests/test_aliens.py`, `tests/test_discovery.py`.
-Tests: 100-seed uniqueness/placement (both modes); salting no longer
-produces entity discoveries.
+`edge/bigbang/validate.py`, `tests/test_aliens.py`, `tests/test_discovery.py`.
+Tests: singular-entity uniqueness + never-Core across 50 seeds × both modes;
+deep-band spawn at the 1000-sector default; `entity` never salted across seeds.
 
 ### WP35 — Entity presence: hint, gated contact, art, codex (M)
 

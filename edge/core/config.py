@@ -806,6 +806,13 @@ class SpeciesConfig(BaseModel):
     starbase_policy: Literal[
         "none", "homeworld", "territorial", "secret", "nomadic_holding"
     ] = "none"
+    # The one roaming, dialogue-only singular being (DESIGN §7, WP34): an explicit flag
+    # (not archetype-string matching, so rosters vary freely). The big bang always draws it
+    # (outside the seeded subset), fields exactly one instance in a deep band, and excludes
+    # it from clustering / the per-band resupply guarantee / the Core + StarDock paths. It
+    # replaces the salted `entity` discovery kind entirely; met only as a voice, never fought
+    # (pair with `combatant: false` + empty `fleet`). Codex art keys off `DiscoveryKind.ENTITY`.
+    singular_entity: bool = False
     attitude_gain_rate: float = 0.1
     attitude_loss_rate: float = 0.2
     # Inter-species stance overrides (§6.4: sparse, atop alliance-derived defaults) and
