@@ -425,6 +425,7 @@ species:
     threat_rating: 0.0
     interception_rating: 0.0
     combatant: false
+    singular_entity: true          # the one roaming dialogue-only being (§7, WP34)
     memory_model: never_forgets
     betrayal_model: permanent
     befriend_price: [prove]

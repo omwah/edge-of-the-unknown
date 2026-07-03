@@ -104,7 +104,10 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     # Governing-alliance members are excluded here — they are settled in the Core + home
     # lanes by `_populate_governing_space`, the only path that enters the Core (WP18).
     gov = state.game.core_governing_alliance_id
-    pool = sorted((s for s in roster.species if s.alliance_id != gov), key=lambda s: s.id)
+    # The singular Entity (§7) is placed separately (`_place_entity`) — always, outside the
+    # seeded subset and the per-band accounting — so keep it out of the ordinary draw pool.
+    pool = sorted((s for s in roster.species if s.alliance_id != gov and not s.singular_entity),
+                  key=lambda s: s.id)
     rng.shuffle(pool)
     lo = max(roster.subset_min, len(live_bands))
     hi = max(roster.subset_max, lo)
@@ -142,6 +145,7 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
         next_id = _place_cluster(placed, next_id, sp, home, band,
                                  base, state, config, rng, reserved=reserved)
 
+    _place_entity(state, config, roster, rng, placed, bases, reserved)
     _populate_governing_space(state, config, roster, rng, placed, bases)
     _place_stardock_contacts(state, config, roster, rng, placed, bases)
     state.species = placed
@@ -345,6 +349,42 @@ def _place_cluster(placed: dict[int, AlienSpecies], next_id: int, sp: SpeciesCon
     return next_id
 
 
+def _place_entity(state: UniverseState, config: GameConfig, roster: RosterConfig,
+                  rng: random.Random, placed: dict[int, AlienSpecies],
+                  bases: dict[str, float], reserved: frozenset[int]) -> None:
+    """Place the singular roaming Entity (DESIGN §7, WP34) — exactly one, deep-band, no satellites.
+
+    The roster's `singular_entity` species (the Concordance) is **always** drawn — never subject
+    to the seeded subset or the per-band resupply accounting — and fielded as **one** instance in
+    a deep band (its `home_band` hint, else the deepest live band with sectors), never in the Core
+    or on the reserved StarDock sector, and with no cluster satellites. It is drawn peaceable (an
+    impartial arbiter that greets whoever finds it); it fields no ships and never fights
+    (`combatant: false` + empty `fleet`, honoured at contact/encounter time, WP24), so the
+    encounter is always the conversation. A roster with no flagged species places nothing.
+    """
+    entity = next((s for s in roster.species if s.singular_entity), None)
+    if entity is None:
+        return
+    band_order = [b.name for b in config.bigbang.active_bands()]
+    core_ids = {s.id for s in state.sectors.values() if s.is_galactic_core}
+
+    def sectors_in(band: str) -> list[int]:
+        return sorted(sid for sid, s in state.sectors.items()
+                      if s.distance_band == band and sid not in core_ids and sid not in reserved)
+
+    # Prefer the roster's `home_band` spawn hint (Void), then the deepest live band inward.
+    prefer = [entity.home_band] if entity.home_band else []
+    for band in [*prefer, *reversed(band_order)]:
+        candidates = sectors_in(band)
+        if not candidates:
+            continue
+        home = rng.choice(candidates)
+        base = _base_for(bases, entity, band, True, config, rng)  # peaceable (anchor draw)
+        next_id = max(placed, default=0) + 1
+        placed[next_id] = _make_species(next_id, entity, home, band, base, config)
+        return
+
+
 def _assign_region_control(state: UniverseState, placed: dict[int, AlienSpecies]) -> None:
     """Stamp each region's controlling species/alliance from the species placed in it.
 
@@ -456,7 +496,8 @@ def _place_stardock_contacts(state: UniverseState, config: GameConfig, roster: R
     hostile_kinds = {sp.roster_id for sp in placed.values()
                      if not is_friendly(sp.base_disposition, config.aliens)}
     welcome = [s for s in sorted(roster.species, key=lambda s: s.id)
-               if s.alliance_id in (gov, None) and s.id not in hostile_kinds]
+               if s.alliance_id in (gov, None) and s.id not in hostile_kinds
+               and not s.singular_entity]  # the roaming Entity never idles at the dock (§7)
     already = {s.roster_id for s in placed.values()}
     fresh = [s for s in welcome if s.id not in already]
     pick_from = fresh if len(fresh) >= want else welcome

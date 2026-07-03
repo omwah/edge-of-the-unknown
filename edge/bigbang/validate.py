@@ -230,6 +230,17 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
         if friendly:
             friendly_bands.add(band)
 
+    # The singular Entity (§7, WP34): if the roster flags one, exactly one instance exists
+    # and it never sits in the Core (it roams the deep bands, drift begins WP36).
+    entity_kinds = {s.id for s in config.roster.species if s.singular_entity}
+    if entity_kinds:
+        instances = [sp for sp in state.species.values() if sp.roster_id in entity_kinds]
+        if len(instances) != 1:
+            raise ValidationError(
+                f"expected exactly one singular Entity, found {len(instances)}")
+        if instances[0].sector_id in core_ids:
+            raise ValidationError("the singular Entity is placed in Core Space")
+
     # The governor inhabits its own capital: if the roster fields governing members, at
     # least one must be settled in the Core (WP18).
     if config.roster is not None and any(

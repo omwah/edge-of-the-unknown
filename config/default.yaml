@@ -298,9 +298,11 @@ discovery:
   # Min effective sensor rating to detect a hidden find of each tier (rarer = harder).
   sensor_difficulty: { COMMON: 1, UNCOMMON: 2, RARE: 3, EXCEPTIONAL: 4, LEGENDARY: 5 }
   nebula_interference: 2      # sensor rating subtracted while inside a nebula sector
-  space_kinds:   { wreck: 5, entity: 3, nebula: 2, black_hole: 1 }
+  # `entity` is NOT salted (DESIGN §7, WP34): the singular roaming Entity is a roster
+  # species flagged `singular_entity`, placed by the big bang — not a discovery object.
+  space_kinds:   { wreck: 5, nebula: 2, black_hole: 1 }
   surface_kinds: { ruins: 4, artifact: 3, ancient_tech: 2, crashed_ship: 3 }
-  hidden_kinds: [wreck, entity]   # phenomena are obvious; drifting finds need sensors
+  hidden_kinds: [wreck]   # phenomena are obvious; drifting finds need sensors
   # Kinds barred from sharing a sector with a port (seam; empty ⇒ all may coexist).
   # Wormholes aren't listed here — they're force-placed on one-way edges, not rolled.
   port_incompatible_kinds: []
