@@ -158,6 +158,15 @@ def _intent_brief(context: str) -> str:
         topic = context[len(BRANCH_PREFIX):].replace("_", " ")
         return (f"The player chose to explore the topic of '{topic}' further. "
                 f"Continue the alien's side of the conversation on this subject.\n")
+    if context.startswith("sig."):
+        # Signature-mechanic prompt (§6.2, WP33): the hook has already run and applied its
+        # outcome before this line speaks; author the delivery, gated on `sig_stage`.
+        name = context[len("sig."):].replace(".", " ").replace("_", " ")
+        return (f"This is the '{name}' signature-mechanic beat: the species' systemic hook "
+                "has just run and applied its outcome (a verdict, reaction, or demand). "
+                "Speak the alien's line delivering that outcome; gate distinct outcomes on "
+                "the persisted `sig_stage` fact (e.g. sig_stage: judged_blessed), and keep a "
+                "catch-all sibling.\n")
     briefs = {
         "greeting": "The player has just hailed you; greet them.\n",
         "trade_open": "You are willing to trade; invite the player to deal.\n",

@@ -108,6 +108,13 @@
 # flags onto the player's per-species arc state; every stored flag is surfaced as
 #   arc.<flag>: <value>             # e.g. { criteria: { arc.oath_sworn: true } } — ABSENT
 #                                   #   until set, so gate unlocks on the flag being present.
+# MECHANIC-STAGE fact (signature mechanics, DESIGN §6.2/WP33): a species' signature-mechanic
+# hook persists the ladder stage it reaches in the same arc store; it is surfaced as
+#   sig_stage: <stage>              # e.g. { criteria: { sig_stage: judged_blessed } } — and
+#                                   #   also as arc.sig_stage. ABSENT until the hook first runs.
+#                                   #   Gate a `sig.*` verdict/response line on it: the stage is
+#                                   #   PERSISTED (unlike a transient outcome) so the projection
+#                                   #   reconstructs the same line the reducer speaks (lockstep).
 # ENCOUNTER facts (live-fight state, DESIGN §6.7/WP31): present only while a COMBAT beat is
 # selected (all other layers above also apply there). Keys:
 #   round: <int>                    # resolved round counter (0 at the opener beat).
@@ -152,7 +159,14 @@
 #           they are never reachable through conversation):
 #              combat_open  combat_taunt  surrender  flee_scorn  betrayal
 #   branch.<name>:  an authored intermediate node, reachable ONLY as a choice `next_context`.
-#   sig.<name>:     a Phase-3 signature-mechanic prompt (reserved namespace).
+#   sig.<name>:     a signature-mechanic prompt (LIVE since WP33, §6.2). Reached ONLY as a
+#                   choice `next_context` (like branch.*): the reducer runs the species'
+#                   signature-mechanic hook BEFORE speaking the line — auditing conduct,
+#                   applying bounded effects (attitude / alignment / experience / latinum /
+#                   a grudge), and persisting the ladder `sig_stage` — then speaks this line.
+#                   Gate its variants on `sig_stage` (e.g. sig.morality_judge.verdict with
+#                   { criteria: { sig_stage: judged_blessed } }); keep a catch-all sibling.
+#                   An unimplemented (WP37+) hook is inert — the line just speaks, no effect.
 # Any other key is invalid and fails validation.
 #
 # --- PLACEHOLDERS ({...} fill from the encounter; unknown ones render empty) -----------------

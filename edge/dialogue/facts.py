@@ -40,6 +40,11 @@ Arc facts (WP30): every flag in ``Player.species_arcs[roster_id]`` — persisted
 by authored choice ``arc`` maps (and, from WP33, signature-mechanic stages) — is surfaced
 as ``arc.<flag>: value``, unlocking branches across visits.
 
+Mechanic-stage fact (WP33): a signature-mechanic hook persists its ladder stage in the
+same arc store under ``mechanics.STAGE_FLAG``; it is surfaced as the bare ``sig_stage``
+fact (in addition to ``arc.sig_stage``) so a line can gate on the stage a species'
+mechanic has reached — e.g. ``criteria: { sig_stage: judged_blessed }``.
+
 Encounter facts (WP31 — present only while a combat beat is selected, all derived from
 the hashed ``Encounter`` so the reducer and the encounter-screen projection agree):
 
@@ -166,9 +171,19 @@ def callback_facts(player: Player, species: AlienSpecies) -> dict[str, object]:
 
 
 def arc_facts(player: Player, species: AlienSpecies) -> dict[str, object]:
-    """The species' persisted arc flags as `arc.<flag>` facts (§6.7, WP30)."""
+    """The species' persisted arc flags as `arc.<flag>` facts, plus the `sig_stage` alias.
+
+    Every `Player.species_arcs[roster_id]` flag becomes `arc.<flag>` (§6.7, WP30). The
+    signature-mechanic ladder stage (persisted under `mechanics.STAGE_FLAG`, WP33) is
+    additionally surfaced as the bare `sig_stage` fact so a line can gate on it directly.
+    """
+    from edge.core.mechanics import STAGE_FLAG  # local import keeps facts below core.mechanics
+
     arcs = player.species_arcs.get(species.roster_id, {})
-    return {f"{ARC_PREFIX}{key}": value for key, value in arcs.items()}
+    facts: dict[str, object] = {f"{ARC_PREFIX}{key}": value for key, value in arcs.items()}
+    if STAGE_FLAG in arcs:
+        facts["sig_stage"] = arcs[STAGE_FLAG]
+    return facts
 
 
 def encounter_facts(enc: Encounter) -> dict[str, object]:

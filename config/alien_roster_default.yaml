@@ -428,7 +428,17 @@ species:
     memory_model: never_forgets
     betrayal_model: permanent
     befriend_price: [prove]
-    signature_mechanic: { hook: morality_judge, params: { audited_metrics: [aggression, genocide, virtue] } }
+    # morality_judge (§6.2, WP33): the roaming arbiter audits the player's alignment counter —
+    # >= bless_alignment blesses (attitude boon + experience), <= curse_alignment curses (a
+    # permanent grudge, given never_forgets/permanent above), between is weighed with no effect.
+    signature_mechanic:
+      hook: morality_judge
+      params:
+        audited_metrics: [aggression, genocide, virtue]
+        bless_alignment: 3
+        curse_alignment: -3
+        blessing_attitude: 0.3
+        blessing_experience: 20
     pack: { behavior: solo }
     fleet: []
     starbase_policy: none
