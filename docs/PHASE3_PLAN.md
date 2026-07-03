@@ -644,20 +644,44 @@ mid-conversation replays to the identical hash on reload.
 
 ### WP29 — Situational facts + per-instance recency (S/M)
 
-`facts.py` gains the situational vocabulary: distance band, sector features
-(nebula/wreck present), hull/fuel state buckets, `just_fled_combat` (from
-`Player.last_combat`, H5), cargo summary. `Player.dialogue_recency` and the
-`encounter_rng` seed re-key `(roster_id, context)` →
-`(species_instance_id, context)` (H7) so two ships of one species stop
-finishing each other's sentences. The playtest harness's synthetic-species
-keying updates to match.
+Lines can name the actual situation, and each contact keeps its own phrasing
+stream. **Shipped.**
 
-Files: `edge/dialogue/facts.py`, `edge/dialogue/select.py`,
+- **Situational vocabulary** (`facts.situational_facts`, layered *under* the
+  session facts in `contact_facts` — no call-site change): `band` (the
+  sector's distance-band name), `in_nebula`, `wreck_here` (a visible
+  uncollected wreck), `hull` (`critical` ≤25% / `scarred` ≤60% / `sound`),
+  `low_turns`, `holds_empty`/`holds_full`, `carrying` (largest cargo stack,
+  absent when unladen), and `just_fled_combat` (fled earlier *today*).
+  Booleans are always present (real `true`/`false`) so authors can pin either
+  polarity. Degrades to empty for hand-built states with no ship/sector, so
+  pure selector rigs and the playtest harness work unchanged.
+- **`Player.last_combat: LastCombat | None`** (hashed; species kind, outcome,
+  day — exactly the DESIGN §4 record): stamped by `_combat_action` at every
+  encounter end — the H5 source of `just_fled_combat` and the WP30 callbacks;
+  never UI memory.
+- **Per-instance recency re-key (H7):** `dialogue.instance_key(species)` =
+  `roster_id#instance_id`; `Player.dialogue_recency` rings and the
+  `encounter_rng` seed now key on it everywhere (`_speak_context`,
+  `_converse_choice`, `_trade_alien`, the projection's `_line` /
+  `_contact_choices`, and the playtest harness), so two ships of one species
+  stop finishing each other's sentences. Key type stays `tuple[str, str]` —
+  no persistence/schema change; goldens re-baseline via self-consistency.
+- **H9 sync:** the corpus spec header gains the SITUATIONAL facts vocabulary
+  and the per-instance ring note; the authoring prompt warns lines not to
+  hard-code a situation they don't pin. DESIGN §4/§6.7 already carried the
+  WP19 spec text (per-instance `dialogue_recency`, `last_combat`).
+
+Files: `edge/dialogue/facts.py`, `edge/dialogue/select.py` (+`__init__`),
 `edge/core/models.py`, `edge/core/rules.py`, `edge/server/session.py`,
-`edge/dialogue/authoring/playtest.py`, spec sync (H9),
-`tests/test_dialogue.py`.
-Tests: the no-repeat ring property holds per instance; situational criteria
-select the pinned line.
+`edge/dialogue/authoring/playtest.py`, `config/alien_dialogue_default.yaml`
+(header), `edge/dialogue/authoring/pipeline.py`, `tests/test_dialogue.py`,
+`tests/test_contact.py`, `tests/test_combat.py`, `tests/test_intel_contact.py`
++ `tests/test_dialogue_playtest.py` (re-keyed assertions).
+Tests: the situational vocabulary end-to-end (incl. wreck flip, stale-flight
+expiry, hand-built degrade); hailing ship A never advances ship B's ring;
+a `band`-pinned species entry wins in the live sector and falls through
+elsewhere; every encounter end stamps `last_combat`.
 
 ### WP30 — Cross-visit arcs + callbacks (S/M)
 

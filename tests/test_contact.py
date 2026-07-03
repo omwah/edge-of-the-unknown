@@ -29,6 +29,7 @@ from edge.core.rules import (
     apply_result,
     reduce,
 )
+from edge.dialogue import instance_key
 from edge.server import session
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
@@ -79,7 +80,7 @@ def test_hail_marks_met_and_advances_recency() -> None:
     apply_result(state, res)
     player = state.players[1]
     assert sp.roster_id in player.species_attitudes  # met (reputation keyed by kind)
-    assert player.dialogue_recency[(sp.roster_id, "greeting")]  # ring advanced
+    assert player.dialogue_recency[(instance_key(sp), "greeting")]  # ring advanced (per instance, WP29)
     # Hail is now Converse(greeting): it speaks the greeting via the general path (WP17).
     assert [type(e).__name__ for e in res.events] == ["AlienSpoke"]
     assert res.events[0].context == "greeting"
@@ -112,7 +113,7 @@ def test_converse_advances_ring_and_emits_alienspoke() -> None:
     apply_result(state, res)
     assert [type(e).__name__ for e in res.events] == ["AlienSpoke"]
     assert res.events[0].context == "farewell" and res.events[0].subject_id is None
-    assert state.players[1].dialogue_recency[(sp.roster_id, "farewell")]  # that context's ring advanced
+    assert state.players[1].dialogue_recency[(instance_key(sp), "farewell")]  # that context's ring advanced
 
 
 def test_converse_dossier_other_carries_subject_and_rephrases() -> None:
@@ -124,7 +125,7 @@ def test_converse_dossier_other_carries_subject_and_rephrases() -> None:
     assert res.events[0].context == "dossier_other" and res.events[0].subject_id == selvani.id
     first = session.contact_view(state, 1, vesk.id, CFG)  # (renders dossier line for selvani)
     apply_result(state, res)
-    assert state.players[1].dialogue_recency[(vesk.roster_id, "dossier_other")]
+    assert state.players[1].dialogue_recency[(instance_key(vesk), "dossier_other")]
     assert first is not None
 
 
@@ -191,7 +192,7 @@ def test_converse_choice_transitions_to_branch_node() -> None:
     res = reduce(state, 1, Converse(vesk.id, "greeting", choice_index=0), CFG)
     apply_result(state, res)
     assert res.events[0].context == "branch.vesk_workshop"  # transitioned to the target node
-    assert state.players[1].dialogue_recency[(vesk.roster_id, "branch.vesk_workshop")]  # spoken
+    assert state.players[1].dialogue_recency[(instance_key(vesk), "branch.vesk_workshop")]  # spoken
     # The branch node then exposes its own replies (a trade gateway + a parting line).
     view = session.contact_view(state, 1, vesk.id, CFG, active_context="branch.vesk_workshop")
     actions = {c.action for c in view.choices}
@@ -278,7 +279,7 @@ def test_converse_choice_chain_replays_into_identical_state(tmp_path: Path) -> N
     svc.apply(1, Converse(sp.id, "greeting", choice_index=0))            # → branch.vesk_workshop
     svc.apply(1, Converse(sp.id, "branch.vesk_workshop", choice_index=2))  # "Another time." (farewell)
     expected = state_hash(svc.state)
-    assert svc.state.players[1].dialogue_recency[(sp.roster_id, "branch.vesk_workshop")]
+    assert svc.state.players[1].dialogue_recency[(instance_key(sp), "branch.vesk_workshop")]
 
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "branch.db"))  # type: ignore[arg-type]
     assert state_hash(reloaded.state) == expected
@@ -566,7 +567,7 @@ def test_converse_chain_replays_into_identical_state(tmp_path: Path) -> None:
     svc.apply(1, Converse(sp.id, "dossier_other", subject_id=sp.id))
     svc.apply(1, Converse(sp.id, "farewell"))
     expected = state_hash(svc.state)
-    assert svc.state.players[1].dialogue_recency[(sp.roster_id, "farewell")]  # rings advanced
+    assert svc.state.players[1].dialogue_recency[(instance_key(sp), "farewell")]  # rings advanced
 
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "converse.db"))  # type: ignore[arg-type]
     assert state_hash(reloaded.state) == expected
@@ -683,3 +684,41 @@ def test_open_session_replays_into_identical_state(tmp_path: Path) -> None:
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "session.db"))  # type: ignore[arg-type]
     assert state_hash(reloaded.state) == expected
     assert reloaded.state.players[1].contact_session == live
+
+# --- WP29: situational facts + per-instance recency (H7) ---------------------------
+
+
+def test_recency_rings_are_kept_per_contact_instance() -> None:
+    # H7: two ships of one species carry separate "what I already said" rings.
+    state = _world()
+    a = _inject(state, "vesk", sid=1)
+    b = replace(a, id=2)
+    state.species[2] = b
+    apply_result(state, reduce(state, 1, Hail(a.id), CFG))
+    rings = state.players[1].dialogue_recency
+    assert (instance_key(a), "greeting") in rings
+    assert (instance_key(b), "greeting") not in rings  # a's hail never advances b's ring
+    apply_result(state, reduce(state, 1, Hail(b.id), CFG))
+    rings = state.players[1].dialogue_recency
+    assert (instance_key(b), "greeting") in rings and instance_key(a) != instance_key(b)
+
+
+def _cfg_with_band_greeting(band: str) -> object:
+    """Vesk gains a species-pack greeting pinned to a situational `band` fact."""
+    data = CFG.roster.model_dump()
+    vesk = next(s for s in data["species"] if s["id"] == "vesk")
+    vesk.setdefault("dialogue_pack", {})["greeting"] = [{
+        "when": {"criteria": {"band": band}},
+        "variants": ["You are far from the Core lanes."],
+    }]
+    return CFG.model_copy(update={"roster": RosterConfig.model_validate(data)})
+
+
+def test_situational_criteria_select_the_pinned_line() -> None:
+    state = _world()
+    sp = _inject(state, "vesk")
+    band = state.sectors[state.ships[1].sector_id].distance_band
+    here = session.contact_view(state, 1, sp.id, _cfg_with_band_greeting(band))
+    assert here.opener == "You are far from the Core lanes."  # the live band pins the entry
+    elsewhere = session.contact_view(state, 1, sp.id, _cfg_with_band_greeting("Void"))
+    assert elsewhere.opener != "You are far from the Core lanes."  # wrong band — falls through

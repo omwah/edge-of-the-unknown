@@ -64,8 +64,19 @@ __all__ = [
     "ALLIED", "FRIENDLY", "NEUTRAL", "WARY", "HOSTILE", "STANDINGS", "GENERIC_PERSONA",
     "DIALOGUE_CONTEXTS", "PEACEFUL_CONTEXTS", "DialogueIntegrityError", "allowed_placeholders",
     "standing_for", "build_chain", "select_line", "select_entry", "entry_for", "when_matches",
-    "fill", "encounter_rng", "speak", "reachable_contexts", "validate_dialogue",
+    "fill", "encounter_rng", "instance_key", "speak", "reachable_contexts", "validate_dialogue",
 ]
+
+
+def instance_key(species: AlienSpecies) -> str:
+    """The per-contact-instance dialogue key for a species ship (DESIGN §6.7, WP29/H7).
+
+    `dialogue_recency` rings and the `encounter_rng` seed are keyed by this — the kind
+    plus the instance id — so two ships of one species stop finishing each other's
+    sentences: each contact carries its own "what I already said" memory. Instance ids
+    are generation-assigned, so the key is stable under `(seed, command log)` replay.
+    """
+    return f"{species.roster_id}#{species.id}"
 
 
 class DialogueIntegrityError(Exception):
@@ -228,11 +239,12 @@ def encounter_rng(seed: int, species_key: str, context: str,
                   recency: tuple[int, ...]) -> random.Random:
     """A deterministic RNG for line selection, reproducible under (seed, command log).
 
-    Seeded from the game seed, the species **kind** (`roster_id`), the context, and the
-    current recency ring, so the projection (read-only) and the reducer (which advances the
-    ring) agree on the line, and replay reproduces it exactly. Keying by kind means every
-    ship of a species draws from one shared, non-repeating dialogue ring. A **string** seed
-    is used deliberately — `random.Random` derives it via SHA-512, which is stable across
+    Seeded from the game seed, the species **instance key** (`instance_key`, WP29 — the
+    kind plus instance id), the context, and the current recency ring, so the projection
+    (read-only) and the reducer (which advances the ring) agree on the line, and replay
+    reproduces it exactly. Keying per instance gives every contact its own phrasing
+    stream (two ships of one species don't echo each other). A **string** seed is used
+    deliberately — `random.Random` derives it via SHA-512, which is stable across
     processes (unlike the hash-randomised `hash()` of a tuple), keeping replay exact.
     """
     return random.Random(f"{seed}|{species_key}|{context}|{recency}")
@@ -248,7 +260,8 @@ def speak(roster: RosterConfig, species: AlienSpecies, player: Player, context: 
     Resolves the species' standing from its effective disposition (Phase 2: friendly /
     allied), builds the pack chain, seeds the interaction context with the common
     `{player}` / `{species}` / `{alliance}` placeholders, and reads the current recency
-    ring from the player. The caller stores the returned ring at `(roster_id, context)`.
+    ring from the player. The caller stores the returned ring at
+    `(instance_key(species), context)` (per contact instance, WP29/H7).
     """
     sc = roster.species_by_id(species.roster_id)
     chain = build_chain(roster, sc, species.persona)
@@ -261,7 +274,7 @@ def speak(roster: RosterConfig, species: AlienSpecies, player: Player, context: 
     }
     if extra:
         ctx.update(extra)
-    recency = player.dialogue_recency.get((species.roster_id, context), ())
+    recency = player.dialogue_recency.get((instance_key(species), context), ())
     return select_line(chain, context, standing=standing, treaty=treaty, ctx=ctx,
                        recency=recency, rng=rng, k=roster.recency_k, facts=facts,
                        shared=roster.grammar)

@@ -104,6 +104,7 @@ from edge.core.models import (
     Encounter,
     Game,
     InstalledComponent,
+    LastCombat,
     Lead,
     Ownership,
     Planet,
@@ -1394,6 +1395,12 @@ def _combat_action(
             player_id, enc.species_id, new_ship.sector_id, new_ship.type_id))
         new_ship = _escape_pod(new_ship, config)
     if result.outcome is not None:
+        if species is not None:
+            # The H5 record situational dialogue facts read (`just_fled_combat`, §6.7)
+            # and the WP30 callbacks build on — written here, never by the UI.
+            new_player = replace(new_player, last_combat=LastCombat(
+                species=species.roster_id, outcome=result.outcome,
+                day=state.game.day_number))
         events.append(EncounterEnded(player_id, enc.species_id, result.outcome))
     return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,))
 
@@ -1663,11 +1670,11 @@ def _species_config(config: GameConfig, species: AlienSpecies) -> SpeciesConfig:
     return sc
 
 
-def _advance_recency(player: Player, roster_id: str, context: str,
+def _advance_recency(player: Player, species_key: str, context: str,
                      new_ring: tuple[int, ...]) -> dict[tuple[str, str], tuple[int, ...]]:
-    """A copy of the player's dialogue recency with one (kind, context) slot updated."""
+    """A copy of the player's dialogue recency with one (instance key, context) slot updated."""
     recency = dict(player.dialogue_recency)
-    recency[(roster_id, context)] = new_ring
+    recency[(species_key, context)] = new_ring
     return recency
 
 
@@ -1722,8 +1729,9 @@ def _speak_context(state: UniverseState, player: Player, ship: Ship, species: Al
     """
     assert config.roster is not None
     all_facts = dialogue_facts.contact_facts(state, player, species, extra=facts)
-    ring = player.dialogue_recency.get((species.roster_id, context), ())
-    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, context, ring)
+    key = dialogue.instance_key(species)
+    ring = player.dialogue_recency.get((key, context), ())
+    rng = dialogue.encounter_rng(state.game.seed, key, context, ring)
     _, new_ring = dialogue.speak(config.roster, species, player, context,
                                  aliens=config.aliens, rng=rng, extra=extra, facts=all_facts)
     session = dialogue_facts.note_topic(
@@ -1731,7 +1739,7 @@ def _speak_context(state: UniverseState, player: Player, ship: Ship, species: Al
     new_player = replace(
         player, species_attitudes=_met(player, species.roster_id),
         species_last_seen={**player.species_last_seen, species.roster_id: ship.sector_id},
-        dialogue_recency=_advance_recency(player, species.roster_id, context, new_ring),
+        dialogue_recency=_advance_recency(player, key, context, new_ring),
         contact_session=None if context == "farewell" else session)
     return new_player, AlienSpoke(player.id, species.id, context, subject_id)
 
@@ -1789,8 +1797,9 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
     # Session facts join the node's own (§6.7, WP28) — the same merge the projection's
     # `_contact_choices` makes, so `choice_index` resolves into the very menu shown.
     facts = dialogue_facts.contact_facts(state, player, species, extra=facts)
-    ring = player.dialogue_recency.get((species.roster_id, cmd.context), ())
-    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, cmd.context, ring)
+    key = dialogue.instance_key(species)
+    ring = player.dialogue_recency.get((key, cmd.context), ())
+    rng = dialogue.encounter_rng(state.game.seed, key, cmd.context, ring)
     # The reply menu resolves via the same fallback (entry choices → generic baseline) the
     # contact-screen view uses, so the position `choice_index` carries agrees on both sides.
     choices = dialogue.choices_for(config.roster, species, player, cmd.context,
@@ -1943,15 +1952,16 @@ def _trade_alien(state: UniverseState, player_id: int, species_id: int, offer_in
     # Advance the trade dialogue ring so a repeat sale rephrases, then mark the visit's
     # session `traded` (§6.7, WP28) — selection sees the pre-utterance facts (lockstep).
     trade_facts = dialogue_facts.contact_facts(state, new_player, species)
-    ring = player.dialogue_recency.get((species.roster_id, "trade_open"), ())
-    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, "trade_open", ring)
+    key = dialogue.instance_key(species)
+    ring = player.dialogue_recency.get((key, "trade_open"), ())
+    rng = dialogue.encounter_rng(state.game.seed, key, "trade_open", ring)
     _, new_ring = dialogue.speak(config.roster, species, new_player, "trade_open",
                                  aliens=config.aliens, rng=rng, facts=trade_facts)
     session = dialogue_facts.note(
         dialogue_facts.ensure_session(new_player, species, ship.sector_id),
         dialogue_facts.TRADED)
     new_player = replace(new_player,
-                         dialogue_recency=_advance_recency(new_player, species.roster_id, "trade_open", new_ring),
+                         dialogue_recency=_advance_recency(new_player, key, "trade_open", new_ring),
                          contact_session=session)
     kind = "barter" if barter else "buy"
     return ReduceResult(

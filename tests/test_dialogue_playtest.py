@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from edge.config import load_default_config
 from edge.core.rules import Converse
+from edge.dialogue import instance_key
 from edge.dialogue.authoring.playtest import BANDS, PlaytestApp, PlaytestService
 from edge.tui.screens.contact import AlienContactScreen
 from edge.tui.widgets import ClickableEntry
@@ -82,7 +83,7 @@ def test_force_enable_traverses_a_branch_species() -> None:
 def test_apply_converse_advances_the_recency_ring() -> None:
     svc = _service()
     sp = svc.state.species[svc.current]
-    key = (sp.roster_id, "greeting")
+    key = (instance_key(sp), "greeting")
     assert key not in svc.state.players[svc.pid].dialogue_recency
     svc.apply(svc.pid, Converse(svc.current, "greeting"))
     ring = svc.state.players[svc.pid].dialogue_recency

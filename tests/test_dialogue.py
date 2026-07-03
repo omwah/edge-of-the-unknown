@@ -409,3 +409,38 @@ def test_session_fact_pins_the_more_specific_entry() -> None:
     got, _ = select_line([pack], "greeting", standing=FRIENDLY, treaty=False, ctx={},
                          recency=(), rng=rng, facts={})
     assert got == "First contact."
+
+
+# --- WP29: situational facts -------------------------------------------------------
+
+
+def test_situational_facts_cover_the_vocabulary() -> None:
+    from edge.core.enums import Commodity, DiscoveryKind, PayloadKind, RarityTier
+    from edge.core.models import Discovery, DiscoveryPayload, LastCombat, Sector, Ship
+
+    state = _bare_state()
+    state.sectors[5] = Sector(id=5, region_id=1, warps_out=(), distance_band="Frontier")
+    state.ships[1] = Ship(id=1, type_id="trailblazer", name="S", owner_player_id=1,
+                          sector_id=5, holds_total=10, cargo={Commodity.FUEL_ORE: 3},
+                          hull_current=10, hull_max=100)
+    player = Player(id=1, name="Cap", ship_id=1, latinum=0, turns_remaining=200,
+                    last_combat=LastCombat(species="quill", outcome="fled", day=1))
+    facts = dialogue_facts.situational_facts(state, player)
+    assert facts["band"] == "Frontier"
+    assert facts["hull"] == "critical"  # 10% of hull_max
+    assert facts["in_nebula"] is False and facts["wreck_here"] is False
+    assert facts["low_turns"] is False
+    assert facts["holds_empty"] is False and facts["holds_full"] is False
+    assert facts["carrying"] == "fuel_ore"
+    assert facts["just_fled_combat"] is True  # fled today (day 1)
+
+    # A visible wreck in the sector flips `wreck_here`.
+    state.discoveries[9] = Discovery(id=9, kind=DiscoveryKind.WRECK, rarity_tier=RarityTier.COMMON,
+                                     sector_id=5, payload=DiscoveryPayload(kind=PayloadKind.LORE))
+    assert dialogue_facts.situational_facts(state, player)["wreck_here"] is True
+    # A stale flight (yesterday) no longer reads as "just fled".
+    stale = Player(id=1, name="Cap", ship_id=1, latinum=0, turns_remaining=200,
+                   last_combat=LastCombat(species="quill", outcome="fled", day=0))
+    assert dialogue_facts.situational_facts(state, stale)["just_fled_combat"] is False
+    # Hand-built rigs without a ship/sector degrade to empty — pure tests keep working.
+    assert dialogue_facts.situational_facts(_bare_state(), player) == {}

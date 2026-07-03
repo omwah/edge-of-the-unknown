@@ -81,8 +81,19 @@
 #   accepted_lead: true             # the player logged a coordinate tip this visit.
 # An entry that pins a session fact outscores a vaguer one only while the fact holds, so always
 # keep a less-specific (or catch-all) sibling for the first exchange of a visit.
-# (Situational facts — band, sector features, hull state, just_fled_combat — land in WP29;
-# persisted cross-visit arc facts in WP30.)
+# SITUATIONAL facts (the live circumstances, DESIGN §6.7/WP29): ALWAYS present in every
+# selection, so a `criteria` may pin either polarity of the booleans (real true/false) or a
+# bucket string. Keys:
+#   band: <band name>               # the sector's distance band, e.g. Hub / Frontier / Deep.
+#   in_nebula: true|false           # a nebula shrouds this sector.
+#   wreck_here: true|false          # a visible, uncollected wreck lies in this sector.
+#   hull: critical|scarred|sound    # player hull state bucket (<=25% / <=60% / above).
+#   low_turns: true|false           # the player is nearly out of turns.
+#   holds_empty: true|false         # nothing in the cargo bay.
+#   holds_full: true|false          # no free hold.
+#   carrying: fuel_ore|organics|equipment   # largest cargo stack (ABSENT when unladen).
+#   just_fled_combat: true|false    # the player fled a fight earlier today.
+# (Persisted cross-visit arc facts land in WP30.)
 #
 # --- A DialogueChoice (authored player reply) ------------------------------------------------
 # The node's `choices` are the player's reply menu — the WHOLE menu (there is no code-derived
@@ -136,6 +147,8 @@
 # `weight` through a seeded RNG. Then realise it:
 #   - variants: pick an index avoiding the last `recency_k` shown (the no-repeat "recency ring");
 #   - grammar:  expand `origin` (GRAMMAR_VARIANTS=8 seeded expansions, also recency-rotated).
+# Rings are kept per (CONTACT INSTANCE, context) — two ships of one species rephrase
+# independently, each with its own "what I already said" memory (WP29).
 # Determinism: the same (game seed, command log) reproduces the same line.
 #
 # --- GRAMMAR (Tracery), optional alternative to `variants` -----------------------------------
