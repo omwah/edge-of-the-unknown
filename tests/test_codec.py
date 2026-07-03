@@ -19,6 +19,7 @@ from edge.core.events import (
     ColonyGrew,
     CombatRound,
     ComponentInstalled,
+    ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
     Descended,
@@ -37,6 +38,8 @@ from edge.core.events import (
     LeadAccepted,
     PlanetProduced,
     Repaired,
+    SalvageCollected,
+    ShipDestroyed,
     ShipPurchased,
     StarbaseSalvaged,
     StockRegenerated,
@@ -161,6 +164,10 @@ EVENTS: list[Event] = [
     EncounterEvaded(1, 3, 55),                     # WP24 slipped away unseen
     CombatRound(1, 3, 2, "fight", 24, 11, 2),      # WP25 one resolved round
     EncounterEnded(1, 3, "fled"),                  # WP25 outcome
+    ComponentKnockedOut(1, "thrusters", 1, "burner"),   # WP26 localized damage
+    ShipDestroyed(1, 3, 55, "trailblazer"),             # WP26 hull 0 → escape pod
+    SalvageCollected(1, 42, ("burner", "linkage")),     # WP26 wreck salvage
+    SalvageCollected(1, 17, ()),                        # WP26 latinum-only salvage
     DevApplied(1, "[dev] set latinum=1000000"),  # dev cheat audit marker
 ]
 

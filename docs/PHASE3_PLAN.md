@@ -490,7 +490,7 @@ Per-round resolution in a new pure `edge/core/combat.py`. **Shipped.**
   contests), and screen deflection.
 - **The WP26 seam, explicit:** hull driven to 0 clamps at 1 and
   force-disengages (`crippled`) until escape pods land — death is never
-  unhandled.
+  unhandled. (WP26 replaced this with the `destroyed` outcome + escape pod.)
 
 Files: new `edge/core/combat.py`, `edge/core/config.py`,
 `config/default.yaml`, `edge/core/rules.py`, `edge/store/codec.py`,
@@ -505,22 +505,46 @@ purchase; full-fight golden reload.
 
 ### WP26 — Localized damage, repair kits, escape pods, salvage (M)
 
-Damage that defeats the screens reduces hull and rolls a **component
-knockout** weighted toward exposed/forward subsystems (config weight table);
-the owning subsystem's aspect degrades immediately via the Phase-2
-derive-on-write rail (`apply_derived` re-run). `FieldPatch` goes live (one
-repair-kit, minimal function, between rounds or sectors); `RepairAtDock` goes
-live (≈25% of tier price, §8). Hull 0 ⇒ **escape pod** (a config hull; ship
-and cargo lost, the pod limps home). Destroyed NPCs yield 10–20% cargo
-salvage plus occasional loose components (feeding the component economy).
+Combat damage localizes into the engine room; destruction and salvage land.
+**Shipped.**
 
-Files: `edge/core/combat.py`, `edge/core/engine_room.py`,
-`edge/core/rules.py`, `config/default.yaml`,
-`edge/tui/screens/engine_room.py` (knocked-out states now real),
-`tests/test_combat.py`, `tests/test_engine_room.py`.
-Tests: knockout degrades exactly the owning subsystem's aspect; field-patch
-consumes one kit and restores minimal function; salvage conservation; pod
-flow golden replay.
+- **Component knockout:** a volley that reaches the hull rolls
+  `knockout_chance` and, on a hit, marks one active slot `knocked_out` —
+  the subsystem pick weighted by the `knockout_weights` table (forward-heavy:
+  main_gun/thrusters 3, screens 2, spindrive 1), the slot uniform within it.
+  The reducer re-runs `apply_derived` immediately, so the owning aspect
+  degrades for the rest of the fight (the Phase-2 derive-on-write rail; the
+  `ComponentKnockedOut` event feeds the ticker and the encounter screen's
+  integrity flag). No knockout while shields hold — only hull-reaching damage
+  localizes.
+- **FieldPatch / RepairAtDock exercised for real:** the Phase-2 reducers were
+  already live (kit spend + `knocked_out=False` + re-derive; dock repair at
+  ≈25% of tier price, §8) — combat now produces the knocked slots they exist
+  for, and the encounter screen's **K** action patches mid-fight.
+- **Escape pod replaces the crippled seam:** hull 0 ⇒ outcome `destroyed`;
+  the reducer swaps the hull for the `combat.escape_pod_class` — a real
+  price-0 ship class (single-slot subsystems, 1-warp drive, vestigial gun)
+  the shipyard listing never sells. Cargo, loose components, devices,
+  missiles, kits, and colonists go down with the ship; latinum and the bank
+  live on the player; the pod keeps the sector — it limps home. Emits
+  `ShipDestroyed` + `EncounterEnded(destroyed)`.
+- **Salvage:** victory rolls per-wreck `hull_max × salvage_hull_value ×
+  U[salvage_frac_min, salvage_frac_max]` latinum (BNT's 10–20% rule mapped
+  onto cargo-less NPC hulls) plus a `salvage_component_chance` shot at one
+  loose Tier-I part per wreck (needs a free hold, else left adrift; RNG draws
+  are hold-independent so replays stay exact). `SalvageCollected` event.
+
+Files: `edge/core/combat.py`, `edge/core/config.py`, `config/default.yaml`
+(knockout/pod/salvage knobs + the `escape_pod` hull), `edge/core/rules.py`
+(`_escape_pod`, `_combat_salvage`, knockout re-derive), `edge/core/events.py`,
+`edge/store/codec.py`, `edge/server/session.py` (event formatting, shipyard
+skips price-0 hulls), `edge/tui/screens/encounter.py`, `tests/test_combat.py`,
+`tests/test_codec.py`, `tests/test_config.py`.
+Tests: knockout degrades exactly the owning subsystem's aspect (forced-weight
+config); field-patch consumes one kit and restores the aspect mid-fight;
+salvage conserved and inside the configured window, components need a free
+hold; destruction issues the pod with everything lost; pod-flow golden reload
+(fight lost to destruction replays to the identical hash).
 
 ### WP27 — Consequences: attitude, grudges, alignment/experience (M)
 

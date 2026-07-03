@@ -515,6 +515,22 @@ class CombatConfig(BaseModel):
     missile_price: int = 300         # per missile at the StarDock hardware emporium (§8)
     swarm_size_min: int = 3          # pack size for swarm/colony behaviors (§6.1)
     swarm_size_max: int = 5
+    # Localized damage (§4.1, WP26): a volley that reaches the hull may also knock out
+    # one subsystem component, the pick weighted toward exposed/forward systems.
+    knockout_chance: float = 0.35
+    knockout_weights: dict[str, float] = Field(
+        default_factory=lambda: {"main_gun": 3.0, "thrusters": 3.0, "screens": 2.0, "spindrive": 1.0}
+    )
+    # Ship destruction (§10, WP26): hull 0 drops the player to this hull (a real
+    # ship class with price 0 — never sold, only issued by the wreck).
+    escape_pod_class: str = "escape_pod"
+    # Salvage from destroyed NPCs (§10, BNT's 10–20% rule): each wreck pays
+    # `hull_max × salvage_hull_value × U[frac_min, frac_max]` latinum, and with
+    # `salvage_component_chance` yields one loose Tier-I part (needs a free hold).
+    salvage_frac_min: float = 0.10
+    salvage_frac_max: float = 0.20
+    salvage_hull_value: float = 3.0
+    salvage_component_chance: float = 0.25
 
 
 class EncountersConfig(BaseModel):
@@ -1072,6 +1088,9 @@ class GameConfig(BaseModel):
                 for hull in (*sp.fleet, *sp.pack.escort):
                     if hull not in known:
                         raise ValueError(f"species {sp.id!r} fleet/escort names unknown hull {hull!r}")
+        pod = self.combat.escape_pod_class
+        if pod not in {k.id for k in classes}:
+            raise ValueError(f"combat.escape_pod_class names unknown hull {pod!r}")
         return self
 
     @classmethod

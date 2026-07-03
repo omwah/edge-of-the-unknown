@@ -45,6 +45,7 @@ from edge.core.events import (
     ColonyGrew,
     CombatRound,
     ComponentInstalled,
+    ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
     Descended,
@@ -62,6 +63,8 @@ from edge.core.events import (
     LeadAccepted,
     PlanetProduced,
     Repaired,
+    SalvageCollected,
+    ShipDestroyed,
     ShipPurchased,
     StarbaseSalvaged,
     TurnsReset,
@@ -568,6 +571,8 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     trade_in = round(config.ship_class(ship.type_id).price * econ.ship_trade_in_frac)
     shipyard: list[dto.ShipyardItem] = []
     for klass in config.ship_classes:
+        if klass.price <= 0:
+            continue  # never sold (the escape pod is issued by the wreck, §10)
         a = derive_aspects(Ship(
             id=0, type_id=klass.id, name=klass.name, owner_player_id=None, sector_id=0,
             holds_total=klass.holds_total, shields=klass.shields_max, warp_speed=klass.warp_speed,
@@ -1294,8 +1299,15 @@ def format_event(event: Event) -> str:
         return {
             "fled": "[yellow]↯ Broke away — escaped the engagement.[/]",
             "victory": "[green]⚔ Victory — the pack is destroyed.[/]",
-            "crippled": "[red]✖ Crippled — systems dead, they let the wreck drift.[/]",
+            "destroyed": "[red]✖ Ship lost — the escape pod tumbles clear.[/]",
         }.get(event.outcome, f"Encounter ended: {event.outcome}")
+    if isinstance(event, ComponentKnockedOut):
+        return f"[red]✖ Direct hit — {event.subsystem} {event.component} knocked out![/]"
+    if isinstance(event, ShipDestroyed):
+        return f"[red]✖ The {event.lost_ship} breaks up — you take to the escape pod.[/]"
+    if isinstance(event, SalvageCollected):
+        parts = f" + {', '.join(event.components)}" if event.components else ""
+        return f"[green]⛏ Salvaged {event.latinum} latinum from the wrecks{parts}.[/]"
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 
@@ -1314,7 +1326,9 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
         return event.to_sector
     if isinstance(event, (EncounterStarted, EncounterEvaded)):
         return event.sector_id
-    if isinstance(event, (CombatRound, EncounterEnded)):
+    if isinstance(event, ShipDestroyed):
+        return event.sector_id
+    if isinstance(event, (CombatRound, EncounterEnded, ComponentKnockedOut, SalvageCollected)):
         player = state.players.get(event.player_id)
         ship = state.ships.get(player.ship_id) if player is not None else None
         return ship.sector_id if ship is not None else None

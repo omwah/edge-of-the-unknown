@@ -136,6 +136,18 @@ combat:
   missile_price: 300
   swarm_size_min: 3
   swarm_size_max: 5
+  # Localized damage (§4.1, WP26): a hull-reaching volley may knock out one
+  # component, weighted toward exposed/forward subsystems.
+  knockout_chance: 0.35
+  knockout_weights: { main_gun: 3.0, thrusters: 3.0, screens: 2.0, spindrive: 1.0 }
+  # Ship destruction (§10): hull 0 drops the player to this hull (price 0 — never sold).
+  escape_pod_class: escape_pod
+  # Salvage (§10, BNT 10–20%): per wreck, hull_max × salvage_hull_value × U[min,max]
+  # latinum, plus an occasional loose Tier-I component (needs a free hold).
+  salvage_frac_min: 0.10
+  salvage_frac_max: 0.20
+  salvage_hull_value: 3.0
+  salvage_component_chance: 0.25
 
 # Weapon catalog (§4): {damage, firing_arc, rate, special}. Referenced by ship-class
 # `armament` lists; arcs drive the §10 evasion counter-play.
@@ -497,3 +509,41 @@ ship_classes:
         keystone: accelerator
         base_components: [accelerator, linkage, accelerator, linkage]
         legal_components: [accelerator, linkage, converter, secondary]
+  # The escape pod (§10, WP26): issued when the player's hull reaches 0 — ship,
+  # cargo, and stores are lost; the pod limps home. price 0 ⇒ never sold, and the
+  # shipyard listing skips unpriced hulls. Minimal single-slot engine room so the
+  # player screens keep working; a vestigial gun and 1-warp drive — it limps.
+  - id: escape_pod
+    name: Escape Pod
+    role: transport
+    holds_total: 2
+    turns_per_warp: 2
+    shields_max: 10
+    warp_speed: 1
+    combat_speed: 1
+    cloak_rating: 0
+    sensor_rating: 1
+    hull_max: 20
+    colonist_capacity: 0
+    price: 0
+    subsystems:
+      spindrive:
+        slot_count: 1
+        keystone: navigator
+        base_components: [navigator]
+        legal_components: [navigator]
+      thrusters:
+        slot_count: 1
+        keystone: burner
+        base_components: [burner]
+        legal_components: [burner]
+      screens:
+        slot_count: 1
+        keystone: secondary
+        base_components: [secondary]
+        legal_components: [secondary]
+      main_gun:
+        slot_count: 1
+        keystone: accelerator
+        base_components: [accelerator]
+        legal_components: [accelerator]

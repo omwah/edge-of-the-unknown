@@ -22,6 +22,7 @@ from edge.core.events import (
     ColonyGrew,
     CombatRound,
     ComponentInstalled,
+    ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
     Descended,
@@ -39,6 +40,8 @@ from edge.core.events import (
     LeadAccepted,
     PlanetProduced,
     Repaired,
+    SalvageCollected,
+    ShipDestroyed,
     ShipPurchased,
     SiteExplored,
     StarbaseSalvaged,
@@ -437,6 +440,21 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "species_id": event.species_id,
                 "outcome": event.outcome,
             }
+        case ComponentKnockedOut():
+            return "ComponentKnockedOut", {
+                "player_id": event.player_id, "subsystem": event.subsystem,
+                "slot_index": event.slot_index, "component": event.component,
+            }
+        case ShipDestroyed():
+            return "ShipDestroyed", {
+                "player_id": event.player_id, "species_id": event.species_id,
+                "sector_id": event.sector_id, "lost_ship": event.lost_ship,
+            }
+        case SalvageCollected():
+            return "SalvageCollected", {
+                "player_id": event.player_id, "latinum": event.latinum,
+                "components": list(event.components),
+            }
         case DevApplied():
             return "DevApplied", {"player_id": event.player_id, "detail": event.detail}
         case _:
@@ -537,6 +555,15 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "EncounterEnded":
             return EncounterEnded(payload["player_id"], payload["species_id"],
                                   payload["outcome"])
+        case "ComponentKnockedOut":
+            return ComponentKnockedOut(payload["player_id"], payload["subsystem"],
+                                       payload["slot_index"], payload["component"])
+        case "ShipDestroyed":
+            return ShipDestroyed(payload["player_id"], payload["species_id"],
+                                 payload["sector_id"], payload["lost_ship"])
+        case "SalvageCollected":
+            return SalvageCollected(payload["player_id"], payload["latinum"],
+                                    tuple(payload["components"]))
         case "DevApplied":
             return DevApplied(payload["player_id"], payload["detail"])
         case _:

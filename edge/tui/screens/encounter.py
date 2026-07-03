@@ -4,7 +4,7 @@ Drives the real `GameService`: each keypress issues one `CombatAction` command (
 combat round — the player's action plus the pack's volley) and recomposes from the
 fresh `encounter_view`. The flee chance shown is the same `combat.flee_chance` number
 the reducer rolls (the H4 view/reducer lockstep). The screen pops when the encounter
-resolves (fled / victory / crippled); movement stays blocked while it is live, so
+resolves (fled / victory / destroyed); movement stays blocked while it is live, so
 there is no way to walk away from the modal without resolving it.
 """
 
@@ -29,7 +29,7 @@ from edge.tui.widgets import bar
 _OUTCOME_NOTES = {
     "fled": ("Broke away — you escaped the engagement.", "warning"),
     "victory": ("Victory — the pack is destroyed.", "information"),
-    "crippled": ("Crippled — systems dead. They let the wreck drift.", "error"),
+    "destroyed": ("Ship lost — the escape pod tumbles clear.", "error"),
 }
 
 

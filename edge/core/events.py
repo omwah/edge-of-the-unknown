@@ -355,8 +355,37 @@ class CombatRound(Event):
 
 @dataclass(frozen=True)
 class EncounterEnded(Event):
-    """A hostile encounter resolved (§10, WP25): fled / victory / crippled."""
+    """A hostile encounter resolved (§10, WP25/WP26): fled / victory / destroyed."""
 
     player_id: int
     species_id: int
     outcome: str
+
+
+@dataclass(frozen=True)
+class ComponentKnockedOut(Event):
+    """A volley localized into a subsystem component (§4.1, WP26)."""
+
+    player_id: int
+    subsystem: str
+    slot_index: int
+    component: str
+
+
+@dataclass(frozen=True)
+class ShipDestroyed(Event):
+    """The player's hull reached zero — dropped to the escape pod (§10, WP26)."""
+
+    player_id: int
+    species_id: int
+    sector_id: int
+    lost_ship: str  # the destroyed hull's class id
+
+
+@dataclass(frozen=True)
+class SalvageCollected(Event):
+    """Post-victory wreck salvage (§10, WP26): latinum plus any loose components."""
+
+    player_id: int
+    latinum: int
+    components: tuple[str, ...]  # loose Tier-I part kinds recovered (may be empty)

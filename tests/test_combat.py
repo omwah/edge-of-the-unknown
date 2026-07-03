@@ -22,9 +22,16 @@ from edge.core import combat
 from edge.core.aliens import HOSTILE, disposition_band
 from edge.core.combat import CombatError, flee_chance
 from edge.core.engine_room import derive_aspects
-from edge.core.events import EncounterEnded
+from edge.core.enums import Commodity, Subsystem
+from edge.core.events import (
+    ComponentKnockedOut,
+    EncounterEnded,
+    SalvageCollected,
+    ShipDestroyed,
+)
 from edge.core.models import Encounter, EncounterFoe
 from edge.core.movement import shortest_path
+from edge.core.dev import DevPatch
 from edge.core.rules import (
     BuyMissiles,
     CombatAction,
@@ -153,17 +160,139 @@ def test_victory_ends_the_encounter() -> None:
     assert ended and ended[0].outcome == combat.VICTORY
 
 
-def test_crippled_seam_clamps_hull_and_disengages() -> None:
-    """Until WP26 escape pods land, a killing volley leaves the ship at 1 hull and
-    force-disengages — death is never unhandled (the documented WP26 seam)."""
+def test_destruction_issues_the_escape_pod() -> None:
+    """Hull 0 (§10, WP26): the ship, cargo, and stores are lost; the escape pod —
+    a real config hull — is issued in place and the encounter ends."""
     state = _fight_state()
+    player = state.players[1]
+    ship = state.ships[player.ship_id]
+    state.ships[ship.id] = replace(
+        ship, cargo={Commodity.FUEL_ORE: 10}, missiles=3, repair_kits=2)
     _engagement(state, (_foe(damage=100_000),))
     result = reduce(state, 1, CombatAction(action="fight"), SMALL)
     apply_result(state, result)
     assert state.players[1].active_encounter is None
-    assert state.ships[state.players[1].ship_id].hull_current == 1
+    pod = state.ships[player.ship_id]
+    pod_class = SMALL.ship_class(SMALL.combat.escape_pod_class)
+    assert pod.type_id == pod_class.id
+    assert pod.hull_current == pod_class.hull_max  # the pod arrives intact
+    assert pod.sector_id == ship.sector_id  # it limps home from where the fight ended
+    assert not pod.cargo and not pod.components  # everything went down with the ship
+    assert pod.missiles == 0 and pod.repair_kits == 0
+    destroyed = [e for e in result.events if isinstance(e, ShipDestroyed)]
+    assert destroyed and destroyed[0].lost_ship == ship.type_id
     ended = [e for e in result.events if isinstance(e, EncounterEnded)]
-    assert ended and ended[0].outcome == combat.CRIPPLED
+    assert ended and ended[0].outcome == combat.DESTROYED
+
+
+def _forced_knockout_config(subsystem: str):
+    """A config where every hull-reaching volley knocks a component out of exactly
+    `subsystem` (weight 1 there, 0 everywhere else)."""
+    weights = {s: 0.0 for s in ("spindrive", "thrusters", "screens", "main_gun")}
+    weights[subsystem] = 1.0
+    return SMALL.model_copy(update={"combat": SMALL.combat.model_copy(
+        update={"knockout_chance": 1.0, "knockout_weights": weights})})
+
+
+def test_knockout_degrades_exactly_the_owning_subsystem() -> None:
+    """§4.1/WP26: a hull-reaching volley knocks out one component of the weighted
+    subsystem, and only that subsystem's derived aspect degrades."""
+    cfg = _forced_knockout_config("thrusters")
+    state = _fight_state()
+    player = state.players[1]
+    ship = state.ships[player.ship_id]
+    state.ships[ship.id] = replace(ship, shields=0)  # bare hull: the volley localizes
+    _engagement(state, (_foe(damage=10, hull=10_000, hull_max=10_000),))
+    before = derive_aspects(state.ships[ship.id], cfg)
+    result = reduce(state, 1, CombatAction(action="fight"), cfg)
+    apply_result(state, result)
+    knocked = [e for e in result.events if isinstance(e, ComponentKnockedOut)]
+    assert len(knocked) == 1 and knocked[0].subsystem == "thrusters"
+    after_ship = state.ships[ship.id]
+    after = derive_aspects(after_ship, cfg)
+    assert after.combat_speed < before.combat_speed  # the owning aspect degraded…
+    assert after.warp_speed == before.warp_speed     # …and only that one
+    assert after.shields == before.shields
+    assert after.gun_damage == before.gun_damage
+    # Derive-on-write: the stored scalar matches the derived value immediately.
+    assert after_ship.combat_speed == after.combat_speed
+
+
+def test_field_patch_restores_the_knocked_component() -> None:
+    """A repair kit field-patches the knocked slot back to function mid-fight (§4.1)."""
+    cfg = _forced_knockout_config("thrusters")
+    state = _fight_state()
+    player = state.players[1]
+    ship = state.ships[player.ship_id]
+    state.ships[ship.id] = replace(ship, shields=0, repair_kits=1)
+    _engagement(state, (_foe(damage=10, hull=10_000, hull_max=10_000),))
+    healthy = derive_aspects(state.ships[ship.id], cfg).combat_speed
+    result = reduce(state, 1, CombatAction(action="fight"), cfg)
+    apply_result(state, result)
+    knocked = [e for e in result.events if isinstance(e, ComponentKnockedOut)]
+    assert knocked
+    sub, idx = Subsystem(knocked[0].subsystem), knocked[0].slot_index
+    # Deep fight-local shields so the patch round's volley can't localize again
+    # (knockout only rolls on hull-reaching damage).
+    enc = state.players[1].active_encounter
+    state.players[1] = replace(
+        state.players[1], active_encounter=replace(enc, player_shields=10_000))
+    result = reduce(state, 1, CombatAction(action="field_patch", subsystem=sub, slot_index=idx), cfg)
+    apply_result(state, result)
+    patched = state.ships[ship.id]
+    assert patched.repair_kits == 0
+    slot = patched.subsystems[sub].slots[idx]
+    assert slot is not None and not slot.knocked_out
+    assert derive_aspects(patched, cfg).combat_speed == healthy  # fully recovered
+
+
+def test_salvage_is_conserved_and_bounded() -> None:
+    """Victory salvage (§10/WP26): the latinum gained equals the event's amount and
+    sits inside the configured 10–20% window; forced component drops land as loose
+    Tier-I parts in the hold."""
+    cfg = SMALL.model_copy(update={"combat": SMALL.combat.model_copy(
+        update={"salvage_component_chance": 1.0})})
+    state = _fight_state()
+    player = state.players[1]
+    before_latinum = player.latinum
+    foes = (_foe(hull=1, shields=0, damage=1), _foe(hull=1, shields=0, damage=1))
+    _engagement(state, foes)
+    # Two 1-hull foes die to one gun rate-2 round? No — one fight action hits one
+    # target; run rounds until victory.
+    for _ in range(4):
+        result = reduce(state, 1, CombatAction(action="fight"), cfg)
+        apply_result(state, result)
+        if state.players[1].active_encounter is None:
+            break
+    assert state.players[1].active_encounter is None
+    salvage = [e for e in result.events if isinstance(e, SalvageCollected)]
+    assert len(salvage) == 1
+    ev = salvage[0]
+    assert state.players[1].latinum == before_latinum + ev.latinum
+    cc = cfg.combat
+    lo = sum(round(f.hull_max * cc.salvage_hull_value * cc.salvage_frac_min) for f in foes)
+    hi = sum(round(f.hull_max * cc.salvage_hull_value * cc.salvage_frac_max) for f in foes)
+    assert lo <= ev.latinum <= hi + 1  # per-wreck rounding
+    assert len(ev.components) == len(foes)  # chance forced to 1, holds are free
+    ship = state.ships[player.ship_id]
+    assert sum(ship.components.values()) == len(ev.components)
+
+
+def test_salvage_components_need_a_free_hold() -> None:
+    """With the holds full the parts are left adrift — cargo is never overwritten."""
+    cfg = SMALL.model_copy(update={"combat": SMALL.combat.model_copy(
+        update={"salvage_component_chance": 1.0})})
+    state = _fight_state()
+    player = state.players[1]
+    ship = state.ships[player.ship_id]
+    state.ships[ship.id] = replace(ship, cargo={Commodity.FUEL_ORE: ship.holds_total})
+    _engagement(state, (_foe(hull=1, shields=0, damage=1),))
+    result = reduce(state, 1, CombatAction(action="fight"), cfg)
+    apply_result(state, result)
+    salvage = [e for e in result.events if isinstance(e, SalvageCollected)]
+    assert salvage and salvage[0].components == ()
+    assert not state.ships[ship.id].components
+    assert salvage[0].latinum > 0  # the latinum still pays out
 
 
 def test_flee_eventually_succeeds_even_when_crippled() -> None:
@@ -180,10 +309,10 @@ def test_flee_eventually_succeeds_even_when_crippled() -> None:
         apply_result(state, result)
         if state.players[1].active_encounter is None:
             ended = [e for e in result.events if isinstance(e, EncounterEnded)]
-            assert ended and ended[0].outcome in (combat.FLED, combat.CRIPPLED)
+            assert ended and ended[0].outcome in (combat.FLED, combat.DESTROYED)
             if ended[0].outcome == combat.FLED:
                 return
-            pytest.skip("crippled before escaping (damage=1 per round — improbable)")
+            pytest.skip("destroyed before escaping (damage=1 per round — improbable)")
     raise AssertionError("never escaped in 400 attempts despite the 10% floor")
 
 
@@ -263,3 +392,50 @@ def test_full_fight_replays_to_identical_hash(tmp_path: Path) -> None:
     expected = state_hash(svc.state)
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "g.db"))
     assert state_hash(reloaded.state) == expected
+
+
+def test_pod_flow_replays_to_identical_hash(tmp_path: Path) -> None:
+    """The WP26 golden: a fight lost to destruction reloads to the identical hash,
+    with the escape pod (and everything it is *not* carrying) reconstructed."""
+    svc = GameService.new_game(SMALL, 3, SqliteRepository(tmp_path / "p.db"),
+                               created_at="1970-01-01T00:00:00Z")
+    sp = _hostile(svc.state)
+    assert sp is not None
+    ship = svc.state.ships[svc.state.players[1].ship_id]
+    path = shortest_path(svc.state.adjacency, ship.sector_id, sp.sector_id)
+    engaged = False
+    for nxt in path[1:]:
+        svc.apply(1, Warp(to_sector=nxt))
+        if svc.state.players[1].active_encounter is not None:
+            engaged = True
+            break
+    if not engaged:
+        back = next(iter(svc.state.adjacency[sp.sector_id]))
+        for _ in range(100):
+            for hop in (back, sp.sector_id):
+                svc.apply(1, Warp(to_sector=hop))
+                if svc.state.players[1].active_encounter is not None:
+                    engaged = True
+                    break
+            if engaged:
+                break
+    assert engaged, "seed 3 reliably intercepts en route (smoke-verified)"
+
+    # On a 1-hull ship the first volley that defeats the shields is the end.
+    svc.apply(1, DevPatch(op="set", target="ship.hull_current", value=1))
+    outcome = None
+    for _ in range(100):
+        events = svc.apply(1, CombatAction(action="fight"))
+        ended = [e for e in events if isinstance(e, EncounterEnded)]
+        if ended:
+            outcome = ended[0].outcome
+            break
+    if outcome != combat.DESTROYED:
+        pytest.skip("won or fled on 1 hull before the pack broke through (improbable)")
+    pod = svc.state.ships[svc.state.players[1].ship_id]
+    assert pod.type_id == SMALL.combat.escape_pod_class
+
+    expected = state_hash(svc.state)
+    reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "p.db"))
+    assert state_hash(reloaded.state) == expected
+    assert reloaded.state.ships[pod.id].type_id == SMALL.combat.escape_pod_class
