@@ -299,7 +299,8 @@ def test_species_placement_does_not_perturb_ports_or_planets() -> None:
     assert a.ports == b.ports
     # Home-cluster carving overlays alliance ownership on some planets (WP23), but the
     # planet *generation* (positions/types/stores) is unperturbed — compare ignoring owner.
-    strip = lambda ps: {pid: replace(p, owner=Ownership()) for pid, p in ps.items()}
+    def strip(ps):  # type: ignore[no-untyped-def]
+        return {pid: replace(p, owner=Ownership()) for pid, p in ps.items()}
     assert strip(a.planets) == strip(b.planets)
     assert not a.species and b.species  # only the alien layer differs
 
