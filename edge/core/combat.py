@@ -16,10 +16,12 @@ The §10 counter-play, implemented:
   even in a crippled ship (a §13 property-test invariant: `flee_chance`).
 - The Spindrive **efficiency bonus** (§4.1) applies once each to gun damage, combat
   speed (both contests), and screen deflection.
-
-Ship destruction (hull 0 → escape pod) is WP26; until it lands, a hull driven to zero
-is clamped at 1 and the ship force-disengages (`crippled`) — the explicit seam pods
-replace.
+- **Localized damage** (§4.1, WP26): a volley that reaches the hull may additionally
+  knock out one subsystem component — the pick weighted toward exposed/forward
+  systems — degrading that aspect immediately (the gun slows, the thrusters fail and
+  the flee floor is all that is left, or the screens themselves weaken).
+- **Destruction** (§10, WP26): hull driven to zero is the `destroyed` outcome — the
+  reducer drops the player to an escape pod (ship and cargo lost, the pod limps home).
 """
 
 from __future__ import annotations
@@ -29,13 +31,14 @@ from dataclasses import dataclass, replace
 
 from edge.core.config import CombatConfig, GameConfig
 from edge.core.engine_room import ShipAspects
+from edge.core.enums import Subsystem
 from edge.core.models import Encounter, EncounterFoe, Ship
 
 COMBAT_ACTIONS = ("fight", "flee", "launch_missile", "field_patch")
 
 FLED = "fled"
 VICTORY = "victory"
-CRIPPLED = "crippled"  # hull driven to zero — the WP26 escape-pod seam
+DESTROYED = "destroyed"  # hull driven to zero — the reducer issues the escape pod
 
 
 class CombatError(Exception):
@@ -44,14 +47,17 @@ class CombatError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class RoundResult:
-    """One resolved combat round (WP25)."""
+    """One resolved combat round (WP25/WP26)."""
 
     encounter: Encounter | None  # None ⇒ the fight ended
-    ship: Ship  # hull / missiles updated
-    outcome: str | None  # None while ongoing, else FLED / VICTORY / CRIPPLED
+    ship: Ship  # hull / missiles / knocked slots updated
+    outcome: str | None  # None while ongoing, else FLED / VICTORY / DESTROYED
     damage_dealt: int
     damage_taken: int
     foes_destroyed: int
+    # A component knocked out by this round's volley (§4.1, WP26), if any:
+    # (subsystem, slot index, component kind value). The reducer re-derives aspects.
+    knockout: tuple[Subsystem, int, str] | None = None
 
 
 def flee_chance(
@@ -92,6 +98,38 @@ def _hit_foe(foe: EncounterFoe, raw: int) -> EncounterFoe:
     dmg = max(1, raw - foe.defense)
     absorbed = min(foe.shields, dmg)
     return replace(foe, shields=foe.shields - absorbed, hull=foe.hull - (dmg - absorbed))
+
+
+def _roll_knockout(
+    ship: Ship, cc: CombatConfig, rng: random.Random
+) -> tuple[Ship, tuple[Subsystem, int, str] | None]:
+    """Maybe knock out one component after a hull-reaching volley (§4.1, WP26).
+
+    The subsystem pick is weighted toward exposed/forward systems (`knockout_weights`);
+    within the subsystem a uniformly-drawn active slot goes down. A flat NPC hull
+    (no engine room) or a ship with nothing left to knock out is untouched. Draw
+    order is fixed (chance roll, then the weighted pick) so replays stay exact (H4).
+    """
+    if ship.subsystems is None or rng.random() >= cc.knockout_chance:
+        return ship, None
+    candidates = [
+        (sub, [i for i, c in enumerate(st.slots) if c is not None and not c.knocked_out])
+        for sub, st in sorted(ship.subsystems.items(), key=lambda kv: kv[0].value)
+    ]
+    candidates = [(sub, idx) for sub, idx in candidates if idx]
+    if not candidates:
+        return ship, None  # everything is already dark
+    weights = [cc.knockout_weights.get(sub.value, 1.0) for sub, _ in candidates]
+    sub, indices = rng.choices(candidates, weights=weights)[0]
+    slot_index = rng.choice(indices)
+    state = ship.subsystems[sub]
+    comp = state.slots[slot_index]
+    assert comp is not None
+    slots = list(state.slots)
+    slots[slot_index] = replace(comp, knocked_out=True)
+    subsystems = dict(ship.subsystems)
+    subsystems[sub] = replace(state, slots=tuple(slots))
+    return replace(ship, subsystems=subsystems), (sub, slot_index, comp.kind.value)
 
 
 def resolve_round(
@@ -171,19 +209,24 @@ def resolve_round(
     hull_left = ship.hull_current - hull_hit
 
     if hull_left <= 0:
-        # WP26 replaces this seam with escape pods; until then the ship is crippled at
-        # 1 hull and force-disengages, so death is never unhandled.
-        crippled = replace(ship, hull_current=1, missiles=new_missiles)
+        # Destroyed (§10, WP26): the reducer drops the player to the escape pod.
+        wreck = replace(ship, hull_current=0, missiles=new_missiles)
         return RoundResult(
-            encounter=None, ship=crippled, outcome=CRIPPLED,
+            encounter=None, ship=wreck, outcome=DESTROYED,
             damage_dealt=dealt, damage_taken=taken, foes_destroyed=destroyed,
         )
+
+    new_ship = replace(ship, hull_current=hull_left, missiles=new_missiles)
+    knockout = None
+    if hull_hit > 0:
+        # Damage that defeats the screens may localize into a component (§4.1).
+        new_ship, knockout = _roll_knockout(new_ship, cc, rng)
 
     new_encounter = replace(
         encounter, foes=tuple(foes), round=next_round, player_shields=shields_left,
     )
-    new_ship = replace(ship, hull_current=hull_left, missiles=new_missiles)
     return RoundResult(
         encounter=new_encounter, ship=new_ship, outcome=None,
         damage_dealt=dealt, damage_taken=taken, foes_destroyed=destroyed,
+        knockout=knockout,
     )

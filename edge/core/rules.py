@@ -60,6 +60,7 @@ from edge.core.events import (
     Colonized,
     ColonistsRecruited,
     ComponentInstalled,
+    ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
     Descended,
@@ -75,6 +76,8 @@ from edge.core.events import (
     Haggled,
     LeadAccepted,
     Repaired,
+    SalvageCollected,
+    ShipDestroyed,
     ShipPurchased,
     SiteExplored,
     StarbaseSalvaged,
@@ -1316,10 +1319,75 @@ def _combat_action(
         player_id, enc.species_id, enc.round + 1, cmd.action,
         result.damage_dealt, result.damage_taken, foes_left,
     ))
+    new_ship = result.ship
+    new_player = replace(player, active_encounter=result.encounter)
+    if result.knockout is not None:
+        # The owning subsystem's aspect degrades immediately (§4.1 derive-on-write).
+        sub, slot_index, component = result.knockout
+        new_ship = apply_derived(new_ship, config)
+        events.append(ComponentKnockedOut(player_id, sub.value, slot_index, component))
+    if result.outcome == combat.VICTORY:
+        new_ship, salvage = _combat_salvage(player_id, enc, new_ship, config, state.rng)
+        new_player = replace(new_player, latinum=new_player.latinum + salvage.latinum)
+        events.append(salvage)
+    elif result.outcome == combat.DESTROYED:
+        # Hull 0 (§10, WP26): ship, cargo, and stores are lost; the escape pod —
+        # a real config hull — is issued in place, and the pod limps home.
+        events.append(ShipDestroyed(
+            player_id, enc.species_id, new_ship.sector_id, new_ship.type_id))
+        new_ship = _escape_pod(new_ship, config)
     if result.outcome is not None:
         events.append(EncounterEnded(player_id, enc.species_id, result.outcome))
-    new_player = replace(player, active_encounter=result.encounter)
-    return ReduceResult(events=tuple(events), players=(new_player,), ships=(result.ship,))
+    return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,))
+
+
+def _escape_pod(wreck: Ship, config: GameConfig) -> Ship:
+    """Replace a destroyed hull with the configured escape pod (§10, WP26).
+
+    Cargo, loose components, devices, missiles, kits, and any colonists aboard go
+    down with the ship; the pod keeps the hull's id and sector so the player limps
+    home from where the fight ended. Latinum and the bank live on the player.
+    """
+    pod = config.ship_class(config.combat.escape_pod_class)
+    return apply_derived(replace(
+        wreck, type_id=pod.id, name=pod.name, holds_total=pod.holds_total,
+        hull_max=pod.hull_max, hull_current=pod.hull_max,
+        cloak_rating=pod.cloak_rating, sensor_rating=pod.sensor_rating,
+        shields=pod.shields_max, warp_speed=pod.warp_speed,
+        combat_speed=pod.combat_speed, turns_per_warp=pod.turns_per_warp,
+        colonist_capacity=pod.colonist_capacity, colonists=0,
+        cargo={}, components={}, devices={}, missiles=0, repair_kits=0,
+        subsystems=build_subsystems(pod),
+    ), config)
+
+
+def _combat_salvage(
+    player_id: int, enc: Encounter, ship: Ship, config: GameConfig, rng: random.Random
+) -> tuple[Ship, SalvageCollected]:
+    """Roll post-victory wreck salvage over the whole destroyed pack (§10, WP26).
+
+    Per wreck: `hull_max × salvage_hull_value × U[frac_min, frac_max]` latinum (the
+    BNT 10–20% rule mapped onto cargo-less NPC hulls), plus an occasional loose
+    Tier-I component — which needs a free hold, else it is left adrift. Draw order
+    is fixed (foes in pack order, fraction then component roll) so replays are exact.
+    """
+    cc = config.combat
+    latinum = 0
+    parts: list[str] = []
+    components = dict(ship.components)
+    free = ship.holds_free
+    for foe in enc.foes:
+        frac = cc.salvage_frac_min + rng.random() * (cc.salvage_frac_max - cc.salvage_frac_min)
+        latinum += round(foe.hull_max * cc.salvage_hull_value * frac)
+        if rng.random() < cc.salvage_component_chance:
+            kind = rng.choice(list(Component))
+            if free >= 1:
+                key = (kind, ComponentTier.I)
+                components[key] = components.get(key, 0) + 1
+                parts.append(kind.value)
+                free -= 1
+    new_ship = replace(ship, components=components) if parts else ship
+    return new_ship, SalvageCollected(player_id, latinum, tuple(parts))
 
 
 def _buy_missiles(
