@@ -602,24 +602,45 @@ once per crossing; seeded grudges land exactly for cast pairs.
 
 ### WP28 — The per-contact dialogue session (M)
 
-`Player.contact_session: ContactSession | None` — a frozen record of
-`(species_instance_id, sector_id, facts)` where `facts` accumulates topics
-asked, offers seen, and reactions within the visit. Opened at hail; cleared
-by farewell **and by every movement/encounter reducer** (H1). The facts merge
-into the fact dictionary fed to `DialogueWhen.criteria` — the matcher
-(`select._score`) already handles arbitrary criteria keys, so this extends
-**fact assembly only**, in a new shared `edge/dialogue/facts.py` used
-identically by the `Converse` reducer and the `session` projection so the
-view/reducer lockstep holds (H4/H8). H9 sync applies (yaml spec header,
-authoring prompt, DESIGN §6.7/§13 in the same change).
+A conversation now remembers this visit. **Shipped.**
+
+- **`Player.contact_session: ContactSession | None`** (hashed): a frozen
+  record of `(species_id, sector_id, facts)` — the species **instance**
+  spoken to, where, and what happened this visit. Session facts (the WP28
+  vocabulary, documented in the corpus spec header): `asked.<context>: true`
+  for every context spoken (so a line can react to a repeat question),
+  `traded: true` on a tech buy/barter, `accepted_lead: true` on a logged tip.
+- **Lifetime is structural (H1):** any conversation reducer opens/continues
+  the session (`Hail` is `Converse(greeting)`; turning to another species
+  starts a fresh visit); `farewell` closes it; **`Warp` and every `TravelTo`
+  hop clear it unconditionally** — the UI is never trusted to close it.
+- **Shared fact assembly** in the new `edge/dialogue/facts.py`
+  (`contact_facts` = session facts + the caller's per-context extras;
+  `ensure_session`/`note_topic`/`note` for the reducer side): the `Converse`
+  reducer (`_speak_context`, `_converse_choice`), `_trade_alien`,
+  `_accept_lead`, and the `contact_view` projection all merge facts there, so
+  the lockstep holds — selection always reads the **pre-utterance** session
+  facts the projection showed the line/menu under, then the utterance is
+  recorded. `contact_facts` already takes `state` so the WP29 situational
+  layer slots in without touching call sites. The matcher (`select._score`)
+  needed no change — `asked.*` keys are ordinary criteria facts.
+- **H9 sync:** the corpus spec header gains the FACTS section (per-context +
+  session vocabulary); the authoring prompt's `_structure_brief` now tells
+  the model each expansion may land mid-visit (self-contained lines). DESIGN
+  §6.7/§13 already carried the WP19 spec text. No new events/commands — the
+  session rides existing commands, so codec/store are untouched; goldens
+  re-baseline via self-consistency (no `config_version` bump).
 
 Files: `edge/core/models.py`, `edge/core/rules.py`, new
 `edge/dialogue/facts.py`, `edge/server/session.py`,
 `config/alien_dialogue_default.yaml` (header),
 `edge/dialogue/authoring/pipeline.py`, `tests/test_dialogue.py`,
 `tests/test_contact.py`.
-Tests: golden replay of a branching conversation; session cleared on warp;
-view and reducer agree on choices under session facts.
+Tests: session opens at hail and accumulates topics; farewell closes it;
+warp clears it (H1); switching contacts starts fresh (no fact leak); an
+`asked.greeting`-keyed species entry re-selects line **and menu** in
+view/reducer lockstep; trade + lead mark the session; a visit left open
+mid-conversation replays to the identical hash on reload.
 
 ### WP29 — Situational facts + per-instance recency (S/M)
 

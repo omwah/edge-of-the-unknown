@@ -370,6 +370,26 @@ class Encounter:
 
 
 @dataclass(frozen=True, slots=True)
+class ContactSession:
+    """One live conversation visit with an alien (DESIGN §6.7) — the per-contact session.
+
+    `species_id` is the `AlienSpecies` **instance** being spoken to (not the kind — a
+    visit is with one ship), `sector_id` where the visit happens. `facts` accumulates
+    what happened *this visit* — topics asked (`asked.<context>`), offers taken
+    (`traded`), tips logged (`accepted_lead`) — and merges into the dialogue fact
+    dictionary (`edge.dialogue.facts`), so authored lines can react to being asked
+    the same thing twice or circle back to an earlier beat. Lifetime is structural
+    (H1): opened by the conversation reducers, cleared by farewell **and by every
+    movement reducer** — the UI is never trusted to close it. Hashed state: a visit
+    reconstructs exactly under `(seed, command log)`.
+    """
+
+    species_id: int
+    sector_id: int
+    facts: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class Player:
     """The player (DESIGN §4). Starts as a member of the Core's governing alliance."""
 
@@ -420,6 +440,10 @@ class Player:
     # encounter roll, cleared by flee/victory. Movement and docking are rejected while set.
     # Hashed state — a fight reconstructs exactly under (seed, command log).
     active_encounter: Encounter | None = None
+    # The live conversation visit, if any (DESIGN §6.7, WP28): opened by the conversation
+    # reducers, cleared by farewell and by every movement reducer (H1). Its `facts` feed
+    # `DialogueWhen.criteria` via `edge.dialogue.facts` so lines can react to this visit.
+    contact_session: ContactSession | None = None
     # Active vendettas held **against the player**, keyed by the holder species kind
     # (`roster_id`, so every ship of a species shares the vendetta — DESIGN §4, §6.5).
     # Created by player conduct (WP27), decayed by the daily cron; a permanent grudge

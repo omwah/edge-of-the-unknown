@@ -66,6 +66,24 @@
 #   posture / stage: <str>          # Phase-3 forward-compat; entries that set these are INERT in
 #                                   #   Phase 2 (never selected). Leave unset for Phase-2 lines.
 #
+# --- FACTS a `criteria` gate can name (assembled in edge/dialogue/facts.py) ------------------
+# Per-context facts (set only while the named context is shown/spoken):
+#   has_intel_target: true|false    # offer_coordinates — the speaker holds an unlogged tip.
+#   subject: <species_id>           # dossier_other + branch.dossier_other.* — the asked-about kind.
+# SESSION facts (the per-contact visit, DESIGN §6.7/WP28): a conversation opens a session on
+# `Player.contact_session` that accumulates what happened THIS VISIT and feeds every selection
+# with that species until the visit ends (farewell, or any movement — the session's lifetime is
+# structural, never trusted to the UI). Keys:
+#   asked.<context_key>: true       # that context was already spoken this visit (set for every
+#                                   #   spoken context — gate on it to react to a repeat question,
+#                                   #   e.g. { criteria: { asked.dossier_self: true } }).
+#   traded: true                    # the player bought/bartered a tech offer this visit.
+#   accepted_lead: true             # the player logged a coordinate tip this visit.
+# An entry that pins a session fact outscores a vaguer one only while the fact holds, so always
+# keep a less-specific (or catch-all) sibling for the first exchange of a visit.
+# (Situational facts — band, sector features, hull state, just_fled_combat — land in WP29;
+# persisted cross-visit arc facts in WP30.)
+#
 # --- A DialogueChoice (authored player reply) ------------------------------------------------
 # The node's `choices` are the player's reply menu — the WHOLE menu (there is no code-derived
 # verb fallback). The contact screen shows them as NUMBERED replies. Resolution walks the same
