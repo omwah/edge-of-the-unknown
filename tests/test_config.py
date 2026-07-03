@@ -92,14 +92,16 @@ def test_default_bigbang_and_ship() -> None:
     assert cfg.bigbang.sector_count == 1_000
     assert cfg.bigbang.max_warps_per_sector == 6
     assert sum(cfg.bigbang.port_class_distribution) == 100
-    assert len(cfg.bigbang.bands) == 4
+    assert len(cfg.bigbang.bands.trunk) == 4
+    assert len(cfg.bigbang.bands.expansive) == 4
+    assert len(cfg.bigbang.active_bands()) == 4
     assert cfg.starter_ship.holds_total == 60
 
 
 def test_species_home_bands_are_valid_distance_bands() -> None:
     cfg = load_default_config()
     assert cfg.roster is not None
-    bands = {b.name for b in cfg.bigbang.bands}
+    bands = {b.name for b in cfg.bigbang.active_bands()}
     # No species names a non-band like "Core" (the Core is the inner Hub, not a band).
     assert all(s.home_band in bands for s in cfg.roster.species)
 

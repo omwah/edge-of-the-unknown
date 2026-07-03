@@ -202,20 +202,21 @@ bigbang:
   initial_stock_min: 200     # low end of a port's randomized starting commodity stock
   initial_stock_max: 2000    # high end of that starting stock
   # Distance bands: each sector's band is set by its warp-hop distance from the Core, and band
-  # drives rarity, danger, and ownership everywhere else in this file. Windows below are for
-  # trunk topology; expansive mode uses bands_expansive instead (§5 step 5).
+  # drives rarity, danger, and ownership everywhere else in this file. Windows are nested by
+  # topology_mode — active_bands() picks the set matching `topology_mode` above (§5 step 5).
+  # Both lists must name the same bands in the same order; only the hop windows differ, because
+  # expansive's ring roads lengthen paths (so its windows are deeper to keep all four populated).
   bands:
-    - { name: Hub,      min_hops: 0,  max_hops: 5 }
-    - { name: Frontier, min_hops: 6,  max_hops: 12 }
-    - { name: Deep,     min_hops: 13, max_hops: 20 }
-    - { name: Void,     min_hops: 21, max_hops: 9999 }
-  # expansive-mode thresholds: same names, deeper hop windows (ring roads lengthen
-  # paths). Used only when topology_mode == expansive (§5 step 5).
-  bands_expansive:
-    - { name: Hub,      min_hops: 0,  max_hops: 14 }
-    - { name: Frontier, min_hops: 15, max_hops: 35 }
-    - { name: Deep,     min_hops: 36, max_hops: 58 }
-    - { name: Void,     min_hops: 59, max_hops: 9999 }
+    trunk:      # windows for topology_mode: trunk (the chokepoint spanning tree)
+      - { name: Hub,      min_hops: 0,  max_hops: 5 }
+      - { name: Frontier, min_hops: 6,  max_hops: 12 }
+      - { name: Deep,     min_hops: 13, max_hops: 20 }
+      - { name: Void,     min_hops: 21, max_hops: 9999 }
+    expansive:  # windows for topology_mode: expansive (the deeper band-lattice web)
+      - { name: Hub,      min_hops: 0,  max_hops: 14 }
+      - { name: Frontier, min_hops: 15, max_hops: 35 }
+      - { name: Deep,     min_hops: 36, max_hops: 58 }
+      - { name: Void,     min_hops: 59, max_hops: 9999 }
 
 # Engine room (§4.1): the game-global formulas turning a hull's slotted parts into
 # derived aspects. Per-subsystem layouts live on each ship class below. The

@@ -118,6 +118,50 @@ class DistanceBand(BaseModel):
     max_hops: int  # inclusive; the outermost band uses a large sentinel
 
 
+def _trunk_bands() -> list[DistanceBand]:
+    return [
+        DistanceBand(name="Hub", min_hops=0, max_hops=5),
+        DistanceBand(name="Frontier", min_hops=6, max_hops=12),
+        DistanceBand(name="Deep", min_hops=13, max_hops=20),
+        DistanceBand(name="Void", min_hops=21, max_hops=9_999),
+    ]
+
+
+def _expansive_bands() -> list[DistanceBand]:
+    return [
+        DistanceBand(name="Hub", min_hops=0, max_hops=14),
+        DistanceBand(name="Frontier", min_hops=15, max_hops=35),
+        DistanceBand(name="Deep", min_hops=36, max_hops=58),
+        DistanceBand(name="Void", min_hops=59, max_hops=9_999),
+    ]
+
+
+class BandSet(BaseModel):
+    """Distance-band hop windows keyed by `topology_mode` (DESIGN §5 step 5).
+
+    Each mode lists the same band **names** in the same order — only the hop
+    windows differ, so every name-keyed placement/validation/UI path is
+    mode-agnostic. `expansive`'s ring-road lattice yields a deeper hop profile
+    than the trunk spanning tree, so its windows are wider to keep all four
+    bands populated. `BigBangConfig.active_bands()` resolves the live list.
+    """
+
+    model_config = _FROZEN
+
+    trunk: list[DistanceBand] = Field(default_factory=_trunk_bands)
+    expansive: list[DistanceBand] = Field(default_factory=_expansive_bands)
+
+    @model_validator(mode="after")
+    def _check_names_match(self) -> BandSet:
+        names = [b.name for b in self.trunk]
+        exp = [b.name for b in self.expansive]
+        if exp != names:
+            raise ValueError(
+                f"bands.expansive names {exp} must match bands.trunk {names}"
+            )
+        return self
+
+
 class BigBangConfig(BaseModel):
     """Universe-generation parameters (DESIGN §5)."""
 
@@ -158,45 +202,17 @@ class BigBangConfig(BaseModel):
     )
     initial_stock_min: int = 200
     initial_stock_max: int = 2_000
-    bands: list[DistanceBand] = Field(
-        default_factory=lambda: [
-            DistanceBand(name="Hub", min_hops=0, max_hops=5),
-            DistanceBand(name="Frontier", min_hops=6, max_hops=12),
-            DistanceBand(name="Deep", min_hops=13, max_hops=20),
-            DistanceBand(name="Void", min_hops=21, max_hops=9_999),
-        ]
-    )
-    # `expansive` mode's ring-road lattice gives a *deeper* hop profile than trunk
-    # (ring roads lengthen shortest paths), so its bands need larger thresholds to
-    # keep all four populated. Same band **names** in the same order — only the
-    # hop windows differ — so all name-keyed logic is mode-agnostic. Resolved by
-    # `active_bands()`; falls back to `bands` when None or in trunk mode.
-    bands_expansive: list[DistanceBand] | None = Field(
-        default_factory=lambda: [
-            DistanceBand(name="Hub", min_hops=0, max_hops=14),
-            DistanceBand(name="Frontier", min_hops=15, max_hops=35),
-            DistanceBand(name="Deep", min_hops=36, max_hops=58),
-            DistanceBand(name="Void", min_hops=59, max_hops=9_999),
-        ]
-    )
+    # Per-mode distance-band hop windows, nested by `topology_mode` (§5 step 5):
+    # `bands.trunk` and `bands.expansive`. Same band names/order across modes — only
+    # the hop windows differ — so all name-keyed logic is mode-agnostic. Resolved by
+    # `active_bands()`.
+    bands: BandSet = Field(default_factory=BandSet)
 
     def active_bands(self) -> list[DistanceBand]:
         """The distance bands for the configured `topology_mode` (§5 step 5)."""
-        if self.topology_mode == "expansive" and self.bands_expansive is not None:
-            return self.bands_expansive
-        return self.bands
-
-    @model_validator(mode="after")
-    def _check_band_names_match(self) -> BigBangConfig:
-        """`bands_expansive` must name the same bands, in the same order, as `bands`
-        (only the hop thresholds differ) — so every name-keyed placement, validation,
-        and UI path is identical across modes."""
-        if self.bands_expansive is not None:
-            names = [b.name for b in self.bands]
-            exp = [b.name for b in self.bands_expansive]
-            if exp != names:
-                raise ValueError(f"bands_expansive names {exp} must match bands {names}")
-        return self
+        if self.topology_mode == "expansive":
+            return self.bands.expansive
+        return self.bands.trunk
 
 
 class SubsystemLayout(BaseModel):
@@ -1133,7 +1149,7 @@ class GameConfig(BaseModel):
         """
         if self.roster is None:
             return self
-        bands = {b.name for b in self.bigbang.bands}
+        bands = {b.name for b in self.bigbang.active_bands()}  # names match across modes
         for sp in self.roster.species:
             if sp.home_band is not None and sp.home_band not in bands:
                 raise ValueError(

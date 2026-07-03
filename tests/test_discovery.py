@@ -41,7 +41,7 @@ def test_rarity_and_value_gradient_monotone(seed: int) -> None:
         band = state.sectors[d.sector_id].distance_band
         by_band.setdefault(band, []).append((d.rarity_tier.value, rarity_value(d.rarity_tier, CONFIG)))
     prev_rank = prev_value = -1.0
-    for band in (b.name for b in CONFIG.bigbang.bands):  # type: ignore[attr-defined]
+    for band in (b.name for b in CONFIG.bigbang.active_bands()):  # type: ignore[attr-defined]
         finds = by_band.get(band)
         if not finds:
             continue
