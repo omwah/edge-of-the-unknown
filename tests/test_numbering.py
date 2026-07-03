@@ -33,7 +33,7 @@ def _inputs(seed: int):
     cfg = CONFIG.bigbang  # type: ignore[attr-defined]
     out, groups = build_graph(cfg, random.Random(f"{seed}-0"))
     core_hops = bfs_distances(out, 1)
-    return groups, core_hops, cfg.bands
+    return groups, core_hops, cfg.active_bands()
 
 
 @pytest.mark.parametrize("seed", SEEDS)

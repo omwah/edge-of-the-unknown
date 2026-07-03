@@ -300,11 +300,11 @@ with the trunk thresholds most sectors fall into Void). The four bands must be
 made to stay populated and every hop-window check must still pass under
 `expansive`.
 
-- **Bands (shipped):** `BigBangConfig.bands` stays the trunk defaults; an
-  optional `bands_expansive` override (Hub 0–14 / Frontier 15–35 / Deep 36–58 /
-  Void 59+) is resolved by `active_bands()` at generation. **Same band names in
-  the same order — only the hop windows differ** — enforced by a config
-  validator (`_check_band_names_match`), so every name-keyed path (placement,
+- **Bands (shipped):** `BigBangConfig.bands` is a `BandSet` nesting `bands.trunk`
+  and `bands.expansive` (Hub 0–14 / Frontier 15–35 / Deep 36–58 / Void 59+),
+  resolved by `active_bands()` at generation per `topology_mode`. **Same band names
+  in the same order — only the hop windows differ** — enforced by a `BandSet`
+  validator (`_check_names_match`), so every name-keyed path (placement,
   validation, UI) is mode-agnostic. All threshold consumers (generator, validate,
   populate, aliens) route through `active_bands()`. At 1000 sectors this keeps all
   four bands populated (25/25 seeds sampled) with an outward-growing gradient
@@ -313,7 +313,7 @@ made to stay populated and every hop-window check must still pass under
   (opposed pair ≤ 5 hops of the Core), StarDock placement within
   `stardock_min/max_hops`, `_check_discovery_gradient` strict monotonicity, ≥1
   contact per band, unowned-planet monotone fraction — all pass at 1000 sectors
-  (10/10 seeds generate cleanly). *(Note: `bands_expansive` is tuned to the
+  (10/10 seeds generate cleanly). *(Note: `bands.expansive` is tuned to the
   ~1000-sector default; smaller universes stay shallow — trunk's bands are
   likewise scale-tuned.)*
 - **Embedding (shipped):** the radial fan hung every sector off a single BFS-tree

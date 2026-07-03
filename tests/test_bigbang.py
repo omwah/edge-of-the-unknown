@@ -210,12 +210,12 @@ def test_bands_expansive_name_mismatch_rejected() -> None:
     differ), so no name-keyed placement/validation silently diverges."""
     import pydantic
 
-    from edge.core.config import BigBangConfig, DistanceBand
+    from edge.core.config import BandSet, DistanceBand
 
     with pytest.raises(pydantic.ValidationError):
-        BigBangConfig(
-            bands=[DistanceBand(name="Hub", min_hops=0, max_hops=5)],
-            bands_expansive=[DistanceBand(name="Core", min_hops=0, max_hops=9)],
+        BandSet(
+            trunk=[DistanceBand(name="Hub", min_hops=0, max_hops=5)],
+            expansive=[DistanceBand(name="Core", min_hops=0, max_hops=9)],
         )
 
 
@@ -230,7 +230,7 @@ BIG_EXPANSIVE = _big_expansive_config()
 
 @pytest.mark.parametrize("seed", range(8))
 def test_expansive_populates_all_four_bands(seed: int) -> None:
-    """At the real 1000-sector scale the retuned `bands_expansive` keeps all four
+    """At the real 1000-sector scale the retuned `bands.expansive` keeps all four
     bands populated, with the frontier bands larger than the Hub (danger/reward
     rises outward, §5/§7)."""
     from collections import Counter
