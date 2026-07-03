@@ -53,7 +53,13 @@ from edge.core.engine_room import (
     legal_components,
     tier_ceiling,
 )
-from edge.core.discovery import describe_payload, is_detectable, sector_has_nebula
+from edge.core.discovery import (
+    describe_payload,
+    entity_codex_discovery,
+    entity_contactable,
+    is_detectable,
+    sector_has_nebula,
+)
 from edge.core.enums import (
     Commodity,
     Component,
@@ -1721,8 +1727,36 @@ def _subject_extra(state: UniverseState, subject_id: int | None) -> dict[str, st
 
 
 def _hail(state: UniverseState, player_id: int, cmd: Hail, config: GameConfig) -> ReduceResult:
-    """Open contact — the greeting case of the general conversation path (WP17)."""
+    """Open contact — the greeting case of the general conversation path (WP17).
+
+    The roaming Entity's sensor gate and first-contact codex stamp live in `_converse`
+    (§7, WP35), so both the hail and a raw `Converse(greeting)` obey them.
+    """
     return _converse(state, player_id, Converse(cmd.species_id, "greeting"), config)
+
+
+def _stamp_entity_codex(result: ReduceResult, player_id: int, state: UniverseState,
+                        config: GameConfig) -> ReduceResult:
+    """Log the Entity's reserved codex row on first contact (§7, WP35), folding it into `result`.
+
+    Once-only and replay-idempotent: the reserved row is collected exactly once (`found_by`
+    latches), so a re-hail leaves `result` untouched. Awards `experience_per_discovery` and
+    emits `DiscoveryCollected` — no new command/event type, so the codec is unchanged.
+    """
+    disc = entity_codex_discovery(state)
+    if disc is None or disc.found_by is not None:
+        return result  # no reserved row, or already logged — idempotent
+    player = next((p for p in result.players if p.id == player_id), state.players[player_id])
+    new_player = replace(
+        player, codex=player.codex | frozenset({disc.id}),
+        experience=player.experience + config.aliens.experience_per_discovery)
+    new_disc = replace(disc, found_by=player_id)
+    event = DiscoveryCollected(player_id, disc.id, disc.kind.value, disc.rarity_tier.name,
+                               disc.payload.kind.value, describe_payload(disc.payload))
+    others = tuple(p for p in result.players if p.id != player_id)
+    return replace(result, players=others + (new_player,),
+                   events=result.events + (event,),
+                   discoveries=result.discoveries + (new_disc,))
 
 
 def _intel_bindings(state: UniverseState, player: Player, species: AlienSpecies,
@@ -1812,8 +1846,17 @@ def _converse(state: UniverseState, player_id: int, cmd: Converse,
     ship = _ship(state, player)
     species = _species_here(state, ship, cmd.species_id)
     sc = _species_config(config, species)
+    entity = sc.singular_entity
+    if entity and not entity_contactable(state, ship.sensor_rating, ship.sector_id, config):
+        # The roaming Entity's contact is sensor-gated at Legendary difficulty (§7, WP35, H2)
+        # — re-checked here (not only in the projection) so a crafted or replayed command log
+        # can never reach it below sensor rating. First contact stamps its codex row below.
+        raise EconomyError(
+            "the anomaly slips past your sensors — you cannot make contact "
+            "(raise your sensor rating)")
     if cmd.choice_index is not None:
-        return _converse_choice(state, player_id, cmd, config, player, ship, species)
+        result = _converse_choice(state, player_id, cmd, config, player, ship, species)
+        return _stamp_entity_codex(result, player_id, state, config) if entity else result
     if cmd.context not in dialogue.reachable_contexts(sc):
         # Non-peaceful (combat / sig.*) or a context the species can't reach (its params):
         # raise rather than silently no-op, so the codec/menu can't smuggle a line through.
@@ -1823,7 +1866,8 @@ def _converse(state: UniverseState, player_id: int, cmd: Converse,
     new_player, event = _speak_context(
         state, player, ship, species, cmd.context, config,
         extra={**subject, **intel_extra}, facts=facts, subject_id=cmd.subject_id)
-    return ReduceResult(events=(event,), players=(new_player,))
+    result = ReduceResult(events=(event,), players=(new_player,))
+    return _stamp_entity_codex(result, player_id, state, config) if entity else result
 
 
 def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config: GameConfig,

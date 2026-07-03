@@ -198,6 +198,22 @@ class SectorShipDTO:
 
 
 @dataclass(frozen=True)
+class SectorAnomalyDTO:
+    """The roaming Entity's always-on in-sector presence hint (DESIGN §7, WP35).
+
+    Fog-safe: presence is shown to everyone (`label` never names the being), but opening
+    contact is sensor-gated — `contactable` is True only when the ship's sensor rating
+    resolves it (Legendary difficulty). `contact_id` is the species id to `Hail` once it
+    can be reached. Computed live from the Entity's *current* sector (H2), never from
+    `Player.detected`, so a drifting Entity's hint tracks it.
+    """
+
+    label: str
+    contact_id: int
+    contactable: bool
+
+
+@dataclass(frozen=True)
 class SectorDTO:
     region: str
     sector_id: int
@@ -209,6 +225,7 @@ class SectorDTO:
     ships: list[SectorShipDTO] = field(default_factory=list)
     warps: list[WarpDTO] = field(default_factory=list)
     discoveries: list[SectorDiscovery] = field(default_factory=list)
+    anomaly: SectorAnomalyDTO | None = None  # the roaming Entity's presence hint here (§7, WP35)
     display_id: int = 0  # spatial id shown in the sector title (§5.1)
     core_bearing: float = 0.0  # direction from here to the Core, radians (§11 nav-rose anchor);
     #                            0.0 when no spatial embedding exists (fallback to gravity axis)
@@ -589,6 +606,8 @@ class ContactDTO:
     # gating (`enabled`/`reason`) ported from the old derived verb menu.
     choices: list[ContactChoiceDTO] = field(default_factory=list)
     portrait_variant: int = 0  # seeded-random variant for the species portrait image
+    singular_entity: bool = False  # the roaming Entity (§7): art fills the slot, a nebular bloom
+    #                                fallback when it has no portrait image (WP35)
     debug_context: str = ""
     debug_when: str = ""
 

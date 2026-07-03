@@ -26,8 +26,10 @@ from dataclasses import replace
 from edge.core.aliens import is_friendly
 from edge.core.starbases import is_operational
 from edge.core.config import GameConfig, RosterConfig, SpeciesConfig
-from edge.core.enums import PortClass
-from edge.core.models import Alliance, AlienSpecies, Grudge, Ownership, UniverseState
+from edge.core.enums import DiscoveryKind, PayloadKind, PortClass, RarityTier
+from edge.core.models import (
+    Alliance, AlienSpecies, Discovery, DiscoveryPayload, Grudge, Ownership, UniverseState,
+)
 
 
 class HomeClusterError(Exception):
@@ -382,7 +384,28 @@ def _place_entity(state: UniverseState, config: GameConfig, roster: RosterConfig
         base = _base_for(bases, entity, band, True, config, rng)  # peaceable (anchor draw)
         next_id = max(placed, default=0) + 1
         placed[next_id] = _make_species(next_id, entity, home, band, base, config)
+        _reserve_entity_codex(state, home)
         return
+
+
+def _reserve_entity_codex(state: UniverseState, home_sector: int) -> None:
+    """Create the reserved hidden Legendary codex row for the Entity (DESIGN §7, WP35).
+
+    Not a spatial salvage object — it is stamped into the codex by the **first `Hail`** of
+    the Entity (`rules._hail`), never salvaged, and is the Legendary sensor-gate reference
+    for opening contact (`discovery.entity_contactable`). It is excluded from the spatial
+    discovery gradient and the sector-view listing (it just marks the find in the codex).
+    Appended at `max+1` so existing discovery ids never renumber; drawn from no RNG, so the
+    generation draw order is untouched. `home_sector` is a placeholder anchor (the Entity
+    roams from WP36); the row's location is never read.
+    """
+    next_id = max(state.discoveries, default=0) + 1
+    state.discoveries[next_id] = Discovery(
+        id=next_id, kind=DiscoveryKind.ENTITY, rarity_tier=RarityTier.LEGENDARY,
+        sector_id=home_sector, hidden=True,
+        payload=DiscoveryPayload(kind=PayloadKind.LORE,
+                                 lore="first contact with the singular roaming Entity"),
+    )
 
 
 def _assign_region_control(state: UniverseState, placed: dict[int, AlienSpecies]) -> None:

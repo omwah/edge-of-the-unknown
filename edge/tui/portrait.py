@@ -26,12 +26,17 @@ class SpeciesPortrait(Static):
         font_ratio: float = art_portrait.DEFAULT_FONT_RATIO,
         images_dir: str | None = None,
         variant: int | None = None,
+        bloom: bool = False,
     ) -> None:
         super().__init__()
         self._roster_id = roster_id
         self._name = name or roster_id
         self._symbols = symbols
         self._font_ratio = font_ratio
+        # The bodiless Entity (§7): when it has no portrait image, fill the slot with a
+        # procedural nebular bloom rather than the bare name placeholder (WP35).
+        self._bloom = bloom
+        self._bloom_variant = variant or 0
         # Pick the image (and any variant) once, here — so resizes re-render the *same*
         # portrait rather than reshuffling variants on every layout change.
         self._path = art_portrait.resolve_portrait(roster_id, images_dir, variant)
@@ -56,4 +61,6 @@ class SpeciesPortrait(Static):
                 )
             except Exception:
                 pass  # missing binding / decode error — fall through to placeholder
+        if self._bloom:
+            return art_portrait.nebular_bloom(cols, rows, self._bloom_variant)
         return Text(self._name, style="dim")

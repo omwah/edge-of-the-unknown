@@ -17,6 +17,7 @@ can wear different faces.
 
 from __future__ import annotations
 
+import math
 import random
 import re
 from functools import lru_cache
@@ -125,6 +126,56 @@ def _render_portrait_ansi(
         image.width * 4,  # rowstride: 4 bytes/pixel (RGBA)
     )
     return canvas.print().decode()
+
+
+# The roaming Entity has no body to photograph (§7): a bodiless luminous arbiter. When no
+# portrait image is available (chafa-less terminal, missing asset) its contact-screen slot
+# fills with a procedural gold **nebular bloom** instead of the bare name placeholder — the
+# `cosmic_arbiter` palette (pale gold, luminous). Deterministic from `variant` so it stays
+# stable across resizes/rebuilds.
+_BLOOM_PALETTE = ("khaki1", "gold1", "gold3", "dark_goldenrod")
+_BLOOM_RAMP = " ·:+░▒▓█"  # low → high intensity
+
+
+def nebular_bloom(cols: int, rows: int, variant: int = 0) -> Text:
+    """A full-slot procedural gold nebular bloom for the bodiless Entity (§7, WP35).
+
+    A soft radial glow with seeded low-harmonic turbulence and a scatter of sparkles,
+    coloured up the `cosmic_arbiter` gold ramp — no external assets or bindings, so it
+    renders anywhere. `variant` seeds the turbulence phases and grain deterministically.
+    """
+    cols, rows = max(1, cols), max(1, rows)
+    rng = random.Random(f"bloom|{variant}")
+    cx, cy = (cols - 1) / 2.0, (rows - 1) / 2.0
+    rx, ry = max(1.0, cols / 2.0), max(1.0, rows / 2.0)
+    # A handful of low harmonics + phases give the cloud its lumpy, off-centre bloom.
+    ph = [rng.uniform(0.0, math.tau) for _ in range(3)]
+    n_pal, n_ramp = len(_BLOOM_PALETTE), len(_BLOOM_RAMP)
+
+    text = Text()
+    for y in range(rows):
+        for x in range(cols):
+            dx, dy = (x - cx) / rx, (y - cy) / ry
+            r = math.hypot(dx, dy)
+            angle = math.atan2(dy, dx)
+            turb = (0.16 * math.sin(3 * angle + ph[0])
+                    + 0.10 * math.sin(2 * angle + 5 * r + ph[1])
+                    + 0.07 * math.sin(5 * angle + ph[2]))
+            intensity = (1.0 - r) + turb + rng.uniform(-0.05, 0.05)
+            if intensity <= 0.05:
+                text.append(" ")
+                continue
+            t = max(0.0, min(1.0, intensity))
+            char = _BLOOM_RAMP[min(n_ramp - 1, int(t * n_ramp))]
+            # A rare sparkle in the mid-body, brightest hue.
+            if 0.35 < t < 0.85 and rng.random() < 0.03:
+                text.append(rng.choice("✦✧·"), style=f"bold {_BLOOM_PALETTE[0]}")
+                continue
+            hue = _BLOOM_PALETTE[min(n_pal - 1, int((1.0 - t) * n_pal))]
+            text.append(char, style=hue)
+        if y < rows - 1:
+            text.append("\n")
+    return text
 
 
 def render_portrait(

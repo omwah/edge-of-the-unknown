@@ -14,6 +14,7 @@ import pytest
 
 from edge.config import load_default_config
 from edge.core.aliens import effective_disposition
+from edge.core.discovery import entity_codex_discovery, entity_species
 from edge.core.config import RosterConfig
 from edge.core.economy import EconomyError
 from edge.core.enums import ComponentTier, RarityTier
@@ -779,3 +780,82 @@ def test_arc_unlock_survives_a_reload_golden(tmp_path: Path) -> None:
     assert reloaded.state.players[1].species_arcs["vesk"]["oath_sworn"] is True
     view = session.contact_view(reloaded.state, 1, sp.id, cfg)
     assert view.opener == "The oath binds us, oath-kin."
+
+
+# --- WP35: the roaming Entity — presence hint, sensor-gated contact, codex ---------
+
+def _entity_here(state: UniverseState, sensor: int):
+    """Move the player into the Entity's sector at a given sensor rating; return the Entity."""
+    ent = entity_species(state, CFG)
+    assert ent is not None
+    ship = replace(state.ships[1], sector_id=ent.sector_id, sensor_rating=sensor)
+    state.ships[1] = ship
+    return ent
+
+
+_LEG = CFG.discovery.sensor_difficulty["LEGENDARY"]  # the Legendary sensor gate (§7)
+
+
+def test_entity_presence_hint_is_fog_safe_and_gated() -> None:
+    """The sector view always shows the Entity's presence (computed live), never names it,
+    and never lists it as a hailable vessel; contact opens only at the Legendary gate."""
+    state = _world()
+    ent = _entity_here(state, _LEG - 1)  # under the gate
+    view = session.game_view(state, 1, CFG).sector
+    an = view.anomaly
+    assert an is not None and an.contact_id == ent.id
+    assert not an.contactable  # sensors too weak
+    assert ent.name.lower() not in an.label.lower()  # fog-safe: presence, not contents
+    assert all(s.contact_id != ent.id for s in view.ships)  # not a vessel
+    # Raise sensors to the gate — presence resolves into contact.
+    state.ships[1] = replace(state.ships[1], sensor_rating=_LEG)
+    assert session.game_view(state, 1, CFG).sector.anomaly.contactable
+
+
+def test_entity_hint_tracks_current_sector_not_detected() -> None:
+    """The hint is absent where the Entity is not, present where it is — from its current
+    sector, never `Player.detected` (H2)."""
+    state = _world()
+    ent = entity_species(state, CFG)
+    assert ent is not None
+    elsewhere = next(sid for sid in state.sectors if sid != ent.sector_id)
+    state.ships[1] = replace(state.ships[1], sector_id=elsewhere, sensor_rating=_LEG)
+    assert session.game_view(state, 1, CFG).sector.anomaly is None
+    _entity_here(state, _LEG)
+    assert session.game_view(state, 1, CFG).sector.anomaly is not None
+
+
+def test_under_sensored_hail_is_rejected() -> None:
+    """The reducer re-checks the gate (H2): an under-sensored Hail raises, never contacts."""
+    state = _world()
+    ent = _entity_here(state, _LEG - 1)
+    with pytest.raises(EconomyError):
+        reduce(state, 1, Hail(ent.id), CFG)
+
+
+def test_first_contact_stamps_legendary_codex_once() -> None:
+    """First Hail past the gate collects the reserved Legendary codex row (once-only,
+    replay-idempotent) and pays discovery experience; a re-hail changes nothing."""
+    state = _world()
+    ent = _entity_here(state, _LEG)
+    before_xp = state.players[1].experience
+    res = reduce(state, 1, Hail(ent.id), CFG)
+    apply_result(state, res)
+    disc = entity_codex_discovery(state)
+    assert disc is not None and disc.found_by == 1 and disc.id in state.players[1].codex
+    assert state.players[1].experience == before_xp + CFG.aliens.experience_per_discovery
+    assert any(type(e).__name__ == "DiscoveryCollected" for e in res.events)
+    # Idempotent: hailing again neither re-stamps nor re-pays.
+    xp = state.players[1].experience
+    res2 = reduce(state, 1, Hail(ent.id), CFG)
+    apply_result(state, res2)
+    assert state.players[1].experience == xp
+    assert not any(type(e).__name__ == "DiscoveryCollected" for e in res2.events)
+
+
+def test_contact_view_marks_singular_entity() -> None:
+    """The contact projection flags the Entity so the TUI fills the portrait slot (WP35)."""
+    state = _world()
+    ent = _entity_here(state, _LEG)
+    apply_result(state, reduce(state, 1, Hail(ent.id), CFG))
+    assert session.contact_view(state, 1, ent.id, CFG).singular_entity

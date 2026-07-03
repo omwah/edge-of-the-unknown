@@ -210,7 +210,7 @@ class AlienContactScreen(Screen):
                 # screen rebuilds, while different individuals of the same species get
                 # different portraits.
                 yield SpeciesPortrait(c.roster_id, c.species, symbols, font_ratio,
-                                      images_dir, c.portrait_variant)
+                                      images_dir, c.portrait_variant, bloom=c.singular_entity)
             with Vertical(id="right"):
                 speech = Static(self._pinned_speech or c.opener, id="speech")
                 speech.border_title = "they speak"

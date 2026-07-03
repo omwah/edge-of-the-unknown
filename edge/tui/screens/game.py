@@ -288,8 +288,18 @@ class GameScreen(Screen):
         self._hail_species(species_id)
 
     def _hail_species(self, species_id: int) -> None:
-        """Open contact with a specific species in this sector (§6, WP9)."""
-        self._record(self._service.apply(self._pid, Hail(species_id)))
+        """Open contact with a specific species in this sector (§6, WP9).
+
+        A hail can be refused — most notably the roaming Entity, whose contact is
+        sensor-gated at Legendary difficulty (§7, WP35) — so a rejected hail notifies
+        rather than opening the screen.
+        """
+        try:
+            events = self._service.apply(self._pid, Hail(species_id))
+        except (MovementError, EconomyError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self._record(events)
         self.app.push_screen(AlienContactScreen(
             self._service.contact_view(self._pid, species_id),
             self._service, self._pid, species_id))
