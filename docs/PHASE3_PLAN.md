@@ -685,17 +685,37 @@ elsewhere; every encounter end stamps `last_combat`.
 
 ### WP30 — Cross-visit arcs + callbacks (S/M)
 
-`Player.species_arcs: Mapping[roster_id, Mapping[str, int|str|bool]]` — small
-persisted flags set by authored choice actions and mechanic stages, unlocking
-branches across visits. Callback facts derived from `species_last_seen`,
-`leads`, and `last_combat` ("back again so soon?", "did you follow the
-coordinates?", "you fled our patrol"). **M12 golden batch** (H6/H7 land
-here together).
+Conversations remember earlier visits. **Shipped.**
 
-Files: `edge/core/models.py`, `edge/core/rules.py`,
-`edge/dialogue/facts.py`, spec sync (H9), `tests/test_dialogue.py`, goldens.
-Tests: an arc flag set in visit 1 unlocks a branch in visit 2 across a
-save/reload golden.
+- **`Player.species_arcs`** (hashed; `roster_id → {flag: str|int|bool}`):
+  persisted flags surfaced to selection as `arc.<flag>` facts. Set by the new
+  authored **`DialogueChoice.arc`** map — `_converse_choice` merges a taken
+  reply's flags onto the species kind *before* the follow-up line speaks, so
+  the line can already react. (Signature-mechanic stages join in WP33.)
+- **Callback facts** (`facts.callback_facts`, layered between situational and
+  arc facts — always-present booleans): `met_before` (kind in
+  `species_last_seen`), `lead_pending` / `lead_followed` (a tip from this
+  kind, unvisited vs. visited), `fled_us` (most recent combat = fleeing this
+  kind). "Back again so soon?", "did the coordinates pan out?", "you fled our
+  patrol" are all authorable gates now.
+- **M12 golden batch closes** (H6/H7): the milestone's hashed additions —
+  `contact_session` (WP28), `last_combat` + the per-instance recency re-key
+  (WP29), `species_arcs` (here) — are all in; goldens re-baselined via
+  self-consistency throughout, no `config_version` bump (the `arc` choice
+  field is additive with a default).
+- **H9 sync:** corpus header gains the `arc:` choice field and the CALLBACK/
+  ARC facts vocabulary. The machine-authoring output schema stays closed
+  (arc-setting is a hand-authored feature). DESIGN §4/§6.7 already carried
+  the WP19 spec text.
+
+Files: `edge/core/models.py`, `edge/core/config.py` (`DialogueChoice.arc`),
+`edge/core/rules.py`, `edge/dialogue/facts.py`,
+`config/alien_dialogue_default.yaml` (header), `tests/test_dialogue.py`,
+`tests/test_contact.py`.
+Tests: callback-fact derivation (incl. lead pending→followed flip and
+stranger isolation); an oath sworn via an `arc` reply rewrites the greeting,
+survives movement (new visit), and unlocks the branch after a save/reload
+golden.
 
 ### WP31 — Combat dialogue live (M)
 

@@ -465,6 +465,11 @@ class Player:
     # The most recent combat outcome (DESIGN §4, WP29): written by the combat reducer at
     # every encounter end — the H5 source of the `just_fled_combat` dialogue fact (§6.7).
     last_combat: LastCombat | None = None
+    # Persisted cross-visit dialogue-arc flags (DESIGN §4, §6.7, WP30), keyed by species
+    # **kind** (`roster_id` → flag map). Set by authored choice `arc` actions (and, from
+    # WP33, signature-mechanic stages); surfaced to selection as `arc.<flag>` facts, so an
+    # oath sworn in one visit unlocks branches in the next. Hashed state.
+    species_arcs: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
     # Active vendettas held **against the player**, keyed by the holder species kind
     # (`roster_id`, so every ship of a species shares the vendetta — DESIGN §4, §6.5).
     # Created by player conduct (WP27), decayed by the daily cron; a permanent grudge

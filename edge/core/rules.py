@@ -1825,7 +1825,13 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
         lead_result = _accept_lead(state, player_id, AcceptLead(cmd.species_id), config)
         log_events = lead_result.events
         mutated_player = lead_result.players[0]
- 
+    if choice.arc:
+        # The reply's authored arc flags persist on the species kind (§6.7, WP30) —
+        # applied before the follow-up line speaks, so it can already react to them.
+        arcs = dict(mutated_player.species_arcs)
+        arcs[species.roster_id] = {**arcs.get(species.roster_id, {}), **choice.arc}
+        mutated_player = replace(mutated_player, species_arcs=arcs)
+
     target = "farewell" if choice.action == "leave" else (choice.next_context or cmd.context)
     if target == "back":
         return ReduceResult(events=log_events, players=(mutated_player,))

@@ -99,7 +99,15 @@
 #   holds_full: true|false          # no free hold.
 #   carrying: fuel_ore|organics|equipment   # largest cargo stack (ABSENT when unladen).
 #   just_fled_combat: true|false    # the player fled a fight earlier today.
-# (Persisted cross-visit arc facts land in WP30.)
+# CALLBACK facts (per-species history, DESIGN §6.7/WP30): ALWAYS present, both polarities:
+#   met_before: true|false          # this species kind has been spoken to before (any visit).
+#   lead_pending: true|false        # a tip from this kind points somewhere still unvisited.
+#   lead_followed: true|false       # a tip from this kind has been followed to its sector.
+#   fled_us: true|false             # the player's most recent combat was fleeing THIS kind.
+# ARC facts (persisted cross-visit flags, DESIGN §6.7/WP30): a choice's `arc` map writes
+# flags onto the player's per-species arc state; every stored flag is surfaced as
+#   arc.<flag>: <value>             # e.g. { criteria: { arc.oath_sworn: true } } — ABSENT
+#                                   #   until set, so gate unlocks on the flag being present.
 #
 # --- A DialogueChoice (authored player reply) ------------------------------------------------
 # The node's `choices` are the player's reply menu — the WHOLE menu (there is no code-derived
@@ -118,6 +126,9 @@
 #                                   #   pure transition. No next_context + no action ⇒ stay/act.
 #                                   #   Availability is gated in code from species params + offers
 #                                   #   (trade posture, treaty mode, combatant, artifacts, a tip).
+#   arc:          { <flag>: <str|int|bool> }   # OPTIONAL cross-visit flags this reply SETS
+#                                   #   (persisted per species kind on Player.species_arcs and
+#                                   #   surfaced back as `arc.<flag>` facts — see FACTS; WP30).
 #   when:         <DialogueWhen>    # OPTIONAL gate on whether the reply is offered.
 #   weight:       <int >= 1>        # OPTIONAL.
 #

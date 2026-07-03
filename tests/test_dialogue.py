@@ -373,9 +373,12 @@ def test_contact_facts_layer_session_then_extras() -> None:
     assert facts["asked.greeting"] is True
     assert facts["has_intel_target"] is True
     assert facts["traded"] is False  # the caller's extras win over the session layer
-    # A session held for a different species instance contributes nothing.
+    # A session held for a different species instance contributes nothing (the
+    # always-present WP30 callback layer remains, all false for a stranger).
     other = replace(sp, id=2)
-    assert dialogue_facts.contact_facts(_bare_state(), player, other, roster=CFG.roster) == {}
+    other_facts = dialogue_facts.contact_facts(_bare_state(), player, other, roster=CFG.roster)
+    assert "asked.greeting" not in other_facts and "traded" not in other_facts
+    assert other_facts["met_before"] is False
 
 
 def test_ensure_session_and_notes_are_incremental() -> None:
@@ -445,3 +448,35 @@ def test_situational_facts_cover_the_vocabulary() -> None:
     assert dialogue_facts.situational_facts(state, stale, CFG.roster)["just_fled_combat"] is False
     # Hand-built rigs without a ship/sector degrade to empty — pure tests keep working.
     assert dialogue_facts.situational_facts(_bare_state(), player, CFG.roster) == {}
+
+
+# --- WP30: callback + arc facts ----------------------------------------------------
+
+
+def test_callback_and_arc_facts() -> None:
+    from dataclasses import replace
+
+    from edge.core.models import LastCombat, Lead
+
+    sp = _species("vesk")
+    fresh = Player(id=1, name="Cap", ship_id=1, latinum=0)
+    assert dialogue_facts.callback_facts(fresh, sp) == {
+        "met_before": False, "lead_pending": False, "lead_followed": False, "fled_us": False}
+
+    lead = Lead(kind="discovery", ref=7, sector_id=42, origin_sector=11,
+                source_species="vesk", summary="a drifting wreck")
+    seasoned = Player(id=1, name="Cap", ship_id=1, latinum=0,
+                      species_last_seen={"vesk": 11}, leads=(lead,),
+                      last_combat=LastCombat(species="vesk", outcome="fled", day=3),
+                      species_arcs={"vesk": {"oath_sworn": True, "debt": 2}})
+    cb = dialogue_facts.callback_facts(seasoned, sp)
+    assert cb["met_before"] is True and cb["fled_us"] is True
+    assert cb["lead_pending"] is True and cb["lead_followed"] is False  # 42 unvisited
+    followed = replace(seasoned, explored_sectors=frozenset({42}))
+    cb = dialogue_facts.callback_facts(followed, sp)
+    assert cb["lead_pending"] is False and cb["lead_followed"] is True
+
+    # Arc flags surface namespaced; another kind's history contributes nothing.
+    assert dialogue_facts.arc_facts(seasoned, sp) == {"arc.oath_sworn": True, "arc.debt": 2}
+    assert dialogue_facts.arc_facts(seasoned, _species("selvani")) == {}
+    assert dialogue_facts.callback_facts(seasoned, _species("selvani"))["met_before"] is False
