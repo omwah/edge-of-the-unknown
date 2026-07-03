@@ -105,6 +105,18 @@ aliens:
   # friendly resupply anchor). Mean stance falls outward → danger rises (§5/§6).
   band_disposition_bias: { Hub: 0.0, Frontier: -0.1, Deep: -0.2, Void: -0.3 }
   disposition_gradient_tolerance: 0.1
+  # Consequences of conduct (§6.5, WP27): killing a species' ships sours its attitude
+  # (by the species' own attitude_loss_rate) and deepens a grudge against the player;
+  # never_forgets / permanent-betrayal species record it forever and lock the offset.
+  grudge_severity_per_kill: 0.08
+  grudge_duration_days: 30
+  # Alignment per kill by the victim's disposition band, and experience scaling.
+  alignment_kill_friendly: -3
+  alignment_kill_neutral: -1
+  alignment_kill_hostile: 1
+  experience_kill_scale: 10.0
+  experience_per_discovery: 5
+  criminal_alignment: -10   # below this the governor's Core patrols take notice (WP38 enforces)
 
 # Encounter rolls (§10, Phase 3 — read by the WP24 encounter system). Per-band chance an
 # encounter fires (0 in the safe Hub, rising outward); when it does, a species is drawn

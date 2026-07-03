@@ -8,9 +8,14 @@ Phase-1 port/planet draws.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from pydantic import ValidationError
 
+from edge.bigbang.aliens import _seed_grudges
 from edge.bigbang.generator import generate
 from helpers import generate_with_player
 from edge.config import load_default_config
@@ -18,22 +23,32 @@ from edge.core.aliens import (
     FRIENDLY,
     HOSTILE,
     NEUTRAL,
+    attitude_locked,
     disposition_band,
     effective_disposition,
+    grudge_shift,
     is_friendly,
     may_occupy,
+    sour_attitude,
 )
 from edge.core.config import GameConfig, RosterConfig
 from edge.core.enums import PortClass
+from edge.core.events import CoreLawNotice, GrudgeFormed
 from edge.core.models import (
     AlienSpecies,
+    Encounter,
+    EncounterFoe,
     Game,
+    Grudge,
     Ownership,
     Planet,
     Player,
     Sector,
     UniverseState,
 )
+from edge.core.movement import shortest_path
+from edge.core.rules import CombatAction, Salvage, Warp, _raise_attitude, apply_result, reduce
+from edge.engine.cron import daily_turn_reset
 
 CFG = load_default_config()
 SMALL = CFG.model_copy(update={"bigbang": CFG.bigbang.model_copy(update={"sector_count": 80})})
@@ -399,3 +414,192 @@ def test_governing_alliance_inhabits_the_core(seed: int) -> None:
     # The only non-governor in the Core is a StarDock greeter; no rival/unaligned drifts in.
     for sp in in_core:
         assert sp.alliance_id == gov or sp.sector_id == dock_sector
+
+
+# --- WP27: consequences — souring, grudges, alignment, Core law -------------------
+
+
+def _quill_state(seed: int = 3):
+    """A fresh game plus one hand-placed quill kind in the player's sector."""
+    state = generate_with_player(SMALL, seed)
+    ship = state.ships[state.players[1].ship_id]
+    sp = AlienSpecies(
+        id=max(state.species, default=0) + 1, roster_id="quill", name="Quill",
+        archetype_id="ribbon_salvager", sector_id=ship.sector_id, home_band="Hub",
+        tech_level=3, base_disposition=0.3, disposition_center=0.3, disposition_variance=0.0,
+    )
+    state.species[sp.id] = sp
+    return state, sp
+
+
+def test_sour_attitude_drops_offset_and_forms_grudge() -> None:
+    """§6.5: kills lower the offset by the species' loss rate and deepen a dated grudge."""
+    sc = CFG.roster.species_by_id("quill")
+    sp = _species(base=0.5)
+    sp = replace(sp, roster_id="quill")
+    player = _player()
+    soured = sour_attitude(player, sp, sc, CFG.aliens, day=4, kills=2)
+    assert soured.species_attitudes["quill"] == pytest.approx(-2 * sc.attitude_loss_rate)
+    grudge = soured.grudges["quill"]
+    assert grudge.severity == pytest.approx(2 * CFG.aliens.grudge_severity_per_kill)
+    assert grudge.created_day == 4
+    assert grudge.duration_days == CFG.aliens.grudge_duration_days
+    # A second incident deepens the same grudge, keeping the original date.
+    again = sour_attitude(soured, sp, sc, CFG.aliens, day=9, kills=1)
+    assert again.grudges["quill"].severity > grudge.severity
+    assert again.grudges["quill"].created_day == 4
+
+
+def test_memory_none_forgets_instantly() -> None:
+    """A memory_model:none species records nothing — no souring, no grudge (§6.5)."""
+    sc = CFG.roster.species_by_id("quill").model_copy(update={"memory_model": "none"})
+    sp = replace(_species(base=0.5), roster_id="quill")
+    player = _player()
+    assert sour_attitude(player, sp, sc, CFG.aliens, day=1, kills=3) is player
+
+
+@given(kills=st.integers(min_value=1, max_value=5), amends=st.integers(min_value=0, max_value=25))
+@settings(max_examples=80, deadline=None)
+def test_permanent_betrayal_floors_the_offset(kills: int, amends: int) -> None:
+    """§6.5/§13: after betraying a permanent/never_forgets species, no number of
+    amends ever raises the attitude offset above where the betrayal left it."""
+    sc = CFG.roster.species_by_id("vennrith")
+    assert sc.betrayal_model == "permanent"
+    sp = replace(_species(base=0.6), roster_id="vennrith", name="Vennrith")
+    player = _player()
+    soured = sour_attitude(player, sp, sc, CFG.aliens, day=1, kills=kills)
+    floored = soured.species_attitudes["vennrith"]
+    assert soured.grudges["vennrith"].duration_days == -1  # undying
+    assert attitude_locked(soured, "vennrith")
+    current = soured
+    for _ in range(amends):
+        current, _event = _raise_attitude(current, sp, CFG)
+    assert current.species_attitudes["vennrith"] == pytest.approx(floored)
+
+
+def test_grudge_decay_is_deterministic_through_the_daily_timeline() -> None:
+    """§6.5: a finite grudge cools by the holder's gain rate per day and lapses; a
+    permanent one never moves. Exact values — the cron timeline is replay state."""
+    state = generate_with_player(SMALL, 3)
+    quill_rate = CFG.roster.species_by_id("quill").attitude_gain_rate
+    player = state.players[1]
+    state.players[1] = replace(player, grudges={
+        "quill": Grudge("quill", "player", "test", 0.2, state.game.day_number, 30),
+        "vennrith": Grudge("vennrith", "player", "test", 0.9, state.game.day_number, -1),
+    })
+    severities = []
+    for _ in range(4):
+        apply_result(state, daily_turn_reset(state, CFG))
+        grudges = state.players[1].grudges
+        severities.append(grudges.get("quill").severity if "quill" in grudges else None)
+        assert grudges["vennrith"].severity == pytest.approx(0.9)  # permanent: untouched
+    expected = []
+    value = 0.2
+    for _ in range(4):
+        value = round(value - quill_rate, 6)
+        expected.append(value if value > 0 else None)
+    assert severities == pytest.approx(expected)
+
+
+def test_grudge_shifts_the_violence_roll_input() -> None:
+    """§10: an active grudge subtracts its severity from effective disposition."""
+    sp = replace(_species(base=0.7), roster_id="quill")
+    calm = _player()
+    assert grudge_shift(sp, calm) == 0.0
+    angry = replace(calm, grudges={"quill": Grudge("quill", "player", "t", 0.4, 1, 30)})
+    assert grudge_shift(sp, angry) == pytest.approx(0.4)
+
+
+def test_kill_consequences_alignment_experience_and_grudge_event() -> None:
+    """WP27 arithmetic through the combat reducer: a kill sours the species, forms a
+    grudge (event emitted), shifts alignment by the victim's band, and awards xp."""
+    state, sp = _quill_state()
+    player = state.players[1]
+    ship = state.ships[player.ship_id]
+    foe = EncounterFoe(ship_class_id="scout_marauder", name="Q", hull=1, hull_max=50,
+                       shields=0, damage=1, firing_arc="all_round", combat_speed=2)
+    enc = Encounter(species_id=sp.id, sector_id=ship.sector_id, foes=(foe,),
+                    round=0, player_shields=ship.shields)
+    state.players[1] = replace(player, active_encounter=enc)
+    result = reduce(state, 1, CombatAction(action="fight"), SMALL)
+    apply_result(state, result)
+    after = state.players[1]
+    sc = CFG.roster.species_by_id("quill")
+    # quill base 0.3 here ⇒ hostile band: lawful bounty.
+    assert after.alignment == CFG.aliens.alignment_kill_hostile
+    assert after.experience == max(1, round(sc.threat_rating * CFG.aliens.experience_kill_scale))
+    assert after.species_attitudes["quill"] == pytest.approx(-sc.attitude_loss_rate)
+    assert after.grudges["quill"].severity == pytest.approx(CFG.aliens.grudge_severity_per_kill)
+    formed = [e for e in result.events if isinstance(e, GrudgeFormed)]
+    assert formed and formed[0].species_kind == "quill" and not formed[0].permanent
+
+
+def test_discovery_experience_awarded_on_codex_stamp() -> None:
+    """WP27: logging a find into the codex pays experience_per_discovery."""
+    state = generate_with_player(SMALL, 3)
+    ship = state.ships[state.players[1].ship_id]
+    # The nearest obvious open-space find in the Hub — the walk there is encounter-free
+    # (the Hub's interrupt chance is 0), so the reduction sequence is deterministic.
+    candidates = [d for d in state.discoveries.values()
+                  if not d.hidden and d.planet_id is None and d.found_by is None
+                  and state.sectors[d.sector_id].distance_band == "Hub"]
+    assert candidates, "the Hub always salts common obvious finds"
+    paths = ((shortest_path(state.adjacency, ship.sector_id, d.sector_id), d)
+             for d in sorted(candidates, key=lambda d: d.id))
+    path, disc = min(((p, d) for p, d in paths if p is not None), key=lambda t: len(t[0]))
+    for hop in path[1:]:
+        apply_result(state, reduce(state, 1, Warp(to_sector=hop), SMALL))
+    result = reduce(state, 1, Salvage(discovery_id=disc.id), SMALL)
+    apply_result(state, result)
+    assert state.players[1].experience == CFG.aliens.experience_per_discovery
+
+
+def test_core_law_notice_for_criminals_only() -> None:
+    """WP27 Core-law basics: a criminal crossing into the Core is put on notice, once
+    per crossing; a lawful player never is."""
+    state = generate_with_player(SMALL, 3)
+    player = state.players[1]
+    ship = state.ships[player.ship_id]
+    assert state.sectors[ship.sector_id].is_galactic_core  # enrolment starts in the Core
+    # Walk to the Core's edge — a Core sector with a non-Core neighbour.
+    edge, outside = next(
+        (sid, n) for sid in sorted(state.adjacency)
+        if state.sectors[sid].is_galactic_core
+        for n in state.adjacency[sid] if not state.sectors[n].is_galactic_core
+    )
+    path = shortest_path(state.adjacency, ship.sector_id, edge)
+    assert path is not None
+    for hop in path[1:]:
+        apply_result(state, reduce(state, 1, Warp(to_sector=hop), SMALL))
+    # Lawful: out and back in, no notice.
+    for hop in (outside, edge):
+        result = reduce(state, 1, Warp(to_sector=hop), SMALL)
+        apply_result(state, result)
+        assert not any(isinstance(e, CoreLawNotice) for e in result.events)
+        if state.players[1].active_encounter is not None:
+            pytest.skip("intercepted during the walk (rare at this seed)")
+    # Criminal: the Core crossing (and only the crossing) draws the patrol's eye.
+    state.players[1] = replace(state.players[1], alignment=CFG.aliens.criminal_alignment - 1)
+    result = reduce(state, 1, Warp(to_sector=outside), SMALL)
+    apply_result(state, result)
+    assert not any(isinstance(e, CoreLawNotice) for e in result.events)  # leaving is free
+    result = reduce(state, 1, Warp(to_sector=edge), SMALL)
+    apply_result(state, result)
+    assert sum(isinstance(e, CoreLawNotice) for e in result.events) == 1
+
+
+def test_seeded_grudges_land_for_cast_pairs() -> None:
+    """§6.5: roster grudges become Grudge rows exactly when both kinds are cast."""
+    state = generate(SMALL, 3)
+    state.species = {
+        1: replace(_species(sid=1), roster_id="vennrith"),
+        2: replace(_species(sid=2), roster_id="quill"),
+    }
+    _seed_grudges(state, CFG.roster)
+    rows = list(state.grudges.values())
+    assert any(g.holder == "vennrith" and g.target == "quill" and g.duration_days == -1
+               for g in rows)
+    # Remove the target kind: the grudge has no one to hold it against.
+    state.species = {1: replace(_species(sid=1), roster_id="vennrith")}
+    _seed_grudges(state, CFG.roster)
+    assert not any(g.target == "quill" for g in state.grudges.values())

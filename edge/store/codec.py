@@ -25,6 +25,7 @@ from edge.core.events import (
     ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
+    CoreLawNotice,
     Descended,
     DevApplied,
     DevicePurchased,
@@ -36,6 +37,7 @@ from edge.core.events import (
     EncounterStarted,
     Event,
     GenesisDeployed,
+    GrudgeFormed,
     Haggled,
     LeadAccepted,
     PlanetProduced,
@@ -455,6 +457,15 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "latinum": event.latinum,
                 "components": list(event.components),
             }
+        case GrudgeFormed():
+            return "GrudgeFormed", {
+                "player_id": event.player_id, "species_kind": event.species_kind,
+                "severity": event.severity, "permanent": event.permanent,
+            }
+        case CoreLawNotice():
+            return "CoreLawNotice", {
+                "player_id": event.player_id, "sector_id": event.sector_id,
+            }
         case DevApplied():
             return "DevApplied", {"player_id": event.player_id, "detail": event.detail}
         case _:
@@ -564,6 +575,11 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "SalvageCollected":
             return SalvageCollected(payload["player_id"], payload["latinum"],
                                     tuple(payload["components"]))
+        case "GrudgeFormed":
+            return GrudgeFormed(payload["player_id"], payload["species_kind"],
+                                payload["severity"], payload["permanent"])
+        case "CoreLawNotice":
+            return CoreLawNotice(payload["player_id"], payload["sector_id"])
         case "DevApplied":
             return DevApplied(payload["player_id"], payload["detail"])
         case _:

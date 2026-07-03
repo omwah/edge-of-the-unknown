@@ -332,6 +332,8 @@ species:
     starbase_policy: nomadic_holding
     attitude_gain_rate: 0.07
     attitude_loss_rate: 0.15
+    # Fellow opportunists of the lanes; the Vennrith hold the tomb-world against them (§6.5).
+    relations: { stryx: 0.3, vennrith: -0.5 }
     tech_offers:
       - { tier: II, mode: barter, component: accelerator, min_disposition: 0.7 }
 
@@ -636,6 +638,10 @@ species:
     starbase_policy: territorial
     attitude_gain_rate: 0.05
     attitude_loss_rate: 0.4
+    # Inter-species stance + authored grudges (§6.4/§6.5 — schema WP27, semantics WP39).
+    relations: { quill: -0.8, stryx: -0.3 }
+    grudges:
+      - { target: quill, cause: "the stripping of a Covenant tomb-world", severity: 0.6, duration_days: -1 }
 
   # Thessarch — psionic big-brain rulers; gatekeep Covenant membership. (cf. Jot.)
   - id: thessarch

@@ -22,6 +22,7 @@ from edge.core.events import (
     ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
+    CoreLawNotice,
     Descended,
     DevApplied,
     DevicePurchased,
@@ -32,6 +33,7 @@ from edge.core.events import (
     EncounterEvaded,
     EncounterStarted,
     GenesisDeployed,
+    GrudgeFormed,
     SiteExplored,
     Event,
     Haggled,
@@ -168,6 +170,8 @@ EVENTS: list[Event] = [
     ShipDestroyed(1, 3, 55, "trailblazer"),             # WP26 hull 0 → escape pod
     SalvageCollected(1, 42, ("burner", "linkage")),     # WP26 wreck salvage
     SalvageCollected(1, 17, ()),                        # WP26 latinum-only salvage
+    GrudgeFormed(1, "vennrith", 0.6, True),             # WP27 a permanent vendetta
+    CoreLawNotice(1, 3),                                # WP27 governor's warning
     DevApplied(1, "[dev] set latinum=1000000"),  # dev cheat audit marker
 ]
 

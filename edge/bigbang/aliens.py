@@ -27,7 +27,7 @@ from edge.core.aliens import is_friendly
 from edge.core.starbases import is_operational
 from edge.core.config import GameConfig, RosterConfig, SpeciesConfig
 from edge.core.enums import PortClass
-from edge.core.models import Alliance, AlienSpecies, Ownership, UniverseState
+from edge.core.models import Alliance, AlienSpecies, Grudge, Ownership, UniverseState
 
 
 class HomeClusterError(Exception):
@@ -149,6 +149,31 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     # Carve each non-governing bloc in the cast its home cluster of alliance territory,
     # separated from the Core and from rival clusters by neutral lanes (§5 step 6, §6.3).
     state.home_clusters = _carve_home_clusters(state, config, roster, rng, placed, bases, reserved)
+    _seed_grudges(state, roster)
+
+
+def _seed_grudges(state: UniverseState, roster: RosterConfig) -> None:
+    """Seed the roster's authored inter-species grudges for the cast pairs (§6.5, WP27).
+
+    Only pairs where both kinds were actually drawn get a `Grudge` row (hashed state);
+    the NPC-vs-NPC semantics (stances, spillover) land in WP39. Deterministic — no RNG,
+    ids assigned in sorted roster order.
+    """
+    cast = {sp.roster_id for sp in state.species.values()}
+    grudges: dict[int, Grudge] = {}
+    next_id = 1
+    for sp in sorted(roster.species, key=lambda s: s.id):
+        if sp.id not in cast:
+            continue
+        for seed in sp.grudges:
+            if seed.target not in cast:
+                continue
+            grudges[next_id] = Grudge(
+                holder=sp.id, target=seed.target, cause=seed.cause,
+                severity=seed.severity, created_day=1, duration_days=seed.duration_days,
+            )
+            next_id += 1
+    state.grudges = grudges
 
 
 def _carve_home_clusters(state: UniverseState, config: GameConfig, roster: RosterConfig,

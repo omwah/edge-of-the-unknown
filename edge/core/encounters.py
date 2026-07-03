@@ -23,7 +23,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
-from edge.core.aliens import effective_disposition
+from edge.core.aliens import effective_disposition, grudge_shift
 from edge.core.config import GameConfig, PackConfig, SpeciesConfig
 from edge.core.discovery import sector_has_nebula
 from edge.core.models import AlienSpecies, Encounter, EncounterFoe, Player, Ship, UniverseState
@@ -98,10 +98,11 @@ def roll_encounter(
     if rng.random() >= max(0.0, min(1.0, detect)):
         return EncounterRoll(species=species, detected=False, hostile=False)
 
-    # Greeting vs violence, against effective disposition (§6/§10). Non-combatants and
-    # shipless kinds can never reach violence.
+    # Greeting vs violence, against effective disposition (§6/§10) shifted down by any
+    # active grudge the species holds against the player (§6.5, WP27). Non-combatants
+    # and shipless kinds can never reach violence.
     if sc.combatant and sc.fleet:
-        disp = effective_disposition(species, player)
+        disp = max(0.0, effective_disposition(species, player) - grudge_shift(species, player))
         hostility, amity = config.aliens.hostility_threshold, config.aliens.amity_threshold
         if disp >= amity:
             violence = 0.0

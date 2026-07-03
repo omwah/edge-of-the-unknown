@@ -21,7 +21,16 @@ from typing import assert_never
 
 from edge import dialogue
 from edge.core import combat, encounters
-from edge.core.aliens import effective_disposition
+from edge.core.aliens import (
+    FRIENDLY as FRIENDLY_BAND,
+    HOSTILE as HOSTILE_BAND,
+    NEUTRAL as NEUTRAL_BAND,
+    attitude_locked,
+    disposition_band,
+    effective_disposition,
+    is_criminal,
+    sour_attitude,
+)
 from edge.core.combat import CombatError
 from edge.core.dev import DevPatch, apply_dev_patch
 
@@ -63,6 +72,7 @@ from edge.core.events import (
     ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
+    CoreLawNotice,
     Descended,
     DevicePurchased,
     DiscoveryCollected,
@@ -73,6 +83,7 @@ from edge.core.events import (
     EncounterStarted,
     Event,
     GenesisDeployed,
+    GrudgeFormed,
     Haggled,
     LeadAccepted,
     Repaired,
@@ -668,6 +679,7 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
     one_way = ship.sector_id not in state.adjacency.get(cmd.to_sector, ())
     detected, det_events = _detect_in_sector(
         state, player.detected, ship.sensor_rating, cmd.to_sector, player_id, config)
+    law_events = _core_law_events(state, player, ship.sector_id, cmd.to_sector, config)
     encounter, _halt, enc_events = _roll_encounter(state, player, ship, cmd.to_sector, config)
     new_player = replace(
         player,
@@ -679,7 +691,7 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
     )
     return ReduceResult(
         events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost, one_way),
-                *det_events, *enc_events),
+                *det_events, *law_events, *enc_events),
         players=(new_player,),
         ships=(new_ship,),
     )
@@ -689,6 +701,21 @@ def _require_no_encounter(player: Player) -> None:
     """Movement, docking, and descent are rejected while an encounter is live (§10)."""
     if player.active_encounter is not None:
         raise MovementError("you are engaged — fight or flee first")
+
+
+def _core_law_events(
+    state: UniverseState, player: Player, from_sector: int, to_sector: int, config: GameConfig,
+) -> tuple[Event, ...]:
+    """Core-law basics (WP27): a criminal crossing into Core Space is put on notice.
+
+    One notice per crossing (a non-Core → Core hop), not per intra-Core move. A
+    warning only — engagement-on-sight and governor-standing gating land in WP38.
+    """
+    if not is_criminal(player, config.aliens):
+        return ()
+    if state.sectors[to_sector].is_galactic_core and not state.sectors[from_sector].is_galactic_core:
+        return (CoreLawNotice(player.id, to_sector),)
+    return ()
 
 
 def _roll_encounter(
@@ -763,6 +790,7 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
         detected, det_events = _detect_in_sector(
             state, detected, ship.sensor_rating, nxt, player_id, config)
         events.extend(det_events)
+        events.extend(_core_law_events(state, player, current, nxt, config))
         current = nxt
         # The §10 encounter roll — the journey halts *at* the interrupted hop (WP24).
         encounter, halt, enc_events = _roll_encounter(state, player, ship, nxt, config)
@@ -1321,6 +1349,32 @@ def _combat_action(
     ))
     new_ship = result.ship
     new_player = replace(player, active_encounter=result.encounter)
+    if result.foes_destroyed > 0 and species is not None and sc is not None:
+        # Consequences of the kill (§6.5, WP27): souring + grudge, alignment by the
+        # victim's band *before* the souring, experience scaled by threat.
+        al = config.aliens
+        band = disposition_band(effective_disposition(species, new_player), al)
+        align_per_kill = {
+            HOSTILE_BAND: al.alignment_kill_hostile,
+            NEUTRAL_BAND: al.alignment_kill_neutral,
+            FRIENDLY_BAND: al.alignment_kill_friendly,
+        }[band]
+        xp = max(1, round(sc.threat_rating * al.experience_kill_scale)) * result.foes_destroyed
+        soured = sour_attitude(
+            new_player, species, sc, al, state.game.day_number, result.foes_destroyed)
+        if soured is not new_player:  # memory_model none forgets instantly (no events)
+            grudge = soured.grudges[species.roster_id]
+            events.append(GrudgeFormed(
+                player_id, species.roster_id, grudge.severity, grudge.duration_days < 0))
+            events.append(AttitudeChanged(
+                player_id, species.id,
+                round(soured.species_attitudes[species.roster_id], 6),
+                round(effective_disposition(species, soured), 6)))
+        new_player = replace(
+            soured,
+            alignment=soured.alignment + align_per_kill * result.foes_destroyed,
+            experience=soured.experience + xp,
+        )
     if result.knockout is not None:
         # The owning subsystem's aspect degrades immediately (§4.1 derive-on-write).
         sub, slot_index, component = result.knockout
@@ -1466,7 +1520,8 @@ def _explore(
     # `found_by=None` — the player can leave it for the next person.
     new_player = replace(player, turns_remaining=player.turns_remaining - cost,
                          detected=player.detected | frozenset({target.id}),
-                         codex=player.codex | frozenset({target.id}))
+                         codex=player.codex | frozenset({target.id}),
+                         experience=player.experience + config.aliens.experience_per_discovery)
     return ReduceResult(
         events=(SiteExplored(player_id, cmd.planet_id, target.id,
                              target.kind.value, target.rarity_tier.name),),
@@ -1503,8 +1558,10 @@ def _salvage(
         raise MovementError("out of turns")
 
     payload = disc.payload
+    xp = config.aliens.experience_per_discovery if disc.id not in player.codex else 0
     new_player = replace(player, turns_remaining=player.turns_remaining - cost,
-                         codex=player.codex | frozenset({disc.id}))
+                         codex=player.codex | frozenset({disc.id}),
+                         experience=player.experience + xp)
     new_ship = ship
     if payload.kind is PayloadKind.COMPONENT and payload.component is not None and payload.tier is not None:
         if ship.holds_free < 1:
@@ -1815,10 +1872,17 @@ def _deliver_offer(ship: Ship, offer: TechOfferConfig) -> tuple[Ship, str]:
 
 def _raise_attitude(player: Player, species: AlienSpecies,
                     config: GameConfig) -> tuple[Player, AttitudeChanged]:
-    """Raise the player's attitude offset toward `species` (capped so effective ≤ 1)."""
+    """Raise the player's attitude offset toward `species` (capped so effective ≤ 1).
+
+    A permanent grudge (§6.5: `never_forgets` / `betrayal_model=permanent`) locks the
+    offset where the betrayal left it — amends no longer move it (WP27).
+    """
     sc = _species_config(config, species)
     cap = max(0.0, 1.0 - species.base_disposition)
     current = player.species_attitudes.get(species.roster_id, 0.0)
+    if attitude_locked(player, species.roster_id):
+        effective = effective_disposition(species, player)
+        return player, AttitudeChanged(player.id, species.id, round(current, 6), round(effective, 6))
     new_offset = min(cap, current + sc.attitude_gain_rate)
     attitudes = {**player.species_attitudes, species.roster_id: new_offset}
     new_player = replace(player, species_attitudes=attitudes)
