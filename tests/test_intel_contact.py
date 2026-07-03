@@ -14,6 +14,7 @@ from edge.core.economy import EconomyError
 from edge.core.models import AlienSpecies, LocationRef, UniverseState
 from edge.core.movement import shortest_path
 from edge.core.rules import AcceptLead, Converse, apply_result, reduce
+from edge.dialogue import instance_key
 from edge.server import session
 from helpers import generate_with_player
 
@@ -60,7 +61,7 @@ def test_offer_coordinates_then_accept_logs_one_lead() -> None:
 
     # The alien volunteers the tip (the conversation reducer doesn't crash and advances the ring).
     apply_result(state, reduce(state, 1, Converse(sp.id, "offer_coordinates"), CFG))
-    assert state.players[1].dialogue_recency[(sp.roster_id, "offer_coordinates")]
+    assert state.players[1].dialogue_recency[(instance_key(sp), "offer_coordinates")]
 
     # Accepting the tip logs exactly one lead pointing at that discovery.
     here = state.ships[state.players[1].ship_id].sector_id
@@ -130,6 +131,6 @@ def test_offer_coordinates_speaks_even_with_no_tip() -> None:
     state.species_knowledge[sp.roster_id] = ()
     res = reduce(state, 1, Converse(sp.id, "offer_coordinates"), CFG)
     apply_result(state, res)
-    assert state.players[1].dialogue_recency[(sp.roster_id, "offer_coordinates")]
+    assert state.players[1].dialogue_recency[(instance_key(sp), "offer_coordinates")]
     with pytest.raises(EconomyError):
         reduce(state, 1, AcceptLead(sp.id), CFG)  # nothing to accept

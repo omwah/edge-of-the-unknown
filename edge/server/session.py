@@ -921,8 +921,9 @@ def _line(state: UniverseState, roster: object, species: AlienSpecies, player: P
     The projection shows a stable line until a reducer (hail/trade) advances the ring;
     both seed the same deterministic RNG, so they agree and replay reproduces them.
     """
-    ring = player.dialogue_recency.get((species.roster_id, context), ())
-    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, context + salt, ring)
+    key = dialogue.instance_key(species)
+    ring = player.dialogue_recency.get((key, context), ())
+    rng = dialogue.encounter_rng(state.game.seed, key, context + salt, ring)
     text, _ = dialogue.speak(roster, species, player, context,  # type: ignore[arg-type]
                              aliens=config.aliens, rng=rng, extra=extra, facts=facts)
     return text
@@ -1009,8 +1010,9 @@ def _contact_choices(state: UniverseState, roster: object, species: AlienSpecies
     (e.g. a terminal lore beat the player backs out of); the `generic` persona's `start_context`
     choices are the guaranteed baseline via the fallback chain.
     """
-    ring = player.dialogue_recency.get((species.roster_id, context), ())
-    rng = dialogue.encounter_rng(state.game.seed, species.roster_id, context, ring)
+    key = dialogue.instance_key(species)
+    ring = player.dialogue_recency.get((key, context), ())
+    rng = dialogue.encounter_rng(state.game.seed, key, context, ring)
     source = dialogue.choices_for(roster, species, player, context,  # type: ignore[arg-type]
                                   aliens=config.aliens, rng=rng, facts=facts)
     if not source:

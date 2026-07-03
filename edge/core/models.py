@@ -370,6 +370,22 @@ class Encounter:
 
 
 @dataclass(frozen=True, slots=True)
+class LastCombat:
+    """The player's most recent combat outcome (DESIGN §4, §6.7) — a replay-safe record.
+
+    Written by the combat reducer whenever an encounter ends, it is the H5 source of
+    the situational dialogue facts ("just fled combat") and the WP30 callback facts —
+    core state reconstructed by the command log, never UI memory. `species` is the
+    pack's kind (`roster_id`); `outcome` is fled / victory / destroyed; `day` the
+    game day it ended.
+    """
+
+    species: str
+    outcome: str
+    day: int
+
+
+@dataclass(frozen=True, slots=True)
 class ContactSession:
     """One live conversation visit with an alien (DESIGN §6.7) — the per-contact session.
 
@@ -423,10 +439,12 @@ class Player:
     # time so the dossier records the contact point even after the alien moves on (§6,
     # alien-movement WP). Reconstructs under replay (set by the Hail reducer).
     species_last_seen: Mapping[str, int] = field(default_factory=dict)
-    # Dialogue no-repeat ring (DESIGN §6.7): per (roster_id, context) the last K variant
-    # indices spoken, so a repeat encounter rephrases rather than replays — shared across
-    # all ships of a species. Cosmetic but persisted (it rides the command log via contact
-    # commands, WP9) so dialogue stays reproducible from (seed, command log).
+    # Dialogue no-repeat ring (DESIGN §6.7): per (species instance key, context) the last K
+    # variant indices spoken, so a repeat encounter rephrases rather than replays. Keyed
+    # **per contact instance** (`dialogue.instance_key`, WP29/H7) so two ships of one
+    # species don't share a "what I already said" ring. Cosmetic but persisted (it rides
+    # the command log via contact commands, WP9) so dialogue stays reproducible from
+    # (seed, command log).
     dialogue_recency: Mapping[tuple[str, str], tuple[int, ...]] = field(default_factory=dict)
     # Per-port haggle attempts made *today* (port_id -> non-accepted offer count, §8,
     # WP13). Drives the patience/history penalty and the per-day `max_rejections` close;
@@ -444,6 +462,9 @@ class Player:
     # reducers, cleared by farewell and by every movement reducer (H1). Its `facts` feed
     # `DialogueWhen.criteria` via `edge.dialogue.facts` so lines can react to this visit.
     contact_session: ContactSession | None = None
+    # The most recent combat outcome (DESIGN §4, WP29): written by the combat reducer at
+    # every encounter end — the H5 source of the `just_fled_combat` dialogue fact (§6.7).
+    last_combat: LastCombat | None = None
     # Active vendettas held **against the player**, keyed by the holder species kind
     # (`roster_id`, so every ship of a species shares the vendetta — DESIGN §4, §6.5).
     # Created by player conduct (WP27), decayed by the daily cron; a permanent grudge

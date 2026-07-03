@@ -136,8 +136,9 @@ class PlaytestService:
             shown = "greeting"
 
         player = self.state.players[player_id]
-        ring = player.dialogue_recency.get((sp.roster_id, shown), ())
-        rng = dialogue.encounter_rng(self.state.game.seed, sp.roster_id, shown, ring)
+        key = dialogue.instance_key(sp)
+        ring = player.dialogue_recency.get((key, shown), ())
+        rng = dialogue.encounter_rng(self.state.game.seed, key, shown, ring)
 
         from edge.dialogue.intel import pick_intel_target
         intel = pick_intel_target(self.state, player, sp, aliens=self._config.aliens)
@@ -221,8 +222,9 @@ class PlaytestService:
         if sp is None or self._config.roster is None:
             return
         player = self.state.players[self.pid]
-        ring = player.dialogue_recency.get((sp.roster_id, context), ())
-        rng = dialogue.encounter_rng(self.state.game.seed, sp.roster_id, context, ring)
+        key = dialogue.instance_key(sp)
+        ring = player.dialogue_recency.get((key, context), ())
+        rng = dialogue.encounter_rng(self.state.game.seed, key, context, ring)
         facts = {"has_intel_target": bool(self.state.species_knowledge.get(sp.roster_id))}
         try:
             _text, new_ring = dialogue.speak(
@@ -231,7 +233,7 @@ class PlaytestService:
         except Exception:
             return  # an un-resolvable context (e.g. a Phase-3 line) — leave the ring be
         recency = dict(player.dialogue_recency)
-        recency[(sp.roster_id, context)] = new_ring
+        recency[(key, context)] = new_ring
         self.state.players[self.pid] = dataclasses.replace(player, dialogue_recency=recency)
 
     @staticmethod

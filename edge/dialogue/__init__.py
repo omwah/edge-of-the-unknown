@@ -36,6 +36,7 @@ from edge.dialogue.select import (
     encounter_rng,
     entry_for,
     fill,
+    instance_key,
     reachable_contexts,
     select_entry,
     select_line,
@@ -52,7 +53,7 @@ __all__ = [
     "ALLIED", "FRIENDLY", "NEUTRAL", "WARY", "HOSTILE", "STANDINGS", "GENERIC_PERSONA",
     "DIALOGUE_CONTEXTS", "PEACEFUL_CONTEXTS", "INTENTS", "Intent", "DialogueIntegrityError",
     "allowed_placeholders", "is_known_context", "standing_for", "build_chain", "select_line",
-    "select_entry", "entry_for", "choices_for", "when_matches", "fill", "encounter_rng", "speak",
-    "reachable_contexts", "validate_dialogue", "CHOICE_ACTIONS", "BRANCH_PREFIX",
-    "dialogue_fingerprint",
+    "select_entry", "entry_for", "choices_for", "when_matches", "fill", "encounter_rng",
+    "instance_key", "speak", "reachable_contexts", "validate_dialogue", "CHOICE_ACTIONS",
+    "BRANCH_PREFIX", "dialogue_fingerprint",
 ]

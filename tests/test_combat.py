@@ -439,3 +439,16 @@ def test_pod_flow_replays_to_identical_hash(tmp_path: Path) -> None:
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "p.db"))
     assert state_hash(reloaded.state) == expected
     assert reloaded.state.ships[pod.id].type_id == SMALL.combat.escape_pod_class
+
+
+def test_encounter_end_writes_the_last_combat_record() -> None:
+    """WP29 (H5): every encounter end stamps `Player.last_combat` — the replay-safe
+    source of the `just_fled_combat` dialogue fact, written by the reducer, never the UI."""
+    from edge.core.models import LastCombat
+
+    state = _fight_state()
+    _engagement(state, (_foe(hull=1, shields=0, damage=1),))
+    kind = state.species[state.players[1].active_encounter.species_id].roster_id
+    apply_result(state, reduce(state, 1, CombatAction(action="fight"), SMALL))
+    assert state.players[1].last_combat == LastCombat(
+        species=kind, outcome=combat.VICTORY, day=state.game.day_number)

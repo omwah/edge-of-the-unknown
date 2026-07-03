@@ -143,9 +143,10 @@ def _structure_brief(context: str) -> str:
         "distinct alternatives (ideally 3+) in each symbol — a repeat encounter should rephrase, "
         "not replay the same words.\n"
         "- A visit is a multi-exchange SESSION: the player may hear this line early or late in "
-        "the same conversation (topics already asked are remembered as facts a human editor can "
-        "gate on). Keep each expansion self-contained — don't assume it is the first or only "
-        "thing said this visit.\n"
+        "the same conversation (topics already asked, and the live situation — distance band, "
+        "hull damage, cargo, a fresh flight from combat — are facts a human editor can gate "
+        "entries on). Keep each expansion self-contained — don't assume it is the first or "
+        "only thing said this visit, and don't hard-code a situation the line doesn't pin.\n"
         "- Produce ONE self-contained spoken line per expansion (the alien's turn); the player's "
         "side, if any, goes only in 'choices'.\n\n"
     )
