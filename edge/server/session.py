@@ -1182,10 +1182,9 @@ def encounter_view(state: UniverseState, player_id: int, config: GameConfig) -> 
     archetype = species.archetype_id if species is not None else ""
     interception = 0.0
     if species is not None and config.roster is not None:
-        try:
-            interception = config.roster.species_by_id(species.roster_id).interception_rating
-        except KeyError:
-            pass
+        roster_species = config.roster.species_by_id(species.roster_id)
+        if roster_species is not None:
+            interception = roster_species.interception_rating
     effective = effective_disposition(species, player) if species is not None else 0.0
     band = disposition_band(effective, config.aliens)
 

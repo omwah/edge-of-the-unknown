@@ -276,8 +276,8 @@ def _settle_cluster(state: UniverseState, config: GameConfig, rng: random.Random
     for i, sp in enumerate(members):
         sector_id = slots[i % len(slots)]
         band = state.sectors[sector_id].distance_band
-        base = _base_for(bases, sp, band, True, config, rng)  # bloc home is peaceable (§5)
-        placed[next_id] = _make_species(next_id, sp, sector_id, band, base, config)
+        base_disp = _base_for(bases, sp, band, True, config, rng)  # bloc home is peaceable (§5)
+        placed[next_id] = _make_species(next_id, sp, sector_id, band, base_disp, config)
         next_id += 1
 
 
