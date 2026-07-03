@@ -168,10 +168,18 @@ def test_drift_pins_stardock_contacts(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("seed", range(8))
 def test_drift_never_lands_in_core_or_rival_territory(tmp_path: Path, seed: int) -> None:
+    from edge.core.discovery import entity_species
+
     svc = GameService.new_game(_config(), seed, SqliteRepository(tmp_path / f"d{seed}.db"))  # type: ignore[arg-type]
     cfg = _with_drift(svc.config, 1.0)
+    entity = entity_species(svc.state, cfg)
+    entity_id = entity.id if entity is not None else None
     for sp in alien_drift(svc.state, cfg).species:
-        assert may_occupy(svc.state, sp, sp.sector_id, cfg.aliens)
+        if sp.id == entity_id:
+            # The roaming Entity is unbound by the rival rules — it may sit anywhere non-Core (§7).
+            assert not svc.state.sectors[sp.sector_id].is_galactic_core
+        else:
+            assert may_occupy(svc.state, sp, sp.sector_id, cfg.aliens)
 
 
 def test_drift_lets_governor_members_into_the_core_but_not_others() -> None:
@@ -189,3 +197,22 @@ def test_drift_lets_governor_members_into_the_core_but_not_others() -> None:
 
     state.species = {1: _sp(1, 5, alliance_id=2)}
     assert alien_drift(state, cfg).species == ()  # a rival/unaligned ship can't — no legal move
+
+
+def test_entity_drifts_on_its_own_chance(tmp_path: Path) -> None:
+    """The Entity moves on `entity_drift_chance` even when ordinary drift is off, and the
+    drift is deterministic for a given firing (the drift_seq rail) — §7, WP36."""
+    from edge.core.discovery import entity_species
+
+    svc = GameService.new_game(_config(), 7, SqliteRepository(tmp_path / "ent.db"))  # type: ignore[arg-type]
+    cfg = svc.config.model_copy(update={"aliens": svc.config.aliens.model_copy(
+        update={"drift_move_chance": 0.0, "entity_drift_chance": 1.0})})
+    ent = entity_species(svc.state, cfg)
+    assert ent is not None
+    result = alien_drift(svc.state, cfg)
+    moved = {s.id: s.sector_id for s in result.species}
+    assert moved.get(ent.id) is not None      # the Entity moved though ordinary drift is 0
+    assert set(moved) == {ent.id}             # and it alone
+    assert not svc.state.sectors[moved[ent.id]].is_galactic_core  # never into the Core
+    # Same firing (drift_seq unchanged until applied) ⇒ identical result — deterministic.
+    assert alien_drift(svc.state, cfg).species == result.species

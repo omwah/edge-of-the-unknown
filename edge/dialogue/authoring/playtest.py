@@ -160,7 +160,12 @@ class PlaytestService:
         else:
             debug_when_str = "catch-all"
 
-        view = dataclasses.replace(view, debug_context=shown, debug_when=debug_when_str)
+        # The harness owns the **intel dial**, so it owns `intel_summary`: use its own
+        # entity-free, dial-gated tip (the roaming Entity is a live pursuit target, §7/WP36,
+        # not authored dialogue — session.contact_view injects it, but the authoring harness
+        # keeps the dial meaningful by overriding with its own computation).
+        view = dataclasses.replace(view, debug_context=shown, debug_when=debug_when_str,
+                                   intel_summary=(intel.summary() if intel is not None else ""))
 
         return self._force(view) if self.force_enable else view
 

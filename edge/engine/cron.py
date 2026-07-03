@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from edge.core.aliens import decay_grudges, may_occupy
+from edge.core.discovery import entity_species
 from edge.core.config import GameConfig
 from edge.core.economy import accrue_interest as _accrue
 from edge.core.enums import PortClass
@@ -100,16 +101,22 @@ def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
     firing = state.game.drift_seq
     rng = random.Random(f"{state.game.seed}|alien_drift|{firing}")
     pinned = _pinned_species(state)
+    entity = entity_species(state, config)  # the roaming Entity drifts by its own rules (§7, WP36)
+    entity_id = entity.id if entity is not None else None
     player_sectors = {state.ships[p.ship_id].sector_id for p in state.players.values()}
     moved: list[AlienSpecies] = []
     events: list[Event] = []
     for sp in sorted(state.species.values(), key=lambda s: s.id):
         if sp.id in pinned:
             continue
-        if rng.random() >= aliens.drift_move_chance:
+        is_entity = sp.id == entity_id
+        if rng.random() >= (aliens.entity_drift_chance if is_entity else aliens.drift_move_chance):
             continue
+        # The Entity roams anywhere non-Core (unbound by the alliance/rival occupancy rules);
+        # every other species is gated by `may_occupy`.
         legal = [n for n in sorted(state.adjacency.get(sp.sector_id, ()))
-                 if may_occupy(state, sp, n, aliens)]
+                 if (not state.sectors[n].is_galactic_core if is_entity
+                     else may_occupy(state, sp, n, aliens))]
         if not legal:
             continue
         dst = rng.choice(legal)

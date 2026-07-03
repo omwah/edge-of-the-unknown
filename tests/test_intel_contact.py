@@ -39,6 +39,17 @@ def _inject(state: UniverseState, roster_id: str = "vesk", base: float = 0.9) ->
     return sp
 
 
+def _drop_entity(state: UniverseState) -> None:
+    """Remove the roaming Entity so a test can isolate the regular coordinate-tip mechanic.
+
+    The Entity is the highest-value universal tip (§7, WP36); these tests assert the *regular*
+    discovery-tip path, so they drop it first (its own pursuit loop is covered separately)."""
+    from edge.core.discovery import entity_species
+    ent = entity_species(state, CFG)
+    if ent is not None:
+        del state.species[ent.id]
+
+
 def _knows_a_far_discovery(state: UniverseState, sp: AlienSpecies) -> int:
     """Point the species' knowledge at a real, reachable, unexplored rare+ discovery."""
     ship = state.ships[1]
@@ -56,6 +67,7 @@ def _knows_a_far_discovery(state: UniverseState, sp: AlienSpecies) -> int:
 
 def test_offer_coordinates_then_accept_logs_one_lead() -> None:
     state = generate_with_player(SMALL, 3)
+    _drop_entity(state)
     sp = _inject(state)
     disc_id = _knows_a_far_discovery(state, sp)
 
@@ -80,6 +92,7 @@ def test_offer_coordinates_then_accept_logs_one_lead() -> None:
 
 def test_contact_view_surfaces_intel_then_leads_view_plots() -> None:
     state = generate_with_player(SMALL, 3)
+    _drop_entity(state)
     sp = _inject(state)
     _knows_a_far_discovery(state, sp)
 
@@ -127,6 +140,7 @@ def test_accept_lead_without_a_tip_is_rejected() -> None:
 def test_offer_coordinates_speaks_even_with_no_tip() -> None:
     # A friendly species that knows nowhere new still answers (the catch-all line), no crash.
     state = generate_with_player(SMALL, 3)
+    _drop_entity(state)  # and no roaming-Entity fallback tip either → truly nothing to offer
     sp = _inject(state)
     state.species_knowledge[sp.roster_id] = ()
     res = reduce(state, 1, Converse(sp.id, "offer_coordinates"), CFG)

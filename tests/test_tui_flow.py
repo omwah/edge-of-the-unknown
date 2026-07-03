@@ -833,6 +833,11 @@ async def test_leads_tab_lists_logged_tip_plots_and_engages_route() -> None:
         await pilot.pause()
         svc = app.service
         assert svc is not None
+        # Isolate the regular discovery tip: the roaming Entity would out-rank it (§7, WP36).
+        from edge.core.discovery import entity_species
+        _ent = entity_species(svc.state, svc.config)
+        if _ent is not None:
+            del svc.state.species[_ent.id]
         sp = _inject_species(svc, "vesk")  # friendly, in the player's sector
         ship = svc.state.ships[1]
         player = svc.state.players[1]

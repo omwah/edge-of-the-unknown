@@ -40,7 +40,9 @@ def _candidates(state: UniverseState) -> list[LocationRef]:
     refs: list[LocationRef] = [
         LocationRef("discovery", d.id, d.sector_id)
         for d in state.discoveries.values()
-        if d.rarity_tier.value >= _TIP_RARITY_FLOOR
+        if d.rarity_tier.value >= _TIP_RARITY_FLOOR and d.kind is not DiscoveryKind.ENTITY
+        # The reserved Entity codex row (§7, WP35) is not a fixed place — the Entity roams;
+        # its tip is computed live in `pick_intel_target`, not baked into the knowledge table.
     ]
     refs += [LocationRef("starbase", b.id, b.sector_id) for b in state.starbases.values()]
     # Deterministic order before any sampling (sector, kind, ref).
@@ -127,6 +129,8 @@ _DISCOVERY_LABELS: dict[DiscoveryKind, str] = {
 
 
 def _reward_phrase(state: UniverseState, ref: LocationRef) -> str:
+    if ref.kind == "entity":
+        return "a Legendary first contact"
     if ref.kind == "starbase":
         return "better hardware than yours"
     disc = state.discoveries.get(ref.ref)
@@ -143,6 +147,8 @@ def _reward_phrase(state: UniverseState, ref: LocationRef) -> str:
 
 
 def _label(state: UniverseState, ref: LocationRef) -> str:
+    if ref.kind == "entity":
+        return "the roaming Entity"
     if ref.kind == "starbase":
         return "a forward starbase"
     disc = state.discoveries.get(ref.ref)
@@ -152,7 +158,9 @@ def _label(state: UniverseState, ref: LocationRef) -> str:
 def _value(state: UniverseState, ref: LocationRef) -> int:
     """A tip's worth: rarity (or a base for bases) scaled, plus its Core distance."""
     hops_from_core = state.core_hops.get(ref.sector_id, 0)
-    if ref.kind == "discovery":
+    if ref.kind == "entity":
+        base = RarityTier.LEGENDARY.value  # the singular pursuit prize outranks ordinary tips
+    elif ref.kind == "discovery":
         disc = state.discoveries.get(ref.ref)
         base = disc.rarity_tier.value if disc else 0
     else:
@@ -175,14 +183,30 @@ def _is_unencountered(state: UniverseState, player: Player, ref: LocationRef) ->
     return True
 
 
+def _entity_offerable(player: Player, ref: LocationRef) -> bool:
+    """Whether the Entity tip is fresh: the player holds no lead to where it is **now** (§7).
+
+    Keyed on ref **and sector** — a moved Entity (same ref, new sector) is re-offered, so
+    re-asking a friendly speaker updates a cold trail; an already-logged current position is
+    not re-offered (WP36, H3). Not suppressed by `explored_sectors` — the Entity roams, so
+    having once passed through its current sector doesn't mean it is findable there now.
+    """
+    return not any(
+        lead.kind == ref.kind and lead.ref == ref.ref and lead.sector_id == ref.sector_id
+        for lead in player.leads
+    )
+
+
 def pick_intel_target(state: UniverseState, player: Player, speaker: AlienSpecies, *,
-                      aliens: AliensConfig) -> IntelTarget | None:
+                      aliens: AliensConfig, entity: AlienSpecies | None = None) -> IntelTarget | None:
     """The single best coordinate tip `speaker` can offer `player`, or None (§6.7).
 
     Disposition-gated: only an allied or friendly-band speaker volunteers intel in Phase 2.
     Considers only places the player hasn't explored or logged, reachable from the player's
     ship, and picks the highest-value one (deterministically — ties by farther route, then
-    lowest ref id) so the projection and the accept-lead reducer agree.
+    lowest ref id) so the projection and the accept-lead reducer agree. When `entity` (the
+    roaming Entity, §7/WP36) is supplied, its **live current sector** is a candidate tip too,
+    computed here rather than from the generation-time knowledge table (H3).
     """
     allied = player.alliance_id is not None and player.alliance_id == speaker.alliance_id
     if not (allied or is_friendly(effective_disposition(speaker, player), aliens)):
@@ -194,7 +218,13 @@ def pick_intel_target(state: UniverseState, player: Player, speaker: AlienSpecie
 
     best: tuple[int, int, int] | None = None  # (value, distance, -ref) sort key
     chosen: tuple[LocationRef, int] | None = None
-    for ref in state.species_knowledge.get(speaker.roster_id, ()):  # already deterministic order
+    candidates = list(state.species_knowledge.get(speaker.roster_id, ()))  # deterministic order
+    # The Entity's live tip (its current sector), offered by any friendly speaker unless the
+    # player already holds a fresh lead to where it is now (§7, WP36).
+    entity_ref = (LocationRef("entity", entity.id, entity.sector_id)
+                  if entity is not None and _entity_offerable(
+                      player, LocationRef("entity", entity.id, entity.sector_id)) else None)
+    for ref in candidates:
         if not _is_unencountered(state, player, ref):
             continue
         path = shortest_path(state.adjacency, src, ref.sector_id)
@@ -204,6 +234,13 @@ def pick_intel_target(state: UniverseState, player: Player, speaker: AlienSpecie
         key = (_value(state, ref), distance, -ref.ref)
         if best is None or key > best:
             best, chosen = key, (ref, distance)
+    if entity_ref is not None:
+        path = shortest_path(state.adjacency, src, entity_ref.sector_id)
+        if path is not None:
+            distance = len(path) - 1
+            key = (_value(state, entity_ref), distance, -entity_ref.ref)
+            if best is None or key > best:
+                best, chosen = key, (entity_ref, distance)
 
     if chosen is None:
         return None

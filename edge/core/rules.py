@@ -57,6 +57,7 @@ from edge.core.discovery import (
     describe_payload,
     entity_codex_discovery,
     entity_contactable,
+    entity_species,
     is_detectable,
     sector_has_nebula,
 )
@@ -1769,7 +1770,8 @@ def _intel_bindings(state: UniverseState, player: Player, species: AlienSpecies,
     extra: dict[str, str] = {}
     facts: dict[str, object] = {}
     if context == "offer_coordinates":
-        target = pick_intel_target(state, player, species, aliens=config.aliens)
+        target = pick_intel_target(state, player, species, aliens=config.aliens,
+                                   entity=entity_species(state, config))
         facts["has_intel_target"] = target is not None
         if target is not None:
             extra.update(target.bindings())
@@ -2053,7 +2055,8 @@ def _accept_lead(state: UniverseState, player_id: int, cmd: AcceptLead,
     player = _player(state, player_id)
     ship = _ship(state, player)
     species = _species_here(state, ship, cmd.species_id)
-    target: IntelTarget | None = pick_intel_target(state, player, species, aliens=config.aliens)
+    target: IntelTarget | None = pick_intel_target(
+        state, player, species, aliens=config.aliens, entity=entity_species(state, config))
     if target is None:
         raise EconomyError("they have no coordinates to share")
     lead = Lead(kind=target.ref.kind, ref=target.ref.ref, sector_id=target.ref.sector_id,

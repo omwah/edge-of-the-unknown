@@ -124,6 +124,7 @@ aliens:
   experience_kill_scale: 10.0   # experience per kill = this × the victim's threat rating
   experience_per_discovery: 5   # flat experience granted for each new discovery logged
   criminal_alignment: -10   # at/below this the governor's Core patrols treat you as an outlaw (WP38 enforces)
+  entity_drift_chance: 0.5  # the roaming Entity's own per-firing move chance (§7, WP36; it wanders anywhere non-Core)
 
 # Encounter rolls (§10, Phase 3 — read by the WP24 encounter system). Per-band chance an
 # encounter fires (0 in the safe Hub, rising outward); when it does, a species is drawn
