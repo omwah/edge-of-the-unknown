@@ -21,8 +21,10 @@ owns both, so mechanics stay replay-safe and the layer graph stays acyclic (this
 imports only `edge.core.config`/`edge.core.models`, and sits below `core.rules`). The
 first four hooks land in WP33 (`morality_judge`, `literalist`, `flee_drop`,
 `influence_gate`); the transactional remainder (`trojan_gift`, `reprogram_unlock`,
-`escalating_demand`, `contract_kill`, the brokers) land in WP37 — an unimplemented hook
-resolves to ``None`` (the sig line simply speaks with no effect) rather than raising.
+`escalating_demand`, `contract_kill`, `coordinate_broker`, `passage_broker`) land in WP37,
+each a stage machine driven by the reply keyword (`MechanicContext.approach`). A hook id
+not in `MECHANIC_HOOKS` still resolves to ``None`` (the sig line simply speaks with no
+effect) rather than raising, so a roster may name a hook the code has not yet grown.
 """
 
 from __future__ import annotations
@@ -149,13 +151,156 @@ def influence_gate(ctx: MechanicContext) -> MechanicResult:
     return MechanicResult(stage="gated", facts={"influenced": True})
 
 
-# The registry keyed by hook id (DESIGN §6.2 / `KNOWN_SIGNATURE_HOOKS`). WP33 lands these
-# four; the rest resolve to `None` in `run_hook` until WP37.
+# --- the transactional hooks (WP37) ----------------------------------------------------
+#
+# Each is a pure stage machine driven by the reply keyword (`ctx.approach`, the last segment
+# of the `sig.<hook>.<node>` context the reducer routes into) + the persisted `stage` + the
+# authored `params`. Effects stay within the framework's bounded set (attitude / alignment /
+# experience / latinum / grudge); the deeper cross-system reach of a few hooks is a documented
+# forward seam (the trojan's device/hold-occupying payload and delayed cron trigger, the live
+# cross-faction `trade_posture` flip, and `contract_kill`'s actual razing + reward payout —
+# WP40). No default species yet routes a `choices` reply into these `sig.*` contexts, so like
+# WP33's flee_drop/literalist they are registry-complete + unit-tested but not corpus-wired.
+
+def trojan_gift(ctx: MechanicContext) -> MechanicResult:
+    """A 'gift' / 'lower your shields' seeds a delayed harmful payload; a rival sells the
+    removal (DESIGN §6.2). Ladder: offered → carried (a sweetener paid up front, the trap now
+    aboard) → either defused (paid removal at the counter-market) or sprung (the payload
+    detonates, draining latinum). The device/hold-occupying `effect` and cron `delay` are a
+    forward seam — here the payload is a bounded latinum loss so the machine stays exercisable
+    and replay-safe."""
+    stage = ctx.stage or ""
+    approach = ctx.approach
+    if stage in ("defused", "sprung", "declined"):
+        return MechanicResult(stage=stage, facts={"trojan": stage})
+    if stage == "carried":
+        if approach in ("defuse", "purge", "remove"):
+            return MechanicResult(stage="defused", facts={"trojan": "defused"},
+                                  latinum_delta=-_int(ctx.params, "removal_cost", 120))
+        # Any other contact while carrying: the delayed payload springs.
+        return MechanicResult(stage="sprung", facts={"trojan": "sprung"},
+                              latinum_delta=-_int(ctx.params, "payload_latinum", 300))
+    if approach in ("accept", "lower_shields", "take"):
+        return MechanicResult(stage="carried", facts={"trojan": "carried"},
+                              latinum_delta=_int(ctx.params, "gift_latinum", 200))
+    if approach in ("refuse", "decline"):
+        return MechanicResult(stage="declined", facts={"trojan": "declined"})
+    return MechanicResult(stage="offered", facts={"trojan": "offered"})
+
+
+def reprogram_unlock(ctx: MechanicContext) -> MechanicResult:
+    """Installing an item flips another faction's `trade_posture` (DESIGN §6.2). The live
+    cross-faction posture flip + item consumption need per-player faction state (a forward
+    seam); the stage machine here records the install, pays a one-time experience boon, and
+    binds `{target}`/`{posture}` for the line. approach: install → unlocked; decline → held."""
+    stage = ctx.stage or ""
+    approach = ctx.approach
+    target = str(ctx.params.get("target_species") or ctx.params.get("source_species") or "them")
+    posture = str(ctx.params.get("new_posture", "open"))
+    base = {"reprogram_target": target, "reprogram_posture": posture}
+    if stage == "unlocked":
+        return MechanicResult(stage="unlocked", facts={**base, "reprogram": "unlocked"})
+    if approach in ("install", "reprogram", "accept"):
+        return MechanicResult(stage="unlocked", facts={**base, "reprogram": "unlocked"},
+                              experience_delta=_int(ctx.params, "unlock_experience", 10))
+    if approach in ("decline", "refuse"):
+        return MechanicResult(stage="declined", facts={**base, "reprogram": "declined"})
+    return MechanicResult(stage="offered", facts={**base, "reprogram": "offered"})
+
+
+def escalating_demand(ctx: MechanicContext) -> MechanicResult:
+    """Befriending opens a ladder of mounting demands; comply and standing holds, fail once
+    and `betrayal_model=permanent` triggers (DESIGN §6.2). The `demand_ladder` param names the
+    rungs; each comply climbs one (a small attitude reward) until satisfied (a boon), while a
+    single refuse routes through the WP27 grudge machinery (permanent for these species)."""
+    ladder = ctx.params.get("demand_ladder", [])
+    rungs = [str(x) for x in ladder] if isinstance(ladder, (list, tuple)) else []
+    stage = ctx.stage or ""
+    if stage in ("satisfied", "betrayed"):
+        return MechanicResult(stage=stage, facts={"demand": stage})
+    tail = stage.split("_", 1)[1] if stage.startswith("demand_") else ""
+    rung = int(tail) if tail.isdigit() else 0
+    approach = ctx.approach
+    if approach in ("refuse", "fail", "defy"):
+        return MechanicResult(stage="betrayed", facts={"demand": "betrayed"}, grudge=True)
+    if approach in ("comply", "obey", "donate", "pay"):
+        nxt = rung + 1
+        if not rungs or nxt >= len(rungs):
+            return MechanicResult(stage="satisfied", facts={"demand": "satisfied"},
+                                  attitude_delta=_num(ctx.params, "satisfied_attitude", 0.25),
+                                  experience_delta=_int(ctx.params, "satisfied_experience", 15))
+        return MechanicResult(stage=f"demand_{nxt}", facts={"demand": rungs[nxt], "rung": nxt},
+                              attitude_delta=_num(ctx.params, "step_attitude", 0.05))
+    label = rungs[rung] if rung < len(rungs) else "tribute"
+    return MechanicResult(stage=f"demand_{rung}", facts={"demand": label, "rung": rung})
+
+
+def contract_kill(ctx: MechanicContext) -> MechanicResult:
+    """Pays for razing the starbases of named rival species so the patron can move in
+    (DESIGN §6.2). WP37 authors and gates the contract; the razing mechanics + reward payout
+    land in WP40. Ladder: offered → contracted (obligation taken) or declined (a `redemption`
+    path leaves it recoverable). `targets`/`reward` bind the line and drive WP40."""
+    stage = ctx.stage or ""
+    approach = ctx.approach
+    targets = ctx.params.get("targets", [])
+    target = str(targets[0]) if isinstance(targets, (list, tuple)) and targets else "a rival"
+    base = {"contract_target": target}
+    if stage == "contracted":
+        return MechanicResult(stage="contracted", facts={**base, "contract": "contracted"})
+    if approach in ("accept", "take"):
+        return MechanicResult(stage="contracted", facts={**base, "contract": "contracted"})
+    if approach in ("decline", "refuse"):
+        return MechanicResult(stage="declined", facts={**base, "contract": "declined"})
+    return MechanicResult(stage="offered", facts={**base, "contract": "offered"})
+
+
+def coordinate_broker(ctx: MechanicContext) -> MechanicResult:
+    """A predatory species that trades in the coordinates of undefended worlds (DESIGN §6.2).
+    The friendly slice — buying tips — is the live map mechanic (`offer_coordinates`, §6.7);
+    the hostile side authored here **extorts**: pay it off (a latinum drain) or refuse and earn
+    its vendetta. approach: pay → paid; refuse → spurned (grudge)."""
+    stage = ctx.stage or ""
+    approach = ctx.approach
+    if stage in ("paid", "spurned"):
+        return MechanicResult(stage=stage, facts={"broker": stage})
+    if approach in ("pay", "appease"):
+        return MechanicResult(stage="paid", facts={"broker": "paid"},
+                              latinum_delta=-_int(ctx.params, "extort_latinum", 250))
+    if approach in ("refuse", "defy"):
+        return MechanicResult(stage="spurned", facts={"broker": "spurned"}, grudge=True)
+    return MechanicResult(stage="extorted", facts={"broker": "extorted"})
+
+
+def passage_broker(ctx: MechanicContext) -> MechanicResult:
+    """Sells information / special transit for goods or the player's home base (DESIGN §6.2).
+    The hostile side authored here **misleads**: paying the price buys nothing (a latinum
+    drain, no benefit); refusing simply ends it. approach: pay → misled; refuse → declined."""
+    stage = ctx.stage or ""
+    approach = ctx.approach
+    if stage in ("misled", "declined"):
+        return MechanicResult(stage=stage, facts={"passage": stage})
+    if approach in ("pay", "accept"):
+        return MechanicResult(stage="misled", facts={"passage": "misled"},
+                              latinum_delta=-_int(ctx.params, "price_latinum", 200))
+    if approach in ("refuse", "decline"):
+        return MechanicResult(stage="declined", facts={"passage": "declined"})
+    return MechanicResult(stage="offered", facts={"passage": "offered"})
+
+
+# The registry keyed by hook id (DESIGN §6.2 / `KNOWN_SIGNATURE_HOOKS`). WP33 landed the first
+# four; WP37 adds the transactional remainder. An id absent here still resolves to `None` in
+# `run_hook` (an inert sig line), so the roster may name a hook the code has not yet grown.
 MECHANIC_HOOKS: dict[str, Callable[[MechanicContext], MechanicResult]] = {
     "morality_judge": morality_judge,
     "literalist": literalist,
     "flee_drop": flee_drop,
     "influence_gate": influence_gate,
+    "trojan_gift": trojan_gift,
+    "reprogram_unlock": reprogram_unlock,
+    "escalating_demand": escalating_demand,
+    "contract_kill": contract_kill,
+    "coordinate_broker": coordinate_broker,
+    "passage_broker": passage_broker,
 }
 
 
