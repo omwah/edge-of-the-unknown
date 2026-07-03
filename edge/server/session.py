@@ -40,6 +40,7 @@ from edge.core.enums import (
 )
 from edge.core.events import (
     AlienMoved,
+    AlienSpoke,
     Banked,
     Colonized,
     ColonistsRecruited,
@@ -1149,6 +1150,17 @@ _ARC_HINTS = {
     "all_round": "arc: all-round — no safe angle; missiles or firepower settle this",
 }
 
+# Log-line bodies for the spoken combat beats (§6.7, WP31). The voiced corpus line
+# itself renders on the encounter screen (`EncounterDTO.speech`); the log records
+# that the beat happened without duplicating rotating dialogue text into the ticker.
+_COMBAT_BEAT_LINES = {
+    "combat_open": "[red]⚔ They open fire with a challenge on the wideband.[/]",
+    "betrayal": "[red]⚔ A supposed friend turns weapons on you.[/]",
+    "combat_taunt": "[red]⚔ The pack taunts you over the wideband.[/]",
+    "surrender": "[yellow]⚑ Bloodied, they signal for quarter.[/]",
+    "flee_scorn": "[yellow]⚑ Jeers chase your retreating engines.[/]",
+}
+
 
 def encounter_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.EncounterDTO | None:
     """The live hostile encounter (§10, WP24/25), or None when the player is not engaged.
@@ -1202,6 +1214,15 @@ def encounter_view(state: UniverseState, player_id: int, config: GameConfig) -> 
         if any(c is not None and c.knocked_out for c in st.slots)
     ]
     shields_pct = round(100 * enc.player_shields / max(1, ship.shields)) if ship.shields else 0
+    # The pack's combat beat (§6.7, WP31), rendered read-only in the species' voice
+    # under the same encounter facts the reducer spoke it with (shared assembly).
+    speech = ""
+    if enc.speech_context is not None and species is not None and config.roster is not None:
+        beat_facts = dialogue_facts.contact_facts(
+            state, player, species, roster=config.roster,
+            extra=dialogue_facts.encounter_facts(enc))
+        speech = _line(state, config.roster, species, player, enc.speech_context, config,
+                       facts=beat_facts)
     return dto.EncounterDTO(
         species_id=enc.species_id,
         title=title,
@@ -1225,6 +1246,7 @@ def encounter_view(state: UniverseState, player_id: int, config: GameConfig) -> 
         missiles=ship.missiles,
         repair_kits=ship.repair_kits,
         gun_online=aspects.gun_damage > 0,
+        speech=speech,
     )
 
 
@@ -1300,6 +1322,10 @@ def format_event(event: Event) -> str:
         return "[yellow]⚠ Intercepted — they hail you.[/]"
     if isinstance(event, EncounterEvaded):
         return "[cyan]✦ Sensors: a contact sweeps past — they never saw you.[/]"
+    if isinstance(event, AlienSpoke) and event.context in _COMBAT_BEAT_LINES:
+        # Combat beats surface in the log (§6.7, WP31); conversational AlienSpoke
+        # events stay silent — the contact screen carries those lines itself.
+        return _COMBAT_BEAT_LINES[event.context]
     if isinstance(event, CombatRound):
         return (f"[red]⚔ Round {event.round}[/]: dealt {event.damage_dealt}, "
                 f"took {event.damage_taken} ({event.foes_left} foes left)")

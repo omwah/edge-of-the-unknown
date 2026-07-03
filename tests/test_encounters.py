@@ -232,3 +232,53 @@ def test_interrupted_travel_replays_to_identical_hash(tmp_path: Path) -> None:
     expected = state_hash(svc.state)
     reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "g.db"))
     assert state_hash(reloaded.state) == expected
+
+
+# --- WP31: the violent opener beat -----------------------------------------------
+
+
+def test_violent_opener_speaks_combat_open() -> None:
+    state = _state_with_player()
+    player = state.players[1]
+    ship = state.ships[player.ship_id]
+    sp = _hostile(state)
+    if sp is None:
+        pytest.skip("no hostile-band species in this seed")
+    sector = next(sid for sid, s in state.sectors.items()
+                  if s.distance_band in ("Deep", "Void") and not s.is_galactic_core)
+    state.species[sp.id] = replace(sp, sector_id=sector)
+    rng = random.Random(11)
+    for _ in range(300):
+        roll = encounters.roll_encounter(state, player, ship, sector, SMALL, rng)
+        if roll is not None and roll.hostile and roll.species.id == sp.id:
+            assert roll.encounter is not None
+            assert roll.encounter.speech_context == "combat_open"
+            return
+    raise AssertionError("no violent roll in 300 attempts")
+
+
+def test_friendly_band_violence_opens_with_betrayal() -> None:
+    """A friendly-band species pushed to violence by a grudge (§6.5) betrays, not attacks."""
+    from edge.core.models import Grudge
+
+    state = _state_with_player()
+    ship = state.ships[state.players[1].ship_id]
+    sp = _hostile(state) or next(iter(state.species.values()))
+    sector = next(sid for sid, s in state.sectors.items()
+                  if s.distance_band in ("Deep", "Void") and not s.is_galactic_core)
+    # One friendly-band ship of a fighting kind, alone in the sector, holding a
+    # maximum grudge — the violence roll fires while the visible band stays friendly.
+    friendly = replace(sp, id=9001, base_disposition=0.9, sector_id=sector)
+    state.species = {9001: friendly}
+    grudge = Grudge(holder=sp.roster_id, target="player", cause="test", severity=1.0,
+                    created_day=1, duration_days=-1)
+    state.players[1] = replace(state.players[1], grudges={sp.roster_id: grudge})
+    player = state.players[1]
+    rng = random.Random(13)
+    for _ in range(300):
+        roll = encounters.roll_encounter(state, player, ship, sector, SMALL, rng)
+        if roll is not None and roll.hostile:
+            assert roll.encounter is not None
+            assert roll.encounter.speech_context == "betrayal"
+            return
+    raise AssertionError("no violent roll in 300 attempts")

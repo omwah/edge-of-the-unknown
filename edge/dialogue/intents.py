@@ -81,7 +81,9 @@ _INTENTS: tuple[Intent, ...] = (
     Intent("extort_response", ENCOUNTER),
     Intent("demand", ENCOUNTER, frozenset({"subject", "count", "reward", "coords"})),
     Intent("reward", ENCOUNTER, frozenset({"subject", "count", "reward"})),
-    # --- combat / betrayal — authored-but-inert until Phase 3 --------------------
+    # --- combat / betrayal — live since WP31: spoken only by the encounter reducers
+    # (spawn opener, per-round taunt/surrender, flee scorn); never reachable through
+    # `Converse` (`peaceful=False` keeps them out of `reachable_contexts`).
     Intent("combat_open", ENCOUNTER, peaceful=False),
     Intent("combat_taunt", ENCOUNTER, frozenset({"subject"}), peaceful=False),
     Intent("surrender", ENCOUNTER, peaceful=False),

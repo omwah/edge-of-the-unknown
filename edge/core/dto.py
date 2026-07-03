@@ -646,3 +646,6 @@ class EncounterDTO:
     missiles: int
     repair_kits: int
     gun_online: bool
+    # The pack's spoken combat beat (§6.7, WP31), rendered read-only in the species'
+    # voice from the encounter's `speech_context`; "" when it carries none.
+    speech: str = ""

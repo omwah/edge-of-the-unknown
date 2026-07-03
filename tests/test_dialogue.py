@@ -480,3 +480,27 @@ def test_callback_and_arc_facts() -> None:
     assert dialogue_facts.arc_facts(seasoned, sp) == {"arc.oath_sworn": True, "arc.debt": 2}
     assert dialogue_facts.arc_facts(seasoned, _species("selvani")) == {}
     assert dialogue_facts.callback_facts(seasoned, _species("selvani"))["met_before"] is False
+
+
+# --- WP31: encounter facts + combat-context gating ---------------------------------
+
+
+def test_encounter_facts_and_combat_contexts() -> None:
+    from edge.core.models import Encounter, EncounterFoe
+    from edge.dialogue import combat_contexts
+
+    def foe(hull: int) -> EncounterFoe:
+        return EncounterFoe(ship_class_id="x", name="F", hull=hull, hull_max=50, shields=0,
+                            damage=5, firing_arc="all_round", combat_speed=1)
+
+    enc = Encounter(species_id=1, sector_id=9, foes=(foe(50), foe(0), foe(0)),
+                    round=3, player_shields=0)
+    assert dialogue_facts.encounter_facts(enc) == {
+        "round": 3, "pack_size": 3, "foes_left": 1,
+        "pack_bloodied": True, "shields_down": True}
+
+    fighter = next(s for s in CFG.roster.species if s.combatant and s.fleet)
+    assert combat_contexts(fighter) == frozenset(
+        {"combat_open", "combat_taunt", "surrender", "flee_scorn", "betrayal"})
+    pacifist = next(s for s in CFG.roster.species if not s.combatant or not s.fleet)
+    assert combat_contexts(pacifist) == frozenset()

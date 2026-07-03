@@ -64,7 +64,8 @@ __all__ = [
     "ALLIED", "FRIENDLY", "NEUTRAL", "WARY", "HOSTILE", "STANDINGS", "GENERIC_PERSONA",
     "DIALOGUE_CONTEXTS", "PEACEFUL_CONTEXTS", "DialogueIntegrityError", "allowed_placeholders",
     "standing_for", "build_chain", "select_line", "select_entry", "entry_for", "when_matches",
-    "fill", "encounter_rng", "instance_key", "speak", "reachable_contexts", "validate_dialogue",
+    "fill", "encounter_rng", "instance_key", "speak", "reachable_contexts",
+    "combat_contexts", "validate_dialogue",
 ]
 
 
@@ -325,7 +326,11 @@ def choices_for(roster: RosterConfig, species: AlienSpecies, player: Player, con
 # --- validation (DESIGN §13 dialogue integrity) ----------------------------------
 
 def reachable_contexts(species: SpeciesConfig) -> frozenset[str]:
-    """The friendly-path contexts a species can reach in Phase 2 (per its params, §6.7)."""
+    """The peaceful contexts a species can reach in conversation (per its params, §6.7).
+
+    This is the `Converse` guard's allow-list: combat beats are **never** in it — they
+    are spoken only by the encounter reducers (`combat_contexts`, WP31).
+    """
     keys = set(PEACEFUL_CONTEXTS)
     # A `refuses` species never opens trade. `trade_refuse` stays reachable for *everyone*: the
     # contact screen routes an empty shelf (nothing affordable) or a refusal to it, and the
@@ -335,6 +340,19 @@ def reachable_contexts(species: SpeciesConfig) -> frozenset[str]:
     if species.treaty_mode in {"none", "superfluous"}:
         keys -= {"treaty_offer", "treaty_grant", "treaty_condition", "treaty_refuse"}
     return frozenset(keys)
+
+
+def combat_contexts(species: SpeciesConfig) -> frozenset[str]:
+    """The combat beats a species can be driven to by the encounter reducers (§6.7, WP31).
+
+    Only a `combatant` species with a fleet can open violence, so only it can speak
+    them: `combat_open` / `betrayal` at spawn, `combat_taunt` / `surrender` per round,
+    `flee_scorn` at the player's escape. Never reachable through `Converse` — the
+    validator uses this set so a fighting species is proven to resolve every beat.
+    """
+    if not species.combatant or not species.fleet:
+        return frozenset()
+    return frozenset({"combat_open", "betrayal", "combat_taunt", "surrender", "flee_scorn"})
 
 
 def _placeholders_in(template: str) -> set[str]:
@@ -453,13 +471,14 @@ def validate_dialogue(roster: RosterConfig) -> None:
         )
 
     # Per-species: persona resolves, and every reachable context yields a line in all
-    # the standings Phase 2 (and Phase 3) can present.
+    # the standings Phase 2 (and Phase 3) can present — including the combat beats a
+    # fighting species can be driven to by the encounter reducers (WP31).
     probe = random.Random(0)
     for sp in roster.species:
         if sp.persona not in roster.personas:
             raise DialogueIntegrityError(f"species {sp.id!r} uses unknown persona {sp.persona!r}")
         chain = build_chain(roster, sp, sp.persona)
-        for context in _branch_closure(chain, reachable_contexts(sp)):
+        for context in _branch_closure(chain, reachable_contexts(sp) | combat_contexts(sp)):
             ctx = {p: p for p in allowed_placeholders(context)}
             for standing in (ALLIED, FRIENDLY, NEUTRAL, HOSTILE):
                 for treaty in (False, True):

@@ -49,6 +49,7 @@ class EncounterScreen(Screen):
     EncounterScreen #enc-disp {
         height: 1; padding: 0 1; color: $text-muted; border-bottom: solid $error;
     }
+    EncounterScreen #enc-speech { height: auto; padding: 0 2; color: $warning; }
     EncounterScreen #enc-main { height: 1fr; padding: 1 2; }
     EncounterScreen #them {
         width: 1fr; height: auto; border: round $error; padding: 0 1;
@@ -82,6 +83,8 @@ class EncounterScreen(Screen):
             f"detection: they spotted you",
             id="enc-disp",
         )
+        if e.speech:  # the pack's spoken combat beat (§6.7, WP31), in its own voice
+            yield Static(f'[italic]“{e.speech}”[/]', id="enc-speech")
         with Horizontal(id="enc-main"):
             with Vertical(id="them") as them:
                 them.border_title = "THEM"

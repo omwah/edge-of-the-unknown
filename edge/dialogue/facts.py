@@ -39,6 +39,14 @@ pin either polarity):
 Arc facts (WP30): every flag in ``Player.species_arcs[roster_id]`` — persisted flags set
 by authored choice ``arc`` maps (and, from WP33, signature-mechanic stages) — is surfaced
 as ``arc.<flag>: value``, unlocking branches across visits.
+
+Encounter facts (WP31 — present only while a combat beat is selected, all derived from
+the hashed ``Encounter`` so the reducer and the encounter-screen projection agree):
+
+- ``round``          — the resolved round counter (0 at the opener);
+- ``pack_size`` / ``foes_left`` — the pack's spawn size and survivors;
+- ``pack_bloodied``  — at least half the pack is destroyed (the surrender trigger);
+- ``shields_down``   — the player's fight-local shield pool is exhausted.
 """
 
 from __future__ import annotations
@@ -48,7 +56,7 @@ from collections.abc import Mapping
 from edge.core.config import RosterConfig
 from edge.core.discovery import sector_has_nebula
 from edge.core.enums import DiscoveryKind
-from edge.core.models import AlienSpecies, ContactSession, Player, UniverseState
+from edge.core.models import AlienSpecies, ContactSession, Encounter, Player, UniverseState
 
 # Session-fact keys (the closed WP28 vocabulary — documented in the corpus spec header).
 TOPIC_PREFIX = "asked."
@@ -161,6 +169,23 @@ def arc_facts(player: Player, species: AlienSpecies) -> dict[str, object]:
     """The species' persisted arc flags as `arc.<flag>` facts (§6.7, WP30)."""
     arcs = player.species_arcs.get(species.roster_id, {})
     return {f"{ARC_PREFIX}{key}": value for key, value in arcs.items()}
+
+
+def encounter_facts(enc: Encounter) -> dict[str, object]:
+    """The live-fight facts a combat beat selects under (§6.7, WP31).
+
+    Derived entirely from the hashed `Encounter`, so the combat reducer (which
+    advances the beat's recency ring) and the encounter-screen projection (which
+    renders it read-only) always agree — the module-doc encounter vocabulary.
+    """
+    alive = sum(1 for f in enc.foes if f.hull > 0)
+    return {
+        "round": enc.round,
+        "pack_size": len(enc.foes),
+        "foes_left": alive,
+        "pack_bloodied": alive * 2 <= len(enc.foes),
+        "shields_down": enc.player_shields <= 0,
+    }
 
 
 def contact_facts(state: UniverseState, player: Player, species: AlienSpecies, *,

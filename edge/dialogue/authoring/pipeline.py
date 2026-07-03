@@ -169,6 +169,16 @@ def _intent_brief(context: str) -> str:
                              "have not found, and you GIVE THEM the route. Tell them to set "
                              "course for sector {coords} — about {distance} jumps out, in the "
                              "{band} — where {reward} awaits.\n",
+        # The combat beats (§6.7, WP31) — spoken by the encounter reducers, not conversation.
+        "combat_open": "Your pack has just intercepted the player's ship and opens fire; "
+                       "issue the attack challenge.\n",
+        "combat_taunt": "Mid-battle: taunt the player over the wideband while your pack "
+                        "presses the attack.\n",
+        "surrender": "Your pack is bloodied and losing; sue for quarter or signal "
+                     "capitulation.\n",
+        "flee_scorn": "The player just fled the fight; jeer at their retreating engines.\n",
+        "betrayal": "You turn your weapons on the player despite an apparently friendly "
+                    "standing; let the betrayal show.\n",
     }
     return briefs.get(context, "")
 
