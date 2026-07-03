@@ -12,7 +12,7 @@ from dataclasses import replace
 
 import pytest
 
-from edge.config import load_default_config
+from edge.config import DEFAULT_CONFIG_PATH, load_config_with_sidecar
 from edge.core import mechanics
 from edge.core.models import AlienSpecies, Player, UniverseState
 from edge.core.rules import Converse, apply_result, reduce
@@ -20,7 +20,11 @@ from edge.dialogue.select import validate_dialogue
 from edge.store.snapshots import state_hash
 from helpers import generate_with_player
 
-CFG = load_default_config()
+# The morality_judge verdict corpus lives in the species-grammar sidecar, which the loader
+# strips under pytest (edge.config — tests default to the base personas). These tests exercise
+# the mechanic through real dialogue, so they opt back into the sidecar via load_config_with_sidecar.
+_SIDECAR = DEFAULT_CONFIG_PATH.parent / "dialogue" / "alien_dialogue_species.yaml"
+CFG = load_config_with_sidecar(_SIDECAR)
 SMALL = CFG.model_copy(
     update={"bigbang": CFG.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1})})
 
