@@ -1728,7 +1728,8 @@ def _speak_context(state: UniverseState, player: Player, ship: Ship, species: Al
     recorded on the session; `farewell` closes the visit.
     """
     assert config.roster is not None
-    all_facts = dialogue_facts.contact_facts(state, player, species, extra=facts)
+    all_facts = dialogue_facts.contact_facts(state, player, species,
+                                             roster=config.roster, extra=facts)
     key = dialogue.instance_key(species)
     ring = player.dialogue_recency.get((key, context), ())
     rng = dialogue.encounter_rng(state.game.seed, key, context, ring)
@@ -1796,7 +1797,8 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
             facts["subject"] = subject_sp.roster_id
     # Session facts join the node's own (§6.7, WP28) — the same merge the projection's
     # `_contact_choices` makes, so `choice_index` resolves into the very menu shown.
-    facts = dialogue_facts.contact_facts(state, player, species, extra=facts)
+    facts = dialogue_facts.contact_facts(state, player, species,
+                                         roster=config.roster, extra=facts)
     key = dialogue.instance_key(species)
     ring = player.dialogue_recency.get((key, cmd.context), ())
     rng = dialogue.encounter_rng(state.game.seed, key, cmd.context, ring)
@@ -1951,7 +1953,8 @@ def _trade_alien(state: UniverseState, player_id: int, species_id: int, offer_in
     new_player, attitude_event = _raise_attitude(new_player, species, config)
     # Advance the trade dialogue ring so a repeat sale rephrases, then mark the visit's
     # session `traded` (§6.7, WP28) — selection sees the pre-utterance facts (lockstep).
-    trade_facts = dialogue_facts.contact_facts(state, new_player, species)
+    trade_facts = dialogue_facts.contact_facts(state, new_player, species,
+                                               roster=config.roster)
     key = dialogue.instance_key(species)
     ring = player.dialogue_recency.get((key, "trade_open"), ())
     rng = dialogue.encounter_rng(state.game.seed, key, "trade_open", ring)

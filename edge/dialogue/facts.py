@@ -20,8 +20,9 @@ author can pin either polarity; booleans are real ``true``/``false``, buckets ar
 - ``band``               — the sector's distance band name (e.g. ``Hub`` / ``Frontier``);
 - ``in_nebula``          — a nebula shrouds this sector;
 - ``wreck_here``         — a visible (obvious or detected), uncollected wreck lies here;
-- ``hull``               — ``critical`` (≤25%) / ``scarred`` (≤60%) / ``sound``;
-- ``low_turns``          — the player is nearly out of turns (< ``LOW_TURNS``);
+- ``hull``               — ``critical`` / ``scarred`` / ``sound`` (thresholds are the
+  roster config's ``hull_critical`` / ``hull_scarred`` ratios);
+- ``low_turns``          — the player is nearly out of turns (< roster ``low_turns``);
 - ``holds_empty`` / ``holds_full`` — the cargo bay's extremes;
 - ``carrying``           — the largest cargo stack's commodity name (only when laden);
 - ``just_fled_combat``   — the player fled a fight earlier *today* (from
@@ -34,6 +35,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from edge.core.config import RosterConfig
 from edge.core.discovery import sector_has_nebula
 from edge.core.enums import DiscoveryKind
 from edge.core.models import AlienSpecies, ContactSession, Player, UniverseState
@@ -42,12 +44,6 @@ from edge.core.models import AlienSpecies, ContactSession, Player, UniverseState
 TOPIC_PREFIX = "asked."
 TRADED = "traded"
 ACCEPTED_LEAD = "accepted_lead"
-
-# Situational buckets (WP29). Display-style thresholds (like the projection's gauges), not
-# economy tunables: authored dialogue only needs coarse, stable strata to react to.
-HULL_CRITICAL = 0.25  # hull ratio at or below ⇒ "critical"
-HULL_SCARRED = 0.60  # hull ratio at or below ⇒ "scarred" (else "sound")
-LOW_TURNS = 25  # turns_remaining below ⇒ `low_turns` (a tenth of the daily 250)
 
 
 # --- session writing (reducer-side helpers) ---------------------------------------
@@ -87,11 +83,14 @@ def session_facts(player: Player, species: AlienSpecies) -> dict[str, object]:
     return dict(session.facts)
 
 
-def situational_facts(state: UniverseState, player: Player) -> dict[str, object]:
+def situational_facts(state: UniverseState, player: Player,
+                      roster: RosterConfig) -> dict[str, object]:
     """The live-circumstance facts (§6.7, WP29) — the module-doc vocabulary.
 
     Pure and deterministic over core state (H5: `just_fled_combat` reads the
-    `Player.last_combat` record combat reducers write, never UI memory). Degrades to
+    `Player.last_combat` record combat reducers write, never UI memory). Bucket
+    thresholds come from the roster config (`hull_critical` / `hull_scarred` /
+    `low_turns`), authored alongside the corpus whose `criteria` pin them. Degrades to
     empty for hand-built states that carry no ship/sector for the player, so the pure
     selector tests and the playtest harness keep working unchanged.
     """
@@ -102,7 +101,8 @@ def situational_facts(state: UniverseState, player: Player) -> dict[str, object]
     if sector is None:
         return {}
     ratio = ship.hull_current / ship.hull_max if ship.hull_max > 0 else 1.0
-    hull = "critical" if ratio <= HULL_CRITICAL else ("scarred" if ratio <= HULL_SCARRED else "sound")
+    hull = ("critical" if ratio <= roster.hull_critical
+            else ("scarred" if ratio <= roster.hull_scarred else "sound"))
     wreck_here = any(
         d.kind is DiscoveryKind.WRECK and d.planet_id is None and d.found_by is None
         and d.sector_id == ship.sector_id and (not d.hidden or d.id in player.detected)
@@ -114,7 +114,7 @@ def situational_facts(state: UniverseState, player: Player) -> dict[str, object]
         "in_nebula": sector_has_nebula(state, ship.sector_id),
         "wreck_here": wreck_here,
         "hull": hull,
-        "low_turns": player.turns_remaining < LOW_TURNS,
+        "low_turns": player.turns_remaining < roster.low_turns,
         "holds_empty": ship.holds_used == 0,
         "holds_full": ship.holds_free <= 0,
         "just_fled_combat": (last is not None and last.outcome == "fled"
@@ -127,6 +127,7 @@ def situational_facts(state: UniverseState, player: Player) -> dict[str, object]
 
 
 def contact_facts(state: UniverseState, player: Player, species: AlienSpecies, *,
+                  roster: RosterConfig,
                   extra: Mapping[str, object] | None = None) -> dict[str, object]:
     """The full fact dictionary for one dialogue selection (§6.7).
 
@@ -135,7 +136,7 @@ def contact_facts(state: UniverseState, player: Player, species: AlienSpecies, *
     `has_intel_target`, …) on top. Both the `Converse` reducer and the contact
     projection MUST build their facts here — never assemble ad hoc.
     """
-    facts: dict[str, object] = situational_facts(state, player)
+    facts: dict[str, object] = situational_facts(state, player, roster)
     facts.update(session_facts(player, species))
     if extra:
         facts.update(extra)
