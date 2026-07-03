@@ -666,9 +666,12 @@ class DialogueChoice(BaseModel):
     spoken line), an optional `next_context` to transition to (any known context key,
     including a reserved `branch.*` node), an optional mechanical `action` (one of
     `CHOICE_ACTIONS` — leave / trade / barter / accept_lead / attack; `attack` is
-    Phase-3-gated), and a `when` predicate gating whether the reply is offered. Conversation
-    *position* is not stored in core state: the reducer re-resolves the line for the active
-    context and validates the chosen index, so a reply is reproducible from (seed, log).
+    Phase-3-gated), an optional `arc` flag map written to the player's **persisted**
+    per-species arc state when the reply is taken (`Player.species_arcs`, surfaced back to
+    selection as `arc.<flag>` facts — the §6.7/WP30 cross-visit unlock), and a `when`
+    predicate gating whether the reply is offered. Conversation *position* is not stored
+    in core state: the reducer re-resolves the line for the active context and validates
+    the chosen index, so a reply is reproducible from (seed, log).
     """
 
     model_config = _FROZEN
@@ -676,6 +679,9 @@ class DialogueChoice(BaseModel):
     text: str  # the player's reply label (templated with the node's placeholders)
     next_context: str | None = None  # context key to transition to (None ⇒ stay / act only)
     action: str | None = None  # a CHOICE_ACTIONS verb, or None for a pure transition
+    # Cross-visit arc flags this reply sets (flag -> value), merged into the player's
+    # `species_arcs[roster_id]` by the reducer; gate later entries on `arc.<flag>` (WP30).
+    arc: dict[str, str | int | bool] = Field(default_factory=dict)
     when: DialogueWhen = DialogueWhen()
     weight: int = Field(default=1, ge=1)
 

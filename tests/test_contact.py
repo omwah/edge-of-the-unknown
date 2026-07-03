@@ -722,3 +722,60 @@ def test_situational_criteria_select_the_pinned_line() -> None:
     assert here.opener == "You are far from the Core lanes."  # the live band pins the entry
     elsewhere = session.contact_view(state, 1, sp.id, _cfg_with_band_greeting("Void"))
     assert elsewhere.opener != "You are far from the Core lanes."  # wrong band — falls through
+
+# --- WP30: cross-visit arcs (§6.7) --------------------------------------------------
+
+
+def _cfg_with_oath(base) -> object:  # type: ignore[no-untyped-def]
+    """Vesk speaks differently once the player swears an authored oath (an `arc` reply)."""
+    data = CFG.roster.model_dump()
+    vesk = next(s for s in data["species"] if s["id"] == "vesk")
+    vesk.setdefault("dialogue_pack", {})["greeting"] = [
+        {"variants": ["State your business."],
+         "choices": [{"text": "I swear the oath.", "arc": {"oath_sworn": True},
+                      "next_context": "greeting"}]},
+        {"when": {"criteria": {"arc.oath_sworn": True}},
+         "variants": ["The oath binds us, oath-kin."]},
+    ]
+    return base.model_copy(update={"roster": RosterConfig.model_validate(data)})
+
+
+def test_choice_arc_flag_persists_and_unlocks_across_visits() -> None:
+    cfg = _cfg_with_oath(CFG)
+    state = _world()
+    sp = _inject(state, "vesk")
+    apply_result(state, reduce(state, 1, Hail(sp.id), cfg))
+    assert session.contact_view(state, 1, sp.id, cfg).opener == "State your business."
+    apply_result(state, reduce(state, 1, Converse(sp.id, "greeting", choice_index=0), cfg))
+    assert state.players[1].species_arcs == {"vesk": {"oath_sworn": True}}
+    assert session.contact_view(state, 1, sp.id, cfg).opener == "The oath binds us, oath-kin."
+    # A new visit (movement cleared the session) still opens the unlocked branch — the
+    # arc flag is persisted per species kind, not per visit.
+    here = state.ships[1].sector_id
+    dest = next(n for n in state.adjacency[here] if here in state.adjacency[n])
+    apply_result(state, reduce(state, 1, Warp(to_sector=dest), cfg))
+    apply_result(state, reduce(state, 1, Warp(to_sector=here), cfg))
+    assert state.players[1].contact_session is None
+    assert session.contact_view(state, 1, sp.id, cfg).opener == "The oath binds us, oath-kin."
+
+
+def test_arc_unlock_survives_a_reload_golden(tmp_path: Path) -> None:
+    """WP30 (M12 golden): an arc flag sworn in visit 1 unlocks the branch after reload."""
+    cfg = _cfg_with_oath(SMALL)
+    svc = GameService.new_game(cfg, 3, SqliteRepository(tmp_path / "arc.db"), created_at=_CREATED)  # type: ignore[arg-type]
+    found = _reachable_species_of(svc.state, "vesk")
+    if found is None:
+        pytest.skip("no reachable Vesk in this seed")
+    path, sp = found
+    for hop in path[1:]:
+        svc.apply(1, Warp(to_sector=hop))
+    svc.apply(1, Hail(sp.id))
+    svc.apply(1, Converse(sp.id, "greeting", choice_index=0))  # swear the oath
+    assert svc.state.players[1].species_arcs["vesk"]["oath_sworn"] is True
+    expected = state_hash(svc.state)
+
+    reloaded = GameService.load_game(cfg, SqliteRepository(tmp_path / "arc.db"))  # type: ignore[arg-type]
+    assert state_hash(reloaded.state) == expected
+    assert reloaded.state.players[1].species_arcs["vesk"]["oath_sworn"] is True
+    view = session.contact_view(reloaded.state, 1, sp.id, cfg)
+    assert view.opener == "The oath binds us, oath-kin."

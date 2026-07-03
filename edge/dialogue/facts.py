@@ -28,7 +28,17 @@ author can pin either polarity; booleans are real ``true``/``false``, buckets ar
 - ``just_fled_combat``   — the player fled a fight earlier *today* (from
   ``Player.last_combat``, the record combat reducers write — H5, never UI memory).
 
-Persisted cross-visit arc facts join in WP30.
+Callback facts (the WP30 per-species history — always-present booleans, so an author can
+pin either polarity):
+
+- ``met_before``     — this species kind has been spoken to before (any visit);
+- ``lead_pending``   — a coordinate tip from this kind points somewhere still unvisited;
+- ``lead_followed``  — a tip from this kind has been followed to its sector;
+- ``fled_us``        — the player's most recent combat was fleeing *this* kind's pack.
+
+Arc facts (WP30): every flag in ``Player.species_arcs[roster_id]`` — persisted flags set
+by authored choice ``arc`` maps (and, from WP33, signature-mechanic stages) — is surfaced
+as ``arc.<flag>: value``, unlocking branches across visits.
 """
 
 from __future__ import annotations
@@ -44,6 +54,9 @@ from edge.core.models import AlienSpecies, ContactSession, Player, UniverseState
 TOPIC_PREFIX = "asked."
 TRADED = "traded"
 ACCEPTED_LEAD = "accepted_lead"
+
+# Namespace prefix for the persisted per-species arc flags (WP30).
+ARC_PREFIX = "arc."
 
 
 # --- session writing (reducer-side helpers) ---------------------------------------
@@ -126,17 +139,44 @@ def situational_facts(state: UniverseState, player: Player,
     return facts
 
 
+def callback_facts(player: Player, species: AlienSpecies) -> dict[str, object]:
+    """The per-species history facts (§6.7, WP30) — the module-doc callback vocabulary.
+
+    All derived read-only from persisted player state (`species_last_seen`, `leads`,
+    `last_combat`), so a speaker can say "back again so soon?", ask whether the
+    coordinates panned out, or sneer at the patrol the player fled.
+    """
+    kind = species.roster_id
+    from_us = [lead for lead in player.leads if lead.source_species == kind]
+    last = player.last_combat
+    return {
+        "met_before": kind in player.species_last_seen,
+        "lead_pending": any(ld.sector_id not in player.explored_sectors for ld in from_us),
+        "lead_followed": any(ld.sector_id in player.explored_sectors for ld in from_us),
+        "fled_us": last is not None and last.species == kind and last.outcome == "fled",
+    }
+
+
+def arc_facts(player: Player, species: AlienSpecies) -> dict[str, object]:
+    """The species' persisted arc flags as `arc.<flag>` facts (§6.7, WP30)."""
+    arcs = player.species_arcs.get(species.roster_id, {})
+    return {f"{ARC_PREFIX}{key}": value for key, value in arcs.items()}
+
+
 def contact_facts(state: UniverseState, player: Player, species: AlienSpecies, *,
                   roster: RosterConfig,
                   extra: Mapping[str, object] | None = None) -> dict[str, object]:
     """The full fact dictionary for one dialogue selection (§6.7).
 
-    Layered, later layers winning: the situational facts (WP29), the per-contact
-    session facts (WP28), then the caller's context-specific extras (`subject`,
-    `has_intel_target`, …) on top. Both the `Converse` reducer and the contact
-    projection MUST build their facts here — never assemble ad hoc.
+    Layered, later layers winning: the situational facts (WP29), the per-species
+    callback and arc facts (WP30), the per-contact session facts (WP28), then the
+    caller's context-specific extras (`subject`, `has_intel_target`, …) on top. Both
+    the `Converse` reducer and the contact projection MUST build their facts here —
+    never assemble ad hoc.
     """
     facts: dict[str, object] = situational_facts(state, player, roster)
+    facts.update(callback_facts(player, species))
+    facts.update(arc_facts(player, species))
     facts.update(session_facts(player, species))
     if extra:
         facts.update(extra)
