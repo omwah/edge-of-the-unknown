@@ -559,6 +559,19 @@ class SectorScene(Static):
                 self._hotspots.append((0, row, w, row + 1, "contact", cid))
             row += 1
 
+        # The roaming Entity's presence hint (§7, WP35): always shown when it is here, but
+        # hailable only once sensors resolve it (Legendary gate). Fog-safe — never named.
+        anomaly = getattr(sec, "anomaly", None)
+        if anomaly is not None:
+            if anomaly.contactable:
+                self._stamp_line(grid, f"[b gold1]✶ {anomaly.label}[/] [dim](Hail)[/]", row, 0, w)
+                self._hotspots.append((0, row, w, row + 1, "contact", anomaly.contact_id))
+            else:
+                self._stamp_line(
+                    grid, f"[gold3]✶ {anomaly.label}[/] [dim](beyond sensor resolution)[/]",
+                    row, 0, w)
+            row += 1
+
         # (Discoveries are listed in the sidebar's "Anomalies" panel, not the scene.)
 
         out = Text()

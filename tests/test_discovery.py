@@ -73,9 +73,13 @@ def test_space_finds_never_share_a_sector_with_a_planet(seed: int) -> None:
     """Open-space discoveries only land in planet-free sectors; one-way sectors have no planet."""
     from edge.core.movement import one_way_exits
 
+    from edge.core.enums import DiscoveryKind
+
     state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
     planet_sectors = {p.sector_id for p in state.planets.values()}
     for d in state.discoveries.values():
+        if d.kind is DiscoveryKind.ENTITY:
+            continue  # the reserved Entity codex row is a marker, not a placed spatial find (§7, WP35)
         if d.planet_id is None:  # a space find, not a surface site
             assert d.sector_id not in planet_sectors
     one_way = {sid for sid in state.sectors if one_way_exits(state.adjacency, sid)}
@@ -345,14 +349,18 @@ def test_terrestrial_guarantee_does_not_blanket_other_planet_types() -> None:
     raise AssertionError("expected some non-terrestrial planet without a forced uncommon site")
 
 
-# --- WP34: `entity` removed from the salt tables (§7) ------------------------
+# --- WP34/WP35: `entity` off the salt tables; the one reserved codex row (§7) ----
 
 
 @pytest.mark.parametrize("seed", range(30))
-def test_entity_kind_is_never_salted(seed: int) -> None:
-    """The singular Entity is a placed roster species, not a discovery — so salting the
-    space tables never produces an `entity` discovery (DESIGN §7, WP34)."""
+def test_entity_discovery_is_only_the_reserved_codex_row(seed: int) -> None:
+    """The singular Entity is a placed roster species, not a salted spatial find (WP34) — so
+    the only `entity`-kind discovery is the **one reserved codex row** created at generation
+    and collected by the first Hail (hidden, Legendary, uncollected until then; §7, WP35)."""
     from edge.core.enums import DiscoveryKind
 
     state = generate_with_player(CONFIG, seed)  # type: ignore[arg-type]
-    assert not any(d.kind is DiscoveryKind.ENTITY for d in state.discoveries.values())
+    entity_discs = [d for d in state.discoveries.values() if d.kind is DiscoveryKind.ENTITY]
+    assert len(entity_discs) == 1
+    row = entity_discs[0]
+    assert row.hidden and row.rarity_tier is RarityTier.LEGENDARY and row.found_by is None

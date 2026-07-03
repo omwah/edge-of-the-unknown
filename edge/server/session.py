@@ -24,7 +24,7 @@ from edge.server import terrain as terrain_art
 from edge.core import combat
 from edge.core.aliens import disposition_band, effective_disposition
 from edge.core.config import DialogueChoice, GameConfig
-from edge.core.discovery import is_detectable
+from edge.core.discovery import entity_contactable, entity_species, is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import build_subsystems, derive_aspects
 from edge.core.movement import RoutePlan, one_way_exits, plan_route, plan_route_legs
@@ -185,6 +185,8 @@ def _sector_discoveries(state: UniverseState, player: Player, sector_id: int) ->
     """
     out: list[dto.SectorDiscovery] = []
     for d in state.discoveries.values():
+        if d.kind is DiscoveryKind.ENTITY:
+            continue  # the reserved Entity codex row is a marker, shown as an anomaly not a find (§7, WP35)
         if d.planet_id is not None or d.sector_id != sector_id:
             continue  # surface sites are reached by descent (WP6), not listed in space
         collected = d.found_by is not None
@@ -273,9 +275,11 @@ def _sector_dto(
     ]
     # A staged species shows as a present vessel so the player can see (and hail) it —
     # friendly contacts are visible just like ports/planets (§6, WP9). The vessel carries
-    # its own species' palette (`archetype_id`) and `contact_id` is the hail target.
+    # its own species' palette (`archetype_id`) and `contact_id` is the hail target. The
+    # roaming Entity fields no ship (§7): it is shown as an anomalous presence, not a vessel.
+    entity = entity_species(state, config)
     here_species = [sp for sp in sorted(state.species.values(), key=lambda s: s.id)
-                    if sp.sector_id == sector.id]
+                    if sp.sector_id == sector.id and (entity is None or sp.id != entity.id)]
     ships = [
         dto.SectorShipDTO(
             name=f"{sp.name} vessel", role=_species_ship_role(sp, config),
@@ -291,11 +295,21 @@ def _sector_dto(
     ]
     region = state.regions[sector.region_id].name
     core_bearing = _sector_bearing(state.sector_pos, sector.id, 1)  # direction home (§11 anchor)
+    # The roaming Entity's always-on presence hint, computed live from its *current* sector
+    # (§7, WP35, H2) — never `Player.detected`. Opening contact is Legendary-sensor-gated; the
+    # fog-safe label never names the being. Absent unless the Entity is here right now.
+    anomaly: dto.SectorAnomalyDTO | None = None
+    if entity is not None and entity.sector_id == sector.id:
+        ship = state.ships[player.ship_id]
+        contactable = entity_contactable(state, ship.sensor_rating, sector.id, config)
+        anomaly = dto.SectorAnomalyDTO(
+            label="an anomalous presence distorts local space",
+            contact_id=entity.id, contactable=contactable)
     return dto.SectorDTO(
         region=region, sector_id=sector.id, flavor=f"{sector.distance_band.lower()} space",
         beacon=sector.beacon_text, band=sector.distance_band,
         ports=ports, planets=planets, ships=ships, warps=warps,
-        discoveries=_sector_discoveries(state, player, sector.id),
+        discoveries=_sector_discoveries(state, player, sector.id), anomaly=anomaly,
         display_id=_display(state, sector.id),
         core_bearing=core_bearing, trail=_trail(state, player, sector.id),
     )
@@ -1144,6 +1158,7 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         intel_summary=intel.summary() if intel is not None else "",
         choices=choices,
         portrait_variant=portrait_variant,
+        singular_entity=bool(sc is not None and sc.singular_entity),
     )
 
 

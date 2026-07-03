@@ -16,7 +16,7 @@ from edge.core.aliens import is_friendly
 from edge.core.config import GameConfig
 from edge.core.discovery import rarity_value
 from edge.core.economy import port_unit_price
-from edge.core.enums import Commodity, PortClass, PortMode
+from edge.core.enums import Commodity, DiscoveryKind, PortClass, PortMode
 from edge.core.models import Port, UniverseState
 from edge.core.starbases import is_operational
 
@@ -168,6 +168,8 @@ def _check_discovery_gradient(state: UniverseState, config: GameConfig) -> None:
         return
     by_band: dict[str, list[tuple[int, int]]] = {}  # band -> [(rarity rank, value)]
     for d in state.discoveries.values():
+        if d.kind is DiscoveryKind.ENTITY:
+            continue  # the reserved Entity codex row is a marker, not a spatial find (§7, WP35)
         band = state.sectors[d.sector_id].distance_band
         by_band.setdefault(band, []).append((d.rarity_tier.value, rarity_value(d.rarity_tier, config)))
 
@@ -240,6 +242,12 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
                 f"expected exactly one singular Entity, found {len(instances)}")
         if instances[0].sector_id in core_ids:
             raise ValidationError("the singular Entity is placed in Core Space")
+        # Its reserved Legendary codex row exists (stamped by the first Hail, §7 WP35).
+        entity_discs = [d for d in state.discoveries.values()
+                        if d.kind is DiscoveryKind.ENTITY]
+        if len(entity_discs) != 1:
+            raise ValidationError(
+                f"expected exactly one reserved Entity codex row, found {len(entity_discs)}")
 
     # The governor inhabits its own capital: if the roster fields governing members, at
     # least one must be settled in the Core (WP18).

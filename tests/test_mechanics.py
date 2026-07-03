@@ -117,7 +117,10 @@ def test_run_hook_none_for_absent_or_unimplemented() -> None:
 def _entity_world(alignment: int, *, seed: int = 1) -> tuple[UniverseState, int]:
     """A generated world with the Concordance placed in the player's sector."""
     state = generate_with_player(SMALL, seed)
-    ship = state.ships[1]
+    # The Entity's contact is sensor-gated at Legendary difficulty (§7, WP35), so the ship
+    # must carry sensors strong enough to resolve it before the judgment can be reached.
+    ship = replace(state.ships[1], sensor_rating=CFG.discovery.sensor_difficulty["LEGENDARY"])
+    state.ships[1] = ship
     sc = CFG.roster.species_by_id("concordance")
     assert sc is not None
     species = AlienSpecies(
