@@ -786,20 +786,57 @@ species resolves the combat contexts its parameters can reach.
 ### WP33 — Signature-mechanic framework + first hooks (M/L)
 
 A hook registry in new `edge/core/mechanics.py` keyed by
-`KNOWN_SIGNATURE_HOOKS`; each hook is a pure
-`(state, player, species, stage, params) → effects/stage'` with its stage
-persisted in `Player.species_arcs` (WP30). First hooks: `morality_judge`
-(audited metrics from alignment/experience/grudge history → verdict dialogue
-+ blessing/curse effects), `literalist` (keyword map keyed off the choice
-taken, `memory_model=none`), `flee_drop` (pack flees on contact, drops cargo
-packets), `influence_gate` (cannot-attack-unbidden gates the FIGHT choice).
-`sig.*` contexts become reachable.
+`KNOWN_SIGNATURE_HOOKS`; each hook is a pure `(MechanicContext) →
+MechanicResult` with its stage persisted in `Player.species_arcs` (WP30).
+**Shipped.**
+
+- **Registry (`edge/core/mechanics.py`).** `MECHANIC_HOOKS` maps hook id → a
+  pure hook. `MechanicResult` carries the ladder `stage` (persisted under the
+  reserved `STAGE_FLAG` key in `species_arcs`, surfaced as the `sig_stage`
+  fact), transient selection `facts`, and **bounded effects** the reducer
+  applies (attitude offset shift / alignment / experience / a latinum drop / a
+  grudge). `run_hook` resolves an absent or not-yet-implemented (WP37) hook to
+  `None` — the sig line then just speaks, inert. First hooks: `morality_judge`
+  (audits `Player.alignment` → blessed/cursed/weighed verdict, deterministic
+  from the conduct counter; blessing pays attitude + experience, a curse routes
+  through the WP27 `sour_attitude` machinery), `flee_drop` (one-shot cargo drop
+  on contact), `influence_gate` (`attack_forbidden` withholds the FIGHT reply),
+  and `literalist` (`memory_model=none`, reaction keyed to the reply keyword).
+- **Dispatch (`edge/core/rules.py`).** A `choices` reply into a `sig.*` context
+  routes through `_resolve_mechanic`: run the hook, apply effects
+  (`_apply_mechanic`, emitting the existing `AttitudeChanged`/`GrudgeFormed`
+  events — no codec churn), persist the stage, then speak the sig line. The line
+  gates on the **persisted** `sig_stage` (never a transient outcome), so the
+  projection reconstructs the same line/menu the reducer speaks (the §6.7
+  view/reducer lockstep). The influence-gate attack lock names its gate.
+- **Projection (`edge/server/session.py`).** `contact_view` renders `sig.*`
+  nodes read-only from `sig_stage` (like `branch.*`), so the Entity's verdict
+  and its follow-up menu display on the contact screen.
+- **Facts (`edge/dialogue/facts.py`).** `arc_facts` surfaces the mechanic stage
+  as the bare `sig_stage` fact (plus `arc.sig_stage`).
+- **Corpus + roster.** The Entity (`concordance`) authors
+  `sig.morality_judge.verdict` (blessed/cursed/weighed variants gated on
+  `sig_stage`, + a catch-all) reached by a new greeting reply; its roster
+  `signature_mechanic.params` carry the verdict bands + boon magnitudes. H9 sync:
+  spec header (`sig.*` LIVE + the `sig_stage` fact), authoring `_intent_brief`
+  (a `sig.*` brief), DESIGN §6.2/§6.7.
+- **Deferred within the framework (seams left clean):** `flee_drop`'s
+  encounter-side flee/drop integration and `literalist`'s keyword-choice
+  plumbing are registry-complete + unit-tested but not yet wired into an
+  encounter/dialogue flow (no default species reaches them); the transactional
+  hooks are WP37.
 
 Files: new `edge/core/mechanics.py`, `edge/core/rules.py`,
-`edge/dialogue/facts.py` (stage facts), `config/alien_roster_default.yaml`,
-new `tests/test_mechanics.py`.
-Tests: stage ladders replay; the judge's verdict is deterministic from the
-conduct counters.
+`edge/server/session.py`, `edge/dialogue/facts.py`,
+`config/alien_roster_default.yaml`, `config/dialogue/alien_dialogue_species.yaml`,
+`config/alien_dialogue_default.yaml` (spec header),
+`edge/dialogue/authoring/pipeline.py`, `docs/DESIGN.md`, new
+`tests/test_mechanics.py`.
+Tests: verdict determinism across the alignment bands (incl. boundaries); the
+blessing/curse/weigh effects; flee_drop one-shot; influence-gate attack lock;
+`run_hook` None for absent/WP37 hooks; the judgment reducer blesses/curses with
+a grudge and **speaks the sig context**; the stage-ladder replays to the
+identical `state_hash`; the sig corpus stays `validate_dialogue`-green.
 
 ### WP34 — The Entity: generation, roster flag, salvage-table removal (M)
 

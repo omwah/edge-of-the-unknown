@@ -1087,10 +1087,13 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     # offer_coordinates line is shown, binds the same {coords}/{target}/… the reducer will.
     intel = pick_intel_target(state, player, species, aliens=config.aliens)
 
-    # Show the active context if it is a peaceful intent or an authored branch node; combat /
-    # sig.* lines stay Phase 3, so anything else falls back to the opener.
+    # Show the active context if it is a peaceful intent, an authored branch node, or a
+    # signature-mechanic prompt (LIVE since WP33 — rendered read-only from the persisted
+    # `sig_stage`, so the reducer's applied verdict and this view agree; combat lines stay
+    # on the encounter screen). Anything else falls back to the opener.
     shown = (active_context if (active_context in dialogue._PEACEFUL_CONTEXTS
-                                or active_context.startswith(dialogue.BRANCH_PREFIX))
+                                or active_context.startswith(dialogue.BRANCH_PREFIX)
+                                or active_context.startswith("sig."))
              else "greeting")
     subject_extra: dict[str, str] | None = None
     facts: dict[str, object] | None = None

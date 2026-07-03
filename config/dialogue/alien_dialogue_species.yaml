@@ -3399,6 +3399,8 @@ species_grammars:
             - and thy deeds shall determine thy blessing or thy curse
             - yet thou mayest speak before the ledger is sealed
         choices:
+          - text: Submit to the judgment of the Concordance.
+            next_context: sig.morality_judge.verdict   # WP33: runs the morality_judge hook
           - text: I seek the blessing of the Concordance.
             next_context: branch.inquiry
           - text: Let us trade.
@@ -3410,6 +3412,50 @@ species_grammars:
             next_context: dossier_other
           - text: Tell me about the Concordance.
             next_context: dossier_self
+    # The morality_judge verdict (§6.2, WP33): the hook audits the player's alignment before
+    # this line speaks and persists a `judged_<verdict>` stage, surfaced as the `sig_stage`
+    # fact — gate on it (never a transient fact) so the projection reconstructs the same line
+    # the reducer speaks. The catch-all covers the validator probe (which pins no facts).
+    sig.morality_judge.verdict:
+      - when:
+          criteria: { sig_stage: judged_blessed }
+        variants:
+          - The scales rise in thy favour, {player}. Thy deeds shine, and the Concordance sets its blessing upon thee — go forth in grace.
+          - We have weighed thy conduct and found virtue. Be blessed, child of {alliance}; the drifting eye of the Cosmic One watches over thy path.
+        choices:
+          - text: I am grateful, Concordance.
+            next_context: farewell
+            action: leave
+          - text: Judge me once more.
+            next_context: sig.morality_judge.verdict
+      - when:
+          criteria: { sig_stage: judged_cursed }
+        variants:
+          - Thy ledger runs black with ruin, {player}. The Concordance pronounces its curse upon thee — thou art marked, and no drift shall carry us from thy reckoning.
+          - We have weighed thy slaughters, and the balance condemns thee. Bear the curse of the Cosmic One, wretch of {alliance}, until thy deeds are unmade.
+        choices:
+          - text: I will earn back your favour.
+            next_context: farewell
+            action: leave
+          - text: Judge me again, then.
+            next_context: sig.morality_judge.verdict
+      - when:
+          criteria: { sig_stage: judged_weighed }
+        variants:
+          - Thy ledger hangs in balance, {player}. Neither blessed nor damned — the Concordance marks thee, and drifts on to weigh thee anew.
+          - The scales tremble, unsettled. Go, child of dust; thy deeds are noted, and we shall judge thee again when thy path has spoken further.
+        choices:
+          - text: I will strive to prove myself.
+            next_context: farewell
+            action: leave
+          - text: Weigh me once more.
+            next_context: sig.morality_judge.verdict
+      - variants:
+          - Thou standest before the drifting judgment of the Cosmic One, {player}. Thy deeds are weighed, and the verdict is passed.
+        choices:
+          - text: I accept your judgment.
+            next_context: farewell
+            action: leave
     trade_refuse:
       - variants:
           - The Cosmic One does not barter for trinkets. Our judgment is not for sale.

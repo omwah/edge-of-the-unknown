@@ -21,6 +21,7 @@ from typing import assert_never
 
 from edge import dialogue
 from edge.core import combat, encounters
+from edge.core import mechanics
 from edge.core.aliens import (
     FRIENDLY as FRIENDLY_BAND,
     HOSTILE as HOSTILE_BAND,
@@ -1868,8 +1869,12 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
     if not dialogue.when_matches(choice.when, standing=standing, treaty=False, facts=facts):
         raise EconomyError("you cannot say that right now")
     if choice.action == "attack":
+        sc = _species_config(config, species)
+        if mechanics.attack_forbidden(sc):
+            # An influence_gate species forbids being struck while in contact (§6.2, WP33).
+            raise EconomyError("their influence stays your hand — you cannot attack them")
         raise EconomyError("you cannot attack here (Phase 3)")
-    
+
     mutated_player = player
     log_events: tuple[Event, ...] = ()
     if choice.action == "accept_lead":
@@ -1886,6 +1891,11 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
     target = "farewell" if choice.action == "leave" else (choice.next_context or cmd.context)
     if target == "back":
         return ReduceResult(events=log_events, players=(mutated_player,))
+    if target.startswith("sig."):
+        # A choice into a signature-mechanic prompt (§6.2, WP33): run the hook, apply its
+        # effects, then speak the sig line under the verdict it produced.
+        return _resolve_mechanic(
+            state, config, mutated_player, ship, species, target, log_events)
     extra, t_facts = _intel_bindings(state, mutated_player, species, target, config)
     if (target == "dossier_other" or target.startswith("branch.dossier_other.")) and cmd.subject_id is not None:
         subject_sp = state.species.get(cmd.subject_id)
@@ -1896,6 +1906,89 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
         state, mutated_player, ship, species, target, config, extra=extra, facts=t_facts,
         subject_id=cmd.subject_id)
     return ReduceResult(events=log_events + (speak_event,), players=(new_player,))
+
+
+def _resolve_mechanic(state: UniverseState, config: GameConfig, player: Player, ship: Ship,
+                      species: AlienSpecies, target: str,
+                      log_events: tuple[Event, ...]) -> ReduceResult:
+    """Run the species' signature-mechanic hook, apply its effects, then speak the sig line.
+
+    Reached when an authored choice transitions into a `sig.*` prompt (§6.2, WP33). The hook
+    (`core.mechanics.run_hook`) is pure: it audits conduct and returns a ladder `stage`
+    (persisted in `species_arcs` under `mechanics.STAGE_FLAG`), transient `facts` the verdict
+    line gates on (e.g. `{verdict: blessed}`), and bounded effects this reducer applies and
+    reports. An absent or not-yet-implemented (WP37) hook resolves to `None` — the sig line
+    then simply speaks with no effect, so a `sig.*` branch never crashes on an inert hook.
+    """
+    assert config.roster is not None
+    sc = _species_config(config, species)
+    params = sc.signature_mechanic.params if sc.signature_mechanic is not None else {}
+    stage = player.species_arcs.get(species.roster_id, {}).get(mechanics.STAGE_FLAG)
+    result = mechanics.run_hook(mechanics.MechanicContext(
+        player=player, species=species, sc=sc, aliens=config.aliens,
+        stage=stage if isinstance(stage, str) else None, params=params))
+    mutated_player = player
+    effect_events: tuple[Event, ...] = ()
+    if result is not None:
+        mutated_player, effect_events = _apply_mechanic(
+            state, mutated_player, species, sc, result, config)
+    # The verdict line gates on the **persisted** `sig_stage` (surfaced by
+    # `dialogue.facts`), never a transient hook fact — so the projection reconstructs the
+    # same line/menu the reducer speaks (the §6.7 view/reducer lockstep). The stage is
+    # already persisted on `mutated_player` above, before this utterance selects.
+    extra, t_facts = _intel_bindings(state, mutated_player, species, target, config)
+    new_player, speak_event = _speak_context(
+        state, mutated_player, ship, species, target, config, extra=extra, facts=t_facts)
+    return ReduceResult(events=log_events + effect_events + (speak_event,),
+                        players=(new_player,))
+
+
+def _apply_mechanic(state: UniverseState, player: Player, species: AlienSpecies,
+                    sc: SpeciesConfig, result: mechanics.MechanicResult,
+                    config: GameConfig) -> tuple[Player, tuple[Event, ...]]:
+    """Apply a hook's bounded effects to the player and emit the matching WP27 events.
+
+    Effects are mutually-exclusive in practice: a `grudge` (a curse) routes through the WP27
+    `sour_attitude` machinery (attitude drop + grudge + `memory_model`/permanent handling),
+    while a plain `attitude_delta` (a boon) shifts the offset directly unless a permanent
+    grudge has locked it. Alignment/experience/latinum deltas add straight on. The ladder
+    stage persists in `species_arcs` so the mechanic replays exactly.
+    """
+    events: list[Event] = []
+    new_player = player
+    if result.stage:
+        arcs = dict(new_player.species_arcs)
+        arcs[species.roster_id] = {
+            **arcs.get(species.roster_id, {}), mechanics.STAGE_FLAG: result.stage}
+        new_player = replace(new_player, species_arcs=arcs)
+    if result.grudge:
+        soured = sour_attitude(
+            new_player, species, sc, config.aliens, state.game.day_number, 1)
+        if soured is not new_player:  # memory_model none forgets instantly (no events)
+            grudge = soured.grudges[species.roster_id]
+            events.append(GrudgeFormed(
+                player.id, species.roster_id, grudge.severity, grudge.duration_days < 0))
+            events.append(AttitudeChanged(
+                player.id, species.id,
+                round(soured.species_attitudes[species.roster_id], 6),
+                round(effective_disposition(species, soured), 6)))
+            new_player = soured
+    elif result.attitude_delta and not attitude_locked(new_player, species.roster_id):
+        offset = new_player.species_attitudes.get(species.roster_id, 0.0)
+        new_offset = round(max(-1.0, min(1.0, offset + result.attitude_delta)), 6)
+        if new_offset != offset:
+            new_player = replace(new_player, species_attitudes={
+                **new_player.species_attitudes, species.roster_id: new_offset})
+            events.append(AttitudeChanged(
+                player.id, species.id, new_offset,
+                round(effective_disposition(species, new_player), 6)))
+    if result.alignment_delta or result.experience_delta:
+        new_player = replace(
+            new_player, alignment=new_player.alignment + result.alignment_delta,
+            experience=new_player.experience + result.experience_delta)
+    if result.latinum_delta:
+        new_player = replace(new_player, latinum=new_player.latinum + result.latinum_delta)
+    return new_player, tuple(events)
 
 
 def _accept_lead(state: UniverseState, player_id: int, cmd: AcceptLead,
