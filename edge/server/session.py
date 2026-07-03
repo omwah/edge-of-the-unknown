@@ -906,6 +906,7 @@ def leads_view(state: UniverseState, player_id: int, config: GameConfig) -> list
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
     roster = config.roster
+    entity = entity_species(state, config)  # for live Entity-lead staleness (§7, WP36)
     rows: list[dto.LeadDTO] = []
     for lead in player.leads:
         at_origin = ship.sector_id == lead.origin_sector
@@ -915,6 +916,10 @@ def leads_view(state: UniverseState, player_id: int, config: GameConfig) -> list
         source = lead.source_species
         if roster is not None and (sc := roster.species_by_id(lead.source_species)) is not None:
             source = sc.name
+        # An Entity lead points at a last-known sector; the Entity roams, so the trail has
+        # gone cold if it has since moved on (derived read-only at projection, H3).
+        stale = (lead.kind == "entity" and entity is not None
+                 and entity.sector_id != lead.sector_id)
         rows.append(dto.LeadDTO(
             summary=lead.summary, source=source,
             coords=state.spatial_ids.get(lead.sector_id, lead.sector_id),
@@ -923,6 +928,7 @@ def leads_view(state: UniverseState, player_id: int, config: GameConfig) -> list
             sector_id=lead.sector_id,
             at_origin=at_origin,
             origin_coords=state.spatial_ids.get(lead.origin_sector, lead.origin_sector),
+            stale=stale,
         ))
     return rows
 
@@ -1099,7 +1105,8 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     # The intel "map" tip the speaker can offer right now (None unless friendly + knows
     # somewhere unvisited). Computed once: it gates the Log-coordinates verb and, when the
     # offer_coordinates line is shown, binds the same {coords}/{target}/… the reducer will.
-    intel = pick_intel_target(state, player, species, aliens=config.aliens)
+    intel = pick_intel_target(state, player, species, aliens=config.aliens,
+                              entity=entity_species(state, config))
 
     # Show the active context if it is a peaceful intent, an authored branch node, or a
     # signature-mechanic prompt (LIVE since WP33 — rendered read-only from the persisted

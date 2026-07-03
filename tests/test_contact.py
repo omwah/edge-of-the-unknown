@@ -66,6 +66,16 @@ def _inject(state: UniverseState, roster_id: str, *, base: float = 0.85,
     return species
 
 
+def _drop_entity(state: UniverseState) -> None:
+    """Remove the roaming Entity so a test can isolate the regular coordinate-tip mechanic.
+
+    The Entity is the highest-value universal tip (§7, WP36); tests that assert a *specific*
+    regular discovery lead drop it first so its tip doesn't win the ranking."""
+    ent = entity_species(state, CFG)
+    if ent is not None:
+        del state.species[ent.id]
+
+
 def _offer_index(roster_id: str, pred) -> int:  # type: ignore[no-untyped-def]
     sc = CFG.roster.species_by_id(roster_id)
     assert sc is not None
@@ -211,6 +221,7 @@ def test_converse_choice_accept_lead_respects_next_context() -> None:
     from edge.core.events import LeadAccepted, AlienSpoke
     from edge.dialogue.intel import LocationRef
     state = _world()
+    _drop_entity(state)  # isolate the regular discovery tip (the Entity would out-rank it, §7)
     vesk = _inject(state, "vesk")
     src = state.ships[state.players[1].ship_id].sector_id
     d = next(d for d in state.discoveries.values()

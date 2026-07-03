@@ -520,6 +520,9 @@ class AliensConfig(BaseModel):
     # or `drift_enabled=False`. The cron cadence lives in `ticker.crons.alien_drift`.
     drift_enabled: bool = True
     drift_move_chance: float = Field(default=0.25, ge=0.0, le=1.0)
+    # The roaming Entity (§7, WP36) wanders at its own pace and anywhere non-Core (its
+    # occupancy is unbound by the alliance/rival rules that gate ordinary drift).
+    entity_drift_chance: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class CombatConfig(BaseModel):

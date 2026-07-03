@@ -89,3 +89,53 @@ def test_explored_or_logged_places_are_never_revealed() -> None:
     known = {r.sector_id for r in state.species_knowledge[sp.roster_id]}
     seen = replace(player, explored_sectors=frozenset(known))
     assert pick_intel_target(state, seen, sp, aliens=CFG.aliens) is None
+
+
+# --- WP36: the roaming Entity as a live pursuit tip (§7) --------------------------
+
+def test_knowledge_table_never_bakes_the_entity_codex_row() -> None:
+    """The reserved Entity codex row is Legendary but must never enter a knowledge table —
+    the Entity roams, so its tip is computed live, not baked (§7, WP35/WP36)."""
+    from edge.core.enums import DiscoveryKind
+
+    state = _state()
+    for refs in state.species_knowledge.values():
+        for r in refs:
+            if r.kind == "discovery":
+                assert state.discoveries[r.ref].kind is not DiscoveryKind.ENTITY
+
+
+def test_entity_tip_is_live_and_outranks_regular_tips() -> None:
+    from edge.core.discovery import entity_species
+
+    state = _state()
+    sp, player = _speaker_with_knowledge(state)
+    player = replace(player, species_attitudes={sp.roster_id: 1.0})  # friendly band
+    ent = entity_species(state, CFG)
+    assert ent is not None
+    target = pick_intel_target(state, player, sp, aliens=CFG.aliens, entity=ent)
+    assert target is not None and target.ref.kind == "entity"
+    assert target.ref.sector_id == ent.sector_id  # its CURRENT sector, computed live (H3)
+    assert target.label == "the roaming Entity" and target.summary()
+
+
+def test_entity_tip_reoffers_only_after_it_moves() -> None:
+    from edge.core.discovery import entity_species
+    from edge.core.models import Lead
+
+    state = _state()
+    sp, player = _speaker_with_knowledge(state)
+    player = replace(player, species_attitudes={sp.roster_id: 1.0})
+    ent = entity_species(state, CFG)
+    assert ent is not None
+    # A fresh lead to where it is now suppresses the Entity tip (a regular tip may surface).
+    player = replace(player, leads=(Lead(kind="entity", ref=ent.id, sector_id=ent.sector_id,
+                     origin_sector=1, source_species=sp.roster_id, summary="last known"),))
+    held = pick_intel_target(state, player, sp, aliens=CFG.aliens, entity=ent)
+    assert held is None or held.ref.kind != "entity"
+    # Once it moves, the frozen lead no longer matches its sector → a fresh tip is re-offered.
+    dst = next(n for n in state.adjacency[ent.sector_id]
+               if not state.sectors[n].is_galactic_core)
+    moved = replace(ent, sector_id=dst)
+    again = pick_intel_target(state, player, sp, aliens=CFG.aliens, entity=moved)
+    assert again is not None and again.ref.kind == "entity" and again.ref.sector_id == dst
