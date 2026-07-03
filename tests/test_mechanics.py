@@ -14,6 +14,7 @@ import pytest
 
 from edge.config import DEFAULT_CONFIG_PATH, load_config_with_sidecar
 from edge.core import mechanics
+from edge.core.config import SignatureMechanicConfig
 from edge.core.models import AlienSpecies, Player, UniverseState
 from edge.core.rules import Converse, apply_result, reduce
 from edge.dialogue.select import validate_dialogue
@@ -93,8 +94,8 @@ def test_influence_gate_forbids_attack() -> None:
     assert mechanics.attack_forbidden(terran) is False
 
 
-def test_run_hook_none_for_absent_or_unimplemented() -> None:
-    """An absent mechanic, and a WP37-and-later hook, both resolve to None (never raise)."""
+def test_run_hook_none_for_absent_or_unregistered() -> None:
+    """An absent mechanic, and a hook id the code has not grown, both resolve to None."""
     terran = CFG.roster.species_by_id("terran")  # no signature_mechanic
     assert terran is not None and terran.signature_mechanic is None
     species = AlienSpecies(
@@ -105,11 +106,10 @@ def test_run_hook_none_for_absent_or_unimplemented() -> None:
         player=Player(id=1, name="R", ship_id=1, latinum=0), species=species, sc=terran,
         aliens=CFG.aliens, stage=None, params={})
     assert mechanics.run_hook(ctx) is None
-    # A hook name known to config but not yet implemented (WP37) also resolves to None.
-    trojan = CFG.roster.species_by_id("thessbrood")
-    assert trojan is not None and trojan.signature_mechanic is not None
-    assert trojan.signature_mechanic.hook not in mechanics.MECHANIC_HOOKS
-    assert mechanics.run_hook(_ctx("thessbrood")) is None
+    # A hook name not in the registry (a roster naming a hook the code lacks) also → None.
+    unknown_sc = terran.model_copy(update={
+        "signature_mechanic": SignatureMechanicConfig(hook="not_a_real_hook")})
+    assert mechanics.run_hook(replace(ctx, sc=unknown_sc)) is None
 
 
 # --- reducer integration ---------------------------------------------------------------
@@ -192,3 +192,99 @@ def test_attack_reply_gated_by_influence() -> None:
 def test_corpus_stays_valid() -> None:
     """The sig.* verdict corpus resolves under the §13 integrity suite."""
     validate_dialogue(CFG.roster)
+
+
+# --- WP37: transactional hooks (stage machines + bounded effects, §6.2) ---------------
+
+@pytest.mark.parametrize("stage,approach,exp_stage,exp_lat", [
+    (None, "offer", "offered", 0),
+    (None, "accept", "carried", 200),          # sweetener paid up front, the trap now aboard
+    (None, "refuse", "declined", 0),
+    ("carried", "defuse", "defused", -140),     # paid removal at the counter-market
+    ("carried", "haggle", "sprung", -320),      # any other contact while carrying detonates it
+    ("sprung", "defuse", "sprung", 0),          # terminal — inert
+])
+def test_trojan_gift_stage_machine(stage, approach, exp_stage, exp_lat) -> None:
+    r = mechanics.run_hook(_ctx("thessbrood", stage=stage, approach=approach))
+    assert r is not None and r.stage == exp_stage and r.latinum_delta == exp_lat
+
+
+def test_escalating_demand_ladder_climbs_then_satisfies() -> None:
+    """comply up the [donate, destroy_target, surrender_base] ladder → satisfied (a boon)."""
+    stage, r = None, None
+    for expect in ("demand_1", "demand_2", "satisfied"):
+        r = mechanics.run_hook(_ctx("vennrith", stage=stage, approach="comply"))
+        assert r is not None and r.stage == expect
+        stage = r.stage
+    assert r is not None and r.attitude_delta > 0 and r.experience_delta > 0
+
+
+def test_escalating_demand_refuse_betrays() -> None:
+    r = mechanics.run_hook(_ctx("vennrith", stage="demand_1", approach="refuse"))
+    assert r is not None and r.stage == "betrayed" and r.grudge
+
+
+@pytest.mark.parametrize("approach,exp_stage", [("accept", "contracted"), ("decline", "declined")])
+def test_contract_kill_offer_and_gate(approach, exp_stage) -> None:
+    r = mechanics.run_hook(_ctx("cibelline", approach=approach))
+    # WP37 authors/gates the contract; the razing + reward payout land in WP40 (no effect yet).
+    assert r is not None and r.stage == exp_stage and r.latinum_delta == 0
+    assert r.facts["contract_target"] == "vesk"
+
+
+def test_coordinate_broker_extort() -> None:
+    paid = mechanics.run_hook(_ctx("selvani", approach="pay"))
+    assert paid is not None and paid.stage == "paid" and paid.latinum_delta < 0
+    spurned = mechanics.run_hook(_ctx("selvani", approach="refuse"))
+    assert spurned is not None and spurned.stage == "spurned" and spurned.grudge
+
+
+def test_passage_broker_misleads_without_benefit() -> None:
+    r = mechanics.run_hook(_ctx("stryx", approach="pay"))
+    assert r is not None and r.stage == "misled" and r.latinum_delta < 0
+
+
+def test_reprogram_unlock_install_pays_xp_and_binds_target() -> None:
+    r = mechanics.run_hook(_ctx("vesk", approach="install"))
+    assert r is not None and r.stage == "unlocked" and r.experience_delta > 0
+    assert r.facts["reprogram_target"] == "helot" and r.facts["reprogram_posture"] == "open"
+
+
+def test_transactional_hooks_are_deterministic() -> None:
+    """Each hook is a pure function of (stage, approach, params) — the golden-replay guarantee."""
+    for rid, appr in [("thessbrood", "accept"), ("vennrith", "comply"), ("cibelline", "accept"),
+                      ("selvani", "pay"), ("stryx", "pay"), ("vesk", "install")]:
+        assert mechanics.run_hook(_ctx(rid, approach=appr)) == mechanics.run_hook(_ctx(rid, approach=appr))
+
+
+def _apply(roster_id: str, result: mechanics.MechanicResult, *, latinum: int = 1000):
+    """Apply a hook result through the reducer helper against a minimal injected species."""
+    from edge.core import rules
+    state = generate_with_player(SMALL, 1)
+    sc = CFG.roster.species_by_id(roster_id)
+    assert sc is not None
+    species = AlienSpecies(
+        id=1, roster_id=roster_id, name=sc.name, archetype_id=sc.archetype_id,
+        sector_id=state.ships[1].sector_id, home_band=sc.home_band or "Hub",
+        tech_level=sc.tech_level, base_disposition=0.5,
+        disposition_center=sc.disposition_center, disposition_variance=sc.disposition_variance)
+    state.species[1] = species
+    state.players[1] = replace(state.players[1], latinum=latinum)
+    return rules._apply_mechanic(state, state.players[1], species, sc, result, CFG)
+
+
+def test_payload_drain_clamps_latinum_at_zero() -> None:
+    """A drain larger than the purse clamps at zero — the no-negative-balance invariant."""
+    player, _ = _apply("thessbrood", mechanics.MechanicResult(stage="sprung", latinum_delta=-320),
+                       latinum=100)
+    assert player.latinum == 0
+
+
+def test_escalating_betrayal_forms_permanent_grudge() -> None:
+    """A refused demand routes through WP27: vennrith (never_forgets) forms an undying grudge."""
+    result = mechanics.run_hook(_ctx("vennrith", stage="demand_1", approach="refuse"))
+    assert result is not None
+    player, events = _apply("vennrith", result)
+    assert "vennrith" in player.grudges and player.grudges["vennrith"].duration_days < 0
+    assert player.species_arcs["vennrith"]["sig_stage"] == "betrayed"
+    assert any(type(e).__name__ == "GrudgeFormed" for e in events)

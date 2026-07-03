@@ -1968,9 +1968,13 @@ def _resolve_mechanic(state: UniverseState, config: GameConfig, player: Player, 
     sc = _species_config(config, species)
     params = sc.signature_mechanic.params if sc.signature_mechanic is not None else {}
     stage = player.species_arcs.get(species.roster_id, {}).get(mechanics.STAGE_FLAG)
+    # The reply keyword a transactional hook keys on (§6.2, WP37) is the last segment of the
+    # `sig.<hook>.<node>` context the choice routes into — e.g. `sig.trojan_gift.accept` →
+    # "accept". morality_judge ignores it, so this is inert for the WP33 hooks.
+    approach = target.rsplit(".", 1)[-1] if target.startswith("sig.") else None
     result = mechanics.run_hook(mechanics.MechanicContext(
         player=player, species=species, sc=sc, aliens=config.aliens,
-        stage=stage if isinstance(stage, str) else None, params=params))
+        stage=stage if isinstance(stage, str) else None, params=params, approach=approach))
     mutated_player = player
     effect_events: tuple[Event, ...] = ()
     if result is not None:
@@ -1995,8 +1999,9 @@ def _apply_mechanic(state: UniverseState, player: Player, species: AlienSpecies,
     Effects are mutually-exclusive in practice: a `grudge` (a curse) routes through the WP27
     `sour_attitude` machinery (attitude drop + grudge + `memory_model`/permanent handling),
     while a plain `attitude_delta` (a boon) shifts the offset directly unless a permanent
-    grudge has locked it. Alignment/experience/latinum deltas add straight on. The ladder
-    stage persists in `species_arcs` so the mechanic replays exactly.
+    grudge has locked it. Alignment/experience deltas add straight on; a latinum delta (a
+    boon or a WP37 drain) is applied clamped at zero (no negative balance). The ladder stage
+    persists in `species_arcs` so the mechanic replays exactly.
     """
     events: list[Event] = []
     new_player = player
@@ -2031,7 +2036,9 @@ def _apply_mechanic(state: UniverseState, player: Player, species: AlienSpecies,
             new_player, alignment=new_player.alignment + result.alignment_delta,
             experience=new_player.experience + result.experience_delta)
     if result.latinum_delta:
-        new_player = replace(new_player, latinum=new_player.latinum + result.latinum_delta)
+        # A drain (a trojan payload, an extortion, a broker's price) can exceed the purse:
+        # clamp at zero so the no-negative-balance invariant holds (they take all you have).
+        new_player = replace(new_player, latinum=max(0, new_player.latinum + result.latinum_delta))
     return new_player, tuple(events)
 
 

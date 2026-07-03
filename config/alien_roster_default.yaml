@@ -175,7 +175,7 @@ species:
     memory_model: normal
     betrayal_model: recoverable
     befriend_price: [prove]
-    signature_mechanic: { hook: reprogram_unlock, params: { item: philanthropy_circuit, target_species: helot, new_posture: open } }
+    signature_mechanic: { hook: reprogram_unlock, params: { item: philanthropy_circuit, target_species: helot, new_posture: open, unlock_experience: 12 } }
     pack: { behavior: family_group }
     fleet: [scout_marauder]
     starbase_policy: homeworld
@@ -225,7 +225,7 @@ species:
     memory_model: normal
     betrayal_model: recoverable
     befriend_price: [prove]
-    signature_mechanic: { hook: coordinate_broker, params: { reward: habitable_world } }
+    signature_mechanic: { hook: coordinate_broker, params: { reward: habitable_world, extort_latinum: 220 } }
     pack: { behavior: solo }
     fleet: []
     starbase_policy: homeworld
@@ -275,7 +275,7 @@ species:
     memory_model: normal
     betrayal_model: recoverable
     befriend_price: [obey]
-    signature_mechanic: { hook: reprogram_unlock, params: { item: philanthropy_circuit, source_species: vesk, new_posture: open, side_effect: alliance_disables } }
+    signature_mechanic: { hook: reprogram_unlock, params: { item: philanthropy_circuit, source_species: vesk, new_posture: open, side_effect: alliance_disables, unlock_experience: 12 } }
     pack: { behavior: escorted, escort: [scout_marauder] }
     fleet: [battleship]
     starbase_policy: territorial
@@ -326,7 +326,7 @@ species:
     memory_model: normal
     betrayal_model: recoverable
     befriend_price: [pay]
-    signature_mechanic: { hook: coordinate_broker, params: { reward: components } }
+    signature_mechanic: { hook: coordinate_broker, params: { reward: components, extort_latinum: 280 } }
     pack: { behavior: swarm }
     fleet: [missile_frigate]
     starbase_policy: nomadic_holding
@@ -378,7 +378,7 @@ species:
     memory_model: normal
     betrayal_model: recoverable
     befriend_price: [pay]
-    signature_mechanic: { hook: passage_broker, params: { offer: time_jump, price: home_base } }
+    signature_mechanic: { hook: passage_broker, params: { offer: time_jump, price: home_base, price_latinum: 240 } }
     pack: { behavior: solo }
     fleet: [scout_marauder]
     starbase_policy: secret
@@ -643,7 +643,7 @@ species:
     memory_model: never_forgets
     betrayal_model: permanent
     befriend_price: [obey, pay, purge]
-    signature_mechanic: { hook: escalating_demand, params: { demand_ladder: [donate, destroy_target, surrender_base], fail_consequence: permanent_hatred } }
+    signature_mechanic: { hook: escalating_demand, params: { demand_ladder: [donate, destroy_target, surrender_base], fail_consequence: permanent_hatred, step_attitude: 0.05, satisfied_attitude: 0.3, satisfied_experience: 20 } }
     pack: { behavior: escorted, escort: [battleship] }
     fleet: [imperial_starship]
     starbase_policy: territorial
@@ -742,7 +742,7 @@ species:
     memory_model: normal
     betrayal_model: recoverable
     befriend_price: [serve, purge]
-    signature_mechanic: { hook: trojan_gift, params: { trigger: accept_gift, delay: 1, effect: bomb, removable_by: stardock } }
+    signature_mechanic: { hook: trojan_gift, params: { trigger: accept_gift, delay: 1, effect: bomb, removable_by: stardock, gift_latinum: 200, payload_latinum: 320, removal_cost: 140 } }
     pack: { behavior: escorted, escort: [missile_frigate] }
     fleet: [imperial_starship]
     starbase_policy: territorial
