@@ -590,3 +590,22 @@ ship_classes:
         keystone: accelerator
         base_components: [accelerator]
         legal_components: [accelerator]
+
+  # Orbital starbase (§4.2): an immobile set-piece emplacement. Its live subsystems are
+  # generated from `starbase.subsystems`; these flat scalars are the class stats the
+  # WP40 assault foe scales by surviving-component integrity. Never sold (price 0).
+  - id: orbital_platform
+    name: Orbital Platform
+    role: starbase
+    holds_total: 0
+    turns_per_warp: 1
+    shields_max: 250
+    warp_speed: 0
+    combat_speed: 0
+    cloak_rating: 0
+    sensor_rating: 3
+    hull_max: 400
+    colonist_capacity: 0
+    price: 0
+    armament: [turret_array]        # all-round emplacement — no arc to slip (§10)
+    defenses: [{ type: armour, value: 4 }, { type: screens, value: 3 }]

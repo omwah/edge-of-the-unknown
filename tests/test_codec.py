@@ -46,6 +46,9 @@ from edge.core.events import (
     SalvageCollected,
     ShipDestroyed,
     ShipPurchased,
+    StarbaseClaimed,
+    StarbaseRazed,
+    StarbaseRepaired,
     StarbaseSalvaged,
     StockRegenerated,
     Traded,
@@ -55,6 +58,7 @@ from edge.core.events import (
 from edge.core.rules import (
     AcceptLead,
     AdvanceAdmission,
+    AssaultStarbase,
     BarterArtifact,
     BuyAlienTech,
     BuyComponent,
@@ -62,6 +66,7 @@ from edge.core.rules import (
     BuyMissiles,
     BuyShip,
     Cannibalize,
+    ClaimStarbase,
     Colonize,
     CombatAction,
     Command,
@@ -79,6 +84,7 @@ from edge.core.rules import (
     JoinGame,
     RecruitColonists,
     RepairAtDock,
+    RepairStarbase,
     ResignAlliance,
     Salvage,
     SetAllocation,
@@ -129,6 +135,9 @@ COMMANDS: list[Command] = [
     AdvanceAdmission(alliance_id=3, task="pay"), # WP38 complete an admission task
     JoinAlliance(alliance_id=3),                 # WP38 join a bloc
     ResignAlliance(),                            # WP38 leave the current bloc
+    AssaultStarbase(starbase_id=2),              # WP40 begin a set-piece assault
+    RepairStarbase(2, Subsystem.FUSION_REACTOR, 0, Component.CONVERTER, ComponentTier.I),  # WP40
+    ClaimStarbase(starbase_id=2),                # WP40 claim a repaired base
     CombatAction(action="fight"),                # WP25 one combat round
     CombatAction(action="flee"),
     CombatAction(action="field_patch", subsystem=Subsystem.SCREENS, slot_index=1),
@@ -185,6 +194,10 @@ EVENTS: list[Event] = [
     AllianceJoined(1, 3, None),                         # WP38 joined a bloc (was unaligned)
     AllianceJoined(1, 3, 1),                            # WP38 switched blocs
     AllianceResigned(1, 3),                             # WP38 left a bloc
+    StarbaseRazed(1, 2, 5, 55, "alliance", 3, 750),     # WP40 razed a bloc base
+    StarbaseRazed(1, 2, 5, 55, "none", None, 750),      # WP40 razed an unowned base
+    StarbaseRepaired(1, 2, "fusion_reactor", 0, "converter", "I"),  # WP40 refill a slot
+    StarbaseClaimed(1, 2, 2000),                        # WP40 claimed a base
     DevApplied(1, "[dev] set latinum=1000000"),  # dev cheat audit marker
 ]
 

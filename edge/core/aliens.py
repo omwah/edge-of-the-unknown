@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from dataclasses import replace
 
 from edge.core.config import AliensConfig, AllianceConfig, RosterConfig, SpeciesConfig
-from edge.core.models import AlienSpecies, Grudge, Player, UniverseState
+from edge.core.models import AlienSpecies, Grudge, Player, Starbase, UniverseState
 
 HOSTILE = "hostile"
 NEUTRAL = "neutral"
@@ -306,6 +306,22 @@ def governor_hostile(state: UniverseState, player: Player) -> bool:
     if gov is None or player.alliance_id == gov:
         return False
     return alliance_standing(player, gov) < 0.0
+
+
+def base_owner_hostile(state: UniverseState, base: Starbase, player: Player) -> bool:
+    """Whether an operational base's owner treats the player as an enemy (§4.2, WP40).
+
+    A base defends its planetary system against entrants hostile to its owner. A base
+    owned by the Core governor engages a governor-hostile player; a base owned by any
+    other bloc engages a player at negative standing with that bloc. Unowned and
+    player-owned bases never engage the player.
+    """
+    owner = base.owner
+    if owner.kind == "alliance" and owner.ref is not None:
+        if owner.ref == state.game.core_governing_alliance_id:
+            return governor_hostile(state, player)
+        return alliance_standing(player, owner.ref) < 0.0
+    return False
 
 
 def may_occupy(

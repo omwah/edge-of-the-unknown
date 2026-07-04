@@ -73,6 +73,9 @@ from edge.core.events import (
     SalvageCollected,
     ShipDestroyed,
     ShipPurchased,
+    StarbaseClaimed,
+    StarbaseRazed,
+    StarbaseRepaired,
     StarbaseSalvaged,
     TurnsReset,
     Traded,
@@ -1380,6 +1383,12 @@ def format_event(event: Event) -> str:
         return "[green]⚑ You have sworn to a new banner. Old friends may now be foes.[/]"
     if isinstance(event, AllianceResigned):
         return "[yellow]⚑ You renounce your banner — old enmities cool.[/]"
+    if isinstance(event, StarbaseRazed):
+        return f"[red]☄ The starbase is razed — its world lies open (bounty {event.bounty}).[/]"
+    if isinstance(event, StarbaseRepaired):
+        return f"[green]⚙ Base repaired: {event.subsystem} slot {event.slot_index} refilled.[/]"
+    if isinstance(event, StarbaseClaimed):
+        return "[green]⚑ The base is yours — a forward foothold on the frontier.[/]"
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 
@@ -1398,7 +1407,7 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
         return event.to_sector
     if isinstance(event, (EncounterStarted, EncounterEvaded)):
         return event.sector_id
-    if isinstance(event, (ShipDestroyed, CoreLawNotice)):
+    if isinstance(event, (ShipDestroyed, CoreLawNotice, StarbaseRazed)):
         return event.sector_id
     if isinstance(event, (CombatRound, EncounterEnded, ComponentKnockedOut,
                           SalvageCollected, GrudgeFormed)):

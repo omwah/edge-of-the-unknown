@@ -22,6 +22,7 @@ from typing import assert_never
 from edge import dialogue
 from edge.core import combat, encounters
 from edge.core import mechanics
+from edge.core import starbases
 from edge.core.aliens import (
     FRIENDLY as FRIENDLY_BAND,
     HOSTILE as HOSTILE_BAND,
@@ -107,6 +108,9 @@ from edge.core.events import (
     ShipDestroyed,
     ShipPurchased,
     SiteExplored,
+    StarbaseClaimed,
+    StarbaseRazed,
+    StarbaseRepaired,
     StarbaseSalvaged,
     Traded,
     Warped,
@@ -129,6 +133,7 @@ from edge.core.models import (
     Ship,
     Starbase,
     SubsystemState,
+    UNOWNED,
     UniverseState,
 )
 from edge.core.movement import MovementError, can_warp, shortest_path
@@ -467,6 +472,46 @@ class ResignAlliance:
     """
 
 
+@dataclass(frozen=True, slots=True)
+class AssaultStarbase:
+    """Attack an operational starbase in the current sector (§4.2, §10 — WP40).
+
+    Opens a set-piece encounter against the base (one immobile emplacement). Victory
+    razes it — flipping the world toward unowned/claimable, souring its owner bloc, and
+    paying a bounty. A derelict base cannot be assaulted (salvage/repair it instead).
+    """
+
+    starbase_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class RepairStarbase:
+    """Install a loose component from the hold into a base's subsystem slot (§4.2, WP40).
+
+    Refills a derelict base slot-by-slot (the same rules as an engine-room install):
+    restoring the reactor keystone makes the base operational, the precondition for
+    claiming it into a forward foothold.
+    """
+
+    starbase_id: int
+    subsystem: Subsystem
+    slot_index: int
+    component: Component
+    tier: ComponentTier
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimStarbase:
+    """Claim an operational, unowned base as a player foothold (§4.2, WP40).
+
+    Costs `starbase.claim_cost` latinum; the base must be operational and unowned and sit
+    in the player's sector. Sets ownership to the player (a forward foothold — services
+    are Phase 5).
+    """
+
+    starbase_id: int
+
+
 Command = (
     JoinGame
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
@@ -477,6 +522,7 @@ Command = (
     | CombatAction | BuyMissiles
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
     | AdvanceAdmission | JoinAlliance | ResignAlliance
+    | AssaultStarbase | RepairStarbase | ClaimStarbase
     | DevPatch  # dev/testing cheat (core.dev); recorded in the log like any command
 )
 
@@ -593,6 +639,12 @@ def reduce(
             return _join_alliance(state, player_id, command, config)
         case ResignAlliance():
             return _resign_alliance(state, player_id, command, config)
+        case AssaultStarbase():
+            return _assault_starbase(state, player_id, command, config)
+        case RepairStarbase():
+            return _repair_starbase(state, player_id, command, config)
+        case ClaimStarbase():
+            return _claim_starbase(state, player_id, command, config)
         case DevPatch():
             return apply_dev_patch(state, player_id, command, config)
         case _ as unreachable:
@@ -793,6 +845,13 @@ def _roll_encounter(
     the returned player carries the advanced recency ring. Draws from `state.rng`
     inside the reducer (H4), so a journey replays exactly.
     """
+    # A hostile operational base defends its system on sight (§4.2, WP40) — deterministic,
+    # checked before the ship-encounter roll so it never perturbs the RNG draw order (H4).
+    base_enc = encounters.roll_base_defense(state, player, ship, sector_id, config)
+    if base_enc is not None:
+        band = state.sectors[sector_id].distance_band
+        started = EncounterStarted(player.id, 0, sector_id, True, len(base_enc.foes), band)
+        return player, base_enc, True, (started,)
     roll = encounters.roll_encounter(state, player, ship, sector_id, config, state.rng)
     if roll is None:
         return player, None, False, ()
@@ -1470,10 +1529,16 @@ def _combat_action(
             new_player, active_encounter=replace(result.encounter, speech_context=beat))
         new_player, spoke = _combat_speak(state, new_player, species, beat, config, enc_facts)
         events.append(spoke)
+    razed_bases: tuple[Starbase, ...] = ()
+    razed_planets: tuple[Planet, ...] = ()
     if result.outcome == combat.VICTORY:
         new_ship, salvage = _combat_salvage(player_id, enc, new_ship, config, state.rng)
         new_player = replace(new_player, latinum=new_player.latinum + salvage.latinum)
         events.append(salvage)
+        if enc.starbase_id is not None:
+            new_player, razed_bases, razed_planets, raze_events = _raze_starbase(
+                state, new_player, enc.starbase_id, config)
+            events.extend(raze_events)
     elif result.outcome == combat.DESTROYED:
         # Hull 0 (§10, WP26): ship, cargo, and stores are lost; the escape pod —
         # a real config hull — is issued in place, and the pod limps home.
@@ -1494,7 +1559,8 @@ def _combat_action(
                 species=species.roster_id, outcome=result.outcome,
                 day=state.game.day_number))
         events.append(EncounterEnded(player_id, enc.species_id, result.outcome))
-    return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,))
+    return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,),
+                        starbases=razed_bases, planets=razed_planets)
 
 
 def _escape_pod(wreck: Ship, config: GameConfig) -> Ship:
@@ -1544,6 +1610,138 @@ def _combat_salvage(
                 free -= 1
     new_ship = replace(ship, components=components) if parts else ship
     return new_ship, SalvageCollected(player_id, latinum, tuple(parts))
+
+
+# --- starbases: assault, raze, repair, claim (§4.2, §10 — WP40) -------------
+
+
+def _starbase_here(state: UniverseState, ship: Ship, starbase_id: int) -> Starbase:
+    base = state.starbases.get(starbase_id)
+    if base is None or base.sector_id != ship.sector_id:
+        raise CombatError("no such starbase here")
+    return base
+
+
+def _raze_starbase(
+    state: UniverseState, player: Player, starbase_id: int, config: GameConfig,
+) -> tuple[Player, tuple[Starbase, ...], tuple[Planet, ...], tuple[Event, ...]]:
+    """Raze a defeated base (§4.2, §10 — WP40): derelict it, free its world, sour its bloc.
+
+    The base is stripped of its reactor keystone (so it reads derelict — repairable and
+    claimable), its host world drops to unowned if the bloc owned it, and the owning
+    alliance is soured to hostile standing (the WP38/WP39 fallout). Pays a bounty +
+    experience. Contract-kill/admission credit for a *named* razing is a documented seam
+    (the WP37 `contract_kill` hook is registry-complete but not yet corpus-wired).
+    """
+    base = state.starbases[starbase_id]
+    sbcfg = config.starbase
+    assert sbcfg is not None
+    subsystems = dict(base.subsystems)
+    reactor = subsystems.get(Subsystem.FUSION_REACTOR)
+    if reactor is not None and reactor.keystone_index is not None:
+        slots = list(reactor.slots)
+        slots[reactor.keystone_index] = None  # the minimal break that derelicts it (§4.2)
+        subsystems[Subsystem.FUSION_REACTOR] = replace(reactor, slots=tuple(slots))
+    former = base.owner
+    new_base = replace(base, owner=UNOWNED, subsystems=subsystems)
+    razed_planets: tuple[Planet, ...] = ()
+    planet = state.planets.get(base.planet_id)
+    if planet is not None and planet.owner == former and former.kind == "alliance":
+        razed_planets = (replace(planet, owner=UNOWNED),)  # the frontier reward: claimable land
+    new_player = player
+    if former.kind == "alliance" and former.ref is not None:
+        standing = {**new_player.alliance_standing, former.ref: -1.0}
+        new_player = replace(new_player, alliance_standing=standing)
+    new_player = replace(
+        new_player,
+        latinum=new_player.latinum + sbcfg.raze_bounty,
+        experience=new_player.experience + sbcfg.raze_experience,
+    )
+    events: tuple[Event, ...] = (StarbaseRazed(
+        player.id, starbase_id, base.planet_id, base.sector_id,
+        former.kind, former.ref, sbcfg.raze_bounty),)
+    return new_player, (new_base,), razed_planets, events
+
+
+def _assault_starbase(
+    state: UniverseState, player_id: int, cmd: AssaultStarbase, config: GameConfig
+) -> ReduceResult:
+    """Open a set-piece assault on an operational base in the sector (§4.2, §10 — WP40)."""
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    ship = _ship(state, player)
+    base = _starbase_here(state, ship, cmd.starbase_id)
+    if not is_operational(base):
+        raise CombatError("that base is derelict — salvage or repair it, not assault it")
+    foe = starbases.assault_foe(base, config)
+    enc = Encounter(
+        species_id=0, sector_id=ship.sector_id, foes=(foe,), round=0,
+        player_shields=ship.shields, detected=True,
+        speech_context="combat_open", starbase_id=base.id,
+    )
+    new_player = replace(player, active_encounter=enc, contact_session=None)
+    band = state.sectors[ship.sector_id].distance_band
+    return ReduceResult(
+        events=(EncounterStarted(player_id, 0, ship.sector_id, True, 1, band),),
+        players=(new_player,),
+    )
+
+
+def _repair_starbase(
+    state: UniverseState, player_id: int, cmd: RepairStarbase, config: GameConfig
+) -> ReduceResult:
+    """Install a loose hold component into a base slot (§4.2, WP40) — refilling a derelict."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    base = state.starbases.get(cmd.starbase_id)
+    if base is None or base.sector_id != ship.sector_id:
+        raise EngineRoomError("no such starbase here")
+    sub_state = base.subsystems.get(cmd.subsystem)
+    if sub_state is None:
+        raise EngineRoomError("that base has no such subsystem")
+    if not 0 <= cmd.slot_index < len(sub_state.slots):
+        raise EngineRoomError("no such slot")
+    if sub_state.slots[cmd.slot_index] is not None:
+        raise EngineRoomError("slot is occupied")
+    key = (cmd.component, cmd.tier)
+    if ship.components.get(key, 0) < 1:
+        raise EngineRoomError("you do not carry that component")
+    slots = list(sub_state.slots)
+    slots[cmd.slot_index] = InstalledComponent(cmd.component, cmd.tier)
+    subsystems = dict(base.subsystems)
+    subsystems[cmd.subsystem] = replace(sub_state, slots=tuple(slots))
+    new_base = replace(base, subsystems=subsystems)
+    new_ship = replace(ship, components=_inv_take(ship.components, key))
+    return ReduceResult(
+        events=(StarbaseRepaired(player_id, cmd.starbase_id, cmd.subsystem.value,
+                                 cmd.slot_index, cmd.component.value, cmd.tier.name),),
+        ships=(new_ship,), starbases=(new_base,),
+    )
+
+
+def _claim_starbase(
+    state: UniverseState, player_id: int, cmd: ClaimStarbase, config: GameConfig
+) -> ReduceResult:
+    """Claim an operational, unowned base as a player foothold (§4.2, WP40)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    base = state.starbases.get(cmd.starbase_id)
+    if base is None or base.sector_id != ship.sector_id:
+        raise EconomyError("no such starbase here")
+    if base.owner.is_owned:
+        raise EconomyError("that base already has an owner")
+    if not is_operational(base):
+        raise EconomyError("repair the base's reactor before claiming it")
+    assert config.starbase is not None
+    cost = config.starbase.claim_cost
+    if player.latinum < cost:
+        raise EconomyError("insufficient latinum to claim the base")
+    new_base = replace(base, owner=Ownership("player", player_id))
+    new_player = replace(player, latinum=player.latinum - cost)
+    return ReduceResult(
+        events=(StarbaseClaimed(player_id, cmd.starbase_id, cost),),
+        players=(new_player,), starbases=(new_base,),
+    )
 
 
 def _buy_missiles(

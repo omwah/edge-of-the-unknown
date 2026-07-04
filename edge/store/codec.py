@@ -49,6 +49,9 @@ from edge.core.events import (
     ShipDestroyed,
     ShipPurchased,
     SiteExplored,
+    StarbaseClaimed,
+    StarbaseRazed,
+    StarbaseRepaired,
     StarbaseSalvaged,
     StockRegenerated,
     Traded,
@@ -59,6 +62,7 @@ from edge.core.dev import DevPatch
 from edge.core.rules import (
     AcceptLead,
     AdvanceAdmission,
+    AssaultStarbase,
     BarterArtifact,
     BuyAlienTech,
     BuyComponent,
@@ -66,6 +70,7 @@ from edge.core.rules import (
     BuyMissiles,
     BuyShip,
     Cannibalize,
+    ClaimStarbase,
     Colonize,
     CombatAction,
     Command,
@@ -84,6 +89,7 @@ from edge.core.rules import (
     RecruitColonists,
     ResignAlliance,
     RepairAtDock,
+    RepairStarbase,
     Salvage,
     SetAllocation,
     SwapComponent,
@@ -191,6 +197,16 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "JoinAlliance", {"alliance_id": command.alliance_id}
         case ResignAlliance():
             return "ResignAlliance", {}
+        case AssaultStarbase():
+            return "AssaultStarbase", {"starbase_id": command.starbase_id}
+        case RepairStarbase():
+            return "RepairStarbase", {
+                "starbase_id": command.starbase_id,
+                "subsystem": command.subsystem.value, "slot_index": command.slot_index,
+                "component": command.component.value, "tier": command.tier.name,
+            }
+        case ClaimStarbase():
+            return "ClaimStarbase", {"starbase_id": command.starbase_id}
         case DevPatch():
             return "DevPatch", {
                 "op": command.op, "target": command.target, "value": command.value,
@@ -297,6 +313,16 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return JoinAlliance(alliance_id=payload["alliance_id"])
         case "ResignAlliance":
             return ResignAlliance()
+        case "AssaultStarbase":
+            return AssaultStarbase(starbase_id=payload["starbase_id"])
+        case "RepairStarbase":
+            return RepairStarbase(
+                starbase_id=payload["starbase_id"],
+                subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
+                component=Component(payload["component"]), tier=ComponentTier[payload["tier"]],
+            )
+        case "ClaimStarbase":
+            return ClaimStarbase(starbase_id=payload["starbase_id"])
         case "DevPatch":
             return DevPatch(
                 op=payload["op"], target=payload["target"], value=payload["value"],
@@ -497,6 +523,24 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "AllianceResigned", {
                 "player_id": event.player_id, "former_alliance_id": event.former_alliance_id,
             }
+        case StarbaseRazed():
+            return "StarbaseRazed", {
+                "player_id": event.player_id, "starbase_id": event.starbase_id,
+                "planet_id": event.planet_id, "sector_id": event.sector_id,
+                "former_owner_kind": event.former_owner_kind,
+                "former_owner_ref": event.former_owner_ref, "bounty": event.bounty,
+            }
+        case StarbaseRepaired():
+            return "StarbaseRepaired", {
+                "player_id": event.player_id, "starbase_id": event.starbase_id,
+                "subsystem": event.subsystem, "slot_index": event.slot_index,
+                "component": event.component, "tier": event.tier,
+            }
+        case StarbaseClaimed():
+            return "StarbaseClaimed", {
+                "player_id": event.player_id, "starbase_id": event.starbase_id,
+                "cost": event.cost,
+            }
         case DevApplied():
             return "DevApplied", {"player_id": event.player_id, "detail": event.detail}
         case _:
@@ -618,6 +662,17 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                                   payload["former_alliance_id"])
         case "AllianceResigned":
             return AllianceResigned(payload["player_id"], payload["former_alliance_id"])
+        case "StarbaseRazed":
+            return StarbaseRazed(payload["player_id"], payload["starbase_id"],
+                                 payload["planet_id"], payload["sector_id"],
+                                 payload["former_owner_kind"], payload["former_owner_ref"],
+                                 payload["bounty"])
+        case "StarbaseRepaired":
+            return StarbaseRepaired(payload["player_id"], payload["starbase_id"],
+                                    payload["subsystem"], payload["slot_index"],
+                                    payload["component"], payload["tier"])
+        case "StarbaseClaimed":
+            return StarbaseClaimed(payload["player_id"], payload["starbase_id"], payload["cost"])
         case "DevApplied":
             return DevApplied(payload["player_id"], payload["detail"])
         case _:

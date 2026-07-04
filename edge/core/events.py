@@ -436,3 +436,41 @@ class AllianceResigned(Event):
 
     player_id: int
     former_alliance_id: int
+
+
+@dataclass(frozen=True)
+class StarbaseRazed(Event):
+    """A starbase was razed in a set-piece assault (§4.2, §10 — WP40).
+
+    The base is derelicted and its world freed; `former_owner_kind`/`ref` name the bloc
+    (or player) that lost it, `bounty` the latinum paid for the razing.
+    """
+
+    player_id: int
+    starbase_id: int
+    planet_id: int
+    sector_id: int
+    former_owner_kind: str
+    former_owner_ref: int | None
+    bounty: int
+
+
+@dataclass(frozen=True)
+class StarbaseRepaired(Event):
+    """A loose component was installed into a base slot, refilling a derelict (§4.2, WP40)."""
+
+    player_id: int
+    starbase_id: int
+    subsystem: str
+    slot_index: int
+    component: str
+    tier: str
+
+
+@dataclass(frozen=True)
+class StarbaseClaimed(Event):
+    """A repaired, unowned base was claimed as a player foothold (§4.2, WP40)."""
+
+    player_id: int
+    starbase_id: int
+    cost: int

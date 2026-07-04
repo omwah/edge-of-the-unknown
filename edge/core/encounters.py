@@ -23,9 +23,11 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
+from edge.core import starbases
 from edge.core.aliens import (
     FRIENDLY,
     alliance_standing_shift,
+    base_owner_hostile,
     disposition_band,
     effective_disposition,
     governor_hostile,
@@ -33,7 +35,15 @@ from edge.core.aliens import (
 )
 from edge.core.config import GameConfig, PackConfig, SpeciesConfig
 from edge.core.discovery import sector_has_nebula
-from edge.core.models import AlienSpecies, Encounter, EncounterFoe, Player, Ship, UniverseState
+from edge.core.models import (
+    AlienSpecies,
+    Encounter,
+    EncounterFoe,
+    Player,
+    Ship,
+    Starbase,
+    UniverseState,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +153,39 @@ def roll_encounter(
             pack = replace(pack, speech_context=opener)
             return EncounterRoll(species=species, detected=True, hostile=True, encounter=pack)
     return EncounterRoll(species=species, detected=True, hostile=False)
+
+
+def hostile_base_in_sector(
+    state: UniverseState, player: Player, sector_id: int
+) -> Starbase | None:
+    """An operational base in `sector_id` that engages the player (§4.2, WP40)."""
+    for _, base in sorted(state.starbases.items()):
+        if base.sector_id != sector_id:
+            continue
+        if starbases.is_operational(base) and base_owner_hostile(state, base, player):
+            return base
+    return None
+
+
+def roll_base_defense(
+    state: UniverseState, player: Player, ship: Ship, sector_id: int, config: GameConfig,
+) -> Encounter | None:
+    """An operational base defends its system against a hostile entrant (§4.2, §10 — WP40).
+
+    Deterministic (no RNG): whether a base engages is a pure function of ownership and
+    the player's standing, so the command-stream draw order is untouched. The base is a
+    single immobile emplacement; `species_id` is 0 (no pack speaks) and `starbase_id`
+    marks the assault so a victory razes it.
+    """
+    base = hostile_base_in_sector(state, player, sector_id)
+    if base is None:
+        return None
+    foe = starbases.assault_foe(base, config)
+    return Encounter(
+        species_id=0, sector_id=sector_id, foes=(foe,), round=0,
+        player_shields=ship.shields, detected=True,
+        speech_context="combat_open", starbase_id=base.id,
+    )
 
 
 def _governing_defender(
