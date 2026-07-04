@@ -136,6 +136,15 @@ def _expansive_bands() -> list[DistanceBand]:
     ]
 
 
+def _planar_bands() -> list[DistanceBand]:
+    return [
+        DistanceBand(name="Hub", min_hops=0, max_hops=5),
+        DistanceBand(name="Frontier", min_hops=6, max_hops=12),
+        DistanceBand(name="Deep", min_hops=13, max_hops=20),
+        DistanceBand(name="Void", min_hops=21, max_hops=9_999),
+    ]
+
+
 class BandSet(BaseModel):
     """Distance-band hop windows keyed by `topology_mode` (DESIGN §5 step 5).
 
@@ -150,14 +159,20 @@ class BandSet(BaseModel):
 
     trunk: list[DistanceBand] = Field(default_factory=_trunk_bands)
     expansive: list[DistanceBand] = Field(default_factory=_expansive_bands)
+    planar: list[DistanceBand] = Field(default_factory=_planar_bands)
 
     @model_validator(mode="after")
     def _check_names_match(self) -> BandSet:
         names = [b.name for b in self.trunk]
         exp = [b.name for b in self.expansive]
+        pla = [b.name for b in self.planar]
         if exp != names:
             raise ValueError(
                 f"bands.expansive names {exp} must match bands.trunk {names}"
+            )
+        if pla != names:
+            raise ValueError(
+                f"bands.planar names {pla} must match bands.trunk {names}"
             )
         return self
 
@@ -174,7 +189,8 @@ class BigBangConfig(BaseModel):
     # band-lattice web: each group bridges to same-ring peers plus ≥2 inner
     # bridges, so every ring is a widening lattice with no single-bridge
     # chokepoint. The default stays `trunk`; the flip rides the WP22 config epoch.
-    topology_mode: Literal["trunk", "expansive"] = "trunk"
+    topology_mode: Literal["trunk", "expansive", "planar"] = "trunk"
+    planar_strict_bands: bool = True
     cluster_min: int = 5
     cluster_max: int = 25
     intra_group_degree: float = 2.5
@@ -212,6 +228,8 @@ class BigBangConfig(BaseModel):
         """The distance bands for the configured `topology_mode` (§5 step 5)."""
         if self.topology_mode == "expansive":
             return self.bands.expansive
+        if self.topology_mode == "planar":
+            return self.bands.planar
         return self.bands.trunk
 
 

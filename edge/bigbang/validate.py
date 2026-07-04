@@ -38,6 +38,8 @@ def validate(state: UniverseState, config: GameConfig) -> None:
     _check_relations(state, config)
     if config.bigbang.topology_mode == "expansive":
         _check_expansive_no_chokepoint(state)
+    elif config.bigbang.topology_mode == "planar" and config.bigbang.planar_strict_bands:
+        _check_planar_invariants(state)
 
 
 def _check_expansive_no_chokepoint(state: UniverseState) -> None:
@@ -360,3 +362,17 @@ def _check_profitable_pair(state: UniverseState, config: GameConfig) -> None:
             if a.id != b.id and _best_roundtrip_margin(a, b, config) > 0:
                 return
     raise ValidationError("no profitable opposed-class port pair within 5 hops of the Core")
+
+
+def _check_planar_invariants(state: UniverseState) -> None:
+    """Ensure that for planar topology, no cluster (region) contains sectors from different bands."""
+    for rid, region in state.regions.items():
+        bands = {
+            sector.distance_band
+            for sector in state.sectors.values()
+            if sector.region_id == rid
+        }
+        if len(bands) > 1:
+            raise ValidationError(
+                f"Region {region.name} (ID {rid}) spans multiple bands: {list(bands)}"
+            )
