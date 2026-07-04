@@ -10,6 +10,7 @@ bands (default hostility 0.35 / amity 0.65, §6).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 
 from edge.core.config import AliensConfig, AllianceConfig, RosterConfig, SpeciesConfig
@@ -138,6 +139,78 @@ def disposition_band(value: float, config: AliensConfig) -> str:
 def is_friendly(value: float, config: AliensConfig) -> bool:
     """Whether a disposition value sits in the friendly (amity) band."""
     return value >= config.amity_threshold
+
+
+# --- Inter-species relations & spillover (DESIGN §6.4, WP39) ----------------
+
+
+def species_relation(
+    roster: RosterConfig, a_id: str, b_id: str, config: AliensConfig
+) -> float:
+    """`a`'s stance toward `b` on a −1..1 scale (§6.4) — asymmetric, alliance-derived.
+
+    A species' own kind is 1.0. An explicit roster `relations` override on `a` wins
+    (clamped, one-directional). Otherwise the default is alliance-derived: bloc-mates
+    warm to `relation_ally_default`, members of a (symmetric) rival bloc chill to
+    `relation_rival_default`, everyone else is neutral (0.0).
+    """
+    if a_id == b_id:
+        return 1.0
+    a = roster.species_by_id(a_id)
+    if a is None:
+        return 0.0
+    if b_id in a.relations:
+        return max(-1.0, min(1.0, a.relations[b_id]))
+    b = roster.species_by_id(b_id)
+    if a.alliance_id is None or b is None or b.alliance_id is None:
+        return 0.0
+    if a.alliance_id == b.alliance_id:
+        return config.relation_ally_default
+    if b.alliance_id in _rivals_of(roster, a.alliance_id):
+        return config.relation_rival_default
+    return 0.0
+
+
+def apply_spillover(
+    player: Player, subject_id: str, delta: float,
+    roster: RosterConfig, config: AliensConfig,
+) -> Mapping[str, float]:
+    """Reputation spillover from a `delta` attitude change toward `subject_id` (§6.4).
+
+    Returns the new `species_attitudes` map: each species Y with a strong-enough
+    relation from the subject is nudged by `delta × spillover_fraction × relation(subject→Y)`
+    — helping the subject warms its friends and chills its enemies (and harming does the
+    reverse). The subject itself is untouched (its own change is applied by the caller),
+    and a species under a permanent grudge lock is skipped (§6.5). Pure.
+    """
+    if delta == 0.0:
+        return player.species_attitudes
+    attitudes = dict(player.species_attitudes)
+    for other in roster.species:
+        if other.id == subject_id or attitude_locked(player, other.id):
+            continue
+        rel = species_relation(roster, subject_id, other.id, config)
+        if abs(rel) < config.spillover_threshold:
+            continue
+        nudged = attitudes.get(other.id, 0.0) + delta * config.spillover_fraction * rel
+        attitudes[other.id] = round(max(-1.0, min(1.0, nudged)), 6)
+    return attitudes
+
+
+def npc_stance(
+    state: UniverseState, roster: RosterConfig, a_id: str, b_id: str, config: AliensConfig
+) -> float:
+    """`a`'s live stance toward `b` (§6.4) — the relation matrix minus any active grudge.
+
+    The seeded inter-species grudges (`UniverseState.grudges`, WP27) deepen enmity beyond
+    the static relation: an active grudge `a`-holds-against-`b` subtracts its severity.
+    Consumed by NPC-vs-NPC movement/behaviour policies (WP42) and same-sector conduct.
+    """
+    stance = species_relation(roster, a_id, b_id, config)
+    for grudge in state.grudges.values():
+        if grudge.holder == a_id and grudge.target == b_id:
+            stance -= grudge.severity
+    return max(-1.0, min(1.0, stance))
 
 
 # --- Alliances (DESIGN §6.3, WP38) ------------------------------------------

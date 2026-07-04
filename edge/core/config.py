@@ -515,6 +515,19 @@ class AliensConfig(BaseModel):
     # is criminal and the governor's patrols take notice on Core entry.
     criminal_alignment: int = -10
 
+    # Inter-species relations + reputation spillover (§6.4, WP39). The relation matrix is
+    # alliance-derived by default — bloc-mates default to `relation_ally_default`, members
+    # of a (symmetric) rival bloc to `relation_rival_default` — with the roster's sparse
+    # `relations` overrides winning per ordered pair (so the matrix is asymmetric).
+    # Spillover: a change of `delta` in the player's attitude toward X nudges attitude with
+    # each species Y in proportion to X's relation toward Y (`delta × spillover_fraction ×
+    # relation`), for relations of at least `spillover_threshold` magnitude — helping X
+    # warms X's friends and chills X's enemies (harming X does the reverse).
+    relation_ally_default: float = 0.5
+    relation_rival_default: float = -0.5
+    spillover_fraction: float = Field(default=0.25, ge=0.0, le=1.0)
+    spillover_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
+
     # Alien ship drift (WP16, §6.3): each species rolls `drift_move_chance` per firing
     # to warp to a uniformly-chosen legal adjacent sector. A quiet galaxy is chance 0
     # or `drift_enabled=False`. The cron cadence lives in `ticker.crons.alien_drift`.

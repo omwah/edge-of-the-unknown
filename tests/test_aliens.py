@@ -23,13 +23,16 @@ from edge.core.aliens import (
     FRIENDLY,
     HOSTILE,
     NEUTRAL,
+    apply_spillover,
     attitude_locked,
     disposition_band,
     effective_disposition,
     grudge_shift,
     is_friendly,
     may_occupy,
+    npc_stance,
     sour_attitude,
+    species_relation,
 )
 from edge.core.config import GameConfig, RosterConfig
 from edge.core.enums import PortClass
@@ -633,3 +636,92 @@ def test_singular_entity_spawns_in_a_deep_band(seed: int) -> None:
     entity = next(sp for sp in state.species.values()
                   if sp.roster_id == "concordance")
     assert state.sectors[entity.sector_id].distance_band in {"Deep", "Void"}
+
+
+# --- WP39: inter-species relations, spillover, NPC-vs-NPC (§6.4) ------------------
+
+def test_species_relation_alliance_derived_defaults() -> None:
+    roster, al = CFG.roster, CFG.aliens
+    # Bloc-mates (both Federation) default to the ally value, both ways.
+    assert species_relation(roster, "terran", "centaurian", al) == al.relation_ally_default
+    assert species_relation(roster, "centaurian", "terran", al) == al.relation_ally_default
+    # Federation rivals the Liberty Front (id 4) → its members chill to the rival default.
+    assert species_relation(roster, "terran", "thessbrood", al) == al.relation_rival_default
+    # An unaligned raider has no alliance-derived stance.
+    assert species_relation(roster, "vesk", "terran", al) == 0.0
+    # A species is fully aligned with its own kind.
+    assert species_relation(roster, "terran", "terran", al) == 1.0
+
+
+def test_species_relation_override_wins_and_is_asymmetric() -> None:
+    roster, al = CFG.roster, CFG.aliens
+    # Authored overrides (quill/vennrith) beat any alliance default, and disagree by direction.
+    assert species_relation(roster, "vennrith", "quill", al) == -0.8
+    assert species_relation(roster, "quill", "vennrith", al) == -0.5
+
+
+def test_spillover_warms_friends_and_chills_enemies() -> None:
+    roster, al = CFG.roster, CFG.aliens
+    player = _player()
+    # Helping vennrith (delta +0.4): its bloc-mates warm, its authored enemies chill.
+    updated = apply_spillover(player, "vennrith", 0.4, roster, al)
+    frac = al.spillover_fraction
+    assert updated["quill"] == pytest.approx(0.4 * frac * -0.8)      # enemy → chilled
+    assert updated["helot"] == pytest.approx(0.4 * frac * al.relation_ally_default)  # bloc-mate → warmed
+    assert "vennrith" not in updated  # the subject itself is untouched here
+
+
+def test_spillover_reverses_sign_on_harm() -> None:
+    roster, al = CFG.roster, CFG.aliens
+    # Harming vennrith (delta −0.4): its enemies warm instead.
+    updated = apply_spillover(_player(), "vennrith", -0.4, roster, al)
+    assert updated["quill"] == pytest.approx(-0.4 * al.spillover_fraction * -0.8)  # > 0
+    assert updated["quill"] > 0.0
+
+
+def test_spillover_skips_permanently_grudged_species() -> None:
+    roster, al = CFG.roster, CFG.aliens
+    locked = Grudge(holder="quill", target="player", cause="x", severity=0.9,
+                    created_day=1, duration_days=-1)
+    player = _player().__class__(id=1, name="P", ship_id=1, latinum=0,
+                                 grudges={"quill": locked})
+    updated = apply_spillover(player, "vennrith", 0.4, roster, al)
+    assert "quill" not in updated  # a permanent grudge locks the offset (§6.5)
+
+
+def test_npc_stance_subtracts_active_grudge() -> None:
+    roster, al = CFG.roster, CFG.aliens
+    state = UniverseState.new(Game(id=1, seed=1, config_version=CFG.config_version,
+                                   created_at="1970-01-01T00:00:00Z"))
+    base = species_relation(roster, "vennrith", "quill", al)  # -0.8 authored
+    assert npc_stance(state, roster, "vennrith", "quill", al) == pytest.approx(base)
+    state.grudges[1] = Grudge(holder="vennrith", target="quill", cause="raid",
+                              severity=0.15, created_day=1, duration_days=30)
+    assert npc_stance(state, roster, "vennrith", "quill", al) == pytest.approx(
+        max(-1.0, base - 0.15))
+
+
+def test_check_relations_rejects_mutual_intra_bloc_enmity() -> None:
+    from edge.bigbang.validate import ValidationError, _check_relations
+    roster = RosterConfig.model_validate(_roster_mapping(
+        alliances=[{"id": 1, "name": "Fed"}],
+        species=[
+            {"id": "a", "name": "A", "archetype_id": "x", "disposition_center": 0.8,
+             "alliance_id": 1, "relations": {"b": -0.4}},
+            {"id": "b", "name": "B", "archetype_id": "y", "disposition_center": 0.8,
+             "alliance_id": 1, "relations": {"a": -0.4}},
+        ],
+    ))
+    cfg = CFG.model_copy(update={"roster": roster})
+    state = UniverseState.new(Game(id=1, seed=1, config_version=CFG.config_version,
+                                   created_at="1970-01-01T00:00:00Z"))
+    state.species[1] = AlienSpecies(
+        id=1, roster_id="a", name="A", archetype_id="x", sector_id=1, home_band="Hub",
+        tech_level=1, base_disposition=0.8, disposition_center=0.8, disposition_variance=0.0,
+        alliance_id=1)
+    state.species[2] = AlienSpecies(
+        id=2, roster_id="b", name="B", archetype_id="y", sector_id=2, home_band="Hub",
+        tech_level=1, base_disposition=0.8, disposition_center=0.8, disposition_variance=0.0,
+        alliance_id=1)
+    with pytest.raises(ValidationError, match="mutually hostile"):
+        _check_relations(state, cfg)
