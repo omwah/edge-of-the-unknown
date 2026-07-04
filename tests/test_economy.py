@@ -282,3 +282,60 @@ def test_regen_moves_toward_desired_and_stays_in_bounds(
     desired = 500
     # The new stock is no further from desired than the old (moves toward it).
     assert abs(new - desired) <= abs(stock - desired)
+
+
+# --- WP43: NPC-trader goods conservation ------------------------------------
+
+
+def _npc_state(port: Port, sp: object) -> object:
+    """A minimal universe holding one port + one merchant, for `npc.plan_trade`."""
+    from edge.core.models import Game, UniverseState
+
+    state = UniverseState.new(Game(1, 1, 1, "t"))
+    state.ports = {port.id: port}
+    state.species = {sp.id: sp}  # type: ignore[attr-defined]
+    return state
+
+
+@given(
+    sell_stock=st.integers(0, 1000), sell_base=st.floats(1.0, 50.0), sell_delta=st.floats(0.0, 50.0),
+    buy_stock=st.integers(0, 1000), buy_base=st.floats(1.0, 50.0), buy_delta=st.floats(0.0, 50.0),
+    cash=st.integers(0, 100_000), held=st.integers(0, 500),
+)
+@settings(max_examples=300)
+def test_npc_trade_conserves_goods(
+    sell_stock: int, sell_base: float, sell_delta: float,
+    buy_stock: int, buy_base: float, buy_delta: float, cash: int, held: int,
+) -> None:
+    """An NPC trade moves goods between port and merchant without minting or losing any —
+    the §8 conservation invariant, now for the WP43 trader path (`core.npc.plan_trade`)."""
+    from edge.config import load_default_config
+    from edge.core import npc
+    from edge.core.models import AlienSpecies
+
+    config = load_default_config()
+    port = Port(id=1, sector_id=2, name="Mkt", klass=PortClass.CLASS_1, size=1, commodities=(
+        PortCommodity(Commodity.FUEL_ORE, PortMode.SELL, sell_stock, 1000, sell_base, sell_delta),
+        PortCommodity(Commodity.ORGANICS, PortMode.BUY, buy_stock, 1000, buy_base, buy_delta),
+    ))
+    sp = AlienSpecies(
+        id=1, roster_id="selvani", name="S", archetype_id="a", sector_id=2,
+        home_band="Frontier", tech_level=5, base_disposition=0.5,
+        disposition_center=0.5, disposition_variance=0.05,
+        cash=cash, cargo={Commodity.ORGANICS: held} if held else {})
+    state = _npc_state(port, sp)
+
+    trade = npc.plan_trade(state, sp, config)  # type: ignore[arg-type]
+    if trade is None:
+        return
+    old_line = port.line(trade.commodity)
+    new_line = trade.port.line(trade.commodity)
+    assert old_line is not None and new_line is not None
+    old_qty = sp.cargo.get(trade.commodity, 0)
+    new_qty = trade.species.cargo.get(trade.commodity, 0)
+    # Goods conserved: what leaves the port enters the hold (and vice versa).
+    assert old_line.stock + old_qty == new_line.stock + new_qty
+    # Invariants: purse never negative; port stock stays within its capacity.
+    assert trade.species.cash >= 0
+    assert 0 <= new_line.stock <= new_line.capacity
+    assert trade.units > 0

@@ -16,23 +16,27 @@ from edge.config import load_default_config
 from edge.core import npc
 from edge.core.aliens import may_occupy
 from edge.core.config import GameConfig
-from edge.core.enums import PortClass
+from edge.core.enums import Commodity, PortClass, PortMode
 from edge.core.models import (
     AlienSpecies,
     Game,
     Grudge,
     Player,
     Port,
+    PortCommodity,
     Sector,
     Ship,
     UniverseState,
 )
 from edge.core.rules import apply_result
 from edge.engine import cron
-from edge.engine.cron import accrue_interest, alien_drift, daily_turn_reset, regenerate_ports
+from edge.engine.cron import (
+    accrue_interest, alien_drift, daily_turn_reset, regenerate_ports, trader_step,
+)
 from edge.engine.ticker import EngineTicker
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
+from edge.store.snapshots import state_hash
 
 
 def _with_drift(config: GameConfig, chance: float) -> GameConfig:
@@ -328,3 +332,112 @@ def test_policy_drift_is_reproducible() -> None:
     r1 = alien_drift(state, cfg)
     r2 = alien_drift(state, cfg)  # pure — same firing, identical outcome
     assert {(s.id, s.sector_id) for s in r1.species} == {(s.id, s.sector_id) for s in r2.species}
+
+
+# --- WP43: NPC traders moving real goods ---
+
+# Port at sector 2 of a 1-2-3 chain: sells fuel_ore cheap (full stock ⇒ a real deal) and
+# buys organics (empty ⇒ room to absorb). Prices resolve through the §8 formula.
+_FUEL_DEAL = PortCommodity(Commodity.FUEL_ORE, PortMode.SELL, stock=1000, capacity=1000,
+                           base=11.0, delta=5.0)   # quoted 6 < 0.95×11 ⇒ a deal
+_ORG_BUY = PortCommodity(Commodity.ORGANICS, PortMode.BUY, stock=0, capacity=1000,
+                         base=5.0, delta=2.0)
+
+
+def _trader_world(*, player_sector: int | None = None) -> UniverseState:
+    """A 1-2-3 Frontier chain with a trading port at sector 2 (optionally a player there)."""
+    state = UniverseState.new(Game(1, 7, 1, "t", core_governing_alliance_id=1))
+    for i in range(1, 4):
+        outs = tuple(j for j in (i - 1, i + 1) if 1 <= j <= 3)
+        state.sectors[i] = Sector(i, 1, outs, "Frontier")
+    state.rebuild_adjacency()
+    state.ports[1] = Port(id=1, sector_id=2, name="Depot", klass=PortClass.CLASS_1, size=1,
+                          commodities=(_FUEL_DEAL, _ORG_BUY))
+    if player_sector is not None:
+        state.ships[1] = Ship(id=1, type_id="t", name="P", owner_player_id=1,
+                              sector_id=player_sector, holds_total=10)
+        state.players[1] = Player(id=1, name="P", ship_id=1, latinum=0)
+    return state
+
+
+def _selvani(sector: int, *, cash: int = 0, cargo: dict[Commodity, int] | None = None,
+             base_disposition: float = 0.4) -> AlienSpecies:
+    """A `selvani` merchant (movement_policy trade_seek in the default roster ⇒ a trader)."""
+    return AlienSpecies(
+        id=1, roster_id="selvani", name="Selvani", archetype_id="a", sector_id=sector,
+        home_band="Frontier", tech_level=5, base_disposition=base_disposition,
+        disposition_center=base_disposition, disposition_variance=0.05,
+        cash=cash, cargo=cargo or {})
+
+
+def test_trader_seeds_purse_and_buys_a_deal() -> None:
+    state = _trader_world()
+    state.species = {1: _selvani(sector=2)}  # fresh: cash 0, empty hold
+    result = trader_step(state, CFG42)
+    (sp,) = result.species
+    assert sp.cargo == {Commodity.FUEL_ORE: 20}     # bought a 20-unit stack of the deal
+    assert sp.cash == CFG42.aliens.trader_start_cash - 20 * 6  # seeded, then paid 6/unit
+    (port,) = result.ports
+    assert port.line(Commodity.FUEL_ORE).stock == 1000 - 20  # goods left the port
+
+
+def test_trader_dumps_held_cargo_before_buying() -> None:
+    state = _trader_world()
+    state.species = {1: _selvani(sector=2, cash=5000, cargo={Commodity.ORGANICS: 30})}
+    result = trader_step(state, CFG42)
+    (sp,) = result.species
+    assert sp.cargo == {Commodity.ORGANICS: 10}     # sold 20 of the 30 held (per-step cap)
+    assert sp.cash == 5000 + 20 * 7                 # organics buy price 5 + 2×(1-0) = 7
+    (port,) = result.ports
+    assert port.line(Commodity.ORGANICS).stock == 20  # absorbed into the port
+
+
+def test_non_trader_species_never_trades() -> None:
+    state = _trader_world()
+    state.species = {1: _sp_rid("unknown_species", sector=2)}  # wander ⇒ not a trader
+    result = trader_step(state, CFG42)
+    assert result.species == () and result.ports == ()
+
+
+def test_trader_leaves_a_portless_sector_alone() -> None:
+    state = _trader_world()
+    state.species = {1: _selvani(sector=1)}  # no port here
+    result = trader_step(state, CFG42)
+    assert result.species == () and result.ports == ()  # nothing to trade, not even a seed churn
+
+
+def test_trading_alongside_a_merchant_warms_the_player() -> None:
+    state = _trader_world(player_sector=2)  # player shares the market
+    state.species = {1: _selvani(sector=2)}
+    result = trader_step(state, CFG42)
+    (player,) = result.players
+    assert player.species_attitudes["selvani"] == CFG42.aliens.trader_alongside_attitude
+    assert any(getattr(e, "species_id", None) == 1 for e in result.events)  # AttitudeChanged
+
+
+def test_a_distant_player_is_not_warmed() -> None:
+    state = _trader_world(player_sector=1)  # player elsewhere
+    state.species = {1: _selvani(sector=2)}
+    result = trader_step(state, CFG42)
+    assert result.players == ()  # rapport needs co-location
+
+
+def test_trader_step_is_reproducible() -> None:
+    state = _trader_world()
+    state.species = {1: _selvani(sector=2)}
+    r1 = trader_step(state, CFG42)  # pure — does not mutate state
+    r2 = trader_step(state, CFG42)
+    assert [(s.id, s.cash, dict(s.cargo)) for s in r1.species] \
+        == [(s.id, s.cash, dict(s.cargo)) for s in r2.species]
+
+
+def test_ticked_trading_reproduces_to_an_identical_hash() -> None:
+    """A run of ticked trades (the WP12 rail) is deterministic — the same firings from the
+    same start reach the identical `state_hash`, so a reload replays trading exactly."""
+    def run() -> str:
+        state = _trader_world(player_sector=2)
+        state.species = {1: _selvani(sector=2)}
+        for _ in range(4):  # buy, then keep working the market
+            apply_result(state, trader_step(state, CFG42))
+        return state_hash(state)
+    assert run() == run()
