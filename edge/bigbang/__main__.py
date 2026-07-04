@@ -21,8 +21,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=None, help="override the config seed")
     parser.add_argument("--sectors", type=int, default=None, help="override sector_count")
     parser.add_argument(
-        "--mode", choices=("trunk", "expansive"), default=None,
-        help="override topology_mode (trunk chokepoints | expansive band-lattice, §5)",
+        "--mode", choices=("trunk", "expansive", "planar"), default=None,
+        help="override topology_mode (trunk chokepoints | expansive band-lattice | planar spiderweb, §5)",
     )
     parser.add_argument("--inspect", action="store_true", help="print a universe report")
     parser.add_argument(

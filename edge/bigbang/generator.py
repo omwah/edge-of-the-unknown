@@ -80,6 +80,165 @@ def _connect_group(out: OutEdges, group: list[int], cfg: BigBangConfig, rng: ran
         attempts += 1
 
 
+def _connect_group_planar(out: OutEdges, group: list[int], cfg: BigBangConfig, rng: random.Random) -> None:
+    """Wire one group internally as a planar outer-planar graph with zero crossings."""
+    cap = cfg.max_warps_per_sector
+    k = len(group)
+    if k < 2:
+        return
+    if k == 2:
+        add_bidirectional(out, group[0], group[1], cap)
+        return
+
+    # 1. Connect the outer cycle (always planar)
+    order = group[:]
+    rng.shuffle(order)
+    for idx in range(k):
+        add_bidirectional(out, order[idx], order[(idx + 1) % k], cap)
+
+    # 2. Add non-crossing internal chords to satisfy the target intra-group degree
+    target_edges = int(cfg.intra_group_degree * k / 2)
+    current = k
+    attempts = 0
+    chords: list[tuple[int, int]] = []  # indices into order, u < v
+
+    def crosses(u: int, v: int) -> bool:
+        for x, y in chords:
+            if u < x < v < y or x < u < y < v:
+                return True
+        return False
+
+    while current < target_edges and attempts < target_edges * 8:
+        attempts += 1
+        u, v = sorted(rng.sample(range(k), 2))
+        if v == u + 1 or (u == 0 and v == k - 1):
+            continue
+        if not crosses(u, v):
+            if add_bidirectional(out, order[u], order[v], cap):
+                chords.append((u, v))
+                current += 1
+
+
+def _bridge_groups_planar(out: OutEdges, groups: list[list[int]], cfg: BigBangConfig, rng: random.Random) -> None:
+    """`planar` bridging: connects clusters using a planar spiderweb meta-graph
+    without letting sectors in a cluster span multiple distance bands.
+    
+    1. Stratify the clusters into concentric rings (Ring 0 is the Core).
+    2. Assign each cluster in a ring a nominal angle around the Core.
+    3. Connect Ring R clusters to their closest angular neighbor in Ring R-1 (radial spokes)
+       first, using single-band validation to ensure all sectors of the outer cluster
+       fall into the same distance band.
+    4. Connect adjacent clusters within the same ring to form cycle ring roads.
+    """
+    cap = cfg.max_warps_per_sector
+    if len(groups) < 2:
+        return
+
+    active_bands = cfg.active_bands()
+
+    def get_band(d: int) -> str:
+        for b in active_bands:
+            if b.min_hops <= d <= b.max_hops:
+                return b.name
+        return active_bands[-1].name
+
+    def _link_with_band_check(p: int, q: int) -> bool:
+        # Check degree limits first
+        if len(out[p]) >= cap or len(out[q]) >= cap:
+            return False
+            
+        # Temporarily add the bidirectional edge
+        out[p].add(q)
+        out[q].add(p)
+        
+        # Calculate new global BFS distances
+        dists = bfs_distances(out, 1)
+        
+        # Check if any group spans bands
+        has_span_error = False
+        for g in groups:
+            g_bands = {get_band(dists[s]) for s in g if s in dists}
+            if len(g_bands) > 1:
+                has_span_error = True
+                break
+                
+        if has_span_error:
+            # Revert the edge
+            out[p].remove(q)
+            out[q].remove(p)
+            return False
+            
+        # Keep the edge
+        return True
+
+    # Stratify outer clusters into concentric rings
+    outer_indices = list(range(1, len(groups)))
+    rng.shuffle(outer_indices)
+    
+    ring_width = max(3, math.isqrt(len(outer_indices)))
+    rings: list[list[int]] = [[0]]
+    for start in range(0, len(outer_indices), ring_width):
+        rings.append(outer_indices[start : start + ring_width])
+
+    angles: dict[int, float] = {0: 0.0}
+    for ring in rings:
+        k = len(ring)
+        if ring == rings[0]:
+            continue
+        for idx, g_idx in enumerate(ring):
+            angles[g_idx] = (idx / k) * 2 * math.pi
+
+    # Track connected sectors so we can calculate Core-relative hop distances
+    connected_sectors = set(groups[0])
+
+    def _link_clusters_planar(g1_idx: int, g2_idx: int) -> bool:
+        if g1_idx == g2_idx:
+            return False
+        g1_set = set(groups[g1_idx])
+        g2_set = set(groups[g2_idx])
+        
+        degrees_1 = {s: len(out[s] & g1_set) for s in groups[g1_idx]}
+        degrees_2 = {s: len(out[s] & g2_set) for s in groups[g2_idx]}
+        
+        sorted_1 = sorted(groups[g1_idx], key=lambda s: (degrees_1[s], len(out[s]), s))
+        sorted_2 = sorted(groups[g2_idx], key=lambda s: (degrees_2[s], len(out[s]), s))
+        
+        # Try portal pairs in ascending degree order
+        for p in sorted_1:
+            for q in sorted_2:
+                if _link_with_band_check(p, q):
+                    connected_sectors.update(g1_set)
+                    connected_sectors.update(g2_set)
+                    return True
+        return False
+
+    # 1. Radial Spokes: Connect Ring R clusters to their closest Ring R-1 cluster.
+    # We do Ring 1 first, then Ring 2, and so on. This guarantees we connect each ring
+    # to the already-connected component sequentially, preserving distance bands.
+    for r in range(1, len(rings)):
+        inner, outer = rings[r - 1], rings[r]
+        for g_outer in outer:
+            theta_outer = angles[g_outer]
+            best_inner = inner[0]
+            best_diff = 2 * math.pi
+            for g_inner in inner:
+                diff = abs(theta_outer - angles[g_inner])
+                diff = min(diff, 2 * math.pi - diff)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_inner = g_inner
+            _link_clusters_planar(g_outer, best_inner)
+
+    # 2. Ring Roads (Cycles): Wire each ring's clusters into a circle (lateral paths).
+    # Since all clusters are already connected via radial spokes, this will not affect
+    # the initial radial reachability (spanning tree depth).
+    for ring in rings:
+        k = len(ring)
+        if k >= 2:
+            for idx in range(k):
+                _link_clusters_planar(ring[idx], ring[(idx + 1) % k])
+
+
 def _bridge_groups_trunk(out: OutEdges, groups: list[list[int]], cfg: BigBangConfig, rng: random.Random) -> None:
     """`trunk` bridging (§5 step 2): a bidirectional spanning tree, then extra
     (maybe one-way) bridges. A group spanning tree rooted at the Core funnels
@@ -187,9 +346,14 @@ def build_graph(cfg: BigBangConfig, rng: random.Random) -> tuple[OutEdges, list[
     other = _cluster_groups(list(range(cfg.core_sector_count + 1, n + 1)), cfg, rng)
     groups = [core, *other]
     for group in other:
-        _connect_group(out, group, cfg, rng)
+        if cfg.topology_mode == "planar":
+            _connect_group_planar(out, group, cfg, rng)
+        else:
+            _connect_group(out, group, cfg, rng)
     if cfg.topology_mode == "expansive":
         _bridge_groups_expansive(out, groups, cfg, rng)
+    elif cfg.topology_mode == "planar":
+        _bridge_groups_planar(out, groups, cfg, rng)
     else:
         _bridge_groups_trunk(out, groups, cfg, rng)
     add_ring_motifs(out, groups, rng, cap, count=max(1, n // 50))
