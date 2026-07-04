@@ -2,7 +2,7 @@
 
 Lays every rendered sprite out on a single black contact sheet and writes it to
 SVG and/or PDF. matplotlib is imported lazily (headless ``Agg`` backend) so the
-rest of ``edge.art`` stays free of it, mirroring ``edge/bigbang/render.py``.
+rest of ``edge.art`` stays free of it.
 
 Each rich ``Text`` sprite is decomposed into coloured character cells; cells are
 drawn as monospace glyphs over per-cell background rectangles, so the vector

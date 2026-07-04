@@ -1,9 +1,10 @@
-"""CLI: `python -m edge.bigbang [--seed N] [--sectors M] [--inspect] [--render PATH]`.
+"""CLI: `python -m edge.bigbang [--seed N] [--sectors M] [--inspect] [--render DIR]`.
 
 A dev entrypoint that generates a universe from the default config and prints a
 text report (`--inspect`), lists populated items (`--list ports planets …`), plots
-a route between two sectors (`--route SRC DST`, by internal *or* spatial id), and/or
-renders the warp graph to a PNG with port sectors highlighted (`--render`, §5).
+a route between two sectors (`--route SRC DST`, by internal *or* spatial id), writes
+an interactive web topology inspector (`--render DIR`, §5), and/or dumps just the
+visualization payload as JSON (`--dump-json PATH`).
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from edge.config import load_default_config
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="edge.bigbang")
-    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=None, help="override the config seed")
     parser.add_argument("--sectors", type=int, default=None, help="override sector_count")
     parser.add_argument(
         "--mode", choices=("trunk", "expansive"), default=None,
@@ -32,7 +33,14 @@ def main() -> None:
         "--route", nargs=2, metavar=("SRC", "DST"),
         help="plot the route between two sectors (internal or spatial id; i/s prefix forces)",
     )
-    parser.add_argument("--render", metavar="PATH", default=None, help="write a graph PNG")
+    parser.add_argument(
+        "--render", metavar="DIR", default=None,
+        help="write an interactive web topology inspector (index.html + universe.json)",
+    )
+    parser.add_argument(
+        "--dump-json", metavar="PATH", default=None,
+        help="write just the visualization payload as JSON (no HTML)",
+    )
     args = parser.parse_args()
 
     config = load_default_config()
@@ -45,7 +53,9 @@ def main() -> None:
         config = config.model_copy(
             update={"bigbang": config.bigbang.model_copy(update=bigbang_overrides)}
         )
-    state = generate(config, args.seed)
+    # --seed overrides the config default; fall back to it (then 1) when omitted.
+    seed = args.seed if args.seed is not None else (config.seed if config.seed is not None else 1)
+    state = generate(config, seed)
     did_something = False
     if args.inspect:
         print(summarize(state))
@@ -53,7 +63,7 @@ def main() -> None:
     # Every id below is specific to this seed; surface it so a --list in one run and
     # a --route in another are never silently read against different universes.
     if args.list or args.route is not None:
-        print(f"# universe seed={args.seed} ({len(state.sectors)} sectors); ids are seed-specific")
+        print(f"# universe seed={seed} ({len(state.sectors)} sectors); ids are seed-specific")
     if args.list:
         categories = LIST_CATEGORIES if "all" in args.list else args.list
         for category in categories:
@@ -64,16 +74,22 @@ def main() -> None:
             print(format_route(state, args.route[0], args.route[1]))
         except ValueError as exc:
             parser.error(f"{exc} — re-run --route with the same --seed you used to --list "
-                         f"(this run is seed {args.seed})")
+                         f"(this run is seed {seed})")
+        did_something = True
+    if args.dump_json is not None:
+        from edge.bigbang.webviz import dump_json
+
+        dump_json(state, args.dump_json, config=config)
+        print(f"wrote visualization payload to {args.dump_json}")
         did_something = True
     if args.render is not None:
-        from edge.bigbang.render import render_graph
+        from edge.bigbang.webviz import render_web
 
-        render_graph(state, args.render, layout_seed=args.seed)
-        print(f"wrote graph to {args.render}")
+        index = render_web(state, args.render, config=config)
+        print(f"wrote visualization to {index}")
         did_something = True
     if not did_something:
-        print(f"generated universe seed={args.seed} sectors={len(state.sectors)}")
+        print(f"generated universe seed={seed} sectors={len(state.sectors)}")
 
 
 if __name__ == "__main__":

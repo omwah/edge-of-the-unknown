@@ -8,6 +8,7 @@ dependencies = ["opensimplex>=0.4.5.1,<0.5", "tracery>=0.1.1"]
 
 [project.scripts]
 edge = "edge.tui.app:main"
+bigbang = "edge.bigbang.__main__:main"
 edge-author-dialogue = "edge.dialogue.authoring.cli:main"
 edge-playtest-dialogue = "edge.dialogue.authoring.playtest:main"
 
@@ -34,9 +35,7 @@ textual-dev = "*"  # `textual` CLI: demo, run --dev, console, serve
 rich = "*"
 pydantic = ">=2"   # config schema + (later) public DTOs (DESIGN §15)
 pyyaml = "*"       # parse the YAML game config (DESIGN §4 config file)
-networkx = "*"     # graph layout for the bigbang --render inspector (§5)
-scipy = "*"        # networkx's sparse layout backend (spring_layout, >=500 nodes)
-matplotlib = "*"   # the bigbang --render graph dump (§5)
+matplotlib = "*"   # dev-only sprite-sheet export (edge/art/export.py)
 ruff = "*"
 mypy = "*"
 pytest = "*"
@@ -86,11 +85,11 @@ plugins = ["pydantic.mypy"]
 module = "yaml"
 ignore_missing_imports = true
 
-# networkx/matplotlib ship no type stubs and are used only by the dev-only
-# graph-render inspector (edge/bigbang/render.py), isolated behind lazy imports.
-# tracery ships no stubs either; it is used only behind edge/dialogue/render.py.
+# matplotlib ships no type stubs; it is used only by the dev-only sprite-sheet
+# export (edge/art/export.py), isolated behind lazy imports. tracery ships no stubs
+# either; it is used only behind edge/dialogue/render.py.
 [[tool.mypy.overrides]]
-module = ["networkx.*", "matplotlib.*", "tracery.*"]
+module = ["matplotlib.*", "tracery.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

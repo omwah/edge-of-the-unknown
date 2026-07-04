@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edge of the Unknown — Big Bang topology</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden;
+    background: #0b0f14; color: #cdd6e0;
+    font-family: "DejaVu Sans", "Segoe UI", system-ui, sans-serif; }
+  #stage { position: fixed; inset: 0; width: 100vw; height: 100vh;
+    cursor: grab; touch-action: none; background: radial-gradient(circle at 50% 45%, #101822, #0b0f14 70%); }
+  #stage.grabbing { cursor: grabbing; }
+
+  .overlay { position: fixed; z-index: 10; background: rgba(14,20,28,0.86);
+    border: 1px solid #26323f; border-radius: 8px;
+    backdrop-filter: blur(3px); }
+
+  #title { top: 10px; left: 50%; transform: translateX(-50%);
+    padding: 8px 18px; text-align: center; pointer-events: none; }
+  #title .t-main { font-size: 16px; font-weight: 600; letter-spacing: .3px; }
+  #title .t-sub  { font-size: 12px; color: #8695a6; margin-top: 2px; }
+
+  #controls { top: 10px; left: 10px; padding: 10px 12px; font-size: 12.5px;
+    max-width: 220px; }
+  #controls h3 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .6px; color: #8695a6; font-weight: 600; }
+  #controls label { display: flex; align-items: center; gap: 7px; margin: 5px 0;
+    cursor: pointer; }
+  #controls .btnrow { display: flex; gap: 6px; margin-top: 10px; }
+  #controls button { flex: 1; padding: 6px 8px; font-size: 12px; cursor: pointer;
+    color: #cdd6e0; background: #1a2430; border: 1px solid #2f3d4c;
+    border-radius: 5px; }
+  #controls button:hover { background: #223041; border-color: #3d5061; }
+  #controls .hint { margin-top: 8px; font-size: 11px; color: #6f7f90;
+    line-height: 1.4; }
+  #controls.edit { border-color: #b8892f; box-shadow: 0 0 0 1px #b8892f55; }
+
+  #legend { bottom: 10px; right: 10px; padding: 10px 12px; font-size: 12px;
+    max-height: 78vh; overflow: auto; }
+  #legend h3 { margin: 10px 0 5px; font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: .6px; color: #8695a6; font-weight: 600; }
+  #legend h3:first-child { margin-top: 0; }
+  #legend .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+  #legend .sym { width: 16px; text-align: center; font-size: 14px; }
+  #legend .swatch { width: 22px; height: 0; border-top-width: 3px;
+    border-top-style: solid; }
+  #legend .swatch.ring { border-radius: 50%; height: 12px; width: 12px;
+    border: 2px dotted; border-top: none; }
+  .badge { padding: 1px 6px; border-radius: 4px; background: #b8892f;
+    color: #1a1206; font-size: 10px; font-weight: 700; }
+</style>
+</head>
+<body>
+<svg id="stage" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7"
+            markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e0a060"></path>
+    </marker>
+  </defs>
+  <g id="viewport"></g>
+</svg>
+
+<div id="title" class="overlay">
+  <div class="t-main" id="title-main">Big Bang topology</div>
+  <div class="t-sub" id="title-sub"></div>
+</div>
+
+<div id="controls" class="overlay">
+  <h3>View</h3>
+  <label><input type="checkbox" id="tg-id"> Show internal ids</label>
+  <label><input type="checkbox" id="tg-core" checked> Core outline</label>
+  <label><input type="checkbox" id="tg-cluster" checked> Cluster outlines</label>
+  <label><input type="checkbox" id="tg-band" checked> Band rings</label>
+  <label><input type="checkbox" id="tg-edit"> <b>Edit edges</b></label>
+  <div class="btnrow">
+    <button id="btn-save">Save edits</button>
+    <button id="btn-reset">Reset layout</button>
+  </div>
+  <div class="hint" id="edit-hint"></div>
+</div>
+
+<div id="legend" class="overlay"></div>
+
+<script>
+"use strict";
+const UNIVERSE = "__UNIVERSE_DATA__";
+
+// ---- symbol + colour vocabulary (mirrored in the legend) --------------------
+const PORT_SYMS = {
+  STARDOCK: { g: "★", c: "#ffd54f", t: "StarDock" },
+  PORT:     { g: "◆", c: "#c792ea", t: "Trade port" },
+};
+const PLANET_SYMS = {
+  owned: { g: "●", c: "#66d38a", t: "Planet (owned)" },
+  none:  { g: "○", c: "#9fb0a6", t: "Planet (unowned)" },
+};
+const DISC_SYMS = {
+  NEBULA:       { g: "≋", c: "#7fd1ff", t: "Nebula" },
+  BLACK_HOLE:   { g: "◉", c: "#b28bff", t: "Black hole" },
+  WORMHOLE:     { g: "◎", c: "#7fd1ff", t: "Wormhole (one-way anchor)" },
+  WRECK:        { g: "✕", c: "#ff9e64", t: "Shipwreck" },
+  ENTITY:       { g: "Ψ", c: "#ff6b9d", t: "The Entity" },
+  RUINS:        { g: "⌂", c: "#e0af68", t: "Ruins" },
+  ARTIFACT:     { g: "❖", c: "#e0af68", t: "Artifact" },
+  ANCIENT_TECH: { g: "✧", c: "#e0af68", t: "Ancient tech" },
+  CRASHED_SHIP: { g: "⌖", c: "#ff9e64", t: "Crashed ship" },
+};
+const SPECIES_SYM = { g: "⬢", c: "#89ddff" };
+const BAND_COLORS = { Hub: "#4fc3f7", Frontier: "#81c784", Deep: "#ba68c8", Void: "#ff8a65" };
+const BAND_FALLBACK = "#8899aa";
+const bandColor = (b) => BAND_COLORS[b] || BAND_FALLBACK;
+
+const CORE_COLOR = "#ffd54f";
+const EDGE_TWO = "#5a6b7a";
+const EDGE_ONE = "#e0a060";
+const SELECT = "#ffd54f";
+
+const NODE_R = 20;
+const SVGNS = "http://www.w3.org/2000/svg";
+
+// ---- tiny SVG helper --------------------------------------------------------
+function el(tag, attrs) {
+  const node = document.createElementNS(SVGNS, tag);
+  if (attrs) for (const k in attrs) node.setAttribute(k, attrs[k]);
+  return node;
+}
+
+// ---- state ------------------------------------------------------------------
+const svg = document.getElementById("stage");
+const viewport = document.getElementById("viewport");
+const sectors = UNIVERSE.sectors;
+const meta = UNIVERSE.meta;
+const byId = new Map(sectors.map((s) => [s.id, s]));
+
+let nodePos = new Map();   // id -> {x,y} in world coords (mutated by drag)
+let basePos = new Map();   // pristine copy for "reset layout"
+let scale = 1;
+let center = { x: 0, y: 0 };  // ring centre = Core anchor world pos
+
+let currentEdges = UNIVERSE.edges.map((e) => ({ a: e.a, b: e.b, one_way: e.one_way }));
+const baseEdges = UNIVERSE.edges.map((e) => ({ a: e.a, b: e.b, one_way: e.one_way }));
+
+const T = { k: 1, tx: 0, ty: 0 };
+let editMode = false, idMode = "spatial";
+let pendingNode = null, selectedEdge = null;
+
+// layer groups (bottom -> top)
+const gBands = el("g"), gClusters = el("g"), gCore = el("g"), gEdges = el("g"), gNodes = el("g");
+viewport.append(gBands, gClusters, gCore, gEdges, gNodes);
+
+// ---- layout -----------------------------------------------------------------
+function median(arr) {
+  if (!arr.length) return 1;
+  const s = arr.slice().sort((a, b) => a - b);
+  return s[s.length >> 1] || 1;
+}
+function buildLayout() {
+  const lens = [];
+  for (const e of currentEdges) {
+    const a = byId.get(e.a), b = byId.get(e.b);
+    if (a && b) lens.push(Math.hypot(a.x - b.x, a.y - b.y));
+  }
+  const med = median(lens.filter((v) => v > 0));
+  scale = med > 0 ? 110 / med : 60;
+  nodePos = new Map();
+  basePos = new Map();
+  for (const s of sectors) {
+    const p = { x: s.x * scale, y: s.y * scale };
+    nodePos.set(s.id, p);
+    basePos.set(s.id, { x: p.x, y: p.y });
+  }
+  // ring centre: the innermost sector (Core anchor, embedding origin)
+  let anchor = sectors[0];
+  for (const s of sectors) if (s.core_hops < anchor.core_hops) anchor = s;
+  const ap = nodePos.get(anchor.id);
+  center = { x: ap.x, y: ap.y };
+}
+
+function fitView() {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of nodePos.values()) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  const w = Math.max(maxX - minX, 1), h = Math.max(maxY - minY, 1);
+  const vw = svg.clientWidth, vh = svg.clientHeight;
+  T.k = Math.max(0.05, Math.min(vw * 0.86 / w, vh * 0.86 / h, 3));
+  T.tx = vw / 2 - (minX + w / 2) * T.k;
+  T.ty = vh / 2 - (minY + h / 2) * T.k;
+  applyTransform();
+}
+function applyTransform() {
+  viewport.setAttribute("transform", `translate(${T.tx},${T.ty}) scale(${T.k})`);
+}
+
+// ---- geometry for outlines --------------------------------------------------
+function convexHull(pts) {
+  if (pts.length < 3) return pts.slice();
+  const p = pts.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  const upper = [];
+  for (let i = p.length - 1; i >= 0; i--) {
+    const q = p[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  lower.pop(); upper.pop();
+  return lower.concat(upper);
+}
+function centroid(pts) {
+  let x = 0, y = 0;
+  for (const p of pts) { x += p.x; y += p.y; }
+  return { x: x / pts.length, y: y / pts.length };
+}
+function inflate(hull, pad) {
+  const c = centroid(hull);
+  return hull.map((p) => {
+    const dx = p.x - c.x, dy = p.y - c.y, d = Math.hypot(dx, dy) || 1;
+    return { x: p.x + (dx / d) * pad, y: p.y + (dy / d) * pad };
+  });
+}
+// An outline element around a set of sector ids: a rounded hull, or a circle for
+// degenerate (1-2 point) clusters.
+function outlineFor(ids, pad, stroke, dash, width) {
+  const pts = ids.map((id) => nodePos.get(id)).filter(Boolean);
+  if (!pts.length) return null;
+  const attrs = { fill: "none", stroke, "stroke-width": width, "stroke-dasharray": dash,
+    "stroke-linejoin": "round", "stroke-linecap": "round", opacity: 0.9 };
+  if (pts.length < 3) {
+    const c = centroid(pts);
+    let r = NODE_R + pad;
+    for (const p of pts) r = Math.max(r, Math.hypot(p.x - c.x, p.y - c.y) + NODE_R + pad);
+    return el("circle", Object.assign({ cx: c.x, cy: c.y, r }, attrs));
+  }
+  const hull = inflate(convexHull(pts), pad);
+  const d = "M" + hull.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L") + " Z";
+  return el("path", Object.assign({ d }, attrs));
+}
+
+// ---- draw: band rings -------------------------------------------------------
+function drawBands() {
+  gBands.textContent = "";
+  const membersByBand = new Map();
+  for (const s of sectors) {
+    if (!membersByBand.has(s.band)) membersByBand.set(s.band, []);
+    membersByBand.get(s.band).push(s.id);
+  }
+  // order rings by radius so labels don't collide; draw a dotted ring at each
+  // band's outer extent (empirical max distance from the Core anchor).
+  const rings = [];
+  for (const band of meta.bands.map((b) => b.name)) {
+    const ids = membersByBand.get(band);
+    if (!ids || !ids.length) continue;
+    let r = 0;
+    for (const id of ids) {
+      const p = nodePos.get(id);
+      r = Math.max(r, Math.hypot(p.x - center.x, p.y - center.y));
+    }
+    rings.push({ band, r: r + NODE_R + 14 });
+  }
+  rings.sort((a, b) => a.r - b.r);
+  for (const ring of rings) {
+    gBands.appendChild(el("circle", {
+      cx: center.x, cy: center.y, r: ring.r, fill: "none",
+      stroke: bandColor(ring.band), "stroke-width": 2, "stroke-dasharray": "1 7",
+      opacity: 0.75,
+    }));
+    const label = el("text", {
+      x: center.x, y: center.y - ring.r + 16, "text-anchor": "middle",
+      fill: bandColor(ring.band), "font-size": 13, "font-weight": 600, opacity: 0.85,
+    });
+    label.textContent = ring.band;
+    gBands.appendChild(label);
+  }
+}
+
+// ---- draw: cluster + core outlines ------------------------------------------
+function drawClusters() {
+  gClusters.textContent = "";
+  for (const reg of UNIVERSE.regions) {
+    const o = outlineFor(reg.sector_ids, NODE_R + 8, bandColor(reg.band), "7 5", 1.6);
+    if (o) gClusters.appendChild(o);
+  }
+}
+function drawCore() {
+  gCore.textContent = "";
+  const o = outlineFor(UNIVERSE.hub_sector_ids, NODE_R + 16, CORE_COLOR, "2 6", 2.4);
+  if (o) gCore.appendChild(o);
+}
+
+// ---- draw: edges ------------------------------------------------------------
+let edgeEls = [];
+function edgeKey(e) {
+  return e.one_way ? `o:${e.a}>${e.b}` : `t:${Math.min(e.a, e.b)}-${Math.max(e.a, e.b)}`;
+}
+function edgePath(e) {
+  const a = nodePos.get(e.a), b = nodePos.get(e.b);
+  if (!a || !b) return "";
+  let dx = b.x - a.x, dy = b.y - a.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const ux = dx / dist, uy = dy / dist;
+  const sx = a.x + ux * NODE_R, sy = a.y + uy * NODE_R;
+  const ex = b.x - ux * NODE_R, ey = b.y - uy * NODE_R;
+  const off = Math.min(dist * 0.06, 26);       // gentle bow so parallels separate
+  const cx = (sx + ex) / 2 - uy * off, cy = (sy + ey) / 2 + ux * off;
+  return `M${sx.toFixed(1)},${sy.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${ex.toFixed(1)},${ey.toFixed(1)}`;
+}
+function drawEdges() {
+  gEdges.textContent = "";
+  edgeEls = [];
+  for (const e of currentEdges) {
+    const d = edgePath(e);
+    const g = el("g", { "data-key": edgeKey(e) });
+    const hit = el("path", { d, fill: "none", stroke: "transparent", "stroke-width": 14,
+      style: "cursor:pointer" });
+    const vis = el("path", { d, fill: "none",
+      stroke: e.one_way ? EDGE_ONE : EDGE_TWO,
+      "stroke-width": 1.6, opacity: 0.85 });
+    if (e.one_way) vis.setAttribute("marker-end", "url(#arrow)");
+    g.append(hit, vis);
+    const rec = { e, g, vis };
+    g.addEventListener("click", (ev) => { ev.stopPropagation(); onEdgeClick(rec); });
+    gEdges.appendChild(g);
+    edgeEls.push(rec);
+  }
+  if (selectedEdge) {
+    const rec = edgeEls.find((r) => edgeKey(r.e) === selectedEdge);
+    if (rec) highlightEdge(rec, true); else selectedEdge = null;
+  }
+}
+function refreshIncidentEdges(id) {
+  for (const rec of edgeEls) {
+    if (rec.e.a === id || rec.e.b === id) {
+      const d = edgePath(rec.e);
+      rec.g.children[0].setAttribute("d", d);
+      rec.g.children[1].setAttribute("d", d);
+    }
+  }
+}
+
+// ---- draw: nodes ------------------------------------------------------------
+const nodeEls = new Map();  // id -> { g, idText }
+function captionTspans(s) {
+  const out = [];
+  for (const p of s.ports) {
+    const sym = p.klass === "STARDOCK" ? PORT_SYMS.STARDOCK : PORT_SYMS.PORT;
+    out.push(sym);
+  }
+  for (const pl of s.planets) out.push(pl.owner === "none" ? PLANET_SYMS.none : PLANET_SYMS.owned);
+  for (const d of s.discoveries) { const sym = DISC_SYMS[d.kind]; if (sym) out.push(sym); }
+  return out;
+}
+function idLabel(s) { return String(idMode === "internal" ? s.id : s.spatial_id); }
+function drawNodes() {
+  gNodes.textContent = "";
+  nodeEls.clear();
+  for (const s of sectors) {
+    const p = nodePos.get(s.id);
+    const g = el("g", { transform: `translate(${p.x},${p.y})`, style: "cursor:grab" });
+    g.dataset.id = s.id;
+
+    const hasDock = s.ports.some((x) => x.klass === "STARDOCK");
+    const circle = el("circle", {
+      r: NODE_R, fill: hasDock ? "#37300f" : "#141b24",
+      stroke: s.is_core ? CORE_COLOR : bandColor(s.band),
+      "stroke-width": s.is_core ? 2.2 : 1.4, opacity: 0.98,
+    });
+    g.appendChild(circle);
+
+    const idText = el("text", { y: -3, "text-anchor": "middle", fill: "#e8eef5",
+      "font-size": 11, "font-weight": 600, style: "pointer-events:none" });
+    idText.textContent = idLabel(s);
+    g.appendChild(idText);
+
+    const caption = captionTspans(s);
+    if (caption.length) {
+      const cap = el("text", { y: 12, "text-anchor": "middle", "font-size": 11,
+        style: "pointer-events:none" });
+      for (const sym of caption) {
+        const ts = el("tspan", { fill: sym.c });
+        ts.textContent = sym.g;
+        cap.appendChild(ts);
+      }
+      g.appendChild(cap);
+    }
+
+    // species badges arranged around the perimeter
+    s.species.forEach((sp, i) => {
+      const ang = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(s.species.length, 1);
+      const rx = Math.cos(ang) * (NODE_R + 9), ry = Math.sin(ang) * (NODE_R + 9);
+      const anchor = rx > 3 ? "start" : rx < -3 ? "end" : "middle";
+      const label = el("text", { x: rx, y: ry, "text-anchor": anchor,
+        "dominant-baseline": "middle", "font-size": 8.5, fill: SPECIES_SYM.c,
+        style: "pointer-events:none" });
+      label.textContent = `${SPECIES_SYM.g} ${sp.name}`;
+      g.appendChild(label);
+    });
+
+    attachNodeInteraction(g, s);
+    gNodes.appendChild(g);
+    nodeEls.set(s.id, { g, idText, circle });
+  }
+}
+
+// ---- interaction: node drag / click -----------------------------------------
+function attachNodeInteraction(g, s) {
+  let downX = 0, downY = 0, moved = false, dragging = false;
+  g.addEventListener("pointerdown", (ev) => {
+    ev.stopPropagation();
+    downX = ev.clientX; downY = ev.clientY; moved = false; dragging = true;
+    g.setPointerCapture(ev.pointerId);
+    g.style.cursor = "grabbing";
+  });
+  g.addEventListener("pointermove", (ev) => {
+    if (!dragging) return;
+    if (Math.abs(ev.clientX - downX) + Math.abs(ev.clientY - downY) > 3) moved = true;
+    if (!moved) return;
+    const p = nodePos.get(s.id);
+    p.x += (ev.movementX) / T.k;
+    p.y += (ev.movementY) / T.k;
+    g.setAttribute("transform", `translate(${p.x},${p.y})`);
+    refreshIncidentEdges(s.id);
+  });
+  g.addEventListener("pointerup", (ev) => {
+    dragging = false; g.style.cursor = "grab";
+    try { g.releasePointerCapture(ev.pointerId); } catch (_) {}
+    if (!moved) onNodeClick(s);
+  });
+}
+function onNodeClick(s) {
+  if (!editMode) return;
+  if (pendingNode === null) { pendingNode = s.id; markPending(); return; }
+  if (pendingNode === s.id) { pendingNode = null; markPending(); return; }
+  addEdge(pendingNode, s.id);
+  pendingNode = null; markPending();
+}
+function markPending() {
+  for (const [id, rec] of nodeEls) {
+    rec.circle.setAttribute("stroke", id === pendingNode ? SELECT
+      : (byId.get(id).is_core ? CORE_COLOR : bandColor(byId.get(id).band)));
+    rec.circle.setAttribute("stroke-width", id === pendingNode ? 3.4
+      : (byId.get(id).is_core ? 2.2 : 1.4));
+  }
+}
+
+// ---- edge editing -----------------------------------------------------------
+function findEdge(a, b) {
+  return currentEdges.find((e) =>
+    (e.a === a && e.b === b) || (e.a === b && e.b === a));
+}
+function addEdge(a, b) {
+  const existing = findEdge(a, b);
+  if (!existing) { currentEdges.push({ a, b, one_way: true }); drawEdges(); return; }
+  if (existing.one_way && !(existing.a === a && existing.b === b)) {
+    existing.one_way = false;  // reverse of a one-way -> now two-way
+    drawEdges();
+  }
+  // same-direction one-way or already two-way: nothing to add
+}
+function onEdgeClick(rec) {
+  if (!editMode) return;
+  const key = edgeKey(rec.e);
+  if (selectedEdge === key) {                       // second click -> remove
+    currentEdges = currentEdges.filter((e) => edgeKey(e) !== key);
+    selectedEdge = null;
+    drawEdges();
+    return;
+  }
+  if (selectedEdge) {                               // clear previous selection
+    const prev = edgeEls.find((r) => edgeKey(r.e) === selectedEdge);
+    if (prev) highlightEdge(prev, false);
+  }
+  selectedEdge = key;
+  highlightEdge(rec, true);
+}
+function highlightEdge(rec, on) {
+  rec.vis.setAttribute("stroke", on ? SELECT : (rec.e.one_way ? EDGE_ONE : EDGE_TWO));
+  rec.vis.setAttribute("stroke-width", on ? 3 : 1.6);
+  rec.vis.setAttribute("opacity", on ? 1 : 0.85);
+}
+
+// ---- save edits -------------------------------------------------------------
+function saveEdits() {
+  const baseKeys = new Set(baseEdges.map(edgeKey));
+  const curKeys = new Set(currentEdges.map(edgeKey));
+  const added = currentEdges.filter((e) => !baseKeys.has(edgeKey(e))).map((e) => [e.a, e.b]);
+  const removed = baseEdges.filter((e) => !curKeys.has(edgeKey(e))).map((e) => [e.a, e.b]);
+  const payload = {
+    seed: meta.seed, topology_mode: meta.topology_mode, sector_count: meta.sector_count,
+    base_edges: baseEdges.map((e) => [e.a, e.b, e.one_way]),
+    current_edges: currentEdges.map((e) => [e.a, e.b, e.one_way]),
+    added, removed,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `edits_${meta.topology_mode}_seed${meta.seed}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ---- pan / zoom -------------------------------------------------------------
+function initPanZoom() {
+  svg.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const r = svg.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const nk = Math.max(0.05, Math.min(8, T.k * Math.exp(-e.deltaY * 0.0015)));
+    T.tx = mx - (mx - T.tx) * (nk / T.k);
+    T.ty = my - (my - T.ty) * (nk / T.k);
+    T.k = nk;
+    applyTransform();
+  }, { passive: false });
+
+  let panning = false, px = 0, py = 0;
+  // Nodes stop propagation on pointerdown, so this only fires on empty space,
+  // outlines, and edges — all of which should pan when dragged.
+  svg.addEventListener("pointerdown", (e) => {
+    panning = true; px = e.clientX; py = e.clientY;
+    svg.classList.add("grabbing");
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (!panning) return;
+    T.tx += e.clientX - px; T.ty += e.clientY - py;
+    px = e.clientX; py = e.clientY;
+    applyTransform();
+  });
+  window.addEventListener("pointerup", () => { panning = false; svg.classList.remove("grabbing"); });
+}
+
+// ---- toggles / controls -----------------------------------------------------
+function initControls() {
+  document.getElementById("tg-id").addEventListener("change", (e) => {
+    idMode = e.target.checked ? "internal" : "spatial";
+    for (const [id, rec] of nodeEls) rec.idText.textContent = idLabel(byId.get(id));
+  });
+  const bind = (cbId, group) =>
+    document.getElementById(cbId).addEventListener("change", (e) => {
+      group.style.display = e.target.checked ? "" : "none";
+    });
+  bind("tg-core", gCore); bind("tg-cluster", gClusters); bind("tg-band", gBands);
+
+  document.getElementById("tg-edit").addEventListener("change", (e) => {
+    editMode = e.target.checked;
+    document.getElementById("controls").classList.toggle("edit", editMode);
+    if (!editMode) {
+      pendingNode = null; markPending();
+      if (selectedEdge) {
+        const rec = edgeEls.find((r) => edgeKey(r.e) === selectedEdge);
+        if (rec) highlightEdge(rec, false);
+        selectedEdge = null;
+      }
+    }
+    updateHint();
+  });
+  document.getElementById("btn-save").addEventListener("click", saveEdits);
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    for (const [id, p] of basePos) { const n = nodePos.get(id); n.x = p.x; n.y = p.y; }
+    drawNodes(); drawEdges();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    pendingNode = null; markPending();
+    if (selectedEdge) {
+      const rec = edgeEls.find((r) => edgeKey(r.e) === selectedEdge);
+      if (rec) highlightEdge(rec, false);
+      selectedEdge = null;
+    }
+  });
+  updateHint();
+}
+function updateHint() {
+  document.getElementById("edit-hint").innerHTML = editMode
+    ? "Click two nodes to add a directed warp. Click an edge, then click it again to delete. Esc clears."
+    : "Drag nodes to declutter. Scroll to zoom, drag background to pan.";
+}
+
+// ---- legend -----------------------------------------------------------------
+function legendRow(sym, text) {
+  return `<div class="row"><span class="sym" style="color:${sym.c}">${sym.g}</span><span>${text}</span></div>`;
+}
+function buildLegend() {
+  let h = "<h3>Ports</h3>";
+  h += legendRow(PORT_SYMS.STARDOCK, PORT_SYMS.STARDOCK.t);
+  h += legendRow(PORT_SYMS.PORT, PORT_SYMS.PORT.t);
+  h += "<h3>Planets</h3>";
+  h += legendRow(PLANET_SYMS.owned, PLANET_SYMS.owned.t);
+  h += legendRow(PLANET_SYMS.none, PLANET_SYMS.none.t);
+  h += "<h3>Discoveries</h3>";
+  for (const k in DISC_SYMS) h += legendRow(DISC_SYMS[k], DISC_SYMS[k].t);
+  h += "<h3>Species</h3>";
+  h += legendRow(SPECIES_SYM, "Alien species (with name)");
+  h += "<h3>Outlines</h3>";
+  h += `<div class="row"><span class="swatch" style="border-top-style:dotted;border-color:${CORE_COLOR}"></span><span>Core Space (sectors 1&ndash;${meta.core_sector_count})</span></div>`;
+  h += `<div class="row"><span class="swatch" style="border-top-style:dashed;border-color:${BAND_FALLBACK}"></span><span>Cluster (colour = its band)</span></div>`;
+  h += `<div class="row"><span class="swatch" style="border-top-style:dotted;border-color:${BAND_FALLBACK}"></span><span>Band ring (dotted)</span></div>`;
+  h += "<h3>Bands</h3>";
+  for (const b of meta.bands) {
+    h += `<div class="row"><span class="swatch ring" style="border-color:${bandColor(b.name)}"></span><span>${b.name}</span></div>`;
+  }
+  h += "<h3>Warps</h3>";
+  h += `<div class="row"><span class="swatch" style="border-color:${EDGE_TWO}"></span><span>Two-way warp</span></div>`;
+  h += `<div class="row"><span class="swatch" style="border-color:${EDGE_ONE}"></span><span>One-way warp (arrow)</span></div>`;
+  document.getElementById("legend").innerHTML = h;
+}
+
+// ---- boot -------------------------------------------------------------------
+function buildTitle() {
+  document.getElementById("title-main").textContent =
+    `${meta.topology_mode} topology · seed ${meta.seed}`;
+  document.getElementById("title-sub").textContent =
+    `${meta.sector_count} sectors · ${UNIVERSE.regions.length} clusters · ${currentEdges.length} warps`;
+  document.title = `Big Bang — ${meta.topology_mode} · seed ${meta.seed}`;
+}
+function boot() {
+  buildLayout();
+  drawBands(); drawClusters(); drawCore(); drawEdges(); drawNodes();
+  buildTitle(); buildLegend(); initPanZoom(); initControls();
+  fitView();
+  window.addEventListener("resize", applyTransform);
+}
+boot();
+</script>
+</body>
+</html>
