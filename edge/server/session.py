@@ -621,15 +621,17 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
 def map_view(
     state: UniverseState, player_id: int, *,
     route_dest: int | None = None, full_graph: bool = False,
-    config: GameConfig | None = None,
+    config: GameConfig | None = None, fit_width: int | None = None,
 ) -> dto.LocalMapDTO:
     """The local sector ego-graph centered on the player (§10, §11, Map tab).
 
     A node-and-edge graph of the surrounding sectors in gravity columns, baked to
     Rich-markup rows by `mapgraph`. Reach is `config.ui.local_map_radius` (falling
-    back to the module default when no config is supplied). When `route_dest` is
-    given, the plotted course is overlaid (same explored/full-graph gating as
-    `route_view` — `full_graph` honours a coordinate lead only from its origin, §6.7).
+    back to the module default when no config is supplied), unless `fit_width` is
+    given — the Map tab's available character width — in which case the reach is grown
+    to show as many sectors as fit that width. When `route_dest` is given, the plotted
+    course is overlaid (same explored/full-graph gating as `route_view` — `full_graph`
+    honours a coordinate lead only from its origin, §6.7).
     """
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
@@ -647,7 +649,8 @@ def map_view(
         )
         if plan.reachable:
             route = [ship.sector_id, *(h.sector_id for h in plan.hops)]
-    rows, legend, nodes = mapgraph.build_local_map(state, player, radius=radius, route=route)
+    rows, legend, nodes = mapgraph.build_local_map(
+        state, player, radius=radius, route=route, max_width=fit_width)
     return dto.LocalMapDTO(
         you_sector=here.id, you_band=here.distance_band, rows=rows, legend=legend,
         you_display=_display(state, here.id), nodes=nodes,

@@ -145,9 +145,9 @@ class GameService:
         return session.haggle_quote(self._state, player_id, commodity, counter_price, self._config)
 
     def map_view(self, player_id: int, *, route_dest: int | None = None,
-                 full_graph: bool = False) -> dto.LocalMapDTO:
+                 full_graph: bool = False, fit_width: int | None = None) -> dto.LocalMapDTO:
         return session.map_view(self._state, player_id, route_dest=route_dest,
-                                full_graph=full_graph, config=self._config)
+                                full_graph=full_graph, config=self._config, fit_width=fit_width)
 
     def computer_view(self, player_id: int) -> dto.ComputerDTO:
         return session.computer_view(self._state, player_id, self._config)

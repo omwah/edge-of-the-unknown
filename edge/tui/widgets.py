@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 from rich.text import Text
@@ -597,43 +597,133 @@ class LocalMapView(Static):
     A node-and-edge graph of the player's surrounding sectors, centered on the
     current sector and laid out in gravity columns (toward-Core left, deeper
     right). The rows + legend are baked server-side (`session.map_view`); this
-    widget just renders them and can re-render to overlay a freshly plotted route
-    via `update_map`. Clicking a sector node posts `Picked(sector_id)` so the
-    screen can plot a route to it.
+    widget renders them and highlights the keyboard-selected sector (a style span
+    over its baked cell, like the nav rose). **Arrow keys** move the selection to the
+    nearest sector in that direction; **Enter/Space** (or a click) posts
+    `Picked(sector_id)` so the screen can plot a route to it.
+
+    When a `rebake` callback is supplied, the map **grows to fit the widget's width**:
+    on resize the widget re-requests a map sized to its current character width, so it
+    shows as many sectors as the screen allows.
     """
+
+    can_focus = True
 
     DEFAULT_CSS = """
     LocalMapView { height: auto; padding: 1 2; }
     """
 
+    BINDINGS = [
+        Binding("left", "move(-1, 0)", show=False),
+        Binding("right", "move(1, 0)", show=False),
+        Binding("up", "move(0, -1)", show=False),
+        Binding("down", "move(0, 1)", show=False),
+        Binding("enter", "pick", "Plot route", show=False),
+        Binding("space", "pick", "Plot route", show=False),
+    ]
+
     class Picked(Message):
         def __init__(self, sector_id: int) -> None:
-            self.sector_id = sector_id  # internal id of the clicked sector
+            self.sector_id = sector_id  # internal id of the chosen sector
             super().__init__()
 
-    def __init__(self, gmap: LocalMapDTO, **kwargs: object) -> None:
-        super().__init__(self._content(gmap), **kwargs)
+    def __init__(
+        self, gmap: LocalMapDTO,
+        rebake: Callable[[int], LocalMapDTO] | None = None, **kwargs: object,
+    ) -> None:
+        super().__init__(**kwargs)
         self._map = gmap
+        self._rebake = rebake  # (width) -> a map sized to fit; None ⇒ fixed reach
+        self._hits = self._order(gmap)
+        self._idx = 0
 
     @staticmethod
-    def _content(gmap: LocalMapDTO) -> str:
-        body = "\n".join(gmap.rows) if gmap.rows else "[dim]no charted neighbours[/]"
-        return f"{body}\n\n{gmap.legend}" if gmap.legend else body
+    def _order(gmap: LocalMapDTO) -> list:  # type: ignore[type-arg]
+        """Selectable sector nodes, top-to-bottom then left-to-right (cursor home order)."""
+        return sorted(gmap.nodes, key=lambda n: (n.row, n.col0))
 
-    def update_map(self, gmap: LocalMapDTO) -> None:
+    def on_mount(self) -> None:
+        self._refit()
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._refit()
+
+    def _refit(self) -> None:
+        """Re-bake the map to the current widget width (no-op without a rebake hook)."""
+        if self._rebake is None:
+            return
+        width = self.content_size.width
+        if width <= 0:
+            return
+        keep = self._hits[self._idx].sector_id if self._hits else None
+        self.update_map(self._rebake(width), keep_sector=keep)
+
+    def render(self) -> Text:
+        focus = self._hits[self._idx] if self._hits else None
+        body = self._map.rows or ["[dim]no charted neighbours[/]"]
+        lines: list[Text] = []
+        for i, row in enumerate(body):
+            line = Text.from_markup(row)
+            if focus is not None and self.has_focus and focus.row == i:
+                line.stylize("reverse bold", focus.col0, focus.col1)
+            lines.append(line)
+        out = Text("\n").join(lines)
+        if self._map.legend:
+            out.append("\n\n")
+            out.append_text(Text.from_markup(self._map.legend))
+        return out
+
+    def update_map(self, gmap: LocalMapDTO, *, keep_sector: int | None = None) -> None:
+        """Swap in a freshly baked map, preserving the selected sector where possible."""
         self._map = gmap
-        self.update(self._content(gmap))
+        self._hits = self._order(gmap)
+        self._idx = next((i for i, n in enumerate(self._hits) if n.sector_id == keep_sector), 0)
+        self.refresh()
+
+    def action_move(self, dx: int, dy: int) -> None:
+        """Move the selection to the nearest node in the pressed direction."""
+        if len(self._hits) < 2:
+            return
+        cur = self._hits[self._idx]
+        cx, cy = (cur.col0 + cur.col1) / 2, cur.row
+        best, best_score = None, None
+        for j, n in enumerate(self._hits):
+            if j == self._idx:
+                continue
+            ox, oy = (n.col0 + n.col1) / 2 - cx, n.row - cy
+            along, across = (ox, oy) if dx else (oy, ox)
+            step = dx or dy
+            if along == 0 or (along > 0) != (step > 0):
+                continue  # not in the pressed direction
+            score = (abs(along), abs(across))
+            if best_score is None or score < best_score:
+                best, best_score = j, score
+        if best is not None:
+            self._idx = best
+            self.refresh()
+
+    def action_pick(self) -> None:
+        if self._hits:
+            self.post_message(self.Picked(self._hits[self._idx].sector_id))
 
     def on_click(self, event: events.Click) -> None:
         # Click coords are relative to the widget box; shift past the padding to land
         # in the baked `rows` grid, then hit-test the node label boxes.
         pad = self.styles.padding
         col, row = int(event.x) - pad.left, int(event.y) - pad.top
-        for node in self._map.nodes:
+        for i, node in enumerate(self._hits):
             if node.row == row and node.col0 <= col < node.col1:
                 event.stop()
+                self._idx = i
+                self.refresh()
                 self.post_message(self.Picked(node.sector_id))
                 return
+
+    def on_focus(self) -> None:
+        self.refresh()
+
+    def on_blur(self) -> None:
+        self.refresh()
 
 
 class ClickableEntry(Static):

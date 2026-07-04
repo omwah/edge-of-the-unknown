@@ -32,6 +32,10 @@ from edge.server.canvas import Canvas as _Canvas
 # from `ui.local_map_radius` (config). A presentation tuning, not a game rule.
 LOCAL_RADIUS = 3
 
+# Upper bound on the reach the fit-to-width search will try (so a very wide terminal
+# can't grow the ego-graph without limit). A presentation tuning, not a game rule.
+MAX_FIT_RADIUS = 20
+
 _CELL_GAP = 5  # blank columns between node columns — room for edge connectors
 _VSTEP = 2  # blank rows between stacked nodes in a column
 
@@ -88,14 +92,41 @@ def _label(state: UniverseState, player: Player, sector_id: int, here: int) -> s
 
 def build_local_map(
     state: UniverseState, player: Player, *, radius: int = LOCAL_RADIUS,
-    route: Sequence[int] = (),
+    route: Sequence[int] = (), max_width: int | None = None,
 ) -> tuple[list[str], str, list[dto.MapNodeDTO]]:
     """Bake the local ego-graph rows (and legend) centered on the player's sector.
 
     `route` is the internal sector-id path (origin..dest) of a plotted course; any
     of its sectors that fall inside the local view light up, and a destination
-    beyond `radius` gets a directional pointer line so it still reads.
+    beyond the shown reach gets a directional pointer line so it still reads.
+
+    When `max_width` is given (the Computer/Map tab's available character width), the
+    reach is **grown to fit the screen**: the largest hop-radius whose laid-out width
+    fits `max_width` is used, so the map shows as many sectors as the width allows
+    (falling back to reach 1 when even that overflows). Otherwise the fixed `radius`
+    is used (the standalone-map / test path).
     """
+    if max_width is None:
+        rows, legend, hits, _w = _build_at_radius(state, player, radius, route)
+        return rows, legend, hits
+    best: tuple[list[str], str, list[dto.MapNodeDTO], int] | None = None
+    best_nodes = -1
+    for r in range(1, MAX_FIT_RADIUS + 1):
+        cand = _build_at_radius(state, player, r, route)
+        rows, _legend, hits, width = cand
+        if width <= max_width and len(hits) >= best_nodes:
+            best, best_nodes = cand, len(hits)
+        if width > max_width:
+            break  # wider reach only lays out wider — stop growing
+    if best is None:  # even reach 1 overflows the width; show it anyway
+        best = _build_at_radius(state, player, 1, route)
+    return best[0], best[1], best[2]
+
+
+def _build_at_radius(
+    state: UniverseState, player: Player, radius: int, route: Sequence[int],
+) -> tuple[list[str], str, list[dto.MapNodeDTO], int]:
+    """Lay out the ego-graph at a fixed `radius`; returns rows/legend/nodes + its width."""
     here = state.ships[player.ship_id].sector_id
     came_from = player.entered_from.get(here)
     hops = _local_bfs(state, here, radius)
@@ -182,7 +213,7 @@ def build_local_map(
                        row=row - trim, col0=c0, col1=c1)
         for sid, row, c0, c1 in boxes if row - trim >= 0
     ]
-    return rows, LEGEND, hits
+    return rows, LEGEND, hits, width
 
 
 def _draw_edges(

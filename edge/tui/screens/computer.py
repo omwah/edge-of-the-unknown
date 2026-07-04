@@ -63,10 +63,10 @@ class ComputerScreen(Screen):
             with TabPane("Map", id="map"):
                 yield Static(
                     f"[b]LOCAL MAP[/]   [dim]you @ Sector {self._map.you_display} · "
-                    f"Band {self._map.you_band}[/]",
+                    f"Band {self._map.you_band}   ·   ↑↓←→ select · ↵ plot route[/]",
                     id="map-header",
                 )
-                yield LocalMapView(self._map, id="local-map")
+                yield LocalMapView(self._map, rebake=self._map_for_width, id="local-map")
             with TabPane("Ports", id="ports"):
                 yield Static("[b]PORTS DIRECTORY[/]        [dim]charted ports, nearest first[/]")
                 yield DataTable(id="ports-table", zebra_stripes=True, cursor_type="row")
@@ -189,17 +189,27 @@ class ComputerScreen(Screen):
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         # Remember the tab across screens so [C] reopens where the player left off.
-        self.app.computer_tab = self.query_one(TabbedContent).active
+        active = self.query_one(TabbedContent).active
+        self.app.computer_tab = active
+        if active == "map":
+            # The Map pane only has a real width once it is shown — fit + focus it now
+            # so the arrow keys drive the sector cursor immediately.
+            view = self.query_one("#local-map", LocalMapView)
+            view._refit()
+            self.call_after_refresh(view.focus)
+
+    def _map_for_width(self, width: int) -> object:
+        """Bake the local map to fit `width`, overlaying the active route (§6.7/§11).
+
+        full_graph=True is safe for any target: map_view only opens the full graph for a
+        destination the player actually holds a lead for (and at its origin).
+        """
+        return self._service.map_view(
+            self._pid, route_dest=self._engage_target, full_graph=True, fit_width=width)
 
     def _refresh_map(self) -> None:
-        """Re-bake the local map with the active route overlaid (§6.7/§11)."""
-        if self._engage_target is None:
-            return
-        # full_graph=True is safe for any target: map_view only opens the full graph
-        # for a destination the player actually holds a lead for (and at its origin).
-        gmap = self._service.map_view(
-            self._pid, route_dest=self._engage_target, full_graph=True)
-        self.query_one("#local-map", LocalMapView).update_map(gmap)
+        """Re-bake the local map (fit to width) with the active route overlaid (§6.7/§11)."""
+        self.query_one("#local-map", LocalMapView)._refit()
 
     def on_local_map_view_picked(self, msg: LocalMapView.Picked) -> None:
         """Clicking a sector on the Map plots a route to it (and shows the Route tab)."""
