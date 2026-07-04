@@ -593,6 +593,30 @@ class CombatConfig(BaseModel):
     salvage_component_chance: float = 0.25
 
 
+class TerritoryConfig(BaseModel):
+    """Sector fighters / mines / beacons / hazards (DESIGN §10, WP41).
+
+    Deployable territory: `fighter_price`/`mine_price` are per-unit StarDock costs, and
+    `beacon_price` the flat cost to plant a comms beacon. A hostile mine field deals
+    `mine_damage` per surviving mine on entry (shields absorb first), consuming the mines.
+    Hostile fighters force engage-or-retreat — the garrison fights as a foe whose hull is
+    `fighter_hull_each` per fighter (arc `all_round`, `fighter_damage_each` per fighter);
+    fleeing (retreat) costs the garrison `retreat_fighter_cost` fighters (the original
+    rule). A `black_hole` sector deals `black_hole_damage` on entry (a gravity toll).
+    """
+
+    model_config = _FROZEN
+
+    fighter_price: int = Field(default=50, ge=0)
+    mine_price: int = Field(default=200, ge=0)
+    beacon_price: int = Field(default=100, ge=0)
+    mine_damage: int = Field(default=40, ge=0)      # per surviving mine, on hostile entry
+    fighter_hull_each: int = Field(default=6, ge=1)
+    fighter_damage_each: int = Field(default=2, ge=0)
+    retreat_fighter_cost: int = Field(default=1, ge=0)  # retreat costs the garrison a fighter
+    black_hole_damage: int = Field(default=30, ge=0)
+
+
 class EncountersConfig(BaseModel):
     """Encounter-roll parameters (DESIGN §10, Phase 3 — consumed by the WP24 encounter
     system; authored here so the config epoch carries it).
@@ -1161,6 +1185,7 @@ class GameConfig(BaseModel):
     aliens: AliensConfig = AliensConfig()
     encounters: EncountersConfig = EncountersConfig()  # §10 encounter rolls (Phase 3, WP24)
     combat: CombatConfig = CombatConfig()  # §10 combat rounds (Phase 3, WP25)
+    territory: TerritoryConfig = TerritoryConfig()  # §10 fighters/mines/beacons/hazards (WP41)
     weapons: dict[str, WeaponConfig] = Field(default_factory=dict)  # §4 weapon catalog
     bigbang: BigBangConfig = BigBangConfig()
     engine_room: EngineRoomConfig

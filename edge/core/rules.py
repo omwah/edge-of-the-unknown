@@ -23,6 +23,7 @@ from edge import dialogue
 from edge.core import combat, encounters
 from edge.core import mechanics
 from edge.core import starbases
+from edge.core import territory
 from edge.core.aliens import (
     FRIENDLY as FRIENDLY_BAND,
     HOSTILE as HOSTILE_BAND,
@@ -112,9 +113,11 @@ from edge.core.events import (
     StarbaseRazed,
     StarbaseRepaired,
     StarbaseSalvaged,
+    TerritoryDeployed,
     Traded,
     Warped,
 )
+from edge.core.events import HazardDamage as HazardDamageEvent
 from edge.core.events import CombatRound as CombatRoundEvent
 from edge.core.planets import is_colonizable, retype_planet
 from edge.core.starbases import is_operational
@@ -130,6 +133,8 @@ from edge.core.models import (
     Planet,
     Player,
     Port,
+    Sector,
+    SectorForce,
     Ship,
     Starbase,
     SubsystemState,
@@ -512,6 +517,50 @@ class ClaimStarbase:
     starbase_id: int
 
 
+@dataclass(frozen=True, slots=True)
+class BuyFighters:
+    """Buy sector-fighter stock at the StarDock (§10, WP41)."""
+
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class BuyMines:
+    """Buy space-mine stock at the StarDock (§10, WP41)."""
+
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class DeployFighters:
+    """Deploy carried fighters to garrison the current sector (§10, WP41).
+
+    `mode` is offensive / defensive / toll (a toll force levies `toll` latinum on hostile
+    entrants). Never in the Core. Adds to (and re-modes) any player force already here.
+    """
+
+    count: int
+    mode: str = "defensive"
+    toll: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class DeployMines:
+    """Deploy carried mines into the current sector (§10, WP41). Never in the Core."""
+
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class DeployBeacon:
+    """Plant a comms beacon in the current sector (§10, WP41).
+
+    Costs `territory.beacon_price` latinum; one per sector (overwrite); never in the Core.
+    """
+
+    text: str
+
+
 Command = (
     JoinGame
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
@@ -523,6 +572,7 @@ Command = (
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
     | AdvanceAdmission | JoinAlliance | ResignAlliance
     | AssaultStarbase | RepairStarbase | ClaimStarbase
+    | BuyFighters | BuyMines | DeployFighters | DeployMines | DeployBeacon
     | DevPatch  # dev/testing cheat (core.dev); recorded in the log like any command
 )
 
@@ -542,6 +592,8 @@ class ReduceResult:
     starbases: tuple[Starbase, ...] = ()
     discoveries: tuple[Discovery, ...] = ()
     species: tuple[AlienSpecies, ...] = ()  # cron-mutated species positions (WP16 drift)
+    sectors: tuple[Sector, ...] = ()  # beacon-text updates (WP41)
+    sector_forces: tuple[SectorForce, ...] = ()  # deployed fighters/mines (WP41)
     game: Game | None = None  # set by maintenance reducers (e.g. daily day-number bump)
 
 
@@ -561,6 +613,13 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
         state.discoveries[discovery.id] = discovery
     for species in result.species:
         state.species[species.id] = species
+    for sector in result.sectors:
+        state.sectors[sector.id] = sector
+    for force in result.sector_forces:
+        if force.fighters <= 0 and force.mines <= 0:
+            state.sector_forces.pop(force.sector_id, None)  # spent forces clear out
+        else:
+            state.sector_forces[force.sector_id] = force
     if result.game is not None:
         state.game = result.game
 
@@ -645,6 +704,16 @@ def reduce(
             return _repair_starbase(state, player_id, command, config)
         case ClaimStarbase():
             return _claim_starbase(state, player_id, command, config)
+        case BuyFighters():
+            return _buy_fighters(state, player_id, command, config)
+        case BuyMines():
+            return _buy_mines(state, player_id, command, config)
+        case DeployFighters():
+            return _deploy_fighters(state, player_id, command, config)
+        case DeployMines():
+            return _deploy_mines(state, player_id, command, config)
+        case DeployBeacon():
+            return _deploy_beacon(state, player_id, command, config)
         case DevPatch():
             return apply_dev_patch(state, player_id, command, config)
         case _ as unreachable:
@@ -787,27 +856,29 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
     cost = ship.turns_per_warp
     if player.turns_remaining < cost:
         raise MovementError("out of turns")
-    new_ship = replace(ship, sector_id=cmd.to_sector)
-    one_way = ship.sector_id not in state.adjacency.get(cmd.to_sector, ())
+    from_sector = ship.sector_id
+    moved_ship = replace(ship, sector_id=cmd.to_sector)
+    one_way = from_sector not in state.adjacency.get(cmd.to_sector, ())
     detected, det_events = _detect_in_sector(
         state, player.detected, ship.sensor_rating, cmd.to_sector, player_id, config)
-    law_events = _core_law_events(state, player, ship.sector_id, cmd.to_sector, config)
-    player, encounter, _halt, enc_events = _roll_encounter(
-        state, player, ship, cmd.to_sector, config)
+    law_events = _core_law_events(state, player, from_sector, cmd.to_sector, config)
+    player, moved_ship, encounter, _halt, entry_events, forces = _entry_effects(
+        state, player, moved_ship, cmd.to_sector, config)
     new_player = replace(
         player,
         turns_remaining=player.turns_remaining - cost,
         explored_sectors=player.explored_sectors | frozenset({cmd.to_sector}),
-        entered_from={**player.entered_from, cmd.to_sector: ship.sector_id},
+        entered_from={**player.entered_from, cmd.to_sector: from_sector},
         detected=detected,
         active_encounter=encounter,
         contact_session=None,  # movement ends any conversation visit (§6.7 H1)
     )
     return ReduceResult(
-        events=(Warped(player_id, ship.sector_id, cmd.to_sector, cost, one_way),
-                *det_events, *law_events, *enc_events),
+        events=(Warped(player_id, from_sector, cmd.to_sector, cost, one_way),
+                *det_events, *law_events, *entry_events),
         players=(new_player,),
-        ships=(new_ship,),
+        ships=(moved_ship,),
+        sector_forces=tuple(forces),
     )
 
 
@@ -870,6 +941,66 @@ def _roll_encounter(
     return player, roll.encounter, True, tuple(events)
 
 
+def _territory_entry(
+    state: UniverseState, player: Player, ship: Ship, sector_id: int, config: GameConfig,
+) -> tuple[Ship, Encounter | None, list[SectorForce], list[Event]]:
+    """Territory hazards on entering `sector_id` (§10, WP41): black hole, mines, fighters.
+
+    Deterministic (no RNG). A black hole deals a flat gravity toll; a hostile mine field
+    detonates (shields absorb, mines spent); a hostile fighter garrison forces an
+    engagement (a combat encounter — engage-or-retreat, reconciled at the fight's end).
+    Hazard damage is clamped to leave the ship alive (a lethal hazard routing through the
+    escape pod is a documented seam). Returns `(ship, encounter, force_updates, events)`.
+    """
+    tc = config.territory
+    events: list[Event] = []
+    forces: list[SectorForce] = []
+
+    def _apply(hull_raw: int, source: str) -> None:
+        nonlocal ship
+        hit = min(max(0, ship.hull_current - 1), max(0, hull_raw))
+        if hit > 0:
+            ship = replace(ship, hull_current=ship.hull_current - hit)
+            events.append(HazardDamageEvent(player.id, sector_id, source, hit))
+
+    if tc.black_hole_damage > 0 and territory.sector_has_black_hole(state, sector_id):
+        _apply(tc.black_hole_damage, "black_hole")
+
+    force = state.sector_forces.get(sector_id)
+    encounter: Encounter | None = None
+    if force is not None and territory.force_hostile_to_player(state, force, player):
+        if force.mines > 0:
+            raw = force.mines * tc.mine_damage
+            _apply(raw - min(ship.shields, raw), "mine")  # shields absorb first
+            force = replace(force, mines=0)  # mines are spent
+            forces.append(force)
+        if force.fighters > 0:
+            encounter = Encounter(
+                species_id=0, sector_id=sector_id, foes=(territory.fighter_foe(force, config),),
+                round=0, player_shields=ship.shields, detected=True, speech_context="combat_open",
+            )
+    return ship, encounter, forces, events
+
+
+def _entry_effects(
+    state: UniverseState, player: Player, ship: Ship, sector_id: int, config: GameConfig,
+) -> tuple[Player, Ship, Encounter | None, bool, list[Event], list[SectorForce]]:
+    """Everything that happens on *entering* `sector_id`: territory then the encounter roll.
+
+    Territory hazards (WP41) apply first and can spawn a fighter engagement (which halts,
+    like a base defense); otherwise the §4.2/§24 base-defense + ship-encounter roll runs.
+    Returns the (possibly damaged) ship and any deployed-force updates alongside the roll.
+    """
+    ship, t_enc, forces, events = _territory_entry(state, player, ship, sector_id, config)
+    if t_enc is not None:
+        band = state.sectors[sector_id].distance_band
+        events.append(EncounterStarted(player.id, 0, sector_id, True, len(t_enc.foes), band))
+        return player, ship, t_enc, True, events, forces
+    player, encounter, halt, enc_events = _roll_encounter(state, player, ship, sector_id, config)
+    events.extend(enc_events)
+    return player, ship, encounter, halt, events, forces
+
+
 def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameConfig) -> ReduceResult:
     """Multi-hop warp along a *known* route (§9, §11, §6.7, WP-C).
 
@@ -908,6 +1039,8 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
     entered = dict(player.entered_from)
     detected = player.detected
     encounter: Encounter | None = None
+    ship_now = ship
+    force_updates: dict[int, SectorForce] = {}
     for nxt in hops:
         if turns < cost:
             break
@@ -917,22 +1050,27 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
         entered[nxt] = current
         explored = explored | frozenset({nxt})
         detected, det_events = _detect_in_sector(
-            state, detected, ship.sensor_rating, nxt, player_id, config)
+            state, detected, ship_now.sensor_rating, nxt, player_id, config)
         events.extend(det_events)
         events.extend(_core_law_events(state, player, current, nxt, config))
         current = nxt
-        # The §10 encounter roll — the journey halts *at* the interrupted hop (WP24).
-        player, encounter, halt, enc_events = _roll_encounter(state, player, ship, nxt, config)
-        events.extend(enc_events)
+        ship_now = replace(ship_now, sector_id=nxt)
+        # Territory hazards + the §10 encounter roll — the journey halts *at* the
+        # interrupted hop (WP24/WP41).
+        player, ship_now, encounter, halt, entry_events, forces = _entry_effects(
+            state, player, ship_now, nxt, config)
+        events.extend(entry_events)
+        for f in forces:
+            force_updates[f.sector_id] = f
         if halt:
             break
 
-    new_ship = replace(ship, sector_id=current)
     new_player = replace(player, turns_remaining=turns, explored_sectors=explored,
                          entered_from=entered, detected=detected,
                          active_encounter=encounter,
                          contact_session=None)  # movement ends any visit (§6.7 H1)
-    return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,))
+    return ReduceResult(events=tuple(events), players=(new_player,), ships=(ship_now,),
+                        sector_forces=tuple(force_updates.values()))
 
 
 def _dock(state: UniverseState, player_id: int) -> ReduceResult:
@@ -1551,6 +1689,7 @@ def _combat_action(
         new_player, spoke = _combat_speak(state, new_player, species, "flee_scorn", config,
                                           dialogue_facts.encounter_facts(enc))
         events.append(spoke)
+    force_updates: tuple[SectorForce, ...] = ()
     if result.outcome is not None:
         if species is not None:
             # The H5 record situational dialogue facts read (`just_fled_combat`, §6.7)
@@ -1558,9 +1697,20 @@ def _combat_action(
             new_player = replace(new_player, last_combat=LastCombat(
                 species=species.roster_id, outcome=result.outcome,
                 day=state.game.day_number))
+        # A sector-fighter garrison engagement (§10, WP41: species 0, no starbase): victory
+        # wipes the garrison, retreat costs it `retreat_fighter_cost` fighters (the classic rule).
+        if enc.species_id == 0 and enc.starbase_id is None:
+            force = state.sector_forces.get(enc.sector_id)
+            if force is not None and force.fighters > 0:
+                if result.outcome == combat.VICTORY:
+                    force_updates = (replace(force, fighters=0),)
+                elif result.outcome == combat.FLED:
+                    force_updates = (replace(
+                        force, fighters=max(0, force.fighters - config.territory.retreat_fighter_cost)),)
         events.append(EncounterEnded(player_id, enc.species_id, result.outcome))
     return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,),
-                        starbases=razed_bases, planets=razed_planets)
+                        starbases=razed_bases, planets=razed_planets,
+                        sector_forces=force_updates)
 
 
 def _escape_pod(wreck: Ship, config: GameConfig) -> Ship:
@@ -1741,6 +1891,127 @@ def _claim_starbase(
     return ReduceResult(
         events=(StarbaseClaimed(player_id, cmd.starbase_id, cost),),
         players=(new_player,), starbases=(new_base,),
+    )
+
+
+# --- territory: fighters, mines, beacons (§10, WP41) ------------------------
+
+
+def _buy_fighters(
+    state: UniverseState, player_id: int, cmd: BuyFighters, config: GameConfig
+) -> ReduceResult:
+    """Buy sector-fighter stock at the StarDock (§10, WP41)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    if cmd.count < 1:
+        raise EconomyError("buy at least one fighter")
+    cost = cmd.count * config.territory.fighter_price
+    if player.latinum < cost:
+        raise EconomyError(f"need {cost} latinum for {cmd.count} fighters")
+    new_player = replace(player, latinum=player.latinum - cost)
+    new_ship = replace(ship, fighters=ship.fighters + cmd.count)
+    return ReduceResult(
+        events=(DevicePurchased(player_id, "sector_fighter", cost),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _buy_mines(
+    state: UniverseState, player_id: int, cmd: BuyMines, config: GameConfig
+) -> ReduceResult:
+    """Buy space-mine stock at the StarDock (§10, WP41)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    if cmd.count < 1:
+        raise EconomyError("buy at least one mine")
+    cost = cmd.count * config.territory.mine_price
+    if player.latinum < cost:
+        raise EconomyError(f"need {cost} latinum for {cmd.count} mines")
+    new_player = replace(player, latinum=player.latinum - cost)
+    new_ship = replace(ship, mines=ship.mines + cmd.count)
+    return ReduceResult(
+        events=(DevicePurchased(player_id, "space_mine", cost),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _require_deployable_sector(state: UniverseState, ship: Ship) -> None:
+    """Territory may not be deployed in the Core (§10, WP41)."""
+    if state.sectors[ship.sector_id].is_galactic_core:
+        raise EconomyError("you cannot deploy in the Core")
+
+
+def _deploy_fighters(
+    state: UniverseState, player_id: int, cmd: DeployFighters, config: GameConfig
+) -> ReduceResult:
+    """Garrison the current sector with carried fighters (§10, WP41)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _require_deployable_sector(state, ship)
+    if cmd.mode not in territory.FIGHTER_MODES:
+        raise EconomyError(f"unknown fighter mode {cmd.mode!r}")
+    if cmd.count < 1 or ship.fighters < cmd.count:
+        raise EconomyError("not enough fighters aboard")
+    existing = state.sector_forces.get(ship.sector_id)
+    owner = Ownership("player", player_id)
+    if existing is not None and existing.owner != owner:
+        raise EconomyError("another force already holds this sector")
+    base_mines = existing.mines if existing is not None else 0
+    have = existing.fighters if existing is not None else 0
+    force = SectorForce(sector_id=ship.sector_id, owner=owner,
+                        fighters=have + cmd.count, mode=cmd.mode,
+                        toll=cmd.toll, mines=base_mines)
+    new_ship = replace(ship, fighters=ship.fighters - cmd.count)
+    return ReduceResult(
+        events=(TerritoryDeployed(player_id, ship.sector_id, "fighters", cmd.count, cmd.mode),),
+        ships=(new_ship,), sector_forces=(force,),
+    )
+
+
+def _deploy_mines(
+    state: UniverseState, player_id: int, cmd: DeployMines, config: GameConfig
+) -> ReduceResult:
+    """Seed the current sector with carried mines (§10, WP41)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _require_deployable_sector(state, ship)
+    if cmd.count < 1 or ship.mines < cmd.count:
+        raise EconomyError("not enough mines aboard")
+    existing = state.sector_forces.get(ship.sector_id)
+    owner = Ownership("player", player_id)
+    if existing is not None and existing.owner != owner:
+        raise EconomyError("another force already holds this sector")
+    have = existing.mines if existing is not None else 0
+    fighters = existing.fighters if existing is not None else 0
+    mode = existing.mode if existing is not None else "defensive"
+    toll = existing.toll if existing is not None else 0
+    force = SectorForce(sector_id=ship.sector_id, owner=owner,
+                        fighters=fighters, mode=mode, toll=toll, mines=have + cmd.count)
+    new_ship = replace(ship, mines=ship.mines - cmd.count)
+    return ReduceResult(
+        events=(TerritoryDeployed(player_id, ship.sector_id, "mines", cmd.count),),
+        ships=(new_ship,), sector_forces=(force,),
+    )
+
+
+def _deploy_beacon(
+    state: UniverseState, player_id: int, cmd: DeployBeacon, config: GameConfig
+) -> ReduceResult:
+    """Plant a comms beacon in the current sector — one per sector, overwrite (§10, WP41)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _require_deployable_sector(state, ship)
+    cost = config.territory.beacon_price
+    if player.latinum < cost:
+        raise EconomyError(f"need {cost} latinum to plant a beacon")
+    sector = state.sectors[ship.sector_id]
+    new_sector = replace(sector, beacon_text=cmd.text)
+    new_player = replace(player, latinum=player.latinum - cost)
+    return ReduceResult(
+        events=(TerritoryDeployed(player_id, ship.sector_id, "beacon", 1),),
+        players=(new_player,), sectors=(new_sector,),
     )
 
 
