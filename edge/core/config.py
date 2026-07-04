@@ -599,7 +599,19 @@ class EncountersConfig(BaseModel):
 
 
 class AllianceConfig(BaseModel):
-    """One alliance / rival bloc in the roster (DESIGN §6.3)."""
+    """One alliance / rival bloc in the roster (DESIGN §6.3).
+
+    Joinability (WP38): a player may belong to **at most one** bloc, gated by the
+    `admission_price` task ledger and the `membership_gate`. `admission_price` is a
+    list of befriend-price task tokens (the §6.1 vocabulary) the player must complete
+    (recorded in the `species_arcs` alliance ledger) before the bloc will admit them;
+    `admission_fee` is a flat latinum joining cost. `membership_gate` names how the
+    gate is administered: `open` (join freely) or `petition` (the `admission_price`
+    tasks must be met). `rivals` lists the alliance ids this bloc treats as enemies —
+    joining sours the player's standing with them (and rivalry is symmetric, so being
+    named a rival is enough); a player whose bloc the Core governor counts as a rival
+    finds the Core unsafe (§6.3, WP38).
+    """
 
     model_config = _FROZEN
 
@@ -607,6 +619,12 @@ class AllianceConfig(BaseModel):
     name: str
     banner: str = ""
     covets_core: bool = False  # may seize the Core in Phase 5 (authored hint, inert now)
+    admission_price: list[Literal["serve", "obey", "prove", "pay", "purge"]] = Field(
+        default_factory=list
+    )
+    admission_fee: int = Field(default=0, ge=0)  # flat latinum joining cost (§8)
+    membership_gate: Literal["open", "petition"] = "open"
+    rivals: list[int] = Field(default_factory=list)  # alliance ids this bloc opposes
 
 
 class SignatureMechanicConfig(BaseModel):
@@ -915,6 +933,10 @@ class RosterConfig(BaseModel):
             raise ValueError(
                 f"core_governing_alliance_id {self.core_governing_alliance_id} is not an alliance"
             )
+        for a in self.alliances:
+            for rival in a.rivals:
+                if rival not in ids or rival == a.id:
+                    raise ValueError(f"alliance {a.id} names bad rival {rival!r}")
         seen: set[str] = set()
         for sp in self.species:
             if sp.id in seen:

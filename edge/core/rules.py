@@ -26,10 +26,14 @@ from edge.core.aliens import (
     FRIENDLY as FRIENDLY_BAND,
     HOSTILE as HOSTILE_BAND,
     NEUTRAL as NEUTRAL_BAND,
+    admission_met,
+    apply_join_standing,
+    apply_resign_standing,
     attitude_locked,
     disposition_band,
     effective_disposition,
     is_criminal,
+    record_admission_task,
     sour_attitude,
 )
 from edge.core.combat import CombatError
@@ -75,6 +79,9 @@ from edge.core.events import (
     AttitudeChanged,
     Banked,
     Colonized,
+    AdmissionAdvanced,
+    AllianceJoined,
+    AllianceResigned,
     ColonistsRecruited,
     ComponentInstalled,
     ComponentKnockedOut,
@@ -424,6 +431,41 @@ class AcceptLead:
     species_id: int
 
 
+@dataclass(frozen=True, slots=True)
+class AdvanceAdmission:
+    """Record one completed admission task toward a bloc's membership (§6.3, WP38).
+
+    `task` must be one of the alliance's `admission_price` tokens. Completing a task
+    writes it into the bloc's `species_arcs` ledger — the seam where gameplay (contract
+    kills, favours, mechanic hooks) will feed admission progress. Idempotent per task.
+    """
+
+    alliance_id: int
+    task: str
+
+
+@dataclass(frozen=True, slots=True)
+class JoinAlliance:
+    """Join an alliance/bloc (§6.3, WP38) — the player may belong to at most one.
+
+    Rejected unless the bloc's `membership_gate`/`admission_price` are satisfied and the
+    `admission_fee` is affordable. Joining resigns any current membership, warms the
+    bloc to +1 standing, and sours its rivals to −1 — which, if the Core governor is a
+    rival, makes the Core unsafe (engaged on sight).
+    """
+
+    alliance_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class ResignAlliance:
+    """Leave the current alliance (§6.3, WP38) — the amends path.
+
+    Standing resets to neutral, so a soured Core governor's sanctuary recovers. A no-op
+    error if the player belongs to no bloc.
+    """
+
+
 Command = (
     JoinGame
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
@@ -433,6 +475,7 @@ Command = (
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
+    | AdvanceAdmission | JoinAlliance | ResignAlliance
     | DevPatch  # dev/testing cheat (core.dev); recorded in the log like any command
 )
 
@@ -543,6 +586,12 @@ def reduce(
             return _barter_artifact(state, player_id, command, config)
         case AcceptLead():
             return _accept_lead(state, player_id, command, config)
+        case AdvanceAdmission():
+            return _advance_admission(state, player_id, command, config)
+        case JoinAlliance():
+            return _join_alliance(state, player_id, command, config)
+        case ResignAlliance():
+            return _resign_alliance(state, player_id, command, config)
         case DevPatch():
             return apply_dev_patch(state, player_id, command, config)
         case _ as unreachable:
@@ -2071,6 +2120,64 @@ def _accept_lead(state: UniverseState, player_id: int, cmd: AcceptLead,
     event = LeadAccepted(player_id, species.id, target.ref.kind, target.ref.ref,
                          target.ref.sector_id)
     return ReduceResult(events=(event,), players=(new_player,))
+
+
+def _advance_admission(state: UniverseState, player_id: int, cmd: AdvanceAdmission,
+                       config: GameConfig) -> ReduceResult:
+    """Record one completed admission task in a bloc's ledger (§6.3, WP38)."""
+    player = _player(state, player_id)
+    if config.roster is None:
+        raise EconomyError("no alliances in this game")
+    ac = config.roster.alliance(cmd.alliance_id)
+    if ac is None:
+        raise EconomyError("no such alliance")
+    if cmd.task not in ac.admission_price:
+        raise EconomyError(f"{cmd.task!r} is not part of {ac.name}'s admission price")
+    new_player = record_admission_task(player, cmd.alliance_id, cmd.task)
+    return ReduceResult(
+        events=(AdmissionAdvanced(player_id, cmd.alliance_id, cmd.task),),
+        players=(new_player,),
+    )
+
+
+def _join_alliance(state: UniverseState, player_id: int, cmd: JoinAlliance,
+                   config: GameConfig) -> ReduceResult:
+    """Join a bloc (§6.3, WP38): gated by admission, exclusive, with rival fallout."""
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    if config.roster is None:
+        raise EconomyError("no alliances in this game")
+    ac = config.roster.alliance(cmd.alliance_id)
+    if ac is None:
+        raise EconomyError("no such alliance")
+    if player.alliance_id == cmd.alliance_id:
+        raise EconomyError(f"you are already a member of {ac.name}")
+    if ac.membership_gate == "petition" and not admission_met(player, ac):
+        raise EconomyError(f"{ac.name} will not admit you until you meet their price")
+    if player.latinum < ac.admission_fee:
+        raise EconomyError(f"you cannot afford {ac.name}'s admission fee")
+    former = player.alliance_id
+    new_player = replace(player, latinum=player.latinum - ac.admission_fee)
+    new_player = apply_join_standing(new_player, config.roster, cmd.alliance_id)
+    return ReduceResult(
+        events=(AllianceJoined(player_id, cmd.alliance_id, former),),
+        players=(new_player,),
+    )
+
+
+def _resign_alliance(state: UniverseState, player_id: int,
+                     cmd: ResignAlliance, config: GameConfig) -> ReduceResult:
+    """Leave the current bloc (§6.3, WP38): standing resets, sanctuary recovers."""
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    if player.alliance_id is None:
+        raise EconomyError("you belong to no alliance")
+    former = player.alliance_id
+    new_player = apply_resign_standing(player)
+    return ReduceResult(
+        events=(AllianceResigned(player_id, former),),
+        players=(new_player,),
+    )
 
 
 def _select_offer(config: GameConfig, species: AlienSpecies, player: Player,
