@@ -155,6 +155,18 @@ def roll_encounter(
     return EncounterRoll(species=species, detected=True, hostile=False)
 
 
+def kill_bounty(config: GameConfig, *, hostile: bool, count: int) -> int:
+    """Latinum bounty for destroying `count` hostile combat units (§10, WP44).
+
+    Echoes TW2002's Cabal 100/kill: only hostile-band victims (raider ships, hostile
+    sector-fighter garrisons) pay, so hunting the frontier's raiders funds the hunt.
+    Zero for a friendly/neutral victim or a non-positive count — pure and deterministic.
+    """
+    if not hostile or count <= 0:
+        return 0
+    return config.aliens.bounty_per_kill * count
+
+
 def hostile_base_in_sector(
     state: UniverseState, player: Player, sector_id: int
 ) -> Starbase | None:

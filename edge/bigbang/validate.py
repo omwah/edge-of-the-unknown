@@ -169,8 +169,9 @@ def _check_discovery_gradient(state: UniverseState, config: GameConfig) -> None:
         return
     by_band: dict[str, list[tuple[int, int]]] = {}  # band -> [(rarity rank, value)]
     for d in state.discoveries.values():
-        if d.kind is DiscoveryKind.ENTITY:
-            continue  # the reserved Entity codex row is a marker, not a spatial find (§7, WP35)
+        if d.kind is DiscoveryKind.ENTITY or d.raid_cache:
+            continue  # the Entity codex row and hostile-homeworld raid caches (§10, WP44) are
+            # markers placed off the band curve, not spatial finds — excluded from the gradient
         band = state.sectors[d.sector_id].distance_band
         by_band.setdefault(band, []).append((d.rarity_tier.value, rarity_value(d.rarity_tier, config)))
 

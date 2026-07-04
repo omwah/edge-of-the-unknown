@@ -297,6 +297,12 @@ class Discovery:
     site_slot: int = 0
     hidden: bool = False
     found_by: int | None = None
+    # A legendary technology cache salted onto a hostile species' homeworld (DESIGN §7, §10 —
+    # WP44): the reward for raiding the frontier's raiders. Marked so it is **excluded from the
+    # spatial rarity gradient** (like the Entity codex row) — its placement follows hostile
+    # homeworlds, not the distance-band curve, so it must not skew the band means the §5/§7
+    # validator asserts. Ordinary otherwise: descended-to, sensor-gated, codex-logged.
+    raid_cache: bool = False
 
 
 @dataclass(frozen=True, slots=True)
