@@ -27,7 +27,7 @@ model laid out so multiplayer can follow later.
 
 ## Status
 
-**Phases 1–2 are complete and playable, and Phase 3 is under way.**
+**Phases 1–3 are complete and playable.**
 
 - **Phase 1 (the walking skeleton).** Generate a universe, explore it under fog of
   war with turn costs, find profitable routes with the ship computer, trade on live
@@ -40,12 +40,21 @@ model laid out so multiplayer can follow later.
   colonization and derelict-starbase salvage; friendly alien species with config-driven,
   standing-keyed dialogue and tech barter; and the Computer suite (pair-trade finder,
   route planner, codex, alien dossier).
-- **Phase 3 (danger) — in progress.** Milestone **M10 (dangerous worldgen) is complete**:
-  selectable **universe topologies** (`trunk` chokepoints vs. the new default
-  `expansive` band-lattice), band-graded alien disposition so **hostiles now populate the
-  outer bands**, and **alliance home clusters** — each bloc's owned territory near the
-  Core, separated by neutral lanes. Still ahead in Phase 3: the encounter/combat system,
-  the roaming **Entity**, conversation depth, signature mechanics, and joinable alliances.
+- **Phase 3 (danger) — complete.** The frontier bites back. Selectable **universe
+  topologies** (`trunk` chokepoints vs. the new default `expansive` band-lattice) with
+  band-graded disposition so **hostiles populate the outer bands**, and **alliance home
+  clusters** near the Core separated by neutral lanes. A live **encounter system**
+  (interrupt roll, detection, greeting-vs-violence) and **firing-arc combat** with a
+  floored escape chance, localized engine-room damage, field-kit repair, escape pods,
+  and salvage. **Conversation depth** — per-visit sessions, situational facts, cross-visit
+  callbacks, per-instance phrasing, and live combat dialogue. **Signature mechanics** (the
+  morality judge, trojan gifts, brokers, and more) and the singular roaming **Entity**,
+  hunted by stale leads and a sensor-gated contact. **Joinable alliances** with admission
+  prices, rival fallout, and Core law keyed to the governor; inter-species relations and
+  reputation spillover; **starbase set-pieces** (assault, planetary defense, repair-and-claim);
+  sector **fighters, mines, beacons, and black-hole hazards**; goal-directed NPC movement,
+  **NPC merchants trading real goods**, and homeworld raids with legendary tech caches and
+  bounties.
 
 Phases 4–5 (multiplayer, corporations, the order-book economy, dynamic Core governance)
 are designed in `docs/DESIGN.md` but not yet built. The per-phase work-package
