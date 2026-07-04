@@ -237,6 +237,7 @@ species:
     pack: { behavior: solo }
     fleet: []
     starbase_policy: homeworld
+    movement_policy: trade_seek     # coordinate-brokers work the trade lanes (§10, WP42)
     attitude_gain_rate: 0.08
     attitude_loss_rate: 0.25
     tech_offers:
@@ -338,6 +339,7 @@ species:
     pack: { behavior: swarm }
     fleet: [missile_frigate]
     starbase_policy: nomadic_holding
+    movement_policy: hunt          # nomadic raiders run down captains who have wronged them (§10, WP42)
     attitude_gain_rate: 0.07
     attitude_loss_rate: 0.15
     # Fellow opportunists of the lanes; the Vennrith hold the tomb-world against them (§6.5).
@@ -390,6 +392,7 @@ species:
     pack: { behavior: solo }
     fleet: [scout_marauder]
     starbase_policy: secret
+    movement_policy: coward         # secretive ambushers slip away from a ship they cannot surprise (§10, WP42)
     attitude_gain_rate: 0.06
     attitude_loss_rate: 0.12
     tech_offers:
@@ -501,6 +504,7 @@ species:
     pack: { behavior: escorted, escort: [battleship] }
     fleet: [imperial_starship]
     starbase_policy: homeworld
+    movement_policy: patrol         # Compact enforcers hold the home band (§10, WP42)
     attitude_gain_rate: 0.06
     attitude_loss_rate: 0.15
     tech_offers:
