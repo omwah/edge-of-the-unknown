@@ -284,6 +284,55 @@ def test_nearest_node_moves_by_screen_layout() -> None:
     assert _nearest_node(just_above, 0, 0, -1) == 1  # the near overlapping sector, not the far centred one
 
 
+def test_nearest_node_horizontal_steps_to_adjacent_column() -> None:
+    """Left/Right steps to the nearest adjacent *column*, row-nearest, not a far same-row node.
+
+    Reproduces the reported bugs against a slice of the local-map layout: a straight
+    up/down neighbour (its column overlaps) must never count as left/right, and a node
+    that merely shares a row across the map must not beat the adjacent column.
+    """
+    from edge.core.dto import MapNodeDTO
+
+    from edge.tui.widgets import _nearest_node
+
+    # Two gravity columns left-aligned to fixed x (col A at 0, col B at 14), with a
+    # stacked node directly above the cursor in its own column (col C at 28).
+    #   colA: (r2) up-left        colC-above: (r0) straight up
+    #   cursor (r4, colC)         colB: (r4) far right, same row
+    #   colA: (r6) down-left
+    nodes = [
+        MapNodeDTO(sector_id=10, display_id=10, row=4, col0=28, col1=35),  # 0: cursor (col C)
+        MapNodeDTO(sector_id=11, display_id=11, row=0, col0=28, col1=36),  # 1: straight up (col C)
+        MapNodeDTO(sector_id=12, display_id=12, row=2, col0=14, col1=22),  # 2: up-left (col B)
+        MapNodeDTO(sector_id=13, display_id=13, row=6, col0=14, col1=21),  # 3: down-left (col B)
+        MapNodeDTO(sector_id=14, display_id=14, row=4, col0=42, col1=51),  # 4: right, adjacent col
+        MapNodeDTO(sector_id=15, display_id=15, row=4, col0=200, col1=207),  # 5: far right, same row
+    ]
+    # Left must not grab the straight-up/down same-column node; it steps to col B, and
+    # among col B picks the row-nearest (up-left over down-left is a tie broken by "up").
+    assert _nearest_node(nodes, 0, -1, 0) == 2   # left → up-left (nearer/upper), not node 1
+    # Right steps to the *adjacent* column, never the far same-row node across the map.
+    assert _nearest_node(nodes, 0, 1, 0) == 4    # right → adjacent col, not the far same-row 5
+
+
+def test_nearest_node_tie_prefers_warp_linked_then_upper() -> None:
+    """On an exact column/row-distance tie, the warp-linked candidate wins; else the upper."""
+    from edge.core.dto import MapNodeDTO
+
+    from edge.tui.widgets import _nearest_node
+
+    # Cursor at (r4) with an equidistant pair one row up and one row down in the next column.
+    up = MapNodeDTO(sector_id=2, display_id=2, row=3, col0=14, col1=21)
+    down = MapNodeDTO(sector_id=3, display_id=3, row=5, col0=14, col1=21)
+    cursor_plain = MapNodeDTO(sector_id=1, display_id=1, row=4, col0=0, col1=7)
+    assert _nearest_node([cursor_plain, up, down], 0, 1, 0) == 1  # tie → prefer upper (index 1)
+
+    # Same geometry, but the cursor warps to the *lower* node — the link wins over "up".
+    cursor_linked = MapNodeDTO(sector_id=1, display_id=1, row=4, col0=0, col1=7,
+                               neighbors=frozenset({3}))
+    assert _nearest_node([cursor_linked, up, down], 0, 1, 0) == 2  # linked lower node (index 2)
+
+
 async def test_selected_nav_node_inverts_only_its_cell() -> None:
     """The selected warp highlights just its baked compass cell (reverse), not the whole line."""
     app = EdgeApp()

@@ -386,6 +386,10 @@ class MapNodeDTO:
     row: int
     col0: int
     col1: int
+    # Internal ids this node warps to — the arrow-nav tie-breaker: when two candidate
+    # sectors are equally close, the warp-linked one wins (§11 layout-aware nav). Empty
+    # where the baker has no adjacency (the nav rose), which falls back to "prefer up".
+    neighbors: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True)

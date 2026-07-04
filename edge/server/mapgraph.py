@@ -210,7 +210,8 @@ def _build_at_radius(
         rows.append(pointer)
     hits = [
         dto.MapNodeDTO(sector_id=sid, display_id=state.spatial_ids.get(sid, sid),
-                       row=row - trim, col0=c0, col1=c1)
+                       row=row - trim, col0=c0, col1=c1,
+                       neighbors=frozenset(state.adjacency.get(sid, ())))
         for sid, row, c0, c1 in boxes if row - trim >= 0
     ]
     return rows, LEGEND, hits, width
