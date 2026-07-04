@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from edge.core.config import AliensConfig, SpeciesConfig
+from edge.core.config import AliensConfig, AllianceConfig, RosterConfig, SpeciesConfig
 from edge.core.models import AlienSpecies, Grudge, Player, UniverseState
 
 HOSTILE = "hostile"
@@ -138,6 +138,101 @@ def disposition_band(value: float, config: AliensConfig) -> str:
 def is_friendly(value: float, config: AliensConfig) -> bool:
     """Whether a disposition value sits in the friendly (amity) band."""
     return value >= config.amity_threshold
+
+
+# --- Alliances (DESIGN §6.3, WP38) ------------------------------------------
+
+# Reserved `species_arcs` key namespace for a bloc's admission-task ledger. The `@`
+# prefix can never collide with a roster_id (lowercase identifiers), so the befriend-
+# price ledger rides `species_arcs` without a second hashed field (H6 golden batch).
+ALLIANCE_ARC_PREFIX = "@alliance:"
+
+
+def _alliance_key(alliance_id: int) -> str:
+    return f"{ALLIANCE_ARC_PREFIX}{alliance_id}"
+
+
+def admission_tasks_done(player: Player, alliance_id: int) -> frozenset[str]:
+    """The admission tasks the player has completed for a bloc (the §6.3 ledger)."""
+    ledger = player.species_arcs.get(_alliance_key(alliance_id), {})
+    return frozenset(str(task) for task, done in ledger.items() if done)
+
+
+def record_admission_task(player: Player, alliance_id: int, task: str) -> Player:
+    """Mark one admission task complete in the bloc's ledger (pure; WP38)."""
+    key = _alliance_key(alliance_id)
+    ledger = {**player.species_arcs.get(key, {}), task: True}
+    return replace(player, species_arcs={**player.species_arcs, key: ledger})
+
+
+def admission_met(player: Player, alliance: AllianceConfig) -> bool:
+    """Whether the player has completed the bloc's `admission_price` tasks (§6.3)."""
+    return set(alliance.admission_price) <= admission_tasks_done(player, alliance.id)
+
+
+def _rivals_of(roster: RosterConfig, alliance_id: int) -> set[int]:
+    """The blocs at odds with `alliance_id` — rivalry is symmetric (§6.3)."""
+    joined = roster.alliance(alliance_id)
+    rivals = set(joined.rivals) if joined is not None else set()
+    for a in roster.alliances:
+        if alliance_id in a.rivals:
+            rivals.add(a.id)
+    rivals.discard(alliance_id)
+    return rivals
+
+
+def apply_join_standing(player: Player, roster: RosterConfig, alliance_id: int) -> Player:
+    """Set standing for joining `alliance_id`: +1 the bloc, −1 its rivals (§6.3, WP38).
+
+    Membership is exclusive, so the joined bloc becomes the player's `alliance_id`;
+    every other bloc's standing is left as-is unless it is a (symmetric) rival, which
+    sours to −1. Pure — the caller charges the fee and emits the event.
+    """
+    standing = dict(player.alliance_standing)
+    standing[alliance_id] = 1.0
+    for rival in _rivals_of(roster, alliance_id):
+        standing[rival] = -1.0
+    return replace(player, alliance_id=alliance_id, alliance_standing=standing)
+
+
+def apply_resign_standing(player: Player) -> Player:
+    """Leave the current bloc and let rival hostility lapse to neutral (§6.3, WP38).
+
+    Resignation is the amends path: standing resets so the Core governor's sanctuary
+    (and any soured bloc) recovers. Gradual re-warming via missions is a later seam.
+    """
+    return replace(player, alliance_id=None, alliance_standing={})
+
+
+def alliance_standing(player: Player, alliance_id: int | None) -> float:
+    """The player's standing with a bloc (0.0 if none), (§6.3)."""
+    if alliance_id is None:
+        return 0.0
+    return player.alliance_standing.get(alliance_id, 0.0)
+
+
+def alliance_standing_shift(player: Player, species: AlienSpecies) -> float:
+    """The greeting-vs-violence penalty from ill standing with a species' bloc (§6.3).
+
+    Negative standing with the species' alliance is subtracted from effective
+    disposition before the §10 violence roll (like `grudge_shift`), so a rival bloc's
+    members are primed to attack a player aligned against them. 0.0 for an unaligned
+    species or non-negative standing.
+    """
+    standing = alliance_standing(player, species.alliance_id)
+    return -standing if standing < 0.0 else 0.0
+
+
+def governor_hostile(state: UniverseState, player: Player) -> bool:
+    """Whether the Core governor treats the player as an enemy (§6.3, WP38).
+
+    True when the player is *not* a governing member and holds negative standing with
+    the governing bloc — the case that makes the Core unsafe (engaged on sight).
+    """
+    gov = state.game.core_governing_alliance_id
+    if gov is None or player.alliance_id == gov:
+        return False
+    return alliance_standing(player, gov) < 0.0
 
 
 def may_occupy(

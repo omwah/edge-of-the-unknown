@@ -23,7 +23,14 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
-from edge.core.aliens import FRIENDLY, disposition_band, effective_disposition, grudge_shift
+from edge.core.aliens import (
+    FRIENDLY,
+    alliance_standing_shift,
+    disposition_band,
+    effective_disposition,
+    governor_hostile,
+    grudge_shift,
+)
 from edge.core.config import GameConfig, PackConfig, SpeciesConfig
 from edge.core.discovery import sector_has_nebula
 from edge.core.models import AlienSpecies, Encounter, EncounterFoe, Player, Ship, UniverseState
@@ -76,7 +83,22 @@ def roll_encounter(
     band chance and a candidate species present) — both preconditions are pure
     functions of state, so the command-stream draw order stays deterministic.
     """
-    band = state.sectors[sector_id].distance_band
+    sector = state.sectors[sector_id]
+    # Core law (§6.3, WP38): a player aligned against the Core governor is engaged on
+    # sight by any governing combatant present — the Core stops being a sanctuary. This
+    # fires regardless of the band's interrupt chance (the Hub is safe only for the
+    # governor's own). Whether it triggers is a pure function of state, so the
+    # command-stream draw order stays deterministic (H4).
+    if config.roster is not None and sector.is_galactic_core and governor_hostile(state, player):
+        defender = _governing_defender(state, config, sector_id)
+        if defender is not None:
+            sc = _species_cfg(config, defender)
+            if sc is not None and sc.combatant and sc.fleet:
+                pack = spawn_pack(defender, sc, sector_id, ship, config, rng)
+                pack = replace(pack, speech_context="combat_open")
+                return EncounterRoll(species=defender, detected=True, hostile=True, encounter=pack)
+
+    band = sector.distance_band
     chance = config.encounters.interrupt_chance.get(band, 0.0)
     candidates = species_in_sector(state, sector_id)
     if chance <= 0.0 or not candidates or config.roster is None:
@@ -102,7 +124,9 @@ def roll_encounter(
     # active grudge the species holds against the player (§6.5, WP27). Non-combatants
     # and shipless kinds can never reach violence.
     if sc.combatant and sc.fleet:
-        disp = max(0.0, effective_disposition(species, player) - grudge_shift(species, player))
+        disp = max(0.0, effective_disposition(species, player)
+                   - grudge_shift(species, player)
+                   - alliance_standing_shift(player, species))
         hostility, amity = config.aliens.hostility_threshold, config.aliens.amity_threshold
         if disp >= amity:
             violence = 0.0
@@ -119,6 +143,20 @@ def roll_encounter(
             pack = replace(pack, speech_context=opener)
             return EncounterRoll(species=species, detected=True, hostile=True, encounter=pack)
     return EncounterRoll(species=species, detected=True, hostile=False)
+
+
+def _governing_defender(
+    state: UniverseState, config: GameConfig, sector_id: int
+) -> AlienSpecies | None:
+    """A governing-alliance combatant present in `sector_id`, or None (§6.3 Core law)."""
+    gov = state.game.core_governing_alliance_id
+    for sp in species_in_sector(state, sector_id):
+        if sp.alliance_id != gov:
+            continue
+        sc = _species_cfg(config, sp)
+        if sc is not None and sc.combatant and sc.fleet:
+            return sp
+    return None
 
 
 def _draw_species(candidates: list[AlienSpecies], config: GameConfig,

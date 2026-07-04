@@ -8,10 +8,13 @@ from typing import get_args
 
 from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsystem
 from edge.core.events import (
+    AdmissionAdvanced,
     AlienHailed,
     AlienMoved,
     AlienSpoke,
     AlienTraded,
+    AllianceJoined,
+    AllianceResigned,
     AttitudeChanged,
     Banked,
     Colonized,
@@ -51,6 +54,7 @@ from edge.core.events import (
 )
 from edge.core.rules import (
     AcceptLead,
+    AdvanceAdmission,
     BarterArtifact,
     BuyAlienTech,
     BuyComponent,
@@ -71,9 +75,11 @@ from edge.core.rules import (
     Hail,
     HaggleOffer,
     InstallComponent,
+    JoinAlliance,
     JoinGame,
     RecruitColonists,
     RepairAtDock,
+    ResignAlliance,
     Salvage,
     SetAllocation,
     SwapComponent,
@@ -120,6 +126,9 @@ COMMANDS: list[Command] = [
     BuyAlienTech(species_id=3, offer_index=1),   # WP9 buy tech for latinum
     BarterArtifact(species_id=3, offer_index=0), # WP9 barter an artifact for tech
     AcceptLead(species_id=3),                    # §6.7 log an alien's coordinate tip
+    AdvanceAdmission(alliance_id=3, task="pay"), # WP38 complete an admission task
+    JoinAlliance(alliance_id=3),                 # WP38 join a bloc
+    ResignAlliance(),                            # WP38 leave the current bloc
     CombatAction(action="fight"),                # WP25 one combat round
     CombatAction(action="flee"),
     CombatAction(action="field_patch", subsystem=Subsystem.SCREENS, slot_index=1),
@@ -172,6 +181,10 @@ EVENTS: list[Event] = [
     SalvageCollected(1, 17, ()),                        # WP26 latinum-only salvage
     GrudgeFormed(1, "vennrith", 0.6, True),             # WP27 a permanent vendetta
     CoreLawNotice(1, 3),                                # WP27 governor's warning
+    AdmissionAdvanced(1, 3, "pay"),                     # WP38 admission task done
+    AllianceJoined(1, 3, None),                         # WP38 joined a bloc (was unaligned)
+    AllianceJoined(1, 3, 1),                            # WP38 switched blocs
+    AllianceResigned(1, 3),                             # WP38 left a bloc
     DevApplied(1, "[dev] set latinum=1000000"),  # dev cheat audit marker
 ]
 

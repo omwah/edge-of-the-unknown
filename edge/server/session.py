@@ -39,8 +39,11 @@ from edge.core.enums import (
     Subsystem,
 )
 from edge.core.events import (
+    AdmissionAdvanced,
     AlienMoved,
     AlienSpoke,
+    AllianceJoined,
+    AllianceResigned,
     Banked,
     Colonized,
     ColonistsRecruited,
@@ -1371,6 +1374,12 @@ def format_event(event: Event) -> str:
         return f"[red]☠ The {event.species_kind} mark you — {tail}.[/]"
     if isinstance(event, CoreLawNotice):
         return "[yellow]⚖ Governor's patrol: your record is known here. Mind yourself.[/]"
+    if isinstance(event, AdmissionAdvanced):
+        return f"[green]✔ Admission task complete: {event.task}.[/]"
+    if isinstance(event, AllianceJoined):
+        return "[green]⚑ You have sworn to a new banner. Old friends may now be foes.[/]"
+    if isinstance(event, AllianceResigned):
+        return "[yellow]⚑ You renounce your banner — old enmities cool.[/]"
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 

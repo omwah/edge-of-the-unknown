@@ -11,10 +11,13 @@ from typing import Any
 
 from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsystem
 from edge.core.events import (
+    AdmissionAdvanced,
     AlienHailed,
     AlienMoved,
     AlienSpoke,
     AlienTraded,
+    AllianceJoined,
+    AllianceResigned,
     AttitudeChanged,
     Banked,
     Colonized,
@@ -55,6 +58,7 @@ from edge.core.events import (
 from edge.core.dev import DevPatch
 from edge.core.rules import (
     AcceptLead,
+    AdvanceAdmission,
     BarterArtifact,
     BuyAlienTech,
     BuyComponent,
@@ -75,8 +79,10 @@ from edge.core.rules import (
     Hail,
     HaggleOffer,
     InstallComponent,
+    JoinAlliance,
     JoinGame,
     RecruitColonists,
+    ResignAlliance,
     RepairAtDock,
     Salvage,
     SetAllocation,
@@ -179,6 +185,12 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "BarterArtifact", {"species_id": command.species_id, "offer_index": command.offer_index}
         case AcceptLead():
             return "AcceptLead", {"species_id": command.species_id}
+        case AdvanceAdmission():
+            return "AdvanceAdmission", {"alliance_id": command.alliance_id, "task": command.task}
+        case JoinAlliance():
+            return "JoinAlliance", {"alliance_id": command.alliance_id}
+        case ResignAlliance():
+            return "ResignAlliance", {}
         case DevPatch():
             return "DevPatch", {
                 "op": command.op, "target": command.target, "value": command.value,
@@ -279,6 +291,12 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return BarterArtifact(species_id=payload["species_id"], offer_index=payload["offer_index"])
         case "AcceptLead":
             return AcceptLead(species_id=payload["species_id"])
+        case "AdvanceAdmission":
+            return AdvanceAdmission(alliance_id=payload["alliance_id"], task=payload["task"])
+        case "JoinAlliance":
+            return JoinAlliance(alliance_id=payload["alliance_id"])
+        case "ResignAlliance":
+            return ResignAlliance()
         case "DevPatch":
             return DevPatch(
                 op=payload["op"], target=payload["target"], value=payload["value"],
@@ -466,6 +484,19 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "CoreLawNotice", {
                 "player_id": event.player_id, "sector_id": event.sector_id,
             }
+        case AdmissionAdvanced():
+            return "AdmissionAdvanced", {
+                "player_id": event.player_id, "alliance_id": event.alliance_id, "task": event.task,
+            }
+        case AllianceJoined():
+            return "AllianceJoined", {
+                "player_id": event.player_id, "alliance_id": event.alliance_id,
+                "former_alliance_id": event.former_alliance_id,
+            }
+        case AllianceResigned():
+            return "AllianceResigned", {
+                "player_id": event.player_id, "former_alliance_id": event.former_alliance_id,
+            }
         case DevApplied():
             return "DevApplied", {"player_id": event.player_id, "detail": event.detail}
         case _:
@@ -580,6 +611,13 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                                 payload["severity"], payload["permanent"])
         case "CoreLawNotice":
             return CoreLawNotice(payload["player_id"], payload["sector_id"])
+        case "AdmissionAdvanced":
+            return AdmissionAdvanced(payload["player_id"], payload["alliance_id"], payload["task"])
+        case "AllianceJoined":
+            return AllianceJoined(payload["player_id"], payload["alliance_id"],
+                                  payload["former_alliance_id"])
+        case "AllianceResigned":
+            return AllianceResigned(payload["player_id"], payload["former_alliance_id"])
         case "DevApplied":
             return DevApplied(payload["player_id"], payload["detail"])
         case _:

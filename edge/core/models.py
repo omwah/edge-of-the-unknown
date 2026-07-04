@@ -484,6 +484,13 @@ class Player:
     # judgements read (WP27; the morality_judge hook and full Core enforcement, WP33/38).
     alignment: int = 0
     experience: int = 0
+    # Standing with each alliance/bloc (alliance_id → [-1, 1]), set by JoinAlliance
+    # (DESIGN §6.3, WP38): the joined bloc warms to +1, its rivals (and rivals of the
+    # joined bloc) sour to -1. Negative standing with a species' bloc shifts the
+    # greeting-vs-violence roll toward violence (`core.aliens.alliance_standing_shift`),
+    # and negative standing with the Core governor makes the Core unsafe (engaged on
+    # sight). Recovers to neutral on resignation. Empty until the player joins a bloc.
+    alliance_standing: Mapping[int, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

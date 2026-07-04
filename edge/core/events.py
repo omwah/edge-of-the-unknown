@@ -405,8 +405,34 @@ class GrudgeFormed(Event):
 class CoreLawNotice(Event):
     """The governor's patrols flag a criminal player entering Core Space (WP27).
 
-    A warning only in Phase-3's first pass; engagement-on-sight is WP38.
+    A warning only; a rival-aligned player is instead engaged on sight (WP38 encounter).
     """
 
     player_id: int
     sector_id: int
+
+
+@dataclass(frozen=True)
+class AdmissionAdvanced(Event):
+    """One admission task toward a bloc's membership was completed (§6.3, WP38)."""
+
+    player_id: int
+    alliance_id: int
+    task: str
+
+
+@dataclass(frozen=True)
+class AllianceJoined(Event):
+    """The player joined a bloc (§6.3, WP38) — exclusive, with rival fallout."""
+
+    player_id: int
+    alliance_id: int
+    former_alliance_id: int | None  # the membership resigned to join, if any
+
+
+@dataclass(frozen=True)
+class AllianceResigned(Event):
+    """The player left their bloc (§6.3, WP38) — standing recovers to neutral."""
+
+    player_id: int
+    former_alliance_id: int
