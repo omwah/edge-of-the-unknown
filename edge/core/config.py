@@ -523,6 +523,11 @@ class AliensConfig(BaseModel):
     # Core law (WP27 basics; full enforcement WP38): below this alignment the player
     # is criminal and the governor's patrols take notice on Core entry.
     criminal_alignment: int = -10
+    # Bounty paid per hostile combat unit destroyed (§10, WP44 — echoing TW2002's Cabal
+    # 100/kill): a latinum faucet that funds the fight against the frontier's raiders. Only
+    # **hostile-band** ship kills and hostile sector-fighter garrisons pay — culling raiders
+    # is rewarded; gunning down the peaceable is not.
+    bounty_per_kill: int = 100
 
     # Inter-species relations + reputation spillover (§6.4, WP39). The relation matrix is
     # alliance-derived by default — bloc-mates default to `relation_ally_default`, members

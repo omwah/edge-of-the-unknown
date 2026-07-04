@@ -1646,10 +1646,15 @@ def _combat_action(
                 spilled = apply_spillover(
                     soured, species.roster_id, delta, config.roster, al)
                 soured = replace(soured, species_attitudes=spilled)
+        # Bounty for culling a hostile-band raider (§10, WP44) — a latinum faucet that
+        # funds the fight; friendly/neutral kills pay nothing.
+        bounty = encounters.kill_bounty(
+            config, hostile=band == HOSTILE_BAND, count=result.foes_destroyed)
         new_player = replace(
             soured,
             alignment=soured.alignment + align_per_kill * result.foes_destroyed,
             experience=soured.experience + xp,
+            latinum=soured.latinum + bounty,
         )
     if result.knockout is not None:
         # The owning subsystem's aspect degrades immediately (§4.1 derive-on-write).
@@ -1703,6 +1708,10 @@ def _combat_action(
             force = state.sector_forces.get(enc.sector_id)
             if force is not None and force.fighters > 0:
                 if result.outcome == combat.VICTORY:
+                    # A garrison only engages an entrant its owner opposes (§10, WP41), so a
+                    # wiped garrison is always hostile — every downed fighter pays a bounty.
+                    bounty = encounters.kill_bounty(config, hostile=True, count=force.fighters)
+                    new_player = replace(new_player, latinum=new_player.latinum + bounty)
                     force_updates = (replace(force, fighters=0),)
                 elif result.outcome == combat.FLED:
                     force_updates = (replace(

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import random
 
+from edge.core.aliens import HOSTILE, disposition_band
 from edge.core.config import DiscoveryConfig, GameConfig
 from edge.core.enums import Component, ComponentTier, DiscoveryKind, PayloadKind, RarityTier
 from edge.core.models import Discovery, DiscoveryPayload, UniverseState
@@ -153,3 +154,45 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
         did += 1
 
     state.discoveries = discoveries
+
+
+def salt_raid_caches(state: UniverseState, config: GameConfig) -> None:
+    """Salt a legendary technology cache onto each hostile species' homeworld (§7, §10 — WP44).
+
+    Runs **after** `populate_species` (it needs placed species) on its own sub-RNG, so it
+    never shifts the §7 discovery draw order. A hostile-band species whose home (contact)
+    sector holds a planet gets one **legendary** Tier-III component cache on that world — the
+    reward for raiding the raiders — appended to `state.discoveries`. The cache is hidden
+    (sensor-gated) and `raid_cache`-marked, so it is descended-to and codex-logged like any
+    surface site but is excluded from the spatial rarity gradient (its placement follows
+    hostile homeworlds, not the band curve). One per sector; never in the Core.
+    """
+    dcfg = config.discovery
+    if dcfg is None or config.roster is None or not dcfg.component_pool:
+        return
+    rng = random.Random(f"{state.game.seed}-raidcache")
+    next_id = (max(state.discoveries) + 1) if state.discoveries else 1
+    planet_by_sector: dict[int, int] = {}
+    for pid in sorted(state.planets):
+        planet_by_sector.setdefault(state.planets[pid].sector_id, pid)
+    seeded: set[int] = set()
+    for sp in sorted(state.species.values(), key=lambda s: s.id):
+        sector = sp.sector_id
+        if (sector in seeded or state.sectors[sector].is_galactic_core
+                or disposition_band(sp.base_disposition, config.aliens) != HOSTILE):
+            continue
+        home_pid = planet_by_sector.get(sector)
+        if home_pid is None:
+            continue  # a homeworld raid needs a homeworld to cache the tech on
+        seeded.add(sector)
+        slot = max((d.site_slot for d in state.discoveries.values() if d.planet_id == home_pid),
+                   default=-1) + 1
+        state.discoveries[next_id] = Discovery(
+            id=next_id, kind=DiscoveryKind.ANCIENT_TECH, rarity_tier=RarityTier.LEGENDARY,
+            sector_id=sector, planet_id=home_pid, site_slot=slot,
+            payload=DiscoveryPayload(kind=PayloadKind.COMPONENT,
+                                     component=Component(rng.choice(dcfg.component_pool)),
+                                     tier=ComponentTier.III),
+            hidden=True, raid_cache=True,
+        )
+        next_id += 1

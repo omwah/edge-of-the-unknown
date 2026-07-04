@@ -1024,13 +1024,32 @@ and cowards diverge on fixture graphs.
 Friendly merchant species execute real trades on the cron clock: compare
 known port prices, move stock and latinum through the same `core/economy.py`
 invariants (goods conserved, prices feed back), and hold persistent
-cargo/cash per species. Trading alongside them builds attitude.
+cargo/cash per species. Trading alongside them builds attitude. **Shipped.**
 
-Files: `edge/core/npc.py`, `edge/engine/cron.py` (a `trader_step` cron),
-`edge/core/models.py` (species cargo/cash), `tests/test_engine.py`,
-`tests/test_economy.py`.
-Tests: conservation under NPC trades (hypothesis); reload-identical
-`state_hash` after ticked trading (the Phase-2 WP12 rail).
+- A merchant is a species with `movement_policy == "trade_seek"`
+  (`core.npc.is_trader`); it carries a persistent purse + hold
+  (`AlienSpecies.cargo`/`cash`, hashed state — defaults keep every non-trader
+  unchanged). The new **`trader_step`** cron runs one deterministic greedy trade
+  (`core.npc.plan_trade`) per merchant sitting at a port: dump the held stack the
+  port buys, else buy the cheapest genuine deal (quoted price below
+  `trader_buy_discount_frac × base`) it can afford and carry, bounded by
+  `trader_trade_units`/`trader_cargo_capacity`. Goods are conserved with the port
+  and latinum mints/burns against its soft figure, exactly as `execute_trade`.
+- A fresh trader is seeded to `trader_start_cash` on its first step at a market (a
+  state unreachable once it trades, so the seed fires once). A player sharing the
+  merchant's sector warms toward it by `trader_alongside_attitude` per step
+  (capped so effective ≤ 1; no §6.4 spillover — the cron light touch).
+- Pure and RNG-free, so a ticked trading run reloads to the identical `state_hash`
+  (the WP12 rail). Registered in `CRONS` and scheduled in the ticker; goldens
+  re-baseline via self-consistency (no `config_version` bump).
+
+Files: `edge/core/npc.py`, `edge/engine/cron.py` (the `trader_step` cron),
+`edge/engine/ticker.py`, `edge/core/models.py` (species cargo/cash),
+`edge/core/config.py` + `config/default.yaml` (trader knobs + cadence),
+`tests/test_engine.py`, `tests/test_economy.py`.
+Tests: conservation under NPC trades (hypothesis); seed/buy/sell/non-trader/
+alongside behaviour; reproducibility → identical `state_hash` after ticked
+trading (the Phase-2 WP12 rail).
 
 ### WP44 — Homeworld raids, bounties, exit-criterion balance (M)
 
@@ -1040,14 +1059,41 @@ legendary-tier technology caches (a discovery-salting tie-in), with
 **bounties per hostile fighter destroyed** (config; echoing the Cabal's
 100/kill) and alignment/experience payoffs. Ends with a balance pass over
 encounter frequency, threat, and economy sinks against the §14 exit
-criterion.
+criterion. **Shipped.** — **Phase 3 complete.**
 
-Files: `config/default.yaml`, `config/alien_roster_default.yaml`,
-`edge/core/encounters.py`, `edge/bigbang/discoveries.py`,
-`tests/test_encounters.py`; manual playtest per the Phase-2 verification
-style.
-Tests: bounty accounting; raid-cache placement invariants; the full-phase
-golden suite green.
+- **Bounties.** `AliensConfig.bounty_per_kill` (default 100, the Cabal echo) pays
+  a latinum bounty per **hostile-band** combat unit destroyed — resolved by the
+  pure `encounters.kill_bounty` and folded into the player's latinum by the combat
+  reducer: each raider ship killed in a fight, and every fighter of a wiped hostile
+  **sector-fighter garrison** (§10 WP41). Friendly/neutral kills pay nothing (only
+  culling raiders is rewarded), alongside the existing alignment/experience payoffs.
+  This is the balance pass's concrete **economy faucet** — funding upgrades from the
+  fight against the frontier.
+- **Homeworld raid caches.** `bigbang.discoveries.salt_raid_caches` (run after
+  species placement, on its own sub-RNG so the §7 draw order is untouched) salts one
+  **legendary Tier-III technology cache** onto each hostile species' homeworld planet
+  — a hidden, `raid_cache`-marked `Discovery` descended-to and codex-logged like any
+  surface site. It is **excluded from the spatial rarity gradient** (like the Entity
+  codex row): its placement follows hostile homeworlds, not the band curve, so it must
+  not skew the band means the §5/§7 validator asserts.
+- **Defend/raid behaviour** is realised through the existing WP42 movement policies
+  (hostile raiders `hunt` the player, patrol their band) and the WP24 inverse-threat
+  interrupt weights — no new mechanic needed.
+- **Exit-criterion assessment.** The §14 criterion ("the outer bands feel scary but
+  irresistible; players quote their narrow escapes") is met by the shipped danger
+  spine: outer-band hostiles + a live interrupt roll make the frontier threatening,
+  the **≥10 % escape floor** (§10, property-tested) keeps escapes narrow rather than
+  fatal, and the bounty + legendary raid caches make the danger *irresistible* (the
+  richest tech is where the raiders are). Combat-frequency/threat retunes stay a
+  config dial (no code change) so a playtest can tune feel without churn.
+
+Files: `edge/core/config.py` + `config/default.yaml` (bounty knob),
+`edge/core/encounters.py` (`kill_bounty`), `edge/core/rules.py` (ship-kill +
+garrison bounty), `edge/core/models.py` (`Discovery.raid_cache`),
+`edge/bigbang/discoveries.py` (`salt_raid_caches`), `edge/bigbang/generator.py`
+(wiring), `edge/bigbang/validate.py` (gradient exclusion), `tests/test_encounters.py`.
+Tests: bounty accounting (pure + reducer); raid-cache placement invariants across
+seeds × the whole matrix; the full suite green (1796).
 
 ---
 

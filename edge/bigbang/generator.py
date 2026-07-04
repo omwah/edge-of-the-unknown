@@ -19,7 +19,7 @@ import random
 from edge.bigbang import populate as _populate
 from edge.bigbang import validate as _validate
 from edge.bigbang.aliens import HomeClusterError, populate_species
-from edge.bigbang.discoveries import salt_discoveries
+from edge.bigbang.discoveries import salt_discoveries, salt_raid_caches
 from edge.bigbang.embedding import compute_embedding
 from edge.bigbang.naming import NameGenerator
 from edge.bigbang.numbering import assign_spatial_ids
@@ -243,6 +243,7 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
 
         try:
             populate_species(state, config)  # §6 aliens + home clusters on an independent sub-RNG
+            salt_raid_caches(state, config)  # §7/§10 legendary caches on hostile homeworlds (WP44)
             # §6.7 intel: give each species kind the places it can tip the player toward.
             state.species_knowledge = build_species_knowledge(state, seed)
             _validate.validate(state, config)

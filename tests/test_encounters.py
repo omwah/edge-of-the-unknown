@@ -282,3 +282,74 @@ def test_friendly_band_violence_opens_with_betrayal() -> None:
             assert roll.encounter.speech_context == "betrayal"
             return
     raise AssertionError("no violent roll in 300 attempts")
+
+
+# --- WP44: bounties + homeworld raid caches ---
+
+
+def test_kill_bounty_pays_only_for_hostile_kills() -> None:
+    """The §10/WP44 bounty is per hostile combat unit; friendly/neutral kills pay nothing."""
+    assert encounters.kill_bounty(CFG, hostile=True, count=3) == 3 * CFG.aliens.bounty_per_kill
+    assert encounters.kill_bounty(CFG, hostile=False, count=3) == 0
+    assert encounters.kill_bounty(CFG, hostile=True, count=0) == 0
+
+
+def test_destroying_a_hostile_ship_pays_a_bounty() -> None:
+    """Winning a fight against a hostile raider pays bounty_per_kill on top of salvage."""
+    from edge.core.events import SalvageCollected
+    from edge.core.models import AlienSpecies, Encounter, EncounterFoe
+    from edge.core.rules import CombatAction
+
+    state = _state_with_player()
+    ship = state.ships[state.players[1].ship_id]
+    sp = AlienSpecies(  # a synthetic hostile raider co-located with the player
+        id=9001, roster_id="quill", name="Quill", archetype_id="raider",
+        sector_id=ship.sector_id, home_band="Frontier", tech_level=3,
+        base_disposition=0.1, disposition_center=0.1, disposition_variance=0.05)
+    state.species[sp.id] = sp
+    foe = EncounterFoe(ship_class_id="scout_marauder", name="Quill Fighter", hull=1,
+                       hull_max=1, shields=0, damage=1, firing_arc="all_round",
+                       combat_speed=1, defense=0)
+    state.players[1] = replace(state.players[1], active_encounter=Encounter(
+        species_id=sp.id, sector_id=ship.sector_id, foes=(foe,), round=0,
+        player_shields=ship.shields))
+    before = state.players[1].latinum
+
+    result = reduce(state, 1, CombatAction(action="fight"), SMALL)
+    apply_result(state, result)
+    assert state.players[1].active_encounter is None  # the raider is dead — victory
+    salvage = next(e for e in result.events if isinstance(e, SalvageCollected))
+    # The gain is exactly the bounty for the one kill plus the wreck salvage.
+    assert state.players[1].latinum == before + CFG.aliens.bounty_per_kill + salvage.latinum
+
+
+@pytest.mark.parametrize("seed", range(12))
+def test_raid_caches_sit_on_hostile_homeworlds(seed: int) -> None:
+    """Every salted raid cache is a hidden legendary Tier-III tech cache on a hostile
+    species' homeworld planet, off the Core and off the spatial gradient (§7/§10, WP44)."""
+    from edge.core.enums import ComponentTier, DiscoveryKind, PayloadKind, RarityTier
+
+    state = generate(SMALL, seed)
+    hostile_sectors = {s.sector_id for s in state.species.values()
+                       if disposition_band(s.base_disposition, CFG.aliens) == HOSTILE}
+    seen: set[int] = set()
+    for d in state.discoveries.values():
+        if not d.raid_cache:
+            continue
+        assert d.rarity_tier is RarityTier.LEGENDARY
+        assert d.kind is DiscoveryKind.ANCIENT_TECH and d.hidden
+        assert d.payload.kind is PayloadKind.COMPONENT and d.payload.tier is ComponentTier.III
+        assert d.planet_id is not None                       # cached on a homeworld
+        assert not state.sectors[d.sector_id].is_galactic_core
+        assert d.sector_id in hostile_sectors                # at a hostile species' home
+        assert d.sector_id not in seen                       # at most one per sector
+        seen.add(d.sector_id)
+
+
+def test_raid_caches_are_placed_where_hostiles_hold_worlds() -> None:
+    """Across a seed range the pass actually fires (hostiles with homeworlds exist)."""
+    total = 0
+    for seed in range(12):
+        state = generate(SMALL, seed)
+        total += sum(1 for d in state.discoveries.values() if d.raid_cache)
+    assert total >= 1
