@@ -69,6 +69,30 @@ def test_core_anchor_and_trail_present() -> None:
     assert nav.you_display == 999
 
 
+def _anchor_col(rows: list[str]) -> int:
+    for row in rows:
+        plain = _strip(row)
+        if "Core" in plain:
+            return plain.index("Core")
+    raise AssertionError("no Core anchor found")
+
+
+def test_core_anchor_side_is_fixed_and_configurable() -> None:
+    # Core bearing due east (0.0) — the old bearing rule would have put the anchor on the
+    # right. The fixed side wins regardless, so the anchor never jumps between sectors.
+    east = _sector([_warp(10, 0.0, 110)], core_bearing=0.0)
+    left = navstrip.build_nav_strip(east, core_anchor_side="left").rows
+    right = navstrip.build_nav_strip(east, core_anchor_side="right").rows
+    assert "◄ Core" in "\n".join(_strip(r) for r in left)   # pinned left, faces left
+    assert "Core ►" in "\n".join(_strip(r) for r in right)  # pinned right, faces right
+    assert _anchor_col(left) < _anchor_col(right)            # left edge vs right edge
+
+    # A westward core bearing with the same fixed side still pins right (bearing ignored).
+    west = _sector([_warp(10, 0.0, 110)], core_bearing=math.pi)
+    assert "Core ►" in "\n".join(
+        _strip(r) for r in navstrip.build_nav_strip(west, core_anchor_side="right").rows)
+
+
 def test_fallback_to_gravity_axis_without_embedding() -> None:
     # No embedding: every bearing 0.0 → the baker uses each warp's <</>>/-- arrow.
     warps = [

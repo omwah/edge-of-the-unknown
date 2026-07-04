@@ -39,7 +39,7 @@ _ARROW_OCTANT = {"<<": 4, ">>": 0, "--": 2}  # gravity-axis fallback: coreward W
 
 NAV_LEGEND = (
     "[reverse bold cyan]@[/] you   click or ↵ to warp   "
-    "[bold cyan]Core[/] points toward the Core"
+    "[bold cyan]Core[/] the galactic core (home edge)"
 )
 
 
@@ -74,8 +74,15 @@ def _warp_style(warp: dto.WarpDTO) -> str | None:
     return BAND_COLOR.get(warp.band)
 
 
-def build_nav_strip(sector: dto.SectorDTO) -> dto.NavStripDTO:
-    """Bake the nav rose for `sector` — the sole main-screen warp affordance (§11)."""
+def build_nav_strip(
+    sector: dto.SectorDTO, *, core_anchor_side: str = "left"
+) -> dto.NavStripDTO:
+    """Bake the nav rose for `sector` — the sole main-screen warp affordance (§11).
+
+    `core_anchor_side` (`"left"`/`"right"`, from `ui.nav_core_anchor_side`) pins the
+    `Core` orientation anchor to a **fixed** frame edge, so it never jumps sides between
+    sectors and always faces the same way. Warps are still placed by their real bearing.
+    """
     warps = sector.warps
     has_embed = sector.core_bearing != 0.0 or any(w.bearing != 0.0 for w in warps)
 
@@ -95,8 +102,9 @@ def build_nav_strip(sector: dto.SectorDTO) -> dto.NavStripDTO:
     right_w = max((len(labels[o]) for o in placed if _SLOT[o][1] == "R"), default=0)
     center_w = max([len(_HERE)] + [len(labels[o]) for o in placed if _SLOT[o][1] == "C"])
 
-    # The Core anchor sits on the frame edge toward the Core; reserve a margin there.
-    anchor_left = math.cos(sector.core_bearing) < 0 if has_embed else True
+    # The Core anchor pins to a fixed frame edge (config, not bearing) so it never jumps
+    # sides between sectors; reserve a margin there. The arrow always faces the same way.
+    anchor_left = core_anchor_side != "right"
     anchor_text = "◄ Core" if anchor_left else "Core ►"
     left_margin = len(anchor_text) + 1 if anchor_left else 0
     right_margin = len(anchor_text) + 1 if not anchor_left else 0

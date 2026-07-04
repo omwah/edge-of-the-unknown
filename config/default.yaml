@@ -35,6 +35,7 @@ scene:
 ui:
   warp_columns: 3            # warp-grid width; cells fill the printable area, wrap into rows
   warp_focus_default: first  # default keyboard focus: first | backtrack | unexplored
+  nav_core_anchor_side: left # which edge the nav rose's Core anchor pins to: left | right (fixed, never jumps sides)
   sidebar_width: 33          # status sidebar fixed character width (content is fixed-width)
   sidebar_min_screen_width: 90  # hide the sidebar when the terminal is narrower than this
   surface_terrain_height: 15 # SurfaceScreen terrain-panel height (rows, incl. border)

@@ -591,6 +591,37 @@ class SectorScene(Static):
                 return
 
 
+def _nearest_node(hits: list, idx: int, dx: int, dy: int) -> int | None:  # type: ignore[type-arg]
+    """Index of the node nearest `hits[idx]` in the pressed screen direction, or None.
+
+    Navigation follows the on-screen layout, not insertion order: positions are each
+    node's baked cell centre `((col0+col1)/2, row)`; a candidate must lie in the pressed
+    half-plane (right/left for `dx`, down/up for `dy`). **Cross-axis alignment wins first**
+    — pressing Up/Down prefers a sector in the *same column* (and Left/Right one in the
+    *same row*) over a nearer one that is off to the side — with the along-axis gap only
+    breaking ties. Shared by the nav rose and the local map so both cursors move the same,
+    layout-aware way.
+    """
+    if not hits or idx >= len(hits):
+        return None
+    cur = hits[idx]
+    cx, cy = (cur.col0 + cur.col1) / 2, cur.row
+    step = dx or dy
+    best: int | None = None
+    best_score: tuple[float, float] | None = None
+    for j, n in enumerate(hits):
+        if j == idx:
+            continue
+        ex, ey = (n.col0 + n.col1) / 2 - cx, n.row - cy
+        along, across = (ex, ey) if dx else (ey, ex)
+        if along == 0 or (along > 0) != (step > 0):
+            continue  # not in the pressed direction
+        score = (abs(across), abs(along))  # alignment (same row/column) first, then distance
+        if best_score is None or score < best_score:
+            best, best_score = j, score
+    return best
+
+
 class LocalMapView(Static):
     """The local sector ego-graph (Computer/Map screen → §10, §11).
 
@@ -681,25 +712,10 @@ class LocalMapView(Static):
         self.refresh()
 
     def action_move(self, dx: int, dy: int) -> None:
-        """Move the selection to the nearest node in the pressed direction."""
-        if len(self._hits) < 2:
-            return
-        cur = self._hits[self._idx]
-        cx, cy = (cur.col0 + cur.col1) / 2, cur.row
-        best, best_score = None, None
-        for j, n in enumerate(self._hits):
-            if j == self._idx:
-                continue
-            ox, oy = (n.col0 + n.col1) / 2 - cx, n.row - cy
-            along, across = (ox, oy) if dx else (oy, ox)
-            step = dx or dy
-            if along == 0 or (along > 0) != (step > 0):
-                continue  # not in the pressed direction
-            score = (abs(along), abs(across))
-            if best_score is None or score < best_score:
-                best, best_score = j, score
-        if best is not None:
-            self._idx = best
+        """Move the selection to the nearest node in the pressed screen direction."""
+        j = _nearest_node(self._hits, self._idx, dx, dy)
+        if j is not None:
+            self._idx = j
             self.refresh()
 
     def action_pick(self) -> None:
@@ -955,10 +971,10 @@ class NavRose(Static):
             super().__init__()
 
     BINDINGS = [
-        Binding("up", "move(-1)", show=False),
-        Binding("left", "move(-1)", show=False),
-        Binding("down", "move(1)", show=False),
-        Binding("right", "move(1)", show=False),
+        Binding("up", "move(0, -1)", show=False),
+        Binding("down", "move(0, 1)", show=False),
+        Binding("left", "move(-1, 0)", show=False),
+        Binding("right", "move(1, 0)", show=False),
         Binding("enter", "warp", "Warp", show=False),
         Binding("space", "warp", "Warp", show=False),
     ]
@@ -969,7 +985,7 @@ class NavRose(Static):
         super().__init__(**kwargs)
         self._nav = nav
         self._warps = {w.sector_id: w for w in warps}
-        # Cycle order runs top-to-bottom, left-to-right around the rose.
+        # Home selection is the top-left node; arrow keys then move by on-screen layout.
         self._hits = sorted(nav.nodes, key=lambda n: (n.row, n.col0))
         self._idx = 0
 
@@ -1021,9 +1037,11 @@ class NavRose(Static):
         line.append("     (↵ to warp)", style="dim")
         return line
 
-    def action_move(self, step: int) -> None:
-        if self._hits:
-            self._idx = (self._idx + step) % len(self._hits)
+    def action_move(self, dx: int, dy: int) -> None:
+        """Move the selection to the nearest warp in the pressed screen direction."""
+        j = _nearest_node(self._hits, self._idx, dx, dy)
+        if j is not None:
+            self._idx = j
             self.refresh()
 
     def action_warp(self) -> None:

@@ -334,7 +334,8 @@ def game_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.G
         turns=player.turns_remaining, max_turns=config.turns_per_day,
         ship=_ship_dto(state, ship, player, sector),
         sector=sector_dto,
-        nav=navstrip.build_nav_strip(sector_dto),
+        nav=navstrip.build_nav_strip(
+            sector_dto, core_anchor_side=config.ui.nav_core_anchor_side),
     )
 
 

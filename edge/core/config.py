@@ -1119,6 +1119,10 @@ class UIConfig(BaseModel):
 
     warp_columns: int = Field(default=3, gt=0)
     warp_focus_default: Literal["first", "backtrack", "unexplored"] = "first"
+    # Which frame edge the nav rose's `Core` orientation anchor pins to (§11). Fixed —
+    # not bearing-driven — so the anchor never jumps sides between sectors; the arrow
+    # always faces the same way. `left` ⇒ `◄ Core` at the left edge; `right` ⇒ `Core ►`.
+    nav_core_anchor_side: Literal["left", "right"] = "left"
     sidebar_width: int = Field(default=33, gt=0)
     sidebar_min_screen_width: int = Field(default=90, gt=0)
     surface_terrain_height: int = Field(default=12, gt=0)  # SurfaceScreen terrain panel height

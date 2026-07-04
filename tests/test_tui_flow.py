@@ -192,11 +192,12 @@ async def test_sector_title_shows_spatial_id() -> None:
         assert f"[{spatial}]" in title
 
 
-async def test_arrow_keys_cycle_nav_rose_selection() -> None:
-    """Arrow keys move the nav rose's selection around the compass.
+async def test_arrow_keys_move_nav_rose_selection_by_layout() -> None:
+    """Arrow keys move the nav rose's selection to the nearest warp *on screen*, not by
+    insertion order: from the top-left home node, Right lands on a node to its right and
+    Down on one below it.
 
-    The rose auto-focuses on the fresh game screen (no priming Tab); Right/Down step
-    to the next neighbour, Left/Up to the previous, wrapping through the ring.
+    The rose auto-focuses on the fresh game screen (no priming Tab).
     """
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -207,21 +208,62 @@ async def test_arrow_keys_cycle_nav_rose_selection() -> None:
         rose = app.screen.query_one(NavRose)
         assert isinstance(app.focused, NavRose)
         if len(rose._hits) < 2:
-            return  # a lone-exit sector has nothing to cycle through
+            return  # a lone-exit sector has nothing to move to
 
-        start_idx = rose._idx
+        home = rose._hits[0]  # top-left by (row, col0)
+        hx = (home.col0 + home.col1) / 2
+        assert rose._idx == 0
+
         await pilot.press("right")
         await pilot.pause()
-        assert rose._idx == (start_idx + 1) % len(rose._hits)
-        await pilot.press("left")
-        await pilot.pause()
-        assert rose._idx == start_idx
+        if rose._idx != 0:  # a node lies to the right → the selection moved rightward
+            sel = rose._hits[rose._idx]
+            assert (sel.col0 + sel.col1) / 2 > hx
+
+        rose._idx = 0
+        rose.refresh()
         await pilot.press("down")
         await pilot.pause()
-        assert rose._idx == (start_idx + 1) % len(rose._hits)
-        await pilot.press("up")
+        if rose._idx != 0:  # a node lies below → the selection moved downward
+            assert rose._hits[rose._idx].row > home.row
+
+        # The home node is top-left, so at least one of Right/Down must find a neighbour.
+        rose._idx = 0
+        await pilot.press("right")
         await pilot.pause()
-        assert rose._idx == start_idx
+        if rose._idx == 0:
+            await pilot.press("down")
+            await pilot.pause()
+        assert rose._idx != 0
+
+
+def test_nearest_node_moves_by_screen_layout() -> None:
+    """The shared arrow-nav helper picks the nearest node in the pressed direction."""
+    from edge.core.dto import MapNodeDTO
+
+    from edge.tui.widgets import _nearest_node
+
+    nodes = [
+        MapNodeDTO(sector_id=1, display_id=1, row=0, col0=0, col1=3),    # top-left
+        MapNodeDTO(sector_id=2, display_id=2, row=0, col0=10, col1=13),  # top-right
+        MapNodeDTO(sector_id=3, display_id=3, row=4, col0=0, col1=3),    # bottom-left
+    ]
+    assert _nearest_node(nodes, 0, 1, 0) == 1     # right from top-left → top-right
+    assert _nearest_node(nodes, 0, 0, 1) == 2     # down  from top-left → bottom-left
+    assert _nearest_node(nodes, 0, -1, 0) is None  # nothing to the left of top-left
+    assert _nearest_node(nodes, 0, 0, -1) is None  # nothing above the top row
+    assert _nearest_node(nodes, 1, -1, 0) == 0    # left  from top-right → top-left
+    assert _nearest_node(nodes, 2, 0, -1) == 0    # up    from bottom-left → top-left (nearest across)
+
+    # Alignment wins over raw proximity: pressing Up prefers the sector in the SAME column
+    # (row 0) over a nearer one (row 2) that sits off to the side.
+    aligned = [
+        MapNodeDTO(sector_id=1, display_id=1, row=4, col0=10, col1=13),  # 0: current
+        MapNodeDTO(sector_id=2, display_id=2, row=2, col0=0, col1=3),    # 1: nearer row, off-column
+        MapNodeDTO(sector_id=3, display_id=3, row=0, col0=10, col1=13),  # 2: same column, farther row
+    ]
+    assert _nearest_node(aligned, 0, 0, -1) == 2  # Up → the same-column sector, not the nearer one
+    assert _nearest_node(aligned, 0, -1, 0) == 1  # Left → the only sector to the left
 
 
 async def test_selected_nav_node_inverts_only_its_cell() -> None:
