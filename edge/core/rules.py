@@ -29,6 +29,7 @@ from edge.core.aliens import (
     admission_met,
     apply_join_standing,
     apply_resign_standing,
+    apply_spillover,
     attitude_locked,
     disposition_band,
     effective_disposition,
@@ -1430,6 +1431,7 @@ def _combat_action(
             FRIENDLY_BAND: al.alignment_kill_friendly,
         }[band]
         xp = max(1, round(sc.threat_rating * al.experience_kill_scale)) * result.foes_destroyed
+        prior = new_player.species_attitudes.get(species.roster_id, 0.0)
         soured = sour_attitude(
             new_player, species, sc, al, state.game.day_number, result.foes_destroyed)
         if soured is not new_player:  # memory_model none forgets instantly (no events)
@@ -1440,6 +1442,13 @@ def _combat_action(
                 player_id, species.id,
                 round(soured.species_attitudes[species.roster_id], 6),
                 round(effective_disposition(species, soured), 6)))
+            # Reputation spillover (§6.4, WP39): harming this species chills its friends
+            # and warms its enemies in proportion to their relations to it.
+            if config.roster is not None:
+                delta = soured.species_attitudes[species.roster_id] - prior
+                spilled = apply_spillover(
+                    soured, species.roster_id, delta, config.roster, al)
+                soured = replace(soured, species_attitudes=spilled)
         new_player = replace(
             soured,
             alignment=soured.alignment + align_per_kill * result.foes_destroyed,
@@ -2225,6 +2234,12 @@ def _raise_attitude(player: Player, species: AlienSpecies,
     new_offset = min(cap, current + sc.attitude_gain_rate)
     attitudes = {**player.species_attitudes, species.roster_id: new_offset}
     new_player = replace(player, species_attitudes=attitudes)
+    # Reputation spillover (§6.4, WP39): warming to this species also nudges its friends
+    # and enemies in proportion to their relations to it.
+    if config.roster is not None:
+        spilled = apply_spillover(
+            new_player, species.roster_id, new_offset - current, config.roster, config.aliens)
+        new_player = replace(new_player, species_attitudes=spilled)
     effective = effective_disposition(species, new_player)
     return new_player, AttitudeChanged(player.id, species.id, round(new_offset, 6), round(effective, 6))
 

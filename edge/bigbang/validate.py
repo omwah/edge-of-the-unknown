@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections import deque
 
 from edge.bigbang.topology import bfs_distances
-from edge.core.aliens import is_friendly
+from edge.core.aliens import is_friendly, species_relation
 from edge.core.config import GameConfig
 from edge.core.discovery import rarity_value
 from edge.core.economy import port_unit_price
@@ -35,6 +35,7 @@ def validate(state: UniverseState, config: GameConfig) -> None:
     _check_discovery_gradient(state, config)
     _check_species(state, config)
     _check_home_clusters(state, config)
+    _check_relations(state, config)
     if config.bigbang.topology_mode == "expansive":
         _check_expansive_no_chokepoint(state)
 
@@ -263,6 +264,38 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
         )
         if has_non_core and band not in friendly_bands:
             raise ValidationError(f"no friendly alien contact in band {band}")
+
+
+def _check_relations(state: UniverseState, config: GameConfig) -> None:
+    """Inter-species relations are consistent with the alliance structure (§6.4, WP39).
+
+    The relation matrix is alliance-derived by default with sparse per-pair overrides
+    (`core.aliens.species_relation`). The consistency rule over the *cast* (the species
+    actually placed): bloc-mates default non-hostile, and no two members of the same
+    alliance hold mutually-negative explicit relations — an alliance whose own members
+    treat each other as enemies is incoherent. Explicit one-sided friction (a feud a
+    single member nurses) is allowed; mutual intra-bloc enmity is not.
+    """
+    if config.roster is None:
+        return
+    if config.aliens.relation_ally_default < 0.0:
+        raise ValidationError("relation_ally_default must be non-negative (bloc-mates)")
+    cast = sorted({sp.roster_id for sp in state.species.values()})
+    for a_id in cast:
+        a = config.roster.species_by_id(a_id)
+        if a is None or a.alliance_id is None:
+            continue
+        for b_id in cast:
+            if b_id == a_id:
+                continue
+            b = config.roster.species_by_id(b_id)
+            if b is None or b.alliance_id != a.alliance_id:
+                continue
+            ab = species_relation(config.roster, a_id, b_id, config.aliens)
+            ba = species_relation(config.roster, b_id, a_id, config.aliens)
+            if ab < 0.0 and ba < 0.0:
+                raise ValidationError(
+                    f"bloc-mates {a_id!r} and {b_id!r} hold mutually hostile relations")
 
 
 def _check_home_clusters(state: UniverseState, config: GameConfig) -> None:
