@@ -36,6 +36,12 @@
   #controls button:hover { background: #223041; border-color: #3d5061; }
   #controls .hint { margin-top: 8px; font-size: 11px; color: #6f7f90;
     line-height: 1.4; }
+  #controls .band-h { margin-top: 11px; }
+  #controls .band-head { display: flex; gap: 6px; font-size: 10px; color: #6f7f90;
+    margin: 0 0 3px; }
+  #controls .band-head span.c { width: 14px; text-align: center; }
+  #controls .band-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  #controls .band-row input { width: 14px; margin: 0; cursor: pointer; }
   #controls.edit { border-color: #b8892f; box-shadow: 0 0 0 1px #b8892f55; }
 
   #legend { bottom: 10px; right: 10px; padding: 10px 12px; font-size: 12px;
@@ -75,6 +81,9 @@
   <label><input type="checkbox" id="tg-core" checked> Core outline</label>
   <label><input type="checkbox" id="tg-cluster" checked> Cluster outlines</label>
   <label><input type="checkbox" id="tg-band" checked> Band rings</label>
+  <h3 class="band-h">Bands</h3>
+  <div class="band-head"><span class="c" title="nodes">N</span><span class="c" title="edges">E</span><span>band</span></div>
+  <div id="band-toggles"></div>
   <label><input type="checkbox" id="tg-edit"> <b>Edit edges</b></label>
   <div class="btnrow">
     <button id="btn-save">Save edits</button>
@@ -148,6 +157,11 @@ const T = { k: 1, tx: 0, ty: 0 };
 let editMode = false, idMode = "spatial";
 let pendingNode = null, selectedEdge = null;
 
+// per-band visibility (nodes and edges independently); an edge is classed by its
+// outer (deeper) endpoint's band.
+const nodeBandOn = {}, edgeBandOn = {};
+for (const b of meta.bands) { nodeBandOn[b.name] = true; edgeBandOn[b.name] = true; }
+
 // layer groups (bottom -> top)
 const gBands = el("g"), gClusters = el("g"), gCore = el("g"), gEdges = el("g"), gNodes = el("g");
 viewport.append(gBands, gClusters, gCore, gEdges, gNodes);
@@ -158,6 +172,41 @@ function median(arr) {
   const s = arr.slice().sort((a, b) => a - b);
   return s[s.length >> 1] || 1;
 }
+// Nudge overlapping nodes apart while preserving the radial structure: a few
+// grid-bucketed passes that only push pairs closer than one node diameter. Cheap
+// (near O(n) per pass via the spatial hash) and deterministic (id-based tie-break).
+function relaxOverlaps(iterations = 140) {
+  const minDist = 2 * NODE_R + 8;
+  const cell = minDist;
+  const key = (cx, cy) => cx + "," + cy;
+  for (let it = 0; it < iterations; it++) {
+    const grid = new Map();
+    for (const [id, p] of nodePos) {
+      const k = key(Math.floor(p.x / cell), Math.floor(p.y / cell));
+      (grid.get(k) || grid.set(k, []).get(k)).push(id);
+    }
+    let moved = false;
+    for (const [id, p] of nodePos) {
+      const cx = Math.floor(p.x / cell), cy = Math.floor(p.y / cell);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        const arr = grid.get(key(cx + dx, cy + dy));
+        if (!arr) continue;
+        for (const oid of arr) {
+          if (oid <= id) continue;                 // handle each pair once
+          const q = nodePos.get(oid);
+          let ddx = q.x - p.x, ddy = q.y - p.y, d = Math.hypot(ddx, ddy);
+          if (d >= minDist) continue;
+          if (d < 1e-6) { ddx = ((id % 7) - 3) || 1; ddy = ((oid % 5) - 2) || 1; d = Math.hypot(ddx, ddy); }
+          const push = (minDist - d) / 2, ux = ddx / d, uy = ddy / d;
+          p.x -= ux * push; p.y -= uy * push;
+          q.x += ux * push; q.y += uy * push;
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+}
 function buildLayout() {
   const lens = [];
   for (const e of currentEdges) {
@@ -167,12 +216,11 @@ function buildLayout() {
   const med = median(lens.filter((v) => v > 0));
   scale = med > 0 ? 110 / med : 60;
   nodePos = new Map();
+  for (const s of sectors) nodePos.set(s.id, { x: s.x * scale, y: s.y * scale });
+  relaxOverlaps();
+  // pristine copy (post-relaxation) so "reset layout" restores the de-overlapped view
   basePos = new Map();
-  for (const s of sectors) {
-    const p = { x: s.x * scale, y: s.y * scale };
-    nodePos.set(s.id, p);
-    basePos.set(s.id, { x: p.x, y: p.y });
-  }
+  for (const [id, p] of nodePos) basePos.set(id, { x: p.x, y: p.y });
   // ring centre: the innermost sector (Core anchor, embedding origin)
   let anchor = sectors[0];
   for (const s of sectors) if (s.core_hops < anchor.core_hops) anchor = s;
@@ -336,6 +384,7 @@ function drawEdges() {
     const rec = edgeEls.find((r) => edgeKey(r.e) === selectedEdge);
     if (rec) highlightEdge(rec, true); else selectedEdge = null;
   }
+  applyBandVisibility();
 }
 function refreshIncidentEdges(id) {
   for (const rec of edgeEls) {
@@ -344,6 +393,26 @@ function refreshIncidentEdges(id) {
       rec.g.children[0].setAttribute("d", d);
       rec.g.children[1].setAttribute("d", d);
     }
+  }
+}
+
+// ---- per-band visibility ----------------------------------------------------
+function edgeBand(e) {
+  const a = byId.get(e.a), b = byId.get(e.b);
+  if (!a) return b ? b.band : "";
+  if (!b) return a.band;
+  return a.core_hops >= b.core_hops ? a.band : b.band;   // classed by outer endpoint
+}
+// A node hides with its band; an edge hides with its own band's edge-toggle OR when
+// either endpoint's nodes are hidden (so no edge dangles into an empty band).
+function applyBandVisibility() {
+  for (const [id, rec] of nodeEls) {
+    rec.g.style.display = nodeBandOn[byId.get(id).band] ? "" : "none";
+  }
+  for (const rec of edgeEls) {
+    const a = byId.get(rec.e.a), b = byId.get(rec.e.b);
+    const vis = edgeBandOn[edgeBand(rec.e)] && nodeBandOn[a.band] && nodeBandOn[b.band];
+    rec.g.style.display = vis ? "" : "none";
   }
 }
 
@@ -409,6 +478,7 @@ function drawNodes() {
     gNodes.appendChild(g);
     nodeEls.set(s.id, { g, idText, circle });
   }
+  applyBandVisibility();
 }
 
 // ---- interaction: node drag / click -----------------------------------------
@@ -549,6 +619,20 @@ function initControls() {
       group.style.display = e.target.checked ? "" : "none";
     });
   bind("tg-core", gCore); bind("tg-cluster", gClusters); bind("tg-band", gBands);
+
+  // per-band node/edge visibility toggles
+  const bt = document.getElementById("band-toggles");
+  bt.innerHTML = meta.bands.map((b) =>
+    `<div class="band-row">` +
+    `<input type="checkbox" class="bt-node" data-band="${b.name}" title="show ${b.name} nodes" checked>` +
+    `<input type="checkbox" class="bt-edge" data-band="${b.name}" title="show ${b.name} edges" checked>` +
+    `<span style="color:${bandColor(b.name)}">${b.name}</span></div>`).join("");
+  bt.querySelectorAll(".bt-node").forEach((cb) => cb.addEventListener("change", () => {
+    nodeBandOn[cb.dataset.band] = cb.checked; applyBandVisibility();
+  }));
+  bt.querySelectorAll(".bt-edge").forEach((cb) => cb.addEventListener("change", () => {
+    edgeBandOn[cb.dataset.band] = cb.checked; applyBandVisibility();
+  }));
 
   document.getElementById("tg-edit").addEventListener("change", (e) => {
     editMode = e.target.checked;
