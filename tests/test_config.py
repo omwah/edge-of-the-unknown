@@ -95,8 +95,8 @@ def test_default_bigbang_and_ship() -> None:
     assert cfg.bigbang.sector_count == 1_000
     assert cfg.bigbang.max_warps_per_sector == 6
     assert sum(cfg.bigbang.port_class_distribution) == 100
-    assert len(cfg.bigbang.bands.trunk) == 4
-    assert len(cfg.bigbang.bands.expansive) == 4
+    assert len(cfg.bigbang.topology.trunk.bands) == 4
+    assert len(cfg.bigbang.topology.expansive.bands) == 4
     assert len(cfg.bigbang.active_bands()) == 4
     assert cfg.starter_ship.holds_total == 60
 

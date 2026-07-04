@@ -154,41 +154,60 @@ def _mesh_bands() -> list[DistanceBand]:
     ]
 
 
-class BandSet(BaseModel):
-    """Distance-band hop windows keyed by `topology_mode` (DESIGN §5 step 5).
+class TopologyModeConfig(BaseModel):
+    """The parameters specific to one `topology_mode` (DESIGN §5).
+
+    Everything a mode needs beyond the shared `BigBangConfig` knobs lives here:
+    the mode's distance-band hop windows (`bands`) and, for the trunk spanning
+    tree, its extra-bridge range (`bridges_min`/`bridges_max` — the other modes
+    ignore these, deriving inter-cluster links from ring roads/spokes or the
+    grid). `BigBangConfig.active_topology()` resolves the live block.
+    """
+
+    model_config = _FROZEN
+
+    bands: list[DistanceBand]
+    # Trunk-only: the [min, max] range of extra bridges each cluster gets beyond
+    # its one spanning-tree link (DESIGN §5 step 2). Ignored by the other modes.
+    bridges_min: int = 1
+    bridges_max: int = 5
+
+
+class TopologySet(BaseModel):
+    """Per-`topology_mode` config blocks, keyed by mode name (DESIGN §5 step 5).
 
     Each mode lists the same band **names** in the same order — only the hop
     windows differ, so every name-keyed placement/validation/UI path is
     mode-agnostic. `expansive`'s ring-road lattice yields a deeper hop profile
     than the trunk spanning tree, so its windows are wider to keep all four
-    bands populated. `BigBangConfig.active_bands()` resolves the live list.
+    bands populated. `BigBangConfig.active_topology()` resolves the live block.
     """
 
     model_config = _FROZEN
 
-    trunk: list[DistanceBand] = Field(default_factory=_trunk_bands)
-    expansive: list[DistanceBand] = Field(default_factory=_expansive_bands)
-    planar: list[DistanceBand] = Field(default_factory=_planar_bands)
-    mesh: list[DistanceBand] = Field(default_factory=_mesh_bands)
+    trunk: TopologyModeConfig = Field(
+        default_factory=lambda: TopologyModeConfig(bands=_trunk_bands())
+    )
+    expansive: TopologyModeConfig = Field(
+        default_factory=lambda: TopologyModeConfig(bands=_expansive_bands())
+    )
+    planar: TopologyModeConfig = Field(
+        default_factory=lambda: TopologyModeConfig(bands=_planar_bands())
+    )
+    mesh: TopologyModeConfig = Field(
+        default_factory=lambda: TopologyModeConfig(bands=_mesh_bands())
+    )
 
     @model_validator(mode="after")
-    def _check_names_match(self) -> BandSet:
-        names = [b.name for b in self.trunk]
-        exp = [b.name for b in self.expansive]
-        pla = [b.name for b in self.planar]
-        msh = [b.name for b in self.mesh]
-        if exp != names:
-            raise ValueError(
-                f"bands.expansive names {exp} must match bands.trunk {names}"
-            )
-        if pla != names:
-            raise ValueError(
-                f"bands.planar names {pla} must match bands.trunk {names}"
-            )
-        if msh != names:
-            raise ValueError(
-                f"bands.mesh names {msh} must match bands.trunk {names}"
-            )
+    def _check_names_match(self) -> TopologySet:
+        names = [b.name for b in self.trunk.bands]
+        for mode_name in ("expansive", "planar", "mesh"):
+            got = [b.name for b in getattr(self, mode_name).bands]
+            if got != names:
+                raise ValueError(
+                    f"topology.{mode_name}.bands names {got} must match "
+                    f"topology.trunk.bands {names}"
+                )
         return self
 
 
@@ -205,13 +224,12 @@ class BigBangConfig(BaseModel):
     # bridges, so every ring is a widening lattice with no single-bridge
     # chokepoint. The default stays `trunk`; the flip rides the WP22 config epoch.
     topology_mode: Literal["trunk", "expansive", "planar", "mesh"] = "trunk"
+    # --- shared across all topology modes ---
     cluster_min: int = 5
     cluster_max: int = 25
-    intra_group_degree: float = 2.5
-    inter_group_degree: float = 2.5
-    bridges_min: int = 1
-    bridges_max: int = 5
-    one_way_chance: float = 0.15
+    intra_group_degree: float = 2.5  # avg warps per sector inside a cluster (all modes)
+    inter_group_degree: float = 2.5  # avg inter-cluster warps per cluster (all modes)
+    one_way_chance: float = 0.15  # probability a bridge is one-way (all modes)
     max_warps_per_sector: int = 6  # TW2002 canon
     core_sector_count: int = 10  # Core Space = sectors 1..N
     # Alliance home clusters (§5 step 6, §6.3): each non-governing bloc in the cast gets
@@ -233,21 +251,20 @@ class BigBangConfig(BaseModel):
     )
     initial_stock_min: int = 200
     initial_stock_max: int = 2_000
-    # Per-mode distance-band hop windows, nested by `topology_mode` (§5 step 5):
-    # `bands.trunk` and `bands.expansive`. Same band names/order across modes — only
-    # the hop windows differ — so all name-keyed logic is mode-agnostic. Resolved by
-    # `active_bands()`.
-    bands: BandSet = Field(default_factory=BandSet)
+    # --- topology-mode-specific ---
+    # Per-mode config blocks, nested by `topology_mode` (§5 step 5): each holds that
+    # mode's distance-band hop windows and (trunk only) its extra-bridge range. Same
+    # band names/order across modes — only the hop windows differ — so all name-keyed
+    # logic is mode-agnostic. Resolved by `active_topology()` / `active_bands()`.
+    topology: TopologySet = Field(default_factory=TopologySet)
+
+    def active_topology(self) -> TopologyModeConfig:
+        """The config block for the selected `topology_mode` (§5 step 5)."""
+        return getattr(self.topology, self.topology_mode)  # type: ignore[no-any-return]
 
     def active_bands(self) -> list[DistanceBand]:
         """The distance bands for the configured `topology_mode` (§5 step 5)."""
-        if self.topology_mode == "expansive":
-            return self.bands.expansive
-        if self.topology_mode == "planar":
-            return self.bands.planar
-        if self.topology_mode == "mesh":
-            return self.bands.mesh
-        return self.bands.trunk
+        return self.active_topology().bands
 
 
 class SubsystemLayout(BaseModel):

@@ -194,13 +194,14 @@ weapons:
 bigbang:
   sector_count: 1000          # total sectors (nodes) in the generated warp graph
   topology_mode: expansive    # graph shape: trunk (chokepoints) | expansive (band-lattice) | planar (spiderweb) | mesh (grid), §5
+
+  # === Shared across every topology mode ===
+  # These knobs mean the same thing regardless of `topology_mode` above.
   cluster_min: 5              # smallest cluster of sectors the generator forms
   cluster_max: 25            # largest such cluster (clusters are then bridged together, §5)
   intra_group_degree: 2.5    # average warp connections per sector inside a cluster (density)
   inter_group_degree: 2.5    # average inter-cluster warp connections per cluster (density)
-  bridges_min: 1             # fewest bridge edges linking one cluster to the next
-  bridges_max: 5             # most bridge edges between two clusters
-  one_way_chance: 0.15       # probability a given warp edge is one-way (a trap/wormhole seam)
+  one_way_chance: 0.15       # probability a given bridge is one-way (a trap/wormhole seam)
   max_warps_per_sector: 6    # hard cap on a sector's outbound warps (keeps the UI grid readable)
   core_sector_count: 10      # sectors reserved as the protected Core Space (sectors 1–10), §5
   home_cluster_min: 3        # alliance home cluster size range (each < Core), §5 step 6
@@ -213,32 +214,41 @@ bigbang:
   port_class_distribution: [20, 20, 20, 10, 10, 10, 5, 5]  # relative weights of the 8 port buy/sell classes
   initial_stock_min: 200     # low end of a port's randomized starting commodity stock
   initial_stock_max: 2000    # high end of that starting stock
-  # Distance bands: each sector's band is set by its warp-hop distance from the Core, and band
-  # drives rarity, danger, and ownership everywhere else in this file. Windows are nested by
-  # topology_mode — active_bands() picks the set matching `topology_mode` above (§5 step 5).
-  # Both lists must name the same bands in the same order; only the hop windows differ, because
-  # expansive's ring roads lengthen paths (so its windows are deeper to keep all four populated).
-  bands:
-    trunk:      # windows for topology_mode: trunk (the chokepoint spanning tree)
-      - { name: Hub,      min_hops: 0,  max_hops: 5 }
-      - { name: Frontier, min_hops: 6,  max_hops: 12 }
-      - { name: Deep,     min_hops: 13, max_hops: 20 }
-      - { name: Void,     min_hops: 21, max_hops: 9999 }
-    expansive:  # windows for topology_mode: expansive (the deeper band-lattice web)
-      - { name: Hub,      min_hops: 0,  max_hops: 14 }
-      - { name: Frontier, min_hops: 15, max_hops: 35 }
-      - { name: Deep,     min_hops: 36, max_hops: 58 }
-      - { name: Void,     min_hops: 59, max_hops: 9999 }
-    planar:     # windows for topology_mode: planar (concentric planar spiderweb)
-      - { name: Hub,      min_hops: 0,  max_hops: 5 }
-      - { name: Frontier, min_hops: 6,  max_hops: 12 }
-      - { name: Deep,     min_hops: 13, max_hops: 20 }
-      - { name: Void,     min_hops: 21, max_hops: 9999 }
-    mesh:       # windows for topology_mode: mesh (regular grid mesh)
-      - { name: Hub,      min_hops: 0,  max_hops: 8 }
-      - { name: Frontier, min_hops: 9,  max_hops: 16 }
-      - { name: Deep,     min_hops: 17, max_hops: 24 }
-      - { name: Void,     min_hops: 25, max_hops: 9999 }
+
+  # === Topology-mode-specific ===
+  # One block per `topology_mode`; only the block matching the mode selected above is used
+  # (active_topology()). Each block carries that mode's distance bands and, for trunk, its
+  # extra-bridge range. Distance bands set each sector's band by warp-hop distance from the
+  # Core (driving rarity/danger/ownership everywhere else). Every block must name the same
+  # bands in the same order — only the hop windows differ, because expansive's ring roads
+  # lengthen paths (so its windows are deeper to keep all four bands populated).
+  topology:
+    trunk:      # the chokepoint spanning tree (the original algorithm)
+      bridges_min: 1          # fewest extra bridges a cluster gets beyond its spanning-tree link
+      bridges_max: 5          # most such extra bridges (trunk-only; other modes ignore these)
+      bands:
+        - { name: Hub,      min_hops: 0,  max_hops: 5 }
+        - { name: Frontier, min_hops: 6,  max_hops: 12 }
+        - { name: Deep,     min_hops: 13, max_hops: 20 }
+        - { name: Void,     min_hops: 21, max_hops: 9999 }
+    expansive:  # the deeper band-lattice web
+      bands:
+        - { name: Hub,      min_hops: 0,  max_hops: 14 }
+        - { name: Frontier, min_hops: 15, max_hops: 35 }
+        - { name: Deep,     min_hops: 36, max_hops: 58 }
+        - { name: Void,     min_hops: 59, max_hops: 9999 }
+    planar:     # concentric planar spiderweb
+      bands:
+        - { name: Hub,      min_hops: 0,  max_hops: 5 }
+        - { name: Frontier, min_hops: 6,  max_hops: 12 }
+        - { name: Deep,     min_hops: 13, max_hops: 20 }
+        - { name: Void,     min_hops: 21, max_hops: 9999 }
+    mesh:       # regular grid mesh
+      bands:
+        - { name: Hub,      min_hops: 0,  max_hops: 8 }
+        - { name: Frontier, min_hops: 9,  max_hops: 16 }
+        - { name: Deep,     min_hops: 17, max_hops: 24 }
+        - { name: Void,     min_hops: 25, max_hops: 9999 }
 
 # Engine room (§4.1): the game-global formulas turning a hull's slotted parts into
 # derived aspects. Per-subsystem layouts live on each ship class below. The
