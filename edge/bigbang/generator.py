@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import random
+from collections import deque
 
 from edge.bigbang import populate as _populate
 from edge.bigbang import validate as _validate
@@ -37,7 +38,9 @@ from edge.core.enums import PortClass
 from edge.core.models import Game, Region, Sector, UniverseState
 from edge.dialogue.intel import build_species_knowledge
 
-_last_mesh_coords: dict[int, tuple[int, int]] = {}
+_Coord = tuple[int, int]  # a grid cell (row, col), used only by the mesh topology
+
+_last_mesh_coords: dict[int, _Coord] = {}
 _last_mesh_grid_size: tuple[int, int] = (0, 0)
 
 _MAX_ATTEMPTS = 16
@@ -64,8 +67,12 @@ def _cluster_groups(sectors: list[int], cfg: BigBangConfig, rng: random.Random) 
     return groups
 
 
-def _connect_group(out: OutEdges, group: list[int], cfg: BigBangConfig, rng: random.Random) -> None:
-    """Wire one group: a random spanning tree, then edges toward avg degree ~2.5."""
+def _connect_group_standard(out: OutEdges, group: list[int], cfg: BigBangConfig, rng: random.Random) -> None:
+    """Wire one group: a random spanning tree, then edges toward avg degree ~2.5.
+
+    The intra-cluster connector shared by the `trunk` and `expansive` modes
+    (`planar` and `mesh` have their own — see `_connect_group_planar` and the
+    grid pass in `_build_mesh_graph`)."""
     cap = cfg.max_warps_per_sector
     if len(group) < 2:
         return
@@ -199,6 +206,7 @@ def _bridge_groups_trunk(out: OutEdges, groups: list[list[int]], cfg: BigBangCon
     outer-band traffic through the few tree bridges — the trunk-and-branches
     universe of chokepoints (the original, byte-identical algorithm)."""
     cap = cfg.max_warps_per_sector
+    topo = cfg.active_topology()  # trunk block: its bridges_min/bridges_max range
 
     def _bridge(g1: list[int], g2: list[int], one_way: bool) -> None:
         for _ in range(6):  # a few member-pair tries in case of cap saturation
@@ -213,7 +221,7 @@ def _bridge_groups_trunk(out: OutEdges, groups: list[list[int]], cfg: BigBangCon
         _bridge(groups[i], groups[rng.randrange(i)], one_way=False)
     # Extra bridges per group for texture; some directional.
     for i, group in enumerate(groups):
-        extra = rng.randint(cfg.bridges_min, cfg.bridges_max) - 1
+        extra = rng.randint(topo.bridges_min, topo.bridges_max) - 1
         for _ in range(max(0, extra)):
             j = rng.randrange(len(groups))
             if j != i:
@@ -289,165 +297,189 @@ def _bridge_groups_expansive(out: OutEdges, groups: list[list[int]], cfg: BigBan
                 _link(gi, gj, one_way=rng.random() < cfg.one_way_chance)
 
 
-def _build_mesh_graph(out: OutEdges, cfg: BigBangConfig, rng: random.Random) -> list[list[int]]:
-    """Generate mesh topology on a 2D grid and return the groups."""
-    n = cfg.sector_count
-    cap = cfg.max_warps_per_sector
+# --- mesh topology (§5): a regular 2D grid partitioned into contiguous clusters ---
+#
+# Unlike trunk/expansive/planar (which cluster a 1-D range of sector ids and bridge the
+# groups abstractly), mesh lays every sector on a 2D grid and only ever wires spatially
+# adjacent cells. The pipeline mirrors the others — partition, connect within, bridge
+# between — but every step is constrained to grid edges, so the helpers are mesh-specific.
+#
+# Determinism note: the RNG call order across these helpers is load-bearing for
+# golden-master replays. `_bfs_grow`'s neighbour order, and each `rng.*` call below, must
+# stay in this exact sequence when editing.
 
-    # 1. Grid geometry
+_MESH_NEIGHBOR_OFFSETS: tuple[_Coord, ...] = ((-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1))
+
+
+def _grid_neighbors(coord: _Coord, coords_set: set[_Coord]) -> list[_Coord]:
+    """The in-bounds grid cells adjacent to `coord` (the two vertical cells plus the two
+    diagonals on each of the rows above and below), in a fixed order. That order seeds the
+    BFS growth below, so it must stay stable for reproducible generation."""
+    r, c = coord
+    return [(r + dr, c + dc) for dr, dc in _MESH_NEIGHBOR_OFFSETS if (r + dr, c + dc) in coords_set]
+
+
+def _mesh_grid_geometry(n: int) -> tuple[int, int, list[_Coord]]:
+    """Size a near-square R×C grid holding exactly `n` cells and list those cells in
+    row-major order (the trailing row may be partial). Purely geometric — no RNG."""
     R = math.isqrt(n)
     if R * R < n:
-        R = math.isqrt(n) + 1
+        R += 1
     C = (n + R - 1) // R
+    all_coords = [(r, c) for r in range(R) for c in range(C)][:n]
+    return R, C, all_coords
 
-    # Keep exactly n coordinates
-    all_coords: list[tuple[int, int]] = []
-    for r in range(R):
-        for c in range(C):
-            if len(all_coords) < n:
-                all_coords.append((r, c))
-    coords_set = set(all_coords)
 
-    def get_grid_neighbors(coord: tuple[int, int]) -> list[tuple[int, int]]:
-        r, c = coord
-        candidates = [
-            (r - 1, c),
-            (r + 1, c),
-            (r - 1, c - 1),
-            (r - 1, c + 1),
-            (r + 1, c - 1),
-            (r + 1, c + 1),
-        ]
-        return [(nr, nc) for nr, nc in candidates if (nr, nc) in coords_set]
-
-    # 2. Grow contiguous clusters using BFS on coordinate grid
-    from collections import deque
-    unassigned = set(all_coords)
-    groups_coords: list[list[tuple[int, int]]] = []
-
-    # Grow Core cluster first
-    core_target = cfg.core_sector_count
-    core_coords: list[tuple[int, int]] = []
-    grid_seed = (R // 2, C // 2)
-    if grid_seed not in unassigned:
-        grid_seed = next(iter(unassigned))
-        
-    queue = deque([grid_seed])
-    visited = {grid_seed}
-    while queue and len(core_coords) < core_target:
+def _bfs_grow(seed: _Coord, limit: int, unassigned: set[_Coord], coords_set: set[_Coord]) -> list[_Coord]:
+    """Flood-fill a contiguous cluster of up to `limit` cells outward from `seed`, visiting
+    only still-`unassigned` grid cells (the seed itself is always taken). No RNG — the
+    randomness is in the caller's choice of seed and size."""
+    coords: list[_Coord] = []
+    queue = deque([seed])
+    visited = {seed}
+    while queue and len(coords) < limit:
         cur = queue.popleft()
-        core_coords.append(cur)
-        for nbr in get_grid_neighbors(cur):
+        coords.append(cur)
+        for nbr in _grid_neighbors(cur, coords_set):
             if nbr in unassigned and nbr not in visited:
                 visited.add(nbr)
                 queue.append(nbr)
-                
+    return coords
+
+
+def _merge_into_nearest_cluster(groups_coords: list[list[_Coord]], leftover: list[_Coord]) -> None:
+    """Fold a runt cluster into the outer cluster (index >= 1, never the Core at 0) whose
+    nearest cell is closest to it by Manhattan distance."""
+    best_idx = 1
+    best_dist = 999999
+    for c_left in leftover:
+        for g_idx in range(1, len(groups_coords)):
+            for c_g in groups_coords[g_idx]:
+                d = abs(c_left[0] - c_g[0]) + abs(c_left[1] - c_g[1])
+                if d < best_dist:
+                    best_dist = d
+                    best_idx = g_idx
+    groups_coords[best_idx].extend(leftover)
+
+
+def _partition_mesh_coords(
+    cfg: BigBangConfig, rng: random.Random, R: int, C: int,
+    all_coords: list[_Coord], coords_set: set[_Coord],
+) -> list[list[_Coord]]:
+    """Partition the grid into contiguous clusters: a deterministic central Core cluster
+    first, then seeded outer clusters of size [cluster_min, cluster_max], folding any
+    too-small leftover into its nearest existing outer cluster."""
+    unassigned = set(all_coords)
+    groups_coords: list[list[_Coord]] = []
+
+    # Core cluster: grown from the grid centre so the Core sits in the middle of the mesh.
+    # Deterministic (no RNG) — the Core must not vary with the seed.
+    core_seed = (R // 2, C // 2)
+    if core_seed not in unassigned:
+        core_seed = next(iter(unassigned))
+    core_coords = _bfs_grow(core_seed, cfg.core_sector_count, unassigned, coords_set)
     for coord in core_coords:
         unassigned.remove(coord)
     groups_coords.append(core_coords)
 
-    # Grow outer clusters
+    # Outer clusters: pick a random unassigned seed and grow a random-sized blob from it.
     while unassigned:
         size = rng.randint(cfg.cluster_min, cfg.cluster_max)
-        grid_seed = rng.choice(list(unassigned))
-        group_coords: list[tuple[int, int]] = []
-        queue = deque([grid_seed])
-        visited = {grid_seed}
-        while queue and len(group_coords) < size:
-            cur = queue.popleft()
-            group_coords.append(cur)
-            for nbr in get_grid_neighbors(cur):
-                if nbr in unassigned and nbr not in visited:
-                    visited.add(nbr)
-                    queue.append(nbr)
-        
+        seed = rng.choice(list(unassigned))
+        group_coords = _bfs_grow(seed, size, unassigned, coords_set)
         for coord in group_coords:
             unassigned.remove(coord)
-            
         if len(group_coords) < cfg.cluster_min and len(groups_coords) > 1:
-            # Merge leftover with closest outer cluster (index >= 1)
-            best_group_idx = 1
-            best_dist = 999999
-            for c_left in group_coords:
-                for g_idx in range(1, len(groups_coords)):
-                    for c_g in groups_coords[g_idx]:
-                        d = abs(c_left[0] - c_g[0]) + abs(c_left[1] - c_g[1])
-                        if d < best_dist:
-                            best_dist = d
-                            best_group_idx = g_idx
-            groups_coords[best_group_idx].extend(group_coords)
+            _merge_into_nearest_cluster(groups_coords, group_coords)
         else:
             groups_coords.append(group_coords)
+    return groups_coords
 
-    # 3. Map coordinates to sector IDs
-    coord_to_sid = {}
-    groups = []
+
+def _assign_mesh_sector_ids(groups_coords: list[list[_Coord]]) -> tuple[list[list[int]], dict[_Coord, int]]:
+    """Number the cells 1..n cluster-by-cluster, returning the sector-id groups (Core is
+    group 0) and the coord→sector-id map used to translate grid edges into warps."""
+    coord_to_sid: dict[_Coord, int] = {}
+    groups: list[list[int]] = []
     next_sid = 1
     for gc in groups_coords:
-        group_sids = []
+        group_sids: list[int] = []
         for coord in gc:
             coord_to_sid[coord] = next_sid
             group_sids.append(next_sid)
             next_sid += 1
         groups.append(group_sids)
+    return groups, coord_to_sid
 
-    # Save coordinate map to module cache
-    global _last_mesh_coords, _last_mesh_grid_size
-    _last_mesh_coords = {coord_to_sid[coord]: coord for coord in all_coords}
-    _last_mesh_grid_size = (R, C)
 
-    # 4. Allowed grid edges
-    allowed_edges = set()
+def _mesh_allowed_edges(
+    all_coords: list[_Coord], coord_to_sid: dict[_Coord, int], coords_set: set[_Coord],
+) -> set[tuple[int, int]]:
+    """Every grid-adjacent sector pair `(u, v)` with `u < v` — the only edges any mesh pass
+    may add, which is what keeps the warp graph spatially coherent (no crossing warps)."""
+    allowed: set[tuple[int, int]] = set()
     for coord in all_coords:
         u = coord_to_sid[coord]
-        for nbr in get_grid_neighbors(coord):
+        for nbr in _grid_neighbors(coord, coords_set):
             v = coord_to_sid[nbr]
             if u < v:
-                allowed_edges.add((u, v))
+                allowed.add((u, v))
+    return allowed
 
-    # 5. Connect clusters internally
-    sector_to_group = {}
-    for g_idx, group in enumerate(groups):
-        for s in group:
-            sector_to_group[s] = g_idx
 
-    for g_idx, group in enumerate(groups):
-        group_set = set(group)
-        internal_candidates = [
-            (u, v) for (u, v) in allowed_edges
-            if u in group_set and v in group_set
-        ]
-        
-        # Internal spanning tree using grid edges
-        connected = {group[0]}
-        unconnected = set(group[1:])
-        while unconnected:
-            tree_edge = None
-            for u, v in internal_candidates:
-                if (u in connected) != (v in connected):
-                    tree_edge = (u, v)
-                    break
-            if tree_edge is None:
-                break
-            u, v = tree_edge
-            add_bidirectional(out, u, v, cap)
-            connected.add(u)
-            connected.add(v)
-            unconnected.discard(u)
-            unconnected.discard(v)
+def _connect_group_mesh(
+    out: OutEdges, group: list[int], allowed_edges: set[tuple[int, int]],
+    cfg: BigBangConfig, rng: random.Random,
+) -> None:
+    """Wire one mesh cluster: a spanning tree over its grid edges, then extra grid edges
+    toward the target intra-group degree. The grid-constrained counterpart of
+    `_connect_group_standard` / `_connect_group_planar`."""
+    cap = cfg.max_warps_per_sector
+    group_set = set(group)
+    internal_candidates = [(u, v) for (u, v) in allowed_edges if u in group_set and v in group_set]
 
-        # Add extra internal edges up to target density
-        target_edges = int(cfg.intra_group_degree * len(group) / 2)
-        current_edges = len(group) - 1
-        rng.shuffle(internal_candidates)
+    # Spanning tree: repeatedly add a grid edge that joins the connected set to a new cell,
+    # until every cell in the cluster is reachable (or no such edge remains).
+    connected = {group[0]}
+    unconnected = set(group[1:])
+    while unconnected:
+        tree_edge = None
         for u, v in internal_candidates:
-            if current_edges >= target_edges:
+            if (u in connected) != (v in connected):
+                tree_edge = (u, v)
                 break
-            if v not in out[u]:
-                if add_bidirectional(out, u, v, cap):
-                    current_edges += 1
+        if tree_edge is None:
+            break
+        u, v = tree_edge
+        add_bidirectional(out, u, v, cap)
+        connected.add(u)
+        connected.add(v)
+        unconnected.discard(u)
+        unconnected.discard(v)
 
-    # 6. Inter-cluster bridging spanning tree
+    # Extra internal edges up to the configured density (shuffled for seeded variety).
+    target_edges = int(cfg.intra_group_degree * len(group) / 2)
+    current_edges = len(group) - 1
+    rng.shuffle(internal_candidates)
+    for u, v in internal_candidates:
+        if current_edges >= target_edges:
+            break
+        if v not in out[u] and add_bidirectional(out, u, v, cap):
+            current_edges += 1
+
+
+def _bridge_groups_mesh(
+    out: OutEdges, groups: list[list[int]], allowed_edges: set[tuple[int, int]],
+    sector_to_group: dict[int, int], cfg: BigBangConfig, rng: random.Random,
+) -> None:
+    """Bridge the mesh clusters over grid edges: first a spanning tree across the clusters
+    (each new bridge prefers the least-saturated endpoints, ties broken by the seed), then
+    extra bridges toward the target inter-group degree. The grid-constrained counterpart of
+    `_bridge_groups_trunk` / `_expansive` / `_planar`."""
+    cap = cfg.max_warps_per_sector
+
+    # Spanning tree over clusters: greedily attach an unconnected cluster via the grid edge
+    # whose endpoints have the fewest warps so far (`rng.random()` breaks ties).
     connected_groups = {0}
     unconnected_groups = set(range(1, len(groups)))
     while unconnected_groups:
@@ -466,7 +498,7 @@ def _build_mesh_graph(out: OutEdges, cfg: BigBangConfig, rng: random.Random) -> 
         connected_groups.add(new_g)
         unconnected_groups.remove(new_g)
 
-    # Add extra bridges to satisfy the configured inter_group_degree
+    # Extra inter-cluster bridges up to the configured density (shuffled for seeded variety).
     target_bridge_edges = int(cfg.inter_group_degree * len(groups) / 2)
     extra_bridges = max(0, target_bridge_edges - (len(groups) - 1))
     candidate_extra = [
@@ -481,6 +513,30 @@ def _build_mesh_graph(out: OutEdges, cfg: BigBangConfig, rng: random.Random) -> 
         if add_bidirectional(out, u, v, cap):
             added += 1
 
+
+def _build_mesh_graph(out: OutEdges, cfg: BigBangConfig, rng: random.Random) -> list[list[int]]:
+    """Generate the `mesh` topology (§5): lay all sectors on a 2D grid, partition it into
+    contiguous clusters, then connect within and bridge between using only grid edges.
+    Returns the region groups (the Core is group 0) and caches the grid layout for the
+    mesh embedding step back in `generate`."""
+    R, C, all_coords = _mesh_grid_geometry(cfg.sector_count)
+    coords_set = set(all_coords)
+
+    groups_coords = _partition_mesh_coords(cfg, rng, R, C, all_coords, coords_set)
+    groups, coord_to_sid = _assign_mesh_sector_ids(groups_coords)
+
+    # Cache the coord layout for generate()'s mesh embedding — a module-level build cache
+    # like core_hops/adjacency, recomputed identically on every regeneration.
+    global _last_mesh_coords, _last_mesh_grid_size
+    _last_mesh_coords = {coord_to_sid[coord]: coord for coord in all_coords}
+    _last_mesh_grid_size = (R, C)
+
+    allowed_edges = _mesh_allowed_edges(all_coords, coord_to_sid, coords_set)
+    sector_to_group = {s: gi for gi, group in enumerate(groups) for s in group}
+
+    for group in groups:
+        _connect_group_mesh(out, group, allowed_edges, cfg, rng)
+    _bridge_groups_mesh(out, groups, allowed_edges, sector_to_group, cfg, rng)
     return groups
 
 
@@ -502,7 +558,7 @@ def build_graph(cfg: BigBangConfig, rng: random.Random) -> tuple[OutEdges, list[
         if cfg.topology_mode == "planar":
             _connect_group_planar(out, group, cfg, rng)
         else:
-            _connect_group(out, group, cfg, rng)
+            _connect_group_standard(out, group, cfg, rng)
     if cfg.topology_mode == "expansive":
         _bridge_groups_expansive(out, groups, cfg, rng)
     elif cfg.topology_mode == "planar":

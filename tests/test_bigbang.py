@@ -210,12 +210,12 @@ def test_bands_expansive_name_mismatch_rejected() -> None:
     differ), so no name-keyed placement/validation silently diverges."""
     import pydantic
 
-    from edge.core.config import BandSet, DistanceBand
+    from edge.core.config import DistanceBand, TopologyModeConfig, TopologySet
 
     with pytest.raises(pydantic.ValidationError):
-        BandSet(
-            trunk=[DistanceBand(name="Hub", min_hops=0, max_hops=5)],
-            expansive=[DistanceBand(name="Core", min_hops=0, max_hops=9)],
+        TopologySet(
+            trunk=TopologyModeConfig(bands=[DistanceBand(name="Hub", min_hops=0, max_hops=5)]),
+            expansive=TopologyModeConfig(bands=[DistanceBand(name="Core", min_hops=0, max_hops=9)]),
         )
 
 

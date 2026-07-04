@@ -5,6 +5,12 @@ text report (`--inspect`), lists populated items (`--list ports planets …`), p
 a route between two sectors (`--route SRC DST`, by internal *or* spatial id), writes
 an interactive web topology inspector (`--render DIR`, §5), and/or dumps just the
 visualization payload as JSON (`--dump-json PATH`).
+
+Generation parameters can be overridden from the command line without editing the
+config: `--mode`, plus the shared knobs (`--cluster-min/-max`,
+`--intra-group-degree`, `--inter-group-degree`, `--one-way-chance`,
+`--core-sector-count`, `--home-cluster-min/-max`) and the trunk-only
+`--bridges-min/-max` (which land in the active mode's `topology.<mode>` block).
 """
 
 from __future__ import annotations
@@ -24,6 +30,19 @@ def main() -> None:
         "--mode", choices=("trunk", "expansive", "planar", "mesh"), default=None,
         help="override topology_mode (trunk chokepoints | expansive band-lattice | planar spiderweb | mesh grid, §5)",
     )
+    # Generation-parameter overrides. The shared knobs apply to every mode; --bridges-min/max
+    # are trunk-only and land in the active mode's topology block (a no-op for the others).
+    gen = parser.add_argument_group("generation overrides (override config bigbang params)")
+    gen.add_argument("--cluster-min", type=int, default=None, help="override cluster_min (shared)")
+    gen.add_argument("--cluster-max", type=int, default=None, help="override cluster_max (shared)")
+    gen.add_argument("--intra-group-degree", type=float, default=None, help="override intra_group_degree (shared)")
+    gen.add_argument("--inter-group-degree", type=float, default=None, help="override inter_group_degree (shared)")
+    gen.add_argument("--one-way-chance", type=float, default=None, help="override one_way_chance (shared)")
+    gen.add_argument("--core-sector-count", type=int, default=None, help="override core_sector_count (shared)")
+    gen.add_argument("--home-cluster-min", type=int, default=None, help="override home_cluster_min (shared)")
+    gen.add_argument("--home-cluster-max", type=int, default=None, help="override home_cluster_max (shared)")
+    gen.add_argument("--bridges-min", type=int, default=None, help="override topology.<mode>.bridges_min (trunk-only)")
+    gen.add_argument("--bridges-max", type=int, default=None, help="override topology.<mode>.bridges_max (trunk-only)")
     parser.add_argument("--inspect", action="store_true", help="print a universe report")
     parser.add_argument(
         "--list", nargs="+", metavar="CATEGORY", choices=(*LIST_CATEGORIES, "all"),
@@ -49,6 +68,22 @@ def main() -> None:
         bigbang_overrides["sector_count"] = args.sectors
     if args.mode is not None:
         bigbang_overrides["topology_mode"] = args.mode
+    # Shared knobs map straight onto the flat BigBangConfig fields.
+    for field in (
+        "cluster_min", "cluster_max", "intra_group_degree", "inter_group_degree",
+        "one_way_chance", "core_sector_count", "home_cluster_min", "home_cluster_max",
+    ):
+        value = getattr(args, field)
+        if value is not None:
+            bigbang_overrides[field] = value
+    # --bridges-min/max live in the selected mode's topology block, not the top level.
+    topo_overrides = {k: v for k, v in (
+        ("bridges_min", args.bridges_min), ("bridges_max", args.bridges_max),
+    ) if v is not None}
+    if topo_overrides:
+        mode = args.mode if args.mode is not None else config.bigbang.topology_mode
+        block = getattr(config.bigbang.topology, mode).model_copy(update=topo_overrides)
+        bigbang_overrides["topology"] = config.bigbang.topology.model_copy(update={mode: block})
     if bigbang_overrides:
         config = config.model_copy(
             update={"bigbang": config.bigbang.model_copy(update=bigbang_overrides)}
