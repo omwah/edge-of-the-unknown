@@ -80,8 +80,11 @@ def test_default_ship_classes_and_hardware() -> None:
     cfg = load_default_config()
     ids = {s.id for s in cfg.ship_classes}
     assert {"scout_marauder", "missile_frigate", "battleship", "imperial_starship"} <= ids
-    # Buyable hulls are priced; the escape pod is the one price-0 hull (never sold, §10).
-    assert all(s.price > 0 for s in cfg.ship_classes if s.id != cfg.combat.escape_pod_class)
+    # Buyable hulls are priced; the never-sold hulls are price-0: the escape pod (§10)
+    # and the orbital-platform set-piece (a starbase-role emplacement, §4.2).
+    never_sold = {cfg.combat.escape_pod_class} | {
+        s.id for s in cfg.ship_classes if s.role == "starbase"}
+    assert all(s.price > 0 for s in cfg.ship_classes if s.id not in never_sold)
     assert cfg.ship_class(cfg.combat.escape_pod_class).price == 0
     assert cfg.hardware.components and cfg.hardware.tiers == ["I", "II"]  # III is barter-only
     assert cfg.ship_class("scout_marauder").subsystems is not None

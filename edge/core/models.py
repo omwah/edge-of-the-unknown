@@ -371,6 +371,10 @@ class Encounter:
     # `betrayal` at spawn, `combat_taunt` / `surrender` per round) the encounter screen
     # renders read-only; the reducers advance its recency ring so repeats rephrase.
     speech_context: str | None = None
+    # Set when this encounter is a **starbase assault** (§4.2, §10 — WP40): the base being
+    # fought (its foe is a single immobile emplacement, `species_id` is 0). Victory razes
+    # the base rather than souring a species. None for an ordinary ship encounter.
+    starbase_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

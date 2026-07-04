@@ -407,6 +407,15 @@ class StarbaseConfig(BaseModel):
     owned_base_chance: float = 0.0
     derelict_chance: float = 0.0
     subsystems: Mapping[str, SubsystemLayout]
+    # Set-piece assault + planetary defense (§4.2, §10 — WP40). An operational base
+    # fields a foe scaled by its surviving component integrity: hull interpolates from
+    # `defense_hull_floor` (a fully-degraded but powered base) up to its class hull,
+    # shields/damage scale linearly with integrity. Razing a base pays `raze_bounty`
+    # latinum + `raze_experience`; claiming a repaired, unowned base costs `claim_cost`.
+    defense_hull_floor: float = Field(default=0.5, ge=0.0, le=1.0)
+    raze_bounty: int = Field(default=750, ge=0)
+    raze_experience: int = Field(default=25, ge=0)
+    claim_cost: int = Field(default=2000, ge=0)
 
 
 class DiscoveryConfig(BaseModel):

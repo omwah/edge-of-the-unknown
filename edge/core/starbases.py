@@ -12,8 +12,13 @@ defense will read.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from edge.core.enums import Subsystem
-from edge.core.models import Starbase
+from edge.core.models import EncounterFoe, Starbase
+
+if TYPE_CHECKING:
+    from edge.core.config import GameConfig
 
 
 def is_operational(base: Starbase) -> bool:
@@ -26,3 +31,41 @@ def is_operational(base: Starbase) -> bool:
         return False
     keystone = reactor.slots[reactor.keystone_index]
     return keystone is not None and not keystone.knocked_out
+
+
+def component_integrity(base: Starbase) -> float:
+    """The fraction of the base's slots holding a live component (§4.2, WP40).
+
+    Defense strength scales with this — surviving components + an intact reactor make a
+    base formidable; a stripped one is a pushover. 0.0 for a base with no slots.
+    """
+    total = sum(len(st.slots) for st in base.subsystems.values())
+    if total == 0:
+        return 0.0
+    active = sum(len(st.active) for st in base.subsystems.values())
+    return active / total
+
+
+def assault_foe(base: Starbase, config: GameConfig) -> EncounterFoe:
+    """Build the set-piece combat foe for assaulting `base` (§4.2, §10 — WP40).
+
+    An immobile all-round emplacement (no arc to slip, no flee) whose hull, shields, and
+    damage scale with its surviving component integrity and reactor. A base must be
+    operational to defend — a derelict is salvaged/repaired, not fought.
+    """
+    sbcfg = config.starbase
+    assert sbcfg is not None
+    klass = config.ship_class(base.ship_class_id)
+    integrity = component_integrity(base)
+    hull = max(1, round(klass.hull_max * (sbcfg.defense_hull_floor
+                                          + (1.0 - sbcfg.defense_hull_floor) * integrity)))
+    shields = round(klass.shields_max * integrity)
+    weapon = config.weapons[klass.armament[0]] if klass.armament else None
+    damage = max(1, round((weapon.damage if weapon is not None else 1) * (0.5 + 0.5 * integrity)))
+    defense = sum(d.value for d in klass.defenses
+                  if d.type in ("armour", "screens", "energy_plates"))
+    return EncounterFoe(
+        ship_class_id=klass.id, name=klass.name,
+        hull=hull, hull_max=hull, shields=shields, damage=damage,
+        firing_arc="all_round", combat_speed=0, defense=defense,
+    )
