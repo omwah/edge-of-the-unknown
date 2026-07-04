@@ -57,6 +57,11 @@
     border: 2px dotted; border-top: none; }
   .badge { padding: 1px 6px; border-radius: 4px; background: #b8892f;
     color: #1a1206; font-size: 10px; font-weight: 700; }
+  .outline-vis { transition: opacity 0.15s, stroke-width 0.15s; }
+  .outline-group:hover .outline-vis, .outline-vis.dragging {
+    opacity: 1 !important;
+    stroke-width: 3.2px !important;
+  }
 </style>
 </head>
 <body>
@@ -175,9 +180,10 @@ function median(arr) {
 // Nudge overlapping nodes apart while preserving the radial structure: a few
 // grid-bucketed passes that only push pairs closer than one node diameter. Cheap
 // (near O(n) per pass via the spatial hash) and deterministic (id-based tie-break).
-function relaxOverlaps(iterations = 140) {
-  const minDist = 2 * NODE_R + 8;
-  const cell = minDist;
+function relaxOverlaps(iterations = 200) {
+  const sameTarget = 2 * NODE_R + 8;
+  const maxTarget = 2 * NODE_R + 40; // 80 when NODE_R = 20
+  const cell = maxTarget;
   const key = (cx, cy) => cx + "," + cy;
   for (let it = 0; it < iterations; it++) {
     const grid = new Map();
@@ -187,20 +193,145 @@ function relaxOverlaps(iterations = 140) {
     }
     let moved = false;
     for (const [id, p] of nodePos) {
+      const s1 = byId.get(id);
+      if (!s1) continue;
       const cx = Math.floor(p.x / cell), cy = Math.floor(p.y / cell);
       for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
         const arr = grid.get(key(cx + dx, cy + dy));
         if (!arr) continue;
         for (const oid of arr) {
           if (oid <= id) continue;                 // handle each pair once
+          const s2 = byId.get(oid);
+          if (!s2) continue;
+
+          const isSameCluster = (s1.is_core && s2.is_core) || (s1.region_id === s2.region_id);
+          const pad1 = s1.is_core ? (NODE_R + 16) : (NODE_R + 8);
+          const pad2 = s2.is_core ? (NODE_R + 16) : (NODE_R + 8);
+          const target = isSameCluster ? sameTarget : (pad1 + pad2 + 16);
+
           const q = nodePos.get(oid);
           let ddx = q.x - p.x, ddy = q.y - p.y, d = Math.hypot(ddx, ddy);
-          if (d >= minDist) continue;
+          if (d >= target) continue;
           if (d < 1e-6) { ddx = ((id % 7) - 3) || 1; ddy = ((oid % 5) - 2) || 1; d = Math.hypot(ddx, ddy); }
-          const push = (minDist - d) / 2, ux = ddx / d, uy = ddy / d;
+          const push = (target - d) / 2, ux = ddx / d, uy = ddy / d;
           p.x -= ux * push; p.y -= uy * push;
           q.x += ux * push; q.y += uy * push;
           moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+}
+function arrangeClusterGrids() {
+  const gridSpacing = 2 * NODE_R + 16;
+  const regionSectors = new Map();
+  for (const s of sectors) {
+    if (!regionSectors.has(s.region_id)) regionSectors.set(s.region_id, []);
+    regionSectors.get(s.region_id).push(s.id);
+  }
+  for (const [regionId, ids] of regionSectors) {
+    const pts = ids.map((id) => nodePos.get(id)).filter(Boolean);
+    if (pts.length < 2) continue;
+    const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+    const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+    const sortedIds = [...ids].sort((a, b) => {
+      const pa = nodePos.get(a);
+      const pb = nodePos.get(b);
+      return pa.y - pb.y || pa.x - pb.x;
+    });
+    const n = sortedIds.length;
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    const startX = cx - ((cols - 1) * gridSpacing) / 2;
+    const startY = cy - ((rows - 1) * gridSpacing) / 2;
+    for (let i = 0; i < n; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const id = sortedIds[i];
+      const p = nodePos.get(id);
+      p.x = startX + col * gridSpacing;
+      p.y = startY + row * gridSpacing;
+    }
+  }
+}
+function relaxClusters(iterations = 80) {
+  const clusters = [];
+  if (UNIVERSE.hub_sector_ids.length > 0) {
+    clusters.push({
+      id: "core",
+      sectorIds: UNIVERSE.hub_sector_ids,
+      pad: NODE_R + 16
+    });
+  }
+  const coreSet = new Set(UNIVERSE.hub_sector_ids);
+  for (const reg of UNIVERSE.regions) {
+    const nonCoreSectors = reg.sector_ids.filter((id) => !coreSet.has(id));
+    if (nonCoreSectors.length > 0) {
+      clusters.push({
+        id: reg.id,
+        sectorIds: reg.sector_ids,
+        pad: NODE_R + 8
+      });
+    }
+  }
+
+  for (let it = 0; it < iterations; it++) {
+    const forces = new Map(clusters.map((c, idx) => [idx, { x: 0, y: 0, count: 0 }]));
+    let moved = false;
+    for (let i = 0; i < clusters.length; i++) {
+      const c1 = clusters[i];
+      for (let j = i + 1; j < clusters.length; j++) {
+        const c2 = clusters[j];
+        let pushX = 0, pushY = 0, overlapCount = 0;
+        const target = c1.pad + c2.pad + 16;
+        for (const id1 of c1.sectorIds) {
+          const p1 = nodePos.get(id1);
+          if (!p1) continue;
+          for (const id2 of c2.sectorIds) {
+            const p2 = nodePos.get(id2);
+            if (!p2) continue;
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < target) {
+              const d = dist || 1e-3;
+              const pushForce = target - d;
+              pushX += (dx / d) * pushForce;
+              pushY += (dy / d) * pushForce;
+              overlapCount++;
+            }
+          }
+        }
+        if (overlapCount > 0) {
+          const avgPushX = pushX / overlapCount;
+          const avgPushY = pushY / overlapCount;
+          const f1 = forces.get(i);
+          f1.x -= avgPushX;
+          f1.y -= avgPushY;
+          f1.count++;
+          const f2 = forces.get(j);
+          f2.x += avgPushX;
+          f2.y += avgPushY;
+          f2.count++;
+        }
+      }
+    }
+    for (let i = 0; i < clusters.length; i++) {
+      const f = forces.get(i);
+      if (f.count > 0) {
+        const dx = (f.x / f.count) * 0.4;
+        const dy = (f.y / f.count) * 0.4;
+        if (Math.hypot(dx, dy) > 0.05) {
+          moved = true;
+          const c = clusters[i];
+          for (const id of c.sectorIds) {
+            const p = nodePos.get(id);
+            if (p) {
+              p.x += dx;
+              p.y += dy;
+            }
+          }
         }
       }
     }
@@ -217,6 +348,8 @@ function buildLayout() {
   scale = med > 0 ? 110 / med : 60;
   nodePos = new Map();
   for (const s of sectors) nodePos.set(s.id, { x: s.x * scale, y: s.y * scale });
+  arrangeClusterGrids();
+  relaxClusters();
   relaxOverlaps();
   // pristine copy (post-relaxation) so "reset layout" restores the de-overlapped view
   basePos = new Map();
@@ -277,21 +410,32 @@ function inflate(hull, pad) {
   });
 }
 // An outline element around a set of sector ids: a rounded hull, or a circle for
-// degenerate (1-2 point) clusters.
+// degenerate (1-2 point) clusters. Returns a <g> group with a pointer-events grab-target.
 function outlineFor(ids, pad, stroke, dash, width) {
   const pts = ids.map((id) => nodePos.get(id)).filter(Boolean);
   if (!pts.length) return null;
-  const attrs = { fill: "none", stroke, "stroke-width": width, "stroke-dasharray": dash,
+  const g = el("g", { class: "outline-group" });
+  
+  const visAttrs = { class: "outline-vis", fill: "none", stroke, "stroke-width": width, "stroke-dasharray": dash,
     "stroke-linejoin": "round", "stroke-linecap": "round", opacity: 0.9 };
+  const hitAttrs = { class: "outline-hit", fill: "none", stroke: "transparent", "stroke-width": width + 14,
+    "stroke-linejoin": "round", "stroke-linecap": "round", style: "cursor: grab; pointer-events: stroke;" };
+
   if (pts.length < 3) {
     const c = centroid(pts);
     let r = NODE_R + pad;
     for (const p of pts) r = Math.max(r, Math.hypot(p.x - c.x, p.y - c.y) + NODE_R + pad);
-    return el("circle", Object.assign({ cx: c.x, cy: c.y, r }, attrs));
+    const hit = el("circle", Object.assign({ cx: c.x, cy: c.y, r }, hitAttrs));
+    const vis = el("circle", Object.assign({ cx: c.x, cy: c.y, r }, visAttrs));
+    g.append(hit, vis);
+    return g;
   }
   const hull = inflate(convexHull(pts), pad);
   const d = "M" + hull.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L") + " Z";
-  return el("path", Object.assign({ d }, attrs));
+  const hit = el("path", Object.assign({ d }, hitAttrs));
+  const vis = el("path", Object.assign({ d }, visAttrs));
+  g.append(hit, vis);
+  return g;
 }
 
 // ---- draw: band rings -------------------------------------------------------
@@ -341,15 +485,24 @@ let coreEl = null, coreBand = "";
 function drawClusters() {
   gClusters.textContent = "";
   clusterEls = [];
+  const coreSet = new Set(UNIVERSE.hub_sector_ids);
   for (const reg of UNIVERSE.regions) {
+    if (reg.sector_ids.some((id) => coreSet.has(id))) continue;
     const o = outlineFor(reg.sector_ids, NODE_R + 8, bandColor(reg.band), "7 5", 1.6);
-    if (o) { gClusters.appendChild(o); clusterEls.push({ el: o, band: reg.band }); }
+    if (o) {
+      attachOutlineInteraction(o, reg.sector_ids, false);
+      gClusters.appendChild(o);
+      clusterEls.push({ el: o, band: reg.band });
+    }
   }
 }
 function drawCore() {
   gCore.textContent = "";
   coreEl = outlineFor(UNIVERSE.hub_sector_ids, NODE_R + 16, CORE_COLOR, "2 6", 2.4);
-  if (coreEl) gCore.appendChild(coreEl);
+  if (coreEl) {
+    attachOutlineInteraction(coreEl, UNIVERSE.hub_sector_ids, true);
+    gCore.appendChild(coreEl);
+  }
   // Core Space sits in the innermost band, so it follows that band's node toggle.
   const first = UNIVERSE.hub_sector_ids[0];
   coreBand = (first != null && byId.get(first)) ? byId.get(first).band
@@ -520,6 +673,69 @@ function attachNodeInteraction(g, s) {
     dragging = false; g.style.cursor = "grab";
     try { g.releasePointerCapture(ev.pointerId); } catch (_) {}
     if (!moved) onNodeClick(s);
+  });
+}
+function attachOutlineInteraction(g, ids, isCore) {
+  let downX = 0, downY = 0, moved = false, dragging = false;
+  g.addEventListener("pointerdown", (ev) => {
+    ev.stopPropagation();
+    downX = ev.clientX; downY = ev.clientY; moved = false; dragging = true;
+    g.setPointerCapture(ev.pointerId);
+    g.style.cursor = "grabbing";
+    const vis = g.querySelector(".outline-vis");
+    if (vis) vis.classList.add("dragging");
+  });
+  g.addEventListener("pointermove", (ev) => {
+    if (!dragging) return;
+    if (Math.abs(ev.clientX - downX) + Math.abs(ev.clientY - downY) > 3) moved = true;
+    if (!moved) return;
+    const dx = ev.movementX / T.k;
+    const dy = ev.movementY / T.k;
+
+    let tx = parseFloat(g.getAttribute("data-tx") || 0) + dx;
+    let ty = parseFloat(g.getAttribute("data-ty") || 0) + dy;
+    g.setAttribute("data-tx", tx);
+    g.setAttribute("data-ty", ty);
+    g.setAttribute("transform", `translate(${tx},${ty})`);
+
+    if (isCore) {
+      let btx = parseFloat(gBands.getAttribute("data-tx") || 0) + dx;
+      let bty = parseFloat(gBands.getAttribute("data-ty") || 0) + dy;
+      gBands.setAttribute("data-tx", btx);
+      gBands.setAttribute("data-ty", bty);
+      gBands.setAttribute("transform", `translate(${btx},${bty})`);
+    }
+
+    for (const id of ids) {
+      const p = nodePos.get(id);
+      if (p) {
+        p.x += dx;
+        p.y += dy;
+        const nodeEl = nodeEls.get(id);
+        if (nodeEl) nodeEl.g.setAttribute("transform", `translate(${p.x},${p.y})`);
+      }
+    }
+    for (const id of ids) {
+      refreshIncidentEdges(id);
+    }
+  });
+  g.addEventListener("pointerup", (ev) => {
+    if (!dragging) return;
+    dragging = false; g.style.cursor = "grab";
+    try { g.releasePointerCapture(ev.pointerId); } catch (_) {}
+    const vis = g.querySelector(".outline-vis");
+    if (vis) vis.classList.remove("dragging");
+
+    g.removeAttribute("transform");
+    g.removeAttribute("data-tx");
+    g.removeAttribute("data-ty");
+    gBands.removeAttribute("transform");
+    gBands.removeAttribute("data-tx");
+    gBands.removeAttribute("data-ty");
+
+    drawClusters();
+    drawCore();
+    drawBands();
   });
 }
 function onNodeClick(s) {
