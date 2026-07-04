@@ -131,9 +131,9 @@ const bandColor = (b) => BAND_COLORS[b] || BAND_FALLBACK;
 const CORE_COLOR = "#ffd54f";
 const EDGE_TWO = "#5a6b7a";
 const EDGE_ONE = "#e0a060";
-const SELECT = "#ffd54f";
+const SELECT = "#ff2a85";
 
-const NODE_R = 20;
+const NODE_R = 24;
 const SVGNS = "http://www.w3.org/2000/svg";
 
 // ---- tiny SVG helper --------------------------------------------------------
@@ -160,7 +160,7 @@ const baseEdges = UNIVERSE.edges.map((e) => ({ a: e.a, b: e.b, one_way: e.one_wa
 
 const T = { k: 1, tx: 0, ty: 0 };
 let editMode = false, idMode = "spatial";
-let pendingNode = null, selectedEdge = null;
+let pendingNode = null, selectedEdge = null, highlightedNode = null, highlightedEdgeKey = null;
 
 // per-band visibility (nodes and edges independently); an edge is classed by its
 // outer (deeper) endpoint's band.
@@ -223,35 +223,110 @@ function relaxOverlaps(iterations = 200) {
     if (!moved) break;
   }
 }
-function arrangeClusterGrids() {
-  const gridSpacing = 2 * NODE_R + 16;
+function arrangeClusterRadial() {
+  const sameTarget = 2 * NODE_R + 8;
+  const gridSpacing = sameTarget + 8; // 56px between nodes
+
+  function getNeighbors(id) {
+    const neighbors = [];
+    for (const e of currentEdges) {
+      if (e.a === id) neighbors.push(e.b);
+      else if (e.b === id) neighbors.push(e.a);
+    }
+    return neighbors;
+  }
+
+  function inSameCluster(id1, id2) {
+    const s1 = byId.get(id1);
+    const s2 = byId.get(id2);
+    if (!s1 || !s2) return false;
+    return (s1.is_core && s2.is_core) || (s1.region_id === s2.region_id);
+  }
+
+  // Group sector IDs by region_id
   const regionSectors = new Map();
   for (const s of sectors) {
     if (!regionSectors.has(s.region_id)) regionSectors.set(s.region_id, []);
     regionSectors.get(s.region_id).push(s.id);
   }
+
   for (const [regionId, ids] of regionSectors) {
     const pts = ids.map((id) => nodePos.get(id)).filter(Boolean);
     if (pts.length < 2) continue;
+
+    // Centroid of the cluster
     const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
     const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
-    const sortedIds = [...ids].sort((a, b) => {
-      const pa = nodePos.get(a);
-      const pb = nodePos.get(b);
-      return pa.y - pb.y || pa.x - pb.x;
-    });
-    const n = sortedIds.length;
-    const cols = Math.ceil(Math.sqrt(n));
-    const rows = Math.ceil(n / cols);
-    const startX = cx - ((cols - 1) * gridSpacing) / 2;
-    const startY = cy - ((rows - 1) * gridSpacing) / 2;
-    for (let i = 0; i < n; i++) {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const id = sortedIds[i];
-      const p = nodePos.get(id);
-      p.x = startX + col * gridSpacing;
-      p.y = startY + row * gridSpacing;
+
+    // Classify nodes into external-facing and internal-only
+    const externalNodes = [];
+    const internalNodes = [];
+    for (const id of ids) {
+      const neighbors = getNeighbors(id);
+      const isExternal = neighbors.some((nbrId) => !inSameCluster(id, nbrId));
+      if (isExternal) {
+        externalNodes.push(id);
+      } else {
+        internalNodes.push(id);
+      }
+    }
+
+    const nOut = externalNodes.length;
+    const nIn = internalNodes.length;
+
+    // Calculate radii
+    let rOut = 45;
+    if (nOut > 1) {
+      rOut = Math.max(rOut, gridSpacing / (2 * Math.sin(Math.PI / nOut)));
+    }
+    let rIn = 0;
+    if (nIn > 1) {
+      rIn = Math.max(30, gridSpacing / (2 * Math.sin(Math.PI / nIn)));
+    }
+    if (nIn > 0 && rOut - rIn < gridSpacing) {
+      rOut = rIn + gridSpacing;
+    }
+
+    // Position outer (external-facing) nodes
+    if (nOut > 0) {
+      const extWithAngles = externalNodes.map((id) => {
+        const extNbrs = getNeighbors(id).filter((nbr) => !inSameCluster(id, nbr));
+        let sx = 0, sy = 0;
+        for (const nbrId of extNbrs) {
+          const np = nodePos.get(nbrId);
+          if (np) { sx += np.x - cx; sy += np.y - cy; }
+        }
+        if (sx === 0 && sy === 0) {
+          const p = nodePos.get(id);
+          sx = p.x - cx; sy = p.y - cy;
+        }
+        return { id, angle: Math.atan2(sy, sx) };
+      });
+      extWithAngles.sort((a, b) => a.angle - b.angle);
+
+      const baseAngle = extWithAngles[0].angle;
+      for (let i = 0; i < nOut; i++) {
+        const theta = baseAngle + (i / nOut) * 2 * Math.PI;
+        const p = nodePos.get(extWithAngles[i].id);
+        p.x = cx + Math.cos(theta) * rOut;
+        p.y = cy + Math.sin(theta) * rOut;
+      }
+    }
+
+    // Position inner (internal-only) nodes
+    if (nIn > 0) {
+      const intWithAngles = internalNodes.map((id) => {
+        const p = nodePos.get(id);
+        return { id, angle: Math.atan2(p.y - cy, p.x - cx) };
+      });
+      intWithAngles.sort((a, b) => a.angle - b.angle);
+
+      for (let i = 0; i < nIn; i++) {
+        const theta = (i / nIn) * 2 * Math.PI;
+        const p = nodePos.get(intWithAngles[i].id);
+        p.x = cx + Math.cos(theta) * rIn;
+        p.y = cy + Math.sin(theta) * rIn;
+      }
     }
   }
 }
@@ -348,7 +423,7 @@ function buildLayout() {
   scale = med > 0 ? 110 / med : 60;
   nodePos = new Map();
   for (const s of sectors) nodePos.set(s.id, { x: s.x * scale, y: s.y * scale });
-  arrangeClusterGrids();
+  arrangeClusterRadial();
   relaxClusters();
   relaxOverlaps();
   // pristine copy (post-relaxation) so "reset layout" restores the de-overlapped view
@@ -570,12 +645,24 @@ function edgeBand(e) {
 // A node hides with its band; an edge hides with its own band's edge-toggle OR when
 // either endpoint's nodes are hidden (so no edge dangles into an empty band).
 function applyBandVisibility() {
-  for (const [id, rec] of nodeEls) {
-    rec.g.style.display = nodeBandOn[byId.get(id).band] ? "" : "none";
+  let edgeNodes = null;
+  if (highlightedEdgeKey !== null) {
+    const found = edgeEls.find((r) => edgeKey(r.e) === highlightedEdgeKey);
+    if (found) edgeNodes = [found.e.a, found.e.b];
   }
+
+  for (const [id, rec] of nodeEls) {
+    const isSelected = (id === highlightedNode) || 
+                       (edgeNodes !== null && edgeNodes.includes(id)) ||
+                       (highlightedNode !== null && currentEdges.some(e => (e.a === id && e.b === highlightedNode) || (e.b === id && e.a === highlightedNode)));
+    rec.g.style.display = (nodeBandOn[byId.get(id).band] || isSelected) ? "" : "none";
+  }
+
   for (const rec of edgeEls) {
     const a = byId.get(rec.e.a), b = byId.get(rec.e.b);
-    const vis = edgeBandOn[edgeBand(rec.e)] && nodeBandOn[a.band] && nodeBandOn[b.band];
+    const isIncident = (highlightedNode !== null && (rec.e.a === highlightedNode || rec.e.b === highlightedNode)) ||
+                       (highlightedEdgeKey !== null && edgeKey(rec.e) === highlightedEdgeKey);
+    const vis = (edgeBandOn[edgeBand(rec.e)] && nodeBandOn[a.band] && nodeBandOn[b.band]) || isIncident;
     rec.g.style.display = vis ? "" : "none";
   }
   // A disabled band hides its outlines too, over-riding the master outline toggles
@@ -739,11 +826,20 @@ function attachOutlineInteraction(g, ids, isCore) {
   });
 }
 function onNodeClick(s) {
-  if (!editMode) return;
-  if (pendingNode === null) { pendingNode = s.id; markPending(); return; }
-  if (pendingNode === s.id) { pendingNode = null; markPending(); return; }
-  addEdge(pendingNode, s.id);
-  pendingNode = null; markPending();
+  if (editMode) {
+    if (pendingNode === null) { pendingNode = s.id; markPending(); return; }
+    if (pendingNode === s.id) { pendingNode = null; markPending(); return; }
+    addEdge(pendingNode, s.id);
+    pendingNode = null; markPending();
+  } else {
+    if (highlightedNode === s.id) {
+      highlightedNode = null;
+    } else {
+      highlightedNode = s.id;
+      highlightedEdgeKey = null;
+    }
+    applyIncidentHighlight();
+  }
 }
 function markPending() {
   for (const [id, rec] of nodeEls) {
@@ -752,6 +848,29 @@ function markPending() {
     rec.circle.setAttribute("stroke-width", id === pendingNode ? 3.4
       : (byId.get(id).is_core ? 2.2 : 1.4));
   }
+}
+function applyIncidentHighlight() {
+  let edgeNodes = null;
+  if (highlightedEdgeKey !== null) {
+    const found = edgeEls.find((r) => edgeKey(r.e) === highlightedEdgeKey);
+    if (found) edgeNodes = [found.e.a, found.e.b];
+  }
+
+  for (const rec of edgeEls) {
+    const isIncident = (highlightedNode !== null && (rec.e.a === highlightedNode || rec.e.b === highlightedNode)) ||
+                       (highlightedEdgeKey !== null && edgeKey(rec.e) === highlightedEdgeKey);
+    rec.vis.setAttribute("stroke", isIncident ? SELECT : (rec.e.one_way ? EDGE_ONE : EDGE_TWO));
+    rec.vis.setAttribute("stroke-width", isIncident ? 3 : 1.6);
+    rec.vis.setAttribute("opacity", isIncident ? 1 : 0.85);
+  }
+  for (const [id, rec] of nodeEls) {
+    const isSelected = (id === highlightedNode) || (edgeNodes !== null && edgeNodes.includes(id));
+    rec.circle.setAttribute("stroke", isSelected ? SELECT 
+      : (byId.get(id).is_core ? CORE_COLOR : bandColor(byId.get(id).band)));
+    rec.circle.setAttribute("stroke-width", isSelected ? 3.4 
+      : (byId.get(id).is_core ? 2.2 : 1.4));
+  }
+  applyBandVisibility();
 }
 
 // ---- edge editing -----------------------------------------------------------
@@ -769,20 +888,30 @@ function addEdge(a, b) {
   // same-direction one-way or already two-way: nothing to add
 }
 function onEdgeClick(rec) {
-  if (!editMode) return;
-  const key = edgeKey(rec.e);
-  if (selectedEdge === key) {                       // second click -> remove
-    currentEdges = currentEdges.filter((e) => edgeKey(e) !== key);
-    selectedEdge = null;
-    drawEdges();
-    return;
+  if (editMode) {
+    const key = edgeKey(rec.e);
+    if (selectedEdge === key) {                       // second click -> remove
+      currentEdges = currentEdges.filter((e) => edgeKey(e) !== key);
+      selectedEdge = null;
+      drawEdges();
+      return;
+    }
+    if (selectedEdge) {                               // clear previous selection
+      const prev = edgeEls.find((r) => edgeKey(r.e) === selectedEdge);
+      if (prev) highlightEdge(prev, false);
+    }
+    selectedEdge = key;
+    highlightEdge(rec, true);
+  } else {
+    const key = edgeKey(rec.e);
+    if (highlightedEdgeKey === key) {
+      highlightedEdgeKey = null;
+    } else {
+      highlightedEdgeKey = key;
+      highlightedNode = null;
+    }
+    applyIncidentHighlight();
   }
-  if (selectedEdge) {                               // clear previous selection
-    const prev = edgeEls.find((r) => edgeKey(r.e) === selectedEdge);
-    if (prev) highlightEdge(prev, false);
-  }
-  selectedEdge = key;
-  highlightEdge(rec, true);
 }
 function highlightEdge(rec, on) {
   rec.vis.setAttribute("stroke", on ? SELECT : (rec.e.one_way ? EDGE_ONE : EDGE_TWO));
@@ -838,6 +967,13 @@ function initPanZoom() {
     applyTransform();
   });
   window.addEventListener("pointerup", () => { panning = false; svg.classList.remove("grabbing"); });
+  svg.addEventListener("click", (ev) => {
+    if (ev.target === svg && !editMode) {
+      highlightedNode = null;
+      highlightedEdgeKey = null;
+      applyIncidentHighlight();
+    }
+  });
 }
 
 // ---- toggles / controls -----------------------------------------------------
@@ -876,6 +1012,10 @@ function initControls() {
         if (rec) highlightEdge(rec, false);
         selectedEdge = null;
       }
+    } else {
+      highlightedNode = null;
+      highlightedEdgeKey = null;
+      applyIncidentHighlight();
     }
     updateHint();
   });
@@ -883,6 +1023,9 @@ function initControls() {
   document.getElementById("btn-reset").addEventListener("click", () => {
     for (const [id, p] of basePos) { const n = nodePos.get(id); n.x = p.x; n.y = p.y; }
     drawNodes(); drawEdges();
+    highlightedNode = null;
+    highlightedEdgeKey = null;
+    applyIncidentHighlight();
   });
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
@@ -892,6 +1035,9 @@ function initControls() {
       if (rec) highlightEdge(rec, false);
       selectedEdge = null;
     }
+    highlightedNode = null;
+    highlightedEdgeKey = null;
+    applyIncidentHighlight();
   });
   updateHint();
 }
