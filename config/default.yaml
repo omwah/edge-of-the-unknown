@@ -19,6 +19,7 @@ ticker:
     port_economy: 1200                 # every 20 minutes
     planet_growth: 1200                # every 20 minutes
     alien_drift: 120                   # every 2 minutes (per-species move chance applies)
+    trader_step: 120                   # every 2 minutes (NPC merchant trades, WP43)
 
 # SectorView sprite scene — sizes/counts only, no rules impact (presentation).
 # Sprites are sized to the space available, clamped to [min, max] per axis.
@@ -125,6 +126,13 @@ aliens:
   experience_per_discovery: 5   # flat experience granted for each new discovery logged
   criminal_alignment: -10   # at/below this the governor's Core patrols treat you as an outlaw (WP38 enforces)
   entity_drift_chance: 0.5  # the roaming Entity's own per-firing move chance (§7, WP36; it wanders anywhere non-Core)
+  # NPC traders (WP43): a friendly merchant (movement_policy trade_seek) runs real port trades on the
+  # trader_step cron — buys good deals, dumps held cargo, conserving goods through the §8 pricing.
+  trader_start_cash: 5000        # latinum purse a fresh trader is seeded with on its first step
+  trader_cargo_capacity: 100     # units of goods a trader can hold at once
+  trader_trade_units: 20         # max units a trader moves per trade step
+  trader_buy_discount_frac: 0.95 # only buy when the quoted price is below this × the commodity's base (a real deal)
+  trader_alongside_attitude: 0.02 # attitude a co-located player gains toward a trading merchant per step (capped)
 
 # Encounter rolls (§10, Phase 3 — read by the WP24 encounter system). Per-band chance an
 # encounter fires (0 in the safe Hub, rising outward); when it does, a species is drawn

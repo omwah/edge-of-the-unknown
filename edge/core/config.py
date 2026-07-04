@@ -546,6 +546,21 @@ class AliensConfig(BaseModel):
     # occupancy is unbound by the alliance/rival rules that gate ordinary drift).
     entity_drift_chance: float = Field(default=0.5, ge=0.0, le=1.0)
 
+    # NPC traders (DESIGN §8, WP43). A friendly merchant species (movement policy
+    # `trade_seek`) executes real trades on the `trader_step` cron: it seeds a purse of
+    # `trader_start_cash` on its first step, then per step buys the cheapest good deal a
+    # co-located port offers (quoted price below `trader_buy_discount_frac × base`) or
+    # dumps held cargo the port buys, up to `trader_trade_units` a step, carrying at most
+    # `trader_cargo_capacity`. Goods move through the §8 pricing (conserved with the port;
+    # prices feed back), so a trader visibly works the lanes. A player sharing the sector
+    # of a trading merchant warms toward it by `trader_alongside_attitude` per step
+    # (capped so effective ≤ 1) — trading alongside them builds standing.
+    trader_start_cash: int = Field(default=5000, ge=0)
+    trader_cargo_capacity: int = Field(default=100, ge=0)
+    trader_trade_units: int = Field(default=20, ge=1)
+    trader_buy_discount_frac: float = Field(default=0.95, ge=0.0, le=1.0)
+    trader_alongside_attitude: float = Field(default=0.02, ge=0.0, le=1.0)
+
 
 class CombatConfig(BaseModel):
     """Combat-round parameters (DESIGN §10, Phase 3 — WP25).
@@ -1161,6 +1176,7 @@ class CronCadenceConfig(BaseModel):
     port_economy: int = Field(default=1200, ge=1)       # every 20 minutes
     planet_growth: int = Field(default=1200, ge=1)      # every 20 minutes
     alien_drift: int = Field(default=120, ge=1)         # every 2 minutes
+    trader_step: int = Field(default=120, ge=1)         # every 2 minutes (NPC traders work the lanes, WP43)
 
 
 class TickerConfig(BaseModel):

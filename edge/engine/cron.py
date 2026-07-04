@@ -13,13 +13,15 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from edge.core import npc
-from edge.core.aliens import decay_grudges, may_occupy
+from edge.core.aliens import attitude_locked, decay_grudges, effective_disposition, may_occupy
 from edge.core.discovery import entity_species
 from edge.core.config import GameConfig
 from edge.core.economy import accrue_interest as _accrue
 from edge.core.enums import PortClass
-from edge.core.events import AlienMoved, Banked, ColonyGrew, Event, PlanetProduced, TurnsReset
-from edge.core.models import AlienSpecies, UniverseState
+from edge.core.events import (
+    AlienMoved, AttitudeChanged, Banked, ColonyGrew, Event, PlanetProduced, TurnsReset,
+)
+from edge.core.models import AlienSpecies, Player, Port, UniverseState
 from edge.core.planets import produce
 from edge.core.rules import ReduceResult
 from edge.engine.port_economy import regenerate_ports
@@ -28,7 +30,7 @@ CronFn = Callable[[UniverseState, GameConfig], ReduceResult]
 
 __all__ = [
     "daily_turn_reset", "accrue_interest", "regenerate_ports", "planet_growth",
-    "alien_drift", "CronFn", "CRONS", "resolve_cron",
+    "alien_drift", "trader_step", "CronFn", "CRONS", "resolve_cron",
 ]
 
 
@@ -131,6 +133,76 @@ def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
     return ReduceResult(events=tuple(events), species=tuple(moved), game=game)
 
 
+def _trader_rapport(player: Player, species: AlienSpecies,
+                    config: GameConfig) -> tuple[Player, AttitudeChanged | None]:
+    """Warm a player toward a merchant it shares a market with (§8, WP43) — pure.
+
+    Trading alongside a working merchant builds standing: the player's attitude offset
+    toward the species kind ticks up by `trader_alongside_attitude`, capped so effective
+    disposition never exceeds 1. A permanent grudge (§6.5) locks the offset — amends do
+    not move it. This is the cron-side light touch (no reputation spillover, unlike the
+    §6.4 trade/favour path); returns the player unchanged (event None) when nothing moves.
+    """
+    roster_id = species.roster_id
+    if attitude_locked(player, roster_id):
+        return player, None
+    cap = max(0.0, 1.0 - species.base_disposition)
+    current = player.species_attitudes.get(roster_id, 0.0)
+    new_offset = min(cap, current + config.aliens.trader_alongside_attitude)
+    if new_offset <= current:
+        return player, None
+    new_offset = round(new_offset, 6)
+    updated = replace(player,
+                      species_attitudes={**player.species_attitudes, roster_id: new_offset})
+    event = AttitudeChanged(player.id, species.id, new_offset,
+                            round(effective_disposition(species, updated), 6))
+    return updated, event
+
+
+def trader_step(state: UniverseState, config: GameConfig) -> ReduceResult:
+    """Run one trade for every NPC merchant working a port this firing (§8, WP43).
+
+    Friendly merchant species (movement policy `trade_seek`, `core.npc.is_trader`) hold a
+    persistent purse + hold on their `AlienSpecies` row. Each firing, a merchant sitting in
+    a port sector executes one deterministic trade (`core.npc.plan_trade`) through the §8
+    pricing — goods conserved with the port, prices feeding back — so stock and standing
+    move without the player. A fresh trader (empty hold, no purse — its generated state) is
+    seeded to `aliens.trader_start_cash` first; that state is unreachable again once it
+    trades, so the seed fires exactly once. Any player sharing the market warms toward the
+    merchant (`_trader_rapport`). Pure and RNG-free, so a ticked run reloads to the identical
+    `state_hash` (the WP12 replay rail).
+    """
+    ac = config.aliens
+    if not state.species:
+        return ReduceResult()
+    species_out: list[AlienSpecies] = []
+    ports_out: list[Port] = []
+    players: dict[int, Player] = {}
+    events: list[Event] = []
+    for sp in sorted(state.species.values(), key=lambda s: s.id):
+        if not npc.is_trader(config, sp) or state.port_in_sector(sp.sector_id) is None:
+            continue  # only a merchant actually at a market trades this firing
+        seeded = replace(sp, cash=ac.trader_start_cash) if sp.cash == 0 and not sp.cargo else sp
+        trade = npc.plan_trade(state, seeded, config)
+        if trade is None:
+            if seeded is not sp:  # seeded a fresh trader with no deal on offer yet
+                species_out.append(seeded)
+            continue
+        species_out.append(trade.species)
+        ports_out.append(trade.port)
+        # Players sharing this market warm toward the merchant — trading alongside it (§8).
+        for player in state.players.values():
+            ship = state.ships.get(player.ship_id)
+            if ship is None or ship.sector_id != sp.sector_id:
+                continue
+            updated, event = _trader_rapport(players.get(player.id, player), sp, config)
+            if event is not None:
+                players[player.id] = updated
+                events.append(event)
+    return ReduceResult(events=tuple(events), species=tuple(species_out),
+                        ports=tuple(ports_out), players=tuple(players.values()))
+
+
 def accrue_interest(state: UniverseState, config: GameConfig) -> ReduceResult:
     """Compound interest on every non-empty bank balance (§8)."""
     rate = config.economy.bank_interest_per_day
@@ -155,6 +227,7 @@ CRONS: dict[str, CronFn] = {
     "hourly_port_economy": regenerate_ports,
     "hourly_planet_growth": planet_growth,
     "alien_drift": alien_drift,
+    "trader_step": trader_step,
     "interest_accrual": accrue_interest,
     "daily_turn_reset": daily_turn_reset,
 }

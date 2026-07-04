@@ -589,6 +589,15 @@ class AlienSpecies:
     trade_posture: str = "open"  # §6.1: open / earn / goods_only / barter / … / refuses
     treaty_mode: str = "open"  # §6.1: open / conditional / prove_intent / … / none
     persona: str = "generic"  # dialogue voice key (§6.7)
+    # NPC-trader purse + hold (DESIGN §8, WP43). A friendly merchant species (movement
+    # policy `trade_seek`) runs real trades on the `trader_step` cron: it buys cheap
+    # stock and sells held goods through the §8 pricing, so `cash` (its latinum) rises and
+    # falls and `cargo` (its held goods) turns over — persistent per-kind state that rides
+    # `state_hash`. Every non-trader species keeps the defaults (0 / empty); a fresh trader
+    # is seeded to `aliens.trader_start_cash` on its first step. Goods are conserved with
+    # the port (`core.npc.plan_trade`); cash mints/burns against the port's soft latinum.
+    cargo: Mapping[Commodity, int] = field(default_factory=dict)
+    cash: int = 0
 
 
 @dataclass
