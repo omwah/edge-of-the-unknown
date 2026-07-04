@@ -37,6 +37,7 @@ from edge.core.events import (
     EncounterStarted,
     GenesisDeployed,
     GrudgeFormed,
+    HazardDamage,
     SiteExplored,
     Event,
     Haggled,
@@ -51,6 +52,7 @@ from edge.core.events import (
     StarbaseRepaired,
     StarbaseSalvaged,
     StockRegenerated,
+    TerritoryDeployed,
     Traded,
     TurnsReset,
     Warped,
@@ -65,13 +67,18 @@ from edge.core.rules import (
     BuyGenesis,
     BuyMissiles,
     BuyShip,
+    BuyFighters,
+    BuyMines,
     Cannibalize,
     ClaimStarbase,
     Colonize,
     CombatAction,
     Command,
     Converse,
+    DeployBeacon,
+    DeployFighters,
     DeployGenesis,
+    DeployMines,
     Deposit,
     Descend,
     Dock,
@@ -138,6 +145,11 @@ COMMANDS: list[Command] = [
     AssaultStarbase(starbase_id=2),              # WP40 begin a set-piece assault
     RepairStarbase(2, Subsystem.FUSION_REACTOR, 0, Component.CONVERTER, ComponentTier.I),  # WP40
     ClaimStarbase(starbase_id=2),                # WP40 claim a repaired base
+    BuyFighters(count=20),                       # WP41 buy fighter stock
+    BuyMines(count=5),                           # WP41 buy mine stock
+    DeployFighters(count=10, mode="toll", toll=50),  # WP41 garrison a sector
+    DeployMines(count=3),                        # WP41 seed mines
+    DeployBeacon(text="Kilroy was here"),        # WP41 plant a beacon
     CombatAction(action="fight"),                # WP25 one combat round
     CombatAction(action="flee"),
     CombatAction(action="field_patch", subsystem=Subsystem.SCREENS, slot_index=1),
@@ -198,6 +210,10 @@ EVENTS: list[Event] = [
     StarbaseRazed(1, 2, 5, 55, "none", None, 750),      # WP40 razed an unowned base
     StarbaseRepaired(1, 2, "fusion_reactor", 0, "converter", "I"),  # WP40 refill a slot
     StarbaseClaimed(1, 2, 2000),                        # WP40 claimed a base
+    TerritoryDeployed(1, 55, "fighters", 10, "toll"),   # WP41 deployed a garrison
+    TerritoryDeployed(1, 55, "beacon", 1),              # WP41 planted a beacon
+    HazardDamage(1, 55, "mine", 80),                    # WP41 mine field on entry
+    HazardDamage(1, 55, "black_hole", 30),              # WP41 gravity shear
     DevApplied(1, "[dev] set latinum=1000000"),  # dev cheat audit marker
 ]
 

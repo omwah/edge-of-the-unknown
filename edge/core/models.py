@@ -229,6 +229,8 @@ class Ship:
     sensor_rating: int = 0
     missiles: int = 0
     repair_kits: int = 0
+    fighters: int = 0  # carried sector-fighter stock (deployed to hold territory, §10 WP41)
+    mines: int = 0     # carried space-mine stock (deployed to a sector, §10 WP41)
     turns_per_warp: int = 1
     colonist_capacity: int = 0  # life-support berths (separate occupancy limit, §4.2)
     colonists: int = 0  # recruited colonists aboard (≤ colonist_capacity); not cargo
@@ -517,6 +519,26 @@ class Grudge:
 
 
 @dataclass(frozen=True, slots=True)
+class SectorForce:
+    """Sector-deployed fighters + mines holding a sector (DESIGN §10, WP41) — hashed state.
+
+    The classic territory stack: `fighters` garrison the sector in one of three `mode`s
+    (offensive / defensive / toll — a toll force levies `toll` latinum on entrants), and
+    `mines` damage a hostile entrant on arrival (deflector/shields mitigate). `owner` is
+    three-way like a planet/base (a player_id or an alliance_id): a force is hostile only
+    to an entrant its owner opposes (player-owned forces never bar the player). Never
+    placed in the Core. Empty maps carry no force.
+    """
+
+    sector_id: int
+    owner: Ownership = UNOWNED
+    fighters: int = 0
+    mode: str = "defensive"  # offensive / defensive / toll
+    toll: int = 0
+    mines: int = 0
+
+
+@dataclass(frozen=True, slots=True)
 class Alliance:
     """An alliance / rival bloc (DESIGN §4/§6.3).
 
@@ -595,6 +617,10 @@ class UniverseState:
     # hashed state (they will drive NPC-vs-NPC stances and reputation spillover, WP39).
     # Player-targeted grudges live on `Player.grudges` instead.
     grudges: dict[int, Grudge] = field(default_factory=dict)
+    # Sector-deployed fighters/mines holding territory (DESIGN §10, WP41) — hashed state,
+    # keyed by sector id. Appended by the deploy commands and consumed by the movement
+    # reducers (mine hits, fighter engagements), so it reconstructs under (seed, log).
+    sector_forces: dict[int, SectorForce] = field(default_factory=dict)
     adjacency: dict[int, tuple[int, ...]] = field(default_factory=dict)
     # Hop distance from the Core (sector 1) per sector — a runtime-only cache (like
     # adjacency, excluded from `state_hash`) driving the warp "gravity" arrows (§11).

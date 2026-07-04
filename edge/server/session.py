@@ -64,6 +64,7 @@ from edge.core.events import (
     EncounterStarted,
     GenesisDeployed,
     GrudgeFormed,
+    HazardDamage,
     SiteExplored,
     Event,
     Haggled,
@@ -77,6 +78,7 @@ from edge.core.events import (
     StarbaseRazed,
     StarbaseRepaired,
     StarbaseSalvaged,
+    TerritoryDeployed,
     TurnsReset,
     Traded,
     Warped,
@@ -1389,6 +1391,13 @@ def format_event(event: Event) -> str:
         return f"[green]⚙ Base repaired: {event.subsystem} slot {event.slot_index} refilled.[/]"
     if isinstance(event, StarbaseClaimed):
         return "[green]⚑ The base is yours — a forward foothold on the frontier.[/]"
+    if isinstance(event, TerritoryDeployed):
+        if event.kind == "beacon":
+            return "[cyan]⚑ Beacon planted.[/]"
+        return f"[cyan]⚑ Deployed {event.count} {event.kind} to hold the sector.[/]"
+    if isinstance(event, HazardDamage):
+        label = "Mines" if event.source == "mine" else "Gravity shear"
+        return f"[red]✷ {label} — {event.damage} hull damage![/]"
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 
@@ -1407,7 +1416,8 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
         return event.to_sector
     if isinstance(event, (EncounterStarted, EncounterEvaded)):
         return event.sector_id
-    if isinstance(event, (ShipDestroyed, CoreLawNotice, StarbaseRazed)):
+    if isinstance(event, (ShipDestroyed, CoreLawNotice, StarbaseRazed,
+                          TerritoryDeployed, HazardDamage)):
         return event.sector_id
     if isinstance(event, (CombatRound, EncounterEnded, ComponentKnockedOut,
                           SalvageCollected, GrudgeFormed)):

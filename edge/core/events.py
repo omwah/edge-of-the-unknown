@@ -474,3 +474,31 @@ class StarbaseClaimed(Event):
     player_id: int
     starbase_id: int
     cost: int
+
+
+@dataclass(frozen=True)
+class TerritoryDeployed(Event):
+    """Fighters / mines / a beacon were deployed to a sector (§10, WP41).
+
+    `kind` is "fighters" | "mines" | "beacon"; `count` the number deployed (1 for a
+    beacon). `mode` names a fighter garrison's stance (else empty).
+    """
+
+    player_id: int
+    sector_id: int
+    kind: str
+    count: int
+    mode: str = ""
+
+
+@dataclass(frozen=True)
+class HazardDamage(Event):
+    """A sector hazard damaged the ship on entry (§10, WP41).
+
+    `source` is "mine" | "black_hole"; `damage` the hull points taken after shields.
+    """
+
+    player_id: int
+    sector_id: int
+    source: str
+    damage: int

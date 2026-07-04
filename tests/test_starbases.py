@@ -7,7 +7,6 @@ reducers plus razing consequences.
 
 from __future__ import annotations
 
-import random
 from dataclasses import replace
 
 import pytest
@@ -23,7 +22,6 @@ from edge.core.events import StarbaseClaimed, StarbaseRazed, StarbaseRepaired
 from edge.core.models import (
     EncounterFoe,
     Game,
-    InstalledComponent,
     Ownership,
     Planet,
     Player,

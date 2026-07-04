@@ -42,6 +42,7 @@ from edge.core.events import (
     GenesisDeployed,
     GrudgeFormed,
     Haggled,
+    HazardDamage,
     LeadAccepted,
     PlanetProduced,
     Repaired,
@@ -54,6 +55,7 @@ from edge.core.events import (
     StarbaseRepaired,
     StarbaseSalvaged,
     StockRegenerated,
+    TerritoryDeployed,
     Traded,
     TurnsReset,
     Warped,
@@ -64,6 +66,8 @@ from edge.core.rules import (
     AdvanceAdmission,
     AssaultStarbase,
     BarterArtifact,
+    BuyFighters,
+    BuyMines,
     BuyAlienTech,
     BuyComponent,
     BuyGenesis,
@@ -75,7 +79,10 @@ from edge.core.rules import (
     CombatAction,
     Command,
     Converse,
+    DeployBeacon,
+    DeployFighters,
     DeployGenesis,
+    DeployMines,
     Deposit,
     Descend,
     Dock,
@@ -207,6 +214,18 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             }
         case ClaimStarbase():
             return "ClaimStarbase", {"starbase_id": command.starbase_id}
+        case BuyFighters():
+            return "BuyFighters", {"count": command.count}
+        case BuyMines():
+            return "BuyMines", {"count": command.count}
+        case DeployFighters():
+            return "DeployFighters", {
+                "count": command.count, "mode": command.mode, "toll": command.toll,
+            }
+        case DeployMines():
+            return "DeployMines", {"count": command.count}
+        case DeployBeacon():
+            return "DeployBeacon", {"text": command.text}
         case DevPatch():
             return "DevPatch", {
                 "op": command.op, "target": command.target, "value": command.value,
@@ -323,6 +342,16 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             )
         case "ClaimStarbase":
             return ClaimStarbase(starbase_id=payload["starbase_id"])
+        case "BuyFighters":
+            return BuyFighters(count=payload["count"])
+        case "BuyMines":
+            return BuyMines(count=payload["count"])
+        case "DeployFighters":
+            return DeployFighters(count=payload["count"], mode=payload["mode"], toll=payload["toll"])
+        case "DeployMines":
+            return DeployMines(count=payload["count"])
+        case "DeployBeacon":
+            return DeployBeacon(text=payload["text"])
         case "DevPatch":
             return DevPatch(
                 op=payload["op"], target=payload["target"], value=payload["value"],
@@ -541,6 +570,16 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "starbase_id": event.starbase_id,
                 "cost": event.cost,
             }
+        case TerritoryDeployed():
+            return "TerritoryDeployed", {
+                "player_id": event.player_id, "sector_id": event.sector_id,
+                "kind": event.kind, "count": event.count, "mode": event.mode,
+            }
+        case HazardDamage():
+            return "HazardDamage", {
+                "player_id": event.player_id, "sector_id": event.sector_id,
+                "source": event.source, "damage": event.damage,
+            }
         case DevApplied():
             return "DevApplied", {"player_id": event.player_id, "detail": event.detail}
         case _:
@@ -673,6 +712,12 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                                     payload["component"], payload["tier"])
         case "StarbaseClaimed":
             return StarbaseClaimed(payload["player_id"], payload["starbase_id"], payload["cost"])
+        case "TerritoryDeployed":
+            return TerritoryDeployed(payload["player_id"], payload["sector_id"],
+                                     payload["kind"], payload["count"], payload["mode"])
+        case "HazardDamage":
+            return HazardDamage(payload["player_id"], payload["sector_id"],
+                                payload["source"], payload["damage"])
         case "DevApplied":
             return DevApplied(payload["player_id"], payload["detail"])
         case _:
