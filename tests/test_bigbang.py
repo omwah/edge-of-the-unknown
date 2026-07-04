@@ -329,3 +329,40 @@ def test_stardock_route_starts_explored(seed: int) -> None:
     # The route is uncovered for route-locked travel, off-route stays fogged.
     assert shortest_path(state.adjacency, 1, dock.sector_id, allowed=set(player.explored_sectors))
     assert len(player.explored_sectors) < len(state.sectors)
+
+
+def test_mesh_topology_generation() -> None:
+    """Test generating in mesh topology mode."""
+    mesh_cfg = CONFIG.model_copy(
+        update={
+            "bigbang": CONFIG.bigbang.model_copy(
+                update={"topology_mode": "mesh", "sector_count": 100}
+            )
+        }
+    )
+    state = generate(mesh_cfg, seed=4)  # type: ignore[arg-type]
+    
+    assert len(state.sectors) == 100
+    
+    import math
+    n = 100
+    R = math.isqrt(n)
+    if R * R < n:
+        R = math.isqrt(n) + 1
+    C = (n + R - 1) // R
+    
+    coords = {}
+    for sid, (x, y) in state.sector_pos.items():
+        c = int(round(x + C / 2.0))
+        r = int(round(y + R / 2.0))
+        coords[sid] = (r, c)
+        assert 0 <= r < R
+        assert 0 <= c < C
+
+    for u, nbrs in state.adjacency.items():
+        ru, cu = coords[u]
+        for v in nbrs:
+            rv, cv = coords[v]
+            dr = abs(ru - rv)
+            dc = abs(cu - cv)
+            assert (dr == 1 and dc == 0) or (dr == 1 and dc == 1), f"Invalid mesh edge {u} ({ru},{cu}) -> {v} ({rv},{cv})"

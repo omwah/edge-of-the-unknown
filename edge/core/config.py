@@ -145,6 +145,15 @@ def _planar_bands() -> list[DistanceBand]:
     ]
 
 
+def _mesh_bands() -> list[DistanceBand]:
+    return [
+        DistanceBand(name="Hub", min_hops=0, max_hops=8),
+        DistanceBand(name="Frontier", min_hops=9, max_hops=16),
+        DistanceBand(name="Deep", min_hops=17, max_hops=24),
+        DistanceBand(name="Void", min_hops=25, max_hops=9_999),
+    ]
+
+
 class BandSet(BaseModel):
     """Distance-band hop windows keyed by `topology_mode` (DESIGN §5 step 5).
 
@@ -160,12 +169,14 @@ class BandSet(BaseModel):
     trunk: list[DistanceBand] = Field(default_factory=_trunk_bands)
     expansive: list[DistanceBand] = Field(default_factory=_expansive_bands)
     planar: list[DistanceBand] = Field(default_factory=_planar_bands)
+    mesh: list[DistanceBand] = Field(default_factory=_mesh_bands)
 
     @model_validator(mode="after")
     def _check_names_match(self) -> BandSet:
         names = [b.name for b in self.trunk]
         exp = [b.name for b in self.expansive]
         pla = [b.name for b in self.planar]
+        msh = [b.name for b in self.mesh]
         if exp != names:
             raise ValueError(
                 f"bands.expansive names {exp} must match bands.trunk {names}"
@@ -173,6 +184,10 @@ class BandSet(BaseModel):
         if pla != names:
             raise ValueError(
                 f"bands.planar names {pla} must match bands.trunk {names}"
+            )
+        if msh != names:
+            raise ValueError(
+                f"bands.mesh names {msh} must match bands.trunk {names}"
             )
         return self
 
@@ -189,7 +204,7 @@ class BigBangConfig(BaseModel):
     # band-lattice web: each group bridges to same-ring peers plus ≥2 inner
     # bridges, so every ring is a widening lattice with no single-bridge
     # chokepoint. The default stays `trunk`; the flip rides the WP22 config epoch.
-    topology_mode: Literal["trunk", "expansive", "planar"] = "trunk"
+    topology_mode: Literal["trunk", "expansive", "planar", "mesh"] = "trunk"
     cluster_min: int = 5
     cluster_max: int = 25
     intra_group_degree: float = 2.5
@@ -229,6 +244,8 @@ class BigBangConfig(BaseModel):
             return self.bands.expansive
         if self.topology_mode == "planar":
             return self.bands.planar
+        if self.topology_mode == "mesh":
+            return self.bands.mesh
         return self.bands.trunk
 
 
