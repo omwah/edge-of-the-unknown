@@ -101,3 +101,30 @@ def test_layout_is_deterministic() -> None:
     a = _world(explored=frozenset({1, 2, 3, 5}))
     b = _world(explored=frozenset({1, 2, 3, 5}))
     assert _rows(a) == _rows(b)
+
+
+def test_fit_to_width_grows_reach_to_fill_the_screen() -> None:
+    # Sectors 4 and 6 sit two hops out (offset +2) — only a reach ≥ 2 includes them.
+    state = _world(explored=frozenset({1, 2, 3, 4, 5, 6}))
+    wide = _rows(state, max_width=1000)
+    assert "(204)" in wide and "(206)" in wide  # a wide screen pulls in the far ring
+    assert "(102@)" in wide                      # still centered on you
+
+
+def test_fit_to_width_falls_back_to_reach_one_when_narrow() -> None:
+    # A width too small even for the immediate ring still shows it (reach never < 1),
+    # but never reaches the two-hop sectors.
+    state = _world(explored=frozenset({1, 2, 3, 4, 5, 6}))
+    narrow = _rows(state, max_width=8)
+    assert "(105)" in narrow      # the 1-hop neighbour is present
+    assert "(204)" not in narrow  # the 2-hop sector is not (reach clamped to 1)
+
+
+def test_fit_to_width_never_exceeds_the_budget() -> None:
+    # Budgets at/above the immediate ring's width: the fit never lays out wider than
+    # asked (a narrower budget than even reach 1 is the separate fallback case above).
+    state = _world(explored=frozenset({1, 2, 3, 4, 5, 6}))
+    for budget in (30, 40, 60, 100):
+        rows, _legend, _nodes = mapgraph.build_local_map(
+            state, state.players[1], max_width=budget)
+        assert max(len(_strip(r)) for r in rows) <= budget

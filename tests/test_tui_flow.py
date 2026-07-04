@@ -942,6 +942,44 @@ async def test_clicking_a_map_sector_plots_a_route() -> None:
         assert app.screen._route.reachable  # type: ignore[attr-defined]  # a real route was plotted
 
 
+async def test_map_arrow_keys_select_and_enter_plots_route() -> None:
+    """Arrow keys move a sector cursor around the Map tab; Enter plots a route to it."""
+    from textual.widgets import TabbedContent
+
+    from edge.tui.widgets import LocalMapView
+
+    app = EdgeApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+
+        app.push_screen(ComputerScreen(svc, 1, initial_tab="map"))
+        await pilot.pause()
+        view = app.screen.query_one("#local-map", LocalMapView)
+        view.focus()
+        await pilot.pause()
+        assert app.focused is view
+        if len(view._hits) < 2:  # type: ignore[attr-defined]
+            return  # a lone-neighbour sector has nothing to navigate
+
+        # The cursor starts on the home (top-left) node; a Right then Down moves it off.
+        assert view._idx == 0  # type: ignore[attr-defined]
+        await pilot.press("right")
+        await pilot.press("down")
+        await pilot.pause()
+        assert view._idx != 0  # type: ignore[attr-defined]  # the arrow keys moved the selection
+
+        # Enter plots a route to the selected sector and opens the Route tab.
+        selected = view._hits[view._idx].sector_id  # type: ignore[attr-defined]
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.screen.query_one(TabbedContent).active == "route"
+        assert app.screen._engage_target == selected  # type: ignore[attr-defined]
+
+
 async def test_computer_screen_remembers_last_tab() -> None:
     """[C] reopens the Computer on whichever tab was last viewed (not always Trade)."""
     from textual.widgets import TabbedContent
