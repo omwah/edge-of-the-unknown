@@ -592,34 +592,38 @@ class SectorScene(Static):
 
 
 def _nearest_node(hits: list, idx: int, dx: int, dy: int) -> int | None:  # type: ignore[type-arg]
-    """Index of the node nearest `hits[idx]` in the pressed screen direction, or None.
+    """Index of the node to move to from `hits[idx]` in the pressed direction, or None.
 
-    Navigation follows the on-screen layout, not insertion order: positions are each
-    node's baked cell centre `((col0+col1)/2, row)`; a candidate must lie in the pressed
-    half-plane (right/left for `dx`, down/up for `dy`). **Cross-axis alignment wins first**
-    — pressing Up/Down prefers a sector in the *same column* (and Left/Right one in the
-    *same row*) over a nearer one that is off to the side — with the along-axis gap only
-    breaking ties. Shared by the nav rose and the local map so both cursors move the same,
-    layout-aware way.
+    Navigation follows the on-screen layout, not insertion order, using a **directional
+    beam** (the standard spatial-nav rule): a candidate must lie in the pressed direction,
+    and one whose cell **overlaps the current node's beam** — same row for Left/Right, an
+    overlapping column span for Up/Down — is *in beam*. In-beam candidates are always
+    preferred, and among them the **nearest in the travel direction** wins (so you step to
+    the sector just above/beside, never skipping an intervening aligned one, and never
+    jumping to a far sector merely because it is perfectly centred). Off-beam candidates are
+    considered only when nothing lines up. Shared by the nav rose and the local map.
     """
     if not hits or idx >= len(hits):
         return None
     cur = hits[idx]
-    cx, cy = (cur.col0 + cur.col1) / 2, cur.row
-    step = dx or dy
-    best: int | None = None
-    best_score: tuple[float, float] | None = None
+    cx = (cur.col0 + cur.col1) / 2
+    scored: list[tuple[bool, float, float, int]] = []
     for j, n in enumerate(hits):
         if j == idx:
             continue
-        ex, ey = (n.col0 + n.col1) / 2 - cx, n.row - cy
-        along, across = (ex, ey) if dx else (ey, ex)
-        if along == 0 or (along > 0) != (step > 0):
-            continue  # not in the pressed direction
-        score = (abs(across), abs(along))  # alignment (same row/column) first, then distance
-        if best_score is None or score < best_score:
-            best, best_score = j, score
-    return best
+        nx = (n.col0 + n.col1) / 2
+        if dy:  # vertical move — beam is the overlapping column span
+            major = (n.row - cur.row) * dy
+            minor = abs(nx - cx)
+            in_beam = cur.col0 < n.col1 and n.col0 < cur.col1
+        else:  # horizontal move — beam is the same row
+            major = (nx - cx) * dx
+            minor = abs(n.row - cur.row)
+            in_beam = n.row == cur.row
+        if major <= 0:
+            continue  # not in the pressed direction (or level with it)
+        scored.append((not in_beam, major, minor, j))  # in-beam first, then nearest, then aligned
+    return min(scored)[3] if scored else None
 
 
 class LocalMapView(Static):

@@ -255,15 +255,33 @@ def test_nearest_node_moves_by_screen_layout() -> None:
     assert _nearest_node(nodes, 1, -1, 0) == 0    # left  from top-right → top-left
     assert _nearest_node(nodes, 2, 0, -1) == 0    # up    from bottom-left → top-left (nearest across)
 
-    # Alignment wins over raw proximity: pressing Up prefers the sector in the SAME column
-    # (row 0) over a nearer one (row 2) that sits off to the side.
+    # In-beam (same-column) wins over an off-column sector: pressing Up prefers the sector
+    # whose column overlaps (row 0) over a nearer one (row 2) that sits off to the side.
     aligned = [
         MapNodeDTO(sector_id=1, display_id=1, row=4, col0=10, col1=13),  # 0: current
         MapNodeDTO(sector_id=2, display_id=2, row=2, col0=0, col1=3),    # 1: nearer row, off-column
         MapNodeDTO(sector_id=3, display_id=3, row=0, col0=10, col1=13),  # 2: same column, farther row
     ]
-    assert _nearest_node(aligned, 0, 0, -1) == 2  # Up → the same-column sector, not the nearer one
+    assert _nearest_node(aligned, 0, 0, -1) == 2  # Up → the in-beam sector, not the off-column one
     assert _nearest_node(aligned, 0, -1, 0) == 1  # Left → the only sector to the left
+
+    # Don't skip an intervening aligned sector: Up steps to the NEAREST in-beam sector,
+    # not a farther one that is also in the column.
+    stacked = [
+        MapNodeDTO(sector_id=1, display_id=1, row=6, col0=5, col1=8),  # 0: current
+        MapNodeDTO(sector_id=2, display_id=2, row=4, col0=5, col1=8),  # 1: same column, nearer
+        MapNodeDTO(sector_id=3, display_id=3, row=0, col0=5, col1=8),  # 2: same column, farther
+    ]
+    assert _nearest_node(stacked, 0, 0, -1) == 1  # the nearest above, not the farther aligned one
+
+    # The reported bug: a sector *just above* (columns overlap) is chosen over a farther one
+    # in the column that merely happens to be perfectly centre-aligned.
+    just_above = [
+        MapNodeDTO(sector_id=1, display_id=1, row=6, col0=5, col1=9),   # 0: current (centre 7)
+        MapNodeDTO(sector_id=2, display_id=2, row=4, col0=6, col1=10),  # 1: just above, overlaps (centre 8)
+        MapNodeDTO(sector_id=3, display_id=3, row=0, col0=5, col1=9),   # 2: far above, centred (centre 7)
+    ]
+    assert _nearest_node(just_above, 0, 0, -1) == 1  # the near overlapping sector, not the far centred one
 
 
 async def test_selected_nav_node_inverts_only_its_cell() -> None:
