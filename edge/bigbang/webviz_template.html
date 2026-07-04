@@ -518,6 +518,13 @@ let bandEls = [];   // { el, band } for each ring circle + label (for per-band g
 function drawBands() {
   gBands.textContent = "";
   bandEls = [];
+
+  // Recalculate center based on current anchor position
+  let anchor = sectors[0];
+  for (const s of sectors) if (s.core_hops < anchor.core_hops) anchor = s;
+  const ap = nodePos.get(anchor.id);
+  if (ap) center = { x: ap.x, y: ap.y };
+
   const membersByBand = new Map();
   for (const s of sectors) {
     if (!membersByBand.has(s.band)) membersByBand.set(s.band, []);
@@ -615,7 +622,11 @@ function drawEdges() {
     if (e.one_way) vis.setAttribute("marker-end", "url(#arrow)");
     g.append(hit, vis);
     const rec = { e, g, vis };
-    g.addEventListener("click", (ev) => { ev.stopPropagation(); onEdgeClick(rec); });
+    g.addEventListener("click", (ev) => {
+      if (ev.button !== 0) return;
+      ev.stopPropagation();
+      onEdgeClick(rec);
+    });
     gEdges.appendChild(g);
     edgeEls.push(rec);
   }
@@ -741,6 +752,7 @@ function drawNodes() {
 function attachNodeInteraction(g, s) {
   let downX = 0, downY = 0, moved = false, dragging = false;
   g.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
     ev.stopPropagation();
     downX = ev.clientX; downY = ev.clientY; moved = false; dragging = true;
     g.setPointerCapture(ev.pointerId);
@@ -755,8 +767,12 @@ function attachNodeInteraction(g, s) {
     p.y += (ev.movementY) / T.k;
     g.setAttribute("transform", `translate(${p.x},${p.y})`);
     refreshIncidentEdges(s.id);
+    drawClusters();
+    drawCore();
+    drawBands();
   });
   g.addEventListener("pointerup", (ev) => {
+    if (ev.button !== 0) return;
     dragging = false; g.style.cursor = "grab";
     try { g.releasePointerCapture(ev.pointerId); } catch (_) {}
     if (!moved) onNodeClick(s);
@@ -765,6 +781,7 @@ function attachNodeInteraction(g, s) {
 function attachOutlineInteraction(g, ids, isCore) {
   let downX = 0, downY = 0, moved = false, dragging = false;
   g.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
     ev.stopPropagation();
     downX = ev.clientX; downY = ev.clientY; moved = false; dragging = true;
     g.setPointerCapture(ev.pointerId);
@@ -807,6 +824,7 @@ function attachOutlineInteraction(g, ids, isCore) {
     }
   });
   g.addEventListener("pointerup", (ev) => {
+    if (ev.button !== 0) return;
     if (!dragging) return;
     dragging = false; g.style.cursor = "grab";
     try { g.releasePointerCapture(ev.pointerId); } catch (_) {}
@@ -957,6 +975,8 @@ function initPanZoom() {
   // Nodes stop propagation on pointerdown, so this only fires on empty space,
   // outlines, and edges — all of which should pan when dragged.
   svg.addEventListener("pointerdown", (e) => {
+    if (e.button === 1) e.preventDefault(); // Prevent autoscroll
+    if (e.button !== 0 && e.button !== 1) return; // Only pan on left or middle click
     panning = true; px = e.clientX; py = e.clientY;
     svg.classList.add("grabbing");
   });
