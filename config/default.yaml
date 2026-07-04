@@ -194,7 +194,6 @@ weapons:
 bigbang:
   sector_count: 1000          # total sectors (nodes) in the generated warp graph
   topology_mode: expansive    # graph shape: trunk (chokepoints) | expansive (band-lattice) | planar (spiderweb), §5
-  planar_strict_bands: true   # prevent planar clusters from spanning distance bands (trade off speed for strictness)
   cluster_min: 5              # smallest cluster of sectors the generator forms
   cluster_max: 25            # largest such cluster (clusters are then bridged together, §5)
   intra_group_degree: 2.5    # average warp connections per sector inside a cluster (density)

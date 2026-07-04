@@ -190,7 +190,6 @@ class BigBangConfig(BaseModel):
     # bridges, so every ring is a widening lattice with no single-bridge
     # chokepoint. The default stays `trunk`; the flip rides the WP22 config epoch.
     topology_mode: Literal["trunk", "expansive", "planar"] = "trunk"
-    planar_strict_bands: bool = True
     cluster_min: int = 5
     cluster_max: int = 25
     intra_group_degree: float = 2.5
