@@ -197,6 +197,7 @@ bigbang:
   cluster_min: 5              # smallest cluster of sectors the generator forms
   cluster_max: 25            # largest such cluster (clusters are then bridged together, §5)
   intra_group_degree: 2.5    # average warp connections per sector inside a cluster (density)
+  inter_group_degree: 2.5    # average inter-cluster warp connections per cluster (density)
   bridges_min: 1             # fewest bridge edges linking one cluster to the next
   bridges_max: 5             # most bridge edges between two clusters
   one_way_chance: 0.15       # probability a given warp edge is one-way (a trap/wormhole seam)
