@@ -208,6 +208,7 @@ class BigBangConfig(BaseModel):
     cluster_min: int = 5
     cluster_max: int = 25
     intra_group_degree: float = 2.5
+    inter_group_degree: float = 2.5
     bridges_min: int = 1
     bridges_max: int = 5
     one_way_chance: float = 0.15
