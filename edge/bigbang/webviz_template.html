@@ -42,6 +42,12 @@
   #controls .band-head span.c { width: 14px; text-align: center; }
   #controls .band-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
   #controls .band-row input { width: 14px; margin: 0; cursor: pointer; }
+  #controls .slider { margin: 8px 0 4px; }
+  #controls .slider .lab { display: flex; justify-content: space-between; font-size: 11px;
+    color: #8695a6; margin-bottom: 2px; }
+  #controls .slider .lab b { color: #cdd6e0; font-weight: 600; }
+  #controls .slider input[type=range] { width: 100%; margin: 0; cursor: pointer;
+    accent-color: #4fc3f7; }
   #controls.edit { border-color: #b8892f; box-shadow: 0 0 0 1px #b8892f55; }
 
   #legend { bottom: 10px; right: 10px; padding: 10px 12px; font-size: 12px;
@@ -86,6 +92,23 @@
   <label><input type="checkbox" id="tg-core" checked> Core outline</label>
   <label><input type="checkbox" id="tg-cluster" checked> Cluster outlines</label>
   <label><input type="checkbox" id="tg-band" checked> Band rings</label>
+  <label><input type="checkbox" id="tg-autosep"> Auto-separate on drag</label>
+  <div class="slider">
+    <div class="lab"><span>Cluster spacing</span><b id="sl-intra-v"></b></div>
+    <input type="range" id="sl-intra" min="52" max="150" step="1">
+  </div>
+  <div class="slider">
+    <div class="lab"><span>Cluster gap</span><b id="sl-gap-v"></b></div>
+    <input type="range" id="sl-gap" min="0" max="140" step="1">
+  </div>
+  <div class="slider">
+    <div class="lab"><span>Edge clearance</span><b id="sl-clear-v"></b></div>
+    <input type="range" id="sl-clear" min="0" max="40" step="1">
+  </div>
+  <div class="slider">
+    <div class="lab"><span>Compactness</span><b id="sl-compact-v"></b></div>
+    <input type="range" id="sl-compact" min="0.02" max="0.4" step="0.01">
+  </div>
   <h3 class="band-h">Bands</h3>
   <div class="band-head"><span class="c" title="nodes">N</span><span class="c" title="edges">E</span><span>band</span></div>
   <div id="band-toggles"></div>
@@ -134,6 +157,39 @@ const EDGE_ONE = "#e0a060";
 const SELECT = "#ff2a85";
 
 const NODE_R = 24;
+// Outline inflation (distance the drawn outline sits beyond a cluster's node centres).
+// The hull-separation pass uses these same pads, so the geometry it de-overlaps is
+// exactly the geometry that gets drawn. Tightened slightly from the historical
+// +8 / +16 so outlines hug their nodes a little closer before separation spreads them.
+const CLUSTER_PAD = NODE_R + 6;
+const CORE_PAD = NODE_R + 12;
+// Hard anti-overlap floor: two node circles are never allowed closer than this,
+// regardless of the spacing slider. 2*NODE_R = touching, +4 leaves a 4px gap.
+const MIN_NODE_GAP = 2 * NODE_R + 4;
+// ============================================================================
+// LAYOUT DEFAULTS — initial positions of the four spacing sliders, per big-bang
+// topology mode. **Edit here** to retune a mode's default look; the sliders still
+// let you override live. Keys must match meta.topology_mode; `default` is the
+// fallback for any mode not listed.
+//   spacing   : intra-cluster warp length, px          (Cluster spacing slider)
+//   gap       : clearance between cluster outlines, px  (Cluster gap slider)
+//   clearance : px beyond node radius that warps are kept clear of other
+//               sectors — bigger = more edge line-of-sight (Edge clearance slider)
+//   compact   : centroid gravity, higher = tighter blob (Compactness slider)
+// ============================================================================
+const LAYOUT_DEFAULTS = {
+  trunk:     { spacing: 78, gap: 20, clearance: 12, compact: 0.16 },
+  expansive: { spacing: 78, gap: 20, clearance: 12, compact: 0.16 },
+  planar:    { spacing: 78, gap: 20, clearance: 12, compact: 0.16 },
+  mesh:      { spacing: 78, gap: 20, clearance: 12, compact: 0.16 },
+  default:   { spacing: 78, gap: 20, clearance: 12, compact: 0.16 },
+};
+// Live layout parameters — seeded from LAYOUT_DEFAULTS once the topology is known
+// (see below), then mutated by the sliders.
+let SAME_SPACING = LAYOUT_DEFAULTS.default.spacing;  // force-directed target warp length
+let CLUSTER_GAP  = LAYOUT_DEFAULTS.default.gap;       // gap between cluster outlines
+let EDGE_CLEAR   = LAYOUT_DEFAULTS.default.clearance; // node->warp line-of-sight margin
+let GRAVITY      = LAYOUT_DEFAULTS.default.compact;   // intra-cluster centroid gravity
 const SVGNS = "http://www.w3.org/2000/svg";
 
 // ---- tiny SVG helper --------------------------------------------------------
@@ -148,10 +204,16 @@ const svg = document.getElementById("stage");
 const viewport = document.getElementById("viewport");
 const sectors = UNIVERSE.sectors;
 const meta = UNIVERSE.meta;
+// apply this universe's per-topology layout defaults (see LAYOUT_DEFAULTS above)
+{
+  const ld = LAYOUT_DEFAULTS[meta.topology_mode] || LAYOUT_DEFAULTS.default;
+  SAME_SPACING = ld.spacing; CLUSTER_GAP = ld.gap; EDGE_CLEAR = ld.clearance; GRAVITY = ld.compact;
+}
 const byId = new Map(sectors.map((s) => [s.id, s]));
 
 let nodePos = new Map();   // id -> {x,y} in world coords (mutated by drag)
 let basePos = new Map();   // pristine copy for "reset layout"
+let packedPos = new Map(); // post-layout, pre-separation snapshot (for the gap slider)
 let scale = 1;
 let center = { x: 0, y: 0 };  // ring centre = Core anchor world pos
 
@@ -160,6 +222,7 @@ const baseEdges = UNIVERSE.edges.map((e) => ({ a: e.a, b: e.b, one_way: e.one_wa
 
 const T = { k: 1, tx: 0, ty: 0 };
 let editMode = false, idMode = "spatial";
+let autoSeparate = false;   // re-run hull separation when a drag settles (opt-in; default off)
 let pendingNode = null, selectedEdge = null, highlightedNode = null, highlightedEdgeKey = null;
 
 // per-band visibility (nodes and edges independently); an edge is classed by its
@@ -181,7 +244,7 @@ function median(arr) {
 // grid-bucketed passes that only push pairs closer than one node diameter. Cheap
 // (near O(n) per pass via the spatial hash) and deterministic (id-based tie-break).
 function relaxOverlaps(iterations = 200) {
-  const sameTarget = 2 * NODE_R + 8;
+  const sameTarget = MIN_NODE_GAP;   // only guards against overlap; spacing set by layoutClusters
   const maxTarget = 2 * NODE_R + 40; // 80 when NODE_R = 20
   const cell = maxTarget;
   const key = (cx, cy) => cx + "," + cy;
@@ -224,8 +287,7 @@ function relaxOverlaps(iterations = 200) {
   }
 }
 function arrangeClusterRadial() {
-  const sameTarget = 2 * NODE_R + 8;
-  const gridSpacing = sameTarget + 8; // 56px between nodes
+  const gridSpacing = SAME_SPACING; // ring chord between adjacent sectors (compact)
 
   function getNeighbors(id) {
     const neighbors = [];
@@ -274,14 +336,15 @@ function arrangeClusterRadial() {
     const nOut = externalNodes.length;
     const nIn = internalNodes.length;
 
-    // Calculate radii
-    let rOut = 45;
+    // Calculate radii (floors kept small so few-node clusters stay compact; the
+    // chord formula still grows the ring as needed to keep nodes from overlapping)
+    let rOut = NODE_R + 12;
     if (nOut > 1) {
       rOut = Math.max(rOut, gridSpacing / (2 * Math.sin(Math.PI / nOut)));
     }
     let rIn = 0;
     if (nIn > 1) {
-      rIn = Math.max(30, gridSpacing / (2 * Math.sin(Math.PI / nIn)));
+      rIn = Math.max(NODE_R + 4, gridSpacing / (2 * Math.sin(Math.PI / nIn)));
     }
     if (nIn > 0 && rOut - rIn < gridSpacing) {
       rOut = rIn + gridSpacing;
@@ -330,87 +393,237 @@ function arrangeClusterRadial() {
     }
   }
 }
-function relaxClusters(iterations = 80) {
-  const clusters = [];
-  if (UNIVERSE.hub_sector_ids.length > 0) {
-    clusters.push({
-      id: "core",
-      sectorIds: UNIVERSE.hub_sector_ids,
-      pad: NODE_R + 16
-    });
+// The convex outline polygon a cluster is *drawn* with (same shape outlineFor
+// renders): an inflated convex hull for 3+ nodes, or a circle approximated as a
+// 16-gon for degenerate 1-2 node clusters. Everything is convex, so pairs can be
+// de-overlapped with SAT below.
+function clusterPolygon(ids, pad) {
+  const pts = ids.map((id) => nodePos.get(id)).filter(Boolean);
+  if (!pts.length) return null;
+  if (pts.length < 3) {
+    const c = centroid(pts);
+    let r = NODE_R + pad;
+    for (const p of pts) r = Math.max(r, Math.hypot(p.x - c.x, p.y - c.y) + NODE_R + pad);
+    const verts = [], N = 16;
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * 2 * Math.PI;
+      verts.push({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r });
+    }
+    return verts;
   }
-  const coreSet = new Set(UNIVERSE.hub_sector_ids);
-  for (const reg of UNIVERSE.regions) {
-    const nonCoreSectors = reg.sector_ids.filter((id) => !coreSet.has(id));
-    if (nonCoreSectors.length > 0) {
-      clusters.push({
-        id: reg.id,
-        sectorIds: reg.sector_ids,
-        pad: NODE_R + 8
-      });
+  return inflate(convexHull(pts), pad);
+}
+// Separating Axis Theorem: minimum translation vector that pushes convex polygon
+// B off convex polygon A (oriented A -> B), or null when they don't overlap.
+function satMTV(A, B) {
+  let best = Infinity, bx = 0, by = 0;
+  for (const poly of [A, B]) {
+    for (let i = 0; i < poly.length; i++) {
+      const p1 = poly[i], p2 = poly[(i + 1) % poly.length];
+      let ax = -(p2.y - p1.y), ay = p2.x - p1.x;      // edge normal
+      const len = Math.hypot(ax, ay) || 1;
+      ax /= len; ay /= len;
+      let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
+      for (const p of A) { const d = p.x * ax + p.y * ay; if (d < minA) minA = d; if (d > maxA) maxA = d; }
+      for (const p of B) { const d = p.x * ax + p.y * ay; if (d < minB) minB = d; if (d > maxB) maxB = d; }
+      const overlap = Math.min(maxA, maxB) - Math.max(minA, minB);
+      if (overlap <= 0) return null;                  // found a separating axis
+      if (overlap < best) {
+        best = overlap;
+        const sign = (minB + maxB) >= (minA + maxA) ? 1 : -1;
+        bx = ax * sign; by = ay * sign;
+      }
     }
   }
+  return { x: bx * best, y: by * best };
+}
+// Rigidly slide whole clusters apart until no two drawn outlines intersect (which
+// also guarantees no node lands inside a foreign outline). Moving clusters as rigid
+// bodies preserves the intra-cluster spacing that relaxOverlaps established. The Core
+// is pinned (weight 0) so the band rings stay centred on it.
+function separateClusterHulls(iterations = 300) {
+  const coreSet = new Set(UNIVERSE.hub_sector_ids);
+  const clusters = [];
+  if (UNIVERSE.hub_sector_ids.length) {
+    clusters.push({ ids: UNIVERSE.hub_sector_ids, pad: CORE_PAD, weight: 0 });
+  }
+  for (const reg of UNIVERSE.regions) {
+    if (reg.sector_ids.some((id) => coreSet.has(id))) continue;  // no outline drawn -> not separated
+    if (reg.sector_ids.length) clusters.push({ ids: reg.sector_ids, pad: CLUSTER_PAD, weight: 1 });
+  }
+  if (clusters.length < 2) return;
 
   for (let it = 0; it < iterations; it++) {
-    const forces = new Map(clusters.map((c, idx) => [idx, { x: 0, y: 0, count: 0 }]));
-    let moved = false;
+    // separate on collision polygons inflated by half the desired gap on each side,
+    // so when they just touch the *drawn* outlines end up CLUSTER_GAP apart.
+    const polys = clusters.map((c) => clusterPolygon(c.ids, c.pad + CLUSTER_GAP / 2));
+    const disp = clusters.map(() => ({ x: 0, y: 0 }));
+    let overlapping = false;
     for (let i = 0; i < clusters.length; i++) {
-      const c1 = clusters[i];
+      if (!polys[i]) continue;
       for (let j = i + 1; j < clusters.length; j++) {
-        const c2 = clusters[j];
-        let pushX = 0, pushY = 0, overlapCount = 0;
-        const target = c1.pad + c2.pad + 16;
-        for (const id1 of c1.sectorIds) {
-          const p1 = nodePos.get(id1);
-          if (!p1) continue;
-          for (const id2 of c2.sectorIds) {
-            const p2 = nodePos.get(id2);
-            if (!p2) continue;
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < target) {
-              const d = dist || 1e-3;
-              const pushForce = target - d;
-              pushX += (dx / d) * pushForce;
-              pushY += (dy / d) * pushForce;
-              overlapCount++;
-            }
-          }
-        }
-        if (overlapCount > 0) {
-          const avgPushX = pushX / overlapCount;
-          const avgPushY = pushY / overlapCount;
-          const f1 = forces.get(i);
-          f1.x -= avgPushX;
-          f1.y -= avgPushY;
-          f1.count++;
-          const f2 = forces.get(j);
-          f2.x += avgPushX;
-          f2.y += avgPushY;
-          f2.count++;
-        }
+        if (!polys[j]) continue;
+        const mtv = satMTV(polys[i], polys[j]);
+        if (!mtv) continue;
+        overlapping = true;
+        const wsum = (clusters[i].weight + clusters[j].weight) || 1;
+        const fi = clusters[i].weight / wsum, fj = clusters[j].weight / wsum;
+        disp[i].x -= mtv.x * fi; disp[i].y -= mtv.y * fi;
+        disp[j].x += mtv.x * fj; disp[j].y += mtv.y * fj;
       }
     }
+    if (!overlapping) break;
     for (let i = 0; i < clusters.length; i++) {
-      const f = forces.get(i);
-      if (f.count > 0) {
-        const dx = (f.x / f.count) * 0.4;
-        const dy = (f.y / f.count) * 0.4;
-        if (Math.hypot(dx, dy) > 0.05) {
-          moved = true;
-          const c = clusters[i];
-          for (const id of c.sectorIds) {
-            const p = nodePos.get(id);
-            if (p) {
-              p.x += dx;
-              p.y += dy;
-            }
+      const mx = disp[i].x * 0.5, my = disp[i].y * 0.5;   // damped to converge smoothly
+      if (!mx && !my) continue;
+      for (const id of clusters[i].ids) {
+        const p = nodePos.get(id);
+        if (p) { p.x += mx; p.y += my; }
+      }
+    }
+  }
+}
+// Re-separate clusters after an interactive drag, then repaint node positions,
+// edges, outlines and band rings. Used only when the auto-separate toggle is on.
+function settleClusters() {
+  separateClusterHulls();
+  for (const [id, rec] of nodeEls) {
+    const p = nodePos.get(id);
+    if (p) rec.g.setAttribute("transform", `translate(${p.x},${p.y})`);
+  }
+  drawEdges();
+  drawClusters();
+  drawCore();
+  drawBands();
+}
+// Force-directed layout run independently inside each cluster. Connected sectors attract
+// (short warps) and a centroid pull keeps the blob compact; the key readability force is
+// node-edge repulsion, which pushes any non-incident sector off a warp it would sit behind
+// so edges keep line-of-sight even when the cluster is packed tight. Node-node repulsion is
+// short-range only, so clusters stay dense rather than sprawling. Deterministic (seeded
+// from arrangeClusterRadial; no RNG). A final hard overlap pass keeps circles from touching.
+function layoutClusters(iterations = 240) {
+  const coreSet = new Set(UNIVERSE.hub_sector_ids);
+  const groups = [];
+  const collect = (ids) => { const g = ids.filter((id) => nodePos.has(id)); if (g.length > 1) groups.push(g); };
+  if (UNIVERSE.hub_sector_ids.length) collect(UNIVERSE.hub_sector_ids);
+  for (const reg of UNIVERSE.regions) {
+    if (reg.sector_ids.some((id) => coreSet.has(id))) continue;  // folded into Core
+    collect(reg.sector_ids);
+  }
+  const k = SAME_SPACING;   // ideal edge length
+  for (const ids of groups) {
+    const idset = new Set(ids);
+    const edges = [];
+    for (const e of currentEdges) if (idset.has(e.a) && idset.has(e.b)) edges.push([e.a, e.b]);
+    let temp = k * 1.2;          // max step per node, cooled each iteration
+    const repRange = 2.2 * k;          // node-node repulsion is short-range -> compact, not sparse
+    const clear = NODE_R + EDGE_CLEAR; // wanted line-of-sight margin around a warp
+    for (let it = 0; it < iterations; it++) {
+      const disp = new Map(ids.map((id) => [id, { x: 0, y: 0 }]));
+      // short-range node-node repulsion: f = k^2 / d (only nearby pairs, so the cluster
+      // packs densely instead of blowing up like full-range Fruchterman-Reingold)
+      for (let i = 0; i < ids.length; i++) {
+        const p = nodePos.get(ids[i]);
+        for (let j = i + 1; j < ids.length; j++) {
+          const q = nodePos.get(ids[j]);
+          let dx = p.x - q.x, dy = p.y - q.y, d = Math.hypot(dx, dy);
+          if (d > repRange) continue;
+          if (d < 1e-6) { dx = ((ids[i] % 7) - 3) || 1; dy = ((ids[j] % 5) - 2) || 1; d = Math.hypot(dx, dy); }
+          const f = (k * k) / d, ux = dx / d, uy = dy / d;
+          const di = disp.get(ids[i]), dj = disp.get(ids[j]);
+          di.x += ux * f; di.y += uy * f;
+          dj.x -= ux * f; dj.y -= uy * f;
+        }
+      }
+      // attraction along intra-cluster warps: f = d^2 / k (keeps connected sectors close,
+      // so warps are short and unlikely to run behind a third node)
+      for (const [a, b] of edges) {
+        const p = nodePos.get(a), q = nodePos.get(b);
+        let dx = p.x - q.x, dy = p.y - q.y, d = Math.hypot(dx, dy) || 1e-6;
+        const f = (d * d) / k, ux = dx / d, uy = dy / d;
+        const da = disp.get(a), db = disp.get(b);
+        da.x -= ux * f; da.y -= uy * f;
+        db.x += ux * f; db.y += uy * f;
+      }
+      // node-edge repulsion (the readability objective): push any non-incident sector off a
+      // warp it would otherwise hide behind, and nudge the warp's endpoints the other way.
+      for (const [a, b] of edges) {
+        const pa = nodePos.get(a), pb = nodePos.get(b);
+        for (const c of ids) {
+          if (c === a || c === b) continue;
+          const pc = nodePos.get(c);
+          const cp = closestOnSeg(pc.x, pc.y, pa.x, pa.y, pb.x, pb.y);
+          let ex = pc.x - cp.x, ey = pc.y - cp.y, d = Math.hypot(ex, ey);
+          if (d >= clear) continue;
+          if (d < 1e-6) {                                  // c sits on the warp: shove sideways
+            let sx = pb.x - pa.x, sy = pb.y - pa.y, sl = Math.hypot(sx, sy) || 1;
+            ex = -sy / sl; ey = sx / sl;
+            if ((c % 2) === 0) { ex = -ex; ey = -ey; }
+            d = 1e-6;
           }
+          const ux = ex / d, uy = ey / d, force = (clear - d) * 0.6;
+          const dc = disp.get(c);
+          dc.x += ux * force; dc.y += uy * force;
+          const da = disp.get(a), db = disp.get(b);
+          da.x -= ux * force * 0.5; da.y -= uy * force * 0.5;
+          db.x -= ux * force * 0.5; db.y -= uy * force * 0.5;
+        }
+      }
+      // gravity to the centroid keeps the cluster compact and bounded
+      let cx = 0, cy = 0;
+      for (const id of ids) { const p = nodePos.get(id); cx += p.x; cy += p.y; }
+      cx /= ids.length; cy /= ids.length;
+      for (const id of ids) {
+        const p = nodePos.get(id), dsp = disp.get(id);
+        dsp.x += (cx - p.x) * GRAVITY; dsp.y += (cy - p.y) * GRAVITY;
+      }
+      // apply, capped by the cooling temperature
+      for (const id of ids) {
+        const dsp = disp.get(id), len = Math.hypot(dsp.x, dsp.y) || 1e-6;
+        const step = Math.min(len, temp), p = nodePos.get(id);
+        p.x += (dsp.x / len) * step; p.y += (dsp.y / len) * step;
+      }
+      temp *= 0.985;
+    }
+    // Normalise scale: FR fixes the *shape* (few crossings) but its absolute size runs
+    // away for sparse clusters. Rescale about the centroid so the typical (median)
+    // intra-cluster warp is ~k long — connected sectors sit one slider-spacing apart
+    // (edges visible) and the cluster stays compact enough to separate cleanly.
+    if (edges.length) {
+      const lens = edges.map(([a, b]) => {
+        const p = nodePos.get(a), q = nodePos.get(b); return Math.hypot(p.x - q.x, p.y - q.y);
+      }).filter((v) => v > 1e-6).sort((a, b) => a - b);
+      const L = lens.length ? lens[lens.length >> 1] : 0;
+      if (L > 1e-6) {
+        const s = k / L;
+        let cx = 0, cy = 0;
+        for (const id of ids) { const p = nodePos.get(id); cx += p.x; cy += p.y; }
+        cx /= ids.length; cy /= ids.length;
+        for (const id of ids) {
+          const p = nodePos.get(id);
+          p.x = cx + (p.x - cx) * s; p.y = cy + (p.y - cy) * s;
         }
       }
     }
-    if (!moved) break;
+    // hard overlap resolution so node circles never touch
+    for (let pass = 0; pass < 60; pass++) {
+      let moved = false;
+      for (let i = 0; i < ids.length; i++) {
+        const p = nodePos.get(ids[i]);
+        for (let j = i + 1; j < ids.length; j++) {
+          const q = nodePos.get(ids[j]);
+          let dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
+          if (d >= MIN_NODE_GAP) continue;
+          if (d < 1e-6) { dx = ((ids[i] % 7) - 3) || 1; dy = ((ids[j] % 5) - 2) || 1; d = Math.hypot(dx, dy); }
+          const shove = (MIN_NODE_GAP - d) / 2, ux = dx / d, uy = dy / d;
+          p.x -= ux * shove; p.y -= uy * shove;
+          q.x += ux * shove; q.y += uy * shove;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
   }
 }
 function buildLayout() {
@@ -424,16 +637,40 @@ function buildLayout() {
   nodePos = new Map();
   for (const s of sectors) nodePos.set(s.id, { x: s.x * scale, y: s.y * scale });
   arrangeClusterRadial();
-  relaxClusters();
+  layoutClusters();
   relaxOverlaps();
-  // pristine copy (post-relaxation) so "reset layout" restores the de-overlapped view
+  // snapshot the packed-but-not-yet-separated layout so the gap slider can re-separate
+  // without re-running the expensive force-directed pass.
+  packedPos = new Map();
+  for (const [id, p] of nodePos) packedPos.set(id, { x: p.x, y: p.y });
+  separateClusterHulls();
+  recordBaseAndCentre();
+}
+// Capture the pristine post-layout positions ("reset layout" target) and the ring
+// centre (innermost / Core-anchor sector).
+function recordBaseAndCentre() {
   basePos = new Map();
   for (const [id, p] of nodePos) basePos.set(id, { x: p.x, y: p.y });
-  // ring centre: the innermost sector (Core anchor, embedding origin)
   let anchor = sectors[0];
   for (const s of sectors) if (s.core_hops < anchor.core_hops) anchor = s;
   const ap = nodePos.get(anchor.id);
-  center = { x: ap.x, y: ap.y };
+  if (ap) center = { x: ap.x, y: ap.y };
+}
+// Full relayout from scratch (used by the "Cluster spacing" slider — changing edge
+// length requires re-running the force-directed pass).
+function relayout() {
+  buildLayout();
+  drawBands(); drawClusters(); drawCore(); drawEdges(); drawNodes();
+  applyIncidentHighlight();
+}
+// Cheap re-separation only (used by the "Cluster gap" slider): restore the packed
+// snapshot, re-run the hull-separation pass at the new gap, repaint.
+function reseparate() {
+  for (const [id, p] of packedPos) { const n = nodePos.get(id); if (n) { n.x = p.x; n.y = p.y; } }
+  separateClusterHulls();
+  recordBaseAndCentre();
+  drawBands(); drawClusters(); drawCore(); drawEdges(); drawNodes();
+  applyIncidentHighlight();
 }
 
 function fitView() {
@@ -476,6 +713,13 @@ function centroid(pts) {
   let x = 0, y = 0;
   for (const p of pts) { x += p.x; y += p.y; }
   return { x: x / pts.length, y: y / pts.length };
+}
+// Closest point on segment a->b to point p (clamped to the segment).
+function closestOnSeg(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+  let t = len2 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return { x: ax + dx * t, y: ay + dy * t };
 }
 function inflate(hull, pad) {
   const c = centroid(hull);
@@ -570,7 +814,7 @@ function drawClusters() {
   const coreSet = new Set(UNIVERSE.hub_sector_ids);
   for (const reg of UNIVERSE.regions) {
     if (reg.sector_ids.some((id) => coreSet.has(id))) continue;
-    const o = outlineFor(reg.sector_ids, NODE_R + 8, bandColor(reg.band), "7 5", 1.6);
+    const o = outlineFor(reg.sector_ids, CLUSTER_PAD, bandColor(reg.band), "7 5", 1.6);
     if (o) {
       attachOutlineInteraction(o, reg.sector_ids, false);
       gClusters.appendChild(o);
@@ -580,7 +824,7 @@ function drawClusters() {
 }
 function drawCore() {
   gCore.textContent = "";
-  coreEl = outlineFor(UNIVERSE.hub_sector_ids, NODE_R + 16, CORE_COLOR, "2 6", 2.4);
+  coreEl = outlineFor(UNIVERSE.hub_sector_ids, CORE_PAD, CORE_COLOR, "2 6", 2.4);
   if (coreEl) {
     attachOutlineInteraction(coreEl, UNIVERSE.hub_sector_ids, true);
     gCore.appendChild(coreEl);
@@ -776,6 +1020,7 @@ function attachNodeInteraction(g, s) {
     dragging = false; g.style.cursor = "grab";
     try { g.releasePointerCapture(ev.pointerId); } catch (_) {}
     if (!moved) onNodeClick(s);
+    else if (autoSeparate) settleClusters();
   });
 }
 function attachOutlineInteraction(g, ids, isCore) {
@@ -841,6 +1086,7 @@ function attachOutlineInteraction(g, ids, isCore) {
     drawClusters();
     drawCore();
     drawBands();
+    if (autoSeparate) settleClusters();
   });
 }
 function onNodeClick(s) {
@@ -1007,6 +1253,24 @@ function initControls() {
       group.style.display = e.target.checked ? "" : "none";
     });
   bind("tg-core", gCore); bind("tg-cluster", gClusters); bind("tg-band", gBands);
+  document.getElementById("tg-autosep").addEventListener("change", (e) => {
+    autoSeparate = e.target.checked;
+    if (autoSeparate) settleClusters();
+  });
+
+  // layout sliders: live label on input, apply on release so the heavier passes don't
+  // run on every intermediate value. `apply` gets the parsed value; gap only re-separates
+  // (cheap), the rest re-run the full layout.
+  const bindSlider = (id, initial, apply) => {
+    const input = document.getElementById("sl-" + id), val = document.getElementById("sl-" + id + "-v");
+    input.value = initial; val.textContent = initial;
+    input.addEventListener("input", () => { val.textContent = input.value; });
+    input.addEventListener("change", () => apply(+input.value));
+  };
+  bindSlider("intra",   SAME_SPACING, (v) => { SAME_SPACING = v; relayout(); });
+  bindSlider("gap",     CLUSTER_GAP,  (v) => { CLUSTER_GAP = v; reseparate(); });
+  bindSlider("clear",   EDGE_CLEAR,   (v) => { EDGE_CLEAR = v; relayout(); });
+  bindSlider("compact", GRAVITY,      (v) => { GRAVITY = v; relayout(); });
 
   // per-band node/edge visibility toggles
   const bt = document.getElementById("band-toggles");
