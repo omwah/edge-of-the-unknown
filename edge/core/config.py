@@ -889,6 +889,14 @@ class SpeciesConfig(BaseModel):
     starbase_policy: Literal[
         "none", "homeworld", "territorial", "secret", "nomadic_holding"
     ] = "none"
+    # Goal-directed drift policy (DESIGN §8/§10, WP42): how this species moves on the
+    # `alien_drift` cron. `wander` is pure random (the Phase-2 default, byte-identical);
+    # `patrol` hugs the home band; `trade_seek` drifts toward ports; `hunt` pursues a
+    # player it holds a grudge against; `coward` flees the nearest player. The Entity
+    # keeps its own wander regardless of this field (§7).
+    movement_policy: Literal[
+        "wander", "patrol", "trade_seek", "hunt", "coward"
+    ] = "wander"
     # The one roaming, dialogue-only singular being (DESIGN §7, WP34): an explicit flag
     # (not archetype-string matching, so rosters vary freely). The big bang always draws it
     # (outside the seeded subset), fields exactly one instance in a deep band, and excludes

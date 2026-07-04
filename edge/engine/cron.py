@@ -12,6 +12,7 @@ import random
 from collections.abc import Callable
 from dataclasses import replace
 
+from edge.core import npc
 from edge.core.aliens import decay_grudges, may_occupy
 from edge.core.discovery import entity_species
 from edge.core.config import GameConfig
@@ -92,8 +93,10 @@ def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
     and reproducible under replay without ever drawing from the shared command-stream
     `state.rng`. `drift_seq` (a counter on `Game`) advances each firing, so live and
     reloaded runs seed identically. Territory is gated by `may_occupy` (no Core, no rival
-    bloc); StarDock contacts are pinned. `AlienMoved` is emitted only for a move that
-    touches a player's current sector, so the log isn't flooded by galaxy-wide drift.
+    bloc); StarDock contacts are pinned. Non-Entity species pick their destination by their
+    **movement policy** (`core.npc.plan_move`, WP42 — one RNG draw, so `wander` stays
+    byte-identical); the Entity roams by its own rules (§7, WP36). `AlienMoved` is emitted
+    only for a move that touches a player's current sector, so the log isn't flooded.
     """
     aliens = config.aliens
     if not aliens.drift_enabled or not state.species:
@@ -119,7 +122,8 @@ def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
                      else may_occupy(state, sp, n, aliens))]
         if not legal:
             continue
-        dst = rng.choice(legal)
+        # The Entity keeps its own wander; every other species drifts by its policy (WP42).
+        dst = rng.choice(legal) if is_entity else npc.plan_move(state, sp, legal, config, rng)
         moved.append(replace(sp, sector_id=dst))
         if sp.sector_id in player_sectors or dst in player_sectors:
             events.append(AlienMoved(sp.id, sp.sector_id, dst))
