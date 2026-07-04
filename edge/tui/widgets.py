@@ -594,36 +594,48 @@ class SectorScene(Static):
 def _nearest_node(hits: list, idx: int, dx: int, dy: int) -> int | None:  # type: ignore[type-arg]
     """Index of the node to move to from `hits[idx]` in the pressed direction, or None.
 
-    Navigation follows the on-screen layout, not insertion order, using a **directional
-    beam** (the standard spatial-nav rule): a candidate must lie in the pressed direction,
-    and one whose cell **overlaps the current node's beam** — same row for Left/Right, an
-    overlapping column span for Up/Down — is *in beam*. In-beam candidates are always
-    preferred, and among them the **nearest in the travel direction** wins (so you step to
-    the sector just above/beside, never skipping an intervening aligned one, and never
-    jumping to a far sector merely because it is perfectly centred). Off-beam candidates are
-    considered only when nothing lines up. Shared by the nav rose and the local map.
+    Navigation follows the on-screen layout, not insertion order. The map lays nodes out in
+    **gravity columns** (each column left-aligned to a fixed x), so the two axes are treated
+    differently — matching how the eye reads the graph:
+
+    * **Left / Right** steps to the node in the **nearest adjacent column** on that side,
+      picking the one **closest by row**. A candidate whose cell *horizontally overlaps* the
+      current node is in the *same* column (stacked directly above/below), so it is never a
+      left/right target — this is what stops a straight-down node counting as "left" and lets
+      the staggered off-row sectors be reached. On an exact tie (same column-distance and row-
+      distance, one just above and one just below) the **warp-linked** candidate wins; failing
+      that (or where no adjacency is known, e.g. the nav rose) the **upper** one wins.
+    * **Up / Down** keeps to the column: a candidate whose column span **overlaps** the current
+      node's is *in beam*, and in-beam candidates are preferred, nearest-in-travel first — so
+      you step to the sector just above/below rather than jumping to a far, off-column one.
+
+    Shared by the nav rose and the local map.
     """
     if not hits or idx >= len(hits):
         return None
     cur = hits[idx]
     cx = (cur.col0 + cur.col1) / 2
-    scored: list[tuple[bool, float, float, int]] = []
+    scored: list[tuple[bool, float, float, tuple[int, int], int]] = []
     for j, n in enumerate(hits):
         if j == idx:
             continue
-        nx = (n.col0 + n.col1) / 2
-        if dy:  # vertical move — beam is the overlapping column span
+        if dy:  # vertical move — beam is the overlapping column span (stay in the column)
             major = (n.row - cur.row) * dy
-            minor = abs(nx - cx)
+            if major <= 0:
+                continue  # not in the pressed direction (or level with it)
             in_beam = cur.col0 < n.col1 and n.col0 < cur.col1
-        else:  # horizontal move — beam is the same row
-            major = (nx - cx) * dx
-            minor = abs(n.row - cur.row)
-            in_beam = n.row == cur.row
-        if major <= 0:
-            continue  # not in the pressed direction (or level with it)
-        scored.append((not in_beam, major, minor, j))  # in-beam first, then nearest, then aligned
-    return min(scored)[3] if scored else None
+            minor = abs((n.col0 + n.col1) / 2 - cx)
+            scored.append((not in_beam, major, minor, (0, 0), j))  # in-beam, nearest, aligned
+        else:  # horizontal move — step to the adjacent column, nearest by row
+            if cur.col0 < n.col1 and n.col0 < cur.col1:
+                continue  # spans overlap ⇒ same column (stacked): not a left/right neighbour
+            if (n.col0 > cur.col0) != (dx > 0):
+                continue  # the node's column is on the wrong side of the pressed direction
+            linked = n.sector_id in cur.neighbors or cur.sector_id in n.neighbors
+            # column-distance, then row-distance, then: warp-linked wins, else prefer the upper.
+            tie = (0 if linked else 1, n.row)
+            scored.append((False, abs(n.col0 - cur.col0), abs(n.row - cur.row), tie, j))
+    return min(scored)[4] if scored else None
 
 
 class LocalMapView(Static):
