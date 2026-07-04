@@ -95,7 +95,7 @@ Subsystem icons (e.g., Spindrive, Screens, Thrusters) will also be procedurally 
 
 ## 5. Tooling — Offline Art CLI & Sprite Sheets
 
-`edge.art.cli` is a dev-only inspector (mirroring the bigbang `--render` graph tool) for iterating on the generators outside the TUI. It renders one or many sprites and either prints them to the terminal or exports a vector **sprite sheet**.
+`edge.art.cli` is a dev-only inspector (mirroring the bigbang `--render` topology tool) for iterating on the generators outside the TUI. It renders one or many sprites and either prints them to the terminal or exports a vector **sprite sheet**.
 
 ```
 python -m edge.art.cli --type port --subtype stardock --archetype-id ribbon_salvager
