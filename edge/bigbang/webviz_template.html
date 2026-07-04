@@ -295,8 +295,10 @@ function outlineFor(ids, pad, stroke, dash, width) {
 }
 
 // ---- draw: band rings -------------------------------------------------------
+let bandEls = [];   // { el, band } for each ring circle + label (for per-band gating)
 function drawBands() {
   gBands.textContent = "";
+  bandEls = [];
   const membersByBand = new Map();
   for (const s of sectors) {
     if (!membersByBand.has(s.band)) membersByBand.set(s.band, []);
@@ -317,32 +319,41 @@ function drawBands() {
   }
   rings.sort((a, b) => a.r - b.r);
   for (const ring of rings) {
-    gBands.appendChild(el("circle", {
+    const circle = el("circle", {
       cx: center.x, cy: center.y, r: ring.r, fill: "none",
       stroke: bandColor(ring.band), "stroke-width": 2, "stroke-dasharray": "1 7",
       opacity: 0.75,
-    }));
+    });
+    gBands.appendChild(circle);
     const label = el("text", {
       x: center.x, y: center.y - ring.r + 16, "text-anchor": "middle",
       fill: bandColor(ring.band), "font-size": 13, "font-weight": 600, opacity: 0.85,
     });
     label.textContent = ring.band;
     gBands.appendChild(label);
+    bandEls.push({ el: circle, band: ring.band }, { el: label, band: ring.band });
   }
 }
 
 // ---- draw: cluster + core outlines ------------------------------------------
+let clusterEls = [];        // { el, band } per region outline (for per-band gating)
+let coreEl = null, coreBand = "";
 function drawClusters() {
   gClusters.textContent = "";
+  clusterEls = [];
   for (const reg of UNIVERSE.regions) {
     const o = outlineFor(reg.sector_ids, NODE_R + 8, bandColor(reg.band), "7 5", 1.6);
-    if (o) gClusters.appendChild(o);
+    if (o) { gClusters.appendChild(o); clusterEls.push({ el: o, band: reg.band }); }
   }
 }
 function drawCore() {
   gCore.textContent = "";
-  const o = outlineFor(UNIVERSE.hub_sector_ids, NODE_R + 16, CORE_COLOR, "2 6", 2.4);
-  if (o) gCore.appendChild(o);
+  coreEl = outlineFor(UNIVERSE.hub_sector_ids, NODE_R + 16, CORE_COLOR, "2 6", 2.4);
+  if (coreEl) gCore.appendChild(coreEl);
+  // Core Space sits in the innermost band, so it follows that band's node toggle.
+  const first = UNIVERSE.hub_sector_ids[0];
+  coreBand = (first != null && byId.get(first)) ? byId.get(first).band
+    : (meta.bands[0] ? meta.bands[0].name : "");
 }
 
 // ---- draw: edges ------------------------------------------------------------
@@ -414,6 +425,11 @@ function applyBandVisibility() {
     const vis = edgeBandOn[edgeBand(rec.e)] && nodeBandOn[a.band] && nodeBandOn[b.band];
     rec.g.style.display = vis ? "" : "none";
   }
+  // A disabled band hides its outlines too, over-riding the master outline toggles
+  // (a still-enabled master group can't show an outline for a hidden band).
+  for (const c of clusterEls) c.el.style.display = nodeBandOn[c.band] ? "" : "none";
+  for (const bE of bandEls) bE.el.style.display = nodeBandOn[bE.band] ? "" : "none";
+  if (coreEl) coreEl.style.display = nodeBandOn[coreBand] ? "" : "none";
 }
 
 // ---- draw: nodes ------------------------------------------------------------
