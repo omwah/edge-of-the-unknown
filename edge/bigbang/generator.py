@@ -37,6 +37,9 @@ from edge.core.enums import PortClass
 from edge.core.models import Game, Region, Sector, UniverseState
 from edge.dialogue.intel import build_species_knowledge
 
+_last_mesh_coords: dict[int, tuple[int, int]] = {}
+_last_mesh_grid_size: tuple[int, int] = (0, 0)
+
 _MAX_ATTEMPTS = 16
 
 
@@ -292,6 +295,195 @@ def build_graph(cfg: BigBangConfig, rng: random.Random) -> tuple[OutEdges, list[
     cap = cfg.max_warps_per_sector
     out: OutEdges = {sid: set() for sid in range(1, n + 1)}
 
+    if cfg.topology_mode == "mesh":
+        # 1. Grid geometry
+        R = math.isqrt(n)
+        if R * R < n:
+            R = math.isqrt(n) + 1
+        C = (n + R - 1) // R
+
+        # Keep exactly n coordinates
+        all_coords: list[tuple[int, int]] = []
+        for r in range(R):
+            for c in range(C):
+                if len(all_coords) < n:
+                    all_coords.append((r, c))
+        coords_set = set(all_coords)
+
+        def get_grid_neighbors(coord: tuple[int, int]) -> list[tuple[int, int]]:
+            r, c = coord
+            candidates = [
+                (r - 1, c),
+                (r + 1, c),
+                (r - 1, c - 1),
+                (r - 1, c + 1),
+                (r + 1, c - 1),
+                (r + 1, c + 1),
+            ]
+            return [(nr, nc) for nr, nc in candidates if (nr, nc) in coords_set]
+
+        # 2. Grow contiguous clusters using BFS on coordinate grid
+        from collections import deque
+        unassigned = set(all_coords)
+        groups_coords: list[list[tuple[int, int]]] = []
+
+        # Grow Core cluster first
+        core_target = cfg.core_sector_count
+        core_coords: list[tuple[int, int]] = []
+        grid_seed = (R // 2, C // 2)
+        if grid_seed not in unassigned:
+            grid_seed = next(iter(unassigned))
+            
+        queue = deque([grid_seed])
+        visited = {grid_seed}
+        while queue and len(core_coords) < core_target:
+            cur = queue.popleft()
+            core_coords.append(cur)
+            for nbr in get_grid_neighbors(cur):
+                if nbr in unassigned and nbr not in visited:
+                    visited.add(nbr)
+                    queue.append(nbr)
+                    
+        for coord in core_coords:
+            unassigned.remove(coord)
+        groups_coords.append(core_coords)
+
+        # Grow outer clusters
+        while unassigned:
+            size = rng.randint(cfg.cluster_min, cfg.cluster_max)
+            grid_seed = rng.choice(list(unassigned))
+            group_coords: list[tuple[int, int]] = []
+            queue = deque([grid_seed])
+            visited = {grid_seed}
+            while queue and len(group_coords) < size:
+                cur = queue.popleft()
+                group_coords.append(cur)
+                for nbr in get_grid_neighbors(cur):
+                    if nbr in unassigned and nbr not in visited:
+                        visited.add(nbr)
+                        queue.append(nbr)
+            
+            for coord in group_coords:
+                unassigned.remove(coord)
+                
+            if len(group_coords) < cfg.cluster_min and len(groups_coords) > 1:
+                # Merge leftover with closest outer cluster (index >= 1)
+                best_group_idx = 1
+                best_dist = 999999
+                for c_left in group_coords:
+                    for g_idx in range(1, len(groups_coords)):
+                        for c_g in groups_coords[g_idx]:
+                            d = abs(c_left[0] - c_g[0]) + abs(c_left[1] - c_g[1])
+                            if d < best_dist:
+                                best_dist = d
+                                best_group_idx = g_idx
+                groups_coords[best_group_idx].extend(group_coords)
+            else:
+                groups_coords.append(group_coords)
+
+        # 3. Map coordinates to sector IDs
+        coord_to_sid = {}
+        groups = []
+        next_sid = 1
+        for gc in groups_coords:
+            group_sids = []
+            for coord in gc:
+                coord_to_sid[coord] = next_sid
+                group_sids.append(next_sid)
+                next_sid += 1
+            groups.append(group_sids)
+
+        # Save coordinate map to module cache
+        global _last_mesh_coords, _last_mesh_grid_size
+        _last_mesh_coords = {coord_to_sid[coord]: coord for coord in all_coords}
+        _last_mesh_grid_size = (R, C)
+
+        # 4. Allowed grid edges
+        allowed_edges = set()
+        for coord in all_coords:
+            u = coord_to_sid[coord]
+            for nbr in get_grid_neighbors(coord):
+                v = coord_to_sid[nbr]
+                if u < v:
+                    allowed_edges.add((u, v))
+
+        # 5. Connect clusters internally
+        sector_to_group = {}
+        for g_idx, group in enumerate(groups):
+            for s in group:
+                sector_to_group[s] = g_idx
+
+        for g_idx, group in enumerate(groups):
+            group_set = set(group)
+            internal_candidates = [
+                (u, v) for (u, v) in allowed_edges
+                if u in group_set and v in group_set
+            ]
+            
+            # Internal spanning tree using grid edges
+            connected = {group[0]}
+            unconnected = set(group[1:])
+            while unconnected:
+                tree_edge = None
+                for u, v in internal_candidates:
+                    if (u in connected) != (v in connected):
+                        tree_edge = (u, v)
+                        break
+                if tree_edge is None:
+                    break
+                u, v = tree_edge
+                add_bidirectional(out, u, v, cap)
+                connected.add(u)
+                connected.add(v)
+                unconnected.discard(u)
+                unconnected.discard(v)
+
+            # Add extra internal edges up to target density
+            target_edges = int(cfg.intra_group_degree * len(group) / 2)
+            current_edges = len(group) - 1
+            rng.shuffle(internal_candidates)
+            for u, v in internal_candidates:
+                if current_edges >= target_edges:
+                    break
+                if v not in out[u]:
+                    if add_bidirectional(out, u, v, cap):
+                        current_edges += 1
+
+        # 6. Inter-cluster bridging spanning tree
+        connected_groups = {0}
+        unconnected_groups = set(range(1, len(groups)))
+        while unconnected_groups:
+            valid_bridges = []
+            for (u, v) in allowed_edges:
+                g_u = sector_to_group[u]
+                g_v = sector_to_group[v]
+                if (g_u in connected_groups) != (g_v in connected_groups):
+                    valid_bridges.append((u, v, g_u, g_v))
+            if not valid_bridges:
+                break
+            valid_bridges.sort(key=lambda item: (len(out[item[0]]) + len(out[item[1]]), rng.random()))
+            u, v, g_u, g_v = valid_bridges[0]
+            add_bidirectional(out, u, v, cap)
+            new_g = g_v if g_u in connected_groups else g_u
+            connected_groups.add(new_g)
+            unconnected_groups.remove(new_g)
+
+        # Add extra bridges for mesh density
+        extra_bridges = int(len(groups) * 0.3)
+        candidate_extra = [
+            (u, v) for (u, v) in allowed_edges
+            if sector_to_group[u] != sector_to_group[v] and v not in out[u]
+        ]
+        rng.shuffle(candidate_extra)
+        added = 0
+        for u, v in candidate_extra:
+            if added >= extra_bridges:
+                break
+            if add_bidirectional(out, u, v, cap):
+                added += 1
+
+        return out, groups
+
     core = list(range(1, cfg.core_sector_count + 1))
     carve_core(out, core, rng, cap)
     other = _cluster_groups(list(range(cfg.core_sector_count + 1, n + 1)), cfg, rng)
@@ -351,7 +543,15 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
         state.rebuild_adjacency()
         state.core_hops = bfs_distances(out, 1)  # gravity-arrow cache (§11, WP-C)
         state.spatial_ids = assign_spatial_ids(groups, state.core_hops, active_bands)  # §5.1 display ids
-        state.sector_pos = compute_embedding(out, state.core_hops, seed=seed)  # §5.1 nav-rose layout
+        if cfg.topology_mode == "mesh":
+            global _last_mesh_coords, _last_mesh_grid_size
+            R, C = _last_mesh_grid_size
+            state.sector_pos = {
+                sid: (float(coord[1] - C / 2.0), float(coord[0] - R / 2.0))
+                for sid, coord in _last_mesh_coords.items()
+            }
+        else:
+            state.sector_pos = compute_embedding(out, state.core_hops, seed=seed)  # §5.1 nav-rose layout
 
         _populate.populate(state, config, build_rng)
         salt_discoveries(state, config, attempt)  # §7 finds on an independent sub-RNG
