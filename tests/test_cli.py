@@ -10,8 +10,8 @@ import pytest
 from edge.bigbang import __main__ as cli
 
 
-def test_inspect_prints_report(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    monkeypatch.setattr("sys.argv", ["edge.bigbang", "--inspect", "--sectors", "60", "--seed", "2"])
+def test_stats_prints_report(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setattr("sys.argv", ["edge.bigbang", "--stats", "--sectors", "60", "--seed", "2"])
     cli.main()
     out = capsys.readouterr().out
     assert "Sectors" in out and "60" in out and "StarDock" in out
@@ -49,3 +49,10 @@ def test_default_prints_summary(monkeypatch: pytest.MonkeyPatch, capsys: pytest.
     monkeypatch.setattr("sys.argv", ["edge.bigbang", "--sectors", "60", "--seed", "2"])
     cli.main()
     assert "generated universe" in capsys.readouterr().out
+
+
+def test_no_arguments_prints_stats(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setattr("sys.argv", ["edge.bigbang"])
+    cli.main()
+    out = capsys.readouterr().out
+    assert "Sectors" in out and "StarDock" in out

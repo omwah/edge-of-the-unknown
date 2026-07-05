@@ -1,7 +1,7 @@
-"""CLI: `python -m edge.bigbang [--seed N] [--sectors M] [--inspect] [--render DIR]`.
+"""CLI: `python -m edge.bigbang [--seed N] [--sectors M] [--stats] [--render DIR]`.
 
 A dev entrypoint that generates a universe from the default config and prints a
-text report (`--inspect`), lists populated items (`--list ports planets …`), plots
+text report (`--stats`), lists populated items (`--list ports planets …`), plots
 a route between two sectors (`--route SRC DST`, by internal *or* spatial id), writes
 an interactive web topology inspector (`--render DIR`, §5), and/or dumps just the
 visualization payload as JSON (`--dump-json PATH`).
@@ -43,7 +43,7 @@ def main() -> None:
     gen.add_argument("--home-cluster-max", type=int, default=None, help="override home_cluster_max (shared)")
     gen.add_argument("--bridges-min", type=int, default=None, help="override topology.<mode>.bridges_min (trunk-only)")
     gen.add_argument("--bridges-max", type=int, default=None, help="override topology.<mode>.bridges_max (trunk-only)")
-    parser.add_argument("--inspect", action="store_true", help="print a universe report")
+    parser.add_argument("--stats", action="store_true", help="print a universe report")
     parser.add_argument(
         "--list", nargs="+", metavar="CATEGORY", choices=(*LIST_CATEGORIES, "all"),
         help=f"list populated items: {', '.join(LIST_CATEGORIES)}, or all",
@@ -60,7 +60,10 @@ def main() -> None:
         "--dump-json", metavar="PATH", default=None,
         help="write just the visualization payload as JSON (no HTML)",
     )
+    import sys
     args = parser.parse_args()
+    if len(sys.argv) == 1:
+        args.stats = True
 
     config = load_default_config()
     bigbang_overrides: dict[str, object] = {}
@@ -92,7 +95,7 @@ def main() -> None:
     seed = args.seed if args.seed is not None else (config.seed if config.seed is not None else 1)
     state = generate(config, seed)
     did_something = False
-    if args.inspect:
+    if args.stats:
         print(summarize(state))
         did_something = True
     # Every id below is specific to this seed; surface it so a --list in one run and
