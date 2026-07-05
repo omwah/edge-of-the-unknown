@@ -909,7 +909,7 @@ def summarize(state: UniverseState) -> str:
     alliance_rows = []
     core_size = sum(1 for s in state.sectors.values() if s.is_galactic_core)
     gov_id = state.game.core_governing_alliance_id
-    gov_alliance = state.alliances.get(gov_id)
+    gov_alliance = state.alliances.get(gov_id) if gov_id is not None else None
     gov_name = gov_alliance.name if gov_alliance else "Federation"
     alliance_rows.append((f"  {gov_name} (The Core)", f"{core_size} Sectors"))
 
