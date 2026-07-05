@@ -993,11 +993,11 @@ class NavRose(Static):
 
     A compact bearing-placed compass baked server-side (`session.game_view` →
     `navstrip.build_nav_strip`): the player (`@`) centred, each outbound warp in the
-    octant of its real bearing, a fixed `Core` anchor for global orientation, and a
-    recent-route breadcrumb. This widget renders the baked rows verbatim, highlights
-    the keyboard-selected warp (a style span over its baked cell — canvas columns line
-    up with `Text.from_markup` offsets), shows its detail line, and warps on click or
-    Enter. Replaces the old flat `WarpGrid`; one click / keypress = one warp.
+    octant of its real bearing, a fixed `Core` anchor for global orientation.  The
+    baked rose rows are flanked by a **trail column** (left, recent-route breadcrumb)
+    and a **detail column** (right, selected-warp info), so all navigation context
+    fits in 5 rows with no stacked lines below.  Highlights the keyboard-selected
+    warp, and warps on click or Enter.
     """
 
     can_focus = True
@@ -1016,7 +1016,7 @@ class NavRose(Static):
         Binding("space", "warp", "Warp", show=False),
     ]
 
-    DEFAULT_CSS = "NavRose { height: auto; padding: 0 1; width: auto; }"
+    DEFAULT_CSS = "NavRose { height: auto; padding: 0 1; width: 1fr; }"
 
     def __init__(self, nav: NavStripDTO, warps: list[WarpDTO], **kwargs: object) -> None:
         super().__init__(**kwargs)
@@ -1025,6 +1025,7 @@ class NavRose(Static):
         # Home selection is the top-left node; arrow keys then move by on-screen layout.
         self._hits = sorted(nav.nodes, key=lambda n: (n.row, n.col0))
         self._idx = 0
+        self._rose_x_offset = 0  # set in render(); click offset
 
     def on_mount(self) -> None:
         # Grab focus as the rose appears so arrow keys drive selection immediately
@@ -1034,44 +1035,89 @@ class NavRose(Static):
 
     def render(self) -> Text:
         focus_node = self._hits[self._idx] if self._hits else None
-        lines: list[Text] = []
-        for i, row in enumerate(self._nav.rows):
-            line = Text.from_markup(row)
+
+        trail_col = self._trail_column()
+        detail_col = self._detail_column(focus_node)
+
+        # Parse the baked rose rows and pad to the full 5-row compass.
+        rose: list[Text] = [Text.from_markup(r) for r in self._nav.rows]
+        while len(rose) < 5:
+            rose.append(Text())
+
+        # Column widths (trail right-aligned, detail left-aligned).
+        trail_w = max(max((t.cell_len for t in trail_col), default=0), 5)
+        rose_w = max((t.cell_len for t in rose), default=0)
+        sep = " │ "
+
+        # Centre the three-column layout within the widget's content width.
+        content_w = max(0, self.size.width - 2)  # subtract left+right padding
+        detail_nat = max((dc.cell_len for dc in detail_col), default=0)
+        total_nat = trail_w + len(sep) + rose_w + len(sep) + detail_nat
+        left_pad = max(0, (content_w - total_nat) // 2)
+        detail_avail = max(0, content_w - left_pad - trail_w - len(sep) - rose_w - len(sep))
+        self._rose_x_offset = left_pad + trail_w + len(sep)
+
+        out = Text()
+        for i in range(5):
+            if i > 0:
+                out.append("\n")
+            # Centering margin + trail column (right-aligned).
+            tc = trail_col[i]
+            out.append(" " * (left_pad + trail_w - tc.cell_len))
+            out.append_text(tc)
+            out.append(sep, style="dim")
+            # Rose column (with keyboard-focus highlight).
+            rl = rose[i]
             if focus_node is not None and self.has_focus and focus_node.row == i:
-                line.stylize("reverse bold", focus_node.col0, focus_node.col1)
-            lines.append(line)
-        out = Text("\n").join(lines)
-        out.append("\n\n")
-        out.append_text(self._trail_line())
-        out.append("\n")
-        out.append_text(self._detail_line(focus_node))
+                rl.stylize("reverse bold", focus_node.col0, focus_node.col1)
+            out.append_text(rl)
+            out.append(" " * (rose_w - rl.cell_len))
+            out.append(sep, style="dim")
+            # Detail column (truncated to fit available width).
+            dc = detail_col[i]
+            if dc.cell_len > 0 and detail_avail > 0:
+                if dc.cell_len > detail_avail:
+                    dc = dc.copy()
+                    dc.truncate(detail_avail, overflow="ellipsis")
+                out.append_text(dc)
         if self._nav.legend:
             out.append("\n")
             out.append_text(Text.from_markup(self._nav.legend))
         return out
 
-    def _trail_line(self) -> Text:
-        if not self._nav.trail:
-            return Text("trail: —", style="dim")
-        line = Text("trail: ", style="dim")
-        line.append(" › ".join(str(c) for c in self._nav.trail), style="dim")
-        line.append(" › ", style="dim")
-        line.append("[you]", style="bold")
-        return line
+    def _trail_column(self) -> list[Text]:
+        """5 right-aligned trail lines: header, up to 3 history entries, you."""
+        col: list[Text] = [Text() for _ in range(5)]
+        col[0] = Text("trail", style="dim")
+        # Last ≤3 trail entries fill rows 1–3, packed toward the bottom.
+        recent = self._nav.trail[-3:]
+        start = 4 - len(recent)
+        for i, sid in enumerate(recent):
+            col[start + i] = Text(str(sid), style="dim")
+        col[4] = Text(str(self._nav.you_display), style="bold cyan")
+        return col
 
-    def _detail_line(self, focus_node: object) -> Text:
+    def _detail_column(self, focus_node: object) -> list[Text]:
+        """5 detail lines for the keyboard-selected warp target."""
+        col: list[Text] = [Text() for _ in range(5)]
         if focus_node is None:
-            return Text("no warps out of here", style="dim")
+            col[2] = Text("no warps", style="dim")
+            return col
         node = self._hits[self._idx]
         warp = self._warps.get(node.sector_id)
-        line = Text("▶ ", style="bold")
-        line.append(f"{node.display_id}  ", style="bold")
+        # Row 1: ▶ display_id.
+        hdr = Text("▶ ", style="bold")
+        hdr.append(str(node.display_id), style="bold")
+        col[1] = hdr
         if warp is None or not warp.explored:
-            line.append("uncharted", style="dim")
+            col[2] = Text("uncharted", style="dim")
         else:
-            codes = " " + "".join(warp.codes) if warp.codes else ""
-            line.append(f"{warp.label or '—'} · {warp.band}{codes}")
-        return line
+            col[2] = Text(warp.label or "—")
+            if warp.band:
+                col[3] = Text(warp.band)
+            if warp.codes:
+                col[4] = Text.from_markup(_code_markup(warp.codes))
+        return col
 
     def action_move(self, dx: int, dy: int) -> None:
         """Move the selection to the nearest warp in the pressed screen direction."""
@@ -1087,8 +1133,9 @@ class NavRose(Static):
     def on_click(self, event: events.Click) -> None:
         pad = self.styles.padding
         col, row = int(event.x) - pad.left, int(event.y) - pad.top
+        rose_col = col - self._rose_x_offset
         for i, node in enumerate(self._hits):
-            if node.row == row and node.col0 <= col < node.col1:
+            if node.row == row and node.col0 <= rose_col < node.col1:
                 event.stop()
                 self._idx = i
                 self.refresh()
