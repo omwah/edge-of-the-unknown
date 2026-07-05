@@ -585,6 +585,7 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
             created_at=created_at, core_governing_alliance_id=gov,
         )
         state = UniverseState.new(game)  # runtime rng = Random(seed), left untouched
+        state.topology_mode = cfg.topology_mode
 
         sector_to_region = {sid: gi + 1 for gi, group in enumerate(groups) for sid in group}
         core_ids = set(range(1, cfg.core_sector_count + 1))
@@ -640,16 +641,194 @@ def summarize(state: UniverseState) -> str:
     """A text report of a generated universe (the `--inspect` dev view, §5)."""
     from collections import Counter
 
-    bands = Counter(s.distance_band for s in state.sectors.values())
-    classes = Counter(p.klass.name for p in state.ports.values())
-    dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
+    # Helper function for title case conversion
+    def to_title_case(name: str) -> str:
+        if name.upper() == "STARDOCK":
+            return "StarDock"
+        return name.replace("_", " ").title()
+
+    # Spacing and table formatting helper
+    def format_table(title: str, rows: list[tuple[str, str]], width: int = 45) -> list[str]:
+        section_lines = [
+            title,
+            "-" * width,
+        ]
+        for key, val in rows:
+            # Spacing between key and value
+            space_count = max(1, width - len(key) - len(val))
+            section_lines.append(f"{key}{' ' * space_count}{val}")
+        return section_lines
+
+    # Exiting edges histogram helper
+    # We want a text histogram showing the number of sectors for each number of edges exiting it.
     degrees = [len(s.warps_out) for s in state.sectors.values()]
-    lines = [
-        f"seed={state.game.seed}  sectors={len(state.sectors)}  regions={len(state.regions)}",
-        f"ports={len(state.ports)}  planets={len(state.planets)}  "
-        f"max_warps={max(degrees) if degrees else 0}",
-        "bands:        " + ", ".join(f"{b}={n}" for b, n in sorted(bands.items())),
-        "port classes: " + ", ".join(f"{c}={n}" for c, n in sorted(classes.items())),
-        f"stardock:     sector {dock.sector_id}" if dock else "stardock:     MISSING",
+    max_deg = max(degrees) if degrees else 0
+    deg_counts = Counter(degrees)
+
+    edges_histogram: list[str] = [
+        "Exiting Edges",
+        "-------------",
     ]
+    max_deg_count = max(deg_counts.values()) if deg_counts else 0
+    max_label_len = len(str(max_deg))
+    for d in range(1, max_deg + 1):
+        count = deg_counts.get(d, 0)
+        if max_deg_count > 0:
+            width = int(round(count * 40 / max_deg_count))
+            if width == 0 and count > 0:
+                width = 1
+        else:
+            width = 0
+        bar = "█" * width
+        label = f"  {d:<{max_label_len}}"
+        edges_histogram.append(f"{label}  {bar} ({count})")
+
+    # Port Classes histogram helper
+    # Ordered by frequency/count (descending).
+    classes_counts = Counter(p.klass.name for p in state.ports.values())
+    sorted_classes = sorted(
+        classes_counts.items(),
+        key=lambda item: (-item[1], to_title_case(item[0]))
+    )
+    max_class_count = max(classes_counts.values()) if classes_counts else 0
+
+    port_classes_histogram: list[str] = [
+        "Port Classes",
+        "------------",
+    ]
+    formatted_class_names = {k: to_title_case(k) for k in classes_counts.keys()}
+    max_class_label_len = max((len(name) for name in formatted_class_names.values()), default=0)
+    for class_name, count in sorted_classes:
+        name_tc = formatted_class_names[class_name]
+        if max_class_count > 0:
+            width = int(round(count * 40 / max_class_count))
+            if width == 0 and count > 0:
+                width = 1
+        else:
+            width = 0
+        bar = "█" * width
+        label = f"  {name_tc:<{max_class_label_len}}"
+        port_classes_histogram.append(f"{label}  {bar} ({count})")
+
+    # Prepare other sections
+    bands = Counter(s.distance_band for s in state.sectors.values())
+    dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
+
+    # Species by band histogram helper
+    species_counts = Counter(sp.home_band for sp in state.species.values())
+    
+    BAND_ORDER = ["Hub", "Frontier", "Deep", "Void"]
+    band_order_map = {name.lower(): idx for idx, name in enumerate(BAND_ORDER)}
+    sorted_bands = sorted(
+        bands.keys(),
+        key=lambda b: (band_order_map.get(b.lower(), len(BAND_ORDER)), b)
+    )
+    species_by_band_histogram: list[str] = [
+        "Species By Band",
+        "---------------",
+    ]
+    max_species_total = max(species_counts.values()) if species_counts else 0
+
+    # Calculate global max label length for formatting across all bands and species
+    all_species_names = [sp.name for sp in state.species.values()]
+    global_max_label_len = max([5] + [len(name) for name in all_species_names])
+
+    for idx, b in enumerate(sorted_bands):
+        if idx > 0:
+            species_by_band_histogram.append("")
+
+        # Band header
+        species_by_band_histogram.append(to_title_case(b))
+
+        # Get count of each species name in this band
+        band_species = Counter(sp.name for sp in state.species.values() if sp.home_band == b)
+        total_in_band = species_counts.get(b, 0)
+
+        # Sort species by count ascending, then name alphabetically
+        sorted_band_species = sorted(band_species.items(), key=lambda item: (item[1], item[0]))
+
+        # 1. Species rows
+        for name, count in sorted_band_species:
+            if max_species_total > 0:
+                width = int(round(count * 40 / max_species_total))
+                if width == 0 and count > 0:
+                    width = 1
+            else:
+                width = 0
+            bar = "█" * width
+            species_by_band_histogram.append(f"  {name:<{global_max_label_len}}  {bar} ({count})")
+
+        # 2. Total row
+        if max_species_total > 0:
+            width = int(round(total_in_band * 40 / max_species_total))
+            if width == 0 and total_in_band > 0:
+                width = 1
+        else:
+            width = 0
+        total_bar = "█" * width
+        species_by_band_histogram.append(f"  {'Total':<{global_max_label_len}}  {total_bar} ({total_in_band})")
+
+    universe_structure_rows = [
+        ("  Seed", str(state.game.seed)),
+        ("  Topology Mode", to_title_case(state.topology_mode)),
+        ("  Sectors", str(len(state.sectors))),
+        ("  Regions", str(len(state.regions))),
+        ("  Max Warps", str(max_deg)),
+    ]
+
+    stardock_val = f"Sector {dock.sector_id}" if dock else "Missing"
+    economic_rows = [
+        ("  Ports", str(len(state.ports))),
+        ("  Planets", str(len(state.planets))),
+        ("  StarDock", stardock_val),
+    ]
+
+    band_rows = [
+        (f"  {to_title_case(b)}", str(bands[b]))
+        for b in sorted_bands
+    ]
+
+    # Species dispositions table helper
+    disposition_rows: list[str] = [
+        "Species Dispositions",
+        "--------------------",
+    ]
+    from collections import defaultdict
+    from edge.config import load_default_config
+    from edge.core.aliens import disposition_band
+
+    aliens_cfg = load_default_config().aliens
+    name_to_dispositions = defaultdict(list)
+    for sp in state.species.values():
+        name_to_dispositions[sp.name].append(sp.base_disposition)
+
+    avg_dispositions = {
+        name: sum(disps) / len(disps)
+        for name, disps in name_to_dispositions.items()
+    }
+
+    max_sp_name_len = max((len(name) for name in avg_dispositions.keys()), default=0)
+    for name in sorted(avg_dispositions.keys()):
+        disp = avg_dispositions[name]
+        width = int(round(disp * 20))
+        width = max(0, min(20, width))
+        bar = "█" * width + " " * (20 - width)
+        label = to_title_case(disposition_band(disp, aliens_cfg))
+        disposition_rows.append(f"  {name:<{max_sp_name_len}}  {bar} {disp:.2f}  {label}")
+
+    lines = []
+    lines.extend(format_table("Universe Structure", universe_structure_rows, width=45))
+    lines.append("")
+    lines.extend(format_table("Economic & Points Of Interest", economic_rows, width=45))
+    lines.append("")
+    lines.extend(format_table("Distance Bands", band_rows, width=45))
+    lines.append("")
+    lines.extend(edges_histogram)
+    lines.append("")
+    lines.extend(port_classes_histogram)
+    lines.append("")
+    lines.extend(species_by_band_histogram)
+    lines.append("")
+    lines.extend(disposition_rows)
+
     return "\n".join(lines)
