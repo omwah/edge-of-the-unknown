@@ -778,12 +778,20 @@ def summarize(state: UniverseState) -> str:
         total_bar = "█" * width
         species_by_band_histogram.append(f"  {'Total':<{global_max_label_len}}  {total_bar} ({total_in_band})")
 
+    cluster_sizes = list(Counter(s.region_id for s in state.sectors.values()).values())
+    min_cluster = min(cluster_sizes) if cluster_sizes else 0
+    max_cluster = max(cluster_sizes) if cluster_sizes else 0
+    avg_cluster = sum(cluster_sizes) / len(cluster_sizes) if cluster_sizes else 0.0
+
     universe_structure_rows = [
         ("  Seed", str(state.game.seed)),
         ("  Topology Mode", to_title_case(state.topology_mode)),
         ("  Sectors", str(len(state.sectors))),
         ("  Regions", str(len(state.regions))),
         ("  Max Warps", str(max_deg)),
+        ("  Min Sectors / Cluster", str(min_cluster)),
+        ("  Max Sectors / Cluster", str(max_cluster)),
+        ("  Avg Sectors / Cluster", f"{avg_cluster:.1f}"),
     ]
 
     stardock_val = f"Sector {dock.sector_id}" if dock else "Missing"
