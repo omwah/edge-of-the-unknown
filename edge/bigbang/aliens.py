@@ -115,6 +115,11 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     hi = max(roster.subset_max, lo)
     count = min(len(pool), rng.randint(lo, hi))
     chosen = pool[:count]
+    # Sort chosen descending by disposition center so the friendliest species serve
+    # as the resupply anchors (the first len(live_bands) slots), ensuring hostile-leaning
+    # species honor their roster centers and take normal band bias without being forced friendly.
+    chosen.sort(key=lambda s: s.disposition_center, reverse=True)
+
 
     # Band assignment: honour a species' `home_band` hint when that band is live, else
     # round-robin — but first guarantee each live band gets one contact (front of the
@@ -136,13 +141,15 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     bases: dict[str, float] = {}
     placed: dict[int, AlienSpecies] = {}
     next_id = 1
-    # Each band's guaranteed resupply anchor (i < len(live_bands)) is drawn friendly; so
-    # are **bloc members** — an alliance's menace is political (rival standing, §6.3/WP38),
-    # not low disposition, so its people stay friendly-band (§5). Only unaligned outer-band
-    # species take the band bias toward hostility (§13).
+    # Each band's guaranteed resupply anchor (i < len(live_bands)) is drawn friendly.
+    # Alliance members are **not** blanket-clamped here — their authored disposition_center
+    # and the band bias apply normally, so a low-disposition bloc species placed in Deep
+    # can be hostile by nature (§6). Alliance friendliness is localised: home clusters
+    # (_settle_cluster), the Core (_populate_governing_space), and the StarDock
+    # (_place_stardock_contacts) each pass is_anchor=True independently (§6.3).
     for i, (sp, band) in enumerate(zip(chosen, assignment)):
         home = rng.choice(sectors_by_band[band])
-        friendly = i < len(live_bands) or sp.alliance_id is not None
+        friendly = i < len(live_bands)
         base = _base_for(bases, sp, band, friendly, config, rng)
         next_id = _place_cluster(placed, next_id, sp, home, band,
                                  base, state, config, rng, reserved=reserved)
@@ -201,13 +208,7 @@ def _carve_home_clusters(state: UniverseState, config: GameConfig, roster: Roste
         return {}
 
     bands = [b.name for b in config.bigbang.active_bands()]
-    inner_bands = set(bands[:2])  # Hub + inner-Frontier
     core_ids = {s.id for s in state.sectors.values() if s.is_galactic_core}
-    candidates = {
-        sid for sid, s in state.sectors.items()
-        if s.distance_band in inner_bands and sid not in core_ids and sid not in reserved
-        and not any(n in core_ids for n in state.adjacency.get(sid, ()))  # never Core-adjacent
-    }
 
     members_by_bloc: dict[int, list[SpeciesConfig]] = {}
     for sp in sorted(roster.species, key=lambda s: s.id):
@@ -215,21 +216,37 @@ def _carve_home_clusters(state: UniverseState, config: GameConfig, roster: Roste
             members_by_bloc.setdefault(sp.alliance_id, []).append(sp)
 
     lo, hi = config.bigbang.home_cluster_min, config.bigbang.home_cluster_max
-    used: set[int] = set()      # sectors already in a cluster
-    blocked: set[int] = set()   # sectors adjacent to a cluster (the rival-unlink buffer)
-    clusters: dict[int, tuple[int, ...]] = {}
-    for bloc in blocs:
-        avail = candidates - used - blocked
-        cluster = _grow_cluster(state, avail, rng.randint(lo, hi), lo, rng)
-        if cluster is None:
-            raise HomeClusterError(f"no home cluster available for alliance {bloc}")
-        clusters[bloc] = tuple(sorted(cluster))
-        used |= cluster
-        for sid in cluster:
-            blocked |= set(state.adjacency.get(sid, ()))
-        _settle_cluster(state, config, rng, placed, bases, bloc, cluster,
-                        members_by_bloc.get(bloc, ()))
-    return clusters
+
+    # Try Frontier first (bands[1]) to keep the Hub strictly friendly and allow
+    # non-governing bloc species to be hostile; fall back to Hub + Frontier (bands[:2]) if needed.
+    for pass_bands in ({bands[1]}, set(bands[:2])):
+        candidates = {
+            sid for sid, s in state.sectors.items()
+            if s.distance_band in pass_bands and sid not in core_ids and sid not in reserved
+            and not any(n in core_ids for n in state.adjacency.get(sid, ()))  # never Core-adjacent
+        }
+        used: set[int] = set()      # sectors already in a cluster
+        blocked: set[int] = set()   # sectors adjacent to a cluster (the rival-unlink buffer)
+        clusters: dict[int, tuple[int, ...]] = {}
+        success = True
+        for bloc in blocs:
+            avail = candidates - used - blocked
+            cluster = _grow_cluster(state, avail, rng.randint(lo, hi), lo, rng)
+            if cluster is None:
+                success = False
+                break
+            clusters[bloc] = tuple(sorted(cluster))
+            used |= cluster
+            for sid in cluster:
+                blocked |= set(state.adjacency.get(sid, ()))
+        if success:
+            # Settle the clusters now that we know we succeeded.
+            for bloc in blocs:
+                _settle_cluster(state, config, rng, placed, bases, bloc, set(clusters[bloc]),
+                                members_by_bloc.get(bloc, ()))
+            return clusters
+
+    raise HomeClusterError("no home cluster available for non-governing alliances")
 
 
 def _grow_cluster(state: UniverseState, avail: set[int], target: int, minimum: int,
@@ -278,7 +295,11 @@ def _settle_cluster(state: UniverseState, config: GameConfig, rng: random.Random
     for i, sp in enumerate(members):
         sector_id = slots[i % len(slots)]
         band = state.sectors[sector_id].distance_band
-        base_disp = _base_for(bases, sp, band, True, config, rng)  # bloc home is peaceable (§5)
+        # If this species was already drawn in the main band-assignment loop, the memo is
+        # reused (is_anchor has no effect on a second call); a species drawn hostile in an
+        # outer band stays hostile here — the validator exempts home-cluster Hub sectors
+        # from the peaceable check (alliance-political protection, §6.3).
+        base_disp = _base_for(bases, sp, band, True, config, rng)
         placed[next_id] = _make_species(next_id, sp, sector_id, band, base_disp, config)
         next_id += 1
 

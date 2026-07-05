@@ -159,7 +159,7 @@ def _value(state: UniverseState, ref: LocationRef) -> int:
     """A tip's worth: rarity (or a base for bases) scaled, plus its Core distance."""
     hops_from_core = state.core_hops.get(ref.sector_id, 0)
     if ref.kind == "entity":
-        base = RarityTier.LEGENDARY.value  # the singular pursuit prize outranks ordinary tips
+        base = RarityTier.LEGENDARY.value + 1  # the singular pursuit prize outranks ordinary tips
     elif ref.kind == "discovery":
         disc = state.discoveries.get(ref.ref)
         base = disc.rarity_tier.value if disc else 0

@@ -205,6 +205,9 @@ def test_evaded_encounter_does_not_halt() -> None:
     path = shortest_path(state.adjacency, ship.sector_id, sp.sector_id)
     for _ in range(60):
         for hop in path[1:]:
+            # Reset player turns so they don't run out of turns during the test
+            p = state.players[1]
+            state.players[1] = replace(p, turns_remaining=100)
             result = reduce(state, 1, Warp(to_sector=hop), SMALL)
             apply_result(state, result)
             if any(isinstance(e, EncounterEvaded) for e in result.events):
