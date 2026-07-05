@@ -21,7 +21,8 @@ import math
 from edge.core import dto
 from edge.server.canvas import BAND_COLOR, HERE_STYLE, Canvas
 
-_ANCHOR_STYLE = "bold cyan"
+_CORE_ANCHOR_STYLE = "bold cyan"
+_VOID_ANCHOR_STYLE = "bold blue"
 _UNEXPLORED_STYLE = "dim"
 _SPOKE_STYLE = "dim"
 _GAP = 4  # blank columns between a label column and the centre block (room for spokes)
@@ -37,10 +38,7 @@ _HERE = "[ @ ]"
 
 _ARROW_OCTANT = {"<<": 4, ">>": 0, "--": 2}  # gravity-axis fallback: coreward W, deeper E, level N
 
-NAV_LEGEND = (
-    "[reverse bold cyan]@[/] you   click or ↵ to warp   "
-    "[bold cyan]Core[/] the galactic core (home edge)"
-)
+NAV_LEGEND = ""
 
 
 def _octant(bearing: float) -> int:
@@ -121,12 +119,13 @@ def build_nav_strip(
     right_w = max((len(labels[o]) for o in placed if _SLOT[o][1] == "R"), default=0)
     center_w = max([len(_HERE)] + [len(labels[o]) for o in placed if _SLOT[o][1] == "C"])
 
-    # The Core anchor pins to a fixed frame edge (config, not bearing) so it never jumps
-    # sides between sectors; reserve a margin there. The arrow always faces the same way.
+    # Orient the opposite Core and Void anchors to fixed frame edges (config, not bearing)
+    # so they never jump sides between sectors.
     anchor_left = core_anchor_side != "right"
-    anchor_text = "◄ Core" if anchor_left else "Core ►"
-    left_margin = len(anchor_text) + 1 if anchor_left else 0
-    right_margin = len(anchor_text) + 1 if not anchor_left else 0
+    left_anchor_text = "◄ Core" if anchor_left else "◄ Void"
+    right_anchor_text = "Void ►" if anchor_left else "Core ►"
+    left_margin = len(left_anchor_text) + 3
+    right_margin = len(right_anchor_text) + 3
 
     x_left0 = left_margin
     x_center0 = x_left0 + left_w + _GAP
@@ -169,8 +168,9 @@ def build_nav_strip(
     if 7 in placed:  # SE
         canvas.put(3, spoke_rx, "╲", _SPOKE_STYLE)
 
-    anchor_x = 0 if anchor_left else width - len(anchor_text)
-    canvas.put(2, anchor_x, anchor_text, _ANCHOR_STYLE)
+    canvas.put(2, 0, left_anchor_text, _CORE_ANCHOR_STYLE if anchor_left else _VOID_ANCHOR_STYLE)
+    canvas.put(2, width - len(right_anchor_text), right_anchor_text,
+               _VOID_ANCHOR_STYLE if anchor_left else _CORE_ANCHOR_STYLE)
 
     return dto.NavStripDTO(
         rows=canvas.rows(), legend=NAV_LEGEND, you_display=sector.display_id,

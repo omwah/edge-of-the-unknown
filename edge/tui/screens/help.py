@@ -28,7 +28,7 @@ class HelpScreen(ModalScreen[None]):
        `Screen` rule would otherwise paint it opaque and blank the screen). */
     HelpScreen { align: center middle; background: $background 60%; }
     HelpScreen #help-box {
-        width: 64; max-height: 80%; height: auto; padding: 1 2;
+        width: 80; max-height: 80%; height: auto; padding: 1 2;
         border: round $primary; background: $surface;
     }
     HelpScreen #help-title { text-style: bold; color: $primary; margin-bottom: 1; }
@@ -37,10 +37,13 @@ class HelpScreen(ModalScreen[None]):
     """
 
     def compose(self) -> ComposeResult:
+        # Resolve config-driven anchor side from the app
+        ui_config = getattr(self.app, "ui_config", None)
+        side = ui_config.nav_core_anchor_side if ui_config else "left"
+
         with VerticalScroll(id="help-box"):
             yield Static("Help", id="help-title")
-            yield Static("Warp Legend", classes="help-section")
-            yield Static(warp_legend_markup())
+            yield Static(warp_legend_markup(side))
             yield Static("[dim]Esc to close[/]", id="help-footer")
 
     def action_close(self) -> None:
