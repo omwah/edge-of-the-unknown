@@ -187,11 +187,32 @@ def _code_markup(codes: list[str]) -> str:
     return " ".join(f"[{_CODE_STYLE.get(c, 'white')}]{c}[/]" for c in codes)
 
 
-def warp_legend_markup() -> str:
-    """The warp colour/arrow key — shown in the Help modal's Warp Legend (?)."""
+def warp_legend_markup(core_anchor_side: str) -> str:
+    """The warp colour and navigation guide — shown in the Help modal."""
+    anchor_left = core_anchor_side != "right"
+    if anchor_left:
+        core_line = "• [bold cyan]◄ Core[/]: Points towards Core Space (Sectors 1-10), the safe home territory governed by the Federation."
+        void_line = "• [bold blue]Void ►[/]: Points towards the outer boundary of the universe, pointing away from the Core."
+        directions = f"{core_line}\n{void_line}"
+    else:
+        void_line = "• [bold blue]◄ Void[/]: Points towards the outer boundary of the universe, pointing away from the Core."
+        core_line = "• [bold cyan]Core ►[/]: Points towards Core Space (Sectors 1-10), the safe home territory governed by the Federation."
+        directions = f"{void_line}\n{core_line}"
+
     return (
-        "[cyan]■[/] visited   [magenta]■[/] came-from   [dim]■ unmapped[/]\n"
-        "[dim]<< toward Core   -- level   >> deeper[/]"
+        "[bold cyan]Navigation (Nav Rose)[/]\n"
+        "The Nav Rose at the bottom of the main screen is centered on you ( [reverse bold cyan]@[/] ).\n"
+        "• [bold]Mouse & Keyboard[/]: Click any warp label to travel directly, or use the\n"
+        "  [bold]Arrow keys[/] to select a warp and press [bold]Enter[/] / [bold]Space[/] to travel.\n"
+        f"{directions}\n\n"
+        "[bold cyan]Warp Color (Distance Bands)[/]\n"
+        "Colors represent the distance band of the target sector from the Core:\n"
+        "• [cyan]■[/] Hub          • [green]■[/] Frontier\n"
+        "• [magenta]■[/] Deep         • [blue]■[/] Void\n"
+        "• [dim]■[/] Uncharted (unexplored)\n\n"
+        "[bold cyan]Sector Codes[/]\n"
+        "Discovered entities are shown as trailing symbols on warp labels:\n"
+        "• [green]@[/]   Planet       • [magenta]S[/]   StarDock       • [magenta]P[/]   Trade Port"
     )
 
 
@@ -995,7 +1016,7 @@ class NavRose(Static):
         Binding("space", "warp", "Warp", show=False),
     ]
 
-    DEFAULT_CSS = "NavRose { height: auto; padding: 0 1; }"
+    DEFAULT_CSS = "NavRose { height: auto; padding: 0 1; width: auto; }"
 
     def __init__(self, nav: NavStripDTO, warps: list[WarpDTO], **kwargs: object) -> None:
         super().__init__(**kwargs)
@@ -1050,7 +1071,6 @@ class NavRose(Static):
         else:
             codes = " " + "".join(warp.codes) if warp.codes else ""
             line.append(f"{warp.label or '—'} · {warp.band}{codes}")
-        line.append("     (↵ to warp)", style="dim")
         return line
 
     def action_move(self, dx: int, dy: int) -> None:

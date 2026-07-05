@@ -125,3 +125,20 @@ def test_bearings_are_rotated_relative_to_core_bearing() -> None:
     # by_id[1].col0 < by_id[2].col0 must hold.
     assert by_id[1].col0 < by_id[2].col0
 
+
+def test_void_anchor_is_drawn_opposite_to_core_anchor() -> None:
+    sector = _sector([_warp(10, 0.0, 110)], core_bearing=math.pi)
+
+    # Left anchor -> Core is on left, Void is on right
+    left = navstrip.build_nav_strip(sector, core_anchor_side="left").rows
+    left_str = "\n".join(_strip(r) for r in left)
+    assert "◄ Core" in left_str
+    assert "Void ►" in left_str
+
+    # Right anchor -> Void is on left, Core is on right
+    right = navstrip.build_nav_strip(sector, core_anchor_side="right").rows
+    right_str = "\n".join(_strip(r) for r in right)
+    assert "◄ Void" in right_str
+    assert "Core ►" in right_str
+
+

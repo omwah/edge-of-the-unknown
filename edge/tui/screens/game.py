@@ -69,7 +69,7 @@ class SectorView(Container):
 
     DEFAULT_CSS = """
     SectorView { width: 1fr; background: transparent; }
-    SectorView #warp-area { width: 1fr; height: auto; }
+    SectorView #warp-area { width: 1fr; height: auto; align-horizontal: center; }
     """
 
     def __init__(self, sector: SectorDTO, nav: object = None) -> None:

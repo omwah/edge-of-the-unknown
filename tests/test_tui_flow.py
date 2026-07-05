@@ -1301,7 +1301,7 @@ async def test_question_mark_opens_help_with_warp_legend() -> None:
         await pilot.pause()
         assert isinstance(app.screen, HelpScreen)
         text = " ".join(str(s.render()) for s in app.screen.query(Static))
-        assert "Warp Legend" in text
+        assert "Warp Color" in text
         await pilot.press("escape")
         await pilot.pause()
         assert not isinstance(app.screen, HelpScreen)
