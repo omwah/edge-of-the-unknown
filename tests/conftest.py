@@ -20,6 +20,21 @@ TEST_OVERRIDES: dict[str, Any] = {
         "sector_count": 1000,
         "max_warps_per_sector": 6,
         "start_sector": "stardock",
+        "topology_mode": "expansive",
+        "cluster_max": 25,
+        "intra_group_degree": 2.5,
+        "inter_group_degree": 2.5,
+        "core_sector_count": 10,
+        "home_cluster_min": 3,
+        "home_cluster_max": 6,
+    },
+    "aliens": {
+        "band_disposition_bias": {
+            "Hub": 0.0,
+            "Frontier": -0.1,
+            "Deep": -0.2,
+            "Void": -0.3,
+        },
     },
     "economy": {
         "floor_frac": 0.25,
