@@ -510,7 +510,9 @@ def _bridge_groups_mesh(
     for u, v in candidate_extra:
         if added >= extra_bridges:
             break
-        if add_bidirectional(out, u, v, cap):
+        one_way = rng.random() < cfg.one_way_chance
+        ok = add_directed(out, u, v, cap) if one_way else add_bidirectional(out, u, v, cap)
+        if ok:
             added += 1
 
 
@@ -665,12 +667,19 @@ def summarize(state: UniverseState) -> str:
     max_deg = max(degrees) if degrees else 0
     deg_counts = Counter(degrees)
 
+    one_way_count = 0
+    for sid, s in state.sectors.items():
+        for target in s.warps_out:
+            target_sector = state.sectors.get(target)
+            if target_sector is None or sid not in target_sector.warps_out:
+                one_way_count += 1
+
     edges_histogram: list[str] = [
         "Exiting Edges",
         "-------------",
     ]
-    max_deg_count = max(deg_counts.values()) if deg_counts else 0
-    max_label_len = len(str(max_deg))
+    max_deg_count = max(list(deg_counts.values()) + [one_way_count]) if (deg_counts or one_way_count > 0) else 0
+    max_label_len = max([7] + [len(str(d)) for d in range(1, max_deg + 1)])
     for d in range(1, max_deg + 1):
         count = deg_counts.get(d, 0)
         if max_deg_count > 0:
@@ -682,6 +691,16 @@ def summarize(state: UniverseState) -> str:
         bar = "█" * width
         label = f"  {d:<{max_label_len}}"
         edges_histogram.append(f"{label}  {bar} ({count})")
+
+    if max_deg_count > 0:
+        width = int(round(one_way_count * 40 / max_deg_count))
+        if width == 0 and one_way_count > 0:
+            width = 1
+    else:
+        width = 0
+    one_way_bar = "█" * width
+    one_way_label = f"  {'One-Way':<{max_label_len}}"
+    edges_histogram.append(f"{one_way_label}  {one_way_bar} ({one_way_count})")
 
     # Port Classes histogram helper
     # Ordered by frequency/count (ascending), then by formatted label (alphabetically).
@@ -806,6 +825,19 @@ def summarize(state: UniverseState) -> str:
         for b in sorted_bands
     ]
 
+    alliance_rows = []
+    core_size = sum(1 for s in state.sectors.values() if s.is_galactic_core)
+    gov_id = state.game.core_governing_alliance_id
+    gov_alliance = state.alliances.get(gov_id)
+    gov_name = gov_alliance.name if gov_alliance else "Federation"
+    alliance_rows.append((f"  {gov_name} (The Core)", f"{core_size} Sectors"))
+
+    if state.home_clusters:
+        for alliance_id, sectors in sorted(state.home_clusters.items(), key=lambda item: state.alliances[item[0]].name if item[0] in state.alliances else f"Alliance {item[0]}"):
+            name_obj = state.alliances.get(alliance_id)
+            name = name_obj.name if name_obj else f"Alliance {alliance_id}"
+            alliance_rows.append((f"  {name}", f"{len(sectors)} Sectors"))
+
     # Species dispositions table helper
     disposition_rows: list[str] = [
         "Species Dispositions",
@@ -840,6 +872,8 @@ def summarize(state: UniverseState) -> str:
     lines.extend(format_table("Economic & Points Of Interest", economic_rows, width=45))
     lines.append("")
     lines.extend(format_table("Distance Bands", band_rows, width=45))
+    lines.append("")
+    lines.extend(format_table("Alliance Clusters", alliance_rows, width=45))
     lines.append("")
     lines.extend(edges_histogram)
     lines.append("")
