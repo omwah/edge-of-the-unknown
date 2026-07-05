@@ -225,3 +225,17 @@ def test_species_lore_config() -> None:
         assert isinstance(sp.lore.relationships, str)
         assert isinstance(sp.lore.combat_and_ships, str)
 
+
+def test_production_config_validates() -> None:
+    """Ensure the actual production config loads and validates against the schema."""
+    from pathlib import Path
+    import edge.config
+    from edge.core.config import GameConfig
+
+    prod_path = Path(__file__).resolve().parent.parent / "config" / "default.yaml"
+    # Load using the original unpatched load_config to check if the real production config is valid
+    cfg = getattr(edge.config, "original_load_config", edge.config.load_config)(prod_path)
+    assert isinstance(cfg, GameConfig)
+    assert cfg.roster is not None
+
+
