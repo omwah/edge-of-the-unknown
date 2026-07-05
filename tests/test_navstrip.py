@@ -104,3 +104,24 @@ def test_fallback_to_gravity_axis_without_embedding() -> None:
                            warps=warps, display_id=9)  # core_bearing defaults to 0.0
     nav = navstrip.build_nav_strip(sector)
     assert {n.sector_id for n in nav.nodes} == {1, 2, 3}
+
+
+def test_bearings_are_rotated_relative_to_core_bearing() -> None:
+    # Core is East (0.0). Anchor is on the left (West, math.pi).
+    # Rotation is math.pi - 0.0 = math.pi.
+    # Warp 1 (bearing 0.0, toward Core) should rotate to math.pi (Left).
+    # Warp 2 (bearing math.pi, away from Core) should rotate to 0.0 / 2*math.pi (Right).
+    toward_core = _warp(1, 0.0, 101)
+    away_core = _warp(2, math.pi, 102)
+    
+    sector = _sector([toward_core, away_core], core_bearing=0.0)
+    nav = navstrip.build_nav_strip(sector, core_anchor_side="left")
+    
+    by_id = {n.sector_id: n for n in nav.nodes}
+    
+    # toward_core (rotated to West/left) should be on the left of center,
+    # and away_core (rotated to East/right) should be on the right.
+    # Specifically, since West is column "L" and East is column "R",
+    # by_id[1].col0 < by_id[2].col0 must hold.
+    assert by_id[1].col0 < by_id[2].col0
+

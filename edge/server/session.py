@@ -9,10 +9,10 @@ sees a core model, only these DTOs.
 
 from __future__ import annotations
 
+import math
 import random
 from collections.abc import Mapping
 
-from edge.bigbang.embedding import bearing as _sector_bearing
 from edge.bigbang.topology import bfs_distances
 from edge import dialogue
 from edge.dialogue import facts as dialogue_facts
@@ -160,13 +160,13 @@ def _warp_kind(target: int, came_from: int | None, explored: frozenset[int]) -> 
 
 def _warp_dto(
     state: UniverseState, player: Player, sector: Sector, target: int, here: int,
-    came_from: int | None, core_hops: dict[int, int],
+    came_from: int | None, core_hops: dict[int, int], bearing: float,
 ) -> dto.WarpDTO:
     """One outbound warp, with region/band/codes filled only once explored (fog of war)."""
     did = _display(state, target)
     kind = _warp_kind(target, came_from, player.explored_sectors)
     arrow = _gravity_arrow(here, core_hops.get(target, here))
-    brg = _sector_bearing(state.sector_pos, sector.id, target)  # nav-rose direction (§11)
+    brg = bearing
     tgt = state.sectors[target]
     if target in player.explored_sectors:
         return dto.WarpDTO(
@@ -297,12 +297,13 @@ def _sector_dto(
     ]
     here = core_hops.get(sector.id, 0)
     came_from = player.entered_from.get(sector.id)
+    topo_bearings = mapgraph.local_layout_bearings(state, player, sector.id)
     warps = [
-        _warp_dto(state, player, sector, target, here, came_from, core_hops)
+        _warp_dto(state, player, sector, target, here, came_from, core_hops, topo_bearings.get(target, 0.0))
         for target in sector.warps_out
     ]
     region = state.regions[sector.region_id].name
-    core_bearing = _sector_bearing(state.sector_pos, sector.id, 1)  # direction home (§11 anchor)
+    core_bearing = math.pi  # direction home is always West/left in map columns (§11 anchor)
     # The roaming Entity's always-on presence hint, computed live from its *current* sector
     # (§7, WP35, H2) — never `Player.detected`. Opening contact is Legendary-sensor-gated; the
     # fog-safe label never names the being. Absent unless the Entity is here right now.

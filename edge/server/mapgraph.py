@@ -18,6 +18,7 @@ is ever needed.
 
 from __future__ import annotations
 
+import math
 from collections import deque
 from collections.abc import Sequence
 
@@ -123,21 +124,28 @@ def build_local_map(
     return best[0], best[1], best[2]
 
 
-def _build_at_radius(
-    state: UniverseState, player: Player, radius: int, route: Sequence[int],
-) -> tuple[list[str], str, list[dto.MapNodeDTO], int]:
-    """Lay out the ego-graph at a fixed `radius`; returns rows/legend/nodes + its width."""
-    here = state.ships[player.ship_id].sector_id
+def _layout_map_nodes(
+    state: UniverseState, player: Player, here: int, radius: int,
+) -> tuple[dict[int, tuple[int, int]], dict[int, int], int, list[int], dict[int, int], int, int, int]:
+    """Topologically lays out local map nodes.
+    Returns:
+      placed: dict[int, tuple[int, int]] -> sector_id to (row, col_x)
+      hops: dict[int, int] -> sector_id to distance
+      cell_w: int -> width of a cell
+      present: list[int] -> sorted column offsets
+      col_x: dict[int, int] -> column offset to x coordinate
+      center_row: int -> row index of center/player
+      width: int -> total layout width
+      height: int -> total layout height
+    """
     came_from = player.entered_from.get(here)
     hops = _local_bfs(state, here, radius)
     if came_from is not None and came_from in state.sectors:
         hops.setdefault(came_from, 1)  # the way back is always worth showing
-    # The immediate ring is always shown (unexplored warps read as a faint id, like
-    # the warp list); beyond it only charted sectors appear, so the deep fog doesn't
-    # swarm the map.
-    hops = {n: d for n, d in hops.items() if d <= 1 or n in player.explored_sectors}
+    # The immediate ring is always shown; beyond it only charted sectors appear.
+    if radius > 1:
+        hops = {n: d for n, d in hops.items() if d <= 1 or n in player.explored_sectors}
     here_core = state.core_hops.get(here, 0)
-    route_set = set(route)
 
     # Group nodes into gravity columns: offset = clamp(core_hops - here_core).
     columns: dict[int, list[int]] = {}
@@ -162,18 +170,14 @@ def _build_at_radius(
     center_row = height // 2
     width = len(present) * cell_w + max(0, len(present) - 1) * _CELL_GAP
 
-    canvas = _Canvas(width, height)
-    placed: dict[int, tuple[int, int]] = {}  # sector_id → (row, x of label start)
-    occupied: set[tuple[int, int]] = set()  # node-label cells, off-limits to connectors
-    boxes: list[tuple[int, int, int, int]] = []  # (sector_id, canvas_row, col0, col1)
+    placed: dict[int, tuple[int, int]] = {}
 
     def barycentre(node: int) -> float:
         """Mean row of this node's already-placed neighbours (re-uses gravity order)."""
         rows = [placed[m][0] for m in vis_adj[node] if m in placed]
         return sum(rows) / len(rows) if rows else float(center_row)
 
-    # Place columns centre-outward so each node lands near its placed neighbours —
-    # keeping connectors short and the graph legible even at hubs of high degree.
+    # Place columns centre-outward
     for off in sorted(present, key=lambda o: (abs(o), o)):
         nodes = sorted(columns[off], key=lambda n: (barycentre(n), state.spatial_ids.get(n, n)))
         if off == 0 and here in nodes:  # keep the current sector dead-centre
@@ -182,21 +186,40 @@ def _build_at_radius(
         count = len(nodes)
         for i, node in enumerate(nodes):
             row = center_row + round((i - (count - 1) / 2) * _VSTEP)
-            x = col_x[off]
-            label = _label(state, player, node, here)
-            if node == here:
-                style: str | None = _HERE_STYLE
-            elif node in route_set:
-                style = _ROUTE_STYLE
-            elif node not in player.explored_sectors:
-                style = _UNEXPLORED_STYLE
-            else:
-                style = _BAND_COLOR.get(state.sectors[node].distance_band)
-            canvas.put(row, x, label, style)
-            placed[node] = (row, x)
-            occupied.update((row, x + k) for k in range(len(label)))
-            if node != here:  # the current sector isn't a route target
-                boxes.append((node, row, x, x + len(label)))
+            placed[node] = (row, col_x[off])
+
+    return placed, hops, cell_w, present, col_x, center_row, width, height
+
+
+def _build_at_radius(
+    state: UniverseState, player: Player, radius: int, route: Sequence[int],
+) -> tuple[list[str], str, list[dto.MapNodeDTO], int]:
+    """Lay out the ego-graph at a fixed `radius`; returns rows/legend/nodes + its width."""
+    here = state.ships[player.ship_id].sector_id
+    route_set = set(route)
+
+    placed, hops, cell_w, present, col_x, center_row, width, height = _layout_map_nodes(
+        state, player, here, radius
+    )
+
+    canvas = _Canvas(width, height)
+    occupied: set[tuple[int, int]] = set()  # node-label cells, off-limits to connectors
+    boxes: list[tuple[int, int, int, int]] = []  # (sector_id, canvas_row, col0, col1)
+
+    for node, (row, x) in placed.items():
+        label = _label(state, player, node, here)
+        if node == here:
+            style: str | None = _HERE_STYLE
+        elif node in route_set:
+            style = _ROUTE_STYLE
+        elif node not in player.explored_sectors:
+            style = _UNEXPLORED_STYLE
+        else:
+            style = _BAND_COLOR.get(state.sectors[node].distance_band)
+        canvas.put(row, x, label, style)
+        occupied.update((row, x + k) for k in range(len(label)))
+        if node != here:  # the current sector isn't a route target
+            boxes.append((node, row, x, x + len(label)))
 
     _draw_edges(state, canvas, placed, cell_w, route, occupied)
 
@@ -279,3 +302,25 @@ def _pointer_line(state: UniverseState, route: Sequence[int], hops: dict[int, in
         return ""
     disp = state.spatial_ids.get(dest, dest)
     return f"[bold yellow]→ S{disp}[/] [dim]({len(route) - 1} hops)[/]"
+
+
+def local_layout_bearings(state: UniverseState, player: Player, here: int) -> dict[int, float]:
+    """Calculate relative bearings for immediate neighbors of sector `here`,
+    derived from the same topological gravity-column layout used by the Local Map.
+    """
+    placed, _, _, _, _, py, _, _ = _layout_map_nodes(state, player, here, radius=1)
+    here_core = state.core_hops.get(here, 0)
+
+    bearings: dict[int, float] = {}
+    for node, (ny, nx) in placed.items():
+        if node == here:
+            continue
+        # Use logical column offset (dx) and row offset (dy) so the aspect ratio
+        # matches the compact nav rose and does not squash angles horizontally.
+        off = state.core_hops.get(node, here_core) - here_core
+        dx = max(-1, min(1, off))
+        dy = py - ny  # negate row diff so up is positive y
+        bearings[node] = math.atan2(dy, dx)
+
+    return bearings
+
