@@ -23,6 +23,7 @@ from edge.core.enums import Commodity
 
 from edge.tui import art_adapter
 from edge.tui.dummy import LocalMapDTO, NavStripDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
+from edge.server.canvas import BAND_COLOR
 
 
 class Starfield(Static):
@@ -1210,7 +1211,8 @@ class NavRose(Vertical):
         else:
             col[2] = Text(warp.label or "—")
             if warp.band:
-                col[3] = Text(warp.band)
+                color = BAND_COLOR.get(warp.band, "")
+                col[3] = Text(warp.band, style=color)
             if warp.codes:
                 col[4] = Text.from_markup(_code_markup(warp.codes))
         return col
