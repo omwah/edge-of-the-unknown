@@ -81,18 +81,37 @@ def build_nav_strip(
 
     `core_anchor_side` (`"left"`/`"right"`, from `ui.nav_core_anchor_side`) pins the
     `Core` orientation anchor to a **fixed** frame edge, so it never jumps sides between
-    sectors and always faces the same way. Warps are still placed by their real bearing.
+    sectors and always faces the same way. Warps are rotated so they align relative to
+    the fixed Core anchor (Core is placed in the direction of the anchor).
     """
     warps = sector.warps
     has_embed = sector.core_bearing != 0.0 or any(w.bearing != 0.0 for w in warps)
+
+    # If we have embedding, align the Coreward direction with the Core anchor.
+    # To preserve the vertical axis (preventing top/bottom from flipping), we use
+    # a horizontal reflection if the Core bearing faces the opposite horizontal side
+    # of the configured anchor, rather than a full 2D rotation.
+    reflect_horizontal = False
+    if has_embed:
+        anchor_left = core_anchor_side != "right"
+        core_left = math.cos(sector.core_bearing) < 0.0
+        if anchor_left != core_left:
+            reflect_horizontal = True
+
+    def _rot_bearing(w: dto.WarpDTO) -> float:
+        if not has_embed:
+            return 0.0
+        if reflect_horizontal:
+            return (math.pi - w.bearing) % (2.0 * math.pi)
+        return w.bearing
 
     # Assign each warp an octant (bearing when embedded, else the gravity arrow),
     # spilling collisions to the nearest free slot so no two labels overlap.
     used: set[int] = set()
     placed: dict[int, dto.WarpDTO] = {}  # octant → warp
-    for warp in sorted(warps, key=lambda w: (_octant(w.bearing) if has_embed
+    for warp in sorted(warps, key=lambda w: (_octant(_rot_bearing(w)) if has_embed
                                              else _ARROW_OCTANT.get(w.arrow, 0), w.display_id)):
-        pref = _octant(warp.bearing) if has_embed else _ARROW_OCTANT.get(warp.arrow, 0)
+        pref = _octant(_rot_bearing(warp)) if has_embed else _ARROW_OCTANT.get(warp.arrow, 0)
         octant = _nearest_free(pref, used)
         used.add(octant)
         placed[octant] = warp
