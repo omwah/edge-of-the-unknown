@@ -64,7 +64,7 @@
   .badge { padding: 1px 6px; border-radius: 4px; background: #b8892f;
     color: #1a1206; font-size: 10px; font-weight: 700; }
   .outline-vis { transition: opacity 0.15s, stroke-width 0.15s; }
-  .outline-group:hover .outline-vis, .outline-vis.dragging {
+  .outline-group:hover .outline-vis, .outline-vis.dragging, .outline-vis.selected {
     opacity: 1 !important;
     stroke-width: 3.2px !important;
   }
@@ -224,6 +224,7 @@ const T = { k: 1, tx: 0, ty: 0 };
 let editMode = false, idMode = "spatial";
 let autoSeparate = false;   // re-run hull separation when a drag settles (opt-in; default off)
 let pendingNode = null, selectedEdge = null, highlightedNode = null, highlightedEdgeKey = null;
+let highlightedClusterIds = null;
 
 // per-band visibility (nodes and edges independently); an edge is classed by its
 // outer (deeper) endpoint's band.
@@ -818,7 +819,7 @@ function drawClusters() {
     if (o) {
       attachOutlineInteraction(o, reg.sector_ids, false);
       gClusters.appendChild(o);
-      clusterEls.push({ el: o, band: reg.band });
+      clusterEls.push({ el: o, band: reg.band, sector_ids: reg.sector_ids });
     }
   }
 }
@@ -906,17 +907,34 @@ function applyBandVisibility() {
     if (found) edgeNodes = [found.e.a, found.e.b];
   }
 
+  const clusterSet = highlightedClusterIds ? new Set(highlightedClusterIds) : null;
+  const exitingEdgeKeys = new Set();
+  const exitingEdgeNodes = new Set();
+  if (clusterSet) {
+    for (const rec of edgeEls) {
+      const inA = clusterSet.has(rec.e.a);
+      const inB = clusterSet.has(rec.e.b);
+      if ((inA && !inB) || (!inA && inB)) {
+        exitingEdgeKeys.add(edgeKey(rec.e));
+        exitingEdgeNodes.add(rec.e.a);
+        exitingEdgeNodes.add(rec.e.b);
+      }
+    }
+  }
+
   for (const [id, rec] of nodeEls) {
     const isSelected = (id === highlightedNode) || 
                        (edgeNodes !== null && edgeNodes.includes(id)) ||
-                       (highlightedNode !== null && currentEdges.some(e => (e.a === id && e.b === highlightedNode) || (e.b === id && e.a === highlightedNode)));
+                       (highlightedNode !== null && currentEdges.some(e => (e.a === id && e.b === highlightedNode) || (e.b === id && e.a === highlightedNode))) ||
+                       (clusterSet !== null && exitingEdgeNodes.has(id));
     rec.g.style.display = (nodeBandOn[byId.get(id).band] || isSelected) ? "" : "none";
   }
 
   for (const rec of edgeEls) {
     const a = byId.get(rec.e.a), b = byId.get(rec.e.b);
     const isIncident = (highlightedNode !== null && (rec.e.a === highlightedNode || rec.e.b === highlightedNode)) ||
-                       (highlightedEdgeKey !== null && edgeKey(rec.e) === highlightedEdgeKey);
+                       (highlightedEdgeKey !== null && edgeKey(rec.e) === highlightedEdgeKey) ||
+                       (clusterSet !== null && exitingEdgeKeys.has(edgeKey(rec.e)));
     const vis = (edgeBandOn[edgeBand(rec.e)] && nodeBandOn[a.band] && nodeBandOn[b.band]) || isIncident;
     rec.g.style.display = vis ? "" : "none";
   }
@@ -1086,7 +1104,11 @@ function attachOutlineInteraction(g, ids, isCore) {
     drawClusters();
     drawCore();
     drawBands();
-    if (autoSeparate) settleClusters();
+    if (!moved) {
+      onOutlineClick(ids);
+    } else if (autoSeparate) {
+      settleClusters();
+    }
   });
 }
 function onNodeClick(s) {
@@ -1101,9 +1123,24 @@ function onNodeClick(s) {
     } else {
       highlightedNode = s.id;
       highlightedEdgeKey = null;
+      highlightedClusterIds = null;
     }
     applyIncidentHighlight();
   }
+}
+function onOutlineClick(ids) {
+  if (editMode) return;
+  const isSame = highlightedClusterIds && 
+                 highlightedClusterIds.length === ids.length &&
+                 highlightedClusterIds.every((v, i) => v === ids[i]);
+  if (isSame) {
+    highlightedClusterIds = null;
+  } else {
+    highlightedClusterIds = ids;
+    highlightedNode = null;
+    highlightedEdgeKey = null;
+  }
+  applyIncidentHighlight();
 }
 function markPending() {
   for (const [id, rec] of nodeEls) {
@@ -1120,20 +1157,55 @@ function applyIncidentHighlight() {
     if (found) edgeNodes = [found.e.a, found.e.b];
   }
 
+  const clusterSet = highlightedClusterIds ? new Set(highlightedClusterIds) : null;
+  const exitingEdgeKeys = new Set();
+  const exitingEdgeNodes = new Set();
+  if (clusterSet) {
+    for (const rec of edgeEls) {
+      const inA = clusterSet.has(rec.e.a);
+      const inB = clusterSet.has(rec.e.b);
+      if ((inA && !inB) || (!inA && inB)) {
+        exitingEdgeKeys.add(edgeKey(rec.e));
+        exitingEdgeNodes.add(rec.e.a);
+        exitingEdgeNodes.add(rec.e.b);
+      }
+    }
+  }
+
   for (const rec of edgeEls) {
     const isIncident = (highlightedNode !== null && (rec.e.a === highlightedNode || rec.e.b === highlightedNode)) ||
-                       (highlightedEdgeKey !== null && edgeKey(rec.e) === highlightedEdgeKey);
+                       (highlightedEdgeKey !== null && edgeKey(rec.e) === highlightedEdgeKey) ||
+                       (clusterSet !== null && exitingEdgeKeys.has(edgeKey(rec.e)));
     rec.vis.setAttribute("stroke", isIncident ? SELECT : (rec.e.one_way ? EDGE_ONE : EDGE_TWO));
     rec.vis.setAttribute("stroke-width", isIncident ? 3 : 1.6);
     rec.vis.setAttribute("opacity", isIncident ? 1 : 0.85);
   }
   for (const [id, rec] of nodeEls) {
-    const isSelected = (id === highlightedNode) || (edgeNodes !== null && edgeNodes.includes(id));
+    const isSelected = (id === highlightedNode) || 
+                       (edgeNodes !== null && edgeNodes.includes(id)) ||
+                       (clusterSet !== null && exitingEdgeNodes.has(id));
     rec.circle.setAttribute("stroke", isSelected ? SELECT 
       : (byId.get(id).is_core ? CORE_COLOR : bandColor(byId.get(id).band)));
     rec.circle.setAttribute("stroke-width", isSelected ? 3.4 
       : (byId.get(id).is_core ? 2.2 : 1.4));
   }
+
+  // Update selected class on outlines
+  if (coreEl) {
+    const vis = coreEl.querySelector(".outline-vis");
+    if (vis) {
+      const isCoreSelected = clusterSet && UNIVERSE.hub_sector_ids.every(id => clusterSet.has(id));
+      vis.classList.toggle("selected", !!isCoreSelected);
+    }
+  }
+  for (const c of clusterEls) {
+    const vis = c.el.querySelector(".outline-vis");
+    if (vis) {
+      const isThisSelected = clusterSet && c.sector_ids && highlightedClusterIds && c.sector_ids.length === highlightedClusterIds.length && c.sector_ids.every(id => clusterSet.has(id));
+      vis.classList.toggle("selected", !!isThisSelected);
+    }
+  }
+
   applyBandVisibility();
 }
 
@@ -1173,6 +1245,7 @@ function onEdgeClick(rec) {
     } else {
       highlightedEdgeKey = key;
       highlightedNode = null;
+      highlightedClusterIds = null;
     }
     applyIncidentHighlight();
   }
@@ -1237,6 +1310,7 @@ function initPanZoom() {
     if (ev.target === svg && !editMode) {
       highlightedNode = null;
       highlightedEdgeKey = null;
+      highlightedClusterIds = null;
       applyIncidentHighlight();
     }
   });
@@ -1299,6 +1373,7 @@ function initControls() {
     } else {
       highlightedNode = null;
       highlightedEdgeKey = null;
+      highlightedClusterIds = null;
       applyIncidentHighlight();
     }
     updateHint();
@@ -1309,6 +1384,7 @@ function initControls() {
     drawNodes(); drawEdges();
     highlightedNode = null;
     highlightedEdgeKey = null;
+    highlightedClusterIds = null;
     applyIncidentHighlight();
   });
   window.addEventListener("keydown", (e) => {
@@ -1321,6 +1397,7 @@ function initControls() {
     }
     highlightedNode = null;
     highlightedEdgeKey = null;
+    highlightedClusterIds = null;
     applyIncidentHighlight();
   });
   updateHint();
