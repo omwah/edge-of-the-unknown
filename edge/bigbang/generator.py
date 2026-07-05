@@ -638,7 +638,7 @@ def generate(config: GameConfig, seed: int, *, created_at: str = "1970-01-01T00:
 
 
 def summarize(state: UniverseState) -> str:
-    """A text report of a generated universe (the `--inspect` dev view, §5)."""
+    """A text report of a generated universe (the `--stats` dev view, §5)."""
     from collections import Counter
 
     # Helper function for title case conversion
@@ -684,22 +684,32 @@ def summarize(state: UniverseState) -> str:
         edges_histogram.append(f"{label}  {bar} ({count})")
 
     # Port Classes histogram helper
-    # Ordered by frequency/count (descending).
-    classes_counts = Counter(p.klass.name for p in state.ports.values())
+    # Ordered by frequency/count (ascending), then by formatted label (alphabetically).
+    from edge.core.enums import PORT_CLASS_TRADES, PortMode, Commodity
+    
+    def get_port_label(klass: PortClass) -> str:
+        if klass is PortClass.STARDOCK:
+            return "StarDock"
+        trades = PORT_CLASS_TRADES[klass]
+        mnemonic = "".join("B" if trades[c] is PortMode.BUY else "S" for c in Commodity)
+        return f"Class {klass.value} ({mnemonic})"
+
+    classes_counts = Counter(p.klass for p in state.ports.values())
+    formatted_class_names = {klass: get_port_label(klass) for klass in classes_counts.keys()}
     sorted_classes = sorted(
         classes_counts.items(),
-        key=lambda item: (-item[1], to_title_case(item[0]))
+        key=lambda item: (item[1], formatted_class_names[item[0]])
     )
     max_class_count = max(classes_counts.values()) if classes_counts else 0
 
+    port_classes_header = f"Port Classes ({', '.join(to_title_case(c.value) for c in Commodity)})"
     port_classes_histogram: list[str] = [
-        "Port Classes",
-        "------------",
+        port_classes_header,
+        "-" * len(port_classes_header),
     ]
-    formatted_class_names = {k: to_title_case(k) for k in classes_counts.keys()}
     max_class_label_len = max((len(name) for name in formatted_class_names.values()), default=0)
-    for class_name, count in sorted_classes:
-        name_tc = formatted_class_names[class_name]
+    for klass, count in sorted_classes:
+        name_tc = formatted_class_names[klass]
         if max_class_count > 0:
             width = int(round(count * 40 / max_class_count))
             if width == 0 and count > 0:

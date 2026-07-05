@@ -101,8 +101,8 @@ pixi run cov        # tests with a coverage report
 Inspect a generated universe without launching the game:
 
 ```bash
-pixi run bigbang --inspect --seed 4                       # text report
-pixi run bigbang --inspect --seed 4 --mode trunk          # compare the trunk topology
+pixi run bigbang --stats --seed 4                       # text report
+pixi run bigbang --stats --seed 4 --mode trunk          # compare the trunk topology
 pixi run bigbang --render universe.png --seed 4           # graph dump, port sectors highlighted
 ```
 
