@@ -939,8 +939,8 @@ def summarize(state: UniverseState) -> str:
     }
 
     max_sp_name_len = max((len(name) for name in avg_dispositions.keys()), default=0)
-    for name in sorted(avg_dispositions.keys()):
-        disp = avg_dispositions[name]
+    sorted_avg_disps = sorted(avg_dispositions.items(), key=lambda item: (-item[1], item[0]))
+    for name, disp in sorted_avg_disps:
         width = int(round(disp * 20))
         width = max(0, min(20, width))
         bar = "█" * width + " " * (20 - width)
