@@ -717,7 +717,7 @@ def summarize(state: UniverseState) -> str:
     formatted_class_names = {klass: get_port_label(klass) for klass in classes_counts.keys()}
     sorted_classes = sorted(
         classes_counts.items(),
-        key=lambda item: (item[1], formatted_class_names[item[0]])
+        key=lambda item: -1 if item[0] is PortClass.STARDOCK else item[0].value
     )
     max_class_count = max(classes_counts.values()) if classes_counts else 0
 
@@ -745,7 +745,8 @@ def summarize(state: UniverseState) -> str:
 
     # Species by band histogram helper
     species_counts = Counter(sp.home_band for sp in state.species.values())
-    
+    max_species_total = max(species_counts.values()) if species_counts else 0
+
     BAND_ORDER = ["Hub", "Frontier", "Deep", "Void"]
     band_order_map = {name.lower(): idx for idx, name in enumerate(BAND_ORDER)}
     sorted_bands = sorted(
@@ -756,9 +757,6 @@ def summarize(state: UniverseState) -> str:
         "Species By Band",
         "---------------",
     ]
-    max_species_total = max(species_counts.values()) if species_counts else 0
-
-    # Calculate global max label length for formatting across all bands and species
     all_species_names = [sp.name for sp in state.species.values()]
     global_max_label_len = max([5] + [len(name) for name in all_species_names])
 
@@ -766,17 +764,13 @@ def summarize(state: UniverseState) -> str:
         if idx > 0:
             species_by_band_histogram.append("")
 
-        # Band header
         species_by_band_histogram.append(to_title_case(b))
 
-        # Get count of each species name in this band
         band_species = Counter(sp.name for sp in state.species.values() if sp.home_band == b)
         total_in_band = species_counts.get(b, 0)
 
-        # Sort species by count ascending, then name alphabetically
         sorted_band_species = sorted(band_species.items(), key=lambda item: (item[1], item[0]))
 
-        # 1. Species rows
         for name, count in sorted_band_species:
             if max_species_total > 0:
                 width = int(round(count * 40 / max_species_total))
@@ -787,7 +781,6 @@ def summarize(state: UniverseState) -> str:
             bar = "█" * width
             species_by_band_histogram.append(f"  {name:<{global_max_label_len}}  {bar} ({count})")
 
-        # 2. Total row
         if max_species_total > 0:
             width = int(round(total_in_band * 40 / max_species_total))
             if width == 0 and total_in_band > 0:
@@ -796,6 +789,94 @@ def summarize(state: UniverseState) -> str:
             width = 0
         total_bar = "█" * width
         species_by_band_histogram.append(f"  {'Total':<{global_max_label_len}}  {total_bar} ({total_in_band})")
+
+    # Discoveries by band histogram helper
+    discovery_counts = Counter(state.sectors[d.sector_id].distance_band for d in state.discoveries.values())
+    discoveries_by_band_histogram: list[str] = [
+        "Discoveries By Band",
+        "-------------------",
+    ]
+    max_discovery_total = max(discovery_counts.values()) if discovery_counts else 0
+
+    all_discovery_kinds = [to_title_case(d.kind.value) for d in state.discoveries.values()]
+    global_max_disc_label_len = max([5] + [len(kind) for kind in all_discovery_kinds])
+
+    for idx, b in enumerate(sorted_bands):
+        if idx > 0:
+            discoveries_by_band_histogram.append("")
+
+        discoveries_by_band_histogram.append(to_title_case(b))
+
+        band_discoveries = Counter(
+            to_title_case(d.kind.value) for d in state.discoveries.values()
+            if state.sectors[d.sector_id].distance_band == b
+        )
+        total_in_band = discovery_counts.get(b, 0)
+
+        sorted_band_discoveries = sorted(band_discoveries.items(), key=lambda item: (item[1], item[0]))
+
+        for kind, count in sorted_band_discoveries:
+            if max_discovery_total > 0:
+                width = int(round(count * 40 / max_discovery_total))
+                if width == 0 and count > 0:
+                    width = 1
+            else:
+                width = 0
+            bar = "█" * width
+            discoveries_by_band_histogram.append(f"  {kind:<{global_max_disc_label_len}}  {bar} ({count})")
+
+        if max_discovery_total > 0:
+            width = int(round(total_in_band * 40 / max_discovery_total))
+            if width == 0 and total_in_band > 0:
+                width = 1
+        else:
+            width = 0
+        total_bar = "█" * width
+        discoveries_by_band_histogram.append(f"  {'Total':<{global_max_disc_label_len}}  {total_bar} ({total_in_band})")
+
+    # Planets by band histogram helper
+    planet_counts = Counter(state.sectors[p.sector_id].distance_band for p in state.planets.values())
+    planets_by_band_histogram: list[str] = [
+        "Planets By Band",
+        "---------------",
+    ]
+    max_planet_total = max(planet_counts.values()) if planet_counts else 0
+
+    all_planet_types = [to_title_case(p.planet_type) for p in state.planets.values()]
+    global_max_planet_label_len = max([5] + [len(pt) for pt in all_planet_types])
+
+    for idx, b in enumerate(sorted_bands):
+        if idx > 0:
+            planets_by_band_histogram.append("")
+
+        planets_by_band_histogram.append(to_title_case(b))
+
+        band_planets = Counter(
+            to_title_case(p.planet_type) for p in state.planets.values()
+            if state.sectors[p.sector_id].distance_band == b
+        )
+        total_in_band = planet_counts.get(b, 0)
+
+        sorted_band_planets = sorted(band_planets.items(), key=lambda item: (item[1], item[0]))
+
+        for pt, count in sorted_band_planets:
+            if max_planet_total > 0:
+                width = int(round(count * 40 / max_planet_total))
+                if width == 0 and count > 0:
+                    width = 1
+            else:
+                width = 0
+            bar = "█" * width
+            planets_by_band_histogram.append(f"  {pt:<{global_max_planet_label_len}}  {bar} ({count})")
+
+        if max_planet_total > 0:
+            width = int(round(total_in_band * 40 / max_planet_total))
+            if width == 0 and total_in_band > 0:
+                width = 1
+        else:
+            width = 0
+        total_bar = "█" * width
+        planets_by_band_histogram.append(f"  {'Total':<{global_max_planet_label_len}}  {total_bar} ({total_in_band})")
 
     cluster_sizes = list(Counter(s.region_id for s in state.sectors.values()).values())
     min_cluster = min(cluster_sizes) if cluster_sizes else 0
@@ -866,6 +947,29 @@ def summarize(state: UniverseState) -> str:
         label = to_title_case(disposition_band(disp, aliens_cfg))
         disposition_rows.append(f"  {name:<{max_sp_name_len}}  {bar} {disp:.2f}  {label}")
 
+    # Average disposition for all species per band
+    band_disposition_rows: list[str] = [
+        "Average Disposition By Band",
+        "---------------------------",
+    ]
+    band_to_disps = defaultdict(list)
+    for sp in state.species.values():
+        band_to_disps[sp.home_band].append(sp.base_disposition)
+
+    band_avg_disps = {}
+    for b in sorted_bands:
+        disps = band_to_disps.get(b, [])
+        band_avg_disps[b] = sum(disps) / len(disps) if disps else 0.0
+
+    max_band_name_len = max((len(to_title_case(b)) for b in sorted_bands), default=0)
+    for b in sorted_bands:
+        disp = band_avg_disps[b]
+        width = int(round(disp * 20))
+        width = max(0, min(20, width))
+        bar = "█" * width + " " * (20 - width)
+        label = to_title_case(disposition_band(disp, aliens_cfg))
+        band_disposition_rows.append(f"  {to_title_case(b):<{max_band_name_len}}  {bar} {disp:.2f}  {label}")
+
     lines = []
     lines.extend(format_table("Universe Structure", universe_structure_rows, width=45))
     lines.append("")
@@ -882,5 +986,11 @@ def summarize(state: UniverseState) -> str:
     lines.extend(species_by_band_histogram)
     lines.append("")
     lines.extend(disposition_rows)
+    lines.append("")
+    lines.extend(band_disposition_rows)
+    lines.append("")
+    lines.extend(discoveries_by_band_histogram)
+    lines.append("")
+    lines.extend(planets_by_band_histogram)
 
     return "\n".join(lines)
