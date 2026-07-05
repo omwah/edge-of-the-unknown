@@ -69,9 +69,8 @@ async def test_nav_rose_click_warps() -> None:
         assert rose._hits
         node = rose._hits[0]
         target = node.sector_id
-        # Content is drawn past the 1-cell left padding; a node cell (row, col0) sits
-        # at widget offset (col0 + 1, row).
-        await pilot.click(rose, offset=(node.col0 + 1, node.row))
+        compass = rose.query_one("#rose-compass")
+        await pilot.click(compass, offset=(node.col0, node.row))
         await pilot.pause()
         moved = svc.game_view(1).sector.sector_id
         assert moved == target != start
@@ -344,7 +343,7 @@ async def test_selected_nav_node_inverts_only_its_cell() -> None:
         rose = app.screen.query_one(NavRose)
         assert isinstance(app.focused, NavRose)
         node = rose._hits[rose._idx]
-        text = rose.render()
+        text = rose.query_one("#rose-compass").render()
         reversed_spans = [s for s in text.spans if s.style and "reverse" in str(s.style)]
         # Exactly the focused node's cell is inverted: its span width matches the
         # node's baked label box, well short of the whole rendered rose.

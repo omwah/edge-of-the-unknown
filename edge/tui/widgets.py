@@ -10,7 +10,8 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid, Vertical
+from textual.containers import Grid, Vertical, Horizontal
+from textual.css.query import NoMatches
 from textual.message import Message
 from textual.widgets import DataTable, Static
 
@@ -988,7 +989,107 @@ class WarpGrid(Grid):
             row, col = row + drow, col + dcol
 
 
-class NavRose(Static):
+class RoseTrail(Static):
+    """The breadcrumb trail display on the left side of the nav rose."""
+
+    @property
+    def rose(self) -> NavRose:
+        node = self.parent
+        while node is not None:
+            if isinstance(node, NavRose):
+                return node
+            node = node.parent
+        raise RuntimeError("NavRose parent not found")
+
+    def render(self) -> Text:
+        col = self.rose._trail_column()
+        out = Text()
+        for i, line in enumerate(col):
+            if i > 0:
+                out.append("\n")
+            out.append_text(line)
+        return out
+
+
+class RoseCompass(Static):
+    """The central compass rose display widget."""
+
+    @property
+    def rose(self) -> NavRose:
+        node = self.parent
+        while node is not None:
+            if isinstance(node, NavRose):
+                return node
+            node = node.parent
+        raise RuntimeError("NavRose parent not found")
+
+    def render(self) -> Text:
+        rose_widget = self.rose
+        focus_node = rose_widget._hits[rose_widget._idx] if rose_widget._hits else None
+
+        # Parse the baked rose rows and pad to the full 5-row compass.
+        rose: list[Text] = [Text.from_markup(r) for r in rose_widget._nav.rows]
+        while len(rose) < 5:
+            rose.append(Text())
+
+        out = Text()
+        for i in range(5):
+            if i > 0:
+                out.append("\n")
+            rl = rose[i]
+            if focus_node is not None and rose_widget.has_focus and focus_node.row == i:
+                rl = rl.copy()
+                rl.stylize("reverse bold", focus_node.col0, focus_node.col1)
+            out.append_text(rl)
+        return out
+
+    def on_click(self, event: events.Click) -> None:
+        parent = self.rose
+        event.stop()
+        for i, node in enumerate(parent._hits):
+            if node.row == event.y and node.col0 <= event.x < node.col1:
+                parent._idx = i
+                self.refresh()
+                parent.query_one("#rose-detail", RoseDetail).refresh()
+                parent.post_message(parent.Picked(node.sector_id))
+                return
+
+
+class RoseDetail(Static):
+    """The selected warp detail display on the right side of the nav rose."""
+
+    @property
+    def rose(self) -> NavRose:
+        node = self.parent
+        while node is not None:
+            if isinstance(node, NavRose):
+                return node
+            node = node.parent
+        raise RuntimeError("NavRose parent not found")
+
+    def render(self) -> Text:
+        rose_widget = self.rose
+        focus_node = rose_widget._hits[rose_widget._idx] if rose_widget._hits else None
+        col = rose_widget._detail_column(focus_node)
+
+        # Calculate available width dynamically based on NavRose width
+        # Subtract padding (2) and separators/margins
+        content_w = max(0, rose_widget.size.width - 2)
+        rose_w = max((Text.from_markup(r).cell_len for r in rose_widget._nav.rows), default=0)
+        detail_avail = max(0, (content_w - 6 - rose_w) // 2)
+
+        out = Text()
+        for i, line in enumerate(col):
+            if i > 0:
+                out.append("\n")
+            if line.cell_len > detail_avail:
+                line = line.copy()
+                line.truncate(detail_avail, overflow="ellipsis")
+            out.append_text(line)
+        return out
+
+
+class NavRose(Vertical):
     """The always-visible nav rose — the sole main-screen warp affordance (§11).
 
     A compact bearing-placed compass baked server-side (`session.game_view` →
@@ -1016,7 +1117,45 @@ class NavRose(Static):
         Binding("space", "warp", "Warp", show=False),
     ]
 
-    DEFAULT_CSS = "NavRose { height: auto; padding: 0 1; width: 1fr; }"
+    DEFAULT_CSS = """
+    NavRose {
+        height: auto;
+        width: 1fr;
+        padding: 0 1;
+    }
+    NavRose > #rose-row {
+        layout: horizontal;
+        height: 5;
+        width: 1fr;
+    }
+    NavRose #rose-trail {
+        width: 1fr;
+        text-align: right;
+    }
+    NavRose #rose-sep-left {
+        width: auto;
+        color: $primary;
+        opacity: 0.5;
+    }
+    NavRose #rose-compass {
+        width: auto;
+    }
+    NavRose #rose-sep-right {
+        width: auto;
+        color: $primary;
+        opacity: 0.5;
+    }
+    NavRose #rose-detail {
+        width: 1fr;
+        text-align: left;
+    }
+    NavRose > #rose-legend {
+        text-align: center;
+        width: 1fr;
+        height: auto;
+        margin-top: 1;
+    }
+    """
 
     def __init__(self, nav: NavStripDTO, warps: list[WarpDTO], **kwargs: object) -> None:
         super().__init__(**kwargs)
@@ -1025,7 +1164,6 @@ class NavRose(Static):
         # Home selection is the top-left node; arrow keys then move by on-screen layout.
         self._hits = sorted(nav.nodes, key=lambda n: (n.row, n.col0))
         self._idx = 0
-        self._rose_x_offset = 0  # set in render(); click offset
 
     def on_mount(self) -> None:
         # Grab focus as the rose appears so arrow keys drive selection immediately
@@ -1033,57 +1171,15 @@ class NavRose(Static):
         if self._hits:
             self.call_after_refresh(self.focus)
 
-    def render(self) -> Text:
-        focus_node = self._hits[self._idx] if self._hits else None
-
-        trail_col = self._trail_column()
-        detail_col = self._detail_column(focus_node)
-
-        # Parse the baked rose rows and pad to the full 5-row compass.
-        rose: list[Text] = [Text.from_markup(r) for r in self._nav.rows]
-        while len(rose) < 5:
-            rose.append(Text())
-
-        # Column widths (trail right-aligned, detail left-aligned).
-        trail_w = max(max((t.cell_len for t in trail_col), default=0), 5)
-        rose_w = max((t.cell_len for t in rose), default=0)
-        sep = " │ "
-
-        # Centre the three-column layout within the widget's content width.
-        content_w = max(0, self.size.width - 2)  # subtract left+right padding
-        detail_nat = max((dc.cell_len for dc in detail_col), default=0)
-        total_nat = trail_w + len(sep) + rose_w + len(sep) + detail_nat
-        left_pad = max(0, (content_w - total_nat) // 2)
-        detail_avail = max(0, content_w - left_pad - trail_w - len(sep) - rose_w - len(sep))
-        self._rose_x_offset = left_pad + trail_w + len(sep)
-
-        out = Text()
-        for i in range(5):
-            if i > 0:
-                out.append("\n")
-            # Centering margin + trail column (right-aligned).
-            tc = trail_col[i]
-            out.append(" " * (left_pad + trail_w - tc.cell_len))
-            out.append_text(tc)
-            out.append(sep, style="dim")
-            # Rose column (with keyboard-focus highlight).
-            rl = rose[i]
-            if focus_node is not None and self.has_focus and focus_node.row == i:
-                rl.stylize("reverse bold", focus_node.col0, focus_node.col1)
-            out.append_text(rl)
-            out.append(" " * (rose_w - rl.cell_len))
-            out.append(sep, style="dim")
-            # Detail column (truncated to fit available width).
-            dc = detail_col[i]
-            if dc.cell_len > 0 and detail_avail > 0:
-                if dc.cell_len > detail_avail:
-                    dc = dc.copy()
-                    dc.truncate(detail_avail, overflow="ellipsis")
-                out.append_text(dc)
+    def compose(self) -> ComposeResult:
+        with Horizontal(id="rose-row"):
+            yield RoseTrail(id="rose-trail")
+            yield Static("│\n│\n│\n│\n│", id="rose-sep-left")
+            yield RoseCompass(id="rose-compass")
+            yield Static("│\n│\n│\n│\n│", id="rose-sep-right")
+            yield RoseDetail(id="rose-detail")
         if self._nav.legend:
-            out.append("\n")
-            out.append_text(Text.from_markup(self._nav.legend))
-        return out
+            yield Static(self._nav.legend, id="rose-legend")
 
     def _trail_column(self) -> list[Text]:
         """5 right-aligned trail lines: header, up to 3 history entries, you."""
@@ -1124,26 +1220,23 @@ class NavRose(Static):
         j = _nearest_node(self._hits, self._idx, dx, dy)
         if j is not None:
             self._idx = j
-            self.refresh()
+            self.query_one("#rose-compass", RoseCompass).refresh()
+            self.query_one("#rose-detail", RoseDetail).refresh()
 
     def action_warp(self) -> None:
         if self._hits:
             self.post_message(self.Picked(self._hits[self._idx].sector_id))
 
-    def on_click(self, event: events.Click) -> None:
-        pad = self.styles.padding
-        col, row = int(event.x) - pad.left, int(event.y) - pad.top
-        rose_col = col - self._rose_x_offset
-        for i, node in enumerate(self._hits):
-            if node.row == row and node.col0 <= rose_col < node.col1:
-                event.stop()
-                self._idx = i
-                self.refresh()
-                self.post_message(self.Picked(node.sector_id))
-                return
+
 
     def on_focus(self) -> None:
-        self.refresh()
+        try:
+            self.query_one("#rose-compass", RoseCompass).refresh()
+        except NoMatches:
+            pass
 
     def on_blur(self) -> None:
-        self.refresh()
+        try:
+            self.query_one("#rose-compass", RoseCompass).refresh()
+        except NoMatches:
+            pass
