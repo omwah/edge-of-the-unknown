@@ -14,7 +14,7 @@ def test_inspect_prints_report(monkeypatch: pytest.MonkeyPatch, capsys: pytest.C
     monkeypatch.setattr("sys.argv", ["edge.bigbang", "--inspect", "--sectors", "60", "--seed", "2"])
     cli.main()
     out = capsys.readouterr().out
-    assert "sectors=60" in out and "stardock:" in out
+    assert "Sectors" in out and "60" in out and "StarDock" in out
 
 
 def test_render_web_writes_page(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

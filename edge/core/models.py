@@ -663,6 +663,8 @@ class UniverseState:
     # control, settled members) ride the hashed entities; this is the sector-set index for
     # territory queries and the §5 validator. Empty for hand-built (test) states.
     home_clusters: dict[int, tuple[int, ...]] = field(default_factory=dict)
+    # The topological mode used to generate the graph (trunk / expansive / planar / mesh).
+    topology_mode: str = ""
 
     @classmethod
     def new(cls, game: Game) -> UniverseState:
