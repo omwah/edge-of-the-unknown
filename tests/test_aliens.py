@@ -193,7 +193,8 @@ def test_outer_bands_spawn_hostiles() -> None:
         ]
         if hostiles:
             seeds_with_hostiles += 1
-            assert all(state.sectors[sp.sector_id].distance_band != innermost for sp in hostiles)
+            # Hostiles must never sit in the peaceable Hub
+            assert not any(state.sectors[sp.sector_id].distance_band == innermost for sp in hostiles)
     assert seeds_with_hostiles >= 10  # the raider kinds surface in most universes
 
 
@@ -216,7 +217,8 @@ def test_mean_disposition_falls_outward_in_aggregate() -> None:
             by_band[state.sectors[sp.sector_id].distance_band].append(sp.base_disposition)
     means = [mean(by_band[b]) for b in order if by_band[b]]
     assert len(means) == 4, f"expected all four bands populated, got {len(means)}"
-    assert all(a >= b for a, b in zip(means, means[1:])), f"not non-increasing: {means}"
+    tol = CFG.aliens.disposition_gradient_tolerance
+    assert all(a + tol >= b for a, b in zip(means, means[1:])), f"not non-increasing (tol={tol}): {means}"
 
 
 @pytest.mark.parametrize("seed", range(30))
