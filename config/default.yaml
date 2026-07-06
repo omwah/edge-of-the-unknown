@@ -111,7 +111,7 @@ aliens:
   escape_floor: 0.10   # player escape chance never drops below this, however outmatched (§10, Phase 3)
   # Per-band downward bias added to every placed species' disposition (Hub stays friendly; each
   # band still keeps a friendly resupply anchor). Mean stance falls outward → danger rises (§5/§6).
-  band_disposition_bias: { Hub: 0.0, Frontier: -0.1, Deep: -0.2, Void: -0.3 }
+  band_disposition_bias: { Hub: 0.0, Frontier: -0.1, Deep: -0.3, Void: -0.5 }
   disposition_gradient_tolerance: 0.1  # slack the §5 validator allows before the outward danger gradient is "broken"
   # Consequences of conduct (§6.5, WP27): killing a species' ships sours its attitude
   # (by the species' own attitude_loss_rate) and deepens a grudge against the player;
@@ -193,19 +193,19 @@ weapons:
 
 bigbang:
   sector_count: 1000          # total sectors (nodes) in the generated warp graph
-  topology_mode: expansive    # graph shape: trunk (chokepoints) | expansive (band-lattice) | planar (spiderweb) | mesh (grid), §5
+  topology_mode: mesh         # graph shape: trunk (chokepoints) | expansive (band-lattice) | planar (spiderweb) | mesh (grid), §5
 
   # === Shared across every topology mode ===
   # These knobs mean the same thing regardless of `topology_mode` above.
   cluster_min: 5              # smallest cluster of sectors the generator forms
-  cluster_max: 25            # largest such cluster (clusters are then bridged together, §5)
-  intra_group_degree: 2.5    # average warp connections per sector inside a cluster (density)
-  inter_group_degree: 2.5    # average inter-cluster warp connections per cluster (density)
+  cluster_max: 15            # largest such cluster (clusters are then bridged together, §5)
+  intra_group_degree: 3.5    # average warp connections per sector inside a cluster (density)
+  inter_group_degree: 3.5    # average inter-cluster warp connections per cluster (density)
   one_way_chance: 0.15       # probability a given bridge is one-way (a trap/wormhole seam)
   max_warps_per_sector: 6    # hard cap on a sector's outbound warps (keeps the UI grid readable)
-  core_sector_count: 10      # sectors reserved as the protected Core Space (sectors 1–10), §5
-  home_cluster_min: 3        # alliance home cluster size range (each < Core), §5 step 6
-  home_cluster_max: 6
+  core_sector_count: 25      # sectors reserved as the protected Core Space (sectors 1–10), §5
+  home_cluster_min: 10       # alliance home cluster size range (each < Core), §5 step 6
+  home_cluster_max: 20
   start_sector: stardock     # where the player starts: stardock | random | a specific sector number
   stardock_min_hops: 2       # StarDock is placed this many warp hops from the Core, at least…
   stardock_max_hops: 5       # …and at most this many (a short shakedown run from home)
