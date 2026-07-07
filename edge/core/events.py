@@ -434,6 +434,20 @@ class GrudgeFormed(Event):
 
 
 @dataclass(frozen=True)
+class GovernanceChanged(Event):
+    """Core Space changed hands to a new governing alliance (§6.3, §4.2, WP49).
+
+    `cause` records how ("player_champion" / "npc_seizure" / "dev"). Announced to the
+    ticker as the new law of the Core; per-player Core hostility is a projection, not
+    carried here (safety follows the governor positionally).
+    """
+
+    old_alliance_id: int | None
+    new_alliance_id: int | None
+    cause: str
+
+
+@dataclass(frozen=True)
 class CoreLawNotice(Event):
     """The governor's patrols flag a criminal player entering Core Space (WP27).
 

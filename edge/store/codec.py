@@ -36,6 +36,7 @@ from edge.core.events import (
     DiscoveryDetected,
     Docked,
     EncounterEnded,
+    GovernanceChanged,
     EncounterEvaded,
     EncounterStarted,
     Event,
@@ -552,6 +553,11 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "CoreLawNotice", {
                 "player_id": event.player_id, "sector_id": event.sector_id,
             }
+        case GovernanceChanged():
+            return "GovernanceChanged", {
+                "old_alliance_id": event.old_alliance_id,
+                "new_alliance_id": event.new_alliance_id, "cause": event.cause,
+            }
         case AdmissionAdvanced():
             return "AdmissionAdvanced", {
                 "player_id": event.player_id, "alliance_id": event.alliance_id, "task": event.task,
@@ -714,6 +720,9 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                                 payload["severity"], payload["permanent"])
         case "CoreLawNotice":
             return CoreLawNotice(payload["player_id"], payload["sector_id"])
+        case "GovernanceChanged":
+            return GovernanceChanged(payload["old_alliance_id"], payload["new_alliance_id"],
+                                     payload["cause"])
         case "AdmissionAdvanced":
             return AdmissionAdvanced(payload["player_id"], payload["alliance_id"], payload["task"])
         case "AllianceJoined":
