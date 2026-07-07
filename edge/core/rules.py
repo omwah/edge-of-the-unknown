@@ -44,6 +44,7 @@ from edge.core.aliens import (
     sour_attitude,
 )
 from edge.core.governance import flip_core_governor
+from edge.core.services import COMPONENTS, MUNITIONS, REPAIR, require_service
 from edge.core.combat import CombatError
 from edge.core.dev import DevPatch, apply_dev_patch
 
@@ -1190,6 +1191,10 @@ def _haggle(
 def _bank(
     state: UniverseState, player_id: int, amount: int, *, withdraw_: bool
 ) -> ReduceResult:
+    # Banking stays ungated at the reducer (WP53): the plan's "rejection conditions only
+    # widen" rule bars narrowing it, and it was never `_stardock`-gated. It is *surfaced*
+    # as a service at StarDock and player bases (`services.BANKING`) but the account is
+    # reachable anywhere, riding the same `Player.bank_balance` invariants.
     player = _player(state, player_id)
     new_player = withdraw(player, amount) if withdraw_ else deposit(player, amount)
     kind = "withdraw" if withdraw_ else "deposit"
@@ -1215,12 +1220,18 @@ def _buy_component(
 ) -> ReduceResult:
     player = _player(state, player_id)
     ship = _ship(state, player)
-    _stardock(state, ship)
-    price = config.economy.component_price(cmd.tier)
-    if price is None:
+    sp = require_service(state, player, ship, COMPONENTS, config)
+    base_price = config.economy.component_price(cmd.tier)
+    if base_price is None:
         raise EconomyError(f"tier {cmd.tier.name} components are barter-only, not for sale")
     if cmd.component.value not in config.hardware.components or cmd.tier.name not in config.hardware.tiers:
         raise EconomyError(f"this dock does not stock {cmd.component.value} (tier {cmd.tier.name})")
+    # A forward base stocks only the configured tiers (default I/II; §4.2, WP53) and
+    # charges the frontier markup; a StarDock stocks everything at fee_frac 1.0.
+    if sp.kind == "player_base" and config.starbase is not None:
+        if cmd.tier.name not in config.starbase.services.component_stock_tiers:
+            raise EconomyError(f"this base does not stock tier {cmd.tier.name} components")
+    price = round(base_price * sp.fee_frac)
     if player.latinum < price:
         raise EconomyError("insufficient latinum for the component")
     if ship.holds_free < 1:
@@ -1307,7 +1318,7 @@ def _repair_at_dock(
     """
     player = _player(state, player_id)
     ship = _engine_ship(state, player_id)
-    _stardock(state, ship)
+    sp = require_service(state, player, ship, REPAIR, config)
     sub = _subsystem(ship, cmd.subsystem)
     _check_slot(sub, cmd.slot_index)
     comp = sub.slots[cmd.slot_index]
@@ -1316,7 +1327,7 @@ def _repair_at_dock(
     if not comp.knocked_out:
         raise EngineRoomError("component is not knocked out")
     price = config.economy.component_price(comp.tier) or config.economy.tier_ii_component_latinum
-    cost = round(price * config.economy.repair_cost_frac)
+    cost = round(price * config.economy.repair_cost_frac * sp.fee_frac)
     if player.latinum < cost:
         raise EconomyError("insufficient latinum for the repair")
     new_ship = _with_slot(ship, cmd.subsystem, cmd.slot_index, replace(comp, knocked_out=False))
@@ -2070,13 +2081,13 @@ def _deploy_beacon(
 def _buy_missiles(
     state: UniverseState, player_id: int, cmd: BuyMissiles, config: GameConfig
 ) -> ReduceResult:
-    """Buy homing missiles at the StarDock hardware emporium (§8, §10, WP25)."""
+    """Buy homing missiles at a StarDock or a player base (§8, §10, WP25/WP53)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
-    _stardock(state, ship)
+    sp = require_service(state, player, ship, MUNITIONS, config)
     if cmd.count < 1:
         raise EconomyError("buy at least one missile")
-    cost = cmd.count * config.combat.missile_price
+    cost = round(cmd.count * config.combat.missile_price * sp.fee_frac)
     if player.latinum < cost:
         raise EconomyError(f"need {cost} latinum for {cmd.count} missiles")
     new_player = replace(player, latinum=player.latinum - cost)

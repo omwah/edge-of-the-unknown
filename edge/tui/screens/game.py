@@ -32,6 +32,7 @@ from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
+from edge.tui.screens.starbase_services import StarbaseServicesScreen
 from edge.tui.widgets import (
     ClickableEntry,
     NavRose,
@@ -105,6 +106,7 @@ class GameScreen(Screen):
 
     BINDINGS = [
         Binding("p", "dock_port", "Dock"),
+        Binding("b", "base_services", "Base"),
         Binding("w", "travel", "Travel"),
         Binding("h", "hail", "Hail"),
         Binding("s", "survey_planet", "Survey Planet"),
@@ -278,6 +280,13 @@ class GameScreen(Screen):
             else PortScreen(self._service, self._pid)
         )
         self.app.push_screen(screen)
+
+    def action_base_services(self) -> None:
+        """Open your forward base's services, if one operational and yours sits here (§4.2, WP53)."""
+        if self._service.starbase_services_view(self._pid) is None:
+            self.notify("No forward base of yours to visit here.", timeout=2)
+            return
+        self.app.push_screen(StarbaseServicesScreen(self._service, self._pid))
 
     # --- other screens (live: computer/map; sample: the Phase 2-3 ones) ------
 

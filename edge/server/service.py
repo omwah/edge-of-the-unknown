@@ -170,6 +170,10 @@ class GameService:
     def stardock_view(self, player_id: int) -> dto.StarDockDTO:
         return session.stardock_view(self._state, player_id, self._config)
 
+    def starbase_services_view(self, player_id: int) -> dto.StarbaseServicesDTO | None:
+        """Forward-base services for the player's current sector, or None (§4.2, WP53)."""
+        return session.starbase_services_view(self._state, player_id, self._config)
+
     def planet_view(self, player_id: int, planet_id: int) -> dto.PlanetDTO:
         return session.planet_view(self._state, player_id, planet_id, self._config)
 

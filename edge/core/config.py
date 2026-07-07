@@ -475,6 +475,28 @@ class PlanetsConfig(BaseModel):
     ownership: dict[str, OwnershipWeights] = Field(default_factory=dict)
 
 
+class BaseServicesConfig(BaseModel):
+    """Forward-base service set at a player-owned operational orbital base (§4.2, WP53).
+
+    A repaired, claimed base becomes a working home: the same StarDock commands
+    (repair / component purchase / munitions resupply / banking) resolve through one
+    service-point seam, differing only in availability and fee. Each service is a bool
+    toggle; `fee_frac` is the latinum markup over StarDock prices (frontier convenience
+    costs — default 1.25). `component_stock_tiers` caps which tiers a base sells
+    (default I/II; Tier III stays barter-only per §8). Banking rides the same
+    `Player.bank_balance` invariants as StarDock — location is the value, not yield.
+    """
+
+    model_config = _FROZEN
+
+    repair: bool = True
+    components: bool = True
+    munitions: bool = True
+    banking: bool = True
+    fee_frac: float = Field(default=1.25, ge=1.0)  # markup over StarDock (≥1: never cheaper)
+    component_stock_tiers: list[str] = Field(default_factory=lambda: ["I", "II"])
+
+
 class StarbaseConfig(BaseModel):
     """Orbital-starbase generation + layout (DESIGN §4.2, WP4).
 
@@ -501,6 +523,8 @@ class StarbaseConfig(BaseModel):
     raze_bounty: int = Field(default=750, ge=0)
     raze_experience: int = Field(default=25, ge=0)
     claim_cost: int = Field(default=2000, ge=0)
+    # Forward-base services offered once a base is player-owned and operational (§4.2, WP53).
+    services: BaseServicesConfig = BaseServicesConfig()
 
 
 class DiscoveryConfig(BaseModel):
