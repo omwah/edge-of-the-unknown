@@ -40,6 +40,7 @@ from edge.core.events import (
     HazardDamage,
     SiteExplored,
     Event,
+    GovernanceChanged,
     Haggled,
     LeadAccepted,
     MarketSettled,
@@ -207,6 +208,7 @@ EVENTS: list[Event] = [
     SalvageCollected(1, 17, ()),                        # WP26 latinum-only salvage
     GrudgeFormed(1, "vennrith", 0.6, True),             # WP27 a permanent vendetta
     CoreLawNotice(1, 3),                                # WP27 governor's warning
+    GovernanceChanged(1, 2, "dev"),                     # WP49 the Core changed hands
     AdmissionAdvanced(1, 3, "pay"),                     # WP38 admission task done
     AllianceJoined(1, 3, None),                         # WP38 joined a bloc (was unaligned)
     AllianceJoined(1, 3, 1),                            # WP38 switched blocs

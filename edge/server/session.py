@@ -63,6 +63,7 @@ from edge.core.events import (
     EncounterEvaded,
     EncounterStarted,
     GenesisDeployed,
+    GovernanceChanged,
     GrudgeFormed,
     HazardDamage,
     SiteExplored,
@@ -1435,6 +1436,8 @@ def format_event(event: Event) -> str:
         return f"[red]☠ The {event.species_kind} mark you — {tail}.[/]"
     if isinstance(event, CoreLawNotice):
         return "[yellow]⚖ Governor's patrol: your record is known here. Mind yourself.[/]"
+    if isinstance(event, GovernanceChanged):
+        return "[yellow]⚑ The Core changes hands — a new alliance governs the heart of the galaxy.[/]"
     if isinstance(event, AdmissionAdvanced):
         return f"[green]✔ Admission task complete: {event.task}.[/]"
     if isinstance(event, AllianceJoined):

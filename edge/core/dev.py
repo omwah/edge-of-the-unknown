@@ -191,6 +191,20 @@ def apply_dev_patch(
         new_planet = replace(planet, owner=Ownership("player", player_id))
         return done(f"claim planet {cmd.ref}", planets=(new_planet,))
 
+    # --- governance: flip the Core's governing alliance (WP49) --------------
+    if op == "flip_governor":
+        from edge.core.governance import flip_core_governor
+
+        new_gov = cmd.value if cmd.value else None  # value 0 ⇒ ungoverned Core
+        if new_gov is not None and new_gov not in state.alliances:
+            raise DevPatchError(f"no such alliance {new_gov}")
+        delta = flip_core_governor(state, config, new_gov, cause="dev")
+        return ReduceResult(
+            events=(DevApplied(player_id, f"[dev] flip Core governor → {new_gov}"), *delta.events),
+            game=delta.game, planets=delta.planets, starbases=delta.starbases,
+            species=delta.species,
+        )
+
     raise DevPatchError(f"unknown dev patch: op={op!r} target={target!r}")
 
 
