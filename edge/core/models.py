@@ -356,6 +356,40 @@ class Lead:
 
 
 @dataclass(frozen=True, slots=True)
+class Contract:
+    """A favor an alien issued the player through dialogue (DESIGN §6.7, §14 — WP57).
+
+    One of three `kind`s, each pointing its target through a shared, mostly-optional field
+    set (the LocationRef-shaped ref of the plan, flattened so the whole thing stays a plain
+    frozen value that rides `state_hash`):
+
+    - `deliver`  — carry `qty` of `commodity` to the port in sector `dest_sector`;
+    - `destroy`  — kill the species instance `target_species_id` (a grudge cashed, §6.5) or
+                   raze the starbase `target_starbase_id`;
+    - `escort`   — convoy the merchant instance `target_species_id` to `dest_sector`.
+
+    `reward_slips` (a latinum faucet) and `reward_attitude` (a standing lever toward the
+    issuer kind) are paid on completion; `status` walks offered → active → done/failed.
+    Appended by the accept reducer and mutated in place by the completion reducers, so it
+    reconstructs deterministically under `(seed, command log)`.
+    """
+
+    id: int
+    kind: str  # deliver / destroy / escort
+    issuer: str  # the issuing species kind (roster_id)
+    reward_slips: int
+    reward_attitude: float
+    accepted_day: int
+    deadline_day: int
+    status: str = "active"  # offered / active / done / failed
+    commodity: Commodity | None = None  # deliver: the good asked for
+    qty: int = 0  # deliver: units required
+    dest_sector: int | None = None  # deliver/escort: the destination sector
+    target_species_id: int | None = None  # destroy/escort: the species instance
+    target_starbase_id: int | None = None  # destroy: the base to raze
+
+
+@dataclass(frozen=True, slots=True)
 class EncounterFoe:
     """One hostile ship of an encounter pack (DESIGN §10, WP24).
 
@@ -518,6 +552,10 @@ class Player:
     # judgements read (WP27; the morality_judge hook and full Core enforcement, WP33/38).
     alignment: int = 0
     experience: int = 0
+    # Favors accepted from aliens (DESIGN §6.7, §14, WP57) — deliver/destroy/escort jobs,
+    # appended by the accept reducer and resolved by the completion reducers + the deadline
+    # cron. Hashed state (rides the M19 golden batch); reconstructs under (seed, command log).
+    contracts: tuple[Contract, ...] = ()
     # Standing with each alliance/bloc (alliance_id → [-1, 1]), set by JoinAlliance
     # (DESIGN §6.3, WP38): the joined bloc warms to +1, its rivals (and rivals of the
     # joined bloc) sour to -1. Negative standing with a species' bloc shifts the

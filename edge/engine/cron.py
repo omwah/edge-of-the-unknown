@@ -12,15 +12,15 @@ import random
 from collections.abc import Callable
 from dataclasses import replace
 
-from edge.core import npc
+from edge.core import contracts, npc
 from edge.core.aliens import attitude_locked, decay_grudges, effective_disposition, may_occupy
 from edge.core.discovery import entity_species
 from edge.core.config import GameConfig
 from edge.core.economy import accrue_interest as _accrue
 from edge.core.enums import PortClass
 from edge.core.events import (
-    AlienMoved, AttitudeChanged, Banked, CitadelCompleted, ColonyGrew, Event, MarketSettled,
-    PlanetProduced, PortOrderFilled, TurnsReset,
+    AlienMoved, AttitudeChanged, Banked, CitadelCompleted, ColonyGrew, ContractFailed, Event,
+    MarketSettled, PlanetProduced, PortOrderFilled, TurnsReset,
 )
 from edge.core.citadels import advance_build
 from edge.core.governance import apply_intrigue, flip_core_governor, npc_seizure_ready
@@ -182,9 +182,10 @@ def daily_turn_reset(state: UniverseState, config: GameConfig) -> ReduceResult:
     """Refill every player's turns and advance the game day (TWINSTR.DOC, §9).
 
     Also clears the per-day haggle-attempt counters (§8, WP13) so each port's patience
-    is fresh at dawn, and cools each player's finite grudges by the holder species'
-    `attitude_gain_rate` (§6.5, WP27 — permanent vendettas never decay); like turns,
-    all of it rides the daily cron through the replay timeline.
+    is fresh at dawn, cools each player's finite grudges by the holder species'
+    `attitude_gain_rate` (§6.5, WP27 — permanent vendettas never decay), and fails any
+    favor past its deadline (§6.7, WP57 — an escort thereby releases its merchant back to
+    the drift rails); like turns, all of it rides the daily cron through the replay timeline.
     """
     gain_rates = (
         {sp.id: sp.attitude_gain_rate for sp in config.roster.species}
@@ -202,16 +203,20 @@ def daily_turn_reset(state: UniverseState, config: GameConfig) -> ReduceResult:
             return max(0, config.turns_per_day - tax)
         return config.turns_per_day
 
-    players = tuple(
-        decay_grudges(
+    players: list[Player] = []
+    events: list[Event] = []
+    for p in state.players.values():
+        reset = decay_grudges(
             replace(p, turns_remaining=_reset_turns(p), haggle_attempts={}),
             gain_rates, config.aliens, day,
         )
-        for p in state.players.values()
-    )
-    events = tuple(TurnsReset(player_id=p.id, turns=p.turns_remaining) for p in players)
+        # Deadlines are checked against the *new* day (a job due on day D lapses on D+1).
+        reset, lapsed = contracts.expire_deadlines(reset, day)
+        players.append(reset)
+        events.append(TurnsReset(player_id=reset.id, turns=reset.turns_remaining))
+        events.extend(ContractFailed(reset.id, c.id, c.kind, "deadline") for c in lapsed)
     game = replace(state.game, day_number=day)
-    return ReduceResult(events=events, players=players, game=game)
+    return ReduceResult(events=tuple(events), players=tuple(players), game=game)
 
 
 def planet_growth(state: UniverseState, config: GameConfig) -> ReduceResult:
@@ -278,6 +283,8 @@ def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
     for sp in sorted(state.species.values(), key=lambda s: s.id):
         if sp.id in pinned:
             continue
+        if contracts.is_convoyed(state, sp.id):
+            continue  # under player escort — moves with the convoy, not the drift rail (WP57)
         if sp.sector_id in interdicted:
             continue  # pinned by an active interdictor
         is_entity = sp.id == entity_id
@@ -348,6 +355,8 @@ def trader_step(state: UniverseState, config: GameConfig) -> ReduceResult:
     for sp in sorted(state.species.values(), key=lambda s: s.id):
         if not npc.is_trader(config, sp) or state.port_in_sector(sp.sector_id) is None:
             continue  # only a merchant actually at a market trades this firing
+        if contracts.is_convoyed(state, sp.id):
+            continue  # under player escort — off the trade rail until delivered (WP57)
         seeded = replace(sp, cash=ac.trader_start_cash) if sp.cash == 0 and not sp.cargo else sp
         trade = npc.plan_trade(state, seeded, config)
         if trade is None:

@@ -103,6 +103,9 @@ class ComputerScreen(Screen):
                 yield Static("[b]COORDINATE LEADS[/]        [dim]tips logged from contacts[/]")
                 yield DataTable(id="leads-table", zebra_stripes=True, cursor_type="row")
                 yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
+            with TabPane("Contracts", id="contracts"):
+                yield Static("[b]FAVORS[/]        [dim]jobs accepted from aliens[/]")
+                yield DataTable(id="contracts-table", zebra_stripes=True, cursor_type="row")
             with TabPane("Dossier", id="dossier"):
                 yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
                 yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
@@ -152,6 +155,17 @@ class ComputerScreen(Screen):
             leads.add_row(
                 Text("No leads yet — ask a friendly species for coordinates.", style="dim"),
                 *(Text(""),) * 4)
+
+        jobs = self.query_one("#contracts-table", DataTable)
+        jobs.add_columns("#", "Kind", "From", "Task", "Reward", "Due")
+        if self._computer.contracts:
+            for c in self._computer.contracts:
+                jobs.add_row(str(c.contract_id), c.kind, c.issuer, c.summary,
+                             f"{c.reward:,}", f"day {c.deadline_day}")
+        else:
+            jobs.add_row(
+                Text("No favors accepted — ask a friendly species for work.", style="dim"),
+                *(Text(""),) * 5)
 
         ports = self.query_one("#ports-table", DataTable)
         ports.add_columns("Sector", "Port", "Class", "Buys", "Sells", "Dist")

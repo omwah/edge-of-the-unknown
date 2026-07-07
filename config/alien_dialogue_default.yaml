@@ -75,6 +75,7 @@
 # --- FACTS a `criteria` gate can name (assembled in edge/dialogue/facts.py) ------------------
 # Per-context facts (set only while the named context is shown/spoken):
 #   has_intel_target: true|false    # offer_coordinates — the speaker holds an unlogged tip.
+#   has_contract_offer: true|false  # contract_offer/contract_report (WP57) — a job is on offer.
 #   subject: <species_id>           # dossier_other + branch.dossier_other.* — the asked-about kind.
 # SESSION facts (the per-contact visit, DESIGN §6.7/WP28): a conversation opens a session on
 # `Player.contact_session` that accumulates what happened THIS VISIT and feeds every selection
@@ -134,8 +135,9 @@
 #   next_context: <context_key>     # OPTIONAL: transition to any known context, incl. a branch.*
 #                                   #   `back` steps to the previous node; `dossier_other` opens the
 #                                   #   ask-about-a-species picker; `offer_coordinates` asks for a tip.
-#   action:       leave | trade | barter | accept_lead | attack   # OPTIONAL mechanical verb
-#                                   #   (`leave` speaks the parting line then breaks contact;
+#   action:       leave | trade | barter | accept_lead | accept_contract | attack   # OPTIONAL
+#                                   #   mechanical verb (`leave` speaks the parting line then breaks
+#                                   #   contact; `accept_contract` books the offered favor, WP57;
 #                                   #   `attack` is recognised but Phase-3-gated). No action ⇒
 #                                   #   pure transition. No next_context + no action ⇒ stay/act.
 #                                   #   Availability is gated in code from species params + offers
@@ -151,6 +153,9 @@
 #   diplomacy: greeting  treaty_offer  treaty_grant  treaty_condition  treaty_refuse  farewell
 #   trade:     trade_open  trade_refuse
 #   discovery: offer_coordinates                 (the location-tip "map" mechanic)
+#   contracts: contract_offer  contract_report   (favors + escort jobs, WP57; gate the offer
+#              line on has_contract_offer, keep a catch-all sibling; accept via a choice with
+#              action: accept_contract)
 #   lore:      dossier_self  dossier_other
 #   encounter: refuel  extort_response  demand  reward
 #   combat (LIVE since WP31 — spoken only by the encounter reducers: combat_open/betrayal at
@@ -174,6 +179,8 @@
 # Per-context EXTRAS (in addition to the universal set):
 #   treaty_condition:   {subject} {count}
 #   offer_coordinates:  {target} {coords} {distance} {band} {reward}
+#   contract_offer:     {target} {reward} {deadline} {count}
+#   contract_report:    {target} {reward} {deadline} {count}
 #   dossier_other:      {subject}
 #   demand:             {subject} {count} {reward} {coords}
 #   reward:             {subject} {count} {reward}
@@ -226,8 +233,8 @@
 #  3. Every line entry has exactly one of non-empty `variants` / `grammar` (grammar ⇒ has
 #     `origin`), and every `{placeholder}` (in variants, grammar strings, and choice `text`) is
 #     allowed for that context.
-#  4. Every choice's `action` (if set) is one of leave/trade/barter/accept_lead/attack, and
-#     its `next_context` (if set) is a known context key.
+#  4. Every choice's `action` (if set) is one of leave/trade/barter/accept_lead/accept_contract/
+#     attack, and its `next_context` (if set) is a known context key.
 #  5. Every `branch.*` node is reachable (targeted by some choice `next_context`).
 #  6. Every species' `persona` names a real persona pack, and for every context the species can
 #     reach (its Phase-2 friendly path + all branch nodes reachable through choices) a non-empty
@@ -290,6 +297,8 @@ personas:
             action: trade
           - text: "I have an artifact to barter."
             action: barter
+          - text: "Have you work for me?"
+            next_context: contract_offer
           - text: "Let us speak of a treaty."
             next_context: treaty_offer
           - text: "Prepare to be boarded!"
@@ -322,6 +331,29 @@ personas:
         choices:
           - text: "Thanks for nothing..."
             next_context: back
+    contract_offer:
+      - when: { criteria: { has_contract_offer: true } }
+        variants:
+          - "There is a task, {player}: {target}. Do this within {deadline} days and the {species} will pay {reward}."
+          - "The {species} have work — {target}. See it done inside {deadline} days for {reward}."
+          - "If you would earn our favour, {player}: {target}. {reward} awaits, but tarry no more than {deadline} days."
+        choices:  # take the job (gated on an offer being live), or decline
+          - text: "You have my word — I'll do it."
+            action: accept_contract
+          - text: "Not this time."
+            next_context: back
+      - variants:  # catch-all — no work on offer just now
+          - "The {species} have no work for you at present, {player}."
+          - "There is nothing the {species} need of you today. Return later."
+          - We have no task for you now. The {species} will remember your willingness.
+        choices:
+          - text: "Understood."
+            next_context: back
+    contract_report:
+      - variants:
+          - "The {species} await word of {target}, {player}. {reward} is yours when it is done."
+          - "Your task stands, {player}: {target}. Do not forget the {species}."
+          - Still that matter remains, {player}. The {species} are patient — for now.
     treaty_offer:
       - variants:
           - "A lasting peace between us? The {species} will consider it."

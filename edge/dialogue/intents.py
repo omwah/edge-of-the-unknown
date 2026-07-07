@@ -34,7 +34,7 @@ SIG_PLACEHOLDERS = frozenset({"subject", "count", "reward", "coords", "item"})
 # The mechanical verbs an authored player `choice` may carry (DESIGN §6.7 branching). A
 # choice with no `action` is a pure conversation transition (it just moves to `next_context`).
 # `attack` is recognised but Phase-3-gated (rejected by the reducer in Phase 2).
-CHOICE_ACTIONS = frozenset({"leave", "trade", "barter", "accept_lead", "attack"})
+CHOICE_ACTIONS = frozenset({"leave", "trade", "barter", "accept_lead", "accept_contract", "attack"})
 
 # Reserved namespace for authored intermediate **branch nodes** — context keys that exist
 # only as conversation-graph targets (reached via a choice's `next_context`), distinct from
@@ -73,6 +73,11 @@ _INTENTS: tuple[Intent, ...] = (
     # --- discovery (the location-tip "map" mechanic, §6.7) -----------------------
     Intent("offer_coordinates", DISCOVERY,
            frozenset({"target", "coords", "distance", "band", "reward"})),
+    # --- contracts (favors + escort jobs issued through dialogue, §6.7 WP57) ------
+    Intent("contract_offer", DIPLOMACY,
+           frozenset({"target", "reward", "deadline", "count"})),
+    Intent("contract_report", DIPLOMACY,
+           frozenset({"target", "reward", "deadline", "count"})),
     # --- lore / dossiers ---------------------------------------------------------
     Intent("dossier_self", LORE),
     Intent("dossier_other", LORE, frozenset({"subject"})),

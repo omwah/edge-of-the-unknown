@@ -388,6 +388,19 @@ class SeizureStatusDTO:
 
 
 @dataclass(frozen=True)
+class ContractDTO:
+    """One active favor on the Computer's contracts panel (§6.7, §14 — WP57)."""
+
+    contract_id: int
+    kind: str  # deliver / destroy / escort
+    issuer: str  # issuing species kind (roster_id)
+    summary: str  # human target label ("25 fuel ore to sector 12", "escort Selvani to sector 7")
+    reward: int  # slips on completion
+    deadline_day: int
+    dest_display: int  # spatial id of the destination sector (0 when not location-bound)
+
+
+@dataclass(frozen=True)
 class ComputerDTO:
     pairs: list[TradePair]
     selected: str
@@ -396,6 +409,7 @@ class ComputerDTO:
     ports: list[PortDirEntry] = field(default_factory=list)
     planets: list[PlanetDirEntry] = field(default_factory=list)
     leads: list[LeadDTO] = field(default_factory=list)
+    contracts: list[ContractDTO] = field(default_factory=list)  # active favors (§6.7, WP57)
     seizure: SeizureStatusDTO | None = None  # WP50 Core-seizure checklist (if championing a bloc)
     # Standing intel on Core governance (§6.3, WP52): who governs the Core and which blocs
     # covet it. One line per fact, already voiced for display; empty when nothing is known.

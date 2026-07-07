@@ -36,7 +36,7 @@ def test_output_schema_wraps_a_closed_grammar_plus_optional_choices() -> None:
     choice = schema["properties"]["choices"]["items"]
     assert choice["required"] == ["text"]
     assert set(choice["properties"]["action"]["enum"]) == {
-        "leave", "trade", "barter", "accept_lead", "attack"}
+        "leave", "trade", "barter", "accept_lead", "accept_contract", "attack"}
 
 
 def test_build_prompt_lists_only_allowed_placeholders() -> None:

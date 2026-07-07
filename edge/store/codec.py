@@ -27,6 +27,9 @@ from edge.core.events import (
     Colonized,
     ColonistsRecruited,
     ColonyGrew,
+    ContractAccepted,
+    ContractCompleted,
+    ContractFailed,
     CombatRound,
     InterdictorToggled,
     InvasionRepulsed,
@@ -90,10 +93,12 @@ from edge.core.rules import (
     BuyShip,
     Cannibalize,
     ClaimStarbase,
+    AbandonContract,
     Colonize,
     CombatAction,
     Command,
     Converse,
+    DeliverContract,
     DeployBeacon,
     DeployFighters,
     DeployGenesis,
@@ -231,6 +236,10 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "BarterArtifact", {"species_id": command.species_id, "offer_index": command.offer_index}
         case AcceptLead():
             return "AcceptLead", {"species_id": command.species_id}
+        case DeliverContract():
+            return "DeliverContract", {"contract_id": command.contract_id}
+        case AbandonContract():
+            return "AbandonContract", {"contract_id": command.contract_id}
         case AdvanceAdmission():
             return "AdvanceAdmission", {"alliance_id": command.alliance_id, "task": command.task}
         case JoinAlliance():
@@ -378,6 +387,10 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return BarterArtifact(species_id=payload["species_id"], offer_index=payload["offer_index"])
         case "AcceptLead":
             return AcceptLead(species_id=payload["species_id"])
+        case "DeliverContract":
+            return DeliverContract(contract_id=payload["contract_id"])
+        case "AbandonContract":
+            return AbandonContract(contract_id=payload["contract_id"])
         case "AdvanceAdmission":
             return AdvanceAdmission(alliance_id=payload["alliance_id"], task=payload["task"])
         case "JoinAlliance":
@@ -568,6 +581,22 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "PlanetBanked", {
                 "player_id": event.player_id, "planet_id": event.planet_id,
                 "kind": event.kind, "amount": event.amount, "balance": event.balance,
+            }
+        case ContractAccepted():
+            return "ContractAccepted", {
+                "player_id": event.player_id, "contract_id": event.contract_id,
+                "kind": event.kind, "issuer": event.issuer, "reward": event.reward,
+                "deadline_day": event.deadline_day,
+            }
+        case ContractCompleted():
+            return "ContractCompleted", {
+                "player_id": event.player_id, "contract_id": event.contract_id,
+                "kind": event.kind, "reward": event.reward,
+            }
+        case ContractFailed():
+            return "ContractFailed", {
+                "player_id": event.player_id, "contract_id": event.contract_id,
+                "kind": event.kind, "reason": event.reason,
             }
         case TurnsReset():
             return "TurnsReset", {"player_id": event.player_id, "turns": event.turns}
@@ -797,6 +826,15 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "PlanetBanked":
             return PlanetBanked(payload["player_id"], payload["planet_id"], payload["kind"],
                                 payload["amount"], payload["balance"])
+        case "ContractAccepted":
+            return ContractAccepted(payload["player_id"], payload["contract_id"], payload["kind"],
+                                    payload["issuer"], payload["reward"], payload["deadline_day"])
+        case "ContractCompleted":
+            return ContractCompleted(payload["player_id"], payload["contract_id"],
+                                     payload["kind"], payload["reward"])
+        case "ContractFailed":
+            return ContractFailed(payload["player_id"], payload["contract_id"],
+                                  payload["kind"], payload["reason"])
         case "TurnsReset":
             return TurnsReset(payload["player_id"], payload["turns"])
         case "StockRegenerated":

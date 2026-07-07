@@ -658,6 +658,47 @@ class InvasionRepulsed(Event):
 
 
 @dataclass(frozen=True)
+class ContractAccepted(Event):
+    """The player accepted a favor from an alien (DESIGN §6.7, §14 — WP57).
+
+    `kind` is deliver / destroy / escort; `issuer` the species kind (roster_id); `reward`
+    the latinum on completion; `deadline_day` when it lapses. Logs the job so the
+    Computer's contracts panel and the message log reconstruct under replay.
+    """
+
+    player_id: int
+    contract_id: int
+    kind: str
+    issuer: str
+    reward: int
+    deadline_day: int
+
+
+@dataclass(frozen=True)
+class ContractCompleted(Event):
+    """A favor was fulfilled and paid (DESIGN §6.7, WP57): reward slips credited."""
+
+    player_id: int
+    contract_id: int
+    kind: str
+    reward: int
+
+
+@dataclass(frozen=True)
+class ContractFailed(Event):
+    """A favor lapsed or was abandoned (DESIGN §6.7, WP57).
+
+    `reason` is "deadline" (the daily cron) or "abandoned" (the player released it).
+    An escort that fails also releases its merchant back to the drift rails.
+    """
+
+    player_id: int
+    contract_id: int
+    kind: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class PlanetBanked(Event):
     """A treasury deposit/withdraw at an owned citadel world (§4.2, WP54).
 
