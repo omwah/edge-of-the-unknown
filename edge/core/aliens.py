@@ -403,6 +403,23 @@ def governor_hostile(state: UniverseState, player: Player) -> bool:
     return alliance_standing(player, gov) < 0.0
 
 
+def core_status(state: UniverseState, player: Player) -> str:
+    """The player's standing *in the Core* under the current governor (§6.3, WP52).
+
+    A positional label the game screen surfaces so a governance flip is legible:
+    ``"safe"`` when the player governs or belongs to the governing bloc (or the Core
+    is ungoverned); ``"hunted"`` when `governor_hostile` (a non-member at negative
+    standing — engaged on sight, denied the haven); ``"unwelcome"`` for the middle
+    case (a non-member at neutral/positive standing — tolerated but not home). Pure,
+    derived from the same live fields the reducers key off, so it can never disagree
+    with them.
+    """
+    gov = state.game.core_governing_alliance_id
+    if gov is None or player.alliance_id == gov:
+        return "safe"
+    return "hunted" if alliance_standing(player, gov) < 0.0 else "unwelcome"
+
+
 def base_owner_hostile(state: UniverseState, base: Starbase, player: Player) -> bool:
     """Whether an operational base's owner treats the player as an enemy (§4.2, WP40).
 

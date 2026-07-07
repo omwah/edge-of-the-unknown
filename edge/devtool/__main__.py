@@ -125,6 +125,24 @@ def cmd_show(session: Session, player_id: int) -> None:
         print(f"  dev commands in log: {n_dev}")
 
 
+def cmd_governance(session: Session) -> None:
+    """Report the Core governance picture (WP52): governor, coveters, incumbent grip."""
+    from edge.core.governance import _operational_core_bases, npc_seizure_ready
+
+    state = session.state
+    gov_id = state.game.core_governing_alliance_id
+    gov = state.alliances.get(gov_id) if gov_id is not None else None
+    print(f"Core governor: {gov.name if gov else '— (ungoverned)'} (id {gov_id})")
+    print(f"  incumbent operational Core bases: {_operational_core_bases(state, gov_id)}")
+    print("  covets_core blocs:")
+    coveters = [a for a in state.alliances.values() if a.covets_core and a.id != gov_id]
+    if not coveters:
+        print("    none")
+    for a in sorted(coveters, key=lambda a: a.id):
+        ready = npc_seizure_ready(state, session.config, a.id)
+        print(f"    #{a.id} {a.name} — seizure-ready: {ready}")
+
+
 def _mapping(m: Any) -> str:
     return ", ".join(f"{k}x{v}" for k, v in m.items())
 
@@ -195,6 +213,9 @@ def _build_patch(session: Session, args: argparse.Namespace) -> DevPatch | None:
         return DevPatch(op="teleport", target="sector", value=sid)
     if cmd == "claim":
         return DevPatch(op="claim", target="planet", ref=args.planet_id)
+    if cmd == "flip_governor":
+        # value 0 ⇒ ungoverned Core (mirrors dev.py's convention).
+        return DevPatch(op="flip_governor", target="game", value=args.alliance_id)
     return None
 
 
@@ -205,6 +226,8 @@ def dispatch(session: Session, args: argparse.Namespace) -> None:
         cmd_list(session)
     elif cmd == "show":
         cmd_show(session, getattr(args, "player", _PLAYER_ID))
+    elif cmd == "governance":
+        cmd_governance(session)
     else:
         patch = _build_patch(session, args)
         if patch is not None:
@@ -247,6 +270,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_claim = sub.add_parser("claim", help="claim a planet for the player")
     p_claim.add_argument("planet_id", type=int)
 
+    sub.add_parser("governance", help="report Core governor, coveters, incumbent grip")
+    p_flip = sub.add_parser("flip_governor", help="flip the Core governing alliance")
+    p_flip.add_argument("alliance_id", type=int, help="alliance id (0 ⇒ ungoverned Core)")
+
     return parser
 
 
@@ -257,6 +284,7 @@ _REPL_HELP = """commands:
   set <target> <value> | add <target> <value>
   grant component <name:tier> [--qty N] | grant artifact <tier> [--qty N] | grant device <id> [--qty N]
   cargo <commodity> <units> | teleport <sector> | claim <planet_id>
+  governance | flip_governor <alliance_id>
   dry-run [on|off]   toggle preview mode
   help | quit"""
 

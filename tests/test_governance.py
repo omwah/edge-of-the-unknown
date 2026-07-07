@@ -133,6 +133,40 @@ def _as_result(delta: object) -> object:
                         starbases=delta.starbases, species=delta.species)  # type: ignore[attr-defined]
 
 
+# --- WP52: aftermath surfacing (core_status + dock gating) --------------------
+
+
+def test_core_status_truth_table() -> None:
+    from edge.core.aliens import core_status
+
+    state = _world()  # governor is alliance 1
+    # A governing member is always safe at home.
+    member = replace(state.players[1], alliance_id=1)
+    assert core_status(state, member) == "safe"
+    # A non-member at neutral/positive standing is tolerated but not home.
+    neutral = replace(state.players[1], alliance_id=2, alliance_standing={1: 0.0})
+    assert core_status(state, neutral) == "unwelcome"
+    positive = replace(state.players[1], alliance_id=2, alliance_standing={1: 0.4})
+    assert core_status(state, positive) == "unwelcome"
+    # A non-member at negative standing is hunted.
+    hunted = replace(state.players[1], alliance_id=2, alliance_standing={1: -0.5})
+    assert core_status(state, hunted) == "hunted"
+    # An ungoverned Core is safe for everyone.
+    ungov = replace(state, game=replace(state.game, core_governing_alliance_id=None))
+    assert core_status(ungov, hunted) == "safe"
+
+
+def test_game_view_surfaces_governor_and_core_status() -> None:
+    from edge.core.models import Region
+
+    state = _world()
+    state.regions = {1: Region(1, "Hub")}
+    state.players[1] = replace(state.players[1], alliance_id=2, alliance_standing={1: -0.5})
+    view = session.game_view(state, 1, CFG)
+    assert view.governor == "Federation"
+    assert view.core_status == "hunted"
+
+
 # --- dev trigger + replay rail ------------------------------------------------
 
 
