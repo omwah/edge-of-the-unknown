@@ -75,6 +75,7 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
 
     stores = dict(planet.stores)
     colonists = planet.colonists
+    fighters = planet.fighters
 
     if profile.colonizable:
         effective = min(colonists, planet.habitability_cap)
@@ -83,6 +84,10 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
             alloc = planet.allocation.get(commodity, 0.0)
             mult = profile.yield_profile.get(commodity.value, 0.0)
             _add(stores, commodity, round(output * alloc * mult))
+        # Garrison production (§4.2, WP55): the fighter allocation share mints defenders
+        # instead of trade goods — the colony trades output for its own protection.
+        if planet.fighter_allocation > 0.0 and config.citadels is not None:
+            fighters += round(output * planet.fighter_allocation * config.citadels.fighter_yield)
         # Food: eat organics; grow when fed (capped), else starve.
         need = round(colonists * cfg.food_per_colonist)
         have = stores.get(Commodity.ORGANICS, 0)
@@ -98,6 +103,7 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
         _add(stores, Commodity.EQUIPMENT, cfg.asteroid_mining)
     # barren (and any other uncolonizable type) produces nothing.
 
-    if colonists == planet.colonists and stores == dict(planet.stores):
+    if (colonists == planet.colonists and fighters == planet.fighters
+            and stores == dict(planet.stores)):
         return planet  # nothing changed (e.g. an empty colony) — skip the rewrite
-    return replace(planet, stores=stores, colonists=colonists)
+    return replace(planet, stores=stores, colonists=colonists, fighters=fighters)

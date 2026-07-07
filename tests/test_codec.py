@@ -19,11 +19,14 @@ from edge.core.events import (
     Banked,
     CitadelBuildStarted,
     CitadelCompleted,
+    CitadelGunSilenced,
     Colonized,
     ColonistsRecruited,
     ColonyGrew,
     CombatRound,
+    InvasionRepulsed,
     PlanetBanked,
+    PlanetInvaded,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -105,6 +108,7 @@ from edge.core.rules import (
     SetAllocation,
     SwapComponent,
     BuildCitadel,
+    InvadePlanet,
     PlanetDeposit,
     PlanetWithdraw,
     Trade,
@@ -136,6 +140,8 @@ COMMANDS: list[Command] = [
     BuildCitadel(planet_id=5),                       # WP54 open a timed citadel build
     PlanetDeposit(planet_id=5, amount=1_000),        # WP54 treasury deposit
     PlanetWithdraw(planet_id=5, amount=500),         # WP54 treasury withdraw
+    SetAllocation(planet_id=5, allocation={"equipment": 0.6}, fighter=0.4),  # WP55 garrison share
+    InvadePlanet(planet_id=5, fighters=200),         # WP55 ground assault
     InstallComponent(Subsystem.SPINDRIVE, 3, Component.TURBINE, ComponentTier.II),
     SwapComponent(Subsystem.SCREENS, 1, Component.RADIATOR, ComponentTier.III),
     Cannibalize(Subsystem.MAIN_GUN, 2),
@@ -193,6 +199,9 @@ EVENTS: list[Event] = [
     CitadelBuildStarted(1, 5, 1),                      # WP54 citadel build opened
     CitadelCompleted(5, 1),                            # WP54 citadel level reached
     PlanetBanked(1, 5, "deposit", 1_000, 1_000),       # WP54 treasury move
+    CitadelGunSilenced(1, 5),                          # WP55 gun knocked out
+    PlanetInvaded(1, 5, 40, 500, 3_000),               # WP55 conquest
+    InvasionRepulsed(1, 5, 200),                       # WP55 failed assault
     ComponentInstalled(1, "spindrive", 3, "turbine", "II"),
     ComponentRemoved(1, "main_gun", 2, "linkage", "I"),
     Repaired(1, "thrusters", 0),

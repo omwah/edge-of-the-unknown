@@ -16,6 +16,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Static
 
 from edge.core.citadels import CitadelError
+from edge.core.combat import CombatError
 from edge.core.economy import EconomyError
 from edge.core.dto import PlanetDTO
 from edge.core.engine_room import EngineRoomError
@@ -23,7 +24,8 @@ from edge.core.enums import Subsystem
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import (
-    BuildCitadel, Cannibalize, Colonize, DeployGenesis, Descend, PlanetDeposit, PlanetWithdraw,
+    BuildCitadel, Cannibalize, Colonize, DeployGenesis, Descend, InvadePlanet,
+    PlanetDeposit, PlanetWithdraw,
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
@@ -52,6 +54,7 @@ class PlanetScreen(Screen):
         Binding("k", "build_citadel", "Build citadel"),
         Binding("plus", "treasury_deposit", "Deposit"),
         Binding("minus", "treasury_withdraw", "Withdraw"),
+        Binding("i", "invade", "Invade"),
     ]
 
     CSS = """
@@ -85,7 +88,14 @@ class PlanetScreen(Screen):
                 yield Static(f"Stores   {stores}", classes="section")
                 if p.owned_by_you:
                     alloc = "   ".join(f"{label} {pct}%" for label, pct in p.allocation)
+                    if p.fighter_allocation_pct:
+                        alloc += f"   Garrison {p.fighter_allocation_pct}%"
                     yield Static(f"Allocation   {alloc}", classes="section")
+                if p.can_invade:
+                    yield Static(f"[red]\\[I] Invade[/] — land {p.ship_fighters} fighters "
+                                 f"against the garrison ({p.fighters}).", classes="section")
+                elif p.invade_blocker:
+                    yield Static(f"[dim]Invasion barred: {p.invade_blocker}.[/]", classes="section")
                 if p.starbase:
                     colour = "yellow" if p.starbase_derelict else "green"
                     yield Static(f"[{colour}]#[/] Orbital starbase — {p.starbase}", classes="section")
@@ -178,6 +188,22 @@ class PlanetScreen(Screen):
         self.app.pop_screen()
         self.app.push_screen(PlanetScreen(
             self._service.planet_view(self._pid, self._planet.planet_id), self._service, self._pid))
+
+    def action_invade(self) -> None:
+        """Land all carried fighters in a ground assault on this world (§4.2, WP55)."""
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        if not p.can_invade:
+            self.notify(p.invade_blocker or "Nothing to invade here.", timeout=2)
+            return
+        try:
+            self._service.apply(self._pid, InvadePlanet(p.planet_id, p.ship_fighters))
+        except (EconomyError, CombatError, CitadelError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self._reopen()
 
     def action_colonize(self) -> None:
         if self._service is None:

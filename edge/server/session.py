@@ -54,12 +54,15 @@ from edge.core.events import (
     ComponentInstalled,
     CitadelBuildStarted,
     CitadelCompleted,
+    CitadelGunSilenced,
     ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
     CoreLawNotice,
     Descended,
+    InvasionRepulsed,
     PlanetBanked,
+    PlanetInvaded,
     DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
@@ -519,6 +522,22 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
             nxt = config.citadels.levels[planet.citadel_level]  # next level's config
             can_build = True
             next_cost = (nxt.cost_equipment, nxt.cost_latinum)
+    # Invasion affordance (§4.2, WP55): a hostile owned world outside the Core, with its
+    # base razed, gun silenced, and no siege shield — the ladder the reducer enforces.
+    can_invade = False
+    invade_blocker = ""
+    if (config.citadels is not None and planet.owner.is_owned and not owned_by_you
+            and not state.sectors[planet.sector_id].is_galactic_core):
+        if any(b.sector_id == planet.sector_id and is_operational(b) for b in state.starbases.values()):
+            invade_blocker = "raze the orbital base first"
+        elif citadels.has_gun(planet, config):
+            invade_blocker = "silence the citadel gun first"
+        elif citadels.siege_shielded(planet, config, base_operational=False):
+            invade_blocker = "the siege shield holds"
+        elif ship.fighters < 1:
+            invade_blocker = "no fighters aboard to commit"
+        else:
+            can_invade = True
     return dto.PlanetDTO(
         planet_id=planet.id, name=planet.name, ptype=planet.planet_type,
         owner=_owner_label(state, planet, player_id), colonizable=colonizable,
@@ -532,6 +551,8 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         citadel_level=planet.citadel_level, treasury=planet.treasury, fighters=planet.fighters,
         citadel_build_target=citadel_target, citadel_build_pct=citadel_pct,
         can_build_citadel=can_build, citadel_next_cost=next_cost,
+        fighter_allocation_pct=round(planet.fighter_allocation * 100),
+        can_invade=can_invade, invade_blocker=invade_blocker, ship_fighters=ship.fighters,
     )
 
 
@@ -1575,6 +1596,13 @@ def format_event(event: Event) -> str:
     if isinstance(event, PlanetBanked):
         verb = "deposited to" if event.kind == "deposit" else "withdrawn from"
         return f"[dim]⛁ {event.amount:,} slips {verb} the citadel treasury (now {event.balance:,}).[/]"
+    if isinstance(event, CitadelGunSilenced):
+        return "[yellow]⚔ The citadel gun falls silent — the ground lies open.[/]"
+    if isinstance(event, PlanetInvaded):
+        return (f"[green]⚑ The world is taken — {event.colonists:,} colonists spared, "
+                f"{event.loot:,} slips seized (lost {event.fighters_lost} fighters).[/]")
+    if isinstance(event, InvasionRepulsed):
+        return f"[red]✖ The ground assault is thrown back — {event.fighters_lost} fighters lost.[/]"
     if isinstance(event, TerritoryDeployed):
         if event.kind == "beacon":
             return "[cyan]⚑ Beacon planted.[/]"

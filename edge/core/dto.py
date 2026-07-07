@@ -627,6 +627,10 @@ class PlanetDTO:
     citadel_build_pct: int = 0  # percent complete of the open build
     can_build_citadel: bool = False  # owner + next level exists (the affordance shows)
     citadel_next_cost: tuple[int, int] | None = None  # (equipment, latinum) for the next level
+    fighter_allocation_pct: int = 0  # garrison production share, percent (WP55)
+    can_invade: bool = False  # a hostile owned world with defences down + fighters aboard (WP55)
+    invade_blocker: str = ""  # why invasion is barred (base up / gun up / shield / no fighters)
+    ship_fighters: int = 0  # fighters aboard, for the invade affordance
 
 
 @dataclass(frozen=True)

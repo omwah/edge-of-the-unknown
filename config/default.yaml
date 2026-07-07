@@ -421,6 +421,11 @@ citadels:
   gun_shields: 200
   gun_damage: 40
   gun_defense: 30
+  invasion_round_lo: 0.10        # per-round min fraction of the enemy's strength lost (BNT shape)
+  invasion_round_hi: 0.35        # per-round max fraction
+  civilian_survival_frac: 0.5    # fraction of colonists that survive a conquest
+  invasion_alignment_penalty: 20 # alignment hit for a failed ground assault
+  fighter_yield: 0.5             # garrison fighters minted per unit of the fighter allocation share
   levels:
     - { cost_equipment: 200, cost_latinum: 5000,  min_colonists: 100, build_colonist_days: 5000,  garrison_mult: 1.5 }  # L1
     - { cost_equipment: 400, cost_latinum: 12000, min_colonists: 300, build_colonist_days: 15000, garrison_mult: 2.0 }  # L2
