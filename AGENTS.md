@@ -224,9 +224,12 @@ What each is for:
    (`dialogue_pack`, `Player.dialogue_recency`), §10/§11 (encounter & contact screens),
    §13 (dialogue-integrity validation), and Appendix B.
 
-**Phases 1, 1.5, and 2 (incl. the route follow-up WP14–WP18) are implemented and
-shipped.** Phase 3 is planned (`docs/PHASE3_PLAN.md`, WP19–WP44 / M10–M15, with
-the DESIGN.md spec deltas landed) and starts at WP20.
+**Phases 1, 1.5, 2 (incl. the route follow-up WP14–WP18), and 3
+(`docs/PHASE3_PLAN.md`, WP19–WP44 / M10–M15) are implemented and shipped.**
+Phases 5 and 4 are planned together in `docs/PHASE5_4_PLAN.md` (WP45–WP69 /
+M16–M21) with **Phase 5 executed before Phase 4** (the plan's Context records
+why; interview decisions of July 2026 are resolved inline). WP45 was the
+spec-delta commit landing that plan; implementation starts at WP46.
 
 ## Architecture rules (non-negotiable)
 
@@ -269,7 +272,7 @@ the DESIGN.md spec deltas landed) and starts at WP20.
   shaped by `planet_type`/habitability, player colonization of unowned worlds,
   derelict orbital starbases as scavengeable component caches** (DESIGN.md §4.2),
   Genesis torpedoes, Computer screen (pair-trade finder, route planner).
-- **Phase 3 (current; see `docs/PHASE3_PLAN.md`, WP19–WP44 / M10–M15):**
+- **Phase 3 (shipped; see `docs/PHASE3_PLAN.md`, WP19–WP44 / M10–M15):**
   **big bang topology modes** (config-selectable `trunk` / `expansive` band-lattice
   bridge pass, per-mode band retune — DESIGN.md §5), **alliance home clusters +
   neutral lanes generated for real** (§5 step 6), low-disposition (hostile-band)
@@ -291,10 +294,16 @@ the DESIGN.md spec deltas landed) and starts at WP20.
   governing alliance (static Federation governor this phase; Core safety driven by
   the player's standing with the governor), goal-directed NPC movement,
   friendly-disposition NPC traders, hostile homeworld raids with bounties.
-- **Phase 4:** multiplayer (JSON-RPC over websockets), corporations.
-- **Phase 5:** order-book economy, citadels, dynamic governance of Core
-  Space (a `covets_core` bloc seizing control, flipping the governing alliance),
-  probes, richer alien interactions, sysop console, scripting hooks.
+- **Phase 5 (next — executed *before* Phase 4; `docs/PHASE5_4_PLAN.md`
+  WP45–WP60 / M16–M19):** order-book economy with hard port purses, dynamic
+  governance of Core Space (a `covets_core` bloc seizing control, flipping the
+  governing alliance), forward-base services at player-owned orbital starbases,
+  citadels + planetary combat, Armid/limpet mine split, probes/interdictor,
+  favor/escort contracts, tavern/noticeboard, sysop console, scripting hooks.
+- **Phase 4 (executed after Phase 5; `docs/PHASE5_4_PLAN.md` WP61–WP69 /
+  M20–M21):** multiplayer — the wire (JSON-RPC over websockets, a versioned
+  dataclass-DTO codec), lobby/auth, broadcast pipeline, corporations + corp
+  war, full attacker-driven PvP, hosted client via `textual serve`.
 
 ## Conventions
 
