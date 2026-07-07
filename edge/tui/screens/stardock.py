@@ -17,7 +17,9 @@ from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier
-from edge.core.rules import BuyComponent, BuyGenesis, BuyMissiles, BuyShip, RecruitColonists
+from edge.core.rules import (
+    BuyComponent, BuyDevice, BuyGenesis, BuyMissiles, BuyShip, RecruitColonists,
+)
 from edge.server.service import GameService
 from edge.tui import art_adapter
 from edge.tui.screens.engine_room import EngineRoomScreen
@@ -50,7 +52,8 @@ class StarDockScreen(Screen):
     """
 
     # Buy tabs whose table cursor we preserve across a screen rebuild.
-    _BUY_TABLES = {"hardware": "#hardware-table", "shipyard": "#shipyard-table"}
+    _BUY_TABLES = {"hardware": "#hardware-table", "shipyard": "#shipyard-table",
+                   "devices": "#devices-table"}
 
     def __init__(self, service: GameService, player_id: int, initial_tab: str = "trade",
                  initial_cursor: int = 0) -> None:
@@ -96,6 +99,12 @@ class StarDockScreen(Screen):
                 yield self._hardware_table(dock)
                 yield Static("[dim]B buys the highlighted part; slot it in the Engine Room (E). "
                              "Tier III is barter-only.[/]", classes="note")
+            with TabPane("Devices", id="devices"):
+                yield Static(f"[b]DEVICE BAY[/]        Latinum [b yellow]{latinum:,}[/] slips")
+                yield self._devices_table(dock)
+                yield Static("[dim]B buys the highlighted device (probe / interdictor / "
+                             "mine-deflector). Launch probes & toggle the interdictor in flight.[/]",
+                             classes="note")
             with TabPane("Bank", id="bank"):
                 yield Static("[dim]Deposit / withdraw / interest — Phase 2.[/]")
             with TabPane("Tavern", id="tavern"):
@@ -122,6 +131,14 @@ class StarDockScreen(Screen):
                           key=f"{item.component}:{item.tier}")
         return table
 
+    def _devices_table(self, dock: object) -> DataTable:
+        table: DataTable = DataTable(id="devices-table", cursor_type="row")
+        table.add_columns("Device", "Price", "")
+        for device_id, price, affordable in dock.devices:  # type: ignore[attr-defined]
+            mark = "" if affordable else "[red]✗[/]"
+            table.add_row(device_id, f"{price:,}", mark, key=device_id)
+        return table
+
     def _shipyard_table(self, dock: object) -> DataTable:
         table: DataTable = DataTable(id="shipyard-table", cursor_type="row")
         table.add_columns("Hull", "Role", "Holds", "Shld", "Wrp", "Cbt", "Net", "")
@@ -146,8 +163,10 @@ class StarDockScreen(Screen):
             self._buy_component()
         elif active == "shipyard":
             self._buy_ship()
+        elif active == "devices":
+            self._buy_device()
         else:
-            self.notify("Switch to the Hardware or Shipyard tab to buy.", timeout=2)
+            self.notify("Switch to the Hardware, Shipyard, or Devices tab to buy.", timeout=2)
 
     def _buy_component(self) -> None:
         table = self.query_one("#hardware-table", DataTable)
@@ -168,6 +187,13 @@ class StarDockScreen(Screen):
     def action_buy_missiles(self) -> None:
         """Buy a homing missile at the hardware emporium (§10, WP25)."""
         self._issue(BuyMissiles(count=1), "Bought a homing missile")
+
+    def _buy_device(self) -> None:
+        table = self.query_one("#devices-table", DataTable)
+        row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+        if row_key.value is None:
+            return
+        self._issue(BuyDevice(row_key.value), f"Bought {row_key.value}")
 
     def _buy_ship(self) -> None:
         table = self.query_one("#shipyard-table", DataTable)

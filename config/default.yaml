@@ -5,7 +5,7 @@
 # game constant lives here, not in code (CLAUDE.md). Omitted fields fall back to
 # the schema defaults; the values below are spelled out so the balance is legible.
 
-config_version: 4  # Phase-5 schema epoch (order-book market, hard port purses — WP47)
+config_version: 5  # Phase-5 M18 epoch (citadels/treasury/gun, garrison, mine split, devices — WP56)
 seed: 4             # universe seed for a new game; leave empty (seed:) for a random seed
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 
@@ -430,6 +430,15 @@ citadels:
     - { cost_equipment: 200, cost_latinum: 5000,  min_colonists: 100, build_colonist_days: 5000,  garrison_mult: 1.5 }  # L1
     - { cost_equipment: 400, cost_latinum: 12000, min_colonists: 300, build_colonist_days: 15000, garrison_mult: 2.0 }  # L2
     - { cost_equipment: 800, cost_latinum: 30000, min_colonists: 600, build_colonist_days: 40000, garrison_mult: 3.0 }  # L3
+
+# Special devices (§10, §14, WP56): bought at the StarDock into the ship's device bay.
+# A probe is consumable (flies up to probe_range hops charting its path); the interdictor
+# is a toggled stance (turn_tax per day while engaged); the mine-deflector is passive
+# (absorbs armid mines one-for-one on entry).
+devices:
+  probe:          { price: 500,   probe_range: 8, loss_chance: 0.25 }
+  interdictor:    { price: 20000, turn_tax: 5 }
+  mine_deflector: { price: 3000 }
 
 # The starter hull — a Trailblazer-class explorer (§4). Its engine room is built
 # "complete but minimal": every base slot filled at Tier I, every upgrade slot

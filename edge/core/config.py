@@ -433,6 +433,21 @@ class HardwareConfig(BaseModel):
     tiers: list[str]
 
 
+class DeviceConfig(BaseModel):
+    """One buyable special device (§10, §14, WP56): probe / interdictor / mine-deflector.
+
+    Bought at a StarDock into `Ship.devices` (not cargo). `probe_range` is a probe's max
+    hop reach; `turn_tax` is the interdictor's per-day upkeep. Unused fields stay 0.
+    """
+
+    model_config = _FROZEN
+
+    price: int = Field(ge=0)
+    probe_range: int = Field(default=0, ge=0)   # max hops a launched probe flies
+    turn_tax: int = Field(default=0, ge=0)      # per-day turn cost while a stance is active
+    loss_chance: float = Field(default=0.0, ge=0.0, le=1.0)  # per-hop probe loss in a hostile sector
+
+
 class PlanetTypeProfile(BaseModel):
     """Per-`planet_type` production shaping (DESIGN §4.2 table).
 
@@ -819,6 +834,12 @@ class TerritoryConfig(BaseModel):
     fighter_damage_each: int = Field(default=2, ge=0)
     retreat_fighter_cost: int = Field(default=1, ge=0)  # retreat costs the garrison a fighter
     black_hole_damage: int = Field(default=30, ge=0)
+    # Armid/limpet split (§10, WP56). Armid mines damage on entry (above); a carried
+    # `mine_deflector` device absorbs armid hits one-for-one. Limpet mines attach to the
+    # entrant, tagging it for the owner's hunters; removed for `limpet_removal_fee` at any
+    # service point (§4.2/WP53).
+    mine_deflector_device: str = "mine_deflector"
+    limpet_removal_fee: int = Field(default=500, ge=0)
 
 
 class EncountersConfig(BaseModel):
@@ -1442,6 +1463,7 @@ class GameConfig(BaseModel):
     discovery: DiscoveryConfig | None = None  # WP5 discoveries (None ⇒ none salted)
     genesis: GenesisConfig | None = None  # WP10 genesis torpedoes (None ⇒ not sold)
     citadels: CitadelConfig | None = None  # WP54 citadels (None ⇒ not buildable)
+    devices: dict[str, DeviceConfig] = Field(default_factory=dict)  # WP56 probes/interdictor/deflector
     roster: RosterConfig | None = None  # WP7 species roster (None ⇒ no aliens placed)
     names: NamesConfig | None = None  # Configurable name pools
     starter_ship: ShipClassConfig

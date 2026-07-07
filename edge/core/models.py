@@ -252,6 +252,11 @@ class Ship:
     # Counted special devices keyed by device id (e.g. "genesis_torpedo"); bought at
     # StarDock, deployed by their own command (§4, WP10). Not cargo — no hold cost.
     devices: Mapping[str, int] = field(default_factory=dict)
+    # Attached limpet mines (§10, WP56): owner tag ("alliance:2" / "player:3") → count.
+    # A limpeted ship is trackable by that owner's hunters; removed for a fee at a service
+    # point. Batched into config_version 5 at WP56.
+    limpets: Mapping[str, int] = field(default_factory=dict)
+    interdictor_active: bool = False  # the interdictor device is engaged (pins the sector, WP56)
 
     @property
     def holds_used(self) -> int:
@@ -558,7 +563,11 @@ class SectorForce:
     fighters: int = 0
     mode: str = "defensive"  # offensive / defensive / toll
     toll: int = 0
-    mines: int = 0
+    # Mines split into two kinds (§10, WP56): armid mines damage a hostile entrant on arrival
+    # (deflector/shields mitigate); limpet mines *attach* to it, tagging it for the owner's
+    # hunters. Batched into config_version 5 at WP56.
+    armid_mines: int = 0
+    limpet_mines: int = 0
 
 
 @dataclass(frozen=True, slots=True)

@@ -60,9 +60,12 @@ from edge.core.events import (
     ComponentRemoved,
     CoreLawNotice,
     Descended,
+    InterdictorToggled,
     InvasionRepulsed,
+    LimpetsRemoved,
     PlanetBanked,
     PlanetInvaded,
+    ProbeReport,
     DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
@@ -663,9 +666,13 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
             combat=a.combat_speed, affordable=player.latinum >= net, owned=klass.id == ship.type_id,
         ))
 
+    devices = [
+        (device_id, spec.price, player.latinum >= spec.price)
+        for device_id, spec in sorted(config.devices.items())
+    ]
     return dto.StarDockDTO(
         sector_display=_display(state, ship.sector_id),
-        latinum=player.latinum, hardware=hardware, shipyard=shipyard,
+        latinum=player.latinum, hardware=hardware, shipyard=shipyard, devices=devices,
     )
 
 
@@ -1603,6 +1610,16 @@ def format_event(event: Event) -> str:
                 f"{event.loot:,} slips seized (lost {event.fighters_lost} fighters).[/]")
     if isinstance(event, InvasionRepulsed):
         return f"[red]✖ The ground assault is thrown back — {event.fighters_lost} fighters lost.[/]"
+    if isinstance(event, ProbeReport):
+        if event.destroyed:
+            return f"[yellow]◈ Probe lost — charted {event.sectors_charted} new sectors before it fell.[/]"
+        return (f"[cyan]◈ Probe report: {event.sectors_charted} new sectors, "
+                f"{event.ports} ports, {event.planets} planets, {event.contacts} contacts.[/]")
+    if isinstance(event, InterdictorToggled):
+        return ("[cyan]◈ Interdictor engaged — the sector is pinned.[/]" if event.active
+                else "[dim]◈ Interdictor disengaged.[/]")
+    if isinstance(event, LimpetsRemoved):
+        return f"[green]◈ {event.count} limpet(s) stripped from the hull ({event.fee} slips).[/]"
     if isinstance(event, TerritoryDeployed):
         if event.kind == "beacon":
             return "[cyan]⚑ Beacon planted.[/]"

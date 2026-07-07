@@ -24,9 +24,12 @@ from edge.core.events import (
     ColonistsRecruited,
     ColonyGrew,
     CombatRound,
+    InterdictorToggled,
     InvasionRepulsed,
+    LimpetsRemoved,
     PlanetBanked,
     PlanetInvaded,
+    ProbeReport,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -108,9 +111,13 @@ from edge.core.rules import (
     SetAllocation,
     SwapComponent,
     BuildCitadel,
+    BuyDevice,
     InvadePlanet,
+    LaunchProbe,
     PlanetDeposit,
     PlanetWithdraw,
+    RemoveLimpets,
+    ToggleInterdictor,
     Trade,
     TravelTo,
     Warp,
@@ -169,8 +176,13 @@ COMMANDS: list[Command] = [
     BuyFighters(count=20),                       # WP41 buy fighter stock
     BuyMines(count=5),                           # WP41 buy mine stock
     DeployFighters(count=10, mode="toll", toll=50),  # WP41 garrison a sector
-    DeployMines(count=3),                        # WP41 seed mines
+    DeployMines(count=3),                        # WP41 seed mines (armid default)
+    DeployMines(count=2, kind="limpet"),         # WP56 limpet mines
     DeployBeacon(text="Kilroy was here"),        # WP41 plant a beacon
+    BuyDevice(device_id="probe"),                # WP56 buy a device
+    LaunchProbe(dest_sector=42),                 # WP56 launch a probe
+    ToggleInterdictor(),                         # WP56 toggle the interdictor
+    RemoveLimpets(),                             # WP56 strip limpets
     CombatAction(action="fight"),                # WP25 one combat round
     CombatAction(action="flee"),
     CombatAction(action="field_patch", subsystem=Subsystem.SCREENS, slot_index=1),
@@ -202,6 +214,9 @@ EVENTS: list[Event] = [
     CitadelGunSilenced(1, 5),                          # WP55 gun knocked out
     PlanetInvaded(1, 5, 40, 500, 3_000),               # WP55 conquest
     InvasionRepulsed(1, 5, 200),                       # WP55 failed assault
+    ProbeReport(1, 42, 6, 2, 3, 1, False),             # WP56 probe recon
+    InterdictorToggled(1, True),                       # WP56 interdictor engaged
+    LimpetsRemoved(1, 4, 500),                         # WP56 limpets stripped
     ComponentInstalled(1, "spindrive", 3, "turbine", "II"),
     ComponentRemoved(1, "main_gun", 2, "linkage", "I"),
     Repaired(1, "thrusters", 0),

@@ -20,7 +20,7 @@ from __future__ import annotations
 from edge.core.aliens import alliance_standing, governor_hostile
 from edge.core.config import GameConfig
 from edge.core.enums import DiscoveryKind
-from edge.core.models import EncounterFoe, Player, SectorForce, UniverseState
+from edge.core.models import AlienSpecies, EncounterFoe, Ownership, Player, SectorForce, UniverseState
 
 FIGHTER_MODES = ("offensive", "defensive", "toll")
 
@@ -43,6 +43,24 @@ def force_hostile_to_player(state: UniverseState, force: SectorForce, player: Pl
             return governor_hostile(state, player)
         return alliance_standing(player, owner.ref) < 0.0
     return False
+
+
+def owner_tag(owner: Ownership) -> str:
+    """A string tag for a force/holding owner — the limpet key (§10, WP56).
+
+    ``"alliance:2"`` / ``"player:3"`` / ``"none"``. Used to tag a limpet on an entrant so
+    the deploying owner's hunters can read the limpeted ship's exact position.
+    """
+    return f"{owner.kind}:{owner.ref}" if owner.ref is not None else owner.kind
+
+
+def limpet_tags_for_species(sp: AlienSpecies) -> str:
+    """The limpet owner tag whose limpets *this species* can track (§10, WP56).
+
+    A species hunts on behalf of its alliance, so it reads limpets tagged to that bloc.
+    An unaligned species tracks nothing (returns a tag that never matches a real owner).
+    """
+    return f"alliance:{sp.alliance_id}" if sp.alliance_id is not None else "alliance:None"
 
 
 def fighter_foe(force: SectorForce, config: GameConfig) -> EncounterFoe:
