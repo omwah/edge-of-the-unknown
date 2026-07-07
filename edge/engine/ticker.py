@@ -49,6 +49,7 @@ class EngineTicker:
         port_eco = ticks_per_hour if ticks_per_hour is not None else tc.crons.port_economy
         planet_gr = ticks_per_hour if ticks_per_hour is not None else tc.crons.planet_growth
         settlement = ticks_per_day if ticks_per_day is not None else tc.crons.market_settlement
+        governance = ticks_per_day if ticks_per_day is not None else tc.crons.governance_tick
         drift = tc.crons.alien_drift
         trader = tc.crons.trader_step
         interest = ticks_per_day if ticks_per_day is not None else tc.crons.interest_accrual
@@ -57,6 +58,7 @@ class EngineTicker:
             CronTask("hourly_port_economy", port_eco, CRONS["hourly_port_economy"], port_eco),
             CronTask("hourly_planet_growth", planet_gr, CRONS["hourly_planet_growth"], planet_gr),
             CronTask("market_settlement", settlement, CRONS["market_settlement"], settlement),
+            CronTask("governance_tick", governance, CRONS["governance_tick"], governance),
             CronTask("alien_drift", drift, CRONS["alien_drift"], drift),
             CronTask("trader_step", trader, CRONS["trader_step"], trader),
             CronTask("interest_accrual", interest, CRONS["interest_accrual"], interest),

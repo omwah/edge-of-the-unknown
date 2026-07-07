@@ -19,18 +19,21 @@ standings — §6.3's safety rule is positional and the standing math re-evaluat
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 
-from edge.core.config import GameConfig
-from edge.core.events import Event, GovernanceChanged
+from edge.core.config import AllianceConfig, GameConfig
+from edge.core.events import AllianceLeadershipChanged, Event, GovernanceChanged
 from edge.core.models import (
     AlienSpecies,
+    Alliance,
     Game,
     Ownership,
     Planet,
     Starbase,
     UniverseState,
 )
+from edge.core.starbases import is_operational
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,3 +144,104 @@ def flip_core_governor(
         game=game, planets=tuple(planets), starbases=tuple(starbases),
         species=tuple(moved), events=events,
     )
+
+
+# --- NPC governance readiness (§6.3, WP51) ----------------------------------
+
+
+def _operational_core_bases(state: UniverseState, alliance_id: int | None) -> int:
+    """Operational Core-sector starbases owned by `alliance_id` (the incumbent's grip)."""
+    return sum(
+        1 for base in state.starbases.values()
+        if state.sectors[base.sector_id].is_galactic_core
+        and base.owner.kind == "alliance" and base.owner.ref == alliance_id
+        and is_operational(base)
+    )
+
+
+def _home_cluster_bases_intact(state: UniverseState, alliance_id: int) -> bool:
+    """Whether the bloc's own home-cluster bases are all operational (its strength, §6.3).
+
+    Vacuously true if the bloc holds no bases in its cluster (nothing to be broken). A
+    razed home base means the coveter has itself been destabilized — it cannot seize.
+    """
+    cluster = set(state.home_clusters.get(alliance_id, ()))
+    if not cluster:
+        return True
+    for base in state.starbases.values():
+        if (base.sector_id in cluster and base.owner.kind == "alliance"
+                and base.owner.ref == alliance_id and not is_operational(base)):
+            return False
+    return True
+
+
+def npc_seizure_ready(state: UniverseState, config: GameConfig, alliance_id: int) -> bool:
+    """Whether a bloc is positioned to seize the Core by NPC event (§6.3, WP51 — pure).
+
+    Ready when the bloc covets the Core (its *live* `Alliance.covets_core`, so an
+    intrigue-turned-outward bloc qualifies), is not already the governor, holds its own
+    home-cluster bases intact, and the incumbent's operational Core-planet bases have
+    fallen below `governance.min_incumbent_bases` — the destabilization that keeps a flip
+    from coming out of nowhere. The roll itself is the cron's; this is only the gate.
+    """
+    gov = state.game.core_governing_alliance_id
+    if alliance_id == gov:
+        return False
+    alliance = state.alliances.get(alliance_id)
+    if alliance is None or not alliance.covets_core:
+        return False
+    gc = config.aliens.governance
+    if _operational_core_bases(state, gov) >= gc.min_incumbent_bases:
+        return False
+    return _home_cluster_bases_intact(state, alliance_id)
+
+
+@dataclass(frozen=True, slots=True)
+class IntrigueDelta:
+    """A leadership coup's changed species + its event (folded into the cron's result)."""
+
+    species: tuple[AlienSpecies, ...]
+    event: AllianceLeadershipChanged
+
+
+def apply_intrigue(
+    state: UniverseState, alliance: AllianceConfig,
+    current: Mapping[int, AlienSpecies],
+) -> IntrigueDelta | None:
+    """Swap a bloc's leadership to its `internal_rival_species_id` (§6.3, WP51 — pure).
+
+    Demotes every current leader of the bloc (of another kind) to member and promotes
+    every placed instance of the internal-rival kind to leader. `current` overlays any
+    already-changed species this firing (e.g. a seizure eviction), so the coup composes.
+    Returns None — a replay-safe no-op — when the rival kind is absent (never invents
+    instances) or already leads the bloc (idempotent).
+    """
+    rival = alliance.internal_rival_species_id
+    if rival is None:
+        return None
+
+    def cur(sp: AlienSpecies) -> AlienSpecies:
+        return current.get(sp.id, sp)
+
+    leaders = sorted(
+        (cur(s) for s in state.species.values()
+         if s.alliance_id == alliance.id and cur(s).alliance_role == "leader"),
+        key=lambda s: s.id,
+    )
+    promotees = sorted(
+        (cur(s) for s in state.species.values() if s.roster_id == rival),
+        key=lambda s: s.id,
+    )
+    if not promotees:
+        return None  # the rival kind was not drawn into this universe — nothing to promote
+    old_roster = leaders[0].roster_id if leaders else None
+    if old_roster == rival:
+        return None  # the rival already leads — idempotent
+    changed: dict[int, AlienSpecies] = {}
+    for s in leaders:
+        if s.roster_id != rival:
+            changed[s.id] = replace(s, alliance_role="member")
+    for s in promotees:
+        changed[s.id] = replace(s, alliance_role="leader", alliance_id=alliance.id)
+    event = AllianceLeadershipChanged(alliance.id, old_roster, rival)
+    return IntrigueDelta(species=tuple(changed.values()), event=event)

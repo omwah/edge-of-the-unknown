@@ -561,6 +561,28 @@ class GenesisConfig(BaseModel):
     eligible_types: list[str] = Field(default_factory=list)
 
 
+class GovernanceConfig(BaseModel):
+    """NPC-driven Core upheavals — seizures + leadership intrigue (DESIGN §6.3, WP51).
+
+    A background hum, config-gated. Each day the `governance_tick` cron rolls, per
+    eligible bloc, a `seizure_chance` that a `covets_core` bloc (whose home-cluster
+    bases are intact) seizes the Core once the incumbent's operational Core-planet bases
+    have fallen below `min_incumbent_bases` — so a flip never comes from nowhere. A
+    separate `intrigue_chance` rolls an internal leadership coup (§6.3
+    `internal_rival_species_id`). All rolls use a salted sub-RNG + `Game.governance_seq`,
+    so the galaxy's upheavals replay exactly (H11).
+    """
+
+    model_config = _FROZEN
+
+    enabled: bool = True
+    seizure_chance: float = Field(default=0.002, ge=0.0, le=1.0)  # per eligible bloc / day
+    intrigue_chance: float = Field(default=0.001, ge=0.0, le=1.0)  # per bloc with a rival / day
+    # Seizure readiness gate: the incumbent must be down to *fewer* than this many
+    # operational Core-planet bases (default 1 ⇒ its Core presence is fully broken first).
+    min_incumbent_bases: int = Field(default=1, ge=0)
+
+
 class AliensConfig(BaseModel):
     """Disposition thresholds + escape floor for the alien system (DESIGN §6, §10).
 
@@ -650,6 +672,10 @@ class AliensConfig(BaseModel):
     trader_trade_units: int = Field(default=20, ge=1)
     trader_buy_discount_frac: float = Field(default=0.95, ge=0.0, le=1.0)
     trader_alongside_attitude: float = Field(default=0.02, ge=0.0, le=1.0)
+
+    # NPC governance: Core seizures + leadership intrigue (§6.3, WP51). Cadence lives in
+    # `ticker.crons.governance_tick`; the rolls are gated + salted by this block.
+    governance: GovernanceConfig = GovernanceConfig()
 
 
 class CombatConfig(BaseModel):
@@ -793,6 +819,11 @@ class AllianceConfig(BaseModel):
     membership_gate: Literal["open", "petition"] = "open"
     rivals: list[int] = Field(default_factory=list)  # alliance ids this bloc opposes
     core_seizure: SeizureConfig | None = None  # WP50 Core-seizure ladder (covets_core only)
+    # Leadership intrigue (§6.3, WP51): the roster_id of the member/aspirant that may usurp
+    # the bloc's leadership on the `governance_tick` cron. `intrigue_turns_outward` makes the
+    # usurped bloc gain `covets_core` — the authored §6.3 hook, expressed as data.
+    internal_rival_species_id: str | None = None
+    intrigue_turns_outward: bool = False
 
     @model_validator(mode="after")
     def _seizure_only_for_coveters(self) -> AllianceConfig:
@@ -1294,6 +1325,7 @@ class CronCadenceConfig(BaseModel):
     port_economy: int = Field(default=1200, ge=1)       # every 20 minutes
     planet_growth: int = Field(default=1200, ge=1)      # every 20 minutes
     market_settlement: int = Field(default=1200, ge=1)  # daily order-book settlement (§8, WP47)
+    governance_tick: int = Field(default=1200, ge=1)    # daily NPC seizures/intrigue (§6.3, WP51)
     alien_drift: int = Field(default=120, ge=1)         # every 2 minutes
     trader_step: int = Field(default=120, ge=1)         # every 2 minutes (NPC traders work the lanes, WP43)
 

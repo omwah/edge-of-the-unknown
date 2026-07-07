@@ -17,6 +17,7 @@ from edge.core.events import (
     AlienSpoke,
     AlienTraded,
     AllianceJoined,
+    AllianceLeadershipChanged,
     AllianceResigned,
     AttitudeChanged,
     Banked,
@@ -563,6 +564,12 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "old_alliance_id": event.old_alliance_id,
                 "new_alliance_id": event.new_alliance_id, "cause": event.cause,
             }
+        case AllianceLeadershipChanged():
+            return "AllianceLeadershipChanged", {
+                "alliance_id": event.alliance_id,
+                "old_leader_roster": event.old_leader_roster,
+                "new_leader_roster": event.new_leader_roster,
+            }
         case AdmissionAdvanced():
             return "AdmissionAdvanced", {
                 "player_id": event.player_id, "alliance_id": event.alliance_id, "task": event.task,
@@ -728,6 +735,9 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "GovernanceChanged":
             return GovernanceChanged(payload["old_alliance_id"], payload["new_alliance_id"],
                                      payload["cause"])
+        case "AllianceLeadershipChanged":
+            return AllianceLeadershipChanged(payload["alliance_id"], payload["old_leader_roster"],
+                                             payload["new_leader_roster"])
         case "AdmissionAdvanced":
             return AdmissionAdvanced(payload["player_id"], payload["alliance_id"], payload["task"])
         case "AllianceJoined":

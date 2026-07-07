@@ -117,8 +117,9 @@ def test_cron_cadence_fires_once_per_interval(tmp_path: Path) -> None:
     # hourly (interval 2) at ticks 2 and 4; the day crons (interval 5) at tick 5.
     assert fired_by_tick[1] == ["hourly_port_economy", "hourly_planet_growth"]  # tick 2
     assert fired_by_tick[3] == ["hourly_port_economy", "hourly_planet_growth"]  # tick 4
-    # the day crons (interval 5) at tick 5: settlement, interest, turn reset (WP47 adds settlement)
-    assert fired_by_tick[4] == ["market_settlement", "interest_accrual", "daily_turn_reset"]
+    # the day crons (interval 5) at tick 5 (WP47 adds settlement, WP51 adds governance_tick)
+    assert fired_by_tick[4] == [
+        "market_settlement", "governance_tick", "interest_accrual", "daily_turn_reset"]
     assert fired_by_tick[0] == [] and fired_by_tick[2] == []  # no spurious/double fires
 
 
@@ -529,3 +530,23 @@ def test_settlement_is_inert_with_an_empty_book() -> None:
     state = _market_world()  # no hourly tick yet ⇒ no orders
     result = market_settlement(state, cfg)
     assert result.events == () and result.ports == () and result.port_orders is None
+
+
+def test_governance_cron_rides_the_maintenance_replay(tmp_path: Path) -> None:
+    """WP51: the daily governance_tick fires through the ticker and replays by name — a
+    reload of the (seed, maintenance log) reconstructs the identical state (governance_seq
+    and any NPC upheaval included)."""
+    from edge.engine.cron import resolve_cron
+    from edge.store.snapshots import rebuild
+
+    svc = _service(tmp_path)
+    ticker = EngineTicker(svc, tick_seconds=0.0, ticks_per_hour=3, ticks_per_day=2)
+    for _ in range(6):
+        ticker.step()
+    assert svc.state.game.governance_seq > 0  # the day cron fired at least once
+    live = state_hash(svc.state)
+    repo = svc._repo  # type: ignore[attr-defined]
+    reloaded = rebuild(svc.config, svc.state.game.seed, repo.load_commands(),
+                       created_at=_CREATED, maintenance=repo.load_maintenance(),
+                       cron_resolver=resolve_cron)
+    assert state_hash(reloaded) == live

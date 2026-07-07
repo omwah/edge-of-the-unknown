@@ -448,6 +448,20 @@ class GovernanceChanged(Event):
 
 
 @dataclass(frozen=True)
+class AllianceLeadershipChanged(Event):
+    """An internal coup swapped a bloc's leader (§6.3, WP51).
+
+    `old_leader_roster`/`new_leader_roster` are species kinds (`roster_id`s); the old
+    leader is demoted to member and the internal rival promoted. The dossier re-derives
+    its role text from the live species, so the UI follows automatically.
+    """
+
+    alliance_id: int
+    old_leader_roster: str | None
+    new_leader_roster: str
+
+
+@dataclass(frozen=True)
 class CoreLawNotice(Event):
     """The governor's patrols flag a criminal player entering Core Space (WP27).
 

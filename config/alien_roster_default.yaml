@@ -37,8 +37,12 @@ alliances:
   - { id: 1, name: Terran Federation, banner: "Exploration & mutual defence", rivals: [4] }
   - { id: 2, name: Verdant Compact,   banner: "Order through moral authority",
       rivals: [3], membership_gate: petition, admission_price: [prove], admission_fee: 500 }
+  # Iron Covenant simmers with internal rivalry (§6.3, WP51): its member vennrith may usurp
+  # thessarch's leadership on the governance_tick cron, and such a coup turns the bloc outward
+  # to covet the Core — a fresh threat born of the galaxy's own upheavals.
   - { id: 3, name: Iron Covenant,     banner: "Loyalty & retribution",
-      rivals: [2], membership_gate: petition, admission_price: [serve, pay], admission_fee: 1000 }
+      rivals: [2], membership_gate: petition, admission_price: [serve, pay], admission_fee: 1000,
+      internal_rival_species_id: vennrith, intrigue_turns_outward: true }
   # Liberty Front covets the Core (§6.3): joinable freely, but championing it into the
   # Core demands a ladder — two befriend-price tasks, two razed Federation Core bases,
   # and a heavy fee (WP50).

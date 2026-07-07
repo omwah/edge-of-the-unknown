@@ -19,6 +19,7 @@ ticker:
     port_economy: 1200                 # every 20 minutes
     planet_growth: 1200                # every 20 minutes
     market_settlement: 1200            # daily order-book settlement (§8, WP47)
+    governance_tick: 1200              # daily NPC seizures/intrigue (§6.3, WP51)
     alien_drift: 120                   # every 2 minutes (per-species move chance applies)
     trader_step: 120                   # every 2 minutes (NPC merchant trades, WP43)
 
@@ -148,6 +149,13 @@ aliens:
   trader_trade_units: 20         # max units a trader moves per trade step
   trader_buy_discount_frac: 0.95 # only buy when the quoted price is below this × the commodity's base (a real deal)
   trader_alongside_attitude: 0.02 # attitude a co-located player gains toward a trading merchant per step (capped)
+  # NPC governance (§6.3, WP51): a background hum of Core seizures + leadership intrigue on the
+  # governance_tick cron. A covets_core bloc seizes only once the incumbent's Core bases are broken.
+  governance:
+    enabled: true
+    seizure_chance: 0.002       # per eligible covets_core bloc, per day
+    intrigue_chance: 0.001      # per bloc with an internal_rival_species_id, per day
+    min_incumbent_bases: 1      # seizure ready only when the incumbent holds fewer operational Core bases than this
 
 # Encounter rolls (§10, Phase 3 — read by the WP24 encounter system). Per-band chance an
 # encounter fires (0 in the safe Hub, rising outward); when it does, a species is drawn

@@ -330,6 +330,7 @@ class DossierEntry:
     offers: str  # last-seen tech-offer summary
     last_seen: str = "—"  # spatial id of the sector where last encountered (§6)
     note: str = ""  # a self-description line in the species' own voice (WP8 dialogue)
+    role: str = "none"  # alliance role: leader / member / aspirant / none (§6.3; re-derived live, WP51)
 
 
 @dataclass(frozen=True)
