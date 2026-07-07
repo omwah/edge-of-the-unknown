@@ -16,7 +16,7 @@ from dataclasses import dataclass, replace
 from edge.core.config import (
     AliensConfig, AllianceConfig, RosterConfig, SeizureConfig, SpeciesConfig,
 )
-from edge.core.models import AlienSpecies, Grudge, Player, Starbase, UniverseState
+from edge.core.models import AlienSpecies, Grudge, Ownership, Player, Starbase, UniverseState
 
 HOSTILE = "hostile"
 NEUTRAL = "neutral"
@@ -420,20 +420,28 @@ def core_status(state: UniverseState, player: Player) -> str:
     return "hunted" if alliance_standing(player, gov) < 0.0 else "unwelcome"
 
 
-def base_owner_hostile(state: UniverseState, base: Starbase, player: Player) -> bool:
-    """Whether an operational base's owner treats the player as an enemy (§4.2, WP40).
+def owner_hostile(state: UniverseState, owner: Ownership, player: Player) -> bool:
+    """Whether a holding's owner treats the player as an enemy (§4.2, WP40/WP54).
 
-    A base defends its planetary system against entrants hostile to its owner. A base
-    owned by the Core governor engages a governor-hostile player; a base owned by any
-    other bloc engages a player at negative standing with that bloc. Unowned and
-    player-owned bases never engage the player.
+    The shared owner-hostility rule behind base and citadel-gun defense: an
+    alliance-owned holding engages a player who is hostile to that bloc (the Core
+    governor via `governor_hostile`; any other bloc at negative standing). Unowned and
+    player-owned holdings never engage the player.
     """
-    owner = base.owner
     if owner.kind == "alliance" and owner.ref is not None:
         if owner.ref == state.game.core_governing_alliance_id:
             return governor_hostile(state, player)
         return alliance_standing(player, owner.ref) < 0.0
     return False
+
+
+def base_owner_hostile(state: UniverseState, base: Starbase, player: Player) -> bool:
+    """Whether an operational base's owner treats the player as an enemy (§4.2, WP40).
+
+    A base defends its planetary system against entrants hostile to its owner. Delegates
+    to `owner_hostile` (the same rule the citadel gun uses, WP54).
+    """
+    return owner_hostile(state, base.owner, player)
 
 
 def may_occupy(

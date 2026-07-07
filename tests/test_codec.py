@@ -17,10 +17,13 @@ from edge.core.events import (
     AllianceResigned,
     AttitudeChanged,
     Banked,
+    CitadelBuildStarted,
+    CitadelCompleted,
     Colonized,
     ColonistsRecruited,
     ColonyGrew,
     CombatRound,
+    PlanetBanked,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -101,6 +104,9 @@ from edge.core.rules import (
     Salvage,
     SetAllocation,
     SwapComponent,
+    BuildCitadel,
+    PlanetDeposit,
+    PlanetWithdraw,
     Trade,
     TravelTo,
     Warp,
@@ -127,6 +133,9 @@ COMMANDS: list[Command] = [
     RecruitColonists(count=10, from_planet=7),
     Colonize(planet_id=5, colonists=25),
     SetAllocation(planet_id=5, allocation={"fuel_ore": 0.5, "organics": 0.5}),
+    BuildCitadel(planet_id=5),                       # WP54 open a timed citadel build
+    PlanetDeposit(planet_id=5, amount=1_000),        # WP54 treasury deposit
+    PlanetWithdraw(planet_id=5, amount=500),         # WP54 treasury withdraw
     InstallComponent(Subsystem.SPINDRIVE, 3, Component.TURBINE, ComponentTier.II),
     SwapComponent(Subsystem.SCREENS, 1, Component.RADIATOR, ComponentTier.III),
     Cannibalize(Subsystem.MAIN_GUN, 2),
@@ -181,6 +190,9 @@ EVENTS: list[Event] = [
     Colonized(1, 5, 25),
     PlanetProduced(5, 1),
     ColonyGrew(5, 1_050),
+    CitadelBuildStarted(1, 5, 1),                      # WP54 citadel build opened
+    CitadelCompleted(5, 1),                            # WP54 citadel level reached
+    PlanetBanked(1, 5, "deposit", 1_000, 1_000),       # WP54 treasury move
     ComponentInstalled(1, "spindrive", 3, "turbine", "II"),
     ComponentRemoved(1, "main_gun", 2, "linkage", "I"),
     Repaired(1, "thrusters", 0),

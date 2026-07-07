@@ -21,6 +21,7 @@ from edge.core import dto
 from edge.server import mapgraph
 from edge.server import navstrip
 from edge.server import terrain as terrain_art
+from edge.core import citadels
 from edge.core import combat
 from edge.core.aliens import core_status, disposition_band, effective_disposition, seizure_progress
 from edge.core.config import DialogueChoice, GameConfig
@@ -51,11 +52,14 @@ from edge.core.events import (
     ColonyGrew,
     CombatRound,
     ComponentInstalled,
+    CitadelBuildStarted,
+    CitadelCompleted,
     ComponentKnockedOut,
     ComponentPurchased,
     ComponentRemoved,
     CoreLawNotice,
     Descended,
+    PlanetBanked,
     DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
@@ -501,6 +505,20 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
                 for idx, comp in enumerate(sub.slots):
                     if comp is not None:
                         salvage.append((subsystem.value, idx, comp.kind.value))
+    # Citadel affordance (§4.2, WP54): the next-level cost + build progress, owner-only.
+    citadel_target = 0
+    citadel_pct = 0
+    can_build = False
+    next_cost: tuple[int, int] | None = None
+    if config.citadels is not None and owned_by_you:
+        if citadels.building(planet):
+            citadel_target = planet.citadel_level + 1
+            lc = config.citadels.levels[citadel_target - 1]
+            citadel_pct = min(100, round(planet.citadel_progress * 100 / lc.build_colonist_days))
+        elif planet.citadel_level < len(config.citadels.levels):
+            nxt = config.citadels.levels[planet.citadel_level]  # next level's config
+            can_build = True
+            next_cost = (nxt.cost_equipment, nxt.cost_latinum)
     return dto.PlanetDTO(
         planet_id=planet.id, name=planet.name, ptype=planet.planet_type,
         owner=_owner_label(state, planet, player_id), colonizable=colonizable,
@@ -511,6 +529,9 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         ship_genesis=ship_genesis, genesis_eligible=genesis_eligible,
         starbase=starbase_status, starbase_id=planet.starbase_id,
         starbase_derelict=starbase_derelict, salvage=salvage,
+        citadel_level=planet.citadel_level, treasury=planet.treasury, fighters=planet.fighters,
+        citadel_build_target=citadel_target, citadel_build_pct=citadel_pct,
+        can_build_citadel=can_build, citadel_next_cost=next_cost,
     )
 
 
@@ -1547,6 +1568,13 @@ def format_event(event: Event) -> str:
         return f"[green]⚙ Base repaired: {event.subsystem} slot {event.slot_index} refilled.[/]"
     if isinstance(event, StarbaseClaimed):
         return "[green]⚑ The base is yours — a forward foothold on the frontier.[/]"
+    if isinstance(event, CitadelBuildStarted):
+        return f"[cyan]⛨ Citadel level {event.target_level} construction begun.[/]"
+    if isinstance(event, CitadelCompleted):
+        return f"[green]⛨ Citadel level {event.level} complete — the world stands fortified.[/]"
+    if isinstance(event, PlanetBanked):
+        verb = "deposited to" if event.kind == "deposit" else "withdrawn from"
+        return f"[dim]⛁ {event.amount:,} slips {verb} the citadel treasury (now {event.balance:,}).[/]"
     if isinstance(event, TerritoryDeployed):
         if event.kind == "beacon":
             return "[cyan]⚑ Beacon planted.[/]"

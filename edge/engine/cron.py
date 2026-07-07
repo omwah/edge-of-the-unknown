@@ -19,9 +19,10 @@ from edge.core.config import GameConfig
 from edge.core.economy import accrue_interest as _accrue
 from edge.core.enums import PortClass
 from edge.core.events import (
-    AlienMoved, AttitudeChanged, Banked, ColonyGrew, Event, MarketSettled,
+    AlienMoved, AttitudeChanged, Banked, CitadelCompleted, ColonyGrew, Event, MarketSettled,
     PlanetProduced, PortOrderFilled, TurnsReset,
 )
+from edge.core.citadels import advance_build
 from edge.core.governance import apply_intrigue, flip_core_governor, npc_seizure_ready
 from edge.core.market import (
     clear_filled, desired_stock_frac, hinterland_drift, liquidity_drip, match_orders,
@@ -213,13 +214,18 @@ def planet_growth(state: UniverseState, config: GameConfig) -> ReduceResult:
     events: list[Event] = []
     for planet in state.planets.values():
         produced = produce(planet, config)
-        if produced is planet:
-            continue
-        changed.append(produced)
+        # Advance any open citadel build on the same tick — colonist-days accrue toward
+        # completion in proportion to the (already-produced) colony size (§4.2, WP54).
+        built, completed = advance_build(produced, config)
+        if built is planet:
+            continue  # neither production nor a build changed anything
+        changed.append(built)
+        if completed:
+            events.append(CitadelCompleted(built.id, built.citadel_level))
         if planet.owner.kind == "player" and planet.owner.ref is not None:
             events.append(PlanetProduced(planet.id, planet.owner.ref))
-            if produced.colonists != planet.colonists:
-                events.append(ColonyGrew(planet.id, produced.colonists))
+            if built.colonists != planet.colonists:
+                events.append(ColonyGrew(planet.id, built.colonists))
     return ReduceResult(events=tuple(events), planets=tuple(changed))
 
 

@@ -15,13 +15,16 @@ from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from edge.core.citadels import CitadelError
 from edge.core.economy import EconomyError
 from edge.core.dto import PlanetDTO
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Subsystem
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
-from edge.core.rules import Cannibalize, Colonize, DeployGenesis, Descend
+from edge.core.rules import (
+    BuildCitadel, Cannibalize, Colonize, DeployGenesis, Descend, PlanetDeposit, PlanetWithdraw,
+)
 from edge.server.service import GameService
 from edge.tui import art_adapter
 from edge.tui.dummy import sample_surface
@@ -46,6 +49,9 @@ class PlanetScreen(Screen):
         Binding("c", "colonize", "Claim/Colonize"),
         Binding("s", "salvage", "Salvage"),
         Binding("g", "genesis", "Genesis"),
+        Binding("k", "build_citadel", "Build citadel"),
+        Binding("plus", "treasury_deposit", "Deposit"),
+        Binding("minus", "treasury_withdraw", "Withdraw"),
     ]
 
     CSS = """
@@ -86,6 +92,9 @@ class PlanetScreen(Screen):
                     if p.salvage:
                         parts = ", ".join(f"{label}" for _, _, label in p.salvage)
                         yield Static(f"[yellow]\\[S] Salvage[/] — {len(p.salvage)} components: {parts}")
+                if p.owned_by_you and (p.citadel_level > 0 or p.can_build_citadel
+                                       or p.citadel_build_target > 0):
+                    yield Static(self._citadel_lines(), classes="section")
                 hint = self._claim_hint()
                 if hint:
                     yield Static(hint, classes="section")
@@ -117,6 +126,58 @@ class PlanetScreen(Screen):
         if p.ship_colonists <= 0:
             return "[yellow]Unclaimed — recruit colonists at a StarDock first.[/]"
         return f"[green]\\[C] Colonize[/] — land {p.ship_colonists} colonists aboard."
+
+    def _citadel_lines(self) -> str:
+        """The citadel status + build affordance block (§4.2, WP54)."""
+        p = self._planet
+        rows = [f"[b]Citadel[/] level {p.citadel_level}   "
+                f"treasury [yellow]{p.treasury:,}[/]   garrison {p.fighters:,}"]
+        if p.citadel_build_target > 0:
+            rows.append(f"[cyan]Building level {p.citadel_build_target} — {p.citadel_build_pct}%[/]")
+        elif p.can_build_citadel and p.citadel_next_cost is not None:
+            eq, lat = p.citadel_next_cost
+            rows.append(f"[green]\\[K] Build level {p.citadel_level + 1}[/] — "
+                        f"{eq} equipment + {lat:,} latinum")
+        if p.citadel_level >= 1:
+            rows.append("[dim]\\[+]/[-] deposit / withdraw 1,000 to the treasury[/]")
+        return "\n".join(rows)
+
+    def action_build_citadel(self) -> None:
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        try:
+            self._service.apply(self._pid, BuildCitadel(p.planet_id))
+        except (EconomyError, CitadelError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify("Citadel construction begun.", timeout=2)
+        self._reopen()
+
+    def action_treasury_deposit(self) -> None:
+        self._treasury(PlanetDeposit(self._planet.planet_id, 1_000), "Deposited to treasury")
+
+    def action_treasury_withdraw(self) -> None:
+        self._treasury(PlanetWithdraw(self._planet.planet_id, 1_000), "Withdrew from treasury")
+
+    def _treasury(self, command: object, ok: str) -> None:
+        if self._service is None:
+            self.action_noop()
+            return
+        try:
+            self._service.apply(self._pid, command)  # type: ignore[arg-type]
+        except (EconomyError, CitadelError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify(ok, timeout=2)
+        self._reopen()
+
+    def _reopen(self) -> None:
+        assert self._service is not None
+        self.app.pop_screen()
+        self.app.push_screen(PlanetScreen(
+            self._service.planet_view(self._pid, self._planet.planet_id), self._service, self._pid))
 
     def action_colonize(self) -> None:
         if self._service is None:

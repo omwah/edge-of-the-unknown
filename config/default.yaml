@@ -409,6 +409,23 @@ genesis:
   result_type: terrestrial_warm  # what an eligible world is transformed into
   eligible_types: [barren, asteroid_belt, jovian, terrestrial_hot, terrestrial_cold]  # dead/marginal worlds a torpedo can terraform
 
+# Citadels (§4.2, §14, WP54): cumulative planetary fortifications on an owned colony.
+# Each level is paid up front (equipment from planet stores + latinum) and completed as a
+# timed build — colonists accrue toward build_colonist_days on the planet-growth tick, so
+# bigger colonies build faster. L1 = treasury + garrison bonus; L2 = the fixed gun that
+# joins sector defense; L3 = a siege shield (no invasion while a base or the gun stands).
+citadels:
+  gun_min_level: 2
+  shield_min_level: 3
+  gun_hull: 400
+  gun_shields: 200
+  gun_damage: 40
+  gun_defense: 30
+  levels:
+    - { cost_equipment: 200, cost_latinum: 5000,  min_colonists: 100, build_colonist_days: 5000,  garrison_mult: 1.5 }  # L1
+    - { cost_equipment: 400, cost_latinum: 12000, min_colonists: 300, build_colonist_days: 15000, garrison_mult: 2.0 }  # L2
+    - { cost_equipment: 800, cost_latinum: 30000, min_colonists: 600, build_colonist_days: 40000, garrison_mult: 3.0 }  # L3
+
 # The starter hull — a Trailblazer-class explorer (§4). Its engine room is built
 # "complete but minimal": every base slot filled at Tier I, every upgrade slot
 # empty — the canonical first upgrade target (§4.1). The flat aspect scalars below

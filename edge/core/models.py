@@ -148,6 +148,12 @@ class Planet:
     allocation: Mapping[Commodity, float] = field(default_factory=dict)
     stores: Mapping[Commodity, int] = field(default_factory=dict)
     citadel_level: int = 0
+    # Citadel build/holdings (§4.2, WP54; hashed fields batched into config_version 5 at WP56).
+    citadel_progress: int = -1  # colonist-days accrued on an open build; -1 ⇒ no build in progress
+    treasury: int = 0  # the citadel's planetary latinum store (L1+), banked interest-free
+    fighters: int = 0  # the planetary garrison (produced by a colonist allocation share, WP55)
+    gun_integrity: int = 0  # the citadel gun's health (L2+); 0 ⇒ no gun or gun silenced (WP55)
+    fighter_allocation: float = 0.0  # share of production minting garrison fighters (WP55)
     starbase_id: int | None = None  # WP4 orbital base
 
 
@@ -390,6 +396,10 @@ class Encounter:
     # fought (its foe is a single immobile emplacement, `species_id` is 0). Victory razes
     # the base rather than souring a species. None for an ordinary ship encounter.
     starbase_id: int | None = None
+    # Set when this encounter is a **citadel-gun** fight (§4.2, WP54/WP55): the planet whose
+    # fixed gun is being silenced (species_id 0, immobile foe). Victory zeroes the planet's
+    # `gun_integrity` (WP55). None for anything else. Batched into config_version 5 at WP56.
+    citadel_planet_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
