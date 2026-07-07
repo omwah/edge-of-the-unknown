@@ -11,6 +11,7 @@ edge = "edge.tui.app:main"
 bigbang = "edge.bigbang.__main__:main"
 edge-author-dialogue = "edge.dialogue.authoring.cli:main"
 edge-playtest-dialogue = "edge.dialogue.authoring.playtest:main"
+edge-sysop = "edge.devtool.sysop:main"
 
 # Dev-only extras for the cloud authoring backends (the Ollama backend is plain HTTP, no SDK).
 # The runtime never calls an LLM, so these are not Phase-runtime dependencies.
