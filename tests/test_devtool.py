@@ -148,7 +148,88 @@ def test_codec_round_trip() -> None:
         DevPatch("grant", "component", 4, key="accelerator:III"),
         DevPatch("claim", "planet", ref=7),
         DevPatch("teleport", "sector", 12),
+        DevPatch("force_settlement", "market"),
+        DevPatch("expire_contract", "contract", ref=2),
+        DevPatch("moderate_notice", "notice", value=0),
     ):
         assert decode_command(*encode_command(patch)) == patch
     event = DevApplied(1, "[dev] set latinum=1000000")
     assert decode_event(*encode_event(event)) == event
+
+
+# --- WP59 sysop DevPatch ops + reports ------------------------------------------
+
+
+def test_expire_contract_op() -> None:
+    from dataclasses import replace
+
+    from edge.core.contracts import Contract
+    state, config = _state()
+    player = state.players[1]
+    job = Contract(id=1, kind="deliver", issuer="terran", reward_slips=100, reward_attitude=0.0,
+                   accepted_day=1, deadline_day=20, status="active")
+    state.players[1] = replace(player, contracts=(job,))
+    _apply(state, config, DevPatch("expire_contract", "contract", ref=1))
+    assert state.players[1].contracts[0].status == "failed"
+
+
+def test_moderate_notice_op() -> None:
+    from edge.core.models import Notice
+    state, config = _state()
+    state.notices = (Notice(1, 1, "a"), Notice(1, 2, "b"))
+    _apply(state, config, DevPatch("moderate_notice", "notice", value=0))
+    assert [n.text for n in state.notices] == ["b"]
+
+
+def test_force_settlement_survives_reload(tmp_path: Path) -> None:
+    """The force_settlement op is a logged, replayable command — rebuild reproduces it.
+
+    Ticks the engine once so a real order book exists, then forces a settlement through the
+    DevPatch rail and asserts the reload replays to the identical `state_hash` (the WP12 rail).
+    """
+    from edge.engine.ticker import EngineTicker
+    config = _config()
+    repo = SqliteRepository(tmp_path / "settle.db")
+    svc = GameService.new_game(config, 42, repo, created_at=_CREATED)
+    EngineTicker(svc, ticks_per_hour=1, ticks_per_day=1).step()  # posts the order book
+    if svc.state.port_orders:  # only if the market produced a book this seed
+        svc.apply(1, DevPatch("force_settlement", "market"))
+    expected = state_hash(svc.state)
+    schedule = repo.load_maintenance()
+    repo.close()
+
+    from edge.engine.cron import resolve_cron
+    meta = SqliteRepository(tmp_path / "settle.db").load_meta()
+    reloaded = rebuild(config, meta.seed,
+                       SqliteRepository(tmp_path / "settle.db").load_commands(),
+                       created_at=meta.created_at, maintenance=schedule,
+                       cron_resolver=resolve_cron)
+    assert state_hash(reloaded) == expected
+
+
+def test_money_supply_audit_balances() -> None:
+    from edge.devtool import reports
+    state, config = _state()
+    lines = reports.money_supply(state)
+    assert any("TOTAL" in ln for ln in lines)
+    # The audit total equals the sum of its parts (conservation, as a tool).
+    total = sum(p.latinum + p.bank_balance for p in state.players.values())
+    total += sum(port.latinum for port in state.ports.values())
+    total += sum(pl.treasury for pl in state.planets.values())
+    assert f"{total:,}" in lines[-1]
+
+
+def test_sysop_console_report_smoke(tmp_path: Path) -> None:
+    from edge.devtool.__main__ import Session
+    from edge.devtool.sysop import _REPORTS, config_dump, run_report
+    config = _config()
+    repo = SqliteRepository(tmp_path / "smoke.db")
+    GameService.new_game(config, 42, repo, created_at=_CREATED)
+    repo.close()
+    session = Session(tmp_path / "smoke.db")
+    try:
+        for name in _REPORTS:
+            assert run_report(session, name)  # every report yields lines
+        assert config_dump(session)
+    finally:
+        session.close()

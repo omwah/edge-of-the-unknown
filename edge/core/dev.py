@@ -191,6 +191,16 @@ def apply_dev_patch(
         new_planet = replace(planet, owner=Ownership("player", player_id))
         return done(f"claim planet {cmd.ref}", planets=(new_planet,))
 
+    # --- sysop interventions (WP59): settlement / contracts / notices -------
+    if op == "force_settlement":
+        return _force_settlement(state, player_id, config)
+
+    if op == "expire_contract":
+        return _expire_contract(state, player, cmd)
+
+    if op == "moderate_notice":
+        return _moderate_notice(state, player_id, cmd)
+
     # --- governance: flip the Core's governing alliance (WP49) --------------
     if op == "flip_governor":
         from edge.core.governance import flip_core_governor
@@ -206,6 +216,64 @@ def apply_dev_patch(
         )
 
     raise DevPatchError(f"unknown dev patch: op={op!r} target={target!r}")
+
+
+def _force_settlement(state: UniverseState, player_id: int, config: GameConfig) -> ReduceResult:
+    """Run one order-book settlement now (WP59 sysop op) — a logged, replayable market pulse.
+
+    Reuses the pure `core.market` settlement math (the same conservation the cron guarantees)
+    so a sysop can advance the economy on demand. Applies stock + purse deltas and the daily
+    drip, clears filled orders — but emits no market events (a dev pulse, not the daily tick).
+    """
+    from edge.core.rules import ReduceResult
+    from edge.core.market import clear_filled, liquidity_drip, match_orders
+
+    econ = config.economy
+    if not econ.market.enabled or not state.port_orders:
+        raise DevPatchError("no open market book to settle")
+    settlement = match_orders(state.port_orders, state.ports, econ)
+    changed: list[object] = []
+    for pid, port in state.ports.items():
+        stock_d = settlement.stock_deltas.get(pid, {})
+        settled = replace(port, commodities=tuple(
+            replace(line, stock=line.stock + stock_d.get(line.commodity, 0))
+            for line in port.commodities
+        ), latinum=port.latinum + settlement.latinum_deltas.get(pid, 0))
+        settled = replace(settled, latinum=settled.latinum + liquidity_drip(settled, econ))
+        if settled != port:
+            changed.append(settled)
+    residual = clear_filled(state.port_orders, settlement)
+    return ReduceResult(
+        events=(DevApplied(player_id, f"[dev] forced settlement: {len(settlement.fills)} fills"),),
+        ports=tuple(changed), port_orders=residual)  # type: ignore[arg-type]
+
+
+def _expire_contract(state: UniverseState, player: Player, cmd: DevPatch) -> ReduceResult:
+    """Fail a player's active contract by id (WP59 sysop op) — a logged intervention."""
+    from edge.core.rules import ReduceResult
+
+    cid = cmd.ref
+    match = next((c for c in player.contracts if c.id == cid and c.status == "active"), None)
+    if match is None:
+        raise DevPatchError(f"no active contract {cid} on player {player.id}")
+    new_player = replace(player, contracts=tuple(
+        replace(c, status="failed") if c.id == cid else c for c in player.contracts))
+    return ReduceResult(
+        events=(DevApplied(player.id, f"[dev] expired contract {cid}"),),
+        players=(new_player,))
+
+
+def _moderate_notice(state: UniverseState, player_id: int, cmd: DevPatch) -> ReduceResult:
+    """Delete a noticeboard entry by index (WP59 sysop op) — moderation as a logged command."""
+    from edge.core.rules import ReduceResult
+
+    idx = cmd.value
+    if not 0 <= idx < len(state.notices):
+        raise DevPatchError(f"no notice at index {idx} (have {len(state.notices)})")
+    ring = tuple(n for i, n in enumerate(state.notices) if i != idx)
+    return ReduceResult(
+        events=(DevApplied(player_id, f"[dev] deleted notice {idx}"),),
+        notices=ring)  # type: ignore[arg-type]
 
 
 def _clamp_ship_field(ship: Ship, field: str, new: int) -> int:
