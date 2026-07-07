@@ -349,6 +349,17 @@ starbase:
       keystone: accelerator
       base_components: [accelerator, linkage]
       legal_components: [accelerator, linkage, converter, secondary]
+  # Forward-base services (§4.2, WP53): what a player-owned operational base offers, and at
+  # what markup. The same StarDock commands resolve here through the shared service-point
+  # seam. fee_frac ≥ 1 (never cheaper than StarDock); Tier III stays barter-only, so a base
+  # stocks only I/II by default.
+  services:
+    repair: true
+    components: true
+    munitions: true
+    banking: true
+    fee_frac: 1.25            # frontier convenience markup over StarDock latinum prices
+    component_stock_tiers: [I, II]
 
 # Discoveries (§7, WP5): the universe is salted at big bang with finds whose rarity
 # (and value) rises with distance band. Hidden finds (wrecks/entities) need a sensor

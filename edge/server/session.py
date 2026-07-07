@@ -627,6 +627,47 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     )
 
 
+def starbase_services_view(
+    state: UniverseState, player_id: int, config: GameConfig
+) -> dto.StarbaseServicesDTO | None:
+    """Forward-base services for the ship's current sector, or None (§4.2, WP53).
+
+    Resolved through the same `services.service_point` seam the reducers gate on, so the
+    catalog the player sees and what the reducer will accept never drift (H4). Only a
+    *player-owned* base yields a view here — a StarDock has its own screen.
+    """
+    from edge.core.services import COMPONENTS, MUNITIONS, service_point
+
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    sp = service_point(state, player, ship, config)
+    if sp is None or sp.kind != "player_base":
+        return None
+    econ = config.economy
+    stock_tiers = (config.starbase.services.component_stock_tiers
+                   if config.starbase is not None else [])
+    hardware: list[dto.HardwareItem] = []
+    if COMPONENTS in sp.services:
+        for cname in config.hardware.components:
+            for tname in config.hardware.tiers:
+                if tname not in stock_tiers:
+                    continue  # this base does not stock this tier (§4.2)
+                base_price = econ.component_price(ComponentTier[tname])
+                if base_price is None:  # barter-only tier
+                    continue
+                price = round(base_price * sp.fee_frac)
+                hardware.append(dto.HardwareItem(
+                    component=Component(cname).value, tier=tname, price=price,
+                    affordable=player.latinum >= price and ship.holds_free >= 1,
+                ))
+    missile_price = round(config.combat.missile_price * sp.fee_frac) if MUNITIONS in sp.services else 0
+    return dto.StarbaseServicesDTO(
+        sector_display=_display(state, ship.sector_id), latinum=player.latinum,
+        bank_balance=player.bank_balance, hardware=hardware,
+        services=sorted(sp.services), fee_frac=sp.fee_frac, missile_price=missile_price,
+    )
+
+
 def map_view(
     state: UniverseState, player_id: int, *,
     route_dest: int | None = None, full_graph: bool = False,

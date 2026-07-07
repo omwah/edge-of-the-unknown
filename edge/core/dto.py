@@ -576,6 +576,26 @@ class StarDockDTO:
 
 
 @dataclass(frozen=True)
+class StarbaseServicesDTO:
+    """Forward-base services at a player-owned operational orbital base (§4.2, WP53).
+
+    The foothold analogue of `StarDockDTO`, resolved through the shared service-point
+    seam: the hardware catalog is fee-adjusted and tier-capped per `starbase.services`,
+    `services` names which of repair/components/munitions/banking this base offers, and
+    `fee_frac` is the frontier markup surfaced to the player. Present only when the ship
+    sits at such a base; None otherwise.
+    """
+
+    sector_display: int
+    latinum: int
+    bank_balance: int
+    hardware: list[HardwareItem]
+    services: list[str]  # subset of {"repair","components","munitions","banking"}
+    fee_frac: float
+    missile_price: int  # per-missile latinum price at this base (fee-adjusted)
+
+
+@dataclass(frozen=True)
 class PlanetDTO:
     """The orbit view of a planet (UI_MOCKUPS.md §3, DESIGN §4.2)."""
 
