@@ -50,13 +50,23 @@ class TopBar(Static):
     }
     """
 
-    def __init__(self, turns: int, max_turns: int) -> None:
+    def __init__(self, turns: int, max_turns: int,
+                 governor: str | None = None, core_status: str = "safe") -> None:
         super().__init__()
         self._turns = turns
         self._max = max_turns
+        self._governor = governor
+        self._core_status = core_status
 
     def render(self) -> Text:
-        return Text.assemble("EDGE OF THE UNKNOWN", ("  ", ""), f"turns {self._turns}/{self._max}")
+        parts: list[tuple[str, str] | str] = [
+            "EDGE OF THE UNKNOWN", ("  ", ""), f"turns {self._turns}/{self._max}"]
+        if self._governor is not None:
+            # Surface the Core's ruler and the player's standing in it (WP52) — a flip
+            # is only legible if the banner is on screen. "safe" stays quiet.
+            style = {"hunted": "bold red", "unwelcome": "yellow"}.get(self._core_status, "dim")
+            parts += [("   ", ""), (f"Core: {self._governor} [{self._core_status}]", style)]
+        return Text.assemble(*parts)
 
 
 class SectorView(Container):
@@ -116,7 +126,7 @@ class GameScreen(Screen):
 
     def compose(self) -> ComposeResult:
         view = self._service.game_view(self._pid)
-        yield TopBar(view.turns, view.max_turns)
+        yield TopBar(view.turns, view.max_turns, view.governor, view.core_status)
         ui = getattr(self.app, "ui_config", None)
         sidebar_width = ui.sidebar_width if ui is not None else 33
         with Horizontal(id="body"):

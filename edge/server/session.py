@@ -22,7 +22,7 @@ from edge.server import mapgraph
 from edge.server import navstrip
 from edge.server import terrain as terrain_art
 from edge.core import combat
-from edge.core.aliens import disposition_band, effective_disposition, seizure_progress
+from edge.core.aliens import core_status, disposition_band, effective_disposition, seizure_progress
 from edge.core.config import DialogueChoice, GameConfig
 from edge.core.discovery import entity_contactable, entity_species, is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
@@ -334,12 +334,16 @@ def game_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.G
     sector = state.sectors[ship.sector_id]
     core_hops = state.core_hops or bfs_distances(state.adjacency, 1)  # cached at gen (WP-C)
     sector_dto = _sector_dto(state, player, sector, core_hops, config)
+    gov_id = state.game.core_governing_alliance_id
+    gov_alliance = state.alliances.get(gov_id) if gov_id is not None else None
     return dto.GameState(
         turns=player.turns_remaining, max_turns=config.turns_per_day,
         ship=_ship_dto(state, ship, player, sector),
         sector=sector_dto,
         nav=navstrip.build_nav_strip(
             sector_dto, core_anchor_side=config.ui.nav_core_anchor_side),
+        governor=gov_alliance.name if gov_alliance is not None else None,
+        core_status=core_status(state, player),
     )
 
 
@@ -820,7 +824,29 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         ports=_port_directory(state, player_id), planets=_planet_directory(state, player_id),
         leads=leads_view(state, player_id, config),
         seizure=_seizure_status(state, player, config),
+        governance_intel=_governance_intel(state, player),
     )
+
+
+def _governance_intel(state: UniverseState, player: Player) -> list[str]:
+    """Standing intel on Core governance for the dossier's alliance section (§6.3, WP52).
+
+    Names the current governor, the player's status in the Core, and every bloc that
+    covets it — the same facts a flip re-keys, read live so the dossier tracks the world.
+    """
+    gov_id = state.game.core_governing_alliance_id
+    gov = state.alliances.get(gov_id) if gov_id is not None else None
+    lines = [
+        f"Core governor: {gov.name if gov else 'none (contested)'}.",
+        f"Your standing in the Core: {core_status(state, player)}.",
+    ]
+    coveters = sorted(
+        (a for a in state.alliances.values() if a.covets_core and a.id != gov_id),
+        key=lambda a: a.id,
+    )
+    for a in coveters:
+        lines.append(f"The {a.name} covet the Core.")
+    return lines
 
 
 def _seizure_status(

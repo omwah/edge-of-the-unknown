@@ -107,6 +107,7 @@ class ComputerScreen(Screen):
                 yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
                 yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
                 yield Static(self._dossier_notes(), classes="note")
+                yield Static(self._governance_notes(), id="governance-panel", classes="note")
                 yield Static(self._seizure_notes(), id="seizure-panel", classes="note")
             with TabPane("Notes", id="notes"):
                 yield Static("[dim]Avoid lists & player notes — Phase 2.[/]")
@@ -210,6 +211,14 @@ class ComputerScreen(Screen):
         if not self._computer.dossier:
             return "[dim]Hail a friendly species to begin a dossier.[/]"
         return "\n".join(f"[cyan]{d.species}:[/] [dim]{d.note}[/]" for d in self._computer.dossier)
+
+    def _governance_notes(self) -> str:
+        """Standing Core-governance intel (§6.3, WP52) — governor, status, coveters."""
+        intel = self._computer.governance_intel
+        if not intel:
+            return ""
+        body = "\n".join(f"[dim]{line}[/]" for line in intel)
+        return f"[b]CORE GOVERNANCE[/]\n{body}"
 
     def _seizure_notes(self) -> str:
         """The Core-seizure checklist for a championed covets_core bloc (§6.3, WP50)."""

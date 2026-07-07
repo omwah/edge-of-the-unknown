@@ -397,6 +397,9 @@ class ComputerDTO:
     planets: list[PlanetDirEntry] = field(default_factory=list)
     leads: list[LeadDTO] = field(default_factory=list)
     seizure: SeizureStatusDTO | None = None  # WP50 Core-seizure checklist (if championing a bloc)
+    # Standing intel on Core governance (§6.3, WP52): who governs the Core and which blocs
+    # covet it. One line per fact, already voiced for display; empty when nothing is known.
+    governance_intel: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -607,6 +610,8 @@ class GameState:
     ship: ShipDTO
     sector: SectorDTO
     nav: NavStripDTO | None = None  # the main-screen nav rose (§11); None for legacy fixtures
+    governor: str | None = None  # name of the alliance governing the Core, or None if ungoverned (§6.3, WP52)
+    core_status: str = "safe"  # the player's Core standing: "safe" / "unwelcome" / "hunted" (§6.3, WP52)
 
 
 @dataclass(frozen=True)

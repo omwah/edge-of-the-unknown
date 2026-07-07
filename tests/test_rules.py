@@ -245,6 +245,35 @@ def test_dock_costs_one_turn() -> None:
     assert isinstance(res.events[0], Docked)
 
 
+def test_core_stardock_dock_rejection_matrix() -> None:
+    """A hunted player is turned away at the Core StarDock; others dock freely (WP52)."""
+    from dataclasses import replace
+
+    from edge.core.models import Alliance
+    from edge.core.movement import MovementError
+
+    base = _universe()  # StarDock in Core sector 2, governor = alliance 1
+    base.game = replace(base.game, core_governing_alliance_id=1)
+    base.alliances = {1: Alliance(1, "Federation"), 2: Alliance(2, "Cabal", covets_core=True)}
+
+    def _dock_ok(player: Player) -> bool:
+        state = replace(base)
+        state.players = {1: player}
+        try:
+            reduce(state, 1, Dock(), CONFIG)
+            return True
+        except MovementError:
+            return False
+
+    p = base.players[1]
+    # Governing member: welcome.
+    assert _dock_ok(replace(p, alliance_id=1))
+    # Non-member, neutral standing: unwelcome but not barred.
+    assert _dock_ok(replace(p, alliance_id=2, alliance_standing={1: 0.0}))
+    # Non-member at negative standing with the governor: hunted → barred.
+    assert not _dock_ok(replace(p, alliance_id=2, alliance_standing={1: -0.5}))
+
+
 def test_trade_buy_moves_goods_and_burns_latinum() -> None:
     state = _universe()
     before = state.players[1].latinum

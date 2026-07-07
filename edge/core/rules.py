@@ -36,6 +36,7 @@ from edge.core.aliens import (
     attitude_locked,
     disposition_band,
     effective_disposition,
+    governor_hostile,
     is_criminal,
     record_admission_task,
     record_seizure_task,
@@ -1109,6 +1110,13 @@ def _dock(state: UniverseState, player_id: int) -> ReduceResult:
     _require_no_encounter(player)
     ship = _ship(state, player)
     port = _docked_port(state, ship)
+    # The Core StarDock is the governor's haven — a hunted player (§6.3 hostile-governor)
+    # is turned away at the airlock, which denies every dock-gated service (trade,
+    # recruitment, bank) at one lever rather than per command (WP52).
+    if (port.klass is PortClass.STARDOCK
+            and state.sectors[ship.sector_id].is_galactic_core
+            and governor_hostile(state, player)):
+        raise MovementError("the governor's forces bar you from the Core StarDock")
     if player.turns_remaining < 1:
         raise MovementError("out of turns")
     new_player = replace(player, turns_remaining=player.turns_remaining - 1)
