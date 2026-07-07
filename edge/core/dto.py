@@ -573,6 +573,8 @@ class StarDockDTO:
     latinum: int
     hardware: list[HardwareItem]
     shipyard: list[ShipyardItem]
+    # Special devices for sale (§10/§14, WP56): (device_id, price, affordable).
+    devices: list[tuple[str, int, bool]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

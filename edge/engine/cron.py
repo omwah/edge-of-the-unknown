@@ -191,14 +191,25 @@ def daily_turn_reset(state: UniverseState, config: GameConfig) -> ReduceResult:
         if config.roster is not None else {}
     )
     day = state.game.day_number + 1
+    # An engaged interdictor levies a per-day turn tax (§14, WP56) — the day opens with
+    # fewer turns, so running it is a stance, not a free default.
+    interdictor = config.devices.get("interdictor")
+    tax = interdictor.turn_tax if interdictor is not None else 0
+
+    def _reset_turns(p: Player) -> int:
+        ship = state.ships.get(p.ship_id)
+        if ship is not None and ship.interdictor_active and tax:
+            return max(0, config.turns_per_day - tax)
+        return config.turns_per_day
+
     players = tuple(
         decay_grudges(
-            replace(p, turns_remaining=config.turns_per_day, haggle_attempts={}),
+            replace(p, turns_remaining=_reset_turns(p), haggle_attempts={}),
             gain_rates, config.aliens, day,
         )
         for p in state.players.values()
     )
-    events = tuple(TurnsReset(player_id=p.id, turns=config.turns_per_day) for p in players)
+    events = tuple(TurnsReset(player_id=p.id, turns=p.turns_remaining) for p in players)
     game = replace(state.game, day_number=day)
     return ReduceResult(events=events, players=players, game=game)
 
@@ -258,11 +269,17 @@ def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
     entity = entity_species(state, config)  # the roaming Entity drifts by its own rules (§7, WP36)
     entity_id = entity.id if entity is not None else None
     player_sectors = {state.ships[p.ship_id].sector_id for p in state.players.values()}
+    # Interdicted sectors pin their occupants (§14, WP56): while a player's interdictor is
+    # engaged in a sector, no NPC may drift *out* of it.
+    interdicted = {state.ships[p.ship_id].sector_id for p in state.players.values()
+                   if state.ships[p.ship_id].interdictor_active}
     moved: list[AlienSpecies] = []
     events: list[Event] = []
     for sp in sorted(state.species.values(), key=lambda s: s.id):
         if sp.id in pinned:
             continue
+        if sp.sector_id in interdicted:
+            continue  # pinned by an active interdictor
         is_entity = sp.id == entity_id
         if rng.random() >= (aliens.entity_drift_chance if is_entity else aliens.drift_move_chance):
             continue

@@ -18,6 +18,7 @@ from edge.core.economy import EconomyError
 from edge.core.enums import DiscoveryKind, PayloadKind, PortClass, RarityTier
 from edge.core.events import HazardDamage, TerritoryDeployed
 from edge.core.models import (
+    AlienSpecies,
     Discovery,
     DiscoveryPayload,
     Encounter,
@@ -34,7 +35,11 @@ from edge.core.rules import (
     CombatAction,
     DeployBeacon,
     DeployFighters,
+    DeployMines,
     JoinGame,
+    LaunchProbe,
+    RemoveLimpets,
+    ToggleInterdictor,
     Warp,
     apply_result,
     reduce,
@@ -50,7 +55,10 @@ TC = CFG.territory
 
 
 def _force(**kw) -> SectorForce:
-    base = dict(sector_id=2, owner=Ownership("alliance", 2), fighters=5, mines=2)
+    # `mines=` in kwargs maps to armid mines (the WP56 rename; keeps existing callers).
+    if "mines" in kw:
+        kw["armid_mines"] = kw.pop("mines")
+    base = dict(sector_id=2, owner=Ownership("alliance", 2), fighters=5, armid_mines=2)
     base.update(kw)
     return SectorForce(**base)
 
@@ -206,3 +214,116 @@ def test_black_hole_never_kills() -> None:
     apply_result(state, result)
     assert state.ships[1].hull_current == 1  # clamped alive (lethal-hazard→pod is a seam)
     assert any(isinstance(e, HazardDamage) for e in result.events)
+
+
+# --- WP56: armid/limpet split, probes, interdictor --------------------------
+
+
+def test_armid_mines_behave_like_the_old_mines() -> None:
+    """Armid is the WP41 mine renamed — same entry damage, spent on detonation."""
+    state = _mini_state()
+    state.sector_forces[2] = _force(fighters=0, armid_mines=2)
+    _make_hostile(state)
+    before = state.ships[1].hull_current
+    apply_result(state, reduce(state, 1, Warp(to_sector=2), CFG))
+    assert state.ships[1].hull_current < before  # took damage
+    assert 2 not in state.sector_forces  # force spent + cleared
+
+
+def test_mine_deflector_absorbs_armid_hits_one_for_one() -> None:
+    state = _mini_state()
+    state.sector_forces[2] = _force(fighters=0, armid_mines=2)
+    _make_hostile(state)
+    state.ships[1] = replace(state.ships[1], devices={CFG.territory.mine_deflector_device: 2})
+    before = state.ships[1].hull_current
+    apply_result(state, reduce(state, 1, Warp(to_sector=2), CFG))
+    assert state.ships[1].hull_current == before  # 2 deflectors cancel 2 mines
+
+
+def test_limpet_attaches_and_is_removable_for_a_fee() -> None:
+    state = _mini_state()
+    state.sector_forces[2] = _force(fighters=0, armid_mines=0, limpet_mines=3)
+    _make_hostile(state)
+    apply_result(state, reduce(state, 1, Warp(to_sector=2), CFG))
+    tag = territory.owner_tag(Ownership("alliance", 2))
+    assert state.ships[1].limpets.get(tag) == 3  # attached, tagged to the bloc
+    # Removal needs a service point — none here, so it is rejected.
+    with pytest.raises(EconomyError):
+        reduce(state, 1, RemoveLimpets(), CFG)
+
+
+def test_limpet_makes_the_player_trackable_by_the_bloc_hunters() -> None:
+    from edge.core import npc
+    state = _mini_state()
+    # A bloc-2 hunter with no personal grudge cannot normally find the player...
+    sp = AlienSpecies(id=1, roster_id="hunter", name="H", archetype_id="a", sector_id=1,
+                      home_band="Frontier", tech_level=5, base_disposition=0.2,
+                      disposition_center=0.2, disposition_variance=0.0, alliance_id=2)
+    assert npc._grudge_targets(state, sp) == []
+    # ...but a limpet tagged to bloc 2 exposes the player's exact sector to it.
+    tag = territory.owner_tag(Ownership("alliance", 2))
+    state.ships[1] = replace(state.ships[1], limpets={tag: 1})
+    assert npc._grudge_targets(state, sp) == [state.ships[1].sector_id]
+
+
+def test_deploy_mines_kind_routes_to_the_right_pile() -> None:
+    state = _mini_state()
+    state.ships[1] = replace(state.ships[1], sector_id=2, mines=10)
+    apply_result(state, reduce(state, 1, DeployMines(count=3, kind="armid"), CFG))
+    apply_result(state, reduce(state, 1, DeployMines(count=2, kind="limpet"), CFG))
+    force = state.sector_forces[2]
+    assert force.armid_mines == 3 and force.limpet_mines == 2
+    assert state.ships[1].mines == 5  # both drew from the single carried stock
+
+
+def test_probe_charts_its_path_and_reports() -> None:
+    from edge.core.events import ProbeReport
+    state = _mini_state()  # sectors 1<->2
+    state.ships[1] = replace(state.ships[1], devices={"probe": 1})
+    before = set(state.players[1].explored_sectors)
+    result = reduce(state, 1, LaunchProbe(dest_sector=2), CFG)
+    apply_result(state, result)
+    report = next(e for e in result.events if isinstance(e, ProbeReport))
+    assert report.dest_sector == 2 and report.sectors_charted >= 1 and not report.destroyed
+    assert 2 in state.players[1].explored_sectors and 2 not in before
+    assert state.ships[1].devices.get("probe", 0) == 0  # consumed
+
+
+def test_probe_lost_in_a_hostile_sector() -> None:
+    from edge.core.events import ProbeReport
+    state = _mini_state()
+    state.sector_forces[2] = _force(fighters=0, armid_mines=1)  # hostile-held sector 2
+    _make_hostile(state)
+    state.ships[1] = replace(state.ships[1], devices={"probe": 1})
+    # loss_chance 0.25 default; force the roll low so the probe is certainly destroyed.
+    import random
+    state.rng = random.Random(0)
+    # Try a few seeds to find one that destroys — determinism is what we assert, not odds.
+    destroyed_seen = False
+    for seed in range(20):
+        s = _mini_state()
+        s.sector_forces[2] = _force(fighters=0, armid_mines=1)
+        _make_hostile(s)
+        s.ships[1] = replace(s.ships[1], devices={"probe": 1})
+        s.rng = random.Random(seed)
+        res = reduce(s, 1, LaunchProbe(dest_sector=2), CFG)
+        if next(e for e in res.events if isinstance(e, ProbeReport)).destroyed:
+            destroyed_seen = True
+            break
+    assert destroyed_seen  # a hostile sector can down a probe
+
+
+def test_interdictor_toggle_pins_drift() -> None:
+    from edge.engine.cron import alien_drift
+    state = _mini_state()
+    state.ships[1] = replace(state.ships[1], sector_id=2, devices={"interdictor": 1})
+    apply_result(state, reduce(state, 1, ToggleInterdictor(), CFG))
+    assert state.ships[1].interdictor_active
+    # A species sitting in the interdicted sector 2 cannot drift out.
+    state.species[1] = AlienSpecies(
+        id=1, roster_id="drifter", name="D", archetype_id="a", sector_id=2,
+        home_band="Frontier", tech_level=5, base_disposition=0.8,
+        disposition_center=0.8, disposition_variance=0.0, alliance_id=None)
+    drift = alien_drift(state, CFG.model_copy(update={"aliens": CFG.aliens.model_copy(
+        update={"drift_enabled": True, "drift_move_chance": 1.0})}))
+    assert all(s.id != 1 for s in drift.species)  # pinned — did not move

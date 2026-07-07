@@ -96,9 +96,12 @@ from edge.core.events import (
     CitadelCompleted,
     CitadelGunSilenced,
     ColonistsRecruited,
+    InterdictorToggled,
     InvasionRepulsed,
+    LimpetsRemoved,
     PlanetBanked,
     PlanetInvaded,
+    ProbeReport,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -623,9 +626,14 @@ class DeployFighters:
 
 @dataclass(frozen=True, slots=True)
 class DeployMines:
-    """Deploy carried mines into the current sector (§10, WP41). Never in the Core."""
+    """Deploy carried mines into the current sector (§10, WP41/WP56). Never in the Core.
+
+    `kind` is "armid" (damage on entry) or "limpet" (attach + track). Both draw from the
+    single carried `Ship.mines` stock.
+    """
 
     count: int
+    kind: str = "armid"
 
 
 @dataclass(frozen=True, slots=True)
@@ -636,6 +644,42 @@ class DeployBeacon:
     """
 
     text: str
+
+
+@dataclass(frozen=True, slots=True)
+class BuyDevice:
+    """Buy a special device (probe / interdictor / mine-deflector) at the StarDock (§10, WP56).
+
+    Devices are counted in `Ship.devices` (not cargo). Priced from `config.devices`.
+    """
+
+    device_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class LaunchProbe:
+    """Send a consumable probe toward `dest_sector`, charting its path (§11, §14, WP56).
+
+    Flies the shortest full-graph path up to the device's hop range, revealing each sector
+    it traverses and reporting their contents — recon you buy. Lossy through hostile-held
+    sectors. Consumes one `probe` device.
+    """
+
+    dest_sector: int
+
+
+@dataclass(frozen=True, slots=True)
+class ToggleInterdictor:
+    """Engage / disengage the carried interdictor (§14, WP56).
+
+    While engaged, NPC drift out of the player's sector is suppressed and encounter foes
+    cannot disengage, at a daily turn tax. A stance, not a default. Requires the device.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class RemoveLimpets:
+    """Strip all attached limpet mines at a service point for a fee (§10, §4.2, WP56)."""
 
 
 Command = (
@@ -651,6 +695,7 @@ Command = (
     | AdvanceAdmission | JoinAlliance | ResignAlliance | PetitionCoreSeizure
     | AssaultStarbase | RepairStarbase | ClaimStarbase
     | BuyFighters | BuyMines | DeployFighters | DeployMines | DeployBeacon
+    | BuyDevice | LaunchProbe | ToggleInterdictor | RemoveLimpets
     | DevPatch  # dev/testing cheat (core.dev); recorded in the log like any command
 )
 
@@ -699,7 +744,7 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
     for sector in result.sectors:
         state.sectors[sector.id] = sector
     for force in result.sector_forces:
-        if force.fighters <= 0 and force.mines <= 0:
+        if force.fighters <= 0 and force.armid_mines <= 0 and force.limpet_mines <= 0:
             state.sector_forces.pop(force.sector_id, None)  # spent forces clear out
         else:
             state.sector_forces[force.sector_id] = force
@@ -813,6 +858,14 @@ def reduce(
             return _deploy_mines(state, player_id, command, config)
         case DeployBeacon():
             return _deploy_beacon(state, player_id, command, config)
+        case BuyDevice():
+            return _buy_device(state, player_id, command, config)
+        case LaunchProbe():
+            return _launch_probe(state, player_id, command, config)
+        case ToggleInterdictor():
+            return _toggle_interdictor(state, player_id, config)
+        case RemoveLimpets():
+            return _remove_limpets(state, player_id, config)
         case DevPatch():
             return apply_dev_patch(state, player_id, command, config)
         case _ as unreachable:
@@ -1075,10 +1128,20 @@ def _territory_entry(
     force = state.sector_forces.get(sector_id)
     encounter: Encounter | None = None
     if force is not None and territory.force_hostile_to_player(state, force, player):
-        if force.mines > 0:
-            raw = force.mines * tc.mine_damage
-            _apply(raw - min(ship.shields, raw), "mine")  # shields absorb first
-            force = replace(force, mines=0)  # mines are spent
+        if force.armid_mines > 0:
+            # A carried mine-deflector absorbs armid mines one-for-one (§10, WP56); shields
+            # then soak the remaining blast before the hull takes it.
+            deflectors = ship.devices.get(tc.mine_deflector_device, 0)
+            effective = max(0, force.armid_mines - deflectors)
+            raw = effective * tc.mine_damage
+            _apply(raw - min(ship.shields, raw), "mine")
+        if force.limpet_mines > 0:
+            # Limpets attach to the entrant, tagged to the owner so their hunters track it.
+            tag = territory.owner_tag(force.owner)
+            ship = replace(ship, limpets={
+                **ship.limpets, tag: ship.limpets.get(tag, 0) + force.limpet_mines})
+        if force.armid_mines > 0 or force.limpet_mines > 0:
+            force = replace(force, armid_mines=0, limpet_mines=0)  # both piles are spent
             forces.append(force)
         if force.fighters > 0:
             encounter = Encounter(
@@ -2238,11 +2301,12 @@ def _deploy_fighters(
     owner = Ownership("player", player_id)
     if existing is not None and existing.owner != owner:
         raise EconomyError("another force already holds this sector")
-    base_mines = existing.mines if existing is not None else 0
     have = existing.fighters if existing is not None else 0
-    force = SectorForce(sector_id=ship.sector_id, owner=owner,
-                        fighters=have + cmd.count, mode=cmd.mode,
-                        toll=cmd.toll, mines=base_mines)
+    force = SectorForce(
+        sector_id=ship.sector_id, owner=owner, fighters=have + cmd.count, mode=cmd.mode,
+        toll=cmd.toll,
+        armid_mines=existing.armid_mines if existing is not None else 0,
+        limpet_mines=existing.limpet_mines if existing is not None else 0)
     new_ship = replace(ship, fighters=ship.fighters - cmd.count)
     return ReduceResult(
         events=(TerritoryDeployed(player_id, ship.sector_id, "fighters", cmd.count, cmd.mode),),
@@ -2253,25 +2317,33 @@ def _deploy_fighters(
 def _deploy_mines(
     state: UniverseState, player_id: int, cmd: DeployMines, config: GameConfig
 ) -> ReduceResult:
-    """Seed the current sector with carried mines (§10, WP41)."""
+    """Seed the current sector with carried mines — armid or limpet (§10, WP41/WP56)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
     _require_deployable_sector(state, ship)
+    if cmd.kind not in ("armid", "limpet"):
+        raise EconomyError(f"unknown mine kind {cmd.kind!r}")
     if cmd.count < 1 or ship.mines < cmd.count:
         raise EconomyError("not enough mines aboard")
     existing = state.sector_forces.get(ship.sector_id)
     owner = Ownership("player", player_id)
     if existing is not None and existing.owner != owner:
         raise EconomyError("another force already holds this sector")
-    have = existing.mines if existing is not None else 0
-    fighters = existing.fighters if existing is not None else 0
-    mode = existing.mode if existing is not None else "defensive"
-    toll = existing.toll if existing is not None else 0
-    force = SectorForce(sector_id=ship.sector_id, owner=owner,
-                        fighters=fighters, mode=mode, toll=toll, mines=have + cmd.count)
+    armid = existing.armid_mines if existing is not None else 0
+    limpet = existing.limpet_mines if existing is not None else 0
+    if cmd.kind == "armid":
+        armid += cmd.count
+    else:
+        limpet += cmd.count
+    force = SectorForce(
+        sector_id=ship.sector_id, owner=owner,
+        fighters=existing.fighters if existing is not None else 0,
+        mode=existing.mode if existing is not None else "defensive",
+        toll=existing.toll if existing is not None else 0,
+        armid_mines=armid, limpet_mines=limpet)
     new_ship = replace(ship, mines=ship.mines - cmd.count)
     return ReduceResult(
-        events=(TerritoryDeployed(player_id, ship.sector_id, "mines", cmd.count),),
+        events=(TerritoryDeployed(player_id, ship.sector_id, f"{cmd.kind}_mines", cmd.count),),
         ships=(new_ship,), sector_forces=(force,),
     )
 
@@ -2292,6 +2364,117 @@ def _deploy_beacon(
     return ReduceResult(
         events=(TerritoryDeployed(player_id, ship.sector_id, "beacon", 1),),
         players=(new_player,), sectors=(new_sector,),
+    )
+
+
+def _buy_device(
+    state: UniverseState, player_id: int, cmd: BuyDevice, config: GameConfig
+) -> ReduceResult:
+    """Buy a probe / interdictor / mine-deflector at the StarDock (§10, §14, WP56)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    spec = config.devices.get(cmd.device_id)
+    if spec is None:
+        raise EconomyError(f"this dock does not stock {cmd.device_id!r}")
+    if player.latinum < spec.price:
+        raise EconomyError(f"need {spec.price} latinum for the {cmd.device_id}")
+    new_ship = replace(ship, devices={
+        **ship.devices, cmd.device_id: ship.devices.get(cmd.device_id, 0) + 1})
+    new_player = replace(player, latinum=player.latinum - spec.price)
+    return ReduceResult(
+        events=(DevicePurchased(player_id, cmd.device_id, spec.price),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _launch_probe(
+    state: UniverseState, player_id: int, cmd: LaunchProbe, config: GameConfig
+) -> ReduceResult:
+    """Send a consumable probe toward a sector, charting its path (§11, §14, WP56).
+
+    Flies the shortest full-graph path (recon *buys* knowledge — no explored-only gate),
+    up to the device's `probe_range` hops, revealing each traversed sector and tallying
+    its contents. Each hop through a hostile-force sector rolls `loss_chance` from
+    `state.rng` (H4) to destroy the probe mid-flight, so deep probing is lossy.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    spec = config.devices.get("probe")
+    if spec is None:
+        raise EconomyError("probes are not sold in this universe")
+    if ship.devices.get("probe", 0) < 1:
+        raise EconomyError("no probe aboard")
+    if cmd.dest_sector not in state.sectors:
+        raise MovementError("no such sector")
+    path = shortest_path(state.adjacency, ship.sector_id, cmd.dest_sector)
+    if path is None:
+        raise MovementError("no route to that sector for the probe")
+
+    charted = set(player.explored_sectors)
+    newly = ports = planets = contacts = 0
+    destroyed = False
+    for sid in path[1:1 + spec.probe_range]:  # sectors beyond the origin, up to the range
+        if sid not in charted:
+            charted.add(sid)
+            newly += 1
+        if state.port_in_sector(sid) is not None:
+            ports += 1
+        planets += sum(1 for pl in state.planets.values() if pl.sector_id == sid)
+        contacts += sum(1 for sp in state.species.values() if sp.sector_id == sid)
+        force = state.sector_forces.get(sid)
+        if (force is not None and territory.force_hostile_to_player(state, force, player)
+                and state.rng.random() < spec.loss_chance):
+            destroyed = True
+            break  # lost before it could report from deeper in
+
+    devices = {**ship.devices, "probe": ship.devices["probe"] - 1}
+    if devices["probe"] <= 0:
+        del devices["probe"]
+    new_ship = replace(ship, devices=devices)
+    new_player = replace(player, explored_sectors=frozenset(charted))
+    return ReduceResult(
+        events=(ProbeReport(player_id, cmd.dest_sector, newly, ports, planets, contacts, destroyed),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _toggle_interdictor(
+    state: UniverseState, player_id: int, config: GameConfig
+) -> ReduceResult:
+    """Engage / disengage the carried interdictor (§14, WP56)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    if ship.devices.get("interdictor", 0) < 1:
+        raise EconomyError("no interdictor aboard")
+    new_ship = replace(ship, interdictor_active=not ship.interdictor_active)
+    return ReduceResult(
+        events=(InterdictorToggled(player_id, new_ship.interdictor_active),),
+        ships=(new_ship,),
+    )
+
+
+def _remove_limpets(
+    state: UniverseState, player_id: int, config: GameConfig
+) -> ReduceResult:
+    """Strip attached limpet mines at a service point for a fee (§10, §4.2, WP56)."""
+    from edge.core.services import service_point
+
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    if service_point(state, player, ship, config) is None:
+        raise EconomyError("limpets can only be removed at a StarDock or a base you own")
+    if not ship.limpets:
+        raise EconomyError("no limpets attached")
+    fee = config.territory.limpet_removal_fee
+    if player.latinum < fee:
+        raise EconomyError(f"need {fee} latinum to strip the limpets")
+    count = sum(ship.limpets.values())
+    new_ship = replace(ship, limpets={})
+    new_player = replace(player, latinum=player.latinum - fee)
+    return ReduceResult(
+        events=(LimpetsRemoved(player_id, count, fee),),
+        players=(new_player,), ships=(new_ship,),
     )
 
 

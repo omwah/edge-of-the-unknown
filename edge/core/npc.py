@@ -78,11 +78,23 @@ def _port_sectors(state: UniverseState) -> list[int]:
 
 
 def _grudge_targets(state: UniverseState, sp: AlienSpecies) -> list[int]:
-    """The sectors of players the species holds an active grudge against (§6.5)."""
+    """The sectors of players this species can hunt (§6.5, §10 WP56).
+
+    A hunter tracks a player it holds an active grudge against, **and** any player carrying
+    a limpet mine tagged to its bloc — the limpet's whole point: it lets the deploying
+    owner's hunters read the limpeted ship's exact current sector even without a personal
+    grudge (a tracking device expressed through the planner that already exists).
+    """
+    from edge.core.territory import limpet_tags_for_species
+
+    limpet_tag = limpet_tags_for_species(sp)
     targets: list[int] = []
     for player in state.players.values():
-        if sp.roster_id in player.grudges and player.ship_id in state.ships:
-            targets.append(state.ships[player.ship_id].sector_id)
+        if player.ship_id not in state.ships:
+            continue
+        ship = state.ships[player.ship_id]
+        if sp.roster_id in player.grudges or ship.limpets.get(limpet_tag, 0) > 0:
+            targets.append(ship.sector_id)
     return sorted(set(targets))
 
 

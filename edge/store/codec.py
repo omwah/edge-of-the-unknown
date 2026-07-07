@@ -28,9 +28,12 @@ from edge.core.events import (
     ColonistsRecruited,
     ColonyGrew,
     CombatRound,
+    InterdictorToggled,
     InvasionRepulsed,
+    LimpetsRemoved,
     PlanetBanked,
     PlanetInvaded,
+    ProbeReport,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -81,6 +84,7 @@ from edge.core.rules import (
     BuildCitadel,
     BuyAlienTech,
     BuyComponent,
+    BuyDevice,
     BuyGenesis,
     BuyMissiles,
     BuyShip,
@@ -104,17 +108,20 @@ from edge.core.rules import (
     InstallComponent,
     InvadePlanet,
     JoinAlliance,
+    LaunchProbe,
     JoinGame,
     PetitionCoreSeizure,
     PlanetDeposit,
     PlanetWithdraw,
     RecruitColonists,
+    RemoveLimpets,
     ResignAlliance,
     RepairAtDock,
     RepairStarbase,
     Salvage,
     SetAllocation,
     SwapComponent,
+    ToggleInterdictor,
     Trade,
     TravelTo,
     Warp,
@@ -251,9 +258,17 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
                 "count": command.count, "mode": command.mode, "toll": command.toll,
             }
         case DeployMines():
-            return "DeployMines", {"count": command.count}
+            return "DeployMines", {"count": command.count, "kind": command.kind}
         case DeployBeacon():
             return "DeployBeacon", {"text": command.text}
+        case BuyDevice():
+            return "BuyDevice", {"device_id": command.device_id}
+        case LaunchProbe():
+            return "LaunchProbe", {"dest_sector": command.dest_sector}
+        case ToggleInterdictor():
+            return "ToggleInterdictor", {}
+        case RemoveLimpets():
+            return "RemoveLimpets", {}
         case DevPatch():
             return "DevPatch", {
                 "op": command.op, "target": command.target, "value": command.value,
@@ -388,9 +403,17 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
         case "DeployFighters":
             return DeployFighters(count=payload["count"], mode=payload["mode"], toll=payload["toll"])
         case "DeployMines":
-            return DeployMines(count=payload["count"])
+            return DeployMines(count=payload["count"], kind=payload.get("kind", "armid"))
         case "DeployBeacon":
             return DeployBeacon(text=payload["text"])
+        case "BuyDevice":
+            return BuyDevice(device_id=payload["device_id"])
+        case "LaunchProbe":
+            return LaunchProbe(dest_sector=payload["dest_sector"])
+        case "ToggleInterdictor":
+            return ToggleInterdictor()
+        case "RemoveLimpets":
+            return RemoveLimpets()
         case "DevPatch":
             return DevPatch(
                 op=payload["op"], target=payload["target"], value=payload["value"],
@@ -518,6 +541,18 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "CitadelCompleted", {"planet_id": event.planet_id, "level": event.level}
         case CitadelGunSilenced():
             return "CitadelGunSilenced", {"player_id": event.player_id, "planet_id": event.planet_id}
+        case ProbeReport():
+            return "ProbeReport", {
+                "player_id": event.player_id, "dest_sector": event.dest_sector,
+                "sectors_charted": event.sectors_charted, "ports": event.ports,
+                "planets": event.planets, "contacts": event.contacts, "destroyed": event.destroyed,
+            }
+        case InterdictorToggled():
+            return "InterdictorToggled", {"player_id": event.player_id, "active": event.active}
+        case LimpetsRemoved():
+            return "LimpetsRemoved", {
+                "player_id": event.player_id, "count": event.count, "fee": event.fee,
+            }
         case PlanetInvaded():
             return "PlanetInvaded", {
                 "player_id": event.player_id, "planet_id": event.planet_id,
@@ -745,6 +780,14 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return CitadelCompleted(payload["planet_id"], payload["level"])
         case "CitadelGunSilenced":
             return CitadelGunSilenced(payload["player_id"], payload["planet_id"])
+        case "ProbeReport":
+            return ProbeReport(payload["player_id"], payload["dest_sector"],
+                               payload["sectors_charted"], payload["ports"],
+                               payload["planets"], payload["contacts"], payload["destroyed"])
+        case "InterdictorToggled":
+            return InterdictorToggled(payload["player_id"], payload["active"])
+        case "LimpetsRemoved":
+            return LimpetsRemoved(payload["player_id"], payload["count"], payload["fee"])
         case "PlanetInvaded":
             return PlanetInvaded(payload["player_id"], payload["planet_id"],
                                  payload["fighters_lost"], payload["colonists"], payload["loot"])

@@ -586,6 +586,41 @@ class CitadelCompleted(Event):
 
 
 @dataclass(frozen=True)
+class ProbeReport(Event):
+    """A launched probe charted its path and reported its findings (§11, §14, WP56).
+
+    `sectors_charted` new sectors were revealed; `ports`/`planets`/`contacts` count what
+    the probe saw en route; `destroyed` is True if it was lost in a hostile sector before
+    reaching `dest_sector`.
+    """
+
+    player_id: int
+    dest_sector: int
+    sectors_charted: int
+    ports: int
+    planets: int
+    contacts: int
+    destroyed: bool
+
+
+@dataclass(frozen=True)
+class InterdictorToggled(Event):
+    """The interdictor was engaged or disengaged (§14, WP56)."""
+
+    player_id: int
+    active: bool
+
+
+@dataclass(frozen=True)
+class LimpetsRemoved(Event):
+    """Attached limpet mines were stripped at a service point (§10, WP56)."""
+
+    player_id: int
+    count: int
+    fee: int
+
+
+@dataclass(frozen=True)
 class CitadelGunSilenced(Event):
     """A planet's citadel gun was knocked out in combat (§4.2, WP55) — a siege rung."""
 
