@@ -363,6 +363,30 @@ class PlanetDirEntry:
 
 
 @dataclass(frozen=True)
+class SeizureStatusDTO:
+    """The Core-seizure checklist for the Computer's alliance panel (§6.3, WP50).
+
+    Computed for the `covets_core` bloc the player has sworn to; its `ready` flag matches
+    the petition reducer's gating exactly (view/reducer lockstep, H4). `*_done`/`*_needed`
+    drive a checkbox list, and `ready` gates the petition action.
+    """
+
+    alliance_id: int
+    alliance_name: str
+    tasks_done: list[str]
+    tasks_needed: list[str]
+    tasks_met: bool
+    bases_razed: int
+    bases_needed: int
+    bases_met: bool
+    fee: int
+    fee_affordable: bool
+    consented: bool
+    already_governs: bool
+    ready: bool
+
+
+@dataclass(frozen=True)
 class ComputerDTO:
     pairs: list[TradePair]
     selected: str
@@ -371,6 +395,7 @@ class ComputerDTO:
     ports: list[PortDirEntry] = field(default_factory=list)
     planets: list[PlanetDirEntry] = field(default_factory=list)
     leads: list[LeadDTO] = field(default_factory=list)
+    seizure: SeizureStatusDTO | None = None  # WP50 Core-seizure checklist (if championing a bloc)
 
 
 @dataclass(frozen=True)

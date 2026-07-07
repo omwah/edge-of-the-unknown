@@ -29,6 +29,7 @@ from edge.core.aliens import (
     HOSTILE as HOSTILE_BAND,
     NEUTRAL as NEUTRAL_BAND,
     admission_met,
+    alliance_standing,
     apply_join_standing,
     apply_resign_standing,
     apply_spillover,
@@ -37,8 +38,11 @@ from edge.core.aliens import (
     effective_disposition,
     is_criminal,
     record_admission_task,
+    record_seizure_task,
+    seizure_progress,
     sour_attitude,
 )
+from edge.core.governance import flip_core_governor
 from edge.core.combat import CombatError
 from edge.core.dev import DevPatch, apply_dev_patch
 
@@ -479,6 +483,20 @@ class ResignAlliance:
 
 
 @dataclass(frozen=True, slots=True)
+class PetitionCoreSeizure:
+    """Champion a `covets_core` bloc into the Core, flipping the governor (§6.3, WP50).
+
+    Rejected unless the player is a sworn member in good standing, the bloc's
+    `core_seizure` ladder is fully paid (its task tokens recorded, `bases_to_raze`
+    Core-planet starbases razed, and the `fee` affordable). On success it applies
+    `flip_core_governor(cause="player_champion")` — the covets_core bloc becomes the new
+    governor and the Core re-keys to it.
+    """
+
+    alliance_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class AssaultStarbase:
     """Attack an operational starbase in the current sector (§4.2, §10 — WP40).
 
@@ -571,7 +589,7 @@ Command = (
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
-    | AdvanceAdmission | JoinAlliance | ResignAlliance
+    | AdvanceAdmission | JoinAlliance | ResignAlliance | PetitionCoreSeizure
     | AssaultStarbase | RepairStarbase | ClaimStarbase
     | BuyFighters | BuyMines | DeployFighters | DeployMines | DeployBeacon
     | DevPatch  # dev/testing cheat (core.dev); recorded in the log like any command
@@ -705,6 +723,8 @@ def reduce(
             return _join_alliance(state, player_id, command, config)
         case ResignAlliance():
             return _resign_alliance(state, player_id, command, config)
+        case PetitionCoreSeizure():
+            return _petition_core_seizure(state, player_id, command, config)
         case AssaultStarbase():
             return _assault_starbase(state, player_id, command, config)
         case RepairStarbase():
@@ -2622,19 +2642,73 @@ def _accept_lead(state: UniverseState, player_id: int, cmd: AcceptLead,
 
 def _advance_admission(state: UniverseState, player_id: int, cmd: AdvanceAdmission,
                        config: GameConfig) -> ReduceResult:
-    """Record one completed admission task in a bloc's ledger (§6.3, WP38)."""
+    """Record one completed admission or Core-seizure task in a bloc's ledger (§6.3, WP38/WP50).
+
+    A task token may belong to the bloc's `admission_price`, its `core_seizure.price`, or
+    both; it is recorded into whichever ledger(s) it belongs — admission into the
+    `@alliance` ledger, seizure into the reserved `@seizure` ledger (WP50) — so seizure
+    progress rides the same replay-safe machinery without double-booking.
+    """
     player = _player(state, player_id)
     if config.roster is None:
         raise EconomyError("no alliances in this game")
     ac = config.roster.alliance(cmd.alliance_id)
     if ac is None:
         raise EconomyError("no such alliance")
-    if cmd.task not in ac.admission_price:
+    in_admission = cmd.task in ac.admission_price
+    in_seizure = ac.core_seizure is not None and cmd.task in ac.core_seizure.price
+    if not in_admission and not in_seizure:
         raise EconomyError(f"{cmd.task!r} is not part of {ac.name}'s admission price")
-    new_player = record_admission_task(player, cmd.alliance_id, cmd.task)
+    new_player = player
+    if in_admission:
+        new_player = record_admission_task(new_player, cmd.alliance_id, cmd.task)
+    if in_seizure:
+        new_player = record_seizure_task(new_player, cmd.alliance_id, cmd.task)
     return ReduceResult(
         events=(AdmissionAdvanced(player_id, cmd.alliance_id, cmd.task),),
         players=(new_player,),
+    )
+
+
+def _petition_core_seizure(state: UniverseState, player_id: int, cmd: PetitionCoreSeizure,
+                           config: GameConfig) -> ReduceResult:
+    """Champion a `covets_core` bloc into the Core, flipping the governor (§6.3, WP50).
+
+    Every gate carries a precise reason (the `_gate_choice` explain-why discipline) so the
+    projection checklist and this reducer stay in lockstep. On success it charges the fee
+    and folds `flip_core_governor` into one `ReduceResult` (game + re-keyed Core planets/
+    bases + relocated incumbents).
+    """
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    if config.roster is None:
+        raise EconomyError("no alliances in this game")
+    ac = config.roster.alliance(cmd.alliance_id)
+    if ac is None:
+        raise EconomyError("no such alliance")
+    if ac.core_seizure is None or not ac.covets_core:
+        raise EconomyError(f"{ac.name} cannot seize the Core")
+    prog = seizure_progress(state, player, ac, ac.core_seizure)
+    if prog.already_governs:
+        raise EconomyError(f"{ac.name} already governs the Core")
+    if not prog.is_member:
+        raise EconomyError(f"you must be a sworn member of {ac.name} to champion them")
+    if not prog.consented:
+        raise EconomyError(f"{ac.name} will not have you champion them at this standing")
+    if not prog.tasks_met:
+        missing = sorted(set(prog.tasks_required) - prog.tasks_done)
+        raise EconomyError(f"{ac.name}'s price is not yet paid: {', '.join(missing)}")
+    if not prog.bases_met:
+        raise EconomyError(
+            f"the incumbent still holds the Core — raze {prog.bases_required - prog.bases_razed} "
+            "more of its Core-planet bases")
+    if not prog.fee_affordable:
+        raise EconomyError(f"you cannot afford {ac.name}'s seizure fee ({prog.fee})")
+    new_player = replace(player, latinum=player.latinum - ac.core_seizure.fee)
+    delta = flip_core_governor(state, config, cmd.alliance_id, cause="player_champion")
+    return ReduceResult(
+        events=delta.events, players=(new_player,), game=delta.game,
+        planets=delta.planets, starbases=delta.starbases, species=delta.species,
     )
 
 

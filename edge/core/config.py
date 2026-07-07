@@ -749,6 +749,22 @@ class EncountersConfig(BaseModel):
     nebula_cover: float = 0.25            # flat detection penalty inside a nebula
 
 
+class SeizureConfig(BaseModel):
+    """A `covets_core` bloc's Core-seizure ladder (DESIGN §6.3, WP50).
+
+    The price a player champions to flip the Core to this bloc: `price` is a list of
+    befriend-price task tokens (the §6.1 vocabulary, recorded in a reserved `species_arcs`
+    seizure ledger), `bases_to_raze` is how many of the incumbent's Core-planet starbases
+    must be razed (counted from state, not double-booked), and `fee` is a flat latinum cost.
+    """
+
+    model_config = _FROZEN
+
+    price: list[Literal["serve", "obey", "prove", "pay", "purge"]] = Field(default_factory=list)
+    bases_to_raze: int = Field(default=0, ge=0)
+    fee: int = Field(default=0, ge=0)
+
+
 class AllianceConfig(BaseModel):
     """One alliance / rival bloc in the roster (DESIGN §6.3).
 
@@ -776,6 +792,14 @@ class AllianceConfig(BaseModel):
     admission_fee: int = Field(default=0, ge=0)  # flat latinum joining cost (§8)
     membership_gate: Literal["open", "petition"] = "open"
     rivals: list[int] = Field(default_factory=list)  # alliance ids this bloc opposes
+    core_seizure: SeizureConfig | None = None  # WP50 Core-seizure ladder (covets_core only)
+
+    @model_validator(mode="after")
+    def _seizure_only_for_coveters(self) -> AllianceConfig:
+        """A Core-seizure ladder is meaningful only on a `covets_core` bloc (§6.3, WP50)."""
+        if self.core_seizure is not None and not self.covets_core:
+            raise ValueError(f"alliance {self.id} has a core_seizure but is not covets_core")
+        return self
 
 
 class SignatureMechanicConfig(BaseModel):

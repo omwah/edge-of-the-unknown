@@ -39,8 +39,11 @@ alliances:
       rivals: [3], membership_gate: petition, admission_price: [prove], admission_fee: 500 }
   - { id: 3, name: Iron Covenant,     banner: "Loyalty & retribution",
       rivals: [2], membership_gate: petition, admission_price: [serve, pay], admission_fee: 1000 }
+  # Liberty Front covets the Core (§6.3): joinable freely, but championing it into the
+  # Core demands a ladder — two befriend-price tasks, two razed Federation Core bases,
+  # and a heavy fee (WP50).
   - { id: 4, name: Liberty Front,     banner: "Self-determination (a front)", covets_core: true,
-      rivals: [1] }
+      rivals: [1], core_seizure: { price: [prove, purge], bases_to_raze: 2, fee: 5000 } }
 
 species:
   # --- Terran Federation — the Core's governing alliance & the player's own people ---

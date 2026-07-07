@@ -96,6 +96,7 @@ from edge.core.rules import (
     InstallComponent,
     JoinAlliance,
     JoinGame,
+    PetitionCoreSeizure,
     RecruitColonists,
     ResignAlliance,
     RepairAtDock,
@@ -207,6 +208,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "JoinAlliance", {"alliance_id": command.alliance_id}
         case ResignAlliance():
             return "ResignAlliance", {}
+        case PetitionCoreSeizure():
+            return "PetitionCoreSeizure", {"alliance_id": command.alliance_id}
         case AssaultStarbase():
             return "AssaultStarbase", {"starbase_id": command.starbase_id}
         case RepairStarbase():
@@ -335,6 +338,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return JoinAlliance(alliance_id=payload["alliance_id"])
         case "ResignAlliance":
             return ResignAlliance()
+        case "PetitionCoreSeizure":
+            return PetitionCoreSeizure(alliance_id=payload["alliance_id"])
         case "AssaultStarbase":
             return AssaultStarbase(starbase_id=payload["starbase_id"])
         case "RepairStarbase":

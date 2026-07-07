@@ -33,6 +33,7 @@ class ComputerScreen(Screen):
         Binding("p", "plot_route", "Plot route"),
         Binding("g", "engage", "Engage"),
         Binding("r", "route_prompt", "Route to…"),
+        Binding("s", "seize_core", "Seize Core"),
         Binding("a", "noop", "Add note"),
     ]
 
@@ -106,6 +107,7 @@ class ComputerScreen(Screen):
                 yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
                 yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
                 yield Static(self._dossier_notes(), classes="note")
+                yield Static(self._seizure_notes(), id="seizure-panel", classes="note")
             with TabPane("Notes", id="notes"):
                 yield Static("[dim]Avoid lists & player notes — Phase 2.[/]")
         yield Footer()
@@ -206,6 +208,44 @@ class ComputerScreen(Screen):
         if not self._computer.dossier:
             return "[dim]Hail a friendly species to begin a dossier.[/]"
         return "\n".join(f"[cyan]{d.species}:[/] [dim]{d.note}[/]" for d in self._computer.dossier)
+
+    def _seizure_notes(self) -> str:
+        """The Core-seizure checklist for a championed covets_core bloc (§6.3, WP50)."""
+        sz = self._computer.seizure
+        if sz is None:
+            return ""
+        if sz.already_governs:
+            return f"[green]⚑ {sz.alliance_name} governs the Core.[/]"
+
+        def check(done: bool) -> str:
+            return "[green]✔[/]" if done else "[red]✗[/]"
+
+        tasks = ", ".join(sz.tasks_needed) or "—"
+        lines = [
+            f"[b]SEIZE THE CORE — {sz.alliance_name}[/]",
+            f"  {check(sz.tasks_met)} tasks: {', '.join(sz.tasks_done) or 'none'} of {tasks}",
+            f"  {check(sz.bases_met)} razed {sz.bases_razed}/{sz.bases_needed} Core bases",
+            f"  {check(sz.fee_affordable)} fee: {sz.fee:,} slips",
+        ]
+        if sz.ready:
+            lines.append("  [b][green]S[/] Petition to seize the Core[/]")
+        return "\n".join(lines)
+
+    def action_seize_core(self) -> None:
+        """Petition to flip the Core to the championed bloc (§6.3, WP50)."""
+        sz = self._computer.seizure
+        if sz is None or not sz.ready:
+            self.notify("No Core seizure is ready to petition.", severity="warning", timeout=3)
+            return
+        from edge.core.rules import PetitionCoreSeizure
+        try:
+            self._service.apply(self._pid, PetitionCoreSeizure(alliance_id=sz.alliance_id))
+        except (EconomyError, MovementError) as exc:
+            self.notify(str(exc), severity="warning", timeout=4)
+            return
+        self.notify(f"The Core is seized — {sz.alliance_name} now governs.", timeout=5)
+        self._computer = self._service.computer_view(self._pid)
+        self.query_one("#seizure-panel", Static).update(self._seizure_notes())
 
     def _market_note(self) -> str:
         if not self._market.enabled:

@@ -92,6 +92,7 @@ from edge.core.rules import (
     InstallComponent,
     JoinAlliance,
     JoinGame,
+    PetitionCoreSeizure,
     RecruitColonists,
     RepairAtDock,
     RepairStarbase,
@@ -145,6 +146,7 @@ COMMANDS: list[Command] = [
     AdvanceAdmission(alliance_id=3, task="pay"), # WP38 complete an admission task
     JoinAlliance(alliance_id=3),                 # WP38 join a bloc
     ResignAlliance(),                            # WP38 leave the current bloc
+    PetitionCoreSeizure(alliance_id=4),          # WP50 champion a covets_core bloc
     AssaultStarbase(starbase_id=2),              # WP40 begin a set-piece assault
     RepairStarbase(2, Subsystem.FUSION_REACTOR, 0, Component.CONVERTER, ComponentTier.I),  # WP40
     ClaimStarbase(starbase_id=2),                # WP40 claim a repaired base
