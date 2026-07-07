@@ -72,7 +72,12 @@ def _make_port(pid: int, sector_id: int, klass: PortClass, size: int, name: str,
         )
         for c in Commodity
     )
-    return Port(id=pid, sector_id=sector_id, name=name, klass=klass, size=size, commodities=lines)
+    # Seed the port's purse at its size-scaled liquidity floor (§8, WP47), so day-one
+    # trading behaves like Phase 1–2: the port can afford to buy, and the daily drip
+    # keeps it topped up. A soft figure when the order-book market is disabled.
+    purse = size * econ.market.min_purse_per_size
+    return Port(id=pid, sector_id=sector_id, name=name, klass=klass, size=size,
+                commodities=lines, latinum=purse)
 
 
 def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> None:

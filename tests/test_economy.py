@@ -267,6 +267,55 @@ def test_trade_rejects_oversell_and_over_capacity() -> None:
                       commodity=Commodity.FUEL_ORE, units=20, unit_price=11)
 
 
+# --- WP47: hard port purses + partial fills ---------------------------------
+
+
+def _port_with_purse(mode: PortMode, stock: int, latinum: int, capacity: int = 1000) -> Port:
+    return Port(
+        id=1, sector_id=3, name="Test", klass=PortClass.CLASS_1, size=capacity // 1000 or 1,
+        commodities=(_line(mode, stock, capacity, 11, 5),), latinum=latinum,
+    )
+
+
+def test_port_sell_credits_the_purse_under_hard_purse() -> None:
+    port = _port_with_purse(PortMode.SELL, stock=500, latinum=1_000)
+    out = execute_trade(port=port, ship=_ship(holds=60), player=_player(10_000),
+                        commodity=Commodity.FUEL_ORE, units=10, unit_price=11, port_purse=True)
+    assert out.units == 10 and out.requested == 10
+    assert out.port.latinum == 1_000 + 110  # the port earned the sale
+
+
+def test_port_buy_partial_fills_to_the_purse_and_conserves_value() -> None:
+    # The port can afford only 12 units at 11/unit (132 <= 140 < 143).
+    port = _port_with_purse(PortMode.BUY, stock=100, latinum=140)
+    ship = _ship(cargo=50, holds=60)
+    player = _player(1_000)
+    out = execute_trade(port=port, ship=ship, player=player,
+                        commodity=Commodity.FUEL_ORE, units=50, unit_price=11, port_purse=True)
+    assert out.requested == 50 and out.units == 12  # capped by the purse
+    assert out.total == 132
+    # Latinum conserved between player and port purse; goods conserved between hold and stock.
+    assert out.player.latinum + out.port.latinum == player.latinum + port.latinum
+    assert out.port.commodities[0].stock + out.ship.cargo.get(Commodity.FUEL_ORE, 0) \
+        == port.commodities[0].stock + ship.cargo.get(Commodity.FUEL_ORE, 0)
+    assert out.port.latinum >= 0
+
+
+def test_port_buy_rejects_when_the_purse_cannot_afford_one_unit() -> None:
+    broke = _port_with_purse(PortMode.BUY, stock=100, latinum=5)  # < 11/unit
+    with pytest.raises(EconomyError):
+        execute_trade(port=broke, ship=_ship(cargo=10, holds=60), player=_player(1_000),
+                      commodity=Commodity.FUEL_ORE, units=10, unit_price=11, port_purse=True)
+
+
+def test_legacy_mode_leaves_the_purse_untouched() -> None:
+    port = _port_with_purse(PortMode.BUY, stock=100, latinum=140)
+    out = execute_trade(port=port, ship=_ship(cargo=50, holds=60), player=_player(1_000),
+                        commodity=Commodity.FUEL_ORE, units=50, unit_price=11)  # port_purse=False
+    assert out.units == 50 and out.requested == 50  # full fill, no purse cap
+    assert out.port.latinum == 140  # soft figure, unchanged
+
+
 def test_trade_rejects_nonpositive_units() -> None:
     with pytest.raises(EconomyError):
         execute_trade(port=_port(PortMode.SELL, 100), ship=_ship(), player=_player(),

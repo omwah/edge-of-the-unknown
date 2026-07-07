@@ -38,7 +38,7 @@ gradient alive for the market (and the player) to arbitrage:
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from edge.core.config import EconomyConfig
@@ -114,6 +114,13 @@ def desired_stock_frac(port: Port, econ: EconomyConfig) -> float:
 def generate_orders(
     state: UniverseState, econ: EconomyConfig
 ) -> dict[int, tuple[PortOrder, ...]]:
+    """Post every port's open orders from `state.ports` (see `orders_from_ports`)."""
+    return orders_from_ports(state.ports, econ)
+
+
+def orders_from_ports(
+    ports: Mapping[int, Port], econ: EconomyConfig
+) -> dict[int, tuple[PortOrder, ...]]:
     """Post every port's open orders from its desired-stock gaps (§8).
 
     For each commodity line, with ``desired = desired_frac × capacity`` and
@@ -140,8 +147,8 @@ def generate_orders(
     """
     band = econ.market.order_band
     book: dict[int, tuple[PortOrder, ...]] = {}
-    for port_id in sorted(state.ports):
-        port = state.ports[port_id]
+    for port_id in sorted(ports):
+        port = ports[port_id]
         frac = desired_stock_frac(port, econ)
         orders: list[PortOrder] = []
         for line in port.commodities:
@@ -281,6 +288,38 @@ def match_orders(
     return Settlement(
         fills=tuple(fills), stock_deltas=stock_deltas, latinum_deltas=latinum_deltas
     )
+
+
+def clear_filled(
+    orders: Mapping[int, tuple[PortOrder, ...]], settlement: Settlement
+) -> dict[int, tuple[PortOrder, ...]]:
+    """The residual book after a settlement: each order's filled quantity removed (§8, WP47).
+
+    Sums the fills against each `(port, commodity, side)` order and subtracts them;
+    an order filled to zero is dropped, and a port left with no open orders is omitted.
+    Pure and deterministic — the next economy tick replaces the book wholesale anyway,
+    but between a settlement and that regeneration the book must reflect what already
+    traded so a projection (WP48) never shows a filled order as still open.
+    """
+    filled: dict[tuple[int, Commodity, Side], int] = {}
+    for fill in settlement.fills:
+        filled[fill.buyer_port_id, fill.commodity, "buy"] = (
+            filled.get((fill.buyer_port_id, fill.commodity, "buy"), 0) + fill.qty
+        )
+        filled[fill.seller_port_id, fill.commodity, "sell"] = (
+            filled.get((fill.seller_port_id, fill.commodity, "sell"), 0) + fill.qty
+        )
+    residual: dict[int, tuple[PortOrder, ...]] = {}
+    for port_id in sorted(orders):
+        kept: list[PortOrder] = []
+        for order in orders[port_id]:
+            done = filled.get((order.port_id, order.commodity, order.side), 0)
+            remaining = order.qty - done
+            if remaining > 0:
+                kept.append(replace(order, qty=remaining))
+        if kept:
+            residual[port_id] = tuple(kept)
+    return residual
 
 
 def hinterland_drift(

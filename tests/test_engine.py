@@ -117,7 +117,8 @@ def test_cron_cadence_fires_once_per_interval(tmp_path: Path) -> None:
     # hourly (interval 2) at ticks 2 and 4; the day crons (interval 5) at tick 5.
     assert fired_by_tick[1] == ["hourly_port_economy", "hourly_planet_growth"]  # tick 2
     assert fired_by_tick[3] == ["hourly_port_economy", "hourly_planet_growth"]  # tick 4
-    assert fired_by_tick[4] == ["interest_accrual", "daily_turn_reset"]  # tick 5
+    # the day crons (interval 5) at tick 5: settlement, interest, turn reset (WP47 adds settlement)
+    assert fired_by_tick[4] == ["market_settlement", "interest_accrual", "daily_turn_reset"]
     assert fired_by_tick[0] == [] and fired_by_tick[2] == []  # no spurious/double fires
 
 
@@ -351,8 +352,9 @@ def _trader_world(*, player_sector: int | None = None) -> UniverseState:
         outs = tuple(j for j in (i - 1, i + 1) if 1 <= j <= 3)
         state.sectors[i] = Sector(i, 1, outs, "Frontier")
     state.rebuild_adjacency()
+    # Seed a purse so the port can afford to buy under the WP47 hard-purse rule (market on).
     state.ports[1] = Port(id=1, sector_id=2, name="Depot", klass=PortClass.CLASS_1, size=1,
-                          commodities=(_FUEL_DEAL, _ORG_BUY))
+                          commodities=(_FUEL_DEAL, _ORG_BUY), latinum=10_000)
     if player_sector is not None:
         state.ships[1] = Ship(id=1, type_id="t", name="P", owner_player_id=1,
                               sector_id=player_sector, holds_total=10)
@@ -441,3 +443,89 @@ def test_ticked_trading_reproduces_to_an_identical_hash() -> None:
             apply_result(state, trader_step(state, CFG42))
         return state_hash(state)
     assert run() == run()
+
+
+# --- WP47: the order-book market crons ---
+
+from edge.core.events import MarketSettled, PortOrderFilled
+from edge.engine.cron import hourly_port_economy, market_settlement
+
+
+def _market_config(enabled: bool) -> GameConfig:
+    base = load_default_config()
+    econ = base.economy.model_copy(
+        update={"market": base.economy.market.model_copy(update={"enabled": enabled})})
+    return base.model_copy(update={"economy": econ})
+
+
+def _market_world(*, explored: frozenset[int] = frozenset()) -> UniverseState:
+    """A 1-2-3 chain with a shortage port (sector 2) and a surplus port (sector 3)."""
+    state = UniverseState.new(Game(1, 7, 4, "t", core_governing_alliance_id=1))
+    for i in range(1, 4):
+        outs = tuple(j for j in (i - 1, i + 1) if 1 <= j <= 3)
+        state.sectors[i] = Sector(i, 1, outs, "Frontier")
+    state.rebuild_adjacency()
+
+    def _port(pid: int, sector: int, stock: int) -> Port:
+        lines = tuple(PortCommodity(c, PortMode.SELL, stock, 1000, 11, 5) for c in Commodity)
+        return Port(id=pid, sector_id=sector, name=f"P{pid}", klass=PortClass.CLASS_1,
+                    size=1, commodities=lines, latinum=10_000)
+    state.ports = {1: _port(1, 2, 100), 2: _port(2, 3, 900)}  # shortage, surplus
+    state.ships[1] = Ship(id=1, type_id="t", name="P", owner_player_id=1, sector_id=1,
+                          holds_total=10)
+    state.players[1] = Player(id=1, name="P", ship_id=1, latinum=0, explored_sectors=explored)
+    return state
+
+
+def test_legacy_economy_tick_is_byte_identical_to_regen() -> None:
+    """With the market disabled, `hourly_port_economy` is the exact legacy regen body."""
+    cfg = _market_config(enabled=False)
+    state = _market_world()
+    got = hourly_port_economy(state, cfg)
+    want = regenerate_ports(state, cfg)
+    assert {p.id: p for p in got.ports} == {p.id: p for p in want.ports}
+    assert got.port_orders is None  # legacy path posts no order book
+
+
+def test_market_tick_posts_a_book_then_settlement_moves_goods() -> None:
+    cfg = _market_config(enabled=True)
+    state = _market_world()
+    apply_result(state, hourly_port_economy(state, cfg))
+    assert state.port_orders  # the book was posted
+    result = market_settlement(state, cfg)
+    apply_result(state, result)
+    # Goods moved shortage-ward: the low-stock port gained, the high-stock port lost.
+    assert state.ports[1].line(Commodity.FUEL_ORE).stock > 100
+    assert state.ports[2].line(Commodity.FUEL_ORE).stock < 900
+    assert any(isinstance(e, MarketSettled) for e in result.events)
+
+
+def test_settlement_events_are_fog_filtered() -> None:
+    cfg = _market_config(enabled=True)
+    # The player has explored only sector 2 (the shortage port), not sector 3.
+    state = _market_world(explored=frozenset({2}))
+    apply_result(state, hourly_port_economy(state, cfg))
+    result = market_settlement(state, cfg)
+    filled = [e for e in result.events if isinstance(e, PortOrderFilled)]
+    assert filled  # some matches occurred
+    assert all(e.port_id == 1 for e in filled)  # never names the unexplored port (id 2, sector 3)
+
+
+def test_ticked_market_reloads_to_an_identical_hash() -> None:
+    """The market crons ride the WP12 replay rail: same firings ⇒ identical `state_hash`."""
+    cfg = _market_config(enabled=True)
+
+    def run() -> str:
+        state = _market_world(explored=frozenset({2, 3}))
+        for _ in range(3):
+            apply_result(state, hourly_port_economy(state, cfg))
+            apply_result(state, market_settlement(state, cfg))
+        return state_hash(state)
+    assert run() == run()
+
+
+def test_settlement_is_inert_with_an_empty_book() -> None:
+    cfg = _market_config(enabled=True)
+    state = _market_world()  # no hourly tick yet ⇒ no orders
+    result = market_settlement(state, cfg)
+    assert result.events == () and result.ports == () and result.port_orders is None

@@ -87,9 +87,10 @@ class TradeOutcome:
     player: Player
     commodity: Commodity
     mode: PortMode  # the port's mode for this commodity
-    units: int
+    units: int  # units actually filled (< requested only when a hard purse caps it, WP47)
     unit_price: int
     total: int  # units * unit_price, in slips
+    requested: int = 0  # units the trader asked for; == units unless the port's purse capped it
 
 
 def _with_stock(port: Port, commodity: Commodity, new_stock: int) -> Port:
@@ -117,14 +118,21 @@ def execute_trade(
     commodity: Commodity,
     units: int,
     unit_price: int,
+    port_purse: bool = False,
 ) -> TradeOutcome:
     """Move `units` of `commodity` between ship and port at the agreed `unit_price`.
 
     The direction is the port's mode for that commodity. Raises `EconomyError` if
     the trade would violate an invariant (unaffordable, oversell, over-capacity,
     insufficient holds/stock). Goods are conserved; the player's latinum is minted
-    (port buys) or burned (port sells). `Port.latinum` is a soft figure in Phase 1
-    (ports never go broke, §8) and is left unchanged here.
+    (port buys) or burned (port sells).
+
+    `port_purse` toggles the WP47 hard-purse rule (on when the order-book market is
+    enabled — `config_version 4`). When set, `Port.latinum` is a real balance: a
+    port-sell *credits* the purse, and a port-buy *debits* it and is capped to what
+    the purse can afford — the trade then **fills partially** (`units` < `requested`).
+    When clear (legacy Phase 1–3), the purse is the old soft figure, left unchanged,
+    and every trade fills in full.
     """
     if units <= 0:
         raise EconomyError("trade units must be positive")
@@ -132,31 +140,42 @@ def execute_trade(
     if line is None:
         raise EconomyError(f"port {port.id} does not trade {commodity.value}")
 
-    total = units * unit_price
+    requested = units
 
     if line.mode is PortMode.SELL:  # player buys from the port
         if units > line.stock:
             raise EconomyError("port lacks the stock to sell")
         if units > ship.holds_free:
             raise EconomyError("not enough free holds")
+        total = units * unit_price
         if total > player.latinum:
             raise EconomyError("insufficient latinum")
         new_port = _with_stock(port, commodity, line.stock - units)
         new_ship = _with_cargo(ship, commodity, ship.cargo.get(commodity, 0) + units)
         new_player = replace(player, latinum=player.latinum - total)  # burned
+        if port_purse:
+            new_port = replace(new_port, latinum=port.latinum + total)  # port earns
     else:  # PortMode.BUY — player sells into the port
         held = ship.cargo.get(commodity, 0)
         if units > held:
             raise EconomyError("ship lacks the goods to sell")
         if line.stock + units > line.capacity:
             raise EconomyError("port lacks the capacity to absorb")
+        if port_purse:  # the port pays from a real purse — cap the fill to what it can afford
+            affordable = port.latinum // unit_price if unit_price > 0 else units
+            units = min(units, affordable)
+            if units <= 0:
+                raise EconomyError("the port cannot afford to buy")
+        total = units * unit_price
         new_port = _with_stock(port, commodity, line.stock + units)
         new_ship = _with_cargo(ship, commodity, held - units)
         new_player = replace(player, latinum=player.latinum + total)  # minted
+        if port_purse:
+            new_port = replace(new_port, latinum=port.latinum - total)  # port spends
 
     return TradeOutcome(
         port=new_port, ship=new_ship, player=new_player, commodity=commodity,
-        mode=line.mode, units=units, unit_price=unit_price, total=total,
+        mode=line.mode, units=units, unit_price=unit_price, total=total, requested=requested,
     )
 
 

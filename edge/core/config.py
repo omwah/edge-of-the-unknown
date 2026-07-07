@@ -1269,6 +1269,7 @@ class CronCadenceConfig(BaseModel):
     interest_accrual: int = Field(default=1200, ge=1)   # every 20 minutes
     port_economy: int = Field(default=1200, ge=1)       # every 20 minutes
     planet_growth: int = Field(default=1200, ge=1)      # every 20 minutes
+    market_settlement: int = Field(default=1200, ge=1)  # daily order-book settlement (§8, WP47)
     alien_drift: int = Field(default=120, ge=1)         # every 2 minutes
     trader_step: int = Field(default=120, ge=1)         # every 2 minutes (NPC traders work the lanes, WP43)
 
