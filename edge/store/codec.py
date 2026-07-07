@@ -30,6 +30,8 @@ from edge.core.events import (
     ContractAccepted,
     ContractCompleted,
     ContractFailed,
+    NoticePosted,
+    RumorHeard,
     CombatRound,
     InterdictorToggled,
     InvasionRepulsed,
@@ -94,11 +96,13 @@ from edge.core.rules import (
     Cannibalize,
     ClaimStarbase,
     AbandonContract,
+    BuyRumor,
     Colonize,
     CombatAction,
     Command,
     Converse,
     DeliverContract,
+    PostNotice,
     DeployBeacon,
     DeployFighters,
     DeployGenesis,
@@ -240,6 +244,10 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "DeliverContract", {"contract_id": command.contract_id}
         case AbandonContract():
             return "AbandonContract", {"contract_id": command.contract_id}
+        case BuyRumor():
+            return "BuyRumor", {}
+        case PostNotice():
+            return "PostNotice", {"text": command.text}
         case AdvanceAdmission():
             return "AdvanceAdmission", {"alliance_id": command.alliance_id, "task": command.task}
         case JoinAlliance():
@@ -391,6 +399,10 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return DeliverContract(contract_id=payload["contract_id"])
         case "AbandonContract":
             return AbandonContract(contract_id=payload["contract_id"])
+        case "BuyRumor":
+            return BuyRumor()
+        case "PostNotice":
+            return PostNotice(text=payload["text"])
         case "AdvanceAdmission":
             return AdvanceAdmission(alliance_id=payload["alliance_id"], task=payload["task"])
         case "JoinAlliance":
@@ -598,6 +610,13 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "contract_id": event.contract_id,
                 "kind": event.kind, "reason": event.reason,
             }
+        case RumorHeard():
+            return "RumorHeard", {
+                "player_id": event.player_id, "kind": event.kind, "ref": event.ref,
+                "sector_id": event.sector_id, "price": event.price,
+            }
+        case NoticePosted():
+            return "NoticePosted", {"player_id": event.player_id, "day": event.day}
         case TurnsReset():
             return "TurnsReset", {"player_id": event.player_id, "turns": event.turns}
         case StockRegenerated():
@@ -835,6 +854,11 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "ContractFailed":
             return ContractFailed(payload["player_id"], payload["contract_id"],
                                   payload["kind"], payload["reason"])
+        case "RumorHeard":
+            return RumorHeard(payload["player_id"], payload["kind"], payload["ref"],
+                              payload["sector_id"], payload["price"])
+        case "NoticePosted":
+            return NoticePosted(payload["player_id"], payload["day"])
         case "TurnsReset":
             return TurnsReset(payload["player_id"], payload["turns"])
         case "StockRegenerated":

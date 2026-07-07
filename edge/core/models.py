@@ -390,6 +390,21 @@ class Contract:
 
 
 @dataclass(frozen=True, slots=True)
+class Notice:
+    """One posted noticeboard message (DESIGN §14 — WP58).
+
+    A captain's log pinned where you drink; in Phase 4 the same state is the shared board
+    (many authors). `text` is sanitised at the reducer (length-capped, printable-only — the
+    one string-input command in the game). Rides `state_hash` as a capped ring on
+    `UniverseState.notices` (oldest evicted past `tavern.notice_cap`).
+    """
+
+    author_player_id: int
+    day: int
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
 class EncounterFoe:
     """One hostile ship of an encounter pack (DESIGN §10, WP24).
 
@@ -706,6 +721,11 @@ class UniverseState:
     # `market_settlement` cron, so it reconstructs under the (seed, maintenance log) rail.
     # A total replacement each generation (never appended), so the book stays bounded.
     port_orders: dict[int, tuple[PortOrder, ...]] = field(default_factory=dict)
+    # Posted noticeboard messages (DESIGN §14, WP58) — a capped ring (oldest evicted past
+    # `tavern.notice_cap`), hashed state appended by the `PostNotice` command so it
+    # reconstructs under (seed, command log). Single-player a captain's log; the shared
+    # board in Phase 4 (same state, many authors).
+    notices: tuple[Notice, ...] = ()
     adjacency: dict[int, tuple[int, ...]] = field(default_factory=dict)
     # Hop distance from the Core (sector 1) per sector — a runtime-only cache (like
     # adjacency, excluded from `state_hash`) driving the warp "gravity" arrows (§11).

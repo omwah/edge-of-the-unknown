@@ -16,6 +16,8 @@ from edge.core.events import (
     ContractAccepted,
     ContractCompleted,
     ContractFailed,
+    NoticePosted,
+    RumorHeard,
     AllianceJoined,
     AllianceResigned,
     AttitudeChanged,
@@ -76,7 +78,9 @@ from edge.core.events import (
 from edge.core.rules import (
     AbandonContract,
     AcceptLead,
+    BuyRumor,
     DeliverContract,
+    PostNotice,
     AdvanceAdmission,
     AssaultStarbase,
     BarterArtifact,
@@ -173,6 +177,8 @@ COMMANDS: list[Command] = [
     AcceptLead(species_id=3),                    # §6.7 log an alien's coordinate tip
     DeliverContract(contract_id=2),              # WP57 fulfil a deliver favor
     AbandonContract(contract_id=2),              # WP57 release a favor
+    BuyRumor(),                                  # WP58 buy a tavern rumor
+    PostNotice(text="fuel cheap in the Deep"),   # WP58 pin a noticeboard message
     AdvanceAdmission(alliance_id=3, task="pay"), # WP38 complete an admission task
     JoinAlliance(alliance_id=3),                 # WP38 join a bloc
     ResignAlliance(),                            # WP38 leave the current bloc
@@ -246,6 +252,8 @@ EVENTS: list[Event] = [
     ContractAccepted(1, 2, "deliver", "terran", 450, 13),  # WP57 took a favor
     ContractCompleted(1, 2, "deliver", 450),               # WP57 fulfilled a favor
     ContractFailed(1, 2, "escort", "deadline"),            # WP57 a favor lapsed
+    RumorHeard(1, "discovery", 42, 17, 500),               # WP58 bought a tavern rumor
+    NoticePosted(1, 5),                                    # WP58 pinned a notice
     EncounterStarted(1, 3, 55, True, 3, "Deep"),   # WP24 a violence opener
     EncounterStarted(1, 3, 55, False, 0, "Deep"),  # WP24 a peaceful interception
     EncounterEvaded(1, 3, 55),                     # WP24 slipped away unseen

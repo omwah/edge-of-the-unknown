@@ -401,6 +401,26 @@ class ContractDTO:
 
 
 @dataclass(frozen=True)
+class NoticeDTO:
+    """One posted noticeboard message for the tavern panel (§14, WP58)."""
+
+    author: str  # "You" or "Captain #<id>"
+    day: int
+    text: str
+
+
+@dataclass(frozen=True)
+class TavernDTO:
+    """The StarDock tavern — rumors, the bounty board, and the noticeboard (§14, WP58)."""
+
+    rumor_price: int
+    rumor_available: bool  # a fresh tip can be bought right now (at the dock)
+    bounties: list[str] = field(default_factory=list)  # voiced bounty-board lines
+    notices: list[NoticeDTO] = field(default_factory=list)  # newest last
+    contracts: list["ContractDTO"] = field(default_factory=list)  # the player's active favors
+
+
+@dataclass(frozen=True)
 class ComputerDTO:
     pairs: list[TradePair]
     selected: str

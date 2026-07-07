@@ -11,14 +11,15 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
+from textual.screen import ModalScreen, Screen
+from textual.widgets import DataTable, Footer, Input, Static, TabbedContent, TabPane
 
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier
 from edge.core.rules import (
-    BuyComponent, BuyDevice, BuyGenesis, BuyMissiles, BuyShip, RecruitColonists,
+    BuyComponent, BuyDevice, BuyGenesis, BuyMissiles, BuyRumor, BuyShip, PostNotice,
+    RecruitColonists,
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
@@ -37,7 +38,8 @@ class StarDockScreen(Screen):
         Binding("i", "buy_missiles", "Buy missile"),
         Binding("k", "recruit", "Recruit colonists"),
         Binding("e", "engine_room", "Engine room"),
-        Binding("r", "noop", "Repair"),
+        Binding("r", "buy_rumor", "Rumor"),
+        Binding("n", "post_notice", "Notice"),
     ]
 
     CSS = """
@@ -108,8 +110,31 @@ class StarDockScreen(Screen):
             with TabPane("Bank", id="bank"):
                 yield Static("[dim]Deposit / withdraw / interest — Phase 2.[/]")
             with TabPane("Tavern", id="tavern"):
-                yield Static("[dim]Rumors & contracts — Phase 5.[/]")
+                yield from self._tavern_panels()
         yield Footer()
+
+    def _tavern_panels(self) -> ComposeResult:
+        """Rumors, the bounty board, and the noticeboard (§14, WP58)."""
+        tav = self._service.tavern_view(self._pid)
+        buyable = ("[green]a fresh rumour is on offer[/]" if tav.rumor_available
+                   else "[dim]no fresh rumours right now[/]")
+        yield Static(f"[b]TAVERN[/]        rumour: [yellow]{tav.rumor_price:,}[/] slips — {buyable}")
+        yield Static("[dim]R buys a rumour (logs a lead).  N posts a notice.[/]", classes="note")
+        yield Static("[b]BOUNTY BOARD[/]")
+        board = DataTable(id="bounty-table", cursor_type="row")
+        board.add_columns("Notice")
+        for line in tav.bounties or ["[dim]The board is quiet.[/]"]:
+            board.add_row(line)
+        yield board
+        yield Static("[b]NOTICEBOARD[/]")
+        notices = DataTable(id="notices-table", cursor_type="row")
+        notices.add_columns("Day", "By", "Notice")
+        if tav.notices:
+            for n in tav.notices:
+                notices.add_row(f"d{n.day}", n.author, n.text)
+        else:
+            notices.add_row("", "", "[dim]nothing pinned yet[/]")
+        yield notices
 
     def on_mount(self) -> None:
         # Restore the highlighted row on the buy tab we rebuilt from (see _issue),
@@ -217,6 +242,17 @@ class StarDockScreen(Screen):
         self.app.push_screen(
             StarDockScreen(self._service, self._pid, initial_tab=active, initial_cursor=cursor))
 
+    def action_buy_rumor(self) -> None:
+        """Buy a rumour at the tavern — logs a coordinate lead (§14, WP58)."""
+        self._issue(BuyRumor(), "A rumour points the way — lead logged")
+
+    def action_post_notice(self) -> None:
+        """Prompt for a noticeboard message and pin it (§14, WP58)."""
+        def _post(text: str | None) -> None:
+            if text:
+                self._issue(PostNotice(text=text), "Notice pinned")
+        self.app.push_screen(_NoticeInput(), _post)
+
     def action_engine_room(self) -> None:
         self.app.push_screen(EngineRoomScreen(
             self._service.engine_room_view(self._pid), self._service, self._pid))
@@ -226,3 +262,26 @@ class StarDockScreen(Screen):
 
     def action_noop(self) -> None:
         self.notify("Not wired in the skeleton.", timeout=2)
+
+
+class _NoticeInput(ModalScreen[str | None]):
+    """A one-line prompt for a noticeboard message (§14, WP58)."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+    CSS = """
+    _NoticeInput { align: center middle; }
+    _NoticeInput Input { width: 60; }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Static("[b]Post a notice[/]  (Enter to pin, Esc to cancel)")
+        yield Input(placeholder="your message…", id="notice-input")
+
+    def on_mount(self) -> None:
+        self.query_one("#notice-input", Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value.strip() or None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
