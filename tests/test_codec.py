@@ -42,7 +42,9 @@ from edge.core.events import (
     Event,
     Haggled,
     LeadAccepted,
+    MarketSettled,
     PlanetProduced,
+    PortOrderFilled,
     Repaired,
     SalvageCollected,
     ShipDestroyed,
@@ -164,6 +166,9 @@ EVENTS: list[Event] = [
     Warped(1, 7, 12, 1, one_way=True),  # one-way warp heads-up (§9)
     Docked(1, 12, 3),
     Traded(1, 3, Commodity.FUEL_ORE, PortMode.SELL, 10, 13, 130),
+    Traded(1, 3, Commodity.ORGANICS, PortMode.BUY, 12, 6, 72, 20),  # WP47 partial fill (requested 20)
+    MarketSettled(4, 120, 900),                        # WP47 daily settlement summary
+    PortOrderFilled(3, Commodity.FUEL_ORE, "buy", 40, 9, 5),  # WP47 one explored-port fill
     Haggled(1, 3, Commodity.ORGANICS, "accepted", 6),
     Banked(1, "interest", 50, 10_050),
     ComponentPurchased(1, "turbine", "II", 8_000),

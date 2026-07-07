@@ -161,8 +161,12 @@ def _with_line_stock(port: Port, commodity: Commodity, new_stock: int) -> Port:
 
 
 def _resolve_sell(port: Port, sp: AlienSpecies, commodity: Commodity, units: int,
-                  price: int, line_stock: int) -> NpcTrade:
-    """Trader sells `units` of held cargo into the port (goods conserved; cash minted)."""
+                  price: int, line_stock: int, *, port_purse: bool) -> NpcTrade:
+    """Trader sells `units` of held cargo into the port (goods conserved; cash minted).
+
+    Under the WP47 hard purse (`port_purse`), the port pays from `Port.latinum`, so a
+    merchant genuinely drains a small port — the arbitrage texture the book exists for.
+    """
     cargo = dict(sp.cargo)
     remaining = cargo[commodity] - units
     if remaining > 0:
@@ -171,16 +175,20 @@ def _resolve_sell(port: Port, sp: AlienSpecies, commodity: Commodity, units: int
         del cargo[commodity]
     new_sp = replace(sp, cargo=cargo, cash=sp.cash + units * price)
     new_port = _with_line_stock(port, commodity, line_stock + units)
+    if port_purse:
+        new_port = replace(new_port, latinum=port.latinum - units * price)  # port spends
     return NpcTrade(new_port, new_sp, commodity, PortMode.BUY, units, price, units * price)
 
 
 def _resolve_buy(port: Port, sp: AlienSpecies, commodity: Commodity, units: int,
-                 price: int, line_stock: int) -> NpcTrade:
+                 price: int, line_stock: int, *, port_purse: bool) -> NpcTrade:
     """Trader buys `units` from the port into its hold (goods conserved; cash burned)."""
     cargo = dict(sp.cargo)
     cargo[commodity] = cargo.get(commodity, 0) + units
     new_sp = replace(sp, cargo=cargo, cash=sp.cash - units * price)
     new_port = _with_line_stock(port, commodity, line_stock - units)
+    if port_purse:
+        new_port = replace(new_port, latinum=port.latinum + units * price)  # port earns
     return NpcTrade(new_port, new_sp, commodity, PortMode.SELL, units, price, units * price)
 
 
@@ -198,6 +206,7 @@ def plan_trade(state: UniverseState, sp: AlienSpecies, config: GameConfig) -> Np
         return None
     econ = config.economy
     ac = config.aliens
+    port_purse = econ.market.enabled  # WP47: the port pays/earns from a real balance
 
     # 1. Sell — dump held cargo the port buys, choosing the largest-latinum stack.
     sell_best: NpcTrade | None = None
@@ -207,11 +216,14 @@ def plan_trade(state: UniverseState, sp: AlienSpecies, config: GameConfig) -> Np
         held = sp.cargo.get(line.commodity, 0)
         room = line.capacity - line.stock
         units = min(held, room, ac.trader_trade_units)
+        price = port_unit_price(line, econ)
+        if port_purse and price > 0:
+            units = min(units, port.latinum // price)  # the port can't buy past its purse
         if units <= 0:
             continue
-        price = port_unit_price(line, econ)
         if sell_best is None or units * price > sell_best.total:
-            sell_best = _resolve_sell(port, sp, line.commodity, units, price, line.stock)
+            sell_best = _resolve_sell(port, sp, line.commodity, units, price, line.stock,
+                                      port_purse=port_purse)
     if sell_best is not None:
         return sell_best
 
@@ -229,5 +241,6 @@ def plan_trade(state: UniverseState, sp: AlienSpecies, config: GameConfig) -> Np
         if units <= 0:
             continue
         if buy_best is None or price < buy_best.unit_price:
-            buy_best = _resolve_buy(port, sp, line.commodity, units, price, line.stock)
+            buy_best = _resolve_buy(port, sp, line.commodity, units, price, line.stock,
+                                    port_purse=port_purse)
     return buy_best

@@ -20,6 +20,7 @@ from edge.core.enums import Commodity, PortClass, PortMode
 from edge.core.market import (
     PortOrder,
     Settlement,
+    clear_filled,
     desired_stock_frac,
     generate_orders,
     hinterland_drift,
@@ -321,3 +322,37 @@ def test_liquidity_drip_never_overshoots(purse: int, size: int) -> None:
     floor = size * ECON.market.min_purse_per_size
     assert drip >= 0
     assert purse + drip <= max(purse, floor)
+
+
+# --- clearing filled orders (WP47) --------------------------------------------
+
+
+def test_clear_filled_subtracts_fills_and_drops_exhausted_orders() -> None:
+    ports = {
+        1: _port(1, stocks={c: 100 for c in Commodity}),  # shortage: buys
+        2: _port(2, stocks={c: 900 for c in Commodity}),  # surplus: sells
+    }
+    orders = generate_orders(_state(ports), ECON)
+    settlement = match_orders(orders, ports, ECON)
+    assert settlement.fills
+    residual = clear_filled(orders, settlement)
+    # Every residual order's remaining qty equals its original minus what filled.
+    filled: dict[tuple[int, Commodity, str], int] = {}
+    for f in settlement.fills:
+        filled[f.buyer_port_id, f.commodity, "buy"] = filled.get((f.buyer_port_id, f.commodity, "buy"), 0) + f.qty
+        filled[f.seller_port_id, f.commodity, "sell"] = filled.get((f.seller_port_id, f.commodity, "sell"), 0) + f.qty
+    for os in orders.values():
+        for o in os:
+            remaining = o.qty - filled.get((o.port_id, o.commodity, o.side), 0)
+            kept = [r for r in residual.get(o.port_id, ()) if r.commodity is o.commodity and r.side == o.side]
+            if remaining > 0:
+                assert kept and kept[0].qty == remaining
+            else:
+                assert not kept  # fully filled ⇒ dropped
+
+
+def test_clear_filled_is_a_noop_without_fills() -> None:
+    ports = {1: _port(1, stocks={c: 500 for c in Commodity})}  # at pivot: no orders
+    orders = generate_orders(_state(ports), ECON)
+    settlement = match_orders(orders, ports, ECON)
+    assert clear_filled(orders, settlement) == orders

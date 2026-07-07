@@ -19,7 +19,12 @@ from edge.core.config import GameConfig
 from edge.core.economy import accrue_interest as _accrue
 from edge.core.enums import PortClass
 from edge.core.events import (
-    AlienMoved, AttitudeChanged, Banked, ColonyGrew, Event, PlanetProduced, TurnsReset,
+    AlienMoved, AttitudeChanged, Banked, ColonyGrew, Event, MarketSettled,
+    PlanetProduced, PortOrderFilled, TurnsReset,
+)
+from edge.core.market import (
+    clear_filled, desired_stock_frac, hinterland_drift, liquidity_drip, match_orders,
+    orders_from_ports,
 )
 from edge.core.models import AlienSpecies, Player, Port, UniverseState
 from edge.core.planets import produce
@@ -29,9 +34,85 @@ from edge.engine.port_economy import regenerate_ports
 CronFn = Callable[[UniverseState, GameConfig], ReduceResult]
 
 __all__ = [
-    "daily_turn_reset", "accrue_interest", "regenerate_ports", "planet_growth",
-    "alien_drift", "trader_step", "CronFn", "CRONS", "resolve_cron",
+    "daily_turn_reset", "accrue_interest", "regenerate_ports", "hourly_port_economy",
+    "market_settlement", "planet_growth", "alien_drift", "trader_step", "CronFn",
+    "CRONS", "resolve_cron",
 ]
+
+
+def hourly_port_economy(state: UniverseState, config: GameConfig) -> ReduceResult:
+    """The hourly port-economy tick: order-book market, or the legacy regen (§8, WP47).
+
+    With ``economy.market.enabled`` (the `config_version 4` default) each port's
+    unseen hinterland trickles a little stock toward its pivot (`hinterland_drift`,
+    a much gentler residual than the legacy 5%) and then the whole order book is
+    reposted from the drifted stocks (`orders_from_ports`) — a total replacement, so
+    the book stays bounded and reconstructs under replay. With the market disabled
+    this is the **byte-identical** legacy `regenerate_ports` body (the durable cron
+    name is unchanged so old saves resolve to the same reducer).
+    """
+    econ = config.economy
+    if not econ.market.enabled:
+        return regenerate_ports(state, config)
+    new_ports = [
+        replace(port, commodities=tuple(
+            replace(line, stock=hinterland_drift(line, econ,
+                                                 desired_frac=desired_stock_frac(port, econ)))
+            for line in port.commodities
+        ))
+        for port in state.ports.values()
+    ]
+    book = orders_from_ports({p.id: p for p in new_ports}, econ)
+    return ReduceResult(ports=tuple(new_ports), port_orders=book)
+
+
+def market_settlement(state: UniverseState, config: GameConfig) -> ReduceResult:
+    """The daily order-book settlement: match the book, move goods+latinum, drip purses (§8, WP47).
+
+    Matches every crossed order (`match_orders`, conservation self-asserted), applies
+    the resulting stock and purse deltas to the ports, tops each purse toward its
+    liquidity floor (`liquidity_drip`), and clears filled orders from the book. Emits
+    one fog-safe `MarketSettled` aggregate plus a `PortOrderFilled` for each side of
+    each match at a port the player has explored (the `planet_growth` log discipline).
+    Pure and RNG-free, so the ticked market reloads to the identical `state_hash`.
+    """
+    econ = config.economy
+    if not econ.market.enabled or not state.port_orders:
+        return ReduceResult()
+    settlement = match_orders(state.port_orders, state.ports, econ)
+
+    explored: set[int] = set()
+    for player in state.players.values():
+        explored |= player.explored_sectors
+    events: list[Event] = []
+    if settlement.fills:
+        events.append(MarketSettled(
+            matches=len(settlement.fills),
+            volume=sum(f.qty for f in settlement.fills),
+            slips=sum(f.total for f in settlement.fills),
+        ))
+    for fill in settlement.fills:
+        buyer, seller = state.ports[fill.buyer_port_id], state.ports[fill.seller_port_id]
+        if buyer.sector_id in explored:
+            events.append(PortOrderFilled(buyer.id, fill.commodity, "buy",
+                                          fill.qty, fill.unit_price, seller.id))
+        if seller.sector_id in explored:
+            events.append(PortOrderFilled(seller.id, fill.commodity, "sell",
+                                          fill.qty, fill.unit_price, buyer.id))
+
+    changed: list[Port] = []
+    for pid, port in state.ports.items():
+        stock_d = settlement.stock_deltas.get(pid, {})
+        settled = replace(port, commodities=tuple(
+            replace(line, stock=line.stock + stock_d.get(line.commodity, 0))
+            for line in port.commodities
+        ), latinum=port.latinum + settlement.latinum_deltas.get(pid, 0))
+        settled = replace(settled, latinum=settled.latinum + liquidity_drip(settled, econ))
+        if settled != port:
+            changed.append(settled)
+
+    residual = clear_filled(state.port_orders, settlement)
+    return ReduceResult(events=tuple(events), ports=tuple(changed), port_orders=residual)
 
 
 def daily_turn_reset(state: UniverseState, config: GameConfig) -> ReduceResult:
@@ -224,8 +305,9 @@ def accrue_interest(state: UniverseState, config: GameConfig) -> ReduceResult:
 # resolves the name back to the reducer through `resolve_cron`, re-running it in
 # the merged command+maintenance order. Names are durable — keep them stable.
 CRONS: dict[str, CronFn] = {
-    "hourly_port_economy": regenerate_ports,
+    "hourly_port_economy": hourly_port_economy,
     "hourly_planet_growth": planet_growth,
+    "market_settlement": market_settlement,
     "alien_drift": alien_drift,
     "trader_step": trader_step,
     "interest_accrual": accrue_interest,

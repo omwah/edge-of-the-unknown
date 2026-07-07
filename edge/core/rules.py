@@ -141,6 +141,7 @@ from edge.core.models import (
     UNOWNED,
     UniverseState,
 )
+from edge.core.market import PortOrder
 from edge.core.movement import MovementError, can_warp, shortest_path
 from edge.dialogue import facts as dialogue_facts
 from edge.dialogue.intel import IntelTarget, pick_intel_target
@@ -595,6 +596,10 @@ class ReduceResult:
     sectors: tuple[Sector, ...] = ()  # beacon-text updates (WP41)
     sector_forces: tuple[SectorForce, ...] = ()  # deployed fighters/mines (WP41)
     game: Game | None = None  # set by maintenance reducers (e.g. daily day-number bump)
+    # A whole-book replacement of `state.port_orders` (WP47) — None means "unchanged",
+    # a mapping means "replace the book". Unlike the entity tuples (which upsert), the
+    # market book is regenerated in full each cycle, so it is swapped, not merged.
+    port_orders: Mapping[int, tuple[PortOrder, ...]] | None = None
 
 
 def apply_result(state: UniverseState, result: ReduceResult) -> None:
@@ -622,6 +627,8 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
             state.sector_forces[force.sector_id] = force
     if result.game is not None:
         state.game = result.game
+    if result.port_orders is not None:
+        state.port_orders = dict(result.port_orders)  # whole-book replacement (WP47)
 
 
 # --- reducers ---------------------------------------------------------------
@@ -1099,9 +1106,11 @@ def _trade(
     out = execute_trade(
         port=port, ship=ship, player=player,
         commodity=cmd.commodity, units=cmd.units, unit_price=price,
+        port_purse=config.economy.market.enabled,
     )
     return ReduceResult(
-        events=(Traded(player_id, port.id, cmd.commodity, out.mode, out.units, out.unit_price, out.total),),
+        events=(Traded(player_id, port.id, cmd.commodity, out.mode, out.units,
+                       out.unit_price, out.total, out.requested),),
         players=(out.player,), ships=(out.ship,), ports=(out.port,),
     )
 
@@ -1134,8 +1143,10 @@ def _haggle(
         out = execute_trade(
             port=port, ship=ship, player=player,
             commodity=cmd.commodity, units=cmd.units, unit_price=result.price,
+            port_purse=config.economy.market.enabled,
         )
-        traded = Traded(player_id, port.id, cmd.commodity, out.mode, out.units, out.unit_price, out.total)
+        traded = Traded(player_id, port.id, cmd.commodity, out.mode, out.units,
+                        out.unit_price, out.total, out.requested)
         return ReduceResult(
             events=(haggled, traded), players=(out.player,), ships=(out.ship,), ports=(out.port,),
         )

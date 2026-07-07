@@ -57,9 +57,10 @@ class Traded(Event):
     port_id: int
     commodity: Commodity
     mode: PortMode  # the port's mode for this commodity
-    units: int
+    units: int  # units actually filled (may be < requested under a hard port purse, WP47)
     unit_price: int
     total: int
+    requested: int = 0  # units the player asked for; == units unless the port's purse capped it
 
 
 @dataclass(frozen=True)
@@ -229,6 +230,37 @@ class StockRegenerated(Event):
     port_id: int
     commodity: Commodity
     new_stock: int
+
+
+@dataclass(frozen=True)
+class MarketSettled(Event):
+    """The daily order-book settlement summary (§8, WP47).
+
+    One aggregate emitted per settlement, fog-safe (it names no port): `matches` is
+    the number of fills, `volume` the total units moved, `slips` the total latinum
+    that changed hands between ports.
+    """
+
+    matches: int
+    volume: int
+    slips: int
+
+
+@dataclass(frozen=True)
+class PortOrderFilled(Event):
+    """One side of one settled match at an *explored* port (§8, WP47 — fog-respecting).
+
+    Emitted only for a port the player has seen (the `planet_growth` log discipline),
+    so it never leaks an unexplored port's book. `side` is "buy" (this port bought) or
+    "sell" (this port sold); `counterparty_port_id` names the other port in the match.
+    """
+
+    port_id: int
+    commodity: Commodity
+    side: str
+    qty: int
+    unit_price: int
+    counterparty_port_id: int
 
 
 @dataclass(frozen=True)

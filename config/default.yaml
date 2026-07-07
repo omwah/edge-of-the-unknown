@@ -5,7 +5,7 @@
 # game constant lives here, not in code (CLAUDE.md). Omitted fields fall back to
 # the schema defaults; the values below are spelled out so the balance is legible.
 
-config_version: 3  # Phase-3 schema epoch (expansive topology default, band-graded aliens)
+config_version: 4  # Phase-5 schema epoch (order-book market, hard port purses — WP47)
 seed: 4             # universe seed for a new game; leave empty (seed:) for a random seed
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 
@@ -18,6 +18,7 @@ ticker:
     interest_accrual: 1200             # every 20 minutes
     port_economy: 1200                 # every 20 minutes
     planet_growth: 1200                # every 20 minutes
+    market_settlement: 1200            # daily order-book settlement (§8, WP47)
     alien_drift: 120                   # every 2 minutes (per-species move chance applies)
     trader_step: 120                   # every 2 minutes (NPC merchant trades, WP43)
 

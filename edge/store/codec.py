@@ -44,7 +44,9 @@ from edge.core.events import (
     Haggled,
     HazardDamage,
     LeadAccepted,
+    MarketSettled,
     PlanetProduced,
+    PortOrderFilled,
     Repaired,
     SalvageCollected,
     ShipDestroyed,
@@ -379,6 +381,17 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "port_id": event.port_id,
                 "commodity": event.commodity.value, "mode": event.mode.value,
                 "units": event.units, "unit_price": event.unit_price, "total": event.total,
+                "requested": event.requested,
+            }
+        case MarketSettled():
+            return "MarketSettled", {
+                "matches": event.matches, "volume": event.volume, "slips": event.slips,
+            }
+        case PortOrderFilled():
+            return "PortOrderFilled", {
+                "port_id": event.port_id, "commodity": event.commodity.value,
+                "side": event.side, "qty": event.qty, "unit_price": event.unit_price,
+                "counterparty_port_id": event.counterparty_port_id,
             }
         case Haggled():
             return "Haggled", {
@@ -597,7 +610,14 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return Docked(payload["player_id"], payload["sector_id"], payload["port_id"])
         case "Traded":
             return Traded(payload["player_id"], payload["port_id"], Commodity(payload["commodity"]),
-                          PortMode(payload["mode"]), payload["units"], payload["unit_price"], payload["total"])
+                          PortMode(payload["mode"]), payload["units"], payload["unit_price"],
+                          payload["total"], payload.get("requested", payload["units"]))
+        case "MarketSettled":
+            return MarketSettled(payload["matches"], payload["volume"], payload["slips"])
+        case "PortOrderFilled":
+            return PortOrderFilled(payload["port_id"], Commodity(payload["commodity"]),
+                                   payload["side"], payload["qty"], payload["unit_price"],
+                                   payload["counterparty_port_id"])
         case "Haggled":
             return Haggled(payload["player_id"], payload["port_id"], Commodity(payload["commodity"]),
                            payload["status"], payload["price"])

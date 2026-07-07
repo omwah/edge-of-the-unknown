@@ -18,6 +18,7 @@ from __future__ import annotations
 import random
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from edge.core.enums import (
     Commodity,
@@ -30,6 +31,9 @@ from edge.core.enums import (
     RarityTier,
     Subsystem,
 )
+
+if TYPE_CHECKING:  # PortOrder lives in core.market (which imports this module) — annotation only
+    from edge.core.market import PortOrder
 
 
 @dataclass(frozen=True, slots=True)
@@ -636,6 +640,12 @@ class UniverseState:
     # keyed by sector id. Appended by the deploy commands and consumed by the movement
     # reducers (mine hits, fighter engagements), so it reconstructs under (seed, log).
     sector_forces: dict[int, SectorForce] = field(default_factory=dict)
+    # Open market orders per port id (DESIGN §8, WP47) — the order book each port posts
+    # against its desired-stock gaps. Hashed state: a gameplay-visible fact rebuilt by the
+    # `hourly_port_economy` cron (market-enabled path) and consumed/cleared by the daily
+    # `market_settlement` cron, so it reconstructs under the (seed, maintenance log) rail.
+    # A total replacement each generation (never appended), so the book stays bounded.
+    port_orders: dict[int, tuple[PortOrder, ...]] = field(default_factory=dict)
     adjacency: dict[int, tuple[int, ...]] = field(default_factory=dict)
     # Hop distance from the Core (sector 1) per sector — a runtime-only cache (like
     # adjacency, excluded from `state_hash`) driving the warp "gravity" arrows (§11).
