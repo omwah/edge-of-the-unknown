@@ -160,3 +160,116 @@ def test_dev_flip_governor_rejects_an_unknown_alliance(tmp_path: Path) -> None:
     svc = GameService.new_game(load_default_config(), 4, SqliteRepository(tmp_path / "g.db"))
     with pytest.raises(DevPatchError):
         reduce(svc.state, 1, DevPatch(op="flip_governor", target="", value=9999), svc.config)
+
+
+# --- WP50: player-championed Core seizure ------------------------------------
+
+import pytest
+
+from edge.core.aliens import seizure_progress
+from edge.core.economy import EconomyError
+from edge.core.rules import AdvanceAdmission, JoinAlliance, PetitionCoreSeizure
+from edge.server import session
+
+# The default roster's covets_core bloc: Liberty Front (id 4) — price [prove, purge],
+# bases_to_raze 2, fee 5000, joinable freely (membership_gate open).
+LIBERTY = 4
+
+
+def _seizure_world(*, razed: int = 2, latinum: int = 10_000) -> UniverseState:
+    """Core sectors 1,2,3 (Federation planets + bases) + a Frontier tail; `razed` Core bases down."""
+    state = UniverseState.new(Game(1, 1, CFG.config_version, "t", core_governing_alliance_id=1))
+    state.sectors = {
+        1: Sector(1, 1, (2,), "Hub", is_galactic_core=True),
+        2: Sector(2, 1, (1, 3), "Hub", is_galactic_core=True),
+        3: Sector(3, 1, (2, 4), "Hub", is_galactic_core=True),
+        4: Sector(4, 1, (3,), "Frontier"),
+    }
+    state.rebuild_adjacency()
+    state.alliances = {i: Alliance(i, f"A{i}", covets_core=(i == LIBERTY)) for i in (1, 2, 3, 4)}
+    fed = Ownership("alliance", 1)
+    for i in (1, 2, 3):
+        state.planets[i] = Planet(i, i, f"Core-{i}", "terrestrial_warm", owner=fed, starbase_id=i)
+        # A razed Core base reads as unowned (the _raze_starbase consequence, WP40).
+        owner = Ownership("none") if i <= razed else fed
+        state.starbases[i] = Starbase(i, i, i, "orbital_fort", owner=owner)
+    state.ships[1] = Ship(1, "t", "P", 1, 4, 60)
+    state.players[1] = Player(1, "you", 1, latinum, alliance_id=1, turns_remaining=250)
+    return state
+
+
+def _champion(state: UniverseState, *, tasks: tuple[str, ...] = ("prove", "purge")) -> None:
+    """Join Liberty Front and record the seizure tasks (the pre-petition ladder)."""
+    apply_result(state, reduce(state, 1, JoinAlliance(alliance_id=LIBERTY), CFG))
+    for task in tasks:
+        apply_result(state, reduce(state, 1, AdvanceAdmission(alliance_id=LIBERTY, task=task), CFG))
+
+
+def test_seizure_happy_path_flips_the_core() -> None:
+    state = _seizure_world()
+    _champion(state)
+    result = reduce(state, 1, PetitionCoreSeizure(alliance_id=LIBERTY), CFG)
+    apply_result(state, result)
+    assert state.game.core_governing_alliance_id == LIBERTY
+    assert all(state.planets[i].owner == Ownership("alliance", LIBERTY) for i in (1, 2, 3))
+    assert state.players[1].latinum == 10_000 - 5_000  # the fee was charged
+
+
+def test_seizure_rejects_a_non_member() -> None:
+    state = _seizure_world()  # player never joined Liberty Front
+    with pytest.raises(EconomyError, match="sworn member"):
+        reduce(state, 1, PetitionCoreSeizure(alliance_id=LIBERTY), CFG)
+
+
+def test_seizure_rejects_unfinished_tasks() -> None:
+    state = _seizure_world()
+    _champion(state, tasks=("prove",))  # missing "purge"
+    with pytest.raises(EconomyError, match="price is not yet paid"):
+        reduce(state, 1, PetitionCoreSeizure(alliance_id=LIBERTY), CFG)
+
+
+def test_seizure_rejects_when_too_few_bases_razed() -> None:
+    state = _seizure_world(razed=1)  # only one of the two required Core bases is down
+    _champion(state)
+    with pytest.raises(EconomyError, match="still holds the Core"):
+        reduce(state, 1, PetitionCoreSeizure(alliance_id=LIBERTY), CFG)
+
+
+def test_seizure_rejects_an_unaffordable_fee() -> None:
+    state = _seizure_world(latinum=100)  # cannot afford the 5000 fee
+    _champion(state)
+    with pytest.raises(EconomyError, match="seizure fee"):
+        reduce(state, 1, PetitionCoreSeizure(alliance_id=LIBERTY), CFG)
+
+
+def test_seizure_rejects_a_bloc_that_already_governs() -> None:
+    state = _seizure_world()
+    _champion(state)
+    apply_result(state, reduce(state, 1, PetitionCoreSeizure(alliance_id=LIBERTY), CFG))
+    with pytest.raises(EconomyError, match="already governs"):
+        reduce(state, 1, PetitionCoreSeizure(alliance_id=LIBERTY), CFG)
+
+
+def test_seizure_checklist_matches_reducer_gating() -> None:
+    # Ready state: the projection says ready and the petition succeeds (lockstep, H4).
+    ready = _seizure_world()
+    _champion(ready)
+    cv = session.computer_view(ready, 1, CFG)
+    assert cv.seizure is not None and cv.seizure.ready
+    reduce(ready, 1, PetitionCoreSeizure(alliance_id=LIBERTY), CFG)  # does not raise
+
+    # Not-ready state (a base short): the projection says not-ready and the petition raises.
+    blocked = _seizure_world(razed=1)
+    _champion(blocked)
+    cv2 = session.computer_view(blocked, 1, CFG)
+    assert cv2.seizure is not None and not cv2.seizure.ready and not cv2.seizure.bases_met
+    with pytest.raises(EconomyError):
+        reduce(blocked, 1, PetitionCoreSeizure(alliance_id=LIBERTY), CFG)
+
+
+def test_seizure_ledger_records_under_the_reserved_key() -> None:
+    state = _seizure_world()
+    _champion(state, tasks=("prove",))
+    prog = seizure_progress(state, state.players[1], CFG.roster.alliance(LIBERTY),
+                            CFG.roster.alliance(LIBERTY).core_seizure)
+    assert prog.tasks_done == frozenset({"prove"})  # recorded in the @seizure ledger

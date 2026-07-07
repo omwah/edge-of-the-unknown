@@ -11,9 +11,11 @@ bands (default hostility 0.35 / amity 0.65, §6).
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
-from edge.core.config import AliensConfig, AllianceConfig, RosterConfig, SpeciesConfig
+from edge.core.config import (
+    AliensConfig, AllianceConfig, RosterConfig, SeizureConfig, SpeciesConfig,
+)
 from edge.core.models import AlienSpecies, Grudge, Player, Starbase, UniverseState
 
 HOSTILE = "hostile"
@@ -241,6 +243,99 @@ def record_admission_task(player: Player, alliance_id: int, task: str) -> Player
 def admission_met(player: Player, alliance: AllianceConfig) -> bool:
     """Whether the player has completed the bloc's `admission_price` tasks (§6.3)."""
     return set(alliance.admission_price) <= admission_tasks_done(player, alliance.id)
+
+
+# Reserved `species_arcs` key namespace for a bloc's *Core-seizure* task ledger (WP50) —
+# a second `@`-prefixed key so seizure progress never collides with the admission ledger
+# (or a roster_id), riding `species_arcs` without another hashed field (H6).
+SEIZURE_ARC_PREFIX = "@seizure:"
+
+
+def _seizure_key(alliance_id: int) -> str:
+    return f"{SEIZURE_ARC_PREFIX}{alliance_id}"
+
+
+def seizure_tasks_done(player: Player, alliance_id: int) -> frozenset[str]:
+    """The Core-seizure tasks the player has completed for a bloc (the §6.3 ledger, WP50)."""
+    ledger = player.species_arcs.get(_seizure_key(alliance_id), {})
+    return frozenset(str(task) for task, done in ledger.items() if done)
+
+
+def record_seizure_task(player: Player, alliance_id: int, task: str) -> Player:
+    """Mark one Core-seizure task complete in the bloc's seizure ledger (pure; WP50)."""
+    key = _seizure_key(alliance_id)
+    ledger = {**player.species_arcs.get(key, {}), task: True}
+    return replace(player, species_arcs={**player.species_arcs, key: ledger})
+
+
+def core_bases_razed(state: UniverseState, governor_id: int | None) -> int:
+    """How many Core-planet starbases are no longer the incumbent governor's (§4.2, WP50).
+
+    A Core base starts owned by the governing alliance and intact; razing it drops it to
+    unowned (`_raze_starbase`), and even a subsequent player claim leaves it not-the-
+    governor's. So a Core-sector base whose owner is not the current governor counts as
+    razed — the seizure's raze tally, derived from state rather than double-booked.
+    """
+    count = 0
+    for base in state.starbases.values():
+        if not state.sectors[base.sector_id].is_galactic_core:
+            continue
+        if not (base.owner.kind == "alliance" and base.owner.ref == governor_id):
+            count += 1
+    return count
+
+
+@dataclass(frozen=True, slots=True)
+class SeizureProgress:
+    """The player's progress toward championing a bloc into the Core (§6.3, WP50).
+
+    Computed once from state and read by *both* the petition reducer (which raises a
+    precise reason per unmet gate) and the projection (which renders the checklist), so
+    view and reducer stay in lockstep (H4). `ready` is the conjunction the reducer applies.
+    """
+
+    alliance_id: int
+    is_member: bool
+    already_governs: bool
+    consented: bool  # standing with the bloc is non-negative (member in good standing)
+    tasks_done: frozenset[str]
+    tasks_required: tuple[str, ...]
+    bases_razed: int
+    bases_required: int
+    fee: int
+    fee_affordable: bool
+
+    @property
+    def tasks_met(self) -> bool:
+        return set(self.tasks_required) <= self.tasks_done
+
+    @property
+    def bases_met(self) -> bool:
+        return self.bases_razed >= self.bases_required
+
+    @property
+    def ready(self) -> bool:
+        return (self.is_member and not self.already_governs and self.consented
+                and self.tasks_met and self.bases_met and self.fee_affordable)
+
+
+def seizure_progress(
+    state: UniverseState, player: Player, alliance: AllianceConfig, seizure: SeizureConfig,
+) -> SeizureProgress:
+    """Assemble the player's `SeizureProgress` against a bloc's ladder (pure; WP50)."""
+    gov = state.game.core_governing_alliance_id
+    return SeizureProgress(
+        alliance_id=alliance.id,
+        is_member=player.alliance_id == alliance.id,
+        already_governs=gov == alliance.id,
+        consented=alliance_standing(player, alliance.id) >= 0.0,
+        tasks_done=seizure_tasks_done(player, alliance.id),
+        tasks_required=tuple(seizure.price),
+        bases_razed=core_bases_razed(state, gov),
+        bases_required=seizure.bases_to_raze,
+        fee=seizure.fee,
+        fee_affordable=player.latinum >= seizure.fee,
+    )
 
 
 def _rivals_of(roster: RosterConfig, alliance_id: int) -> set[int]:

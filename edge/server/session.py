@@ -22,7 +22,7 @@ from edge.server import mapgraph
 from edge.server import navstrip
 from edge.server import terrain as terrain_art
 from edge.core import combat
-from edge.core.aliens import disposition_band, effective_disposition
+from edge.core.aliens import disposition_band, effective_disposition, seizure_progress
 from edge.core.config import DialogueChoice, GameConfig
 from edge.core.discovery import entity_contactable, entity_species, is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
@@ -817,6 +817,32 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
         ports=_port_directory(state, player_id), planets=_planet_directory(state, player_id),
         leads=leads_view(state, player_id, config),
+        seizure=_seizure_status(state, player, config),
+    )
+
+
+def _seizure_status(
+    state: UniverseState, player: Player, config: GameConfig
+) -> dto.SeizureStatusDTO | None:
+    """The Core-seizure checklist for the bloc the player champions, or None (§6.3, WP50).
+
+    Surfaces only when the player has sworn to a `covets_core` bloc with a `core_seizure`
+    ladder. The flags come straight from `aliens.seizure_progress` — the same predicate the
+    petition reducer gates on — so the checklist and the reducer never drift (H4).
+    """
+    if config.roster is None or player.alliance_id is None:
+        return None
+    ac = config.roster.alliance(player.alliance_id)
+    if ac is None or ac.core_seizure is None:
+        return None
+    prog = seizure_progress(state, player, ac, ac.core_seizure)
+    return dto.SeizureStatusDTO(
+        alliance_id=ac.id, alliance_name=ac.name,
+        tasks_done=sorted(prog.tasks_done & set(prog.tasks_required)),
+        tasks_needed=list(prog.tasks_required), tasks_met=prog.tasks_met,
+        bases_razed=prog.bases_razed, bases_needed=prog.bases_required, bases_met=prog.bases_met,
+        fee=prog.fee, fee_affordable=prog.fee_affordable, consented=prog.consented,
+        already_governs=prog.already_governs, ready=prog.ready,
     )
 
 
