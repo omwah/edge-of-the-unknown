@@ -23,7 +23,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
-from edge.core import starbases
+from edge.core import citadels, starbases
 from edge.core.aliens import (
     FRIENDLY,
     alliance_standing_shift,
@@ -32,6 +32,7 @@ from edge.core.aliens import (
     effective_disposition,
     governor_hostile,
     grudge_shift,
+    owner_hostile,
 )
 from edge.core.config import GameConfig, PackConfig, SpeciesConfig
 from edge.core.discovery import sector_has_nebula
@@ -198,6 +199,29 @@ def roll_base_defense(
         player_shields=ship.shields, detected=True,
         speech_context="combat_open", starbase_id=base.id,
     )
+
+
+def roll_citadel_defense(
+    state: UniverseState, player: Player, ship: Ship, sector_id: int, config: GameConfig,
+) -> Encounter | None:
+    """A hostile-owner planet's citadel gun engages an entrant (§4.2, WP54 — deterministic).
+
+    The gun is the second rung of the invasion ladder (after the orbital base, §10/WP55):
+    it fires only when no operational base already defends the sector — the caller checks
+    base defense first — so razing the base is what exposes the gun. Pure (no RNG). The
+    lowest planet id wins if two guns somehow share a sector.
+    """
+    for planet in sorted(state.planets.values(), key=lambda p: p.id):
+        if planet.sector_id != sector_id:
+            continue
+        if citadels.has_gun(planet, config) and owner_hostile(state, planet.owner, player):
+            foe = citadels.citadel_foe(planet, config)
+            return Encounter(
+                species_id=0, sector_id=sector_id, foes=(foe,), round=0,
+                player_shields=ship.shields, detected=True,
+                speech_context="combat_open", citadel_planet_id=planet.id,
+            )
+    return None
 
 
 def _governing_defender(

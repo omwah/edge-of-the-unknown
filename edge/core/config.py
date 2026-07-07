@@ -585,6 +585,45 @@ class GenesisConfig(BaseModel):
     eligible_types: list[str] = Field(default_factory=list)
 
 
+class CitadelLevelConfig(BaseModel):
+    """One rung of the citadel ladder (§4.2, §14, WP54).
+
+    Cumulative levels 1-3, each paid up front in equipment (from planet stores) +
+    latinum, gated on a minimum colony size, and completed as a timed build measured in
+    colonist-days. `garrison_mult` multiplies the planet's fighter garrison in the
+    invasion math (WP55) — higher levels make a world harder to take.
+    """
+
+    model_config = _FROZEN
+
+    cost_equipment: int = Field(ge=0)
+    cost_latinum: int = Field(ge=0)
+    min_colonists: int = Field(ge=0)
+    build_colonist_days: int = Field(gt=0)  # colonist-days to complete (colonists accrue per tick)
+    garrison_mult: float = Field(default=1.0, ge=1.0)  # defense multiplier on the garrison (WP55)
+
+
+class CitadelConfig(BaseModel):
+    """Citadels: planetary defense levels with treasury and a fixed gun (§4.2, §14, WP54).
+
+    `levels[i]` is level `i+1`. L1 grants the treasury + a garrison bonus, L2 the fixed
+    **citadel gun** (stats below — it joins sector defense exactly as an orbital base
+    does), L3 a **siege shield** (invasion barred while any base or the gun stands). The
+    gun's health is `Planet.gun_integrity`, seeded to `gun_hull` on completion and ticked
+    down when silenced (WP55).
+    """
+
+    model_config = _FROZEN
+
+    levels: list[CitadelLevelConfig]
+    gun_min_level: int = 2       # citadel level at which the fixed gun appears
+    shield_min_level: int = 3    # level granting the siege shield (WP55)
+    gun_hull: int = Field(default=400, gt=0)
+    gun_shields: int = Field(default=200, ge=0)
+    gun_damage: int = Field(default=40, gt=0)
+    gun_defense: int = Field(default=30, ge=0)
+
+
 class GovernanceConfig(BaseModel):
     """NPC-driven Core upheavals — seizures + leadership intrigue (DESIGN §6.3, WP51).
 
@@ -1392,6 +1431,7 @@ class GameConfig(BaseModel):
     starbase: StarbaseConfig | None = None  # WP4 orbital bases (None ⇒ none generated)
     discovery: DiscoveryConfig | None = None  # WP5 discoveries (None ⇒ none salted)
     genesis: GenesisConfig | None = None  # WP10 genesis torpedoes (None ⇒ not sold)
+    citadels: CitadelConfig | None = None  # WP54 citadels (None ⇒ not buildable)
     roster: RosterConfig | None = None  # WP7 species roster (None ⇒ no aliens placed)
     names: NamesConfig | None = None  # Configurable name pools
     starter_ship: ShipClassConfig

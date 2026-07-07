@@ -21,6 +21,7 @@ from typing import assert_never
 
 from edge import dialogue
 from edge.core import combat, encounters
+from edge.core import citadels
 from edge.core import mechanics
 from edge.core import starbases
 from edge.core import territory
@@ -91,7 +92,10 @@ from edge.core.events import (
     AdmissionAdvanced,
     AllianceJoined,
     AllianceResigned,
+    CitadelBuildStarted,
+    CitadelCompleted,
     ColonistsRecruited,
+    PlanetBanked,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -260,6 +264,33 @@ class SetAllocation:
 
     planet_id: int
     allocation: dict[str, float]  # Commodity value -> share
+
+
+@dataclass(frozen=True, slots=True)
+class BuildCitadel:
+    """Open a timed build of the next citadel level on an owned world (§4.2, WP54).
+
+    Pays the level's equipment (from planet stores) + latinum up front and opens the
+    build; progress accrues on the planet-growth cron. Owner-only, in-sector.
+    """
+
+    planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class PlanetDeposit:
+    """Deposit latinum into an owned citadel world's treasury (§4.2, WP54). Owner-only, in-sector."""
+
+    planet_id: int
+    amount: int
+
+
+@dataclass(frozen=True, slots=True)
+class PlanetWithdraw:
+    """Withdraw latinum from an owned citadel world's treasury (§4.2, WP54). Owner-only, in-sector."""
+
+    planet_id: int
+    amount: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -588,6 +619,7 @@ Command = (
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SetAllocation
+    | BuildCitadel | PlanetDeposit | PlanetWithdraw
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles
@@ -691,6 +723,14 @@ def reduce(
             return _colonize(state, player_id, command, config)
         case SetAllocation():
             return _set_allocation(state, player_id, command, config)
+        case BuildCitadel():
+            return _build_citadel(state, player_id, command, config)
+        case PlanetDeposit():
+            return _planet_bank(state, player_id, command.planet_id, command.amount,
+                                config, withdraw_=False)
+        case PlanetWithdraw():
+            return _planet_bank(state, player_id, command.planet_id, command.amount,
+                                config, withdraw_=True)
         case InstallComponent():
             return _install_component(state, player_id, command, config)
         case SwapComponent():
@@ -956,6 +996,13 @@ def _roll_encounter(
         band = state.sectors[sector_id].distance_band
         started = EncounterStarted(player.id, 0, sector_id, True, len(base_enc.foes), band)
         return player, base_enc, True, (started,)
+    # The citadel gun is the ladder's second rung (§4.2, WP54): it defends only once no
+    # operational base does, so razing the base exposes it. Deterministic, like base defense.
+    gun_enc = encounters.roll_citadel_defense(state, player, ship, sector_id, config)
+    if gun_enc is not None:
+        band = state.sectors[sector_id].distance_band
+        started = EncounterStarted(player.id, 0, sector_id, True, len(gun_enc.foes), band)
+        return player, gun_enc, True, (started,)
     roll = encounters.roll_encounter(state, player, ship, sector_id, config, state.rng)
     if roll is None:
         return player, None, False, ()
@@ -1428,6 +1475,75 @@ def _set_allocation(
         raise EconomyError("allocation must be positive")
     normalized = {c: v / total for c, v in alloc.items()}
     return ReduceResult(planets=(replace(planet, allocation=normalized),))
+
+
+# --- citadels: build ladder + treasury (§4.2, WP54) -------------------------
+
+
+def _owned_planet_here(state: UniverseState, player_id: int, planet_id: int) -> Planet:
+    """The player-owned planet in the ship's sector, or raise (citadel ops gate, WP54)."""
+    ship = _ship(state, _player(state, player_id))
+    planet = state.planets.get(planet_id)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise EconomyError("no such world in this sector")
+    if planet.owner.kind != "player" or planet.owner.ref != player_id:
+        raise EconomyError("you do not own that world")
+    return planet
+
+
+def _build_citadel(
+    state: UniverseState, player_id: int, cmd: BuildCitadel, config: GameConfig
+) -> ReduceResult:
+    """Open a timed build of the next citadel level, paid up front (§4.2, WP54)."""
+    player = _player(state, player_id)
+    planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    target = planet.citadel_level + 1
+    lc = citadels.level_config(config, target)  # raises CitadelError past the top
+    if player.latinum < lc.cost_latinum:
+        raise EconomyError(
+            f"need {lc.cost_latinum} latinum for citadel level {target} (have {player.latinum})")
+    # open_build validates the ladder + colonist gate + equipment stores and removes the
+    # equipment; the latinum is burned here (a §8 sink). Both charged up front (interview #2).
+    new_planet, target_level = citadels.open_build(planet, config)
+    new_player = replace(player, latinum=player.latinum - lc.cost_latinum)
+    return ReduceResult(
+        events=(CitadelBuildStarted(player_id, planet.id, target_level),),
+        players=(new_player,), planets=(new_planet,),
+    )
+
+
+def _planet_bank(
+    state: UniverseState, player_id: int, planet_id: int, amount: int,
+    config: GameConfig, *, withdraw_: bool
+) -> ReduceResult:
+    """Deposit/withdraw latinum against an owned citadel world's treasury (§4.2, WP54).
+
+    Interest-free — the treasury's value is *location* (a bank in deep space), not yield
+    (documented rationale). Conserves latinum: it moves between the player's purse and the
+    planet's `treasury`, never minted. Requires a level-1+ citadel (the treasury it grants).
+    """
+    player = _player(state, player_id)
+    planet = _owned_planet_here(state, player_id, planet_id)
+    if planet.citadel_level < 1:
+        raise EconomyError("this world has no citadel treasury (build level 1 first)")
+    if amount <= 0:
+        raise EconomyError("amount must be positive")
+    if withdraw_:
+        if planet.treasury < amount:
+            raise EconomyError("the treasury does not hold that much")
+        new_player = replace(player, latinum=player.latinum + amount)
+        new_planet = replace(planet, treasury=planet.treasury - amount)
+        kind = "withdraw"
+    else:
+        if player.latinum < amount:
+            raise EconomyError("insufficient latinum to deposit")
+        new_player = replace(player, latinum=player.latinum - amount)
+        new_planet = replace(planet, treasury=planet.treasury + amount)
+        kind = "deposit"
+    return ReduceResult(
+        events=(PlanetBanked(player_id, planet.id, kind, amount, new_planet.treasury),),
+        players=(new_player,), planets=(new_planet,),
+    )
 
 
 # --- engine room: install / swap / cannibalize / field-patch (§4.1) ---------

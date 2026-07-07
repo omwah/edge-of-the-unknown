@@ -619,6 +619,14 @@ class PlanetDTO:
     starbase_derelict: bool = False
     # Salvageable components on a derelict/own base: (subsystem value, slot index, label).
     salvage: list[tuple[str, int, str]] = field(default_factory=list)
+    # Citadel state (§4.2, WP54): current level, treasury, garrison, and the build affordance.
+    citadel_level: int = 0
+    treasury: int = 0
+    fighters: int = 0
+    citadel_build_target: int = 0  # level under construction (0 ⇒ none in progress)
+    citadel_build_pct: int = 0  # percent complete of the open build
+    can_build_citadel: bool = False  # owner + next level exists (the affordance shows)
+    citadel_next_cost: tuple[int, int] | None = None  # (equipment, latinum) for the next level
 
 
 @dataclass(frozen=True)

@@ -21,10 +21,13 @@ from edge.core.events import (
     AllianceResigned,
     AttitudeChanged,
     Banked,
+    CitadelBuildStarted,
+    CitadelCompleted,
     Colonized,
     ColonistsRecruited,
     ColonyGrew,
     CombatRound,
+    PlanetBanked,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -72,6 +75,7 @@ from edge.core.rules import (
     BarterArtifact,
     BuyFighters,
     BuyMines,
+    BuildCitadel,
     BuyAlienTech,
     BuyComponent,
     BuyGenesis,
@@ -98,6 +102,8 @@ from edge.core.rules import (
     JoinAlliance,
     JoinGame,
     PetitionCoreSeizure,
+    PlanetDeposit,
+    PlanetWithdraw,
     RecruitColonists,
     ResignAlliance,
     RepairAtDock,
@@ -153,6 +159,12 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "Colonize", {"planet_id": command.planet_id, "colonists": command.colonists}
         case SetAllocation():
             return "SetAllocation", {"planet_id": command.planet_id, "allocation": command.allocation}
+        case BuildCitadel():
+            return "BuildCitadel", {"planet_id": command.planet_id}
+        case PlanetDeposit():
+            return "PlanetDeposit", {"planet_id": command.planet_id, "amount": command.amount}
+        case PlanetWithdraw():
+            return "PlanetWithdraw", {"planet_id": command.planet_id, "amount": command.amount}
         case InstallComponent():
             return "InstallComponent", {
                 "subsystem": command.subsystem.value, "slot_index": command.slot_index,
@@ -283,6 +295,12 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return Colonize(planet_id=payload["planet_id"], colonists=payload["colonists"])
         case "SetAllocation":
             return SetAllocation(planet_id=payload["planet_id"], allocation=payload["allocation"])
+        case "BuildCitadel":
+            return BuildCitadel(planet_id=payload["planet_id"])
+        case "PlanetDeposit":
+            return PlanetDeposit(planet_id=payload["planet_id"], amount=payload["amount"])
+        case "PlanetWithdraw":
+            return PlanetWithdraw(planet_id=payload["planet_id"], amount=payload["amount"])
         case "InstallComponent":
             return InstallComponent(
                 subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
@@ -479,6 +497,18 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "PlanetProduced", {"planet_id": event.planet_id, "owner_player_id": event.owner_player_id}
         case ColonyGrew():
             return "ColonyGrew", {"planet_id": event.planet_id, "colonists": event.colonists}
+        case CitadelBuildStarted():
+            return "CitadelBuildStarted", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "target_level": event.target_level,
+            }
+        case CitadelCompleted():
+            return "CitadelCompleted", {"planet_id": event.planet_id, "level": event.level}
+        case PlanetBanked():
+            return "PlanetBanked", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "kind": event.kind, "amount": event.amount, "balance": event.balance,
+            }
         case TurnsReset():
             return "TurnsReset", {"player_id": event.player_id, "turns": event.turns}
         case StockRegenerated():
@@ -683,6 +713,14 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return PlanetProduced(payload["planet_id"], payload["owner_player_id"])
         case "ColonyGrew":
             return ColonyGrew(payload["planet_id"], payload["colonists"])
+        case "CitadelBuildStarted":
+            return CitadelBuildStarted(payload["player_id"], payload["planet_id"],
+                                       payload["target_level"])
+        case "CitadelCompleted":
+            return CitadelCompleted(payload["planet_id"], payload["level"])
+        case "PlanetBanked":
+            return PlanetBanked(payload["player_id"], payload["planet_id"], payload["kind"],
+                                payload["amount"], payload["balance"])
         case "TurnsReset":
             return TurnsReset(payload["player_id"], payload["turns"])
         case "StockRegenerated":

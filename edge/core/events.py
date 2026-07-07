@@ -562,3 +562,38 @@ class HazardDamage(Event):
     sector_id: int
     source: str
     damage: int
+
+
+@dataclass(frozen=True)
+class CitadelBuildStarted(Event):
+    """A timed citadel build was opened on a planet (§4.2, WP54).
+
+    Paid up front; `target_level` is the level under construction. Progress accrues on
+    the planet-growth cron in colonist-days until `CitadelCompleted`.
+    """
+
+    player_id: int
+    planet_id: int
+    target_level: int
+
+
+@dataclass(frozen=True)
+class CitadelCompleted(Event):
+    """A citadel build finished, raising the planet to `level` (§4.2, WP54)."""
+
+    planet_id: int
+    level: int
+
+
+@dataclass(frozen=True)
+class PlanetBanked(Event):
+    """A treasury deposit/withdraw at an owned citadel world (§4.2, WP54).
+
+    `kind` is "deposit" | "withdraw"; `balance` is the treasury after the move.
+    """
+
+    player_id: int
+    planet_id: int
+    kind: str
+    amount: int
+    balance: int
