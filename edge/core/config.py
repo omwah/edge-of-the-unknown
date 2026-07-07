@@ -51,6 +51,36 @@ class HagglingConfig(BaseModel):
     history_penalty: float = 0.08  # acceptance drop per recent attempt at this port
 
 
+class MarketConfig(BaseModel):
+    """The Phase-5 order-book market's tunables (DESIGN §8, WP46).
+
+    The book itself is pure math in `edge.core.market`; these knobs shape it.
+    `enabled: False` falls back to the legacy 5% regen byte-identically (the
+    WP47 wiring reads the switch; nothing consults it before then).
+    """
+
+    model_config = _FROZEN
+
+    enabled: bool = True
+    # Dead zone around desired stock: a port posts no order while its stock sits
+    # within ±band of the pivot, so the book is silent at equilibrium (no churn).
+    order_band: float = 0.10
+    # Residual off-map regen fraction (vs the legacy 0.05): the external gradient
+    # a closed book needs to keep trading at all (edge.core.market docstring).
+    hinterland_frac: float = 0.01
+    # Liquidity floor: the daily drip tops a port's purse toward size × this, so
+    # player selling stays viable everywhere (§8 faucet; never overshoots).
+    min_purse_per_size: int = 200
+    # Fraction of the purse gap to the floor closed per daily drip. 0.25 refills
+    # a drained purse in about a week of game days — slow enough that a working
+    # arbitrageur can genuinely drain a small market first.
+    drip_frac: float = 0.25
+    # Settlement price policy — named so a future rule is a config value, not a
+    # rewrite. "midpoint" (the integer midpoint of the crossed limits) is the
+    # only policy implemented.
+    settle_price: Literal["midpoint"] = "midpoint"
+
+
 class EconomyConfig(BaseModel):
     """Economy constants (DESIGN §8). All latinum figures in slips."""
 
@@ -86,6 +116,9 @@ class EconomyConfig(BaseModel):
     regen_fraction: float = 0.05  # stock moves 5% toward desired each econ tick
     desired_stock_frac_standard: float = 0.50
     desired_stock_frac_stardock: float = 0.90
+
+    # The Phase-5 order-book market (§8, WP46) — pure math in edge.core.market.
+    market: MarketConfig = MarketConfig()
 
     haggling: HagglingConfig = HagglingConfig()
 

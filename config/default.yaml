@@ -95,6 +95,18 @@ economy:
   desired_stock_frac_standard: 0.50 # a normal port settles toward 50% of capacity (its price pivot)
   desired_stock_frac_stardock: 0.90 # StarDock stays near-full (90%) so it's a reliable supplier
 
+  # The Phase-5 order-book market (§8, WP46+): ports post buy/sell orders against their
+  # desired-stock gaps each economy tick, and a daily settlement moves real goods and
+  # latinum between them (conserving). The math is pure (edge/core/market.py); the WP47
+  # wiring reads `enabled` — false falls back to the legacy regen byte-identically.
+  market:
+    enabled: true
+    order_band: 0.10        # dead zone around desired stock: no orders within ±10% (silence at equilibrium)
+    hinterland_frac: 0.01   # residual off-map regen (vs legacy 0.05) — the external gradient the book arbitrages
+    min_purse_per_size: 200 # liquidity floor: the daily drip tops each purse toward size × this (selling never deadlocks)
+    drip_frac: 0.25         # fraction of the purse gap to the floor closed per day (capped at the gap — never overshoots)
+    settle_price: midpoint  # settlement price policy; "midpoint" of the crossed limits is the only one implemented
+
   # Haggling mini-game when trading at a port (§8). quick-trade mode skips it entirely.
   haggling:
     insult_frac: 0.30      # an offer worse than this fraction off the fair price insults the trader (may end talks)
