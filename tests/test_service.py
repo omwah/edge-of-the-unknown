@@ -353,3 +353,9 @@ def test_describe_event_uses_spatial_id(tmp_path: Path) -> None:
     events = svc.apply(1, Warp(to_sector=target))  # may also detect a discovery on entry
     # The spatial id rides in the sector gutter the ticker prepends to each event.
     assert any(f"S{svc.state.spatial_ids[target]}" in svc.describe_event(e) for e in events)
+
+
+def test_gameservice_conforms_to_protocol(tmp_path: Path) -> None:
+    """The service satisfies the H16 seam every consumer programs against (WP60)."""
+    from edge.server.protocol import ServiceProtocol
+    assert isinstance(_service(tmp_path), ServiceProtocol)
