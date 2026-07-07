@@ -236,6 +236,62 @@ def test_port_directory_buy_sell_labels_match_class() -> None:
     assert bbs.buys == "Fuel, Org" and bbs.sells == "Equ"
 
 
+# --- WP48: the order-book Market tab -----------------------------------------
+
+from edge.core.events import MarketSettled
+from edge.core.market import PortOrder
+
+
+def _booked_world() -> UniverseState:
+    """`_world` with an order book: port 1 (explored) buys fuel, port 3 (unexplored) sells."""
+    world = _world()
+    world.players[1] = Player(1, "you", 1, 2_000, turns_remaining=250,
+                              explored_sectors=frozenset({1, 2}))  # sector 3 NOT explored
+    world.port_orders = {
+        1: (PortOrder(1, Commodity.FUEL_ORE, "buy", 40, 9),),
+        3: (PortOrder(3, Commodity.FUEL_ORE, "sell", 60, 7),),
+    }
+    return world
+
+
+def test_market_view_lists_explored_port_orders_only() -> None:
+    world = _booked_world()
+    mv = session.market_view(world, [], CONFIG, 1)
+    assert mv.enabled
+    assert len(mv.orders) == 1  # only port 1 (explored); port 3's book is fogged
+    (order,) = mv.orders
+    assert order.commodity == "Fuel" and order.side == "buys" and order.qty == 40
+
+
+def test_market_view_never_names_an_unexplored_port() -> None:
+    world = _booked_world()
+    mv = session.market_view(world, [], CONFIG, 1)
+    seen_sectors = {o.sector_display for o in mv.orders} | {p[0] for p in mv.purses}
+    unexplored_display = session._display(world, 3)  # port 3's sector
+    assert unexplored_display not in seen_sectors
+
+
+def test_market_view_surfaces_last_settlement_from_the_log() -> None:
+    world = _booked_world()
+    events = [MarketSettled(2, 30, 500), MarketSettled(5, 120, 900)]  # newest last
+    mv = session.market_view(world, events, CONFIG, 1)
+    assert (mv.last_matches, mv.last_volume, mv.last_slips) == (5, 120, 900)
+    assert "5 matches" in mv.summary
+
+
+def test_market_view_is_disabled_under_the_legacy_economy() -> None:
+    econ = CONFIG.economy.model_copy(
+        update={"market": CONFIG.economy.market.model_copy(update={"enabled": False})})
+    cfg = CONFIG.model_copy(update={"economy": econ})
+    mv = session.market_view(_booked_world(), [], cfg, 1)
+    assert mv.enabled is False and mv.orders == []
+
+
+def test_market_view_is_deterministic() -> None:
+    world = _booked_world()
+    assert session.market_view(world, [], CONFIG, 1) == session.market_view(world, [], CONFIG, 1)
+
+
 def test_map_view_renders_local_ego_graph() -> None:
     world = _world()  # player at sector 2, explored {1, 2, 3}; line 1-2-3-4
     mv = session.map_view(world, 1)

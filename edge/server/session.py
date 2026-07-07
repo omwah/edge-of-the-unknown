@@ -69,6 +69,7 @@ from edge.core.events import (
     Event,
     Haggled,
     LeadAccepted,
+    MarketSettled,
     PlanetProduced,
     Repaired,
     SalvageCollected,
@@ -790,7 +791,12 @@ def _planet_directory(state: UniverseState, player_id: int) -> list[dto.PlanetDi
 
 
 def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.ComputerDTO:
-    """Pair-trade finder + discovery codex + alien dossier + ports/planets directory (§9, §11)."""
+    """Pair-trade finder + discovery codex + alien dossier + ports/planets directory (§9, §11).
+
+    The pair finder quotes from live §8 prices over *explored* ports only — unchanged by
+    the WP47 order book, and it never leaks an unexplored port's stock (the fog contract;
+    the Market tab, `market_view`, honours the same explored-sectors gate).
+    """
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
     dist = bfs_distances(state.adjacency, ship.sector_id)
@@ -810,6 +816,44 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
         ports=_port_directory(state, player_id), planets=_planet_directory(state, player_id),
         leads=leads_view(state, player_id, config),
+    )
+
+
+def market_view(
+    state: UniverseState, events: list[Event], config: GameConfig, player_id: int = 1
+) -> dto.MarketDTO:
+    """The order-book market for the Computer's Market tab (§8, WP48).
+
+    Fog-respecting: only ports in the player's explored sectors appear (the same
+    contract as the Ports directory), so the projection can never name an unexplored
+    port's book. Purses read live (stale-by-design). The last-settlement aggregates
+    come from the most recent `MarketSettled` in the durable log.
+    """
+    if not config.economy.market.enabled:
+        return dto.MarketDTO(enabled=False)
+    player = state.players[player_id]
+    orders: list[dto.MarketOrderDTO] = []
+    purses: list[tuple[int, str, int]] = []
+    for port in sorted(state.ports.values(), key=lambda p: p.id):
+        if port.sector_id not in player.explored_sectors:
+            continue  # fog of war: never surface an unexplored port's book
+        disp = _display(state, port.sector_id)
+        purses.append((disp, port.name, port.latinum))
+        for order in state.port_orders.get(port.id, ()):
+            side = "buys" if order.side == "buy" else "sells"
+            orders.append(dto.MarketOrderDTO(
+                sector_display=disp, port_name=port.name, commodity=_LABEL[order.commodity],
+                side=side, qty=order.qty, limit=order.limit,
+            ))
+    orders.sort(key=lambda o: (o.sector_display, o.commodity, o.side))
+    purses.sort()
+    last = next((e for e in reversed(events) if isinstance(e, MarketSettled)), None)
+    if last is None:
+        return dto.MarketDTO(enabled=True, orders=orders, purses=purses)
+    return dto.MarketDTO(
+        enabled=True, orders=orders, purses=purses, last_matches=last.matches,
+        last_volume=last.volume, last_slips=last.slips,
+        summary=f"{last.matches} matches · {last.volume} units · {last.slips} slips",
     )
 
 
@@ -1304,7 +1348,14 @@ def format_event(event: Event) -> str:
         return "[magenta]⚓ Docked.[/]"
     if isinstance(event, Traded):
         verb = "Bought" if event.mode is PortMode.SELL else "Sold"
-        return f"{verb} {event.units} {event.commodity.value} @ {event.unit_price} = {event.total} slips"
+        line = f"{verb} {event.units} {event.commodity.value} @ {event.unit_price} = {event.total} slips"
+        if event.requested and event.requested > event.units:
+            # A hard port purse capped the fill (WP47) — say so, like TW's short quote.
+            line += f"  [yellow](the port could only afford {event.units} of {event.requested})[/]"
+        return line
+    if isinstance(event, MarketSettled):
+        return (f"[grey46]⇄ Markets settled: {event.matches} matches · "
+                f"{event.volume} units · {event.slips} slips moved.[/]")
     if isinstance(event, Haggled):
         price = "—" if event.price is None else event.price
         return f"Haggle {event.status} @ {price}"

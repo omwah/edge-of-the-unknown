@@ -152,6 +152,10 @@ class GameService:
     def computer_view(self, player_id: int) -> dto.ComputerDTO:
         return session.computer_view(self._state, player_id, self._config)
 
+    def market_view(self, player_id: int) -> dto.MarketDTO:
+        """The order-book Market tab: explored ports' open books + last settlement (§8, WP48)."""
+        return session.market_view(self._state, self._repo.load_events(), self._config, player_id)
+
     def route_view(self, player_id: int, dst_sector: int, *,
                    full_graph: bool = False) -> dto.RouteDTO:
         return session.route_view(self._state, player_id, dst_sector, self._config,

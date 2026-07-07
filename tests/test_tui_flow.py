@@ -148,6 +148,25 @@ async def test_log_hotkey_opens_computer_log() -> None:
         assert app.screen.query_one("#log-table", DataTable) is not None
 
 
+async def test_computer_market_tab_shows_the_order_book() -> None:
+    """WP48: the Computer's Market tab renders (fog-respecting) without error."""
+    from textual.widgets import DataTable, TabbedContent
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        await pilot.press("c")  # open the Computer
+        await pilot.pause()
+        assert isinstance(app.screen, ComputerScreen)
+        app.screen.query_one(TabbedContent).active = "market"
+        await pilot.pause()
+        table = app.screen.query_one("#market-table", DataTable)
+        assert table is not None
+        assert table.row_count >= 1  # either an order/empty row — always renders
+
+
 async def test_travel_prompt_warps_along_known_route() -> None:
     from textual.widgets import Input
 
