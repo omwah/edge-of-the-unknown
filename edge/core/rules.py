@@ -94,8 +94,11 @@ from edge.core.events import (
     AllianceResigned,
     CitadelBuildStarted,
     CitadelCompleted,
+    CitadelGunSilenced,
     ColonistsRecruited,
+    InvasionRepulsed,
     PlanetBanked,
+    PlanetInvaded,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -260,10 +263,17 @@ class Colonize:
 
 @dataclass(frozen=True, slots=True)
 class SetAllocation:
-    """Set a player-owned colony's production split over the trio (§8)."""
+    """Set a player-owned colony's production split over the trio + garrison (§8, §4.2).
+
+    `allocation` maps Commodity value → share; `fighter` is the optional garrison share
+    (§4.2, WP55). The reducer normalizes the trio shares **plus** `fighter` to sum 1.0, so
+    `sum(commodity shares) + fighter_allocation == 1.0` holds (the §4 invariant — the trio
+    stays sacred, fighters ride their own share rather than a fourth commodity).
+    """
 
     planet_id: int
     allocation: dict[str, float]  # Commodity value -> share
+    fighter: float = 0.0  # garrison production share (WP55)
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,6 +285,20 @@ class BuildCitadel:
     """
 
     planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class InvadePlanet:
+    """Land carried fighters to take an owned world by ground assault (§4.2, §14, WP55).
+
+    Legal only when no operational base defends the sector and the citadel gun is down
+    (or was never built), and the L3 siege shield does not bar it. Commits `fighters`
+    from the ship; resolution is a per-round exchange against the citadel-scaled garrison.
+    Never in the Core (deployment-free, §10).
+    """
+
+    planet_id: int
+    fighters: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -619,7 +643,7 @@ Command = (
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SetAllocation
-    | BuildCitadel | PlanetDeposit | PlanetWithdraw
+    | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles
@@ -731,6 +755,8 @@ def reduce(
         case PlanetWithdraw():
             return _planet_bank(state, player_id, command.planet_id, command.amount,
                                 config, withdraw_=True)
+        case InvadePlanet():
+            return _invade_planet(state, player_id, command, config)
         case InstallComponent():
             return _install_component(state, player_id, command, config)
         case SwapComponent():
@@ -1470,11 +1496,14 @@ def _set_allocation(
     if planet.owner.kind != "player" or planet.owner.ref != player_id:
         raise EconomyError("you do not own that world")
     alloc = {c: float(cmd.allocation.get(c.value, 0.0)) for c in Commodity}
-    total = sum(alloc.values())
+    fighter = max(0.0, float(cmd.fighter))
+    total = sum(alloc.values()) + fighter
     if total <= 0:
         raise EconomyError("allocation must be positive")
+    # Normalize the trio + fighter share together so they sum to 1.0 (§4.2 invariant, WP55).
     normalized = {c: v / total for c, v in alloc.items()}
-    return ReduceResult(planets=(replace(planet, allocation=normalized),))
+    return ReduceResult(planets=(replace(
+        planet, allocation=normalized, fighter_allocation=fighter / total),))
 
 
 # --- citadels: build ladder + treasury (§4.2, WP54) -------------------------
@@ -1543,6 +1572,70 @@ def _planet_bank(
     return ReduceResult(
         events=(PlanetBanked(player_id, planet.id, kind, amount, new_planet.treasury),),
         players=(new_player,), planets=(new_planet,),
+    )
+
+
+def _invade_planet(
+    state: UniverseState, player_id: int, cmd: InvadePlanet, config: GameConfig
+) -> ReduceResult:
+    """Ground-assault an owned world once its defences have fallen (§4.2, §14, WP55).
+
+    Enforces the invasion ladder in order (no operational base, gun down, no siege shield),
+    commits carried fighters, and resolves the fight in `citadels.resolve_invasion` (drawing
+    from `state.rng`, H4). Victory flips ownership and captures the treasury; defeat costs
+    the committed fighters, drops alignment, and sours the owner bloc (the WP27 rail).
+    """
+    if config.citadels is None:
+        raise CombatError("planetary invasion is not enabled in this universe")
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    ship = _ship(state, player)
+    planet = state.planets.get(cmd.planet_id)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise CombatError("no such world in this sector")
+    if not planet.owner.is_owned or (planet.owner.kind == "player" and planet.owner.ref == player_id):
+        raise CombatError("there is nothing to invade — it is unowned or already yours")
+    # Core worlds can never be invaded (deployment-free Core, §10 — assert, don't special-case).
+    if state.sectors[ship.sector_id].is_galactic_core:
+        raise CombatError("the Core's worlds cannot be invaded")
+    # The ladder, in order: an operational base must be razed, then the gun silenced, and
+    # the L3 siege shield must not stand — each rung rejects until the previous falls.
+    if any(b.sector_id == ship.sector_id and is_operational(b) for b in state.starbases.values()):
+        raise CombatError("raze the orbital base before a ground assault")
+    if citadels.has_gun(planet, config):
+        raise CombatError("silence the citadel gun before a ground assault")
+    if citadels.siege_shielded(planet, config, base_operational=False):
+        raise CombatError("the citadel's siege shield holds — nothing can land")
+    if cmd.fighters < 1 or ship.fighters < cmd.fighters:
+        raise CombatError("not enough fighters aboard to commit")
+
+    outcome = citadels.resolve_invasion(planet, cmd.fighters, config, state.rng)
+    new_ship = replace(ship, fighters=ship.fighters - cmd.fighters)
+    former = planet.owner
+
+    def _sour(p: Player) -> Player:
+        # Taking (or trying to take) a bloc's world is an act of war (the WP38 rail).
+        if former.kind == "alliance" and former.ref is not None:
+            return replace(p, alliance_standing={**p.alliance_standing, former.ref: -1.0})
+        return p
+
+    if outcome.victory:
+        new_planet, loot = citadels.conquer(planet, player_id, outcome.attacker_survivors, config)
+        new_player = _sour(replace(player, latinum=player.latinum + loot))
+        return ReduceResult(
+            events=(PlanetInvaded(player_id, planet.id, outcome.fighters_lost,
+                                  new_planet.colonists, loot),),
+            players=(new_player,), ships=(new_ship,), planets=(new_planet,),
+        )
+    # Repulsed: the committed fighters are gone, alignment drops, the garrison is attrited.
+    new_player = _sour(replace(
+        player, alignment=player.alignment - config.citadels.invasion_alignment_penalty))
+    mult = citadels.citadel_defense_mult(planet, config)
+    raw_survivors = min(planet.fighters, round(outcome.defender_survivors / mult)) if mult else 0
+    new_planet = replace(planet, fighters=raw_survivors)
+    return ReduceResult(
+        events=(InvasionRepulsed(player_id, planet.id, outcome.fighters_lost),),
+        players=(new_player,), ships=(new_ship,), planets=(new_planet,),
     )
 
 
@@ -1844,6 +1937,7 @@ def _combat_action(
         events.append(spoke)
     razed_bases: tuple[Starbase, ...] = ()
     razed_planets: tuple[Planet, ...] = ()
+    silenced_planets: tuple[Planet, ...] = ()
     if result.outcome == combat.VICTORY:
         new_ship, salvage = _combat_salvage(player_id, enc, new_ship, config, state.rng)
         new_player = replace(new_player, latinum=new_player.latinum + salvage.latinum)
@@ -1852,6 +1946,13 @@ def _combat_action(
             new_player, razed_bases, razed_planets, raze_events = _raze_starbase(
                 state, new_player, enc.starbase_id, config)
             events.extend(raze_events)
+        elif enc.citadel_planet_id is not None:
+            # Silencing the gun is the ladder's second rung (§4.2, WP55): zero its
+            # integrity (mirroring how base components fall), exposing a ground assault.
+            gun_planet = state.planets.get(enc.citadel_planet_id)
+            if gun_planet is not None and gun_planet.gun_integrity > 0:
+                silenced_planets = (replace(gun_planet, gun_integrity=0),)
+                events.append(CitadelGunSilenced(player_id, gun_planet.id))
     elif result.outcome == combat.DESTROYED:
         # Hull 0 (§10, WP26): ship, cargo, and stores are lost; the escape pod —
         # a real config hull — is issued in place, and the pod limps home.
@@ -1888,7 +1989,7 @@ def _combat_action(
                         force, fighters=max(0, force.fighters - config.territory.retreat_fighter_cost)),)
         events.append(EncounterEnded(player_id, enc.species_id, result.outcome))
     return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,),
-                        starbases=razed_bases, planets=razed_planets,
+                        starbases=razed_bases, planets=razed_planets + silenced_planets,
                         sector_forces=force_updates)
 
 

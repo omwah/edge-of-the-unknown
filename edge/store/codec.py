@@ -23,11 +23,14 @@ from edge.core.events import (
     Banked,
     CitadelBuildStarted,
     CitadelCompleted,
+    CitadelGunSilenced,
     Colonized,
     ColonistsRecruited,
     ColonyGrew,
     CombatRound,
+    InvasionRepulsed,
     PlanetBanked,
+    PlanetInvaded,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -99,6 +102,7 @@ from edge.core.rules import (
     Hail,
     HaggleOffer,
     InstallComponent,
+    InvadePlanet,
     JoinAlliance,
     JoinGame,
     PetitionCoreSeizure,
@@ -158,13 +162,18 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
         case Colonize():
             return "Colonize", {"planet_id": command.planet_id, "colonists": command.colonists}
         case SetAllocation():
-            return "SetAllocation", {"planet_id": command.planet_id, "allocation": command.allocation}
+            return "SetAllocation", {
+                "planet_id": command.planet_id, "allocation": command.allocation,
+                "fighter": command.fighter,
+            }
         case BuildCitadel():
             return "BuildCitadel", {"planet_id": command.planet_id}
         case PlanetDeposit():
             return "PlanetDeposit", {"planet_id": command.planet_id, "amount": command.amount}
         case PlanetWithdraw():
             return "PlanetWithdraw", {"planet_id": command.planet_id, "amount": command.amount}
+        case InvadePlanet():
+            return "InvadePlanet", {"planet_id": command.planet_id, "fighters": command.fighters}
         case InstallComponent():
             return "InstallComponent", {
                 "subsystem": command.subsystem.value, "slot_index": command.slot_index,
@@ -294,13 +303,16 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
         case "Colonize":
             return Colonize(planet_id=payload["planet_id"], colonists=payload["colonists"])
         case "SetAllocation":
-            return SetAllocation(planet_id=payload["planet_id"], allocation=payload["allocation"])
+            return SetAllocation(planet_id=payload["planet_id"], allocation=payload["allocation"],
+                                 fighter=payload.get("fighter", 0.0))
         case "BuildCitadel":
             return BuildCitadel(planet_id=payload["planet_id"])
         case "PlanetDeposit":
             return PlanetDeposit(planet_id=payload["planet_id"], amount=payload["amount"])
         case "PlanetWithdraw":
             return PlanetWithdraw(planet_id=payload["planet_id"], amount=payload["amount"])
+        case "InvadePlanet":
+            return InvadePlanet(planet_id=payload["planet_id"], fighters=payload["fighters"])
         case "InstallComponent":
             return InstallComponent(
                 subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
@@ -504,6 +516,19 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             }
         case CitadelCompleted():
             return "CitadelCompleted", {"planet_id": event.planet_id, "level": event.level}
+        case CitadelGunSilenced():
+            return "CitadelGunSilenced", {"player_id": event.player_id, "planet_id": event.planet_id}
+        case PlanetInvaded():
+            return "PlanetInvaded", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "fighters_lost": event.fighters_lost, "colonists": event.colonists,
+                "loot": event.loot,
+            }
+        case InvasionRepulsed():
+            return "InvasionRepulsed", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "fighters_lost": event.fighters_lost,
+            }
         case PlanetBanked():
             return "PlanetBanked", {
                 "player_id": event.player_id, "planet_id": event.planet_id,
@@ -718,6 +743,14 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                                        payload["target_level"])
         case "CitadelCompleted":
             return CitadelCompleted(payload["planet_id"], payload["level"])
+        case "CitadelGunSilenced":
+            return CitadelGunSilenced(payload["player_id"], payload["planet_id"])
+        case "PlanetInvaded":
+            return PlanetInvaded(payload["player_id"], payload["planet_id"],
+                                 payload["fighters_lost"], payload["colonists"], payload["loot"])
+        case "InvasionRepulsed":
+            return InvasionRepulsed(payload["player_id"], payload["planet_id"],
+                                    payload["fighters_lost"])
         case "PlanetBanked":
             return PlanetBanked(payload["player_id"], payload["planet_id"], payload["kind"],
                                 payload["amount"], payload["balance"])

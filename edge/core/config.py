@@ -622,6 +622,16 @@ class CitadelConfig(BaseModel):
     gun_shields: int = Field(default=200, ge=0)
     gun_damage: int = Field(default=40, gt=0)
     gun_defense: int = Field(default=30, ge=0)
+    # Ground-assault resolution (§4.2, §14, WP55). Per round each side loses a random
+    # fraction of the *other's* current strength (BNT §A.3 shape), drawn in the reducer.
+    invasion_round_lo: float = Field(default=0.10, ge=0.0, le=1.0)
+    invasion_round_hi: float = Field(default=0.35, ge=0.0, le=1.0)
+    civilian_survival_frac: float = Field(default=0.5, ge=0.0, le=1.0)  # colonists kept on conquest
+    invasion_alignment_penalty: int = Field(default=20, ge=0)  # alignment hit on a failed assault
+    # Garrison production (§4.2, WP55): fighters minted per production tick equal
+    # `output × fighter_allocation × fighter_yield` (equipment-flavoured, so a colony trades
+    # trade goods for defenders). Requires an owned colony with a fighter allocation share.
+    fighter_yield: float = Field(default=0.5, ge=0.0)
 
 
 class GovernanceConfig(BaseModel):

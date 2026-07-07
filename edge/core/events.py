@@ -586,6 +586,43 @@ class CitadelCompleted(Event):
 
 
 @dataclass(frozen=True)
+class CitadelGunSilenced(Event):
+    """A planet's citadel gun was knocked out in combat (§4.2, WP55) — a siege rung."""
+
+    player_id: int
+    planet_id: int
+
+
+@dataclass(frozen=True)
+class PlanetInvaded(Event):
+    """A ground assault took an owned world (§4.2, §14, WP55).
+
+    `fighters_lost` of the attacker's committed fighters died taking it; `colonists`
+    survived the conquest; `loot` latinum (captured treasury + looted stores value) was
+    seized. The planet's `owner` flips to the invader and its citadel drops one level.
+    """
+
+    player_id: int
+    planet_id: int
+    fighters_lost: int
+    colonists: int
+    loot: int
+
+
+@dataclass(frozen=True)
+class InvasionRepulsed(Event):
+    """A ground assault failed — the garrison held (§4.2, §14, WP55).
+
+    All `fighters_lost` committed fighters died; the attacker takes an alignment hit and
+    the owner's consequence rail fires (grudge/spillover, §6.5).
+    """
+
+    player_id: int
+    planet_id: int
+    fighters_lost: int
+
+
+@dataclass(frozen=True)
 class PlanetBanked(Event):
     """A treasury deposit/withdraw at an owned citadel world (§4.2, WP54).
 
