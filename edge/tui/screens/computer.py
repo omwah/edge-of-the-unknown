@@ -51,6 +51,7 @@ class ComputerScreen(Screen):
         self._service = service
         self._pid = player_id
         self._computer = service.computer_view(player_id)
+        self._market = service.market_view(player_id)
         self._map = service.map_view(player_id)
         self._messages = service.messages_view(player_id)
         self._initial_tab = initial_tab
@@ -83,6 +84,10 @@ class ComputerScreen(Screen):
                     "[b]P[/] Plot route   [b]A[/] Add note",
                     classes="note",
                 )
+            with TabPane("Market", id="market"):
+                yield Static(f"[b]ORDER BOOK[/]        [dim]{self._market.summary}[/]")
+                yield DataTable(id="market-table", zebra_stripes=True, cursor_type="row")
+                yield Static(self._market_note(), classes="note")
             with TabPane("Log", id="log"):
                 yield Static("[b]EVENT LOG[/]        [dim]newest first[/]")
                 yield DataTable(id="log-table", zebra_stripes=True, cursor_type="row")
@@ -169,6 +174,21 @@ class ComputerScreen(Screen):
                 Text("No planets discovered yet — explore to chart them.", style="dim"),
                 *(Text(""),) * 7)
 
+        market = self.query_one("#market-table", DataTable)
+        market.add_columns("Sector", "Port", "Commodity", "Side", "Qty", "Limit")
+        if not self._market.enabled:
+            market.add_row(Text("The order-book market is disabled.", style="dim"),
+                           *(Text(""),) * 5)
+        elif self._market.orders:
+            for o in self._market.orders:
+                market.add_row(f"S{o.sector_display}", o.port_name, o.commodity,
+                               o.side, str(o.qty), str(o.limit))
+        else:
+            market.add_row(
+                Text("No open orders at charted ports — dock somewhere to read its book.",
+                     style="dim"),
+                *(Text(""),) * 5)
+
         route = self.query_one("#route-table", DataTable)
         route.add_columns("Hop", "Sector", "Notes")
         self._render_route()
@@ -186,6 +206,15 @@ class ComputerScreen(Screen):
         if not self._computer.dossier:
             return "[dim]Hail a friendly species to begin a dossier.[/]"
         return "\n".join(f"[cyan]{d.species}:[/] [dim]{d.note}[/]" for d in self._computer.dossier)
+
+    def _market_note(self) -> str:
+        if not self._market.enabled:
+            return "[dim]The legacy port economy is running — no order book to show.[/]"
+        if not self._market.purses:
+            return "[dim]Purses shown as of your last visit — dock to refresh a port's book.[/]"
+        purses = "   ".join(f"S{d} {name} [cyan]{purse:,}[/]"
+                            for d, name, purse in self._market.purses[:6])
+        return f"[dim]Purses (as of last dock):[/]  {purses}"
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         # Remember the tab across screens so [C] reopens where the player left off.

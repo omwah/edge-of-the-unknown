@@ -374,6 +374,37 @@ class ComputerDTO:
 
 
 @dataclass(frozen=True)
+class MarketOrderDTO:
+    """One open order on the Computer's Market tab (§8, WP48)."""
+
+    sector_display: int  # spatial id of the posting port
+    port_name: str
+    commodity: str  # short label, e.g. "Fuel"
+    side: str  # "buys" | "sells" — the port's side of the order
+    qty: int  # units still wanted/offered
+    limit: int  # per-unit limit in slips (max bid / min ask)
+
+
+@dataclass(frozen=True)
+class MarketDTO:
+    """The order-book market for the Computer's Market tab (§8, WP48).
+
+    Fog-respecting: only explored ports' books appear (never a port outside the
+    player's explored sectors). Purses are shown as-of-now (stale-by-design, like the
+    Ports directory). `last_*` are the most recent `MarketSettled` aggregates from the
+    log; `enabled` is False when the legacy regen economy is running (no book to show).
+    """
+
+    enabled: bool
+    orders: list[MarketOrderDTO] = field(default_factory=list)
+    purses: list[tuple[int, str, int]] = field(default_factory=list)  # (sector_display, name, purse)
+    last_matches: int = 0
+    last_volume: int = 0
+    last_slips: int = 0
+    summary: str = "no settlement yet"
+
+
+@dataclass(frozen=True)
 class MapNodeDTO:
     """A clickable sector node on the local map: its label's cell box in `rows`.
 
