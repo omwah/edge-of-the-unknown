@@ -22,11 +22,12 @@ from edge.core.events import (
     AlienMoved, AttitudeChanged, Banked, ColonyGrew, Event, MarketSettled,
     PlanetProduced, PortOrderFilled, TurnsReset,
 )
+from edge.core.governance import apply_intrigue, flip_core_governor, npc_seizure_ready
 from edge.core.market import (
     clear_filled, desired_stock_frac, hinterland_drift, liquidity_drip, match_orders,
     orders_from_ports,
 )
-from edge.core.models import AlienSpecies, Player, Port, UniverseState
+from edge.core.models import AlienSpecies, Alliance, Planet, Player, Port, Starbase, UniverseState
 from edge.core.planets import produce
 from edge.core.rules import ReduceResult
 from edge.engine.port_economy import regenerate_ports
@@ -35,8 +36,8 @@ CronFn = Callable[[UniverseState, GameConfig], ReduceResult]
 
 __all__ = [
     "daily_turn_reset", "accrue_interest", "regenerate_ports", "hourly_port_economy",
-    "market_settlement", "planet_growth", "alien_drift", "trader_step", "CronFn",
-    "CRONS", "resolve_cron",
+    "market_settlement", "governance_tick", "planet_growth", "alien_drift", "trader_step",
+    "CronFn", "CRONS", "resolve_cron",
 ]
 
 
@@ -113,6 +114,67 @@ def market_settlement(state: UniverseState, config: GameConfig) -> ReduceResult:
 
     residual = clear_filled(state.port_orders, settlement)
     return ReduceResult(events=tuple(events), ports=tuple(changed), port_orders=residual)
+
+
+def governance_tick(state: UniverseState, config: GameConfig) -> ReduceResult:
+    """NPC Core seizures + leadership intrigue on the daily clock (§6.3, WP51).
+
+    A salted sub-RNG keyed by `(seed, governance_seq)` — never the shared command RNG —
+    keeps every roll deterministic and reproducible under the maintenance replay (the
+    `alien_drift` pattern, H11). Per eligible `covets_core` bloc it rolls `seizure_chance`
+    to flip the Core (at most one flip per firing, `flip_core_governor` cause
+    `npc_seizure`); per bloc with an `internal_rival_species_id` it rolls `intrigue_chance`
+    to swap leadership (and, if `intrigue_turns_outward`, turn the bloc's live
+    `Alliance.covets_core` on). One `ReduceResult` folds the whole firing; `species_arcs`,
+    grudges, and standings are untouched — NPC upheavals are political, not personal.
+    """
+    gc = config.aliens.governance
+    if not gc.enabled or config.roster is None:
+        return ReduceResult()
+    firing = state.game.governance_seq
+    rng = random.Random(f"{state.game.seed}|governance|{firing}")
+    events: list[Event] = []
+    game = state.game
+    planets: dict[int, Planet] = {}
+    starbases: dict[int, Starbase] = {}
+    species: dict[int, AlienSpecies] = {}
+    alliances: dict[int, Alliance] = {}
+
+    # 1. NPC Core seizure — at most one flip per firing (a flip re-keys the whole Core).
+    for aid in sorted(a.id for a in config.roster.alliances):
+        if not npc_seizure_ready(state, config, aid):
+            continue
+        if rng.random() < gc.seizure_chance:
+            delta = flip_core_governor(state, config, aid, cause="npc_seizure")
+            game = delta.game
+            planets.update({p.id: p for p in delta.planets})
+            starbases.update({b.id: b for b in delta.starbases})
+            species.update({s.id: s for s in delta.species})
+            events.extend(delta.events)
+            break
+
+    # 2. Leadership intrigue — an internal coup within each bloc that authored a rival.
+    for ac in sorted(config.roster.alliances, key=lambda a: a.id):
+        if ac.internal_rival_species_id is None:
+            continue
+        if rng.random() >= gc.intrigue_chance:
+            continue
+        intrigue = apply_intrigue(state, ac, species)
+        if intrigue is None:
+            continue
+        species.update({s.id: s for s in intrigue.species})
+        events.append(intrigue.event)
+        if ac.intrigue_turns_outward and ac.id in state.alliances:
+            base = alliances.get(ac.id, state.alliances[ac.id])
+            if not base.covets_core:
+                alliances[ac.id] = replace(base, covets_core=True)
+
+    game = replace(game, governance_seq=firing + 1)
+    return ReduceResult(
+        events=tuple(events), game=game,
+        planets=tuple(planets.values()), starbases=tuple(starbases.values()),
+        species=tuple(species.values()), alliances=tuple(alliances.values()),
+    )
 
 
 def daily_turn_reset(state: UniverseState, config: GameConfig) -> ReduceResult:
@@ -308,6 +370,7 @@ CRONS: dict[str, CronFn] = {
     "hourly_port_economy": hourly_port_economy,
     "hourly_planet_growth": planet_growth,
     "market_settlement": market_settlement,
+    "governance_tick": governance_tick,
     "alien_drift": alien_drift,
     "trader_step": trader_step,
     "interest_accrual": accrue_interest,

@@ -127,6 +127,7 @@ from edge.core.planets import is_colonizable, retype_planet
 from edge.core.starbases import is_operational
 from edge.core.models import (
     AlienSpecies,
+    Alliance,
     Discovery,
     Encounter,
     Game,
@@ -613,6 +614,7 @@ class ReduceResult:
     species: tuple[AlienSpecies, ...] = ()  # cron-mutated species positions (WP16 drift)
     sectors: tuple[Sector, ...] = ()  # beacon-text updates (WP41)
     sector_forces: tuple[SectorForce, ...] = ()  # deployed fighters/mines (WP41)
+    alliances: tuple[Alliance, ...] = ()  # bloc state changes (e.g. intrigue turns outward, WP51)
     game: Game | None = None  # set by maintenance reducers (e.g. daily day-number bump)
     # A whole-book replacement of `state.port_orders` (WP47) — None means "unchanged",
     # a mapping means "replace the book". Unlike the entity tuples (which upsert), the
@@ -643,6 +645,8 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
             state.sector_forces.pop(force.sector_id, None)  # spent forces clear out
         else:
             state.sector_forces[force.sector_id] = force
+    for alliance in result.alliances:
+        state.alliances[alliance.id] = alliance
     if result.game is not None:
         state.game = result.game
     if result.port_orders is not None:

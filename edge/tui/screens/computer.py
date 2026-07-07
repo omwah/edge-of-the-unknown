@@ -199,7 +199,9 @@ class ComputerScreen(Screen):
         dossier.add_columns("Species", "Alliance", "Standing", "Last seen", "Disp", "Tech offers")
         if self._computer.dossier:
             for d in self._computer.dossier:
-                dossier.add_row(d.species, d.alliance, d.standing, f"S{d.last_seen}",
+                # Show a bloc member's role (leader / aspirant) so an intrigue coup is legible (WP51).
+                alliance = f"{d.alliance} · {d.role}" if d.role not in ("none", "member") else d.alliance
+                dossier.add_row(d.species, alliance, d.standing, f"S{d.last_seen}",
                                 bar(d.disposition_filled, 5), d.offers)
         else:
             dossier.add_row(*(Text("no species met yet", style="dim"), *(Text(""),) * 5))

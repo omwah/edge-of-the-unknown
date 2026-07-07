@@ -50,6 +50,9 @@ class Game:
     # sub-RNG so movement is deterministic and reproduces under replay, without ever
     # touching the shared command-stream RNG. Rebuilt by re-running crons on reload.
     drift_seq: int = 0
+    # The same pattern for the `governance_tick` cron (WP51): seeds its salted sub-RNG so
+    # NPC seizures/intrigue are deterministic and replay through the maintenance log.
+    governance_seq: int = 0
 
 
 @dataclass(frozen=True, slots=True)

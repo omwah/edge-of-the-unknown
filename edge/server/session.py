@@ -43,6 +43,7 @@ from edge.core.events import (
     AlienMoved,
     AlienSpoke,
     AllianceJoined,
+    AllianceLeadershipChanged,
     AllianceResigned,
     Banked,
     Colonized,
@@ -730,6 +731,7 @@ def _dossier_entries(state: UniverseState, player: Player, config: GameConfig) -
             offers=_offer_summary(sc),
             last_seen=str(_display(state, seen)) if seen is not None else "—",
             note=_line(state, roster, species, player, "dossier_self", config),
+            role=species.alliance_role,  # re-derived live, so an intrigue coup follows (WP51)
         ))
     return out
 
@@ -1464,6 +1466,8 @@ def format_event(event: Event) -> str:
         return "[yellow]⚖ Governor's patrol: your record is known here. Mind yourself.[/]"
     if isinstance(event, GovernanceChanged):
         return "[yellow]⚑ The Core changes hands — a new alliance governs the heart of the galaxy.[/]"
+    if isinstance(event, AllianceLeadershipChanged):
+        return f"[yellow]⚑ A coup: the {event.new_leader_roster} seize leadership of their bloc.[/]"
     if isinstance(event, AdmissionAdvanced):
         return f"[green]✔ Admission task complete: {event.task}.[/]"
     if isinstance(event, AllianceJoined):

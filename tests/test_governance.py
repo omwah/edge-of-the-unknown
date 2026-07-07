@@ -273,3 +273,149 @@ def test_seizure_ledger_records_under_the_reserved_key() -> None:
     prog = seizure_progress(state, state.players[1], CFG.roster.alliance(LIBERTY),
                             CFG.roster.alliance(LIBERTY).core_seizure)
     assert prog.tasks_done == frozenset({"prove"})  # recorded in the @seizure ledger
+
+
+# --- WP51: NPC governance + leadership intrigue ------------------------------
+
+from edge.core.enums import Subsystem
+from edge.core.engine_room import build_layouts
+from edge.core.events import AllianceLeadershipChanged, GovernanceChanged
+from edge.core.governance import apply_intrigue, npc_seizure_ready
+from edge.engine.cron import governance_tick
+
+IRON = 3  # Iron Covenant — the roster's intrigue bloc (internal_rival vennrith, turns outward)
+
+
+def _gov_config(*, seizure: float = 0.0, intrigue: float = 0.0,
+                min_incumbent: int = 1, enabled: bool = True) -> object:
+    base = load_default_config()
+    gov = base.aliens.governance.model_copy(update={
+        "enabled": enabled, "seizure_chance": seizure,
+        "intrigue_chance": intrigue, "min_incumbent_bases": min_incumbent})
+    return base.model_copy(update={"aliens": base.aliens.model_copy(update={"governance": gov})})
+
+
+def _base(bid: int, sector: int, planet: int, owner: Ownership, *, operational: bool) -> Starbase:
+    layouts = build_layouts(CFG.starbase.subsystems)
+    if not operational:
+        reactor = layouts[Subsystem.FUSION_REACTOR]
+        slots = list(reactor.slots)
+        slots[reactor.keystone_index] = None  # strip the keystone → derelict
+        layouts[Subsystem.FUSION_REACTOR] = replace(reactor, slots=tuple(slots))
+    return Starbase(id=bid, sector_id=sector, planet_id=planet, ship_class_id="orbital_platform",
+                    owner=owner, subsystems=layouts)
+
+
+def _gov_world(*, incumbent_operational: int = 0, coveter: int = LIBERTY) -> UniverseState:
+    """Two Core planets+bases (Federation), `incumbent_operational` of them still live."""
+    state = UniverseState.new(Game(1, 1, CFG.config_version, "t", core_governing_alliance_id=1))
+    state.sectors = {
+        1: Sector(1, 1, (2,), "Hub", is_galactic_core=True),
+        2: Sector(2, 1, (1, 3), "Hub", is_galactic_core=True),
+        3: Sector(3, 1, (2,), "Frontier"),
+    }
+    state.rebuild_adjacency()
+    state.alliances = {i: Alliance(i, f"A{i}", covets_core=(i == coveter)) for i in (1, 2, 3, 4)}
+    fed = Ownership("alliance", 1)
+    for i in (1, 2):
+        state.planets[i] = Planet(i, i, f"Core-{i}", "terrestrial_warm", owner=fed, starbase_id=i)
+        state.starbases[i] = _base(i, i, i, fed, operational=(i <= incumbent_operational))
+    return state
+
+
+def test_npc_seizure_readiness_truth_table() -> None:
+    cfg = _gov_config()
+    broken = _gov_world(incumbent_operational=0)  # incumbent driven out of the Core
+    assert npc_seizure_ready(broken, cfg, LIBERTY)          # coveter, Core broken → ready
+    assert not npc_seizure_ready(broken, cfg, 2)            # a non-covets bloc is never ready
+    assert not npc_seizure_ready(broken, cfg, 1)            # the incumbent cannot seize itself
+    strong = _gov_world(incumbent_operational=1)            # a Core base still stands
+    assert not npc_seizure_ready(strong, cfg, LIBERTY)      # not destabilized enough → not ready
+
+
+def test_npc_seizure_readiness_needs_intact_home_bases() -> None:
+    state = _gov_world(incumbent_operational=0)
+    state.home_clusters = {LIBERTY: (3,)}
+    state.planets[3] = Planet(3, 3, "Home", "barren", owner=Ownership("alliance", LIBERTY), starbase_id=3)
+    state.starbases[3] = _base(3, 3, 3, Ownership("alliance", LIBERTY), operational=False)  # razed
+    assert not npc_seizure_ready(state, _gov_config(), LIBERTY)  # its own strength is broken
+
+
+def test_governance_tick_npc_seizure_flips_the_core() -> None:
+    state = _gov_world(incumbent_operational=0)
+    result = governance_tick(state, _gov_config(seizure=1.0))  # force the roll
+    apply_result(state, result)
+    assert state.game.core_governing_alliance_id == LIBERTY
+    assert state.game.governance_seq == 1
+    assert any(isinstance(e, GovernanceChanged) and e.cause == "npc_seizure" for e in result.events)
+    assert all(state.planets[i].owner == Ownership("alliance", LIBERTY) for i in (1, 2))
+
+
+def test_governance_tick_is_quiet_when_no_bloc_is_ready() -> None:
+    state = _gov_world(incumbent_operational=2)  # incumbent Core intact → nobody ready
+    result = governance_tick(state, _gov_config(seizure=1.0))
+    assert not any(isinstance(e, GovernanceChanged) for e in result.events)
+    assert result.game is not None and result.game.governance_seq == 1  # seq still advances
+
+
+def _intrigue_world() -> UniverseState:
+    """Iron Covenant (3) with a leader (thessarch) and its internal rival (vennrith)."""
+    state = _gov_world(incumbent_operational=2)  # keep the incumbent strong: isolate intrigue
+
+    def sp(sid: int, roster: str, role: str) -> AlienSpecies:
+        return AlienSpecies(id=sid, roster_id=roster, name=roster.title(), archetype_id="a",
+                            sector_id=3, home_band="Deep", tech_level=5, base_disposition=0.4,
+                            disposition_center=0.4, disposition_variance=0.05,
+                            alliance_id=IRON, alliance_role=role)
+    state.species = {1: sp(1, "thessarch", "leader"), 2: sp(2, "vennrith", "member")}
+    state.ships[1] = Ship(1, "t", "P", 1, 3, 60)
+    state.players[1] = Player(1, "you", 1, 2_000, turns_remaining=250,
+                              species_attitudes={"thessarch": 0.1, "vennrith": 0.1})
+    return state
+
+
+def test_governance_tick_intrigue_swaps_leadership_and_turns_the_bloc_outward() -> None:
+    state = _intrigue_world()
+    result = governance_tick(state, _gov_config(intrigue=1.0))
+    apply_result(state, result)
+    assert state.species[1].alliance_role == "member"   # thessarch demoted
+    assert state.species[2].alliance_role == "leader"   # vennrith usurps
+    assert state.alliances[IRON].covets_core is True    # intrigue_turns_outward
+    assert any(isinstance(e, AllianceLeadershipChanged) and e.new_leader_roster == "vennrith"
+               and e.old_leader_roster == "thessarch" for e in result.events)
+
+
+def test_intrigue_is_idempotent_once_the_rival_leads() -> None:
+    state = _intrigue_world()
+    apply_result(state, governance_tick(state, _gov_config(intrigue=1.0)))
+    # A second firing finds vennrith already leading → no-op (no event, no re-swap).
+    again = governance_tick(state, _gov_config(intrigue=1.0))
+    assert not any(isinstance(e, AllianceLeadershipChanged) for e in again.events)
+
+
+def test_intrigue_never_invents_a_missing_rival() -> None:
+    state = _gov_world(incumbent_operational=2)  # no species placed at all
+    assert apply_intrigue(state, CFG.roster.alliance(IRON), {}) is None
+
+
+def test_intrigue_follows_into_the_dossier() -> None:
+    state = _intrigue_world()
+    apply_result(state, governance_tick(state, _gov_config(intrigue=1.0)))
+    roles = {e.species: e.role for e in session.computer_view(state, 1, CFG).dossier}
+    assert roles.get("Vennrith") == "leader" and roles.get("Thessarch") == "member"
+
+
+def test_governance_tick_is_deterministic_under_replay() -> None:
+    def run() -> str:
+        state = _intrigue_world()
+        cfg = _gov_config(seizure=1.0, intrigue=1.0)
+        for _ in range(3):
+            apply_result(state, governance_tick(state, cfg))
+        return state_hash(state)
+    assert run() == run()
+
+
+def test_governance_tick_disabled_is_inert() -> None:
+    state = _gov_world(incumbent_operational=0)
+    result = governance_tick(state, _gov_config(seizure=1.0, enabled=False))
+    assert result.events == () and result.game is None  # nothing fires, seq untouched
