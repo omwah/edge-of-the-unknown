@@ -13,6 +13,9 @@ from edge.core.events import (
     AlienMoved,
     AlienSpoke,
     AlienTraded,
+    ContractAccepted,
+    ContractCompleted,
+    ContractFailed,
     AllianceJoined,
     AllianceResigned,
     AttitudeChanged,
@@ -71,7 +74,9 @@ from edge.core.events import (
     Warped,
 )
 from edge.core.rules import (
+    AbandonContract,
     AcceptLead,
+    DeliverContract,
     AdvanceAdmission,
     AssaultStarbase,
     BarterArtifact,
@@ -166,6 +171,8 @@ COMMANDS: list[Command] = [
     BuyAlienTech(species_id=3, offer_index=1),   # WP9 buy tech for latinum
     BarterArtifact(species_id=3, offer_index=0), # WP9 barter an artifact for tech
     AcceptLead(species_id=3),                    # §6.7 log an alien's coordinate tip
+    DeliverContract(contract_id=2),              # WP57 fulfil a deliver favor
+    AbandonContract(contract_id=2),              # WP57 release a favor
     AdvanceAdmission(alliance_id=3, task="pay"), # WP38 complete an admission task
     JoinAlliance(alliance_id=3),                 # WP38 join a bloc
     ResignAlliance(),                            # WP38 leave the current bloc
@@ -236,6 +243,9 @@ EVENTS: list[Event] = [
     AlienTraded(1, 3, "buy", "radiator (II)", 7_000),
     AttitudeChanged(1, 3, 0.12, 0.87),
     LeadAccepted(1, 3, "discovery", 42, 17),  # §6.7 accepted a coordinate tip
+    ContractAccepted(1, 2, "deliver", "terran", 450, 13),  # WP57 took a favor
+    ContractCompleted(1, 2, "deliver", 450),               # WP57 fulfilled a favor
+    ContractFailed(1, 2, "escort", "deadline"),            # WP57 a favor lapsed
     EncounterStarted(1, 3, 55, True, 3, "Deep"),   # WP24 a violence opener
     EncounterStarted(1, 3, 55, False, 0, "Deep"),  # WP24 a peaceful interception
     EncounterEvaded(1, 3, 55),                     # WP24 slipped away unseen

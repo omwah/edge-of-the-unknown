@@ -118,7 +118,8 @@ def build_prompt(req: AuthoringRequest, known_contexts: frozenset[str] | None = 
         "- Do not invent other {curly} placeholders. Keep every line in the speaker's voice.\n"
         "- OPTIONALLY add 'choices': an array of the PLAYER'S possible replies to this line, "
         "each {\"text\": <the captain's short reply, plain first person>, \"next_context\": "
-        "<a beat to go to, optional>, \"action\": <one of leave/trade/barter/accept_lead, "
+        "<a beat to go to, optional>, \"action\": <one of "
+        "leave/trade/barter/accept_lead/accept_contract, "
         "optional>}. Only 'text' is required. Omit 'choices' if no branching reply fits."
         + contexts_info
         + example
@@ -178,6 +179,11 @@ def _intent_brief(context: str) -> str:
                              "have not found, and you GIVE THEM the route. Tell them to set "
                              "course for sector {coords} — about {distance} jumps out, in the "
                              "{band} — where {reward} awaits.\n",
+        "contract_offer": "You have a job for the player: {target}. Offer it as a favour — "
+                          "done within {deadline} days, it pays {reward}. Speak the ask "
+                          "plainly and invite them to take it.\n",
+        "contract_report": "The player already took your job ({target}); remind them it "
+                           "still stands and {reward} awaits when it is done.\n",
         # The combat beats (§6.7, WP31) — spoken by the encounter reducers, not conversation.
         "combat_open": "Your pack has just intercepted the player's ship and opens fire; "
                        "issue the attack challenge.\n",

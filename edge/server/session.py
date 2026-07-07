@@ -23,6 +23,7 @@ from edge.server import navstrip
 from edge.server import terrain as terrain_art
 from edge.core import citadels
 from edge.core import combat
+from edge.core import contracts
 from edge.core.aliens import core_status, disposition_band, effective_disposition, seizure_progress
 from edge.core.config import DialogueChoice, GameConfig
 from edge.core.discovery import entity_contactable, entity_species, is_detectable
@@ -54,6 +55,9 @@ from edge.core.events import (
     ComponentInstalled,
     CitadelBuildStarted,
     CitadelCompleted,
+    ContractAccepted,
+    ContractCompleted,
+    ContractFailed,
     CitadelGunSilenced,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -913,9 +917,24 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
         ports=_port_directory(state, player_id), planets=_planet_directory(state, player_id),
         leads=leads_view(state, player_id, config),
+        contracts=_contracts_view(state, player),
         seizure=_seizure_status(state, player, config),
         governance_intel=_governance_intel(state, player),
     )
+
+
+def _contracts_view(state: UniverseState, player: Player) -> list[dto.ContractDTO]:
+    """The player's active favors for the Computer's contracts panel (§6.7, WP57)."""
+    return [
+        dto.ContractDTO(
+            contract_id=c.id, kind=c.kind, issuer=c.issuer,
+            summary=contracts.target_label(state, c), reward=c.reward_slips,
+            deadline_day=c.deadline_day,
+            dest_display=(state.spatial_ids.get(c.dest_sector, c.dest_sector)
+                          if c.dest_sector is not None else 0),
+        )
+        for c in contracts.active(player)
+    ]
 
 
 def _governance_intel(state: UniverseState, player: Player) -> list[str]:
@@ -1153,7 +1172,8 @@ def _line(state: UniverseState, roster: object, species: AlienSpecies, player: P
 
 
 def _gate_choice(choice: DialogueChoice, *, posture: str, treaty_mode: str, combatant: bool,
-                 has_barter: bool, has_intel: bool, subjects_available: bool) -> tuple[bool, str]:
+                 has_barter: bool, has_intel: bool, subjects_available: bool,
+                 has_contract: bool = False) -> tuple[bool, str]:
     """Gate one authored reply, greying it with a reason (§6.7).
 
     The mechanical actions and the Phase-3 navigations carry the same availability checks and
@@ -1172,6 +1192,8 @@ def _gate_choice(choice: DialogueChoice, *, posture: str, treaty_mode: str, comb
         return (True, "") if has_barter else (False, "they offer no barter")
     if choice.action == "accept_lead":  # LOG COORDINATES — only what the speaker has volunteered.
         return (True, "") if has_intel else (False, "no coordinates on offer")
+    if choice.action == "accept_contract":  # TAKE THE JOB — only when one is on offer (WP57).
+        return (True, "") if has_contract else (False, "no work on offer")
     if choice.next_context == "dossier_other":  # ASK ABOUT… another met species.
         return (True, "") if subjects_available else (False, "no other species met yet")
     if choice.next_context == "treaty_offer":  # TREATY — Phase 3.
@@ -1222,6 +1244,7 @@ def _contact_choices(state: UniverseState, roster: object, species: AlienSpecies
                      player: Player, context: str, config: GameConfig, *, standing: str,
                      ctx: Mapping[str, str], sc: object, offers: list[dto.TechOfferDTO],
                      has_intel: bool, subjects_available: bool,
+                     has_contract: bool = False,
                      facts: Mapping[str, object] | None = None) -> list[dto.ContactChoiceDTO]:
     """The authored player replies on the active node — the whole reply menu (§6.7).
 
@@ -1250,7 +1273,8 @@ def _contact_choices(state: UniverseState, roster: object, species: AlienSpecies
             continue
         enabled, reason = _gate_choice(
             choice, posture=posture, treaty_mode=treaty_mode, combatant=combatant,
-            has_barter=has_barter, has_intel=has_intel, subjects_available=subjects_available)
+            has_barter=has_barter, has_intel=has_intel, subjects_available=subjects_available,
+            has_contract=has_contract)
         out.append(dto.ContactChoiceDTO(
             index=i, text=dialogue.fill(choice.text, ctx), action=choice.action or "",
             next_context=choice.next_context or "", enabled=enabled, reason=reason))
@@ -1332,6 +1356,13 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         facts = {"has_intel_target": intel is not None}
         if intel is not None:
             subject_extra = intel.bindings()
+    elif shown in ("contract_offer", "contract_report"):
+        # The favor the speaker would offer right now (§6.7, WP57) — the same deterministic
+        # pick the accept reducer makes, so the shown line and booked job agree (lockstep).
+        offer = contracts.pick_contract(state, species, player, config)
+        facts = {"has_contract_offer": offer is not None}
+        if offer is not None:
+            subject_extra = contracts.offer_bindings(state, offer, config)
     # The live visit's session facts join the node's own (§6.7, WP28) — the same shared
     # merge the Converse reducer makes, so line and menu agree on both sides (lockstep).
     facts = dialogue_facts.contact_facts(state, player, species, roster=roster, extra=facts)
@@ -1346,7 +1377,9 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
     choices = _contact_choices(state, roster, species, player, shown, config,
                                standing=standing, ctx=choice_ctx, facts=facts, sc=sc,
                                offers=offers, has_intel=intel is not None,
-                               subjects_available=bool(subjects))
+                               subjects_available=bool(subjects),
+                               has_contract=contracts.pick_contract(
+                                   state, species, player, config) is not None)
     # A seeded-random portrait variant so different individuals of the same species show
     # different faces, deterministically keyed to the game seed + species instance id.
     # Uses the same string-seed `random.Random` pattern as `encounter_rng` (stable across
@@ -1627,6 +1660,14 @@ def format_event(event: Event) -> str:
     if isinstance(event, HazardDamage):
         label = "Mines" if event.source == "mine" else "Gravity shear"
         return f"[red]✷ {label} — {event.damage} hull damage![/]"
+    if isinstance(event, ContractAccepted):
+        return (f"[cyan]✎ Favor accepted ({event.kind}) — {event.reward:,} slips on delivery, "
+                f"due day {event.deadline_day}.[/]")
+    if isinstance(event, ContractCompleted):
+        return f"[green]✓ Favor fulfilled — {event.reward:,} slips paid.[/]"
+    if isinstance(event, ContractFailed):
+        why = "deadline passed" if event.reason == "deadline" else "abandoned"
+        return f"[yellow]✖ Favor failed ({why}).[/]"
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 

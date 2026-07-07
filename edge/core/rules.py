@@ -22,6 +22,7 @@ from typing import assert_never
 from edge import dialogue
 from edge.core import combat, encounters
 from edge.core import citadels
+from edge.core import contracts
 from edge.core import mechanics
 from edge.core import starbases
 from edge.core import territory
@@ -95,6 +96,9 @@ from edge.core.events import (
     CitadelBuildStarted,
     CitadelCompleted,
     CitadelGunSilenced,
+    ContractAccepted,
+    ContractCompleted,
+    ContractFailed,
     ColonistsRecruited,
     InterdictorToggled,
     InvasionRepulsed,
@@ -140,6 +144,7 @@ from edge.core.starbases import is_operational
 from edge.core.models import (
     AlienSpecies,
     Alliance,
+    Contract,
     Discovery,
     Encounter,
     Game,
@@ -509,6 +514,29 @@ class AcceptLead:
 
 
 @dataclass(frozen=True, slots=True)
+class DeliverContract:
+    """Fulfil an active `deliver` favor at its target port (§6.7, WP57).
+
+    The player must hold an active deliver contract, be in the destination sector docked at
+    a port that buys the good, and carry the required cargo. The cargo debits and the reward
+    credits — completion is reducer-side, never polled by the UI.
+    """
+
+    contract_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class AbandonContract:
+    """Release an active favor, failing it honestly (§6.7, WP57).
+
+    An escort releases its merchant back to the drift rails; any kind takes the WP27
+    consequence rail only on a *destroyed-merchant* escort failure, not a plain abandon.
+    """
+
+    contract_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class AdvanceAdmission:
     """Record one completed admission task toward a bloc's membership (§6.3, WP38).
 
@@ -692,6 +720,7 @@ Command = (
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
+    | DeliverContract | AbandonContract
     | AdvanceAdmission | JoinAlliance | ResignAlliance | PetitionCoreSeizure
     | AssaultStarbase | RepairStarbase | ClaimStarbase
     | BuyFighters | BuyMines | DeployFighters | DeployMines | DeployBeacon
@@ -834,6 +863,10 @@ def reduce(
             return _barter_artifact(state, player_id, command, config)
         case AcceptLead():
             return _accept_lead(state, player_id, command, config)
+        case DeliverContract():
+            return _deliver_contract(state, player_id, command, config)
+        case AbandonContract():
+            return _abandon_contract(state, player_id, command, config)
         case AdvanceAdmission():
             return _advance_admission(state, player_id, command, config)
         case JoinAlliance():
@@ -1025,11 +1058,14 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
         active_encounter=encounter,
         contact_session=None,  # movement ends any conversation visit (§6.7 H1)
     )
+    # Any escorted merchant sitting where we depart from rides along (§6.7, WP57).
+    new_player, convoy, convoy_events = _convoy_step(state, new_player, from_sector, cmd.to_sector)
     return ReduceResult(
         events=(Warped(player_id, from_sector, cmd.to_sector, cost, one_way),
-                *det_events, *law_events, *entry_events),
+                *det_events, *law_events, *entry_events, *convoy_events),
         players=(new_player,),
         ships=(moved_ship,),
+        species=tuple(convoy),
         sector_forces=tuple(forces),
     )
 
@@ -1038,6 +1074,26 @@ def _require_no_encounter(player: Player) -> None:
     """Movement, docking, and descent are rejected while an encounter is live (§10)."""
     if player.active_encounter is not None:
         raise MovementError("you are engaged — fight or flee first")
+
+
+def _convoy_step(state: UniverseState, player: Player, from_sector: int, to_sector: int,
+                 positions: dict[int, AlienSpecies] | None = None
+                 ) -> tuple[Player, list[AlienSpecies], list[Event]]:
+    """Move escorted merchants with one player hop and pay arrivals (§6.7, WP57 — interview 9).
+
+    Wraps `contracts.advance_convoy`: relocates each convoyed merchant that sat in
+    `from_sector`, completes an escort whose merchant thereby reaches its destination, and
+    pays the reward through `apply_reward` (folded into the caller's `ReduceResult`, so
+    convoy replays exactly). `positions` threads the merchant's live position through a
+    multi-hop journey. Returns `(player, moved_merchants, events)`.
+    """
+    new_player, moved, completed = contracts.advance_convoy(
+        state, player, from_sector, to_sector, state.game.day_number, positions)
+    events: list[Event] = []
+    for c in completed:
+        new_player = contracts.apply_reward(new_player, c, state)
+        events.append(ContractCompleted(player.id, c.id, c.kind, c.reward_slips))
+    return new_player, moved, events
 
 
 def _core_law_events(
@@ -1210,6 +1266,7 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
     encounter: Encounter | None = None
     ship_now = ship
     force_updates: dict[int, SectorForce] = {}
+    convoy_updates: dict[int, AlienSpecies] = {}
     for nxt in hops:
         if turns < cost:
             break
@@ -1222,6 +1279,11 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
             state, detected, ship_now.sensor_rating, nxt, player_id, config)
         events.extend(det_events)
         events.extend(_core_law_events(state, player, current, nxt, config))
+        # Escorted merchants ride each departing hop alongside the player (§6.7, WP57).
+        player, convoy, convoy_events = _convoy_step(state, player, current, nxt, convoy_updates)
+        for merchant in convoy:
+            convoy_updates[merchant.id] = merchant
+        events.extend(convoy_events)
         current = nxt
         ship_now = replace(ship_now, sector_id=nxt)
         # Territory hazards + the §10 encounter roll — the journey halts *at* the
@@ -1239,6 +1301,7 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
                          active_encounter=encounter,
                          contact_session=None)  # movement ends any visit (§6.7 H1)
     return ReduceResult(events=tuple(events), players=(new_player,), ships=(ship_now,),
+                        species=tuple(convoy_updates.values()),
                         sector_forces=tuple(force_updates.values()))
 
 
@@ -2036,6 +2099,14 @@ def _combat_action(
             new_player = replace(new_player, last_combat=LastCombat(
                 species=species.roster_id, outcome=result.outcome,
                 day=state.game.day_number))
+            # A destroy favor cashes at the same hook as the kill bounty (§6.7, WP57):
+            # a victory over this species instance settles any contract naming it.
+            if (result.outcome == combat.VICTORY and enc.starbase_id is None
+                    and enc.citadel_planet_id is None):
+                new_player, done_jobs = contracts.complete_destroy_on_kill(new_player, species)
+                for c in done_jobs:
+                    new_player = contracts.apply_reward(new_player, c, state)
+                    events.append(ContractCompleted(player_id, c.id, c.kind, c.reward_slips))
         # A sector-fighter garrison engagement (§10, WP41: species 0, no starbase): victory
         # wipes the garrison, retreat costs it `retreat_fighter_cost` fighters (the classic rule).
         if enc.species_id == 0 and enc.starbase_id is None:
@@ -2150,10 +2221,16 @@ def _raze_starbase(
         latinum=new_player.latinum + sbcfg.raze_bounty,
         experience=new_player.experience + sbcfg.raze_experience,
     )
-    events: tuple[Event, ...] = (StarbaseRazed(
+    events: list[Event] = [StarbaseRazed(
         player.id, starbase_id, base.planet_id, base.sector_id,
-        former.kind, former.ref, sbcfg.raze_bounty),)
-    return new_player, (new_base,), razed_planets, events
+        former.kind, former.ref, sbcfg.raze_bounty)]
+    # A destroy favor targeting this base settles on the razing (§6.7, WP57 — the seam
+    # this docstring named is now live for named base kills).
+    new_player, done_jobs = contracts.complete_destroy_on_raze(new_player, starbase_id)
+    for c in done_jobs:
+        new_player = contracts.apply_reward(new_player, c, state)
+        events.append(ContractCompleted(player.id, c.id, c.kind, c.reward_slips))
+    return new_player, (new_base,), razed_planets, tuple(events)
 
 
 def _assault_starbase(
@@ -2765,6 +2842,11 @@ def _intel_bindings(state: UniverseState, player: Player, species: AlienSpecies,
         facts["has_intel_target"] = target is not None
         if target is not None:
             extra.update(target.bindings())
+    elif context in ("contract_offer", "contract_report"):
+        offer = contracts.pick_contract(state, species, player, config)
+        facts["has_contract_offer"] = offer is not None
+        if offer is not None:
+            extra.update(contracts.offer_bindings(state, offer, config))
     return extra, facts
 
 
@@ -2917,6 +2999,10 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
         lead_result = _accept_lead(state, player_id, AcceptLead(cmd.species_id), config)
         log_events = lead_result.events
         mutated_player = lead_result.players[0]
+    if choice.action == "accept_contract":
+        job_result = _accept_contract(state, player_id, species, config)
+        log_events = job_result.events
+        mutated_player = job_result.players[0]
     if choice.arc:
         # The reply's authored arc flags persist on the species kind (§6.7, WP30) —
         # applied before the follow-up line speaks, so it can already react to them.
@@ -3060,6 +3146,75 @@ def _accept_lead(state: UniverseState, player_id: int, cmd: AcceptLead,
                          contact_session=session)
     event = LeadAccepted(player_id, species.id, target.ref.kind, target.ref.ref,
                          target.ref.sector_id)
+    return ReduceResult(events=(event,), players=(new_player,))
+
+
+def _accept_contract(state: UniverseState, player_id: int, species: AlienSpecies,
+                     config: GameConfig) -> ReduceResult:
+    """Book the favor a species is offering onto the player's slate (§6.7, WP57).
+
+    Re-picks the offer deterministically (`pick_contract`, the same choice the projection
+    showed — H4 lockstep) rather than trusting a passed job, so a crafted/replayed command
+    can never smuggle a richer contract through. Appends it as an active job and logs the
+    acceptance. A no-op error if the speaker has nothing to offer now.
+    """
+    player = _player(state, player_id)
+    offer = contracts.pick_contract(state, species, player, config)
+    if offer is None:
+        raise EconomyError("they have no work for you right now")
+    booked = contracts.accept(player, offer, state.game.day_number, config)
+    new_player = replace(player, contracts=(*player.contracts, booked),
+                         species_attitudes=_met(player, species.roster_id))
+    event = ContractAccepted(player_id, booked.id, booked.kind, booked.issuer,
+                             booked.reward_slips, booked.deadline_day)
+    return ReduceResult(events=(event,), players=(new_player,))
+
+
+def _deliver_contract(state: UniverseState, player_id: int, cmd: DeliverContract,
+                      config: GameConfig) -> ReduceResult:
+    """Fulfil a `deliver` favor at its destination port (§6.7, WP57).
+
+    Guards: the job is an active deliver contract, the ship is in the destination sector,
+    and it carries the required cargo. The cargo debits (conserved out of the hold), the
+    reward credits through `apply_reward`, and the contract flips to done. Rewards flow
+    through the same latinum/attitude rails a completed favor always uses.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    contract = contracts.by_id(player, cmd.contract_id)
+    if contract is None or contract.status != "active" or contract.kind != "deliver":
+        raise EconomyError("no such active delivery")
+    if contract.commodity is None or contract.dest_sector is None:
+        raise EconomyError("that delivery has no destination")
+    if ship.sector_id != contract.dest_sector:
+        raise EconomyError(
+            f"deliver it at sector {_spatial(state, contract.dest_sector)}")
+    have = ship.cargo.get(contract.commodity, 0)
+    if have < contract.qty:
+        raise EconomyError(
+            f"you carry only {have} of {contract.qty} {contract.commodity.value}")
+    new_cargo = {**ship.cargo, contract.commodity: have - contract.qty}
+    new_ship = replace(ship, cargo=new_cargo)
+    done_player = contracts.set_status(player, contract.id, "done")
+    paid = contracts.apply_reward(done_player, contract, state)
+    event = ContractCompleted(player_id, contract.id, contract.kind, contract.reward_slips)
+    return ReduceResult(events=(event,), players=(paid,), ships=(new_ship,))
+
+
+def _abandon_contract(state: UniverseState, player_id: int, cmd: AbandonContract,
+                      config: GameConfig) -> ReduceResult:
+    """Release an active favor, failing it honestly (§6.7, WP57).
+
+    An escort merchant simply resumes its rails (the `is_convoyed` predicate goes false once
+    the job is no longer active). No consequence rail on a plain abandon — that is reserved
+    for a *destroyed* escort merchant (the WP27 rail, handled in combat).
+    """
+    player = _player(state, player_id)
+    contract = contracts.by_id(player, cmd.contract_id)
+    if contract is None or contract.status != "active":
+        raise EconomyError("no such active contract")
+    new_player = contracts.set_status(player, contract.id, "failed")
+    event = ContractFailed(player_id, contract.id, contract.kind, "abandoned")
     return ReduceResult(events=(event,), players=(new_player,))
 
 

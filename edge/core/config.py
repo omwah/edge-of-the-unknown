@@ -671,6 +671,35 @@ class GovernanceConfig(BaseModel):
     min_incumbent_bases: int = Field(default=1, ge=0)
 
 
+class ContractsConfig(BaseModel):
+    """Favors + escort contracts issued through the dialogue system (DESIGN §6.7, §14 — WP57).
+
+    A friendly (or allied) speaker may offer the player one job — deliver goods to a
+    port short of them, destroy a foe it holds a grudge against, or escort one of its
+    merchants to a destination. Rewards flow through the existing latinum / attitude /
+    artifact rails, so a contract is a bounded faucet (slips) and a standing lever
+    (attitude) rather than a new economy. Deterministic offer selection (`pick_contract`)
+    mirrors the intel planner so the projection and the reducer agree on the very job the
+    player accepts. Config-gated so a host can run a contract-free universe.
+    """
+
+    model_config = _FROZEN
+
+    enabled: bool = True
+    deadline_days: int = Field(default=12, ge=1)  # days from acceptance before a job lapses
+    # A deliver job asks for this many units of a commodity a target port is short of; the
+    # reward is `deliver_reward_per_unit × qty` slips (a modest faucet over honest carriage).
+    deliver_qty: int = Field(default=25, ge=1)
+    deliver_reward_per_unit: int = Field(default=18, ge=0)
+    # A destroy job (cash a grudge, §6.5) pays a flat bounty on the kill.
+    destroy_reward: int = Field(default=1500, ge=0)
+    # An escort job pays for delivering a merchant safely to its destination sector.
+    escort_reward: int = Field(default=1200, ge=0)
+    # Every completed job also warms the player toward the issuer's kind by this offset
+    # (capped so effective disposition never exceeds 1, like every attitude gain).
+    attitude_reward: float = Field(default=0.06, ge=0.0, le=1.0)
+
+
 class AliensConfig(BaseModel):
     """Disposition thresholds + escape floor for the alien system (DESIGN §6, §10).
 
@@ -764,6 +793,9 @@ class AliensConfig(BaseModel):
     # NPC governance: Core seizures + leadership intrigue (§6.3, WP51). Cadence lives in
     # `ticker.crons.governance_tick`; the rolls are gated + salted by this block.
     governance: GovernanceConfig = GovernanceConfig()
+
+    # Favors + escort contracts issued through dialogue (§6.7, §14, WP57).
+    contracts: ContractsConfig = ContractsConfig()
 
 
 class CombatConfig(BaseModel):
@@ -1151,6 +1183,11 @@ class SpeciesConfig(BaseModel):
     movement_policy: Literal[
         "wander", "patrol", "trade_seek", "hunt", "coward"
     ] = "wander"
+    # Which favors this species will offer through dialogue (DESIGN §6.7, WP57): `none`
+    # never issues a job; `deliver`/`destroy`/`escort` restrict to one kind; `any` offers
+    # whichever fits the live world (a short port ⇒ deliver, a grudge ⇒ destroy, a bloc
+    # merchant en route ⇒ escort). Only a friendly/allied-standing speaker ever offers.
+    contract_posture: Literal["none", "deliver", "destroy", "escort", "any"] = "any"
     # The one roaming, dialogue-only singular being (DESIGN §7, WP34): an explicit flag
     # (not archetype-string matching, so rosters vary freely). The big bang always draws it
     # (outside the seeded subset), fields exactly one instance in a deep band, and excludes
