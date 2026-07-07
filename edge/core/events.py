@@ -658,6 +658,29 @@ class InvasionRepulsed(Event):
 
 
 @dataclass(frozen=True)
+class RumorHeard(Event):
+    """The player bought a rumor at the tavern (DESIGN §14 — WP58).
+
+    A latinum sink that logs a coordinate `Lead` (`kind`/`ref`/`sector_id`) the Core-welcome
+    species collectively knew — intel for cash. `price` is the slips paid.
+    """
+
+    player_id: int
+    kind: str
+    ref: int
+    sector_id: int
+    price: int
+
+
+@dataclass(frozen=True)
+class NoticePosted(Event):
+    """A player pinned a message to the tavern noticeboard (DESIGN §14 — WP58)."""
+
+    player_id: int
+    day: int
+
+
+@dataclass(frozen=True)
 class ContractAccepted(Event):
     """The player accepted a favor from an alien (DESIGN §6.7, §14 — WP57).
 

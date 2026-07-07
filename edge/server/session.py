@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from edge.bigbang.topology import bfs_distances
 from edge import dialogue
 from edge.dialogue import facts as dialogue_facts
-from edge.dialogue.intel import pick_intel_target
+from edge.dialogue.intel import pick_intel_target, pick_rumor
 from edge.core import dto
 from edge.server import mapgraph
 from edge.server import navstrip
@@ -58,6 +58,8 @@ from edge.core.events import (
     ContractAccepted,
     ContractCompleted,
     ContractFailed,
+    NoticePosted,
+    RumorHeard,
     CitadelGunSilenced,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -628,6 +630,50 @@ def surface_view(state: UniverseState, player_id: int, planet_id: int, config: G
         terrain_blurb=terrain_art.blurb_for(planet.planet_type),
         ptype=planet.planet_type,
     )
+
+
+def tavern_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.TavernDTO:
+    """The StarDock tavern panel: rumors, the bounty board, and the noticeboard (§14, WP58).
+
+    Read-only. Rumor availability is computed live against the Core-welcome species' pooled
+    knowledge (the same deterministic pick the `BuyRumor` reducer makes, so the panel never
+    lies about a buyable tip). The bounty board reads live from hostile-band standings, the
+    player's active grudges (who hunts them), their open favors, and the governance situation.
+    """
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    port = state.port_in_sector(ship.sector_id)
+    at_dock = port is not None and port.klass is PortClass.STARDOCK
+    rumor_available = False
+    if at_dock and port is not None:
+        speakers = [sp for sp in state.species.values() if sp.sector_id == port.sector_id]
+        rumor_available = pick_rumor(
+            state, player, speakers, aliens=config.aliens,
+            entity=entity_species(state, config)) is not None
+
+    bounties: list[str] = []
+    if config.roster is not None:
+        for rid in sorted(player.species_attitudes):
+            sc = config.roster.species_by_id(rid)
+            sp = next((s for s in state.species.values() if s.roster_id == rid), None)
+            if sc is None or sp is None:
+                continue
+            if disposition_band(effective_disposition(sp, player), config.aliens) == "hostile":
+                bounties.append(f"Bounty on {sp.name}: {config.aliens.bounty_per_kill} slips/kill.")
+    for rid, grudge in sorted(player.grudges.items()):
+        name = next((s.name for s in state.species.values() if s.roster_id == rid), rid)
+        bounties.append(f"The {name} hunt you (grudge {grudge.severity:.2f}).")
+    bounties += _governance_intel(state, player)[:1]  # the current-governor line
+
+    notices = [
+        dto.NoticeDTO(
+            author="You" if n.author_player_id == player_id else f"Captain #{n.author_player_id}",
+            day=n.day, text=n.text)
+        for n in state.notices
+    ]
+    return dto.TavernDTO(
+        rumor_price=config.tavern.rumor_price, rumor_available=rumor_available,
+        bounties=bounties, notices=notices, contracts=_contracts_view(state, player))
 
 
 def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.StarDockDTO:
@@ -1668,6 +1714,10 @@ def format_event(event: Event) -> str:
     if isinstance(event, ContractFailed):
         why = "deadline passed" if event.reason == "deadline" else "abandoned"
         return f"[yellow]✖ Favor failed ({why}).[/]"
+    if isinstance(event, RumorHeard):
+        return f"[cyan]✎ A tavern rumour points the way — a new lead logged ({event.price} slips).[/]"
+    if isinstance(event, NoticePosted):
+        return "[dim]✎ Your notice is pinned to the board.[/]"
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 

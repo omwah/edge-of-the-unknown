@@ -253,3 +253,25 @@ def pick_intel_target(state: UniverseState, player: Player, speaker: AlienSpecie
         label=_label(state, ref),
         reward=_reward_phrase(state, ref),
     )
+
+
+def pick_rumor(state: UniverseState, player: Player, speakers: list[AlienSpecies], *,
+               aliens: AliensConfig, entity: AlienSpecies | None = None) -> IntelTarget | None:
+    """The best undiscovered tip a set of speakers collectively know (DESIGN §14 — WP58).
+
+    The tavern draws intel for cash from the union of the Core-welcome species' knowledge:
+    it runs the ordinary per-speaker `pick_intel_target` and keeps the highest-value result
+    (ties by farther route, then lowest ref id — the same ranking a single speaker uses), so
+    a rumor is deterministic and never re-offers a tip already logged (the `_is_unencountered`
+    dedup). Returns None when nobody knows anywhere fresh — the tavern is out of rumors.
+    """
+    best_key: tuple[int, int, int] | None = None
+    best: IntelTarget | None = None
+    for speaker in sorted(speakers, key=lambda s: s.id):
+        target = pick_intel_target(state, player, speaker, aliens=aliens, entity=entity)
+        if target is None:
+            continue
+        key = (_value(state, target.ref), target.distance, -target.ref.ref)
+        if best_key is None or key > best_key:
+            best_key, best = key, target
+    return best

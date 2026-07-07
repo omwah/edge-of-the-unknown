@@ -103,9 +103,11 @@ from edge.core.events import (
     InterdictorToggled,
     InvasionRepulsed,
     LimpetsRemoved,
+    NoticePosted,
     PlanetBanked,
     PlanetInvaded,
     ProbeReport,
+    RumorHeard,
     ComponentInstalled,
     ComponentKnockedOut,
     ComponentPurchased,
@@ -151,6 +153,7 @@ from edge.core.models import (
     InstalledComponent,
     LastCombat,
     Lead,
+    Notice,
     Ownership,
     Planet,
     Player,
@@ -166,7 +169,7 @@ from edge.core.models import (
 from edge.core.market import PortOrder
 from edge.core.movement import MovementError, can_warp, shortest_path
 from edge.dialogue import facts as dialogue_facts
-from edge.dialogue.intel import IntelTarget, pick_intel_target
+from edge.dialogue.intel import IntelTarget, pick_intel_target, pick_rumor
 
 # --- commands ---------------------------------------------------------------
 
@@ -537,6 +540,28 @@ class AbandonContract:
 
 
 @dataclass(frozen=True, slots=True)
+class BuyRumor:
+    """Buy a rumor at the StarDock tavern (§14, WP58) — a latinum-for-`Lead` sink.
+
+    Draws the best undiscovered coordinate tip the Core-welcome species collectively know
+    and logs it as a `Lead`. Rejected off the StarDock, when unaffordable, or when the
+    tavern has no fresh rumor (every tip the pinned species know is already logged).
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class PostNotice:
+    """Pin a message to the tavern noticeboard (§14, WP58) — the one string-input command.
+
+    `text` is sanitised at the reducer (printable-only, length-capped) and appended to the
+    capped notice ring (oldest evicted). A captain's log single-player; the shared board in
+    Phase 4. Rejected off the StarDock or with empty text.
+    """
+
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
 class AdvanceAdmission:
     """Record one completed admission task toward a bloc's membership (§6.3, WP38).
 
@@ -720,7 +745,7 @@ Command = (
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
-    | DeliverContract | AbandonContract
+    | DeliverContract | AbandonContract | BuyRumor | PostNotice
     | AdvanceAdmission | JoinAlliance | ResignAlliance | PetitionCoreSeizure
     | AssaultStarbase | RepairStarbase | ClaimStarbase
     | BuyFighters | BuyMines | DeployFighters | DeployMines | DeployBeacon
@@ -752,6 +777,9 @@ class ReduceResult:
     # a mapping means "replace the book". Unlike the entity tuples (which upsert), the
     # market book is regenerated in full each cycle, so it is swapped, not merged.
     port_orders: Mapping[int, tuple[PortOrder, ...]] | None = None
+    # A whole-ring replacement of `state.notices` (WP58) — None means "unchanged". The
+    # noticeboard is a capped ring the `PostNotice` reducer rebuilds, so it is swapped.
+    notices: tuple[Notice, ...] | None = None
 
 
 def apply_result(state: UniverseState, result: ReduceResult) -> None:
@@ -783,6 +811,8 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
         state.game = result.game
     if result.port_orders is not None:
         state.port_orders = dict(result.port_orders)  # whole-book replacement (WP47)
+    if result.notices is not None:
+        state.notices = result.notices  # whole-ring replacement (WP58)
 
 
 # --- reducers ---------------------------------------------------------------
@@ -867,6 +897,10 @@ def reduce(
             return _deliver_contract(state, player_id, command, config)
         case AbandonContract():
             return _abandon_contract(state, player_id, command, config)
+        case BuyRumor():
+            return _buy_rumor(state, player_id, config)
+        case PostNotice():
+            return _post_notice(state, player_id, command, config)
         case AdvanceAdmission():
             return _advance_admission(state, player_id, command, config)
         case JoinAlliance():
@@ -3216,6 +3250,61 @@ def _abandon_contract(state: UniverseState, player_id: int, cmd: AbandonContract
     new_player = contracts.set_status(player, contract.id, "failed")
     event = ContractFailed(player_id, contract.id, contract.kind, "abandoned")
     return ReduceResult(events=(event,), players=(new_player,))
+
+
+def _core_welcome_species(state: UniverseState, port: Port) -> list[AlienSpecies]:
+    """The Core-welcome species staged at the StarDock — the tavern's rumour-mongers (§14).
+
+    These are the species pinned to the hub (the governing alliance's friendly members and
+    the peaceable wanderers stationed there); their pooled knowledge is what the tavern sells.
+    """
+    return [sp for sp in state.species.values() if sp.sector_id == port.sector_id]
+
+
+def _buy_rumor(state: UniverseState, player_id: int, config: GameConfig) -> ReduceResult:
+    """Buy a rumour at the tavern — a latinum-for-`Lead` sink (§14, WP58).
+
+    Gated to the StarDock (the tavern is there); charges `tavern.rumor_price`; draws the best
+    undiscovered tip the Core-welcome species collectively know (`pick_rumor`, deterministic +
+    deduped against the player's leads/codex/explored, so repeat buys exhaust like repeated
+    asks). Logs it as a `Lead` — intel for cash, the standing-free twin of asking a contact.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    port = _stardock(state, ship)
+    price = config.tavern.rumor_price
+    if player.latinum < price:
+        raise EconomyError(f"a rumour costs {price} slips")
+    target = pick_rumor(state, player, _core_welcome_species(state, port),
+                        aliens=config.aliens, entity=entity_species(state, config))
+    if target is None:
+        raise EconomyError("the tavern has no fresh rumours for you")
+    lead = Lead(kind=target.ref.kind, ref=target.ref.ref, sector_id=target.ref.sector_id,
+                origin_sector=ship.sector_id, source_species="tavern",
+                summary=target.summary())
+    new_player = replace(player, latinum=player.latinum - price, leads=(*player.leads, lead))
+    event = RumorHeard(player_id, target.ref.kind, target.ref.ref, target.ref.sector_id, price)
+    return ReduceResult(events=(event,), players=(new_player,))
+
+
+def _post_notice(state: UniverseState, player_id: int, cmd: PostNotice,
+                 config: GameConfig) -> ReduceResult:
+    """Pin a sanitised message to the tavern noticeboard's capped ring (§14, WP58).
+
+    The one string-input command, so validation is explicit: text is stripped to printable
+    characters and length-capped, and an empty result is rejected. The notice appends to the
+    ring; the oldest is evicted once it exceeds `tavern.notice_cap`.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)  # the board is at the tavern
+    text = "".join(ch for ch in cmd.text if ch.isprintable()).strip()[:config.tavern.notice_max_len]
+    if not text:
+        raise EconomyError("your notice is empty")
+    notice = Notice(author_player_id=player_id, day=state.game.day_number, text=text)
+    ring = (*state.notices, notice)[-config.tavern.notice_cap:]
+    event = NoticePosted(player_id, state.game.day_number)
+    return ReduceResult(events=(event,), notices=ring)
 
 
 def _advance_admission(state: UniverseState, player_id: int, cmd: AdvanceAdmission,

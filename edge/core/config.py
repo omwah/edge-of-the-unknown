@@ -1474,6 +1474,22 @@ class TickerConfig(BaseModel):
     crons: CronCadenceConfig = CronCadenceConfig()
 
 
+class TavernConfig(BaseModel):
+    """The StarDock tavern — rumors + the noticeboard (DESIGN §14 — WP58).
+
+    Rumors are intel for cash (the contact-for-standing path's twin): `rumor_price` slips
+    buys the best undiscovered coordinate tip the Core-welcome species collectively know,
+    logged as a `Lead`. The noticeboard is a capped ring of player notices (`notice_cap`,
+    oldest evicted) — a captain's log single-player, the shared board in Phase 4.
+    """
+
+    model_config = _FROZEN
+
+    rumor_price: int = Field(default=500, ge=0)  # a latinum sink: a tip for cash
+    notice_cap: int = Field(default=50, ge=1)  # ring size; oldest notice evicted past it
+    notice_max_len: int = Field(default=200, ge=1)  # per-notice text cap (sanitised at reducer)
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -1500,6 +1516,7 @@ class GameConfig(BaseModel):
     discovery: DiscoveryConfig | None = None  # WP5 discoveries (None ⇒ none salted)
     genesis: GenesisConfig | None = None  # WP10 genesis torpedoes (None ⇒ not sold)
     citadels: CitadelConfig | None = None  # WP54 citadels (None ⇒ not buildable)
+    tavern: TavernConfig = TavernConfig()  # WP58 rumors + noticeboard at the StarDock
     devices: dict[str, DeviceConfig] = Field(default_factory=dict)  # WP56 probes/interdictor/deflector
     roster: RosterConfig | None = None  # WP7 species roster (None ⇒ no aliens placed)
     names: NamesConfig | None = None  # Configurable name pools
