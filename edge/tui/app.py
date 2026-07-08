@@ -16,7 +16,7 @@ from textual.theme import Theme
 from edge.config import load_default_config
 from edge.server.service import DialogueConfigMismatchError
 from edge.core.config import SceneArtConfig, UIConfig
-from edge.engine.ticker import EngineTicker
+from edge.server.client import LocalClient
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
 from edge.tui import art_adapter
@@ -56,14 +56,27 @@ class EdgeApp(App[None]):
     def __init__(self, plain: bool = False) -> None:
         super().__init__()
         self.plain = plain
-        self.service: GameService | None = None
-        self._ticker: EngineTicker | None = None
+        # The app talks to the game exclusively through a `GameClient` (WP61); single-player
+        # is a `LocalClient` wrapping the in-process service. `service` stays exposed as a
+        # back-compat property (screens/tests read the synchronous `GameService` through it —
+        # Textual's compose/render are synchronous, so the screen-level await migration is
+        # deferred; the load-bearing seam is that the *client* now owns the ticker).
+        self.client: LocalClient | None = None
         # SectorView sprite-scene sizes + warp-grid options; replaced from config
         # when a game starts.
         self.scene_art = SceneArtConfig()
         self.ui_config = UIConfig()
         self.max_warps_per_sector = 6  # TW2002 cap; reserves the warp grid's row count
         self.computer_tab = "trade"  # last Computer tab, restored when reopened with [C]
+
+    @property
+    def service(self) -> GameService | None:
+        """The in-process `GameService`, via the owning `LocalClient` (back-compat, WP61).
+
+        Screens and the Pilot suite read the synchronous service through this seam; the
+        client is the real owner and the ticker rides with it.
+        """
+        return self.client.service if self.client is not None else None
 
     def on_mount(self) -> None:
         self.register_theme(TW2002_THEME)
@@ -89,9 +102,10 @@ class EdgeApp(App[None]):
         clear_slot()
         if seed is None:
             seed = config.seed if config.seed is not None else random.randrange(_SEED_MAX)
-        self.service = GameService.new_game(config, seed, SqliteRepository(save))
-        self._start_ticker(self.service)
-        return self.service
+        service = GameService.new_game(config, seed, SqliteRepository(save))
+        self.client = LocalClient(service, player_id=self.player_id)
+        self._start_ticker(self.client)
+        return service
 
     def continue_game(self) -> GameService | None:
         """Reload the saved game by replaying its command log (DESIGN §12).
@@ -105,12 +119,13 @@ class EdgeApp(App[None]):
         config = load_default_config()
         self._apply_art_config(config)
         try:
-            self.service = GameService.load_game(config, SqliteRepository(default_save()))
+            service = GameService.load_game(config, SqliteRepository(default_save()))
         except DialogueConfigMismatchError as exc:
             self.notify(str(exc), severity="error", timeout=8)
             return None
-        self._start_ticker(self.service)
-        return self.service
+        self.client = LocalClient(service, player_id=self.player_id)
+        self._start_ticker(self.client)
+        return service
 
     def _apply_art_config(self, config: object) -> None:
         """Validate art coverage and read scene-sprite sizes before a game starts.
@@ -124,9 +139,13 @@ class EdgeApp(App[None]):
         self.ui_config = config.ui  # type: ignore[attr-defined]
         self.max_warps_per_sector = config.bigbang.max_warps_per_sector  # type: ignore[attr-defined]
 
-    def _start_ticker(self, service: GameService) -> None:
-        self._ticker = EngineTicker(service)
-        self.run_worker(self._ticker.run(), name="engine-ticker", group="engine")
+    def _start_ticker(self, client: LocalClient) -> None:
+        """Run the client-owned engine ticker as a Textual worker (WP61).
+
+        The ticker is owned by whoever owns the service — `LocalClient` here, the net server
+        for a hosted game (WP63) — so the TUI just starts it and forgets it.
+        """
+        self.run_worker(client.run_ticker(), name="engine-ticker", group="engine")
 
 
 def _serve(host: str, port: int, *, plain: bool) -> None:
