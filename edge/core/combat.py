@@ -30,7 +30,7 @@ import random
 from dataclasses import dataclass, replace
 
 from edge.core.config import CombatConfig, GameConfig
-from edge.core.engine_room import ShipAspects
+from edge.core.engine_room import ShipAspects, derive_aspects
 from edge.core.enums import Subsystem
 from edge.core.models import Encounter, EncounterFoe, Ship
 
@@ -58,6 +58,30 @@ class RoundResult:
     # A component knocked out by this round's volley (§4.1, WP26), if any:
     # (subsystem, slot index, component kind value). The reducer re-derives aspects.
     knockout: tuple[Subsystem, int, str] | None = None
+
+
+def player_foe(ship: Ship, config: GameConfig, name: str) -> EncounterFoe:
+    """Build the combat foe for a *defending player's* live ship (§14, WP67 — attacker-driven PvP).
+
+    The defender fights back automatically from the very aspects their own fights use: gun
+    damage / shields / combat speed are subsystem-derived (§4.1), so a tuned engine room
+    defends its owner even offline. Hull is the ship's *current* hull (a wounded ship enters the
+    fight wounded); the firing arc comes from the hull's Main Gun weapon. `defense` sums the
+    hull's flat armour/screens like the NPC and starbase foes, so one combat model serves all.
+    """
+    aspects = derive_aspects(ship, config)
+    klass = config.ship_class(ship.type_id)
+    weapon = config.weapons[klass.armament[0]] if klass.armament else None
+    arc = weapon.firing_arc if weapon is not None else "ahead"
+    damage = max(1, aspects.gun_damage + aspects.efficiency_bonus)
+    defense = sum(d.value for d in klass.defenses
+                  if d.type in ("armour", "screens", "energy_plates"))
+    hull = max(1, ship.hull_current)
+    return EncounterFoe(
+        ship_class_id=klass.id, name=name, hull=hull, hull_max=ship.hull_max,
+        shields=aspects.shields, damage=damage, firing_arc=arc,
+        combat_speed=aspects.combat_speed, defense=defense,
+    )
 
 
 def flee_chance(

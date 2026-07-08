@@ -816,3 +816,32 @@ class CorpWarEnded(Event):
     player_id: int
     corp_id: int
     target_corp_id: int
+
+
+# --- PvP (DESIGN §14, WP67) --------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PlayerAttacked(Event):
+    """One player opened attacker-driven PvP combat on another (§14, WP67).
+
+    Sector-scoped, so it reaches the defender (and bystanders) through the broadcast — how an
+    offline/absent defender's client learns the fight began.
+    """
+
+    player_id: int  # the attacker
+    target_player_id: int
+    sector_id: int
+
+
+@dataclass(frozen=True)
+class BountyPosted(Event):
+    """A claimable outlaw bounty was posted on a player for a lawful kill (§14, WP67).
+
+    `amount` is the bounty *added* this event (bounties accrue); `total` is the running head
+    price any player who later pods them collects.
+    """
+
+    player_id: int  # the outlaw the bounty rides on
+    amount: int
+    total: int

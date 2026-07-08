@@ -24,6 +24,8 @@ from edge.core.events import (
     CorpWarDeclared,
     CorpWarEnded,
     PlanetTransferred,
+    PlayerAttacked,
+    BountyPosted,
     NoticePosted,
     RumorHeard,
     AllianceJoined,
@@ -87,6 +89,7 @@ from edge.core.rules import (
     AbandonContract,
     AcceptCorpInvite,
     AcceptLead,
+    AttackPlayer,
     BuyRumor,
     CorpDeposit,
     CorpWithdraw,
@@ -226,6 +229,7 @@ COMMANDS: list[Command] = [
     TransferPlanetFromCorp(planet_id=5),         # WP66 corp → CEO
     DeclareCorpWar(target_corp_id=2),            # WP66 declare war
     EndCorpWar(target_corp_id=2),                # WP66 withdraw
+    AttackPlayer(target_player_id=2),            # WP67 open PvP
     CombatAction(action="fight"),                # WP25 one combat round
     CombatAction(action="flee"),
     CombatAction(action="field_patch", subsystem=Subsystem.SCREENS, slot_index=1),
@@ -292,6 +296,8 @@ EVENTS: list[Event] = [
     PlanetTransferred(1, 5, 1, True),                      # WP66 world → corp
     CorpWarDeclared(1, 1, 2),                              # WP66 declared war
     CorpWarEnded(1, 1, 2),                                 # WP66 withdrew from war
+    PlayerAttacked(1, 2, 55),                              # WP67 opened PvP
+    BountyPosted(1, 5000, 5000),                           # WP67 outlaw bounty
     EncounterStarted(1, 3, 55, True, 3, "Deep"),   # WP24 a violence opener
     EncounterStarted(1, 3, 55, False, 0, "Deep"),  # WP24 a peaceful interception
     EncounterEvaded(1, 3, 55),                     # WP24 slipped away unseen
