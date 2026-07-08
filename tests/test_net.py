@@ -324,3 +324,89 @@ async def test_rate_limit_rejects_a_flood(tmp_path: Path) -> None:
         assert results[-1]["error"]["code"] == -32003  # ERR_RATE_LIMITED on the 4th within 1s
     finally:
         await lobby.aclose()
+
+
+# --- remote client over a real socket (WP68) ---------------------------------
+
+
+async def _served_lobby(tmp_path: Path) -> tuple[LobbyServer, object, int]:
+    (tmp_path / "games").mkdir()
+    lobby = _lobby(tmp_path)
+    ws_server = await lobby.serve("localhost", 0)
+    port = ws_server.sockets[0].getsockname()[1]
+    return lobby, ws_server, port
+
+
+async def test_remote_client_login_join_play_and_push(tmp_path: Path) -> None:
+    from edge.server.client import RemoteClient
+
+    lobby, ws_server, port = await _served_lobby(tmp_path)
+    client = RemoteClient(f"ws://localhost:{port}")
+    try:
+        await client.connect()
+        await client.register("host", "pw")
+        await client.login("host", "pw")
+        gid = await client.create_game("alpha", seed=42)
+        pid = await client.join_game(gid)
+        assert pid == 1
+
+        view = await client.game_view()  # a DTO decoded off the wire
+        assert view.sector.sector_id > 0
+        start = view.sector.sector_id
+        neighbour = next(iter(lobby._games[gid].service.state.adjacency[start]))  # type: ignore[attr-defined]
+
+        events = await client.apply(Warp(to_sector=neighbour))  # a mutator round-trip
+        assert events  # events came back decoded
+        # the same warp is pushed as a broadcast notification and reaches the stream
+        pushed = await asyncio.wait_for(anext(client.events()), timeout=2.0)
+        assert pushed is not None
+        assert (await client.game_view()).sector.sector_id == neighbour  # view re-reads live
+    finally:
+        await client.aclose()
+        await lobby.aclose()
+        ws_server.close()
+        await ws_server.wait_closed()
+
+
+async def test_remote_client_reconnect_catches_up(tmp_path: Path) -> None:
+    from edge.server.client import RemoteClient
+
+    lobby, ws_server, port = await _served_lobby(tmp_path)
+    client = RemoteClient(f"ws://localhost:{port}")
+    try:
+        await client.connect()
+        await client.register("host", "pw")
+        await client.login("host", "pw")
+        gid = await client.create_game("alpha", seed=42)
+        await client.join_game(gid)
+        view = await client.game_view()
+        neighbour = next(iter(lobby._games[gid].service.state.adjacency[view.sector.sector_id]))  # type: ignore[attr-defined]
+        await client.apply(Warp(to_sector=neighbour))  # produces a persisted, pushed event
+        # Drop the link *before* consuming the push, then reconnect and catch up.
+        await client._conn.close()  # type: ignore[attr-defined]
+        await asyncio.sleep(0.05)
+        assert client.status == "disconnected"
+        await client.reconnect()
+        # events_since(0) replays the whole rail (we never consumed the push), so the warp returns.
+        first = await asyncio.wait_for(anext(client.events()), timeout=2.0)
+        assert first is not None
+    finally:
+        await client.aclose()
+        await lobby.aclose()
+        ws_server.close()
+        await ws_server.wait_closed()
+
+
+async def test_remote_client_refuses_a_fingerprint_mismatch(tmp_path: Path) -> None:
+    from edge.server.client import RemoteClient, RemoteError
+
+    lobby, ws_server, port = await _served_lobby(tmp_path)
+    client = RemoteClient(f"ws://localhost:{port}")
+    try:
+        with pytest.raises(RemoteError):
+            await client.connect(fingerprint="deadbeefdeadbeef")  # a build-skew hello, refused
+    finally:
+        await client.aclose()
+        await lobby.aclose()
+        ws_server.close()
+        await ws_server.wait_closed()

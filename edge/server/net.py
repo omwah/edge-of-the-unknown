@@ -71,7 +71,7 @@ _READ_METHODS = frozenset({
     "corp_view", "market_view", "route_view", "route_legs_view", "engine_room_view", "stardock_view",
     "starbase_services_view", "planet_view", "current_planet_view", "surface_view",
     "contact_view", "species_in_sector", "current_contact_view", "encounter_view", "leads_view",
-    "messages_view", "resolve_display_id",
+    "messages_view", "corp_view",
 })
 
 
@@ -237,6 +237,8 @@ class GameServer:
                 return self.events_since(pid, int(params.get("since", 0)))
             if method == "describe_event":
                 return self._service.describe_event(wire.decode_event(params["event"]))
+            if method == "resolve_display_id":  # no player_id (a pure spatial-id lookup)
+                return self._service.resolve_display_id(int(params["shown"]))
             if method == "haggle_quote":
                 quote = self._service.haggle_quote(
                     pid, Commodity(params["commodity"]), params["counter_price"])

@@ -53,9 +53,14 @@ class EdgeApp(App[None]):
 
     player_id = 1
 
-    def __init__(self, plain: bool = False) -> None:
+    def __init__(self, plain: bool = False, connect: str | None = None) -> None:
         super().__init__()
         self.plain = plain
+        # A remote-play target (`edge --connect ws://…`, WP68): when set, on_mount opens the
+        # LobbyScreen instead of the local main menu, and `service` resolves to the sync bridge.
+        self._connect_url = connect
+        self._remote_service: object | None = None
+        self._remote_bridge: object | None = None
         # The app talks to the game exclusively through a `GameClient` (WP61); single-player
         # is a `LocalClient` wrapping the in-process service. `service` stays exposed as a
         # back-compat property (screens/tests read the synchronous `GameService` through it —
@@ -71,17 +76,28 @@ class EdgeApp(App[None]):
 
     @property
     def service(self) -> GameService | None:
-        """The in-process `GameService`, via the owning `LocalClient` (back-compat, WP61).
+        """The synchronous game surface the screens read (WP61/WP68).
 
-        Screens and the Pilot suite read the synchronous service through this seam; the
-        client is the real owner and the ticker rides with it.
+        Single-player: the in-process `GameService` via the owning `LocalClient`. Remote play:
+        the `RemoteService` sync bridge over the hosted client (set once the lobby joins a game).
         """
+        if self._remote_service is not None:
+            return self._remote_service  # type: ignore[return-value]
         return self.client.service if self.client is not None else None
 
     def on_mount(self) -> None:
         self.register_theme(TW2002_THEME)
         self.theme = "tw2002"
-        self.push_screen(MainMenuScreen())
+        if self._connect_url is not None:  # remote play (WP68): straight to the lobby turnstile
+            from edge.tui.screens.lobby import LobbyScreen
+            self.push_screen(LobbyScreen(self._connect_url))
+        else:
+            self.push_screen(MainMenuScreen())
+
+    def on_unmount(self) -> None:
+        """Tear down the remote loop/thread on exit (WP68)."""
+        if self._remote_bridge is not None:
+            self._remote_bridge.close()  # type: ignore[attr-defined]
 
     def start_new_game(self, seed: int | None = None) -> GameService:
         """Generate a fresh universe on disk and start the background ticker.
@@ -148,15 +164,20 @@ class EdgeApp(App[None]):
         self.run_worker(client.run_ticker(), name="engine-ticker", group="engine")
 
 
-def _serve(host: str, port: int, *, plain: bool) -> None:
-    """Host the app in a browser via `textual-serve` (DESIGN §11, §15).
+def _serve(host: str, port: int, *, plain: bool, connect: str | None = None) -> None:
+    """Host the app in a browser via `textual-serve` (DESIGN §11, §15; WP68 remote).
 
-    The served subprocess runs the *plain* `edge` invocation (never `--serve`), so
-    each browser session gets an ordinary app instance and there is no recursion.
+    The served subprocess runs the *plain* `edge` invocation (never `--serve`), so each browser
+    session gets an ordinary app instance and there is no recursion. With `connect`, each served
+    session is an `edge --connect ws://…` remote client — the hosted-play recipe (docs/HOSTING.md).
     """
     from textual_serve.server import Server
 
-    command = "python -m edge.tui --plain" if plain else "python -m edge.tui"
+    command = "python -m edge.tui"
+    if plain:
+        command += " --plain"
+    if connect:
+        command += f" --connect {connect}"
     Server(command, host=host, port=port).serve()
 
 
@@ -170,11 +191,13 @@ def main() -> None:
     )
     parser.add_argument("--host", default="localhost", help="bind host for --serve")
     parser.add_argument("--port", type=int, default=8000, help="bind port for --serve")
+    parser.add_argument("--connect", metavar="URL",
+                        help="play a hosted game over a websocket, e.g. ws://host:8765 (WP68)")
     args = parser.parse_args()
     if args.serve:
-        _serve(args.host, args.port, plain=args.plain)
+        _serve(args.host, args.port, plain=args.plain, connect=args.connect)
         return
-    EdgeApp(plain=args.plain).run()
+    EdgeApp(plain=args.plain, connect=args.connect).run()
 
 
 if __name__ == "__main__":
