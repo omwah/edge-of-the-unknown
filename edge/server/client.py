@@ -30,7 +30,7 @@ import asyncio
 import itertools
 import json
 from collections.abc import AsyncIterator, Sequence
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast, runtime_checkable
 
 from edge.core import dto
 from edge.core.config import GameConfig
@@ -41,6 +41,9 @@ from edge.core.rules import Command
 from edge.engine.ticker import EngineTicker
 from edge.server import session, wire
 from edge.server.service import GameService
+
+
+T = TypeVar("T")
 
 
 @runtime_checkable
@@ -442,8 +445,8 @@ class RemoteClient:
 
     # --- reads (generic round-trip through the wire codec) -------------------
 
-    async def _read(self, method: str, **params: Any) -> Any:
-        return _decode_any(await self._call(method, params))
+    async def _read(self, method: str, **params: Any) -> T:
+        return cast(T, _decode_any(await self._call(method, params)))
 
     async def game_view(self) -> dto.GameState:
         return await self._read("game_view")
@@ -519,10 +522,10 @@ class RemoteClient:
         return await self._read("messages_view")
 
     async def describe_event(self, event: Event) -> str:
-        return await self._call("describe_event", {"event": wire.encode_event(event)})
+        return cast(str, await self._call("describe_event", {"event": wire.encode_event(event)}))
 
     async def resolve_display_id(self, shown: int) -> int | None:
-        return await self._call("resolve_display_id", {"shown": shown})
+        return cast(int | None, await self._call("resolve_display_id", {"shown": shown}))
 
     # --- trusted accessors ---------------------------------------------------
 

@@ -166,8 +166,8 @@ def pick_contract(state: UniverseState, speaker: AlienSpecies, player: Player,
     if not _speaker_offers(player, speaker, config):
         return None
     cc = config.aliens.contracts
-    posture = (config.roster.species_by_id(speaker.roster_id).contract_posture
-               if config.roster is not None else "any")
+    sc = config.roster.species_by_id(speaker.roster_id) if config.roster is not None else None
+    posture = sc.contract_posture if sc is not None else "any"
     allow = {posture} if posture != "any" else {"deliver", "destroy", "escort"}
 
     if "deliver" in allow and not _has_open(player, "deliver"):

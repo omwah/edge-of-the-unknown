@@ -273,7 +273,7 @@ def _moderate_notice(state: UniverseState, player_id: int, cmd: DevPatch) -> Red
     ring = tuple(n for i, n in enumerate(state.notices) if i != idx)
     return ReduceResult(
         events=(DevApplied(player_id, f"[dev] deleted notice {idx}"),),
-        notices=ring)  # type: ignore[arg-type]
+        notices=ring)
 
 
 def _clamp_ship_field(ship: Ship, field: str, new: int) -> int:

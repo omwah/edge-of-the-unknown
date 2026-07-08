@@ -18,7 +18,6 @@ from edge.core.market import PortOrder
 from edge.core.models import (
     AlienSpecies,
     Game,
-    Grudge,
     Player,
     Port,
     PortCommodity,

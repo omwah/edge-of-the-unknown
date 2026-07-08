@@ -28,10 +28,12 @@ from edge.core.models import (
     Ship,
     UniverseState,
 )
+from edge.core.events import MarketSettled, PortOrderFilled
 from edge.core.rules import apply_result
 from edge.engine import cron
 from edge.engine.cron import (
     accrue_interest, alien_drift, daily_turn_reset, regenerate_ports, trader_step,
+    hourly_port_economy, market_settlement,
 )
 from edge.engine.ticker import EngineTicker
 from edge.server.service import GameService
@@ -447,9 +449,6 @@ def test_ticked_trading_reproduces_to_an_identical_hash() -> None:
 
 
 # --- WP47: the order-book market crons ---
-
-from edge.core.events import MarketSettled, PortOrderFilled
-from edge.engine.cron import hourly_port_economy, market_settlement
 
 
 def _market_config(enabled: bool) -> GameConfig:

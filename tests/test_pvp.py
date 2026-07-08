@@ -145,7 +145,7 @@ def test_bounty_is_claimed_when_an_outlaw_is_podded(tmp_path: Path) -> None:
 
 
 def test_player_force_bars_a_different_player_only_when_pvp_on(tmp_path: Path) -> None:
-    cfg_on, cfg_off = _cfg(), _cfg(enabled=False)
+    cfg_on = _cfg()
     svc = _two_players(tmp_path, cfg_on)
     force = SectorForce(sector_id=1, owner=Ownership("player", 2), fighters=10)
     p1 = svc.state.players[1]

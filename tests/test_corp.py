@@ -36,12 +36,10 @@ from edge.core.rules import (
     FormCorp,
     InviteToCorp,
     LeaveCorp,
-    TransferPlanetFromCorp,
     TransferPlanetToCorp,
     apply_result,
     reduce,
 )
-from edge.core.starbases import is_operational
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
 from edge.store.snapshots import rebuild, state_hash

@@ -11,11 +11,16 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import pytest
 
 from edge.config import load_default_config
-from edge.core.aliens import governor_hostile, may_occupy
+from edge.core.aliens import governor_hostile, may_occupy, seizure_progress
 from edge.core.dev import DevPatch
-from edge.core.governance import flip_core_governor
+from edge.core.economy import EconomyError
+from edge.core.engine_room import build_layouts
+from edge.core.enums import Subsystem
+from edge.core.events import AllianceLeadershipChanged, GovernanceChanged
+from edge.core.governance import apply_intrigue, flip_core_governor, npc_seizure_ready
 from edge.core.models import (
     AlienSpecies,
     Alliance,
@@ -28,7 +33,15 @@ from edge.core.models import (
     Starbase,
     UniverseState,
 )
-from edge.core.rules import apply_result, reduce
+from edge.core.rules import (
+    AdvanceAdmission,
+    JoinAlliance,
+    PetitionCoreSeizure,
+    apply_result,
+    reduce,
+)
+from edge.engine.cron import governance_tick
+from edge.server import session
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
 from edge.store.snapshots import rebuild, state_hash
@@ -187,8 +200,6 @@ def test_dev_flip_governor_replays_to_an_identical_hash(tmp_path: Path) -> None:
 
 
 def test_dev_flip_governor_rejects_an_unknown_alliance(tmp_path: Path) -> None:
-    import pytest
-
     from edge.core.dev import DevPatchError
 
     svc = GameService.new_game(load_default_config(), 4, SqliteRepository(tmp_path / "g.db"))
@@ -197,13 +208,6 @@ def test_dev_flip_governor_rejects_an_unknown_alliance(tmp_path: Path) -> None:
 
 
 # --- WP50: player-championed Core seizure ------------------------------------
-
-import pytest
-
-from edge.core.aliens import seizure_progress
-from edge.core.economy import EconomyError
-from edge.core.rules import AdvanceAdmission, JoinAlliance, PetitionCoreSeizure
-from edge.server import session
 
 # The default roster's covets_core bloc: Liberty Front (id 4) — price [prove, purge],
 # bases_to_raze 2, fee 5000, joinable freely (membership_gate open).
@@ -310,12 +314,6 @@ def test_seizure_ledger_records_under_the_reserved_key() -> None:
 
 
 # --- WP51: NPC governance + leadership intrigue ------------------------------
-
-from edge.core.enums import Subsystem
-from edge.core.engine_room import build_layouts
-from edge.core.events import AllianceLeadershipChanged, GovernanceChanged
-from edge.core.governance import apply_intrigue, npc_seizure_ready
-from edge.engine.cron import governance_tick
 
 IRON = 3  # Iron Covenant — the roster's intrigue bloc (internal_rival vennrith, turns outward)
 

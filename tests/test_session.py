@@ -5,6 +5,8 @@ from __future__ import annotations
 from edge.config import load_default_config
 from edge.core.dto import CommodityLine
 from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass
+from edge.core.events import MarketSettled
+from edge.core.market import PortOrder
 from edge.core.models import (
     AlienSpecies,
     Game,
@@ -287,9 +289,6 @@ def test_port_directory_buy_sell_labels_match_class() -> None:
 
 
 # --- WP48: the order-book Market tab -----------------------------------------
-
-from edge.core.events import MarketSettled
-from edge.core.market import PortOrder
 
 
 def _booked_world() -> UniverseState:
