@@ -140,7 +140,12 @@ async def test_end_to_end_websocket(tmp_path: Path) -> None:
             async def call(method: str, params: dict[str, object]) -> dict[str, object]:
                 await conn.send(json.dumps({"jsonrpc": "2.0", "id": 1, "method": method,
                                             "params": params}))
-                return json.loads(await conn.recv())
+                # Broadcast notifications (WP65, method="event", no id) share the socket — a
+                # real client demuxes them; skip to this request's response.
+                while True:
+                    msg = json.loads(await conn.recv())
+                    if msg.get("id") is not None:
+                        return msg
 
             hello = await call("hello", {"fingerprint": wire.wire_fingerprint(), "player_id": 1})
             assert hello["result"]["player_id"] == 1  # type: ignore[index]
@@ -158,6 +163,47 @@ async def test_end_to_end_websocket(tmp_path: Path) -> None:
         await server.aclose()
         ws_server.close()
         await ws_server.wait_closed()
+
+
+# --- broadcast + catch-up (WP65) ---------------------------------------------
+
+
+async def test_broadcast_pushes_visible_events_to_registered_sessions(tmp_path: Path) -> None:
+    server = _server(tmp_path)
+    server.start()  # wires on_events → fan-out
+    try:
+        s1 = Session(conn=None, player_id=1)
+        server.register_session(s1)
+        svc = server._service  # type: ignore[attr-defined]
+        start = svc.game_view(1).sector.sector_id
+        neighbour = next(iter(svc.state.adjacency[start]))
+        await server.submit(1, Warp(to_sector=neighbour))
+        note = s1.outbox.get_nowait()
+        assert note["method"] == "event"
+        assert note["params"]["seq"] > 0
+        assert wire.decode_event(note["params"]["event"])  # a real, decodable event
+    finally:
+        await server.aclose()
+
+
+async def test_catch_up_equals_the_live_pushed_stream(tmp_path: Path) -> None:
+    server = _server(tmp_path)
+    server.start()
+    try:
+        s1 = Session(conn=None, player_id=1)
+        server.register_session(s1)
+        svc = server._service  # type: ignore[attr-defined]
+        start = svc.game_view(1).sector.sector_id
+        neighbour = next(iter(svc.state.adjacency[start]))
+        await server.submit(1, Warp(to_sector=neighbour))
+        live = []
+        while not s1.outbox.empty():
+            live.append(s1.outbox.get_nowait())
+        catch_up = server.events_since(1, 0)  # same seq window (from the start)
+        assert [n["params"]["seq"] for n in live] == [c["seq"] for c in catch_up]
+        assert [n["params"]["event"] for n in live] == [c["event"] for c in catch_up]
+    finally:
+        await server.aclose()
 
 
 # --- lobby (WP64) ------------------------------------------------------------

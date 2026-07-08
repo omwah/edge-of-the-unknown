@@ -40,6 +40,7 @@ from edge.core.events import Event
 from edge.core.movement import MovementError
 from edge.core.rules import Command, JoinGame
 from edge.engine.ticker import EngineTicker
+from edge.server import session as projection
 from edge.server import wire
 from edge.server.accounts import AccountStore, AuthError
 from edge.server.service import GameService
@@ -109,6 +110,9 @@ class Session:
     game_id: int | None = None     # set on join_game/resume (which game this session is playing)
     player_id: int | None = None   # the seat in that game (from the binding, never from params)
     _hits: list[float] = field(default_factory=list)  # recent command times (rate limiter)
+    # Server-pushed JSON-RPC notifications (WP65 broadcast): the fan-out enqueues, a per-connection
+    # writer task drains to the socket — so a synchronous `on_events` never awaits a slow client.
+    outbox: asyncio.Queue[dict[str, Any]] = field(default_factory=asyncio.Queue)
 
 
 @dataclass
@@ -163,6 +167,56 @@ class GameServer:
                 if not item.future.cancelled():
                     item.future.set_exception(exc)
 
+    # --- broadcast fan-out (WP65) --------------------------------------------
+
+    def register_session(self, session: Session) -> None:
+        """Track a session so it receives this game's pushed events (the lobby calls it on join)."""
+        self._sessions.add(session)
+
+    def unregister_session(self, session: Session) -> None:
+        self._sessions.discard(session)
+
+    def _broadcast(self, appended: Any) -> None:
+        """Fan freshly-persisted events to every session that should see them (the `on_events` seam).
+
+        Called synchronously on the loop from `apply`/`apply_maintenance`, so it must not await —
+        it enqueues onto each session's outbox and returns; a per-connection writer drains to the
+        socket. Visibility is the same fog rule the message log uses (`event_visible_to`), so a
+        pushed stream never leaks an event about a sector a player has neither entered nor charted.
+        """
+        state = self._service.state
+        for seq, event in appended:
+            encoded: Any = None  # encode lazily, at most once, only if some session wants it
+            for session in self._sessions:
+                if session.player_id is None:
+                    continue
+                if not projection.event_visible_to(state, event, session.player_id):
+                    continue
+                if encoded is None:
+                    encoded = wire.encode_event(event)
+                session.outbox.put_nowait(
+                    {"jsonrpc": "2.0", "method": "event", "params": {"seq": seq, "event": encoded}})
+
+    def events_since(self, player_id: int, since: int) -> list[dict[str, Any]]:
+        """Catch-up: filtered events after `since` for a reconnecting seat (WP65).
+
+        Re-applies the live push's fog filter over the durable rail, so a client that reconnects
+        and asks for everything after its last seq gets exactly the stream it would have received
+        live over that window (the catch-up == live-stream property).
+        """
+        state = self._service.state
+        return [
+            {"seq": seq, "event": wire.encode_event(event)}
+            for seq, event in self._service.events_since(since)
+            if projection.event_visible_to(state, event, player_id)
+        ]
+
+    async def _drain_outbox(self, session: Session) -> None:
+        """Push queued notifications to one connection until the connection closes (WP65)."""
+        while True:
+            note = await session.outbox.get()
+            await session.conn.send(json.dumps(note))
+
     # --- request dispatch (transport only, no rules) -------------------------
 
     async def dispatch(self, session: Session, method: str, params: dict[str, Any]) -> Any:
@@ -179,6 +233,8 @@ class GameServer:
                 command = wire.decode_command(params["command"])
                 events = await self.submit(pid, command)
                 return [wire.encode_event(e) for e in events]
+            if method == "events_since":
+                return self.events_since(pid, int(params.get("since", 0)))
             if method == "describe_event":
                 return self._service.describe_event(wire.decode_event(params["event"]))
             if method == "haggle_quote":
@@ -227,6 +283,7 @@ class GameServer:
     async def _serve_connection(self, conn: Any) -> None:
         session = Session(conn=conn)
         self._sessions.add(session)
+        writer = asyncio.create_task(self._drain_outbox(session))  # pushed-event pump (WP65)
         try:
             async for raw in conn:
                 try:
@@ -238,6 +295,7 @@ class GameServer:
                 if response is not None:
                     await conn.send(json.dumps(response))
         finally:
+            writer.cancel()
             self._sessions.discard(session)
 
     def start(self) -> None:
@@ -250,6 +308,10 @@ class GameServer:
             self._worker_task = asyncio.create_task(self._run_worker(), name="command-worker")
         if self._ticker_task is None:
             self._ticker_task = asyncio.create_task(self._ticker.run(), name="engine-ticker")
+        # Route both command- and tick-driven events to the broadcast fan-out (WP65). Set here,
+        # after construction, so a bare GameService (tests, single-writer without sessions) stays
+        # push-free until a server actually owns it.
+        self._service.on_events = self._broadcast
 
     @property
     def service(self) -> GameService:
@@ -377,15 +439,17 @@ class LobbyServer:
             await server.submit(player_id, JoinGame())
         self._accounts.bind(session.account_id, game_id, player_id)  # type: ignore[arg-type]
         session.game_id, session.player_id = game_id, player_id
+        server.register_session(session)  # start receiving this game's broadcasts (WP65)
         return player_id
 
     def _resume(self, session: Session, game_id: int) -> int:
         """Re-bind a session to an account's existing seat (no new `JoinGame`)."""
-        self._open_game(game_id)
+        server = self._open_game(game_id)
         existing = self._accounts.binding(session.account_id, game_id)  # type: ignore[arg-type]
         if existing is None:
             raise RpcError(ERR_AUTH, "no seat in that game — join it first")
         session.game_id, session.player_id = game_id, existing
+        server.register_session(session)  # resume receiving this game's broadcasts (WP65)
         return existing
 
     # --- connection loop -----------------------------------------------------
@@ -422,6 +486,7 @@ class LobbyServer:
     async def _serve_connection(self, conn: Any) -> None:
         session = Session(conn=conn)
         self._sessions.add(session)
+        writer = asyncio.create_task(self._drain_outbox(session))  # pushed-event pump (WP65)
         try:
             async for raw in conn:
                 try:
@@ -433,7 +498,17 @@ class LobbyServer:
                 if response is not None:
                     await conn.send(json.dumps(response))
         finally:
+            writer.cancel()
             self._sessions.discard(session)
+            if session.game_id is not None and session.game_id in self._games:
+                self._games[session.game_id].unregister_session(session)
+
+    @staticmethod
+    async def _drain_outbox(session: Session) -> None:
+        """Push a lobby connection's queued game notifications to its socket (WP65)."""
+        while True:
+            note = await session.outbox.get()
+            await session.conn.send(json.dumps(note))
 
     async def serve(self, host: str, port: int) -> Any:
         from websockets.asyncio.server import serve as ws_serve

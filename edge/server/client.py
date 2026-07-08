@@ -27,7 +27,7 @@ stream in both modes.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from edge.core import dto
@@ -37,6 +37,7 @@ from edge.core.events import Event
 from edge.core.models import UniverseState
 from edge.core.rules import Command
 from edge.engine.ticker import EngineTicker
+from edge.server import session
 from edge.server.service import GameService
 
 
@@ -110,25 +111,31 @@ class LocalClient:
         self._service = service
         self.player_id = player_id
         self._ticker = EngineTicker(service)
-        # The broadcast stub: apply() pushes its events here so a single consumer (the TUI
-        # ticker) can drain one stream in both single- and multi-player (WP65 fills the remote
-        # side). Unbounded is fine — a single-player consumer keeps pace, and nothing blocks on
-        # a full queue.
+        # The broadcast stream (WP65): the service pushes every persisted event here — from an
+        # `apply` *and* from a ticker `apply_maintenance` — so one consumer (the TUI ticker)
+        # drains command- and time-driven events on a single channel, exactly as a `RemoteClient`
+        # drains the server's pushed notifications. Fog-filtered to this seat, so a future
+        # second local seat would only see what it should. Unbounded is fine: a single consumer
+        # keeps pace and nothing blocks on a full queue.
         self._events: asyncio.Queue[Event] = asyncio.Queue()
+        self._service.on_events = self._on_service_events
+
+    def _on_service_events(self, appended: Sequence[tuple[int, Event]]) -> None:
+        """Fan freshly-persisted events to the stream, filtered to this seat (the WP65 seam)."""
+        for _seq, event in appended:
+            if session.event_visible_to(self._service.state, event, self.player_id):
+                self._events.put_nowait(event)
 
     # --- the single mutator --------------------------------------------------
 
     async def apply(self, command: Command) -> tuple[Event, ...]:
-        """Apply a command through the in-process service and fan its events to the stream."""
-        events = self._service.apply(self.player_id, command)
-        for event in events:
-            self._events.put_nowait(event)
-        return events
+        """Apply a command through the in-process service (events fan out via `on_events`)."""
+        return self._service.apply(self.player_id, command)
 
     # --- the broadcast stream ------------------------------------------------
 
     async def events(self) -> AsyncIterator[Event]:
-        """Yield events as they are produced — apply results today, server pushes at WP65."""
+        """Yield events as they are produced — the service pushes both apply + tick events."""
         while True:
             yield await self._events.get()
 
