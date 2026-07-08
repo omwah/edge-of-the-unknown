@@ -22,4 +22,4 @@ def test_main_routes_serve_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("sys.argv", ["edge", "--serve", "--port", "9000"])
     with patch.object(app, "_serve") as serve:
         app.main()
-    serve.assert_called_once_with("localhost", 9000, plain=False)
+    serve.assert_called_once_with("localhost", 9000, plain=False, connect=None)
