@@ -17,6 +17,7 @@ Every function here is pure; the movement reducers pass state and apply the effe
 
 from __future__ import annotations
 
+from edge.core import corp
 from edge.core.aliens import alliance_standing, governor_hostile
 from edge.core.config import GameConfig
 from edge.core.enums import DiscoveryKind
@@ -42,6 +43,8 @@ def force_hostile_to_player(state: UniverseState, force: SectorForce, player: Pl
         if owner.ref == state.game.core_governing_alliance_id:
             return governor_hostile(state, player)
         return alliance_standing(player, owner.ref) < 0.0
+    if owner.kind == "corp":  # a corp force bars a rival-corp player (corp war, WP66)
+        return corp.owner_at_war_with_player(state, owner, player)
     return False
 
 

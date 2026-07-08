@@ -1490,6 +1490,22 @@ class TavernConfig(BaseModel):
     notice_max_len: int = Field(default=200, ge=1)  # per-notice text cap (sanitised at reducer)
 
 
+class CorpConfig(BaseModel):
+    """Player corporations — shared bank + assets + corp war (DESIGN §4 — WP66).
+
+    Forming a corp costs `form_fee` slips (a §8 sink). `tag_max_len` bounds the short
+    uppercase handle shown in the sector view. `war_cooldown_days` is how long after
+    withdrawing a corp must wait before re-declaring war on the same rival — so war is a
+    stance with a cost, not a toll-dodge toggle spammed each hop.
+    """
+
+    model_config = _FROZEN
+
+    form_fee: int = Field(default=5000, ge=0)  # latinum to charter a corp (a §8 sink)
+    tag_max_len: int = Field(default=5, ge=1)  # sector-view handle length cap
+    war_cooldown_days: int = Field(default=3, ge=0)  # re-declare delay after withdrawal
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -1517,6 +1533,7 @@ class GameConfig(BaseModel):
     genesis: GenesisConfig | None = None  # WP10 genesis torpedoes (None ⇒ not sold)
     citadels: CitadelConfig | None = None  # WP54 citadels (None ⇒ not buildable)
     tavern: TavernConfig = TavernConfig()  # WP58 rumors + noticeboard at the StarDock
+    corp: CorpConfig = CorpConfig()  # WP66 player corporations (shared bank/assets + corp war)
     devices: dict[str, DeviceConfig] = Field(default_factory=dict)  # WP56 probes/interdictor/deflector
     roster: RosterConfig | None = None  # WP7 species roster (None ⇒ no aliens placed)
     names: NamesConfig | None = None  # Configurable name pools

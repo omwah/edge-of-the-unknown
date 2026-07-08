@@ -23,6 +23,7 @@ from edge import dialogue
 from edge.core import combat, encounters
 from edge.core import citadels
 from edge.core import contracts
+from edge.core import corp
 from edge.core import mechanics
 from edge.core import starbases
 from edge.core import territory
@@ -99,6 +100,14 @@ from edge.core.events import (
     ContractAccepted,
     ContractCompleted,
     ContractFailed,
+    CorpBanked,
+    CorpDeparted,
+    CorpFormed,
+    CorpInvited,
+    CorpJoined,
+    CorpWarDeclared,
+    CorpWarEnded,
+    PlanetTransferred,
     ColonistsRecruited,
     InterdictorToggled,
     InvasionRepulsed,
@@ -147,6 +156,7 @@ from edge.core.models import (
     AlienSpecies,
     Alliance,
     Contract,
+    Corporation,
     Discovery,
     Encounter,
     Game,
@@ -735,6 +745,85 @@ class RemoveLimpets:
     """Strip all attached limpet mines at a service point for a fee (§10, §4.2, WP56)."""
 
 
+# --- corporations (DESIGN §4, WP66) ------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class FormCorp:
+    """Charter a new corporation (pays `corp.form_fee`); the founder becomes CEO + sole member."""
+
+    name: str
+    tag: str
+
+
+@dataclass(frozen=True, slots=True)
+class InviteToCorp:
+    """CEO invites a player to the corp — the first half of the two-step (consent) join."""
+
+    invitee_player_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class AcceptCorpInvite:
+    """Accept a standing invite and join the corp (the invitee's consent — no press-ganging)."""
+
+    corp_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class LeaveCorp:
+    """Leave the player's corp; the last member out dissolves it (assets re-key to the CEO)."""
+
+
+@dataclass(frozen=True, slots=True)
+class ExpelFromCorp:
+    """CEO expels a member from the corp (the CEO cannot expel themselves — they dissolve instead)."""
+
+    member_player_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class CorpDeposit:
+    """Deposit personal latinum into the corp bank (any member)."""
+
+    amount: int
+
+
+@dataclass(frozen=True, slots=True)
+class CorpWithdraw:
+    """Withdraw from the corp bank into personal latinum (CEO-gated — the shared purse)."""
+
+    amount: int
+
+
+@dataclass(frozen=True, slots=True)
+class TransferPlanetToCorp:
+    """Hand a member's owned world to the corp (shared holding) — an in-sector member action."""
+
+    planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class TransferPlanetFromCorp:
+    """Return a corp-owned world to the CEO's personal ownership (CEO-gated)."""
+
+    planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class DeclareCorpWar:
+    """CEO declares war on a rival corp — hostility is mutual-by-declaration (either side is enough)."""
+
+    target_corp_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class EndCorpWar:
+    """CEO unilaterally withdraws from a war; a cooldown blocks immediate re-declaration."""
+
+    target_corp_id: int
+
+
 Command = (
     JoinGame
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
@@ -750,6 +839,9 @@ Command = (
     | AssaultStarbase | RepairStarbase | ClaimStarbase
     | BuyFighters | BuyMines | DeployFighters | DeployMines | DeployBeacon
     | BuyDevice | LaunchProbe | ToggleInterdictor | RemoveLimpets
+    | FormCorp | InviteToCorp | AcceptCorpInvite | LeaveCorp | ExpelFromCorp
+    | CorpDeposit | CorpWithdraw | TransferPlanetToCorp | TransferPlanetFromCorp
+    | DeclareCorpWar | EndCorpWar
     | DevPatch  # dev/testing cheat (core.dev); recorded in the log like any command
 )
 
@@ -772,6 +864,9 @@ class ReduceResult:
     sectors: tuple[Sector, ...] = ()  # beacon-text updates (WP41)
     sector_forces: tuple[SectorForce, ...] = ()  # deployed fighters/mines (WP41)
     alliances: tuple[Alliance, ...] = ()  # bloc state changes (e.g. intrigue turns outward, WP51)
+    corporations: tuple[Corporation, ...] = ()  # corp create/membership/bank/war changes (WP66)
+    # Corp ids to delete (dissolution) — removed from state after the upserts (WP66).
+    dissolved_corps: tuple[int, ...] = ()
     game: Game | None = None  # set by maintenance reducers (e.g. daily day-number bump)
     # A whole-book replacement of `state.port_orders` (WP47) — None means "unchanged",
     # a mapping means "replace the book". Unlike the entity tuples (which upsert), the
@@ -807,6 +902,10 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
             state.sector_forces[force.sector_id] = force
     for alliance in result.alliances:
         state.alliances[alliance.id] = alliance
+    for corporation in result.corporations:
+        state.corporations[corporation.id] = corporation
+    for corp_id in result.dissolved_corps:
+        state.corporations.pop(corp_id, None)
     if result.game is not None:
         state.game = result.game
     if result.port_orders is not None:
@@ -933,6 +1032,28 @@ def reduce(
             return _toggle_interdictor(state, player_id, config)
         case RemoveLimpets():
             return _remove_limpets(state, player_id, config)
+        case FormCorp():
+            return _form_corp(state, player_id, command, config)
+        case InviteToCorp():
+            return _invite_to_corp(state, player_id, command, config)
+        case AcceptCorpInvite():
+            return _accept_corp_invite(state, player_id, command, config)
+        case LeaveCorp():
+            return _leave_corp(state, player_id, config)
+        case ExpelFromCorp():
+            return _expel_from_corp(state, player_id, command, config)
+        case CorpDeposit():
+            return _corp_bank(state, player_id, command.amount, config, withdraw_=False)
+        case CorpWithdraw():
+            return _corp_bank(state, player_id, command.amount, config, withdraw_=True)
+        case TransferPlanetToCorp():
+            return _transfer_planet(state, player_id, command.planet_id, config, to_corp=True)
+        case TransferPlanetFromCorp():
+            return _transfer_planet(state, player_id, command.planet_id, config, to_corp=False)
+        case DeclareCorpWar():
+            return _declare_corp_war(state, player_id, command, config)
+        case EndCorpWar():
+            return _end_corp_war(state, player_id, command, config)
         case DevPatch():
             return apply_dev_patch(state, player_id, command, config)
         case _ as unreachable:
@@ -1653,7 +1774,7 @@ def _set_allocation(
     planet = state.planets.get(cmd.planet_id)
     if planet is None:
         raise EconomyError("no such world")
-    if planet.owner.kind != "player" or planet.owner.ref != player_id:
+    if not corp.player_owns(state, planet.owner, player_id):
         raise EconomyError("you do not own that world")
     alloc = {c: float(cmd.allocation.get(c.value, 0.0)) for c in Commodity}
     fighter = max(0.0, float(cmd.fighter))
@@ -1675,7 +1796,7 @@ def _owned_planet_here(state: UniverseState, player_id: int, planet_id: int) -> 
     planet = state.planets.get(planet_id)
     if planet is None or planet.sector_id != ship.sector_id:
         raise EconomyError("no such world in this sector")
-    if planet.owner.kind != "player" or planet.owner.ref != player_id:
+    if not corp.player_owns(state, planet.owner, player_id):
         raise EconomyError("you do not own that world")
     return planet
 
@@ -1753,7 +1874,7 @@ def _invade_planet(
     planet = state.planets.get(cmd.planet_id)
     if planet is None or planet.sector_id != ship.sector_id:
         raise CombatError("no such world in this sector")
-    if not planet.owner.is_owned or (planet.owner.kind == "player" and planet.owner.ref == player_id):
+    if not planet.owner.is_owned or corp.player_owns(state, planet.owner, player_id):
         raise CombatError("there is nothing to invade — it is unowned or already yours")
     # Core worlds can never be invaded (deployment-free Core, §10 — assert, don't special-case).
     if state.sectors[ship.sector_id].is_galactic_core:
@@ -1950,7 +2071,7 @@ def _cannibalize_starbase(
     base = state.starbases.get(cmd.starbase_id)
     if base is None or base.sector_id != ship.sector_id:
         raise EngineRoomError("no such starbase in this sector")
-    player_owned = base.owner.kind == "player" and base.owner.ref == player_id
+    player_owned = corp.player_owns(state, base.owner, player_id)
     if is_operational(base) and not player_owned:
         raise EngineRoomError("that starbase is operational — only a derelict or your own base can be salvaged")
     sub = base.subsystems.get(cmd.subsystem)
@@ -3305,6 +3426,221 @@ def _post_notice(state: UniverseState, player_id: int, cmd: PostNotice,
     ring = (*state.notices, notice)[-config.tavern.notice_cap:]
     event = NoticePosted(player_id, state.game.day_number)
     return ReduceResult(events=(event,), notices=ring)
+
+
+# --- corporations (DESIGN §4, WP66) ------------------------------------------
+
+
+def _corp_of(state: UniverseState, player_id: int) -> Corporation:
+    """The player's corporation, or raise (the gate on every corp action)."""
+    c = corp.player_corp(state, player_id)
+    if c is None:
+        raise EconomyError("you are not in a corporation")
+    return c
+
+
+def _form_corp(state: UniverseState, player_id: int, cmd: FormCorp,
+               config: GameConfig) -> ReduceResult:
+    """Charter a corporation: pay the fee, become CEO + sole member (§4, WP66)."""
+    player = _player(state, player_id)
+    if player.corp_id is not None:
+        raise EconomyError("you already belong to a corporation")
+    name = cmd.name.strip()
+    tag = cmd.tag.strip().upper()
+    cc = config.corp
+    if not name:
+        raise EconomyError("a corporation needs a name")
+    if not tag or not tag.isalnum() or len(tag) > cc.tag_max_len:
+        raise EconomyError(f"tag must be 1-{cc.tag_max_len} alphanumeric characters")
+    if any(existing.tag == tag for existing in state.corporations.values()):
+        raise EconomyError(f"the tag {tag!r} is already taken")
+    if player.latinum < cc.form_fee:
+        raise EconomyError(
+            f"chartering a corp costs {cc.form_fee} latinum (have {player.latinum})")
+    cid = max(state.corporations, default=0) + 1
+    corp_ent = Corporation(id=cid, name=name, tag=tag, ceo_player_id=player_id,
+                           member_player_ids=frozenset({player_id}))
+    new_player = replace(player, latinum=player.latinum - cc.form_fee, corp_id=cid)
+    return ReduceResult(events=(CorpFormed(player_id, cid, name, tag, cc.form_fee),),
+                        players=(new_player,), corporations=(corp_ent,))
+
+
+def _invite_to_corp(state: UniverseState, player_id: int, cmd: InviteToCorp,
+                    config: GameConfig) -> ReduceResult:
+    """CEO invites a player — step one of the two-step (consent) join (§4, WP66)."""
+    _player(state, player_id)
+    c = _corp_of(state, player_id)
+    if c.ceo_player_id != player_id:
+        raise EconomyError("only the CEO may invite members")
+    invitee = state.players.get(cmd.invitee_player_id)
+    if invitee is None:
+        raise EconomyError("no such player")
+    if invitee.corp_id is not None:
+        raise EconomyError("that player already belongs to a corporation")
+    new_corp = replace(c, invited_player_ids=c.invited_player_ids | {cmd.invitee_player_id})
+    return ReduceResult(events=(CorpInvited(player_id, c.id, cmd.invitee_player_id),),
+                        corporations=(new_corp,))
+
+
+def _accept_corp_invite(state: UniverseState, player_id: int, cmd: AcceptCorpInvite,
+                        config: GameConfig) -> ReduceResult:
+    """The invitee consents and joins (§4, WP66) — no press-ganging."""
+    player = _player(state, player_id)
+    if player.corp_id is not None:
+        raise EconomyError("you already belong to a corporation")
+    c = state.corporations.get(cmd.corp_id)
+    if c is None:
+        raise EconomyError("no such corporation")
+    if player_id not in c.invited_player_ids:
+        raise EconomyError("you have not been invited to that corporation")
+    new_corp = replace(c, member_player_ids=c.member_player_ids | {player_id},
+                       invited_player_ids=c.invited_player_ids - {player_id})
+    new_player = replace(player, corp_id=c.id)
+    return ReduceResult(events=(CorpJoined(player_id, c.id),),
+                        players=(new_player,), corporations=(new_corp,))
+
+
+def _dissolve_corp(state: UniverseState, c: Corporation, ceo: Player) -> ReduceResult:
+    """Wind up a corp when its last member (the CEO) leaves (§4, WP66).
+
+    Assets re-key to the departing CEO — owned things stay owned, never revert to `none`
+    (documented rationale) — and the shared bank pays out to their personal latinum (no
+    latinum vanishes). Any war another corp still holds against this one ends with it.
+    """
+    corp_owner = Ownership("corp", c.id)
+    to_ceo = Ownership("player", ceo.id)
+    planets = tuple(replace(p, owner=to_ceo) for p in state.planets.values() if p.owner == corp_owner)
+    starbases = tuple(replace(b, owner=to_ceo) for b in state.starbases.values() if b.owner == corp_owner)
+    forces = tuple(replace(f, owner=to_ceo) for f in state.sector_forces.values() if f.owner == corp_owner)
+    paid_out = replace(ceo, corp_id=None, latinum=ceo.latinum + c.bank_balance)
+    others = tuple(replace(o, at_war_with=o.at_war_with - {c.id})
+                   for o in state.corporations.values()
+                   if o.id != c.id and c.id in o.at_war_with)
+    return ReduceResult(events=(CorpDeparted(ceo.id, c.id, "dissolved"),),
+                        players=(paid_out,), planets=planets, starbases=starbases,
+                        sector_forces=forces, corporations=others, dissolved_corps=(c.id,))
+
+
+def _depart_corp(state: UniverseState, c: Corporation, member_id: int, reason: str) -> ReduceResult:
+    """Remove a member; the last one out dissolves the corp (§4, WP66)."""
+    remaining = c.member_player_ids - {member_id}
+    departing = replace(state.players[member_id], corp_id=None)
+    if not remaining:
+        return _dissolve_corp(state, c, departing)
+    # A departing CEO hands the chair to the lowest-id remaining member (deterministic, no RNG).
+    ceo = min(remaining) if member_id == c.ceo_player_id else c.ceo_player_id
+    new_corp = replace(c, member_player_ids=remaining, ceo_player_id=ceo,
+                       invited_player_ids=c.invited_player_ids - {member_id})
+    return ReduceResult(events=(CorpDeparted(member_id, c.id, reason),),
+                        players=(departing,), corporations=(new_corp,))
+
+
+def _leave_corp(state: UniverseState, player_id: int, config: GameConfig) -> ReduceResult:
+    _player(state, player_id)
+    return _depart_corp(state, _corp_of(state, player_id), player_id, "left")
+
+
+def _expel_from_corp(state: UniverseState, player_id: int, cmd: ExpelFromCorp,
+                     config: GameConfig) -> ReduceResult:
+    _player(state, player_id)
+    c = _corp_of(state, player_id)
+    if c.ceo_player_id != player_id:
+        raise EconomyError("only the CEO may expel members")
+    if cmd.member_player_id == player_id:
+        raise EconomyError("the CEO cannot expel themselves — leave to dissolve the corp")
+    if cmd.member_player_id not in c.member_player_ids:
+        raise EconomyError("that player is not a member")
+    return _depart_corp(state, c, cmd.member_player_id, "expelled")
+
+
+def _corp_bank(state: UniverseState, player_id: int, amount: int, config: GameConfig,
+               *, withdraw_: bool) -> ReduceResult:
+    """Move latinum between a member's purse and the corp bank (§4, WP66).
+
+    Deposits are open to any member; withdrawals are CEO-gated (the shared purse). Neither the
+    purse nor the bank may go negative — the `core.economy` non-negativity invariant, reused.
+    """
+    player = _player(state, player_id)
+    c = _corp_of(state, player_id)
+    if amount <= 0:
+        raise EconomyError("amount must be positive")
+    if withdraw_:
+        if c.ceo_player_id != player_id:
+            raise EconomyError("only the CEO may withdraw from the corp bank")
+        if c.bank_balance < amount:
+            raise EconomyError("the corp bank lacks that balance")
+        new_corp = replace(c, bank_balance=c.bank_balance - amount)
+        new_player = replace(player, latinum=player.latinum + amount)
+        kind = "withdraw"
+    else:
+        if player.latinum < amount:
+            raise EconomyError("insufficient latinum")
+        new_corp = replace(c, bank_balance=c.bank_balance + amount)
+        new_player = replace(player, latinum=player.latinum - amount)
+        kind = "deposit"
+    event = CorpBanked(player_id, c.id, kind, amount, new_corp.bank_balance)
+    return ReduceResult(events=(event,), players=(new_player,), corporations=(new_corp,))
+
+
+def _transfer_planet(state: UniverseState, player_id: int, planet_id: int, config: GameConfig,
+                     *, to_corp: bool) -> ReduceResult:
+    """Move a world between a member's personal ownership and the corp (§4, WP66) — in-sector."""
+    player = _player(state, player_id)
+    c = _corp_of(state, player_id)
+    ship = _ship(state, player)
+    planet = state.planets.get(planet_id)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise EconomyError("no such world in this sector")
+    if to_corp:
+        if not (planet.owner.kind == "player" and planet.owner.ref == player_id):
+            raise EconomyError("you do not personally own that world")
+        new_owner = Ownership("corp", c.id)
+    else:
+        if c.ceo_player_id != player_id:
+            raise EconomyError("only the CEO may return corp worlds")
+        if not (planet.owner.kind == "corp" and planet.owner.ref == c.id):
+            raise EconomyError("that world is not owned by your corp")
+        new_owner = Ownership("player", player_id)
+    event = PlanetTransferred(player_id, planet_id, c.id, to_corp)
+    return ReduceResult(events=(event,), planets=(replace(planet, owner=new_owner),))
+
+
+def _declare_corp_war(state: UniverseState, player_id: int, cmd: DeclareCorpWar,
+                      config: GameConfig) -> ReduceResult:
+    """CEO declares war on a rival corp (§4, WP66) — hostility is mutual-by-declaration."""
+    _player(state, player_id)
+    c = _corp_of(state, player_id)
+    if c.ceo_player_id != player_id:
+        raise EconomyError("only the CEO may declare war")
+    target = state.corporations.get(cmd.target_corp_id)
+    if target is None:
+        raise EconomyError("no such corporation")
+    if target.id == c.id:
+        raise EconomyError("a corporation cannot war itself")
+    if cmd.target_corp_id in c.at_war_with:
+        raise EconomyError("already at war with that corporation")
+    ready_day = c.war_cooldowns.get(cmd.target_corp_id)
+    if ready_day is not None and state.game.day_number < ready_day:
+        raise EconomyError(f"a war cooldown blocks re-declaration until day {ready_day}")
+    new_corp = replace(c, at_war_with=c.at_war_with | {cmd.target_corp_id})
+    return ReduceResult(events=(CorpWarDeclared(player_id, c.id, cmd.target_corp_id),),
+                        corporations=(new_corp,))
+
+
+def _end_corp_war(state: UniverseState, player_id: int, cmd: EndCorpWar,
+                  config: GameConfig) -> ReduceResult:
+    """CEO unilaterally withdraws from a war, opening a re-declaration cooldown (§4, WP66)."""
+    _player(state, player_id)
+    c = _corp_of(state, player_id)
+    if c.ceo_player_id != player_id:
+        raise EconomyError("only the CEO may end a war")
+    if cmd.target_corp_id not in c.at_war_with:
+        raise EconomyError("you are not at war with that corporation")
+    ready_day = state.game.day_number + config.corp.war_cooldown_days
+    new_corp = replace(c, at_war_with=c.at_war_with - {cmd.target_corp_id},
+                       war_cooldowns={**c.war_cooldowns, cmd.target_corp_id: ready_day})
+    return ReduceResult(events=(CorpWarEnded(player_id, c.id, cmd.target_corp_id),),
+                        corporations=(new_corp,))
 
 
 def _advance_admission(state: UniverseState, player_id: int, cmd: AdvanceAdmission,

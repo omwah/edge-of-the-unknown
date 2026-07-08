@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from edge.core import corp
 from edge.core.config import GameConfig
 from edge.core.enums import PortClass
 from edge.core.models import Player, Ship, UniverseState
@@ -73,8 +74,7 @@ def service_point(
     for base in sorted(state.starbases.values(), key=lambda b: b.id):
         if base.sector_id != sector_id:
             continue
-        if (base.owner.kind == "player" and base.owner.ref == player.id
-                and is_operational(base)):
+        if corp.player_owns(state, base.owner, player.id) and is_operational(base):
             offered = frozenset(
                 kind for kind, on in (
                     (REPAIR, sc.repair), (COMPONENTS, sc.components),

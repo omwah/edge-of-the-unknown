@@ -421,6 +421,36 @@ class TavernDTO:
 
 
 @dataclass(frozen=True)
+class CorpMemberDTO:
+    """One member row on the corp screen (§4, WP66)."""
+
+    player_id: int
+    name: str
+    is_ceo: bool
+
+
+@dataclass(frozen=True)
+class CorpDTO:
+    """The player's corporation — roster, bank, holdings, wars (§4, WP66). None ⇒ no corp.
+
+    Single-player this manages a corp of one (estate-keeping); the same DTO serves the
+    multiplayer `T` screen. `at_war_with` names rival corp tags; `invites` are corps that have
+    invited *this* player (so they can accept), listed only when the player is corpless.
+    """
+
+    corp_id: int
+    name: str
+    tag: str
+    is_ceo: bool
+    bank_balance: int
+    members: list[CorpMemberDTO] = field(default_factory=list)
+    planet_count: int = 0
+    starbase_count: int = 0
+    at_war_with: list[str] = field(default_factory=list)  # rival corp tags
+    invites: list[str] = field(default_factory=list)  # "TAG — Name" of corps inviting a corpless player
+
+
+@dataclass(frozen=True)
 class ComputerDTO:
     pairs: list[TradePair]
     selected: str

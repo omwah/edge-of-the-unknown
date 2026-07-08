@@ -68,7 +68,7 @@ _REJECTIONS = (EconomyError, MovementError, CombatError, EngineRoomError, DevPat
 # takes `player_id` first and the JSON params as keyword arguments.
 _READ_METHODS = frozenset({
     "game_view", "port_view", "current_port_view", "map_view", "computer_view", "tavern_view",
-    "market_view", "route_view", "route_legs_view", "engine_room_view", "stardock_view",
+    "corp_view", "market_view", "route_view", "route_legs_view", "engine_room_view", "stardock_view",
     "starbase_services_view", "planet_view", "current_planet_view", "surface_view",
     "contact_view", "species_in_sector", "current_contact_view", "encounter_view", "leads_view",
     "messages_view", "resolve_display_id",
