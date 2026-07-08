@@ -12,7 +12,7 @@ from edge.core.config import GameConfig, SceneArtConfig
 def test_default_config_loads() -> None:
     cfg = load_default_config()
     assert isinstance(cfg, GameConfig)
-    assert cfg.config_version == 5  # Phase-5 M18 epoch (citadels, garrison, mine split, devices)
+    assert cfg.config_version == 6  # Phase-4 M21 epoch (corp ownership kind + Player.corp_id/bounty, WP66)
     assert cfg.turns_per_day == 250
     assert cfg.seed == 4  # default.yaml pins a curated seed; empty ⇒ random at start
     assert cfg.bigbang.start_sector == "stardock"  # the player starts at the StarDock
