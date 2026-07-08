@@ -26,7 +26,6 @@ from edge.core.config import AllianceConfig, GameConfig
 from edge.core.events import AllianceLeadershipChanged, Event, GovernanceChanged
 from edge.core.models import (
     AlienSpecies,
-    Alliance,
     Game,
     Ownership,
     Planet,

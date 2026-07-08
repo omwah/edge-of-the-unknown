@@ -32,7 +32,6 @@ from edge.core.aliens import (
     HOSTILE as HOSTILE_BAND,
     NEUTRAL as NEUTRAL_BAND,
     admission_met,
-    alliance_standing,
     apply_join_standing,
     apply_resign_standing,
     apply_spillover,
@@ -95,7 +94,6 @@ from edge.core.events import (
     AllianceJoined,
     AllianceResigned,
     CitadelBuildStarted,
-    CitadelCompleted,
     CitadelGunSilenced,
     ContractAccepted,
     ContractCompleted,
@@ -157,7 +155,6 @@ from edge.core.starbases import is_operational
 from edge.core.models import (
     AlienSpecies,
     Alliance,
-    Contract,
     Corporation,
     Discovery,
     Encounter,

@@ -20,7 +20,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
-from edge.core.config import CitadelConfig, GameConfig
+from edge.core.config import CitadelConfig, CitadelLevelConfig, GameConfig
 from edge.core.enums import Commodity
 from edge.core.models import EncounterFoe, Ownership, Planet
 
@@ -37,7 +37,7 @@ def _levels(config: GameConfig) -> CitadelConfig:
     return config.citadels
 
 
-def level_config(config: GameConfig, level: int):  # -> CitadelLevelConfig
+def level_config(config: GameConfig, level: int) -> CitadelLevelConfig:
     """The config for citadel `level` (1-based). Raises for an out-of-range level."""
     cfg = _levels(config)
     if not 1 <= level <= len(cfg.levels):
