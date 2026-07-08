@@ -27,8 +27,10 @@ stream in both modes.
 from __future__ import annotations
 
 import asyncio
+import itertools
+import json
 from collections.abc import AsyncIterator, Sequence
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from edge.core import dto
 from edge.core.config import GameConfig
@@ -37,7 +39,7 @@ from edge.core.events import Event
 from edge.core.models import UniverseState
 from edge.core.rules import Command
 from edge.engine.ticker import EngineTicker
-from edge.server import session
+from edge.server import session, wire
 from edge.server.service import GameService
 
 
@@ -254,4 +256,289 @@ class LocalClient:
 
 if TYPE_CHECKING:  # static conformance: mypy fails if LocalClient drifts from the async protocol.
     def _assert_impl(client: LocalClient) -> GameClient:
+        return client
+
+
+# --- remote client (WP68) -----------------------------------------------------
+
+
+class RemoteError(Exception):
+    """A JSON-RPC error returned by the server (a rules rejection or a transport fault)."""
+
+    def __init__(self, code: int, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+class LinkLost(RemoteError):
+    """The websocket dropped mid-call — surfaced to the TUI as a retryable status, not a crash."""
+
+    def __init__(self, message: str = "link lost") -> None:
+        super().__init__(-1, message)
+
+
+def _decode_any(value: Any) -> Any:
+    """Inverse of the server's `_encode_any`: unwrap DTO/event envelopes, recurse lists (WP68).
+
+    The server returns None/primitives as-is, dataclasses as `{"kind":"dto",…}`, events as
+    `{"kind":"event",…}`, and lists of these; this rebuilds the real objects the caller expects.
+    """
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, list):
+        return [_decode_any(v) for v in value]
+    if isinstance(value, dict) and value.get("kind") == "dto":
+        return wire.decode_dto(value)
+    if isinstance(value, dict) and value.get("kind") == "event":
+        return wire.decode_event(value)
+    return value
+
+
+class RemoteClient:
+    """A `GameClient` over a websocket to `edge-server` (WP68) — the hosted-play seam.
+
+    Implements the WP61 async protocol against a remote authoritative game: every mutator/reader
+    round-trips as a JSON-RPC call (wire codec both ways, correlated by request id), the
+    server-pushed `event` notifications feed `events()`, and identity/ticking live on the server.
+    A dropped socket surfaces as `LinkLost` (the TUI shows "link lost — retrying") rather than a
+    crash; `reconnect()` re-auths, re-binds the seat, and replays missed events via `events_since`
+    — the durable rail as the catch-up buffer (H16). No optimistic prediction: commands
+    round-trip and views re-read (correctness over snappiness at LAN scales, §2).
+    """
+
+    def __init__(self, url: str, *, player_id: int = 1) -> None:
+        self.player_id = player_id
+        self._url = url
+        self._conn: Any = None
+        self._ids = itertools.count(1)
+        self._pending: dict[int, asyncio.Future[Any]] = {}
+        self._events: asyncio.Queue[Event] = asyncio.Queue()
+        self._reader: asyncio.Task[None] | None = None
+        self._last_seq = 0
+        self._status = "disconnected"
+        # Lobby state so a reconnect can re-establish the same seat without user input.
+        self._token: str | None = None
+        self._game_id: int | None = None
+        # A locally-loaded config for pure rendering (static shared file, not per-game state —
+        # never sent over the wire; the server uses the same `load_default_config()`).
+        self._config: GameConfig | None = None
+
+    # --- connection lifecycle ------------------------------------------------
+
+    async def connect(self, *, fingerprint: str | None = None) -> None:
+        """Open the socket and complete the fingerprint handshake (refuses a build mismatch).
+
+        `fingerprint` overrides the sent value (tests drive a mismatch); production sends this
+        build's real fingerprint, so a client/server skew is refused cleanly at `hello`.
+        """
+        from websockets.asyncio.client import connect as ws_connect
+
+        self._conn = await ws_connect(self._url)
+        self._reader = asyncio.create_task(self._read_loop())
+        await self._call("hello", {"fingerprint": fingerprint or wire.wire_fingerprint()})
+        self._status = "connected"
+
+    async def aclose(self) -> None:
+        self._status = "closed"
+        if self._reader is not None:
+            self._reader.cancel()
+        if self._conn is not None:
+            await self._conn.close()
+
+    @property
+    def status(self) -> str:
+        """"connected" / "disconnected" / "closed" — the TUI status-bar link state."""
+        return self._status
+
+    async def _read_loop(self) -> None:
+        """Demux the socket: pushed `event` notifications feed the stream; results resolve calls."""
+        try:
+            async for raw in self._conn:
+                msg = json.loads(raw)
+                if msg.get("method") == "event":  # a server push (no id)
+                    params = msg.get("params") or {}
+                    self._last_seq = max(self._last_seq, int(params.get("seq", 0)))
+                    self._events.put_nowait(wire.decode_event(params["event"]))
+                    continue
+                fut = self._pending.pop(msg.get("id"), None)
+                if fut is None or fut.done():
+                    continue
+                if "error" in msg:
+                    err = msg["error"]
+                    fut.set_exception(RemoteError(err.get("code", -1), err.get("message", "error")))
+                else:
+                    fut.set_result(msg.get("result"))
+        except Exception:  # noqa: BLE001 — a closed/broken socket ends the loop; fail pending calls
+            pass
+        finally:
+            self._status = "disconnected"
+            for fut in self._pending.values():
+                if not fut.done():
+                    fut.set_exception(LinkLost())
+            self._pending.clear()
+
+    async def _call(self, method: str, params: dict[str, Any]) -> Any:
+        """One JSON-RPC request/response round-trip (raises `RemoteError`/`LinkLost`)."""
+        if self._conn is None:
+            raise LinkLost("not connected")
+        rid = next(self._ids)
+        loop = asyncio.get_running_loop()
+        fut: asyncio.Future[Any] = loop.create_future()
+        self._pending[rid] = fut
+        try:
+            await self._conn.send(json.dumps(
+                {"jsonrpc": "2.0", "id": rid, "method": method, "params": params}))
+        except Exception as exc:  # noqa: BLE001
+            self._pending.pop(rid, None)
+            raise LinkLost(str(exc)) from exc
+        return await fut
+
+    # --- lobby (auth + game selection) ---------------------------------------
+
+    async def register(self, username: str, password: str) -> int:
+        return int((await self._call("register", {"username": username, "password": password}))["account_id"])
+
+    async def login(self, username: str, password: str) -> str:
+        self._token = (await self._call("login", {"username": username, "password": password}))["token"]
+        return self._token
+
+    async def list_games(self) -> list[dict[str, Any]]:
+        return list((await self._call("list_games", {}))["games"])
+
+    async def create_game(self, name: str, seed: int = 0) -> int:
+        return int((await self._call("create_game", {"name": name, "seed": seed}))["game_id"])
+
+    async def join_game(self, game_id: int) -> int:
+        """Join a game and bind this client's seat to the returned player id."""
+        self._game_id = game_id
+        self.player_id = int((await self._call("join_game", {"game_id": game_id}))["player_id"])
+        return self.player_id
+
+    async def reconnect(self) -> None:
+        """Re-open the link, re-auth + re-bind the seat, and replay any events missed (WP68).
+
+        The durable event rail is the catch-up buffer: after re-binding we ask for everything
+        after the last seq we saw and push it onto the stream, so a blip loses no events.
+        """
+        await self.connect()
+        if self._token is not None:
+            await self._call("resume_session", {"token": self._token})
+        if self._game_id is not None:
+            self.player_id = int((await self._call("resume", {"game_id": self._game_id}))["player_id"])
+        for record in (await self._call("events_since", {"since": self._last_seq})):
+            self._last_seq = max(self._last_seq, int(record["seq"]))
+            self._events.put_nowait(wire.decode_event(record["event"]))
+
+    # --- the single mutator + broadcast stream -------------------------------
+
+    async def apply(self, command: Command) -> tuple[Event, ...]:
+        result = await self._call("apply", {"command": wire.encode_command(command)})
+        return tuple(wire.decode_event(e) for e in result)
+
+    async def events(self) -> AsyncIterator[Event]:
+        while True:
+            yield await self._events.get()
+
+    # --- reads (generic round-trip through the wire codec) -------------------
+
+    async def _read(self, method: str, **params: Any) -> Any:
+        return _decode_any(await self._call(method, params))
+
+    async def game_view(self) -> dto.GameState:
+        return await self._read("game_view")
+
+    async def port_view(self, port_id: int) -> dto.PortDTO:
+        return await self._read("port_view", port_id=port_id)
+
+    async def current_port_view(self) -> dto.PortDTO | None:
+        return await self._read("current_port_view")
+
+    async def haggle_quote(self, commodity: Commodity, counter_price: int) -> dto.HaggleQuote:
+        return await self._read("haggle_quote", commodity=commodity.value, counter_price=counter_price)
+
+    async def map_view(self, *, route_dest: int | None = None, full_graph: bool = False,
+                       fit_width: int | None = None) -> dto.LocalMapDTO:
+        return await self._read("map_view", route_dest=route_dest, full_graph=full_graph,
+                                fit_width=fit_width)
+
+    async def computer_view(self) -> dto.ComputerDTO:
+        return await self._read("computer_view")
+
+    async def tavern_view(self) -> dto.TavernDTO:
+        return await self._read("tavern_view")
+
+    async def corp_view(self) -> dto.CorpDTO | None:
+        return await self._read("corp_view")
+
+    async def market_view(self) -> dto.MarketDTO:
+        return await self._read("market_view")
+
+    async def route_view(self, dst_sector: int, *, full_graph: bool = False) -> dto.RouteDTO:
+        return await self._read("route_view", dst_sector=dst_sector, full_graph=full_graph)
+
+    async def route_legs_view(self, waypoints: list[int]) -> dto.RouteDTO:
+        return await self._read("route_legs_view", waypoints=waypoints)
+
+    async def engine_room_view(self) -> dto.EngineRoomDTO:
+        return await self._read("engine_room_view")
+
+    async def stardock_view(self) -> dto.StarDockDTO:
+        return await self._read("stardock_view")
+
+    async def starbase_services_view(self) -> dto.StarbaseServicesDTO | None:
+        return await self._read("starbase_services_view")
+
+    async def planet_view(self, planet_id: int) -> dto.PlanetDTO:
+        return await self._read("planet_view", planet_id=planet_id)
+
+    async def current_planet_view(self) -> dto.PlanetDTO | None:
+        return await self._read("current_planet_view")
+
+    async def surface_view(self, planet_id: int) -> dto.SurfaceDTO:
+        return await self._read("surface_view", planet_id=planet_id)
+
+    async def contact_view(self, species_id: int, active_context: str = "greeting",
+                           active_subject: int | None = None) -> dto.ContactDTO:
+        return await self._read("contact_view", species_id=species_id,
+                                active_context=active_context, active_subject=active_subject)
+
+    async def species_in_sector(self) -> int | None:
+        return await self._read("species_in_sector")
+
+    async def current_contact_view(self) -> dto.ContactDTO | None:
+        return await self._read("current_contact_view")
+
+    async def encounter_view(self) -> dto.EncounterDTO | None:
+        return await self._read("encounter_view")
+
+    async def leads_view(self) -> list[dto.LeadDTO]:
+        return await self._read("leads_view")
+
+    async def messages_view(self) -> dto.MessagesDTO:
+        return await self._read("messages_view")
+
+    async def describe_event(self, event: Event) -> str:
+        return await self._call("describe_event", {"event": wire.encode_event(event)})
+
+    async def resolve_display_id(self, shown: int) -> int | None:
+        return await self._call("resolve_display_id", {"shown": shown})
+
+    # --- trusted accessors ---------------------------------------------------
+
+    @property
+    def state(self) -> UniverseState:
+        raise NotImplementedError("raw state is not available over the wire (fog of war, H15)")
+
+    @property
+    def config(self) -> GameConfig:
+        """The static shared config, loaded locally for pure rendering (never wired, WP68)."""
+        if self._config is None:
+            from edge.config import load_default_config
+            self._config = load_default_config()
+        return self._config
+
+
+if TYPE_CHECKING:  # static conformance: RemoteClient must also satisfy the async protocol.
+    def _assert_remote_impl(client: RemoteClient) -> GameClient:
         return client

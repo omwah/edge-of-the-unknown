@@ -349,9 +349,8 @@ class ComputerScreen(Screen):
         return items[row]
 
     def _current_sector(self) -> int:
-        state = self._service.state
-        player = state.players[self._pid]
-        return state.ships[player.ship_id].sector_id
+        # Through the projection (not raw state) so it works over a remote client too (WP68).
+        return self._service.game_view(self._pid).sector.sector_id
 
     def action_plot_route(self) -> None:
         active = self.query_one(TabbedContent).active

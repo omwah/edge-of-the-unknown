@@ -1,0 +1,100 @@
+"""Sync bridge: drive an async `RemoteClient` from the synchronous TUI (WP68).
+
+The Textual screens read the game through a `GameService`-shaped **synchronous** surface
+(`compose`/`render` are sync, and WP61 deliberately deferred the screen-level `await`
+migration on the throwaway TUI). A hosted game speaks the async `GameClient` over a socket, so
+this bridge runs the client on a background event loop and blocks the caller on each round-trip
+— the TUI's one concession to the network (correctness over snappiness at LAN scales, §2).
+
+`RemoteBridge` owns the loop/thread and exposes `run(coro)` for the lobby flow; `RemoteService`
+is the `GameService`-shaped facade the game screens consume unchanged: every `service.foo(pid,
+…)` call forwards to the seat-bound `client.foo(…)` and blocks for the reply.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import threading
+from collections.abc import Callable
+from typing import Any
+
+from edge.server.client import RemoteClient
+
+
+class RemoteBridge:
+    """Owns the background asyncio loop a `RemoteClient` runs on (WP68).
+
+    The loop lives on a daemon thread so the synchronous TUI can schedule client coroutines onto
+    it and wait for the result. `run` is the one primitive; the lobby screen uses it for
+    login/join, and `RemoteService` uses it for every game call.
+    """
+
+    def __init__(self, url: str) -> None:
+        self.client = RemoteClient(url)
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self._loop.run_forever, name="remote-loop", daemon=True)
+        self._thread.start()
+
+    def run(self, coro: Any) -> Any:
+        """Schedule `coro` on the client's loop and block until it completes (or raises)."""
+        return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
+
+    def connect(self) -> None:
+        self.run(self.client.connect())
+
+    def service(self) -> RemoteService:
+        """A `GameService`-shaped synchronous facade over the connected client."""
+        return RemoteService(self.client, self.run)
+
+    def close(self) -> None:
+        try:
+            self.run(self.client.aclose())
+        except Exception:  # noqa: BLE001 — shutting down; a dead socket is fine
+            pass
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self._thread.join(timeout=2.0)
+
+
+class RemoteService:
+    """A synchronous `GameService`-shaped facade over an async `RemoteClient` (WP68).
+
+    The game screens call `service.method(player_id, …)`; this drops the (server-enforced)
+    `player_id`, forwards the rest to the seat-bound async client method, and blocks for the
+    reply. A handful of methods differ from the generic shape and are spelled out below.
+    """
+
+    def __init__(self, client: RemoteClient, run: Callable[[Any], Any]) -> None:
+        self._client = client
+        self._run = run
+
+    # --- methods whose signature isn't "(player_id, *args)" ------------------
+
+    def apply(self, player_id: int, command: Any) -> Any:
+        return self._run(self._client.apply(command))
+
+    def describe_event(self, event: Any) -> str:
+        return self._run(self._client.describe_event(event))
+
+    def resolve_display_id(self, shown: int) -> int | None:
+        return self._run(self._client.resolve_display_id(shown))
+
+    @property
+    def config(self) -> Any:
+        """The static shared config, loaded locally for rendering (never wired, WP68)."""
+        return self._client.config
+
+    @property
+    def state(self) -> Any:
+        raise NotImplementedError("raw state is unavailable over a remote link (fog of war, H15)")
+
+    # --- everything else: generic (player_id, *args) → client.method(*args) --
+
+    def __getattr__(self, name: str) -> Callable[..., Any]:
+        if name.startswith("_"):
+            raise AttributeError(name)
+        method = getattr(self._client, name)
+
+        def call(_player_id: int | None = None, *args: Any, **kwargs: Any) -> Any:
+            return self._run(method(*args, **kwargs))
+
+        return call
