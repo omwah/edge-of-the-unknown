@@ -2235,7 +2235,8 @@ def _pvp_apply(state: UniverseState, attacker_id: int, enc: Encounter, result: c
         bounty = round(pv.bounty_frac * config.ship_class(d_ship.type_id).price)
         new_attacker = replace(new_attacker, alignment=new_attacker.alignment - pv.alignment_hit,
                                bounty=new_attacker.bounty + bounty)
-        events.append(BountyPosted(attacker_id, bounty, new_attacker.bounty))
+        if bounty > 0:  # a price-0 hull (e.g. a pod/starter) still costs alignment but posts no bounty
+            events.append(BountyPosted(attacker_id, bounty, new_attacker.bounty))
     # Claim any bounty the defender already carried (the WP44 pod-kill hook, player-side).
     if defender.bounty > 0:
         new_attacker = replace(new_attacker, latinum=new_attacker.latinum + defender.bounty)
