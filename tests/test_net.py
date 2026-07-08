@@ -16,9 +16,20 @@ import pytest
 from edge.config import load_default_config
 from edge.core.rules import Dock, JoinGame, Warp
 from edge.server import wire
-from edge.server.net import ERR_HANDSHAKE, ERR_METHOD_NOT_FOUND, GameServer, RpcError, Session
+from edge.server.accounts import AccountStore
+from edge.server.net import (
+    ERR_AUTH,
+    ERR_HANDSHAKE,
+    ERR_METHOD_NOT_FOUND,
+    GameServer,
+    LobbyServer,
+    RpcError,
+    Session,
+)
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
+from edge.store.snapshots import rebuild
+from edge.engine.cron import resolve_cron
 
 _CREATED = "2026-06-15T00:00:00Z"
 
@@ -147,3 +158,123 @@ async def test_end_to_end_websocket(tmp_path: Path) -> None:
         await server.aclose()
         ws_server.close()
         await ws_server.wait_closed()
+
+
+# --- lobby (WP64) ------------------------------------------------------------
+
+
+def _lobby(tmp_path: Path) -> LobbyServer:
+    store = AccountStore(tmp_path / "accounts.db")
+    return LobbyServer(store, _config(), tmp_path / "games", tick_seconds=1000.0)
+
+
+async def test_lobby_register_login_create_join_play(tmp_path: Path) -> None:
+    (tmp_path / "games").mkdir()
+    lobby = _lobby(tmp_path)
+    try:
+        session = Session(conn=None)
+        assert (await lobby.dispatch(session, "hello",
+                                     {"fingerprint": wire.wire_fingerprint()}))["wire_version"] == 1
+        await lobby.dispatch(session, "register", {"username": "host", "password": "pw"})
+        await lobby.dispatch(session, "login", {"username": "host", "password": "pw"})
+        gid = (await lobby.dispatch(session, "create_game", {"name": "alpha", "seed": 42}))["game_id"]
+        joined = await lobby.dispatch(session, "join_game", {"game_id": gid})
+        assert joined["player_id"] == 1  # first seat
+        # A game method now routes to the bound game as that seat.
+        view = await lobby.dispatch(session, "game_view", {})
+        assert wire.decode_dto(view) is not None
+    finally:
+        await lobby.aclose()
+
+
+async def test_join_allocates_seat_via_logged_joingame(tmp_path: Path) -> None:
+    (tmp_path / "games").mkdir()
+    lobby = _lobby(tmp_path)
+    try:
+        host = Session(conn=None)
+        await lobby.dispatch(host, "register", {"username": "host", "password": "pw"})
+        await lobby.dispatch(host, "login", {"username": "host", "password": "pw"})
+        gid = (await lobby.dispatch(host, "create_game", {"name": "alpha", "seed": 42}))["game_id"]
+        await lobby.dispatch(host, "join_game", {"game_id": gid})
+
+        guest = Session(conn=None)
+        await lobby.dispatch(guest, "register", {"username": "guest", "password": "pw"})
+        await lobby.dispatch(guest, "login", {"username": "guest", "password": "pw"})
+        p2 = (await lobby.dispatch(guest, "join_game", {"game_id": gid}))["player_id"]
+        assert p2 == 2  # next free seat
+
+        # The roster rebuilds from the command log alone (the §3 seam: joins are logged).
+        server = lobby._games[gid]  # type: ignore[attr-defined]
+        repo = server.service._repo  # type: ignore[attr-defined]
+        meta = repo.load_meta()
+        rebuilt = rebuild(_config(), meta.seed, repo.load_commands(), created_at=meta.created_at,
+                          maintenance=repo.load_maintenance(), cron_resolver=resolve_cron)
+        assert set(rebuilt.players) == {1, 2}
+    finally:
+        await lobby.aclose()
+
+
+async def test_resume_returns_same_seat(tmp_path: Path) -> None:
+    (tmp_path / "games").mkdir()
+    lobby = _lobby(tmp_path)
+    try:
+        s = Session(conn=None)
+        await lobby.dispatch(s, "register", {"username": "host", "password": "pw"})
+        await lobby.dispatch(s, "login", {"username": "host", "password": "pw"})
+        gid = (await lobby.dispatch(s, "create_game", {"name": "alpha", "seed": 42}))["game_id"]
+        first = (await lobby.dispatch(s, "join_game", {"game_id": gid}))["player_id"]
+        # A fresh connection resumes the same account into the same seat (no new JoinGame).
+        again = Session(conn=None)
+        await lobby.dispatch(again, "login", {"username": "host", "password": "pw"})
+        assert (await lobby.dispatch(again, "resume", {"game_id": gid}))["player_id"] == first
+    finally:
+        await lobby.aclose()
+
+
+async def test_game_methods_require_auth_and_seat(tmp_path: Path) -> None:
+    (tmp_path / "games").mkdir()
+    lobby = _lobby(tmp_path)
+    try:
+        anon = Session(conn=None)
+        with pytest.raises(RpcError) as ei:
+            await lobby.dispatch(anon, "list_games", {})
+        assert ei.value.code == ERR_AUTH  # not logged in
+
+        s = Session(conn=None)
+        await lobby.dispatch(s, "register", {"username": "host", "password": "pw"})
+        await lobby.dispatch(s, "login", {"username": "host", "password": "pw"})
+        with pytest.raises(RpcError) as ei2:
+            await lobby.dispatch(s, "game_view", {})  # logged in but no seat
+        assert ei2.value.code == ERR_AUTH
+    finally:
+        await lobby.aclose()
+
+
+async def test_create_game_is_host_gated(tmp_path: Path) -> None:
+    (tmp_path / "games").mkdir()
+    lobby = _lobby(tmp_path)
+    try:
+        host = Session(conn=None)
+        await lobby.dispatch(host, "register", {"username": "host", "password": "pw"})
+        guest = Session(conn=None)
+        await lobby.dispatch(guest, "register", {"username": "guest", "password": "pw"})
+        await lobby.dispatch(guest, "login", {"username": "guest", "password": "pw"})
+        with pytest.raises(RpcError) as ei:
+            await lobby.dispatch(guest, "create_game", {"name": "x", "seed": 1})
+        assert ei.value.code == ERR_AUTH  # non-host
+    finally:
+        await lobby.aclose()
+
+
+async def test_rate_limit_rejects_a_flood(tmp_path: Path) -> None:
+    store = AccountStore(tmp_path / "accounts.db")
+    (tmp_path / "games").mkdir()
+    lobby = LobbyServer(store, _config(), tmp_path / "games", rate_limit=3, tick_seconds=1000.0)
+    try:
+        s = Session(conn=None)
+        req = {"jsonrpc": "2.0", "id": 1, "method": "hello",
+               "params": {"fingerprint": wire.wire_fingerprint()}}
+        results = [await lobby._handle(s, req) for _ in range(4)]  # type: ignore[attr-defined]
+        assert results[-1]["error"]["code"] == -32003  # ERR_RATE_LIMITED on the 4th within 1s
+    finally:
+        await lobby.aclose()
