@@ -11,5 +11,6 @@ privileges — no sandbox).
 """
 
 from edge.bot.runner import BotRunner
+from edge.bot.swarm import BotSwarm
 
-__all__ = ["BotRunner"]
+__all__ = ["BotRunner", "BotSwarm"]

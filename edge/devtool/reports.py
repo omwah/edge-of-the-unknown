@@ -42,15 +42,33 @@ def money_supply(state: UniverseState) -> list[str]:
     bank = sum(p.bank_balance for p in state.players.values())
     purses = sum(port.latinum for port in state.ports.values())
     treasuries = sum(pl.treasury for pl in state.planets.values())
-    total = player_cash + bank + purses + treasuries
+    corp_banks = sum(c.bank_balance for c in state.corporations.values())  # WP66 shared purses
+    total = player_cash + bank + purses + treasuries + corp_banks
     return [
         "money supply (latinum):",
         f"  players (cash):   {player_cash:,}",
         f"  players (bank):   {bank:,}",
         f"  port purses:      {purses:,}",
         f"  planet treasuries:{treasuries:,}",
+        f"  corp banks:       {corp_banks:,}",
         f"  TOTAL:            {total:,}",
     ]
+
+
+def money_total(state: UniverseState) -> int:
+    """Total latinum across every store — the numeric H10 conservation invariant (WP69).
+
+    Sums player cash + bank, port purses, planet treasuries, and corp banks. Port-to-port
+    settlement and player trades are transfers, so this only *moves* between the sources it
+    counts; it changes only through the named §8 faucets/sinks (bounties, fees, drips).
+    """
+    return (
+        sum(p.latinum for p in state.players.values())
+        + sum(p.bank_balance for p in state.players.values())
+        + sum(port.latinum for port in state.ports.values())
+        + sum(pl.treasury for pl in state.planets.values())
+        + sum(c.bank_balance for c in state.corporations.values())
+    )
 
 
 def market_report(state: UniverseState) -> list[str]:

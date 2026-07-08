@@ -114,7 +114,17 @@ class BotRunner:
         for _ in range(turns):
             if self._stopped or not self._turn_drivers:
                 break
-            for driver in list(self._turn_drivers):
-                driver(self)
+            self.step()
             iterations += 1
         return iterations
+
+    def step(self) -> None:
+        """Run each registered turn driver once (the swarm's round-robin unit, WP69)."""
+        for driver in list(self._turn_drivers):
+            if self._stopped:
+                break
+            driver(self)
+
+    @property
+    def stopped(self) -> bool:
+        return self._stopped
