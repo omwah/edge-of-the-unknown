@@ -32,6 +32,7 @@ from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
+from edge.tui.screens.corp import CorpScreen
 from edge.tui.screens.starbase_services import StarbaseServicesScreen
 from edge.tui.widgets import (
     ClickableEntry,
@@ -115,6 +116,7 @@ class GameScreen(Screen):
         Binding("e", "engine_room", "Engine Room"),
         Binding("m", "map", "Map"),
         Binding("g", "messages", "Log"),
+        Binding("t", "corp", "Corp"),
         Binding("question_mark", "help", "Help"),
         Binding("ctrl+q", "quit", "Quit"),
     ]
@@ -336,6 +338,9 @@ class GameScreen(Screen):
 
     def action_messages(self) -> None:
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="log"))
+
+    def action_corp(self) -> None:
+        self.app.push_screen(CorpScreen(self._service, self._pid))
 
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen())

@@ -174,6 +174,10 @@ class GameService:
         """The StarDock tavern: rumors, bounty board, noticeboard (§14, WP58)."""
         return session.tavern_view(self._state, player_id, self._config)
 
+    def corp_view(self, player_id: int) -> dto.CorpDTO | None:
+        """The player's corporation for the `T` screen — roster, bank, holdings, wars (§4, WP66)."""
+        return session.corp_view(self._state, player_id, self._config)
+
     def market_view(self, player_id: int) -> dto.MarketDTO:
         """The order-book Market tab: explored ports' open books + last settlement (§8, WP48)."""
         return session.market_view(self._state, self._repo.load_events(), self._config, player_id)

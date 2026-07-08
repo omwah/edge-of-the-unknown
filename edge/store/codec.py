@@ -30,6 +30,14 @@ from edge.core.events import (
     ContractAccepted,
     ContractCompleted,
     ContractFailed,
+    CorpBanked,
+    CorpDeparted,
+    CorpFormed,
+    CorpInvited,
+    CorpJoined,
+    CorpWarDeclared,
+    CorpWarEnded,
+    PlanetTransferred,
     NoticePosted,
     RumorHeard,
     CombatRound,
@@ -96,12 +104,23 @@ from edge.core.rules import (
     Cannibalize,
     ClaimStarbase,
     AbandonContract,
+    AcceptCorpInvite,
     BuyRumor,
     Colonize,
     CombatAction,
     Command,
     Converse,
+    CorpDeposit,
+    CorpWithdraw,
+    DeclareCorpWar,
     DeliverContract,
+    EndCorpWar,
+    ExpelFromCorp,
+    FormCorp,
+    InviteToCorp,
+    LeaveCorp,
+    TransferPlanetFromCorp,
+    TransferPlanetToCorp,
     PostNotice,
     DeployBeacon,
     DeployFighters,
@@ -286,6 +305,28 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "ToggleInterdictor", {}
         case RemoveLimpets():
             return "RemoveLimpets", {}
+        case FormCorp():
+            return "FormCorp", {"name": command.name, "tag": command.tag}
+        case InviteToCorp():
+            return "InviteToCorp", {"invitee_player_id": command.invitee_player_id}
+        case AcceptCorpInvite():
+            return "AcceptCorpInvite", {"corp_id": command.corp_id}
+        case LeaveCorp():
+            return "LeaveCorp", {}
+        case ExpelFromCorp():
+            return "ExpelFromCorp", {"member_player_id": command.member_player_id}
+        case CorpDeposit():
+            return "CorpDeposit", {"amount": command.amount}
+        case CorpWithdraw():
+            return "CorpWithdraw", {"amount": command.amount}
+        case TransferPlanetToCorp():
+            return "TransferPlanetToCorp", {"planet_id": command.planet_id}
+        case TransferPlanetFromCorp():
+            return "TransferPlanetFromCorp", {"planet_id": command.planet_id}
+        case DeclareCorpWar():
+            return "DeclareCorpWar", {"target_corp_id": command.target_corp_id}
+        case EndCorpWar():
+            return "EndCorpWar", {"target_corp_id": command.target_corp_id}
         case DevPatch():
             return "DevPatch", {
                 "op": command.op, "target": command.target, "value": command.value,
@@ -439,6 +480,28 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return ToggleInterdictor()
         case "RemoveLimpets":
             return RemoveLimpets()
+        case "FormCorp":
+            return FormCorp(name=payload["name"], tag=payload["tag"])
+        case "InviteToCorp":
+            return InviteToCorp(invitee_player_id=payload["invitee_player_id"])
+        case "AcceptCorpInvite":
+            return AcceptCorpInvite(corp_id=payload["corp_id"])
+        case "LeaveCorp":
+            return LeaveCorp()
+        case "ExpelFromCorp":
+            return ExpelFromCorp(member_player_id=payload["member_player_id"])
+        case "CorpDeposit":
+            return CorpDeposit(amount=payload["amount"])
+        case "CorpWithdraw":
+            return CorpWithdraw(amount=payload["amount"])
+        case "TransferPlanetToCorp":
+            return TransferPlanetToCorp(planet_id=payload["planet_id"])
+        case "TransferPlanetFromCorp":
+            return TransferPlanetFromCorp(planet_id=payload["planet_id"])
+        case "DeclareCorpWar":
+            return DeclareCorpWar(target_corp_id=payload["target_corp_id"])
+        case "EndCorpWar":
+            return EndCorpWar(target_corp_id=payload["target_corp_id"])
         case "DevPatch":
             return DevPatch(
                 op=payload["op"], target=payload["target"], value=payload["value"],
@@ -617,6 +680,42 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             }
         case NoticePosted():
             return "NoticePosted", {"player_id": event.player_id, "day": event.day}
+        case CorpFormed():
+            return "CorpFormed", {
+                "player_id": event.player_id, "corp_id": event.corp_id,
+                "name": event.name, "tag": event.tag, "fee": event.fee,
+            }
+        case CorpInvited():
+            return "CorpInvited", {
+                "player_id": event.player_id, "corp_id": event.corp_id,
+                "invitee_player_id": event.invitee_player_id,
+            }
+        case CorpJoined():
+            return "CorpJoined", {"player_id": event.player_id, "corp_id": event.corp_id}
+        case CorpDeparted():
+            return "CorpDeparted", {
+                "player_id": event.player_id, "corp_id": event.corp_id, "reason": event.reason,
+            }
+        case CorpBanked():
+            return "CorpBanked", {
+                "player_id": event.player_id, "corp_id": event.corp_id,
+                "kind": event.kind, "amount": event.amount, "balance": event.balance,
+            }
+        case PlanetTransferred():
+            return "PlanetTransferred", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "corp_id": event.corp_id, "to_corp": event.to_corp,
+            }
+        case CorpWarDeclared():
+            return "CorpWarDeclared", {
+                "player_id": event.player_id, "corp_id": event.corp_id,
+                "target_corp_id": event.target_corp_id,
+            }
+        case CorpWarEnded():
+            return "CorpWarEnded", {
+                "player_id": event.player_id, "corp_id": event.corp_id,
+                "target_corp_id": event.target_corp_id,
+            }
         case TurnsReset():
             return "TurnsReset", {"player_id": event.player_id, "turns": event.turns}
         case StockRegenerated():
@@ -859,6 +958,28 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                               payload["sector_id"], payload["price"])
         case "NoticePosted":
             return NoticePosted(payload["player_id"], payload["day"])
+        case "CorpFormed":
+            return CorpFormed(payload["player_id"], payload["corp_id"], payload["name"],
+                              payload["tag"], payload["fee"])
+        case "CorpInvited":
+            return CorpInvited(payload["player_id"], payload["corp_id"],
+                               payload["invitee_player_id"])
+        case "CorpJoined":
+            return CorpJoined(payload["player_id"], payload["corp_id"])
+        case "CorpDeparted":
+            return CorpDeparted(payload["player_id"], payload["corp_id"], payload["reason"])
+        case "CorpBanked":
+            return CorpBanked(payload["player_id"], payload["corp_id"], payload["kind"],
+                              payload["amount"], payload["balance"])
+        case "PlanetTransferred":
+            return PlanetTransferred(payload["player_id"], payload["planet_id"],
+                                     payload["corp_id"], payload["to_corp"])
+        case "CorpWarDeclared":
+            return CorpWarDeclared(payload["player_id"], payload["corp_id"],
+                                   payload["target_corp_id"])
+        case "CorpWarEnded":
+            return CorpWarEnded(payload["player_id"], payload["corp_id"],
+                                payload["target_corp_id"])
         case "TurnsReset":
             return TurnsReset(payload["player_id"], payload["turns"])
         case "StockRegenerated":

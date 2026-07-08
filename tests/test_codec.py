@@ -16,6 +16,14 @@ from edge.core.events import (
     ContractAccepted,
     ContractCompleted,
     ContractFailed,
+    CorpBanked,
+    CorpDeparted,
+    CorpFormed,
+    CorpInvited,
+    CorpJoined,
+    CorpWarDeclared,
+    CorpWarEnded,
+    PlanetTransferred,
     NoticePosted,
     RumorHeard,
     AllianceJoined,
@@ -77,9 +85,20 @@ from edge.core.events import (
 )
 from edge.core.rules import (
     AbandonContract,
+    AcceptCorpInvite,
     AcceptLead,
     BuyRumor,
+    CorpDeposit,
+    CorpWithdraw,
+    DeclareCorpWar,
     DeliverContract,
+    EndCorpWar,
+    ExpelFromCorp,
+    FormCorp,
+    InviteToCorp,
+    LeaveCorp,
+    TransferPlanetFromCorp,
+    TransferPlanetToCorp,
     PostNotice,
     AdvanceAdmission,
     AssaultStarbase,
@@ -196,6 +215,17 @@ COMMANDS: list[Command] = [
     LaunchProbe(dest_sector=42),                 # WP56 launch a probe
     ToggleInterdictor(),                         # WP56 toggle the interdictor
     RemoveLimpets(),                             # WP56 strip limpets
+    FormCorp(name="Vanguard", tag="VAN"),        # WP66 charter a corp
+    InviteToCorp(invitee_player_id=2),           # WP66 invite (step one)
+    AcceptCorpInvite(corp_id=1),                 # WP66 accept (step two)
+    LeaveCorp(),                                 # WP66 leave / dissolve
+    ExpelFromCorp(member_player_id=2),           # WP66 CEO expel
+    CorpDeposit(amount=500),                     # WP66 corp bank in
+    CorpWithdraw(amount=200),                    # WP66 corp bank out (CEO)
+    TransferPlanetToCorp(planet_id=5),           # WP66 member → corp
+    TransferPlanetFromCorp(planet_id=5),         # WP66 corp → CEO
+    DeclareCorpWar(target_corp_id=2),            # WP66 declare war
+    EndCorpWar(target_corp_id=2),                # WP66 withdraw
     CombatAction(action="fight"),                # WP25 one combat round
     CombatAction(action="flee"),
     CombatAction(action="field_patch", subsystem=Subsystem.SCREENS, slot_index=1),
@@ -254,6 +284,14 @@ EVENTS: list[Event] = [
     ContractFailed(1, 2, "escort", "deadline"),            # WP57 a favor lapsed
     RumorHeard(1, "discovery", 42, 17, 500),               # WP58 bought a tavern rumor
     NoticePosted(1, 5),                                    # WP58 pinned a notice
+    CorpFormed(1, 1, "Vanguard", "VAN", 5000),             # WP66 chartered a corp
+    CorpInvited(1, 1, 2),                                  # WP66 CEO invited a player
+    CorpJoined(2, 1),                                      # WP66 invitee joined
+    CorpDeparted(2, 1, "expelled"),                        # WP66 left/expelled/dissolved
+    CorpBanked(1, 1, "deposit", 500, 500),                 # WP66 corp bank move
+    PlanetTransferred(1, 5, 1, True),                      # WP66 world → corp
+    CorpWarDeclared(1, 1, 2),                              # WP66 declared war
+    CorpWarEnded(1, 1, 2),                                 # WP66 withdrew from war
     EncounterStarted(1, 3, 55, True, 3, "Deep"),   # WP24 a violence opener
     EncounterStarted(1, 3, 55, False, 0, "Deep"),  # WP24 a peaceful interception
     EncounterEvaded(1, 3, 55),                     # WP24 slipped away unseen

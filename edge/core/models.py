@@ -107,11 +107,12 @@ class Port:
 
 @dataclass(frozen=True, slots=True)
 class Ownership:
-    """Three-way planet/base ownership (DESIGN §4.2): none / an alliance / a player.
+    """Ownership of a planet/base/force (DESIGN §4.2, §4-WP66): none / alliance / player / corp.
 
-    `kind` is "none" | "alliance" | "player"; `ref` is the alliance_id or player_id
-    (None when unowned). Kept as a small frozen value so the three-way stays explicit
-    and hashable (it rides `state_hash` cleanly).
+    `kind` is "none" | "alliance" | "player" | "corp"; `ref` is the alliance_id, player_id,
+    or corporation id (None when unowned). A `"corp"` holding treats every corp member as its
+    owner (WP66). Kept as a small frozen value so the ownership stays explicit and hashable (it
+    rides `state_hash` cleanly).
     """
 
     kind: str = "none"
@@ -578,6 +579,15 @@ class Player:
     # and negative standing with the Core governor makes the Core unsafe (engaged on
     # sight). Recovers to neutral on resignation. Empty until the player joins a bloc.
     alliance_standing: Mapping[int, float] = field(default_factory=dict)
+    # The corporation this player belongs to (DESIGN §4, WP66), or None. A player is in at
+    # most one corp; the corp's shared assets treat them as an owner. Set by the corp
+    # form/join/leave commands, so it reconstructs under (seed, command log).
+    corp_id: int | None = None
+    # A claimable bounty riding on this player's head (DESIGN §14, WP67) — accrued when they
+    # kill a lawful player, collected by whoever pods them. 0 until an outlaw kill; WP67 reads
+    # it, landed here in the WP66 epoch batch so consumer and field ship in one milestone
+    # (H17). Hashed state.
+    bounty: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -638,6 +648,33 @@ class Alliance:
     name: str
     banner: str = ""
     covets_core: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class Corporation:
+    """A player corporation (DESIGN §4, WP66) — shared bank + assets + corp war.
+
+    A corp is a player-level cooperative distinct from an `Alliance` (which is NPC
+    diplomacy): members pool a `bank_balance`, and any asset owned `Ownership("corp", id)`
+    treats **every** member as its owner (the reason `Ownership` gains a `"corp"` kind).
+    `at_war_with` is the set of corp ids this corp has declared war on; hostility is
+    mutual-by-declaration, so a fight is on if *either* side lists the other (the
+    `rival_alliance_ids` symmetry rule reused). `invited_player_ids` gates the two-step
+    join (invite → accept) so no one is press-ganged. All membership/war changes are
+    ordinary logged commands, so corp history replays under (seed, command log).
+    """
+
+    id: int
+    name: str
+    tag: str  # short uppercase handle, unique — the sector-view corp marker
+    ceo_player_id: int
+    member_player_ids: frozenset[int]
+    bank_balance: int = 0
+    at_war_with: frozenset[int] = frozenset()
+    invited_player_ids: frozenset[int] = frozenset()
+    # Per rival-corp id, the earliest day this corp may re-declare war after withdrawing
+    # (`corp.war_cooldown_days`) — stops war being a toggle spammed to dodge tolls (WP66).
+    war_cooldowns: Mapping[int, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -706,6 +743,10 @@ class UniverseState:
     ships: dict[int, Ship] = field(default_factory=dict)
     players: dict[int, Player] = field(default_factory=dict)
     alliances: dict[int, Alliance] = field(default_factory=dict)
+    # Player corporations (DESIGN §4, WP66) — shared bank + assets + corp war, keyed by corp
+    # id. Hashed state, created/mutated only by the corp commands, so it reconstructs under
+    # (seed, command log). Empty until a player forms a corp.
+    corporations: dict[int, Corporation] = field(default_factory=dict)
     species: dict[int, AlienSpecies] = field(default_factory=dict)
     # Inter-species grudges seeded from the roster at the big bang (DESIGN §4, §6.5) —
     # hashed state (they will drive NPC-vs-NPC stances and reputation spillover, WP39).

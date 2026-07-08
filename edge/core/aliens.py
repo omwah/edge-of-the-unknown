@@ -16,6 +16,7 @@ from dataclasses import dataclass, replace
 from edge.core.config import (
     AliensConfig, AllianceConfig, RosterConfig, SeizureConfig, SpeciesConfig,
 )
+from edge.core import corp
 from edge.core.models import AlienSpecies, Grudge, Ownership, Player, Starbase, UniverseState
 
 HOSTILE = "hostile"
@@ -432,6 +433,8 @@ def owner_hostile(state: UniverseState, owner: Ownership, player: Player) -> boo
         if owner.ref == state.game.core_governing_alliance_id:
             return governor_hostile(state, player)
         return alliance_standing(player, owner.ref) < 0.0
+    if owner.kind == "corp":  # a corp holding engages a rival-corp player (corp war, WP66)
+        return corp.owner_at_war_with_player(state, owner, player)
     return False
 
 

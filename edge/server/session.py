@@ -105,6 +105,7 @@ from edge.core.events import (
 )
 from edge.core.models import (
     AlienSpecies,
+    Ownership,
     Planet,
     Player,
     Port,
@@ -630,6 +631,42 @@ def surface_view(state: UniverseState, player_id: int, planet_id: int, config: G
         planet_id=planet_id, explorable=explorable,
         terrain_blurb=terrain_art.blurb_for(planet.planet_type),
         ptype=planet.planet_type,
+    )
+
+
+def corp_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.CorpDTO | None:
+    """The player's corporation for the `T` screen — roster, bank, holdings, wars (§4, WP66).
+
+    Read-only. Returns None when the player is in no corp *and* holds no standing invites; when
+    corpless-but-invited it returns a shell DTO carrying only the invite list (so the screen can
+    offer accept). Holding counts derive live from ownership, never stored.
+    """
+    player = state.players.get(player_id)
+    if player is None:
+        return None
+    if player.corp_id is None:
+        invites = [f"{c.tag} — {c.name}" for c in sorted(state.corporations.values(), key=lambda c: c.id)
+                   if player_id in c.invited_player_ids]
+        if not invites:
+            return None
+        return dto.CorpDTO(corp_id=0, name="", tag="", is_ceo=False, bank_balance=0, invites=invites)
+    c = state.corporations[player.corp_id]
+    owner = Ownership("corp", c.id)
+    members = [
+        dto.CorpMemberDTO(
+            player_id=pid,
+            name=state.players[pid].name if pid in state.players else f"Captain #{pid}",
+            is_ceo=(pid == c.ceo_player_id))
+        for pid in sorted(c.member_player_ids)
+    ]
+    war_tags = sorted(
+        state.corporations[rid].tag for rid in c.at_war_with if rid in state.corporations)
+    return dto.CorpDTO(
+        corp_id=c.id, name=c.name, tag=c.tag, is_ceo=(c.ceo_player_id == player_id),
+        bank_balance=c.bank_balance, members=members,
+        planet_count=sum(1 for p in state.planets.values() if p.owner == owner),
+        starbase_count=sum(1 for b in state.starbases.values() if b.owner == owner),
+        at_war_with=war_tags,
     )
 
 

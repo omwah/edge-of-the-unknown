@@ -733,3 +733,86 @@ class PlanetBanked(Event):
     kind: str
     amount: int
     balance: int
+
+
+# --- corporations (DESIGN §4, WP66) ------------------------------------------
+
+
+@dataclass(frozen=True)
+class CorpFormed(Event):
+    """A player chartered a corporation (§4, WP66). `tag` is the short handle; `fee` the sink paid."""
+
+    player_id: int
+    corp_id: int
+    name: str
+    tag: str
+    fee: int
+
+
+@dataclass(frozen=True)
+class CorpInvited(Event):
+    """The CEO invited a player to the corp (§4, WP66) — the first half of the two-step join."""
+
+    player_id: int  # the inviting CEO
+    corp_id: int
+    invitee_player_id: int
+
+
+@dataclass(frozen=True)
+class CorpJoined(Event):
+    """A player accepted an invite and joined the corp (§4, WP66)."""
+
+    player_id: int
+    corp_id: int
+
+
+@dataclass(frozen=True)
+class CorpDeparted(Event):
+    """A player left, was expelled, or the corp dissolved (§4, WP66).
+
+    `reason` is "left" | "expelled" | "dissolved". On dissolution the last member's departure
+    re-keys corp assets to the departing CEO (never to `none`).
+    """
+
+    player_id: int
+    corp_id: int
+    reason: str
+
+
+@dataclass(frozen=True)
+class CorpBanked(Event):
+    """A corp bank deposit/withdraw (§4, WP66). `kind` is "deposit" | "withdraw"; `balance` after."""
+
+    player_id: int
+    corp_id: int
+    kind: str
+    amount: int
+    balance: int
+
+
+@dataclass(frozen=True)
+class PlanetTransferred(Event):
+    """A planet moved between a player and their corp (§4, WP66). `to_corp` marks the direction."""
+
+    player_id: int
+    planet_id: int
+    corp_id: int
+    to_corp: bool
+
+
+@dataclass(frozen=True)
+class CorpWarDeclared(Event):
+    """One corp declared war on another (§4, WP66) — hostility is mutual-by-declaration."""
+
+    player_id: int  # the declaring CEO
+    corp_id: int
+    target_corp_id: int
+
+
+@dataclass(frozen=True)
+class CorpWarEnded(Event):
+    """A corp unilaterally withdrew from a war (§4, WP66); a cooldown blocks immediate re-declaration."""
+
+    player_id: int
+    corp_id: int
+    target_corp_id: int
