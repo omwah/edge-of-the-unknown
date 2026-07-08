@@ -13,6 +13,8 @@ universe, a loaded game reconstructs state by replaying the saved command log.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
+
 from edge.bigbang.generator import generate
 from edge.core import dto
 from edge.core.config import GameConfig
@@ -45,6 +47,11 @@ class GameService:
         # The latest command_log seq applied — the `after_command_seq` stamped on a
         # maintenance firing so replay interleaves it correctly with commands (WP12).
         self._last_command_seq = last_command_seq
+        # The broadcast seam (WP65): invoked with the (seq, event) pairs just persisted by
+        # every `apply` *and* every `apply_maintenance`, so a subscriber (the LocalClient's
+        # ticker stream, or the GameServer's fan-out) sees command- and time-driven events on
+        # one channel. None in the bare in-process case (tests, bots reading apply results).
+        self.on_events: Callable[[Sequence[tuple[int, Event]]], None] | None = None
 
     @classmethod
     def new_game(cls, config: GameConfig, seed: int, repo: Repository, *,
@@ -95,9 +102,10 @@ class GameService:
         """
         result = reduce(self._state, player_id, command, self._config)
         self._last_command_seq = self._repo.append_command(player_id, command)
-        for event in result.events:
-            self._repo.append_event(event)
+        appended = [(self._repo.append_event(event), event) for event in result.events]
         apply_result(self._state, result)
+        if self.on_events is not None and appended:
+            self.on_events(appended)
         return result.events
 
     def apply_maintenance(self, result: ReduceResult, *,
@@ -113,8 +121,18 @@ class GameService:
         if cron_name is not None:
             self._repo.append_maintenance(cron_name, tick, self._last_command_seq)
         apply_result(self._state, result)
-        for event in result.events:
-            self._repo.append_event(event)
+        appended = [(self._repo.append_event(event), event) for event in result.events]
+        if self.on_events is not None and appended:
+            self.on_events(appended)
+
+    def events_since(self, seq: int) -> list[tuple[int, Event]]:
+        """Persisted events after `seq`, each with its seq — the reconnect catch-up buffer (WP65).
+
+        The durable rail is the replay buffer: a client that dropped resumes by asking for
+        everything after the last seq it saw, and the caller re-applies the same fog filter it
+        applies to a live push, so catch-up over a seq window equals the live stream over it.
+        """
+        return self._repo.load_events_since(seq)
 
     def save_engine_state(self, tick: int, schedule: dict[str, int]) -> None:
         """Persist the ticker schedule so a reload resumes mid-interval (WP12)."""

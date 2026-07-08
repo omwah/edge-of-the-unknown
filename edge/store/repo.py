@@ -82,6 +82,9 @@ class Repository(ABC):
     def load_events(self) -> list[Event]: ...
 
     @abstractmethod
+    def load_events_since(self, seq: int) -> list[tuple[int, Event]]: ...
+
+    @abstractmethod
     def append_maintenance(self, cron_name: str, tick: int, after_command_seq: int) -> int: ...
 
     @abstractmethod
@@ -173,6 +176,18 @@ class SqliteRepository(Repository):
             "SELECT type, payload FROM event_log ORDER BY seq"
         ).fetchall()
         return [codec.decode_event(r[0], json.loads(r[1])) for r in rows]
+
+    def load_events_since(self, seq: int) -> list[tuple[int, Event]]:
+        """Events appended after `seq`, each with its own seq — the reconnect replay buffer (WP65).
+
+        The durable event rail doubles as the broadcast catch-up log: a reconnecting client asks
+        for everything after the last seq it saw, and the server re-filters + re-pushes it. No new
+        queue state, so a live push and a catch-up read over the same seq window agree exactly.
+        """
+        rows = self._conn.execute(
+            "SELECT seq, type, payload FROM event_log WHERE seq > ? ORDER BY seq", (seq,)
+        ).fetchall()
+        return [(int(r[0]), codec.decode_event(r[1], json.loads(r[2]))) for r in rows]
 
     def append_maintenance(self, cron_name: str, tick: int, after_command_seq: int) -> int:
         cur = self._conn.execute(

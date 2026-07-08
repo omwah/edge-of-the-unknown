@@ -88,6 +88,7 @@ from edge.core.events import (
     Haggled,
     LeadAccepted,
     MarketSettled,
+    PortOrderFilled,
     PlanetProduced,
     Repaired,
     SalvageCollected,
@@ -1761,7 +1762,69 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
             return None
         ship = state.ships.get(player.ship_id)
         return ship.sector_id if ship is not None else None
+    if isinstance(event, (CitadelGunSilenced, PlanetInvaded, InvasionRepulsed)):
+        planet = state.planets.get(event.planet_id)
+        return planet.sector_id if planet is not None else None
+    if isinstance(event, PortOrderFilled):
+        port = state.ports.get(event.port_id)
+        return port.sector_id if port is not None else None
     return None
+
+
+# Galaxy-wide announcements: every player hears them wherever they are (§6.3/§8) — a
+# governance flip, a market settlement aggregate, an alliance leadership change reach all.
+_GLOBAL_EVENTS: tuple[type[Event], ...] = (
+    MarketSettled, GovernanceChanged, AllianceLeadershipChanged, CoreLawNotice,
+)
+
+# Events a bystander sharing the sector witnesses first-hand: arrivals, drift, combat,
+# destruction, deployment, siege. A non-actor receives one only when present in — or having
+# charted — the sector (the fog write-side twin, WP65). Every *other* event is private to its
+# acting player (their own ledger: trades, banking, purchases, contracts, colony ticks).
+_SECTOR_PUBLIC_EVENTS: tuple[type[Event], ...] = (
+    Warped, AlienMoved, ShipDestroyed, StarbaseRazed, TerritoryDeployed, HazardDamage,
+    EncounterStarted, EncounterEvaded, EncounterEnded, CombatRound, ComponentKnockedOut,
+    SalvageCollected, GrudgeFormed, GenesisDeployed, CitadelGunSilenced, PlanetInvaded,
+    InvasionRepulsed, PortOrderFilled,
+)
+
+
+def _event_player(event: Event) -> int | None:
+    """The acting/addressed player of an event, if any (its `player_id`/`owner_player_id`)."""
+    pid = getattr(event, "player_id", None)
+    if pid is not None:
+        return int(pid)
+    owner = getattr(event, "owner_player_id", None)
+    return int(owner) if owner is not None else None
+
+
+def event_visible_to(state: UniverseState, event: Event, player_id: int) -> bool:
+    """Whether `player_id` should receive `event` under the fog-of-war broadcast policy (WP65).
+
+    The write-side twin of the read projections' explored-sectors gate: a global announcement
+    reaches everyone; a sector-witnessed event reaches its actor plus any player present in or
+    having charted the sector; every other event is private to its acting player. Single-player
+    (one seat) sees exactly what it saw before — the actor short-circuit, global pass-through, and
+    the fog-safe emission of drift/settlement events mean nothing it used to see is now hidden.
+    """
+    if isinstance(event, _GLOBAL_EVENTS):
+        return True
+    owner = _event_player(event)
+    if isinstance(event, _SECTOR_PUBLIC_EVENTS):
+        if owner is not None and owner == player_id:
+            return True  # the actor always sees their own action, wherever they now are
+        sector = _event_sector(event, state)
+        if sector is None:
+            return owner is None or owner == player_id
+        viewer = state.players.get(player_id)
+        if viewer is None:
+            return False
+        ship = state.ships.get(viewer.ship_id)
+        if ship is not None and ship.sector_id == sector:
+            return True  # present in the sector — witnessed live
+        return sector in viewer.explored_sectors  # charted it — hears of it after the fact
+    # Private / player-addressed (or an unowned, fog-safe-emitted event with no anchor).
+    return owner is None or owner == player_id
 
 
 def format_log_line(event: Event, state: UniverseState) -> str:
@@ -1819,6 +1882,8 @@ def messages_view(
             day, turn = day + 1, 0
         else:
             turn += _event_turn_cost(event, config)
+        if not event_visible_to(state, event, player_id):
+            continue  # fog write-side twin (WP65): another player's private/off-sector event
         text = format_log_line(event, state)
         if text:
             entries.append(dto.LogEntry(when=f"D{day} · T{turn}", text=text))

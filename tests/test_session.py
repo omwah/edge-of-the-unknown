@@ -79,6 +79,56 @@ def test_empty_sector_lists_no_ships() -> None:
     assert session.game_view(world, 1, CONFIG).sector.ships == []
 
 
+# --- WP65 broadcast visibility -----------------------------------------------
+
+
+def _two_player_world() -> UniverseState:
+    """P1 at sector 2 (charted 1-3); P2 at sector 4 (charted 4-5) — disjoint horizons."""
+    world = _world()
+    world.ships[2] = Ship(2, "trailblazer", "S.S.", 2, 4, 60)
+    world.players[2] = Player(2, "them", 2, 2_000, turns_remaining=250,
+                              explored_sectors=frozenset({4, 5}))
+    return world
+
+
+def test_global_event_reaches_every_player() -> None:
+    from edge.core.events import MarketSettled
+
+    world = _two_player_world()
+    ev = MarketSettled(matches=3, volume=99, slips=100)
+    assert session.event_visible_to(world, ev, 1)
+    assert session.event_visible_to(world, ev, 2)
+
+
+def test_private_event_reaches_only_its_actor() -> None:
+    from edge.core.events import Banked
+
+    world = _two_player_world()
+    ev = Banked(player_id=1, kind="deposit", amount=50, balance=50)
+    assert session.event_visible_to(world, ev, 1)
+    assert not session.event_visible_to(world, ev, 2)  # P2 never sees P1's ledger
+
+
+def test_sector_event_reaches_actor_and_those_who_charted_it() -> None:
+    from edge.core.events import Warped
+
+    world = _two_player_world()
+    # P2 warps into sector 3 — P1 has charted 3, so hears of it after the fact.
+    into_charted = Warped(player_id=2, from_sector=4, to_sector=3, turn_cost=1)
+    assert session.event_visible_to(world, into_charted, 2)  # the actor
+    assert session.event_visible_to(world, into_charted, 1)  # charted sector 3
+
+
+def test_no_event_about_an_unexplored_absent_sector_reaches_a_player() -> None:
+    from edge.core.events import Warped
+
+    world = _two_player_world()
+    # P2 warps into sector 5 — P1 is neither present nor has charted it: the fog write-side twin.
+    into_fog = Warped(player_id=2, from_sector=4, to_sector=5, turn_cost=1)
+    assert session.event_visible_to(world, into_fog, 2)  # the actor still sees their own move
+    assert not session.event_visible_to(world, into_fog, 1)
+
+
 def test_engine_room_view_projects_slots_and_derived_aspects() -> None:
     from edge.core.engine_room import build_subsystems
     from edge.core.enums import Component, ComponentTier
