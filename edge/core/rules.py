@@ -108,6 +108,8 @@ from edge.core.events import (
     CorpWarDeclared,
     CorpWarEnded,
     PlanetTransferred,
+    PlayerAttacked,
+    BountyPosted,
     ColonistsRecruited,
     InterdictorToggled,
     InvasionRepulsed,
@@ -445,6 +447,18 @@ class CombatAction:
     action: str  # fight / flee / launch_missile / field_patch
     subsystem: Subsystem | None = None  # field_patch target
     slot_index: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AttackPlayer:
+    """Open attacker-driven PvP combat on another player's ship in this sector (§14, WP67).
+
+    Legal only when `pvp.enabled`, both ships share a non-Core sector, neither is pod-bound or
+    already in an encounter. Opens an `Encounter` whose foe is the target's live ship; the
+    attacker then submits `CombatAction` rounds and the defender fights back automatically (H18).
+    """
+
+    target_player_id: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -832,7 +846,7 @@ Command = (
     | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
-    | CombatAction | BuyMissiles
+    | CombatAction | BuyMissiles | AttackPlayer
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
     | DeliverContract | AbandonContract | BuyRumor | PostNotice
     | AdvanceAdmission | JoinAlliance | ResignAlliance | PetitionCoreSeizure
@@ -980,6 +994,8 @@ def reduce(
             return _deploy_genesis(state, player_id, command, config)
         case CombatAction():
             return _combat_action(state, player_id, command, config)
+        case AttackPlayer():
+            return _attack_player(state, player_id, command, config)
         case BuyMissiles():
             return _buy_missiles(state, player_id, command, config)
         case Hail():
@@ -1338,7 +1354,8 @@ def _territory_entry(
 
     force = state.sector_forces.get(sector_id)
     encounter: Encounter | None = None
-    if force is not None and territory.force_hostile_to_player(state, force, player):
+    if force is not None and territory.force_hostile_to_player(
+            state, force, player, pvp_enabled=config.pvp.enabled):
         if force.armid_mines > 0:
             # A carried mine-deflector absorbs armid mines one-for-one (§10, WP56); shields
             # then soak the remaining blast before the hull takes it.
@@ -2119,6 +2136,114 @@ def _field_patch(
 # --- combat: encounter rounds + missile purchase (§10, WP24/WP25) -----------
 
 
+def _attack_player(
+    state: UniverseState, player_id: int, cmd: AttackPlayer, config: GameConfig
+) -> ReduceResult:
+    """Open attacker-driven PvP on another player's ship in this sector (§14, WP67).
+
+    The gate is enforced here in the reducer (H18), never in the transport, so a modified client
+    gains nothing: `pvp.enabled`, a shared non-Core sector (the Core sanctuary extends to
+    players), neither party pod-bound or already fighting. The foe is the defender's live ship;
+    the attacker submits the rounds from here on.
+    """
+    if not config.pvp.enabled:
+        raise CombatError("player-vs-player combat is disabled in this game")
+    attacker = _player(state, player_id)
+    _require_no_encounter(attacker)
+    if cmd.target_player_id == player_id:
+        raise CombatError("you cannot attack yourself")
+    target = state.players.get(cmd.target_player_id)
+    if target is None:
+        raise CombatError("no such player")
+    a_ship, d_ship = _ship(state, attacker), _ship(state, target)
+    if a_ship.sector_id != d_ship.sector_id:
+        raise CombatError("that player is not in your sector")
+    if state.sectors[a_ship.sector_id].is_galactic_core:
+        raise CombatError("the Core is a sanctuary — no attacks here")
+    if target.active_encounter is not None:
+        raise CombatError("that player is already in a fight")
+    pod = config.combat.escape_pod_class
+    if a_ship.type_id == pod or d_ship.type_id == pod:
+        raise CombatError("an escape pod can neither attack nor be attacked")
+    foe = combat.player_foe(d_ship, config, f"{target.name} ({config.ship_class(d_ship.type_id).name})")
+    aspects = derive_aspects(a_ship, config)
+    enc = Encounter(species_id=0, sector_id=a_ship.sector_id, foes=(foe,),
+                    player_shields=aspects.shields, target_player_id=cmd.target_player_id)
+    new_attacker = replace(attacker, active_encounter=enc)
+    return ReduceResult(events=(PlayerAttacked(player_id, cmd.target_player_id, a_ship.sector_id),),
+                        players=(new_attacker,))
+
+
+@dataclass(frozen=True, slots=True)
+class _PvpDelta:
+    """The extra state a PvP round mutates beyond the attacker's own ship (§14, WP67)."""
+
+    attacker: Player
+    attacker_ship: Ship
+    players: tuple[Player, ...]  # the defender (podded / bounty-cleared)
+    ships: tuple[Ship, ...]      # the defender's ship (wounded or podded)
+    events: tuple[Event, ...]
+
+
+def _pvp_apply(state: UniverseState, attacker_id: int, enc: Encounter, result: combat.RoundResult,
+               attacker: Player, attacker_ship: Ship, config: GameConfig) -> _PvpDelta:
+    """Sync the defender's real ship with a PvP round and resolve a kill (§14, WP67).
+
+    Hull damage always persists onto the defender's ship (the fight is authored entirely by the
+    attacker's commands, yet mutates real defender state — H18). On the attacker's victory the
+    defender drops to an escape pod (the WP26 rule verbatim, bank/planets/corp intact), the
+    victor salvages a fraction of the defender's cargo + loose components (moved, never minted),
+    and a *lawful*-player kill outlaws the attacker: an alignment hit plus a claimable bounty.
+    Podding a defender who already carried a bounty collects it (the WP44 kill hook, player-side).
+    """
+    assert enc.target_player_id is not None
+    defender = state.players[enc.target_player_id]
+    d_ship = state.ships[defender.ship_id]
+    pv = config.pvp
+
+    if result.outcome != combat.VICTORY:
+        # Ongoing / attacker fled or died: mirror the encounter foe's remaining hull onto the ship.
+        foe_hull = result.encounter.foes[0].hull if result.encounter is not None else d_ship.hull_current
+        wounded = replace(d_ship, hull_current=max(0, foe_hull))
+        return _PvpDelta(attacker, attacker_ship, (), (wounded,), ())
+
+    events: list[Event] = [ShipDestroyed(enc.target_player_id, 0, d_ship.sector_id, d_ship.type_id)]
+    # Salvage a fraction of the defender's cargo + loose components into the victor's free holds.
+    frac = pv.salvage_frac_min + state.rng.random() * (pv.salvage_frac_max - pv.salvage_frac_min)
+    cargo = dict(attacker_ship.cargo)
+    comps = dict(attacker_ship.components)
+    free = attacker_ship.holds_free
+    taken_labels: list[str] = []
+    for commodity, qty in sorted(d_ship.cargo.items(), key=lambda kv: kv[0].value):
+        take = min(int(qty * frac), free)
+        if take > 0:
+            cargo[commodity] = cargo.get(commodity, 0) + take
+            free -= take
+            taken_labels.append(f"{take} {commodity.value}")
+    for key, count in sorted(d_ship.components.items(), key=lambda kv: (kv[0][0].value, kv[0][1].value)):
+        take = min(int(count * frac), free)
+        if take > 0:
+            comps[key] = comps.get(key, 0) + take
+            free -= take
+            taken_labels.append(f"{take}×{key[0].value}")
+    new_attacker_ship = replace(attacker_ship, cargo=cargo, components=comps)
+    events.append(SalvageCollected(attacker_id, 0, tuple(taken_labels)))
+
+    new_attacker = attacker
+    # Outlawry (§14, interview decision 5): a lawful victim's death outlaws the attacker.
+    if not is_criminal(defender, config.aliens):
+        bounty = round(pv.bounty_frac * config.ship_class(d_ship.type_id).price)
+        new_attacker = replace(new_attacker, alignment=new_attacker.alignment - pv.alignment_hit,
+                               bounty=new_attacker.bounty + bounty)
+        events.append(BountyPosted(attacker_id, bounty, new_attacker.bounty))
+    # Claim any bounty the defender already carried (the WP44 pod-kill hook, player-side).
+    if defender.bounty > 0:
+        new_attacker = replace(new_attacker, latinum=new_attacker.latinum + defender.bounty)
+    podded = _escape_pod(d_ship, config)
+    new_defender = replace(defender, bounty=0)  # a podded outlaw's head price resets
+    return _PvpDelta(new_attacker, new_attacker_ship, (new_defender,), (podded,), tuple(events))
+
+
 def _combat_action(
     state: UniverseState, player_id: int, cmd: CombatAction, config: GameConfig
 ) -> ReduceResult:
@@ -2219,10 +2344,21 @@ def _combat_action(
     razed_bases: tuple[Starbase, ...] = ()
     razed_planets: tuple[Planet, ...] = ()
     silenced_planets: tuple[Planet, ...] = ()
+    extra_players: tuple[Player, ...] = ()
+    extra_ships: tuple[Ship, ...] = ()
+    if enc.target_player_id is not None:
+        # PvP (§14, WP67): the foe *is* the defender's live ship — reconcile its damage and,
+        # on a kill, pod the defender + salvage + outlawry (H18: all from the attacker's command).
+        pvp = _pvp_apply(state, player_id, enc, result, new_player, new_ship, config)
+        new_player, new_ship = pvp.attacker, pvp.attacker_ship
+        extra_players, extra_ships = pvp.players, pvp.ships
+        events.extend(pvp.events)
     if result.outcome == combat.VICTORY:
-        new_ship, salvage = _combat_salvage(player_id, enc, new_ship, config, state.rng)
-        new_player = replace(new_player, latinum=new_player.latinum + salvage.latinum)
-        events.append(salvage)
+        if enc.target_player_id is None:
+            # NPC / set-piece wreck salvage (PvP salvage is handled in `_pvp_apply`).
+            new_ship, salvage = _combat_salvage(player_id, enc, new_ship, config, state.rng)
+            new_player = replace(new_player, latinum=new_player.latinum + salvage.latinum)
+            events.append(salvage)
         if enc.starbase_id is not None:
             new_player, razed_bases, razed_planets, raze_events = _raze_starbase(
                 state, new_player, enc.starbase_id, config)
@@ -2277,7 +2413,8 @@ def _combat_action(
                     force_updates = (replace(
                         force, fighters=max(0, force.fighters - config.territory.retreat_fighter_cost)),)
         events.append(EncounterEnded(player_id, enc.species_id, result.outcome))
-    return ReduceResult(events=tuple(events), players=(new_player,), ships=(new_ship,),
+    return ReduceResult(events=tuple(events), players=(new_player, *extra_players),
+                        ships=(new_ship, *extra_ships),
                         starbases=razed_bases, planets=razed_planets + silenced_planets,
                         sector_forces=force_updates)
 
@@ -2655,7 +2792,8 @@ def _launch_probe(
         planets += sum(1 for pl in state.planets.values() if pl.sector_id == sid)
         contacts += sum(1 for sp in state.species.values() if sp.sector_id == sid)
         force = state.sector_forces.get(sid)
-        if (force is not None and territory.force_hostile_to_player(state, force, player)
+        if (force is not None and territory.force_hostile_to_player(
+                    state, force, player, pvp_enabled=config.pvp.enabled)
                 and state.rng.random() < spec.loss_chance):
             destroyed = True
             break  # lost before it could report from deeper in

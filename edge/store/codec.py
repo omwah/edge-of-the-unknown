@@ -38,6 +38,8 @@ from edge.core.events import (
     CorpWarDeclared,
     CorpWarEnded,
     PlanetTransferred,
+    PlayerAttacked,
+    BountyPosted,
     NoticePosted,
     RumorHeard,
     CombatRound,
@@ -105,6 +107,7 @@ from edge.core.rules import (
     ClaimStarbase,
     AbandonContract,
     AcceptCorpInvite,
+    AttackPlayer,
     BuyRumor,
     Colonize,
     CombatAction,
@@ -327,6 +330,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "DeclareCorpWar", {"target_corp_id": command.target_corp_id}
         case EndCorpWar():
             return "EndCorpWar", {"target_corp_id": command.target_corp_id}
+        case AttackPlayer():
+            return "AttackPlayer", {"target_player_id": command.target_player_id}
         case DevPatch():
             return "DevPatch", {
                 "op": command.op, "target": command.target, "value": command.value,
@@ -502,6 +507,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return DeclareCorpWar(target_corp_id=payload["target_corp_id"])
         case "EndCorpWar":
             return EndCorpWar(target_corp_id=payload["target_corp_id"])
+        case "AttackPlayer":
+            return AttackPlayer(target_player_id=payload["target_player_id"])
         case "DevPatch":
             return DevPatch(
                 op=payload["op"], target=payload["target"], value=payload["value"],
@@ -715,6 +722,15 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "CorpWarEnded", {
                 "player_id": event.player_id, "corp_id": event.corp_id,
                 "target_corp_id": event.target_corp_id,
+            }
+        case PlayerAttacked():
+            return "PlayerAttacked", {
+                "player_id": event.player_id, "target_player_id": event.target_player_id,
+                "sector_id": event.sector_id,
+            }
+        case BountyPosted():
+            return "BountyPosted", {
+                "player_id": event.player_id, "amount": event.amount, "total": event.total,
             }
         case TurnsReset():
             return "TurnsReset", {"player_id": event.player_id, "turns": event.turns}
@@ -980,6 +996,11 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "CorpWarEnded":
             return CorpWarEnded(payload["player_id"], payload["corp_id"],
                                 payload["target_corp_id"])
+        case "PlayerAttacked":
+            return PlayerAttacked(payload["player_id"], payload["target_player_id"],
+                                  payload["sector_id"])
+        case "BountyPosted":
+            return BountyPosted(payload["player_id"], payload["amount"], payload["total"])
         case "TurnsReset":
             return TurnsReset(payload["player_id"], payload["turns"])
         case "StockRegenerated":

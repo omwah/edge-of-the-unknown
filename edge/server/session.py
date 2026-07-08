@@ -90,6 +90,8 @@ from edge.core.events import (
     MarketSettled,
     PortOrderFilled,
     PlanetProduced,
+    PlayerAttacked,
+    BountyPosted,
     Repaired,
     SalvageCollected,
     ShipDestroyed,
@@ -1756,6 +1758,10 @@ def format_event(event: Event) -> str:
         return f"[cyan]✎ A tavern rumour points the way — a new lead logged ({event.price} slips).[/]"
     if isinstance(event, NoticePosted):
         return "[dim]✎ Your notice is pinned to the board.[/]"
+    if isinstance(event, PlayerAttacked):
+        return "[red]⚔ A rival captain opens fire — PvP engagement![/]"
+    if isinstance(event, BountyPosted):
+        return f"[red]⚠ You are outlawed — a {event.total:,}-slip bounty rides on your head.[/]"
     return ""  # StockRegenerated and any unmodelled event: not player-facing
 
 
@@ -1805,6 +1811,8 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
     if isinstance(event, PortOrderFilled):
         port = state.ports.get(event.port_id)
         return port.sector_id if port is not None else None
+    if isinstance(event, PlayerAttacked):
+        return event.sector_id
     return None
 
 
@@ -1822,7 +1830,7 @@ _SECTOR_PUBLIC_EVENTS: tuple[type[Event], ...] = (
     Warped, AlienMoved, ShipDestroyed, StarbaseRazed, TerritoryDeployed, HazardDamage,
     EncounterStarted, EncounterEvaded, EncounterEnded, CombatRound, ComponentKnockedOut,
     SalvageCollected, GrudgeFormed, GenesisDeployed, CitadelGunSilenced, PlanetInvaded,
-    InvasionRepulsed, PortOrderFilled,
+    InvasionRepulsed, PortOrderFilled, PlayerAttacked,
 )
 
 

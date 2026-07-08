@@ -455,6 +455,11 @@ class Encounter:
     # fixed gun is being silenced (species_id 0, immobile foe). Victory zeroes the planet's
     # `gun_integrity` (WP55). None for anything else. Batched into config_version 5 at WP56.
     citadel_planet_id: int | None = None
+    # Set when this encounter is an **attacker-driven PvP fight** (§14, WP67): the defending
+    # player whose live ship *is* the foe (species_id 0). The attacker submits the rounds; the
+    # defender's ship fights back automatically and takes damage on its real `Ship` (H18). None
+    # for any non-PvP encounter. Landed in the WP66 config_version-6 epoch batch.
+    target_player_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

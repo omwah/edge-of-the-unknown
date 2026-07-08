@@ -31,20 +31,28 @@ def force_in_sector(state: UniverseState, sector_id: int) -> SectorForce | None:
     return state.sector_forces.get(sector_id)
 
 
-def force_hostile_to_player(state: UniverseState, force: SectorForce, player: Player) -> bool:
-    """Whether `force` bars the player — its owner opposes them (§10, WP41).
+def force_hostile_to_player(state: UniverseState, force: SectorForce, player: Player,
+                            *, pvp_enabled: bool = False) -> bool:
+    """Whether `force` bars the player — its owner opposes them (§10, WP41; §14 WP67).
 
-    A player-owned or unowned force never engages the player. An alliance-owned force
-    engages a player at negative standing with that bloc (the governor's own force keys
-    on `governor_hostile`), mirroring the base-defense rule (§4.2/§6.3).
+    An alliance-owned force engages a player at negative standing with that bloc (the governor's
+    own force keys on `governor_hostile`), mirroring the base-defense rule (§4.2/§6.3). When
+    `pvp_enabled` (WP67, interview decision 7) deployed territory additionally engages **any
+    non-owner player**: another player's fighters/mines are a hazard to walk into, and a
+    corp force bars any non-member. Its own owner (player or corp member) always passes free,
+    so single-player and cooperative games are unchanged.
     """
     owner = force.owner
     if owner.kind == "alliance" and owner.ref is not None:
         if owner.ref == state.game.core_governing_alliance_id:
             return governor_hostile(state, player)
         return alliance_standing(player, owner.ref) < 0.0
-    if owner.kind == "corp":  # a corp force bars a rival-corp player (corp war, WP66)
-        return corp.owner_at_war_with_player(state, owner, player)
+    if owner.kind == "corp":
+        if corp.owner_at_war_with_player(state, owner, player):
+            return True  # corp war (WP66) — hostile regardless of the pvp toggle
+        return pvp_enabled and not corp.player_owns(state, owner, player.id)
+    if owner.kind == "player":  # a player force bars a *different* player when pvp is on (WP67)
+        return pvp_enabled and owner.ref != player.id
     return False
 
 

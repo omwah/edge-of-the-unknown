@@ -1490,6 +1490,26 @@ class TavernConfig(BaseModel):
     notice_max_len: int = Field(default=200, ge=1)  # per-notice text cap (sanitised at reducer)
 
 
+class PvpConfig(BaseModel):
+    """Player-vs-player combat rules (DESIGN §14, interview decisions 3-5 — WP67).
+
+    `enabled` is the per-game host toggle: off makes an `AttackPlayer` a rejection in the
+    reducer (a cooperative universe; the enforcement is in core, never the transport, so a
+    modified client gains nothing). A victor salvages `U[salvage_frac_min, salvage_frac_max]`
+    of the loser's cargo + loose components. Killing a *lawful* player (alignment ≥ criminal
+    line) drops the attacker's alignment by `alignment_hit` and posts a bounty of `bounty_frac`
+    × the victim's ship price — claimable by whoever later pods the outlaw.
+    """
+
+    model_config = _FROZEN
+
+    enabled: bool = True  # host toggle; off ⇒ AttackPlayer rejected (cooperative universe)
+    salvage_frac_min: float = Field(default=0.10, ge=0.0, le=1.0)  # the §A.3 10-20% echo
+    salvage_frac_max: float = Field(default=0.20, ge=0.0, le=1.0)
+    bounty_frac: float = Field(default=0.25, ge=0.0)  # bounty as a fraction of victim ship price
+    alignment_hit: int = Field(default=200, ge=0)  # alignment lost for a lawful-player kill
+
+
 class CorpConfig(BaseModel):
     """Player corporations — shared bank + assets + corp war (DESIGN §4 — WP66).
 
@@ -1534,6 +1554,7 @@ class GameConfig(BaseModel):
     citadels: CitadelConfig | None = None  # WP54 citadels (None ⇒ not buildable)
     tavern: TavernConfig = TavernConfig()  # WP58 rumors + noticeboard at the StarDock
     corp: CorpConfig = CorpConfig()  # WP66 player corporations (shared bank/assets + corp war)
+    pvp: PvpConfig = PvpConfig()  # WP67 attacker-driven player-vs-player combat
     devices: dict[str, DeviceConfig] = Field(default_factory=dict)  # WP56 probes/interdictor/deflector
     roster: RosterConfig | None = None  # WP7 species roster (None ⇒ no aliens placed)
     names: NamesConfig | None = None  # Configurable name pools
