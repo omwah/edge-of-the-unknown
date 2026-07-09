@@ -1486,8 +1486,9 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
                                subjects_available=bool(subjects),
                                has_contract=contracts.pick_contract(
                                    state, species, player, config) is not None,
-                               attack_block=encounters.first_strike_block(
-                                   state, ship, species, sc, config))
+                               attack_block=(
+                                   encounters.first_strike_block(state, ship, species, sc, config)
+                                   if sc is not None else "unknown species"))
     # A seeded-random portrait variant so different individuals of the same species show
     # different faces, deterministically keyed to the game seed + species instance id.
     # Uses the same string-seed `random.Random` pattern as `encounter_rng` (stable across
