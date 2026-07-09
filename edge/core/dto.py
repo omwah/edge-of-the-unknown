@@ -184,17 +184,21 @@ class SectorPortDTO:
 
 @dataclass(frozen=True)
 class SectorShipDTO:
-    """A vessel present in the current sector (§6).
+    """A vessel present in the current sector (§6, §14).
 
     `role` is the art ship role (transport / fighter / warship / …) derived from the
     species' fleet, `archetype_id` is the vessel's own species palette, and
     `contact_id` is the species id to hail (folding in the old parallel `contact_ids`).
+    Another *player's* ship (WP70) carries `player_id` instead of `contact_id` — the
+    attack target for `AttackPlayer` — with the corp tag and outlaw marker (`bounty > 0`)
+    already baked into `name`.
     """
 
     name: str
     role: str
     archetype_id: str | None = None
     contact_id: int | None = None
+    player_id: int | None = None
 
 
 @dataclass(frozen=True)

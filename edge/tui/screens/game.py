@@ -16,14 +16,16 @@ from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from edge.core.combat import CombatError
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.events import DiscoveryCollected, EncounterStarted, Event
 from edge.core.movement import MovementError
-from edge.core.rules import Dock, Hail, Salvage, TravelTo, Warp
+from edge.core.rules import AttackPlayer, AttackSpecies, Dock, Hail, Salvage, TravelTo, Warp
 from edge.server.service import GameService
 from edge.tui.dummy import SectorDTO
 from edge.tui.screens.computer import ComputerScreen
+from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.contact import AlienContactScreen
 from edge.tui.screens.encounter import EncounterScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
@@ -110,6 +112,7 @@ class GameScreen(Screen):
         Binding("b", "base_services", "Base"),
         Binding("w", "travel", "Travel"),
         Binding("h", "hail", "Hail"),
+        Binding("a", "attack", "Attack"),
         Binding("s", "survey_planet", "Survey Planet"),
         Binding("z", "scan", "Scan"),
         Binding("c", "computer", "Computer"),
@@ -187,6 +190,8 @@ class GameScreen(Screen):
             await self._salvage(msg.ref)
         elif msg.dest == "contact" and msg.ref is not None:
             self._hail_species(int(msg.ref))
+        elif msg.dest == "player" and msg.ref is not None:
+            self._attack_target(player_id=int(msg.ref))
         else:
             await self._dock()
 
@@ -307,6 +312,46 @@ class GameScreen(Screen):
             self.notify("No alien contact in this sector.", timeout=2)
             return
         self._hail_species(species_id)
+
+    def action_attack(self) -> None:
+        """Open fire on the first ship in this sector (WP70; A is a shortcut — click a
+        player's ship to pick it, or attack a specific alien from its contact screen)."""
+        view = self._service.game_view(self._pid)
+        target = next((s for s in view.sector.ships
+                       if s.contact_id is not None or s.player_id is not None), None)
+        if target is None:
+            self.notify("No ship to engage in this sector.", timeout=2)
+            return
+        self._attack_target(species_id=target.contact_id, player_id=target.player_id,
+                            name=target.name)
+
+    def _attack_target(self, *, species_id: int | None = None, player_id: int | None = None,
+                       name: str | None = None) -> None:
+        """Confirm, then open first-strike combat (§10 WP70; D7 — attacks are deliberate)."""
+        if name is None and player_id is not None:
+            view = self._service.game_view(self._pid)
+            named = next((s for s in view.sector.ships if s.player_id == player_id), None)
+            name = named.name if named is not None else "that ship"
+        message = (
+            f"Open fire on {name}? Killing a lawful captain makes you an outlaw."
+            if player_id is not None else
+            f"Open fire on {name}? A first strike is a betrayal their kind will remember."
+        )
+
+        def _go(confirmed: bool | None) -> None:
+            if not confirmed:
+                return
+            command = (AttackPlayer(player_id) if player_id is not None
+                       else AttackSpecies(int(species_id)))  # type: ignore[arg-type]
+            try:
+                events = self._service.apply(self._pid, command)
+            except (MovementError, EconomyError, CombatError) as exc:
+                self.notify(str(exc), severity="warning", timeout=3)
+                return
+            self._record(events)
+            self.app.push_screen(EncounterScreen(self._service, self._pid))
+
+        self.app.push_screen(ConfirmScreen(message, confirm_label="Attack"), _go)
 
     def _hail_species(self, species_id: int) -> None:
         """Open contact with a specific species in this sector (§6, WP9).

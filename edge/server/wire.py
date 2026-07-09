@@ -36,8 +36,12 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 1
-"""Bumps on any breaking change to the envelope or a codec entry (client/server handshake)."""
+WIRE_VERSION = 2
+"""Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
+
+v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
+into the sector view).
+"""
 
 
 # --- the DTO registry ---------------------------------------------------------

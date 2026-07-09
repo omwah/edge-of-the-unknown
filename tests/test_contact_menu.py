@@ -17,10 +17,10 @@ from edge.tui.screens.contact import AlienContactScreen
 # --- server gating (session._gate_choice) ----------------------------------------
 
 def _gate(choice: DialogueChoice, *, posture: str = "open", treaty_mode: str = "open",
-          combatant: bool = True, has_barter: bool = True, has_intel: bool = True,
+          attack_block: str | None = None, has_barter: bool = True, has_intel: bool = True,
           subjects_available: bool = True) -> tuple[bool, str]:
     return session._gate_choice(
-        choice, posture=posture, treaty_mode=treaty_mode, combatant=combatant,
+        choice, posture=posture, treaty_mode=treaty_mode, attack_block=attack_block,
         has_barter=has_barter, has_intel=has_intel, subjects_available=subjects_available)
 
 
@@ -42,10 +42,15 @@ def test_gate_barter_and_accept_lead_track_availability() -> None:
     assert _gate(log, has_intel=False)[0] is False
 
 
-def test_gate_phase3_replies_are_disabled_with_a_reason() -> None:
+def test_gate_attack_follows_the_first_strike_block() -> None:
+    """FIGHT is live (WP70): offered when nothing blocks it, greyed with the shared reason."""
     attack = DialogueChoice(text="Attack", action="attack")
-    assert _gate(attack, combatant=True) == (False, "they are friendly")
-    assert _gate(attack, combatant=False)[0] is False
+    assert _gate(attack) == (True, "")
+    blocked = _gate(attack, attack_block="the Core is a sanctuary — no attacks here")
+    assert blocked == (False, "the Core is a sanctuary — no attacks here")
+
+
+def test_gate_treaty_stays_disabled_with_a_reason() -> None:
     treaty = DialogueChoice(text="Treaty", next_context="treaty_offer")
     enabled, reason = _gate(treaty, treaty_mode="none")
     assert enabled is False and reason

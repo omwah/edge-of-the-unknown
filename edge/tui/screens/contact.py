@@ -334,6 +334,12 @@ class AlienContactScreen(Screen):
         if choice.action == "leave":
             self._break_contact()  # the parting line was spoken; break contact
             return
+        if choice.action == "attack":
+            # The first strike opened combat (WP70): contact is over, the encounter is
+            # live — popping back lets the game screen's resume hook raise the fight.
+            self.notify("You open fire — betrayal remembered.", severity="warning", timeout=3)
+            self._break_contact()
+            return
         if choice.action == "trade":
             self._trade_or_refuse()
             return
