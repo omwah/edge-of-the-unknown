@@ -14,6 +14,7 @@ import pytest
 
 from edge.config import load_default_config
 from edge.core.aliens import effective_disposition
+from edge.core.combat import CombatError
 from edge.core.discovery import entity_codex_discovery, entity_species
 from edge.core.config import RosterConfig
 from edge.core.economy import EconomyError
@@ -259,23 +260,43 @@ def test_converse_choice_rejects_bad_index_and_choiceless_node() -> None:
 
 
 def _cfg_with_attack_choice() -> object:
-    """A config whose Vesk workshop node also offers a Phase-3 `attack` reply."""
+    """A config whose Vesk workshop node also offers an `attack` reply (live since WP70)."""
     data = CFG.roster.model_dump()
     data["personas"]["serial_formal"]["branch.vesk_workshop"][0]["choices"].append(
         {"text": "Draw weapons.", "action": "attack"})
     return CFG.model_copy(update={"roster": RosterConfig.model_validate(data)})
 
 
-def test_converse_choice_attack_is_phase3_gated() -> None:
+def test_converse_choice_attack_is_core_gated() -> None:
+    """In the Core sanctuary the FIGHT reply is greyed and the reducer refuses (WP70)."""
     cfg = _cfg_with_attack_choice()
     state = _world()
-    vesk = _inject(state, "vesk")
+    vesk = _inject(state, "vesk")  # the player starts in the Core
     apply_result(state, reduce(state, 1, Converse(vesk.id, "greeting", choice_index=0), cfg))
     view = session.contact_view(state, 1, vesk.id, cfg, active_context="branch.vesk_workshop")
     attack = next(c for c in view.choices if c.action == "attack")
-    assert not attack.enabled  # the projection greys the Phase-3 reply
-    with pytest.raises(EconomyError, match="attack"):
+    assert not attack.enabled and "sanctuary" in attack.reason
+    with pytest.raises(CombatError, match="sanctuary"):
         reduce(state, 1, Converse(vesk.id, "branch.vesk_workshop", choice_index=attack.index), cfg)
+
+
+def test_converse_choice_attack_opens_combat_outside_the_core() -> None:
+    """The live FIGHT reply (WP70) ends the conversation and opens the encounter."""
+    cfg = _cfg_with_attack_choice()
+    state = _world()
+    vesk = _inject(state, "vesk")
+    out = next(sid for sid, sec in sorted(state.sectors.items()) if not sec.is_galactic_core)
+    state.ships[1] = replace(state.ships[1], sector_id=out)
+    state.species[vesk.id] = replace(state.species[vesk.id], sector_id=out)
+    apply_result(state, reduce(state, 1, Converse(vesk.id, "greeting", choice_index=0), cfg))
+    view = session.contact_view(state, 1, vesk.id, cfg, active_context="branch.vesk_workshop")
+    attack = next(c for c in view.choices if c.action == "attack")
+    assert attack.enabled
+    res = reduce(state, 1, Converse(vesk.id, "branch.vesk_workshop", choice_index=attack.index), cfg)
+    apply_result(state, res)
+    player = state.players[1]
+    assert player.active_encounter is not None and player.active_encounter.species_id == vesk.id
+    assert player.contact_session is None  # contact broke with the betrayal
 
 
 def test_converse_choice_chain_replays_into_identical_state(tmp_path: Path) -> None:

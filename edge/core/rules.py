@@ -459,6 +459,21 @@ class AttackPlayer:
 
 
 @dataclass(frozen=True, slots=True)
+class AttackSpecies:
+    """Open first-strike combat on an alien contact in this sector (§10, WP70).
+
+    The player-initiated twin of the violence opener: spawns the species' pack per its
+    pack behavior onto `Player.active_encounter` and the fight proceeds through ordinary
+    `CombatAction` rounds. Gated in the reducer: same sector, non-Core (the sanctuary),
+    no pod, not the sensor-gated Entity, a combatant species with a fleet to field, and
+    not forbidden by an `influence_gate` mechanic. A first strike is remembered like a
+    kill: the attitude sours and a grudge forms before the first round (§6.5).
+    """
+
+    species_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class BuyMissiles:
     """Buy homing missiles at the StarDock hardware emporium (§8, §10, WP25)."""
 
@@ -843,7 +858,7 @@ Command = (
     | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
-    | CombatAction | BuyMissiles | AttackPlayer
+    | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
     | DeliverContract | AbandonContract | BuyRumor | PostNotice
     | AdvanceAdmission | JoinAlliance | ResignAlliance | PetitionCoreSeizure
@@ -993,6 +1008,8 @@ def reduce(
             return _combat_action(state, player_id, command, config)
         case AttackPlayer():
             return _attack_player(state, player_id, command, config)
+        case AttackSpecies():
+            return _attack_species(state, player_id, command, config)
         case BuyMissiles():
             return _buy_missiles(state, player_id, command, config)
         case Hail():
@@ -2171,6 +2188,59 @@ def _attack_player(
                         players=(new_attacker,))
 
 
+def _attack_species(
+    state: UniverseState, player_id: int, cmd: AttackSpecies, config: GameConfig
+) -> ReduceResult:
+    """Open first-strike combat on an alien contact in this sector (§10, WP70).
+
+    The player-initiated twin of the WP24 violence opener: the same pack spawn, the
+    same `CombatAction` rounds. Because the player chose it, the §6.5 souring rail
+    fires at initiation — a first strike sours like one kill (with an honest grudge
+    cause) even if the player then flees; kills during the fight add more through
+    the ordinary WP27 rail. The gates (Core sanctuary, the Entity, influence_gate's
+    forbid, shipless kinds) live in `encounters.first_strike_block` — shared with the
+    contact projection so the FIGHT menu and this reducer can never disagree — and
+    are enforced here regardless, so a crafted log gains nothing (H18 discipline).
+    """
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    ship = _ship(state, player)
+    species = _species_here(state, ship, cmd.species_id)
+    sc = _species_config(config, species)
+    block = encounters.first_strike_block(state, ship, species, sc, config)
+    if block is not None:
+        raise CombatError(block)
+    pack = encounters.spawn_pack(species, sc, ship.sector_id, ship, config, state.rng)
+    pack = replace(pack, speech_context="combat_open")
+    events: list[Event] = [EncounterStarted(
+        player_id, species.id, ship.sector_id, True, len(pack.foes),
+        state.sectors[ship.sector_id].distance_band)]
+    al = config.aliens
+    prior = player.species_attitudes.get(species.roster_id, 0.0)
+    soured = sour_attitude(player, species, sc, al, state.game.day_number, 1,
+                           cause=f"opened fire on {species.name} ships unprovoked")
+    if soured is not player:  # memory_model none forgets instantly (no events)
+        grudge = soured.grudges[species.roster_id]
+        events.append(GrudgeFormed(
+            player_id, species.roster_id, grudge.severity, grudge.duration_days < 0))
+        events.append(AttitudeChanged(
+            player_id, species.id,
+            round(soured.species_attitudes[species.roster_id], 6),
+            round(effective_disposition(species, soured), 6)))
+        # Reputation spillover (§6.4, WP39): striking this species chills its friends
+        # and warms its enemies, same as a kill would.
+        if config.roster is not None:
+            delta = soured.species_attitudes[species.roster_id] - prior
+            spilled = apply_spillover(soured, species.roster_id, delta, config.roster, al)
+            soured = replace(soured, species_attitudes=spilled)
+    # The pack speaks its opener beat (§6.7, WP31) — same voice as a rolled violence opener.
+    soured, spoke = _combat_speak(state, soured, species, "combat_open", config,
+                                  dialogue_facts.encounter_facts(pack))
+    events.append(spoke)
+    new_player = replace(soured, active_encounter=pack, contact_session=None)
+    return ReduceResult(events=tuple(events), players=(new_player,))
+
+
 @dataclass(frozen=True, slots=True)
 class _PvpDelta:
     """The extra state a PvP round mutates beyond the attacker's own ship (§14, WP67)."""
@@ -3242,9 +3312,10 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
     `cmd.context` names the node shown; the reducer re-resolves that node's line (read-only,
     with the same RNG inputs the projection used, so it sees the very choices the player
     did), validates the indexed choice and its `when`, then applies it: an `accept_lead`
-    choice delegates to the lead logger; `attack` is rejected (Phase 3); `leave` speaks the
-    parting line; any other choice transitions to its `next_context` (or re-speaks the node
-    for a trade/barter gateway, the mechanical effect riding on the follow-up Buy/Barter
+    choice delegates to the lead logger; `attack` ends the conversation and opens
+    first-strike combat (`_attack_species`, WP70); `leave` speaks the parting line; any
+    other choice transitions to its `next_context` (or re-speaks the node for a
+    trade/barter gateway, the mechanical effect riding on the follow-up Buy/Barter
     command). Position lives only on the command, so this stays replay-stable.
     """
     assert config.roster is not None
@@ -3278,11 +3349,10 @@ def _converse_choice(state: UniverseState, player_id: int, cmd: Converse, config
     if not dialogue.when_matches(choice.when, standing=standing, treaty=False, facts=facts):
         raise EconomyError("you cannot say that right now")
     if choice.action == "attack":
-        sc = _species_config(config, species)
-        if mechanics.attack_forbidden(sc):
-            # An influence_gate species forbids being struck while in contact (§6.2, WP33).
-            raise EconomyError("their influence stays your hand — you cannot attack them")
-        raise EconomyError("you cannot attack here (Phase 3)")
+        # Live since WP70: the reply ends the conversation and opens first-strike combat.
+        # `_attack_species` owns every gate (Core sanctuary, the Entity, influence_gate's
+        # forbid, shipless kinds) and the §6.5 first-strike souring.
+        return _attack_species(state, player_id, AttackSpecies(cmd.species_id), config)
 
     mutated_player = player
     log_events: tuple[Event, ...] = ()

@@ -8,3 +8,7 @@ __pycache__/
 *.pyc
 # Coverage.py
 .coverage
+
+# runtime server state (lobby accounts + hosted game saves)
+accounts.db
+games/

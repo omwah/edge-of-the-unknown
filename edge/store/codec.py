@@ -108,6 +108,7 @@ from edge.core.rules import (
     AbandonContract,
     AcceptCorpInvite,
     AttackPlayer,
+    AttackSpecies,
     BuyRumor,
     Colonize,
     CombatAction,
@@ -332,6 +333,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "EndCorpWar", {"target_corp_id": command.target_corp_id}
         case AttackPlayer():
             return "AttackPlayer", {"target_player_id": command.target_player_id}
+        case AttackSpecies():
+            return "AttackSpecies", {"species_id": command.species_id}
         case DevPatch():
             return "DevPatch", {
                 "op": command.op, "target": command.target, "value": command.value,
@@ -509,6 +512,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return EndCorpWar(target_corp_id=payload["target_corp_id"])
         case "AttackPlayer":
             return AttackPlayer(target_player_id=payload["target_player_id"])
+        case "AttackSpecies":
+            return AttackSpecies(species_id=payload["species_id"])
         case "DevPatch":
             return DevPatch(
                 op=payload["op"], target=payload["target"], value=payload["value"],

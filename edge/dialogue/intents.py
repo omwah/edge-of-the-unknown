@@ -33,7 +33,8 @@ SIG_PLACEHOLDERS = frozenset({"subject", "count", "reward", "coords", "item"})
 
 # The mechanical verbs an authored player `choice` may carry (DESIGN §6.7 branching). A
 # choice with no `action` is a pure conversation transition (it just moves to `next_context`).
-# `attack` is recognised but Phase-3-gated (rejected by the reducer in Phase 2).
+# `attack` ends the conversation and opens first-strike combat (WP70), gated by
+# `encounters.first_strike_block` (Core sanctuary / Entity / influence_gate / shipless kinds).
 CHOICE_ACTIONS = frozenset({"leave", "trade", "barter", "accept_lead", "accept_contract", "attack"})
 
 # Reserved namespace for authored intermediate **branch nodes** — context keys that exist

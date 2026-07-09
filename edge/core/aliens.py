@@ -65,7 +65,7 @@ def attitude_locked(player: Player, roster_id: str) -> bool:
 
 def sour_attitude(
     player: Player, species: AlienSpecies, sc: SpeciesConfig,
-    config: AliensConfig, day: int, kills: int,
+    config: AliensConfig, day: int, kills: int, *, cause: str | None = None,
 ) -> Player:
     """Apply the consequences of destroying `kills` of a species' ships (§6.5, WP27).
 
@@ -74,7 +74,8 @@ def sour_attitude(
     at 1.0). A `memory_model: none` species forgets instantly — no souring, no
     grudge. A `never_forgets` or `betrayal_model: permanent` species records the
     grudge as undying (`duration_days -1`), which also locks the offset (§6.5).
-    Pure — the caller (a reducer or test) owns event emission.
+    `cause` overrides the recorded grudge cause (a first strike sours like one kill
+    but is remembered differently, §10 WP70). Pure — the caller owns event emission.
     """
     if kills <= 0 or sc.memory_model == "none":
         return player
@@ -86,7 +87,7 @@ def sour_attitude(
                    + config.grudge_severity_per_kill * kills)
     grudge = Grudge(
         holder=species.roster_id, target="player",
-        cause=f"destroyed {species.name} ships",
+        cause=cause if cause is not None else f"destroyed {species.name} ships",
         severity=round(severity, 6),
         created_day=existing.created_day if existing is not None else day,
         duration_days=-1 if permanent else config.grudge_duration_days,

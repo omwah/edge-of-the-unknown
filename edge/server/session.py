@@ -24,6 +24,7 @@ from edge.server import terrain as terrain_art
 from edge.core import citadels
 from edge.core import combat
 from edge.core import contracts
+from edge.core import encounters
 from edge.core.aliens import core_status, disposition_band, effective_disposition, seizure_progress
 from edge.core.config import DialogueChoice, GameConfig
 from edge.core.discovery import entity_contactable, entity_species, is_detectable
@@ -318,6 +319,23 @@ def _sector_dto(
         )
         for sp in here_species
     ]
+    # Other players' ships (§14, WP70 — the WP67 projection promise): visible whenever
+    # co-located, like any vessel; `player_id` is the AttackPlayer target. The corp tag
+    # and outlaw marker ride in the name (fog-safe: name/corp/bounty are public identity).
+    for pid, other in sorted(state.players.items()):
+        if pid == player.id:
+            continue
+        other_ship = state.ships.get(other.ship_id)
+        if other_ship is None or other_ship.sector_id != sector.id:
+            continue
+        corp = state.corporations.get(other.corp_id) if other.corp_id is not None else None
+        label = other.name + (f" [{corp.tag}]" if corp is not None else "")
+        if other.bounty > 0:
+            label += " ☠"
+        ships.append(dto.SectorShipDTO(
+            name=label, role=config.ship_class(other_ship.type_id).role,
+            player_id=pid,
+        ))
     here = core_hops.get(sector.id, 0)
     came_from = player.entered_from.get(sector.id)
     topo_bearings = mapgraph.local_layout_bearings(state, player, sector.id)
@@ -1257,17 +1275,20 @@ def _line(state: UniverseState, roster: object, species: AlienSpecies, player: P
     return text
 
 
-def _gate_choice(choice: DialogueChoice, *, posture: str, treaty_mode: str, combatant: bool,
+def _gate_choice(choice: DialogueChoice, *, posture: str, treaty_mode: str,
                  has_barter: bool, has_intel: bool, subjects_available: bool,
-                 has_contract: bool = False) -> tuple[bool, str]:
+                 has_contract: bool = False,
+                 attack_block: str | None = None) -> tuple[bool, str]:
     """Gate one authored reply, greying it with a reason (§6.7).
 
     The mechanical actions and the Phase-3 navigations carry the same availability checks and
     reasons the derived verb menu used to — now hung on the authored `choices` instead. A plain
     conversational transition (no recognised action/target) is always offered.
     """
-    if choice.action == "attack":  # FIGHT — Phase 3; Phase 2 places only friendly species.
-        return False, "non-combatant" if not combatant else "they are friendly"
+    if choice.action == "attack":
+        # FIGHT — live since WP70. `attack_block` is `encounters.first_strike_block`'s
+        # verdict, the same gate the AttackSpecies reducer raises, so menu and rule agree.
+        return (True, "") if attack_block is None else (False, attack_block)
     if choice.action == "trade":   # empty shelves are handled by the trade_refuse beat, not a gate.
         if posture == "alliance_gated":
             return False, "requires alliance membership (Phase 3)"
@@ -1330,7 +1351,7 @@ def _contact_choices(state: UniverseState, roster: object, species: AlienSpecies
                      player: Player, context: str, config: GameConfig, *, standing: str,
                      ctx: Mapping[str, str], sc: object, offers: list[dto.TechOfferDTO],
                      has_intel: bool, subjects_available: bool,
-                     has_contract: bool = False,
+                     has_contract: bool = False, attack_block: str | None = None,
                      facts: Mapping[str, object] | None = None) -> list[dto.ContactChoiceDTO]:
     """The authored player replies on the active node — the whole reply menu (§6.7).
 
@@ -1351,16 +1372,15 @@ def _contact_choices(state: UniverseState, roster: object, species: AlienSpecies
         return []
     posture = getattr(sc, "trade_posture", "open")
     treaty_mode = getattr(sc, "treaty_mode", "open")
-    combatant = getattr(sc, "combatant", True)
     has_barter = any(o.mode == "barter" and o.available for o in offers)
     out: list[dto.ContactChoiceDTO] = []
     for i, choice in enumerate(source):
         if not dialogue.when_matches(choice.when, standing=standing, treaty=False, facts=facts):
             continue
         enabled, reason = _gate_choice(
-            choice, posture=posture, treaty_mode=treaty_mode, combatant=combatant,
+            choice, posture=posture, treaty_mode=treaty_mode,
             has_barter=has_barter, has_intel=has_intel, subjects_available=subjects_available,
-            has_contract=has_contract)
+            has_contract=has_contract, attack_block=attack_block)
         out.append(dto.ContactChoiceDTO(
             index=i, text=dialogue.fill(choice.text, ctx), action=choice.action or "",
             next_context=choice.next_context or "", enabled=enabled, reason=reason))
@@ -1465,7 +1485,9 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
                                offers=offers, has_intel=intel is not None,
                                subjects_available=bool(subjects),
                                has_contract=contracts.pick_contract(
-                                   state, species, player, config) is not None)
+                                   state, species, player, config) is not None,
+                               attack_block=encounters.first_strike_block(
+                                   state, ship, species, sc, config))
     # A seeded-random portrait variant so different individuals of the same species show
     # different faces, deterministically keyed to the game seed + species instance id.
     # Uses the same string-seed `random.Random` pattern as `encounter_rng` (stable across

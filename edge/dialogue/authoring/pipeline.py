@@ -185,8 +185,8 @@ def _intent_brief(context: str) -> str:
         "contract_report": "The player already took your job ({target}); remind them it "
                            "still stands and {reward} awaits when it is done.\n",
         # The combat beats (§6.7, WP31) — spoken by the encounter reducers, not conversation.
-        "combat_open": "Your pack has just intercepted the player's ship and opens fire; "
-                       "issue the attack challenge.\n",
+        "combat_open": "Battle is joined with the player's ship — your pack intercepted "
+                       "them, or they struck first (WP70); issue the attack challenge.\n",
         "combat_taunt": "Mid-battle: taunt the player over the wideband while your pack "
                         "presses the attack.\n",
         "surrender": "Your pack is bloodied and losing; sue for quarter or signal "

@@ -23,7 +23,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
-from edge.core import citadels, starbases
+from edge.core import citadels, mechanics, starbases
 from edge.core.aliens import (
     FRIENDLY,
     alliance_standing_shift,
@@ -154,6 +154,29 @@ def roll_encounter(
             pack = replace(pack, speech_context=opener)
             return EncounterRoll(species=species, detected=True, hostile=True, encounter=pack)
     return EncounterRoll(species=species, detected=True, hostile=False)
+
+
+def first_strike_block(
+    state: UniverseState, ship: Ship, species: AlienSpecies, sc: SpeciesConfig,
+    config: GameConfig,
+) -> str | None:
+    """Why a player first strike on `species` cannot fire here, or None if it may (§10, WP70).
+
+    Shared by the `AttackSpecies` reducer (which raises the reason) and the contact
+    projection (which greys the FIGHT reply with it), so the menu and the rule can
+    never disagree. Pure — no RNG, no mutation.
+    """
+    if state.sectors[ship.sector_id].is_galactic_core:
+        return "the Core is a sanctuary — no attacks here"
+    if ship.type_id == config.combat.escape_pod_class:
+        return "an escape pod can neither attack nor be attacked"
+    if sc.singular_entity:
+        return "your weapons find nothing to lock onto"
+    if mechanics.attack_forbidden(sc):
+        return "their influence stays your hand — you cannot attack them"
+    if not sc.combatant or not sc.fleet:
+        return f"the {species.name} field no ships to fight"
+    return None
 
 
 def kill_bounty(config: GameConfig, *, hostile: bool, count: int) -> int:

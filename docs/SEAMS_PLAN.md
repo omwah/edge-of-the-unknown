@@ -213,13 +213,20 @@ follows immediately because it is cheap (D6); multiplayer parity is in-arc, not
 deferred (D10) — WP70 includes other-player rendering + `AttackPlayer`, and the
 corp UI (WP76) ships in this arc. Sizes are relative (S/M/L).
 
-- **WP70 — Combat initiative (M).** Lift the A1 attack gate; add player-initiated
-  engagement on **both** surfaces (D2): an in-sector Engage on any NPC contact and
-  the contact-screen attack choice going live. Per D10 (parity now) this WP also
-  projects other players into `SectorDTO.ships` and wires `AttackPlayer` through
-  the same Engage affordance, closing B6. Betrayal/attitude consequences ride the
-  existing WP27 rail; destructive confirms per D7 (first-strike on a friendly
-  species confirms).
+- **WP70 — Combat initiative (M) — SHIPPED.** New `AttackSpecies` command +
+  `_attack_species` reducer (pack spawn via the WP24 machinery; first-strike souring
+  at initiation — one kill's worth with an honest grudge cause — plus §6.4 spillover);
+  gates live in the shared pure `encounters.first_strike_block` (Core sanctuary /
+  Entity / influence_gate / shipless kinds), used by both the reducer and
+  `session._gate_choice` so the FIGHT menu and the rule agree. The A1 stub is gone:
+  the contact `attack` reply delegates to `_attack_species` and the TUI pops back to
+  the encounter screen. Game screen gained `A` Attack + a ConfirmScreen (D7) with
+  distinct species/player wording; other players project into `SectorDTO.ships`
+  (`player_id`, corp tag + outlaw ☠ in the name) and are clickable "(Engage)" targets
+  wired to `AttackPlayer` (closing B6). Codec entry, WIRE_VERSION 1→2 + wire-fixture
+  regen, H9 three-place dialogue-spec sync, DESIGN §6.7/§10 updated. Tests:
+  `tests/test_attack_species.py` (gates, souring, lockstep, projection, replay hash)
+  + rewritten contact-menu / contact attack tests.
 - **WP75 — Danger polish (S, runs second per D6).** Escort-merchant targeting
   (A3), route hazards + the hazard-confirm modal finally firing (A4),
   lethal-hazard→escape-pod (A5). Three small core changes with existing tests to

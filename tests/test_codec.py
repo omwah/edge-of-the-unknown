@@ -90,6 +90,7 @@ from edge.core.rules import (
     AcceptCorpInvite,
     AcceptLead,
     AttackPlayer,
+    AttackSpecies,
     BuyRumor,
     CorpDeposit,
     CorpWithdraw,
@@ -230,6 +231,7 @@ COMMANDS: list[Command] = [
     DeclareCorpWar(target_corp_id=2),            # WP66 declare war
     EndCorpWar(target_corp_id=2),                # WP66 withdraw
     AttackPlayer(target_player_id=2),            # WP67 open PvP
+    AttackSpecies(species_id=7),                 # WP70 first strike on an alien contact
     CombatAction(action="fight"),                # WP25 one combat round
     CombatAction(action="flee"),
     CombatAction(action="field_patch", subsystem=Subsystem.SCREENS, slot_index=1),

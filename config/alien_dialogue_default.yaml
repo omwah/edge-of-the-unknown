@@ -138,10 +138,12 @@
 #   action:       leave | trade | barter | accept_lead | accept_contract | attack   # OPTIONAL
 #                                   #   mechanical verb (`leave` speaks the parting line then breaks
 #                                   #   contact; `accept_contract` books the offered favor, WP57;
-#                                   #   `attack` is recognised but Phase-3-gated). No action ⇒
-#                                   #   pure transition. No next_context + no action ⇒ stay/act.
-#                                   #   Availability is gated in code from species params + offers
-#                                   #   (trade posture, treaty mode, combatant, artifacts, a tip).
+#                                   #   `attack` ends the conversation and opens first-strike
+#                                   #   combat, WP70 — a betrayal the species remembers). No
+#                                   #   action ⇒ pure transition. No next_context + no action ⇒
+#                                   #   stay/act. Availability is gated in code from species
+#                                   #   params + offers (trade posture, treaty mode, attackability
+#                                   #   per `first_strike_block`, artifacts, a tip).
 #   arc:          { <flag>: <str|int|bool> }   # OPTIONAL cross-visit flags this reply SETS
 #                                   #   (persisted per species kind on Player.species_arcs and
 #                                   #   surfaced back as `arc.<flag>` facts — see FACTS; WP30).
@@ -285,9 +287,11 @@ personas:
         # The baseline reply menu (§6.7). `start_context` (greeting) MUST carry choices: this list
         # is the menu every species falls back to (via `choices_for`) unless its own pack authors
         # replies for the node. Each reply's availability is gated in code from species params +
-        # live offers (a `refuses`/gated trader, a treaty mode, the combatant flag, artifacts on
-        # offer, a coordinate tip), so a greyed reply shows *why*. Treaty/attack are Phase-3 and
-        # stay disabled (hidden unless `ui.show_disabled_options`).
+        # live offers (a `refuses`/gated trader, a treaty mode, attackability per
+        # `first_strike_block`, artifacts on offer, a coordinate tip), so a greyed reply shows
+        # *why*. Treaty stays disabled (hidden unless `ui.show_disabled_options`); attack is
+        # live (WP70) outside the Core sanctuary against a combatant, non-Entity,
+        # non-influence-gated species.
         choices:
           - text: "Ask about another people…"
             next_context: dossier_other

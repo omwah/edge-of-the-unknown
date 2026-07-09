@@ -567,19 +567,27 @@ class SectorScene(Static):
                                                      sw=sw, sh=sh, facing=facing,
                                                      archetype_id=vessel.archetype_id), row, left)
                 cid = vessel.contact_id
-                tag = " [dim](Hail)[/]" if cid is not None else ""
+                pid = getattr(vessel, "player_id", None)  # another player's ship (WP70)
+                tag = (" [dim](Hail)[/]" if cid is not None
+                       else " [dim](Engage)[/]" if pid is not None else "")
                 self._stamp_line(grid, f"{vessel.name}{tag}", row + sh, left, sw)
                 if cid is not None:
                     self._hotspots.append((left, row, left + sw, row + sh + 1, "contact", cid))
+                elif pid is not None:
+                    self._hotspots.append((left, row, left + sw, row + sh + 1, "player", pid))
             row += sh + 1
         # Overflow ships beyond the sprite cap stay hailable as centred text rows.
         for i in range(cfg.max_ships_shown, len(sec.ships)):
             vessel = sec.ships[i]
             cid = vessel.contact_id
-            tag = " [dim](Hail)[/]" if cid is not None else ""
+            pid = getattr(vessel, "player_id", None)
+            tag = (" [dim](Hail)[/]" if cid is not None
+                   else " [dim](Engage)[/]" if pid is not None else "")
             self._stamp_line(grid, f"[white]>[/] {vessel.name}{tag}", row, 0, w)
             if cid is not None:
                 self._hotspots.append((0, row, w, row + 1, "contact", cid))
+            elif pid is not None:
+                self._hotspots.append((0, row, w, row + 1, "player", pid))
             row += 1
 
         # The roaming Entity's presence hint (§7, WP35): always shown when it is here, but
