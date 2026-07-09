@@ -219,8 +219,8 @@ async def test_lobby_register_login_create_join_play(tmp_path: Path) -> None:
     lobby = _lobby(tmp_path)
     try:
         session = Session(conn=None)
-        assert (await lobby.dispatch(session, "hello",
-                                     {"fingerprint": wire.wire_fingerprint()}))["wire_version"] == 1
+        hello = await lobby.dispatch(session, "hello", {"fingerprint": wire.wire_fingerprint()})
+        assert hello["wire_version"] == wire.WIRE_VERSION
         await lobby.dispatch(session, "register", {"username": "host", "password": "pw"})
         await lobby.dispatch(session, "login", {"username": "host", "password": "pw"})
         gid = (await lobby.dispatch(session, "create_game", {"name": "alpha", "seed": 42}))["game_id"]
