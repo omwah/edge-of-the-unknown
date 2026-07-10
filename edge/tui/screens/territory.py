@@ -9,10 +9,9 @@ bought at the StarDock (Devices tab / `F`/`M`). Deployment is barred in the Core
 
 from __future__ import annotations
 
-from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Footer, Input, Static
 
@@ -23,36 +22,20 @@ from edge.core.rules import (
     ToggleInterdictor,
 )
 from edge.server.service import GameService
+from edge.tui.screens.picker import ListPicker
 from edge.tui.screens.stardock import _AmountInput
 from edge.tui.screens.travel import TravelPromptScreen
-from edge.tui.widgets import ClickableEntry
 
 
-class _ModePicker(ModalScreen[str | None]):
+class _ModePicker(ListPicker):
     """Pick a fighter-garrison mode (§10, WP41)."""
 
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-    CSS = """
-    _ModePicker { align: center middle; }
-    _ModePicker #mode-box {
-        width: 44; height: auto; padding: 1 2; border: round $primary; background: $surface;
-    }
-    """
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="mode-box"):
-            yield Static("[b]Garrison mode?[/]  [dim](Esc to cancel)[/]")
-            yield ClickableEntry("  [b]Defensive[/] — engage hostile entrants", dest="mode", ref="defensive")
-            yield ClickableEntry("  [b]Offensive[/] — engage any non-owner", dest="mode", ref="offensive")
-            yield ClickableEntry("  [b]Toll[/] — levy latinum on entrants", dest="mode", ref="toll")
-
-    @on(ClickableEntry.Picked)
-    def on_mode_picked(self, msg: ClickableEntry.Picked) -> None:
-        if msg.dest == "mode":
-            self.dismiss(str(msg.ref))
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
+    def __init__(self) -> None:
+        super().__init__("Garrison mode?", [
+            ("[b]Defensive[/] — engage hostile entrants", "defensive"),
+            ("[b]Offensive[/] — engage any non-owner", "offensive"),
+            ("[b]Toll[/] — levy latinum on entrants", "toll"),
+        ], width=48)
 
 
 class TerritoryScreen(Screen):
@@ -194,7 +177,7 @@ class _BeaconInput(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     CSS = """
-    _BeaconInput { align: center middle; }
+    _BeaconInput { align: center middle; background: $background 60%; }
     _BeaconInput Input { width: 60; }
     """
 

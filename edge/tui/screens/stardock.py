@@ -311,7 +311,7 @@ class _AmountInput(ModalScreen[int | None]):
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     CSS = """
-    _AmountInput { align: center middle; }
+    _AmountInput { align: center middle; background: $background 60%; }
     _AmountInput Input { width: 30; }
     """
 
@@ -339,7 +339,7 @@ class _NoticeInput(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     CSS = """
-    _NoticeInput { align: center middle; }
+    _NoticeInput { align: center middle; background: $background 60%; }
     _NoticeInput Input { width: 60; }
     """
 

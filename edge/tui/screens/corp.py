@@ -28,6 +28,11 @@ class _FormCorpModal(ModalScreen[tuple[str, str] | None]):
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
+    CSS = """
+    _FormCorpModal { align: center middle; background: $background 60%; }
+    _FormCorpModal Input, _FormCorpModal Button { width: 40; }
+    """
+
     def compose(self) -> ComposeResult:
         yield Static("Charter a corporation", id="corp-modal-title")
         yield Input(placeholder="Name", id="corp-name")

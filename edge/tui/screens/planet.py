@@ -14,9 +14,9 @@ from __future__ import annotations
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, VerticalScroll
 from textual.message import Message
-from textual.screen import ModalScreen, Screen
+from textual.screen import Screen
 from textual.widgets import Footer, Static
 
 from edge.core.citadels import CitadelError
@@ -297,9 +297,10 @@ class PlanetScreen(Screen):
             self.notify("You can only transfer cargo at a world you own.", timeout=2)
             return
 
-        def _amount(commodity: Commodity | None) -> None:
-            if commodity is None:
+        def _amount(picked: int | str | None) -> None:
+            if picked is None:
                 return
+            commodity = Commodity(str(picked))
 
             def _go(units: int | None) -> None:
                 if not units:
@@ -318,7 +319,11 @@ class PlanetScreen(Screen):
                 _AmountInput(f"{verb} how many {commodity.value.replace('_', ' ')}? "
                              "(a big number = all)"), _go)
 
-        self.app.push_screen(_CommodityPicker(), _amount)
+        from edge.tui.screens.picker import ListPicker
+        self.app.push_screen(ListPicker(
+            "Which commodity?",
+            [(f"[b]{c.value.replace('_', ' ').title()}[/]", c.value) for c in Commodity],
+            width=40), _amount)
 
     def action_unload_cargo(self) -> None:
         self._transfer(to_planet=True)
@@ -344,30 +349,3 @@ class PlanetScreen(Screen):
 
     def action_noop(self) -> None:
         self.notify("Not wired in the skeleton.", timeout=2)
-
-
-class _CommodityPicker(ModalScreen[Commodity | None]):
-    """Pick one of the sacred trio to haul (§4.2 cargo transfer)."""
-
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-    CSS = """
-    _CommodityPicker { align: center middle; }
-    _CommodityPicker #commodity-box {
-        width: 40; height: auto; padding: 1 2; border: round $primary; background: $surface;
-    }
-    """
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="commodity-box"):
-            yield Static("[b]Which commodity?[/]  [dim](Esc to cancel)[/]")
-            for c in Commodity:
-                yield ClickableEntry(f"  [b]{c.value.replace('_', ' ').title()}[/]",
-                                     dest="commodity", ref=c.value)
-
-    @on(ClickableEntry.Picked)
-    def on_commodity_picked(self, msg: ClickableEntry.Picked) -> None:
-        if msg.dest == "commodity":
-            self.dismiss(Commodity(str(msg.ref)))
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)

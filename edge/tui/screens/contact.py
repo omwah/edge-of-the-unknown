@@ -19,7 +19,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.screen import ModalScreen, Screen
+from textual.screen import Screen
 from textual.widgets import Footer, Static
 
 from edge.core import dto
@@ -27,75 +27,28 @@ from edge.core.rules import BarterArtifact, BuyAlienTech, Converse
 from edge.server.service import GameService
 from edge.art import portrait as art_portrait
 from edge.tui.portrait import SpeciesPortrait
+from edge.tui.screens.picker import ListPicker
 from edge.tui.widgets import ClickableEntry, bar
 
 
-class SubjectPickerScreen(ModalScreen[int | None]):
+class SubjectPickerScreen(ListPicker):
     """Pick a met species to ask a contact about (WP17); dismisses with its id or None."""
 
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    CSS = """
-    SubjectPickerScreen { align: center middle; }
-    SubjectPickerScreen #subject-box {
-        width: 44; height: auto; padding: 1 2; border: round $primary; background: $surface;
-    }
-    SubjectPickerScreen #subject-box Static.title { margin-bottom: 1; }
-    """
-
     def __init__(self, subjects: list[tuple[int, str]]) -> None:
-        super().__init__()
-        self._subjects = subjects
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="subject-box"):
-            yield Static("[b]Ask about which species?[/]  [dim](Esc to cancel)[/]", classes="title")
-            for sid, name in self._subjects:
-                yield ClickableEntry(f"  [b]{name}[/]", dest="subject", ref=sid)
-
-    @on(ClickableEntry.Picked)
-    def on_pick(self, msg: ClickableEntry.Picked) -> None:
-        if msg.dest == "subject":
-            self.dismiss(int(msg.ref))  # type: ignore[arg-type]
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
+        super().__init__("Ask about which species?",
+                         [(f"[b]{name}[/]", sid) for sid, name in subjects], width=44)
 
 
-class OfferPickerScreen(ModalScreen[int | None]):
+class OfferPickerScreen(ListPicker):
     """Pick a tech offer to buy or barter; dismisses with its index or None."""
 
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    CSS = """
-    OfferPickerScreen { align: center middle; }
-    OfferPickerScreen #offer-box {
-        width: 50; height: auto; padding: 1 2; border: round $primary; background: $surface;
-    }
-    OfferPickerScreen #offer-box Static.title { margin-bottom: 1; }
-    """
-
     def __init__(self, offers: list[dto.TechOfferDTO], mode: str) -> None:
-        super().__init__()
-        self._offers = offers
-        self._mode = mode  # "latinum" or "barter"
-
-    def compose(self) -> ComposeResult:
-        title = "Buy which tech?" if self._mode == "latinum" else "Barter which item?"
-        with Vertical(id="offer-box"):
-            yield Static(f"[b]{title}[/]  [dim](Esc to cancel)[/]", classes="title")
-            for offer in self._offers:
-                cost = f"{offer.price} latinum" if self._mode == "latinum" else offer.barter_cost
-                line = f"  [b]{offer.label}[/]  {cost}"
-                yield ClickableEntry(line, dest="offer", ref=offer.index)
-
-    @on(ClickableEntry.Picked)
-    def on_pick(self, msg: ClickableEntry.Picked) -> None:
-        if msg.dest == "offer":
-            self.dismiss(int(msg.ref))  # type: ignore[arg-type]
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
+        title = "Buy which tech?" if mode == "latinum" else "Barter which item?"
+        options: list[tuple[str, int | str]] = []
+        for offer in offers:
+            cost = f"{offer.price} latinum" if mode == "latinum" else offer.barter_cost
+            options.append((f"[b]{offer.label}[/]  {cost}", offer.index))
+        super().__init__(title, options)
 
 
 class AlienContactScreen(Screen):

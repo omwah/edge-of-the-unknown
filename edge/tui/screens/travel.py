@@ -18,7 +18,7 @@ class TravelPromptScreen(ModalScreen[int | None]):
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
     CSS = """
-    TravelPromptScreen { align: center middle; }
+    TravelPromptScreen { align: center middle; background: $background 60%; }
     TravelPromptScreen #travel-box {
         width: 48; height: auto; padding: 1 2; border: round $primary; background: $surface;
     }

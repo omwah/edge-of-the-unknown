@@ -33,7 +33,7 @@ class HaggleScreen(ModalScreen[bool]):
     BINDINGS = [Binding("escape", "walk", "Walk away")]
 
     CSS = """
-    HaggleScreen { align: center middle; }
+    HaggleScreen { align: center middle; background: $background 60%; }
     HaggleScreen #haggle-box {
         width: 54; height: auto; padding: 1 2; border: round $secondary; background: $surface;
     }

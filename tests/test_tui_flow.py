@@ -1413,3 +1413,31 @@ async def test_base_key_opens_unified_base_screen() -> None:
         await pilot.press("escape")
         await pilot.pause()
         assert isinstance(app.screen, GameScreen)
+
+
+async def test_list_picker_keyboard_navigation() -> None:
+    """The shared ListPicker is fully keyboard-driven: ↑/↓ move the highlight,
+    Enter confirms it, Esc cancels — no mouse required (and wrap-around works)."""
+    from edge.tui.screens.picker import ListPicker
+
+    app = EdgeApp()
+    async with app.run_test(size=(80, 30)) as pilot:
+        picked: list[object] = []
+        app.push_screen(ListPicker("Pick one", [("Alpha", "a"), ("Beta", "b"), ("Gamma", "c")]),
+                        picked.append)
+        await pilot.pause()
+        await pilot.press("down", "down", "enter")   # → third row
+        await pilot.pause()
+        assert picked == ["c"]
+        picked.clear()
+        app.push_screen(ListPicker("Pick one", [("Alpha", "a"), ("Beta", "b")]), picked.append)
+        await pilot.pause()
+        await pilot.press("up", "enter")             # wraps to the last row
+        await pilot.pause()
+        assert picked == ["b"]
+        picked.clear()
+        app.push_screen(ListPicker("Pick one", [("Alpha", "a")]), picked.append)
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+        assert picked == [None]
