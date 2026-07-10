@@ -35,6 +35,8 @@ class ComputerScreen(Screen):
         Binding("r", "route_prompt", "Route to…"),
         Binding("s", "seize_core", "Seize Core"),
         Binding("a", "noop", "Add note"),
+        Binding("d", "deliver_contract", "Deliver"),
+        Binding("x", "abandon_contract", "Abandon"),
     ]
 
     CSS = """
@@ -106,6 +108,8 @@ class ComputerScreen(Screen):
             with TabPane("Contracts", id="contracts"):
                 yield Static("[b]FAVORS[/]        [dim]jobs accepted from aliens[/]")
                 yield DataTable(id="contracts-table", zebra_stripes=True, cursor_type="row")
+                yield Static("[dim][b]D[/] Deliver highlighted (dock at its target port first)"
+                             "   ·   [b]X[/] Abandon highlighted[/]", classes="note")
             with TabPane("Dossier", id="dossier"):
                 yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
                 yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
@@ -161,7 +165,8 @@ class ComputerScreen(Screen):
         if self._computer.contracts:
             for c in self._computer.contracts:
                 jobs.add_row(str(c.contract_id), c.kind, c.issuer, c.summary,
-                             f"{c.reward:,}", f"day {c.deadline_day}")
+                             f"{c.reward:,}", f"day {c.deadline_day}",
+                             key=str(c.contract_id))
         else:
             jobs.add_row(
                 Text("No favors accepted — ask a friendly species for work.", style="dim"),
@@ -271,6 +276,52 @@ class ComputerScreen(Screen):
         self.notify(f"The Core is seized — {sz.alliance_name} now governs.", timeout=5)
         self._computer = self._service.computer_view(self._pid)
         self.query_one("#seizure-panel", Static).update(self._seizure_notes())
+
+    # --- Contracts (WP57 — surfaced WP71) -------------------------------------
+
+    def _highlighted_contract(self) -> int | None:
+        """The contract id under the cursor on the Contracts tab, or None."""
+        if self.query_one(TabbedContent).active != "contracts":
+            self.notify("Switch to the Contracts tab first.", timeout=2)
+            return None
+        table = self.query_one("#contracts-table", DataTable)
+        if not table.row_count:
+            return None
+        key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+        return int(key.value) if key.value is not None else None
+
+    def action_deliver_contract(self) -> None:
+        """Fulfil the highlighted deliver favor at its destination port (§6.7, WP57)."""
+        cid = self._highlighted_contract()
+        if cid is None:
+            return
+        from edge.core.rules import DeliverContract
+        try:
+            self._service.apply(self._pid, DeliverContract(contract_id=cid))
+        except EconomyError as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify("Delivered — the reward is paid.", timeout=3)
+        self._reopen_tab("contracts")
+
+    def action_abandon_contract(self) -> None:
+        """Release the highlighted favor, failing it honestly (§6.7, WP57)."""
+        cid = self._highlighted_contract()
+        if cid is None:
+            return
+        from edge.core.rules import AbandonContract
+        try:
+            self._service.apply(self._pid, AbandonContract(contract_id=cid))
+        except EconomyError as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify("Contract abandoned.", timeout=2)
+        self._reopen_tab("contracts")
+
+    def _reopen_tab(self, tab: str) -> None:
+        """Rebuild the screen on the given tab after a state change."""
+        self.app.pop_screen()
+        self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab=tab))
 
     def _market_note(self) -> str:
         if not self._market.enabled:

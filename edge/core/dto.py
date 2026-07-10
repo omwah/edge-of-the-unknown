@@ -644,6 +644,9 @@ class StarDockDTO:
     shipyard: list[ShipyardItem]
     # Special devices for sale (§10/§14, WP56): (device_id, price, affordable).
     devices: list[tuple[str, int, bool]] = field(default_factory=list)
+    # The bank counter (§8 — surfaced WP71): balance + the daily interest rate.
+    bank_balance: int = 0
+    interest_per_day: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -702,6 +705,13 @@ class PlanetDTO:
     can_invade: bool = False  # a hostile owned world with defences down + fighters aboard (WP55)
     invade_blocker: str = ""  # why invasion is barred (base up / gun up / shield / no fighters)
     ship_fighters: int = 0  # fighters aboard, for the invade affordance
+    # Starbase ops affordances (§4.2, WP40 — surfaced WP71).
+    base_assaultable: bool = False  # operational + not yours: open a set-piece assault
+    base_claimable: bool = False  # unowned + operational: claim into a forward foothold
+    base_claim_cost: int = 0
+    # Empty base slots open for repair (derelict or your own base), keystone first:
+    # (subsystem value, slot index, is_keystone).
+    base_empty_slots: list[tuple[str, int, bool]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

@@ -3,6 +3,9 @@
 Reads `planet_view` for the planet in the player's current sector: type, owner,
 colony population, allocation, stores, starbase status. `C` claims/colonizes an
 unowned colonizable world by landing the colonists aboard; `D` descends (WP6).
+Starbase ops (§4.2, WP40 — surfaced WP71): `A` assaults an operational hostile
+base, `R` installs a carried component into an open base slot (keystone first,
+so a derelict comes back to life), `B` claims an operational unowned base.
 With no service (screenshot harness) it shows a static sample.
 """
 
@@ -24,8 +27,8 @@ from edge.core.enums import Subsystem
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import (
-    BuildCitadel, Cannibalize, Colonize, DeployGenesis, Descend, InvadePlanet,
-    PlanetDeposit, PlanetWithdraw,
+    AssaultStarbase, BuildCitadel, Cannibalize, ClaimStarbase, Colonize, DeployGenesis,
+    Descend, InvadePlanet, PlanetDeposit, PlanetWithdraw, RepairStarbase,
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
@@ -55,6 +58,9 @@ class PlanetScreen(Screen):
         Binding("plus", "treasury_deposit", "Deposit"),
         Binding("minus", "treasury_withdraw", "Withdraw"),
         Binding("i", "invade", "Invade"),
+        Binding("a", "assault_base", "Assault base"),
+        Binding("r", "repair_base", "Repair base"),
+        Binding("b", "claim_base", "Claim base"),
     ]
 
     CSS = """
@@ -102,6 +108,17 @@ class PlanetScreen(Screen):
                     if p.salvage:
                         parts = ", ".join(f"{label}" for _, _, label in p.salvage)
                         yield Static(f"[yellow]\\[S] Salvage[/] — {len(p.salvage)} components: {parts}")
+                    if p.base_empty_slots:
+                        keystone = sum(1 for _, _, k in p.base_empty_slots if k)
+                        note = " (incl. the reactor keystone)" if keystone else ""
+                        yield Static(f"[cyan]\\[R] Repair[/] — {len(p.base_empty_slots)} empty "
+                                     f"slot(s){note}; installs a carried component.")
+                    if p.base_claimable:
+                        yield Static(f"[green]\\[B] Claim[/] — take this base as a forward "
+                                     f"foothold for {p.base_claim_cost:,} latinum.")
+                    if p.base_assaultable:
+                        yield Static("[red]\\[A] Assault[/] — engage the base's defenses; "
+                                     "victory razes it.")
                 if p.owned_by_you and (p.citadel_level > 0 or p.can_build_citadel
                                        or p.citadel_build_target > 0):
                     yield Static(self._citadel_lines(), classes="section")
@@ -262,6 +279,72 @@ class PlanetScreen(Screen):
         self.app.pop_screen()
         self.app.push_screen(PlanetScreen(
             self._service.planet_view(self._pid, p.planet_id), self._service, self._pid))
+
+    def action_assault_base(self) -> None:
+        """Open a set-piece assault on the orbital base (§4.2, WP40 — surfaced WP71)."""
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        if p.starbase_id is None or not p.base_assaultable:
+            self.notify("No operational hostile base to assault here.", timeout=2)
+            return
+        try:
+            self._service.apply(self._pid, AssaultStarbase(p.starbase_id))
+        except (CombatError, EconomyError, MovementError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        # Back to the game screen — it opens the encounter screen on resume.
+        self.app.pop_screen()
+
+    def action_repair_base(self) -> None:
+        """Install a carried component into the base's first open slot (§4.2, WP40).
+
+        Keystone slots come first in `base_empty_slots`, so repair heads straight for
+        what makes a derelict operational; the component is drawn from the ship's
+        loose inventory (first carried part — the base accepts any kind).
+        """
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        if p.starbase_id is None or not p.base_empty_slots:
+            self.notify("No open base slot to repair here.", timeout=2)
+            return
+        from edge.tui.screens.engine_room import _parse_on_hand
+        on_hand = self._service.engine_room_view(self._pid).on_hand
+        if not on_hand:
+            self.notify("No loose components aboard — buy or salvage parts first.", timeout=2)
+            return
+        subsystem, slot_index, _ = p.base_empty_slots[0]
+        component, tier = _parse_on_hand(on_hand[0])
+        try:
+            self._service.apply(self._pid, RepairStarbase(
+                p.starbase_id, Subsystem(subsystem), slot_index, component, tier))
+        except (EngineRoomError, EconomyError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify(f"Installed {component.value} ({tier.name}) into the {subsystem}.",
+                    timeout=2)
+        self._reopen()
+
+    def action_claim_base(self) -> None:
+        """Claim an operational, unowned base as a forward foothold (§4.2, WP40)."""
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        if p.starbase_id is None or not p.base_claimable:
+            self.notify("No claimable base here (it must be operational and unowned).",
+                        timeout=2)
+            return
+        try:
+            self._service.apply(self._pid, ClaimStarbase(p.starbase_id))
+        except EconomyError as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify("The base answers to you now — a forward foothold.", timeout=2)
+        self._reopen()
 
     def action_back(self) -> None:
         self.app.pop_screen()
