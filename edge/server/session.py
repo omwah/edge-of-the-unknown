@@ -117,6 +117,7 @@ from edge.core.events import (
     Traded,
     Warped,
 )
+from edge.core import corp
 from edge.core.models import (
     AlienSpecies,
     Ownership,
@@ -124,6 +125,7 @@ from edge.core.models import (
     Player,
     Port,
     Sector,
+    SectorForce,
     Ship,
     SubsystemState,
     UniverseState,
@@ -148,15 +150,50 @@ def _display(state: UniverseState, sector_id: int) -> int:
     return state.spatial_ids.get(sector_id, sector_id)
 
 
-def _sector_codes(state: UniverseState, sector_id: int) -> list[str]:
-    """Short content tokens for an explored sector: port (S=StarDock/P) and planet."""
+def _sector_codes(state: UniverseState, sector_id: int,
+                  player: Player | None = None) -> list[str]:
+    """Short content tokens for an explored sector: port (S=StarDock/P), planet (@),
+    starbase (#), and known forces (×) — fighters are public, mines only yours (fog)."""
     codes: list[str] = []
     port = state.port_in_sector(sector_id)
     if port is not None:
         codes.append("S" if port.klass is PortClass.STARDOCK else "P")
     if any(pl.sector_id == sector_id for pl in state.planets.values()):
         codes.append("@")
+    if any(b.sector_id == sector_id for b in state.starbases.values()):
+        codes.append("#")
+    force = state.sector_forces.get(sector_id)
+    if force is not None and _force_visible(state, force, player):
+        codes.append("×")
     return codes
+
+
+def _force_visible(state: UniverseState, force: SectorForce,
+                   player: Player | None) -> bool:
+    """Classic TW force fog (§10): garrisons announce themselves; mines are silent
+    to everyone but their owner."""
+    if force.fighters > 0:
+        return True
+    if player is None:
+        return False
+    return ((force.armid_mines > 0 or force.limpet_mines > 0)
+            and corp.player_owns(state, force.owner, player.id))
+
+
+def _ownership_label(state: UniverseState, owner: Ownership, player_id: int) -> str:
+    """A short display label for any three-way `Ownership` (§4.2)."""
+    if owner.kind == "player":
+        return "yours" if owner.ref == player_id else f"Captain #{owner.ref}"
+    if owner.kind == "corp" and owner.ref is not None:
+        c = state.corporations.get(owner.ref)
+        label = f"⟨{c.tag}⟩" if c is not None else "a corporation"
+        if c is not None and player_id in c.member_player_ids:
+            label += " (yours)"
+        return label
+    if owner.kind == "alliance" and owner.ref is not None:
+        alliance = state.alliances.get(owner.ref)
+        return alliance.name if alliance is not None else "an alliance"
+    return "unclaimed"
 
 
 def _ship_dto(state: UniverseState, ship: Ship, player: Player, sector: Sector) -> dto.ShipDTO:
@@ -207,7 +244,7 @@ def _warp_dto(
         return dto.WarpDTO(
             sector_id=target, arrow=arrow, label=state.regions[tgt.region_id].name,
             kind=kind, display_id=did, band=tgt.distance_band,
-            codes=_sector_codes(state, target), bearing=brg,
+            codes=_sector_codes(state, target, player), bearing=brg,
         )
     return dto.WarpDTO(sector_id=target, arrow=arrow, kind=kind, display_id=did,
                        band="?", bearing=brg)
@@ -373,7 +410,47 @@ def _sector_dto(
         discoveries=_sector_discoveries(state, player, sector.id), anomaly=anomaly,
         display_id=_display(state, sector.id),
         core_bearing=core_bearing, trail=_trail(state, player, sector.id),
+        force=_sector_force_dto(state, player, sector.id),
+        starbases=_sector_starbases(state, player, sector.id, config),
     )
+
+
+def _sector_force_dto(state: UniverseState, player: Player,
+                      sector_id: int) -> dto.SectorForceDTO | None:
+    """The sector's deployed force as this player may see it (classic TW fog, §10).
+
+    Fighters are public (with owner); mines project only to their owner — a foreign
+    mines-only force returns None, invisible until it detonates.
+    """
+    force = state.sector_forces.get(sector_id)
+    if force is None or not _force_visible(state, force, player):
+        return None
+    yours = corp.player_owns(state, force.owner, player.id)
+    return dto.SectorForceDTO(
+        owner=_ownership_label(state, force.owner, player.id), yours=yours,
+        fighters=force.fighters, mode=force.mode, toll=force.toll,
+        armid_mines=force.armid_mines if yours else 0,
+        limpet_mines=force.limpet_mines if yours else 0,
+    )
+
+
+def _sector_starbases(state: UniverseState, player: Player, sector_id: int,
+                      config: GameConfig) -> list[dto.SectorStarbaseDTO]:
+    """The sector's orbital starbases for the scene + sidebar (§4.2)."""
+    out: list[dto.SectorStarbaseDTO] = []
+    for base in sorted(state.starbases.values(), key=lambda b: b.id):
+        if base.sector_id != sector_id:
+            continue
+        try:
+            name = config.ship_class(base.ship_class_id).name
+        except KeyError:
+            name = "Starbase"
+        out.append(dto.SectorStarbaseDTO(
+            starbase_id=base.id, name=name,
+            owner=_ownership_label(state, base.owner, player.id),
+            operational=is_operational(base), planet_id=base.planet_id,
+        ))
+    return out
 
 
 def game_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.GameState:

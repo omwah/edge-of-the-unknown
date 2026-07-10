@@ -218,6 +218,35 @@ class SectorAnomalyDTO:
 
 
 @dataclass(frozen=True)
+class SectorForceDTO:
+    """Deployed forces visible in the sector (§10, WP41 — surfaced with classic TW fog).
+
+    Fighter garrisons announce themselves to everyone (owner named); mines are known
+    only to their owner — `armid_mines`/`limpet_mines` are zeroed for anyone else, and
+    a mines-only foreign force projects as nothing at all (you find it by hitting it).
+    """
+
+    owner: str  # display label: "yours" / ⟨TAG⟩ corp / alliance name / "Captain #N"
+    yours: bool
+    fighters: int
+    mode: str  # defensive / offensive / toll
+    toll: int
+    armid_mines: int  # own eyes only
+    limpet_mines: int  # own eyes only
+
+
+@dataclass(frozen=True)
+class SectorStarbaseDTO:
+    """An orbital starbase's presence in the sector view (§4.2 — scene sprite + caption)."""
+
+    starbase_id: int
+    name: str  # hull-class display name, e.g. "Orbital Platform"
+    owner: str  # display label (as SectorForceDTO.owner)
+    operational: bool  # False reads "derelict — salvageable"
+    planet_id: int | None  # the world it orbits (click-through to the planet screen)
+
+
+@dataclass(frozen=True)
 class SectorDTO:
     region: str
     sector_id: int
@@ -235,6 +264,10 @@ class SectorDTO:
     #                            0.0 when no spatial embedding exists (fallback to gravity axis)
     trail: list[int] = field(default_factory=list)  # recent route breadcrumb: spatial ids of the
     #                                                  last sectors travelled, oldest → newest (§11)
+    # Deployed forces here, classic-TW fogged (None when nothing is visible to this player).
+    force: SectorForceDTO | None = None
+    # Orbital starbases present (scene sprite + sidebar caption; click → planet screen).
+    starbases: list[SectorStarbaseDTO] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

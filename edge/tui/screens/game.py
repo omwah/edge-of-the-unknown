@@ -46,6 +46,28 @@ from edge.tui.widgets import (
 )
 
 
+def _presence_lines(sector: object) -> list[str]:
+    """Sidebar lines for starbases + known forces here (§4.2/§10 — fog pre-applied)."""
+    lines: list[str] = []
+    for b in getattr(sector, "starbases", ()) or ():
+        status = "[green]operational[/]" if b.operational else "[yellow]derelict[/]"
+        lines.append(f"[cyan]#[/] {b.name} — {status}\n  [dim]{b.owner}[/]")
+    force = getattr(sector, "force", None)
+    if force is not None:
+        if force.fighters > 0:
+            toll = f", toll {force.toll}" if force.mode == "toll" else ""
+            who = "[green]yours[/]" if force.yours else f"[red]{force.owner}[/]"
+            lines.append(f"[red]×[/] {force.fighters} fighters ({force.mode}{toll}) — {who}")
+        if force.armid_mines or force.limpet_mines:
+            kinds = []
+            if force.armid_mines:
+                kinds.append(f"{force.armid_mines} armid")
+            if force.limpet_mines:
+                kinds.append(f"{force.limpet_mines} limpet")
+            lines.append(f"[red]✺[/] {' + '.join(kinds)} mines — [green]yours[/]")
+    return lines
+
+
 class TopBar(Static):
     DEFAULT_CSS = """
     TopBar {
@@ -139,7 +161,8 @@ class GameScreen(Screen):
         sidebar_width = ui.sidebar_width if ui is not None else 33
         with Horizontal(id="body"):
             yield SectorView(view.sector, view.nav)
-            sidebar = StatusSidebar(view.ship, view.sector.discoveries, sidebar_width, id="sidebar")
+            sidebar = StatusSidebar(view.ship, view.sector.discoveries, sidebar_width,
+                                    presence=_presence_lines(view.sector), id="sidebar")
             sidebar.display = self._sidebar_visible()  # also re-evaluated on resize
             yield sidebar
         yield Ticker(self._ticker_lines())

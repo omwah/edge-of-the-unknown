@@ -263,3 +263,54 @@ def test_cargo_transfer_breaks_the_citadel_bootstrap_deadlock() -> None:
         state, 1, TransferCargo(1, Commodity.EQUIPMENT, 10**9, to_planet=False), CFG))
     assert state.ships[1].cargo[Commodity.EQUIPMENT] == 50
     assert state.planets[1].stores[Commodity.EQUIPMENT] == 0
+
+
+# --- sector presence: starbases + forces with classic-TW fog -------------------------
+
+
+def test_sector_projects_starbase_and_forces_with_classic_fog() -> None:
+    from edge.core.models import Region, SectorForce
+    from edge.server.session import game_view
+
+    state = _state(base_owner=Ownership("alliance", 2), operational=True)
+    state.regions[1] = Region(id=1, name="Testspace")  # game_view resolves the region name
+    # A foreign force with fighters AND mines: fighters announce themselves,
+    # the mines stay silent (classic TW fog).
+    state.sector_forces[1] = SectorForce(
+        sector_id=1, owner=Ownership("alliance", 2), fighters=6, mode="toll", toll=25,
+        armid_mines=3, limpet_mines=1)
+    state.players[1] = replace(state.players[1], explored_sectors=frozenset({1}))
+    sec = game_view(state, 1, CFG).sector
+    assert len(sec.starbases) == 1
+    base = sec.starbases[0]
+    assert base.operational and base.planet_id == 1 and base.owner != "yours"
+    force = sec.force
+    assert force is not None and not force.yours
+    assert force.fighters == 6 and force.mode == "toll" and force.toll == 25
+    assert force.armid_mines == 0 and force.limpet_mines == 0  # fogged — not yours
+    # Your own force projects its mines in full.
+    state.sector_forces[1] = SectorForce(
+        sector_id=1, owner=Ownership("player", 1), fighters=0, armid_mines=3, limpet_mines=1)
+    force = game_view(state, 1, CFG).sector.force
+    assert force is not None and force.yours
+    assert force.armid_mines == 3 and force.limpet_mines == 1
+    # A foreign mines-only force is invisible — you find it by hitting it.
+    state.sector_forces[1] = SectorForce(
+        sector_id=1, owner=Ownership("alliance", 2), fighters=0, armid_mines=3)
+    assert game_view(state, 1, CFG).sector.force is None
+
+
+def test_sector_codes_mark_starbases_and_known_forces() -> None:
+    from edge.core.models import SectorForce
+    from edge.server.session import _sector_codes
+
+    state = _state(base_owner=Ownership("none"), operational=False)
+    player = state.players[1]
+    assert "#" in _sector_codes(state, 1, player)  # the derelict base still charts
+    # Foreign fighters chart; foreign mines alone do not.
+    state.sector_forces[1] = SectorForce(sector_id=1, owner=Ownership("alliance", 2), fighters=4)
+    assert "×" in _sector_codes(state, 1, player)
+    state.sector_forces[1] = SectorForce(sector_id=1, owner=Ownership("alliance", 2), armid_mines=2)
+    assert "×" not in _sector_codes(state, 1, player)
+    state.sector_forces[1] = SectorForce(sector_id=1, owner=Ownership("player", 1), armid_mines=2)
+    assert "×" in _sector_codes(state, 1, player)  # your own minefield is charted
