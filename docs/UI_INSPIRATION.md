@@ -106,6 +106,39 @@ layout. Assets are already in-repo (read-only):
 
 ---
 
+## 5. Modern-overhaul research refresh (WP-UI01, 2026)
+
+What the `UI_UX_OVERHAUL_PLAN.md` work leans on beyond the original board:
+
+- **Textual 8.x official guidance** — the overhaul tracks current upstream
+  practice rather than 2025-era idioms:
+  - Themes & design tokens: <https://textual.textualize.io/guide/design/> —
+    semantic variables per theme (our `edge-ansi` / `edge-high-contrast` /
+    `edge-monochrome`, WP-UI03) instead of raw colors in screens.
+  - Layout: <https://textual.textualize.io/guide/layout/> — fr-unit grids +
+    breakpoint CSS classes back our three layout tiers (WP-UI05).
+  - Command palette: <https://textual.textualize.io/guide/command_palette/> —
+    screen-aware `SystemCommand`s fed from our `ActionDescriptor` list
+    (WP-UI06), so `Ctrl+P` can never disagree with the footer or `.` menu.
+  - Testing: <https://textual.textualize.io/guide/testing/> +
+    `pytest-textual-snapshot` — Pilot flows plus byte-stable SVG snapshot
+    baselines (WP-UI02/UI22).
+- **Harlequin** (<https://harlequin.sh>) — still the density benchmark: its
+  results-pane pattern (table + selected-row detail) is the model for the
+  Computer's compact column-folding and wide detail pane (WP-UI21).
+- **Command Line Interface Guidelines** (<https://clig.dev>) — the feedback
+  rules behind WP-UI07: errors say what happened *and* what to do next, never
+  discard user input on failure, confirm destructive acts, and make state
+  changes visible ("no output is not success" → our standard success toasts).
+- **Terminal accessibility research** — applied WCAG floors (4.5:1 body text,
+  3:1 focus/controls — <https://www.w3.org/WAI/WCAG22/quickref/>) to theme
+  tokens with automated contrast tests (WP-UI03); every color-carried state
+  also gets a glyph or word (monochrome parity, exercised by the
+  `edge-monochrome` snapshots); reduced-motion preference honored app-wide
+  (`UISettings.reduced_motion` / `--plain`).
+
+---
+
 ## Mapping: our screen → borrow-from
 
 | Screen (UI_MOCKUPS) | Primary references |
