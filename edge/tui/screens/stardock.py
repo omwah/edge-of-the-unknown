@@ -3,8 +3,10 @@
 The Commodities tab reuses `PortScreen`'s `TradePanel` (so `T` trades there too);
 the **Hardware** tab sells engine-room components by tier and the **Shipyard** tab
 sells hulls (trade-in adjusted) — `B` buys the highlighted row of the active tab,
-reading the fog-of-war `stardock_view` catalog (DESIGN §8, §11). Bank/Tavern remain
-stubs. Buy a component here, then slot it in the Engine Room (`E`).
+reading the fog-of-war `stardock_view` catalog (DESIGN §8, §11). The **Bank** tab
+deposits/withdraws by typed amount (`D`/`W`; interest accrues on the daily cron)
+and the **Tavern** sells rumours and hosts the noticeboard (WP58). Buy a
+component here, then slot it in the Engine Room (`E`).
 """
 
 from __future__ import annotations
@@ -18,8 +20,8 @@ from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier
 from edge.core.rules import (
-    BuyComponent, BuyDevice, BuyGenesis, BuyMissiles, BuyRumor, BuyShip, PostNotice,
-    RecruitColonists,
+    BuyComponent, BuyDevice, BuyGenesis, BuyMissiles, BuyRumor, BuyShip, Deposit,
+    PostNotice, RecruitColonists, Withdraw,
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
@@ -40,6 +42,8 @@ class StarDockScreen(Screen):
         Binding("e", "engine_room", "Engine room"),
         Binding("r", "buy_rumor", "Rumor"),
         Binding("n", "post_notice", "Notice"),
+        Binding("d", "deposit", "Deposit"),
+        Binding("w", "withdraw", "Withdraw"),
     ]
 
     CSS = """
@@ -108,7 +112,15 @@ class StarDockScreen(Screen):
                              "mine-deflector). Launch probes & toggle the interdictor in flight.[/]",
                              classes="note")
             with TabPane("Bank", id="bank"):
-                yield Static("[dim]Deposit / withdraw / interest — Phase 2.[/]")
+                rate = dock.interest_per_day * 100
+                yield Static(
+                    f"[b]BANK OF THE CORE[/]\n\n"
+                    f"On hand   [b yellow]{latinum:,}[/] slips\n"
+                    f"Banked    [b green]{dock.bank_balance:,}[/] slips\n\n"
+                    f"[dim]Interest: {rate:.2g}%/day, compounded on the daily clock.[/]"
+                )
+                yield Static("[dim][b]D[/] Deposit an amount   ·   [b]W[/] Withdraw an amount[/]",
+                             classes="note")
             with TabPane("Tavern", id="tavern"):
                 yield from self._tavern_panels()
         yield Footer()
@@ -242,6 +254,20 @@ class StarDockScreen(Screen):
         self.app.push_screen(
             StarDockScreen(self._service, self._pid, initial_tab=active, initial_cursor=cursor))
 
+    def action_deposit(self) -> None:
+        """Prompt for an amount and bank it (§8 — surfaced WP71)."""
+        def _go(amount: int | None) -> None:
+            if amount:
+                self._issue(Deposit(amount=amount), f"Deposited {amount:,} slips")
+        self.app.push_screen(_AmountInput("Deposit how many slips?"), _go)
+
+    def action_withdraw(self) -> None:
+        """Prompt for an amount and withdraw it from the bank (§8 — surfaced WP71)."""
+        def _go(amount: int | None) -> None:
+            if amount:
+                self._issue(Withdraw(amount=amount), f"Withdrew {amount:,} slips")
+        self.app.push_screen(_AmountInput("Withdraw how many slips?"), _go)
+
     def action_buy_rumor(self) -> None:
         """Buy a rumour at the tavern — logs a coordinate lead (§14, WP58)."""
         self._issue(BuyRumor(), "A rumour points the way — lead logged")
@@ -262,6 +288,34 @@ class StarDockScreen(Screen):
 
     def action_noop(self) -> None:
         self.notify("Not wired in the skeleton.", timeout=2)
+
+
+class _AmountInput(ModalScreen[int | None]):
+    """A one-line numeric prompt for a latinum amount (§8 — the WP71 bank tab)."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+    CSS = """
+    _AmountInput { align: center middle; }
+    _AmountInput Input { width: 30; }
+    """
+
+    def __init__(self, prompt: str) -> None:
+        super().__init__()
+        self._prompt = prompt
+
+    def compose(self) -> ComposeResult:
+        yield Static(f"[b]{self._prompt}[/]  (Enter to confirm, Esc to cancel)")
+        yield Input(placeholder="amount…", id="amount-input", type="integer")
+
+    def on_mount(self) -> None:
+        self.query_one("#amount-input", Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        raw = event.value.strip()
+        self.dismiss(int(raw) if raw.isdigit() and int(raw) > 0 else None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
 class _NoticeInput(ModalScreen[str | None]):

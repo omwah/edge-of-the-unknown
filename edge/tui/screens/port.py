@@ -3,7 +3,8 @@
 Used when the docked port is *not* a StarDock (a StarDock hosts the same
 `TradePanel` as its Commodities tab). Reads `service.current_port_view`; `T`
 trades a chunk of the highlighted commodity in the port's natural direction
-(quick-trade), and `H` opens a counter-offer haggle on it (§8).
+(quick-trade), and `H` opens a counter-offer haggle on it (§8). `D` delivers any
+active deliver favor targeting this port (§6.7, WP57 — surfaced WP71).
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ class PortScreen(Screen):
         Binding("q", "leave", "Leave dock"),
         Binding("t", "trade", "Trade highlighted"),
         Binding("h", "haggle", "Haggle highlighted"),
+        Binding("d", "deliver", "Deliver favor"),
     ]
 
     # Mirror the StarDockScreen frame: a docked-top title bar, the port sprite
@@ -75,6 +77,25 @@ class PortScreen(Screen):
 
     def action_haggle(self) -> None:
         _haggle_highlighted(self, self._service, self._pid)
+
+    def action_deliver(self) -> None:
+        """Fulfil the first active deliver favor targeting this dock (§6.7, WP57)."""
+        from edge.core.rules import DeliverContract
+        jobs = [c for c in self._service.computer_view(self._pid).contracts
+                if c.kind == "deliver"]
+        if not jobs:
+            self.notify("No active delivery to fulfil.", timeout=2)
+            return
+        errors: list[str] = []
+        for job in jobs:
+            try:
+                self._service.apply(self._pid, DeliverContract(contract_id=job.contract_id))
+            except EconomyError as exc:
+                errors.append(str(exc))
+                continue
+            self.notify(f"Delivered — {job.reward:,} slips paid.", timeout=3)
+            return
+        self.notify(errors[0], severity="warning", timeout=3)
 
     def action_leave(self) -> None:
         self.app.pop_screen()

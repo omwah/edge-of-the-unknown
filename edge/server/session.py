@@ -530,16 +530,28 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     starbase_status: str | None = None
     starbase_derelict = False
     salvage: list[tuple[str, int, str]] = []
+    base_assaultable = False
+    base_claimable = False
+    base_claim_cost = config.starbase.claim_cost if config.starbase is not None else 0
+    base_empty_slots: list[tuple[str, int, bool]] = []
     if base is not None:
         operational = is_operational(base)
         starbase_derelict = not operational
         starbase_status = "operational" if operational else "derelict — salvageable"
         base_owned_by_you = base.owner.kind == "player" and base.owner.ref == player_id
+        base_assaultable = operational and not base_owned_by_you
+        base_claimable = operational and not base.owner.is_owned
         if not operational or base_owned_by_you:  # the cannibalize-allowed condition (§4.2)
             for subsystem, sub in base.subsystems.items():
                 for idx, comp in enumerate(sub.slots):
                     if comp is not None:
                         salvage.append((subsystem.value, idx, comp.kind.value))
+                    else:
+                        base_empty_slots.append(
+                            (subsystem.value, idx, idx == sub.keystone_index))
+            # Keystone slots first: filling the reactor keystone is what flips a
+            # derelict operational (§4.2), so repair heads straight for it.
+            base_empty_slots.sort(key=lambda t: (not t[2], t[0], t[1]))
     # Citadel affordance (§4.2, WP54): the next-level cost + build progress, owner-only.
     citadel_target = 0
     citadel_pct = 0
@@ -585,6 +597,8 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         can_build_citadel=can_build, citadel_next_cost=next_cost,
         fighter_allocation_pct=round(planet.fighter_allocation * 100),
         can_invade=can_invade, invade_blocker=invade_blocker, ship_fighters=ship.fighters,
+        base_assaultable=base_assaultable, base_claimable=base_claimable,
+        base_claim_cost=base_claim_cost, base_empty_slots=base_empty_slots,
     )
 
 
@@ -782,6 +796,8 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     return dto.StarDockDTO(
         sector_display=_display(state, ship.sector_id),
         latinum=player.latinum, hardware=hardware, shipyard=shipyard, devices=devices,
+        bank_balance=player.bank_balance,
+        interest_per_day=config.economy.bank_interest_per_day,
     )
 
 

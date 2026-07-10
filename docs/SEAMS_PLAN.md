@@ -240,11 +240,17 @@ corp UI (WP76) ships in this arc. Sizes are relative (S/M/L).
   no engagement spawns over the wreck). Tests: `tests/test_danger_polish.py` +
   the rewritten `test_black_hole_lethal_toll_pods_the_player`. NPC territoriality
   (A6) stays roadmap.
-- **WP71 — Surfacing pass 1: the frontier loop (L).** Starbase assault/repair/
-  claim on the planet screen (B2); contract Deliver/Abandon on the Contracts tab +
-  port screen (B3); RepairAtDock + engine-room `P`/`U` (B7/B8); StarDock Bank tab
-  with amount prompts **plus a daily interest tick** — a config rate on
-  `bank_balance` credited by the existing daily cron (B9, D8).
+- **WP71 — Surfacing pass 1: the frontier loop (L) — SHIPPED.** Planet screen
+  gained `A` Assault / `R` Repair / `B` Claim (B2) driven by new
+  `PlanetDTO.base_assaultable/base_claimable/base_claim_cost/base_empty_slots`
+  (keystone-first, so repair heads straight for what revives a derelict); the
+  Computer Contracts tab gained `D` Deliver / `X` Abandon (row-keyed) and the
+  port screen a `D` Deliver shortcut (B3); the engine room's `P` field-patch and
+  `U` upgrade are live plus a new `R` dock repair (`RepairAtDock`; B7/B8); the
+  StarDock Bank tab is real — balance, typed-amount `D`/`W` deposit/withdraw via
+  `_AmountInput`, and the interest note (B9/D8 — the `interest_accrual` cron and
+  `economy.bank_interest_per_day` already existed, so only the UI was missing).
+  Tests: `tests/test_surfacing.py` (projection seam).
 - **WP72 — Surfacing pass 2: territory, devices, alliances (L).** Deploy
   fighters/mines/beacons UI (B4); probe launch (Computer/Map), interdictor toggle,
   limpet removal at service points (B5). Alliance membership on **both** surfaces

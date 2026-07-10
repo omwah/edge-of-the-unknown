@@ -4,9 +4,11 @@ The player ship's aspects are *derived* from four slotted subsystems (spindrive 
 thrusters / screens / main_gun, DESIGN §4.1); each panel shows its derived aspect
 and a slot grid (keystone / filled / knocked-out / empty). When a live
 `GameService` is supplied the panels read `engine_room_view` and the install /
-cannibalize actions issue real commands; field-patch is present but inert in
-Phase 2 (nothing is knocked out yet). With no service (screenshot harness) it
-renders the passed sample DTO.
+cannibalize actions issue real commands. `P` field-patches knocked-out components
+(one repair-kit each, WP26 damage), `R` pays a dock/base to restore them
+(`RepairAtDock`, service-point gated), and `U` swaps a selected loose component
+into a selected filled slot (the upgrade path — the old part returns to the
+hold). With no service (screenshot harness) it renders the passed sample DTO.
 """
 
 from __future__ import annotations
@@ -19,8 +21,10 @@ from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from edge.core.economy import EconomyError
+from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier, Subsystem as SubsystemKind
-from edge.core.rules import Cannibalize, InstallComponent
+from edge.core.rules import Cannibalize, FieldPatch, InstallComponent, RepairAtDock, SwapComponent
 from edge.server.service import GameService
 from edge.tui import sprites
 from edge.tui.dummy import EngineRoomDTO, Subsystem
@@ -171,9 +175,10 @@ class _ComponentsPickerPanel(Vertical):
 class EngineRoomScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Back"),
-        Binding("p", "noop", "Field-patch"),
+        Binding("p", "field_patch", "Field-patch"),
         Binding("x", "cannibalize", "Cannibalize"),
-        Binding("u", "noop", "Upgrade"),
+        Binding("u", "upgrade", "Upgrade"),
+        Binding("r", "dock_repair", "Dock repair"),
     ]
 
     CSS = """
@@ -234,8 +239,9 @@ class EngineRoomScreen(Screen):
             f"[green][+][/] healthy   [white][✓][/] selected   "
             f"[red][!][/] knocked-out   [dim][ ][/] empty slot\n"
             f"Repair-kits x{r.kits}\n"
-            f"[b]P[/] Field-patch   [b]X[/] Cannibalize   "
-            f"[b]U[/] Upgrade [dim](StarDock/base)[/]   [b]Esc[/] Back",
+            f"[b]P[/] Field-patch knocked-out   [b]R[/] Dock repair [dim](StarDock/base)[/]   "
+            f"[b]X[/] Cannibalize   [b]U[/] Upgrade [dim](swap selected part into selected slot)[/]"
+            f"   [b]Esc[/] Back",
             id="engine-foot",
         )
         yield Footer()
@@ -245,6 +251,92 @@ class EngineRoomScreen(Screen):
 
     def action_noop(self) -> None:
         self.notify("Not wired in the skeleton.", timeout=2)
+
+    def _knocked_slots(self) -> list[tuple[SubsystemKind, int]]:
+        """Every knocked-out slot across the panels, as (subsystem kind, slot index)."""
+        targets: list[tuple[SubsystemKind, int]] = []
+        for panel in self.query(_SubsystemPanel):
+            kind = _DISPLAY_TO_KIND.get(panel.system.name)
+            if kind is None:
+                continue
+            for idx, slot in enumerate(panel.system.slots):
+                if slot.state == "knocked":
+                    targets.append((kind, idx))
+        return targets
+
+    def action_field_patch(self) -> None:
+        """Spend repair-kits to un-knock-out damaged components (§4.1, WP26)."""
+        if self._service is None:
+            self.action_noop()
+            return
+        targets = self._knocked_slots()
+        if not targets:
+            self.notify("Nothing is knocked out.", timeout=2)
+            return
+        patched = 0
+        for kind, idx in targets:
+            try:
+                self._service.apply(self._pid, FieldPatch(kind, idx))
+                patched += 1
+            except (EngineRoomError, EconomyError) as exc:
+                self.notify(str(exc), severity="warning", timeout=3)
+                break
+        if patched:
+            self.notify(f"Patched {patched} component(s).", timeout=2)
+            self._reopen()
+
+    def action_dock_repair(self) -> None:
+        """Pay the dock/base to restore knocked-out components (§4.1, §8 — WP71)."""
+        if self._service is None:
+            self.action_noop()
+            return
+        targets = self._knocked_slots()
+        if not targets:
+            self.notify("Nothing is knocked out.", timeout=2)
+            return
+        repaired = 0
+        for kind, idx in targets:
+            try:
+                self._service.apply(self._pid, RepairAtDock(kind, idx))
+                repaired += 1
+            except (EngineRoomError, EconomyError) as exc:
+                self.notify(str(exc), severity="warning", timeout=3)
+                break
+        if repaired:
+            self.notify(f"Restored {repaired} component(s).", timeout=2)
+            self._reopen()
+
+    def action_upgrade(self) -> None:
+        """Swap the selected loose component into the selected filled slot (§4.1).
+
+        Needs exactly one loose component and one filled slot selected; the old part
+        returns to the hold (`SwapComponent` conserves components).
+        """
+        if self._service is None:
+            self.action_noop()
+            return
+        loose = sorted(self._component_picker.selected_components)
+        slots = [
+            (panel, idx)
+            for panel in self.query(_SubsystemPanel)
+            for idx in sorted(panel.selected_slots)
+        ]
+        if len(loose) != 1 or len(slots) != 1:
+            self.notify("Select exactly one loose component and one filled slot to swap.",
+                        timeout=3)
+            return
+        panel, idx = slots[0]
+        kind = _DISPLAY_TO_KIND.get(panel.system.name)
+        if kind is None:
+            return
+        component, tier = _parse_on_hand(loose[0])
+        try:
+            self._service.apply(self._pid, SwapComponent(kind, idx, component, tier))
+        except (EngineRoomError, EconomyError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify(f"Swapped in {component.value} ({tier.name}).", timeout=2)
+        self._reopen()
 
     def action_cannibalize(self) -> None:
         """Cannibalize every slot the player has selected across the subsystem
