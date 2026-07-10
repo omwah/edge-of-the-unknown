@@ -565,6 +565,22 @@ class HazardDamage(Event):
 
 
 @dataclass(frozen=True)
+class CargoTransferred(Event):
+    """Goods moved between the ship's hold and an owned world's stores (§4.2).
+
+    `to_planet` True is an unload (ship → stores); False a load (stores → ship).
+    Goods are conserved — haulage, not a trade. This is the colony-supply rail:
+    how citadel equipment reaches a world (the WP54 build draws from stores).
+    """
+
+    player_id: int
+    planet_id: int
+    commodity: Commodity
+    units: int
+    to_planet: bool
+
+
+@dataclass(frozen=True)
 class CitadelBuildStarted(Event):
     """A timed citadel build was opened on a planet (§4.2, WP54).
 

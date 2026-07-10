@@ -32,6 +32,7 @@ from edge.core.events import (
     AllianceResigned,
     AttitudeChanged,
     Banked,
+    CargoTransferred,
     CitadelBuildStarted,
     CitadelCompleted,
     CitadelGunSilenced,
@@ -154,6 +155,7 @@ from edge.core.rules import (
     ToggleAvoid,
     ToggleInterdictor,
     Trade,
+    TransferCargo,
     TravelTo,
     Warp,
     Withdraw,
@@ -184,6 +186,8 @@ COMMANDS: list[Command] = [
     PlanetWithdraw(planet_id=5, amount=500),         # WP54 treasury withdraw
     SetAllocation(planet_id=5, allocation={"equipment": 0.6}, fighter=0.4),  # WP55 garrison share
     InvadePlanet(planet_id=5, fighters=200),         # WP55 ground assault
+    TransferCargo(planet_id=5, commodity=Commodity.EQUIPMENT, units=120),  # §4.2 supply haul
+    TransferCargo(planet_id=5, commodity=Commodity.ORGANICS, units=30, to_planet=False),
     InstallComponent(Subsystem.SPINDRIVE, 3, Component.TURBINE, ComponentTier.II),
     SwapComponent(Subsystem.SCREENS, 1, Component.RADIATOR, ComponentTier.III),
     Cannibalize(Subsystem.MAIN_GUN, 2),
@@ -263,6 +267,7 @@ EVENTS: list[Event] = [
     Colonized(1, 5, 25),
     PlanetProduced(5, 1),
     ColonyGrew(5, 1_050),
+    CargoTransferred(1, 5, Commodity.EQUIPMENT, 120, True),  # §4.2 colony-supply haul
     CitadelBuildStarted(1, 5, 1),                      # WP54 citadel build opened
     CitadelCompleted(5, 1),                            # WP54 citadel level reached
     PlanetBanked(1, 5, "deposit", 1_000, 1_000),       # WP54 treasury move
