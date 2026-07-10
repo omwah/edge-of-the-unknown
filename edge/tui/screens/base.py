@@ -20,7 +20,8 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
+from textual.widget import Widget
+from textual.widgets import DataTable, Footer, Static, TabbedContent
 
 from edge.core.combat import CombatError
 from edge.core.dto import StarbaseDTO
@@ -41,7 +42,7 @@ from edge.tui.component_workbench import (
     STARBASE_WORKBENCH_PROFILE,
     WorkbenchCapabilities,
 )
-from edge.tui.widgets import TradePanel
+from edge.tui.widgets import ServiceHub, TradePanel
 
 _STANDING_STYLE = {
     "yours": "[green]yours[/]",
@@ -102,28 +103,32 @@ market; a player-owned host earns a cut of outsider trades."""
             f"{v.owner} · {standing} · integrity {v.integrity_pct}%",
             id="base-title",
         )
-        panes = list(self._panes(v))
-        initial = self._initial_tab if self._initial_tab in [p.id for p in panes] else panes[0].id
-        with TabbedContent(initial=initial or ""):
-            yield from panes
+        entries = self._services(v)
+        preferred = ("station" if v.standing in ("derelict", "yours") else
+                     "trade" if v.market_port_id is not None and v.market_open else "status")
+        initial = self._initial_tab or preferred
+        yield ServiceHub(entries, initial=initial, id="base-services")
         yield Footer()
 
     def _view(self) -> StarbaseDTO:
         return self._service.starbase_view(self._pid, self._base_id)
 
-    def _panes(self, v: StarbaseDTO) -> list[TabPane]:
-        panes: list[TabPane] = []
-        if v.standing in ("derelict", "yours"):
-            panes.append(TabPane("Station", self._station_pane(v), id="station"))
-        if v.market_port_id is not None:
-            panes.append(TabPane("Trade", self._trade_pane(v), id="trade"))
-        if v.hardware:
-            panes.append(TabPane("Hardware", self._hardware_pane(v), id="hardware"))
-        if "banking" in v.services:
-            panes.append(TabPane("Bank", self._bank_pane(v), id="bank"))
-        if not panes or v.standing in ("open", "hostile"):
-            panes.insert(0, TabPane("Status", self._status_pane(v), id="status"))
-        return panes
+    def _services(self, v: StarbaseDTO) -> list[tuple[str, str, Widget, str | None]]:
+        station_reason = (None if v.standing in ("derelict", "yours") else
+                          "Station access requires an unowned derelict or a base you own.")
+        trade_reason = (None if v.market_port_id is not None and v.market_open else
+                        v.market_notice or "This base has no operational market.")
+        hardware_reason = (None if v.hardware else
+                           "Component service requires an operational, friendly base.")
+        bank_reason = (None if "banking" in v.services else
+                       "Banking requires a player-owned operational base with vault service.")
+        return [
+            ("Status", "status", self._status_pane(v), None),
+            ("Station", "station", self._station_pane(v), station_reason),
+            ("Trade", "trade", self._trade_pane(v), trade_reason),
+            ("Hardware", "hardware", self._hardware_pane(v), hardware_reason),
+            ("Bank", "bank", self._bank_pane(v), bank_reason),
+        ]
 
     def _station_pane(self, v: StarbaseDTO) -> Vertical:
         on_hand = self._service.engine_room_view(self._pid).on_hand

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 
 from rich.text import Text
@@ -13,7 +13,8 @@ from textual.binding import Binding
 from textual.containers import Grid, Vertical, Horizontal
 from textual.css.query import NoMatches
 from textual.message import Message
-from textual.widgets import DataTable, Static
+from textual.widget import Widget
+from textual.widgets import DataTable, Select, Static, TabbedContent, TabPane
 
 from rich.style import Style
 
@@ -251,6 +252,83 @@ class TradePanel(Vertical):
         if 0 <= row < len(self._port.commodities):
             return self._port.commodities[row].name
         return None
+
+
+class ServiceHub(Vertical):
+    """Shared responsive service navigation for StarDock and orbital bases.
+
+    Standard/wide layouts expose Textual tabs. Compact replaces their overflowing tab
+    rail with a keyboard/mouse Select; unavailable entries remain selectable and explain
+    the prerequisite in their pane instead of disappearing. Hosts still issue commands
+    through their reducers, which remain the eligibility authority.
+    """
+
+    DEFAULT_CSS = """
+    ServiceHub { height: 1fr; }
+    ServiceHub #service-selector { display: none; width: 1fr; margin: 0 1; }
+    .compact ServiceHub #service-selector, ServiceHub.compact #service-selector { display: block; }
+    .compact ServiceHub Tabs, ServiceHub.compact Tabs { display: none; }
+    ServiceHub TabPane { padding: 1 2; }
+    ServiceHub .service-unavailable { padding: 1 2; color: $text-muted; }
+    """
+
+    def __init__(
+        self,
+        entries: Sequence[tuple[str, str, Widget, str | None]],
+        *,
+        initial: str,
+        **kwargs: object,
+    ) -> None:
+        super().__init__(**kwargs)
+        self._entries = list(entries)
+        ids = {entry_id for _, entry_id, _, _ in entries}
+        self._initial = initial if initial in ids else entries[0][1]
+        self._syncing = False
+
+    def compose(self) -> ComposeResult:
+        options = [
+            (f"{label}{' — unavailable' if reason else ''}", entry_id)
+            for label, entry_id, _, reason in self._entries
+        ]
+        yield Select[str](options, value=self._initial, allow_blank=False,
+                          id="service-selector")
+        with TabbedContent(initial=self._initial):
+            for label, entry_id, content, reason in self._entries:
+                with TabPane(label, id=entry_id):
+                    if reason is not None:
+                        yield Static(
+                            f"[b]{label} unavailable[/]\n\n{reason}",
+                            classes="service-unavailable",
+                        )
+                    else:
+                        yield content
+
+    def on_mount(self) -> None:
+        self._sync_tier_class()
+
+    def on_resize(self) -> None:
+        self._sync_tier_class()
+
+    def _sync_tier_class(self) -> None:
+        self.set_class(
+            getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "compact",
+            "compact",
+        )
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id != "service-selector" or self._syncing:
+            return
+        value = event.value
+        if isinstance(value, str):
+            self.query_one(TabbedContent).active = value
+
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        selector = self.query_one("#service-selector", Select)
+        if selector.value == event.pane.id:
+            return
+        self._syncing = True
+        selector.value = event.pane.id
+        self._syncing = False
 
 
 _CODE_STYLE = {"S": "b magenta", "P": "magenta", "@": "green"}

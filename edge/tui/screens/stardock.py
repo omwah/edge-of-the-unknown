@@ -14,7 +14,8 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import ModalScreen, Screen
-from textual.widgets import DataTable, Footer, Input, Static, TabbedContent, TabPane
+from textual.containers import Vertical
+from textual.widgets import DataTable, Footer, Input, Static, TabbedContent
 
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
@@ -27,7 +28,7 @@ from edge.server.service import GameService
 from edge.tui import art_adapter
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
-from edge.tui.widgets import TradePanel
+from edge.tui.widgets import ServiceHub, TradePanel
 
 
 class StarDockScreen(Screen):
@@ -94,42 +95,46 @@ daily interest; deposits ride the same account everywhere."""
             ),
             id="dock-art",
         )
-        with TabbedContent(initial=self._initial_tab):
-            with TabPane("Commodities", id="trade"):
-                yield TradePanel(port, latinum=latinum, show_title=False)
-            with TabPane("Shipyard", id="shipyard"):
-                yield Static(
+        trade = TradePanel(port, latinum=latinum, show_title=False)
+        shipyard = Vertical(
+                Static(
                     f"[b]SHIPYARD[/]        Latinum [b yellow]{latinum:,}[/] slips        "
                     "[dim]net price shown after trade-in[/]"
-                )
-                yield self._shipyard_table(dock)
-                yield Static("[dim]B buys the highlighted hull (your parts return loose).[/]",
-                             classes="note")
-            with TabPane("Hardware", id="hardware"):
-                yield Static(
+                ), self._shipyard_table(dock),
+                Static("[dim]B buys the highlighted hull (your parts return loose).[/]",
+                       classes="note"))
+        hardware = Vertical(
+                Static(
                     f"[b]HARDWARE EMPORIUM[/]        Latinum [b yellow]{latinum:,}[/] slips"
-                )
-                yield self._hardware_table(dock)
-                yield Static("[dim]B buys the highlighted part; slot it in the Engine Room (E). "
-                             "Tier III is barter-only.[/]", classes="note")
-            with TabPane("Devices", id="devices"):
-                yield Static(f"[b]DEVICE BAY[/]        Latinum [b yellow]{latinum:,}[/] slips")
-                yield self._devices_table(dock)
-                yield Static("[dim]B buys the highlighted device (probe / interdictor / "
-                             "mine-deflector); F/M buy sector fighters / mines. Work them "
-                             "from the game screen's Deploy (D).[/]", classes="note")
-            with TabPane("Bank", id="bank"):
-                rate = dock.interest_per_day * 100
-                yield Static(
+                ), self._hardware_table(dock),
+                Static("[dim]B buys the highlighted part; slot it in the Engine Room (E). "
+                       "Tier III is barter-only.[/]", classes="note"))
+        devices = Vertical(
+                Static(f"[b]DEVICE BAY[/]        Latinum [b yellow]{latinum:,}[/] slips"),
+                self._devices_table(dock),
+                Static("[dim]B buys the highlighted device (probe / interdictor / "
+                       "mine-deflector); F/M buy sector fighters / mines. Work them "
+                       "from the game screen's Deploy (D).[/]", classes="note"))
+        rate = dock.interest_per_day * 100
+        bank = Vertical(
+                Static(
                     f"[b]BANK OF THE CORE[/]\n\n"
                     f"On hand   [b yellow]{latinum:,}[/] slips\n"
                     f"Banked    [b green]{dock.bank_balance:,}[/] slips\n\n"
                     f"[dim]Interest: {rate:.2g}%/day, compounded on the daily clock.[/]"
-                )
-                yield Static("[dim][b]D[/] Deposit an amount   ·   [b]W[/] Withdraw an amount[/]",
-                             classes="note")
-            with TabPane("Tavern", id="tavern"):
-                yield from self._tavern_panels()
+                ),
+                Static("[dim][b]D[/] Deposit an amount   ·   [b]W[/] Withdraw an amount[/]",
+                       classes="note"))
+        tavern = Vertical(*list(self._tavern_panels()))
+        entries = [
+            ("Commodities", "trade", trade, None),
+            ("Shipyard", "shipyard", shipyard, None),
+            ("Hardware", "hardware", hardware, None),
+            ("Devices", "devices", devices, None),
+            ("Bank", "bank", bank, None),
+            ("Tavern", "tavern", tavern, None),
+        ]
+        yield ServiceHub(entries, initial=self._initial_tab, id="stardock-services")
         yield Footer()
 
     def _tavern_panels(self) -> ComposeResult:

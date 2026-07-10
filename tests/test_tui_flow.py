@@ -1550,6 +1550,57 @@ async def test_base_hosted_market_trades_inside_base_screen() -> None:
         assert svc.state.players[1].latinum < before
 
 
+async def test_compact_stardock_uses_shared_service_selector() -> None:
+    """WP-UI15 replaces the overflowing compact tab rail with the shared selector."""
+    from textual.widgets import Select, TabbedContent, Tabs
+
+    from edge.tui.widgets import ServiceHub
+
+    app = EdgeApp()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        await _new_game_at_stardock(app, pilot)
+        hub = app.screen.query_one(ServiceHub)
+        selector = hub.query_one("#service-selector", Select)
+        assert selector.display
+        assert not hub.query_one(Tabs).display
+        selector.value = "bank"
+        await pilot.pause()
+        assert hub.query_one(TabbedContent).active == "bank"
+
+
+async def test_base_service_hub_explains_unavailable_facilities() -> None:
+    """Unavailable base services stay discoverable and name their prerequisite."""
+    from dataclasses import replace as _replace
+
+    from textual.widgets import Select, Static, TabbedContent
+
+    from edge.tui.screens.base import BaseScreen
+    from edge.tui.widgets import ServiceHub
+
+    app = EdgeApp()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        ship = svc.state.ships[svc.state.players[1].ship_id]
+        base = next(b for b in svc.state.starbases.values()
+                    if not svc.starbase_view(1, b.id).hardware)
+        svc.state.ships[ship.id] = _replace(ship, sector_id=base.sector_id)
+        await pilot.press("b")
+        await pilot.pause()
+        assert isinstance(app.screen, BaseScreen)
+        hub = app.screen.query_one(ServiceHub)
+        selector = hub.query_one("#service-selector", Select)
+        selector.value = "hardware"
+        await pilot.pause()
+        assert hub.query_one(TabbedContent).active == "hardware"
+        explanation = str(hub.query_one("#hardware .service-unavailable", Static).render())
+        assert "Hardware unavailable" in explanation
+        assert "friendly base" in explanation
+
+
 async def test_list_picker_keyboard_navigation() -> None:
     """The shared ListPicker is fully keyboard-driven: ↑/↓ move the highlight,
     Enter confirms it, Esc cancels — no mouse required (and wrap-around works)."""
