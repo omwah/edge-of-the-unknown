@@ -162,6 +162,27 @@ class EdgeApp(App[None]):
         if "theme" in changes:
             self.theme = self.ui_settings.theme
 
+    def mark_objective(self, objective_id: str) -> None:
+        """Tick off a Captain's objective (WP-UI11) — local progress only.
+
+        Called from the UI seam where the player performs the act (dock, trade,
+        …). Idempotent; updates any mounted strip in place and toasts the first
+        completion so the feedback lands even when the strip is off-screen.
+        """
+        from edge.tui.onboarding import OBJECTIVE_IDS, OBJECTIVES, ObjectivesStrip, all_done
+        done = self.ui_settings.objectives_done
+        if objective_id in done or objective_id not in OBJECTIVE_IDS:
+            return
+        done = tuple(o for o in OBJECTIVE_IDS if o in (*done, objective_id))
+        self.update_ui_settings(objectives_done=done)
+        if self.ui_settings.show_onboarding:
+            label = next(lbl for oid, lbl, _ in OBJECTIVES if oid == objective_id)
+            suffix = " — all objectives complete!" if all_done(done) else ""
+            self.notify(f"{label} ✓{suffix}", title="Objective", timeout=3)
+        for screen in self.screen_stack:
+            for strip in screen.query(ObjectivesStrip):
+                strip.show_progress(done) if not all_done(done) else strip.remove()
+
     def on_unmount(self) -> None:
         """Tear down the remote loop/thread on exit (WP68)."""
         if self._remote_bridge is not None:

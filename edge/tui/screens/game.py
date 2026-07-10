@@ -24,6 +24,7 @@ from edge.core.movement import MovementError
 from edge.core.rules import AttackPlayer, AttackSpecies, Dock, Hail, Salvage, TravelTo, Warp
 from edge.server.service import GameService
 from edge.tui.dummy import SectorDTO
+from edge.tui.onboarding import ObjectivesStrip, all_done
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.contact import AlienContactScreen
@@ -143,6 +144,9 @@ class GameScreen(Screen):
         Binding("g", "messages", "Log"),
         Binding("t", "corp", "Corp"),
         Binding("d", "territory", "Deploy"),
+        # Captain's objectives (WP-UI11): hide the onboarding strip; re-enable
+        # in Options. Unadvertised — the strip itself carries the affordance.
+        Binding("o", "dismiss_objectives", "Hide objectives", show=False),
         Binding("question_mark", "help", "Help"),
         Binding("ctrl+q", "quit", "Quit"),
     ]
@@ -173,6 +177,9 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
                                     presence=_presence_lines(view.sector), id="sidebar")
             sidebar.display = self._sidebar_visible()  # also re-evaluated on resize
             yield sidebar
+        settings = getattr(self.app, "ui_settings", None)
+        if settings and settings.show_onboarding and not all_done(settings.objectives_done):
+            yield ObjectivesStrip(settings.objectives_done, id="objectives")
         yield Ticker(self._ticker_lines())
         yield Footer()
 
@@ -284,6 +291,7 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
 
     async def action_scan(self) -> None:
         # Scan logs the first unlogged visible find — the same action as clicking one.
+        self.app.mark_objective("scan")  # type: ignore[attr-defined]
         view = self._service.game_view(self._pid)
         target = next((d for d in view.sector.discoveries if d.salvageable), None)
         if target is None:
@@ -303,6 +311,8 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
             return
         self._record(events)
         collected = next((e for e in events if isinstance(e, DiscoveryCollected)), None)
+        if collected is not None:
+            self.app.mark_objective("discover")  # type: ignore[attr-defined]
         if collected is not None and collected.reward:
             self.notify(f"You discovered {collected.reward}.", title="Discovery", timeout=4)
         if target is not None and target.kind == "wormhole":
@@ -333,6 +343,7 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
                                 initial_tab="trade")
         else:
             screen = PortScreen(self._service, self._pid)
+        self.app.mark_objective("dock")  # type: ignore[attr-defined]
         self.app.push_screen(screen)
 
     def action_base_services(self) -> None:
@@ -426,6 +437,7 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
         self.app.push_screen(PlanetScreen(planet, self._service, self._pid))
 
     def action_engine_room(self) -> None:
+        self.app.mark_objective("inspect")  # type: ignore[attr-defined]
         self.app.push_screen(EngineRoomScreen(
             self._service.engine_room_view(self._pid), self._service, self._pid))
 
@@ -442,6 +454,13 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
 
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen(self))
+
+    def action_dismiss_objectives(self) -> None:
+        """Hide the Captain's-objectives strip (WP-UI11); Options re-enables it."""
+        for strip in self.query(ObjectivesStrip):
+            strip.remove()
+        self.app.update_ui_settings(show_onboarding=False)  # type: ignore[attr-defined]
+        self.notify("Objectives hidden — re-enable in Options (main menu).", timeout=3)
 
     # --- event ticker --------------------------------------------------------
 
