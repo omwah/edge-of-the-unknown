@@ -300,7 +300,11 @@ corp UI (WP76) ships in this arc. Sizes are relative (S/M/L).
   corp # (an `other_corps` id+label list feeds the picker), and `P`/`O` transfer
   this sector's world to the corp / back to the CEO. Wire fixtures regenerated
   for the CorpDTO fields. Tests: `tests/test_surfacing.py` WP76 section.
-- **WP77 — Balance playtest (ongoing).** A10, after WP70–73 land.
+- **WP77 — Balance playtest (ongoing) — READY.** A10's precondition is met
+  (WP70–WP76 all shipped; full suite 2260 green). The hands-on pass is the
+  human's: `PLAYTEST_NOTES.md` §"WP77 readiness" lists what to exercise and
+  which dials to watch (encounter frequency/threat, escort risk, faucet pacing
+  incl. the new bank interest, sig-mechanic proportionality, discoverability).
 
 ---
 

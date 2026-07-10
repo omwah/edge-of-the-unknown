@@ -27,3 +27,28 @@ incumbent's operational Core-base count, and each `covets_core` bloc's
 seizure-readiness — the fastest way to see whether the gate is open.
 `python -m edge.devtool flip_governor <alliance_id>` forces a flip (0 =
 ungoverned) to exercise the aftermath surfacing directly.
+
+## WP77 readiness (the A10 hands-on pass — seams arc, July 2026)
+
+The precondition A10 named is met: the WP70–WP76 correction arc closed every
+player-reachable gap (attack initiative, starbase ops, contracts, dock repair,
+bank, territory/devices, alliances, keymap + action menu, corp UI, sig-mechanic
+corpus), so a feel-tune no longer mis-tunes against a UI missing half the
+systems. What to exercise, and the dials to watch:
+
+- **Combat frequency/threat** — `encounters.interrupt_chance` per band and
+  `combat.threat_damage_scale`. Known data point: the starter Trailblazer loses
+  to a 3-foe quill swarm in ~4 rounds; with dock repair (`R` in the engine room)
+  and the escape-pod rail live, check death now reads as a setback, not a wall.
+- **Danger polish (WP75)** — `aliens.contracts.escort_target_chance` (0.25):
+  does a convoy feel *escortable* but tense? Lethal hazards can now pod you:
+  fly a mined route and check the hazard-confirm modal (`G` engage) reads right.
+- **Faucets** — the WP75 escort risk cuts expected contract income; the WP71
+  bank interest (`economy.bank_interest_per_day`, 0.5%/day) adds a passive
+  faucet. Watch the trade→first-upgrade pacing against DESIGN §8's ratio.
+- **Sig mechanics (WP74)** — visit the Thessbrood (gift), Vennrith (demands),
+  Stryx (passage), Vesk→Helot (circuit): does each scheme telegraph enough to
+  be fair, and is `trojan_gift`'s payload (320) proportionate to the sweetener?
+- **Discoverability (WP73)** — a fresh player should find every system through
+  `.` (action menu) and `?` (keymap) alone; note any verb that still feels
+  buried.
