@@ -251,12 +251,18 @@ corp UI (WP76) ships in this arc. Sizes are relative (S/M/L).
   `_AmountInput`, and the interest note (B9/D8 — the `interest_accrual` cron and
   `economy.bank_interest_per_day` already existed, so only the UI was missing).
   Tests: `tests/test_surfacing.py` (projection seam).
-- **WP72 — Surfacing pass 2: territory, devices, alliances (L).** Deploy
-  fighters/mines/beacons UI (B4); probe launch (Computer/Map), interdictor toggle,
-  limpet removal at service points (B5). Alliance membership on **both** surfaces
-  (D9): join/advance-admission/resign as derived contact-screen verbs, plus a
-  Computer **Alliances** tab (blocs, standings, admission progress, Core
-  governance) (B1).
+- **WP72 — Surfacing pass 2: territory, devices, alliances (L) — SHIPPED.** New
+  `TerritoryScreen` (game screen `D` Deploy) driven by a new `territory_view` /
+  `TerritoryDTO`: deploy fighters (mode picker incl. toll), armid/limpet mines,
+  beacon, probe launch, interdictor toggle, limpet strip (B4+B5); StarDock `F`/`M`
+  buy fighters/mines. Alliances on both surfaces (B1/D9): contact screen `J`
+  Join/Resign derived verb (`ContactDTO.alliance_id`/`alliance_member`) and a
+  Computer **Alliances** tab (`ComputerDTO.alliances` / `AllianceRowDTO`: standing,
+  gate, fee, admission ledger, governor/covets flags) with `J` join/resign and `T`
+  log-admission-task (the WP38 seam surfaced; gameplay hooks still to feed it).
+  WIRE_VERSION 2→3 (+ WP71's DTO fields) with fixture regen; `territory_view` on
+  GameClient/LocalClient/RemoteClient + the net read whitelist. Tests:
+  `tests/test_surfacing.py` WP72 section.
 - **WP73 — Keymap normalization & discoverability (M).** The §4 plan: a keymap
   convention doc in `UI_MOCKUPS.md`, conflict fixes, a real Help keymap, **and a
   numbered context-action menu** (one key lists everything doable here) (D3);

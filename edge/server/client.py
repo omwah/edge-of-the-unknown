@@ -79,6 +79,7 @@ class GameClient(Protocol):
     async def route_legs_view(self, waypoints: list[int]) -> dto.RouteDTO: ...
     async def engine_room_view(self) -> dto.EngineRoomDTO: ...
     async def stardock_view(self) -> dto.StarDockDTO: ...
+    async def territory_view(self) -> dto.TerritoryDTO: ...
     async def starbase_services_view(self) -> dto.StarbaseServicesDTO | None: ...
     async def planet_view(self, planet_id: int) -> dto.PlanetDTO: ...
     async def current_planet_view(self) -> dto.PlanetDTO | None: ...
@@ -206,6 +207,9 @@ class LocalClient:
 
     async def stardock_view(self) -> dto.StarDockDTO:
         return self._service.stardock_view(self.player_id)
+
+    async def territory_view(self) -> dto.TerritoryDTO:
+        return self._service.territory_view(self.player_id)
 
     async def starbase_services_view(self) -> dto.StarbaseServicesDTO | None:
         return self._service.starbase_services_view(self.player_id)
@@ -488,6 +492,9 @@ class RemoteClient:
 
     async def stardock_view(self) -> dto.StarDockDTO:
         return await self._read("stardock_view")
+
+    async def territory_view(self) -> dto.TerritoryDTO:
+        return await self._read("territory_view")
 
     async def starbase_services_view(self) -> dto.StarbaseServicesDTO | None:
         return await self._read("starbase_services_view")

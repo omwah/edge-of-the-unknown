@@ -25,9 +25,9 @@ from edge.core.models import (
     SubsystemState,
     UniverseState,
 )
-from edge.core.rules import RepairStarbase, apply_result, reduce
+from edge.core.rules import AdvanceAdmission, RepairStarbase, apply_result, reduce
 from edge.core.starbases import is_operational
-from edge.server.session import planet_view, stardock_view
+from edge.server.session import computer_view, planet_view, stardock_view, territory_view
 
 CFG = load_default_config()
 
@@ -99,3 +99,48 @@ def test_stardock_view_exposes_the_bank_counter() -> None:
     dock = stardock_view(state, 1, CFG)
     assert dock.bank_balance == 2_500
     assert dock.interest_per_day == CFG.economy.bank_interest_per_day > 0
+
+
+# --- WP72: territory/devices + alliances projections --------------------------------
+
+
+def test_territory_view_reports_stock_devices_and_own_force() -> None:
+    from edge.core.models import SectorForce
+    state = _state(base_owner=Ownership("none"), operational=False)
+    state.ships[1] = replace(
+        state.ships[1], fighters=12, mines=4, devices={"probe": 2, "interdictor": 1},
+        limpets={"alliance:2": 3}, interdictor_active=True)
+    state.sector_forces[1] = SectorForce(
+        sector_id=1, owner=Ownership("player", 1), fighters=8, mode="toll", toll=25,
+        armid_mines=2)
+    t = territory_view(state, 1, CFG)
+    assert (t.fighters, t.mines, t.probes) == (12, 4, 2)
+    assert t.interdictor_owned and t.interdictor_active
+    assert t.limpets == 3 and t.limpet_removal_fee == CFG.territory.limpet_removal_fee
+    assert "8 fighters (toll, toll 25)" in t.force_line and "2 armid mines" in t.force_line
+    assert not t.in_core
+    assert not t.at_service_point  # no StarDock / owned base here
+
+
+def test_alliance_rows_project_membership_admission_and_governor() -> None:
+    from edge.core.models import Alliance
+    state = _state(base_owner=Ownership("none"), operational=False)
+    state.alliances = {
+        1: Alliance(id=1, name="Terran Federation"),
+        2: Alliance(id=2, name="Verdant Compact"),
+        4: Alliance(id=4, name="Liberty Front", covets_core=True),
+    }
+    state.players[1] = replace(state.players[1], alliance_id=1,
+                               alliance_standing={1: 1.0, 2: -0.25})
+    rows = {r.alliance_id: r for r in computer_view(state, 1, CFG).alliances}
+    fed, compact, front = rows[1], rows[2], rows[4]
+    assert fed.member and fed.governs_core and not fed.joinable
+    assert front.covets_core and front.joinable  # open gate, fee 0
+    # Verdant Compact petitions behind a task price — unmet, so barred.
+    assert compact.gate == "petition" and not compact.joinable
+    assert compact.tasks_needed == ["prove"] and compact.tasks_done == []
+    assert compact.standing == -0.25
+    # Recording the admission task through the WP38 seam opens the gate.
+    apply_result(state, reduce(state, 1, AdvanceAdmission(2, "prove"), CFG))
+    rows2 = {r.alliance_id: r for r in computer_view(state, 1, CFG).alliances}
+    assert rows2[2].tasks_done == ["prove"] and rows2[2].joinable

@@ -120,6 +120,7 @@ class GameScreen(Screen):
         Binding("m", "map", "Map"),
         Binding("g", "messages", "Log"),
         Binding("t", "corp", "Corp"),
+        Binding("d", "territory", "Deploy"),
         Binding("question_mark", "help", "Help"),
         Binding("ctrl+q", "quit", "Quit"),
     ]
@@ -380,6 +381,11 @@ class GameScreen(Screen):
     def action_engine_room(self) -> None:
         self.app.push_screen(EngineRoomScreen(
             self._service.engine_room_view(self._pid), self._service, self._pid))
+
+    def action_territory(self) -> None:
+        """Deploy fighters/mines/beacons and work the devices (§10/§14 — WP72)."""
+        from edge.tui.screens.territory import TerritoryScreen
+        self.app.push_screen(TerritoryScreen(self._service, self._pid))
 
     def action_messages(self) -> None:
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="log"))

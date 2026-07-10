@@ -196,6 +196,10 @@ class GameService:
     def stardock_view(self, player_id: int) -> dto.StarDockDTO:
         return session.stardock_view(self._state, player_id, self._config)
 
+    def territory_view(self, player_id: int) -> dto.TerritoryDTO:
+        """Carried territory stock + devices for the Deploy screen (§10/§14, WP72)."""
+        return session.territory_view(self._state, player_id, self._config)
+
     def starbase_services_view(self, player_id: int) -> dto.StarbaseServicesDTO | None:
         """Forward-base services for the player's current sector, or None (§4.2, WP53)."""
         return session.starbase_services_view(self._state, player_id, self._config)

@@ -37,6 +37,8 @@ class ComputerScreen(Screen):
         Binding("a", "noop", "Add note"),
         Binding("d", "deliver_contract", "Deliver"),
         Binding("x", "abandon_contract", "Abandon"),
+        Binding("j", "join_alliance", "Join/Resign"),
+        Binding("t", "log_admission_task", "Log task"),
     ]
 
     CSS = """
@@ -110,6 +112,12 @@ class ComputerScreen(Screen):
                 yield DataTable(id="contracts-table", zebra_stripes=True, cursor_type="row")
                 yield Static("[dim][b]D[/] Deliver highlighted (dock at its target port first)"
                              "   ·   [b]X[/] Abandon highlighted[/]", classes="note")
+            with TabPane("Alliances", id="alliances"):
+                yield Static("[b]ALLIANCES[/]        [dim]blocs, standings, admission — join one (§6.3)[/]")
+                yield DataTable(id="alliances-table", zebra_stripes=True, cursor_type="row")
+                yield Static("[dim][b]J[/] Join highlighted (resigns any current bloc)   ·   "
+                             "[b]T[/] Log admission task   ·   [b]J[/] on your own bloc resigns[/]",
+                             classes="note")
             with TabPane("Dossier", id="dossier"):
                 yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
                 yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
@@ -214,6 +222,24 @@ class ComputerScreen(Screen):
         route = self.query_one("#route-table", DataTable)
         route.add_columns("Hop", "Sector", "Notes")
         self._render_route()
+
+        blocs = self.query_one("#alliances-table", DataTable)
+        blocs.add_columns("Bloc", "Standing", "Gate", "Fee", "Admission", "")
+        if self._computer.alliances:
+            for a in self._computer.alliances:
+                flags = "".join((
+                    "[green]⭐ sworn[/] " if a.member else "",
+                    "[cyan]⚑ governs Core[/] " if a.governs_core else "",
+                    "[yellow]covets Core[/]" if a.covets_core else "",
+                ))
+                progress = (f"{len(a.tasks_done)}/{len(a.tasks_needed)} "
+                            f"({', '.join(a.tasks_done) or '—'})"
+                            if a.tasks_needed else "open")
+                blocs.add_row(a.name, f"{a.standing:+.2f}", a.gate, f"{a.fee:,}",
+                              progress, Text.from_markup(flags),
+                              key=str(a.alliance_id))
+        else:
+            blocs.add_row(Text("no blocs in this universe", style="dim"), *(Text(""),) * 5)
 
         dossier = self.query_one("#dossier-table", DataTable)
         dossier.add_columns("Species", "Alliance", "Standing", "Last seen", "Disp", "Tech offers")
@@ -322,6 +348,60 @@ class ComputerScreen(Screen):
         """Rebuild the screen on the given tab after a state change."""
         self.app.pop_screen()
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab=tab))
+
+    # --- Alliances (§6.3, WP38 — surfaced WP72) --------------------------------
+
+    def _highlighted_alliance(self) -> object | None:
+        """The AllianceRowDTO under the cursor on the Alliances tab, or None."""
+        if self.query_one(TabbedContent).active != "alliances":
+            self.notify("Switch to the Alliances tab first.", timeout=2)
+            return None
+        table = self.query_one("#alliances-table", DataTable)
+        if not table.row_count:
+            return None
+        key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+        if key.value is None:
+            return None
+        aid = int(key.value)
+        return next((a for a in self._computer.alliances if a.alliance_id == aid), None)
+
+    def action_join_alliance(self) -> None:
+        """Join the highlighted bloc — or resign your own (§6.3, WP38)."""
+        row = self._highlighted_alliance()
+        if row is None:
+            return
+        from edge.core.rules import JoinAlliance, ResignAlliance
+        command = ResignAlliance() if row.member else JoinAlliance(row.alliance_id)
+        try:
+            self._service.apply(self._pid, command)
+        except (EconomyError, MovementError) as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify("Resigned — you stand apart again." if row.member
+                    else f"Sworn to the {row.name}.", timeout=3)
+        self._reopen_tab("alliances")
+
+    def action_log_admission_task(self) -> None:
+        """Record the next admission task for the highlighted bloc (§6.3, WP38).
+
+        `AdvanceAdmission` is the seam gameplay will feed automatically; until those
+        hooks land, the ledger is advanced here (one task per press, in price order).
+        """
+        row = self._highlighted_alliance()
+        if row is None:
+            return
+        pending = [t for t in row.tasks_needed if t not in row.tasks_done]
+        if not pending:
+            self.notify("Their admission price is already met.", timeout=2)
+            return
+        from edge.core.rules import AdvanceAdmission
+        try:
+            self._service.apply(self._pid, AdvanceAdmission(row.alliance_id, pending[0]))
+        except EconomyError as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self.notify(f"Recorded: {pending[0]}.", timeout=2)
+        self._reopen_tab("alliances")
 
     def _market_note(self) -> str:
         if not self._market.enabled:

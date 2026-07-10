@@ -20,8 +20,8 @@ from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier
 from edge.core.rules import (
-    BuyComponent, BuyDevice, BuyGenesis, BuyMissiles, BuyRumor, BuyShip, Deposit,
-    PostNotice, RecruitColonists, Withdraw,
+    BuyComponent, BuyDevice, BuyFighters, BuyGenesis, BuyMines, BuyMissiles, BuyRumor,
+    BuyShip, Deposit, PostNotice, RecruitColonists, Withdraw,
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
@@ -44,6 +44,8 @@ class StarDockScreen(Screen):
         Binding("n", "post_notice", "Notice"),
         Binding("d", "deposit", "Deposit"),
         Binding("w", "withdraw", "Withdraw"),
+        Binding("f", "buy_fighters", "Buy fighters"),
+        Binding("m", "buy_mines", "Buy mines"),
     ]
 
     CSS = """
@@ -109,8 +111,8 @@ class StarDockScreen(Screen):
                 yield Static(f"[b]DEVICE BAY[/]        Latinum [b yellow]{latinum:,}[/] slips")
                 yield self._devices_table(dock)
                 yield Static("[dim]B buys the highlighted device (probe / interdictor / "
-                             "mine-deflector). Launch probes & toggle the interdictor in flight.[/]",
-                             classes="note")
+                             "mine-deflector); F/M buy sector fighters / mines. Work them "
+                             "from the game screen's Deploy (D).[/]", classes="note")
             with TabPane("Bank", id="bank"):
                 rate = dock.interest_per_day * 100
                 yield Static(
@@ -267,6 +269,20 @@ class StarDockScreen(Screen):
             if amount:
                 self._issue(Withdraw(amount=amount), f"Withdrew {amount:,} slips")
         self.app.push_screen(_AmountInput("Withdraw how many slips?"), _go)
+
+    def action_buy_fighters(self) -> None:
+        """Buy sector-fighter stock (§10, WP41 — surfaced WP72)."""
+        def _go(count: int | None) -> None:
+            if count:
+                self._issue(BuyFighters(count=count), f"Bought {count} fighters")
+        self.app.push_screen(_AmountInput("Buy how many fighters?"), _go)
+
+    def action_buy_mines(self) -> None:
+        """Buy space-mine stock (§10, WP41 — surfaced WP72)."""
+        def _go(count: int | None) -> None:
+            if count:
+                self._issue(BuyMines(count=count), f"Bought {count} mines")
+        self.app.push_screen(_AmountInput("Buy how many mines?"), _go)
 
     def action_buy_rumor(self) -> None:
         """Buy a rumour at the tavern — logs a coordinate lead (§14, WP58)."""

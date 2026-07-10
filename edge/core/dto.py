@@ -469,6 +469,46 @@ class ComputerDTO:
     # Standing intel on Core governance (§6.3, WP52): who governs the Core and which blocs
     # covet it. One line per fact, already voiced for display; empty when nothing is known.
     governance_intel: list[str] = field(default_factory=list)
+    # Every bloc in the game with the player's standing + admission state (§6.3 — WP72).
+    alliances: list["AllianceRowDTO"] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class AllianceRowDTO:
+    """One bloc on the Computer's Alliances tab (§6.3, WP38 — surfaced WP72)."""
+
+    alliance_id: int
+    name: str
+    banner: str
+    standing: float
+    member: bool  # the player's sworn bloc
+    governs_core: bool
+    covets_core: bool
+    gate: str  # "open" | "petition"
+    fee: int  # admission fee, slips
+    tasks_done: list[str]  # admission tasks recorded in the ledger
+    tasks_needed: list[str]  # the full admission price
+    joinable: bool
+    join_blocker: str  # why joining is barred ("" when joinable)
+
+
+@dataclass(frozen=True)
+class TerritoryDTO:
+    """Carried territory stock + devices + this sector's force (§10/§14 — WP72)."""
+
+    sector_display: int
+    in_core: bool  # deployment is barred in the Core
+    fighters: int  # carried sector-fighter stock
+    mines: int  # carried mine stock (armid/limpet draw from the same pile)
+    devices: list[tuple[str, int]]  # carried (device_id, count)
+    limpets: int  # limpet mines stuck to the hull
+    interdictor_owned: bool
+    interdictor_active: bool
+    probes: int  # carried probe count
+    beacon_text: str  # the current sector's beacon ("" if none)
+    force_line: str  # your deployed force here, human-voiced ("" if none)
+    limpet_removal_fee: int
+    at_service_point: bool  # limpet removal is possible here
 
 
 @dataclass(frozen=True)
@@ -789,6 +829,9 @@ class ContactDTO:
     #                                fallback when it has no portrait image (WP35)
     debug_context: str = ""
     debug_when: str = ""
+    # The speaker's bloc, for the derived Join/Resign verb (§6.3 — WP72).
+    alliance_id: int | None = None
+    alliance_member: bool = False  # the player is sworn to this speaker's bloc
 
 
 @dataclass(frozen=True)

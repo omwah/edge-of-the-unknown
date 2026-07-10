@@ -26,7 +26,15 @@ from edge.core import combat
 from edge.core import contracts
 from edge.core import encounters
 from edge.core import territory
-from edge.core.aliens import core_status, disposition_band, effective_disposition, seizure_progress
+from edge.core.aliens import (
+    admission_met,
+    admission_tasks_done,
+    alliance_standing,
+    core_status,
+    disposition_band,
+    effective_disposition,
+    seizure_progress,
+)
 from edge.core.config import DialogueChoice, GameConfig
 from edge.core.discovery import entity_contactable, entity_species, is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
@@ -801,6 +809,46 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     )
 
 
+def territory_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.TerritoryDTO:
+    """Carried territory stock, devices, and this sector's own force (§10/§14 — WP72).
+
+    Feeds the Deploy/Devices screen: what the ship carries (fighters, mines, probes,
+    interdictor, attached limpets), whether deployment is barred (the Core), and the
+    player's existing force in the sector — all the entrant's own knowledge.
+    """
+    from edge.core.services import service_point
+
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    sector = state.sectors[ship.sector_id]
+    force = state.sector_forces.get(ship.sector_id)
+    force_line = ""
+    if force is not None and force.owner.kind == "player" and force.owner.ref == player_id:
+        bits: list[str] = []
+        if force.fighters:
+            toll = f", toll {force.toll}" if force.mode == "toll" else ""
+            bits.append(f"{force.fighters} fighters ({force.mode}{toll})")
+        if force.armid_mines:
+            bits.append(f"{force.armid_mines} armid mines")
+        if force.limpet_mines:
+            bits.append(f"{force.limpet_mines} limpet mines")
+        force_line = " · ".join(bits)
+    devices = sorted((d, n) for d, n in ship.devices.items() if n > 0)
+    return dto.TerritoryDTO(
+        sector_display=_display(state, ship.sector_id),
+        in_core=sector.is_galactic_core,
+        fighters=ship.fighters, mines=ship.mines, devices=devices,
+        limpets=sum(ship.limpets.values()),
+        interdictor_owned=ship.devices.get("interdictor", 0) > 0,
+        interdictor_active=ship.interdictor_active,
+        probes=ship.devices.get("probe", 0),
+        beacon_text=sector.beacon_text or "",
+        force_line=force_line,
+        limpet_removal_fee=config.territory.limpet_removal_fee,
+        at_service_point=service_point(state, player, ship, config) is not None,
+    )
+
+
 def starbase_services_view(
     state: UniverseState, player_id: int, config: GameConfig
 ) -> dto.StarbaseServicesDTO | None:
@@ -1041,7 +1089,44 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         contracts=_contracts_view(state, player),
         seizure=_seizure_status(state, player, config),
         governance_intel=_governance_intel(state, player),
+        alliances=_alliance_rows(state, player, config),
     )
+
+
+def _alliance_rows(state: UniverseState, player: Player,
+                   config: GameConfig) -> list[dto.AllianceRowDTO]:
+    """Every bloc with the player's standing + admission state (§6.3 — WP72).
+
+    Blocs are world knowledge (the roster is public lore); what is *player*-scoped —
+    standing, ledger progress, membership, affordability — comes from the player's own
+    state, so the projection leaks nothing another player couldn't know.
+    """
+    roster = config.roster
+    if roster is None:
+        return []
+    rows: list[dto.AllianceRowDTO] = []
+    for al in sorted(state.alliances.values(), key=lambda a: a.id):
+        ac = roster.alliance(al.id)
+        if ac is None:
+            continue
+        member = player.alliance_id == al.id
+        joinable, blocker = True, ""
+        if member:
+            joinable, blocker = False, "you are a sworn member"
+        elif ac.membership_gate == "petition" and not admission_met(player, ac):
+            joinable, blocker = False, "admission price unmet"
+        elif player.latinum < ac.admission_fee:
+            joinable, blocker = False, "cannot afford the admission fee"
+        rows.append(dto.AllianceRowDTO(
+            alliance_id=al.id, name=al.name, banner=al.banner,
+            standing=round(alliance_standing(player, al.id), 3), member=member,
+            governs_core=al.id == state.game.core_governing_alliance_id,
+            covets_core=al.covets_core, gate=ac.membership_gate, fee=ac.admission_fee,
+            tasks_done=sorted(admission_tasks_done(player, al.id)),
+            tasks_needed=list(ac.admission_price),
+            joinable=joinable, join_blocker=blocker,
+        ))
+    return rows
 
 
 def _contracts_view(state: UniverseState, player: Player) -> list[dto.ContractDTO]:
@@ -1569,6 +1654,9 @@ def contact_view(state: UniverseState, player_id: int, species_id: int,
         choices=choices,
         portrait_variant=portrait_variant,
         singular_entity=bool(sc is not None and sc.singular_entity),
+        alliance_id=species.alliance_id,
+        alliance_member=(species.alliance_id is not None
+                         and player.alliance_id == species.alliance_id),
     )
 
 
