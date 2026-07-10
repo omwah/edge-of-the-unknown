@@ -21,6 +21,7 @@ from edge.core.events import (
     AllianceResigned,
     AttitudeChanged,
     Banked,
+    BaseCommission,
     CargoTransferred,
     CitadelBuildStarted,
     CitadelCompleted,
@@ -584,6 +585,12 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "port_id": event.port_id,
                 "commodity": event.commodity.value, "status": event.status, "price": event.price,
             }
+        case BaseCommission():
+            return "BaseCommission", {
+                "player_id": event.player_id, "starbase_id": event.starbase_id,
+                "port_id": event.port_id, "owner_kind": event.owner_kind,
+                "owner_ref": event.owner_ref, "amount": event.amount,
+            }
         case Banked():
             return "Banked", {
                 "player_id": event.player_id, "kind": event.kind,
@@ -929,6 +936,9 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "Haggled":
             return Haggled(payload["player_id"], payload["port_id"], Commodity(payload["commodity"]),
                            payload["status"], payload["price"])
+        case "BaseCommission":
+            return BaseCommission(payload["player_id"], payload["starbase_id"], payload["port_id"],
+                                  payload["owner_kind"], payload["owner_ref"], payload["amount"])
         case "Banked":
             return Banked(payload["player_id"], payload["kind"], payload["amount"], payload["balance"])
         case "ComponentPurchased":

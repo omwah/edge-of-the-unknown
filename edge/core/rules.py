@@ -36,6 +36,7 @@ from edge.core.aliens import (
     apply_resign_standing,
     apply_spillover,
     attitude_locked,
+    base_owner_hostile,
     disposition_band,
     effective_disposition,
     governor_hostile,
@@ -54,6 +55,7 @@ from edge.core.config import GameConfig, SpeciesConfig, TechOfferConfig
 from edge.core.economy import (
     EconomyError,
     HaggleStatus,
+    TradeOutcome,
     deposit,
     execute_trade,
     port_unit_price,
@@ -89,6 +91,7 @@ from edge.core.events import (
     AlienTraded,
     AttitudeChanged,
     Banked,
+    BaseCommission,
     Colonized,
     AdmissionAdvanced,
     AllianceJoined,
@@ -1243,6 +1246,63 @@ def _docked_port(state: UniverseState, ship: Ship) -> Port:
     return port
 
 
+def _market_port(state: UniverseState, player: Player, ship: Ship) -> Port:
+    """The tradable port here, gated by a hosting base's state (§4.2, WP78).
+
+    A port sharing its sector with an orbital base is **base-hosted**: the base *is*
+    the market. It trades only while the base is operational (a derelict's market is
+    dark until its reactor is repaired) and its owner tolerates the player (the same
+    WP40 defense predicate). A StarDock is sovereign — never base-hosted.
+    """
+    port = _docked_port(state, ship)
+    if port.klass is PortClass.STARDOCK:
+        return port
+    base = starbases.base_in_sector(state, ship.sector_id)
+    if base is not None:
+        if not is_operational(base):
+            raise EconomyError("the base's market is dark — repair its reactor to reopen trade")
+        if base_owner_hostile(state, base, player):
+            raise EconomyError("the base's owner refuses to trade with you")
+    return port
+
+
+def _base_commission(
+    state: UniverseState, player_id: int, out: TradeOutcome, config: GameConfig,
+) -> tuple[tuple[Event, ...], Port, tuple[Player, ...], tuple[Corporation, ...]]:
+    """The owner's cut of a trade at a base-hosted market (§4.2, WP78).
+
+    With the order-book purse live, a player- or corp-owned hosting base skims
+    `services.trade_cut_frac` of the trade's value out of the port's purse into the
+    owner's bank — rent for holding the local market. No cut on the owner's (or a
+    corp member's) own trades — you don't pay yourself — none for alliance/unowned
+    hosts, and the cut clamps to the purse so it never goes negative.
+    """
+    port = out.port
+    sbcfg = config.starbase
+    if sbcfg is None or not config.economy.market.enabled or port.klass is PortClass.STARDOCK:
+        return (), port, (), ()
+    base = starbases.base_in_sector(state, port.sector_id)
+    if base is None or base.owner.ref is None or base.owner.kind not in ("player", "corp"):
+        return (), port, (), ()
+    cut = min(round(out.total * sbcfg.services.trade_cut_frac), port.latinum)
+    if cut <= 0:
+        return (), port, (), ()
+    owner = base.owner
+    paid = replace(port, latinum=port.latinum - cut)
+    event = BaseCommission(player_id, base.id, port.id, owner.kind, owner.ref, cut)
+    if owner.kind == "player":
+        landlord = state.players.get(owner.ref)
+        if landlord is None or landlord.id == player_id:
+            return (), port, (), ()
+        credited = replace(landlord, bank_balance=landlord.bank_balance + cut)
+        return (event,), paid, (credited,), ()
+    host_corp = state.corporations.get(owner.ref)
+    if host_corp is None or player_id in host_corp.member_player_ids:
+        return (), port, (), ()
+    richer = replace(host_corp, bank_balance=host_corp.bank_balance + cut)
+    return (event,), paid, (), (richer,)
+
+
 def _detect_in_sector(
     state: UniverseState, detected: frozenset[int], sensor_rating: int,
     sector_id: int, player_id: int, config: GameConfig,
@@ -1567,7 +1627,7 @@ def _dock(state: UniverseState, player_id: int) -> ReduceResult:
     player = _player(state, player_id)
     _require_no_encounter(player)
     ship = _ship(state, player)
-    port = _docked_port(state, ship)
+    port = _market_port(state, player, ship)
     # The Core StarDock is the governor's haven — a hunted player (§6.3 hostile-governor)
     # is turned away at the airlock, which denies every dock-gated service (trade,
     # recruitment, bank) at one lever rather than per command (WP52).
@@ -1588,7 +1648,7 @@ def _trade(
 ) -> ReduceResult:
     player = _player(state, player_id)
     ship = _ship(state, player)
-    port = _docked_port(state, ship)
+    port = _market_port(state, player, ship)
     line = port.line(cmd.commodity)
     if line is None:
         raise EconomyError(f"port does not trade {cmd.commodity.value}")
@@ -1598,10 +1658,12 @@ def _trade(
         commodity=cmd.commodity, units=cmd.units, unit_price=price,
         port_purse=config.economy.market.enabled,
     )
+    cut_events, paid_port, cut_players, cut_corps = _base_commission(state, player_id, out, config)
     return ReduceResult(
         events=(Traded(player_id, port.id, cmd.commodity, out.mode, out.units,
-                       out.unit_price, out.total, out.requested),),
-        players=(out.player,), ships=(out.ship,), ports=(out.port,),
+                       out.unit_price, out.total, out.requested), *cut_events),
+        players=(out.player, *cut_players), ships=(out.ship,), ports=(paid_port,),
+        corporations=cut_corps,
     )
 
 
@@ -1610,7 +1672,7 @@ def _haggle(
 ) -> ReduceResult:
     player = _player(state, player_id)
     ship = _ship(state, player)
-    port = _docked_port(state, ship)
+    port = _market_port(state, player, ship)
     line = port.line(cmd.commodity)
     if line is None:
         raise EconomyError(f"port does not trade {cmd.commodity.value}")
@@ -1637,8 +1699,12 @@ def _haggle(
         )
         traded = Traded(player_id, port.id, cmd.commodity, out.mode, out.units,
                         out.unit_price, out.total, out.requested)
+        cut_events, paid_port, cut_players, cut_corps = _base_commission(
+            state, player_id, out, config)
         return ReduceResult(
-            events=(haggled, traded), players=(out.player,), ships=(out.ship,), ports=(out.port,),
+            events=(haggled, traded, *cut_events),
+            players=(out.player, *cut_players), ships=(out.ship,), ports=(paid_port,),
+            corporations=cut_corps,
         )
     # A non-accepted offer wears the port's patience: bump the attempt counter.
     new_player = replace(player, haggle_attempts={**player.haggle_attempts, port.id: attempts + 1})

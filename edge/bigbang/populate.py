@@ -41,6 +41,8 @@ from edge.core.models import (
 _OWNERSHIP_SALT = 0x504C414E  # "PLAN"
 # A second independent salt for orbital-starbase placement (same discipline).
 _STARBASE_SALT = 0x42415345  # "BASE"
+# A third for base-hosted market minting (WP78): ports minted under starbases.
+_MARKET_SALT = 0x4D41524B  # "MARK"
 
 _TRADE_CLASSES = [
     PortClass.CLASS_1, PortClass.CLASS_2, PortClass.CLASS_3, PortClass.CLASS_4,
@@ -171,6 +173,7 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     # ownership roll uses its own sub-RNG (golden-master ordering).
     _finalize_planets(state, config)
     _place_starbases(state, config)
+    _host_markets(state, config)
     # The player is enrolled separately by the `JoinGame` reducer (`core.rules`), not
     # seeded here — joining is a recorded command, not seed-derived world generation.
 
@@ -271,6 +274,35 @@ def _place_starbases(state: UniverseState, config: GameConfig) -> None:
         state.planets[pid] = replace(planet, starbase_id=bid)
         bid += 1
     state.starbases = bases
+
+
+def _host_markets(state: UniverseState, config: GameConfig) -> None:
+    """Every starbase sector hosts a market: mint a port where none exists (§4.2, WP78).
+
+    The base **is** the sector's trading post — a starbase takes the place of a
+    free-standing port. Where the port draw already landed one in a base's sector it
+    simply becomes base-hosted; otherwise a standard-class port is minted here. Access
+    is gated at the trade seam (`rules._market_port`): dark while the base is derelict,
+    closed to players its owner counts as enemies — so a derelict's market is one more
+    thing repair-and-claim switches on. Runs on its own sub-RNG after starbase
+    placement so it never perturbs the earlier draws (golden-master ordering, §5).
+    """
+    if not state.starbases:
+        return
+    mrng = random.Random(state.game.seed ^ _MARKET_SALT)
+    names_cfg = config.names
+    port_gen = NameGenerator(names_cfg.ports if names_cfg else None, "Port", mrng)
+    with_port = {p.sector_id for p in state.ports.values()}
+    pid = max(state.ports, default=0) + 1
+    for bid in sorted(state.starbases):
+        sector_id = state.starbases[bid].sector_id
+        if sector_id in with_port:
+            continue
+        klass = mrng.choices(_TRADE_CLASSES, weights=config.bigbang.port_class_distribution, k=1)[0]
+        size = mrng.randint(1, 5)
+        state.ports[pid] = _make_port(pid, sector_id, klass, size, port_gen.draw(), mrng, config)
+        with_port.add(sector_id)
+        pid += 1
 
 
 def _mid_stock(port: Port) -> Port:

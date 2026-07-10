@@ -160,6 +160,10 @@ def _check_starbases(state: UniverseState) -> None:
             raise ValidationError(f"starbase {base.id} on owned planet {planet.id} is derelict")
         if not is_operational(base) and (planet.owner.is_owned or planet.inhabited_by_species_id is not None):
             raise ValidationError(f"derelict starbase {base.id} is not on an unowned, uninhabited world")
+        # Base-hosted markets (§4.2, WP78): every base sector holds a port — the base
+        # *is* the sector's trading post (minted by `populate._host_markets`).
+        if not any(p.sector_id == base.sector_id for p in state.ports.values()):
+            raise ValidationError(f"starbase {base.id} sector {base.sector_id} hosts no market port")
 
 
 def _check_discovery_gradient(state: UniverseState, config: GameConfig) -> None:

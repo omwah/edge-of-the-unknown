@@ -500,6 +500,8 @@ class BaseServicesConfig(BaseModel):
     costs — default 1.25). `component_stock_tiers` caps which tiers a base sells
     (default I/II; Tier III stays barter-only per §8). Banking rides the same
     `Player.bank_balance` invariants as StarDock — location is the value, not yield.
+    `trade_cut_frac` is the base-hosted-market commission (§4.2, WP78): the share of
+    each commodity trade's value paid from the port's purse to a player/corp owner.
     """
 
     model_config = _FROZEN
@@ -510,6 +512,7 @@ class BaseServicesConfig(BaseModel):
     banking: bool = True
     fee_frac: float = Field(default=1.25, ge=1.0)  # markup over StarDock (≥1: never cheaper)
     component_stock_tiers: list[str] = Field(default_factory=lambda: ["I", "II"])
+    trade_cut_frac: float = Field(default=0.05, ge=0.0, le=0.5)  # market commission (WP78)
 
 
 class StarbaseConfig(BaseModel):
