@@ -245,8 +245,12 @@ class AlienContactScreen(Screen):
 
     def _show_disabled(self) -> bool:
         # Prefer the app-held UI config (synced from game config at start; the WP73
-        # Options screen toggles it live) over the frozen service config.
-        ui = getattr(self.app, "ui_config", None)
+        # Options screen toggles it live) over the frozen service config. An unmounted
+        # screen (unit tests drive _menu_items directly) has no app — fall through.
+        try:
+            ui = getattr(self.app, "ui_config", None)
+        except Exception:
+            ui = None
         if ui is not None:
             return bool(ui.show_disabled_options)
         return self._service.config.ui.show_disabled_options if self._service else False
