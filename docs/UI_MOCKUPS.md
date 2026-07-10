@@ -620,13 +620,114 @@ and any first strike (in-sector or from a conversation) go through `ConfirmScree
 live list; `?` is the reference card. A feature reachable only by hotkey is a bug —
 it must also appear in its screen's action menu (automatic once it is a `Binding`).
 
-## Open layout questions (resolve during the Phase 1 UI build)
+## Resolved layout decisions (WP-UI01 — formerly "open questions")
 
-- **Sidebar width** on narrow terminals (<100 cols): collapse the region mini-map
-  first, then the holds bars to a single line.
-- **Mini-map vs. full MapScreen**: keep the sidebar node diagram to <= current
-  region; everything larger lives in §10.
-- **Haggle panel** as modal over PortScreen vs. inline — mocked as modal; revisit
-  with Pilot once we feel the flow.
-- **Engine-room reuse** for orbital starbases (§4.2): same screen, swapped
-  subsystem set — confirm one widget can render both before duplicating.
+- **Narrow terminals (<100 cols)** — resolved by the layout tiers (DESIGN §11,
+  WP-UI05/UI12): on the **compact** tier the permanent sidebar is not squeezed,
+  it is **removed** — the sector scene gives way to a location header plus a
+  focusable object list, and `I` opens the full ship-status drawer on demand.
+  Below 80×24 a size notice overlays the app (Help/Quit stay live).
+- **Mini-map vs. full MapScreen** — resolved (WP73): the map lives in the
+  Computer's Map tab; the sidebar keeps only local presence/anomaly lines.
+- **Haggle panel** — stays a modal over PortScreen (shipped); it rides the
+  shared modal sizing rules (WP-UI07), so it clamps and scrolls at 80×24.
+- **Engine-room reuse for orbital starbases** — confirmed (WP-UI08–UI10): one
+  `ComponentWorkbench` widget renders both, parameterized by a presentation
+  profile (ship names/rounded panels vs. base names/industrial square glyphs).
+
+## Responsive tier wireframes (WP-UI01)
+
+How the five load-bearing screens reshape across the tiers (DESIGN §11:
+compact 80×24 · standard 100×34 · wide ≥120×40). Schematic, not to scale;
+decorative art is always the first thing removed under space pressure.
+
+### Sector view *(shipped — WP-UI12)*
+
+```
+COMPACT 80×24                        STANDARD 100×34 / WIDE 120×40
+┌──────────────────────────────┐     ┌───────────────────────────┬──────────────┐
+│ EDGE OF …  turns 142/240     │     │ EDGE OF …  turns  Core:…  │              │
+│ [412] Frontier Reach (B3)    │     │                           │ PLAYER       │
+│ "thin dust, old wrecks"      │     │      sector scene art     │ HOLDS  ████  │
+│ ── Objects ────────────────  │     │   (planet · port · ships) │ SHIP   bars  │
+│ > Dock: Ore Refinery Zeta    │     │                           │ PRESENCE     │
+│ > Planet: Kessel IV          │     │                           │ ANOMALIES    │
+│ > Hail: Vreex trader         │     ├───────────────────────────┤ (wide adds:  │
+│ ── Navigation ─────────────  │     │ ── Navigation ──────────  │  anomaly     │
+│        nav rose + warps      │     │      nav rose + warps     │  detail,     │
+│ ticker: last event…          │     │ ticker: last event…       │  objectives) │
+│ footer: P Dock W Travel  …   │     │ footer                    │              │
+└──────────────────────────────┘     └───────────────────────────┴──────────────┘
+Sidebar gone; `I` opens the status drawer. Object rows post the same messages
+as the scene hotspots, so keyboard and mouse stay equivalent.
+```
+
+### Component workbench — Engine Room / base Station tab *(shipped — WP-UI08–UI10)*
+
+```
+COMPACT: 1 column                 STANDARD: 2 columns          WIDE: ship 2 / base 3
+┌────────────────────────┐        ┌──────────┬──────────┐      ┌───────┬───────┬───────┐
+│ ▸ SPINDRIVE  [+][+][!] │        │ SPINDRIVE│ THRUSTERS│      │FUSION │DEFENSE│ORBITAL│
+│ ▸ THRUSTERS  [+][ ]    │        │ art [+][!]│ art [+][+]│    │CORE   │GRID   │BATTERY│
+│ ▸ SCREENS    [+][+]    │        ├──────────┼──────────┤      │■ ■ ◆  │■ ■    │■ [ ]  │
+│ ▸ MAIN GUN   [+][✓]    │        │ SCREENS  │ MAIN GUN │      └───────┴───────┴───────┘
+│ ── Carried ──────────  │        ├──────────┴──────────┤      (base profile: square
+│ > turbine II  radiator │        │ carried components  │       glyphs, warning borders)
+│ legend · instructions  │        │ legend · instructions│
+└────────────────────────┘        └──────────────────────┘
+Small art or none in compact (per art-detail setting); selection survives
+refresh and tier changes.
+```
+
+### Computer *(target — WP-UI20/UI21; current 13-tab strip until then)*
+
+```
+COMPACT: category popup            STANDARD/WIDE: category tabs + subview row
+┌──────────────────────────────┐   ┌────────────────────────────────┬─────────┐
+│ SHIP COMPUTER  [Commerce ▾]  │   │ Nav │ Commerce │ Expl │ Rel │ R│ (wide:  │
+│ subview: Ports · Trade · Mkt │   │  Ports · Trade · Market        │ detail  │
+│ ┌──────────────────────────┐ │   │ ┌────────────────────────────┐ │ pane of │
+│ │ table (low-priority cols │ │   │ │ full table · zebra · sort  │ │ selected│
+│ │ folded into row detail)  │ │   │ │ `/` filter                 │ │ row)    │
+│ └──────────────────────────┘ │   │ └────────────────────────────┘ │         │
+│ P Plot · A Note · …          │   │ footer                         │         │
+└──────────────────────────────┘   └────────────────────────────────┴─────────┘
+Five categories (Navigation/Commerce/Exploration/Relations/Records); each
+remembers its last subview; `M`/`G` and links still open the right subview.
+```
+
+### Alien contact *(target — WP-UI17)*
+
+```
+COMPACT 80×24                        STANDARD/WIDE
+┌──────────────────────────────┐     ┌───────────┬──────────────────────────┐
+│ CONTACT — Vreex   [ally ▮▮▮░]│     │           │ standing: friendly ▮▮▮░  │
+│ (portrait hidden/one-line)   │     │ portrait  │ ┌──────────────────────┐ │
+│ ┌──────────────────────────┐ │     │   art     │ │ speech (scrollable)  │ │
+│ │ speech — current line    │ │     │           │ └──────────────────────┘ │
+│ └──────────────────────────┘ │     │ (wide:    │ 1. reply · 2. reply      │
+│ 1. Ask about the ruins       │     │  dossier  │ 3. [dim reply — reason]  │
+│ 2. Offer trade               │     │  facts)   │ B Back · F Farewell      │
+│ 3. …                         │     └───────────┴──────────────────────────┘
+│ B Back · F Farewell          │     Missing portrait → region collapses,
+└──────────────────────────────┘     speech takes the width (never half-blank).
+Speech + numbered replies always win space over the portrait.
+```
+
+### Encounter / combat *(target — WP-UI18)*
+
+```
+COMPACT 80×24                        STANDARD/WIDE
+┌──────────────────────────────┐     ┌──────────────────┬───────────────────┐
+│ ENCOUNTER — Krell pack (3)   │     │ ENEMY PACK       │ YOUR SHIP         │
+│ enemy: hull ▮▮░ arc:ahead    │     │ ship · arc · dmg │ shields ▮▮▮░ hull │
+│ you: sh ▮▮▮░ hull ▮▮▮▮ ammo 4│     │ (per ship row)   │ ammo · kits · KO'd│
+│ ── last round ─────────────  │     ├──────────────────┴───────────────────┤
+│ Their volley missed. You hit │     │ LAST ROUND result (stays until next  │
+│ their thrusters.             │     │ action) · tactical advice            │
+│ flee: 34% (floor 10%)        │     ├──────────────────────────────────────┤
+│ [F]ight [M]issile [FL]ee [P] │     │ [F]ight [M]issile [FL]ee 34% [P]atch │
+└──────────────────────────────┘     └──────────────────────────────────────┘
+Fight/Missile/Flee/Patch distinguished by key letter + word, never color
+alone; flee floor and firing arcs always visible.
+```
