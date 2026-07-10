@@ -54,7 +54,8 @@ Leads · Contracts · Alliances · Dossier · Notes)
   [b]I[/] interdictor   [b]R[/] strip limpets
 
 [b]Contact / Encounter[/]
-  [b]1–9[/] replies   [b]B[/] back   [b]F[/] farewell   [b]J[/] join/resign bloc\
+  [b]1–9[/] replies   [b]B[/] back   [b]F[/]/[b]Esc[/] farewell   [b]J[/] join/resign bloc
+  [dim]a live fight has no Esc — fight, missile, patch, or flee[/]\
 """
 
 
