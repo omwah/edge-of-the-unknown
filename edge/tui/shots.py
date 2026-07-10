@@ -41,6 +41,7 @@ from edge.tui.dummy import (
 from edge.tui.screens.contact import AlienContactScreen
 from edge.tui.screens.encounter import EncounterScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
+from edge.tui.screens.game import GameScreen
 from edge.tui.screens.lobby import LobbyScreen
 from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.base import BaseScreen
@@ -138,10 +139,10 @@ async def _capture() -> None:
         await _shot(app, pilot, "options.svg")
         await pilot.press("escape")
 
-        await pilot.press("n")  # New game -> live GameScreen
+        # Start explicitly so screenshots never inherit the normal random new-game seed.
+        svc = app.start_new_game(seed=1986)
+        app.push_screen(GameScreen(svc, app.player_id))
         await pilot.pause()
-        svc = app.service
-        assert svc is not None
         state = svc.state
         ports = {p.sector_id: p for p in state.ports.values()}
         planet_sectors = {pl.sector_id for pl in state.planets.values()}
