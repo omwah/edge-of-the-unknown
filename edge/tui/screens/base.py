@@ -71,6 +71,7 @@ class BaseScreen(Screen):
         Binding("d", "deposit", "Deposit 1k"),
         Binding("w", "withdraw", "Withdraw 1k"),
     ]
+    ACTION_DANGER = {"assault": "destructive"}  # WP-UI06: confirms before firing
 
     HELP_TITLE = "Starbase"
     HELP = """\

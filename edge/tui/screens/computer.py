@@ -42,6 +42,11 @@ class ComputerScreen(Screen):
         Binding("j", "join_alliance", "Join/Resign"),
         Binding("t", "log_admission_task", "Log task"),
     ]
+    # WP-UI06: seize_core flips Core governance (destructive, always confirmed);
+    # engage confirms only over known hazards; join_alliance confirms the resign
+    # branch. Enforced statically by tests/test_ui_actions.py.
+    ACTION_DANGER = {"seize_core": "destructive", "engage": "caution",
+                     "join_alliance": "caution"}
 
     HELP_TITLE = "Ship's computer"
     HELP = """\

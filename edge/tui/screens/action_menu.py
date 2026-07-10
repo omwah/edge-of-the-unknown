@@ -46,7 +46,11 @@ class ActionMenuScreen(ModalScreen[None]):
                     key = descriptor.key or "palette"
                     reason = (f" — {descriptor.disabled_reason}"
                               if not descriptor.enabled and descriptor.disabled_reason else "")
-                    yield ClickableEntry(f"  [b]{num}[/] {label}  [dim]({key}){reason}[/]",
+                    # Danger states read without color too (glyph + word): a
+                    # destructive action always confirms before it fires.
+                    badge = {"destructive": " [$error]![/][dim] confirms[/]",
+                             "caution": " [dim]· confirms[/]"}.get(descriptor.danger, "")
+                    yield ClickableEntry(f"  [b]{num}[/] {label}{badge}  [dim]({key}){reason}[/]",
                                          dest="action", ref=str(n - 1))
             yield Static("[dim]number / click to run · Esc to close[/]")
 

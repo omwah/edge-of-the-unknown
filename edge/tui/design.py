@@ -42,10 +42,17 @@ class ActionDescriptor:
 
 
 def screen_actions(screen: Screen) -> list[ActionDescriptor]:
-    """Return the one canonical advertised-action list for a screen."""
+    """Return the one canonical advertised-action list for a screen.
+
+    Danger levels come from the screen's optional ``ACTION_DANGER`` class map
+    (action name → "caution"/"destructive"). A destructive action's method must
+    route through the shared `ConfirmScreen` — tests/test_ui_actions.py enforces
+    it statically, so every entry point (key, `.` menu, palette) confirms.
+    """
     dynamic = getattr(screen, "action_descriptors", None)
     if callable(dynamic):
         return list(dynamic())
+    danger_map: dict[str, str] = getattr(type(screen), "ACTION_DANGER", {})
     actions: list[ActionDescriptor] = []
     for binding in getattr(type(screen), "BINDINGS", []):
         if isinstance(binding, Binding) and binding.show:
@@ -54,6 +61,7 @@ def screen_actions(screen: Screen) -> list[ActionDescriptor]:
                 title=binding.description or binding.action,
                 help=binding.tooltip or binding.description or binding.action,
                 key=binding.key,
+                danger=danger_map.get(binding.action, "none"),  # type: ignore[arg-type]
                 action=binding.action,
             ))
     return actions
