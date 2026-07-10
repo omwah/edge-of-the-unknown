@@ -23,6 +23,7 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Static
 
 from edge.tui.widgets import warp_legend_markup
+from edge.tui.design import screen_actions
 
 _CONVENTIONS = """\
 [b]Esc[/] backs out of any screen · [b].[/] lists this screen's actions (numbered) \
@@ -34,11 +35,14 @@ destructive acts always confirm first · pickers: [b]↑/↓[/] select, [b]Enter
 def _binding_rows(host: Screen) -> list[str]:
     """The host screen's advertised bindings as help rows (never drifts — live)."""
     rows: list[str] = []
-    for b in getattr(type(host), "BINDINGS", []):
-        if isinstance(b, Binding) and b.show:
-            key = {"escape": "Esc", "plus": "+", "minus": "-",
-                   "question_mark": "?", "full_stop": ".", "ctrl+q": "^Q"}.get(b.key, b.key.upper())
-            rows.append(f"  [b]{key}[/]  {b.description or b.action}")
+    for descriptor in screen_actions(host):
+        raw_key = descriptor.key or "Ctrl+P"
+        key = {"escape": "Esc", "plus": "+", "minus": "-",
+               "question_mark": "?", "full_stop": ".", "ctrl+q": "^Q"}.get(
+                   raw_key, raw_key.upper())
+        suffix = (f" [dim]— {descriptor.disabled_reason}[/]"
+                  if not descriptor.enabled and descriptor.disabled_reason else "")
+        rows.append(f"  [b]{key}[/]  {descriptor.title}{suffix}")
     return rows
 
 

@@ -210,9 +210,13 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
         # Options screen toggles it live) over the frozen service config. An unmounted
         # screen (unit tests drive _menu_items directly) has no app — fall through.
         try:
+            settings = getattr(self.app, "ui_settings", None)
             ui = getattr(self.app, "ui_config", None)
         except Exception:
+            settings = None
             ui = None
+        if settings is not None:
+            return bool(settings.show_disabled_options)
         if ui is not None:
             return bool(ui.show_disabled_options)
         return self._service.config.ui.show_disabled_options if self._service else False

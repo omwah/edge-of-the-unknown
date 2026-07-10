@@ -41,7 +41,9 @@ class MainMenuScreen(Screen):
 
     def compose(self) -> ComposeResult:
         saved = has_save()
-        yield Starfield(animate=not getattr(self.app, "plain", False))
+        settings = getattr(self.app, "ui_settings", None)
+        reduced = bool(settings and settings.reduced_motion)
+        yield Starfield(animate=not getattr(self.app, "plain", False) and not reduced)
         with Container(id="menu-box"):
             yield Static(_BANNER, classes="title")
             yield Static(_SUBTITLE, classes="subtitle")
