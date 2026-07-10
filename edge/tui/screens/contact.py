@@ -102,6 +102,9 @@ class AlienContactScreen(Screen):
     BINDINGS = [
         Binding("b", "back_one", "Back"),       # step back to the previous node (no-op at the opener)
         Binding("f", "farewell", "Farewell"),   # speak a parting line, then break contact
+        # Esc backs out of any screen (the WP73 convention): here it IS a farewell — the
+        # parting line speaks and the contact session closes properly, never a raw pop.
+        Binding("escape", "farewell", "Farewell", show=False),
         Binding("j", "alliance", "Join/Resign bloc"),  # derived §6.3 verb (WP72)
         # Play-test only: re-roll the current context's line in place. `check_action` hides it
         # (and disables it) outside the dialogue play-test harness.
@@ -494,7 +497,10 @@ class AlienContactScreen(Screen):
             _go()
 
     def action_farewell(self) -> None:
-        """Farewell (f): speak a parting line, then break contact — the single exit."""
+        """Farewell (f / Esc): speak a parting line, then break contact — the single exit."""
+        if self._service is None:  # screenshot harness — no session to close, just leave
+            self._break_contact()
+            return
         self._say("farewell", None, close=True)
 
     def action_refresh(self) -> None:
