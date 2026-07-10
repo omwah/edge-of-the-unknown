@@ -1247,10 +1247,13 @@ def _hop_label(state: UniverseState, sector_id: int) -> str:
 def _routable(player: Player, *endpoints: int) -> set[int]:
     """Charted space minus the avoid list (§9 Notes tab — WP73).
 
-    Endpoints (origin, destination, waypoints) are never blocked — an explicit plot to
-    an avoided sector is the player overriding their own list for that one place.
+    A *charted* endpoint (origin, destination, waypoint) is never blocked by its own
+    avoid mark — an explicit plot there overrides the list for that one place. Fog is
+    untouched: an unexplored endpoint stays unreachable.
     """
-    return (set(player.explored_sectors) - set(player.avoid_sectors)) | set(endpoints)
+    allowed = set(player.explored_sectors) - set(player.avoid_sectors)
+    allowed.update(e for e in endpoints if e in player.explored_sectors)
+    return allowed
 
 
 def _route_hazards(state: UniverseState, player: Player, plan: RoutePlan,
