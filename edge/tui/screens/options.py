@@ -27,15 +27,13 @@ class OptionsScreen(ModalScreen[None]):
 
     CSS = """
     OptionsScreen { align: center middle; background: $background 60%; }
-    OptionsScreen #options-box {
-        width: 60; height: auto; padding: 1 2; border: round $primary; background: $surface;
-    }
+    OptionsScreen #options-box { width: 60; }
     OptionsScreen #options-title { text-style: bold; color: $primary; margin-bottom: 1; }
     OptionsScreen #options-footer { color: $text-muted; margin-top: 1; }
     """
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="options-box"):
+        with Vertical(id="options-box", classes="modal-box"):
             yield Static("Options", id="options-title")
             yield ClickableEntry(self._theme_line(), dest="opt", ref="theme")
             yield ClickableEntry(self._motion_line(), dest="opt", ref="motion")

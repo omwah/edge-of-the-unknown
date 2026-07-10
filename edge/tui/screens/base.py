@@ -33,6 +33,7 @@ from edge.core.rules import (
     RepairStarbase, Withdraw,
 )
 from edge.server.service import GameService
+from edge.tui.chrome import TitleBar
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.component_workbench import (
@@ -77,10 +78,7 @@ Repair fills the [b]reactor keystone first[/] — waking a derelict also opens i
 market; a player-owned host earns a cut of outsider trades."""
 
     CSS = """
-    BaseScreen #base-title {
-        dock: top; height: 1; background: $warning; color: $background;
-        text-style: bold; padding: 0 1;
-    }
+    BaseScreen #base-title { background: $warning; }
     BaseScreen TabPane { padding: 1 2; }
     BaseScreen DataTable { height: auto; max-height: 18; }
     BaseScreen .note { margin-top: 1; color: $text-muted; }
@@ -99,8 +97,8 @@ market; a player-owned host earns a cut of outsider trades."""
     def compose(self) -> ComposeResult:
         v = self._view()
         standing = _STANDING_STYLE.get(v.standing, v.standing)
-        yield Static(
-            f"⌂ {v.name.upper()} · {v.planet_name} · Sector {v.sector_display} · "
+        yield TitleBar(
+            f"⌂ {v.name.upper()} · {v.planet_name} · Sector {v.sector_display}",
             f"{v.owner} · {standing} · integrity {v.integrity_pct}%",
             id="base-title",
         )
