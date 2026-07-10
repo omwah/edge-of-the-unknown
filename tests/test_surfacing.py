@@ -27,7 +27,9 @@ from edge.core.models import (
 )
 from edge.core.rules import AdvanceAdmission, RepairStarbase, apply_result, reduce
 from edge.core.starbases import is_operational
-from edge.server.session import computer_view, planet_view, stardock_view, territory_view
+from edge.server.session import (
+    computer_view, planet_view, starbase_view, stardock_view, territory_view,
+)
 
 CFG = load_default_config()
 
@@ -63,17 +65,19 @@ def _state(*, base_owner: Ownership, operational: bool) -> UniverseState:
 
 def test_derelict_base_projects_repair_affordance_keystone_first() -> None:
     state = _state(base_owner=Ownership("none"), operational=False)
+    v = starbase_view(state, 1, 1, CFG)
     p = planet_view(state, 1, 1, CFG)
-    assert p.starbase_derelict and not p.base_assaultable and not p.base_claimable
-    assert p.base_empty_slots, "a stripped keystone must surface as an open slot"
-    subsystem, slot_index, is_keystone = p.base_empty_slots[0]
+    assert p.starbase_derelict and v.standing == "derelict"
+    assert not v.assaultable and not v.claimable
+    assert v.empty_slots, "a stripped keystone must surface as an open slot"
+    subsystem, slot_index, is_keystone = v.empty_slots[0]
     assert is_keystone and subsystem == Subsystem.FUSION_REACTOR.value
 
 
 def test_repairing_the_keystone_flips_the_base_claimable() -> None:
     state = _state(base_owner=Ownership("none"), operational=False)
-    p = planet_view(state, 1, 1, CFG)
-    subsystem, slot_index, _ = p.base_empty_slots[0]
+    v = starbase_view(state, 1, 1, CFG)
+    subsystem, slot_index, _ = v.empty_slots[0]
     reactor = state.starbases[1].subsystems[Subsystem.FUSION_REACTOR]
     keystone = build_layouts(CFG.starbase.subsystems)[Subsystem.FUSION_REACTOR] \
         .slots[reactor.keystone_index]
@@ -82,16 +86,17 @@ def test_repairing_the_keystone_flips_the_base_claimable() -> None:
     apply_result(state, reduce(state, 1, RepairStarbase(
         1, Subsystem(subsystem), slot_index, keystone.kind, keystone.tier), CFG))
     assert is_operational(state.starbases[1])
-    p2 = planet_view(state, 1, 1, CFG)
-    assert p2.base_claimable and not p2.starbase_derelict
-    assert p2.base_claim_cost == CFG.starbase.claim_cost
+    v2 = starbase_view(state, 1, 1, CFG)
+    assert v2.claimable and v2.operational and v2.standing == "open"
+    assert v2.claim_cost == CFG.starbase.claim_cost
+    assert not planet_view(state, 1, 1, CFG).starbase_derelict
 
 
 def test_operational_foreign_base_projects_assault_not_repair() -> None:
     state = _state(base_owner=Ownership("alliance", 2), operational=True)
-    p = planet_view(state, 1, 1, CFG)
-    assert p.base_assaultable and not p.base_claimable
-    assert p.base_empty_slots == []  # an operational foreign base is not yours to refit
+    v = starbase_view(state, 1, 1, CFG)
+    assert v.assaultable and not v.claimable
+    assert v.empty_slots == []  # an operational foreign base is not yours to refit
 
 
 def test_stardock_view_exposes_the_bank_counter() -> None:

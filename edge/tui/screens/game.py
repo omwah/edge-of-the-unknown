@@ -35,7 +35,7 @@ from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StarDockScreen
 from edge.tui.screens.corp import CorpScreen
-from edge.tui.screens.starbase_services import StarbaseServicesScreen
+from edge.tui.screens.base import BaseScreen
 from edge.tui.widgets import (
     ClickableEntry,
     NavRose,
@@ -226,6 +226,8 @@ class GameScreen(Screen):
             self._hail_species(int(msg.ref))
         elif msg.dest == "player" and msg.ref is not None:
             self._attack_target(player_id=int(msg.ref))
+        elif msg.dest == "starbase":
+            self.action_base_services()
         else:
             await self._dock()
 
@@ -323,11 +325,12 @@ class GameScreen(Screen):
         self.app.push_screen(screen)
 
     def action_base_services(self) -> None:
-        """Open your forward base's services, if one operational and yours sits here (§4.2, WP53)."""
-        if self._service.starbase_services_view(self._pid) is None:
-            self.notify("No forward base of yours to visit here.", timeout=2)
+        """Open the unified base view for the starbase here, if any (§4.2, WP80)."""
+        view = self._service.current_starbase_view(self._pid)
+        if view is None:
+            self.notify("No starbase to visit here.", timeout=2)
             return
-        self.app.push_screen(StarbaseServicesScreen(self._service, self._pid))
+        self.app.push_screen(BaseScreen(self._service, self._pid, view.starbase_id))
 
     # --- other screens (live: computer/map; sample: the Phase 2-3 ones) ------
 

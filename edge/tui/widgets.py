@@ -525,21 +525,21 @@ class SectorScene(Static):
                         row, dleft)
 
         # Port (or placeholder), vertically centred against the taller planet. The
-        # controlling species' palette (`archetype_id`) styles the port sprite. With no
-        # port, an orbital starbase takes the slot (§4.2 — the base *is* the station
-        # here); a port-crowded base rides the presence band below the ships instead.
+        # controlling species' palette (`archetype_id`) styles the port sprite. A
+        # starbase **takes the place of a port** (§4.2, WP80): where a base orbits, the
+        # base sprite holds the slot and its market is entered through the base view.
         bases = list(getattr(sec, "starbases", ()) or ())
-        base_in_orbit = bool(bases) and not sec.ports
-        if sec.ports:
+        base_in_orbit = bool(bases)
+        if base_in_orbit:
+            self._paint(grid, self._sprite_cells("port", "starbase",
+                                                 seed=bases[0].starbase_id,
+                                                 sw=portw, sh=porth),
+                        row + (band_h - porth) // 2, rcx - portw // 2)
+        elif sec.ports:
             port = sec.ports[0]
             sub = art_adapter.port_subtype(port.klass)
             self._paint(grid, self._sprite_cells("port", sub, seed=sec.sector_id, sw=portw,
                                                  sh=porth, archetype_id=port.archetype_id),
-                        row + (band_h - porth) // 2, rcx - portw // 2)
-        elif base_in_orbit:
-            self._paint(grid, self._sprite_cells("port", "starbase",
-                                                 seed=bases[0].starbase_id,
-                                                 sw=portw, sh=porth),
                         row + (band_h - porth) // 2, rcx - portw // 2)
 
         name_row = row + band_h
@@ -556,16 +556,18 @@ class SectorScene(Static):
             else:
                 dest, ref = "discovery", disc.discovery_id  # click scans/salvages
             self._hotspots.append((0, row, span, name_row + 1, dest, ref))
-        if sec.ports:
-            self._stamp_line(grid, f"[b yellow]{sec.ports[0].name}[/]", name_row, half, half)
-            self._hotspots.append((half, row, w, name_row + 1, "port", None))
-        elif base_in_orbit:
+        if base_in_orbit:
             b = bases[0]
             status = "[green]operational[/]" if b.operational else "[yellow]derelict[/]"
-            self._stamp_line(grid, f"[b cyan]{b.name}[/] {status} [dim]· {b.owner}[/]",
+            market = f" · [yellow]{sec.ports[0].name}[/]" if sec.ports else ""
+            self._stamp_line(grid, f"[b cyan]{b.name}[/] {status}{market} [dim]· {b.owner}[/]",
                              name_row, half, half)
-            # Click-through to the planet screen, where assault/repair/claim live (§4.2).
-            self._hotspots.append((half, row, w, name_row + 1, "planet", None))
+            # Click-through to the unified base view (§4.2, WP80) — station, market,
+            # services, assault/repair/claim all live there.
+            self._hotspots.append((half, row, w, name_row + 1, "starbase", b.starbase_id))
+        elif sec.ports:
+            self._stamp_line(grid, f"[b yellow]{sec.ports[0].name}[/]", name_row, half, half)
+            self._hotspots.append((half, row, w, name_row + 1, "port", None))
         row = name_row + 1 + self._ORBIT_MARGIN
 
         # Ships — up to N sprites side by side (no heading), names beneath. The 2nd
@@ -631,12 +633,6 @@ class SectorScene(Static):
         # mines were zeroed, a mines-only foreign force never arrives here at all.
         force = getattr(sec, "force", None)
         entries: list[tuple[str, str, int, str, str, int | str | None]] = []
-        if bases and sec.ports:  # the orbit slot was taken — the base shows here
-            b = bases[0]
-            status = "[green]operational[/]" if b.operational else "[yellow]derelict[/]"
-            entries.append(("port", "starbase", b.starbase_id,
-                            f"[b cyan]{b.name}[/] {status} [dim]· {b.owner}[/]",
-                            "planet", None))
         if force is not None and force.fighters > 0:
             toll = f", toll {force.toll}" if force.mode == "toll" else ""
             who = "[green]yours[/]" if force.yours else f"[red]{force.owner}[/]"
