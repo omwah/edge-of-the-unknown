@@ -44,7 +44,9 @@ into the sector view).
 v3 (WP71–WP73): `PlanetDTO.base_*` starbase-ops affordances; `StarDockDTO` bank counter;
 `ContactDTO.alliance_id`/`alliance_member`; `ComputerDTO.alliances`/`notes`/`avoid`; new
 `TerritoryDTO` + `AllianceRowDTO`; `territory_view` read method; `AddNote`/`RemoveNote`/
-`ToggleAvoid` commands; `CorpDTO.invite_ids`/`other_corps` (WP76).
+`ToggleAvoid` commands; `CorpDTO.invite_ids`/`other_corps` (WP76); `TransferCargo`/
+`CargoTransferred` (§4.2 colony supply); `SectorDTO.force`/`starbases` +
+`SectorForceDTO`/`SectorStarbaseDTO` (sector presence, classic-TW force fog).
 """
 
 

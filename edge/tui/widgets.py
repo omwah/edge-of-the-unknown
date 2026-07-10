@@ -264,17 +264,23 @@ class StatusSidebar(Vertical):
     """
 
     def __init__(self, ship: ShipDTO, discoveries: list[SectorDiscovery],
-                 width: int = 33, **kwargs: object) -> None:
+                 width: int = 33, presence: list[str] | None = None,
+                 **kwargs: object) -> None:
         super().__init__(**kwargs)
         self._ship = ship
         self._discoveries = discoveries
         self._width = width
+        self._presence = presence or []
 
     def on_mount(self) -> None:
         self.styles.width = self._width
 
     def compose(self) -> ComposeResult:
         yield Static(self._stats_markup())
+        if self._presence:  # starbases + known forces here (§4.2/§10, fog-applied)
+            yield Static("[b yellow]Presence[/]")
+            for line in self._presence:
+                yield Static(line)
         yield Static("[b yellow]Anomalies[/]")
         if self._discoveries:
             for discovery in self._discoveries:
@@ -519,12 +525,21 @@ class SectorScene(Static):
                         row, dleft)
 
         # Port (or placeholder), vertically centred against the taller planet. The
-        # controlling species' palette (`archetype_id`) styles the port sprite.
+        # controlling species' palette (`archetype_id`) styles the port sprite. With no
+        # port, an orbital starbase takes the slot (§4.2 — the base *is* the station
+        # here); a port-crowded base rides the presence band below the ships instead.
+        bases = list(getattr(sec, "starbases", ()) or ())
+        base_in_orbit = bool(bases) and not sec.ports
         if sec.ports:
             port = sec.ports[0]
             sub = art_adapter.port_subtype(port.klass)
             self._paint(grid, self._sprite_cells("port", sub, seed=sec.sector_id, sw=portw,
                                                  sh=porth, archetype_id=port.archetype_id),
+                        row + (band_h - porth) // 2, rcx - portw // 2)
+        elif base_in_orbit:
+            self._paint(grid, self._sprite_cells("port", "starbase",
+                                                 seed=bases[0].starbase_id,
+                                                 sw=portw, sh=porth),
                         row + (band_h - porth) // 2, rcx - portw // 2)
 
         name_row = row + band_h
@@ -544,6 +559,13 @@ class SectorScene(Static):
         if sec.ports:
             self._stamp_line(grid, f"[b yellow]{sec.ports[0].name}[/]", name_row, half, half)
             self._hotspots.append((half, row, w, name_row + 1, "port", None))
+        elif base_in_orbit:
+            b = bases[0]
+            status = "[green]operational[/]" if b.operational else "[yellow]derelict[/]"
+            self._stamp_line(grid, f"[b cyan]{b.name}[/] {status} [dim]· {b.owner}[/]",
+                             name_row, half, half)
+            # Click-through to the planet screen, where assault/repair/claim live (§4.2).
+            self._hotspots.append((half, row, w, name_row + 1, "planet", None))
         row = name_row + 1 + self._ORBIT_MARGIN
 
         # Ships — up to N sprites side by side (no heading), names beneath. The 2nd
@@ -602,6 +624,55 @@ class SectorScene(Static):
                     grid, f"[gold3]✶ {anomaly.label}[/] [dim](beyond sensor resolution)[/]",
                     row, 0, w)
             row += 1
+
+        # Presence band (§10/§4.2 — WP interview): deployed forces and a port-crowded
+        # starbase, as small sprites with captions (caption-only on a short terminal).
+        # The projection already applies classic-TW fog: fighters are public, foreign
+        # mines were zeroed, a mines-only foreign force never arrives here at all.
+        force = getattr(sec, "force", None)
+        entries: list[tuple[str, str, int, str, str, int | str | None]] = []
+        if bases and sec.ports:  # the orbit slot was taken — the base shows here
+            b = bases[0]
+            status = "[green]operational[/]" if b.operational else "[yellow]derelict[/]"
+            entries.append(("port", "starbase", b.starbase_id,
+                            f"[b cyan]{b.name}[/] {status} [dim]· {b.owner}[/]",
+                            "planet", None))
+        if force is not None and force.fighters > 0:
+            toll = f", toll {force.toll}" if force.mode == "toll" else ""
+            who = "[green]yours[/]" if force.yours else f"[red]{force.owner}[/]"
+            entries.append(("ship", "fighter", sec.sector_id * 31,
+                            f"[b]{force.fighters} fighters[/] [dim]({force.mode}{toll})[/] · {who}",
+                            "", None))
+        if force is not None and (force.armid_mines or force.limpet_mines):
+            kinds = []
+            if force.armid_mines:
+                kinds.append(f"{force.armid_mines} armid")
+            if force.limpet_mines:
+                kinds.append(f"{force.limpet_mines} limpet")
+            entries.append(("__mines__", "", sec.sector_id,
+                            f"[b]{' + '.join(kinds)} mines[/] · [green]yours[/]",
+                            "", None))
+        if entries:
+            sprite_h = 4 if h - row >= 6 else 0  # caption-only on a short terminal
+            col_w = w / len(entries)
+            for i, (entity, sub, seed, caption, dest, ref) in enumerate(entries):
+                left = max(0, int(i * col_w))
+                span = max(8, int(col_w))
+                if sprite_h:
+                    if entity == "__mines__":
+                        cells = art_adapter.text_to_cells(Text.from_markup(
+                            "[red] ✺     ✺ [/]\n[red]    ✺    [/]\n[red] ✺     ✺ [/]"))
+                    else:
+                        sw = min(14, span - 2)
+                        cells = self._sprite_cells(entity, sub, seed=int(seed),
+                                                   sw=sw, sh=sprite_h)
+                    cw = max((len(r) for r in cells), default=0)
+                    self._paint(grid, cells, row, left + max(0, (span - cw) // 2))
+                self._stamp_line(grid, caption, row + sprite_h, left, span)
+                if dest:
+                    self._hotspots.append((left, row, left + span,
+                                           row + sprite_h + 1, dest, ref))
+            row += sprite_h + 1
 
         # (Discoveries are listed in the sidebar's "Anomalies" panel, not the scene.)
 

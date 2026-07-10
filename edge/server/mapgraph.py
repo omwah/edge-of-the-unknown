@@ -22,6 +22,7 @@ import math
 from collections import deque
 from collections.abc import Sequence
 
+from edge.core import corp
 from edge.core import dto
 from edge.core.enums import PortClass
 from edge.core.models import Player, UniverseState
@@ -46,7 +47,8 @@ _ONEWAY_STYLE = "dim"  # a warp with no return edge (one-way), drawn faintly
 
 LEGEND = (
     "[reverse bold cyan]@[/] you   [bold yellow]*[/] route   ─ warp   "
-    "[magenta]P[/]/[magenta]S[/] port   [green]@[/] planet   [dim](n)[/] unexplored"
+    "[magenta]P[/]/[magenta]S[/] port   [green]@[/] planet   [cyan]#[/] starbase   "
+    "[red]×[/] forces   [dim](n)[/] unexplored"
 )
 
 
@@ -65,14 +67,24 @@ def _local_bfs(state: UniverseState, src: int, radius: int) -> dict[int, int]:
     return seen
 
 
-def _codes(state: UniverseState, sector_id: int) -> str:
-    """Short content tokens for an explored sector (mirrors session._sector_codes)."""
+def _codes(state: UniverseState, sector_id: int, player: Player | None = None) -> str:
+    """Short content tokens for an explored sector (mirrors session._sector_codes):
+    port (S/P), planet (@), starbase (#), known forces (× — classic fog: fighters are
+    public, mines only your own)."""
     out = ""
     port = state.port_in_sector(sector_id)
     if port is not None:
         out += "S" if port.klass is PortClass.STARDOCK else "P"
     if any(pl.sector_id == sector_id for pl in state.planets.values()):
         out += "@"
+    if any(b.sector_id == sector_id for b in state.starbases.values()):
+        out += "#"
+    force = state.sector_forces.get(sector_id)
+    if force is not None and (force.fighters > 0 or (
+            player is not None
+            and (force.armid_mines > 0 or force.limpet_mines > 0)
+            and corp.player_owns(state, force.owner, player.id))):
+        out += "×"
     return out
 
 
@@ -88,7 +100,7 @@ def _label(state: UniverseState, player: Player, sector_id: int, here: int) -> s
         return f"({disp}@)"
     if sector_id not in player.explored_sectors:
         return f"({disp})"
-    return f"({disp}){_codes(state, sector_id)}"
+    return f"({disp}){_codes(state, sector_id, player)}"
 
 
 def build_local_map(
