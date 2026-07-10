@@ -263,13 +263,21 @@ corp UI (WP76) ships in this arc. Sizes are relative (S/M/L).
   WIRE_VERSION 2→3 (+ WP71's DTO fields) with fixture regen; `territory_view` on
   GameClient/LocalClient/RemoteClient + the net read whitelist. Tests:
   `tests/test_surfacing.py` WP72 section.
-- **WP73 — Keymap normalization & discoverability (M).** The §4 plan: a keymap
-  convention doc in `UI_MOCKUPS.md`, conflict fixes, a real Help keymap, **and a
-  numbered context-action menu** (one key lists everything doable here) (D3);
-  ConfirmScreen on Genesis / Seize Core / Invade / ResignAlliance / friendly
-  first-strikes (D7); stale-copy fixes (C4); delete `MapScreen`/`MessagesScreen`
-  + their shots entries, **build the Notes tab** (notes + route-planner
-  avoid-list), drop menu Load, add a minimal Options screen (D5).
+- **WP73 — Keymap normalization & discoverability (M) — SHIPPED.** Keymap
+  convention section in `UI_MOCKUPS.md` (reserved globals: Esc-back, `.` action
+  menu, `?` help; verb vocabulary; D7 confirm rule). Conflict fixes: Port/Help
+  drop `q`, Planet drops the noop Trade `t`, Corp/Starbase withdraw `y`→`w`.
+  Real Help keymap (`?`): conventions + per-screen verbs + warp legend. Numbered
+  context-action menu on `.` (app-level `ActionMenuScreen` reading the current
+  screen's advertised bindings — every feature is discoverable for free) (D3).
+  ConfirmScreen on Genesis, Seize Core, Invade, ResignAlliance (contact +
+  Alliances tab), and the contact-screen first strike (D7; the in-sector attack
+  confirm shipped in WP70). Stale copy fixed in `game.py`/`computer.py` (C4).
+  `MapScreen`/`MessagesScreen` deleted (+ shots entries); **Notes tab built**:
+  `Player.notes` + `Player.avoid_sectors`, `AddNote`/`RemoveNote`/`ToggleAvoid`
+  commands (codec-covered), avoid list honored by the route planner (endpoints
+  never blocked); menu Load dropped; minimal `OptionsScreen` (theme cycle +
+  greyed-replies toggle) (D5). Tests: `tests/test_surfacing.py` WP73 section.
 - **WP74 — Signature-mechanic corpus (M, content).** Author `sig.*` routes for
   all six dark hooks — authored directly in-session (D4: Claude writes the
   corpus content, human-reviewed; not the local-model pipeline) — and wire the

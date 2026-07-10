@@ -125,7 +125,10 @@ from edge.core.rules import (
     LeaveCorp,
     TransferPlanetFromCorp,
     TransferPlanetToCorp,
+    AddNote,
     PostNotice,
+    RemoveNote,
+    ToggleAvoid,
     DeployBeacon,
     DeployFighters,
     DeployGenesis,
@@ -271,6 +274,12 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "BuyRumor", {}
         case PostNotice():
             return "PostNotice", {"text": command.text}
+        case AddNote():
+            return "AddNote", {"text": command.text}
+        case RemoveNote():
+            return "RemoveNote", {"index": command.index}
+        case ToggleAvoid():
+            return "ToggleAvoid", {"sector_id": command.sector_id}
         case AdvanceAdmission():
             return "AdvanceAdmission", {"alliance_id": command.alliance_id, "task": command.task}
         case JoinAlliance():
@@ -452,6 +461,12 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return BuyRumor()
         case "PostNotice":
             return PostNotice(text=payload["text"])
+        case "AddNote":
+            return AddNote(text=payload["text"])
+        case "RemoveNote":
+            return RemoveNote(index=payload["index"])
+        case "ToggleAvoid":
+            return ToggleAvoid(sector_id=payload["sector_id"])
         case "AdvanceAdmission":
             return AdvanceAdmission(alliance_id=payload["alliance_id"], task=payload["task"])
         case "JoinAlliance":

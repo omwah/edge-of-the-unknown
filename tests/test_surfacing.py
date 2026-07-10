@@ -144,3 +144,56 @@ def test_alliance_rows_project_membership_admission_and_governor() -> None:
     apply_result(state, reduce(state, 1, AdvanceAdmission(2, "prove"), CFG))
     rows2 = {r.alliance_id: r for r in computer_view(state, 1, CFG).alliances}
     assert rows2[2].tasks_done == ["prove"] and rows2[2].joinable
+
+
+# --- WP73: captain's notes + the route-planner avoid list ---------------------------
+
+
+def _linear_world() -> UniverseState:
+    """Sectors 1—2—3 in a line plus a 1—4—3 detour, all explored."""
+    game = Game(id=1, seed=1, config_version=CFG.config_version,
+                created_at="1970-01-01T00:00:00Z", core_governing_alliance_id=1)
+    state = UniverseState.new(game)
+    state.sectors = {
+        1: Sector(1, 1, (2, 4), "Frontier"),
+        2: Sector(2, 1, (1, 3), "Frontier"),
+        3: Sector(3, 1, (2, 4), "Frontier"),
+        4: Sector(4, 1, (1, 3), "Frontier"),
+    }
+    state.rebuild_adjacency()
+    state.ships[1] = Ship(id=1, type_id="trailblazer", name="T", owner_player_id=1,
+                          sector_id=1, holds_total=20, hull_current=200, hull_max=200,
+                          shields=100, warp_speed=3, combat_speed=3, turns_per_warp=1)
+    state.players[1] = Player(id=1, name="T", ship_id=1, latinum=100, turns_remaining=100,
+                              explored_sectors=frozenset({1, 2, 3, 4}))
+    return state
+
+
+def test_notes_ring_appends_sanitizes_and_removes() -> None:
+    from edge.core.rules import AddNote, RemoveNote
+    state = _linear_world()
+    apply_result(state, reduce(state, 1, AddNote(text="  buy ore at S2\x00  "), CFG))
+    apply_result(state, reduce(state, 1, AddNote(text="quill pack near S9"), CFG))
+    assert state.players[1].notes == ("buy ore at S2", "quill pack near S9")
+    view = computer_view(state, 1, CFG)
+    assert view.notes == ["buy ore at S2", "quill pack near S9"]
+    apply_result(state, reduce(state, 1, RemoveNote(index=0), CFG))
+    assert state.players[1].notes == ("quill pack near S9",)
+
+
+def test_avoid_list_reroutes_but_never_blocks_endpoints() -> None:
+    from edge.core.rules import ToggleAvoid
+    from edge.server.session import route_view
+    state = _linear_world()
+    direct = route_view(state, 1, 3, CFG)
+    assert len(direct.hops) == 2  # 1→2→3
+    apply_result(state, reduce(state, 1, ToggleAvoid(sector_id=2), CFG))
+    rerouted = route_view(state, 1, 3, CFG)
+    assert rerouted.reachable
+    assert [h.display_id for h in rerouted.hops] == [4, 3]  # detoured around 2
+    # An avoided *destination* is still plottable — the endpoint override.
+    to_avoided = route_view(state, 1, 2, CFG)
+    assert to_avoided.reachable and len(to_avoided.hops) == 1
+    # Toggling again clears it.
+    apply_result(state, reduce(state, 1, ToggleAvoid(sector_id=2), CFG))
+    assert state.players[1].avoid_sectors == frozenset()

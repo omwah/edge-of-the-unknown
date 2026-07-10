@@ -244,6 +244,11 @@ class AlienContactScreen(Screen):
         return art_portrait.DEFAULT_SYMBOLS, art_portrait.DEFAULT_FONT_RATIO, None
 
     def _show_disabled(self) -> bool:
+        # Prefer the app-held UI config (synced from game config at start; the WP73
+        # Options screen toggles it live) over the frozen service config.
+        ui = getattr(self.app, "ui_config", None)
+        if ui is not None:
+            return bool(ui.show_disabled_options)
         return self._service.config.ui.show_disabled_options if self._service else False
 
     def _menu_items(self, c: dto.ContactDTO) -> list[tuple[str, object]]:
@@ -315,7 +320,7 @@ class AlienContactScreen(Screen):
         _kind, item = items[n - 1]
         self._choose(item.index)  # type: ignore[attr-defined]
 
-    def _choose(self, index: int) -> None:
+    def _choose(self, index: int, *, confirmed: bool = False) -> None:
         """Apply a player reply, then navigate per its action/transition (§6.7)."""
         pre = self._view()
         choice = next((ch for ch in pre.choices if ch.index == index), None)
@@ -325,6 +330,15 @@ class AlienContactScreen(Screen):
             self.notify(choice.reason or "unavailable here", timeout=2)
             return
         if self._service is None:
+            return
+        if choice.action == "attack" and not confirmed:
+            # D7 (WP73): a first strike from a conversation is confirmed before it fires —
+            # betrayal consequences (WP27/WP70) are not for a slipped keypress.
+            from edge.tui.screens.confirm import ConfirmScreen
+            self.app.push_screen(
+                ConfirmScreen(f"Open fire on the {pre.species}?\n"
+                              "A first strike is a betrayal they will remember."),
+                lambda ok: self._choose(index, confirmed=True) if ok else None)
             return
         # Capture the intel feedback *before* the reducer consumes the tip (an accept_lead reply
         # logs the lead inside Converse, then the next view no longer offers it).
@@ -454,14 +468,26 @@ class AlienContactScreen(Screen):
             return
         from edge.core.rules import JoinAlliance, ResignAlliance
         command = ResignAlliance() if c.alliance_member else JoinAlliance(c.alliance_id)
-        try:
-            self._service.apply(self._pid, command)
-        except Exception as exc:  # core rejected it — surface the reason, stay put
-            self.notify(str(exc), timeout=3)
-            return
-        done = "You stand apart again." if c.alliance_member else f"Sworn to the {c.alliance}."
-        self.notify(done, timeout=3)
-        self._reopen()
+
+        def _go(ok: bool | None = True) -> None:
+            if not ok:
+                return
+            try:
+                self._service.apply(self._pid, command)
+            except Exception as exc:  # core rejected it — surface the reason, stay put
+                self.notify(str(exc), timeout=3)
+                return
+            done = ("You stand apart again." if c.alliance_member
+                    else f"Sworn to the {c.alliance}.")
+            self.notify(done, timeout=3)
+            self._reopen()
+
+        if c.alliance_member:  # D7 (WP73): resigning resets standings — confirm it
+            from edge.tui.screens.confirm import ConfirmScreen
+            self.app.push_screen(ConfirmScreen(
+                f"Resign from the {c.alliance}?\nYour standing with them resets."), _go)
+        else:
+            _go()
 
     def action_farewell(self) -> None:
         """Farewell (f): speak a parting line, then break contact — the single exit."""

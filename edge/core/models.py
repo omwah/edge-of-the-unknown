@@ -577,6 +577,11 @@ class Player:
     # appended by the accept reducer and resolved by the completion reducers + the deadline
     # cron. Hashed state (rides the M19 golden batch); reconstructs under (seed, command log).
     contracts: tuple[Contract, ...] = ()
+    # Captain's notes + the route-planner avoid list (§9 Notes tab — WP73). Notes are
+    # sanitized free text (capped, oldest evicted); avoided sectors are skipped when the
+    # planner plots through charted space (an origin/destination is never blocked).
+    notes: tuple[str, ...] = ()
+    avoid_sectors: frozenset[int] = frozenset()
     # Standing with each alliance/bloc (alliance_id → [-1, 1]), set by JoinAlliance
     # (DESIGN §6.3, WP38): the joined bloc warms to +1, its rivals (and rivals of the
     # joined bloc) sour to -1. Negative standing with a species' bloc shifts the

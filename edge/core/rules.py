@@ -598,6 +598,35 @@ class PostNotice:
 
 
 @dataclass(frozen=True, slots=True)
+class AddNote:
+    """Write a captain's note (§9 Notes tab — WP73).
+
+    Sanitised like `PostNotice` (printable-only, length-capped) and appended to a
+    capped ring on the player (oldest evicted). Personal state; no event.
+    """
+
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class RemoveNote:
+    """Delete the captain's note at `index` (§9 Notes tab — WP73)."""
+
+    index: int
+
+
+@dataclass(frozen=True, slots=True)
+class ToggleAvoid:
+    """Toggle a sector on the route-planner avoid list (§9 Notes tab — WP73).
+
+    An avoided sector is skipped when the planner plots through charted space; the
+    origin and destination of a plot are never blocked.
+    """
+
+    sector_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class AdvanceAdmission:
     """Record one completed admission task toward a bloc's membership (§6.3, WP38).
 
@@ -861,6 +890,7 @@ Command = (
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
     | DeliverContract | AbandonContract | BuyRumor | PostNotice
+    | AddNote | RemoveNote | ToggleAvoid
     | AdvanceAdmission | JoinAlliance | ResignAlliance | PetitionCoreSeizure
     | AssaultStarbase | RepairStarbase | ClaimStarbase
     | BuyFighters | BuyMines | DeployFighters | DeployMines | DeployBeacon
@@ -1030,6 +1060,12 @@ def reduce(
             return _buy_rumor(state, player_id, config)
         case PostNotice():
             return _post_notice(state, player_id, command, config)
+        case AddNote():
+            return _add_note(state, player_id, command)
+        case RemoveNote():
+            return _remove_note(state, player_id, command)
+        case ToggleAvoid():
+            return _toggle_avoid(state, player_id, command)
         case AdvanceAdmission():
             return _advance_admission(state, player_id, command, config)
         case JoinAlliance():
@@ -3704,6 +3740,42 @@ def _post_notice(state: UniverseState, player_id: int, cmd: PostNotice,
     ring = (*state.notices, notice)[-config.tavern.notice_cap:]
     event = NoticePosted(player_id, state.game.day_number)
     return ReduceResult(events=(event,), notices=ring)
+
+
+# --- captain's notes + avoid list (§9 Notes tab — WP73) ----------------------
+
+_NOTE_CAP = 50
+_NOTE_MAX_LEN = 160
+
+
+def _add_note(state: UniverseState, player_id: int, cmd: AddNote) -> ReduceResult:
+    """Append a sanitised captain's note to the capped ring (WP73). No event — personal."""
+    player = _player(state, player_id)
+    text = "".join(ch for ch in cmd.text if ch.isprintable()).strip()[:_NOTE_MAX_LEN]
+    if not text:
+        raise EconomyError("your note is empty")
+    notes = (*player.notes, text)[-_NOTE_CAP:]
+    return ReduceResult(players=(replace(player, notes=notes),))
+
+
+def _remove_note(state: UniverseState, player_id: int, cmd: RemoveNote) -> ReduceResult:
+    player = _player(state, player_id)
+    if not 0 <= cmd.index < len(player.notes):
+        raise EconomyError("no such note")
+    notes = tuple(n for i, n in enumerate(player.notes) if i != cmd.index)
+    return ReduceResult(players=(replace(player, notes=notes),))
+
+
+def _toggle_avoid(state: UniverseState, player_id: int, cmd: ToggleAvoid) -> ReduceResult:
+    """Toggle a charted sector on the route-planner avoid list (WP73)."""
+    player = _player(state, player_id)
+    if cmd.sector_id not in state.sectors:
+        raise EconomyError("no such sector")
+    if cmd.sector_id in player.avoid_sectors:
+        avoid = player.avoid_sectors - {cmd.sector_id}
+    else:
+        avoid = player.avoid_sectors | {cmd.sector_id}
+    return ReduceResult(players=(replace(player, avoid_sectors=avoid),))
 
 
 # --- corporations (DESIGN §4, WP66) ------------------------------------------

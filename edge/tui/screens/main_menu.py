@@ -33,8 +33,7 @@ class MainMenuScreen(Screen):
     BINDINGS = [
         Binding("n", "new_game", "New game"),
         Binding("c", "continue_game", "Continue"),
-        Binding("l", "unavailable", "Load"),
-        Binding("o", "unavailable", "Options"),
+        Binding("o", "options", "Options"),
         Binding("q", "quit_app", "Quit"),
         # Secret: open the sprite gallery (dev preview). Unadvertised.
         Binding("~", "gallery", "Sprite gallery", show=False),
@@ -50,7 +49,6 @@ class MainMenuScreen(Screen):
                 yield Button("N  New game", id="new", variant="primary")
                 label = "C  Continue" if saved else "C  Continue  (no save found)"
                 yield Button(label, id="continue", disabled=not saved)
-                yield Button("L  Load game …", id="load")
                 yield Button("O  Options", id="options")
                 yield Button("Q  Quit", id="quit")
             yield Static(_FOOTER, classes="footer")
@@ -66,10 +64,10 @@ class MainMenuScreen(Screen):
                 self.action_new_game()
             case "continue":
                 self.action_continue_game()
+            case "options":
+                self.action_options()
             case "quit":
                 self.action_quit_app()
-            case _:
-                self.action_unavailable()
 
     def action_new_game(self) -> None:
         # A new game replaces the single save slot — confirm before destroying it.
@@ -104,8 +102,9 @@ class MainMenuScreen(Screen):
     def action_gallery(self) -> None:
         self.app.push_screen(SpriteGalleryScreen())
 
-    def action_unavailable(self) -> None:
-        self.notify("Not wired in the skeleton.", timeout=2)
+    def action_options(self) -> None:
+        from edge.tui.screens.options import OptionsScreen
+        self.app.push_screen(OptionsScreen())
 
     def action_quit_app(self) -> None:
         self.app.exit()

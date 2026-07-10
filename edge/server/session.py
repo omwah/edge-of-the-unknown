@@ -1090,6 +1090,8 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         seizure=_seizure_status(state, player, config),
         governance_intel=_governance_intel(state, player),
         alliances=_alliance_rows(state, player, config),
+        notes=list(player.notes),
+        avoid=sorted(_display(state, s) for s in player.avoid_sectors),
     )
 
 
@@ -1236,6 +1238,15 @@ def _hop_label(state: UniverseState, sector_id: int) -> str:
     return f"({did}) · {' '.join(words)}" if words else f"({did})"
 
 
+def _routable(player: Player, *endpoints: int) -> set[int]:
+    """Charted space minus the avoid list (§9 Notes tab — WP73).
+
+    Endpoints (origin, destination, waypoints) are never blocked — an explicit plot to
+    an avoided sector is the player overriding their own list for that one place.
+    """
+    return (set(player.explored_sectors) - set(player.avoid_sectors)) | set(endpoints)
+
+
 def _route_hazards(state: UniverseState, player: Player, plan: RoutePlan,
                    config: GameConfig) -> list[str]:
     """Hazard warnings for a plotted route (§11, WP75 — the A4 seam finally lit).
@@ -1342,7 +1353,7 @@ def route_view(
     at_origin = lead is not None and ship.sector_id == lead.origin_sector
     plan = plan_route(
         state.adjacency, ship.sector_id, dst_sector,
-        allowed=None if at_origin else set(player.explored_sectors),
+        allowed=None if at_origin else _routable(player, ship.sector_id, dst_sector),
         turns_per_warp=ship.turns_per_warp,
     )
     origin_hint = (_display(state, lead.origin_sector)
@@ -1358,7 +1369,8 @@ def route_legs_view(
     ship = state.ships[player.ship_id]
     plan = plan_route_legs(
         state.adjacency, ship.sector_id, waypoints,
-        allowed=set(player.explored_sectors), turns_per_warp=ship.turns_per_warp,
+        allowed=_routable(player, ship.sector_id, *waypoints),
+        turns_per_warp=ship.turns_per_warp,
     )
     return _route_dto(state, player, plan, config)
 

@@ -28,7 +28,7 @@ class StarbaseServicesScreen(Screen):
         Binding("b", "buy", "Buy"),
         Binding("m", "buy_missiles", "Resupply missile"),
         Binding("d", "deposit", "Deposit 1k"),
-        Binding("y", "withdraw", "Withdraw 1k"),
+        Binding("w", "withdraw", "Withdraw 1k"),
     ]
 
     CSS = """

@@ -43,7 +43,7 @@ class CorpScreen(Screen):
         Binding("escape", "back", "Back"),
         Binding("f", "form", "Form corp"),
         Binding("d", "deposit", "Deposit 1k"),
-        Binding("y", "withdraw", "Withdraw 1k"),
+        Binding("w", "withdraw", "Withdraw 1k"),
         Binding("l", "leave", "Leave corp"),
     ]
 

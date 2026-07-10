@@ -32,6 +32,7 @@ from edge.core.rules import (
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
+from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.dummy import sample_surface
 from edge.tui.screens.surface import SurfaceScreen
 
@@ -50,7 +51,6 @@ class PlanetScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Break orbit"),
         Binding("d", "descend", "Descend"),
-        Binding("t", "noop", "Trade"),
         Binding("c", "colonize", "Claim/Colonize"),
         Binding("s", "salvage", "Salvage"),
         Binding("g", "genesis", "Genesis"),
@@ -215,12 +215,20 @@ class PlanetScreen(Screen):
         if not p.can_invade:
             self.notify(p.invade_blocker or "Nothing to invade here.", timeout=2)
             return
-        try:
-            self._service.apply(self._pid, InvadePlanet(p.planet_id, p.ship_fighters))
-        except (EconomyError, CombatError, CitadelError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
-            return
-        self._reopen()
+
+        def _go(ok: bool | None) -> None:
+            if not ok:
+                return
+            try:
+                self._service.apply(self._pid, InvadePlanet(p.planet_id, p.ship_fighters))
+            except (EconomyError, CombatError, CitadelError) as exc:
+                self.notify(str(exc), severity="warning", timeout=3)
+                return
+            self._reopen()
+
+        self.app.push_screen(ConfirmScreen(
+            f"Invade {p.name} with {p.ship_fighters} fighters?\n"
+            "Committed troops do not come back."), _go)
 
     def action_colonize(self) -> None:
         if self._service is None:
@@ -270,15 +278,23 @@ class PlanetScreen(Screen):
         if not p.genesis_eligible or p.ship_genesis <= 0:
             self.notify("Can't deploy genesis here (need an eligible world + a torpedo).", timeout=2)
             return
-        try:
-            self._service.apply(self._pid, DeployGenesis(planet_id=p.planet_id))
-        except (EconomyError, MovementError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
-            return
-        self.notify("Genesis deployed — the world is re-forming!", timeout=2)
-        self.app.pop_screen()
-        self.app.push_screen(PlanetScreen(
-            self._service.planet_view(self._pid, p.planet_id), self._service, self._pid))
+
+        def _go(ok: bool | None) -> None:
+            if not ok:
+                return
+            try:
+                self._service.apply(self._pid, DeployGenesis(planet_id=p.planet_id))
+            except (EconomyError, MovementError) as exc:
+                self.notify(str(exc), severity="warning", timeout=3)
+                return
+            self.notify("Genesis deployed — the world is re-forming!", timeout=2)
+            self.app.pop_screen()
+            self.app.push_screen(PlanetScreen(
+                self._service.planet_view(self._pid, p.planet_id), self._service, self._pid))
+
+        self.app.push_screen(ConfirmScreen(
+            f"Fire a Genesis torpedo at {p.name}?\n"
+            "The world is re-formed — this cannot be undone."), _go)
 
     def action_assault_base(self) -> None:
         """Open a set-piece assault on the orbital base (§4.2, WP40 — surfaced WP71)."""

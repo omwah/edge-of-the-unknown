@@ -41,9 +41,10 @@ WIRE_VERSION = 3
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
 into the sector view).
-v3 (WP71/WP72): `PlanetDTO.base_*` starbase-ops affordances; `StarDockDTO` bank counter;
-`ContactDTO.alliance_id`/`alliance_member`; `ComputerDTO.alliances`; new `TerritoryDTO`
-+ `AllianceRowDTO`; `territory_view` read method.
+v3 (WP71–WP73): `PlanetDTO.base_*` starbase-ops affordances; `StarDockDTO` bank counter;
+`ContactDTO.alliance_id`/`alliance_member`; `ComputerDTO.alliances`/`notes`/`avoid`; new
+`TerritoryDTO` + `AllianceRowDTO`; `territory_view` read method; `AddNote`/`RemoveNote`/
+`ToggleAvoid` commands.
 """
 
 

@@ -27,7 +27,6 @@ _CHUNK = 10  # units traded per keypress (clamped to what's affordable/available
 class PortScreen(Screen):
     BINDINGS = [
         Binding("escape", "leave", "Leave dock"),
-        Binding("q", "leave", "Leave dock"),
         Binding("t", "trade", "Trade highlighted"),
         Binding("h", "haggle", "Haggle highlighted"),
         Binding("d", "deliver", "Deliver favor"),
