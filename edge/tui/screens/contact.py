@@ -102,6 +102,7 @@ class AlienContactScreen(Screen):
     BINDINGS = [
         Binding("b", "back_one", "Back"),       # step back to the previous node (no-op at the opener)
         Binding("f", "farewell", "Farewell"),   # speak a parting line, then break contact
+        Binding("j", "alliance", "Join/Resign bloc"),  # derived §6.3 verb (WP72)
         # Play-test only: re-roll the current context's line in place. `check_action` hides it
         # (and disables it) outside the dialogue play-test harness.
         Binding("f5", "refresh", "Refresh"),
@@ -223,6 +224,10 @@ class AlienContactScreen(Screen):
                     if self._history:
                         yield ClickableEntry("  [dim]← Back (b)[/]", dest="back",
                                              classes="derived")
+                    if c.alliance_id is not None:
+                        verb = "Resign from" if c.alliance_member else "Join"
+                        yield Static(f"  [dim][b]J[/] {verb} the {c.alliance} (§6.3)[/]",
+                                     classes="derived")
                     if self.playtest_mode:
                         yield Static(f"\n  [dim]context = {c.debug_context} | when = {c.debug_when}[/]", classes="derived")
         yield Footer()
@@ -433,6 +438,29 @@ class AlienContactScreen(Screen):
         except Exception as exc:  # core rejected it — surface the reason, stay put
             self.notify(str(exc), timeout=2)
             return
+        self._reopen()
+
+    def action_alliance(self) -> None:
+        """Join the speaker's bloc — or resign it (§6.3, WP38 — the derived WP72 verb).
+
+        Joining is gated reducer-side (admission price, fee, exclusivity) and its rival
+        fallout can flip the Core hostile; resigning is the amends path.
+        """
+        if self._service is None:
+            return
+        c = self._view()
+        if c.alliance_id is None:
+            self.notify("They answer to no bloc.", timeout=2)
+            return
+        from edge.core.rules import JoinAlliance, ResignAlliance
+        command = ResignAlliance() if c.alliance_member else JoinAlliance(c.alliance_id)
+        try:
+            self._service.apply(self._pid, command)
+        except Exception as exc:  # core rejected it — surface the reason, stay put
+            self.notify(str(exc), timeout=3)
+            return
+        done = "You stand apart again." if c.alliance_member else f"Sworn to the {c.alliance}."
+        self.notify(done, timeout=3)
         self._reopen()
 
     def action_farewell(self) -> None:

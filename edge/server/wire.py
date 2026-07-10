@@ -36,11 +36,14 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 2
+WIRE_VERSION = 3
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
 into the sector view).
+v3 (WP71/WP72): `PlanetDTO.base_*` starbase-ops affordances; `StarDockDTO` bank counter;
+`ContactDTO.alliance_id`/`alliance_member`; `ComputerDTO.alliances`; new `TerritoryDTO`
++ `AllianceRowDTO`; `territory_view` read method.
 """
 
 
