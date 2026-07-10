@@ -595,7 +595,7 @@ follow this; collisions are bugs.
 |-----|---------|
 | `Esc` | Back / close the current screen (the only back key — `q` is menu-quit only) |
 | `.` | Numbered context-action menu: lists every advertised action on the current screen |
-| `?` | Help overlay (keymap + warp legend) |
+| `?` | Contextual help: the *current screen's* keys + notes (app-level, works everywhere); the sector view's help adds the warp legend |
 | `Ctrl+Q` | Quit the app |
 | `1`–`9` | Numbered menu/reply selection where a numbered list is shown |
 
@@ -604,7 +604,7 @@ follow this; collisions are bugs.
 | Key | Verb | Screens |
 |-----|------|---------|
 | `t` | Trade | Port, StarDock (Game: Corp — grandfathered, rename when corp gets a hub) |
-| `b` | Buy / Claim-base | StarDock/Starbase buy; Planet claims the base |
+| `b` | Buy / Base | StarDock/Starbase buy; Game/Planet open the base view (WP80) |
 | `h` | Haggle / Hail | Ports haggle; Game hails |
 | `d` | Deposit / Deliver / Deploy | StarDock deposit, Port deliver, Game deploy, Planet descend |
 | `w` | Withdraw / Travel | banking withdraw everywhere (`y` is retired); Game travel |

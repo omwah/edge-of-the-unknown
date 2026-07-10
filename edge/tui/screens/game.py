@@ -147,6 +147,14 @@ class GameScreen(Screen):
         Binding("ctrl+q", "quit", "Quit"),
     ]
 
+    HELP_TITLE = "Sector view"
+    HELP_LEGEND = True
+    HELP = """\
+Click the planet, base, port, or a ship for the same actions as the keys.
+[b]B[/] opens the starbase here (station · trade · hardware · bank, by standing);
+[b]P[/] docks at a free-standing port; a base's market is entered through the base.
+The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden finds."""
+
     def __init__(self, service: GameService, player_id: int) -> None:
         super().__init__()
         self._service = service
@@ -430,7 +438,7 @@ class GameScreen(Screen):
         self.app.push_screen(CorpScreen(self._service, self._pid))
 
     def action_help(self) -> None:
-        self.app.push_screen(HelpScreen())
+        self.app.push_screen(HelpScreen(self))
 
     # --- event ticker --------------------------------------------------------
 

@@ -54,6 +54,9 @@ class EdgeApp(App[None]):
         # The numbered context-action menu (WP73, D3): one key lists everything
         # doable on the current screen. App-level so every screen gets it for free.
         Binding("full_stop", "action_menu", "Actions", show=False),
+        # Contextual help: `?` opens the current screen's keys + notes. App-level,
+        # so every screen gets it for free (the game screen advertises it).
+        Binding("question_mark", "help", "Help", show=False),
     ]
 
     player_id = 1
@@ -86,6 +89,14 @@ class EdgeApp(App[None]):
         if isinstance(self.screen, ModalScreen):
             return  # modals (prompts, confirms, the menu itself) keep their own keys
         self.push_screen(ActionMenuScreen(self.screen))
+
+    def action_help(self) -> None:
+        """Open contextual help for the current screen (`?` anywhere)."""
+        from textual.screen import ModalScreen
+        from edge.tui.screens.help import HelpScreen
+        if isinstance(self.screen, ModalScreen):
+            return  # modals keep their own keys (and `?` may be typed input there)
+        self.push_screen(HelpScreen(self.screen))
 
     @property
     def service(self) -> GameService | None:

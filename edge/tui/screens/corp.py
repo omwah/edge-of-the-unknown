@@ -64,6 +64,8 @@ class CorpScreen(Screen):
         Binding("o", "planet_from_corp", "World → CEO"),
     ]
 
+    HELP_TITLE = "Corporation"
+
     CSS = """
     CorpScreen #corp-title {
         dock: top; height: 1; background: $accent; color: $background;

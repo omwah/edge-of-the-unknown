@@ -44,6 +44,12 @@ class EncounterScreen(Screen):
         Binding("escape", "close_if_over", "Close", show=False),
     ]
 
+    HELP_TITLE = "Encounter"
+    HELP = """\
+A live fight has no Esc — fight, missile, patch, or flee. Once it resolves,
+[b]Esc[/] returns to the sector. Your escape chance never drops below the
+configured floor; firing arcs decide who can answer."""
+
     CSS = """
     EncounterScreen #enc-title {
         dock: top; height: 1; background: $error; color: $background;

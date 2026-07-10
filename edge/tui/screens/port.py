@@ -32,6 +32,11 @@ class PortScreen(Screen):
         Binding("d", "deliver", "Deliver favor"),
     ]
 
+    HELP_TITLE = "Trade port"
+    HELP = """\
+Trading acts on the [b]highlighted[/] commodity row. Haggling wears the port's
+patience — too many rejected offers close negotiation for the day."""
+
     # Mirror the StarDockScreen frame: a docked-top title bar, the port sprite
     # centred beneath it, then the trade panel — so a plain port and a StarDock read
     # the same (the title lives in the bar, so TradePanel's own title is suppressed).

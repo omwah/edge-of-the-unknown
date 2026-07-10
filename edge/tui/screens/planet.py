@@ -63,6 +63,13 @@ class PlanetScreen(Screen):
         Binding("l", "load_cargo", "Load cargo"),
     ]
 
+    HELP_TITLE = "Planet orbit"
+    HELP = """\
+Colony matters live here; every starbase op (repair · salvage · claim · assault ·
+market · services) is on the base screen — [b]B[/] or click the base line.
+[b]T[/]/[b]L[/] haul cargo between ship and stores: citadel builds draw equipment
+from [i]stores[/], so supply runs in trips are the intended loop."""
+
     CSS = """
     PlanetScreen #orbit-title {
         dock: top; height: 1; background: $primary; color: $background;

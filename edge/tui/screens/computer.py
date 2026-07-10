@@ -43,6 +43,13 @@ class ComputerScreen(Screen):
         Binding("t", "log_admission_task", "Log task"),
     ]
 
+    HELP_TITLE = "Ship's computer"
+    HELP = """\
+Tabs: Map · Ports · Planets · Trade · Market · Log · Route · Codex · Leads ·
+Contracts · Alliances · Dossier · Notes. Keys act on the [b]active tab[/]
+([b]X[/] abandons a contract or removes a note, per tab). [b]J[/] joins/resigns a
+bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
+
     CSS = """
     ComputerScreen #computer-title {
         dock: top; height: 1; background: $primary; color: $background;
