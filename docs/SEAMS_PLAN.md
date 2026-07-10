@@ -227,10 +227,19 @@ corp UI (WP76) ships in this arc. Sizes are relative (S/M/L).
   regen, H9 three-place dialogue-spec sync, DESIGN §6.7/§10 updated. Tests:
   `tests/test_attack_species.py` (gates, souring, lockstep, projection, replay hash)
   + rewritten contact-menu / contact attack tests.
-- **WP75 — Danger polish (S, runs second per D6).** Escort-merchant targeting
-  (A3), route hazards + the hazard-confirm modal finally firing (A4),
-  lethal-hazard→escape-pod (A5). Three small core changes with existing tests to
-  extend. NPC territoriality (A6) stays roadmap.
+- **WP75 — Danger polish (S, runs second per D6) — SHIPPED.** Escort-merchant
+  targeting (A3): each fought round with a live foe and an escorted merchant in the
+  fight's sector, a config-weighted roll (`aliens.contracts.escort_target_chance`,
+  default 0.25) drops the volley on the convoy — contract failed
+  (`merchant destroyed`) with the full WP27 rail against the issuer (souring +
+  honest-cause grudge + §6.4 spillover). Route hazards (A4): `RouteDTO.hazards`
+  now lists charted black holes + known hostile forces (explored hops only —
+  full-graph lead routes stay fogged) + per-band encounter interrupt risk; the
+  Computer's hazard-confirm modal fires for real. Lethal hazards (A5): black-hole
+  tolls and mine fields route hull 0 through the WP26 escape pod (`ShipDestroyed`,
+  no engagement spawns over the wreck). Tests: `tests/test_danger_polish.py` +
+  the rewritten `test_black_hole_lethal_toll_pods_the_player`. NPC territoriality
+  (A6) stays roadmap.
 - **WP71 — Surfacing pass 1: the frontier loop (L).** Starbase assault/repair/
   claim on the planet screen (B2); contract Deliver/Abandon on the Contracts tab +
   port screen (B3); RepairAtDock + engine-room `P`/`U` (B7/B8); StarDock Bank tab

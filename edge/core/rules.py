@@ -1343,14 +1343,15 @@ def _roll_encounter(
 
 def _territory_entry(
     state: UniverseState, player: Player, ship: Ship, sector_id: int, config: GameConfig,
-) -> tuple[Ship, Encounter | None, list[SectorForce], list[Event]]:
+) -> tuple[Ship, Encounter | None, list[SectorForce], list[Event], bool]:
     """Territory hazards on entering `sector_id` (§10, WP41): black hole, mines, fighters.
 
     Deterministic (no RNG). A black hole deals a flat gravity toll; a hostile mine field
     detonates (shields absorb, mines spent); a hostile fighter garrison forces an
     engagement (a combat encounter — engage-or-retreat, reconciled at the fight's end).
-    Hazard damage is clamped to leave the ship alive (a lethal hazard routing through the
-    escape pod is a documented seam). Returns `(ship, encounter, force_updates, events)`.
+    A lethal hazard routes through the WP26 escape pod (§10, WP75): hull 0 pods the
+    player on the spot, and no engagement spawns over a wreck. Returns
+    `(ship, encounter, force_updates, events, destroyed)`.
     """
     tc = config.territory
     events: list[Event] = []
@@ -1358,13 +1359,23 @@ def _territory_entry(
 
     def _apply(hull_raw: int, source: str) -> None:
         nonlocal ship
-        hit = min(max(0, ship.hull_current - 1), max(0, hull_raw))
+        hit = min(ship.hull_current, max(0, hull_raw))
         if hit > 0:
             ship = replace(ship, hull_current=ship.hull_current - hit)
             events.append(HazardDamageEvent(player.id, sector_id, source, hit))
 
+    def _podded() -> bool:
+        nonlocal ship
+        if ship.hull_current > 0:
+            return False
+        events.append(ShipDestroyed(player.id, 0, sector_id, ship.type_id))
+        ship = _escape_pod(ship, config)
+        return True
+
     if tc.black_hole_damage > 0 and territory.sector_has_black_hole(state, sector_id):
         _apply(tc.black_hole_damage, "black_hole")
+        if _podded():
+            return ship, None, forces, events, True
 
     force = state.sector_forces.get(sector_id)
     encounter: Encounter | None = None
@@ -1385,12 +1396,14 @@ def _territory_entry(
         if force.armid_mines > 0 or force.limpet_mines > 0:
             force = replace(force, armid_mines=0, limpet_mines=0)  # both piles are spent
             forces.append(force)
+        if _podded():
+            return ship, None, forces, events, True
         if force.fighters > 0:
             encounter = Encounter(
                 species_id=0, sector_id=sector_id, foes=(territory.fighter_foe(force, config),),
                 round=0, player_shields=ship.shields, detected=True, speech_context="combat_open",
             )
-    return ship, encounter, forces, events
+    return ship, encounter, forces, events, False
 
 
 def _entry_effects(
@@ -1400,9 +1413,13 @@ def _entry_effects(
 
     Territory hazards (WP41) apply first and can spawn a fighter engagement (which halts,
     like a base defense); otherwise the §4.2/§24 base-defense + ship-encounter roll runs.
-    Returns the (possibly damaged) ship and any deployed-force updates alongside the roll.
+    A lethal hazard pods the player (§10, WP75) and halts the journey — no encounter
+    rolls over a wreck. Returns the (possibly damaged) ship and any deployed-force
+    updates alongside the roll.
     """
-    ship, t_enc, forces, events = _territory_entry(state, player, ship, sector_id, config)
+    ship, t_enc, forces, events, destroyed = _territory_entry(state, player, ship, sector_id, config)
+    if destroyed:
+        return player, ship, None, True, events, forces
     if t_enc is not None:
         band = state.sectors[sector_id].distance_band
         events.append(EncounterStarted(player.id, 0, sector_id, True, len(t_enc.foes), band))
@@ -2354,6 +2371,11 @@ def _combat_action(
     ))
     new_ship = result.ship
     new_player = replace(player, active_encounter=result.encounter)
+    if foes_left > 0:
+        # A surviving pack may fall on an escorted merchant instead (§6.7, WP75 — the
+        # WP57 A3 seam): the convoy is a target while the fight rages in its sector.
+        new_player, escort_events = _escort_under_fire(state, new_player, enc.sector_id, config)
+        events.extend(escort_events)
     if result.foes_destroyed > 0 and species is not None and sc is not None:
         # Consequences of the kill (§6.5, WP27): souring + grudge, alignment by the
         # victim's band *before* the souring, experience scaled by threat.
@@ -2485,6 +2507,56 @@ def _combat_action(
                         ships=(new_ship, *extra_ships),
                         starbases=razed_bases, planets=razed_planets + silenced_planets,
                         sector_forces=force_updates)
+
+
+def _escort_under_fire(state: UniverseState, player: Player, sector_id: int,
+                       config: GameConfig) -> tuple[Player, list[Event]]:
+    """The pack's side volley at an escorted merchant (§6.7, WP75 — the WP57 A3 seam).
+
+    Each fought round with a live foe left and an active escort whose merchant sits in
+    the fight's sector, a config-weighted roll may drop the volley on the convoy: the
+    merchant's ship is destroyed (the kind persists — packs are ephemeral — but the job
+    is lost), the contract fails, and the issuing kind takes the full WP27 consequence
+    rail — one kill's worth of souring with an honest grudge cause, plus §6.4 spillover.
+    RNG discipline (H4): the roll draws only when a targetable merchant is present.
+    """
+    cc = config.aliens.contracts
+    if cc.escort_target_chance <= 0.0 or config.roster is None:
+        return player, []
+    events: list[Event] = []
+    new_player = player
+    for c in contracts.active(new_player, "escort"):
+        if c.target_species_id is None:
+            continue
+        merchant = state.species.get(c.target_species_id)
+        if merchant is None or merchant.sector_id != sector_id:
+            continue
+        if state.rng.random() >= cc.escort_target_chance:
+            continue
+        new_player = contracts.set_status(new_player, c.id, "failed")
+        events.append(ContractFailed(player.id, c.id, c.kind, "merchant destroyed"))
+        issuer = next((sp for sp in sorted(state.species.values(), key=lambda sp: sp.id)
+                       if sp.roster_id == c.issuer), merchant)
+        sc = config.roster.species_by_id(issuer.roster_id)
+        if sc is None:
+            continue
+        al = config.aliens
+        prior = new_player.species_attitudes.get(issuer.roster_id, 0.0)
+        soured = sour_attitude(
+            new_player, issuer, sc, al, state.game.day_number, 1,
+            cause=f"lost {merchant.name}'s convoy under the player's escort")
+        if soured is not new_player:  # memory_model none forgets instantly (no events)
+            grudge = soured.grudges[issuer.roster_id]
+            events.append(GrudgeFormed(
+                player.id, issuer.roster_id, grudge.severity, grudge.duration_days < 0))
+            events.append(AttitudeChanged(
+                player.id, issuer.id,
+                round(soured.species_attitudes[issuer.roster_id], 6),
+                round(effective_disposition(issuer, soured), 6)))
+            delta = soured.species_attitudes[issuer.roster_id] - prior
+            spilled = apply_spillover(soured, issuer.roster_id, delta, config.roster, al)
+            new_player = replace(soured, species_attitudes=spilled)
+    return new_player, events
 
 
 def _escape_pod(wreck: Ship, config: GameConfig) -> Ship:

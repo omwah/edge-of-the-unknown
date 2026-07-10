@@ -698,6 +698,11 @@ class ContractsConfig(BaseModel):
     # Every completed job also warms the player toward the issuer's kind by this offset
     # (capped so effective disposition never exceeds 1, like every attitude gain).
     attitude_reward: float = Field(default=0.06, ge=0.0, le=1.0)
+    # Each combat round fought with a live foe and an escorted merchant in the fight's
+    # sector, the pack may fall on the convoy instead (WP75): the merchant is destroyed,
+    # the job fails, and the issuer takes the WP27 souring rail (a lost charge is a
+    # betrayal of trust). 0 disables convoy targeting entirely.
+    escort_target_chance: float = Field(default=0.25, ge=0.0, le=1.0)
 
 
 class AliensConfig(BaseModel):

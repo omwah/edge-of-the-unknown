@@ -158,7 +158,7 @@ def test_hostile_mines_damage_on_entry_and_are_spent() -> None:
     _make_hostile(state)
     apply_result(state, reduce(state, 1, Warp(to_sector=2), CFG))
     ship = state.ships[1]
-    # 2 mines × mine_damage, minus 50 shields absorbed, clamped to leave the ship alive.
+    # 2 mines × mine_damage, minus 50 shields absorbed.
     assert ship.hull_current < 200
     assert 2 not in state.sector_forces or state.sector_forces[2].mines == 0  # spent
     assert state.players[1].active_encounter is None  # no fighters ⇒ no engagement
@@ -207,13 +207,19 @@ def test_black_hole_damages_on_entry() -> None:
     assert any(isinstance(e, HazardDamage) and e.source == "black_hole" for e in result.events)
 
 
-def test_black_hole_never_kills() -> None:
+def test_black_hole_lethal_toll_pods_the_player() -> None:
+    """A lethal hazard routes through the WP26 escape pod (WP75 — the A5 seam closed)."""
+    from edge.core.events import ShipDestroyed
     state = _mini_state(black_hole=True)
     state.ships[1] = replace(state.ships[1], hull_current=5)  # below the toll
     result = reduce(state, 1, Warp(to_sector=2), CFG)
     apply_result(state, result)
-    assert state.ships[1].hull_current == 1  # clamped alive (lethal-hazard→pod is a seam)
+    ship = state.ships[1]
+    assert ship.type_id == CFG.combat.escape_pod_class  # podded on the spot
+    assert ship.sector_id == 2 and ship.hull_current == ship.hull_max
     assert any(isinstance(e, HazardDamage) for e in result.events)
+    assert any(isinstance(e, ShipDestroyed) for e in result.events)
+    assert state.players[1].active_encounter is None  # no engagement over a wreck
 
 
 # --- WP56: armid/limpet split, probes, interdictor --------------------------

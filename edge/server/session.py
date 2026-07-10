@@ -25,6 +25,7 @@ from edge.core import citadels
 from edge.core import combat
 from edge.core import contracts
 from edge.core import encounters
+from edge.core import territory
 from edge.core.aliens import core_status, disposition_band, effective_disposition, seizure_progress
 from edge.core.config import DialogueChoice, GameConfig
 from edge.core.discovery import entity_contactable, entity_species, is_detectable
@@ -1134,8 +1135,50 @@ def _hop_label(state: UniverseState, sector_id: int) -> str:
     return f"({did}) · {' '.join(words)}" if words else f"({did})"
 
 
+def _route_hazards(state: UniverseState, player: Player, plan: RoutePlan,
+                   config: GameConfig) -> list[str]:
+    """Hazard warnings for a plotted route (§11, WP75 — the A4 seam finally lit).
+
+    Fog-of-war-safe: reads only what the player already knows — black holes and hostile
+    deployed forces in **explored** hop sectors, plus the per-band encounter interrupt
+    risk (world knowledge, a config fact). Feeds the Computer's hazard-confirm modal.
+    """
+    hazards: list[str] = []
+    risky_hops = 0
+    deepest = ""
+    deepest_chance = 0.0
+    for hop in plan.hops:
+        sid = hop.sector_id
+        did = _display(state, sid)
+        if sid in player.explored_sectors:
+            if territory.sector_has_black_hole(state, sid):
+                hazards.append(f"Black hole at ({did}) — gravity toll on entry")
+            force = state.sector_forces.get(sid)
+            if force is not None and territory.force_hostile_to_player(
+                    state, force, player, pvp_enabled=config.pvp.enabled):
+                kinds: list[str] = []
+                if force.fighters > 0:
+                    kinds.append(f"{force.fighters} fighters")
+                if force.armid_mines > 0 or force.limpet_mines > 0:
+                    kinds.append("mines")
+                if kinds:
+                    hazards.append(f"Hostile {' + '.join(kinds)} at ({did})")
+        chance = config.encounters.interrupt_chance.get(
+            state.sectors[sid].distance_band, 0.0)
+        if chance > 0.0:
+            risky_hops += 1
+            if chance > deepest_chance:
+                deepest_chance = chance
+                deepest = state.sectors[sid].distance_band
+    if risky_hops:
+        hazards.append(
+            f"Encounter risk on {risky_hops} hop{'s' if risky_hops != 1 else ''}"
+            f" (deepest band: {deepest})")
+    return hazards
+
+
 def _route_dto(state: UniverseState, player: Player, plan: RoutePlan,
-               *, origin_hint: int | None = None) -> dto.RouteDTO:
+               config: GameConfig, *, origin_hint: int | None = None) -> dto.RouteDTO:
     """Map a pure `RoutePlan` to the read-only, spatial-id Route DTO (§11, WP14).
 
     `origin_hint` (a spatial id) tailors the unreachable reason for a lead the player can't
@@ -1175,7 +1218,7 @@ def _route_dto(state: UniverseState, player: Player, plan: RoutePlan,
         affordable=affordable,
         reachable=plan.reachable,
         reason=reason,
-        hazards=[],  # Phase-3 encounter seam (empty in Phase 2)
+        hazards=_route_hazards(state, player, plan, config) if plan.reachable else [],
         summary=" · ".join(parts),
     )
 
@@ -1203,7 +1246,7 @@ def route_view(
     )
     origin_hint = (_display(state, lead.origin_sector)
                    if lead is not None and not at_origin and not plan.reachable else None)
-    return _route_dto(state, player, plan, origin_hint=origin_hint)
+    return _route_dto(state, player, plan, config, origin_hint=origin_hint)
 
 
 def route_legs_view(
@@ -1216,7 +1259,7 @@ def route_legs_view(
         state.adjacency, ship.sector_id, waypoints,
         allowed=set(player.explored_sectors), turns_per_warp=ship.turns_per_warp,
     )
-    return _route_dto(state, player, plan)
+    return _route_dto(state, player, plan, config)
 
 
 def leads_view(state: UniverseState, player_id: int, config: GameConfig) -> list[dto.LeadDTO]:

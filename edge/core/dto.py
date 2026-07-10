@@ -305,8 +305,9 @@ class RouteDTO:
     """A plotted route for the Computer's Route tab (§11, WP14).
 
     Read-only and spatial-id only (internal ids stay in core). `reason` is "" when
-    reachable, else why not (fog, already here, out of turns). `hazards` is empty in
-    Phase 2 — the Phase-3 encounter system fills it without reshaping the DTO.
+    reachable, else why not (fog, already here, out of turns). `hazards` lists what the
+    player already knows about the route (WP75): charted black holes, known hostile
+    forces, and the per-band encounter interrupt risk.
     """
 
     origin_display: int
