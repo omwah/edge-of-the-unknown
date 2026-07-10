@@ -197,3 +197,28 @@ def test_avoid_list_reroutes_but_never_blocks_endpoints() -> None:
     # Toggling again clears it.
     apply_result(state, reduce(state, 1, ToggleAvoid(sector_id=2), CFG))
     assert state.players[1].avoid_sectors == frozenset()
+
+
+# --- WP76: corp projections for the completed T screen -------------------------------
+
+
+def test_corp_view_carries_invite_ids_and_other_corps() -> None:
+    from edge.core.models import Corporation
+    from edge.server.session import corp_view
+    state = _linear_world()
+    state.players[2] = replace(state.players[1], id=2, name="Rival")
+    state.corporations = {
+        1: Corporation(id=1, name="Edge Haulage", tag="EDGE", ceo_player_id=1,
+                       member_player_ids=frozenset({1})),
+        2: Corporation(id=2, name="Void Syndicate", tag="VOID", ceo_player_id=2,
+                       member_player_ids=frozenset({2}), invited_player_ids=frozenset({3})),
+    }
+    state.players[1] = replace(state.players[1], corp_id=1)
+    view = corp_view(state, 1, CFG)
+    assert view is not None and view.corp_id == 1
+    assert view.other_corps == [(2, "VOID — Void Syndicate")]
+    # A corpless-but-invited player sees the invite with its accept id.
+    state.players[3] = replace(state.players[2], id=3, name="Free", corp_id=None)
+    invited = corp_view(state, 3, CFG)
+    assert invited is not None and invited.corp_id == 0
+    assert invited.invite_ids == [2] and invited.invites == ["VOID — Void Syndicate"]

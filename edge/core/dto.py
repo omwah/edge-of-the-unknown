@@ -453,6 +453,9 @@ class CorpDTO:
     starbase_count: int = 0
     at_war_with: list[str] = field(default_factory=list)  # rival corp tags
     invites: list[str] = field(default_factory=list)  # "TAG — Name" of corps inviting a corpless player
+    invite_ids: list[int] = field(default_factory=list)  # corp ids parallel to `invites` (WP76 accept)
+    # Every *other* corporation as (corp_id, "TAG — Name") — the war-target picker (WP76).
+    other_corps: list[tuple[int, str]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
