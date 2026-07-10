@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 4
+WIRE_VERSION = 5
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -51,6 +51,9 @@ v4 (WP78–WP79): base-hosted markets + the unified base view. `StarbaseServices
 replaced by `StarbaseDTO` (`starbase_view`/`current_starbase_view` read methods);
 `PlanetDTO` loses the base-ops affordances (`salvage`/`base_*` — moved to
 `StarbaseDTO`); `BaseCommission` event (owner's market cut, WP78).
+v5 (WP-UI13–UI14): navigation/trade presentation projections. `WarpDTO` gains
+`one_way`/`avoided`/`turn_cost`/`hazards`; `RouteDTO` gains `avoids`; `PortDTO` gains
+`purse`/`purse_enabled`/`holds_used`/`holds_total`.
 """
 
 
