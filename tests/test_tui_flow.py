@@ -1463,3 +1463,44 @@ async def test_help_is_contextual_to_the_current_screen() -> None:
         await pilot.press("escape")
         await pilot.pause()
         assert isinstance(app.screen, StarDockScreen)
+
+
+async def test_corp_screen_charters_with_derived_tag_and_buttons() -> None:
+    """The corp screen is panel/button-driven: chartering asks for a name only
+    (the ⟨TAG⟩ is derived internally), and the treasury buttons issue the
+    commands without hotkeys."""
+    from textual.widgets import Button, Input
+
+    from edge.tui.screens.corp import CorpScreen, _FormCorpModal, _derive_tag
+
+    assert _derive_tag("Edge of the Unknown", 3) == "EOT"
+    assert _derive_tag("Vanguard", 3) == "VAN"
+
+    app = EdgeApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        from dataclasses import replace as _replace
+        svc.state.players[1] = _replace(svc.state.players[1], latinum=50_000)  # afford the fee
+        await pilot.press("t")  # game screen → corp screen
+        await pilot.pause()
+        assert isinstance(app.screen, CorpScreen)
+        await pilot.click("#btn-form")
+        await pilot.pause()
+        assert isinstance(app.screen, _FormCorpModal)
+        app.screen.query_one("#corp-name", Input).value = "Edge of the Unknown"
+        await pilot.click("#corp-ok")
+        await pilot.pause()
+        corp = next(iter(svc.state.corporations.values()))
+        assert corp.name == "Edge of the Unknown"
+        assert corp.tag == _derive_tag("Edge of the Unknown", svc.config.corp.tag_max_len)
+        # Back on the corp screen, the panels are up; Deposit is a button click.
+        assert isinstance(app.screen, CorpScreen)
+        before = corp.bank_balance
+        assert app.screen.query(Button)  # panels rendered with buttons
+        await pilot.click("#btn-deposit")
+        await pilot.pause()
+        corp = svc.state.corporations[corp.id]
+        assert corp.bank_balance == before + 1_000
