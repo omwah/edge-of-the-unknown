@@ -425,7 +425,7 @@ class ComputerScreen(Screen):
         if not dto.reachable or not dto.affordable:
             self.notify(dto.reason or "Cannot travel that route.", severity="warning", timeout=3)
             return
-        if dto.hazards:  # Phase-3 seam: empty in Phase 2, so the confirm never appears yet
+        if dto.hazards:  # known black holes / hostile forces / band interrupt risk (WP75)
             self.app.push_screen(
                 ConfirmScreen("Hazards on route:\n" + "\n".join(dto.hazards) + "\n\nProceed?"),
                 self._engage_confirmed,
