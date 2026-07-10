@@ -46,6 +46,7 @@ pytest = "*"
 hypothesis = "*"
 pytest-asyncio = "*"
 pytest-cov = "*"
+pytest-textual-snapshot = "*"  # SVG visual-regression coverage for responsive TUI layouts
 
 [tool.pixi.pypi-dependencies]
 edge-of-the-unknown = { path = ".", editable = true }
