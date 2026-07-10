@@ -11,7 +11,7 @@ from __future__ import annotations
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import Footer, Static
@@ -23,6 +23,7 @@ from edge.core.events import DiscoveryCollected, EncounterStarted, Event
 from edge.core.movement import MovementError
 from edge.core.rules import AttackPlayer, AttackSpecies, Dock, Hail, Salvage, TravelTo, Warp
 from edge.server.service import GameService
+from edge.tui.design import LayoutTier, layout_tier
 from edge.tui.dummy import SectorDTO
 from edge.tui.onboarding import ObjectivesStrip, all_done
 from edge.tui.screens.computer import ComputerScreen
@@ -41,9 +42,11 @@ from edge.tui.widgets import (
     ClickableEntry,
     NavRose,
     SectionRule,
+    SectorObjectList,
     SectorScene,
     StatusSidebar,
     Ticker,
+    force_lines,
 )
 
 
@@ -53,19 +56,7 @@ def _presence_lines(sector: object) -> list[str]:
     for b in getattr(sector, "starbases", ()) or ():
         status = "[green]operational[/]" if b.operational else "[yellow]derelict[/]"
         lines.append(f"[cyan]#[/] {b.name} — {status}\n  [dim]{b.owner}[/]")
-    force = getattr(sector, "force", None)
-    if force is not None:
-        if force.fighters > 0:
-            toll = f", toll {force.toll}" if force.mode == "toll" else ""
-            who = "[green]yours[/]" if force.yours else f"[red]{force.owner}[/]"
-            lines.append(f"[red]×[/] {force.fighters} fighters ({force.mode}{toll}) — {who}")
-        if force.armid_mines or force.limpet_mines:
-            kinds = []
-            if force.armid_mines:
-                kinds.append(f"{force.armid_mines} armid")
-            if force.limpet_mines:
-                kinds.append(f"{force.limpet_mines} limpet")
-            lines.append(f"[red]✺[/] {' + '.join(kinds)} mines — [green]yours[/]")
+    lines.extend(force_lines(getattr(sector, "force", None)))
     return lines
 
 
@@ -101,28 +92,49 @@ class SectorView(Container):
 
     A single composited `SectorScene` (starfield behind header / planet / port /
     ships) fills the upper area, and the interactive `NavRose` — the single,
-    direction-aware warp affordance — fills the width at the bottom.
+    direction-aware warp affordance — fills the width at the bottom. On the
+    compact tier (WP-UI12) the art scene gives way to a location header plus a
+    focusable object list — gameplay information wins over art — while the nav
+    rose stays put as the visual anchor.
     """
 
     DEFAULT_CSS = """
     SectorView { width: 1fr; background: transparent; }
     SectorView #warp-area { width: 1fr; height: auto; align-horizontal: center; }
+    SectorView #compact-header { width: 1fr; height: auto; text-align: center; }
+    SectorView #compact-objects { width: 1fr; height: 1fr; }
     """
 
-    def __init__(self, sector: SectorDTO, nav: object = None) -> None:
+    def __init__(self, sector: SectorDTO, nav: object = None, compact: bool = False) -> None:
         super().__init__()
         self._sector = sector
         self._nav = nav
+        self._compact = compact
 
     def compose(self) -> ComposeResult:
         sec = self._sector
-        yield SectorScene(sec)
+        if self._compact:
+            yield Static(self._compact_header(), id="compact-header")
+            with VerticalScroll(id="compact-objects"):
+                yield SectionRule("Objects")
+                yield SectorObjectList(sec)
+        else:
+            yield SectorScene(sec)
         yield SectionRule("Navigation", id="warp-rule")
         with Container(id="warp-area"):
             if self._nav is not None:
                 yield NavRose(self._nav, sec.warps)
             else:  # defensive: a legacy view with no baked rose
                 yield Static("[dim]no navigation data[/]")
+
+    def _compact_header(self) -> str:
+        """Location lines the compact tier keeps when the art scene is dropped."""
+        sec = self._sector
+        title = f"[{sec.display_id}] {sec.region}" + (f" ({sec.band})" if sec.band else "")
+        lines = [f"[b cyan]{title}[/]", f"[i #8a8a8a]{sec.flavor}[/]"]
+        if sec.beacon:
+            lines.append(f"[yellow]![/] {sec.beacon}")
+        return "\n".join(lines)
 
 
 class GameScreen(Screen):
@@ -138,6 +150,7 @@ class GameScreen(Screen):
         Binding("a", "attack", "Attack"),
         Binding("s", "survey_planet", "Survey Planet"),
         Binding("z", "scan", "Scan"),
+        Binding("i", "status", "Status"),
         Binding("c", "computer", "Computer"),
         Binding("e", "engine_room", "Engine Room"),
         Binding("m", "map", "Map"),
@@ -157,7 +170,9 @@ class GameScreen(Screen):
 Click the planet, base, port, or a ship for the same actions as the keys.
 [b]B[/] opens the starbase here (station · trade · hardware · bank, by standing);
 [b]P[/] docks at a free-standing port; a base's market is entered through the base.
-The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden finds."""
+The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden finds.
+[b]I[/] opens the status drawer — the full ship readout plus a keyboard-navigable
+list of everything in the sector (the sidebar's stand-in on a compact terminal)."""
 
     def __init__(self, service: GameService, player_id: int) -> None:
         super().__init__()
@@ -165,18 +180,36 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
         self._pid = player_id
         self._log: list[str] = []
         self._active = False
+        self._composed_tier: LayoutTier | None = None
+
+    def _current_tier(self) -> LayoutTier:
+        """The live layout tier, computed from the app size directly (resize-event
+        ordering between app and screen handlers is not guaranteed)."""
+        return layout_tier(self.app.size.width, self.app.size.height)
 
     def compose(self) -> ComposeResult:
         view = self._service.game_view(self._pid)
+        tier = self._current_tier()
+        self._composed_tier = tier
+        compact = tier is LayoutTier.COMPACT
         yield TopBar(view.turns, view.max_turns, view.governor, view.core_status)
         ui = getattr(self.app, "ui_config", None)
         sidebar_width = ui.sidebar_width if ui is not None else 33
         with Horizontal(id="body"):
-            yield SectorView(view.sector, view.nav)
-            sidebar = StatusSidebar(view.ship, view.sector.discoveries, sidebar_width,
-                                    presence=_presence_lines(view.sector), id="sidebar")
-            sidebar.display = self._sidebar_visible()  # also re-evaluated on resize
-            yield sidebar
+            yield SectorView(view.sector, view.nav, compact=compact)
+            # Compact drops the sidebar entirely — the I status drawer carries its
+            # readout (WP-UI12). Wide enriches it with the objectives checklist and
+            # anomaly detail.
+            if not compact:
+                settings = getattr(self.app, "ui_settings", None)
+                wide = tier is LayoutTier.WIDE
+                objectives = (settings.objectives_done
+                              if wide and settings and settings.show_onboarding else None)
+                sidebar = StatusSidebar(view.ship, view.sector.discoveries, sidebar_width,
+                                        presence=_presence_lines(view.sector),
+                                        detail=wide, objectives=objectives, id="sidebar")
+                sidebar.display = self._sidebar_visible()  # also re-evaluated on resize
+                yield sidebar
         settings = getattr(self.app, "ui_settings", None)
         if settings and settings.show_onboarding and not all_done(settings.objectives_done):
             yield ObjectivesStrip(settings.objectives_done, id="objectives")
@@ -191,6 +224,13 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
         return self.app.size.width >= threshold
 
     def on_resize(self) -> None:
+        # Crossing a layout breakpoint swaps the sector presentation (art scene vs.
+        # compact object list, sidebar detail), so recompose from fresh state.
+        tier = self._current_tier()
+        if (self._composed_tier is not None and tier is not self._composed_tier
+                and tier is not LayoutTier.UNSUPPORTED):
+            self.refresh(recompose=True)
+            return
         try:
             sidebar = self.query_one("#sidebar", StatusSidebar)
         except NoMatches:
@@ -435,6 +475,20 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
             self.notify("No planet to survey here.", timeout=2)
             return
         self.app.push_screen(PlanetScreen(planet, self._service, self._pid))
+
+    def action_status(self) -> None:
+        """Open the `I` status drawer (WP-UI12): the full ship readout plus a focusable
+        list of every object here — the keyboard equivalent of the scene hotspots,
+        and the compact tier's stand-in for the hidden sidebar."""
+        from edge.tui.screens.status_drawer import StatusDrawerScreen
+        view = self._service.game_view(self._pid)
+
+        def _picked(result: tuple[str, int | str | None] | None) -> None:
+            if result is not None:  # route through the one shared Picked handler
+                self.post_message(ClickableEntry.Picked(*result))
+
+        self.app.push_screen(
+            StatusDrawerScreen(view, presence=_presence_lines(view.sector)), _picked)
 
     def action_engine_room(self) -> None:
         self.app.mark_objective("inspect")  # type: ignore[attr-defined]

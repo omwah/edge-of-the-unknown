@@ -224,6 +224,7 @@ class AnomalyRow(Static):
     An unlogged find can be scanned/collected; clicking reuses the existing
     `ClickableEntry.Picked("discovery", id)` the scene used, so the GameScreen
     handler is untouched. A logged find is a plain, non-clickable line.
+    `detail` (the wide tier, WP-UI12) appends the find's kind to logged rows.
     """
 
     DEFAULT_CSS = """
@@ -231,23 +232,44 @@ class AnomalyRow(Static):
     AnomalyRow.scan:hover { background: $boost; text-style: bold; }
     """
 
-    def __init__(self, discovery: SectorDiscovery, **kwargs: object) -> None:
-        super().__init__(self._markup(discovery), **kwargs)
+    def __init__(self, discovery: SectorDiscovery, detail: bool = False,
+                 **kwargs: object) -> None:
+        super().__init__(self._markup(discovery, detail), **kwargs)
         self._discovery_id = discovery.discovery_id
         self._scan = not discovery.collected
         if self._scan:
             self.add_class("scan")
 
     @staticmethod
-    def _markup(d: SectorDiscovery) -> str:
+    def _markup(d: SectorDiscovery, detail: bool = False) -> str:
         # The find's identity stays hidden until scanned — pre-scan it reads generic.
         if d.collected:
-            return f"[cyan]✦[/] {d.label} [dim]— logged[/]"
+            kind = f" · {d.kind}" if detail else ""
+            return f"[cyan]✦[/] {d.label} [dim]— logged{kind}[/]"
         return "[cyan]✦[/] Anomaly detected [dim](Scan)[/]"
 
     def on_click(self) -> None:
         if self._scan:
             self.post_message(ClickableEntry.Picked("discovery", self._discovery_id))
+
+
+def force_lines(force: object) -> list[str]:
+    """Hazard captions for deployed forces here (§10 — classic-TW fog pre-applied)."""
+    lines: list[str] = []
+    if force is None:
+        return lines
+    fighters = getattr(force, "fighters", 0)
+    if fighters > 0:
+        toll = f", toll {force.toll}" if force.mode == "toll" else ""  # type: ignore[attr-defined]
+        who = ("[green]yours[/]" if getattr(force, "yours", False)
+               else f"[red]{force.owner}[/]")  # type: ignore[attr-defined]
+        lines.append(f"[red]×[/] {fighters} fighters ({force.mode}{toll}) — {who}")  # type: ignore[attr-defined]
+    armid = getattr(force, "armid_mines", 0)
+    limpet = getattr(force, "limpet_mines", 0)
+    if armid or limpet:
+        kinds = ([f"{armid} armid"] if armid else []) + ([f"{limpet} limpet"] if limpet else [])
+        lines.append(f"[red]✺[/] {' + '.join(kinds)} mines — [green]yours[/]")
+    return lines
 
 
 class StatusSidebar(Vertical):
@@ -256,6 +278,8 @@ class StatusSidebar(Vertical):
     A container (not a single Static) so each anomaly row is an individually
     clickable scan affordance. The warp quick-reference that used to live here is
     folded into the sector warp grid; the warp legend moved to the Help modal.
+    On the wide tier (WP-UI12) `detail=True` enriches anomaly rows and an
+    `objectives` tuple appends the Captain's-objectives checklist.
     """
 
     DEFAULT_CSS = """
@@ -265,12 +289,15 @@ class StatusSidebar(Vertical):
 
     def __init__(self, ship: ShipDTO, discoveries: list[SectorDiscovery],
                  width: int = 33, presence: list[str] | None = None,
+                 detail: bool = False, objectives: tuple[str, ...] | None = None,
                  **kwargs: object) -> None:
         super().__init__(**kwargs)
         self._ship = ship
         self._discoveries = discoveries
         self._width = width
         self._presence = presence or []
+        self._detail = detail
+        self._objectives = objectives
 
     def on_mount(self) -> None:
         self.styles.width = self._width
@@ -284,9 +311,17 @@ class StatusSidebar(Vertical):
         yield Static("[b yellow]Anomalies[/]")
         if self._discoveries:
             for discovery in self._discoveries:
-                yield AnomalyRow(discovery)
+                yield AnomalyRow(discovery, detail=self._detail)
         else:
             yield Static("[#8a8a8a]-----[/]")
+        if self._objectives is not None:  # wide tier: the checklist in full (WP-UI12)
+            from edge.tui.onboarding import OBJECTIVES
+            yield Static("[b yellow]Objectives[/]")
+            for obj_id, label, hint in OBJECTIVES:
+                if obj_id in self._objectives:
+                    yield Static(f"[green]✓ {label}[/]")
+                else:
+                    yield Static(f"[dim]○ {label} — {hint}[/]")
 
     def _stats_markup(self) -> str:
         s = self._ship
@@ -877,6 +912,101 @@ class ClickableEntry(Static):
 
     def on_click(self) -> None:
         self.post_message(self.Picked(self._dest, self._ref))
+
+
+class ObjectRow(ClickableEntry, can_focus=True):
+    """A focusable object row — the keyboard equivalent of a scene hotspot (WP-UI12).
+
+    Tab/arrow focus + Enter/Space post the same `ClickableEntry.Picked` a click
+    (or the scene hotspot) posts, so the GameScreen routing is shared verbatim.
+    """
+
+    BINDINGS = [
+        Binding("enter", "pick", "Open", show=False),
+        Binding("space", "pick", "Open", show=False),
+    ]
+
+    DEFAULT_CSS = """
+    ObjectRow { height: 1; padding: 0 1; }
+    ObjectRow:focus { background: $primary 30%; text-style: bold; }
+    """
+
+    def action_pick(self) -> None:
+        self.post_message(self.Picked(self._dest, self._ref))
+
+
+class SectorObjectList(Vertical):
+    """Everything in the sector as a focusable list (WP-UI12).
+
+    The keyboard/list equivalent of the `SectorScene` click hotspots: each
+    interactable row is an `ObjectRow` posting the identical
+    `ClickableEntry.Picked`, so planet/port/base/ship/anomaly/discovery routing
+    stays in one GameScreen handler. Informational lines (unhailable ships,
+    deployed-force hazards) render as plain text. Shown inline on the compact
+    tier — where the scene art is hidden — and inside the `I` status drawer on
+    every tier.
+    """
+
+    DEFAULT_CSS = "SectorObjectList { height: auto; } SectorObjectList > Static { height: 1; }"
+
+    def __init__(self, sector: SectorDTO, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._sector = sector
+
+    def compose(self) -> ComposeResult:
+        sec = self._sector
+        empty = True
+        for planet in sec.planets:
+            empty = False
+            yield ObjectRow(f"[green]@[/] {planet.name} [dim](Survey)[/]", "planet")
+        for b in getattr(sec, "starbases", ()) or ():
+            empty = False
+            status = "[green]operational[/]" if b.operational else "[yellow]derelict[/]"
+            yield ObjectRow(f"[cyan]#[/] {b.name} — {status} [dim]· {b.owner} (Visit)[/]",
+                            "starbase", b.starbase_id)
+        # A base's market is entered through the base (§4.2, WP80) — mirror the scene,
+        # which lists the free-standing port only when no base holds the orbit slot.
+        if sec.ports and not (getattr(sec, "starbases", ()) or ()):
+            port = sec.ports[0]
+            code = "S" if port.is_stardock else "P"
+            yield ObjectRow(f"[magenta]{code}[/] {port.name} [dim](Dock)[/]", "port")
+            empty = False
+        for vessel in sec.ships:
+            empty = False
+            if vessel.contact_id is not None:
+                yield ObjectRow(f"[white]>[/] {vessel.name} [dim](Hail)[/]",
+                                "contact", vessel.contact_id)
+            elif getattr(vessel, "player_id", None) is not None:
+                yield ObjectRow(f"[white]>[/] {vessel.name} [dim](Engage)[/]",
+                                "player", vessel.player_id)
+            else:
+                yield Static(f"[white]>[/] {vessel.name}")
+        anomaly = getattr(sec, "anomaly", None)
+        if anomaly is not None:  # the Entity's fog-safe presence hint (§7, WP35)
+            empty = False
+            if anomaly.contactable:
+                yield ObjectRow(f"[b gold1]✶ {anomaly.label}[/] [dim](Hail)[/]",
+                                "contact", anomaly.contact_id)
+            else:
+                yield Static(f"[gold3]✶ {anomaly.label}[/] [dim](beyond sensor resolution)[/]")
+        for d in sec.discoveries:
+            empty = False
+            label = d.label if d.collected else "Anomaly detected"
+            if d.kind == "wormhole" and d.warp_to is not None:
+                # Same routing as the scene hotspot: entering IS the interaction.
+                yield ObjectRow(f"[cyan]✦[/] {label} [dim](Enter — one-way)[/]",
+                                "wormhole", d.warp_to)
+            elif not d.collected:
+                yield ObjectRow("[cyan]✦[/] Anomaly detected [dim](Scan)[/]",
+                                "discovery", d.discovery_id)
+            else:
+                yield Static(f"[cyan]✦[/] {label} [dim]— logged[/]")
+        for line in force_lines(getattr(sec, "force", None)):  # hazards, info-only
+            empty = False
+            yield Static(line)
+        if empty:
+            yield Static("[dim]Nothing but empty space.[/]")
+
 
 class WarpCell(Static):
     """One outbound warp — the single, information-rich warp affordance (§5.1).
