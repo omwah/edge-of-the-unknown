@@ -142,6 +142,7 @@ def _trade_highlighted(screen: Screen, service: GameService, player_id: int) -> 
         screen.notify(str(exc), severity="warning", timeout=3)
         return
     _refresh(panel, service, player_id)
+    screen.app.mark_objective("trade")  # type: ignore[attr-defined]
     verb = "Bought" if line.mode == "SELL" else "Sold"
     screen.notify(f"{verb} {qty} {line.name}.", timeout=2)
 
@@ -160,6 +161,8 @@ def _haggle_highlighted(screen: Screen, service: GameService, player_id: int) ->
     def _after(_traded: bool | None) -> None:
         # The multi-round screen issues the offers itself and self-notifies each round;
         # we only refresh the panel from the resulting state when it closes (§8, WP13).
+        if _traded:
+            screen.app.mark_objective("trade")  # type: ignore[attr-defined]
         _refresh(panel, service, player_id)
 
     screen.app.push_screen(

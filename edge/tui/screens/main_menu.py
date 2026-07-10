@@ -8,7 +8,7 @@ from textual.containers import Container, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Static
 
-from edge.tui.saves import has_save
+from edge.tui.saves import has_save, save_summary
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.game import GameScreen
 from edge.tui.screens.sprites_gallery import SpriteGalleryScreen
@@ -48,9 +48,19 @@ class MainMenuScreen(Screen):
             yield Static(_BANNER, classes="title")
             yield Static(_SUBTITLE, classes="subtitle")
             with Vertical(id="menu-items"):
-                yield Button("N  New game", id="new", variant="primary")
-                label = "C  Continue" if saved else "C  Continue  (no save found)"
-                yield Button(label, id="continue", disabled=not saved)
+                # The likely intent leads and is the sole primary action: Continue
+                # when a save exists, otherwise New game (WP-UI11).
+                new = Button("N  New game", id="new", variant="default" if saved else "primary")
+                cont = Button("C  Continue" if saved else "C  Continue  (no save found)",
+                              id="continue", disabled=not saved,
+                              variant="primary" if saved else "default")
+                yield from (cont, new) if saved else (new, cont)
+                if saved and (summary := save_summary()) is not None:
+                    yield Static(
+                        f"day {summary.day_number} · {summary.commands} commands · "
+                        f"last played {summary.last_played} · seed {summary.seed}",
+                        classes="save-meta",
+                    )
                 yield Button("O  Options", id="options")
                 yield Button("Q  Quit", id="quit")
             yield Static(_FOOTER, classes="footer")

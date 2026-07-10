@@ -47,6 +47,13 @@ MainMenuScreen Starfield {
     margin-bottom: 1;
 }
 
+#menu-box .save-meta {
+    width: 100%;
+    text-align: center;
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
 #menu-box .footer {
     width: 100%;
     text-align: center;

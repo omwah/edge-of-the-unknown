@@ -21,6 +21,9 @@ class UISettings:
     density: Literal["comfortable", "compact"] = "comfortable"
     show_onboarding: bool = True
     show_disabled_options: bool = False
+    # Captain's-objectives progress (WP-UI11) — purely local presentation
+    # state, never part of universe state, replays, or hashes.
+    objectives_done: tuple[str, ...] = ()
 
 
 def settings_path():
@@ -34,6 +37,8 @@ def load_settings() -> tuple[UISettings, str | None]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         known = {field: raw[field] for field in asdict(UISettings()) if field in raw}
+        if "objectives_done" in known:  # JSON stores lists; the dataclass holds a tuple
+            known["objectives_done"] = tuple(known["objectives_done"])
         return UISettings(**known), None
     except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
         return UISettings(), f"UI settings were reset: {exc}"
