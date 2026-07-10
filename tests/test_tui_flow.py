@@ -1345,3 +1345,39 @@ async def test_ticker_expands_and_collapses_on_divider_click() -> None:
         await pilot.click(app.screen.query_one(_TickerDivider))
         await pilot.pause()
         assert not ticker.has_class("expanded")
+
+
+async def test_stale_encounter_screen_never_strands_the_player() -> None:
+    """A resolved fight can't trap the player (the double-push regression).
+
+    A stale EncounterScreen (no live encounter) self-heals: any combat key pops it
+    instead of parroting "no live encounter", Esc closes it, and the game screen's
+    resume hook never stacks a second copy while one is already open.
+    """
+    from edge.tui.screens.encounter import EncounterScreen
+    from edge.tui.screens.game import GameScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        assert svc.encounter_view(1) is None
+        # Simulate the stale screen a double-push used to leave behind.
+        app.push_screen(EncounterScreen(svc, 1))
+        await pilot.pause()
+        await pilot.press("f")  # a combat key on a resolved fight pops, not "no live encounter"
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+        app.push_screen(EncounterScreen(svc, 1))
+        await pilot.pause()
+        await pilot.press("escape")  # Esc closes a resolved engagement too
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
+        # The resume guard: with an EncounterScreen already up, resuming the game
+        # screen must not stack another (one pop returns straight to the ship).
+        game = app.screen
+        assert isinstance(game, GameScreen)
+        assert not any(isinstance(s, EncounterScreen) for s in app.screen_stack)

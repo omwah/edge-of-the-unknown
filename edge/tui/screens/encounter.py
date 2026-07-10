@@ -39,6 +39,9 @@ class EncounterScreen(Screen):
         Binding("m", "missile", "Missile"),
         Binding("r", "flee", "Flee"),
         Binding("k", "patch", "Field-patch"),
+        # A live fight has no Esc (fight or flee) — but a *resolved* one must always be
+        # exitable, so a stale screen can never strand the player.
+        Binding("escape", "close_if_over", "Close", show=False),
     ]
 
     CSS = """
@@ -75,6 +78,7 @@ class EncounterScreen(Screen):
         e = self._service.encounter_view(self._pid)
         if e is None:  # resolved between refreshes — nothing to show
             yield Static("The engagement is over.", id="enc-title")
+            yield Static("\n[dim]Press Esc to return to your ship.[/]")
             yield Footer()
             return
         yield Static(f"ENCOUNTER · {e.title}        [b]they OPEN FIRE[/]", id="enc-title")
@@ -120,7 +124,19 @@ class EncounterScreen(Screen):
 
     # --- actions: one CombatAction command per keypress -----------------------
 
+    def action_close_if_over(self) -> None:
+        """Esc leaves a *resolved* engagement; a live fight still has no way out."""
+        if self._service.encounter_view(self._pid) is None:
+            self.app.pop_screen()
+        else:
+            self.notify("No escape — fight or flee.", timeout=2)
+
     async def _act(self, action: CombatAction) -> None:
+        if self._service.encounter_view(self._pid) is None:
+            # A stale screen (the fight resolved elsewhere) heals itself instead of
+            # stranding the player behind "no live encounter".
+            self.app.pop_screen()
+            return
         try:
             events = self._service.apply(self._pid, action)
         except (CombatError, EngineRoomError, MovementError, EconomyError) as exc:
