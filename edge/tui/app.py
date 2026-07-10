@@ -129,16 +129,30 @@ class EdgeApp(App[None]):
             )
 
     def on_resize(self, event: events.Resize) -> None:
-        """Apply one stable responsive class to the active screen."""
+        """Recompute the layout tier and apply its class across the screen stack."""
         tier = layout_tier(event.size.width, event.size.height)
         self.layout_tier = tier
         self.call_after_refresh(self._apply_layout_class)
 
     def _apply_layout_class(self) -> None:
-        screen = self.screen
-        for tier in LayoutTier:
-            screen.remove_class(tier.value)
-        screen.add_class(self.layout_tier.value)
+        # Every screen in the stack tracks the tier: a modal must not strand a
+        # stale breakpoint class on the screen it will reveal when dismissed.
+        for screen in self.screen_stack:
+            for tier in LayoutTier:
+                screen.remove_class(tier.value)
+            screen.add_class(self.layout_tier.value)
+        self._sync_size_notice()
+
+    def _sync_size_notice(self) -> None:
+        """Overlay the below-minimum notice under 80×24; pop it on regrowth (WP-UI05)."""
+        from edge.tui.chrome import SizeNoticeScreen
+        if not self.screen_stack:
+            return  # nothing mounted yet; on_mount re-syncs after the first screen
+        showing = isinstance(self.screen, SizeNoticeScreen)
+        if self.layout_tier is LayoutTier.UNSUPPORTED and not showing:
+            self.push_screen(SizeNoticeScreen())
+        elif self.layout_tier is not LayoutTier.UNSUPPORTED and showing:
+            self.pop_screen()
 
     def update_ui_settings(self, **changes: object) -> None:
         """Persist local-only presentation settings and apply the theme immediately."""

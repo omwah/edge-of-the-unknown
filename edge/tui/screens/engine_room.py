@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import Footer, Static
+from textual.widgets import Footer
 
 from edge.core.dto import EngineRoomDTO
 from edge.core.economy import EconomyError
@@ -13,6 +13,7 @@ from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier, Subsystem as SubsystemKind
 from edge.core.rules import Cannibalize, FieldPatch, InstallComponent, RepairAtDock, SwapComponent
 from edge.server.service import GameService
+from edge.tui.chrome import ContextStrip, TitleBar
 from edge.tui.component_workbench import (
     ComponentWorkbench,
     SHIP_WORKBENCH_PROFILE,
@@ -43,16 +44,6 @@ The same component workbench is used for ships and starbases. Select a carried
 part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it.
 [b]P[/] spends repair kits; [b]R[/] pays a service point; [b]X[/] pulls selected parts."""
 
-    CSS = """
-    EngineRoomScreen #engine-title {
-        dock: top; height: 1; background: $primary; color: $background;
-        text-style: bold; padding: 0 1;
-    }
-    EngineRoomScreen #engine-foot {
-        height: auto; max-height: 4; padding: 0 1; border-top: solid $primary; color: $text-muted;
-    }
-    """
-
     def __init__(self, room: EngineRoomDTO, service: GameService | None = None,
                  pid: int = 1) -> None:
         super().__init__()
@@ -62,10 +53,8 @@ part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it
 
     def compose(self) -> ComposeResult:
         room = self._room
-        yield Static(
-            f"ENGINE ROOM · {room.ship}        efficiency bonus: {room.efficiency_bonus}",
-            id="engine-title",
-        )
+        yield TitleBar(f"ENGINE ROOM · {room.ship}",
+                       f"efficiency bonus: {room.efficiency_bonus}", id="engine-title")
         yield ComponentWorkbench(
             room.subsystems,
             room.on_hand,
@@ -75,7 +64,7 @@ part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it
             ),
             id="component-workbench",
         )
-        yield Static(
+        yield ContextStrip(
             f"Repair kits: {room.kits}  ·  [+] healthy  [!] knocked-out  [ ] empty  [✓] selected",
             id="engine-foot",
         )

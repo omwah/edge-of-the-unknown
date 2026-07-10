@@ -22,9 +22,6 @@ class ConfirmScreen(ModalScreen[bool]):
 
     CSS = """
     ConfirmScreen { align: center middle; background: $background 60%; }
-    ConfirmScreen #confirm-box {
-        width: 56; height: auto; padding: 1 2; border: round $primary; background: $surface;
-    }
     ConfirmScreen #confirm-box Static { margin-bottom: 1; }
     ConfirmScreen #confirm-actions { height: auto; align-horizontal: center; }
     ConfirmScreen #confirm-actions Button { margin: 0 1; }
@@ -38,7 +35,7 @@ class ConfirmScreen(ModalScreen[bool]):
         self._deny_label = deny_label
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="confirm-box"):
+        with Vertical(id="confirm-box", classes="modal-box"):
             yield Static(self._message)
             with Horizontal(id="confirm-actions"):
                 yield Button(self._confirm_label, id="confirm", variant="error")

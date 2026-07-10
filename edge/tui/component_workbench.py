@@ -19,6 +19,7 @@ from textual.widgets import Static
 
 from edge.core.dto import Subsystem
 from edge.tui import sprites
+from edge.tui.chrome import EmptyState
 from edge.tui.widgets import ClickableEntry
 
 
@@ -144,15 +145,20 @@ class ComponentWorkbench(Widget):
         with Grid(id="workbench-grid"):
             for subsystem in self.subsystems:
                 yield _BayPanel(self, subsystem)
-        if self.loose_components:
-            with Vertical(id="workbench-loose"):
-                yield Static(self.profile.loose_components_title, classes="section-heading")
+        with Vertical(id="workbench-loose"):
+            yield Static(self.profile.loose_components_title, classes="section-heading")
+            if self.loose_components:
                 for component in self.loose_components:
                     marker = self.profile.slot_glyphs.selected if component in self._selected_components else " "
                     yield ClickableEntry(
                         f"[{marker}] {component}", dest="workbench-loose", ref=component,
                         classes="workbench-component",
                     )
+            else:
+                yield EmptyState(
+                    "No loose components aboard.",
+                    "Buy parts at a hardware emporium or salvage them from wrecks and bases.",
+                )
         yield Static(self.profile.instructions, id="workbench-instructions")
 
     def on_mount(self) -> None:
