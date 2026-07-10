@@ -425,6 +425,72 @@ async def test_trade_keeps_highlighted_row() -> None:
         assert table.cursor_row == 1  # cursor stays put across the refresh
 
 
+async def test_trade_panel_standard_explains_price_stock_and_hold_impact() -> None:
+    """WP-UI14 keeps the full aligned matrix plus selected-row decision detail."""
+    from textual.widgets import DataTable, Static
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await _new_game_at_stardock(app, pilot)
+        table = app.screen.query_one("#commodities", DataTable)
+        labels = [str(column.label) for column in table.columns.values()]
+        assert labels == [
+            "Commodity", "Port", "Stock / capacity", "Unit price", "Aboard", "Action"]
+        detail = str(app.screen.query_one("#trade-detail", Static).render())
+        assert "Port sells / you buy" in detail
+        assert "stock" in detail and "unit" in detail and "est." in detail and "holds" in detail
+
+
+async def test_trade_panel_compact_moves_numbers_into_selected_detail() -> None:
+    """Compact retains the action matrix while secondary numbers remain available below."""
+    from textual.widgets import DataTable, Static
+
+    app = EdgeApp()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        await _new_game_at_stardock(app, pilot)
+        table = app.screen.query_one("#commodities", DataTable)
+        labels = [str(column.label) for column in table.columns.values()]
+        assert labels == ["Commodity", "Port", "Action"]
+        detail = str(app.screen.query_one("#trade-detail", Static).render())
+        assert "stock" in detail and "unit" in detail and "holds" in detail
+
+
+async def test_trade_panel_explains_a_hard_port_purse_cap() -> None:
+    """A buyer unable to settle the quick trade says so before the captain acts."""
+    from dataclasses import replace as _replace
+
+    from textual.widgets import DataTable, Static
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None and svc.config.economy.market.enabled
+        port = next(p for p in svc.state.ports.values()
+                    if any(line.mode.name == "BUY" for line in p.commodities))
+        bought = next(line.commodity for line in port.commodities if line.mode.name == "BUY")
+        player = svc.state.players[1]
+        ship = svc.state.ships[player.ship_id]
+        cargo = dict(ship.cargo)
+        cargo[bought] = 10
+        svc.state.ships[ship.id] = _replace(ship, sector_id=port.sector_id, cargo=cargo)
+        svc.state.ports[port.id] = _replace(port, latinum=0)
+        await pilot.press("p")
+        await pilot.pause()
+        table = app.screen.query_one("#commodities", DataTable)
+        view = svc.current_port_view(1)
+        assert view is not None
+        buy_row = next(i for i, line in enumerate(view.commodities) if line.mode == "BUY")
+        table.move_cursor(row=buy_row, animate=False)
+        await pilot.pause()
+        detail = str(app.screen.query_one("#trade-detail", Static).render())
+        assert "Port buys / you sell" in detail
+        assert "purse caps payment (0 available)" in detail
+
+
 async def test_dock_and_haggle_accepts_fair_counter() -> None:
     """Press H, counter at the fair price (improvement 0 ⇒ always accepted), and the
     deal goes through as a HaggleOffer — the path playtesting found missing."""

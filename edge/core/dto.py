@@ -53,6 +53,10 @@ class PortDTO:
     commodities: list[CommodityLine]
     display_id: int = 0  # spatial id of the port's sector (§5.1)
     archetype_id: str | None = None  # controlling species' palette, for the port sprite (§4)
+    purse: int = 0  # hard settlement purse; caps how much the port can buy (§8)
+    purse_enabled: bool = False  # legacy economy keeps `purse` informational only
+    holds_used: int = 0  # player cargo occupancy for trade impact copy
+    holds_total: int = 0
 
 
 @dataclass(frozen=True)

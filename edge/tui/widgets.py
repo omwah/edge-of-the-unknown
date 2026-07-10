@@ -98,6 +98,10 @@ NAME_TO_COMMODITY = {
     "Equipment": Commodity.EQUIPMENT,
 }
 
+# One quick-trade keypress requests this many units. The panel estimate and shared
+# port handler consume the same presentation constant so their previews cannot drift.
+TRADE_CHUNK = 10
+
 
 @contextmanager
 def preserve_cursor(table: DataTable) -> Iterator[None]:
@@ -125,7 +129,10 @@ class TradePanel(Vertical):
     a trade; `cursor_commodity` is the highlighted row's commodity name.
     """
 
-    DEFAULT_CSS = "TradePanel { height: auto; }"
+    DEFAULT_CSS = """
+    TradePanel { height: auto; }
+    TradePanel #trade-detail { height: auto; min-height: 2; padding: 0 1; }
+    """
 
     def __init__(self, port: PortDTO, *, latinum: int = 0, show_title: bool = True,
                  **kwargs: object) -> None:
@@ -133,6 +140,7 @@ class TradePanel(Vertical):
         self._port = port
         self._latinum = latinum
         self._show_title = show_title
+        self._compact = False
 
     def compose(self) -> ComposeResult:
         p = self._port
@@ -143,23 +151,86 @@ class TradePanel(Vertical):
                 id="port-title",
             )
         yield DataTable(id="commodities", zebra_stripes=True, cursor_type="row")
+        yield Static("", id="trade-detail")
         yield Static(self._footer_text(), id="port-footer")
 
     def on_mount(self) -> None:
-        table = self.query_one("#commodities", DataTable)
-        table.add_columns("Commodity", "They", "Stock", "Price/u", "You", "Action")
-        self._fill_rows()
+        self._configure_table()
 
-    def _fill_rows(self) -> None:
+    def _is_compact(self) -> bool:
+        return getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "compact"
+
+    def _configure_table(self) -> None:
+        """Rebuild responsive columns while preserving the logical commodity selection."""
+        table = self.query_one("#commodities", DataTable)
+        selected = self.cursor_commodity()
+        self._compact = self._is_compact()
+        table.clear(columns=True)
+        if self._compact:
+            table.add_columns("Commodity", "Port", "Action")
+        else:
+            table.add_columns(
+                "Commodity", "Port", "Stock / capacity", "Unit price", "Aboard", "Action")
+        self._fill_rows(selected)
+
+    def _fill_rows(self, selected: str | None = None) -> None:
         table = self.query_one("#commodities", DataTable)
         with preserve_cursor(table):
             table.clear()
             for c in self._port.commodities:
-                stock = f"{bar(round(c.stock_ratio * 9), 9)} {round(c.stock_ratio * 100):>2}%"
-                action = "[b]Sell[/]" if c.mode == "BUY" else "[b]Buy[/]"
-                table.add_row(
-                    c.name, c.mode, stock, f"{c.price} {c.trend}", str(c.player_qty), action
-                )
+                posture = "Buys" if c.mode == "BUY" else "Sells"
+                action = "You sell" if c.mode == "BUY" else "You buy"
+                if self._compact:
+                    table.add_row(c.name, posture, action, key=c.name)
+                else:
+                    table.add_row(
+                        c.name, posture, f"{c.stock:,} / {c.capacity:,}",
+                        f"{c.price:,} {c.trend}", f"{c.player_qty:,}", action, key=c.name)
+        if selected is not None:
+            row = next((i for i, c in enumerate(self._port.commodities) if c.name == selected), 0)
+            table.move_cursor(row=row, animate=False)
+        self._refresh_detail()
+
+    def _refresh_detail(self) -> None:
+        detail = self.query_one("#trade-detail", Static)
+        line = next((c for c in self._port.commodities
+                     if c.name == self.cursor_commodity()), None)
+        if line is None:
+            detail.update("[dim]No commodity selected.[/]")
+            return
+        free = max(0, self._port.holds_total - self._port.holds_used)
+        if line.mode == "SELL":
+            qty = min(TRADE_CHUNK, line.stock, free,
+                      self._latinum // max(1, line.price))
+            impact = f"holds {self._port.holds_used} → {self._port.holds_used + qty}"
+            limit = "hold/latinum limited" if qty < TRADE_CHUNK else "within limits"
+        else:
+            purse_qty = (self._port.purse // max(1, line.price)
+                         if self._port.purse_enabled else TRADE_CHUNK)
+            qty = min(TRADE_CHUNK, line.player_qty,
+                      max(0, line.capacity - line.stock), purse_qty)
+            impact = f"holds {self._port.holds_used} → {self._port.holds_used - qty}"
+            if not self._port.purse_enabled:
+                limit = "port purse not limiting"
+            elif purse_qty < min(TRADE_CHUNK, line.player_qty):
+                limit = f"purse caps payment ({self._port.purse:,} available)"
+            else:
+                limit = f"purse {self._port.purse:,} · within limits"
+        verb = "Port sells / you buy" if line.mode == "SELL" else "Port buys / you sell"
+        detail.update(
+            f"[b]{verb}[/]  ·  stock [b]{line.stock:,}/{line.capacity:,}[/]  ·  "
+            f"unit [yellow]{line.price:,}[/]  ·  est. {qty} units = "
+            f"[yellow]{qty * line.price:,}[/]  ·  {impact}  ·  [dim]{limit}[/]"
+        )
+
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        if event.data_table.id == "commodities":
+            self._refresh_detail()
+
+    def on_resize(self) -> None:
+        compact = self._is_compact()
+        if self.is_mounted and compact != self._compact:
+            self._configure_table()
 
     def _footer_text(self) -> str:
         return (
@@ -169,9 +240,10 @@ class TradePanel(Vertical):
         )
 
     def refresh_port(self, port: PortDTO, latinum: int) -> None:
+        selected = self.cursor_commodity()
         self._port = port
         self._latinum = latinum
-        self._fill_rows()
+        self._fill_rows(selected)
         self.query_one("#port-footer", Static).update(self._footer_text())
 
     def cursor_commodity(self) -> str | None:
