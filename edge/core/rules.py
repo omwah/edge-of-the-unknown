@@ -3527,6 +3527,17 @@ def _resolve_mechanic(state: UniverseState, config: GameConfig, player: Player, 
     if result is not None:
         mutated_player, effect_events = _apply_mechanic(
             state, mutated_player, species, sc, result, config)
+        if (sc.signature_mechanic is not None
+                and sc.signature_mechanic.hook == "reprogram_unlock"
+                and result.stage == "unlocked"):
+            # The live cross-faction posture flip (§6.2 — the WP74 sub-seam): a completed
+            # install opens the *target* kind's trade for this player. Written onto the
+            # target's arc ledger, so it rides state_hash and replays exactly.
+            target = str(params.get("target_species") or species.roster_id)
+            arcs = dict(mutated_player.species_arcs)
+            arcs[target] = {**arcs.get(target, {}),
+                            mechanics.POSTURE_OVERRIDE_FLAG: str(params.get("new_posture", "open"))}
+            mutated_player = replace(mutated_player, species_arcs=arcs)
     # The verdict line gates on the **persisted** `sig_stage` (surfaced by
     # `dialogue.facts`), never a transient hook fact — so the projection reconstructs the
     # same line/menu the reducer speaks (the §6.7 view/reducer lockstep). The stage is

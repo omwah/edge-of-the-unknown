@@ -278,10 +278,21 @@ corp UI (WP76) ships in this arc. Sizes are relative (S/M/L).
   commands (codec-covered), avoid list honored by the route planner (endpoints
   never blocked); menu Load dropped; minimal `OptionsScreen` (theme cycle +
   greyed-replies toggle) (D5). Tests: `tests/test_surfacing.py` WP73 section.
-- **WP74 — Signature-mechanic corpus (M, content).** Author `sig.*` routes for
-  all six dark hooks — authored directly in-session (D4: Claude writes the
-  corpus content, human-reviewed; not the local-model pipeline) — and wire the
-  trojan device/cron payload and reprogram posture-flip sub-seams live.
+- **WP74 — Signature-mechanic corpus (M, content) — SHIPPED.** A
+  `species_grammars` block in the base corpus routes all six dark hooks: each
+  carrier species (vesk/helot reprogram_unlock, stryx passage_broker,
+  concordance morality_judge, selvi flee_drop, vennrith escalating_demand,
+  thessbrood trojan_gift) overrides `contract_offer` — a `has_contract_offer`
+  entry preserves the WP57 favor flow, the catch-all voices the scheme, and
+  choices transition into `sig.<hook>.<approach>` nodes with stage-gated
+  verdict lines. The **reprogram posture-flip sub-seam is live**: a completed
+  install writes `posture_override` onto the target kind's arc ledger, read by
+  the new `mechanics.effective_trade_posture` (which also opens
+  `alliance_gated` trade for sworn members — the stale "(Phase 3)" gate reasons
+  are gone). The trojan's device/hold-occupying payload + delayed **cron**
+  trigger remains the one documented sub-seam (the payload currently springs
+  as a bounded latinum loss at the next contact). Tests:
+  `tests/test_sig_corpus.py`.
 - **WP76 — Corp completeness (S–M).** Invite/accept/expel/war/transfer UI (B10) —
   in-arc per D10.
 - **WP77 — Balance playtest (ongoing).** A10, after WP70–73 land.

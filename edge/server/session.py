@@ -25,6 +25,7 @@ from edge.core import citadels
 from edge.core import combat
 from edge.core import contracts
 from edge.core import encounters
+from edge.core import mechanics
 from edge.core import territory
 from edge.core.aliens import (
     admission_met,
@@ -1446,10 +1447,12 @@ def _gate_choice(choice: DialogueChoice, *, posture: str, treaty_mode: str,
         # verdict, the same gate the AttackSpecies reducer raises, so menu and rule agree.
         return (True, "") if attack_block is None else (False, attack_block)
     if choice.action == "trade":   # empty shelves are handled by the trade_refuse beat, not a gate.
+        # `posture` arrives pre-resolved through `mechanics.effective_trade_posture` (WP74):
+        # a sworn member passes an alliance gate, an installed circuit passes a circuit gate.
         if posture == "alliance_gated":
-            return False, "requires alliance membership (Phase 3)"
+            return False, "they trade only with sworn members of their bloc"
         if posture == "circuit_gated":
-            return False, "needs a reprogram circuit (Phase 3)"
+            return False, "needs their reprogram circuit installed"
         return True, ""
     if choice.action == "barter":
         return (True, "") if has_barter else (False, "they offer no barter")
@@ -1526,7 +1529,8 @@ def _contact_choices(state: UniverseState, roster: object, species: AlienSpecies
                                   aliens=config.aliens, rng=rng, facts=facts)
     if not source:
         return []
-    posture = getattr(sc, "trade_posture", "open")
+    posture = (mechanics.effective_trade_posture(player, species, sc)  # type: ignore[arg-type]
+               if hasattr(sc, "trade_posture") else "open")
     treaty_mode = getattr(sc, "treaty_mode", "open")
     has_barter = any(o.mode == "barter" and o.available for o in offers)
     out: list[dto.ContactChoiceDTO] = []

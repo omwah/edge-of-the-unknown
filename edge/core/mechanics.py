@@ -41,6 +41,28 @@ from edge.core.models import AlienSpecies, Player
 # to selection as both the `sig_stage` fact and `arc.sig_stage` (edge.dialogue.facts).
 STAGE_FLAG = "sig_stage"
 
+# The reserved arc key a reprogram_unlock writes onto its *target* kind (WP74): a live
+# per-player trade-posture override. Read through `effective_trade_posture`, so installing
+# the Vesk philanthropy circuit genuinely opens the Helot trade interface for that player.
+POSTURE_OVERRIDE_FLAG = "posture_override"
+
+
+def effective_trade_posture(player: Player, species: AlienSpecies, sc: SpeciesConfig) -> str:
+    """The species' trade posture as this player experiences it (§6.1/§6.2 — WP74).
+
+    A `posture_override` arc flag (written by a completed reprogram_unlock) wins outright;
+    otherwise `alliance_gated` resolves open for a sworn member of the species' own bloc
+    (membership is live since WP38); else the roster posture stands.
+    """
+    override = player.species_arcs.get(species.roster_id, {}).get(POSTURE_OVERRIDE_FLAG)
+    if isinstance(override, str) and override:
+        return override
+    posture = sc.trade_posture
+    if (posture == "alliance_gated" and species.alliance_id is not None
+            and player.alliance_id == species.alliance_id):
+        return "open"
+    return posture
+
 
 @dataclass(frozen=True, slots=True)
 class MechanicResult:
@@ -156,11 +178,12 @@ def influence_gate(ctx: MechanicContext) -> MechanicResult:
 # Each is a pure stage machine driven by the reply keyword (`ctx.approach`, the last segment
 # of the `sig.<hook>.<node>` context the reducer routes into) + the persisted `stage` + the
 # authored `params`. Effects stay within the framework's bounded set (attitude / alignment /
-# experience / latinum / grudge); the deeper cross-system reach of a few hooks is a documented
-# forward seam (the trojan's device/hold-occupying payload and delayed cron trigger, the live
-# cross-faction `trade_posture` flip, and `contract_kill`'s actual razing + reward payout —
-# WP40). No default species yet routes a `choices` reply into these `sig.*` contexts, so like
-# WP33's flee_drop/literalist they are registry-complete + unit-tested but not corpus-wired.
+# experience / latinum / grudge). Since WP74 the default corpus routes every hook: each
+# carrier species' `contract_offer` offers `sig.*` choices (see the species_grammars block in
+# config/alien_dialogue_default.yaml), and a completed reprogram_unlock flips the target
+# kind's live trade posture through `POSTURE_OVERRIDE_FLAG`/`effective_trade_posture`. The
+# one remaining forward seam is the trojan's device/hold-occupying payload + delayed *cron*
+# trigger — here the payload is a bounded latinum loss sprung at the next contact instead.
 
 def trojan_gift(ctx: MechanicContext) -> MechanicResult:
     """A 'gift' / 'lower your shields' seeds a delayed harmful payload; a rival sells the
