@@ -48,11 +48,16 @@ class SaveSummary:
 
 
 def save_summary() -> SaveSummary | None:
-    """Read the save's meta row and command count without loading the game.
+    """Read the save's meta row and log counters without loading the game.
 
     Opens the SQLite file read-only (never migrates or touches the slot) and
     returns None for a missing, locked, or unreadable save — the menu then
     just shows the plain Continue button.
+
+    The meta row's `day_number` is the value at creation (derived state is
+    never written back — DESIGN §12), so the *current* day is reconstructed
+    the same way replay does: one `daily_turn_reset` cron firing per dawn in
+    the durable maintenance log.
     """
     save = default_save()
     if not save.exists():
@@ -63,10 +68,13 @@ def save_summary() -> SaveSummary | None:
                 "SELECT seed, created_at, day_number FROM meta WHERE id = 1"
             ).fetchone()
             commands = conn.execute("SELECT COUNT(*) FROM command_log").fetchone()[0]
+            dawns = conn.execute(
+                "SELECT COUNT(*) FROM maintenance_log WHERE cron_name = 'daily_turn_reset'"
+            ).fetchone()[0]
         if meta is None:
             return None
         mtime = datetime.datetime.fromtimestamp(save.stat().st_mtime)
-        return SaveSummary(seed=meta[0], created_at=meta[1], day_number=meta[2],
+        return SaveSummary(seed=meta[0], created_at=meta[1], day_number=meta[2] + dawns,
                            commands=commands, last_played=mtime.strftime("%Y-%m-%d %H:%M"))
     except (sqlite3.Error, OSError):
         return None

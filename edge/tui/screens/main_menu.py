@@ -35,6 +35,9 @@ class MainMenuScreen(Screen):
         Binding("c", "continue_game", "Continue"),
         Binding("o", "options", "Options"),
         Binding("q", "quit_app", "Quit"),
+        # Arrow keys walk the menu buttons like a classic title screen.
+        Binding("down", "app.focus_next", "Next", show=False),
+        Binding("up", "app.focus_previous", "Previous", show=False),
         # Secret: open the sprite gallery (dev preview). Unadvertised.
         Binding("~", "gallery", "Sprite gallery", show=False),
     ]
@@ -47,6 +50,16 @@ class MainMenuScreen(Screen):
         with Container(id="menu-box"):
             yield Static(_BANNER, classes="title")
             yield Static(_SUBTITLE, classes="subtitle")
+            # The saved-game card sits between the title block and the actions, so
+            # the button list stays uninterrupted (WP-UI11 follow-up).
+            if saved and (summary := save_summary()) is not None:
+                card = Static(
+                    f"day {summary.day_number} · last played {summary.last_played}\n"
+                    f"[dim]seed {summary.seed}[/]",
+                    classes="save-card",
+                )
+                card.border_title = "Saved game"
+                yield card
             with Vertical(id="menu-items"):
                 # The likely intent leads and is the sole primary action: Continue
                 # when a save exists, otherwise New game (WP-UI11).
@@ -55,12 +68,6 @@ class MainMenuScreen(Screen):
                               id="continue", disabled=not saved,
                               variant="primary" if saved else "default")
                 yield from (cont, new) if saved else (new, cont)
-                if saved and (summary := save_summary()) is not None:
-                    yield Static(
-                        f"day {summary.day_number} · {summary.commands} commands · "
-                        f"last played {summary.last_played} · seed {summary.seed}",
-                        classes="save-meta",
-                    )
                 yield Button("O  Options", id="options")
                 yield Button("Q  Quit", id="quit")
             yield Static(_FOOTER, classes="footer")
