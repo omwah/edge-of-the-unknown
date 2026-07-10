@@ -181,6 +181,12 @@ class EngineRoomScreen(Screen):
         Binding("r", "dock_repair", "Dock repair"),
     ]
 
+    HELP_TITLE = "Engine room"
+    HELP = """\
+Click slots and loose components to select them; [b]U[/] swaps the selected part
+into the selected slot (the old part returns to the hold). [b]P[/] spends carried
+repair-kits; [b]R[/] pays a StarDock or your own base to restore knockouts."""
+
     CSS = """
     EngineRoomScreen #engine-title {
         dock: top; height: 1; background: $primary; color: $background;

@@ -50,6 +50,11 @@ class TerritoryScreen(Screen):
         Binding("r", "remove_limpets", "Strip limpets"),
     ]
 
+    HELP_TITLE = "Territory & devices"
+    HELP = """\
+Deployment is barred in Core Space. Toll fighters levy latinum on entrants;
+limpet mines tag passing hulls so their owner can track them."""
+
     CSS = """
     TerritoryScreen #territory-title {
         dock: top; height: 1; background: $primary; color: $background;

@@ -61,6 +61,12 @@ class BaseScreen(Screen):
         Binding("w", "withdraw", "Withdraw 1k"),
     ]
 
+    HELP_TITLE = "Starbase"
+    HELP = """\
+Tabs follow your standing with the base (yours · open · hostile · derelict).
+Repair fills the [b]reactor keystone first[/] — waking a derelict also opens its
+market; a player-owned host earns a cut of outsider trades."""
+
     CSS = """
     BaseScreen #base-title {
         dock: top; height: 1; background: $warning; color: $background;

@@ -1441,3 +1441,25 @@ async def test_list_picker_keyboard_navigation() -> None:
         await pilot.press("escape")
         await pilot.pause()
         assert picked == [None]
+
+
+async def test_help_is_contextual_to_the_current_screen() -> None:
+    """`?` works on every screen (app-level) and shows *that* screen's keys: the
+    StarDock help lists dock verbs and skips the sector view's warp legend."""
+    from textual.widgets import Static
+
+    from edge.tui.screens.help import HelpScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await _new_game_at_stardock(app, pilot)  # StarDockScreen on top
+        assert isinstance(app.screen, StarDockScreen)
+        await pilot.press("question_mark")
+        await pilot.pause()
+        assert isinstance(app.screen, HelpScreen)
+        text = " ".join(str(s.render()) for s in app.screen.query(Static))
+        assert "StarDock" in text and "Recruit colonists" in text
+        assert "Warp Color" not in text  # the legend belongs to the sector view only
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, StarDockScreen)

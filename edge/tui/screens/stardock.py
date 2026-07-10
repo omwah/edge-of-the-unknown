@@ -48,6 +48,11 @@ class StarDockScreen(Screen):
         Binding("m", "buy_mines", "Buy mines"),
     ]
 
+    HELP_TITLE = "StarDock"
+    HELP = """\
+[b]B[/] buys from the active tab (hardware · shipyard · devices). The bank pays
+daily interest; deposits ride the same account everywhere."""
+
     CSS = """
     StarDockScreen #dock-title {
         dock: top; height: 1; background: $primary; color: $background;

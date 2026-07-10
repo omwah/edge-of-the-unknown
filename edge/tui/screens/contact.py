@@ -66,6 +66,12 @@ class AlienContactScreen(Screen):
         *[Binding(str(n), f"choice({n})", show=False) for n in range(1, 10)],
     ]
 
+    HELP_TITLE = "Contact"
+    HELP = """\
+[b]1–9[/] speak the numbered replies. [b]Esc[/]/[b]F[/] is a farewell — the parting
+line speaks and the visit closes properly. Verbs are derived from the species:
+trade posture, treaty, bloc membership, and mood all move what's on offer."""
+
     CSS = """
     AlienContactScreen #contact-title {
         dock: top; height: 1; background: $primary; color: $background;

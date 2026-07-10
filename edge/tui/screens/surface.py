@@ -168,6 +168,8 @@ class SurfaceScreen(Screen):
         Binding("t", "take", "Take find"),
     ]
 
+    HELP_TITLE = "Planet surface"
+
     CSS = """
     SurfaceScreen #surface-title {
         dock: top; height: 1; background: $primary; color: $background;
