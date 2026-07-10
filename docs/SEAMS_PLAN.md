@@ -293,8 +293,13 @@ corp UI (WP76) ships in this arc. Sizes are relative (S/M/L).
   trigger remains the one documented sub-seam (the payload currently springs
   as a bounded latinum loss at the next contact). Tests:
   `tests/test_sig_corpus.py`.
-- **WP76 — Corp completeness (S–M).** Invite/accept/expel/war/transfer UI (B10) —
-  in-arc per D10.
+- **WP76 — Corp completeness (S–M) — SHIPPED.** The corp screen carries the full
+  WP66 command set (B10, in-arc per D10): `I` invite a captain by id, `A` accept
+  the first standing invite (`CorpDTO.invite_ids` now rides beside the labels),
+  `X` expel the highlighted member (row-keyed roster), `G`/`E` declare/end war by
+  corp # (an `other_corps` id+label list feeds the picker), and `P`/`O` transfer
+  this sector's world to the corp / back to the CEO. Wire fixtures regenerated
+  for the CorpDTO fields. Tests: `tests/test_surfacing.py` WP76 section.
 - **WP77 — Balance playtest (ongoing).** A10, after WP70–73 land.
 
 ---

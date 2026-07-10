@@ -689,11 +689,13 @@ def corp_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.C
     if player is None:
         return None
     if player.corp_id is None:
-        invites = [f"{c.tag} — {c.name}" for c in sorted(state.corporations.values(), key=lambda c: c.id)
-                   if player_id in c.invited_player_ids]
-        if not invites:
+        inviting = [c for c in sorted(state.corporations.values(), key=lambda c: c.id)
+                    if player_id in c.invited_player_ids]
+        if not inviting:
             return None
-        return dto.CorpDTO(corp_id=0, name="", tag="", is_ceo=False, bank_balance=0, invites=invites)
+        return dto.CorpDTO(corp_id=0, name="", tag="", is_ceo=False, bank_balance=0,
+                           invites=[f"{c.tag} — {c.name}" for c in inviting],
+                           invite_ids=[c.id for c in inviting])
     c = state.corporations[player.corp_id]
     owner = Ownership("corp", c.id)
     members = [
@@ -711,6 +713,9 @@ def corp_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.C
         planet_count=sum(1 for p in state.planets.values() if p.owner == owner),
         starbase_count=sum(1 for b in state.starbases.values() if b.owner == owner),
         at_war_with=war_tags,
+        other_corps=[(o.id, f"{o.tag} — {o.name}")
+                     for o in sorted(state.corporations.values(), key=lambda o: o.id)
+                     if o.id != c.id],
     )
 
 

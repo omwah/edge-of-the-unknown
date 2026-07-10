@@ -44,7 +44,7 @@ into the sector view).
 v3 (WP71–WP73): `PlanetDTO.base_*` starbase-ops affordances; `StarDockDTO` bank counter;
 `ContactDTO.alliance_id`/`alliance_member`; `ComputerDTO.alliances`/`notes`/`avoid`; new
 `TerritoryDTO` + `AllianceRowDTO`; `territory_view` read method; `AddNote`/`RemoveNote`/
-`ToggleAvoid` commands.
+`ToggleAvoid` commands; `CorpDTO.invite_ids`/`other_corps` (WP76).
 """
 
 
