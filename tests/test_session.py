@@ -408,6 +408,24 @@ def test_game_view_marks_the_way_back() -> None:
     assert kinds[6] == "unexplored"
 
 
+def test_game_view_warps_carry_navigation_clarity_flags() -> None:
+    """WP-UI13 projects immediate navigation facts without leaking hidden contents."""
+    from dataclasses import replace
+
+    world = _nav_world()
+    world.players[1] = replace(
+        world.players[1], entered_from={2: 1}, avoid_sectors=frozenset({3}))
+    # Make 2 -> 3 one-way while keeping 3 charted; sector 6 remains fogged.
+    world.sectors[3] = replace(world.sectors[3], warps_out=())
+    world.rebuild_adjacency()
+    by_id = {w.sector_id: w for w in session.game_view(world, 1, CONFIG).sector.warps}
+
+    assert by_id[1].kind == "backtrack"
+    assert by_id[3].one_way and by_id[3].avoided
+    assert by_id[3].turn_cost == world.ships[1].turns_per_warp
+    assert by_id[6].band == "?" and by_id[6].hazards == ()
+
+
 def test_game_view_sector_title_carries_band() -> None:
     view = session.game_view(_nav_world(), 1, CONFIG)
     assert view.sector.region == "Sol Core" and view.sector.band == "Hub"

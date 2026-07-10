@@ -371,6 +371,27 @@ async def test_selected_nav_node_inverts_only_its_cell() -> None:
         assert max(s.end for s in reversed_spans) < len(text.plain)
 
 
+def test_route_confirmation_summarizes_course_without_replanning() -> None:
+    """WP-UI13 confirmation exposes all decision inputs already present in the DTO."""
+    from edge.core.dto import RouteDTO, RouteHopDTO
+    from edge.tui.screens.computer import ComputerScreen
+
+    route = RouteDTO(
+        origin_display=101, dest_display=404,
+        hops=[RouteHopDTO(202, "(202)", False), RouteHopDTO(404, "(404)", True)],
+        turn_cost=4, turns_remaining=20, affordable=True, reachable=True, reason="",
+        hazards=["Black hole at (404)", "Encounter risk on 1 hop (deepest band: Void)"],
+        summary="2 hops · 4 turns · 1 one-way", avoids=[303],
+    )
+
+    text = ComputerScreen._route_confirmation(route)
+    assert "Route to S404" in text
+    assert "2 hops · 4 turns" in text
+    assert "Avoid list honored: S303" in text
+    assert "Interruption risk: Encounter risk on 1 hop" in text
+    assert "Black hole at (404)" in text
+
+
 async def test_dock_and_trade_buys_fuel() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:

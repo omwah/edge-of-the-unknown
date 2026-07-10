@@ -128,6 +128,10 @@ class WarpDTO:
     codes: list[str] = field(default_factory=list)  # short content tokens, explored only
     bearing: float = 0.0  # direction to this warp from the current sector, radians (§11 nav rose);
     #                       from the seeded spatial embedding, 0.0 when no layout exists (fallback)
+    one_way: bool = False  # no direct return warp from the target
+    avoided: bool = False  # captain marked this sector on the route-planner avoid list
+    turn_cost: int = 1  # immediate cost for this hop, derived from the current ship
+    hazards: tuple[str, ...] = ()  # fog-safe, already-known target warnings
 
     @property
     def explored(self) -> bool:
@@ -353,6 +357,7 @@ class RouteDTO:
     reason: str
     hazards: list[str]
     summary: str  # "3 hops · 6 turns · 1 one-way"
+    avoids: list[int] = field(default_factory=list)  # spatial ids skipped by normal plotting
 
 
 @dataclass(frozen=True)

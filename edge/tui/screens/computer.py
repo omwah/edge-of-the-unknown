@@ -655,11 +655,25 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
             return
         if dto.hazards:  # known black holes / hostile forces / band interrupt risk (WP75)
             self.app.push_screen(
-                ConfirmScreen("Hazards on route:\n" + "\n".join(dto.hazards) + "\n\nProceed?"),
+                ConfirmScreen(self._route_confirmation(dto), confirm_label="Engage"),
                 self._engage_confirmed,
             )
             return
         self._engage_confirmed(True)
+
+    @staticmethod
+    def _route_confirmation(dto: RouteDTO) -> str:
+        """Summarize the authoritative plotted DTO without duplicating route rules."""
+        avoids = ", ".join(f"S{sid}" for sid in dto.avoids) or "none"
+        hazards = "\n".join(f"• {item}" for item in dto.hazards) or "• none known"
+        interruption = next((h for h in dto.hazards if "Encounter risk" in h), "none known")
+        return (
+            f"Route to S{dto.dest_display}\n"
+            f"{len(dto.hops)} hops · {dto.turn_cost} turns\n"
+            f"Avoid list honored: {avoids}\n"
+            f"Interruption risk: {interruption}\n\n"
+            f"Known hazards:\n{hazards}\n\nEngage route?"
+        )
 
     def _engage_confirmed(self, ok: bool | None) -> None:
         if not ok or self._engage_target is None:
