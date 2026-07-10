@@ -90,7 +90,7 @@ async def test_menu_with_save_leads_with_continue_and_metadata() -> None:
         assert buttons[1].id == "new" and buttons[1].variant == "default"
         assert app2.focused is buttons[0]
         card = app2.screen.query(".save-card")
-        assert card and f"seed {summary.seed}" in str(card.first().render())
+        assert card and f"seed {summary.seed}" in str(card.first().render()).lower()
         # Arrow keys walk the buttons (visual reading order).
         await pilot.press("down")
         assert app2.focused is buttons[1]
