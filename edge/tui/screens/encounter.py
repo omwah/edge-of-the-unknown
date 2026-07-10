@@ -23,6 +23,7 @@ from edge.core.enums import Subsystem
 from edge.core.events import EncounterEnded
 from edge.core.movement import MovementError
 from edge.core.rules import CombatAction
+from edge.tui.chrome import notify_warning
 from edge.tui import art_adapter
 from edge.tui.widgets import bar
 
@@ -146,7 +147,7 @@ configured floor; firing arcs decide who can answer."""
         try:
             events = self._service.apply(self._pid, action)
         except (CombatError, EngineRoomError, MovementError, EconomyError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         ended = next((e for e in events if isinstance(e, EncounterEnded)), None)
         if ended is not None:

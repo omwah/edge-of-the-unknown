@@ -21,6 +21,7 @@ from edge.core.config import SceneArtConfig, UIConfig
 from edge.server.client import LocalClient
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
+from edge.tui.chrome import notify_error, notify_warning
 from edge.tui import art_adapter
 from edge.tui.saves import clear_slot, default_save, has_save
 from edge.tui.design import EDGE_THEMES, LayoutTier, layout_tier, screen_actions
@@ -125,7 +126,7 @@ class EdgeApp(App[None]):
         self.call_after_refresh(self._apply_layout_class)
         if self._settings_warning:
             self.call_after_refresh(
-                lambda: self.notify(self._settings_warning or "", severity="warning", timeout=5)
+                lambda: notify_warning(self, self._settings_warning or "")
             )
 
     def on_resize(self, event: events.Resize) -> None:
@@ -133,6 +134,17 @@ class EdgeApp(App[None]):
         tier = layout_tier(event.size.width, event.size.height)
         self.layout_tier = tier
         self.call_after_refresh(self._apply_layout_class)
+
+    def push_screen(self, *args: object, **kwargs: object):  # type: ignore[no-untyped-def, override]
+        """Push, then stamp the current tier class on the new screen (WP-UI07).
+
+        Mount/resize alone would leave a screen pushed *between* resizes without
+        the tier class, so tier-scoped CSS (e.g. `.compact .modal-box`) would
+        silently not apply to it.
+        """
+        result = super().push_screen(*args, **kwargs)  # type: ignore[arg-type]
+        self.call_after_refresh(self._apply_layout_class)
+        return result
 
     def _apply_layout_class(self) -> None:
         # Every screen in the stack tracks the tier: a modal must not strand a
@@ -226,7 +238,7 @@ class EdgeApp(App[None]):
         try:
             service = GameService.load_game(config, SqliteRepository(default_save()))
         except DialogueConfigMismatchError as exc:
-            self.notify(str(exc), severity="error", timeout=8)
+            notify_error(self, str(exc))
             return None
         self.client = LocalClient(service, player_id=self.player_id)
         self._start_ticker(self.client)

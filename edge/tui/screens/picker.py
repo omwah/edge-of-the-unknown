@@ -34,8 +34,8 @@ class ListPicker(ModalScreen[int | str | None]):
     /* Translucent so the screen underneath shows through behind the box. */
     ListPicker { align: center middle; background: $background 60%; }
     ListPicker #picker-box {
-        width: 50; max-height: 80%; height: auto; padding: 1 2;
-        border: round $primary; background: $surface;
+        width: 50; max-width: 100%; max-height: 80%; height: auto; overflow-y: auto;
+        padding: 1 2; border: round $primary; background: $surface;
     }
     ListPicker #picker-title { margin-bottom: 1; }
     ListPicker #picker-hint { margin-top: 1; color: $text-muted; }

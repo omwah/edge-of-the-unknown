@@ -22,6 +22,7 @@ from edge.core.enums import Commodity
 from edge.core.events import Traded
 from edge.core.rules import HaggleOffer
 from edge.server.service import GameService
+from edge.tui.chrome import notify_warning
 
 _LABEL_COLOUR = {
     "accepted": "green", "likely": "green", "unlikely": "yellow",
@@ -35,7 +36,8 @@ class HaggleScreen(ModalScreen[bool]):
     CSS = """
     HaggleScreen { align: center middle; background: $background 60%; }
     HaggleScreen #haggle-box {
-        width: 54; height: auto; padding: 1 2; border: round $secondary; background: $surface;
+        width: 54; max-width: 100%; height: auto; max-height: 90%; overflow-y: auto;
+        padding: 1 2; border: round $secondary; background: $surface;
     }
     HaggleScreen #haggle-box Static { margin-bottom: 1; }
     HaggleScreen #haggle-round { color: $secondary; margin-bottom: 0; }
@@ -105,7 +107,7 @@ class HaggleScreen(ModalScreen[bool]):
             events = self._service.apply(
                 self._pid, HaggleOffer(commodity=self._commodity, units=self._units, counter_price=counter))
         except EconomyError as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
 
         if any(isinstance(e, Traded) for e in events):
@@ -121,7 +123,7 @@ class HaggleScreen(ModalScreen[bool]):
             self.query_one("#haggle-hint", Static).update(
                 "[red]They won't haggle further today. Walk away (Esc).[/]")
         else:
-            self.notify("No deal — counter again or walk away.", severity="warning", timeout=2)
+            notify_warning(self, "No deal — counter again or walk away.")
             self.query_one("#haggle-hint", Static).update(
                 "[dim]They passed. Sweeten the offer or Esc to walk.[/]")
 

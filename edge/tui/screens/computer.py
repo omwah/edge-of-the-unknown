@@ -22,6 +22,7 @@ from edge.core.economy import EconomyError
 from edge.core.movement import MovementError
 from edge.core.rules import TravelTo
 from edge.server.service import GameService
+from edge.tui.chrome import notify_warning
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.widgets import LocalMapView, bar, preserve_cursor
@@ -320,7 +321,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         """Petition to flip the Core to the championed bloc (§6.3, WP50)."""
         sz = self._computer.seizure
         if sz is None or not sz.ready:
-            self.notify("No Core seizure is ready to petition.", severity="warning", timeout=3)
+            notify_warning(self, "No Core seizure is ready to petition.")
             return
 
         def _go(ok: bool | None) -> None:
@@ -330,7 +331,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
             try:
                 self._service.apply(self._pid, PetitionCoreSeizure(alliance_id=sz.alliance_id))
             except (EconomyError, MovementError) as exc:
-                self.notify(str(exc), severity="warning", timeout=4)
+                notify_warning(self, str(exc))
                 return
             self.notify(f"The Core is seized — {sz.alliance_name} now governs.", timeout=5)
             self._computer = self._service.computer_view(self._pid)
@@ -362,7 +363,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         try:
             self._service.apply(self._pid, DeliverContract(contract_id=cid))
         except EconomyError as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self.notify("Delivered — the reward is paid.", timeout=3)
         self._reopen_tab("contracts")
@@ -379,7 +380,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         try:
             self._service.apply(self._pid, AbandonContract(contract_id=cid))
         except EconomyError as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self.notify("Contract abandoned.", timeout=2)
         self._reopen_tab("contracts")
@@ -397,7 +398,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
             try:
                 self._service.apply(self._pid, AddNote(text=text))
             except EconomyError as exc:
-                self.notify(str(exc), severity="warning", timeout=3)
+                notify_warning(self, str(exc))
                 return
             self._reopen_tab("notes")
 
@@ -414,7 +415,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         try:
             self._service.apply(self._pid, RemoveNote(index=int(key.value)))
         except EconomyError as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self._reopen_tab("notes")
 
@@ -425,13 +426,13 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
                 return
             internal = self._service.resolve_display_id(shown)
             if internal is None:
-                self.notify(f"No sector {shown}.", severity="warning", timeout=3)
+                notify_warning(self, f"No sector {shown}.")
                 return
             from edge.core.rules import ToggleAvoid
             try:
                 self._service.apply(self._pid, ToggleAvoid(sector_id=internal))
             except EconomyError as exc:
-                self.notify(str(exc), severity="warning", timeout=3)
+                notify_warning(self, str(exc))
                 return
             self._reopen_tab("notes")
         self.app.push_screen(TravelPromptScreen(), _go)
@@ -471,7 +472,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
             try:
                 self._service.apply(self._pid, command)
             except (EconomyError, MovementError) as exc:
-                self.notify(str(exc), severity="warning", timeout=3)
+                notify_warning(self, str(exc))
                 return
             self.notify("Resigned — you stand apart again." if row.member
                         else f"Sworn to the {row.name}.", timeout=3)
@@ -500,7 +501,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         try:
             self._service.apply(self._pid, AdvanceAdmission(row.alliance_id, pending[0]))
         except EconomyError as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self.notify(f"Recorded: {pending[0]}.", timeout=2)
         self._reopen_tab("alliances")
@@ -644,7 +645,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
             return
         internal = self._service.resolve_display_id(dest)  # player typed a spatial id (§5.1)
         if internal is None:
-            self.notify(f"No sector {dest}.", severity="warning", timeout=3)
+            notify_warning(self, f"No sector {dest}.")
             return
         self._route = self._service.route_view(self._pid, internal)
         self._engage_target = internal
@@ -656,7 +657,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
             self.notify("No route plotted.", timeout=2)
             return
         if not dto.reachable or not dto.affordable:
-            self.notify(dto.reason or "Cannot travel that route.", severity="warning", timeout=3)
+            notify_warning(self, dto.reason or "Cannot travel that route.")
             return
         if dto.hazards:  # known black holes / hostile forces / band interrupt risk (WP75)
             self.app.push_screen(
@@ -686,7 +687,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         try:
             self._service.apply(self._pid, TravelTo(to_sector=self._engage_target))
         except (MovementError, EconomyError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self.app.pop_screen()  # back to the game screen, which recomposes on resume
 
