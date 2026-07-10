@@ -69,7 +69,8 @@ _REJECTIONS = (EconomyError, MovementError, CombatError, EngineRoomError, DevPat
 _READ_METHODS = frozenset({
     "game_view", "port_view", "current_port_view", "map_view", "computer_view", "tavern_view",
     "corp_view", "market_view", "route_view", "route_legs_view", "engine_room_view", "stardock_view",
-    "territory_view", "starbase_services_view", "planet_view", "current_planet_view", "surface_view",
+    "territory_view", "starbase_view", "current_starbase_view", "planet_view",
+    "current_planet_view", "surface_view",
     "contact_view", "species_in_sector", "current_contact_view", "encounter_view", "leads_view",
     "messages_view", "corp_view",
 })

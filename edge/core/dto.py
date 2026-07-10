@@ -729,23 +729,46 @@ class StarDockDTO:
 
 
 @dataclass(frozen=True)
-class StarbaseServicesDTO:
-    """Forward-base services at a player-owned operational orbital base (§4.2, WP53).
+class StarbaseDTO:
+    """The unified base view (§4.2, WP79) — one screen, state-gated tabs.
 
-    The foothold analogue of `StarDockDTO`, resolved through the shared service-point
-    seam: the hardware catalog is fee-adjusted and tier-capped per `starbase.services`,
-    `services` names which of repair/components/munitions/banking this base offers, and
-    `fee_frac` is the frontier markup surfaced to the player. Present only when the ship
-    sits at such a base; None otherwise.
+    `standing` gates which tabs a client shows: "yours" (Station/Trade/Hardware/Bank),
+    "open" (Trade + status), "hostile" (status + Assault), "derelict" (Station:
+    repair/salvage + Claim). The subsystem panels reuse the engine-room `Subsystem`/
+    `Slot` shapes; the market block surfaces the WP78 base-hosted port; the service
+    block (hardware/bank) is filled only when the WP53 service-point resolver grants
+    it — the catalog shown and what the reducer accepts never drift.
     """
 
+    starbase_id: int
+    name: str  # hull-class display name, e.g. "Orbital Platform"
     sector_display: int
-    latinum: int
-    bank_balance: int
-    hardware: list[HardwareItem]
+    planet_id: int | None
+    planet_name: str
+    owner: str  # display label (as SectorForceDTO.owner)
+    standing: str  # "yours" | "open" | "hostile" | "derelict"
+    operational: bool
+    integrity_pct: int  # surviving-component fraction, percent
+    subsystems: list[Subsystem]  # reactor / screens / main gun panels (engine-room shapes)
+    # Station ops (derelict or your own base): the §4.2 repair/salvage/claim rail.
+    salvage: list[tuple[str, int, str]]  # (subsystem value, slot index, component label)
+    empty_slots: list[tuple[str, int, bool]]  # (subsystem value, slot index, is_keystone)
+    claimable: bool
+    claim_cost: int
+    assaultable: bool
+    # The base-hosted market (§4.2, WP78).
+    market_port_id: int | None
+    market_name: str
+    market_open: bool
+    market_notice: str  # why the market is closed ("" when open)
+    trade_cut_pct: int  # the owner's commission on outsider trades, percent
+    # Forward-base services (WP53) — own operational base only; empty otherwise.
     services: list[str]  # subset of {"repair","components","munitions","banking"}
     fee_frac: float
+    hardware: list[HardwareItem]
     missile_price: int  # per-missile latinum price at this base (fee-adjusted)
+    latinum: int
+    bank_balance: int
 
 
 @dataclass(frozen=True)
@@ -768,10 +791,8 @@ class PlanetDTO:
     ship_genesis: int = 0  # genesis torpedoes aboard (drives the Genesis affordance, WP10)
     genesis_eligible: bool = False  # this world can be re-formed by a genesis torpedo
     starbase: str | None = None  # WP4 display status: "operational" | "derelict — salvageable"
-    starbase_id: int | None = None
+    starbase_id: int | None = None  # click-through to the unified base view (WP79)
     starbase_derelict: bool = False
-    # Salvageable components on a derelict/own base: (subsystem value, slot index, label).
-    salvage: list[tuple[str, int, str]] = field(default_factory=list)
     # Citadel state (§4.2, WP54): current level, treasury, garrison, and the build affordance.
     citadel_level: int = 0
     treasury: int = 0
@@ -784,13 +805,6 @@ class PlanetDTO:
     can_invade: bool = False  # a hostile owned world with defences down + fighters aboard (WP55)
     invade_blocker: str = ""  # why invasion is barred (base up / gun up / shield / no fighters)
     ship_fighters: int = 0  # fighters aboard, for the invade affordance
-    # Starbase ops affordances (§4.2, WP40 — surfaced WP71).
-    base_assaultable: bool = False  # operational + not yours: open a set-piece assault
-    base_claimable: bool = False  # unowned + operational: claim into a forward foothold
-    base_claim_cost: int = 0
-    # Empty base slots open for repair (derelict or your own base), keystone first:
-    # (subsystem value, slot index, is_keystone).
-    base_empty_slots: list[tuple[str, int, bool]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

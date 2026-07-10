@@ -200,9 +200,19 @@ class GameService:
         """Carried territory stock + devices for the Deploy screen (§10/§14, WP72)."""
         return session.territory_view(self._state, player_id, self._config)
 
-    def starbase_services_view(self, player_id: int) -> dto.StarbaseServicesDTO | None:
-        """Forward-base services for the player's current sector, or None (§4.2, WP53)."""
-        return session.starbase_services_view(self._state, player_id, self._config)
+    def starbase_view(self, player_id: int, starbase_id: int) -> dto.StarbaseDTO:
+        """The unified base view — identity, station ops, market, services (§4.2, WP79)."""
+        return session.starbase_view(self._state, player_id, starbase_id, self._config)
+
+    def current_starbase_view(self, player_id: int) -> dto.StarbaseDTO | None:
+        """The base view for the player's current sector, if a base is present."""
+        from edge.core.starbases import base_in_sector
+
+        ship = self._state.ships[self._state.players[player_id].ship_id]
+        base = base_in_sector(self._state, ship.sector_id)
+        if base is None:
+            return None
+        return session.starbase_view(self._state, player_id, base.id, self._config)
 
     def planet_view(self, player_id: int, planet_id: int) -> dto.PlanetDTO:
         return session.planet_view(self._state, player_id, planet_id, self._config)
