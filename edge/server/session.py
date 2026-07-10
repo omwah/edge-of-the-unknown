@@ -130,8 +130,9 @@ from edge.core.models import (
     SubsystemState,
     UniverseState,
 )
+from edge.core.aliens import base_owner_hostile
 from edge.core.planets import is_colonizable, pretty_planet_type
-from edge.core.starbases import is_operational
+from edge.core.starbases import component_integrity, is_operational
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
 _FULL = {Commodity.FUEL_ORE: "Fuel Ore", Commodity.ORGANICS: "Organics", Commodity.EQUIPMENT: "Equipment"}
@@ -616,29 +617,11 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     base = state.starbases.get(planet.starbase_id) if planet.starbase_id is not None else None
     starbase_status: str | None = None
     starbase_derelict = False
-    salvage: list[tuple[str, int, str]] = []
-    base_assaultable = False
-    base_claimable = False
-    base_claim_cost = config.starbase.claim_cost if config.starbase is not None else 0
-    base_empty_slots: list[tuple[str, int, bool]] = []
     if base is not None:
+        # Status line only — all base ops live in the unified base view (WP79).
         operational = is_operational(base)
         starbase_derelict = not operational
         starbase_status = "operational" if operational else "derelict — salvageable"
-        base_owned_by_you = base.owner.kind == "player" and base.owner.ref == player_id
-        base_assaultable = operational and not base_owned_by_you
-        base_claimable = operational and not base.owner.is_owned
-        if not operational or base_owned_by_you:  # the cannibalize-allowed condition (§4.2)
-            for subsystem, sub in base.subsystems.items():
-                for idx, comp in enumerate(sub.slots):
-                    if comp is not None:
-                        salvage.append((subsystem.value, idx, comp.kind.value))
-                    else:
-                        base_empty_slots.append(
-                            (subsystem.value, idx, idx == sub.keystone_index))
-            # Keystone slots first: filling the reactor keystone is what flips a
-            # derelict operational (§4.2), so repair heads straight for it.
-            base_empty_slots.sort(key=lambda t: (not t[2], t[0], t[1]))
     # Citadel affordance (§4.2, WP54): the next-level cost + build progress, owner-only.
     citadel_target = 0
     citadel_pct = 0
@@ -678,14 +661,12 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         ship_colonist_capacity=ship.colonist_capacity,
         ship_genesis=ship_genesis, genesis_eligible=genesis_eligible,
         starbase=starbase_status, starbase_id=planet.starbase_id,
-        starbase_derelict=starbase_derelict, salvage=salvage,
+        starbase_derelict=starbase_derelict,
         citadel_level=planet.citadel_level, treasury=planet.treasury, fighters=planet.fighters,
         citadel_build_target=citadel_target, citadel_build_pct=citadel_pct,
         can_build_citadel=can_build, citadel_next_cost=next_cost,
         fighter_allocation_pct=round(planet.fighter_allocation * 100),
         can_invade=can_invade, invade_blocker=invade_blocker, ship_fighters=ship.fighters,
-        base_assaultable=base_assaultable, base_claimable=base_claimable,
-        base_claim_cost=base_claim_cost, base_empty_slots=base_empty_slots,
     )
 
 
@@ -933,44 +914,131 @@ def territory_view(state: UniverseState, player_id: int, config: GameConfig) -> 
     )
 
 
-def starbase_services_view(
-    state: UniverseState, player_id: int, config: GameConfig
-) -> dto.StarbaseServicesDTO | None:
-    """Forward-base services for the ship's current sector, or None (§4.2, WP53).
+_BASE_SUBSYSTEM_DISPLAY = {
+    Subsystem.FUSION_REACTOR: "FUSION REACTOR", Subsystem.SCREENS: "SCREENS",
+    Subsystem.MAIN_GUN: "MAIN GUN",
+}
 
-    Resolved through the same `services.service_point` seam the reducers gate on, so the
-    catalog the player sees and what the reducer will accept never drift (H4). Only a
-    *player-owned* base yields a view here — a StarDock has its own screen.
+
+def starbase_view(
+    state: UniverseState, player_id: int, starbase_id: int, config: GameConfig
+) -> dto.StarbaseDTO:
+    """The unified base view (§4.2, WP79): identity, station ops, market, services.
+
+    One projection for every base state — the client gates its tabs on `standing`
+    ("yours" / "open" / "hostile" / "derelict"). The service block resolves through
+    the same `services.service_point` seam the reducers gate on and the market block
+    mirrors `rules._market_port` (H4), so what the player sees and what a command
+    will accept never drift.
     """
     from edge.core.services import COMPONENTS, MUNITIONS, service_point
 
+    base = state.starbases[starbase_id]
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
+    operational = is_operational(base)
+    if not operational:
+        standing = "derelict"
+    elif corp.player_owns(state, base.owner, player_id):
+        standing = "yours"
+    elif base_owner_hostile(state, base, player):
+        standing = "hostile"
+    else:
+        standing = "open"
+
+    # Station panels: the base's three subsystems in engine-room shapes.
+    panels: list[dto.Subsystem] = []
+    for kind in (Subsystem.FUSION_REACTOR, Subsystem.SCREENS, Subsystem.MAIN_GUN):
+        sub = base.subsystems.get(kind)
+        if sub is None:
+            continue
+        panels.append(dto.Subsystem(
+            name=_BASE_SUBSYSTEM_DISPLAY[kind],
+            derived=f"{len(sub.active)}/{len(sub.slots)} live",
+            slots=[_slot_dto(sub, i) for i in range(len(sub.slots))],
+        ))
+
+    # Station ops: salvage/repair open on a derelict or your own base (§4.2).
+    salvage: list[tuple[str, int, str]] = []
+    empty_slots: list[tuple[str, int, bool]] = []
+    if standing in ("derelict", "yours"):
+        for subsystem, sub in base.subsystems.items():
+            for idx, comp in enumerate(sub.slots):
+                if comp is not None:
+                    salvage.append((subsystem.value, idx, comp.kind.value))
+                else:
+                    empty_slots.append((subsystem.value, idx, idx == sub.keystone_index))
+        # Keystone slots first: filling the reactor keystone flips a derelict live.
+        empty_slots.sort(key=lambda t: (not t[2], t[0], t[1]))
+
+    # The base-hosted market (WP78) — mirror rules._market_port exactly.
+    port = state.port_in_sector(base.sector_id)
+    market_open = False
+    market_notice = "no market port here"
+    if port is not None:
+        if port.klass is PortClass.STARDOCK or (
+                operational and not base_owner_hostile(state, base, player)):
+            market_open, market_notice = True, ""
+        elif not operational:
+            market_notice = "the market is dark — repair the reactor to reopen trade"
+        else:
+            market_notice = "the owner refuses to trade with you"
+    trade_cut_pct = 0
+    if (config.starbase is not None and config.economy.market.enabled
+            and base.owner.kind in ("player", "corp")):
+        trade_cut_pct = round(config.starbase.services.trade_cut_frac * 100)
+
+    # Forward-base services (WP53): only when the resolver grants *this* base.
     sp = service_point(state, player, ship, config)
-    if sp is None or sp.kind != "player_base":
-        return None
+    if sp is None or sp.kind != "player_base" or sp.ref != base.id:
+        sp = None
     econ = config.economy
-    stock_tiers = (config.starbase.services.component_stock_tiers
-                   if config.starbase is not None else [])
     hardware: list[dto.HardwareItem] = []
-    if COMPONENTS in sp.services:
-        for cname in config.hardware.components:
-            for tname in config.hardware.tiers:
-                if tname not in stock_tiers:
-                    continue  # this base does not stock this tier (§4.2)
-                base_price = econ.component_price(ComponentTier[tname])
-                if base_price is None:  # barter-only tier
-                    continue
-                price = round(base_price * sp.fee_frac)
-                hardware.append(dto.HardwareItem(
-                    component=Component(cname).value, tier=tname, price=price,
-                    affordable=player.latinum >= price and ship.holds_free >= 1,
-                ))
-    missile_price = round(config.combat.missile_price * sp.fee_frac) if MUNITIONS in sp.services else 0
-    return dto.StarbaseServicesDTO(
-        sector_display=_display(state, ship.sector_id), latinum=player.latinum,
-        bank_balance=player.bank_balance, hardware=hardware,
-        services=sorted(sp.services), fee_frac=sp.fee_frac, missile_price=missile_price,
+    services: list[str] = []
+    fee_frac = 1.0
+    missile_price = 0
+    if sp is not None:
+        services = sorted(sp.services)
+        fee_frac = sp.fee_frac
+        stock_tiers = (config.starbase.services.component_stock_tiers
+                       if config.starbase is not None else [])
+        if COMPONENTS in sp.services:
+            for cname in config.hardware.components:
+                for tname in config.hardware.tiers:
+                    if tname not in stock_tiers:
+                        continue  # this base does not stock this tier (§4.2)
+                    base_price = econ.component_price(ComponentTier[tname])
+                    if base_price is None:  # barter-only tier
+                        continue
+                    price = round(base_price * sp.fee_frac)
+                    hardware.append(dto.HardwareItem(
+                        component=Component(cname).value, tier=tname, price=price,
+                        affordable=player.latinum >= price and ship.holds_free >= 1,
+                    ))
+        if MUNITIONS in sp.services:
+            missile_price = round(config.combat.missile_price * sp.fee_frac)
+
+    planet = state.planets.get(base.planet_id)
+    try:
+        klass_name = config.ship_class(base.ship_class_id).name
+    except KeyError:
+        klass_name = base.ship_class_id
+    return dto.StarbaseDTO(
+        starbase_id=base.id, name=klass_name,
+        sector_display=_display(state, base.sector_id),
+        planet_id=base.planet_id, planet_name=planet.name if planet is not None else "",
+        owner=_ownership_label(state, base.owner, player_id),
+        standing=standing, operational=operational,
+        integrity_pct=round(component_integrity(base) * 100),
+        subsystems=panels, salvage=salvage, empty_slots=empty_slots,
+        claimable=operational and not base.owner.is_owned,
+        claim_cost=config.starbase.claim_cost if config.starbase is not None else 0,
+        assaultable=operational and standing != "yours",
+        market_port_id=port.id if port is not None else None,
+        market_name=port.name if port is not None else "",
+        market_open=market_open, market_notice=market_notice, trade_cut_pct=trade_cut_pct,
+        services=services, fee_frac=fee_frac, hardware=hardware, missile_price=missile_price,
+        latinum=player.latinum, bank_balance=player.bank_balance,
     )
 
 

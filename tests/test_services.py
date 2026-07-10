@@ -147,11 +147,27 @@ def test_banking_stays_ungated_but_is_a_listed_base_service() -> None:
     assert sp is not None and BANKING in sp.services
 
 
-def test_starbase_services_view_matches_resolver() -> None:
+def test_starbase_view_matches_resolver() -> None:
     state = _world(base_owner=Ownership("player", 1))
-    view = session.starbase_services_view(state, 1, CONFIG)
-    assert view is not None
+    view = session.starbase_view(state, 1, 1, CONFIG)
+    assert view.standing == "yours"
     assert set(view.services) == {REPAIR, COMPONENTS, MUNITIONS, BANKING}
     # Only stocked tiers appear, at the markup.
     tiers = {item.tier for item in view.hardware}
     assert tiers <= set(CONFIG.starbase.services.component_stock_tiers)  # type: ignore[union-attr]
+
+
+def test_starbase_view_gates_services_and_station_by_standing() -> None:
+    # A derelict: station ops (salvage + keystone-first repair slots), no services.
+    derelict = _world(base_owner=Ownership("none"), base_operational=False)
+    view = session.starbase_view(derelict, 1, 1, CONFIG)
+    assert view.standing == "derelict" and not view.operational
+    assert view.salvage and view.empty_slots and view.empty_slots[0][2]  # keystone first
+    assert not view.services and not view.hardware
+    assert not view.market_open  # no port in the fixture sector → closed with a notice
+    # An alliance base at neutral standing: open, but no station ops or services.
+    friendly = _world(base_owner=Ownership("alliance", 2))
+    view = session.starbase_view(friendly, 1, 1, CONFIG)
+    assert view.standing == "open"
+    assert not view.salvage and not view.empty_slots and not view.services
+    assert view.assaultable  # razing a bloc's base stays the coin of diplomacy

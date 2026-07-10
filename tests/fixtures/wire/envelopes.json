@@ -1,43 +1,43 @@
 {
   "command": {
+    "v": 4,
     "kind": "command",
+    "type": "JoinGame",
     "payload": {
       "name": "Trailblazer"
-    },
-    "type": "JoinGame",
-    "v": 3
+    }
+  },
+  "event": {
+    "v": 4,
+    "kind": "event",
+    "type": "Warped",
+    "payload": {
+      "player_id": 1,
+      "from_sector": 7,
+      "to_sector": 12,
+      "turn_cost": 1,
+      "one_way": false
+    }
   },
   "dto": {
+    "v": 4,
     "kind": "dto",
     "payload": {
       "__dto__": "MapNodeDTO",
       "fields": {
+        "sector_id": 3,
+        "display_id": 3,
+        "row": 0,
         "col0": 0,
         "col1": 1,
-        "display_id": 3,
         "neighbors": {
           "__frozenset__": [
             1,
             2,
             4
           ]
-        },
-        "row": 0,
-        "sector_id": 3
+        }
       }
-    },
-    "v": 3
-  },
-  "event": {
-    "kind": "event",
-    "payload": {
-      "from_sector": 7,
-      "one_way": false,
-      "player_id": 1,
-      "to_sector": 12,
-      "turn_cost": 1
-    },
-    "type": "Warped",
-    "v": 3
+    }
   }
 }

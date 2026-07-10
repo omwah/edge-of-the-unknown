@@ -80,7 +80,8 @@ class GameClient(Protocol):
     async def engine_room_view(self) -> dto.EngineRoomDTO: ...
     async def stardock_view(self) -> dto.StarDockDTO: ...
     async def territory_view(self) -> dto.TerritoryDTO: ...
-    async def starbase_services_view(self) -> dto.StarbaseServicesDTO | None: ...
+    async def starbase_view(self, starbase_id: int) -> dto.StarbaseDTO: ...
+    async def current_starbase_view(self) -> dto.StarbaseDTO | None: ...
     async def planet_view(self, planet_id: int) -> dto.PlanetDTO: ...
     async def current_planet_view(self) -> dto.PlanetDTO | None: ...
     async def surface_view(self, planet_id: int) -> dto.SurfaceDTO: ...
@@ -211,8 +212,11 @@ class LocalClient:
     async def territory_view(self) -> dto.TerritoryDTO:
         return self._service.territory_view(self.player_id)
 
-    async def starbase_services_view(self) -> dto.StarbaseServicesDTO | None:
-        return self._service.starbase_services_view(self.player_id)
+    async def starbase_view(self, starbase_id: int) -> dto.StarbaseDTO:
+        return self._service.starbase_view(self.player_id, starbase_id)
+
+    async def current_starbase_view(self) -> dto.StarbaseDTO | None:
+        return self._service.current_starbase_view(self.player_id)
 
     async def planet_view(self, planet_id: int) -> dto.PlanetDTO:
         return self._service.planet_view(self.player_id, planet_id)
@@ -496,8 +500,11 @@ class RemoteClient:
     async def territory_view(self) -> dto.TerritoryDTO:
         return await self._read("territory_view")
 
-    async def starbase_services_view(self) -> dto.StarbaseServicesDTO | None:
-        return await self._read("starbase_services_view")
+    async def starbase_view(self, starbase_id: int) -> dto.StarbaseDTO:
+        return await self._read("starbase_view", starbase_id=starbase_id)
+
+    async def current_starbase_view(self) -> dto.StarbaseDTO | None:
+        return await self._read("current_starbase_view")
 
     async def planet_view(self, planet_id: int) -> dto.PlanetDTO:
         return await self._read("planet_view", planet_id=planet_id)
