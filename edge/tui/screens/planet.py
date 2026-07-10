@@ -102,6 +102,8 @@ class PlanetScreen(Screen):
         Binding("t", "unload_cargo", "Unload cargo"),
         Binding("l", "load_cargo", "Load cargo"),
     ]
+    # WP-UI06: both irreversibly commit troops / re-form the world — confirmed.
+    ACTION_DANGER = {"invade": "destructive", "genesis": "destructive"}
 
     HELP_TITLE = "Planet orbit"
     HELP = """\

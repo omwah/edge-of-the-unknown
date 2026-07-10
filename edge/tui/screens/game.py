@@ -163,6 +163,8 @@ class GameScreen(Screen):
         Binding("question_mark", "help", "Help"),
         Binding("ctrl+q", "quit", "Quit"),
     ]
+    # WP-UI06: a first strike is a betrayal (D7) — _attack_target confirms it.
+    ACTION_DANGER = {"attack": "destructive"}
 
     HELP_TITLE = "Sector view"
     HELP_LEGEND = True

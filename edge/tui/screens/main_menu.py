@@ -41,6 +41,9 @@ class MainMenuScreen(Screen):
         # Secret: open the sprite gallery (dev preview). Unadvertised.
         Binding("~", "gallery", "Sprite gallery", show=False),
     ]
+    # WP-UI06: new_game overwrites the single save slot — its method confirms
+    # via the shared ConfirmScreen (enforced by tests/test_ui_actions.py).
+    ACTION_DANGER = {"new_game": "destructive"}
 
     def compose(self) -> ComposeResult:
         saved = has_save()

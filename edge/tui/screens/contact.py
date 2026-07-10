@@ -65,6 +65,8 @@ class AlienContactScreen(Screen):
         # Numbered player replies (§6.7) — the whole reply menu is authored choices.
         *[Binding(str(n), f"choice({n})", show=False) for n in range(1, 10)],
     ]
+    # WP-UI06: resigning a bloc resets standings — the resign branch confirms.
+    ACTION_DANGER = {"alliance": "caution"}
 
     HELP_TITLE = "Contact"
     HELP = """\

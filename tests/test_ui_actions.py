@@ -12,6 +12,7 @@ import collections
 import importlib
 import inspect
 import pkgutil
+import re
 
 from textual.binding import Binding
 from textual.screen import ModalScreen, Screen
@@ -91,6 +92,63 @@ def test_screen_actions_parity_with_footer_bindings() -> None:
         derived = screen_actions(fake())  # type: ignore[arg-type]
         assert [d.key for d in derived] == [b.key for b in shown]
         assert all(d.title and d.help for d in derived)
+
+
+def _method_source(cls: type, action: str) -> str:
+    method = getattr(cls, f"action_{action}", None)
+    try:
+        return inspect.getsource(method) if method is not None else ""
+    except (OSError, TypeError):
+        return ""
+
+
+def test_danger_map_actions_route_through_confirm_screen() -> None:
+    """WP-UI06: destructive descriptors always reach the shared confirmation.
+
+    Every `ACTION_DANGER` entry must name a bound action whose method pushes
+    `ConfirmScreen` — directly or through one `self._helper()` level (the game
+    screen's attack path). Static, so it holds for key, `.` menu, and palette
+    entry points alike (they all invoke the same action method).
+    """
+    for cls in _screen_classes():
+        danger = cls.__dict__.get("ACTION_DANGER", {})
+        bound = {b.action for b in _bindings(cls)}
+        for action, level in danger.items():
+            assert level in ("caution", "destructive"), (
+                f"{cls.__name__}.ACTION_DANGER[{action!r}] = {level!r}")
+            assert action in bound, (
+                f"{cls.__name__}.ACTION_DANGER names unbound action {action!r}")
+            src = _method_source(cls, action)
+            assert src, f"{cls.__name__} has no action_{action} method"
+            if "ConfirmScreen" not in src:
+                helpers = re.findall(r"self\.(_\w+)\(", src)
+                assert any("ConfirmScreen" in inspect.getsource(getattr(cls, h))
+                           for h in helpers if callable(getattr(cls, h, None))), (
+                    f"{cls.__name__}.action_{action} is marked {level!r} but "
+                    f"neither it nor its helpers reach ConfirmScreen")
+
+
+def test_confirming_actions_declare_their_danger() -> None:
+    """The inverse guard: a bound action that confirms must be in ACTION_DANGER."""
+    for cls in _screen_classes():
+        if issubclass(cls, ModalScreen):
+            continue  # ConfirmScreen itself and other modals
+        danger = cls.__dict__.get("ACTION_DANGER", {})
+        for binding in _bindings(cls):
+            if "ConfirmScreen(" in _method_source(cls, binding.action):
+                assert binding.action in danger, (
+                    f"{cls.__name__}.action_{binding.action} pushes ConfirmScreen "
+                    f"but is missing from ACTION_DANGER — mark it caution or "
+                    f"destructive so `.`/palette/help can badge it")
+
+
+def test_screen_actions_carry_danger_metadata() -> None:
+    fake = type("FakeHost", (), {
+        "BINDINGS": [Binding("a", "assault", "Assault"), Binding("t", "trade", "Trade")],
+        "ACTION_DANGER": {"assault": "destructive"},
+    })
+    derived = {d.action: d.danger for d in screen_actions(fake())}  # type: ignore[arg-type]
+    assert derived == {"assault": "destructive", "trade": "none"}
 
 
 async def test_size_notice_appears_below_minimum_and_clears() -> None:
