@@ -527,7 +527,8 @@ async def test_clicking_planet_descends() -> None:
 async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
     from textual.widgets import TabbedContent
 
-    from edge.tui.screens.engine_room import EngineRoomScreen, _SubsystemPanel
+    from edge.tui.component_workbench import ComponentWorkbench
+    from edge.tui.screens.engine_room import EngineRoomScreen
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -541,22 +542,25 @@ async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
         await pilot.pause()
         loose = sum(svc.state.ships[1].components.values())
         assert loose == 1 and svc.state.players[1].latinum < lat0
-        # Slot it in the engine room. Install is a two-step interaction: select the
-        # loose component in the picker, then click a subsystem panel to drop it into
-        # that subsystem's first legal empty slot — a derived aspect then rises.
+        # Slot it in the shared component workbench: select the carried part and an
+        # empty destination, then invoke Install / swap.
         await pilot.press("e")
         await pilot.pause()
         screen = app.screen
         assert isinstance(screen, EngineRoomScreen)
-        await pilot.click(screen.query(".loose_components").first())  # select the part
+        workbench = screen.query_one(ComponentWorkbench)
+        await pilot.click(screen.query(".workbench-component").first())
         await pilot.pause()
-        # Target whichever subsystem accepts the on-hand part (Tier-I parts are widely
-        # legal); a successful install reopens the screen, so stop once it lands.
-        for panel in list(screen.query(_SubsystemPanel)):
-            await pilot.click(panel)
-            await pilot.pause()
-            if sum(svc.state.ships[1].components.values()) == 0:
-                break
+        flat_index = next(
+            index
+            for index, slot in enumerate(
+                slot for subsystem in workbench.subsystems for slot in subsystem.slots
+            )
+            if slot.state == "empty"
+        )
+        await pilot.click(list(screen.query(".workbench-slot"))[flat_index])
+        await pilot.press("u")
+        await pilot.pause()
         assert sum(svc.state.ships[1].components.values()) == 0  # the loose part was installed
 
 
