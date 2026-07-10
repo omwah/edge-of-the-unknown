@@ -233,7 +233,8 @@ def _warp_kind(target: int, came_from: int | None, explored: frozenset[int]) -> 
 
 def _warp_dto(
     state: UniverseState, player: Player, sector: Sector, target: int, here: int,
-    came_from: int | None, core_hops: dict[int, int], bearing: float,
+    came_from: int | None, core_hops: dict[int, int], bearing: float, turn_cost: int,
+    pvp_enabled: bool,
 ) -> dto.WarpDTO:
     """One outbound warp, with region/band/codes filled only once explored (fog of war)."""
     did = _display(state, target)
@@ -241,14 +242,32 @@ def _warp_dto(
     arrow = _gravity_arrow(here, core_hops.get(target, here))
     brg = bearing
     tgt = state.sectors[target]
+    one_way = here not in state.adjacency.get(target, ())
+    avoided = target in player.avoid_sectors
+    warnings: list[str] = []
+    if target in player.explored_sectors:
+        if territory.sector_has_black_hole(state, target):
+            warnings.append("black hole")
+        force = state.sector_forces.get(target)
+        if force is not None and territory.force_hostile_to_player(
+                state, force, player, pvp_enabled=pvp_enabled):
+            kinds = []
+            if force.fighters > 0:
+                kinds.append("fighters")
+            if force.armid_mines > 0 or force.limpet_mines > 0:
+                kinds.append("mines")
+            if kinds:
+                warnings.append("hostile " + "/".join(kinds))
     if target in player.explored_sectors:
         return dto.WarpDTO(
             sector_id=target, arrow=arrow, label=state.regions[tgt.region_id].name,
             kind=kind, display_id=did, band=tgt.distance_band,
-            codes=_sector_codes(state, target, player), bearing=brg,
+            codes=_sector_codes(state, target, player), bearing=brg, one_way=one_way,
+            avoided=avoided, turn_cost=turn_cost, hazards=tuple(warnings),
         )
     return dto.WarpDTO(sector_id=target, arrow=arrow, kind=kind, display_id=did,
-                       band="?", bearing=brg)
+                       band="?", bearing=brg, one_way=one_way, avoided=avoided,
+                       turn_cost=turn_cost)
 
 
 def _discovery_label(kind: str, rarity: str) -> str:
@@ -387,9 +406,12 @@ def _sector_dto(
         ))
     here = core_hops.get(sector.id, 0)
     came_from = player.entered_from.get(sector.id)
+    player_ship = state.ships[player.ship_id]
     topo_bearings = mapgraph.local_layout_bearings(state, player, sector.id)
     warps = [
-        _warp_dto(state, player, sector, target, here, came_from, core_hops, topo_bearings.get(target, 0.0))
+        _warp_dto(state, player, sector, target, here, came_from, core_hops,
+                  topo_bearings.get(target, 0.0), player_ship.turns_per_warp,
+                  config.pvp.enabled)
         for target in sector.warps_out
     ]
     region = state.regions[sector.region_id].name
@@ -1487,6 +1509,7 @@ def _route_dto(state: UniverseState, player: Player, plan: RoutePlan,
         reason=reason,
         hazards=_route_hazards(state, player, plan, config) if plan.reachable else [],
         summary=" · ".join(parts),
+        avoids=sorted(_display(state, sid) for sid in player.avoid_sectors),
     )
 
 

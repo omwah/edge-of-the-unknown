@@ -1407,18 +1407,31 @@ class NavRose(Vertical):
             return col
         node = self._hits[self._idx]
         warp = self._warps.get(node.sector_id)
-        # Row 1: ▶ display_id.
         hdr = Text("▶ ", style="bold")
         hdr.append(str(node.display_id), style="bold")
-        col[1] = hdr
+        direction = {"<<": "Coreward", ">>": "Outward", "--": "Cross-band"}.get(
+            warp.arrow if warp is not None else "", "Warp")
+        col[0] = hdr
         if warp is None or not warp.explored:
-            col[2] = Text("uncharted", style="dim")
+            col[1] = Text("? uncharted", style="dim")
         else:
-            col[2] = Text(warp.label or "—")
-            if warp.band:
-                color = BAND_COLOR.get(warp.band, "")
-                col[3] = Text(warp.band, style=color)
-            if warp.codes:
+            col[1] = Text(warp.label or "—")
+        state_bits = [direction, f"{warp.turn_cost if warp else 1} turn"]
+        if warp is not None and warp.kind == "backtrack":
+            state_bits.append("↩ backtrack")
+        if warp is not None and warp.one_way:
+            state_bits.append("⇢ one-way")
+        col[2] = Text(" · ".join(state_bits), style="yellow" if warp and warp.one_way else "")
+        if warp is not None and warp.band:
+            band = Text(f"Band {warp.band}", style=BAND_COLOR.get(warp.band, ""))
+            if warp.avoided:
+                band.append(" · ⊘ avoided", style="yellow")
+            col[3] = band
+        if warp is not None:
+            tail = ", ".join(warp.hazards)
+            if tail:
+                col[4] = Text("⚠ " + tail, style="yellow")
+            elif warp.codes:
                 col[4] = Text.from_markup(_code_markup(warp.codes))
         return col
 
