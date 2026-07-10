@@ -47,11 +47,14 @@ MainMenuScreen Starfield {
     margin-bottom: 1;
 }
 
-#menu-box .save-meta {
-    width: 100%;
-    text-align: center;
+#menu-box .save-card {
+    width: 40;
+    height: auto;
+    border: round $primary;
+    border-title-color: $primary;
+    padding: 0 1;
+    margin: 0 8 1 8;
     color: $text-muted;
-    margin-bottom: 1;
 }
 
 #menu-box .footer {
