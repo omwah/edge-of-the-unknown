@@ -44,7 +44,8 @@ Leads · Contracts · Alliances · Dossier · Notes)
 [b]Planet (orbit)[/]
   [b]D[/] descend   [b]C[/] colonize   [b]S[/] salvage   [b]G[/] genesis   [b]K[/] citadel \
   [b]I[/] invade
-  [b]A[/] assault base   [b]R[/] repair base   [b]B[/] claim base   [b]+[/]/[b]-[/] treasury
+  [b]A[/] assault base   [b]R[/] repair base   [b]B[/] claim base   [b]+[/]/[b]-[/] treasury \
+  [b]T[/]/[b]L[/] unload/load cargo
 
 [b]Engine room[/]
   [b]P[/] field-patch   [b]R[/] dock repair   [b]X[/] cannibalize   [b]U[/] upgrade (swap)

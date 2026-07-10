@@ -93,6 +93,7 @@ from edge.core.events import (
     AdmissionAdvanced,
     AllianceJoined,
     AllianceResigned,
+    CargoTransferred,
     CitadelBuildStarted,
     CitadelGunSilenced,
     ContractAccepted,
@@ -319,6 +320,22 @@ class InvadePlanet:
 
     planet_id: int
     fighters: int
+
+
+@dataclass(frozen=True, slots=True)
+class TransferCargo:
+    """Move goods between the ship's hold and an owned world's stores (§4.2).
+
+    `to_planet` True unloads (ship → stores); False loads (stores → ship). Owner-only
+    (player or their corp), in-sector; goods are conserved. `units` is clamped to what
+    is aboard/available and — loading — the free holds, so "transfer all" is a large
+    number. The colony-supply rail: hauled equipment is how a citadel gets built.
+    """
+
+    planet_id: int
+    commodity: Commodity
+    units: int
+    to_planet: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -884,7 +901,7 @@ Command = (
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SetAllocation
-    | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
+    | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet | TransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
@@ -1008,6 +1025,8 @@ def reduce(
             return _set_allocation(state, player_id, command, config)
         case BuildCitadel():
             return _build_citadel(state, player_id, command, config)
+        case TransferCargo():
+            return _transfer_cargo(state, player_id, command)
         case PlanetDeposit():
             return _planet_bank(state, player_id, command.planet_id, command.amount,
                                 config, withdraw_=False)
@@ -1883,6 +1902,44 @@ def _owned_planet_here(state: UniverseState, player_id: int, planet_id: int) -> 
     if not corp.player_owns(state, planet.owner, player_id):
         raise EconomyError("you do not own that world")
     return planet
+
+
+def _transfer_cargo(state: UniverseState, player_id: int, cmd: TransferCargo) -> ReduceResult:
+    """Haul goods between the ship's hold and an owned world's stores (§4.2).
+
+    Conserves goods exactly (the §13 invariant): one side debits what the other
+    credits. Clamped rather than rejected on partial fits — loading stops at the free
+    holds, unloading at what is aboard — so "transfer all" needs no pre-arithmetic.
+    This closes the citadel bootstrap: level costs draw equipment from *stores*, and
+    stores could previously be filled only by slow colony production.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    if cmd.units <= 0:
+        raise EconomyError("transfer a positive amount")
+    if cmd.to_planet:
+        moved = min(cmd.units, ship.cargo.get(cmd.commodity, 0))
+        if moved <= 0:
+            raise EconomyError(f"no {cmd.commodity.value} aboard to unload")
+        new_ship = replace(ship, cargo={
+            **ship.cargo, cmd.commodity: ship.cargo.get(cmd.commodity, 0) - moved})
+        new_planet = replace(planet, stores={
+            **planet.stores, cmd.commodity: planet.stores.get(cmd.commodity, 0) + moved})
+    else:
+        available = planet.stores.get(cmd.commodity, 0)
+        moved = min(cmd.units, available, ship.holds_free)
+        if moved <= 0:
+            reason = "no free holds" if available > 0 else f"no {cmd.commodity.value} in stores"
+            raise EconomyError(f"cannot load — {reason}")
+        new_ship = replace(ship, cargo={
+            **ship.cargo, cmd.commodity: ship.cargo.get(cmd.commodity, 0) + moved})
+        new_planet = replace(planet, stores={
+            **planet.stores, cmd.commodity: available - moved})
+    return ReduceResult(
+        events=(CargoTransferred(player_id, planet.id, cmd.commodity, moved, cmd.to_planet),),
+        ships=(new_ship,), planets=(new_planet,),
+    )
 
 
 def _build_citadel(

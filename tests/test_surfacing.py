@@ -222,3 +222,44 @@ def test_corp_view_carries_invite_ids_and_other_corps() -> None:
     invited = corp_view(state, 3, CFG)
     assert invited is not None and invited.corp_id == 0
     assert invited.invite_ids == [2] and invited.invites == ["VOID — Void Syndicate"]
+
+
+# --- §4.2 cargo transfer: the citadel bootstrap fix ----------------------------------
+
+
+def test_cargo_transfer_breaks_the_citadel_bootstrap_deadlock() -> None:
+    """A citadel draws equipment from planet *stores*, which production alone fills too
+    slowly (and no hull carries a level's worth) — hauling cargo to your own world in
+    trips is the intended loop, and it was missing entirely."""
+    from edge.core.enums import Commodity
+    from edge.core.events import CargoTransferred
+    from edge.core.rules import BuildCitadel, TransferCargo
+
+    state = _linear_world()
+    lc = CFG.citadels.levels[0]
+    state.planets[1] = Planet(id=1, sector_id=1, name="Home", planet_type="terrestrial_warm",
+                              owner=Ownership("player", 1), colonists=lc.min_colonists)
+    state.ships[1] = replace(state.ships[1], holds_total=120,
+                             cargo={Commodity.EQUIPMENT: 120})
+    state.players[1] = replace(state.players[1], latinum=lc.cost_latinum)
+    # Trip one: "unload all" (a big number — the reducer clamps to what's aboard).
+    result = reduce(state, 1, TransferCargo(1, Commodity.EQUIPMENT, 10**9), CFG)
+    apply_result(state, result)
+    moved = next(e for e in result.events if isinstance(e, CargoTransferred))
+    assert moved.units == 120 and moved.to_planet
+    assert state.planets[1].stores[Commodity.EQUIPMENT] == 120
+    assert state.ships[1].cargo[Commodity.EQUIPMENT] == 0
+    # Trip two tops the stores up to the level cost; the build then opens.
+    state.ships[1] = replace(state.ships[1],
+                             cargo={Commodity.EQUIPMENT: lc.cost_equipment - 120})
+    apply_result(state, reduce(state, 1, TransferCargo(1, Commodity.EQUIPMENT, 10**9), CFG))
+    apply_result(state, reduce(state, 1, BuildCitadel(planet_id=1), CFG))
+    assert state.planets[1].citadel_progress == 0  # the timed build is open
+    assert state.planets[1].stores.get(Commodity.EQUIPMENT, 0) == 0  # paid from stores
+    # Loading back out is clamped by the free holds (goods conserved both ways).
+    state.planets[1] = replace(state.planets[1],
+                               stores={Commodity.EQUIPMENT: 50})
+    apply_result(state, reduce(
+        state, 1, TransferCargo(1, Commodity.EQUIPMENT, 10**9, to_planet=False), CFG))
+    assert state.ships[1].cargo[Commodity.EQUIPMENT] == 50
+    assert state.planets[1].stores[Commodity.EQUIPMENT] == 0

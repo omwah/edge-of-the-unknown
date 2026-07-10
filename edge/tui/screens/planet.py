@@ -11,11 +11,12 @@ With no service (screenshot harness) it shows a static sample.
 
 from __future__ import annotations
 
+from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
-from textual.screen import Screen
+from textual.screen import ModalScreen, Screen
 from textual.widgets import Footer, Static
 
 from edge.core.citadels import CitadelError
@@ -26,15 +27,17 @@ from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Subsystem
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
+from edge.core.enums import Commodity
 from edge.core.rules import (
     AssaultStarbase, BuildCitadel, Cannibalize, ClaimStarbase, Colonize, DeployGenesis,
-    Descend, InvadePlanet, PlanetDeposit, PlanetWithdraw, RepairStarbase,
+    Descend, InvadePlanet, PlanetDeposit, PlanetWithdraw, RepairStarbase, TransferCargo,
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.dummy import sample_surface
 from edge.tui.screens.surface import SurfaceScreen
+from edge.tui.widgets import ClickableEntry
 
 
 class PlanetSprite(Static):
@@ -61,6 +64,8 @@ class PlanetScreen(Screen):
         Binding("a", "assault_base", "Assault base"),
         Binding("r", "repair_base", "Repair base"),
         Binding("b", "claim_base", "Claim base"),
+        Binding("t", "unload_cargo", "Unload cargo"),
+        Binding("l", "load_cargo", "Load cargo"),
     ]
 
     CSS = """
@@ -97,6 +102,8 @@ class PlanetScreen(Screen):
                     if p.fighter_allocation_pct:
                         alloc += f"   Garrison {p.fighter_allocation_pct}%"
                     yield Static(f"Allocation   {alloc}", classes="section")
+                    yield Static("[dim][b]T[/] Unload cargo to stores   ·   "
+                                 "[b]L[/] Load stores aboard[/]")
                 if p.can_invade:
                     yield Static(f"[red]\\[I] Invade[/] — land {p.ship_fighters} fighters "
                                  f"against the garrison ({p.fighters}).", classes="section")
@@ -362,6 +369,49 @@ class PlanetScreen(Screen):
         self.notify("The base answers to you now — a forward foothold.", timeout=2)
         self._reopen()
 
+    def _transfer(self, *, to_planet: bool) -> None:
+        """Pick a commodity + amount, then haul it (§4.2 — the colony-supply rail).
+
+        The reducer clamps to what fits/is aboard, so a big number means "all"; this
+        is how citadel equipment reaches a world (the build draws from stores).
+        """
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        if not p.owned_by_you:
+            self.notify("You can only transfer cargo at a world you own.", timeout=2)
+            return
+
+        def _amount(commodity: Commodity | None) -> None:
+            if commodity is None:
+                return
+
+            def _go(units: int | None) -> None:
+                if not units:
+                    return
+                try:
+                    self._service.apply(self._pid, TransferCargo(
+                        p.planet_id, commodity, units, to_planet=to_planet))
+                except EconomyError as exc:
+                    self.notify(str(exc), severity="warning", timeout=3)
+                    return
+                self._reopen()
+
+            from edge.tui.screens.stardock import _AmountInput
+            verb = "Unload" if to_planet else "Load"
+            self.app.push_screen(
+                _AmountInput(f"{verb} how many {commodity.value.replace('_', ' ')}? "
+                             "(a big number = all)"), _go)
+
+        self.app.push_screen(_CommodityPicker(), _amount)
+
+    def action_unload_cargo(self) -> None:
+        self._transfer(to_planet=True)
+
+    def action_load_cargo(self) -> None:
+        self._transfer(to_planet=False)
+
     def action_back(self) -> None:
         self.app.pop_screen()
 
@@ -380,3 +430,30 @@ class PlanetScreen(Screen):
 
     def action_noop(self) -> None:
         self.notify("Not wired in the skeleton.", timeout=2)
+
+
+class _CommodityPicker(ModalScreen[Commodity | None]):
+    """Pick one of the sacred trio to haul (§4.2 cargo transfer)."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+    CSS = """
+    _CommodityPicker { align: center middle; }
+    _CommodityPicker #commodity-box {
+        width: 40; height: auto; padding: 1 2; border: round $primary; background: $surface;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="commodity-box"):
+            yield Static("[b]Which commodity?[/]  [dim](Esc to cancel)[/]")
+            for c in Commodity:
+                yield ClickableEntry(f"  [b]{c.value.replace('_', ' ').title()}[/]",
+                                     dest="commodity", ref=c.value)
+
+    @on(ClickableEntry.Picked)
+    def on_commodity_picked(self, msg: ClickableEntry.Picked) -> None:
+        if msg.dest == "commodity":
+            self.dismiss(Commodity(str(msg.ref)))
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)

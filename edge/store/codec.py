@@ -21,6 +21,7 @@ from edge.core.events import (
     AllianceResigned,
     AttitudeChanged,
     Banked,
+    CargoTransferred,
     CitadelBuildStarted,
     CitadelCompleted,
     CitadelGunSilenced,
@@ -129,6 +130,7 @@ from edge.core.rules import (
     PostNotice,
     RemoveNote,
     ToggleAvoid,
+    TransferCargo,
     DeployBeacon,
     DeployFighters,
     DeployGenesis,
@@ -207,6 +209,11 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "SetAllocation", {
                 "planet_id": command.planet_id, "allocation": command.allocation,
                 "fighter": command.fighter,
+            }
+        case TransferCargo():
+            return "TransferCargo", {
+                "planet_id": command.planet_id, "commodity": command.commodity.value,
+                "units": command.units, "to_planet": command.to_planet,
             }
         case BuildCitadel():
             return "BuildCitadel", {"planet_id": command.planet_id}
@@ -395,6 +402,10 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
         case "SetAllocation":
             return SetAllocation(planet_id=payload["planet_id"], allocation=payload["allocation"],
                                  fighter=payload.get("fighter", 0.0))
+        case "TransferCargo":
+            return TransferCargo(planet_id=payload["planet_id"],
+                                 commodity=Commodity(payload["commodity"]),
+                                 units=payload["units"], to_planet=payload["to_planet"])
         case "BuildCitadel":
             return BuildCitadel(planet_id=payload["planet_id"])
         case "PlanetDeposit":
@@ -647,6 +658,12 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "PlanetProduced", {"planet_id": event.planet_id, "owner_player_id": event.owner_player_id}
         case ColonyGrew():
             return "ColonyGrew", {"planet_id": event.planet_id, "colonists": event.colonists}
+        case CargoTransferred():
+            return "CargoTransferred", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "commodity": event.commodity.value, "units": event.units,
+                "to_planet": event.to_planet,
+            }
         case CitadelBuildStarted():
             return "CitadelBuildStarted", {
                 "player_id": event.player_id, "planet_id": event.planet_id,
@@ -956,6 +973,10 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return PlanetProduced(payload["planet_id"], payload["owner_player_id"])
         case "ColonyGrew":
             return ColonyGrew(payload["planet_id"], payload["colonists"])
+        case "CargoTransferred":
+            return CargoTransferred(payload["player_id"], payload["planet_id"],
+                                    Commodity(payload["commodity"]), payload["units"],
+                                    payload["to_planet"])
         case "CitadelBuildStarted":
             return CitadelBuildStarted(payload["player_id"], payload["planet_id"],
                                        payload["target_level"])

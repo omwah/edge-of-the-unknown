@@ -64,6 +64,7 @@ from edge.core.events import (
     ColonyGrew,
     CombatRound,
     ComponentInstalled,
+    CargoTransferred,
     CitadelBuildStarted,
     CitadelCompleted,
     ContractAccepted,
@@ -1909,6 +1910,9 @@ def format_event(event: Event) -> str:
         return f"[green]⚙ Base repaired: {event.subsystem} slot {event.slot_index} refilled.[/]"
     if isinstance(event, StarbaseClaimed):
         return "[green]⚑ The base is yours — a forward foothold on the frontier.[/]"
+    if isinstance(event, CargoTransferred):
+        direction = "unloaded to the colony" if event.to_planet else "loaded aboard"
+        return f"[dim]⇄ {event.units:,} {event.commodity.value} {direction}.[/]"
     if isinstance(event, CitadelBuildStarted):
         return f"[cyan]⛨ Citadel level {event.target_level} construction begun.[/]"
     if isinstance(event, CitadelCompleted):
