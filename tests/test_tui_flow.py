@@ -1415,6 +1415,50 @@ async def test_base_key_opens_unified_base_screen() -> None:
         assert isinstance(app.screen, GameScreen)
 
 
+async def test_base_hosted_market_trades_inside_base_screen() -> None:
+    """A base-hosted port is a Trade tab, not a second PortScreen navigation layer."""
+    from dataclasses import replace as _replace
+
+    from textual.widgets import DataTable, TabbedContent
+
+    from edge.tui.screens.base import BaseScreen
+    from edge.tui.widgets import TradePanel
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        ship = svc.state.ships[svc.state.players[1].ship_id]
+        base = None
+        sell_row = -1
+        for candidate in svc.state.starbases.values():
+            svc.state.ships[ship.id] = _replace(ship, sector_id=candidate.sector_id)
+            view = svc.current_starbase_view(1)
+            port = svc.current_port_view(1)
+            if view is not None and view.market_open and port is not None:
+                sell_row = next((i for i, line in enumerate(port.commodities)
+                                 if line.mode == "SELL"), -1)
+                if sell_row >= 0:
+                    base = candidate
+                    break
+        assert base is not None, "generated bases should include an open supplier market"
+
+        await pilot.press("p")
+        await pilot.pause()
+        assert isinstance(app.screen, BaseScreen)
+        assert app.screen.query_one(TabbedContent).active == "trade"
+        assert app.screen.query_one(TradePanel)
+        table = app.screen.query_one("#commodities", DataTable)
+        table.move_cursor(row=sell_row, animate=False)
+        before = svc.state.players[1].latinum
+        await pilot.press("t")
+        await pilot.pause()
+        assert isinstance(app.screen, BaseScreen)
+        assert svc.state.players[1].latinum < before
+
+
 async def test_list_picker_keyboard_navigation() -> None:
     """The shared ListPicker is fully keyboard-driven: ↑/↓ move the highlight,
     Enter confirms it, Esc cancels — no mouse required (and wrap-around works)."""

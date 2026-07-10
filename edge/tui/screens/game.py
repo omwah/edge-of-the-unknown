@@ -325,11 +325,14 @@ The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden fi
             self.notify(str(exc), severity="warning", timeout=3)
             return
         is_stardock = any(p.is_stardock for p in ports)
-        screen = (
-            StarDockScreen(self._service, self._pid)
-            if is_stardock
-            else PortScreen(self._service, self._pid)
-        )
+        base = self._service.current_starbase_view(self._pid)
+        if is_stardock:
+            screen = StarDockScreen(self._service, self._pid)
+        elif base is not None:
+            screen = BaseScreen(self._service, self._pid, base.starbase_id,
+                                initial_tab="trade")
+        else:
+            screen = PortScreen(self._service, self._pid)
         self.app.push_screen(screen)
 
     def action_base_services(self) -> None:

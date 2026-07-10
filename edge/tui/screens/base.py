@@ -34,6 +34,8 @@ from edge.core.rules import (
 )
 from edge.server.service import GameService
 from edge.tui.screens.confirm import ConfirmScreen
+from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
+from edge.tui.widgets import TradePanel
 
 _STANDING_STYLE = {
     "yours": "[green]yours[/]",
@@ -50,7 +52,8 @@ _SLOT_GLYPH = {"filled": "[cyan]▣[/]", "knocked": "[red]▨[/]", "empty": "[di
 class BaseScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Leave base"),
-        Binding("t", "trade", "Trade"),
+        Binding("t", "trade", "Trade highlighted"),
+        Binding("h", "haggle", "Haggle highlighted"),
         Binding("r", "repair", "Repair slot"),
         Binding("s", "salvage", "Salvage"),
         Binding("c", "claim", "Claim"),
@@ -154,16 +157,21 @@ market; a player-owned host earns a cut of outsider trades."""
                         Static("\n".join(lines) or "[dim]All slots live.[/]", classes="note"))
 
     def _trade_pane(self, v: StarbaseDTO) -> Vertical:
-        lines = [f"[b]{v.market_name}[/] — the base's trading post."]
-        if v.market_open:
-            lines.append("[green]Market open.[/]  [b]T[/] opens the trade desk.")
+        lines: list[str] = []
+        children: list[object] = []
+        port = self._service.current_port_view(self._pid)
+        if v.market_open and port is not None:
+            children.append(TradePanel(port, latinum=v.latinum, show_title=True,
+                                       id="base-trade-panel"))
+            lines.append("[dim]T trades the highlighted row · H haggles.[/]")
         else:
             lines.append(f"[red]Market closed[/] — {v.market_notice}.")
         if v.trade_cut_pct:
             who = "you" if v.standing == "yours" else v.owner
             lines.append(f"[dim]The owner ({who}) takes a {v.trade_cut_pct}% cut of outsider "
                          "trades from the port's purse.[/]")
-        return Vertical(Static("\n".join(lines)))
+        children.append(Static("\n".join(lines), classes="note"))
+        return Vertical(*children)  # type: ignore[arg-type]
 
     def _hardware_pane(self, v: StarbaseDTO) -> Vertical:
         table: DataTable = DataTable(id="base-hardware-table", cursor_type="row")
@@ -219,15 +227,16 @@ market; a player-owned host earns a cut of outsider trades."""
         return True
 
     def action_trade(self) -> None:
-        v = self._view()
-        if v.market_port_id is None:
-            self.notify("No market at this base.", timeout=2)
+        if self.query_one(TabbedContent).active != "trade":
+            self.notify("Switch to the Trade tab to trade.", timeout=2)
             return
-        if not v.market_open:
-            self.notify(f"Market closed — {v.market_notice}.", severity="warning", timeout=3)
+        _trade_highlighted(self, self._service, self._pid)
+
+    def action_haggle(self) -> None:
+        if self.query_one(TabbedContent).active != "trade":
+            self.notify("Switch to the Trade tab to haggle.", timeout=2)
             return
-        from edge.tui.screens.port import PortScreen
-        self.app.push_screen(PortScreen(self._service, self._pid))
+        _haggle_highlighted(self, self._service, self._pid)
 
     def action_repair(self) -> None:
         """Install a carried component into the first open slot, keystone first (§4.2)."""
