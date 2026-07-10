@@ -25,7 +25,7 @@ _BANNER = r"""
 | |_| | .` | ' <| .` | (_) \ \/\/ /| .` |
  \___/|_|\_|_|\_\_|\_|\___/ \_/\_/ |_|\_|
 """.strip("\n")
-_SUBTITLE = "trade · discover · navigate the alien frontier"
+_SUBTITLE = "\ntrade · discover · navigate the alien frontier"
 _FOOTER = "v0.1"
 
 
@@ -54,8 +54,8 @@ class MainMenuScreen(Screen):
             # the button list stays uninterrupted (WP-UI11 follow-up).
             if saved and (summary := save_summary()) is not None:
                 card = Static(
-                    f"day {summary.day_number} · last played {summary.last_played}\n"
-                    f"[dim]seed {summary.seed}[/]",
+                    f"Day {summary.day_number} · [dim]Seed {summary.seed}[/]\n"
+                    f"Last Played {summary.last_played}",
                     classes="save-card",
                 )
                 card.border_title = "Saved game"

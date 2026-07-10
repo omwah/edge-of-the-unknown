@@ -48,12 +48,12 @@ MainMenuScreen Starfield {
 }
 
 #menu-box .save-card {
-    width: 40;
+    align: center middle;
     height: auto;
     border: round $primary;
     border-title-color: $primary;
     padding: 0 1;
-    margin: 0 8 1 8;
+    margin: 0 4 1 4;
     color: $text-muted;
 }
 
