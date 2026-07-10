@@ -42,10 +42,13 @@ Leads · Contracts · Alliances · Dossier · Notes)
   [b]F[/]/[b]M[/] fighters/mines   [b]R[/] rumor   [b]N[/] notice
 
 [b]Planet (orbit)[/]
-  [b]D[/] descend   [b]C[/] colonize   [b]S[/] salvage   [b]G[/] genesis   [b]K[/] citadel \
-  [b]I[/] invade
-  [b]A[/] assault base   [b]R[/] repair base   [b]B[/] claim base   [b]+[/]/[b]-[/] treasury \
-  [b]T[/]/[b]L[/] unload/load cargo
+  [b]D[/] descend   [b]C[/] colonize   [b]G[/] genesis   [b]K[/] citadel   [b]I[/] invade
+  [b]B[/] enter base   [b]+[/]/[b]-[/] treasury   [b]T[/]/[b]L[/] unload/load cargo
+
+[b]Starbase[/] (tabs by standing: Station · Trade · Hardware · Bank)
+  [b]T[/] trade desk   [b]R[/] repair slot   [b]S[/] salvage   [b]C[/] claim \
+  [b]A[/] assault
+  [b]B[/] buy part   [b]M[/] missile   [b]D[/]/[b]W[/] bank deposit/withdraw
 
 [b]Engine room[/]
   [b]P[/] field-patch   [b]R[/] dock repair   [b]X[/] cannibalize   [b]U[/] upgrade (swap)

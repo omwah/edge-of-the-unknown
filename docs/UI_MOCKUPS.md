@@ -240,9 +240,14 @@ docking reaches an identical trade experience — only the container differs.
 - **Ownership/production block**: owner (none / alliance / player), habitability
   bar, colonists, `yield_profile` over the trio, citadel level, stores;
   allocation sliders shown **only to the owner** (§8 production).
-- **Orbital starbase row**: status (operational / **derelict** = can't power or
-  defend, §4.2); `[Inspect]` opens the engine-room view (§8 below) for repair/
-  cannibalize/claim.
+- **Orbital starbase row** (WP80): status only (operational / **derelict** = can't
+  power or defend, §4.2); the row is a click-through (`B` / click) to the unified
+  **BaseScreen** — a state-gated tabbed screen (tabs by `standing`: Station with
+  engine-room-style slot panels in base colours for repair/salvage/claim, Trade
+  fronting the WP78 base-hosted market, Hardware and Bank for the WP53 forward-base
+  services, Assault on a hostile/foreign base). The planet screen keeps colony
+  matters only; the sector scene's base sprite (which takes the port's orbit slot)
+  opens the same screen.
 - **Actions**: `[D]` -> SurfaceScreen (§4); `[C]` claim if unowned & habitable
   (Core worlds off-limits); `[T]` colony trade.
 - DESIGN: §4.2 (types/ownership/starbases), §8 (production), §7 (sites).

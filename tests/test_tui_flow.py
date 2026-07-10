@@ -1381,3 +1381,35 @@ async def test_stale_encounter_screen_never_strands_the_player() -> None:
         game = app.screen
         assert isinstance(game, GameScreen)
         assert not any(isinstance(s, EncounterScreen) for s in app.screen_stack)
+
+
+async def test_base_key_opens_unified_base_screen() -> None:
+    """WP80 — `B` on the game screen opens the state-gated BaseScreen for the base here.
+
+    The player is teleported (state mutation, no Warp — no encounters/hazards) onto a
+    starbase sector; the unified base view must open, and Esc must return to the game.
+    Every base sector hosts a market port (WP78), so a Trade tab is always present.
+    """
+    from dataclasses import replace as _replace
+
+    from edge.tui.screens.base import BaseScreen
+    from edge.tui.screens.game import GameScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        assert svc.state.starbases, "default universe should hold at least one base"
+        base = svc.state.starbases[min(svc.state.starbases)]
+        ship = svc.state.ships[svc.state.players[1].ship_id]
+        svc.state.ships[ship.id] = _replace(ship, sector_id=base.sector_id)
+        await pilot.press("b")
+        await pilot.pause()
+        assert isinstance(app.screen, BaseScreen)
+        view = svc.current_starbase_view(1)
+        assert view is not None and view.market_port_id is not None
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, GameScreen)
