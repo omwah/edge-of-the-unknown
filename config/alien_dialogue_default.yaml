@@ -707,3 +707,320 @@ personas:
           - "The {subject}? A minor concern, {player}. The cluster is full of such."
           - The {subject}? Potential allies in the struggle, perhaps.
           - We watch the {subject} closely. Everyone plays a part in the grand design.
+
+# --- WP74: signature-mechanic corpus routes (SEAMS_PLAN A2, decision D4) ----------------------
+# The six previously corpus-dark hooks, routed live. Each species overrides `contract_offer`
+# (reached from the baseline "Have you work for me?" reply): a `has_contract_offer`-gated entry
+# preserves the real WP57 favor flow, and the catch-all entry voices the species' *scheme*,
+# whose choices transition into `sig.<hook>.<approach>` nodes — the reducer runs the hook
+# (bounded effects, `sig_stage` persisted) and then speaks the node's line. Verdict/response
+# lines gate on `sig_stage` with a catch-all sibling, per the spec header. Authored directly
+# (human-reviewed, D4), keyed by species id so the routes ride each species' own pack.
+species_grammars:
+  # Vesk — reprogram_unlock: sell the philanthropy circuit that opens the Helots' trade.
+  vesk:
+    contract_offer:
+      - when: { criteria: { has_contract_offer: true } }
+        variants:
+          - "A commission, {player}: {target}. Veska VK-7 will log {reward} to your account — within {deadline} days."
+          - "The {species} have work. {target}. Payment: {reward}. Deadline: {deadline} days."
+        choices:
+          - text: "You have my word — I'll do it."
+            action: accept_contract
+          - text: "Not this time."
+            next_context: back
+      - when: { criteria: { sig_stage: unlocked } }
+        variants:
+          - "The philanthropy circuit sings in its socket, {player}. The Helot trade interface stands open to you. Veska VK-7 is pleased."
+          - "Our finest work performs as specified: the Helots now deal with you freely, {player}."
+        choices:
+          - text: "Fine workmanship."
+            next_context: back
+      - variants:
+          - "Not work, {player} — a gift of craft. The {species} have built a philanthropy circuit: install it and the cold Helot trade interface opens to you."
+          - "Veska VK-7 offers you our masterpiece, {player}: a philanthropy circuit. The Helots refuse all commerce — this teaches their sockets generosity."
+        choices:
+          - text: "Install the circuit."
+            next_context: sig.reprogram_unlock.install
+          - text: "I don't trust machine gifts."
+            next_context: sig.reprogram_unlock.decline
+          - text: "Another time."
+            next_context: back
+    sig.reprogram_unlock.install:
+      - variants:
+          - "Installation complete, {player}. The circuit hums; the Helots will open their stalls to you now. The {species} celebrate good craft."
+          - "It is done. Where the Helots refused you, they will now deal. Veska VK-7 thanks you for trusting our making, {player}."
+        choices:
+          - text: "Remarkable."
+            next_context: back
+    sig.reprogram_unlock.decline:
+      - variants:
+          - "As you wish, {player}. The circuit returns to the shelf — the {species} do not force their gifts."
+          - "Noted. Veska VK-7 stores the circuit for you, {player}, should you reconsider."
+        choices:
+          - text: "Perhaps later."
+            next_context: back
+  # Helot — reprogram_unlock (self): the circuit-gated trade interface, opened at the socket.
+  helot:
+    contract_offer:
+      - when: { criteria: { has_contract_offer: true } }
+        variants:
+          - "Task: {target}. Compensation: {reward}. Window: {deadline} days. Confirm, {player}."
+        choices:
+          - text: "Confirmed."
+            action: accept_contract
+          - text: "Declined."
+            next_context: back
+      - when: { criteria: { sig_stage: unlocked } }
+        variants:
+          - "Status: authorisation module active. Trade function enabled for {player}. No further work available."
+          - "1. A record. 2. The {species} confirm: your circuit is seated. Commerce permitted."
+        choices:
+          - text: "Acknowledged."
+            next_context: back
+      - variants:
+          - "Work: unavailable. Observation: your hold carries a Vesk philanthropy circuit socket-key, or could. Install one and trade function unlocks, {player}."
+          - "1. A refusal. 2. The {species} do not deal with unauthorised units. Remedy: install the reprogram circuit. Proceed, {player}?"
+        choices:
+          - text: "Install the circuit here."
+            next_context: sig.reprogram_unlock.install
+          - text: "Refuse the procedure."
+            next_context: sig.reprogram_unlock.decline
+          - text: "Disengage."
+            next_context: back
+    sig.reprogram_unlock.install:
+      - variants:
+          - "Circuit seated. Recalibrating… done. Trade function: enabled. The {species} will now exchange goods with {player}."
+          - "1. An installation. 2. The interface opens. The {species} acknowledge {player} as authorised. Proceed to commerce."
+        choices:
+          - text: "Open the trade interface."
+            action: trade
+          - text: "Later."
+            next_context: back
+    sig.reprogram_unlock.decline:
+      - variants:
+          - "Election logged: no installation. Trade function remains locked, {player}."
+          - "1. A decision. 2. The {species} respect unit autonomy. Interface remains closed."
+        choices:
+          - text: "Disengage."
+            next_context: back
+  # Stryx — passage_broker: sells a "time jump" that buys nothing (the mislead).
+  stryx:
+    contract_offer:
+      - when: { criteria: { has_contract_offer: true } }
+        variants:
+          - "Wurk, yes! {target}. Yu doo, wee paie {reward}. Feenish in {deadline} dayz, {player}!"
+        choices:
+          - text: "Deal."
+            action: accept_contract
+          - text: "No deal."
+            next_context: back
+      - when: { criteria: { sig_stage: misled } }
+        variants:
+          - "Moor passage? Hah! Da {species} membur yu, {player}. Furst jump wen well, yez?"
+          - "Yu bak! Gud custommer! ...No refundz, {player}."
+        choices:
+          - text: "We're done here."
+            next_context: back
+      - variants:
+          - "Beter dan wurk, {player}! Da {species} sell passage — tyme jump! Enny playce, enny wen. Yu paie furst."
+          - "Speshul offur, {player}: sekrit passage, verry fast, verry old teknolojee. Da {species} take latinum now, yez?"
+        choices:
+          - text: "Pay for the passage."
+            next_context: sig.passage_broker.pay
+          - text: "This reeks of a swindle."
+            next_context: sig.passage_broker.refuse
+          - text: "Walk away."
+            next_context: back
+    sig.passage_broker.pay:
+      - variants:
+          - "Hah! Da coordinatez… old. Verry old. Passage wuz yesterdai, {player}! No refundz — da {species} thank yu!"
+          - "Tyme jump compleet! ...Wut, nuthing happen? Ah. Smol print, {player}: satisfakshun not garanteed."
+        choices:
+          - text: "You'll regret this."
+            next_context: back
+    sig.passage_broker.refuse:
+      - variants:
+          - "No sale? Yor loss, {player}. Da {species} find uther custommer, eezy."
+          - "Fyn, fyn. Wawk away. Da passage not for evrywun, {player}."
+        choices:
+          - text: "Goodbye."
+            next_context: back
+  # Concordance — morality_judge: the roaming arbiter weighs the player's conduct.
+  concordance:
+    contract_offer:
+      - variants:
+          - "Thou askest for work, {player}? Thy work is thy conduct. Present thyself, and the {species} shall weigh it."
+          - "The {species} deal not in errands. But thy deeds are a ledger, {player}, and it can be read. Wilt thou be weighed?"
+        choices:
+          - text: "Weigh me, then."
+            next_context: sig.morality_judge.verdict
+          - text: "I am not ready to be judged."
+            next_context: back
+    sig.morality_judge.verdict:
+      - when: { criteria: { sig_stage: judged_blessed } }
+        variants:
+          - "Thy ledger is read, {player}, and found righteous. Go blessed of the {species}: doors shall open before thee."
+          - "Verily, thou hast hunted the wicked and spared the meek. The {species} bless thee, {player}."
+        choices:
+          - text: "I am honoured."
+            next_context: back
+      - when: { criteria: { sig_stage: judged_cursed } }
+        variants:
+          - "Woe unto thee, {player}. Thy ledger is black with the blood of the innocent. The {species} curse thee — carry it."
+          - "Thou art weighed and found wanting. Bear the mark of the {species}, {player}, until thy amends are made."
+        choices:
+          - text: "So be it."
+            next_context: back
+      - variants:
+          - "The scales barely tremble, {player}. Neither righteous nor damned — the {species} note thy name and watch."
+          - "Thy ledger is thin. Go and write upon it, {player}, and return to be weighed again."
+        choices:
+          - text: "I will return."
+            next_context: back
+  # Selvi — flee_drop: the timid darlings bolt, scattering trinkets on first contact.
+  selvi:
+    contract_offer:
+      - when: { criteria: { has_contract_offer: true } }
+        variants:
+          - "W-work? For you, dear {player}? Very well: {target}. We'll kiss {reward} into your hold — within {deadline} days, yes?"
+        choices:
+          - text: "Consider it done."
+            action: accept_contract
+          - text: "Another time."
+            next_context: back
+      - variants:
+          - "Eek — work?! Oh, you startle us, {player}! The {species} are not built for errands… don't come closer!"
+          - "Oh! Oh no. Bold {player} wants something of the {species}? We— we might just have to flee!"
+        choices:
+          - text: "Easy now — I'm coming alongside."
+            next_context: sig.flee_drop.contact
+          - text: "Relax. Never mind."
+            next_context: back
+    sig.flee_drop.contact:
+      - variants:
+          - "Aaah! Too close, too close! The {species} scatter — farewell, lovely {player}! Keep whatever falls from our hold!"
+          - "You magnificent brute! We flee! We flee! (Trinkets tumble in their engine-wash, {player}.)"
+        choices:
+          - text: "Wait— and they're gone."
+            next_context: back
+  # Vennrith — escalating_demand: befriending opens a ladder of mounting tribute.
+  vennrith:
+    contract_offer:
+      - when: { criteria: { has_contract_offer: true } }
+        variants:
+          - "Work, there is: {target}. Pay {reward}, we will — if within {deadline} days done it is, {player}."
+        choices:
+          - text: "It will be done."
+            action: accept_contract
+          - text: "Find another."
+            next_context: back
+      - when: { criteria: { sig_stage: satisfied } }
+        variants:
+          - "Proven yourself, you have, {player}. Ask nothing more of you, the {species} do. Honoured friend, you are."
+        choices:
+          - text: "At last."
+            next_context: back
+      - when: { criteria: { sig_stage: betrayed } }
+        variants:
+          - "Words with you? None, the {species} have. Betrayed us once, you did, {player}. Forget, we never shall."
+        choices:
+          - text: "…"
+            next_context: back
+      - variants:
+          - "Friendship with the {species}, you seek? Earned, it must be. Demands, we have — meet them, you will, or nothing you are."
+          - "Trust you, we do not yet, {player}. A price, friendship has. Hear our demand, you will?"
+        choices:
+          - text: "Name your demand — I will comply."
+            next_context: sig.escalating_demand.comply
+          - text: "I refuse to be squeezed."
+            next_context: sig.escalating_demand.refuse
+          - text: "Let me think on it."
+            next_context: back
+    sig.escalating_demand.comply:
+      - when: { criteria: { sig_stage: satisfied } }
+        variants:
+          - "Enough, it is. Satisfied, the {species} are. Stand with us now, you do, {player} — remembered, your tribute is."
+        choices:
+          - text: "We are done climbing, then."
+            next_context: back
+      - variants:
+          - "Good, this is. But finished, we are not — more, the {species} require of you, {player}. The next demand, hear you will."
+          - "Accepted, your tribute is. Climb higher, you must — another price, there is, {player}."
+        choices:
+          - text: "I will meet the next demand too."
+            next_context: sig.escalating_demand.comply
+          - text: "This ends here — no more."
+            next_context: sig.escalating_demand.refuse
+          - text: "Enough for today."
+            next_context: back
+    sig.escalating_demand.refuse:
+      - variants:
+          - "Refuse us, you dare?! Finished, we are, {player}. A vendetta, the {species} swear — undying, it is."
+          - "So. False, your friendship was. Remember this insult forever, the {species} will, {player}."
+        choices:
+          - text: "So be it."
+            next_context: back
+  # Thessbrood — trojan_gift: the humble governor's gift ticks.
+  thessbrood:
+    contract_offer:
+      - when: { criteria: { has_contract_offer: true } }
+        variants:
+          - "For you, mighty {player}, a trifling errand: {target}. Your humble servants will press {reward} upon you — within {deadline} days, if it pleases."
+        choices:
+          - text: "I'll see to it."
+            action: accept_contract
+          - text: "Not today."
+            next_context: back
+      - when: { criteria: { sig_stage: carried } }
+        variants:
+          - "Does our gift please you, powerful {player}? It… hums, you say? Surely a feature. Though — for a modest fee — the {species} could quiet it."
+          - "Ah, the gift rides with you still! Wonderful. Pay it no mind, generous one. (Unless you wish it… examined?)"
+        choices:
+          - text: "Quiet it. Remove the thing — now."
+            next_context: sig.trojan_gift.defuse
+          - text: "It's fine. All is well."
+            next_context: back
+      - when: { criteria: { sig_stage: sprung } }
+        variants:
+          - "Alas! The gift… malfunctioned? Such shoddy workmanship, {player} — the {species} are mortified. Devastated. Truly."
+        choices:
+          - text: "You will pay for this."
+            next_context: back
+      - variants:
+          - "Work? No no, honoured {player} — a *gift*! The {species} offer tribute to the powerful: a sealed casket, and latinum atop it. Only lower your shields to take it aboard."
+          - "Have mercy and accept, {player}: a token of our devotion, with a sweetener of slips. The humble {species} ask nothing in return. Nothing at all."
+        choices:
+          - text: "Lower shields — accept the gift."
+            next_context: sig.trojan_gift.accept
+          - text: "Keep your gift."
+            next_context: sig.trojan_gift.refuse
+          - text: "Not now."
+            next_context: back
+    sig.trojan_gift.accept:
+      - when: { criteria: { sig_stage: sprung } }
+        variants:
+          - "Oh! Oh dear. The casket has… expressed itself, {player}. How dreadful. The {species} grieve for your latinum."
+        choices:
+          - text: "You oily little schemers."
+            next_context: back
+      - variants:
+          - "Such wisdom, such grace! The casket is yours, mighty {player}, and the slips atop it. May it… serve you as intended."
+          - "The {species} rejoice! Take the sweetener, take the gift. Think of your humble servants when it — when you use it."
+        choices:
+          - text: "A pleasure doing business."
+            next_context: back
+    sig.trojan_gift.refuse:
+      - variants:
+          - "You wound us, {player}! But as you wish. The {species} withdraw the gift… for now."
+          - "So cautious, so wise. Very well, powerful one — the casket stays with us."
+        choices:
+          - text: "Wise of me indeed."
+            next_context: back
+    sig.trojan_gift.defuse:
+      - variants:
+          - "There — quieted, {player}. A trifling fee for such delicate work. The {species} live only to serve."
+          - "Snip, snip… done. The casket sleeps. That will be a small consideration, generous {player}. So sorry."
+        choices:
+          - text: "Take your fee and keep your distance."
+            next_context: back
