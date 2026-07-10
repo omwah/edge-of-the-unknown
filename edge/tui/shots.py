@@ -3,9 +3,9 @@
 Run with `pixi run shots`. Writes to docs/ui/shots/. The live screens (game,
 port, stardock, map, computer) are captured against a real generated universe
 (WP8): the player is navigated to a presentable sector via the service, then the
-GameScreen is recomposed. The Phase 2-3 screens (planet, surface, engine room,
-contact, encounter) are still skeletons, captured by pushing them
-directly with sample data.
+GameScreen is recomposed. Screens which need a particular encounter or remote
+connection are captured with presentation-only sample data. Tabbed screens use
+``screen-tab.svg``; every tab is captured.
 """
 
 from __future__ import annotations
@@ -21,12 +21,15 @@ os.environ.setdefault("TEXTUAL_ANIMATIONS", "none")
 # ruff: noqa: E402
 import asyncio
 import tempfile
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 from textual.pilot import Pilot
 from textual.widgets import TabbedContent
 
 from edge.core.movement import shortest_path
+from edge.core.models import Ownership
 from edge.core.rules import Warp
 from edge.tui.app import EdgeApp
 from edge.tui.dummy import (
@@ -38,9 +41,18 @@ from edge.tui.dummy import (
 from edge.tui.screens.contact import AlienContactScreen
 from edge.tui.screens.encounter import EncounterScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
+from edge.tui.screens.lobby import LobbyScreen
 from edge.tui.screens.planet import PlanetScreen
+from edge.tui.screens.base import BaseScreen
 
 OUT = Path("docs/ui/shots")
+_WRITTEN: set[str] = set()
+
+_STARDOCK_TABS = ("trade", "shipyard", "hardware", "devices", "bank", "tavern")
+_COMPUTER_TABS = (
+    "map", "ports", "planets", "trade", "market", "log", "route", "codex",
+    "leads", "contracts", "alliances", "dossier", "notes",
+)
 
 # Sprite-gallery tabs to capture, each to its own SVG: (TabPane id, file stem).
 # Must match SpriteGalleryScreen's tabs (planets / ports / ships / discoveries /
@@ -83,6 +95,37 @@ async def _shot(app: EdgeApp, pilot: Pilot, name: str) -> None:
     """Settle the screen, then write `name`.svg to the shots directory."""
     await _settle(app, pilot)
     app.save_screenshot(filename=name, path=str(OUT))
+    _WRITTEN.add(name)
+
+
+async def _tab_shots(
+    app: EdgeApp, pilot: Pilot, screen: str, tab_ids: tuple[str, ...]
+) -> None:
+    """Capture each tab of the current screen using the common naming rule."""
+    tabs = app.screen.query_one(TabbedContent)
+    for tab_id in tab_ids:
+        tabs.active = tab_id
+        await _shot(app, pilot, f"{screen}-{tab_id}.svg")
+
+
+class _EncounterSampleService:
+    """Tiny read-only service seam for the live encounter presentation."""
+
+    def encounter_view(self, _player_id: int) -> object:
+        e = sample_encounter()
+        foes = [
+            SimpleNamespace(name=x.name, hull_filled=x.hull_filled,
+                            hull_pct=x.hull_pct, alive=True)
+            for x in e.enemies
+        ]
+        return SimpleNamespace(
+            title=e.title, disposition_filled=e.disposition_filled, band=e.band,
+            speech=e.taunt.strip('"'), foes=foes, arc_hint=e.arc_hint,
+            shields_pct=e.shields_pct, hull_pct=e.hull_pct,
+            combat_line=e.combat_line, integrity_flag=e.integrity_flag,
+            round_no=e.round_no, flee_chance=e.flee_chance, flee_floor=e.flee_floor,
+            gun_online=True, missiles=3, repair_kits=2,
+        )
 
 
 async def _capture() -> None:
@@ -91,6 +134,9 @@ async def _capture() -> None:
     app = EdgeApp(plain=True)
     async with app.run_test(size=(100, 34)) as pilot:
         await _shot(app, pilot, "main-menu.svg")
+        await pilot.press("o")
+        await _shot(app, pilot, "options.svg")
+        await pilot.press("escape")
 
         await pilot.press("n")  # New game -> live GameScreen
         await pilot.pause()
@@ -125,27 +171,57 @@ async def _capture() -> None:
             await pilot.press("escape")
             await pilot.pause()
 
-        # The StarDock -> services hub, Hardware tab.
+        # The StarDock -> services hub, every service tab.
         dock = next(s for s, p in ports.items() if p.klass.value == 9)
         await goto(dock)
         await pilot.press("p")
         await pilot.pause()
-        app.screen.query_one(TabbedContent).active = "hardware"
-        await _shot(app, pilot, "stardock.svg")
+        await _tab_shots(app, pilot, "stardock", _STARDOCK_TABS)
         await pilot.press("escape")
         await pilot.pause()
 
-        await pilot.press("m")  # Galactic map (live)
-        await _shot(app, pilot, "map.svg")
+        await pilot.press("c")  # Ship computer: capture every live query tab.
+        await _tab_shots(app, pilot, "computer", _COMPUTER_TABS)
         await pilot.press("escape")
         await pilot.pause()
 
-        await pilot.press("c")  # Ship computer (live pair-finder over seen ports)
-        await _shot(app, pilot, "computer.svg")
+        # Current top-level utility screens.
+        await pilot.press("d")
+        await _shot(app, pilot, "territory.svg")
         await pilot.press("escape")
-        await pilot.pause()
+        await pilot.press("t")
+        await _shot(app, pilot, "corp.svg")
+        await pilot.press("escape")
+        await pilot.press("question_mark")
+        await _shot(app, pilot, "help.svg")
+        await pilot.press("escape")
+        await pilot.press("full_stop")
+        await _shot(app, pilot, "action-menu.svg")
+        await pilot.press("escape")
 
-        # The Phase 2-3 skeleton screens, pushed directly with sample data.
+        # Capture a real orbital base and all tabs available for its standing.
+        starbase = next(iter(state.starbases.values()), None)
+        if starbase is not None:
+            await goto(starbase.sector_id)
+            app.push_screen(BaseScreen(svc, 1, starbase.id))
+            await pilot.pause()
+            tab_ids = tuple(p.id for p in app.screen.query("TabPane") if p.id)
+            await _tab_shots(app, pilot, "base", tab_ids)
+            await pilot.press("escape")
+
+            # A fresh universe has no player-owned base, but that standing owns the
+            # Station/Hardware/Bank tabs. Flip ownership only in this throwaway state
+            # and capture those otherwise-unreachable initial-state presentations.
+            state.starbases[starbase.id] = replace(
+                starbase, owner=Ownership("player", 1)
+            )
+            app.push_screen(BaseScreen(svc, 1, starbase.id))
+            await pilot.pause()
+            owned_tabs = tuple(p.id for p in app.screen.query("TabPane") if p.id)
+            await _tab_shots(app, pilot, "base", owned_tabs)
+            await pilot.press("escape")
+
+        # Screens with stable sample presentation data.
         app.push_screen(PlanetScreen(sample_planet()))
         await _shot(app, pilot, "planet.svg")
         await pilot.press("d")  # descend -> SurfaceScreen
@@ -157,7 +233,7 @@ async def _capture() -> None:
         for name, screen in (
             ("engine-room", EngineRoomScreen(sample_engine_room())),
             ("contact", AlienContactScreen(sample_contact())),
-            ("encounter", EncounterScreen(sample_encounter())),
+            ("encounter", EncounterScreen(_EncounterSampleService(), 1)),
         ):
             app.push_screen(screen)
             await _shot(app, pilot, f"{name}.svg")
@@ -175,10 +251,21 @@ async def _capture() -> None:
             tabs.active = tab_id
             await _shot(gal, pilot, f"{stem}.svg")
 
+    # The hosted lobby has no dependency on a running server until a button is pressed.
+    lobby = EdgeApp(plain=True)
+    async with lobby.run_test(size=(100, 34)) as pilot:
+        lobby.push_screen(LobbyScreen("ws://host.example:8765"))
+        await _shot(lobby, pilot, "lobby.svg")
+
+    # Prune screenshots for screens/tabs which no longer exist, but only after a
+    # complete successful capture so a mid-run error never destroys the review set.
+    for old in OUT.glob("*.svg"):
+        if old.name not in _WRITTEN:
+            old.unlink()
+
     gallery_stems = ", ".join(stem for _, stem in _GALLERY_TABS)
     print(
-        "wrote main-menu, game, port, stardock, map, computer, planet, surface, "
-        f"engine-room, contact, encounter, {gallery_stems} .svg to {OUT}"
+        f"wrote {len(_WRITTEN)} screen/tab SVGs (including {gallery_stems}) to {OUT}"
     )
 
 
