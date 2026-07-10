@@ -8,7 +8,7 @@ only ever asserts UI-side effects).
 
 from __future__ import annotations
 
-from textual.widgets import Button, Static
+from textual.widgets import Button
 
 from edge.tui.app import EdgeApp
 from edge.tui.onboarding import OBJECTIVE_IDS, ObjectivesStrip, all_done, next_hint
