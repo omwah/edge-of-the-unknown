@@ -15,10 +15,23 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from edge.core.enums import Subsystem
-from edge.core.models import EncounterFoe, Starbase
+from edge.core.models import EncounterFoe, Starbase, UniverseState
 
 if TYPE_CHECKING:
     from edge.core.config import GameConfig
+
+
+def base_in_sector(state: UniverseState, sector_id: int) -> Starbase | None:
+    """The orbital base in `sector_id`, or None (WP78).
+
+    At most one exists — the big bang places at most one planet per sector and a base
+    hangs off a planet — but iterate id-sorted so a hand-built state stays deterministic.
+    """
+    return next(
+        (b for b in sorted(state.starbases.values(), key=lambda b: b.id)
+         if b.sector_id == sector_id),
+        None,
+    )
 
 
 def is_operational(base: Starbase) -> bool:

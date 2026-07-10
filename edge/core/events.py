@@ -64,6 +64,22 @@ class Traded(Event):
 
 
 @dataclass(frozen=True)
+class BaseCommission(Event):
+    """A base-hosted market paid its owner a cut of a trade (§4.2, WP78).
+
+    `player_id` is the trader; the owner (`owner_kind` "player"/"corp", `owner_ref` the
+    player/corp id) is credited `amount` latinum out of the port's purse.
+    """
+
+    player_id: int
+    starbase_id: int
+    port_id: int
+    owner_kind: str
+    owner_ref: int
+    amount: int
+
+
+@dataclass(frozen=True)
 class Haggled(Event):
     player_id: int
     port_id: int

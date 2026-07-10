@@ -360,6 +360,10 @@ starbase:
     banking: true
     fee_frac: 1.25            # frontier convenience markup over StarDock latinum prices
     component_stock_tiers: [I, II]
+    # Base-hosted markets (WP78): a starbase sector's port is the base's trading post.
+    # A player/corp owner skims this share of each outsider trade's value from the
+    # port's purse into their bank — rent for holding the local market.
+    trade_cut_frac: 0.05
 
 # Discoveries (§7, WP5): the universe is salted at big bang with finds whose rarity
 # (and value) rises with distance band. Hidden finds (wrecks/entities) need a sensor

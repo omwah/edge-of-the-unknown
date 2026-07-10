@@ -32,6 +32,7 @@ from edge.core.events import (
     AllianceResigned,
     AttitudeChanged,
     Banked,
+    BaseCommission,
     CargoTransferred,
     CitadelBuildStarted,
     CitadelCompleted,
@@ -260,6 +261,8 @@ EVENTS: list[Event] = [
     MarketSettled(4, 120, 900),                        # WP47 daily settlement summary
     PortOrderFilled(3, Commodity.FUEL_ORE, "buy", 40, 9, 5),  # WP47 one explored-port fill
     Haggled(1, 3, Commodity.ORGANICS, "accepted", 6),
+    BaseCommission(2, 4, 3, "player", 1, 36),          # WP78 base-hosted market rent
+    BaseCommission(2, 4, 3, "corp", 1, 36),
     Banked(1, "interest", 50, 10_050),
     ComponentPurchased(1, "turbine", "II", 8_000),
     ShipPurchased(1, "scout_marauder", 20_000, 0),
