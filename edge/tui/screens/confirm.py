@@ -21,7 +21,7 @@ class ConfirmScreen(ModalScreen[bool]):
     ]
 
     CSS = """
-    ConfirmScreen { align: center middle; }
+    ConfirmScreen { align: center middle; background: $background 60%; }
     ConfirmScreen #confirm-box {
         width: 56; height: auto; padding: 1 2; border: round $primary; background: $surface;
     }
