@@ -3,9 +3,10 @@
 Phase-1 core screen: a tabbed query console over the owned game engine. The
 **Trade** tab is the pair-trade finder; the **Map** and **Log** tabs fold in the
 galactic map and the durable event log (WP-B — they live *inside* the computer
-but keep their direct `M`/`G` hotkeys on the game screen). The **Ports** directory
-(WP15) and **Route** planner (WP14) are live; **Codex** and **Dossier** ship in
-WP11; **Notes** is the last Phase-2 stub.
+but keep their direct `M`/`G` hotkeys on the game screen). Every tab is live:
+Ports/Route (WP15/WP14), Codex/Dossier (WP11), Contracts (WP57/WP71),
+Alliances (WP72), and Notes — captain's notes plus the route-planner avoid
+list (WP73).
 """
 
 from __future__ import annotations
@@ -34,7 +35,8 @@ class ComputerScreen(Screen):
         Binding("g", "engage", "Engage"),
         Binding("r", "route_prompt", "Route to…"),
         Binding("s", "seize_core", "Seize Core"),
-        Binding("a", "noop", "Add note"),
+        Binding("a", "add_note", "Add note"),
+        Binding("v", "toggle_avoid", "Avoid sector"),
         Binding("d", "deliver_contract", "Deliver"),
         Binding("x", "abandon_contract", "Abandon"),
         Binding("j", "join_alliance", "Join/Resign"),
@@ -125,7 +127,14 @@ class ComputerScreen(Screen):
                 yield Static(self._governance_notes(), id="governance-panel", classes="note")
                 yield Static(self._seizure_notes(), id="seizure-panel", classes="note")
             with TabPane("Notes", id="notes"):
-                yield Static("[dim]Avoid lists & player notes — Phase 2.[/]")
+                yield Static("[b]CAPTAIN'S NOTES[/]        [dim]personal log + avoid list[/]")
+                yield DataTable(id="notes-table", zebra_stripes=True, cursor_type="row")
+                avoid = (", ".join(f"S{d}" for d in self._computer.avoid)
+                         or "[dim]none[/]")
+                yield Static(f"[b]AVOID LIST[/] (route planner skips these): {avoid}",
+                             classes="note", id="avoid-line")
+                yield Static("[dim][b]A[/] Add note   ·   [b]X[/] Remove highlighted   ·   "
+                             "[b]V[/] Toggle a sector on the avoid list[/]", classes="note")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -241,6 +250,14 @@ class ComputerScreen(Screen):
         else:
             blocs.add_row(Text("no blocs in this universe", style="dim"), *(Text(""),) * 5)
 
+        notes = self.query_one("#notes-table", DataTable)
+        notes.add_columns("#", "Note")
+        if self._computer.notes:
+            for i, text in enumerate(self._computer.notes):
+                notes.add_row(str(i + 1), text, key=str(i))
+        else:
+            notes.add_row(Text(""), Text("no notes yet — press A to write one", style="dim"))
+
         dossier = self.query_one("#dossier-table", DataTable)
         dossier.add_columns("Species", "Alliance", "Standing", "Last seen", "Disp", "Tech offers")
         if self._computer.dossier:
@@ -293,15 +310,23 @@ class ComputerScreen(Screen):
         if sz is None or not sz.ready:
             self.notify("No Core seizure is ready to petition.", severity="warning", timeout=3)
             return
-        from edge.core.rules import PetitionCoreSeizure
-        try:
-            self._service.apply(self._pid, PetitionCoreSeizure(alliance_id=sz.alliance_id))
-        except (EconomyError, MovementError) as exc:
-            self.notify(str(exc), severity="warning", timeout=4)
-            return
-        self.notify(f"The Core is seized — {sz.alliance_name} now governs.", timeout=5)
-        self._computer = self._service.computer_view(self._pid)
-        self.query_one("#seizure-panel", Static).update(self._seizure_notes())
+
+        def _go(ok: bool | None) -> None:
+            if not ok:
+                return
+            from edge.core.rules import PetitionCoreSeizure
+            try:
+                self._service.apply(self._pid, PetitionCoreSeizure(alliance_id=sz.alliance_id))
+            except (EconomyError, MovementError) as exc:
+                self.notify(str(exc), severity="warning", timeout=4)
+                return
+            self.notify(f"The Core is seized — {sz.alliance_name} now governs.", timeout=5)
+            self._computer = self._service.computer_view(self._pid)
+            self.query_one("#seizure-panel", Static).update(self._seizure_notes())
+
+        self.app.push_screen(ConfirmScreen(
+            f"Petition {sz.alliance_name} to seize the Core?\n"
+            "Core governance flips — the old governor's welcome ends."), _go)
 
     # --- Contracts (WP57 — surfaced WP71) -------------------------------------
 
@@ -331,7 +356,10 @@ class ComputerScreen(Screen):
         self._reopen_tab("contracts")
 
     def action_abandon_contract(self) -> None:
-        """Release the highlighted favor, failing it honestly (§6.7, WP57)."""
+        """X: abandon the highlighted favor — or, on the Notes tab, remove a note."""
+        if self.query_one(TabbedContent).active == "notes":
+            self._remove_note()
+            return
         cid = self._highlighted_contract()
         if cid is None:
             return
@@ -343,6 +371,58 @@ class ComputerScreen(Screen):
             return
         self.notify("Contract abandoned.", timeout=2)
         self._reopen_tab("contracts")
+
+    # --- Notes + avoid list (§9 Notes tab — WP73) ------------------------------
+
+    def action_add_note(self) -> None:
+        """Write a captain's note (any tab; lands on the Notes tab)."""
+        from edge.tui.screens.stardock import _NoticeInput
+
+        def _go(text: str | None) -> None:
+            if not text:
+                return
+            from edge.core.rules import AddNote
+            try:
+                self._service.apply(self._pid, AddNote(text=text))
+            except EconomyError as exc:
+                self.notify(str(exc), severity="warning", timeout=3)
+                return
+            self._reopen_tab("notes")
+
+        self.app.push_screen(_NoticeInput("Write a note"), _go)
+
+    def _remove_note(self) -> None:
+        table = self.query_one("#notes-table", DataTable)
+        if not table.row_count:
+            return
+        key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+        if key.value is None:
+            return
+        from edge.core.rules import RemoveNote
+        try:
+            self._service.apply(self._pid, RemoveNote(index=int(key.value)))
+        except EconomyError as exc:
+            self.notify(str(exc), severity="warning", timeout=3)
+            return
+        self._reopen_tab("notes")
+
+    def action_toggle_avoid(self) -> None:
+        """Toggle a sector on the route-planner avoid list (§9 — WP73)."""
+        def _go(shown: int | None) -> None:
+            if shown is None:
+                return
+            internal = self._service.resolve_display_id(shown)
+            if internal is None:
+                self.notify(f"No sector {shown}.", severity="warning", timeout=3)
+                return
+            from edge.core.rules import ToggleAvoid
+            try:
+                self._service.apply(self._pid, ToggleAvoid(sector_id=internal))
+            except EconomyError as exc:
+                self.notify(str(exc), severity="warning", timeout=3)
+                return
+            self._reopen_tab("notes")
+        self.app.push_screen(TravelPromptScreen(), _go)
 
     def _reopen_tab(self, tab: str) -> None:
         """Rebuild the screen on the given tab after a state change."""
@@ -372,14 +452,24 @@ class ComputerScreen(Screen):
             return
         from edge.core.rules import JoinAlliance, ResignAlliance
         command = ResignAlliance() if row.member else JoinAlliance(row.alliance_id)
-        try:
-            self._service.apply(self._pid, command)
-        except (EconomyError, MovementError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
-            return
-        self.notify("Resigned — you stand apart again." if row.member
-                    else f"Sworn to the {row.name}.", timeout=3)
-        self._reopen_tab("alliances")
+
+        def _go(ok: bool | None = True) -> None:
+            if not ok:
+                return
+            try:
+                self._service.apply(self._pid, command)
+            except (EconomyError, MovementError) as exc:
+                self.notify(str(exc), severity="warning", timeout=3)
+                return
+            self.notify("Resigned — you stand apart again." if row.member
+                        else f"Sworn to the {row.name}.", timeout=3)
+            self._reopen_tab("alliances")
+
+        if row.member:  # D7 (WP73): resigning resets standings — confirm it
+            self.app.push_screen(ConfirmScreen(
+                f"Resign from the {row.name}?\nYour standing with them resets."), _go)
+        else:
+            _go()
 
     def action_log_admission_task(self) -> None:
         """Record the next admission task for the highlighted bloc (§6.3, WP38).

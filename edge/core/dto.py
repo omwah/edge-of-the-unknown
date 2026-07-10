@@ -471,6 +471,9 @@ class ComputerDTO:
     governance_intel: list[str] = field(default_factory=list)
     # Every bloc in the game with the player's standing + admission state (§6.3 — WP72).
     alliances: list["AllianceRowDTO"] = field(default_factory=list)
+    # Captain's notes + the route-planner avoid list (§9 Notes tab — WP73).
+    notes: list[str] = field(default_factory=list)
+    avoid: list[int] = field(default_factory=list)  # avoided sectors as display ids
 
 
 @dataclass(frozen=True)

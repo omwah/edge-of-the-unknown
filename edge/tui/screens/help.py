@@ -1,8 +1,9 @@
-"""HelpScreen — a centred Help modal (Ctrl+H), opening on the Warp Legend.
+"""HelpScreen — the key reference + warp legend overlay (`?` / Ctrl+H).
 
-A reference overlay for the sector screen. It currently holds the warp colour/arrow
-legend that used to sit in the status sidebar; it is structured so further help
-sections can be appended beneath it later.
+WP73: a real keymap (the §4 keymap-normalization decision, D3) — the global
+conventions, the main screens' verbs, and the warp colour legend. The per-screen
+numbered action menu (`.`) lists exactly what the *current* screen can do; this
+overlay is the study-at-leisure companion.
 """
 
 from __future__ import annotations
@@ -15,12 +16,52 @@ from textual.widgets import Static
 
 from edge.tui.widgets import warp_legend_markup
 
+_KEYMAP = """\
+[b]Conventions[/]
+  [b]Esc[/] backs out of any screen · [b].[/] lists this screen's actions (numbered) \
+· [b]?[/] this help
+  [b]T[/] trade · [b]B[/] buy · [b]H[/] haggle · destructive acts always confirm first
+
+[b]Game screen[/]
+  [b]W[/] travel   [b]P[/] dock   [b]S[/] survey planet   [b]H[/] hail   [b]A[/] attack \
+  [b]Z[/] scan
+  [b]C[/] computer   [b]E[/] engine room   [b]M[/] map   [b]G[/] log   [b]D[/] deploy \
+  [b]T[/] corp   [b]B[/] base
+
+[b]Computer[/] (tabs: Map · Ports · Planets · Trade · Market · Log · Route · Codex ·
+Leads · Contracts · Alliances · Dossier · Notes)
+  [b]P[/] plot route   [b]R[/] route to…   [b]G[/] engage route   [b]D[/] deliver favor \
+  [b]X[/] abandon/remove
+  [b]J[/] join/resign bloc   [b]T[/] log admission task   [b]A[/] add note \
+  [b]V[/] avoid sector   [b]S[/] seize Core
+
+[b]Port / StarDock[/]
+  [b]T[/] trade   [b]H[/] haggle   [b]B[/] buy (active tab)   [b]D[/] deposit / deliver \
+  [b]W[/] withdraw
+  [b]G[/] genesis   [b]I[/] missile   [b]K[/] recruit   [b]E[/] engine room \
+  [b]F[/]/[b]M[/] fighters/mines   [b]R[/] rumor   [b]N[/] notice
+
+[b]Planet (orbit)[/]
+  [b]D[/] descend   [b]C[/] colonize   [b]S[/] salvage   [b]G[/] genesis   [b]K[/] citadel \
+  [b]I[/] invade
+  [b]A[/] assault base   [b]R[/] repair base   [b]B[/] claim base   [b]+[/]/[b]-[/] treasury
+
+[b]Engine room[/]
+  [b]P[/] field-patch   [b]R[/] dock repair   [b]X[/] cannibalize   [b]U[/] upgrade (swap)
+
+[b]Territory & devices[/] (game screen [b]D[/])
+  [b]F[/] fighters   [b]M[/]/[b]L[/] armid/limpet mines   [b]B[/] beacon   [b]P[/] probe \
+  [b]I[/] interdictor   [b]R[/] strip limpets
+
+[b]Contact / Encounter[/]
+  [b]1–9[/] replies   [b]B[/] back   [b]F[/] farewell   [b]J[/] join/resign bloc\
+"""
+
 
 class HelpScreen(ModalScreen[None]):
     BINDINGS = [
         Binding("escape", "close", "Close"),
         Binding("question_mark", "close", "Close"),
-        Binding("q", "close", "Close"),
     ]
 
     CSS = """
@@ -28,7 +69,7 @@ class HelpScreen(ModalScreen[None]):
        `Screen` rule would otherwise paint it opaque and blank the screen). */
     HelpScreen { align: center middle; background: $background 60%; }
     HelpScreen #help-box {
-        width: 80; max-height: 80%; height: auto; padding: 1 2;
+        width: 90; max-height: 90%; height: auto; padding: 1 2;
         border: round $primary; background: $surface;
     }
     HelpScreen #help-title { text-style: bold; color: $primary; margin-bottom: 1; }
@@ -42,7 +83,9 @@ class HelpScreen(ModalScreen[None]):
         side = ui_config.nav_core_anchor_side if ui_config else "left"
 
         with VerticalScroll(id="help-box"):
-            yield Static("Help", id="help-title")
+            yield Static("Help — keys", id="help-title")
+            yield Static(_KEYMAP)
+            yield Static("Warp legend", classes="help-section")
             yield Static(warp_legend_markup(side))
             yield Static("[dim]Esc to close[/]", id="help-footer")
 

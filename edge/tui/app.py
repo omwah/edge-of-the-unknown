@@ -49,7 +49,12 @@ class EdgeApp(App[None]):
     # any screen binding and never reaches the footer. Re-declare it without
     # priority so a screen's own ctrl+q binding wins display; keep it hidden here
     # so the "^q Quit" label surfaces only where a screen opts in (the GameScreen).
-    BINDINGS = [Binding("ctrl+q", "quit", "Quit", show=False)]
+    BINDINGS = [
+        Binding("ctrl+q", "quit", "Quit", show=False),
+        # The numbered context-action menu (WP73, D3): one key lists everything
+        # doable on the current screen. App-level so every screen gets it for free.
+        Binding("full_stop", "action_menu", "Actions", show=False),
+    ]
 
     player_id = 1
 
@@ -73,6 +78,14 @@ class EdgeApp(App[None]):
         self.ui_config = UIConfig()
         self.max_warps_per_sector = 6  # TW2002 cap; reserves the warp grid's row count
         self.computer_tab = "trade"  # last Computer tab, restored when reopened with [C]
+
+    def action_action_menu(self) -> None:
+        """Open the numbered context-action menu over the current screen (WP73, D3)."""
+        from textual.screen import ModalScreen
+        from edge.tui.screens.action_menu import ActionMenuScreen
+        if isinstance(self.screen, ModalScreen):
+            return  # modals (prompts, confirms, the menu itself) keep their own keys
+        self.push_screen(ActionMenuScreen(self.screen))
 
     @property
     def service(self) -> GameService | None:

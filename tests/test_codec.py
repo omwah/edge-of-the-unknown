@@ -89,6 +89,7 @@ from edge.core.rules import (
     AbandonContract,
     AcceptCorpInvite,
     AcceptLead,
+    AddNote,
     AttackPlayer,
     AttackSpecies,
     BuyRumor,
@@ -149,6 +150,8 @@ from edge.core.rules import (
     PlanetDeposit,
     PlanetWithdraw,
     RemoveLimpets,
+    RemoveNote,
+    ToggleAvoid,
     ToggleInterdictor,
     Trade,
     TravelTo,
@@ -202,6 +205,9 @@ COMMANDS: list[Command] = [
     AbandonContract(contract_id=2),              # WP57 release a favor
     BuyRumor(),                                  # WP58 buy a tavern rumor
     PostNotice(text="fuel cheap in the Deep"),   # WP58 pin a noticeboard message
+    AddNote(text="quill pack near S9"),          # WP73 captain's note
+    RemoveNote(index=0),                         # WP73 delete a note
+    ToggleAvoid(sector_id=9),                    # WP73 route-planner avoid list
     AdvanceAdmission(alliance_id=3, task="pay"), # WP38 complete an admission task
     JoinAlliance(alliance_id=3),                 # WP38 join a bloc
     ResignAlliance(),                            # WP38 leave the current bloc

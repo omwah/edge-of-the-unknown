@@ -335,7 +335,7 @@ class _AmountInput(ModalScreen[int | None]):
 
 
 class _NoticeInput(ModalScreen[str | None]):
-    """A one-line prompt for a noticeboard message (§14, WP58)."""
+    """A one-line text prompt (noticeboard §14 WP58; reused for captain's notes, WP73)."""
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
     CSS = """
@@ -343,8 +343,12 @@ class _NoticeInput(ModalScreen[str | None]):
     _NoticeInput Input { width: 60; }
     """
 
+    def __init__(self, prompt: str = "Post a notice") -> None:
+        super().__init__()
+        self._prompt = prompt
+
     def compose(self) -> ComposeResult:
-        yield Static("[b]Post a notice[/]  (Enter to pin, Esc to cancel)")
+        yield Static(f"[b]{self._prompt}[/]  (Enter to confirm, Esc to cancel)")
         yield Input(placeholder="your message…", id="notice-input")
 
     def on_mount(self) -> None:

@@ -481,7 +481,7 @@ SPINDRIVE   THRUSTERS   SCREENS     MAIN GUN
 
 ---
 
-## 10. MapScreen  *(Phase 1)* — galactic map
+## 10. MapScreen  *(retired — WP73; superseded by the Computer's Map tab)*
 
 ```
 ┌─ GALACTIC MAP ────────────────────── you @ Sector 7 . Band 0 (Core) ─┐
@@ -513,7 +513,7 @@ SPINDRIVE   THRUSTERS   SCREENS     MAIN GUN
 
 ---
 
-## 11. MessagesScreen  *(Phase 1 shell)*
+## 11. MessagesScreen  *(retired — WP73; superseded by the Computer's Log tab)*
 
 ```
 ┌─ MESSAGES & LOG ─────────────────────────────────────────────────────┐
@@ -578,6 +578,42 @@ reference.
   state, so no DTO/service boundary is crossed.
 
 ---
+
+## Keymap convention (WP73 — the normative contract)
+
+Added in the seams-correction arc (SEAMS_PLAN §4, decision D3). New bindings must
+follow this; collisions are bugs.
+
+**Reserved global keys** (same meaning on every screen; never rebind locally):
+
+| Key | Meaning |
+|-----|---------|
+| `Esc` | Back / close the current screen (the only back key — `q` is menu-quit only) |
+| `.` | Numbered context-action menu: lists every advertised action on the current screen |
+| `?` | Help overlay (keymap + warp legend) |
+| `Ctrl+Q` | Quit the app |
+| `1`–`9` | Numbered menu/reply selection where a numbered list is shown |
+
+**Verb vocabulary** (a letter keeps one meaning wherever it appears):
+
+| Key | Verb | Screens |
+|-----|------|---------|
+| `t` | Trade | Port, StarDock (Game: Corp — grandfathered, rename when corp gets a hub) |
+| `b` | Buy / Claim-base | StarDock/Starbase buy; Planet claims the base |
+| `h` | Haggle / Hail | Ports haggle; Game hails |
+| `d` | Deposit / Deliver / Deploy | StarDock deposit, Port deliver, Game deploy, Planet descend |
+| `w` | Withdraw / Travel | banking withdraw everywhere (`y` is retired); Game travel |
+| `r` | Repair / Rumor / Route-to | context-local but always "restorative/plot" flavored |
+| `a` | Attack / Assault / Add | martial on Game/Planet; additive on Computer |
+| `g` | Genesis / enGage / loG | destructive `g` actions always confirm (D7) |
+
+**Destructive-confirm rule (D7):** Genesis, Seize Core, Invade, ResignAlliance,
+and any first strike (in-sector or from a conversation) go through `ConfirmScreen`
+— deny-focused, so a stray Enter never fires them.
+
+**Discoverability:** the Footer shows what fits; `.` (action menu) is the complete
+live list; `?` is the reference card. A feature reachable only by hotkey is a bug —
+it must also appear in its screen's action menu (automatic once it is a `Binding`).
 
 ## Open layout questions (resolve during the Phase 1 UI build)
 

@@ -4,7 +4,7 @@ Run with `pixi run shots`. Writes to docs/ui/shots/. The live screens (game,
 port, stardock, map, computer) are captured against a real generated universe
 (WP8): the player is navigated to a presentable sector via the service, then the
 GameScreen is recomposed. The Phase 2-3 screens (planet, surface, engine room,
-contact, encounter, messages) are still skeletons, captured by pushing them
+contact, encounter) are still skeletons, captured by pushing them
 directly with sample data.
 """
 
@@ -33,13 +33,11 @@ from edge.tui.dummy import (
     sample_contact,
     sample_encounter,
     sample_engine_room,
-    sample_messages,
     sample_planet,
 )
 from edge.tui.screens.contact import AlienContactScreen
 from edge.tui.screens.encounter import EncounterScreen
 from edge.tui.screens.engine_room import EngineRoomScreen
-from edge.tui.screens.messages import MessagesScreen
 from edge.tui.screens.planet import PlanetScreen
 
 OUT = Path("docs/ui/shots")
@@ -160,7 +158,6 @@ async def _capture() -> None:
             ("engine-room", EngineRoomScreen(sample_engine_room())),
             ("contact", AlienContactScreen(sample_contact())),
             ("encounter", EncounterScreen(sample_encounter())),
-            ("messages", MessagesScreen(sample_messages())),
         ):
             app.push_screen(screen)
             await _shot(app, pilot, f"{name}.svg")
@@ -181,7 +178,7 @@ async def _capture() -> None:
     gallery_stems = ", ".join(stem for _, stem in _GALLERY_TABS)
     print(
         "wrote main-menu, game, port, stardock, map, computer, planet, surface, "
-        f"engine-room, contact, encounter, messages, {gallery_stems} .svg to {OUT}"
+        f"engine-room, contact, encounter, {gallery_stems} .svg to {OUT}"
     )
 
 

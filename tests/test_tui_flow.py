@@ -999,8 +999,12 @@ async def test_leads_tab_lists_logged_tip_plots_and_engages_route() -> None:
         assert app.screen._route.reachable  # type: ignore[attr-defined]
         assert app.screen.query_one("#route-table", DataTable).row_count == len(route.hops)
 
+        from edge.tui.screens.confirm import ConfirmScreen
         await pilot.press("g")  # engage — fly the plotted lead route through uncharted space
         await pilot.pause()
+        if isinstance(app.screen, ConfirmScreen):  # WP75: band-risk hazards confirm first
+            await pilot.press("y")
+            await pilot.pause()
         assert svc.state.ships[1].sector_id == disc.sector_id  # arrived at the tip
         assert disc.sector_id in svc.state.players[1].explored_sectors  # charted en route
 

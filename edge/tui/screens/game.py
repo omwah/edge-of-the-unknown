@@ -2,8 +2,8 @@
 
 Reads `service.game_view(player_id)` (the fog-of-war DTO) and issues commands
 through `service.apply`; after a state change it recomposes from the fresh view.
-Warps and docking are real commands (turn costs, persistence); the deferred
-Phase 2-3 screens still open on sample data.
+Every screen it opens is wired to the live service (the last sample-data
+skeletons were retired in the WP70–WP73 correction arc).
 """
 
 from __future__ import annotations
