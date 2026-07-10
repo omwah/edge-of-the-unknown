@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
 
@@ -35,6 +35,11 @@ from edge.core.rules import (
 from edge.server.service import GameService
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
+from edge.tui.component_workbench import (
+    ComponentWorkbench,
+    STARBASE_WORKBENCH_PROFILE,
+    WorkbenchCapabilities,
+)
 from edge.tui.widgets import TradePanel
 
 _STANDING_STYLE = {
@@ -44,10 +49,11 @@ _STANDING_STYLE = {
     "derelict": "[yellow]derelict[/]",
 }
 
-# Station-tab slot glyphs — deliberately distinct from the engine room's [+]/[!]
-# so a base panel never reads as your own ship.
-_SLOT_GLYPH = {"filled": "[cyan]▣[/]", "knocked": "[red]▨[/]", "empty": "[dim]▢[/]"}
-
+_DISPLAY_TO_KIND = {
+    "FUSION REACTOR": Subsystem.FUSION_REACTOR,
+    "SCREENS": Subsystem.SCREENS,
+    "MAIN GUN": Subsystem.MAIN_GUN,
+}
 
 class BaseScreen(Screen):
     BINDINGS = [
@@ -77,10 +83,6 @@ market; a player-owned host earns a cut of outsider trades."""
     }
     BaseScreen TabPane { padding: 1 2; }
     BaseScreen DataTable { height: auto; max-height: 18; }
-    BaseScreen .station-panel {
-        height: auto; border: round $warning; padding: 0 1; margin: 0 1 1 0; width: 1fr;
-    }
-    BaseScreen #station-panels { height: auto; }
     BaseScreen .note { margin-top: 1; color: $text-muted; }
     """
 
@@ -126,18 +128,14 @@ market; a player-owned host earns a cut of outsider trades."""
         return panes
 
     def _station_pane(self, v: StarbaseDTO) -> Vertical:
-        panels: list[Static] = []
-        for sub in v.subsystems:
-            rows = []
-            for slot in sub.slots:
-                glyph = _SLOT_GLYPH.get(slot.state, "[dim]?[/]")
-                label = slot.component or "[dim]____[/]"
-                key = " [dim](keystone)[/]" if slot.keystone else ""
-                rows.append(f" {glyph} {label}{key}")
-            panel = Static("\n".join(rows), classes="station-panel")
-            panel.border_title = sub.name
-            panel.border_subtitle = f"→ {sub.derived}"
-            panels.append(panel)
+        on_hand = self._service.engine_room_view(self._pid).on_hand
+        workbench = ComponentWorkbench(
+            v.subsystems,
+            on_hand,
+            STARBASE_WORKBENCH_PROFILE,
+            WorkbenchCapabilities(install=True, full_repair=True, salvage=True),
+            id="base-component-workbench",
+        )
         lines = []
         if v.empty_slots:
             keystone = sum(1 for _, _, k in v.empty_slots if k)
@@ -153,8 +151,9 @@ market; a player-owned host earns a cut of outsider trades."""
         if not v.operational:
             lines.append("[dim]The base is dark — fill the reactor keystone to wake it "
                          "(and its market).[/]")
-        return Vertical(Horizontal(*panels, id="station-panels"),
-                        Static("\n".join(lines) or "[dim]All slots live.[/]", classes="note"))
+        return Vertical(workbench,
+                        Static("\n".join(lines) or "[dim]All installations live.[/]",
+                               classes="note"))
 
     def _trade_pane(self, v: StarbaseDTO) -> Vertical:
         lines: list[str] = []
@@ -239,19 +238,28 @@ market; a player-owned host earns a cut of outsider trades."""
         _haggle_highlighted(self, self._service, self._pid)
 
     def action_repair(self) -> None:
-        """Install a carried component into the first open slot, keystone first (§4.2)."""
+        """Install the selected carried component into the selected open base slot."""
         v = self._view()
         if not v.empty_slots or v.standing not in ("derelict", "yours"):
             self.notify("No open base slot to repair here.", timeout=2)
             return
         from edge.tui.screens.engine_room import _parse_on_hand
-        on_hand = self._service.engine_room_view(self._pid).on_hand
-        if not on_hand:
-            self.notify("No loose components aboard — buy or salvage parts first.", timeout=2)
+        try:
+            selection = self.query_one(ComponentWorkbench).selection
+        except Exception:
+            self.notify("Open the Station tab to repair installations.", timeout=2)
             return
-        subsystem, slot_index, _ = v.empty_slots[0]
-        component, tier = _parse_on_hand(on_hand[0])
-        if self._issue(RepairStarbase(v.starbase_id, Subsystem(subsystem), slot_index,
+        if len(selection.loose_components) != 1 or len(selection.slots) != 1:
+            self.notify("Select one carried component and one empty installation slot.", timeout=3)
+            return
+        subsystem, slot_index = selection.slots[0]
+        slot = next(s for s in v.subsystems if s.name == subsystem).slots[slot_index]
+        if slot.state != "empty":
+            self.notify("The selected installation slot is not empty.", timeout=2)
+            return
+        component, tier = _parse_on_hand(selection.loose_components[0])
+        kind = _DISPLAY_TO_KIND[subsystem]
+        if self._issue(RepairStarbase(v.starbase_id, kind, slot_index,
                                       component, tier),
                        f"Installed {component.value} ({tier.name}) into the {subsystem}."):
             self._reopen()
@@ -262,8 +270,21 @@ market; a player-owned host earns a cut of outsider trades."""
         if not v.salvage:
             self.notify("Nothing to salvage here.", timeout=2)
             return
-        subsystem, slot_index, _ = v.salvage[0]
-        if self._issue(Cannibalize(subsystem=Subsystem(subsystem), slot_index=slot_index,
+        try:
+            selection = self.query_one(ComponentWorkbench).selection
+        except Exception:
+            self.notify("Open the Station tab to salvage components.", timeout=2)
+            return
+        if len(selection.slots) != 1:
+            self.notify("Select one removable installation component.", timeout=2)
+            return
+        subsystem, slot_index = selection.slots[0]
+        kind = _DISPLAY_TO_KIND[subsystem]
+        allowed = {(name, index) for name, index, _ in v.salvage}
+        if (kind.value, slot_index) not in allowed:
+            self.notify("That installation cannot be salvaged.", timeout=2)
+            return
+        if self._issue(Cannibalize(subsystem=kind, slot_index=slot_index,
                                    starbase_id=v.starbase_id),
                        "Component salvaged."):
             self._reopen()
