@@ -16,15 +16,7 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Static
 
 from edge.tui.widgets import ClickableEntry
-
-
-def _host_bindings(host: Screen) -> list[Binding]:
-    """The host screen's advertised bindings (class-declared, `show=True`)."""
-    out: list[Binding] = []
-    for b in getattr(type(host), "BINDINGS", []):
-        if isinstance(b, Binding) and b.show:
-            out.append(b)
-    return out
+from edge.tui.design import ActionDescriptor, screen_actions
 
 
 class ActionMenuScreen(ModalScreen[None]):
@@ -42,16 +34,19 @@ class ActionMenuScreen(ModalScreen[None]):
     def __init__(self, host: Screen) -> None:
         super().__init__()
         self._host = host
-        self._actions = _host_bindings(host)
+        self._actions: list[ActionDescriptor] = screen_actions(host)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="action-box"):
             yield Static(f"Actions — {type(self._host).__name__}", id="action-title")
             with VerticalScroll():
-                for n, b in enumerate(self._actions, start=1):
-                    label = b.description or b.action
+                for n, descriptor in enumerate(self._actions, start=1):
+                    label = descriptor.title
                     num = f"{n}." if n <= 9 else "  "
-                    yield ClickableEntry(f"  [b]{num}[/] {label}  [dim]({b.key})[/]",
+                    key = descriptor.key or "palette"
+                    reason = (f" — {descriptor.disabled_reason}"
+                              if not descriptor.enabled and descriptor.disabled_reason else "")
+                    yield ClickableEntry(f"  [b]{num}[/] {label}  [dim]({key}){reason}[/]",
                                          dest="action", ref=str(n - 1))
             yield Static("[dim]number / click to run · Esc to close[/]")
 
@@ -69,7 +64,11 @@ class ActionMenuScreen(ModalScreen[None]):
     async def _run(self, index: int) -> None:
         if not 0 <= index < len(self._actions):
             return
-        action = self._actions[index].action
+        descriptor = self._actions[index]
+        if not descriptor.enabled:
+            self.notify(descriptor.disabled_reason or "Unavailable here.", timeout=2)
+            return
+        action = descriptor.action
         host = self._host
         self.dismiss(None)
         await host.run_action(action)

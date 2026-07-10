@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import argparse
 import random
+from typing import Iterable
 
-from textual.app import App
+from textual import events
+from textual.app import App, SystemCommand
 from textual.binding import Binding
-from textual.theme import Theme
+from textual.screen import Screen
 
 from edge.config import load_default_config
 from edge.server.service import DialogueConfigMismatchError
@@ -21,26 +23,12 @@ from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
 from edge.tui import art_adapter
 from edge.tui.saves import clear_slot, default_save, has_save
+from edge.tui.design import EDGE_THEMES, LayoutTier, layout_tier, screen_actions
+from edge.tui.settings import load_settings, save_settings
 from edge.tui.screens.main_menu import MainMenuScreen
 
 # Fallback seed when neither the caller nor the config supplies one (random, below).
 _SEED_MAX = 2**31 - 1
-
-TW2002_THEME = Theme(
-    name="tw2002",
-    primary="#00cccc",      # cyan
-    secondary="#cccc00",    # yellow
-    accent="#cc00cc",       # magenta
-    foreground="#c0c0c0",
-    background="#000000",
-    surface="#0a0a0a",
-    panel="#101418",
-    success="#00cc00",
-    warning="#cccc00",
-    error="#cc3030",
-    dark=True,
-)
-
 
 class EdgeApp(App[None]):
     CSS_PATH = "app.tcss"
@@ -81,6 +69,8 @@ class EdgeApp(App[None]):
         self.ui_config = UIConfig()
         self.max_warps_per_sector = 6  # TW2002 cap; reserves the warp grid's row count
         self.computer_tab = "trade"  # last Computer tab, restored when reopened with [C]
+        self.ui_settings, self._settings_warning = load_settings()
+        self.layout_tier = LayoutTier.STANDARD
 
     def action_action_menu(self) -> None:
         """Open the numbered context-action menu over the current screen (WP73, D3)."""
@@ -98,6 +88,18 @@ class EdgeApp(App[None]):
             return  # modals keep their own keys (and `?` may be typed input there)
         self.push_screen(HelpScreen(self.screen))
 
+    def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
+        """Expose current-screen actions through Textual's fuzzy command palette."""
+        yield from super().get_system_commands(screen)
+        for descriptor in screen_actions(screen):
+            if not descriptor.enabled or not descriptor.action:
+                continue
+
+            async def run(action: str = descriptor.action) -> None:
+                await screen.run_action(action)
+
+            yield SystemCommand(descriptor.title, descriptor.help, run, discover=True)
+
     @property
     def service(self) -> GameService | None:
         """The synchronous game surface the screens read (WP61/WP68).
@@ -110,13 +112,41 @@ class EdgeApp(App[None]):
         return self.client.service if self.client is not None else None
 
     def on_mount(self) -> None:
-        self.register_theme(TW2002_THEME)
-        self.theme = "tw2002"
+        for theme in EDGE_THEMES:
+            self.register_theme(theme)
+        self.theme = (self.ui_settings.theme if self.ui_settings.theme in self.available_themes
+                      else "edge-ansi")
+        self.layout_tier = layout_tier(self.size.width, self.size.height)
         if self._connect_url is not None:  # remote play (WP68): straight to the lobby turnstile
             from edge.tui.screens.lobby import LobbyScreen
             self.push_screen(LobbyScreen(self._connect_url))
         else:
             self.push_screen(MainMenuScreen())
+        self.call_after_refresh(self._apply_layout_class)
+        if self._settings_warning:
+            self.call_after_refresh(
+                lambda: self.notify(self._settings_warning or "", severity="warning", timeout=5)
+            )
+
+    def on_resize(self, event: events.Resize) -> None:
+        """Apply one stable responsive class to the active screen."""
+        tier = layout_tier(event.size.width, event.size.height)
+        self.layout_tier = tier
+        self.call_after_refresh(self._apply_layout_class)
+
+    def _apply_layout_class(self) -> None:
+        screen = self.screen
+        for tier in LayoutTier:
+            screen.remove_class(tier.value)
+        screen.add_class(self.layout_tier.value)
+
+    def update_ui_settings(self, **changes: object) -> None:
+        """Persist local-only presentation settings and apply the theme immediately."""
+        from dataclasses import replace
+        self.ui_settings = replace(self.ui_settings, **changes)
+        save_settings(self.ui_settings)
+        if "theme" in changes:
+            self.theme = self.ui_settings.theme
 
     def on_unmount(self) -> None:
         """Tear down the remote loop/thread on exit (WP68)."""
