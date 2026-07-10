@@ -1282,21 +1282,23 @@ def _base_commission(
     if sbcfg is None or not config.economy.market.enabled or port.klass is PortClass.STARDOCK:
         return (), port, (), ()
     base = starbases.base_in_sector(state, port.sector_id)
-    if base is None or base.owner.ref is None or base.owner.kind not in ("player", "corp"):
+    if base is None:
+        return (), port, (), ()
+    owner, ref = base.owner, base.owner.ref
+    if ref is None or owner.kind not in ("player", "corp"):
         return (), port, (), ()
     cut = min(round(out.total * sbcfg.services.trade_cut_frac), port.latinum)
     if cut <= 0:
         return (), port, (), ()
-    owner = base.owner
     paid = replace(port, latinum=port.latinum - cut)
-    event = BaseCommission(player_id, base.id, port.id, owner.kind, owner.ref, cut)
+    event = BaseCommission(player_id, base.id, port.id, owner.kind, ref, cut)
     if owner.kind == "player":
-        landlord = state.players.get(owner.ref)
+        landlord = state.players.get(ref)
         if landlord is None or landlord.id == player_id:
             return (), port, (), ()
         credited = replace(landlord, bank_balance=landlord.bank_balance + cut)
         return (event,), paid, (credited,), ()
-    host_corp = state.corporations.get(owner.ref)
+    host_corp = state.corporations.get(ref)
     if host_corp is None or player_id in host_corp.member_player_ids:
         return (), port, (), ()
     richer = replace(host_corp, bank_balance=host_corp.bank_balance + cut)
