@@ -174,7 +174,17 @@ class GameScreen(Screen):
             self._active = True
         # A save quit mid-fight resumes engaged: reopen the encounter screen (§10) —
         # movement is blocked in core anyway, so the modal is the only way forward.
+        # Guard against a duplicate: a confirm-modal dismiss resumes this screen in the
+        # same tick its callback pushes the fight, and a second stale EncounterScreen
+        # would strand the player once the top one pops at the encounter's end.
         if self._service.encounter_view(self._pid) is not None:
+            self._push_encounter()
+
+    def _push_encounter(self) -> None:
+        """Open the fight screen, never a duplicate (WP-fix): a confirm-modal dismiss can
+        resume this screen in the same tick its callback pushes the fight, and a second
+        stale EncounterScreen would strand the player once the top one pops."""
+        if not any(isinstance(s, EncounterScreen) for s in self.app.screen_stack):
             self.app.push_screen(EncounterScreen(self._service, self._pid))
 
     # --- commands ------------------------------------------------------------
@@ -213,7 +223,7 @@ class GameScreen(Screen):
         if started is None:
             return
         if started.hostile:
-            self.app.push_screen(EncounterScreen(self._service, self._pid))
+            self._push_encounter()
         else:
             self._hail_species(started.species_id)
 
@@ -350,7 +360,7 @@ class GameScreen(Screen):
                 self.notify(str(exc), severity="warning", timeout=3)
                 return
             self._record(events)
-            self.app.push_screen(EncounterScreen(self._service, self._pid))
+            self._push_encounter()
 
         self.app.push_screen(ConfirmScreen(message, confirm_label="Attack"), _go)
 
