@@ -19,9 +19,7 @@ from edge.core.rules import Trade
 from edge.server.service import GameService
 from edge.tui import art_adapter
 from edge.tui.screens.haggle import HaggleScreen
-from edge.tui.widgets import NAME_TO_COMMODITY, TradePanel
-
-_CHUNK = 10  # units traded per keypress (clamped to what's affordable/available)
+from edge.tui.widgets import NAME_TO_COMMODITY, TRADE_CHUNK, TradePanel
 
 
 class PortScreen(Screen):
@@ -123,8 +121,8 @@ def _chunk_qty(line, ship) -> int:  # type: ignore[no-untyped-def]
     """A clamped trade chunk for the highlighted row (the port's natural direction)."""
     holds_free = ship.holds_total - ship.holds_used
     if line.mode == "SELL":  # port sells -> player buys
-        return min(_CHUNK, line.stock, holds_free, ship.latinum // max(1, line.price))
-    return min(_CHUNK, line.player_qty, line.capacity - line.stock)  # port buys -> player sells
+        return min(TRADE_CHUNK, line.stock, holds_free, ship.latinum // max(1, line.price))
+    return min(TRADE_CHUNK, line.player_qty, line.capacity - line.stock)  # port buys -> player sells
 
 
 def _trade_highlighted(screen: Screen, service: GameService, player_id: int) -> None:
