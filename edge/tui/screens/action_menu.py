@@ -25,7 +25,7 @@ class ActionMenuScreen(ModalScreen[None]):
     CSS = """
     ActionMenuScreen { align: center middle; background: $background 60%; }
     ActionMenuScreen #action-box {
-        width: 52; max-height: 80%; height: auto; padding: 1 2;
+        width: 52; max-width: 100%; max-height: 80%; height: auto; padding: 1 2;
         border: round $primary; background: $surface;
     }
     ActionMenuScreen #action-title { text-style: bold; color: $primary; margin-bottom: 1; }

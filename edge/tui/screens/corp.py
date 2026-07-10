@@ -18,8 +18,8 @@ import re
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, DataTable, Footer, Input, Static
+from textual.screen import Screen
+from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.economy import EconomyError
 from edge.core.rules import (
@@ -28,6 +28,7 @@ from edge.core.rules import (
     TransferPlanetToCorp,
 )
 from edge.server.service import GameService
+from edge.tui.chrome import TextPrompt, notify_warning
 
 
 def _derive_tag(name: str, max_len: int) -> str:
@@ -46,41 +47,12 @@ def _derive_tag(name: str, max_len: int) -> str:
     return tag.upper()
 
 
-class _FormCorpModal(ModalScreen[str | None]):
-    """Prompt a corporation *name* — the tag is derived, not typed."""
+class _FormCorpModal(TextPrompt):
+    """Prompt a corporation *name* — the tag is derived, not typed (WP-UI07 shared form)."""
 
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    CSS = """
-    _FormCorpModal { align: center middle; background: $background 60%; }
-    _FormCorpModal #corp-form-box {
-        width: 50; height: auto; padding: 1 2; border: round $primary; background: $surface;
-    }
-    _FormCorpModal Input { margin-top: 1; }
-    _FormCorpModal Button { margin-top: 1; }
-    """
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="corp-form-box"):
-            yield Static("[b]Charter a corporation[/]  [dim](Esc to cancel)[/]")
-            yield Input(placeholder="Corporation name", id="corp-name")
-            yield Button("Charter", id="corp-ok", variant="primary")
-
-    def on_mount(self) -> None:
-        self.query_one("#corp-name", Input).focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self._submit()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        self._submit()
-
-    def _submit(self) -> None:
-        name = self.query_one("#corp-name", Input).value.strip()
-        self.dismiss(name or None)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
+    def __init__(self) -> None:
+        super().__init__("Charter a corporation", placeholder="Corporation name",
+                         submit_label="Charter")
 
 
 class CorpScreen(Screen):
@@ -227,7 +199,7 @@ are accelerators for the same buttons."""
             self._service.apply(self._pid, command)  # type: ignore[arg-type]
         except EconomyError as exc:
             self.app.bell()
-            self.notify(str(exc), severity="warning")
+            notify_warning(self, str(exc))
             return
         if ok:
             self.notify(ok, timeout=2)
@@ -276,17 +248,17 @@ are accelerators for the same buttons."""
                 if "already taken" in str(exc):
                     continue  # collision — try the next derived tag
                 self.app.bell()
-                self.notify(str(exc), severity="warning")
+                notify_warning(self, str(exc))
                 return
             self.notify(f"Chartered ⟨{tag}⟩ {name}.", timeout=2)
             self._refresh()
             return
-        self.notify("Couldn't derive a free tag — try a different name.", severity="warning")
+        notify_warning(self, "Couldn't derive a free tag — try a different name.")
 
     def action_form(self) -> None:
         view = self._service.corp_view(self._pid)
         if view is not None and view.corp_id:
-            self.notify("You already belong to a corporation.", severity="warning")
+            notify_warning(self, "You already belong to a corporation.")
             return
 
         def _done(name: str | None) -> None:

@@ -23,6 +23,7 @@ from edge.core.events import DiscoveryCollected, EncounterStarted, Event
 from edge.core.movement import MovementError
 from edge.core.rules import AttackPlayer, AttackSpecies, Dock, Hail, Salvage, TravelTo, Warp
 from edge.server.service import GameService
+from edge.tui.chrome import notify_warning
 from edge.tui.design import LayoutTier, layout_tier
 from edge.tui.dummy import SectorDTO
 from edge.tui.onboarding import ObjectivesStrip, all_done
@@ -292,7 +293,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         try:
             events = self._service.apply(self._pid, Warp(to_sector=sector_id))
         except (MovementError, EconomyError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self._record(events)
         await self.recompose()
@@ -317,12 +318,12 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
             return
         internal = self._service.resolve_display_id(dest)  # player typed a spatial id (§5.1)
         if internal is None:
-            self.notify(f"No sector {dest}.", severity="warning", timeout=3)
+            notify_warning(self, f"No sector {dest}.")
             return
         try:
             events = self._service.apply(self._pid, TravelTo(to_sector=internal))
         except (MovementError, EconomyError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         if not events:
             self.notify("No move made.", timeout=2)
@@ -349,7 +350,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         try:
             events = self._service.apply(self._pid, Salvage(discovery_id=discovery_id))
         except (MovementError, EconomyError, EngineRoomError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self._record(events)
         collected = next((e for e in events if isinstance(e, DiscoveryCollected)), None)
@@ -358,8 +359,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         if collected is not None and collected.reward:
             self.notify(f"You discovered {collected.reward}.", title="Discovery", timeout=4)
         if target is not None and target.kind == "wormhole":
-            self.notify("Sensor reading: one-way warp — no direct way back.",
-                        severity="warning", timeout=3)
+            notify_warning(self, "Sensor reading: one-way warp — no direct way back.")
         await self.recompose()
 
     async def action_dock_port(self) -> None:
@@ -374,7 +374,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         try:
             self._record(self._service.apply(self._pid, Dock()))
         except MovementError as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         is_stardock = any(p.is_stardock for p in ports)
         base = self._service.current_starbase_view(self._pid)
@@ -447,7 +447,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
             try:
                 events = self._service.apply(self._pid, command)
             except (MovementError, EconomyError, CombatError) as exc:
-                self.notify(str(exc), severity="warning", timeout=3)
+                notify_warning(self, str(exc))
                 return
             self._record(events)
             self._push_encounter()
@@ -464,7 +464,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         try:
             events = self._service.apply(self._pid, Hail(species_id))
         except (MovementError, EconomyError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self._record(events)
         self.app.push_screen(AlienContactScreen(

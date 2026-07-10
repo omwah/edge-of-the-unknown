@@ -29,6 +29,7 @@ class LobbyScreen(Screen):
         super().__init__()
         self._url = url
         self._bridge: RemoteBridge | None = None
+        self._busy = False  # WP-UI07: one join attempt at a time
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -45,16 +46,33 @@ class LobbyScreen(Screen):
         self.query_one("#status", Static).update(text)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if self._busy:
+            return  # WP-UI07: a join is already running — no duplicate submits
         user = self.query_one("#user", Input).value.strip()
         pw = self.query_one("#pass", Input).value
         game = self.query_one("#game", Input).value.strip() or "alpha"
-        if not user or not pw:
-            self._status("username and password required")
+        # WP-UI07 inline validation: name the missing field and put focus there;
+        # typed values are never cleared, so a failed attempt is editable in place.
+        if not user:
+            self._status("username required")
+            self.query_one("#user", Input).focus()
             return
+        if not pw:
+            self._status("password required")
+            self.query_one("#pass", Input).focus()
+            return
+        self._busy = True
+        for button in self.query(Button):
+            button.disabled = True
+        self._status(f"connecting to {self._url}…")
         try:
             self._connect_and_join(user, pw, game, register=event.button.id == "register")
         except RemoteError as exc:
             self._status(f"failed: {exc.message}")
+        finally:
+            self._busy = False
+            for button in self.query(Button):
+                button.disabled = False
 
     def _connect_and_join(self, user: str, pw: str, game: str, *, register: bool) -> None:
         """Bring up the link, authenticate, pick-or-create the game, and enter it (WP68)."""

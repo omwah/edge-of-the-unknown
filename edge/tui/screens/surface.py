@@ -30,6 +30,7 @@ from edge.core.movement import MovementError
 from edge.core.events import DiscoveryCollected, SiteExplored
 from edge.core.rules import Explore, Salvage
 from edge.server.service import GameService
+from edge.tui.chrome import notify_warning
 from edge.tui import art_adapter
 
 # Site markers ride a solid light "plate" with dark text, so they read as labels on top
@@ -257,7 +258,7 @@ class SurfaceScreen(Screen):
         try:
             events = self._service.apply(self._pid, Explore(planet_id=self._surface.planet_id))
         except (EconomyError, MovementError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         # The survey logs the find to the codex and uncovers it; find the freshly
         # revealed site in the reloaded view to name what's there to take (or leave).
@@ -282,7 +283,7 @@ class SurfaceScreen(Screen):
         try:
             events = self._service.apply(self._pid, Salvage(discovery_id=site.discovery_id))
         except (EconomyError, EngineRoomError, MovementError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         collected = next((e for e in events if isinstance(e, DiscoveryCollected)), None)
         gain = f" — you took {collected.reward}" if collected is not None and collected.reward else ""

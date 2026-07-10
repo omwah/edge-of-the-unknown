@@ -186,7 +186,7 @@ async def test_travel_prompt_warps_along_known_route() -> None:
         await pilot.pause()
         assert isinstance(app.screen, TravelPromptScreen)
         # The prompt takes a *spatial* display id (§5.1) — type the start sector's id.
-        app.screen.query_one("#travel-input", Input).value = str(svc.state.spatial_ids[start])
+        app.screen.query_one("#field-input", Input).value = str(svc.state.spatial_ids[start])
         await pilot.press("enter")
         await pilot.pause()
         assert svc.game_view(1).sector.sector_id == start
@@ -1676,8 +1676,8 @@ async def test_corp_screen_charters_with_derived_tag_and_buttons() -> None:
         await pilot.click("#btn-form")
         await pilot.pause()
         assert isinstance(app.screen, _FormCorpModal)
-        app.screen.query_one("#corp-name", Input).value = "Edge of the Unknown"
-        await pilot.click("#corp-ok")
+        app.screen.query_one("#field-input", Input).value = "Edge of the Unknown"
+        await pilot.click("#field-submit")
         await pilot.pause()
         corp = next(iter(svc.state.corporations.values()))
         assert corp.name == "Edge of the Unknown"

@@ -13,9 +13,9 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.screen import ModalScreen, Screen
+from textual.screen import Screen
 from textual.containers import Vertical
-from textual.widgets import DataTable, Footer, Input, Static, TabbedContent
+from textual.widgets import DataTable, Footer, Static, TabbedContent
 
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
@@ -26,6 +26,7 @@ from edge.core.rules import (
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
+from edge.tui.chrome import AmountPrompt, TextPrompt, notify_warning
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.widgets import ServiceHub, TradePanel
@@ -255,7 +256,7 @@ daily interest; deposits ride the same account everywhere."""
         try:
             self._service.apply(self._pid, command)  # type: ignore[arg-type]
         except (EconomyError, EngineRoomError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self.notify(ok, timeout=2)
         active = self.query_one(TabbedContent).active
@@ -316,56 +317,16 @@ daily interest; deposits ride the same account everywhere."""
         self.notify("Not wired in the skeleton.", timeout=2)
 
 
-class _AmountInput(ModalScreen[int | None]):
-    """A one-line numeric prompt for a latinum amount (§8 — the WP71 bank tab)."""
+class _AmountInput(AmountPrompt):
+    """A one-line numeric prompt for a latinum amount (§8 — the WP71 bank tab).
 
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-    CSS = """
-    _AmountInput { align: center middle; background: $background 60%; }
-    _AmountInput Input { width: 30; }
+    WP-UI07: a shared `FieldPrompt` — invalid amounts hold the form open with an
+    inline reason instead of silently dismissing with None.
     """
 
-    def __init__(self, prompt: str) -> None:
-        super().__init__()
-        self._prompt = prompt
 
-    def compose(self) -> ComposeResult:
-        yield Static(f"[b]{self._prompt}[/]  (Enter to confirm, Esc to cancel)")
-        yield Input(placeholder="amount…", id="amount-input", type="integer")
-
-    def on_mount(self) -> None:
-        self.query_one("#amount-input", Input).focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        raw = event.value.strip()
-        self.dismiss(int(raw) if raw.isdigit() and int(raw) > 0 else None)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
-class _NoticeInput(ModalScreen[str | None]):
+class _NoticeInput(TextPrompt):
     """A one-line text prompt (noticeboard §14 WP58; reused for captain's notes, WP73)."""
 
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-    CSS = """
-    _NoticeInput { align: center middle; background: $background 60%; }
-    _NoticeInput Input { width: 60; }
-    """
-
     def __init__(self, prompt: str = "Post a notice") -> None:
-        super().__init__()
-        self._prompt = prompt
-
-    def compose(self) -> ComposeResult:
-        yield Static(f"[b]{self._prompt}[/]  (Enter to confirm, Esc to cancel)")
-        yield Input(placeholder="your message…", id="notice-input")
-
-    def on_mount(self) -> None:
-        self.query_one("#notice-input", Input).focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value.strip() or None)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
+        super().__init__(prompt, placeholder="your message…")

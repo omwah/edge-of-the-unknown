@@ -68,16 +68,29 @@ MainMenuScreen Starfield {
     height: 1fr;
 }
 
-/* Shared modal sizing (WP-UI05): every dialog box uses this class so modals
-   stay usable at 80×24 instead of each screen guessing its own bounds. */
+/* Shared modal sizing (WP-UI05/WP-UI07): every dialog box uses this class so
+   modals stay usable at 80×24 instead of each screen guessing its own bounds.
+   Widths are standardized per layout tier (the tier class sits on the modal
+   screen itself), and bodies scroll rather than clip when the terminal is
+   short — no modal may ever exceed an 80×24 screen. */
 .modal-box {
     width: 56;
     max-width: 100%;
     height: auto;
     max-height: 90%;
+    overflow-y: auto;
     padding: 1 2;
     border: round $primary;
     background: $surface;
+}
+
+.compact .modal-box {
+    width: 72;
+    max-height: 100%;
+}
+
+.wide .modal-box {
+    width: 64;
 }
 
 /* Port screen */

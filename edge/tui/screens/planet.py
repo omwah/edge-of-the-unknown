@@ -36,6 +36,7 @@ from edge.core.rules import (
     PlanetWithdraw, TransferCargo,
 )
 from edge.server.service import GameService
+from edge.tui.chrome import notify_warning
 from edge.tui import art_adapter
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.dummy import sample_surface
@@ -272,7 +273,7 @@ trips are the intended loop; the citadel art grows with its level."""
         try:
             self._service.apply(self._pid, BuildCitadel(p.planet_id))
         except (EconomyError, CitadelError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self.notify("Citadel construction begun.", timeout=2)
         self._reopen()
@@ -290,7 +291,7 @@ trips are the intended loop; the citadel art grows with its level."""
         try:
             self._service.apply(self._pid, command)  # type: ignore[arg-type]
         except (EconomyError, CitadelError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self.notify(ok, timeout=2)
         self._reopen()
@@ -317,7 +318,7 @@ trips are the intended loop; the citadel art grows with its level."""
             try:
                 self._service.apply(self._pid, InvadePlanet(p.planet_id, p.ship_fighters))
             except (EconomyError, CombatError, CitadelError) as exc:
-                self.notify(str(exc), severity="warning", timeout=3)
+                notify_warning(self, str(exc))
                 return
             self._reopen()
 
@@ -336,7 +337,7 @@ trips are the intended loop; the citadel art grows with its level."""
         try:
             self._service.apply(self._pid, Colonize(p.planet_id, p.ship_colonists))
         except EconomyError as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self.notify("Colony established!", timeout=2)
         self.app.pop_screen()
@@ -376,7 +377,7 @@ trips are the intended loop; the citadel art grows with its level."""
             try:
                 self._service.apply(self._pid, DeployGenesis(planet_id=p.planet_id))
             except (EconomyError, MovementError) as exc:
-                self.notify(str(exc), severity="warning", timeout=3)
+                notify_warning(self, str(exc))
                 return
             self.notify("Genesis deployed — the world is re-forming!", timeout=2)
             self.app.pop_screen()
@@ -413,7 +414,7 @@ trips are the intended loop; the citadel art grows with its level."""
                     self._service.apply(self._pid, TransferCargo(
                         p.planet_id, commodity, units, to_planet=to_planet))
                 except EconomyError as exc:
-                    self.notify(str(exc), severity="warning", timeout=3)
+                    notify_warning(self, str(exc))
                     return
                 self._reopen()
 
@@ -446,7 +447,7 @@ trips are the intended loop; the citadel art grows with its level."""
         try:
             self._service.apply(self._pid, Descend(planet_id=p.planet_id))
         except (EconomyError, MovementError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         self.app.push_screen(SurfaceScreen(
             self._service.surface_view(self._pid, p.planet_id), self._service, self._pid))

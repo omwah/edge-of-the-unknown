@@ -13,7 +13,7 @@ from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier, Subsystem as SubsystemKind
 from edge.core.rules import Cannibalize, FieldPatch, InstallComponent, RepairAtDock, SwapComponent
 from edge.server.service import GameService
-from edge.tui.chrome import ContextStrip, TitleBar
+from edge.tui.chrome import ContextStrip, TitleBar, notify_warning
 from edge.tui.component_workbench import (
     ComponentWorkbench,
     SHIP_WORKBENCH_PROFILE,
@@ -108,7 +108,7 @@ part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it
                 self._service.apply(self._pid, FieldPatch(kind, index))
                 patched += 1
             except (EngineRoomError, EconomyError) as exc:
-                self.notify(str(exc), severity="warning", timeout=3)
+                notify_warning(self, str(exc))
                 break
         if patched:
             self.notify(f"Patched {patched} component(s).", timeout=2)
@@ -128,7 +128,7 @@ part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it
                 self._service.apply(self._pid, RepairAtDock(kind, index))
                 repaired += 1
             except (EngineRoomError, EconomyError) as exc:
-                self.notify(str(exc), severity="warning", timeout=3)
+                notify_warning(self, str(exc))
                 break
         if repaired:
             self.notify(f"Restored {repaired} component(s).", timeout=2)
@@ -157,7 +157,7 @@ part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it
         try:
             self._service.apply(self._pid, command)
         except (EngineRoomError, EconomyError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
         verb = "Installed" if slot.state == "empty" else "Swapped in"
         self.notify(f"{verb} {component.value} ({tier.name}).", timeout=2)
@@ -183,7 +183,7 @@ part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it
                 self._service.apply(self._pid, Cannibalize(kind, index))
                 pulled += 1
             except (EngineRoomError, EconomyError) as exc:
-                self.notify(str(exc), severity="warning", timeout=3)
+                notify_warning(self, str(exc))
                 break
         if pulled:
             self.notify(f"Cannibalized {pulled} component(s).", timeout=2)

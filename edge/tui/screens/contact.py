@@ -26,6 +26,7 @@ from edge.core import dto
 from edge.core.rules import BarterArtifact, BuyAlienTech, Converse
 from edge.server.service import GameService
 from edge.art import portrait as art_portrait
+from edge.tui.chrome import notify_warning
 from edge.tui.portrait import SpeciesPortrait
 from edge.tui.screens.picker import ListPicker
 from edge.tui.widgets import ClickableEntry, bar
@@ -328,7 +329,7 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
         if choice.action == "attack":
             # The first strike opened combat (WP70): contact is over, the encounter is
             # live — popping back lets the game screen's resume hook raise the fight.
-            self.notify("You open fire — betrayal remembered.", severity="warning", timeout=3)
+            notify_warning(self, "You open fire — betrayal remembered.")
             self._break_contact()
             return
         if choice.action == "trade":

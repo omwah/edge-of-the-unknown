@@ -15,8 +15,8 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Vertical, VerticalScroll
-from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, DataTable, Footer, Input, Static
+from textual.screen import Screen
+from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.economy import EconomyError
 from edge.core.movement import MovementError
@@ -26,6 +26,7 @@ from edge.core.rules import (
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
+from edge.tui.chrome import TextPrompt, notify_success, notify_warning
 from edge.tui.screens.picker import ListPicker
 from edge.tui.screens.stardock import _AmountInput
 from edge.tui.screens.travel import TravelPromptScreen
@@ -248,9 +249,9 @@ limpet mines tag passing hulls so their owner can track them."""
         try:
             self._service.apply(self._pid, command)  # type: ignore[arg-type]
         except (EconomyError, MovementError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return
-        self.notify(ok, timeout=2)
+        notify_success(self, ok)
         self._reopen()
 
     def _reopen(self) -> None:
@@ -309,7 +310,7 @@ limpet mines tag passing hulls so their owner can track them."""
                 return
             internal = self._service.resolve_display_id(dest)
             if internal is None:
-                self.notify(f"No sector {dest}.", severity="warning", timeout=3)
+                notify_warning(self, f"No sector {dest}.")
                 return
             self._issue(LaunchProbe(dest_sector=internal), "Probe away")
         self.app.push_screen(TravelPromptScreen(), _go)
@@ -321,24 +322,9 @@ limpet mines tag passing hulls so their owner can track them."""
         self._issue(RemoveLimpets(), "Limpets stripped")
 
 
-class _BeaconInput(ModalScreen[str | None]):
-    """A one-line prompt for the beacon text (§10, WP41)."""
+class _BeaconInput(TextPrompt):
+    """A one-line prompt for the beacon text (§10, WP41; WP-UI07 shared form)."""
 
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-    CSS = """
-    _BeaconInput { align: center middle; background: $background 60%; }
-    _BeaconInput Input { width: 60; }
-    """
-
-    def compose(self) -> ComposeResult:
-        yield Static("[b]Beacon text[/]  (Enter to plant, Esc to cancel)")
-        yield Input(placeholder="marker message…", id="beacon-input")
-
-    def on_mount(self) -> None:
-        self.query_one("#beacon-input", Input).focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value.strip() or None)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
+    def __init__(self) -> None:
+        super().__init__("Beacon text", placeholder="marker message…",
+                         hint="Enter to plant · Esc to cancel")

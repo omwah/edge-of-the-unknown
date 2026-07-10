@@ -56,8 +56,8 @@ class HelpScreen(ModalScreen[None]):
     /* Translucent so the host screen shows through behind the box. */
     HelpScreen { align: center middle; background: $background 60%; }
     HelpScreen #help-box {
-        width: 80; max-height: 90%; height: auto; padding: 1 2;
-        border: round $primary; background: $surface;
+        width: 80; max-width: 100%; max-height: 90%; height: auto; overflow-y: auto;
+        padding: 1 2; border: round $primary; background: $surface;
     }
     HelpScreen #help-title { text-style: bold; color: $primary; margin-bottom: 1; }
     HelpScreen .help-section { text-style: bold; color: $secondary; margin-top: 1; }

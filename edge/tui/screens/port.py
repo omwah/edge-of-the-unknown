@@ -17,6 +17,7 @@ from textual.widgets import Footer, Static
 from edge.core.economy import EconomyError
 from edge.core.rules import Trade
 from edge.server.service import GameService
+from edge.tui.chrome import notify_warning
 from edge.tui import art_adapter
 from edge.tui.screens.haggle import HaggleScreen
 from edge.tui.widgets import NAME_TO_COMMODITY, TRADE_CHUNK, TradePanel
@@ -97,7 +98,7 @@ patience — too many rejected offers close negotiation for the day."""
                 continue
             self.notify(f"Delivered — {job.reward:,} slips paid.", timeout=3)
             return
-        self.notify(errors[0], severity="warning", timeout=3)
+        notify_warning(self, errors[0])
 
     def action_leave(self) -> None:
         self.app.pop_screen()
@@ -137,7 +138,7 @@ def _trade_highlighted(screen: Screen, service: GameService, player_id: int) -> 
     try:
         service.apply(player_id, Trade(commodity=NAME_TO_COMMODITY[line.name], units=qty))
     except EconomyError as exc:
-        screen.notify(str(exc), severity="warning", timeout=3)
+        notify_warning(screen, str(exc))
         return
     _refresh(panel, service, player_id)
     screen.app.mark_objective("trade")  # type: ignore[attr-defined]

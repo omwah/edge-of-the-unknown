@@ -34,7 +34,7 @@ from edge.core.rules import (
     RepairStarbase, Withdraw,
 )
 from edge.server.service import GameService
-from edge.tui.chrome import TitleBar
+from edge.tui.chrome import TitleBar, notify_warning
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.component_workbench import (
@@ -224,9 +224,9 @@ market; a player-owned host earns a cut of outsider trades."""
         try:
             self._service.apply(self._pid, command)  # type: ignore[arg-type]
         except (EconomyError, EngineRoomError, MovementError, CombatError) as exc:
-            self.notify(str(exc), severity="warning", timeout=3)
+            notify_warning(self, str(exc))
             return False
-        self.notify(ok, timeout=2)
+        notify_success(self, ok)
         return True
 
     def action_trade(self) -> None:
