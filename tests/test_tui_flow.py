@@ -1546,3 +1546,39 @@ async def test_territory_screen_cards_and_deployed_table() -> None:
         table = app.screen.query_one("#deployed-table", DataTable)
         assert table.row_count >= 1
         assert app.screen.query(Button)  # cards rendered with buttons
+
+
+async def test_planet_citadel_panel_builds_via_button() -> None:
+    """The planet screen's stores + citadel blocks are widget panels: a stores
+    DataTable, staged citadel art, and a Build button that opens the timed build."""
+    from dataclasses import replace as _replace
+
+    from textual.widgets import DataTable
+
+    from edge.core.enums import Commodity
+    from edge.core.models import Ownership
+    from edge.tui.screens.planet import PlanetScreen, _citadel_stage
+
+    app = EdgeApp()
+    async with app.run_test(size=(120, 44)) as pilot:
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        planet = next(iter(svc.state.planets.values()))
+        svc.state.planets[planet.id] = _replace(
+            planet, owner=Ownership("player", 1), colonists=1_000,
+            stores={Commodity.EQUIPMENT: 10_000})
+        svc.state.players[1] = _replace(svc.state.players[1], latinum=200_000)
+        ship = svc.state.ships[svc.state.players[1].ship_id]
+        svc.state.ships[ship.id] = _replace(ship, sector_id=planet.sector_id)
+        await pilot.press("s")  # survey planet → PlanetScreen
+        await pilot.pause()
+        assert isinstance(app.screen, PlanetScreen)
+        app.screen.query_one("#stores-table", DataTable)  # stores are tabular now
+        assert _citadel_stage(app.screen._planet) == "site"  # unbuilt art stage
+        await pilot.click("#btn-build")
+        await pilot.pause()
+        assert svc.state.planets[planet.id].citadel_progress >= 0  # build opened
+        assert isinstance(app.screen, PlanetScreen)  # screen reopened
+        assert _citadel_stage(app.screen._planet) == "building"  # scaffolding art

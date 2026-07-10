@@ -6,18 +6,23 @@ unowned colonizable world by landing the colonists aboard; `D` descends (WP6).
 The planet screen is **colony matters only** (WP80): all starbase ops — assault,
 repair, salvage, claim, and the base's market/services — live in the unified
 `BaseScreen`; the base status line here is a click-through (`B` or click).
+The stores and citadel blocks are widget panels: a stores DataTable (colony vs.
+hold) with Unload/Load buttons, and a citadel panel whose art shows a different
+structure per development stage (survey site → scaffolding → keep → keep + gun →
+shielded fortress) with Build/treasury buttons. Hotkeys stay as accelerators.
 With no service (screenshot harness) it shows a static sample.
 """
 
 from __future__ import annotations
 
+from rich.text import Text
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import Screen
-from textual.widgets import Footer, Static
+from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.citadels import CitadelError
 from edge.core.combat import CombatError
@@ -36,6 +41,41 @@ from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.dummy import sample_surface
 from edge.tui.screens.surface import SurfaceScreen
 from edge.tui.widgets import ClickableEntry
+
+
+# Citadel art, one structure per development stage (§4.2, WP54): an unbuilt survey
+# site, construction scaffolding, the L1 treasury keep, the L2 keep + planetary gun,
+# and the L3 siege fortress under its shield dome. Markup-safe (no '[' in the art).
+_CITADEL_ART = {
+    "site": ("[dim] ·    ·    ·  [/]\n"
+             "[dim]   ▂▂▂▂▂▂▂▂   [/]\n"
+             "[dim] ·    ·    ·  [/]"),
+    "building": ("[yellow]       ┌─╴    [/]\n"
+                 "[yellow]  ▒▒▒  │      [/]\n"
+                 "[yellow]  ▒█▒▒▒▒▒     [/]\n"
+                 "[dim]  ▔▔▔▔▔▔▔▔▔   [/]"),
+    "l1": ("[cyan]     ▄█▄      [/]\n"
+           "[cyan]    ▐███▌     [/]\n"
+           "[dim]  ▔▔▔▔▔▔▔▔▔   [/]"),
+    "l2": ("[cyan]     ▄█▄      [/]\n"
+           "[cyan]    ▐███▌ ═╬► [/]\n"
+           "[cyan]    █████     [/]\n"
+           "[dim]  ▔▔▔▔▔▔▔▔▔   [/]"),
+    "l3": ("[blue]  ⌒⌒⌒⌒⌒⌒⌒⌒⌒   [/]\n"
+           "[cyan]    ▟███▙     [/]\n"
+           "[cyan]   ▐█████▌═╬► [/]\n"
+           "[cyan]   ███████    [/]"),
+}
+_STAGE_LABEL = {
+    "site": "unbuilt site", "building": "under construction",
+    "l1": "treasury keep (L1)", "l2": "planetary gun (L2)", "l3": "siege fortress (L3)",
+}
+
+
+def _citadel_stage(p: PlanetDTO) -> str:
+    if p.citadel_build_target > 0:
+        return "building"
+    return {0: "site", 1: "l1", 2: "l2"}.get(p.citadel_level, "l3")
 
 
 class PlanetSprite(Static):
@@ -67,8 +107,10 @@ class PlanetScreen(Screen):
     HELP = """\
 Colony matters live here; every starbase op (repair · salvage · claim · assault ·
 market · services) is on the base screen — [b]B[/] or click the base line.
-[b]T[/]/[b]L[/] haul cargo between ship and stores: citadel builds draw equipment
-from [i]stores[/], so supply runs in trips are the intended loop."""
+The Stores and Citadel panels are button-driven ([b]Tab[/] walks the buttons,
+[b]Enter[/] fires): haul cargo between ship and stores, start builds, move the
+treasury. Citadel builds draw equipment from [i]stores[/], so supply runs in
+trips are the intended loop; the citadel art grows with its level."""
 
     CSS = """
     PlanetScreen #orbit-title {
@@ -81,6 +123,15 @@ from [i]stores[/], so supply runs in trips are the intended loop."""
         width: 1fr; height: 1fr; content-align: center top; text-align: center;
     }
     PlanetScreen .section { margin-top: 1; }
+    PlanetScreen .orbit-panel {
+        border: round $primary; padding: 0 1; height: auto; margin-top: 1;
+    }
+    PlanetScreen .orbit-panel:focus-within { border: round $accent; }
+    PlanetScreen .orbit-panel DataTable { height: auto; max-height: 8; }
+    PlanetScreen .orbit-panel .buttons { height: auto; margin-top: 1; }
+    PlanetScreen .orbit-panel Button { margin-right: 1; }
+    PlanetScreen .citadel-art { height: auto; }
+    PlanetScreen .section-tight { margin-top: 1; }
     """
 
     def __init__(self, planet: PlanetDTO, service: GameService | None = None, pid: int = 1) -> None:
@@ -97,15 +148,15 @@ from [i]stores[/], so supply runs in trips are the intended loop."""
                 yield Static(f"Owner    [cyan]{p.owner}[/]")
                 cap = f"{p.habitability_cap:,}" if p.colonizable else "—"
                 yield Static(f"Habitability cap  {cap}      Colonists  {p.colonists:,}")
-                stores = "   ".join(f"{label} {qty:,}" for label, qty in p.stores)
-                yield Static(f"Stores   {stores}", classes="section")
                 if p.owned_by_you:
                     alloc = "   ".join(f"{label} {pct}%" for label, pct in p.allocation)
                     if p.fighter_allocation_pct:
                         alloc += f"   Garrison {p.fighter_allocation_pct}%"
                     yield Static(f"Allocation   {alloc}", classes="section")
-                    yield Static("[dim][b]T[/] Unload cargo to stores   ·   "
-                                 "[b]L[/] Load stores aboard[/]")
+                yield self._stores_panel(p)
+                if p.owned_by_you and (p.citadel_level > 0 or p.can_build_citadel
+                                       or p.citadel_build_target > 0):
+                    yield self._citadel_panel(p)
                 if p.can_invade:
                     yield Static(f"[red]\\[I] Invade[/] — land {p.ship_fighters} fighters "
                                  f"against the garrison ({p.fighters}).", classes="section")
@@ -117,9 +168,6 @@ from [i]stores[/], so supply runs in trips are the intended loop."""
                         f"[{colour}]#[/] Orbital starbase — {p.starbase}   "
                         f"[dim]\\[B] Enter base[/]",
                         dest="starbase", ref=p.starbase_id, classes="section")
-                if p.owned_by_you and (p.citadel_level > 0 or p.can_build_citadel
-                                       or p.citadel_build_target > 0):
-                    yield Static(self._citadel_lines(), classes="section")
                 hint = self._claim_hint()
                 if hint:
                     yield Static(hint, classes="section")
@@ -152,20 +200,67 @@ from [i]stores[/], so supply runs in trips are the intended loop."""
             return "[yellow]Unclaimed — recruit colonists at a StarDock first.[/]"
         return f"[green]\\[C] Colonize[/] — land {p.ship_colonists} colonists aboard."
 
-    def _citadel_lines(self) -> str:
-        """The citadel status + build affordance block (§4.2, WP54)."""
-        p = self._planet
-        rows = [f"[b]Citadel[/] level {p.citadel_level}   "
-                f"treasury [yellow]{p.treasury:,}[/]   garrison {p.fighters:,}"]
+    def _stores_panel(self, p: PlanetDTO) -> Vertical:
+        """Colony stores vs. the ship's hold, tabular, with haul buttons (§4.2)."""
+        aboard: dict[str, int] = {}
+        if self._service is not None:
+            ship = self._service.game_view(self._pid).ship
+            aboard = {h.label: h.qty for h in ship.holds}
+        table: DataTable = DataTable(id="stores-table", zebra_stripes=True, cursor_type="row")
+        table.add_columns("Commodity", "In stores", "Aboard")
+        for label, qty in p.stores:
+            table.add_row(label, f"{qty:,}", f"{aboard.get(label, 0):,}")
+        children: list[Static | DataTable | Horizontal] = [table]
+        if p.owned_by_you:
+            children.append(Horizontal(
+                Button("Unload → stores…", id="btn-unload"),
+                Button("Load aboard…", id="btn-load"),
+                classes="buttons"))
+            children.append(Static("[dim]Citadel builds draw equipment from stores — "
+                                   "supply runs in trips are the loop.[/]"))
+        panel = Vertical(*children, classes="orbit-panel")
+        panel.border_title = "Stores"
+        return panel
+
+    def _citadel_panel(self, p: PlanetDTO) -> Vertical:
+        """The citadel: staged art, status, and its build/treasury buttons (§4.2, WP54)."""
+        stage = _citadel_stage(p)
+        art = Static(Text.from_markup(_CITADEL_ART[stage]), classes="citadel-art")
+        status = Static(
+            f"Level [b]{p.citadel_level}[/]   treasury [yellow]{p.treasury:,}[/]   "
+            f"garrison {p.fighters:,}", classes="section-tight")
+        children: list[Static | Horizontal] = [art, status]
         if p.citadel_build_target > 0:
-            rows.append(f"[cyan]Building level {p.citadel_build_target} — {p.citadel_build_pct}%[/]")
-        elif p.can_build_citadel and p.citadel_next_cost is not None:
+            done = max(1, p.citadel_build_pct // 10)
+            bar = "█" * done + "░" * (10 - done)
+            children.append(Static(
+                f"[cyan]Building level {p.citadel_build_target}  {bar} "
+                f"{p.citadel_build_pct}%[/]  [dim](colonist-days accrue daily)[/]"))
+        buttons: list[Button] = []
+        if p.citadel_build_target == 0 and p.can_build_citadel and p.citadel_next_cost is not None:
             eq, lat = p.citadel_next_cost
-            rows.append(f"[green]\\[K] Build level {p.citadel_level + 1}[/] — "
-                        f"{eq} equipment + {lat:,} latinum")
+            buttons.append(Button(
+                f"Build level {p.citadel_level + 1} — {eq} equ + {lat:,} latinum",
+                id="btn-build", variant="primary"))
         if p.citadel_level >= 1:
-            rows.append("[dim]\\[+]/[-] deposit / withdraw 1,000 to the treasury[/]")
-        return "\n".join(rows)
+            buttons.append(Button("Deposit 1k", id="btn-cit-dep"))
+            buttons.append(Button("Withdraw 1k", id="btn-cit-wd"))
+        if buttons:
+            children.append(Horizontal(*buttons, classes="buttons"))
+        panel = Vertical(*children, classes="orbit-panel")
+        panel.border_title = f"Citadel — {_STAGE_LABEL[stage]}"
+        return panel
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        actions = {
+            "btn-unload": self.action_unload_cargo, "btn-load": self.action_load_cargo,
+            "btn-build": self.action_build_citadel,
+            "btn-cit-dep": self.action_treasury_deposit,
+            "btn-cit-wd": self.action_treasury_withdraw,
+        }
+        handler = actions.get(event.button.id or "")
+        if handler is not None:
+            handler()
 
     def action_build_citadel(self) -> None:
         if self._service is None:
