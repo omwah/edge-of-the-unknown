@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from types import SimpleNamespace
+
+import pytest
 from textual.widget import Widget
 
 from edge.tui.app import EdgeApp
@@ -31,18 +35,79 @@ def _assert_controls_reachable(app: EdgeApp) -> None:
         )
 
 
-async def test_compact_live_screen_controls_are_visible_or_scrollable() -> None:
+@pytest.mark.parametrize(
+    "surface",
+    [
+        "sector", "computer", "lobby", "port", "stardock", "planet", "surface",
+        "contact", "encounter", "territory", "base", "help", "detail-modal",
+    ],
+)
+async def test_compact_art_screen_controls_are_visible_or_scrollable(surface: str) -> None:
+    """Every WP-PR10 art-bearing family stays operable at the 80x24 floor.
+
+    The two modal cases cover the shared help and detail/picker containers used by
+    art-screen overlays; individual prompt contents do not change their geometry.
+    """
     app = EdgeApp(plain=True)
     async with app.run_test(size=(80, 24)) as pilot:
         service = app.start_new_game(seed=1986)
-        for screen in (
-            GameScreen(service, app.player_id),
-            ComputerScreen(service, app.player_id, initial_tab="ports"),
-            LobbyScreen("ws://host.example:8765"),
-        ):
-            app.push_screen(screen)
-            await pilot.pause()
-            await pilot.pause()
-            _assert_controls_reachable(app)
-            app.pop_screen()
-            await pilot.pause()
+        if surface == "sector":
+            screen = GameScreen(service, app.player_id)
+        elif surface == "computer":
+            screen = ComputerScreen(service, app.player_id, initial_tab="ports")
+        elif surface == "lobby":
+            screen = LobbyScreen("ws://host.example:8765")
+        elif surface == "port":
+            from edge.tui.screens.port import PortScreen
+            screen = PortScreen(service, app.player_id)
+        elif surface == "stardock":
+            from edge.tui.screens.stardock import StarDockScreen
+            screen = StarDockScreen(service, app.player_id, initial_tab="devices")
+        elif surface == "planet":
+            from edge.tui.dummy import sample_planet
+            from edge.tui.screens.planet import PlanetScreen
+            screen = PlanetScreen(sample_planet())
+        elif surface == "surface":
+            from edge.tui.dummy import sample_surface
+            from edge.tui.screens.surface import SurfaceScreen
+            screen = SurfaceScreen(sample_surface())
+        elif surface == "contact":
+            from edge.tui.dummy import sample_contact
+            from edge.tui.screens.contact import AlienContactScreen
+            screen = AlienContactScreen(sample_contact())
+        elif surface == "encounter":
+            from edge.tui.dummy import sample_encounter_view
+            from edge.tui.screens.encounter import EncounterScreen
+
+            class StaticEncounterService:
+                def encounter_view(self, player_id: int):
+                    return sample_encounter_view()
+
+                def engine_room_view(self, player_id: int):
+                    return SimpleNamespace(subsystems=[])
+
+            screen = EncounterScreen(StaticEncounterService(), app.player_id)
+        elif surface == "territory":
+            from edge.tui.screens.territory import TerritoryScreen
+            ship = service.state.ships[service.state.players[app.player_id].ship_id]
+            outside = next(s.id for s in service.state.sectors.values()
+                           if not s.is_galactic_core)
+            service.state.ships[ship.id] = replace(ship, sector_id=outside, fighters=40)
+            screen = TerritoryScreen(service, app.player_id)
+        elif surface == "base":
+            from edge.tui.screens.base import BaseScreen
+            base = next(iter(service.state.starbases.values()))
+            ship = service.state.ships[service.state.players[app.player_id].ship_id]
+            service.state.ships[ship.id] = replace(ship, sector_id=base.sector_id)
+            screen = BaseScreen(service, app.player_id, base.id)
+        elif surface == "help":
+            from edge.tui.screens.help import HelpScreen
+            screen = HelpScreen(GameScreen(service, app.player_id))
+        else:
+            from edge.tui.screens.picker import ListPicker
+            screen = ListPicker("Object details", [("Inspect", "inspect"), ("Leave", "leave")])
+
+        app.push_screen(screen)
+        await pilot.pause()
+        await pilot.pause()
+        _assert_controls_reachable(app)

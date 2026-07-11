@@ -262,3 +262,45 @@ def test_dense_screen_themes(snap_compare, theme: str, surface: str) -> None:
     else:
         assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["standard"],
                             run_before=open_surface)
+
+
+@pytest.mark.parametrize("theme", ["edge-high-contrast", "edge-monochrome"])
+@pytest.mark.parametrize("surface", ["port", "planet", "surface", "territory", "base"])
+def test_world_art_screen_themes(snap_compare, theme: str, surface: str) -> None:
+    """WP-PR10: alternate-theme baselines for the remaining art-bearing families."""
+    async def open_surface(pilot: Pilot) -> None:
+        from dataclasses import replace
+
+        app = pilot.app
+        assert isinstance(app, EdgeApp)
+        app.theme = theme
+        service = app.start_new_game(seed=1986)
+        if surface == "port":
+            from edge.tui.screens.port import PortScreen
+            screen = PortScreen(service, app.player_id)
+        elif surface == "planet":
+            from edge.tui.dummy import sample_planet
+            from edge.tui.screens.planet import PlanetScreen
+            screen = PlanetScreen(sample_planet())
+        elif surface == "surface":
+            from edge.tui.dummy import sample_surface
+            from edge.tui.screens.surface import SurfaceScreen
+            screen = SurfaceScreen(sample_surface())
+        elif surface == "territory":
+            from edge.tui.screens.territory import TerritoryScreen
+            ship = service.state.ships[service.state.players[app.player_id].ship_id]
+            outside = next(s.id for s in service.state.sectors.values()
+                           if not s.is_galactic_core)
+            service.state.ships[ship.id] = replace(ship, sector_id=outside, fighters=40)
+            screen = TerritoryScreen(service, app.player_id)
+        else:
+            from edge.tui.screens.base import BaseScreen
+            base = next(iter(service.state.starbases.values()))
+            ship = service.state.ships[service.state.players[app.player_id].ship_id]
+            service.state.ships[ship.id] = replace(ship, sector_id=base.sector_id)
+            screen = BaseScreen(service, app.player_id, base.id)
+        app.push_screen(screen)
+        await pilot.pause()
+
+    assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["standard"],
+                        run_before=open_surface)
