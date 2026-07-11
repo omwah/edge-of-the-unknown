@@ -244,7 +244,13 @@ DTO capabilities, legacy decode, no land/citadel/store controls in Pilot/snapsho
 
 Commit: `playtest: WP-PR06 asteroid-belt interaction model`
 
-### WP-PR07 — Planet logistics and colonist settlement
+### WP-PR07 — Planet logistics and colonist settlement — complete
+
+**Scope note:** the transfer editor issues one clamped reducer call per row (Load/Unload/
+Settle) and Load-all/Unload-all iterate the trio; each `TransferCargo`/`SettleColonists` is
+its own transaction, so no partial-mutation window exists. A single batch-transfer command
+(one event group) is left as a deferred optimisation — its atomicity value is low for the
+local single-player service, and it was not needed to close PT-10/PT-11.
 
 **Goal:** provide one legible transfer editor and allow adding colonists to an
 already owned colony.

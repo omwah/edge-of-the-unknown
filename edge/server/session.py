@@ -61,6 +61,7 @@ from edge.core.events import (
     AllianceResigned,
     Banked,
     Colonized,
+    ColonistsSettled,
     ColonistsRecruited,
     ColonyGrew,
     CombatRound,
@@ -2038,6 +2039,8 @@ def format_event(event: Event) -> str:
         return f"Recruited {event.count} colonists ({via}){cost}"
     if isinstance(event, Colonized):
         return f"[green]Colonized world {event.planet_id}[/] with {event.colonists} colonists"
+    if isinstance(event, ColonistsSettled):
+        return f"[green]Settled {event.colonists:,} more colonists[/] on your world"
     if isinstance(event, ColonyGrew):
         return f"Colony {event.planet_id} grew to {event.colonists}"
     if isinstance(event, PlanetProduced):
@@ -2176,7 +2179,7 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
     if isinstance(event, (Traded, Haggled)):
         port = state.ports.get(event.port_id)
         return port.sector_id if port is not None else None
-    if isinstance(event, (GenesisDeployed, Descended, SiteExplored, Colonized, ColonyGrew, PlanetProduced)):
+    if isinstance(event, (GenesisDeployed, Descended, SiteExplored, Colonized, ColonistsSettled, ColonyGrew, PlanetProduced)):
         planet = state.planets.get(event.planet_id)
         return planet.sector_id if planet is not None else None
     if isinstance(event, (DiscoveryDetected, DiscoveryCollected)):

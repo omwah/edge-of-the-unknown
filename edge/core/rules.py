@@ -97,6 +97,7 @@ from edge.core.events import (
     Banked,
     BaseCommission,
     Colonized,
+    ColonistsSettled,
     AdmissionAdvanced,
     AllianceJoined,
     AllianceResigned,
@@ -286,6 +287,20 @@ class RecruitColonists:
 @dataclass(frozen=True, slots=True)
 class Colonize:
     """Settle recruited colonists onto an unowned colonizable world, claiming it (§8)."""
+
+    planet_id: int
+    colonists: int
+
+
+@dataclass(frozen=True, slots=True)
+class SettleColonists:
+    """Land more colonists from the ship's berth onto a world the player already owns (§8).
+
+    The top-up counterpart to `Colonize` (which *claims* an unowned world): this only adds
+    people to an existing colony. Owner-only (player or their corp), in-sector, colonizable.
+    `colonists` is clamped to what is aboard and the world's remaining habitability headroom,
+    so "settle all" is a large number — the accepted count moves atomically.
+    """
 
     planet_id: int
     colonists: int
@@ -909,7 +924,7 @@ Command = (
     JoinGame
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
-    | RecruitColonists | Colonize | SetAllocation
+    | RecruitColonists | Colonize | SettleColonists | SetAllocation
     | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet | TransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
@@ -1034,6 +1049,8 @@ def reduce(
             return _recruit_colonists(state, player_id, command, config)
         case Colonize():
             return _colonize(state, player_id, command, config)
+        case SettleColonists():
+            return _settle_colonists(state, player_id, command, config)
         case SetAllocation():
             return _set_allocation(state, player_id, command, config)
         case BuildCitadel():
@@ -1948,6 +1965,41 @@ def _colonize(
     )
     return ReduceResult(
         events=(Colonized(player_id, planet.id, cmd.colonists),),
+        ships=(new_ship,), planets=(new_planet,),
+    )
+
+
+def _settle_colonists(
+    state: UniverseState, player_id: int, cmd: SettleColonists, config: GameConfig
+) -> ReduceResult:
+    """Land more colonists onto a world the player already owns (§8, WP-PR07).
+
+    The top-up path (distinct from `Colonize`, which claims): requires an owned, colonizable
+    world in the ship's sector and a positive amount. Clamped to what is aboard and the
+    world's remaining habitability headroom; the accepted count moves atomically. Colonists
+    ride the ship's berth (`colonists`), never a cargo hold — peopling never competes with trade.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    planet = state.planets.get(cmd.planet_id)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise EconomyError("no such world in this sector")
+    if not corp.player_owns(state, planet.owner, player_id):
+        raise EconomyError("you do not own that world")  # claim an unowned world with Colonize
+    if not is_colonizable(planet.planet_type, config):
+        raise EconomyError(f"a {planet.planet_type} world cannot hold colonists")
+    if cmd.colonists <= 0:
+        raise EconomyError("must land at least one colonist")
+    if ship.colonists <= 0:
+        raise EconomyError("no colonists aboard to settle")
+    headroom = max(0, planet.habitability_cap - planet.colonists)
+    if headroom <= 0:
+        raise EconomyError("the colony is at its habitability cap")
+    moved = min(cmd.colonists, ship.colonists, headroom)
+    new_ship = replace(ship, colonists=ship.colonists - moved)
+    new_planet = replace(planet, colonists=planet.colonists + moved)
+    return ReduceResult(
+        events=(ColonistsSettled(player_id, planet.id, moved),),
         ships=(new_ship,), planets=(new_planet,),
     )
 
