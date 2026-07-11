@@ -101,8 +101,8 @@ acceptance criteria live in
 | PT-07 | Tavern | Improve the bounty board's information hierarchy and interactions; the current single-column prose list is difficult to scan. | WP-PR08 |
 | PT-08 | Computer / Planets | Sort player-owned planets ahead of the normal selected sort order and show their ownership clearly. | WP-PR09 |
 | PT-09 | Computer / Ports | Show when a port is attached to the player's starbase and sort those ports ahead of the normal selected sort order. | WP-PR09 |
-| PT-10 | Planet logistics | Replace separate store-transfer prompts with one editor: a row per commodity, `−`/`+` controls stepping by 10, exact amount entry, and Load All / Unload All actions. | WP-PR07 |
-| PT-11 | Planet colonists | Allow colonists already aboard to be settled onto a planet the player owns; the current flow rejects an additional unload after initial colonization. | WP-PR07 |
+| PT-10 | Planet logistics | ~~Replace separate store-transfer prompts with one editor: a row per commodity, `−`/`+` controls stepping by 10, exact amount entry, and Load All / Unload All actions.~~ Fixed in `playtest: WP-PR07 planet transfer workbench`. | WP-PR07 |
+| PT-11 | Planet colonists | ~~Allow colonists already aboard to be settled onto a planet the player owns; the current flow rejects an additional unload after initial colonization.~~ Fixed in `playtest: WP-PR07 planet transfer workbench` — new `SettleColonists` command tops up an owned colony. | WP-PR07 |
 | PT-12 | Objectives | Hiding Captain's Objectives should also remove objective detail from the sidebar. | WP-PR10 |
 | PT-13 | Responsive UI | Apply compact-tier behavior to remaining art-bearing screens so decorative art cannot displace primary controls at 80x24. | WP-PR10 |
 | PT-14 | Status Drawer | Sector objects in the Status Drawer must be keyboard navigable and activatable. | WP-PR10 |

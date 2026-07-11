@@ -40,6 +40,7 @@ from edge.core.events import (
     CitadelGunSilenced,
     Colonized,
     ColonistsRecruited,
+    ColonistsSettled,
     ColonyGrew,
     CombatRound,
     InterdictorToggled,
@@ -145,6 +146,7 @@ from edge.core.rules import (
     ResignAlliance,
     Salvage,
     SetAllocation,
+    SettleColonists,
     SwapComponent,
     BuildCitadel,
     BuyDevice,
@@ -182,6 +184,7 @@ COMMANDS: list[Command] = [
     RecruitColonists(count=40, from_planet=None),
     RecruitColonists(count=10, from_planet=7),
     Colonize(planet_id=5, colonists=25),
+    SettleColonists(planet_id=5, colonists=25),        # WP-PR07 top up an owned colony
     SetAllocation(planet_id=5, allocation={"fuel_ore": 0.5, "organics": 0.5}),
     BuildCitadel(planet_id=5),                       # WP54 open a timed citadel build
     PlanetDeposit(planet_id=5, amount=1_000),        # WP54 treasury deposit
@@ -269,6 +272,7 @@ EVENTS: list[Event] = [
     ShipPurchased(1, "scout_marauder", 20_000, 0),
     ColonistsRecruited(1, "stardock", 40, 200),
     Colonized(1, 5, 25),
+    ColonistsSettled(1, 5, 25),
     PlanetProduced(5, 1),
     ColonyGrew(5, 1_050),
     CargoTransferred(1, 5, Commodity.EQUIPMENT, 120, True),  # §4.2 colony-supply haul

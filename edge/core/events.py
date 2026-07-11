@@ -224,6 +224,16 @@ class Colonized(Event):
 
 
 @dataclass(frozen=True)
+class ColonistsSettled(Event):
+    """More colonists landed onto an already-owned colony (§8, WP-PR07). `colonists` is the
+    accepted count (clamped to berth + remaining habitability)."""
+
+    player_id: int
+    planet_id: int
+    colonists: int
+
+
+@dataclass(frozen=True)
 class PlanetProduced(Event):
     planet_id: int
     owner_player_id: int  # only player-owned colonies announce (alliance output is silent)

@@ -7,7 +7,7 @@ The planet screen is **colony matters only** (WP80): all starbase ops — assaul
 repair, salvage, claim, and the base's market/services — live in the unified
 `BaseScreen`; the base status line here is a click-through (`B` or click).
 The stores and citadel blocks are widget panels: a stores DataTable (colony vs.
-hold) with Unload/Load buttons, and a citadel panel whose art shows a different
+hold) with a Transfer… button (the unified goods/colonist editor), and a citadel panel whose art shows a different
 structure per development stage (survey site → scaffolding → keep → keep + gun →
 shielded fortress) with Build/treasury buttons. Hotkeys stay as accelerators.
 With no service (screenshot harness) it shows a static sample.
@@ -32,10 +32,9 @@ from edge.core.economy import EconomyError
 from edge.core.dto import PlanetDTO
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
-from edge.core.enums import Commodity
 from edge.core.rules import (
     BuildCitadel, Colonize, DeployGenesis, Descend, InvadePlanet, PlanetDeposit,
-    PlanetWithdraw, TransferCargo,
+    PlanetWithdraw,
 )
 from edge.server.service import GameService
 from edge.tui.chrome import notify_warning
@@ -113,9 +112,10 @@ class PlanetScreen(Screen[None]):
 Colony matters live here; every starbase op (repair · salvage · claim · assault ·
 market · services) is on the base screen — [b]B[/] or click the base line.
 The Stores and Citadel panels are button-driven ([b]Tab[/] walks the buttons,
-[b]Enter[/] fires): haul cargo between ship and stores, start builds, move the
-treasury. Citadel builds draw equipment from [i]stores[/], so supply runs in
-trips are the intended loop; the citadel art grows with its level."""
+[b]Enter[/] fires): [b]Transfer…[/] opens one editor to haul cargo between ship and
+stores and to settle colonists onto the colony; start builds and move the treasury
+from the citadel panel. Citadel builds draw equipment from [i]stores[/], so supply
+runs in trips are the intended loop; the citadel art grows with its level."""
 
     CSS = """
     PlanetScreen #orbit-title {
@@ -267,11 +267,12 @@ trips are the intended loop; the citadel art grows with its level."""
         children: list[Static | DataTable[Any] | Horizontal] = [table]
         if p.owned_by_you:
             children.append(Horizontal(
-                Button("Unload → stores…", id="btn-unload"),
-                Button("Load aboard…", id="btn-load"),
+                Button("Transfer…", id="btn-transfer", variant="primary"),
                 classes="buttons"))
-            children.append(Static("[dim]Citadel builds draw equipment from stores — "
-                                   "supply runs in trips are the loop.[/]"))
+            hint = ("[dim]Open the transfer editor to haul goods and settle colonists.[/]"
+                    if p.colonizable else
+                    "[dim]Citadel builds draw equipment from stores — supply runs in trips are the loop.[/]")
+            children.append(Static(hint))
         panel = Vertical(*children, classes="orbit-panel")
         panel.border_title = "Stores"
         return panel
@@ -307,7 +308,7 @@ trips are the intended loop; the citadel art grows with its level."""
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {
-            "btn-unload": self.action_unload_cargo, "btn-load": self.action_load_cargo,
+            "btn-transfer": self.action_transfer,
             "btn-build": self.action_build_citadel,
             "btn-cit-dep": self.action_treasury_deposit,
             "btn-cit-wd": self.action_treasury_withdraw,
@@ -441,54 +442,27 @@ trips are the intended loop; the citadel art grows with its level."""
             f"Fire a Genesis torpedo at {p.name}?\n"
             "The world is re-formed — this cannot be undone."), _go)
 
-    def _transfer(self, *, to_planet: bool) -> None:
-        """Pick a commodity + amount, then haul it (§4.2 — the colony-supply rail).
-
-        The reducer clamps to what fits/is aboard, so a big number means "all"; this
-        is how citadel equipment reaches a world (the build draws from stores).
-        """
+    def action_transfer(self) -> None:
+        """Open the unified transfer editor: haul goods and settle colonists (WP-PR07)."""
         if self._service is None:
             self.action_noop()
             return
-        service = self._service
         p = self._planet
         if not p.owned_by_you:
             self.notify("You can only transfer cargo at a world you own.", timeout=2)
             return
+        from edge.tui.screens.transfer import TransferWorkbenchScreen
+        # Reopen the orbit view on close so colony numbers reflect what was moved.
+        self.app.push_screen(
+            TransferWorkbenchScreen(self._service, self._pid, p.planet_id),
+            lambda _=None: self._reopen())
 
-        def _amount(picked: int | str | None) -> None:
-            if picked is None:
-                return
-            commodity = Commodity(str(picked))
-
-            def _go(units: int | None) -> None:
-                if not units:
-                    return
-                try:
-                    service.apply(self._pid, TransferCargo(
-                        p.planet_id, commodity, units, to_planet=to_planet))
-                except EconomyError as exc:
-                    notify_warning(self, str(exc))
-                    return
-                self._reopen()
-
-            from edge.tui.screens.stardock import _AmountInput
-            verb = "Unload" if to_planet else "Load"
-            self.app.push_screen(
-                _AmountInput(f"{verb} how many {commodity.value.replace('_', ' ')}? "
-                             "(a big number = all)"), _go)
-
-        from edge.tui.screens.picker import ListPicker
-        self.app.push_screen(ListPicker(
-            "Which commodity?",
-            [(f"[b]{c.value.replace('_', ' ').title()}[/]", c.value) for c in Commodity],
-            width=40), _amount)
-
+    # Back-compat accelerators (T/L): both open the one transfer editor now.
     def action_unload_cargo(self) -> None:
-        self._transfer(to_planet=True)
+        self.action_transfer()
 
     def action_load_cargo(self) -> None:
-        self._transfer(to_planet=False)
+        self.action_transfer()
 
     def action_back(self) -> None:
         self.app.pop_screen()

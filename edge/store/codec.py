@@ -29,6 +29,7 @@ from edge.core.events import (
     CitadelGunSilenced,
     Colonized,
     ColonistsRecruited,
+    ColonistsSettled,
     ColonyGrew,
     ContractAccepted,
     ContractCompleted,
@@ -159,6 +160,7 @@ from edge.core.rules import (
     RepairStarbase,
     Salvage,
     SetAllocation,
+    SettleColonists,
     SwapComponent,
     ToggleInterdictor,
     Trade,
@@ -207,6 +209,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "RecruitColonists", {"count": command.count, "from_planet": command.from_planet}
         case Colonize():
             return "Colonize", {"planet_id": command.planet_id, "colonists": command.colonists}
+        case SettleColonists():
+            return "SettleColonists", {"planet_id": command.planet_id, "colonists": command.colonists}
         case SetAllocation():
             return "SetAllocation", {
                 "planet_id": command.planet_id, "allocation": command.allocation,
@@ -401,6 +405,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return RecruitColonists(count=payload["count"], from_planet=payload["from_planet"])
         case "Colonize":
             return Colonize(planet_id=payload["planet_id"], colonists=payload["colonists"])
+        case "SettleColonists":
+            return SettleColonists(planet_id=payload["planet_id"], colonists=payload["colonists"])
         case "SetAllocation":
             return SetAllocation(planet_id=payload["planet_id"], allocation=payload["allocation"],
                                  fighter=payload.get("fighter", 0.0))
@@ -660,6 +666,10 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             }
         case Colonized():
             return "Colonized", {
+                "player_id": event.player_id, "planet_id": event.planet_id, "colonists": event.colonists,
+            }
+        case ColonistsSettled():
+            return "ColonistsSettled", {
                 "player_id": event.player_id, "planet_id": event.planet_id, "colonists": event.colonists,
             }
         case PlanetProduced():
@@ -986,6 +996,8 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                                       payload["count"], payload["cost"])
         case "Colonized":
             return Colonized(payload["player_id"], payload["planet_id"], payload["colonists"])
+        case "ColonistsSettled":
+            return ColonistsSettled(payload["player_id"], payload["planet_id"], payload["colonists"])
         case "PlanetProduced":
             return PlanetProduced(payload["planet_id"], payload["owner_player_id"])
         case "ColonyGrew":
