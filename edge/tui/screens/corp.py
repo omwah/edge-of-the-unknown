@@ -28,7 +28,16 @@ from edge.core.rules import (
     TransferPlanetToCorp,
 )
 from edge.server.service import GameService
-from edge.tui.chrome import TextPrompt, notify_warning
+from edge.tui.chrome import EmptyState, TextPrompt, notify_warning
+
+
+def _ceo_button(label: str, button_id: str, *, is_ceo: bool,
+                variant: str = "default") -> Button:
+    """A CEO-gated verb: members see it disabled with the reason (WP-UI19)."""
+    button = Button(label, id=button_id, variant=variant, disabled=not is_ceo)  # type: ignore[arg-type]
+    if not is_ceo:
+        button.tooltip = "Only the CEO may do this."
+    return button
 
 
 def _derive_tag(name: str, max_len: int) -> str:
@@ -110,6 +119,10 @@ are accelerators for the same buttons."""
         if view is None or not view.corp_id:
             yield Static("You have no corporation.", id="corp-title")
             with Vertical(id="corp-empty-box"):
+                yield EmptyState(
+                    "You fly alone — no charter, no shared treasury.",
+                    "Charter a corporation to pool latinum, worlds, and bases "
+                    "with other captains (a corp of one works too).")
                 invites = view.invites if view is not None else []
                 if invites:
                     table: DataTable = DataTable(id="corp-invites", cursor_type="row")
@@ -132,15 +145,20 @@ are accelerators for the same buttons."""
         yield Footer()
 
     def _roster_panel(self, view: object) -> Vertical:
+        is_ceo: bool = view.is_ceo  # type: ignore[attr-defined]
         table: DataTable = DataTable(id="corp-members", zebra_stripes=True, cursor_type="row")
         table.add_columns("Member", "Role")
         for m in view.members:  # type: ignore[attr-defined]
             table.add_row(m.name, "CEO" if m.is_ceo else "member", key=str(m.player_id))
+        # WP-UI19: the CEO's primary verb is growing the roster; members see the
+        # CEO-gated verbs disabled with the reason instead of a surprise rejection.
         panel = Vertical(
             table,
             Horizontal(
-                Button("Invite…", id="btn-invite"),
-                Button("Expel selected", id="btn-expel", variant="warning"),
+                _ceo_button("Invite…", "btn-invite", is_ceo=is_ceo,
+                            variant="primary" if is_ceo else "default"),
+                _ceo_button("Expel selected", "btn-expel", is_ceo=is_ceo,
+                            variant="warning"),
                 classes="buttons"),
             Horizontal(Button("Leave corp", id="btn-leave", variant="error"),
                        classes="buttons"),
@@ -149,24 +167,29 @@ are accelerators for the same buttons."""
         return panel
 
     def _holdings_panel(self, view: object) -> Vertical:
+        is_ceo: bool = view.is_ceo  # type: ignore[attr-defined]
         panel = Vertical(
             Static(f"Bank      [b yellow]{view.bank_balance:,}[/] slips", classes="stat"),  # type: ignore[attr-defined]
             Static(f"Worlds    [b]{view.planet_count}[/]", classes="stat"),  # type: ignore[attr-defined]
             Static(f"Bases     [b]{view.starbase_count}[/]", classes="stat"),  # type: ignore[attr-defined]
             Horizontal(
-                Button("Deposit 1k", id="btn-deposit"),
-                Button("Withdraw 1k", id="btn-withdraw"),
+                Button("Deposit 1k", id="btn-deposit",
+                       variant="default" if is_ceo else "primary"),
+                _ceo_button("Withdraw 1k", "btn-withdraw", is_ceo=is_ceo),
                 classes="buttons"),
             Horizontal(
                 Button("World → corp", id="btn-world-to"),
-                Button("World → CEO", id="btn-world-from"),
+                _ceo_button("World → CEO", "btn-world-from", is_ceo=is_ceo),
                 classes="buttons"),
-            Static("[dim]World transfers act on the planet in your current sector.[/]"),
+            Static("[dim]World transfers act on the planet in your current sector."
+                   + ("" if is_ceo else " Withdrawals and world returns are CEO-only.")
+                   + "[/]"),
             classes="corp-panel")
         panel.border_title = "Treasury & holdings"
         return panel
 
     def _diplomacy_panel(self, view: object) -> Vertical:
+        is_ceo: bool = view.is_ceo  # type: ignore[attr-defined]
         table: DataTable = DataTable(id="corp-others", zebra_stripes=True, cursor_type="row")
         table.add_columns("Corporation", "Status")
         at_war = set(view.at_war_with)  # type: ignore[attr-defined]
@@ -175,15 +198,22 @@ are accelerators for the same buttons."""
             status = "[red]at war[/]" if tag in at_war else "[dim]—[/]"
             table.add_row(label, status, key=str(cid))
         children: list[object] = [table]
-        if not view.other_corps:  # type: ignore[attr-defined]
-            children = [Static("[dim]No other corporations charted.[/]", classes="stat")]
+        has_rivals = bool(view.other_corps)  # type: ignore[attr-defined]
+        if not has_rivals:
+            children = [EmptyState("No other corporations charted.",
+                                   "Rival corps appear here as they charter.")]
+        war = _ceo_button("Declare war", "btn-war", is_ceo=is_ceo, variant="error")
+        peace = _ceo_button("End war", "btn-peace", is_ceo=is_ceo, variant="success")
+        if is_ceo and not has_rivals:
+            for button in (war, peace):
+                button.disabled = True
+                button.tooltip = "No other corporation to act on."
         panel = Vertical(
             *children,  # type: ignore[arg-type]
-            Horizontal(
-                Button("Declare war", id="btn-war", variant="error"),
-                Button("End war", id="btn-peace", variant="success"),
-                classes="buttons"),
-            Static("[dim]War acts on the selected row.[/]"),
+            Horizontal(war, peace, classes="buttons"),
+            Static("[dim]War acts on the selected row"
+                   + ("." if is_ceo else " — declaring and ending it are CEO-only.")
+                   + "[/]"),
             classes="corp-panel")
         panel.border_title = "Diplomacy"
         return panel

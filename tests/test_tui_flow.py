@@ -164,7 +164,11 @@ async def test_computer_market_tab_shows_the_order_book() -> None:
         await pilot.pause()
         table = app.screen.query_one("#market-table", DataTable)
         assert table is not None
-        assert table.row_count >= 1  # either an order/empty row — always renders
+        if table.display:  # orders charted — rows render
+            assert table.row_count >= 1
+        else:  # WP-UI19: an empty book shows the shared EmptyState instead
+            from edge.tui.chrome import EmptyState
+            assert app.screen.query_one("#market").query(EmptyState)
 
 
 async def test_travel_prompt_warps_along_known_route() -> None:
