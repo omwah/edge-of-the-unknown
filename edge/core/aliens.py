@@ -340,6 +340,17 @@ def seizure_progress(
     )
 
 
+def alliance_rivals(roster: RosterConfig | None, alliance_id: int) -> set[int]:
+    """Public: the blocs at odds with `alliance_id` (symmetric rivalry, §6.3).
+
+    Thin wrapper over `_rivals_of` for callers outside `aliens` (e.g. territory
+    entry-defense, WP-PR02). An absent roster yields no rivals.
+    """
+    if roster is None:
+        return set()
+    return _rivals_of(roster, alliance_id)
+
+
 def _rivals_of(roster: RosterConfig, alliance_id: int) -> set[int]:
     """The blocs at odds with `alliance_id` — rivalry is symmetric (§6.3)."""
     joined = roster.alliance(alliance_id)

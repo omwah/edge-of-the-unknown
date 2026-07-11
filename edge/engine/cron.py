@@ -12,15 +12,15 @@ import random
 from collections.abc import Callable
 from dataclasses import replace
 
-from edge.core import contracts, npc
+from edge.core import contracts, npc, territory
 from edge.core.aliens import attitude_locked, decay_grudges, effective_disposition, may_occupy
 from edge.core.discovery import entity_species
 from edge.core.config import GameConfig
 from edge.core.economy import accrue_interest as _accrue
 from edge.core.enums import PortClass
 from edge.core.events import (
-    AlienMoved, AttitudeChanged, Banked, CitadelCompleted, ColonyGrew, ContractFailed, Event,
-    MarketSettled, PlanetProduced, PortOrderFilled, TurnsReset,
+    AlienDestroyed, AlienMoved, AttitudeChanged, Banked, CitadelCompleted, ColonyGrew,
+    ContractFailed, Event, MarketSettled, PlanetProduced, PortOrderFilled, TurnsReset,
 )
 from edge.core.citadels import advance_build
 from edge.core.governance import apply_intrigue, flip_core_governor, npc_seizure_ready
@@ -28,7 +28,9 @@ from edge.core.market import (
     clear_filled, desired_stock_frac, hinterland_drift, liquidity_drip, match_orders,
     orders_from_ports,
 )
-from edge.core.models import AlienSpecies, Alliance, Planet, Player, Port, Starbase, UniverseState
+from edge.core.models import (
+    AlienSpecies, Alliance, Planet, Player, Port, SectorForce, Starbase, UniverseState,
+)
 from edge.core.planets import produce
 from edge.core.rules import ReduceResult
 from edge.engine.port_economy import regenerate_ports
@@ -279,7 +281,11 @@ def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
     interdicted = {state.ships[p.ship_id].sector_id for p in state.players.values()
                    if state.ships[p.ship_id].interdictor_active}
     moved: list[AlienSpecies] = []
+    removed_ids: list[int] = []
     events: list[Event] = []
+    # Territory depletion accrued this firing, so several entrants into one defended sector
+    # deplete its mines/fighters in turn (§10, WP-PR02). Read here, applied at the end.
+    force_overrides: dict[int, SectorForce] = {}
     for sp in sorted(state.species.values(), key=lambda s: s.id):
         if sp.id in pinned:
             continue
@@ -299,11 +305,27 @@ def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
             continue
         # The Entity keeps its own wander; every other species drifts by its policy (WP42).
         dst = rng.choice(legal) if is_entity else npc.plan_move(state, sp, legal, config, rng)
+        touches = sp.sector_id in player_sectors or dst in player_sectors
+        # Sector-entry defenses fire on the drifting NPC exactly as on a player warp (§10,
+        # WP-PR02): resolve entry first, then move or destroy based on survival. The Entity is
+        # a shipless contact and never triggers territory.
+        entry = (territory.NpcEntry(False, None, "") if is_entity
+                 else territory.resolve_npc_entry(
+                     state, sp, force_overrides.get(dst, state.sector_forces.get(dst)), config))
+        if entry.force is not None:
+            force_overrides[dst] = entry.force
+        if entry.destroyed:
+            removed_ids.append(sp.id)  # a downed NPC never reaches the destination
+            if touches:
+                events.append(AlienDestroyed(sp.id, dst, entry.cause))
+            continue
         moved.append(replace(sp, sector_id=dst))
-        if sp.sector_id in player_sectors or dst in player_sectors:
+        if touches:
             events.append(AlienMoved(sp.id, sp.sector_id, dst))
     game = replace(state.game, drift_seq=firing + 1)
-    return ReduceResult(events=tuple(events), species=tuple(moved), game=game)
+    return ReduceResult(
+        events=tuple(events), species=tuple(moved), removed_species_ids=tuple(removed_ids),
+        sector_forces=tuple(force_overrides.values()), game=game)
 
 
 def _trader_rapport(player: Player, species: AlienSpecies,

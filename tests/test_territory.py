@@ -319,6 +319,101 @@ def test_probe_lost_in_a_hostile_sector() -> None:
     assert destroyed_seen  # a hostile sector can down a probe
 
 
+# --- NPC entry defenses (WP-PR02) -------------------------------------------
+
+
+def _species(**kw) -> AlienSpecies:
+    # A real roster id so `_npc_combat_stats` resolves a fleet hull. `stryx` is an
+    # unaligned scout (hull 80 + shields 120 → pool 200), disposition 0.3 (hostile band).
+    base = dict(id=7, roster_id="stryx", name="Stryx", archetype_id="a", sector_id=1,
+                home_band="Frontier", tech_level=3, base_disposition=0.3,
+                disposition_center=0.3, disposition_variance=0.0, alliance_id=None)
+    base.update(kw)
+    return AlienSpecies(**base)
+
+
+def test_force_hostile_to_species_keys_on_owner() -> None:
+    state = _mini_state()
+    # Player-owned force bars a hostile-band wanderer; a friendly one passes.
+    pforce = _force(owner=Ownership("player", 1))
+    assert territory.force_hostile_to_species(state, pforce, _species(), CFG) is True
+    friendly = _species(base_disposition=0.95)
+    assert territory.force_hostile_to_species(state, pforce, friendly, CFG) is False
+    # Alliance-owned force bars a rival bloc's species, not its own members. Alliance 2's
+    # rival is 3 (helot); alliance 2's own member (selvi) passes free.
+    aforce = _force(owner=Ownership("alliance", 2))
+    rival = _species(roster_id="helot", alliance_id=3)
+    assert territory.force_hostile_to_species(state, aforce, rival, CFG) is True
+    member = _species(roster_id="selvi", alliance_id=2)
+    assert territory.force_hostile_to_species(state, aforce, member, CFG) is False
+
+
+def test_npc_entry_mines_destroy_a_light_hull() -> None:
+    state = _mini_state()
+    force = _force(owner=Ownership("player", 1), fighters=0, mines=5)  # 5×40 = 200 ≥ pool 200
+    entry = territory.resolve_npc_entry(state, _species(), force, CFG)
+    assert entry.destroyed and entry.cause == "mine"
+    assert entry.force is not None and entry.force.armid_mines == 0  # spent
+
+
+def test_npc_entry_is_inert_for_a_non_hostile_or_empty_force() -> None:
+    state = _mini_state()
+    friendly = _species(base_disposition=0.95)
+    force = _force(owner=Ownership("player", 1), fighters=0, mines=5)
+    assert territory.resolve_npc_entry(state, friendly, force, CFG) == territory.NpcEntry(
+        False, None, "")
+    assert territory.resolve_npc_entry(state, _species(), None, CFG) == territory.NpcEntry(
+        False, None, "")
+
+
+def test_npc_entry_fighters_alone_cannot_kill_a_warship_but_are_attrited() -> None:
+    state = _mini_state()
+    force = _force(owner=Ownership("player", 1), fighters=4, mines=0)
+    entry = territory.resolve_npc_entry(state, _species(), force, CFG)
+    assert entry.destroyed is False  # a token garrison can't gut a scout's hull
+    assert entry.force is not None and entry.force.fighters < 4  # but the entrant thins it
+
+
+def test_npc_entry_is_deterministic() -> None:
+    state = _mini_state()
+    force = _force(owner=Ownership("player", 1), fighters=3, mines=3)
+    a = territory.resolve_npc_entry(state, _species(), force, CFG)
+    b = territory.resolve_npc_entry(state, _species(), force, CFG)
+    assert a == b
+
+
+def test_alien_drift_destroys_hostile_npc_in_a_minefield() -> None:
+    from edge.engine.cron import alien_drift
+    from edge.core.events import AlienDestroyed
+    state = _mini_state()
+    state.ships[1] = replace(state.ships[1], sector_id=2)  # player present ⇒ event surfaces
+    state.sector_forces[2] = _force(owner=Ownership("player", 1), fighters=0, mines=5)
+    state.species[7] = _species(sector_id=1)  # drifts 1 → 2 into the minefield
+    cfg = CFG.model_copy(update={"aliens": CFG.aliens.model_copy(
+        update={"drift_enabled": True, "drift_move_chance": 1.0})})
+    result = alien_drift(state, cfg)
+    assert 7 in result.removed_species_ids  # destroyed, not relocated
+    assert all(s.id != 7 for s in result.species)
+    assert any(isinstance(e, AlienDestroyed) and e.sector_id == 2 for e in result.events)
+    apply_result(state, result)
+    assert 7 not in state.species  # gone from the destination
+    assert 2 not in state.sector_forces  # mines spent, force cleared
+
+
+def test_alien_drift_moves_a_friendly_npc_through_a_minefield_unharmed() -> None:
+    from edge.engine.cron import alien_drift
+    state = _mini_state()
+    state.ships[1] = replace(state.ships[1], sector_id=2)
+    state.sector_forces[2] = _force(owner=Ownership("player", 1), fighters=0, mines=5)
+    state.species[7] = _species(sector_id=1, base_disposition=0.95)  # friendly ⇒ passes free
+    cfg = CFG.model_copy(update={"aliens": CFG.aliens.model_copy(
+        update={"drift_enabled": True, "drift_move_chance": 1.0})})
+    result = alien_drift(state, cfg)
+    assert 7 not in result.removed_species_ids
+    assert any(s.id == 7 and s.sector_id == 2 for s in result.species)
+    assert state.sector_forces[2].armid_mines == 5  # untriggered
+
+
 def test_interdictor_toggle_pins_drift() -> None:
     from edge.engine.cron import alien_drift
     state = _mini_state()
