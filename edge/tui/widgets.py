@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable, Iterator, Sequence
+from typing import Any
 from contextlib import contextmanager
 
 from rich.text import Text
@@ -37,7 +38,7 @@ class Starfield(Static):
     DEFAULT_CSS = "Starfield { width: 1fr; height: 1fr; color: $primary; }"
     _CHARS = (".", ".", ".", "·", "*", "+")
 
-    def __init__(self, animate: bool = True, density: float = 0.03, **kwargs: object) -> None:
+    def __init__(self, animate: bool = True, density: float = 0.03, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._animate = animate
         self._density = density
@@ -105,7 +106,7 @@ TRADE_CHUNK = 10
 
 
 @contextmanager
-def preserve_cursor(table: DataTable) -> Iterator[None]:
+def preserve_cursor(table: DataTable[Any]) -> Iterator[None]:
     """Keep the highlighted row stable across a clear()+repopulate refresh.
 
     Textual's ``DataTable.clear()`` resets the cursor to the top, so repeated
@@ -136,7 +137,7 @@ class TradePanel(Vertical):
     """
 
     def __init__(self, port: PortDTO, *, latinum: int = 0, show_title: bool = True,
-                 **kwargs: object) -> None:
+                 **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._port = port
         self._latinum = latinum
@@ -277,7 +278,7 @@ class ServiceHub(Vertical):
         entries: Sequence[tuple[str, str, Widget, str | None]],
         *,
         initial: str,
-        **kwargs: object,
+        **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._entries = list(entries)
@@ -383,7 +384,7 @@ class AnomalyRow(Static):
     """
 
     def __init__(self, discovery: SectorDiscovery, detail: bool = False,
-                 **kwargs: object) -> None:
+                 **kwargs: Any) -> None:
         super().__init__(self._markup(discovery, detail), **kwargs)
         self._discovery_id = discovery.discovery_id
         self._scan = not discovery.collected
@@ -440,7 +441,7 @@ class StatusSidebar(Vertical):
     def __init__(self, ship: ShipDTO, discoveries: list[SectorDiscovery],
                  width: int = 33, presence: list[str] | None = None,
                  detail: bool = False, objectives: tuple[str, ...] | None = None,
-                 **kwargs: object) -> None:
+                 **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._ship = ship
         self._discoveries = discoveries
@@ -508,7 +509,7 @@ class _TickerDivider(Static):
 
     DEFAULT_CSS = "_TickerDivider { height: 1; color: $primary; }"
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._expanded = False
 
@@ -547,7 +548,7 @@ class Ticker(Vertical):
     Ticker #ticker-body { height: 1fr; color: $text; }
     """
 
-    def __init__(self, lines: list[str], **kwargs: object) -> None:
+    def __init__(self, lines: list[str], **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._lines = lines
         self._expanded = False
@@ -588,7 +589,7 @@ class SectorScene(Static):
 
     _ORBIT_MARGIN = 3  # blank rows between the planet/port band and the ships row
 
-    def __init__(self, sector: SectorDTO, **kwargs: object) -> None:
+    def __init__(self, sector: SectorDTO, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._sector = sector
         # (x0, y0, x1, y1, dest, ref) recorded each render; on_click maps a hit to
@@ -836,7 +837,7 @@ class SectorScene(Static):
         if entries:
             sprite_h = 4 if h - row >= 6 else 0  # caption-only on a short terminal
             col_w = w / len(entries)
-            for i, (entity, sub, seed, caption, dest, ref) in enumerate(entries):
+            for i, (entity, sub, seed, caption, fdest, fref) in enumerate(entries):
                 left = max(0, int(i * col_w))
                 span = max(8, int(col_w))
                 if sprite_h:
@@ -850,9 +851,9 @@ class SectorScene(Static):
                     cw = max((len(r) for r in cells), default=0)
                     self._paint(grid, cells, row, left + max(0, (span - cw) // 2))
                 self._stamp_line(grid, caption, row + sprite_h, left, span)
-                if dest:
+                if fdest:
                     self._hotspots.append((left, row, left + span,
-                                           row + sprite_h + 1, dest, ref))
+                                           row + sprite_h + 1, fdest, fref))
             row += sprite_h + 1
 
         # (Discoveries are listed in the sidebar's "Anomalies" panel, not the scene.)
@@ -959,7 +960,7 @@ class LocalMapView(Static):
 
     def __init__(
         self, gmap: LocalMapDTO,
-        rebake: Callable[[int], LocalMapDTO] | None = None, **kwargs: object,
+        rebake: Callable[[int], LocalMapDTO] | None = None, **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._map = gmap
@@ -1055,7 +1056,7 @@ class ClickableEntry(Static):
             self.ref = ref  # an optional target id (e.g. a discovery to salvage)
             super().__init__()
 
-    def __init__(self, markup: str, dest: str, ref: int | str | None = None, **kwargs: object) -> None:
+    def __init__(self, markup: str, dest: str, ref: int | str | None = None, **kwargs: Any) -> None:
         super().__init__(markup, **kwargs)
         self._dest = dest
         self._ref = ref
@@ -1099,7 +1100,7 @@ class SectorObjectList(Vertical):
 
     DEFAULT_CSS = "SectorObjectList { height: auto; } SectorObjectList > Static { height: 1; }"
 
-    def __init__(self, sector: SectorDTO, **kwargs: object) -> None:
+    def __init__(self, sector: SectorDTO, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._sector = sector
 
@@ -1188,7 +1189,7 @@ class WarpCell(Static):
     WarpCell:hover { background: $boost; }
     """
 
-    def __init__(self, warp: WarpDTO, **kwargs: object) -> None:
+    def __init__(self, warp: WarpDTO, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._warp = warp
         if warp.kind == "unexplored":
@@ -1237,7 +1238,7 @@ class SectionRule(Static):
 
     DEFAULT_CSS = "SectionRule { height: 1; color: $primary; }"
 
-    def __init__(self, label: str, **kwargs: object) -> None:
+    def __init__(self, label: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._label = label
 
@@ -1285,7 +1286,7 @@ class WarpGrid(Grid):
 
     def __init__(
         self, warps: list[WarpDTO], columns: int = 3, focus_default: str = "first",
-        min_rows: int = 1, **kwargs: object,
+        min_rows: int = 1, **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._warps = warps
@@ -1513,7 +1514,7 @@ class NavRose(Vertical):
     }
     """
 
-    def __init__(self, nav: NavStripDTO, warps: list[WarpDTO], **kwargs: object) -> None:
+    def __init__(self, nav: NavStripDTO, warps: list[WarpDTO], **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._nav = nav
         self._warps = {w.sector_id: w for w in warps}

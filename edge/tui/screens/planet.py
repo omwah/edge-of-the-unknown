@@ -15,6 +15,8 @@ With no service (screenshot harness) it shows a static sample.
 
 from __future__ import annotations
 
+from typing import Any
+
 from rich.text import Text
 from textual import on
 from textual.app import ComposeResult
@@ -89,7 +91,7 @@ class PlanetSprite(Static):
         self.post_message(self.Descend())
 
 
-class PlanetScreen(Screen):
+class PlanetScreen(Screen[None]):
     BINDINGS = [
         Binding("escape", "back", "Break orbit"),
         Binding("d", "descend", "Descend"),
@@ -227,11 +229,11 @@ trips are the intended loop; the citadel art grows with its level."""
         if self._service is not None:
             ship = self._service.game_view(self._pid).ship
             aboard = {h.label: h.qty for h in ship.holds}
-        table: DataTable = DataTable(id="stores-table", zebra_stripes=True, cursor_type="row")
+        table: DataTable[Any] = DataTable(id="stores-table", zebra_stripes=True, cursor_type="row")
         table.add_columns("Commodity", "In stores", "Aboard")
         for label, qty in p.stores:
             table.add_row(label, f"{qty:,}", f"{aboard.get(label, 0):,}")
-        children: list[Static | DataTable | Horizontal] = [table]
+        children: list[Static | DataTable[Any] | Horizontal] = [table]
         if p.owned_by_you:
             children.append(Horizontal(
                 Button("Unload → stores…", id="btn-unload"),
@@ -325,6 +327,7 @@ trips are the intended loop; the citadel art grows with its level."""
         if self._service is None:
             self.action_noop()
             return
+        service = self._service
         p = self._planet
         if not p.can_invade:
             self.notify(p.invade_blocker or "Nothing to invade here.", timeout=2)
@@ -334,7 +337,7 @@ trips are the intended loop; the citadel art grows with its level."""
             if not ok:
                 return
             try:
-                self._service.apply(self._pid, InvadePlanet(p.planet_id, p.ship_fighters))
+                service.apply(self._pid, InvadePlanet(p.planet_id, p.ship_fighters))
             except (EconomyError, CombatError, CitadelError) as exc:
                 notify_warning(self, str(exc))
                 return
@@ -384,6 +387,7 @@ trips are the intended loop; the citadel art grows with its level."""
         if self._service is None:
             self.action_noop()
             return
+        service = self._service
         p = self._planet
         if not p.genesis_eligible or p.ship_genesis <= 0:
             self.notify("Can't deploy genesis here (need an eligible world + a torpedo).", timeout=2)
@@ -393,14 +397,14 @@ trips are the intended loop; the citadel art grows with its level."""
             if not ok:
                 return
             try:
-                self._service.apply(self._pid, DeployGenesis(planet_id=p.planet_id))
+                service.apply(self._pid, DeployGenesis(planet_id=p.planet_id))
             except (EconomyError, MovementError) as exc:
                 notify_warning(self, str(exc))
                 return
             self.notify("Genesis deployed — the world is re-forming!", timeout=2)
             self.app.pop_screen()
             self.app.push_screen(PlanetScreen(
-                self._service.planet_view(self._pid, p.planet_id), self._service, self._pid))
+                service.planet_view(self._pid, p.planet_id), service, self._pid))
 
         self.app.push_screen(ConfirmScreen(
             f"Fire a Genesis torpedo at {p.name}?\n"
@@ -415,6 +419,7 @@ trips are the intended loop; the citadel art grows with its level."""
         if self._service is None:
             self.action_noop()
             return
+        service = self._service
         p = self._planet
         if not p.owned_by_you:
             self.notify("You can only transfer cargo at a world you own.", timeout=2)
@@ -429,7 +434,7 @@ trips are the intended loop; the citadel art grows with its level."""
                 if not units:
                     return
                 try:
-                    self._service.apply(self._pid, TransferCargo(
+                    service.apply(self._pid, TransferCargo(
                         p.planet_id, commodity, units, to_planet=to_planet))
                 except EconomyError as exc:
                     notify_warning(self, str(exc))

@@ -11,6 +11,8 @@ component here, then slot it in the Engine Room (`E`).
 
 from __future__ import annotations
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
@@ -32,7 +34,7 @@ from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.widgets import ServiceHub, TradePanel
 
 
-class StarDockScreen(Screen):
+class StarDockScreen(Screen[None]):
     BINDINGS = [
         Binding("escape", "back", "Undock"),
         Binding("t", "trade", "Trade"),
@@ -147,7 +149,7 @@ daily interest; deposits ride the same account everywhere."""
         yield Static("[dim]R buys a rumour (logs a lead).  N posts a notice.[/]", classes="note")
         yield Static("[b]BOUNTY BOARD[/]")
         if tav.bounties:
-            board = DataTable(id="bounty-table", cursor_type="row")
+            board: DataTable[Any] = DataTable(id="bounty-table", cursor_type="row")
             board.add_columns("Notice")
             for line in tav.bounties:
                 board.add_row(line)
@@ -157,7 +159,7 @@ daily interest; deposits ride the same account everywhere."""
                              "Bounties post here when raids put a price on someone.")
         yield Static("[b]NOTICEBOARD[/]")
         if tav.notices:
-            notices = DataTable(id="notices-table", cursor_type="row")
+            notices: DataTable[Any] = DataTable(id="notices-table", cursor_type="row")
             notices.add_columns("Day", "By", "Notice")
             for n in tav.notices:
                 notices.add_row(f"d{n.day}", n.author, n.text)
@@ -177,8 +179,8 @@ daily interest; deposits ride the same account everywhere."""
             table.move_cursor(
                 row=min(self._initial_cursor, table.row_count - 1), animate=False)
 
-    def _hardware_table(self, dock: object) -> DataTable:
-        table: DataTable = DataTable(id="hardware-table", cursor_type="row")
+    def _hardware_table(self, dock: object) -> DataTable[Any]:
+        table: DataTable[Any] = DataTable(id="hardware-table", cursor_type="row")
         table.add_columns("Component", "Tier", "Price", "")
         for item in dock.hardware:  # type: ignore[attr-defined]
             mark = "" if item.affordable else "[red]✗[/]"
@@ -186,16 +188,16 @@ daily interest; deposits ride the same account everywhere."""
                           key=f"{item.component}:{item.tier}")
         return table
 
-    def _devices_table(self, dock: object) -> DataTable:
-        table: DataTable = DataTable(id="devices-table", cursor_type="row")
+    def _devices_table(self, dock: object) -> DataTable[Any]:
+        table: DataTable[Any] = DataTable(id="devices-table", cursor_type="row")
         table.add_columns("Device", "Price", "")
         for device_id, price, affordable in dock.devices:  # type: ignore[attr-defined]
             mark = "" if affordable else "[red]✗[/]"
             table.add_row(device_id, f"{price:,}", mark, key=device_id)
         return table
 
-    def _shipyard_table(self, dock: object) -> DataTable:
-        table: DataTable = DataTable(id="shipyard-table", cursor_type="row")
+    def _shipyard_table(self, dock: object) -> DataTable[Any]:
+        table: DataTable[Any] = DataTable(id="shipyard-table", cursor_type="row")
         table.add_columns("Hull", "Role", "Holds", "Shld", "Wrp", "Cbt", "Net", "")
         for item in dock.shipyard:  # type: ignore[attr-defined]
             flag = "[green]flown[/]" if item.owned else ("" if item.affordable else "[red]✗[/]")

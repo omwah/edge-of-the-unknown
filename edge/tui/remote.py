@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from edge.server.client import RemoteClient
 
@@ -73,10 +73,10 @@ class RemoteService:
         return self._run(self._client.apply(command))
 
     def describe_event(self, event: Any) -> str:
-        return self._run(self._client.describe_event(event))
+        return cast(str, self._run(self._client.describe_event(event)))
 
     def resolve_display_id(self, shown: int) -> int | None:
-        return self._run(self._client.resolve_display_id(shown))
+        return cast("int | None", self._run(self._client.resolve_display_id(shown)))
 
     @property
     def config(self) -> Any:

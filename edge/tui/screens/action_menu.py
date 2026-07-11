@@ -8,6 +8,8 @@ being buried in hotkeys because the menu *is* the hotkey table, live.
 
 from __future__ import annotations
 
+from typing import Any
+
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -31,7 +33,7 @@ class ActionMenuScreen(ModalScreen[None]):
     ActionMenuScreen #action-title { text-style: bold; color: $primary; margin-bottom: 1; }
     """
 
-    def __init__(self, host: Screen) -> None:
+    def __init__(self, host: Screen[Any]) -> None:
         super().__init__()
         self._host = host
         self._actions: list[ActionDescriptor] = screen_actions(host)
@@ -56,7 +58,7 @@ class ActionMenuScreen(ModalScreen[None]):
 
     @on(ClickableEntry.Picked)
     async def on_action_picked(self, msg: ClickableEntry.Picked) -> None:
-        if msg.dest == "action":
+        if msg.dest == "action" and msg.ref is not None:
             await self._run(int(msg.ref))
 
     async def on_key(self, event: object) -> None:

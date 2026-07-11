@@ -19,7 +19,7 @@ from edge.server.client import RemoteError
 from edge.tui.remote import RemoteBridge
 
 
-class LobbyScreen(Screen):
+class LobbyScreen(Screen[None]):
     CSS = """
     LobbyScreen Vertical { width: 60; max-width: 100%; margin: 2 4; }
     LobbyScreen #lobby-title { text-style: bold; margin-bottom: 1; }

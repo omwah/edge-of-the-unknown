@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import random
-from typing import Iterable
+from typing import Any, Iterable
 
 from textual import events
 from textual.app import App, SystemCommand
@@ -91,7 +91,7 @@ class EdgeApp(App[None]):
             return  # modals keep their own keys (and `?` may be typed input there)
         self.push_screen(HelpScreen(self.screen))
 
-    def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
+    def get_system_commands(self, screen: Screen[Any]) -> Iterable[SystemCommand]:
         """Expose current-screen actions through Textual's fuzzy command palette."""
         yield from super().get_system_commands(screen)
         for descriptor in screen_actions(screen):
@@ -137,14 +137,14 @@ class EdgeApp(App[None]):
         self.layout_tier = tier
         self.call_after_refresh(self._apply_layout_class)
 
-    def push_screen(self, *args: object, **kwargs: object):  # type: ignore[no-untyped-def, override]
+    def push_screen(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore[override]
         """Push, then stamp the current tier class on the new screen (WP-UI07).
 
         Mount/resize alone would leave a screen pushed *between* resizes without
         the tier class, so tier-scoped CSS (e.g. `.compact .modal-box`) would
         silently not apply to it.
         """
-        result = super().push_screen(*args, **kwargs)  # type: ignore[arg-type]
+        result = super().push_screen(*args, **kwargs)
         self.call_after_refresh(self._apply_layout_class)
         return result
 
@@ -170,7 +170,7 @@ class EdgeApp(App[None]):
         elif self.layout_tier is not LayoutTier.UNSUPPORTED and showing:
             self.pop_screen()
 
-    def update_ui_settings(self, **changes: object) -> None:
+    def update_ui_settings(self, **changes: Any) -> None:
         """Persist local-only presentation settings and apply the theme immediately."""
         from dataclasses import replace
         self.ui_settings = replace(self.ui_settings, **changes)

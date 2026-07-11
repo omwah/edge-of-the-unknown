@@ -69,7 +69,7 @@ class OfferPickerScreen(ListPicker):
         super().__init__(title, options)
 
 
-class AlienContactScreen(Screen):
+class AlienContactScreen(Screen[None]):
     BINDINGS = [
         Binding("b", "back_one", "Back"),       # step back to the previous node (no-op at the opener)
         Binding("f", "farewell", "Farewell"),   # speak a parting line, then break contact
@@ -281,7 +281,7 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
             return bool(ui.show_disabled_options)
         return self._service.config.ui.show_disabled_options if self._service else False
 
-    def _menu_items(self, c: dto.ContactDTO) -> list[tuple[str, object]]:
+    def _menu_items(self, c: dto.ContactDTO) -> list[tuple[str, dto.ContactChoiceDTO]]:
         """The ordered reply menu — the node's authored `choices` (§6.7).
 
         Disabled replies are hidden unless `ui.show_disabled_options`. The farewell reply always
@@ -291,14 +291,14 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
         """
         show_disabled = self._show_disabled()
         chs = c.choices if show_disabled else [ch for ch in c.choices if ch.enabled]
-        items: list[tuple[str, object]] = [("choice", ch) for ch in chs]
+        items: list[tuple[str, dto.ContactChoiceDTO]] = [("choice", ch) for ch in chs]
         items.sort(key=lambda it: 1 if self._is_farewell(it) else 0)
         return items
 
     @staticmethod
-    def _is_farewell(item: tuple[str, object]) -> bool:
+    def _is_farewell(item: tuple[str, dto.ContactChoiceDTO]) -> bool:
         _, obj = item
-        return obj.action == "leave"  # type: ignore[attr-defined]
+        return obj.action == "leave"
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         """Show a footer shortcut only when its key would actually do something here (§11).
@@ -436,9 +436,9 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
             self.notify("no other species met yet", timeout=2)
             return
 
-        def picked(subject_id: int | None) -> None:
+        def picked(subject_id: int | str | None) -> None:
             if subject_id is not None:
-                self._say(context, subject_id, close=False)
+                self._say(context, int(subject_id), close=False)
 
         self.app.push_screen(SubjectPickerScreen(subjects), picked)
 
@@ -461,9 +461,9 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
             self.notify(f"nothing on offer ({mode})", timeout=2)
             return
 
-        def picked(index: int | None) -> None:
+        def picked(index: int | str | None) -> None:
             if index is not None:
-                offer = next((o for o in self._view().offers if o.index == index), None)
+                offer = next((o for o in self._view().offers if o.index == int(index)), None)
                 if offer is not None:
                     self._buy(offer)
 
@@ -493,7 +493,8 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
         if self._service is None:
             return
         c = self._view()
-        if c.alliance_id is None:
+        service = self._service
+        if c.alliance_id is None or service is None:
             self.notify("They answer to no bloc.", timeout=2)
             return
         from edge.core.rules import JoinAlliance, ResignAlliance
@@ -503,7 +504,7 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
             if not ok:
                 return
             try:
-                self._service.apply(self._pid, command)
+                service.apply(self._pid, command)
             except Exception as exc:  # core rejected it — surface the reason, stay put
                 self.notify(str(exc), timeout=3)
                 return

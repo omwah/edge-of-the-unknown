@@ -12,13 +12,13 @@ from __future__ import annotations
 from edge.tui.chrome import FieldPrompt
 
 
-class TravelPromptScreen(FieldPrompt):
+class TravelPromptScreen(FieldPrompt[int]):
     def __init__(self) -> None:
         super().__init__("Travel to sector", placeholder="sector number",
                          hint="known route only · Enter to go · Esc to cancel",
                          input_type="integer")
 
-    def parse(self, raw: str) -> tuple[object | None, str | None]:
+    def parse(self, raw: str) -> tuple[int | None, str | None]:
         text = raw.strip()
         if not text.isdigit():
             return None, "Enter a sector number — or press Esc to cancel."

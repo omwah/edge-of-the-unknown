@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 
 from textual.binding import Binding
 from textual.screen import Screen
@@ -41,7 +41,7 @@ class ActionDescriptor:
     action: str = ""
 
 
-def screen_actions(screen: Screen) -> list[ActionDescriptor]:
+def screen_actions(screen: Screen[Any]) -> list[ActionDescriptor]:
     """Return the one canonical advertised-action list for a screen.
 
     Danger levels come from the screen's optional ``ACTION_DANGER`` class map

@@ -16,6 +16,8 @@ reducers accept never drift.
 
 from __future__ import annotations
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
@@ -57,7 +59,7 @@ _DISPLAY_TO_KIND = {
     "MAIN GUN": Subsystem.MAIN_GUN,
 }
 
-class BaseScreen(Screen):
+class BaseScreen(Screen[None]):
     BINDINGS = [
         Binding("escape", "back", "Leave base"),
         Binding("t", "trade", "Trade highlighted"),
@@ -177,7 +179,7 @@ market; a player-owned host earns a cut of outsider trades."""
         return Vertical(*children)  # type: ignore[arg-type]
 
     def _hardware_pane(self, v: StarbaseDTO) -> Vertical:
-        table: DataTable = DataTable(id="base-hardware-table", cursor_type="row")
+        table: DataTable[Any] = DataTable(id="base-hardware-table", cursor_type="row")
         table.add_columns("Component", "Tier", "Price", "")
         for item in v.hardware:
             mark = "" if item.affordable else "[red]✗[/]"

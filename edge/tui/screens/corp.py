@@ -13,6 +13,8 @@ multiplayer.
 
 from __future__ import annotations
 
+from typing import Any
+
 import re
 
 from textual.app import ComposeResult
@@ -64,7 +66,7 @@ class _FormCorpModal(TextPrompt):
                          submit_label="Charter")
 
 
-class CorpScreen(Screen):
+class CorpScreen(Screen[None]):
     # Hotkeys are accelerators only — every verb is also a Button on its panel.
     BINDINGS = [
         Binding("escape", "back", "Back"),
@@ -125,7 +127,7 @@ are accelerators for the same buttons."""
                     "with other captains (a corp of one works too).")
                 invites = view.invites if view is not None else []
                 if invites:
-                    table: DataTable = DataTable(id="corp-invites", cursor_type="row")
+                    table: DataTable[Any] = DataTable(id="corp-invites", cursor_type="row")
                     table.add_columns("Standing invites")
                     for cid, label in zip(view.invite_ids, invites):  # type: ignore[union-attr]
                         table.add_row(label, key=str(cid))
@@ -146,7 +148,7 @@ are accelerators for the same buttons."""
 
     def _roster_panel(self, view: object) -> Vertical:
         is_ceo: bool = view.is_ceo  # type: ignore[attr-defined]
-        table: DataTable = DataTable(id="corp-members", zebra_stripes=True, cursor_type="row")
+        table: DataTable[Any] = DataTable(id="corp-members", zebra_stripes=True, cursor_type="row")
         table.add_columns("Member", "Role")
         for m in view.members:  # type: ignore[attr-defined]
             table.add_row(m.name, "CEO" if m.is_ceo else "member", key=str(m.player_id))
@@ -190,7 +192,7 @@ are accelerators for the same buttons."""
 
     def _diplomacy_panel(self, view: object) -> Vertical:
         is_ceo: bool = view.is_ceo  # type: ignore[attr-defined]
-        table: DataTable = DataTable(id="corp-others", zebra_stripes=True, cursor_type="row")
+        table: DataTable[Any] = DataTable(id="corp-others", zebra_stripes=True, cursor_type="row")
         table.add_columns("Corporation", "Status")
         at_war = set(view.at_war_with)  # type: ignore[attr-defined]
         for cid, label in view.other_corps:  # type: ignore[attr-defined]

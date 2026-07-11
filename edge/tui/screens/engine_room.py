@@ -7,7 +7,7 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import Footer
 
-from edge.core.dto import EngineRoomDTO
+from edge.core.dto import EngineRoomDTO, Slot
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier, Subsystem as SubsystemKind
@@ -29,7 +29,7 @@ _DISPLAY_TO_KIND = {
 }
 
 
-class EngineRoomScreen(Screen):
+class EngineRoomScreen(Screen[None]):
     BINDINGS = [
         Binding("escape", "back", "Back"),
         Binding("p", "field_patch", "Field-patch"),
@@ -134,7 +134,7 @@ part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it
             self.notify(f"Restored {repaired} component(s).", timeout=2)
             await self._refresh()
 
-    def _slot(self, name: str, index: int):
+    def _slot(self, name: str, index: int) -> Slot:
         subsystem = next(system for system in self._room.subsystems if system.name == name)
         return subsystem.slots[index]
 

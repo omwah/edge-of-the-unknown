@@ -10,6 +10,8 @@ connection are captured with presentation-only sample data. Tabbed screens use
 
 from __future__ import annotations
 
+from typing import Any
+
 import os
 
 # Textual reads TEXTUAL_ANIMATIONS once, at import time — so it must be set before the
@@ -68,7 +70,7 @@ _GALLERY_TABS = [
 ]
 
 
-async def _settle(app: EdgeApp, pilot: Pilot) -> None:
+async def _settle(app: EdgeApp, pilot: Pilot[Any]) -> None:
     """Pump the layout pipeline until the rendered frame stops changing.
 
     A single `pilot.pause()` can capture a half-laid-out screen — a footer not yet
@@ -92,7 +94,7 @@ async def _settle(app: EdgeApp, pilot: Pilot) -> None:
         prev = cur
 
 
-async def _shot(app: EdgeApp, pilot: Pilot, name: str) -> None:
+async def _shot(app: EdgeApp, pilot: Pilot[Any], name: str) -> None:
     """Settle the screen, then write `name`.svg to the shots directory."""
     await _settle(app, pilot)
     app.save_screenshot(filename=name, path=str(OUT))
@@ -100,7 +102,7 @@ async def _shot(app: EdgeApp, pilot: Pilot, name: str) -> None:
 
 
 async def _tab_shots(
-    app: EdgeApp, pilot: Pilot, screen: str, tab_ids: tuple[str, ...]
+    app: EdgeApp, pilot: Pilot[Any], screen: str, tab_ids: tuple[str, ...]
 ) -> None:
     """Capture each tab of the current screen using the common naming rule."""
     tabs = app.screen.query_one(TabbedContent)

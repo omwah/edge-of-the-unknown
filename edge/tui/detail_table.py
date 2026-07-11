@@ -26,7 +26,9 @@ Presentation-only: the module never imports the service or issues commands.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from rich.text import Text
 from textual import on
@@ -120,8 +122,8 @@ class DetailTable(Vertical):
 
     def __init__(self, table_id: str, columns: tuple[ColumnSpec, ...], *,
                  empty: tuple[str, str] = ("Nothing here yet.", ""),
-                 detail_title: str = "Details", **kwargs: object) -> None:
-        super().__init__(id=f"{table_id}-panel", **kwargs)  # type: ignore[arg-type]
+                 detail_title: str = "Details", **kwargs: Any) -> None:
+        super().__init__(id=f"{table_id}-panel", **kwargs)
         self._table_id = table_id
         self._columns = columns
         self._empty = empty
@@ -175,7 +177,7 @@ class DetailTable(Vertical):
 
     # --- data ------------------------------------------------------------------
 
-    def set_rows(self, rows: list[tuple[str, tuple[object, ...]]], *,
+    def set_rows(self, rows: Sequence[tuple[str, tuple[object, ...]]], *,
                  empty: tuple[str, str] | None = None) -> None:
         """Replace the backing rows (presentation copy only), keeping the
         cursor on the same logical row when it survives the refresh."""
@@ -197,7 +199,8 @@ class DetailTable(Vertical):
             rows = [r for r in rows
                     if any(needle in _plain(c).lower() for c in r[1])]
         if self._sort_index is not None:
-            rows = sorted(rows, key=lambda r: _sort_value(r[1][self._sort_index]),
+            index = self._sort_index
+            rows = sorted(rows, key=lambda r: _sort_value(r[1][index]),
                           reverse=self._sort_desc)
         return rows
 

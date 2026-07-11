@@ -30,7 +30,8 @@ class SpeciesPortrait(Static):
     ) -> None:
         super().__init__()
         self._roster_id = roster_id
-        self._name = name or roster_id
+        # Not `_name` — Widget already owns that attribute (typed str | None).
+        self._placeholder_name = name or roster_id
         self._symbols = symbols
         self._font_ratio = font_ratio
         # The bodiless Entity (§7): when it has no portrait image, fill the slot with a
@@ -63,4 +64,4 @@ class SpeciesPortrait(Static):
                 pass  # missing binding / decode error — fall through to placeholder
         if self._bloom:
             return art_portrait.nebular_bloom(cols, rows, self._bloom_variant)
-        return Text(self._name, style="dim")
+        return Text(self._placeholder_name, style="dim")

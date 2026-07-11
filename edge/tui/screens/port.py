@@ -9,11 +9,14 @@ active deliver favor targeting this port (§6.7, WP57 — surfaced WP71).
 
 from __future__ import annotations
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from edge.core.dto import CommodityLine, PortDTO, ShipDTO
 from edge.core.economy import EconomyError
 from edge.core.rules import Trade
 from edge.server.service import GameService
@@ -23,7 +26,7 @@ from edge.tui.screens.haggle import HaggleScreen
 from edge.tui.widgets import NAME_TO_COMMODITY, TRADE_CHUNK, TradePanel
 
 
-class PortScreen(Screen):
+class PortScreen(Screen[None]):
     BINDINGS = [
         Binding("escape", "leave", "Leave dock"),
         Binding("t", "trade", "Trade highlighted"),
@@ -104,7 +107,9 @@ patience — too many rejected offers close negotiation for the day."""
         self.app.pop_screen()
 
 
-def _highlighted_line(screen: Screen, service: GameService, player_id: int):  # type: ignore[no-untyped-def]
+def _highlighted_line(
+    screen: Screen[Any], service: GameService, player_id: int,
+) -> "tuple[TradePanel | None, CommodityLine | None, PortDTO | None]":
     """The (TradePanel, highlighted CommodityLine, port) trio, or (None, None, None)."""
     panels = list(screen.query(TradePanel))
     if not panels:  # empty port (no panel mounted)
@@ -118,7 +123,7 @@ def _highlighted_line(screen: Screen, service: GameService, player_id: int):  # 
     return panel, line, port
 
 
-def _chunk_qty(line, ship) -> int:  # type: ignore[no-untyped-def]
+def _chunk_qty(line: CommodityLine, ship: ShipDTO) -> int:
     """A clamped trade chunk for the highlighted row (the port's natural direction)."""
     holds_free = ship.holds_total - ship.holds_used
     if line.mode == "SELL":  # port sells -> player buys
@@ -126,7 +131,7 @@ def _chunk_qty(line, ship) -> int:  # type: ignore[no-untyped-def]
     return min(TRADE_CHUNK, line.player_qty, line.capacity - line.stock)  # port buys -> player sells
 
 
-def _trade_highlighted(screen: Screen, service: GameService, player_id: int) -> None:
+def _trade_highlighted(screen: Screen[Any], service: GameService, player_id: int) -> None:
     """Shared trade handler: buy/sell a clamped chunk of the highlighted row."""
     panel, line, _ = _highlighted_line(screen, service, player_id)
     if panel is None or line is None:
@@ -146,7 +151,7 @@ def _trade_highlighted(screen: Screen, service: GameService, player_id: int) -> 
     screen.notify(f"{verb} {qty} {line.name}.", timeout=2)
 
 
-def _haggle_highlighted(screen: Screen, service: GameService, player_id: int) -> None:
+def _haggle_highlighted(screen: Screen[Any], service: GameService, player_id: int) -> None:
     """Open a counter-offer haggle on the highlighted row (§8); commit on submit."""
     panel, line, _ = _highlighted_line(screen, service, player_id)
     if panel is None or line is None:
