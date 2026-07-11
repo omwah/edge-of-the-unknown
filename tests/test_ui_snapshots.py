@@ -118,3 +118,20 @@ def test_surface_sizes(snap_compare, size: tuple[int, int]) -> None:
         await pilot.pause()
 
     assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_surface)
+
+
+@pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
+def test_contact_sizes(snap_compare, size: tuple[int, int]) -> None:
+    from dataclasses import replace
+
+    from edge.tui.dummy import sample_contact
+    from edge.tui.screens.contact import AlienContactScreen
+
+    async def open_contact(pilot: Pilot) -> None:
+        # Exercise disabled-reply reasons as part of the visual contract without
+        # persisting a local preference from a snapshot test.
+        pilot.app.ui_settings = replace(pilot.app.ui_settings, show_disabled_options=True)
+        pilot.app.push_screen(AlienContactScreen(sample_contact()))
+        await pilot.pause()
+
+    assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_contact)
