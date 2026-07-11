@@ -94,3 +94,27 @@ def test_ship_workbench_sizes(snap_compare, size: tuple[int, int]) -> None:
 def test_base_workbench_with_empty_loose_bay(snap_compare) -> None:
     app = _WorkbenchApp(STARBASE_WORKBENCH_PROFILE, [])
     assert snap_compare(app, terminal_size=SIZES["standard"])
+
+
+@pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
+def test_planet_sizes(snap_compare, size: tuple[int, int]) -> None:
+    from edge.tui.dummy import sample_planet
+    from edge.tui.screens.planet import PlanetScreen
+
+    async def open_planet(pilot: Pilot) -> None:
+        pilot.app.push_screen(PlanetScreen(sample_planet()))
+        await pilot.pause()
+
+    assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_planet)
+
+
+@pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
+def test_surface_sizes(snap_compare, size: tuple[int, int]) -> None:
+    from edge.tui.dummy import sample_surface
+    from edge.tui.screens.surface import SurfaceScreen
+
+    async def open_surface(pilot: Pilot) -> None:
+        pilot.app.push_screen(SurfaceScreen(sample_surface()))
+        await pilot.pause()
+
+    assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_surface)

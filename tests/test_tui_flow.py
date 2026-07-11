@@ -1768,3 +1768,51 @@ async def test_planet_citadel_panel_builds_via_button() -> None:
         assert svc.state.planets[planet.id].citadel_progress >= 0  # build opened
         assert isinstance(app.screen, PlanetScreen)  # screen reopened
         assert _citadel_stage(app.screen._planet) == "building"  # scaffolding art
+
+
+async def test_planet_and_surface_responsive_priority_at_all_tiers() -> None:
+    """WP-UI16: compact prioritizes workflows; larger tiers retain scene art."""
+    from textual.widgets import Static
+
+    from edge.tui.dummy import sample_planet, sample_surface
+    from edge.tui.screens.planet import PlanetScreen
+    from edge.tui.screens.surface import SurfaceScreen
+
+    for size, tier in [((80, 24), "compact"), ((100, 34), "standard"), ((120, 40), "wide")]:
+        app = EdgeApp(plain=True)
+        async with app.run_test(size=size) as pilot:
+            app.push_screen(PlanetScreen(sample_planet()))
+            await pilot.pause()
+            assert app.screen.has_class(tier)
+            assert app.screen.query_one("#identity-panel").display
+            assert app.screen.query_one("#orbit-art").display is (tier != "compact")
+
+            app.pop_screen()
+            app.push_screen(SurfaceScreen(sample_surface()))
+            await pilot.pause()
+            assert app.screen.has_class(tier)
+            assert app.screen.query_one("#terrain").display is (tier != "compact")
+            assert app.screen.query_one("#site-art").display is (tier != "compact")
+            detail = app.screen.query_one("#site-detail", Static).render().plain
+            assert "Rarity" in detail and "Status" in detail and "Reward" in detail
+
+
+async def test_surface_site_buttons_track_selection() -> None:
+    """WP-UI16: survey and collect are mouse-visible and selection-aware."""
+    from textual.widgets import Button, DataTable
+
+    from edge.tui.dummy import sample_surface
+    from edge.tui.screens.surface import SurfaceScreen
+
+    app = EdgeApp(plain=True)
+    async with app.run_test(size=(80, 24)) as pilot:
+        app.push_screen(SurfaceScreen(sample_surface()))
+        await pilot.pause()
+        survey = app.screen.query_one("#btn-survey", Button)
+        collect = app.screen.query_one("#btn-collect", Button)
+        assert not survey.disabled
+        assert collect.disabled
+        table = app.screen.query_one("#sites", DataTable)
+        table.move_cursor(row=1, animate=False)
+        await pilot.pause()
+        assert not collect.disabled

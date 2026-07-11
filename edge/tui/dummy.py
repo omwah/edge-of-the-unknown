@@ -169,15 +169,15 @@ def sample_surface() -> SurfaceDTO:
     sites = [
         SurfaceSite(
             "[1]", "Ruined Spire", "Rare", "unexplored",
-            payload=["[red]ancient_tech ?[/]", "lore fragment"],
+            payload=["[red]ancient_tech ?[/]", "lore fragment"], discovery_id=1,
         ),
         SurfaceSite(
-            "[2]", "Crashed Ship", "Uncommon", "explored → ancient",
-            payload=["ancient drive (claimed)", "salvage cache"],
+            "[2]", "Crashed Ship", "Uncommon", "explored",
+            payload=["ancient drive", "salvage cache"], discovery_id=2,
+            salvageable=True, kind="shipwreck",
         ),
         SurfaceSite(
-            "[?]", "(hidden)", "?", "hidden",
-            payload=["needs a sensor sweep", "sensors Tier II"],
+            "[?]", "(hidden)", "?", "unexplored", discovery_id=3,
         ),
     ]
     return SurfaceDTO(
@@ -187,6 +187,7 @@ def sample_surface() -> SurfaceDTO:
             "terrestrial_warm", sites, seed=1986, planet_id=1,
         ),
         sites=sites,
+        explorable=True,
         terrain_blurb=terrain_art.blurb_for("terrestrial_warm"),
         ptype="terrestrial_warm",
     )

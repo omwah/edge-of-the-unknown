@@ -34,7 +34,7 @@ from edge.core.rules import (
     RepairStarbase, Withdraw,
 )
 from edge.server.service import GameService
-from edge.tui.chrome import TitleBar, notify_warning
+from edge.tui.chrome import TitleBar, notify_success, notify_warning
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.component_workbench import (
