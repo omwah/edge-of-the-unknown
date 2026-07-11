@@ -82,8 +82,10 @@ from edge.core.enums import (
     Commodity,
     Component,
     ComponentTier,
+    DiscoveryKind,
     PayloadKind,
     PortClass,
+    RarityTier,
     Subsystem,
 )
 from edge.core.events import (
@@ -161,7 +163,9 @@ from edge.core.models import (
     Alliance,
     Corporation,
     Discovery,
+    DiscoveryPayload,
     Encounter,
+    EncounterFoe,
     Game,
     InstalledComponent,
     LastCombat,
@@ -937,6 +941,8 @@ class ReduceResult:
     starbases: tuple[Starbase, ...] = ()
     discoveries: tuple[Discovery, ...] = ()
     species: tuple[AlienSpecies, ...] = ()  # cron-mutated species positions (WP16 drift)
+    # Destroyed roaming NPC contacts are removed after their combat wrecks are upserted.
+    removed_species_ids: tuple[int, ...] = ()
     sectors: tuple[Sector, ...] = ()  # beacon-text updates (WP41)
     sector_forces: tuple[SectorForce, ...] = ()  # deployed fighters/mines (WP41)
     alliances: tuple[Alliance, ...] = ()  # bloc state changes (e.g. intrigue turns outward, WP51)
@@ -969,6 +975,8 @@ def apply_result(state: UniverseState, result: ReduceResult) -> None:
         state.discoveries[discovery.id] = discovery
     for species in result.species:
         state.species[species.id] = species
+    for species_id in result.removed_species_ids:
+        state.species.pop(species_id, None)
     for sector in result.sectors:
         state.sectors[sector.id] = sector
     for force in result.sector_forces:
@@ -2597,6 +2605,20 @@ def _combat_action(
     silenced_planets: tuple[Planet, ...] = ()
     extra_players: tuple[Player, ...] = ()
     extra_ships: tuple[Ship, ...] = ()
+    wrecks: tuple[Discovery, ...] = ()
+    removed_species_ids: tuple[int, ...] = ()
+    plain_npc = (
+        species is not None
+        and enc.target_player_id is None
+        and enc.starbase_id is None
+        and enc.citadel_planet_id is None
+    )
+    if plain_npc and result.foes_destroyed:
+        # Combat currently damages the first live foe. Capture exactly the foes
+        # killed by this command so partial victories also leave wreckage when the
+        # player later flees or is destroyed.
+        killed = tuple(f for f in enc.foes if f.hull > 0)[:result.foes_destroyed]
+        wrecks = _combat_wrecks(state, enc.sector_id, killed, config, state.rng)
     if enc.target_player_id is not None:
         # PvP (§14, WP67): the foe *is* the defender's live ship — reconcile its damage and,
         # on a kill, pod the defender + salvage + outlawry (H18: all from the attacker's command).
@@ -2605,8 +2627,13 @@ def _combat_action(
         extra_players, extra_ships = pvp.players, pvp.ships
         events.extend(pvp.events)
     if result.outcome == combat.VICTORY:
-        if enc.target_player_id is None:
-            # NPC / set-piece wreck salvage (PvP salvage is handled in `_pvp_apply`).
+        if plain_npc:
+            # PT-01: a destroyed roaming contact disappears and its pack leaves
+            # persistent discovery wrecks. Recovery is a later Salvage command.
+            removed_species_ids = (enc.species_id,)
+        elif enc.target_player_id is None:
+            # Fixed emplacements/garrisons retain their existing immediate salvage;
+            # PvP salvage is handled in `_pvp_apply`.
             new_ship, salvage = _combat_salvage(player_id, enc, new_ship, config, state.rng)
             new_player = replace(new_player, latinum=new_player.latinum + salvage.latinum)
             events.append(salvage)
@@ -2667,6 +2694,7 @@ def _combat_action(
     return ReduceResult(events=tuple(events), players=(new_player, *extra_players),
                         ships=(new_ship, *extra_ships),
                         starbases=razed_bases, planets=razed_planets + silenced_planets,
+                        discoveries=wrecks, removed_species_ids=removed_species_ids,
                         sector_forces=force_updates)
 
 
@@ -2767,6 +2795,41 @@ def _combat_salvage(
                 free -= 1
     new_ship = replace(ship, components=components) if parts else ship
     return new_ship, SalvageCollected(player_id, latinum, tuple(parts))
+
+
+def _combat_wrecks(
+    state: UniverseState, sector_id: int, foes: tuple[EncounterFoe, ...],
+    config: GameConfig, rng: random.Random,
+) -> tuple[Discovery, ...]:
+    """Roll one persistent, obvious wreck cache per destroyed NPC foe (PT-01).
+
+    Cache rolls keep the former WP26 order — fraction, component chance, optional
+    component choice for every foe in pack order — but defer all transfer until a
+    later `Salvage`. Discovery ids are allocated from live state in that same stable
+    order, so `(seed, command log)` recreates identical wrecks and hashes.
+    """
+    cc = config.combat
+    next_id = max(state.discoveries, default=0) + 1
+    wrecks: list[Discovery] = []
+    for index, foe in enumerate(foes):
+        frac = cc.salvage_frac_min + rng.random() * (cc.salvage_frac_max - cc.salvage_frac_min)
+        latinum = round(foe.hull_max * cc.salvage_hull_value * frac)
+        components: tuple[tuple[Component, ComponentTier], ...] = ()
+        if rng.random() < cc.salvage_component_chance:
+            components = ((rng.choice(list(Component)), ComponentTier.I),)
+        wrecks.append(Discovery(
+            id=next_id + index,
+            kind=DiscoveryKind.WRECK,
+            rarity_tier=RarityTier.COMMON,
+            sector_id=sector_id,
+            payload=DiscoveryPayload(
+                kind=PayloadKind.WRECK,
+                latinum=latinum,
+                components=components,
+            ),
+            hidden=False,
+        ))
+    return tuple(wrecks)
 
 
 # --- starbases: assault, raze, repair, claim (§4.2, §10 — WP40) -------------
@@ -3279,6 +3342,16 @@ def _salvage(
         artifacts = dict(player.artifacts)
         artifacts[payload.barter_tier] = artifacts.get(payload.barter_tier, 0) + 1
         new_player = replace(new_player, artifacts=artifacts)
+    elif payload.kind is PayloadKind.WRECK:
+        if ship.holds_free < len(payload.components):
+            raise EngineRoomError(
+                "no free hold for the wreck's components — sell cargo first")
+        components = dict(ship.components)
+        for component, tier in payload.components:
+            key = (component, tier)
+            components[key] = components.get(key, 0) + 1
+        new_ship = replace(ship, components=components) if payload.components else ship
+        new_player = replace(new_player, latinum=new_player.latinum + payload.latinum)
     # LORE: codex-only, nothing material.
     new_disc = replace(disc, found_by=player_id)
     return ReduceResult(
