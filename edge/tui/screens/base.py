@@ -121,9 +121,13 @@ market; a player-owned host earns a cut of outsider trades."""
                           "Station access requires an unowned derelict or a base you own.")
         trade_reason = (None if v.market_port_id is not None and v.market_open else
                         v.market_notice or "This base has no operational market.")
-        hardware_reason = (None if v.hardware else
+        # A powered but battered base withholds services until repaired above the gate (WP-PR04).
+        gate_reason = (f"Repair the base above {v.service_integrity_min_pct}% integrity to reopen "
+                       f"services (currently {v.integrity_pct}%)."
+                       if v.operational and not v.services_operational else None)
+        hardware_reason = (None if v.hardware else gate_reason or
                            "Component service requires an operational, friendly base.")
-        bank_reason = (None if "banking" in v.services else
+        bank_reason = (None if "banking" in v.services else gate_reason or
                        "Banking requires a player-owned operational base with vault service.")
         return [
             ("Status", "status", self._status_pane(v), None),

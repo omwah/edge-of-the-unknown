@@ -757,6 +757,11 @@ class StarbaseDTO:
     owner: str  # display label (as SectorForceDTO.owner)
     standing: str  # "yours" | "open" | "hostile" | "derelict"
     operational: bool
+    # Whether the base is above the WP-PR04 service integrity gate — market/hardware/bank/
+    # munitions are open only when True. `service_integrity_min_pct` is the required
+    # threshold so BaseScreen can explain a greyed-out tab ("needs ≥70%; at 55%").
+    services_operational: bool
+    service_integrity_min_pct: int
     integrity_pct: int  # surviving-component fraction, percent
     subsystems: list[Subsystem]  # reactor / screens / main gun panels (engine-room shapes)
     # Station ops (derelict or your own base): the §4.2 repair/salvage/claim rail.

@@ -133,7 +133,7 @@ from edge.core.models import (
 )
 from edge.core.aliens import base_owner_hostile
 from edge.core.planets import is_colonizable, pretty_planet_type
-from edge.core.starbases import component_integrity, is_operational
+from edge.core.starbases import component_integrity, is_operational, services_operational
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
 _FULL = {Commodity.FUEL_ORE: "Fuel Ore", Commodity.ORGANICS: "Organics", Commodity.EQUIPMENT: "Equipment"}
@@ -969,6 +969,7 @@ def starbase_view(
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
     operational = is_operational(base)
+    services_ok = services_operational(base, config)  # powered *and* above the integrity gate
     if not operational:
         standing = "derelict"
     elif corp.player_owns(state, base.owner, player_id):
@@ -1007,12 +1008,16 @@ def starbase_view(
     port = state.port_in_sector(base.sector_id)
     market_open = False
     market_notice = "no market port here"
+    integrity_min_pct = round(
+        config.starbase.service_integrity_min * 100) if config.starbase is not None else 0
     if port is not None:
         if port.klass is PortClass.STARDOCK or (
-                operational and not base_owner_hostile(state, base, player)):
+                services_ok and not base_owner_hostile(state, base, player)):
             market_open, market_notice = True, ""
         elif not operational:
             market_notice = "the market is dark — repair the reactor to reopen trade"
+        elif not services_ok:
+            market_notice = f"the base is too damaged to trade — repair it above {integrity_min_pct}% integrity"
         else:
             market_notice = "the owner refuses to trade with you"
     trade_cut_pct = 0
@@ -1061,6 +1066,7 @@ def starbase_view(
         planet_id=base.planet_id, planet_name=planet.name if planet is not None else "",
         owner=_ownership_label(state, base.owner, player_id),
         standing=standing, operational=operational,
+        services_operational=services_ok, service_integrity_min_pct=integrity_min_pct,
         integrity_pct=round(component_integrity(base) * 100),
         subsystems=panels, salvage=salvage, empty_slots=empty_slots,
         claimable=operational and not base.owner.is_owned,

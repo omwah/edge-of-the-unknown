@@ -102,6 +102,7 @@ def test_hand_built_dtos_round_trip() -> None:
         dto.StarbaseDTO(
             starbase_id=4, name="Orbital Platform", sector_display=61, planet_id=5,
             planet_name="Kestrel", owner="yours", standing="yours", operational=True,
+            services_operational=True, service_integrity_min_pct=70,
             integrity_pct=80,
             subsystems=[dto.Subsystem(name="FUSION REACTOR", derived="3/3 live",
                                       slots=[dto.Slot(state="filled", component="converter",
