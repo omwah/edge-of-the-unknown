@@ -310,7 +310,7 @@ planets:
     terrestrial_hot:   { colonizable: true,  habitability: 20000,  yield_profile: { fuel_ore: 1.5, organics: 0.2, equipment: 0.4 } }
     terrestrial_cold:  { colonizable: true,  habitability: 20000,  yield_profile: { fuel_ore: 0.4, organics: 0.2, equipment: 1.5 } }
     jovian:            { colonizable: false, habitability: 0,      yield_profile: { fuel_ore: 1.0, organics: 0.0, equipment: 0.0 } }
-    asteroid_belt:     { colonizable: false, habitability: 0,      yield_profile: { fuel_ore: 0.2, organics: 0.0, equipment: 1.0 } }
+    asteroid_belt:     { colonizable: false, habitability: 0,      landable: false, yield_profile: { fuel_ore: 0.2, organics: 0.0, equipment: 1.0 } }
     barren:            { colonizable: false, habitability: 0,      yield_profile: {} }
   # Band-weighted owner roll (non-Core): alliance-owned vs unowned. The unowned
   # fraction is non-decreasing Hub→Frontier→Deep→Void (§4.2 invariant). Core worlds
@@ -412,7 +412,7 @@ genesis:
   device_id: genesis_torpedo   # the StarDock item id this rule applies to
   price: 15000                 # latinum cost of one Genesis torpedo (a high-end sink)
   result_type: terrestrial_warm  # what an eligible world is transformed into
-  eligible_types: [barren, asteroid_belt, jovian, terrestrial_hot, terrestrial_cold]  # dead/marginal worlds a torpedo can terraform
+  eligible_types: [barren, jovian, terrestrial_hot, terrestrial_cold]  # dead/marginal worlds a torpedo can terraform (asteroid belts have no surface to re-form)
 
 # Citadels (§4.2, §14, WP54): cumulative planetary fortifications on an owned colony.
 # Each level is paid up front (equipment from planet stores + latinum) and completed as a

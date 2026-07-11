@@ -462,6 +462,10 @@ class PlanetTypeProfile(BaseModel):
     colonizable: bool
     habitability: int
     yield_profile: dict[str, float] = Field(default_factory=dict)
+    # Whether a ship can descend onto a solid surface to explore sites (§4.2). Spatial
+    # "world objects" with no surface — asteroid belts — set this false: they are scanned
+    # and mined in orbit, never landed on, colonized, or given colony/citadel state.
+    landable: bool = True
 
 
 class OwnershipWeights(BaseModel):

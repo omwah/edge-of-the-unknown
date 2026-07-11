@@ -282,8 +282,10 @@ def test_home_clusters_well_formed(config: object, seed: int) -> None:
 
 
 def test_home_cluster_planets_alliance_owned() -> None:
-    """A cluster's non-derelict planets are owned by its bloc; a derelict-hosting world
-    stays unowned (§4.2), so the base validator's derelict⇒unowned rule still holds."""
+    """A cluster's colonizable, non-derelict planets are owned by its bloc; a derelict-hosting
+    world stays unowned (§4.2, base validator), and an asteroid belt stays unowned too — a
+    spatial feature is never a colony/owned world (§4.2, WP-PR06)."""
+    from edge.core.planets import is_landable
     from edge.core.starbases import is_operational
 
     for seed in range(10):
@@ -293,7 +295,9 @@ def test_home_cluster_planets_alliance_owned() -> None:
                 if planet.sector_id not in secs:
                     continue
                 base = state.starbases.get(planet.starbase_id) if planet.starbase_id else None
-                if base is not None and not is_operational(base):
+                if not is_landable(planet.planet_type, BIG_EXPANSIVE):  # type: ignore[arg-type]
+                    assert planet.owner.kind == "none"  # a belt is inert bloc space
+                elif base is not None and not is_operational(base):
                     assert planet.owner.kind == "none"  # derelict cache stays unowned
                 else:
                     assert planet.owner == type(planet.owner)(kind="alliance", ref=bloc)

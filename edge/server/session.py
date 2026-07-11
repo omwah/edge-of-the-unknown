@@ -132,7 +132,7 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.aliens import base_owner_hostile
-from edge.core.planets import is_colonizable, pretty_planet_type
+from edge.core.planets import is_colonizable, is_extractable, is_landable, pretty_planet_type
 from edge.core.starbases import component_integrity, is_operational, services_operational
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
@@ -692,6 +692,8 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         can_build_citadel=can_build, citadel_next_cost=next_cost,
         fighter_allocation_pct=round(planet.fighter_allocation * 100),
         can_invade=can_invade, invade_blocker=invade_blocker, ship_fighters=ship.fighters,
+        landable=is_landable(planet.planet_type, config),
+        extractable=is_extractable(planet.planet_type, config),
     )
 
 

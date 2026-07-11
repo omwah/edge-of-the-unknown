@@ -217,7 +217,7 @@ never crash for nonlethal or lethal damage.
 
 Commit: `playtest: WP-PR05 black-hole interaction crash`
 
-### WP-PR06 — Asteroid-belt domain and UI correction
+### WP-PR06 — Asteroid-belt domain and UI correction — complete
 
 **Goal:** enforce the existing DESIGN §4.2 statement that belts are minable spatial
 features, not landable colony planets.

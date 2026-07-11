@@ -24,6 +24,7 @@ import random
 from dataclasses import replace
 
 from edge.core.aliens import is_friendly
+from edge.core.planets import is_landable
 from edge.core.starbases import is_operational
 from edge.core.config import GameConfig, RosterConfig, SpeciesConfig
 from edge.core.enums import DiscoveryKind, PayloadKind, PortClass, RarityTier
@@ -277,6 +278,10 @@ def _settle_cluster(state: UniverseState, config: GameConfig, rng: random.Random
     """Alliance-own the cluster's planets, stamp its regions, settle its friendly members."""
     for pid, planet in state.planets.items():
         if planet.sector_id not in cluster:
+            continue
+        # An asteroid belt is a spatial feature, never a colony/owned world (§4.2, WP-PR06),
+        # so a cluster leaves its belts unowned — a bloc claims the worlds around them.
+        if not is_landable(planet.planet_type, config):
             continue
         # A derelict base must stay on an *unowned* world (§4.2 / the starbase validator),
         # so a cluster leaves a derelict-hosting planet unowned (a salvage cache in bloc space).

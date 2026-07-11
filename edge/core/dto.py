@@ -819,6 +819,12 @@ class PlanetDTO:
     can_invade: bool = False  # a hostile owned world with defences down + fighters aboard (WP55)
     invade_blocker: str = ""  # why invasion is barred (base up / gun up / shield / no fighters)
     ship_fighters: int = 0  # fighters aboard, for the invade affordance
+    # Capabilities keyed by planet type (§4.2, WP-PR06): a belt is a spatial feature —
+    # not `landable` (no descent/surface), `extractable` in orbit instead. `colonizable`
+    # (above) also gates colony stores/citadel/banking/invasion, so the TUI never infers
+    # legality from a label. Defaulted so older fixtures read as ordinary landable worlds.
+    landable: bool = True
+    extractable: bool = False
 
 
 @dataclass(frozen=True)

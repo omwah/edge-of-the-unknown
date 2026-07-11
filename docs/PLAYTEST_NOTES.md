@@ -121,7 +121,7 @@ acceptance criteria live in
 | PT-27 | Contracts | Retain completed contracts in the Computer and render them grey/dim with actions disabled instead of hiding them. | WP-PR09 |
 | PT-28 | Black holes | ~~First activation of a black hole can crash the game when gravity damage is applied to the player's ship. Reproduce with both mouse and keyboard and cover lethal and nonlethal damage.~~ Did not reproduce — the lethal-hazard crash was already closed by the WP26/WP75 escape pod; regression-locked in `playtest: WP-PR05 black-hole interaction crash`. | WP-PR05 |
 | PT-29 | StarDock Shipyard | The currently flown hull is shown as purchasable even though it cannot be bought. Mark it as current and disable its purchase action. | WP-PR08 |
-| PT-30 | Asteroid belts | Asteroid belts are not landable planets and must not expose colonies, citadels, colony stores, or planetary descent. Preserve only their intended scanning/mining interactions. | WP-PR06 |
+| PT-30 | Asteroid belts | ~~Asteroid belts are not landable planets and must not expose colonies, citadels, colony stores, or planetary descent. Preserve only their intended scanning/mining interactions.~~ Fixed in `playtest: WP-PR06 asteroid-belt interaction model` — per-type `landable`/`colonizable` capabilities gate every seam; belts generate/normalize inert (unowned, base-less, no surface sites) and render an orbital view. | WP-PR06 |
 | PT-31 | Computer routing | Plotting a route from a non-Navigation subview briefly shows Route and then returns to the original subview. The completed action must remain on Route without a flash-back. | WP-PR09 |
 
 When a finding is fixed, strike through its finding text and append the implementing

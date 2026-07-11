@@ -160,8 +160,13 @@ trips are the intended loop; the citadel art grows with its level."""
         with Horizontal(id="orbit-main"):
             with VerticalScroll(id="orbit-body"):
                 yield self._identity_panel(p)
-                yield self._stores_panel(p)
-                if p.owned_by_you and (p.citadel_level > 0 or p.can_build_citadel
+                # A belt is a spatial feature, not a colony: no descent, no colony stores
+                # or citadel — only its orbital scan/mining note (§4.2, WP-PR06).
+                if not p.landable:
+                    yield self._orbital_panel(p)
+                else:
+                    yield self._stores_panel(p)
+                if p.landable and p.owned_by_you and (p.citadel_level > 0 or p.can_build_citadel
                                        or p.citadel_build_target > 0):
                     yield self._citadel_panel(p)
                 if p.can_invade:
@@ -185,9 +190,17 @@ trips are the intended loop; the citadel art grows with its level."""
                 ),
                 id="orbit-art",
             )
-            art.tooltip = "Click to descend to the surface"
+            art.tooltip = ("Scan for finds in orbit" if not p.landable
+                           else "Click to descend to the surface")
             yield art
         yield Footer()
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        # A belt has no surface — hide the Descend affordance (and its footer hint) so the
+        # control never implies a landing that the reducer would reject (§4.2, WP-PR06).
+        if action == "descend" and not self._planet.landable:
+            return False
+        return True
 
     def _identity_panel(self, p: PlanetDTO) -> Vertical:
         """Keep identity, ownership, habitability, and colony state together."""
@@ -209,12 +222,30 @@ trips are the intended loop; the citadel art grows with its level."""
         return panel
 
     def on_planet_sprite_descend(self, msg: PlanetSprite.Descend) -> None:
+        if not self._planet.landable:
+            self.notify("No surface to land on — scan for finds in orbit instead.", timeout=3)
+            return
         self.action_descend()
+
+    def _orbital_panel(self, p: PlanetDTO) -> Vertical:
+        """A belt's orbital readout (§4.2, WP-PR06): a spatial feature, scanned/mined, not landed on."""
+        lines = [
+            "[dim]A spatial feature, not a colony world — it cannot be landed on, "
+            "colonized, or given a citadel.[/]",
+            "[cyan]Scan[/] the sector for finds; anything logged appears in your codex.",
+        ]
+        if p.extractable:
+            lines.append("[dim]Raw ore drifts here for the taking — orbital mining.[/]")
+        panel = Vertical(*(Static(t) for t in lines), id="orbital-panel", classes="orbit-panel")
+        panel.border_title = "Orbit"
+        return panel
 
     def _claim_hint(self) -> str:
         p = self._planet
         if p.owned_by_you:
             return "[dim]Your colony.[/]"
+        if not p.landable:
+            return ""  # the orbital panel explains a belt; no colony hint applies
         if not p.colonizable:
             return "[dim]Uncolonizable — extraction only.[/]"
         if not p.claimable:
