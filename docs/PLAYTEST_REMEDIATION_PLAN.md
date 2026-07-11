@@ -358,7 +358,16 @@ Pilot/snapshot tests.
 
 Commit: `playtest: WP-PR09 Computer ownership and route UX`
 
-### WP-PR10 — Responsive shell, status drawer, and nav rose
+### WP-PR10 — Responsive shell, status drawer, and nav rose — in progress
+
+**Progress (2026-07-11):** the first implementation slice makes the projected
+backtrack edge the default NavRose selection (with first-edge fallback), adds
+explicit Up/Down traversal to the Status Drawer object list, verifies the shared
+onboarding visibility switch for both objective presentations, completes the Help
+legend, and removes Port/StarDock decorative art at 80x24. Compact StarDock
+snapshots were intentionally refreshed. The remaining package work is the
+parametric all-art-screen geometry inventory (including modal details) and its
+high-contrast/monochrome acceptance coverage.
 
 **Goal:** finish responsive and keyboard behavior missed by the UI overhaul.
 

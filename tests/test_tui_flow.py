@@ -95,6 +95,26 @@ async def test_enter_warps_selected_node() -> None:
         assert moved == target != start
 
 
+async def test_nav_rose_focuses_the_return_warp_after_travel() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        start = svc.game_view(1).sector.sector_id
+        rose = app.screen.query_one(NavRose)
+        target = rose._hits[rose._idx].sector_id
+        await pilot.press("enter")
+        await pilot.pause()
+        assert svc.game_view(1).sector.sector_id == target
+        rose = app.screen.query_one(NavRose)
+        selected = rose._hits[rose._idx].sector_id
+        assert selected == start
+        assert rose._warps[selected].kind == "backtrack"
+
+
 async def test_wormhole_art_is_clickable_and_warps() -> None:
     """A wormhole sector renders clickable discovery art whose hotspot warps to the
     far side of the one-way edge (§7)."""
@@ -1416,6 +1436,9 @@ async def test_question_mark_opens_help_with_warp_legend() -> None:
         assert isinstance(app.screen, HelpScreen)
         text = " ".join(str(s.render()) for s in app.screen.query(Static))
         assert "Warp Color" in text
+        for label in ("Coreward", "Outward", "Cross-band", "Backtrack", "One-way",
+                      "Avoided", "Known hazard", "Unexplored", "Sector Codes"):
+            assert label in text
         await pilot.press("escape")
         await pilot.pause()
         assert not isinstance(app.screen, HelpScreen)

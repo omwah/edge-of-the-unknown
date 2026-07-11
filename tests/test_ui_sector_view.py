@@ -75,6 +75,23 @@ async def test_status_drawer_opens_and_routes_a_pick() -> None:
         assert isinstance(app.screen, StarDockScreen)
 
 
+async def test_status_drawer_up_down_walks_object_rows() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        await pilot.press("i")
+        await pilot.pause()
+        rows = list(app.screen.query(ObjectRow))
+        assert len(rows) >= 2
+        assert app.focused is rows[0]
+        await pilot.press("down")
+        assert app.focused is rows[1]
+        await pilot.press("up")
+        assert app.focused is rows[0]
+
+
 async def test_resize_across_breakpoint_recomposes() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -103,3 +120,30 @@ async def test_wide_sidebar_adds_objectives_checklist() -> None:
         texts = [str(s.render()) for s in app.screen.query("#sidebar Static")]
         assert any("Objectives" in t for t in texts)
         assert any("Dock" in t for t in texts)  # the checklist's first open item
+
+
+async def test_objective_visibility_is_one_setting_for_strip_and_sidebar() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        assert app.screen.query("#objectives")
+        assert any("Objectives" in str(s.render())
+                   for s in app.screen.query("#sidebar Static"))
+
+        app.update_ui_settings(show_onboarding=False)
+        await app.screen.recompose()
+        await pilot.pause()
+        assert not app.screen.query("#objectives")
+        assert not any("Objectives" in str(s.render())
+                       for s in app.screen.query("#sidebar Static"))
+
+        done = app.ui_settings.objectives_done
+        app.update_ui_settings(show_onboarding=True)
+        await app.screen.recompose()
+        await pilot.pause()
+        assert app.ui_settings.objectives_done == done
+        assert app.screen.query("#objectives")
+        assert any("Objectives" in str(s.render())
+                   for s in app.screen.query("#sidebar Static"))

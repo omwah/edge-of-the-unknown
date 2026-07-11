@@ -81,6 +81,10 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
     StarDockScreen DataTable { height: auto; max-height: 18; }
     StarDockScreen #concourse-art { height: auto; margin-bottom: 1; }
     StarDockScreen Button { margin-top: 1; margin-right: 1; }
+    StarDockScreen.compact #dock-art { display: none; }
+    StarDockScreen.compact TabPane { padding: 0 1; }
+    StarDockScreen.compact DataTable { max-height: 10; }
+    StarDockScreen.compact #concourse-art { display: none; }
     """
 
     # Buy tabs whose table cursor we preserve across a screen rebuild.

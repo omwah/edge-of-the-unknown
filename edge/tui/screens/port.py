@@ -48,6 +48,8 @@ patience — too many rejected offers close negotiation for the day."""
         text-style: bold; padding: 0 1;
     }
     PortScreen #port-art { height: auto; content-align: center top; }
+    PortScreen.compact #port-art { display: none; }
+    PortScreen.compact #port-body { height: 1fr; }
     """
 
     def __init__(self, service: GameService, player_id: int) -> None:
