@@ -190,7 +190,15 @@ save/replay/config loading, BaseScreen disabled-tab flow.
 
 Commit: `playtest: WP-PR04 starbase recovery and integrity gates`
 
-### WP-PR05 — Black-hole interaction crash
+### WP-PR05 — Black-hole interaction crash — complete
+
+**Resolution note:** the original crash did not reproduce in the current tree. It was
+the lethal-hazard path, closed at the core by the WP26/WP75 escape pod (the note's own
+"the core already has entry-hazard tests" points at `test_territory.py`). WP-PR05
+therefore lands as the missing TUI regression lock-down: `tests/test_ui_black_hole.py`
+drives the real app through the full mouse/keyboard x nonlethal/lethal matrix (plus a
+repeated current-sector interaction), asserting each warp survives the refresh, reports
+the toll in the ticker, routes a lethal toll through the escape pod, and never crashes.
 
 **Goal:** fix the first-click crash and lock it down before broader UI work.
 
