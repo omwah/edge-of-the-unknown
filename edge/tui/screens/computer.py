@@ -7,6 +7,14 @@ but keep their direct `M`/`G` hotkeys on the game screen). Every tab is live:
 Ports/Route (WP15/WP14), Codex/Dossier (WP11), Contracts (WP57/WP71),
 Alliances (WP72), and Notes — captain's notes plus the route-planner avoid
 list (WP73).
+
+WP-UI20: the thirteen-tab strip is grouped into five categories (Navigation ·
+Commerce · Exploration · Relations · Records), each holding its subviews as an
+inner tab row. Every category remembers its last subview (app-level, so `[C]`
+reopens where the player left off); direct hotkeys, plotted routes, codex and
+contract links target subviews by their unchanged pane ids via
+`show_subview()`. Compact terminals swap the category tab bar for a popup
+selector (the subview row stays), per the UI_MOCKUPS wireframe.
 """
 
 from __future__ import annotations
@@ -14,8 +22,9 @@ from __future__ import annotations
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.containers import Horizontal
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
+from textual.widgets import Button, DataTable, Footer, Static, TabbedContent, TabPane
 
 from edge.core.dto import RouteDTO
 from edge.core.economy import EconomyError
@@ -24,8 +33,31 @@ from edge.core.rules import TravelTo
 from edge.server.service import GameService
 from edge.tui.chrome import EmptyState, notify_warning
 from edge.tui.screens.confirm import ConfirmScreen
+from edge.tui.screens.picker import ListPicker
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.widgets import LocalMapView, bar, preserve_cursor
+
+# WP-UI20: the five-category information architecture. Every legacy tab id maps
+# to exactly one category; pane ids are unchanged so hotkeys and links keep
+# addressing subviews by the same names.
+CATEGORIES: dict[str, tuple[str, ...]] = {
+    "navigation": ("map", "route"),
+    "commerce": ("ports", "trade", "market"),
+    "exploration": ("planets", "codex", "leads"),
+    "relations": ("contracts", "alliances", "dossier"),
+    "records": ("log", "notes"),
+}
+CATEGORY_LABELS = {
+    "navigation": "Navigation", "commerce": "Commerce",
+    "exploration": "Exploration", "relations": "Relations", "records": "Records",
+}
+SUBVIEW_LABELS = {
+    "map": "Map", "route": "Route", "ports": "Ports", "trade": "Trade",
+    "market": "Market", "planets": "Planets", "codex": "Codex", "leads": "Leads",
+    "contracts": "Contracts", "alliances": "Alliances", "dossier": "Dossier",
+    "log": "Log", "notes": "Notes",
+}
+_CATEGORY_OF = {sub: cat for cat, subs in CATEGORIES.items() for sub in subs}
 
 
 class ComputerScreen(Screen):
@@ -51,10 +83,12 @@ class ComputerScreen(Screen):
 
     HELP_TITLE = "Ship's computer"
     HELP = """\
-Tabs: Map · Ports · Planets · Trade · Market · Log · Route · Codex · Leads ·
-Contracts · Alliances · Dossier · Notes. Keys act on the [b]active tab[/]
-([b]X[/] abandons a contract or removes a note, per tab). [b]J[/] joins/resigns a
-bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
+Five categories — [b]Navigation[/] (Map · Route), [b]Commerce[/] (Ports · Trade ·
+Market), [b]Exploration[/] (Planets · Codex · Leads), [b]Relations[/] (Contracts ·
+Alliances · Dossier), [b]Records[/] (Log · Notes) — each remembers its last
+subview. Keys act on the [b]active subview[/] ([b]X[/] abandons a contract or
+removes a note, per subview). [b]J[/] joins/resigns a bloc; [b]V[/] toggles
+avoiding the highlighted sector on plotted routes."""
 
     CSS = """
     ComputerScreen #computer-title {
@@ -62,8 +96,16 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         text-style: bold; padding: 0 1;
     }
     ComputerScreen TabPane { padding: 1 2; }
+    /* WP-UI20: the category panes are pure containers for the subview row —
+       no padding of their own, so nesting costs no content columns. */
+    ComputerScreen .cat-pane { padding: 0; }
     ComputerScreen DataTable { height: auto; max-height: 14; margin-top: 1; }
     ComputerScreen .note { color: $text-muted; margin-top: 1; }
+    /* WP-UI20 compact: the category tab bar yields to the popup selector. */
+    ComputerScreen #cat-strip { display: none; height: auto; padding: 0 1; }
+    ComputerScreen #cat-strip Button { min-width: 24; }
+    ComputerScreen.compact #cat-strip { display: block; }
+    ComputerScreen.compact #cats > ContentTabs { display: none; }
     """
 
     def __init__(self, service: GameService, player_id: int, *, initial_tab: str = "trade") -> None:
@@ -78,89 +120,116 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         self._route: RouteDTO | None = None  # the plotted route (per-interaction)
         self._engage_target: int | None = None  # internal sector [G] travels to
 
+    def _inner_initial(self, category: str) -> str:
+        """The subview a category opens on: the requested target if it lives here,
+        else the category's remembered last subview (WP-UI20), else its first."""
+        if _CATEGORY_OF.get(self._initial_tab) == category:
+            return self._initial_tab
+        remembered = getattr(self.app, "computer_subviews", {}).get(category)
+        if remembered in CATEGORIES[category]:
+            return remembered
+        return CATEGORIES[category][0]
+
     def compose(self) -> ComposeResult:
         yield Static("SHIP COMPUTER", id="computer-title")
-        with TabbedContent(initial=self._initial_tab):
-            with TabPane("Map", id="map"):
-                yield Static(
-                    f"[b]LOCAL MAP[/]   [dim]you @ Sector {self._map.you_display} · "
-                    f"Band {self._map.you_band}   ·   ↑↓←→ select · ↵ plot route[/]",
-                    id="map-header",
-                )
-                yield LocalMapView(self._map, rebake=self._map_for_width, id="local-map")
-            with TabPane("Ports", id="ports"):
-                yield Static("[b]PORTS DIRECTORY[/]        [dim]charted ports, nearest first[/]")
-                yield DataTable(id="ports-table", zebra_stripes=True, cursor_type="row")
-                yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
-            with TabPane("Planets", id="planets"):
-                yield Static("[b]PLANETS DIRECTORY[/]        [dim]charted planets, nearest first[/]")
-                yield DataTable(id="planets-table", zebra_stripes=True, cursor_type="row")
-                yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
-            with TabPane("Trade", id="trade"):
-                yield Static("[b]PAIR-TRADE FINDER[/]        [dim]scored by profit / turn[/]")
-                yield DataTable(id="finder", zebra_stripes=True, cursor_type="row")
-                yield Static(
-                    f"selected: [cyan]{self._computer.selected}[/]   ·   "
-                    "[b]P[/] Plot route   [b]A[/] Add note",
-                    classes="note",
-                )
-            with TabPane("Market", id="market"):
-                yield Static(f"[b]ORDER BOOK[/]        [dim]{self._market.summary}[/]")
-                market = DataTable(id="market-table", zebra_stripes=True, cursor_type="row")
-                market_empty = self._market_empty()  # WP-UI19 shared empty state
-                if market_empty is not None:
-                    market.display = False
-                yield market
-                if market_empty is not None:
-                    yield market_empty
-                yield Static(self._market_note(), classes="note")
-            with TabPane("Log", id="log"):
-                yield Static("[b]EVENT LOG[/]        [dim]newest first[/]")
-                yield DataTable(id="log-table", zebra_stripes=True, cursor_type="row")
-            with TabPane("Route", id="route"):
-                yield Static("[b]ROUTE PLANNER[/]        [dim]plot before you commit[/]")
-                yield DataTable(id="route-table", zebra_stripes=True, cursor_type="row")
-                yield Static("", id="route-summary", classes="note")
-            with TabPane("Codex", id="codex"):
-                yield Static("[b]DISCOVERY CODEX[/]        [dim]logged finds, richest first[/]")
-                yield DataTable(id="codex-table", zebra_stripes=True, cursor_type="row")
-            with TabPane("Leads", id="leads"):
-                yield Static("[b]COORDINATE LEADS[/]        [dim]tips logged from contacts[/]")
-                yield DataTable(id="leads-table", zebra_stripes=True, cursor_type="row")
-                yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
-            with TabPane("Contracts", id="contracts"):
-                yield Static("[b]FAVORS[/]        [dim]jobs accepted from aliens[/]")
-                jobs = DataTable(id="contracts-table", zebra_stripes=True, cursor_type="row")
-                if not self._computer.contracts:  # WP-UI19 shared empty state
-                    jobs.display = False
-                yield jobs
-                if not self._computer.contracts:
-                    yield EmptyState("No favors accepted.",
-                                     "Ask a friendly species for work — accepted "
-                                     "jobs appear here.")
-                yield Static("[dim][b]D[/] Deliver highlighted (dock at its target port first)"
-                             "   ·   [b]X[/] Abandon highlighted[/]", classes="note")
-            with TabPane("Alliances", id="alliances"):
-                yield Static("[b]ALLIANCES[/]        [dim]blocs, standings, admission — join one (§6.3)[/]")
-                yield DataTable(id="alliances-table", zebra_stripes=True, cursor_type="row")
-                yield Static("[dim][b]J[/] Join highlighted (resigns any current bloc)   ·   "
-                             "[b]T[/] Log admission task   ·   [b]J[/] on your own bloc resigns[/]",
-                             classes="note")
-            with TabPane("Dossier", id="dossier"):
-                yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
-                yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
-                yield Static(self._dossier_notes(), classes="note")
-                yield Static(self._governance_notes(), id="governance-panel", classes="note")
-                yield Static(self._seizure_notes(), id="seizure-panel", classes="note")
-            with TabPane("Notes", id="notes"):
-                yield Static("[b]CAPTAIN'S NOTES[/]        [dim]personal log + avoid list[/]")
-                yield DataTable(id="notes-table", zebra_stripes=True, cursor_type="row")
-                avoid = (", ".join(f"S{d}" for d in self._computer.avoid)
-                         or "[dim]none[/]")
-                yield Static(f"[b]AVOID LIST[/] (route planner skips these): {avoid}",
-                             classes="note", id="avoid-line")
-                yield Static("[dim][b]A[/] Add note   ·   [b]X[/] Remove highlighted   ·   "
-                             "[b]V[/] Toggle a sector on the avoid list[/]", classes="note")
+        initial_cat = _CATEGORY_OF.get(self._initial_tab, "commerce")
+        # Compact tier: the category tab bar is hidden and this popup selector
+        # stands in for it (UI_MOCKUPS wireframe); the subview row stays.
+        with Horizontal(id="cat-strip"):
+            yield Button(f"Category: {CATEGORY_LABELS[initial_cat]} ▾", id="cat-button")
+        with TabbedContent(initial=f"cat-{initial_cat}", id="cats"):
+            with TabPane("Navigation", id="cat-navigation", classes="cat-pane"):
+                with TabbedContent(initial=self._inner_initial("navigation"),
+                                   id="sub-navigation"):
+                    with TabPane("Map", id="map"):
+                        yield Static(
+                            f"[b]LOCAL MAP[/]   [dim]you @ Sector {self._map.you_display} · "
+                            f"Band {self._map.you_band}   ·   ↑↓←→ select · ↵ plot route[/]",
+                            id="map-header",
+                        )
+                        yield LocalMapView(self._map, rebake=self._map_for_width, id="local-map")
+                    with TabPane("Route", id="route"):
+                        yield Static("[b]ROUTE PLANNER[/]        [dim]plot before you commit[/]")
+                        yield DataTable(id="route-table", zebra_stripes=True, cursor_type="row")
+                        yield Static("", id="route-summary", classes="note")
+            with TabPane("Commerce", id="cat-commerce", classes="cat-pane"):
+                with TabbedContent(initial=self._inner_initial("commerce"), id="sub-commerce"):
+                    with TabPane("Ports", id="ports"):
+                        yield Static("[b]PORTS DIRECTORY[/]        [dim]charted ports, nearest first[/]")
+                        yield DataTable(id="ports-table", zebra_stripes=True, cursor_type="row")
+                        yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
+                    with TabPane("Trade", id="trade"):
+                        yield Static("[b]PAIR-TRADE FINDER[/]        [dim]scored by profit / turn[/]")
+                        yield DataTable(id="finder", zebra_stripes=True, cursor_type="row")
+                        yield Static(
+                            f"selected: [cyan]{self._computer.selected}[/]   ·   "
+                            "[b]P[/] Plot route   [b]A[/] Add note",
+                            classes="note",
+                        )
+                    with TabPane("Market", id="market"):
+                        yield Static(f"[b]ORDER BOOK[/]        [dim]{self._market.summary}[/]")
+                        market = DataTable(id="market-table", zebra_stripes=True, cursor_type="row")
+                        market_empty = self._market_empty()  # WP-UI19 shared empty state
+                        if market_empty is not None:
+                            market.display = False
+                        yield market
+                        if market_empty is not None:
+                            yield market_empty
+                        yield Static(self._market_note(), classes="note")
+            with TabPane("Exploration", id="cat-exploration", classes="cat-pane"):
+                with TabbedContent(initial=self._inner_initial("exploration"),
+                                   id="sub-exploration"):
+                    with TabPane("Planets", id="planets"):
+                        yield Static("[b]PLANETS DIRECTORY[/]        [dim]charted planets, nearest first[/]")
+                        yield DataTable(id="planets-table", zebra_stripes=True, cursor_type="row")
+                        yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
+                    with TabPane("Codex", id="codex"):
+                        yield Static("[b]DISCOVERY CODEX[/]        [dim]logged finds, richest first[/]")
+                        yield DataTable(id="codex-table", zebra_stripes=True, cursor_type="row")
+                    with TabPane("Leads", id="leads"):
+                        yield Static("[b]COORDINATE LEADS[/]        [dim]tips logged from contacts[/]")
+                        yield DataTable(id="leads-table", zebra_stripes=True, cursor_type="row")
+                        yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
+            with TabPane("Relations", id="cat-relations", classes="cat-pane"):
+                with TabbedContent(initial=self._inner_initial("relations"), id="sub-relations"):
+                    with TabPane("Contracts", id="contracts"):
+                        yield Static("[b]FAVORS[/]        [dim]jobs accepted from aliens[/]")
+                        jobs = DataTable(id="contracts-table", zebra_stripes=True, cursor_type="row")
+                        if not self._computer.contracts:  # WP-UI19 shared empty state
+                            jobs.display = False
+                        yield jobs
+                        if not self._computer.contracts:
+                            yield EmptyState("No favors accepted.",
+                                             "Ask a friendly species for work — accepted "
+                                             "jobs appear here.")
+                        yield Static("[dim][b]D[/] Deliver highlighted (dock at its target port first)"
+                                     "   ·   [b]X[/] Abandon highlighted[/]", classes="note")
+                    with TabPane("Alliances", id="alliances"):
+                        yield Static("[b]ALLIANCES[/]        [dim]blocs, standings, admission — join one (§6.3)[/]")
+                        yield DataTable(id="alliances-table", zebra_stripes=True, cursor_type="row")
+                        yield Static("[dim][b]J[/] Join highlighted (resigns any current bloc)   ·   "
+                                     "[b]T[/] Log admission task   ·   [b]J[/] on your own bloc resigns[/]",
+                                     classes="note")
+                    with TabPane("Dossier", id="dossier"):
+                        yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
+                        yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
+                        yield Static(self._dossier_notes(), classes="note")
+                        yield Static(self._governance_notes(), id="governance-panel", classes="note")
+                        yield Static(self._seizure_notes(), id="seizure-panel", classes="note")
+            with TabPane("Records", id="cat-records", classes="cat-pane"):
+                with TabbedContent(initial=self._inner_initial("records"), id="sub-records"):
+                    with TabPane("Log", id="log"):
+                        yield Static("[b]EVENT LOG[/]        [dim]newest first[/]")
+                        yield DataTable(id="log-table", zebra_stripes=True, cursor_type="row")
+                    with TabPane("Notes", id="notes"):
+                        yield Static("[b]CAPTAIN'S NOTES[/]        [dim]personal log + avoid list[/]")
+                        yield DataTable(id="notes-table", zebra_stripes=True, cursor_type="row")
+                        avoid = (", ".join(f"S{d}" for d in self._computer.avoid)
+                                 or "[dim]none[/]")
+                        yield Static(f"[b]AVOID LIST[/] (route planner skips these): {avoid}",
+                                     classes="note", id="avoid-line")
+                        yield Static("[dim][b]A[/] Add note   ·   [b]X[/] Remove highlighted   ·   "
+                                     "[b]V[/] Toggle a sector on the avoid list[/]", classes="note")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -344,7 +413,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
 
     def _highlighted_contract(self) -> int | None:
         """The contract id under the cursor on the Contracts tab, or None."""
-        if self.query_one(TabbedContent).active != "contracts":
+        if self._active_subview() != "contracts":
             self.notify("Switch to the Contracts tab first.", timeout=2)
             return None
         table = self.query_one("#contracts-table", DataTable)
@@ -369,7 +438,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
 
     def action_abandon_contract(self) -> None:
         """X: abandon the highlighted favor — or, on the Notes tab, remove a note."""
-        if self.query_one(TabbedContent).active == "notes":
+        if self._active_subview() == "notes":
             self._remove_note()
             return
         cid = self._highlighted_contract()
@@ -445,7 +514,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
 
     def _highlighted_alliance(self) -> object | None:
         """The AllianceRowDTO under the cursor on the Alliances tab, or None."""
-        if self.query_one(TabbedContent).active != "alliances":
+        if self._active_subview() != "alliances":
             self.notify("Switch to the Alliances tab first.", timeout=2)
             return None
         table = self.query_one("#alliances-table", DataTable)
@@ -525,11 +594,50 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
                             for d, name, purse in self._market.purses[:6])
         return f"[dim]Purses (as of last dock):[/]  {purses}"
 
+    # --- WP-UI20: category + subview navigation --------------------------------
+
+    def _active_category(self) -> str:
+        return (self.query_one("#cats", TabbedContent).active or "cat-commerce")[len("cat-"):]
+
+    def _active_subview(self) -> str:
+        """The pane id of the visible subview (the unit every action keys on)."""
+        category = self._active_category()
+        return self.query_one(f"#sub-{category}", TabbedContent).active
+
+    def show_subview(self, subview: str) -> None:
+        """Open `subview` by its legacy pane id, switching category as needed."""
+        category = _CATEGORY_OF[subview]
+        self.query_one("#cats", TabbedContent).active = f"cat-{category}"
+        self.query_one(f"#sub-{category}", TabbedContent).active = subview
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id != "cat-button":
+            return
+
+        def _picked(category: object) -> None:
+            if category is not None:
+                self.query_one("#cats", TabbedContent).active = f"cat-{category}"
+
+        options = [(CATEGORY_LABELS[c] + "  [dim]" +
+                    " · ".join(SUBVIEW_LABELS[s] for s in subs) + "[/]", c)
+                   for c, subs in CATEGORIES.items()]
+        self.app.push_screen(ListPicker("Computer category", options), _picked)
+
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
-        # Remember the tab across screens so [C] reopens where the player left off.
-        active = self.query_one(TabbedContent).active
+        source = event.tabbed_content
+        if source.id == "cats":
+            category = self._active_category()
+            self.query_one("#cat-button", Button).label = (
+                f"Category: {CATEGORY_LABELS[category]} ▾")
+        elif source.id is not None and source.id.startswith("sub-"):
+            # Each category remembers its last subview, app-wide (WP-UI20).
+            subviews = getattr(self.app, "computer_subviews", None)
+            if subviews is not None:
+                subviews[source.id[len("sub-"):]] = source.active
+        # Remember the visible subview across screens so [C] reopens there.
+        active = self._active_subview()
         self.app.computer_tab = active
-        if active == "map":
+        if active == "map" and self._active_category() == "navigation":
             # The Map pane only has a real width once it is shown — fit + focus it now
             # so the arrow keys drive the sector cursor immediately.
             view = self.query_one("#local-map", LocalMapView)
@@ -583,7 +691,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
     def _show_route(self) -> None:
         self._render_route()
         self._refresh_map()  # overlay the plotted course on the Map tab too
-        self.query_one(TabbedContent).active = "route"
+        self.show_subview("route")
 
     def _cursor_entry(self, table_id: str, items: list) -> object | None:  # type: ignore[type-arg]
         """The DTO under the highlighted row of `table_id`, or None."""
@@ -597,7 +705,7 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         return self._service.game_view(self._pid).sector.sector_id
 
     def action_plot_route(self) -> None:
-        active = self.query_one(TabbedContent).active
+        active = self._active_subview()
         if active == "trade":
             pair = self._cursor_entry("#finder", self._computer.pairs)
             if pair is None:

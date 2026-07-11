@@ -160,7 +160,7 @@ async def test_computer_market_tab_shows_the_order_book() -> None:
         await pilot.press("c")  # open the Computer
         await pilot.pause()
         assert isinstance(app.screen, ComputerScreen)
-        app.screen.query_one(TabbedContent).active = "market"
+        app.screen.show_subview("market")
         await pilot.pause()
         table = app.screen.query_one("#market-table", DataTable)
         assert table is not None
@@ -874,7 +874,7 @@ async def test_computer_dossier_lists_a_met_species() -> None:
         await pilot.press("c")  # open the computer
         await pilot.pause()
         assert isinstance(app.screen, ComputerScreen)
-        app.screen.query_one(TabbedContent).active = "dossier"
+        app.screen.show_subview("dossier")
         await pilot.pause()
         table = app.screen.query_one("#dossier-table", DataTable)
         assert table.row_count == 1
@@ -985,7 +985,7 @@ async def test_trade_plot_route_and_engage() -> None:
         before = svc.state.ships[1].sector_id
         await pilot.press("p")  # plot the highlighted pair's round trip
         await pilot.pause()
-        assert app.screen.query_one(TabbedContent).active == "route"
+        assert app.screen._active_subview() == "route"
         assert app.screen.query_one("#route-table", DataTable).row_count >= 1
 
         await pilot.press("g")  # engage
@@ -1033,7 +1033,7 @@ async def test_codex_plot_route_to_a_logged_find() -> None:
         await pilot.pause()
         await pilot.press("p")  # plot a route to the highlighted find
         await pilot.pause()
-        assert app.screen.query_one(TabbedContent).active == "route"
+        assert app.screen._active_subview() == "route"
         # The plotted route targets the find's sector and renders its hops.
         assert app.screen._engage_target == disc.sector_id  # type: ignore[attr-defined]
         route = svc.route_view(1, disc.sector_id)
@@ -1085,7 +1085,7 @@ async def test_leads_tab_lists_logged_tip_plots_and_engages_route() -> None:
         assert app.screen.query_one("#leads-table", DataTable).row_count == 1
         await pilot.press("p")  # plot a route to the highlighted lead
         await pilot.pause()
-        assert app.screen.query_one(TabbedContent).active == "route"
+        assert app.screen._active_subview() == "route"
         assert app.screen._engage_target == disc.sector_id  # type: ignore[attr-defined]
         # The tip points somewhere unvisited, so the route plans over the full graph and is
         # reachable (not the "explore a path first" empty state of an explored-only plot).
@@ -1163,7 +1163,7 @@ async def test_clicking_a_map_sector_plots_a_route() -> None:
         await pilot.click(view, offset=(node.col0 + pad.left, node.row + pad.top))
         await pilot.pause()
 
-        assert app.screen.query_one(TabbedContent).active == "route"  # opened the Route tab
+        assert app.screen._active_subview() == "route"  # opened the Route tab
         assert app.screen._engage_target == came_from  # type: ignore[attr-defined]
         assert app.screen._route.reachable  # type: ignore[attr-defined]  # a real route was plotted
 
@@ -1202,7 +1202,7 @@ async def test_map_arrow_keys_select_and_enter_plots_route() -> None:
         selected = view._hits[view._idx].sector_id  # type: ignore[attr-defined]
         await pilot.press("enter")
         await pilot.pause()
-        assert app.screen.query_one(TabbedContent).active == "route"
+        assert app.screen._active_subview() == "route"
         assert app.screen._engage_target == selected  # type: ignore[attr-defined]
 
 
@@ -1220,9 +1220,9 @@ async def test_computer_screen_remembers_last_tab() -> None:
         await pilot.press("c")  # open the Computer — defaults to the Trade tab
         await pilot.pause()
         assert isinstance(app.screen, ComputerScreen)
-        assert app.screen.query_one(TabbedContent).active == "trade"
+        assert app.screen._active_subview() == "trade"
 
-        app.screen.query_one(TabbedContent).active = "codex"  # switch tabs
+        app.screen.show_subview("codex")  # switch tabs
         await pilot.pause()
         assert app.computer_tab == "codex"  # the switch is remembered on the app
         await pilot.press("c")  # [C] closes the Computer from within
@@ -1232,7 +1232,7 @@ async def test_computer_screen_remembers_last_tab() -> None:
         await pilot.press("c")  # reopen — should land back on Codex, not Trade
         await pilot.pause()
         assert isinstance(app.screen, ComputerScreen)
-        assert app.screen.query_one(TabbedContent).active == "codex"
+        assert app.screen._active_subview() == "codex"
 
 
 async def test_ports_directory_lists_and_plots_route() -> None:
@@ -1251,13 +1251,13 @@ async def test_ports_directory_lists_and_plots_route() -> None:
         await pilot.pause()
         assert isinstance(app.screen, ComputerScreen)
 
-        app.screen.query_one(TabbedContent).active = "ports"
+        app.screen.show_subview("ports")
         await pilot.pause()
         assert app.screen.query_one("#ports-table", DataTable).row_count == len(directory)
 
         await pilot.press("p")  # plot a route to the highlighted (nearest) port
         await pilot.pause()
-        assert app.screen.query_one(TabbedContent).active == "route"
+        assert app.screen._active_subview() == "route"
         assert app.screen._engage_target == directory[0].sector_id  # type: ignore[attr-defined]
 
 

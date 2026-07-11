@@ -450,7 +450,9 @@ SPINDRIVE   THRUSTERS   SCREENS     MAIN GUN
 
 ---
 
-## 9. ComputerScreen  *(Phase 1 core; tabs grow through Phase 2)*
+## 9. ComputerScreen  *(Phase 1 core; tabs grow through Phase 2 — since
+WP-UI20 the flat strip is grouped into five categories with subview rows;
+see the "Computer" wireframe under "Responsive tier wireframes")*
 
 ```
 ┌─ SHIP COMPUTER ──────────────────────────────────────────────────────┐
@@ -679,7 +681,8 @@ Small art or none in compact (per art-detail setting); selection survives
 refresh and tier changes.
 ```
 
-### Computer *(target — WP-UI20/UI21; current 13-tab strip until then)*
+### Computer *(WP-UI20 landed: five categories with per-category subview
+memory, popup category selector in compact; WP-UI21 tables/filtering pending)*
 
 ```
 COMPACT: category popup            STANDARD/WIDE: category tabs + subview row
