@@ -134,7 +134,14 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.aliens import base_owner_hostile
-from edge.core.planets import is_colonizable, is_extractable, is_landable, pretty_planet_type
+from edge.core.planets import (
+    genesis_blocker,
+    genesis_valid_target,
+    is_colonizable,
+    is_extractable,
+    is_landable,
+    pretty_planet_type,
+)
 from edge.core.starbases import component_integrity, is_operational, services_operational
 
 _LABEL = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodity.EQUIPMENT: "Equ"}
@@ -635,10 +642,9 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     owned_by_you = planet.owner.kind == "player" and planet.owner.ref == player_id
     genesis = config.genesis
     ship_genesis = ship.devices.get(genesis.device_id, 0) if genesis is not None else 0
-    genesis_eligible = (
-        genesis is not None and not planet.owner.is_owned
-        and planet.planet_type in genesis.eligible_types
-    )
+    genesis_has_device = ship_genesis > 0
+    genesis_eligible = genesis_valid_target(planet, config)
+    genesis_blocker_text = genesis_blocker(planet, genesis_has_device, config)
     stores = [(_FULL[c], planet.stores.get(c, 0)) for c in Commodity]
     allocation = [(_FULL[c], round(planet.allocation.get(c, 0.0) * 100)) for c in Commodity]
     base = state.starbases.get(planet.starbase_id) if planet.starbase_id is not None else None
@@ -687,6 +693,7 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         stores=stores, allocation=allocation, ship_colonists=ship.colonists,
         ship_colonist_capacity=ship.colonist_capacity,
         ship_genesis=ship_genesis, genesis_eligible=genesis_eligible,
+        genesis_has_device=genesis_has_device, genesis_blocker=genesis_blocker_text,
         starbase=starbase_status, starbase_id=planet.starbase_id,
         starbase_derelict=starbase_derelict,
         citadel_level=planet.citadel_level, treasury=planet.treasury, fighters=planet.fighters,
@@ -2020,6 +2027,17 @@ def encounter_view(state: UniverseState, player_id: int, config: GameConfig) -> 
             extra=dialogue_facts.encounter_facts(enc))
         speech = _line(state, config.roster, species, player, enc.speech_context, config,
                        facts=beat_facts)
+    # Set-piece art (WP-PR12): a starbase assault draws the base's port sprite (its owner
+    # archetype + a stable per-base seed) instead of a ship. Ordinary fights stay "ship".
+    target_kind = "ship"
+    target_archetype = ""
+    target_seed = 0
+    if enc.starbase_id is not None:
+        base = state.starbases.get(enc.starbase_id)
+        if base is not None:
+            target_kind = "starbase"
+            target_seed = base.id
+            target_archetype = _controlling_archetype(state, base.sector_id) or ""
     return dto.EncounterDTO(
         species_id=enc.species_id,
         title=title,
@@ -2044,6 +2062,9 @@ def encounter_view(state: UniverseState, player_id: int, config: GameConfig) -> 
         repair_kits=ship.repair_kits,
         gun_online=aspects.gun_damage > 0,
         speech=speech,
+        target_kind=target_kind,
+        target_archetype=target_archetype,
+        target_seed=target_seed,
     )
 
 

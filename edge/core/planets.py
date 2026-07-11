@@ -70,6 +70,38 @@ def is_extractable(planet_type: str, config: GameConfig) -> bool:
     return False
 
 
+def genesis_valid_target(planet: Planet, config: GameConfig) -> bool:
+    """Whether this world is a legal Genesis target: unowned and an eligible type (§4.2).
+
+    Independent of whether a torpedo is aboard — that's the separate `has_device` axis
+    (WP-PR12). Asteroid belts and other ineligible types are excluded because they are
+    absent from `genesis.eligible_types`.
+    """
+    gen = config.genesis
+    if gen is None:
+        return False
+    return not planet.owner.is_owned and planet.planet_type in gen.eligible_types
+
+
+def genesis_blocker(planet: Planet, has_device: bool, config: GameConfig) -> str:
+    """The human reason a Genesis deploy is barred here, or "" when it is allowed (§4.2).
+
+    Shared by the `DeployGenesis` reducer (which raises it) and the `PlanetDTO` projection
+    (which shows it), so the error text can never drift (WP-PR12). Check order matches the
+    reducer: universe support, then a torpedo aboard, then a valid target (owned vs. type).
+    """
+    gen = config.genesis
+    if gen is None:
+        return "genesis torpedoes are not sold in this universe"
+    if not has_device:
+        return "no genesis torpedo aboard"
+    if planet.owner.is_owned:
+        return "that world is claimed — genesis only re-forms unclaimed worlds"
+    if planet.planet_type not in gen.eligible_types:
+        return f"a {planet.planet_type} world cannot be re-formed by genesis"
+    return ""
+
+
 def normalize_belt(planet: Planet, config: GameConfig) -> Planet:
     """Scrub colony/citadel/base affordances off a non-landable spatial world (§4.2).
 

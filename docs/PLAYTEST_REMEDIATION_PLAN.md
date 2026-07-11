@@ -431,7 +431,17 @@ device states, keyboard traversal, focus restoration, compact/wide snapshots.
 
 Commit: `playtest: WP-PR11 deployment action list`
 
-### WP-PR12 — Error specificity and set-piece art
+### WP-PR12 — Error specificity and set-piece art — complete
+
+**Completed (2026-07-11):** Genesis eligibility is split into `genesis_has_device` and
+`genesis_eligible` (the valid-target axis) on `PlanetDTO`, plus a `genesis_blocker` string
+computed by the shared core predicate `planets.genesis_blocker` — the `DeployGenesis`
+reducer raises the very same message the projection shows (reducer/UI parity, tested). The
+PlanetScreen shows the Genesis affordance only when unblocked and otherwise names the reason;
+`action_genesis` reports the specific blocker. Starbase assaults now project
+`EncounterDTO.target_kind == "starbase"` with the base's owner archetype and a stable
+per-base seed, so the encounter screen draws `edge/art/port.py` starbase art instead of a
+ship sprite; ordinary alien/PvP fights keep `target_kind == "ship"`. Wire bumped to v9.
 
 **Goal:** close the remaining small but visible feedback defects.
 

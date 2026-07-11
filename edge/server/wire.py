@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 8
+WIRE_VERSION = 9
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -56,6 +56,9 @@ v5 (WP-UI13–UI14): navigation/trade presentation projections. `WarpDTO` gains
 `purse`/`purse_enabled`/`holds_used`/`holds_total`.
 v8 (WP-PR11): `TerritoryDTO.options` adds typed `DeploymentOptionDTO` affordances
 for reducer-parity deployment legality and blockers.
+v9 (WP-PR12): `PlanetDTO` gains `genesis_has_device`/`genesis_blocker` (split Genesis
+eligibility + shared human blocker); `EncounterDTO` gains `target_kind`/`target_archetype`/
+`target_seed` (starbase-assault set-piece draws port art, not a ship sprite).
 """
 
 

@@ -136,7 +136,14 @@ configured floor; firing arcs decide who can answer."""
             with Horizontal(id="enc-main"):
                 with Vertical(id="them") as them:
                     them.border_title = "ENEMY PACK"
-                    if e.foes:
+                    if e.foes and e.target_kind == "starbase":
+                        # A base assault draws the base's own port sprite (WP-PR12), not a
+                        # ship — its owner archetype + a stable per-base seed keep one identity.
+                        yield Static(art_adapter.sprite(
+                            "port", "starbase", seed=e.target_seed, width=22, height=5,
+                            archetype_id=e.target_archetype or None, facing="left"),
+                            classes="foe-art")
+                    elif e.foes:
                         entity, sub = art_adapter.ship_entity(e.foes[0].name)
                         yield Static(art_adapter.sprite(
                             entity, sub, seed=len(e.foes), width=22, height=5, facing="left"),
