@@ -330,6 +330,7 @@ starbase:
   ship_class_id: orbital_platform  # the ship-class template a starbase is built from
   owned_base_chance: 0.5      # chance an owned planet carries an intact, system-defending base
   derelict_chance: 0.4        # chance an unowned, uninhabited planet carries a strippable derelict
+  service_integrity_min: 0.70  # a powered base below this component integrity withholds services (WP-PR04)
   # Starbase engine room: like a ship's, minus thrusters/spindrive, plus a fusion_reactor that
   # powers the whole base. slot_count = total slots; keystone = the part whose loss kills the
   # subsystem; base_components = what ships pre-filled; legal_components = what may be slotted.

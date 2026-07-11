@@ -18,7 +18,7 @@ from edge.core.economy import EconomyError
 from edge.core.combat import CombatError
 from edge.core.engine_room import build_layouts
 from edge.core.enums import Component, ComponentTier, Subsystem
-from edge.core.events import StarbaseClaimed, StarbaseRazed, StarbaseRepaired
+from edge.core.events import StarbaseClaimed, StarbaseRazed, StarbaseRepaired, StarbaseSalvaged
 from edge.core.models import (
     EncounterFoe,
     Game,
@@ -33,15 +33,19 @@ from edge.core.models import (
 )
 from edge.core.rules import (
     AssaultStarbase,
+    Cannibalize,
     ClaimStarbase,
     CombatAction,
+    Dock,
     JoinGame,
     RepairStarbase,
     Warp,
     apply_result,
     reduce,
 )
-from edge.core.starbases import assault_foe, component_integrity, is_operational
+from edge.core.starbases import (
+    assault_foe, component_integrity, is_operational, services_operational,
+)
 
 CFG = load_default_config()
 SMALL = CFG.model_copy(update={"bigbang": CFG.bigbang.model_copy(
@@ -218,3 +222,106 @@ def test_claim_rejects_derelict() -> None:
     state.starbases[88] = _base(88, ship.sector_id, 1, Ownership("none"), operational=False)
     with pytest.raises(EconomyError, match="repair"):
         reduce(state, 1, ClaimStarbase(starbase_id=88), SMALL)
+
+
+# --- service integrity gate (WP-PR04) ---------------------------------------
+
+
+def _degraded_base(bid: int, sector: int, planet: int, owner: Ownership, active: int) -> Starbase:
+    """A powered base with exactly `active` of its 10 slots filled (reactor keystone kept)."""
+    layouts = build_layouts(CFG.starbase.subsystems)  # default 7/10 filled
+    current = sum(len(st.active) for st in layouts.values())
+    to_empty = current - active  # only ever *removes* filled slots (active ≤ default)
+    for sub in (Subsystem.MAIN_GUN, Subsystem.SCREENS, Subsystem.FUSION_REACTOR):
+        st = layouts[sub]
+        slots = list(st.slots)
+        for i in range(len(slots)):
+            if to_empty <= 0:
+                break
+            if i == st.keystone_index or slots[i] is None:
+                continue
+            slots[i] = None
+            to_empty -= 1
+        layouts[sub] = replace(st, slots=tuple(slots))
+    assert to_empty == 0
+    return Starbase(id=bid, sector_id=sector, planet_id=planet, ship_class_id="orbital_platform",
+                    owner=owner, subsystems=layouts)
+
+
+def _cfg_gate(frac: float):
+    return SMALL.model_copy(update={"starbase": SMALL.starbase.model_copy(
+        update={"service_integrity_min": frac})})
+
+
+def test_services_operational_gate_boundaries() -> None:
+    base = _degraded_base(1, 2, 1, Ownership("player", 1), active=7)  # integrity 0.70
+    assert component_integrity(base) == 0.7
+    assert services_operational(base, _cfg_gate(0.70)) is True   # at the line ⇒ open
+    assert services_operational(base, _cfg_gate(0.69)) is True   # below ⇒ open
+    assert services_operational(base, _cfg_gate(0.71)) is False  # above ⇒ closed
+    # A base is never service-operational once its reactor is dead, regardless of the gate.
+    dead = _base(2, 2, 1, Ownership("player", 1), operational=False)
+    assert services_operational(dead, _cfg_gate(0.0)) is False
+
+
+def test_forward_services_close_below_gate_and_reopen_on_repair() -> None:
+    from edge.core.services import service_point
+    state = _generated()
+    ship = state.ships[state.players[1].ship_id]
+    # An owned base battered below the 0.70 gate (6/10) offers no forward services.
+    state.starbases[9] = _degraded_base(9, ship.sector_id, 1, Ownership("player", 1), active=6)
+    assert service_point(state, state.players[1], ship, SMALL) is None
+    # Repair one slot back above the gate (7/10) and services reopen at the base.
+    state.starbases[9] = _degraded_base(9, ship.sector_id, 1, Ownership("player", 1), active=7)
+    sp = service_point(state, state.players[1], ship, SMALL)
+    assert sp is not None and sp.kind == "player_base"
+
+
+def test_repair_below_gate_does_not_set_owner() -> None:
+    state = _generated()
+    ship = state.ships[state.players[1].ship_id]
+    # A derelict with a spare non-keystone slot; refilling it must not silently claim it.
+    base = _degraded_base(88, ship.sector_id, 1, Ownership("none"), active=6)
+    # Ensure the reactor keystone is live but the base sits below the gate — find an empty slot.
+    sub, idx = next((s, i) for s in base.subsystems for i, c in enumerate(base.subsystems[s].slots)
+                    if c is None and i != base.subsystems[s].keystone_index)
+    state.starbases[88] = base
+    comp = Component.CONVERTER
+    state.ships[ship.id] = replace(ship, components={(comp, ComponentTier.I): 1})
+    apply_result(state, reduce(state, 1, RepairStarbase(88, sub, idx, comp, ComponentTier.I), SMALL))
+    assert state.starbases[88].owner == Ownership("none")  # repair never claims
+
+
+def test_recovery_stays_open_but_market_closes_below_gate() -> None:
+    state = _generated()
+    ship = state.ships[state.players[1].ship_id]
+    # Base-hosted market: put a standard port and a below-gate owned base in the ship's sector.
+    from edge.core.enums import PortClass
+    port = next(p for p in state.ports.values() if p.klass is not PortClass.STARDOCK)
+    state.ports[port.id] = replace(port, sector_id=ship.sector_id)
+    state.starbases[9] = _degraded_base(9, ship.sector_id, port.id, Ownership("player", 1), active=6)
+    with pytest.raises(EconomyError, match="too damaged"):
+        reduce(state, 1, Dock(), SMALL)
+    # But recovery (salvaging a component) still works below the gate.
+    sub, idx = next((s, i) for s in state.starbases[9].subsystems
+                    for i, c in enumerate(state.starbases[9].subsystems[s].slots) if c is not None)
+    result = reduce(state, 1, Cannibalize(sub, idx, starbase_id=9), SMALL)
+    apply_result(state, result)
+    assert any(isinstance(e, StarbaseSalvaged) for e in result.events)
+
+
+def test_repair_and_salvage_blocked_on_hostile_base() -> None:
+    state = _mini_state()  # base 1 owned by alliance 2, ship in sector 1
+    state.players[1] = replace(state.players[1], alliance_standing={2: -1.0})  # rival ⇒ hostile
+    state.ships[1] = replace(state.ships[1], sector_id=2)  # sit in the base's sector
+    base = _degraded_base(1, 2, 1, Ownership("alliance", 2), active=6)
+    state.starbases[1] = base
+    sub, idx = next((s, i) for s in base.subsystems for i, c in enumerate(base.subsystems[s].slots)
+                    if c is None and i != base.subsystems[s].keystone_index)
+    from edge.core.engine_room import EngineRoomError
+    with pytest.raises(EngineRoomError, match="hostile"):
+        reduce(state, 1, RepairStarbase(1, sub, idx, Component.CONVERTER, ComponentTier.I), CFG)
+    fsub, fidx = next((s, i) for s in base.subsystems
+                      for i, c in enumerate(base.subsystems[s].slots) if c is not None)
+    with pytest.raises(EngineRoomError, match="hostile"):
+        reduce(state, 1, Cannibalize(fsub, fidx, starbase_id=1), CFG)

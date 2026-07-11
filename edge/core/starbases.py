@@ -46,6 +46,22 @@ def is_operational(base: Starbase) -> bool:
     return keystone is not None and not keystone.knocked_out
 
 
+def services_operational(base: Starbase, config: GameConfig) -> bool:
+    """Whether `base` may offer forward services — powered *and* above the integrity gate.
+
+    Stricter than `is_operational` (§4.2, WP-PR04): the reactor keystone must be live and
+    the surviving-component integrity must meet `starbase.service_integrity_min`. A base
+    above the powered line but battered below the threshold is still salvageable/repairable
+    (recovery never closes) yet withholds market/hardware/munitions/bank until repaired
+    back above it. The single predicate the service reducers *and* the DTO projection read,
+    so hidden tabs and command legality can't drift.
+    """
+    if not is_operational(base):
+        return False
+    threshold = config.starbase.service_integrity_min if config.starbase is not None else 0.0
+    return component_integrity(base) >= threshold
+
+
 def component_integrity(base: Starbase) -> float:
     """The fraction of the base's slots holding a live component (§4.2, WP40).
 

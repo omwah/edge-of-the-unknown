@@ -1015,7 +1015,7 @@ def reduce(
         case TravelTo():
             return _travel(state, player_id, command, config)
         case Dock():
-            return _dock(state, player_id)
+            return _dock(state, player_id, config)
         case Trade():
             return _trade(state, player_id, command, config)
         case HaggleOffer():
@@ -1256,21 +1256,25 @@ def _docked_port(state: UniverseState, ship: Ship) -> Port:
     return port
 
 
-def _market_port(state: UniverseState, player: Player, ship: Ship) -> Port:
-    """The tradable port here, gated by a hosting base's state (§4.2, WP78).
+def _market_port(state: UniverseState, player: Player, ship: Ship, config: GameConfig) -> Port:
+    """The tradable port here, gated by a hosting base's state (§4.2, WP78/WP-PR04).
 
     A port sharing its sector with an orbital base is **base-hosted**: the base *is*
-    the market. It trades only while the base is operational (a derelict's market is
-    dark until its reactor is repaired) and its owner tolerates the player (the same
-    WP40 defense predicate). A StarDock is sovereign — never base-hosted.
+    the market. It trades only while the base is *service-operational* — powered and above
+    the integrity gate (a derelict's or a battered base's market is closed until repaired,
+    WP-PR04) — and its owner tolerates the player (the same WP40 defense predicate). A
+    StarDock is sovereign — never base-hosted.
     """
     port = _docked_port(state, ship)
     if port.klass is PortClass.STARDOCK:
         return port
     base = starbases.base_in_sector(state, ship.sector_id)
     if base is not None:
-        if not is_operational(base):
-            raise EconomyError("the base's market is dark — repair its reactor to reopen trade")
+        if not starbases.services_operational(base, config):
+            if not is_operational(base):
+                raise EconomyError("the base's market is dark — repair its reactor to reopen trade")
+            pct = round(config.starbase.service_integrity_min * 100) if config.starbase is not None else 0
+            raise EconomyError(f"the base is too damaged to trade — repair it above {pct}% integrity")
         if base_owner_hostile(state, base, player):
             raise EconomyError("the base's owner refuses to trade with you")
     return port
@@ -1635,11 +1639,11 @@ def _travel(state: UniverseState, player_id: int, cmd: TravelTo, config: GameCon
                         sector_forces=tuple(force_updates.values()))
 
 
-def _dock(state: UniverseState, player_id: int) -> ReduceResult:
+def _dock(state: UniverseState, player_id: int, config: GameConfig) -> ReduceResult:
     player = _player(state, player_id)
     _require_no_encounter(player)
     ship = _ship(state, player)
-    port = _market_port(state, player, ship)
+    port = _market_port(state, player, ship, config)
     # The Core StarDock is the governor's haven — a hunted player (§6.3 hostile-governor)
     # is turned away at the airlock, which denies every dock-gated service (trade,
     # recruitment, bank) at one lever rather than per command (WP52).
@@ -1660,7 +1664,7 @@ def _trade(
 ) -> ReduceResult:
     player = _player(state, player_id)
     ship = _ship(state, player)
-    port = _market_port(state, player, ship)
+    port = _market_port(state, player, ship, config)
     line = port.line(cmd.commodity)
     if line is None:
         raise EconomyError(f"port does not trade {cmd.commodity.value}")
@@ -1684,7 +1688,7 @@ def _haggle(
 ) -> ReduceResult:
     player = _player(state, player_id)
     ship = _ship(state, player)
-    port = _market_port(state, player, ship)
+    port = _market_port(state, player, ship, config)
     line = port.line(cmd.commodity)
     if line is None:
         raise EconomyError(f"port does not trade {cmd.commodity.value}")
@@ -2291,6 +2295,8 @@ def _cannibalize_starbase(
     if base is None or base.sector_id != ship.sector_id:
         raise EngineRoomError("no such starbase in this sector")
     player_owned = corp.player_owns(state, base.owner, player_id)
+    if base_owner_hostile(state, base, player) and not player_owned:
+        raise EngineRoomError("that base's owner is hostile — you cannot salvage it")
     if is_operational(base) and not player_owned:
         raise EngineRoomError("that starbase is operational — only a derelict or your own base can be salvaged")
     sub = base.subsystems.get(cmd.subsystem)
@@ -2987,12 +2993,20 @@ def _assault_starbase(
 def _repair_starbase(
     state: UniverseState, player_id: int, cmd: RepairStarbase, config: GameConfig
 ) -> ReduceResult:
-    """Install a loose hold component into a base slot (§4.2, WP40) — refilling a derelict."""
+    """Install a loose hold component into a base slot (§4.2, WP40/WP-PR04).
+
+    Recovery work — refilling a derelict or shoring up your own base — never requires a
+    prior claim: repair is authorized on any base whose owner is not hostile to the player
+    (installing a component never sets ownership; claiming stays the explicit `ClaimStarbase`).
+    A base battered below the service integrity gate is repaired the same way, back above it.
+    """
     player = _player(state, player_id)
     ship = _ship(state, player)
     base = state.starbases.get(cmd.starbase_id)
     if base is None or base.sector_id != ship.sector_id:
         raise EngineRoomError("no such starbase here")
+    if base_owner_hostile(state, base, player):
+        raise EngineRoomError("that base's owner is hostile — you cannot work on it")
     sub_state = base.subsystems.get(cmd.subsystem)
     if sub_state is None:
         raise EngineRoomError("that base has no such subsystem")

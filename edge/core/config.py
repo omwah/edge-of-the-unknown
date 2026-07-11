@@ -541,6 +541,11 @@ class StarbaseConfig(BaseModel):
     raze_bounty: int = Field(default=750, ge=0)
     raze_experience: int = Field(default=25, ge=0)
     claim_cost: int = Field(default=2000, ge=0)
+    # Service integrity gate (§4.2, WP-PR04): a powered base whose surviving-component
+    # integrity falls below this fraction withholds its forward services (market, hardware,
+    # munitions, bank) until repaired above it. Recovery (salvage/repair) stays open below
+    # the line, so a battered base is always workable — it just cannot yet serve customers.
+    service_integrity_min: float = Field(default=0.70, ge=0.0, le=1.0)
     # Forward-base services offered once a base is player-owned and operational (§4.2, WP53).
     services: BaseServicesConfig = BaseServicesConfig()
 

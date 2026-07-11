@@ -23,7 +23,7 @@ from edge.core import corp
 from edge.core.config import GameConfig
 from edge.core.enums import PortClass
 from edge.core.models import Player, Ship, UniverseState
-from edge.core.starbases import is_operational
+from edge.core.starbases import services_operational
 
 # The dock-gated service kinds a service point may offer (the closed vocabulary the
 # reducers check against). Kept as plain strings so they cross the config/DTO seams
@@ -59,9 +59,11 @@ def service_point(
     """The service provider for the ship's current sector, or None (§4.1/§4.2, WP53).
 
     A StarDock in the sector always wins (full services, no markup). Otherwise a
-    **player-owned, operational** orbital base in the sector serves the config-gated
-    subset at its markup — the forward-foothold payoff. Everything else (no port, a
-    trade port, a derelict/rival base) yields None, so the service reducers reject.
+    **player-owned** orbital base in the sector that is powered *and above the integrity
+    gate* (`services_operational`, WP-PR04) serves the config-gated subset at its markup —
+    the forward-foothold payoff. Everything else (no port, a trade port, a derelict/rival
+    base, or a base battered below the service threshold) yields None, so the service
+    reducers reject.
     """
     sector_id = ship.sector_id
     port = state.port_in_sector(sector_id)
@@ -74,7 +76,7 @@ def service_point(
     for base in sorted(state.starbases.values(), key=lambda b: b.id):
         if base.sector_id != sector_id:
             continue
-        if corp.player_owns(state, base.owner, player.id) and is_operational(base):
+        if corp.player_owns(state, base.owner, player.id) and services_operational(base, config):
             offered = frozenset(
                 kind for kind, on in (
                     (REPAIR, sc.repair), (COMPONENTS, sc.components),
