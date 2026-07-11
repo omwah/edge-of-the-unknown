@@ -536,4 +536,54 @@ following, which were **not** previously tracked. **All were closed** in the fol
 completed in earlier sessions and closed by WP-UI23; this pass did not re-diff it bullet by
 bullet, so any latent gaps there remain unassessed. One cross-cutting intersection worth a
 look: WP-UI15's "changing tabs/subviews preserves selected rows" vs. WP-PR08's index-based
-StarDock cursor restore (above).
+StarDock cursor restore (above). *(That re-diff was subsequently done — see §8.2.)*
+
+### 8.2 WP-UI01–UI22 audit (2026-07-11) — unresolved overhaul items
+
+A follow-up **bullet-level re-diff of the UI/UX overhaul** (`UI_UX_OVERHAUL_PLAN.md`) against
+the implemented tree. All 23 WP-UI packages are committed and WP-UI23 (closeout) is complete;
+the items below are **unmet implementation/verification bullets** discovered by the audit —
+none block the shipped experience, but each is a spec bullet that is not satisfied. The audit
+was **targeted** (existence of each package's key deliverables + its named verification tests),
+not an exhaustive behavioural replay, so absence of a finding is not proof of full conformance.
+
+**Unresolved — feature/behaviour bullets:**
+
+- **WP-UI09 — no before/after derived-stat swap/install preview.** The plan required: "Show a
+  before/after derived-stat preview when exactly one legal swap or install target is selected."
+  `edge/tui/screens/engine_room.py::action_upgrade` selects one carried component + one slot and
+  applies immediately with only a post-action notification; neither `engine_room.py` nor
+  `component_workbench.py` renders projected shields/warp/combat deltas (no `derive_aspects`
+  preview). Follow-up: on a single legal selection, show the projected aspect delta using the
+  existing pure derive helper (presentation-only).
+- **WP-UI11 — objectives not reopenable *from Help*.** The plan said "Make objectives reopenable
+  from Help." The strip is dismissible (`O`) and re-enable exists, but **via Options** (the
+  `O`/toggle-onboarding row in `options.py`), not from the Help screen (`help.py` has no
+  objectives affordance). Partial: the capability exists, the specified entry point does not.
+  Follow-up: add an objectives reopen/toggle to Help, or amend the bullet to name Options.
+
+**Unresolved — missing verification bullets (behaviour present, gate absent):**
+
+- **WP-UI03 — no automated contrast gate.** The three themes exist (`design.py`:
+  `EDGE_ANSI` / `EDGE_HIGH_CONTRAST` / `EDGE_MONOCHROME`) and are exercised by high-contrast and
+  monochrome *snapshots*. But the verification bullet "Automated tests fail when a semantic token
+  drops below its required contrast" (4.5:1 text, 3:1 focus/controls) has **no** implementation —
+  there is no WCAG/luminance contrast-ratio computation anywhere. Accessibility is snapshot-only,
+  not numerically gated. Follow-up: add a contrast-ratio test over the theme tokens.
+- **WP-UI04 — no corrupt-settings-recovery test.** `edge/tui/settings.py` does recover from a
+  missing/corrupt/newer file (`try/except (OSError, TypeError, ValueError, JSONDecodeError)` →
+  defaults), so the behaviour is present, but there is no test asserting the plan's "A corrupt
+  preferences file does not prevent startup." Follow-up: add a focused loader test (garbage JSON
+  → defaults + one warning, startup proceeds).
+
+**Spot-verified present (no action):** WP-UI01 docs (`UI_MOCKUPS.md`, `UI_INSPIRATION.md`,
+`docs/ui/`, `docs/shots/`); WP-UI02 Textual **8.2.8** pinned in `pixi.lock` + `pytest-textual-snapshot`
+in `pyproject.toml`/DESIGN §15; WP-UI05/06 `LayoutTier` + `ActionDescriptor`/`screen_actions` with
+reserved-key, descriptor-parity, and destructive-confirmation guards (`test_ui_actions.py`);
+WP-UI10 `STARBASE_WORKBENCH_PROFILE` + structural test that both Engine Room and Station use the
+one `ComponentWorkbench` (`test_component_workbench.py`); WP-UI14 one `TradePanel` across port /
+StarDock / base; WP-UI17 standing meter + reasoned disabled replies; WP-UI21 `DetailTable`
+sorting/filtering/stable-key; WP-UI22 geometry + collision + destructive checks.
+
+**Cross-check resolved:** the WP-UI15 "preserve selected rows" vs. WP-PR08 index-cursor concern
+(noted in §8.1) is closed — WP-PR08's cursor is now restored by stable row key (§8.1, done).
