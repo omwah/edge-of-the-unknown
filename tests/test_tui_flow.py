@@ -1816,3 +1816,27 @@ async def test_surface_site_buttons_track_selection() -> None:
         table.move_cursor(row=1, animate=False)
         await pilot.pause()
         assert not collect.disabled
+
+
+async def test_contact_replies_are_responsive_and_keyboard_focusable() -> None:
+    """WP-UI17: speech/replies win compact space and arrows reach every reply."""
+    from dataclasses import replace
+
+    from edge.tui.dummy import sample_contact
+    from edge.tui.screens.contact import AlienContactScreen, ContactReply
+
+    for size, tier in [((80, 24), "compact"), ((100, 34), "standard"), ((120, 40), "wide")]:
+        app = EdgeApp(plain=True)
+        async with app.run_test(size=size) as pilot:
+            app.ui_settings = replace(app.ui_settings, show_disabled_options=True)
+            app.push_screen(AlienContactScreen(sample_contact()))
+            await pilot.pause()
+            assert app.screen.has_class(tier)
+            assert app.screen.query_one("#portrait-box").display is (tier != "compact")
+            replies = list(app.screen.query(ContactReply))
+            assert len(replies) == len(sample_contact().choices)
+            await pilot.press("down")
+            assert app.focused is replies[0]
+            await pilot.press("down")
+            assert app.focused is replies[1]
+            await pilot.press("enter")  # no-service harness: dispatches safely

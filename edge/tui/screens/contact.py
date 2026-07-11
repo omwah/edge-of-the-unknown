@@ -18,7 +18,7 @@ from collections.abc import Callable
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
@@ -30,6 +30,23 @@ from edge.tui.chrome import notify_warning
 from edge.tui.portrait import SpeciesPortrait
 from edge.tui.screens.picker import ListPicker
 from edge.tui.widgets import ClickableEntry, bar
+
+
+class ContactReply(ClickableEntry, can_focus=True):
+    """A numbered reply with identical mouse and keyboard dispatch."""
+
+    BINDINGS = [
+        Binding("enter", "pick", "Choose", show=False),
+        Binding("space", "pick", "Choose", show=False),
+    ]
+
+    DEFAULT_CSS = """
+    ContactReply { height: auto; min-height: 1; padding: 0 1; }
+    ContactReply:focus { background: $primary 30%; text-style: bold; }
+    """
+
+    def action_pick(self) -> None:
+        self.post_message(self.Picked(self._dest, self._ref))
 
 
 class SubjectPickerScreen(ListPicker):
@@ -60,6 +77,8 @@ class AlienContactScreen(Screen):
         # parting line speaks and the contact session closes properly, never a raw pop.
         Binding("escape", "farewell", "Farewell", show=False),
         Binding("j", "alliance", "Join/Resign bloc"),  # derived §6.3 verb (WP72)
+        Binding("up", "reply_up", "Previous reply", show=False),
+        Binding("down", "reply_down", "Next reply", show=False),
         # Play-test only: re-roll the current context's line in place. `check_action` hides it
         # (and disables it) outside the dialogue play-test harness.
         Binding("f5", "refresh", "Refresh"),
@@ -90,14 +109,21 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
     AlienContactScreen #portrait-box SpeciesPortrait {
         width: 1fr; height: 1fr; content-align: center middle;
     }
-    AlienContactScreen #right { width: 1fr; height: 1fr; }
+    AlienContactScreen #right { width: 2fr; height: 1fr; }
     AlienContactScreen #speech {
-        height: 1fr; border: round $secondary; padding: 0 1; margin: 1 1;
+        height: auto; min-height: 5; border: round $secondary; padding: 0 1; margin: 1 1;
     }
-    AlienContactScreen #verbs { height: 2fr; margin: 0 1; }
+    AlienContactScreen #verbs { height: auto; margin: 0 1 1 1; }
     AlienContactScreen #verbs .heading { color: $secondary; text-style: bold; }
     AlienContactScreen #verbs .subhead { color: $text-muted; text-style: bold; margin-top: 1; }
     AlienContactScreen #verbs .derived { color: $text-muted; margin-top: 1; }
+    AlienContactScreen.compact #portrait-box { display: none; }
+    AlienContactScreen.compact #right { width: 1fr; }
+    AlienContactScreen.compact #speech { min-height: 4; margin: 0; }
+    AlienContactScreen.compact #verbs { margin: 0; }
+    AlienContactScreen.compact #contact-standing { height: 2; }
+    AlienContactScreen.wide #portrait-box { width: 2fr; }
+    AlienContactScreen.wide #right { width: 3fr; }
     """
 
     def __init__(self, contact: dto.ContactDTO, service: GameService | None = None,
@@ -163,9 +189,10 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
             id="contact-title",
         )
         yield Static(
-            f"standing: [green]{c.standing}[/]  "
-            f"[dim](base {c.base_disposition:.2f} {c.attitude:+.2f} you = {c.effective:.2f})[/]"
-            f"        alliance: [cyan]{c.alliance}[/]",
+            f"Standing  [green][b]{c.standing.upper()}[/] {bar(c.disposition_filled, 5)}[/]  "
+            f"{c.effective:.2f} · {self._relationship_text(c)}"
+            f"   [dim]base {c.base_disposition:.2f} {c.attitude:+.2f}[/]"
+            f"   Alliance [cyan]{c.alliance}[/]",
             id="contact-standing",
         )
         with Horizontal(id="contact-main"):
@@ -177,15 +204,15 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
                 # different portraits.
                 yield SpeciesPortrait(c.roster_id, c.species, symbols, font_ratio,
                                       images_dir, c.portrait_variant, bloom=c.singular_entity)
-            with Vertical(id="right"):
+            with VerticalScroll(id="right"):
                 speech = Static(self._pinned_speech or c.opener, id="speech")
                 speech.border_title = "they speak"
                 yield speech
                 with Vertical(id="verbs"):
                     yield Static("Your reply", classes="heading")
                     for n, (_kind, item) in enumerate(self._menu_items(c), start=1):
-                        yield ClickableEntry(self._choice_line(n, item, self.playtest_mode),
-                                             dest="choice", ref=item.index)
+                        yield ContactReply(self._choice_line(n, item, self.playtest_mode),
+                                           dest="choice", ref=item.index)
                     if self._history:
                         yield ClickableEntry("  [dim]← Back (b)[/]", dest="back",
                                              classes="derived")
@@ -196,6 +223,36 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
                     if self.playtest_mode:
                         yield Static(f"\n  [dim]context = {c.debug_context} | when = {c.debug_when}[/]", classes="derived")
         yield Footer()
+
+    @staticmethod
+    def _relationship_text(c: dto.ContactDTO) -> str:
+        """Plain-language meaning alongside the exact effective-disposition cue."""
+        if c.standing == "allied":
+            return "sworn allies"
+        if c.effective >= 0.65:
+            return "they welcome you"
+        if c.effective >= 0.50:
+            return "they remain cautious"
+        if c.effective >= 0.35:
+            return "they distrust you"
+        return "they regard you as an enemy"
+
+    def _move_reply_focus(self, step: int) -> None:
+        replies = list(self.query(ContactReply))
+        if not replies:
+            return
+        focused = self.app.focused
+        try:
+            index = replies.index(focused)  # type: ignore[arg-type]
+        except ValueError:
+            index = -1 if step > 0 else 0
+        replies[(index + step) % len(replies)].focus()
+
+    def action_reply_up(self) -> None:
+        self._move_reply_focus(-1)
+
+    def action_reply_down(self) -> None:
+        self._move_reply_focus(1)
 
     def _portrait_opts(self) -> tuple[str, float, str | None]:
         """The chafa symbol selector, cell font-ratio, and image dir from config.
