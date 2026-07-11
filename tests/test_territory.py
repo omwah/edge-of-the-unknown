@@ -137,6 +137,42 @@ def test_deploy_rejects_core() -> None:
         reduce(state, 1, DeployFighters(count=1), CFG)
 
 
+@pytest.mark.parametrize("action, command", [
+    ("fighters", DeployFighters(count=1)),
+    ("armid", DeployMines(count=1, kind="armid")),
+    ("limpet", DeployMines(count=1, kind="limpet")),
+    ("probe", LaunchProbe(dest_sector=2)),
+    ("interdictor", ToggleInterdictor()),
+    ("strip", RemoveLimpets()),
+])
+def test_deployment_affordance_blocker_matches_reducer(action: str, command: object) -> None:
+    state = _mini_state()
+    legal = territory.deployment_legality(state, 1, action, CFG)
+    assert not legal.enabled and legal.blocker
+    with pytest.raises(EconomyError, match=legal.blocker):
+        reduce(state, 1, command, CFG)  # type: ignore[arg-type]
+
+
+def test_deployment_affordance_covers_core_foreign_force_and_active_state() -> None:
+    state = _mini_state()
+    state.ships[1] = replace(state.ships[1], fighters=5, mines=4)
+    state.sectors[1] = replace(state.sectors[1], is_galactic_core=True)
+    for action in ("fighters", "armid", "limpet", "beacon"):
+        option = territory.deployment_legality(state, 1, action, CFG)
+        assert not option.enabled and "Core" in option.blocker
+
+    state.sectors[1] = replace(state.sectors[1], is_galactic_core=False)
+    state.sector_forces[1] = _force(sector_id=1, owner=Ownership("player", 1),
+                                    fighters=2, armid_mines=3, limpet_mines=1)
+    assert territory.deployment_legality(state, 1, "fighters", CFG).active
+    assert territory.deployment_legality(state, 1, "armid", CFG).active
+    assert territory.deployment_legality(state, 1, "limpet", CFG).active
+    state.sector_forces[1] = replace(state.sector_forces[1], owner=Ownership("player", 2))
+    for action in ("fighters", "armid", "limpet"):
+        option = territory.deployment_legality(state, 1, action, CFG)
+        assert not option.enabled and "another force" in option.blocker
+
+
 def test_deploy_beacon_sets_text_and_charges() -> None:
     state = _mini_state()
     before = state.players[1].latinum

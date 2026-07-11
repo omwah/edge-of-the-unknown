@@ -567,6 +567,17 @@ class AllianceRowDTO:
 
 
 @dataclass(frozen=True)
+class DeploymentOptionDTO:
+    """One pre-validated Territory action affordance (WP-PR11)."""
+
+    id: str
+    quantity: int
+    enabled: bool
+    blocker: str
+    active: bool = False
+
+
+@dataclass(frozen=True)
 class TerritoryDTO:
     """Carried territory stock + devices + this sector's force (§10/§14 — WP72)."""
 
@@ -583,6 +594,7 @@ class TerritoryDTO:
     force_line: str  # your deployed force here, human-voiced ("" if none)
     limpet_removal_fee: int
     at_service_point: bool  # limpet removal is possible here
+    options: list[DeploymentOptionDTO] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

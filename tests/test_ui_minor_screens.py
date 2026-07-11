@@ -16,7 +16,7 @@ from edge.tui.app import EdgeApp
 from edge.tui.chrome import EmptyState
 
 
-# --- Territory: responsive card grid ----------------------------------------
+# --- Territory: one stable vertical deployment sequence ---------------------
 
 async def _open_territory(app: EdgeApp, pilot: object) -> None:
     from dataclasses import replace as _replace
@@ -32,12 +32,16 @@ async def _open_territory(app: EdgeApp, pilot: object) -> None:
     await pilot.pause()  # type: ignore[attr-defined]
 
 
-def _card_columns(app: EdgeApp) -> int:
-    from edge.tui.screens.territory import _DeployCard
+def _row_columns(app: EdgeApp) -> int:
+    from edge.tui.screens.territory import _DeployRow
 
-    cards = list(app.screen.query(_DeployCard))
-    assert cards
-    return len({c.region.x for c in cards})
+    rows = list(app.screen.query(_DeployRow))
+    assert rows
+    assert [row.id for row in rows] == [
+        "option-fighters", "option-armid", "option-limpet", "option-beacon",
+        "option-probe", "option-interdictor",
+    ]
+    return len({row.region.x for row in rows})
 
 
 async def test_territory_grid_is_one_column_compact() -> None:
@@ -46,25 +50,70 @@ async def test_territory_grid_is_one_column_compact() -> None:
         await pilot.pause()
         await _open_territory(app, pilot)
         assert app.screen.has_class("compact")
-        assert _card_columns(app) == 1
+        assert _row_columns(app) == 1
 
 
-async def test_territory_grid_is_two_columns_standard() -> None:
+async def test_territory_list_is_one_column_standard() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         await _open_territory(app, pilot)
         assert app.screen.has_class("standard")
-        assert _card_columns(app) == 2
+        assert _row_columns(app) == 1
 
 
-async def test_territory_grid_is_three_columns_wide() -> None:
+async def test_territory_list_is_one_column_wide() -> None:
     app = EdgeApp()
     async with app.run_test(size=(126, 44)) as pilot:
         await pilot.pause()
         await _open_territory(app, pilot)
         assert app.screen.has_class("wide")
-        assert _card_columns(app) == 3
+        assert _row_columns(app) == 1
+
+
+async def test_territory_rows_project_blockers_and_restore_focus_by_id() -> None:
+    from textual.widgets import Button
+
+    from edge.tui.screens.territory import TerritoryScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await _open_territory(app, pilot)
+        assert isinstance(app.screen, TerritoryScreen)
+        # The fixture carries fighters but no mines/devices: projection disables the
+        # impossible actions before a form can open and gives the exact reason.
+        assert not app.screen.query_one("#go-fighters", Button).disabled
+        for option_id in ("armid", "limpet", "probe", "interdictor"):
+            button = app.screen.query_one(f"#go-{option_id}", Button)
+            assert button.disabled and button.tooltip
+            row_text = " ".join(str(s.render()) for s in
+                                app.screen.query(f"#option-{option_id} Static"))
+            assert "Unavailable" in row_text
+
+        # Recomposition keys focus by option id, not the old row index.
+        app.screen._active_option_id = "beacon"
+        app.screen._reopen()
+        await pilot.pause()
+        assert app.focused is app.screen.query_one("#go-beacon", Button)
+
+
+async def test_territory_keyboard_traverses_enabled_rows_in_reading_order() -> None:
+    from textual.widgets import Button
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await _open_territory(app, pilot)
+        fighters = app.screen.query_one("#go-fighters", Button)
+        beacon = app.screen.query_one("#go-beacon", Button)
+        fighters.focus()
+        await pilot.press("tab")
+        # Disabled mine/device rows are skipped without disturbing the one-column
+        # reading order; the next legal action is the beacon.
+        assert app.focused is beacon
+        await pilot.press("shift+tab")
+        assert app.focused is fighters
 
 
 # --- Corporation states -------------------------------------------------------

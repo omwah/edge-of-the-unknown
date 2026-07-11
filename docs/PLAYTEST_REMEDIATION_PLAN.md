@@ -400,7 +400,15 @@ high-contrast/monochrome snapshots.
 
 Commit: `playtest: WP-PR10 responsive shell and nav polish`
 
-### WP-PR11 — Deployment list and legality projection
+### WP-PR11 — Deployment list and legality projection — complete
+
+**Completed (2026-07-11):** Territory now projects typed, stable-key
+`DeploymentOptionDTO` affordances from pure core predicates shared by the reducers.
+The TUI renders one vertical sequence at every layout tier, shows stock/purpose and
+the exact blocker, disables impossible buttons, and makes accelerator keys report
+the same blocker before opening a form. Focus restoration uses option ids. The DTO
+addition intentionally bumps the wire protocol to v8; compact/standard/wide and
+alternate-theme snapshots cover the new list.
 
 **Goal:** replace the six-card grid with a readable vertical action list and disable
 impossible deployments before submission.

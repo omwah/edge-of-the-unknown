@@ -16,11 +16,12 @@ from typing import Any
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.economy import EconomyError
+from edge.core.dto import TerritoryDTO
 from edge.core.movement import MovementError
 from edge.core.rules import (
     DeployBeacon, DeployFighters, DeployMines, LaunchProbe, RemoveLimpets,
@@ -57,39 +58,49 @@ _GLYPH_ART = {
 }
 
 
-class _DeployCard(Vertical):
-    """One deployable: art, carried stock, a one-line purpose, and its button."""
+class _DeployRow(Horizontal):
+    """One stable-key deployment row with projected legality (WP-PR11)."""
 
     DEFAULT_CSS = """
-    _DeployCard {
-        border: round $primary; padding: 0 1; height: auto; margin: 0 1 1 0;
+    _DeployRow {
+        border-bottom: solid $primary 40%; padding: 0 1; height: 6; width: 1fr;
     }
-    _DeployCard:focus-within { border: round $accent; background: $boost; }
-    _DeployCard .card-art { height: 3; content-align: center middle; text-align: center; }
-    _DeployCard .card-stock { text-style: bold; }
-    _DeployCard .card-desc { color: $text-muted; height: auto; }
-    _DeployCard Button { margin-top: 1; width: 100%; }
+    _DeployRow:focus-within { background: $boost; }
+    _DeployRow .deploy-art { width: 14; height: 3; content-align: center middle; text-align: center; }
+    _DeployRow .deploy-copy { width: 1fr; height: auto; padding: 0 1; }
+    _DeployRow .deploy-title { text-style: bold; height: 1; }
+    _DeployRow .deploy-desc { color: $text-muted; height: auto; }
+    _DeployRow .deploy-status { height: 1; }
+    _DeployRow Button { width: 20; margin-top: 1; }
+    TerritoryScreen.compact _DeployRow { height: 7; }
+    TerritoryScreen.compact _DeployRow .deploy-art { width: 10; }
+    TerritoryScreen.compact _DeployRow Button { width: 16; }
     """
 
-    def __init__(self, *, card_id: str, title: str, art: Text | str, stock: str,
-                 desc: str, button: str, enabled: bool = True) -> None:
-        super().__init__(classes="deploy-card")
-        self._card_id = card_id
+    def __init__(self, *, option_id: str, title: str, art: Text | str, stock: str,
+                 desc: str, button: str, enabled: bool, blocker: str) -> None:
+        super().__init__(id=f"option-{option_id}", classes="deploy-row")
+        self._option_id = option_id
         self._title = title
         self._art = art
         self._stock = stock
         self._desc = desc
         self._button = button
         self._enabled = enabled
+        self._blocker = blocker
 
     def compose(self) -> ComposeResult:
-        yield Static(self._art, classes="card-art")
-        yield Static(self._stock, classes="card-stock")
-        yield Static(self._desc, classes="card-desc")
-        yield Button(self._button, id=f"go-{self._card_id}", disabled=not self._enabled)
-
-    def on_mount(self) -> None:
-        self.border_title = self._title
+        yield Static(self._art, classes="deploy-art")
+        with Vertical(classes="deploy-copy"):
+            yield Static(f"{self._title} · {self._stock}", classes="deploy-title")
+            yield Static(self._desc, classes="deploy-desc")
+            status = ("[green]Ready[/]" if self._enabled
+                      else f"[dim]Unavailable — {self._blocker}[/]")
+            yield Static(status, classes="deploy-status")
+        button = Button(self._button, id=f"go-{self._option_id}", disabled=not self._enabled)
+        if self._blocker:
+            button.tooltip = self._blocker
+        yield button
 
 
 class TerritoryScreen(Screen[None]):
@@ -107,8 +118,8 @@ class TerritoryScreen(Screen[None]):
 
     HELP_TITLE = "Territory & devices"
     HELP = """\
-Each deployable is a card: [b]Tab[/]/[b]Shift-Tab[/] walk the cards and [b]Enter[/]
-fires the focused button (the keys above are accelerators for the same cards).
+    Each deployable is a row: [b]Tab[/]/[b]Shift-Tab[/] walk its button and [b]Enter[/]
+fires it (the keys above are accelerators for the same actions).
 The table shows what is already deployed here — foreign mines stay invisible.
 Deployment is barred in Core Space; toll fighters levy latinum on entrants;
 limpet mines tag passing hulls so their owner can track them."""
@@ -123,17 +134,17 @@ limpet mines tag passing hulls so their owner can track them."""
         border: round $secondary; height: auto; padding: 0 1; margin-bottom: 1;
     }
     TerritoryScreen #deployed-panel DataTable { height: auto; max-height: 8; }
-    /* WP-UI19: card columns follow the layout tier (1 / 2 / 3). */
-    TerritoryScreen #deploy-grid { grid-size: 2; grid-gutter: 0 1; height: auto; }
-    TerritoryScreen.compact #deploy-grid { grid-size: 1; }
-    TerritoryScreen.wide #deploy-grid { grid-size: 3; }
+    TerritoryScreen #deploy-list { height: auto; }
     TerritoryScreen .warn { color: $warning; margin-bottom: 1; }
     """
 
-    def __init__(self, service: GameService, pid: int = 1) -> None:
+    def __init__(self, service: GameService, pid: int = 1,
+                 initial_option_id: str | None = None) -> None:
         super().__init__()
         self._service = service
         self._pid = pid
+        self._initial_option_id = initial_option_id
+        self._active_option_id = initial_option_id
 
     # --- layout ----------------------------------------------------------------
 
@@ -145,9 +156,18 @@ limpet mines tag passing hulls so their owner can track them."""
             yield self._deployed_panel(t, sector)
             if t.in_core:
                 yield Static("Deployment is barred in Core Space.", classes="warn")
-            with Grid(id="deploy-grid"):
-                yield from self._cards(t)
+            with Vertical(id="deploy-list"):
+                yield from self._rows(t)
         yield Footer()
+
+    def on_mount(self) -> None:
+        if self._initial_option_id is not None:
+            self.call_after_refresh(self._restore_focus)
+
+    def _restore_focus(self) -> None:
+        buttons = self.query(f"#go-{self._initial_option_id}")
+        if buttons and not buttons.first().disabled:
+            buttons.first().focus()
 
     def _deployed_panel(self, t: object, sector: object) -> Vertical:
         """What already sits in this sector, tabular (fog pre-applied upstream)."""
@@ -185,57 +205,47 @@ limpet mines tag passing hulls so their owner can track them."""
         panel.border_title = "Deployed in this sector"
         return panel
 
-    def _cards(self, t: object) -> list[_DeployCard]:
+    def _rows(self, t: TerritoryDTO) -> list[_DeployRow]:
+        options = {option.id: option for option in t.options}
         fighter_art = art_adapter.sprite("ship", "fighter", seed=11, width=12, height=3)
-        cards = [
-            _DeployCard(
-                card_id="fighters", title="Fighters", art=fighter_art,
-                stock=f"aboard: {t.fighters:,}",  # type: ignore[attr-defined]
-                desc="Garrison the sector: defend it, deny it, or levy a toll on entrants.",
-                button="Deploy fighters…", enabled=t.fighters > 0),  # type: ignore[attr-defined]
-            _DeployCard(
-                card_id="armid", title="Armid mines",
-                art=Text.from_markup(_GLYPH_ART["armid"]),
-                stock=f"aboard: {t.mines:,} mines",  # type: ignore[attr-defined]
-                desc="Detonate against hostile hulls on entry — shields absorb, mines spend.",
-                button="Lay armid mines…", enabled=t.mines > 0),  # type: ignore[attr-defined]
-            _DeployCard(
-                card_id="limpet", title="Limpet mines",
-                art=Text.from_markup(_GLYPH_ART["limpet"]),
-                stock=f"aboard: {t.mines:,} mines",  # type: ignore[attr-defined]
-                desc="Cling to passing hulls and betray their position to you.",
-                button="Lay limpet mines…", enabled=t.mines > 0),  # type: ignore[attr-defined]
-            _DeployCard(
-                card_id="beacon", title="Comms beacon",
-                art=Text.from_markup(_GLYPH_ART["beacon"]),
-                stock="one message per sector",
-                desc="Plant a short message every visitor to this sector will read.",
-                button="Plant beacon…"),
-            _DeployCard(
-                card_id="probe", title="Probe",
-                art=Text.from_markup(_GLYPH_ART["probe"]),
-                stock=f"aboard: {t.probes}",  # type: ignore[attr-defined]
-                desc="Fire at a charted sector for a one-shot recon report.",
-                button="Launch probe…", enabled=t.probes > 0),  # type: ignore[attr-defined]
-            _DeployCard(
-                card_id="interdictor", title="Interdictor",
-                art=Text.from_markup(_GLYPH_ART["interdictor"]),
-                stock=("engaged" if t.interdictor_active else  # type: ignore[attr-defined]
-                       ("idle" if t.interdictor_owned else "not installed")),  # type: ignore[attr-defined]
-                desc="Pin this sector while engaged — nothing flees it (daily turn tax).",
-                button=("Disengage" if t.interdictor_active else "Engage"),  # type: ignore[attr-defined]
-                enabled=t.interdictor_owned),  # type: ignore[attr-defined]
+        specs = [
+            ("fighters", "Fighters", fighter_art,
+                f"aboard: {t.fighters:,}",
+                "Garrison the sector: defend it, deny it, or levy a toll on entrants.",
+                "Deploy…"),
+            ("armid", "Armid mines", Text.from_markup(_GLYPH_ART["armid"]),
+                f"aboard: {t.mines:,} mines",
+                "Detonate against hostile hulls on entry — shields absorb, mines spend.",
+                "Lay…"),
+            ("limpet", "Limpet mines", Text.from_markup(_GLYPH_ART["limpet"]),
+                f"aboard: {t.mines:,} mines",
+                "Cling to passing hulls and betray their position to you.",
+                "Lay…"),
+            ("beacon", "Comms beacon", Text.from_markup(_GLYPH_ART["beacon"]),
+                "one message per sector",
+                "Plant a short message every visitor to this sector will read.",
+                "Plant…"),
+            ("probe", "Probe", Text.from_markup(_GLYPH_ART["probe"]),
+                f"aboard: {t.probes}",
+                "Fire at a charted sector for a one-shot recon report.",
+                "Launch…"),
+            ("interdictor", "Interdictor", Text.from_markup(_GLYPH_ART["interdictor"]),
+                ("engaged" if t.interdictor_active else
+                       ("idle" if t.interdictor_owned else "not installed")),
+                "Pin this sector while engaged — nothing flees it (daily turn tax).",
+                ("Disengage" if t.interdictor_active else "Engage")),
         ]
-        if t.limpets:  # type: ignore[attr-defined]
-            where = ("here" if t.at_service_point  # type: ignore[attr-defined]
+        if t.limpets:
+            where = ("here" if t.at_service_point
                      else "at a StarDock or your own base")
-            cards.append(_DeployCard(
-                card_id="strip", title="Strip limpets",
-                art=Text.from_markup(_GLYPH_ART["strip"]),
-                stock=f"fee: {t.limpet_removal_fee:,} latinum",  # type: ignore[attr-defined]
-                desc=f"Pay the yard to scrape off attached limpets — removable {where}.",
-                button="Strip limpets", enabled=t.at_service_point))  # type: ignore[attr-defined]
-        return cards
+            specs.append(("strip", "Strip limpets", Text.from_markup(_GLYPH_ART["strip"]),
+                f"fee: {t.limpet_removal_fee:,} latinum",
+                f"Pay the yard to scrape off attached limpets — removable {where}.",
+                "Strip"))
+        return [_DeployRow(option_id=option_id, title=title, art=art, stock=stock,
+                           desc=desc, button=button, enabled=options[option_id].enabled,
+                           blocker=options[option_id].blocker)
+                for option_id, title, art, stock, desc, button in specs]
 
     # --- helpers ---------------------------------------------------------------
 
@@ -261,7 +271,18 @@ limpet mines tag passing hulls so their owner can track them."""
 
     def _reopen(self) -> None:
         self.app.pop_screen()
-        self.app.push_screen(TerritoryScreen(self._service, self._pid))
+        self.app.push_screen(TerritoryScreen(
+            self._service, self._pid, initial_option_id=self._active_option_id))
+
+    def _available(self, option_id: str) -> bool:
+        """Apply the same projected blocker to accelerator keys as disabled buttons."""
+        option = next(o for o in self._service.territory_view(self._pid).options
+                      if o.id == option_id)
+        self._active_option_id = option_id
+        if option.enabled:
+            return True
+        notify_warning(self, option.blocker)
+        return False
 
     def action_back(self) -> None:
         self.app.pop_screen()
@@ -269,6 +290,8 @@ limpet mines tag passing hulls so their owner can track them."""
     # --- deploy ---------------------------------------------------------------
 
     def action_deploy_fighters(self) -> None:
+        if not self._available("fighters"):
+            return
         def _mode(count: int, mode: str | None) -> None:
             if mode is None:
                 return
@@ -296,12 +319,18 @@ limpet mines tag passing hulls so their owner can track them."""
         self.app.push_screen(_AmountInput(f"Lay how many {kind} mines?"), _go)
 
     def action_deploy_armid(self) -> None:
+        if not self._available("armid"):
+            return
         self._deploy_mines("armid")
 
     def action_deploy_limpets(self) -> None:
+        if not self._available("limpet"):
+            return
         self._deploy_mines("limpet")
 
     def action_beacon(self) -> None:
+        if not self._available("beacon"):
+            return
         def _go(text: str | None) -> None:
             if text:
                 self._issue(DeployBeacon(text=text), "Beacon planted")
@@ -310,6 +339,8 @@ limpet mines tag passing hulls so their owner can track them."""
     # --- devices ---------------------------------------------------------------
 
     def action_probe(self) -> None:
+        if not self._available("probe"):
+            return
         def _go(dest: int | None) -> None:
             if dest is None:
                 return
@@ -321,9 +352,13 @@ limpet mines tag passing hulls so their owner can track them."""
         self.app.push_screen(TravelPromptScreen(), _go)
 
     def action_interdictor(self) -> None:
+        if not self._available("interdictor"):
+            return
         self._issue(ToggleInterdictor(), "Interdictor toggled")
 
     def action_remove_limpets(self) -> None:
+        if not self._available("strip"):
+            return
         self._issue(RemoveLimpets(), "Limpets stripped")
 
 

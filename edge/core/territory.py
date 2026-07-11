@@ -34,6 +34,88 @@ from edge.core.models import AlienSpecies, EncounterFoe, Ownership, Player, Sect
 FIGHTER_MODES = ("offensive", "defensive", "toll")
 
 
+@dataclass(frozen=True, slots=True)
+class DeploymentLegality:
+    """Pure reducer-parity affordance for one Territory action (WP-PR11)."""
+
+    id: str
+    quantity: int
+    enabled: bool
+    blocker: str = ""
+    active: bool = False
+
+
+def deployment_legality(
+    state: UniverseState, player_id: int, action_id: str, config: GameConfig,
+) -> DeploymentLegality:
+    """Return exact pre-submit legality for a Territory action.
+
+    Command-specific input (fighter mode/count, beacon text, probe destination) is
+    still validated by reducers; this covers every fact already known before opening
+    those forms and is itself called by the reducers so projection cannot drift.
+    """
+    from edge.core.services import service_point
+
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    sector = state.sectors[ship.sector_id]
+    own = Ownership("player", player_id)
+    existing = state.sector_forces.get(ship.sector_id)
+    foreign_force = existing is not None and existing.owner != own
+
+    quantity = 0
+    blocker = ""
+    active = False
+    if action_id == "fighters":
+        quantity = ship.fighters
+        active = existing is not None and existing.owner == own and existing.fighters > 0
+        if sector.is_galactic_core:
+            blocker = "deployment is barred in Core Space"
+        elif quantity < 1:
+            blocker = "no fighters aboard"
+        elif foreign_force:
+            blocker = "another force already holds this sector"
+    elif action_id in ("armid", "limpet"):
+        quantity = ship.mines
+        active = (existing is not None and existing.owner == own and
+                  (existing.armid_mines if action_id == "armid" else existing.limpet_mines) > 0)
+        if sector.is_galactic_core:
+            blocker = "deployment is barred in Core Space"
+        elif quantity < 1:
+            blocker = "no space mines aboard"
+        elif foreign_force:
+            blocker = "another force already holds this sector"
+    elif action_id == "beacon":
+        quantity = player.latinum // max(1, config.territory.beacon_price)
+        active = bool(sector.beacon_text)
+        if sector.is_galactic_core:
+            blocker = "deployment is barred in Core Space"
+        elif player.latinum < config.territory.beacon_price:
+            blocker = f"need {config.territory.beacon_price} latinum to plant a beacon"
+    elif action_id == "probe":
+        quantity = ship.devices.get("probe", 0)
+        if config.devices.get("probe") is None:
+            blocker = "probes are not sold in this universe"
+        elif quantity < 1:
+            blocker = "no probe aboard"
+    elif action_id == "interdictor":
+        quantity = ship.devices.get("interdictor", 0)
+        active = ship.interdictor_active
+        if quantity < 1:
+            blocker = "no interdictor aboard"
+    elif action_id == "strip":
+        quantity = sum(ship.limpets.values())
+        if quantity < 1:
+            blocker = "no limpets attached"
+        elif service_point(state, player, ship, config) is None:
+            blocker = "limpets can only be removed at a StarDock or a base you own"
+        elif player.latinum < config.territory.limpet_removal_fee:
+            blocker = f"need {config.territory.limpet_removal_fee} latinum to strip the limpets"
+    else:
+        raise ValueError(f"unknown deployment action {action_id!r}")
+    return DeploymentLegality(action_id, quantity, not blocker, blocker, active)
+
+
 def force_in_sector(state: UniverseState, sector_id: int) -> SectorForce | None:
     """The deployed force garrisoning `sector_id`, or None."""
     return state.sector_forces.get(sector_id)
