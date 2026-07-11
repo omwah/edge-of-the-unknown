@@ -12,15 +12,15 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, Static
+from textual.widgets import Button, Footer, Static
 
 from edge.core.combat import CombatError
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Subsystem
-from edge.core.events import EncounterEnded
+from edge.core.events import CombatRound, EncounterEnded
 from edge.core.movement import MovementError
 from edge.core.rules import CombatAction
 from edge.tui.chrome import notify_warning
@@ -59,8 +59,9 @@ configured floor; firing arcs decide who can answer."""
     EncounterScreen #enc-disp {
         height: 1; padding: 0 1; color: $text-muted; border-bottom: solid $error;
     }
+    EncounterScreen #enc-body { height: 1fr; }
     EncounterScreen #enc-speech { height: auto; padding: 0 2; color: $warning; }
-    EncounterScreen #enc-main { height: 1fr; padding: 1 2; }
+    EncounterScreen #enc-main { height: auto; padding: 1 2; }
     EncounterScreen #them {
         width: 1fr; height: auto; border: round $error; padding: 0 1;
     }
@@ -68,18 +69,33 @@ configured floor; firing arcs decide who can answer."""
         width: 1fr; height: auto; border: round $primary; padding: 0 1; margin-left: 2;
     }
     EncounterScreen .arc { color: $text-muted; margin-top: 1; }
-    EncounterScreen #enc-round {
-        height: 1; padding: 0 2; color: $secondary; text-style: bold;
+    EncounterScreen #enc-result {
+        height: auto; min-height: 3; padding: 0 1; margin: 0 2;
+        border: round $secondary;
     }
-    EncounterScreen #enc-controls {
+    EncounterScreen #enc-advice {
+        height: auto; padding: 0 2; color: $text-muted;
+    }
+    EncounterScreen #enc-actions {
         height: auto; padding: 0 2 1 2; border-top: solid $error;
     }
+    EncounterScreen #enc-actions Button { width: 1fr; margin-right: 1; }
+    EncounterScreen.compact #enc-main { padding: 0; }
+    EncounterScreen.compact #them, EncounterScreen.compact #you { padding: 0 1; margin: 0; }
+    EncounterScreen.compact .foe-art { display: none; }
+    EncounterScreen.compact #enc-result { margin: 0; min-height: 3; }
+    EncounterScreen.compact #enc-advice { padding: 0; }
+    EncounterScreen.compact #enc-actions { padding: 0; }
+    EncounterScreen.compact #enc-actions Button { min-width: 12; height: 3; margin: 0; }
+    EncounterScreen.wide #them { width: 3fr; }
+    EncounterScreen.wide #you { width: 2fr; }
     """
 
     def __init__(self, service, player_id: int) -> None:
         super().__init__()
         self._service = service
         self._pid = player_id
+        self._last_round = "Opening engagement · choose a tactical action."
 
     def compose(self) -> ComposeResult:
         e = self._service.encounter_view(self._pid)
@@ -94,40 +110,60 @@ configured floor; firing arcs decide who can answer."""
             f"detection: they spotted you",
             id="enc-disp",
         )
-        if e.speech:  # the pack's spoken combat beat (§6.7, WP31), in its own voice
-            yield Static(f'[italic]“{e.speech}”[/]', id="enc-speech")
-        with Horizontal(id="enc-main"):
-            with Vertical(id="them") as them:
-                them.border_title = "THEM"
-                if e.foes:
-                    entity, sub = art_adapter.ship_entity(e.foes[0].name)
-                    yield Static(art_adapter.sprite(
-                        entity, sub, seed=len(e.foes), width=22, height=6, facing="left"))
-                for s in e.foes:
-                    mark = "[white]>[/]" if s.alive else "[dim]x[/]"
-                    yield Static(
-                        f"{mark} {s.name:<28} hull [red]{bar(s.hull_filled)}[/] {s.hull_pct:>3}%"
-                    )
-                yield Static(e.arc_hint, classes="arc")
-            with Vertical(id="you") as you:
-                you.border_title = "YOU"
-                yield Static(f"Shields  [cyan]{bar(e.shields_pct // 10)}[/] {e.shields_pct:>3}%")
-                yield Static(f"Hull     [green]{bar(e.hull_pct // 10)}[/] {e.hull_pct:>3}%")
-                yield Static(e.combat_line)
-                flag = "[red]\\[!][/]" if e.integrity_flag != "all nominal" else "[dim]\\[ ][/]"
-                yield Static(f"{flag} {e.integrity_flag}")
-        yield Static(
-            f"Round {e.round_no}      flee chance  [b]{e.flee_chance}%[/]  "
-            f"[dim](floor {e.flee_floor}%)[/]",
-            id="enc-round",
-        )
-        gun = "[green][+][/]" if e.gun_online else "[red]offline[/]"
-        yield Static(
-            f"[b]F[/] Fire Main Gun {gun}    [b]M[/] Missile x{e.missiles} [dim](ignores arc)[/]\n"
-            f"[b]R[/] Flee     [b]K[/] Field-patch kit x{e.repair_kits}",
-            id="enc-controls",
-        )
+        with VerticalScroll(id="enc-body"):
+            if e.speech:  # the pack's spoken combat beat (§6.7, WP31), in its own voice
+                yield Static(f'[italic]“{e.speech}”[/]', id="enc-speech")
+            with Horizontal(id="enc-main"):
+                with Vertical(id="them") as them:
+                    them.border_title = "ENEMY PACK"
+                    if e.foes:
+                        entity, sub = art_adapter.ship_entity(e.foes[0].name)
+                        yield Static(art_adapter.sprite(
+                            entity, sub, seed=len(e.foes), width=22, height=5, facing="left"),
+                            classes="foe-art")
+                    for s in e.foes:
+                        mark = "[white]>[/]" if s.alive else "[dim]x[/]"
+                        yield Static(
+                            f"{mark} {s.name:<20} HULL [red]{bar(s.hull_filled)}[/] {s.hull_pct:>3}%\n"
+                            f"  ARC {s.firing_arc.replace('_', ' ')}"
+                        )
+                with Vertical(id="you") as you:
+                    you.border_title = "YOUR SHIP"
+                    yield Static(f"◇ SHIELDS [cyan]{bar(e.shields_pct // 10)}[/] {e.shields_pct:>3}%")
+                    yield Static(f"△ HULL    [green]{bar(e.hull_pct // 10)}[/] {e.hull_pct:>3}%")
+                    yield Static(f"→ {e.combat_line}")
+                    flag = "[red]\\[!][/]" if e.integrity_flag != "all nominal" else "[dim]\\[ ][/]"
+                    yield Static(f"{flag} COMPONENTS  {e.integrity_flag}")
+            result = Static(self._last_round, id="enc-result")
+            result.border_title = "CURRENT ROUND RESULT"
+            yield result
+            yield Static(
+                f"TACTICAL · Round {e.round_no} · Flee [b]{e.flee_chance}%[/] "
+                f"(hard floor {e.flee_floor}%)\n"
+                f"FIRING ARC · {e.arc_hint or 'no arc advantage known'} · "
+                "Missiles ignore firing arcs.",
+                id="enc-advice",
+            )
+            with Horizontal(id="enc-actions"):
+                yield Button("▶ FIRE [F]", id="btn-fight", variant="error",
+                             disabled=not e.gun_online)
+                yield Button(f"◆ MISSILE [M] ×{e.missiles}", id="btn-missile",
+                             disabled=e.missiles <= 0)
+                yield Button("↱ FLEE [R]", id="btn-flee", variant="warning")
+                yield Button(f"⚒ PATCH [K] ×{e.repair_kits}", id="btn-patch",
+                             disabled=e.repair_kits <= 0 or self._first_knocked_out() is None)
         yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        actions = {
+            "btn-fight": self.action_fight,
+            "btn-missile": self.action_missile,
+            "btn-flee": self.action_flee,
+            "btn-patch": self.action_patch,
+        }
+        handler = actions.get(event.button.id or "")
+        if handler is not None:
+            self.run_worker(handler())
 
     # --- actions: one CombatAction command per keypress -----------------------
 
@@ -155,6 +191,18 @@ configured floor; firing arcs decide who can answer."""
             self.notify(note, title="Encounter", severity=severity, timeout=4)
             self.app.pop_screen()
             return
+        round_event = next((e for e in events if isinstance(e, CombatRound)), None)
+        if round_event is not None:
+            action_label = {
+                "fight": "FIRE", "launch_missile": "MISSILE",
+                "flee": "FLEE", "field_patch": "PATCH",
+            }.get(round_event.action, round_event.action.upper())
+            self._last_round = (
+                f"Round {round_event.round} · {action_label} · "
+                f"damage dealt {round_event.damage_dealt} · "
+                f"damage taken {round_event.damage_taken} · "
+                f"foes remaining {round_event.foes_left}"
+            )
         await self.recompose()
 
     async def action_fight(self) -> None:

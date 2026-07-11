@@ -348,6 +348,25 @@ def sample_encounter() -> EncounterDTO:
     )
 
 
+def sample_encounter_view() -> dto.EncounterDTO:
+    """The live combat DTO used by the responsive EncounterScreen snapshots."""
+    return dto.EncounterDTO(
+        species_id=7, title="Kessrin Raider pack (x3)", species_name="Kessrin Raiders",
+        archetype_id="kessrin", band="hostile", disposition_filled=1, round_no=3,
+        foes=[
+            dto.EncounterFoeDTO("Raider", 7, 70, 0, "ahead", True),
+            dto.EncounterFoeDTO("Raider", 10, 99, 0, "spinal", True),
+            dto.EncounterFoeDTO("Skiff", 4, 40, 0, "all_round", True),
+        ],
+        arc_hint="ahead/spinal → break their firing line",
+        shields_pct=38, hull_pct=74,
+        combat_line="Combat spd 4 (+1 eff) vs intercept 0.6",
+        integrity_flag="thrusters: 1 out", flee_chance=31, flee_floor=10,
+        missiles=3, repair_kits=2, gun_online=True,
+        speech="Sol-meat. Your drive-glow led us right to you.",
+    )
+
+
 def sample_messages() -> MessagesDTO:
     """The messages & log from UI_MOCKUPS.md §11 (the durable event_log, §12)."""
     return MessagesDTO(
