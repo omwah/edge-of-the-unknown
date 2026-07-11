@@ -345,12 +345,12 @@ def warp_legend_markup(core_anchor_side: str) -> str:
     """The warp colour and navigation guide — shown in the Help modal."""
     anchor_left = core_anchor_side != "right"
     if anchor_left:
-        core_line = "• [bold cyan]◄ Core[/]: Points towards Core Space (Sectors 1-10), the safe home territory governed by the Federation."
+        core_line = "• [bold cyan]◄ Core[/]: Points towards Core Space (Sectors 1-10) and its current governor."
         void_line = "• [bold blue]Void ►[/]: Points towards the outer boundary of the universe, pointing away from the Core."
         directions = f"{core_line}\n{void_line}"
     else:
         void_line = "• [bold blue]◄ Void[/]: Points towards the outer boundary of the universe, pointing away from the Core."
-        core_line = "• [bold cyan]Core ►[/]: Points towards Core Space (Sectors 1-10), the safe home territory governed by the Federation."
+        core_line = "• [bold cyan]Core ►[/]: Points towards Core Space (Sectors 1-10) and its current governor."
         directions = f"{void_line}\n{core_line}"
 
     return (
@@ -359,6 +359,12 @@ def warp_legend_markup(core_anchor_side: str) -> str:
         "• [bold]Mouse & Keyboard[/]: Click any warp label to travel directly, or use the\n"
         "  [bold]Arrow keys[/] to select a warp and press [bold]Enter[/] / [bold]Space[/] to travel.\n"
         f"{directions}\n\n"
+        "[bold cyan]Warp Symbols[/]\n"
+        "• [b]<<[/] Coreward (closer)   • [b]>>[/] Outward (deeper)   "
+        "• [b]--[/] Cross-band (level)\n"
+        "• [b]↩[/] Backtrack / the sector just left   • [b]⇢[/] One-way exit\n"
+        "• [b yellow]⊘[/] Avoided by route plotting   • [b yellow]⚠[/] Known hazard\n"
+        "• [dim]?[/] Unexplored destination (name and contents remain hidden)\n\n"
         "[bold cyan]Warp Color (Distance Bands)[/]\n"
         "Colors represent the distance band of the target sector from the Core:\n"
         "• [cyan]■[/] Hub          • [green]■[/] Frontier\n"
@@ -1536,6 +1542,22 @@ class NavRose(Vertical):
         # Grab focus as the rose appears so arrow keys drive selection immediately
         # (no priming Tab); re-homes on each recompose, as the old warp grid did.
         if self._hits:
+            focus_default = getattr(getattr(self.app, "ui_config", None),
+                                    "warp_focus_default", "backtrack")
+            if focus_default == "backtrack":
+                self._idx = next(
+                    (i for i, node in enumerate(self._hits)
+                     if self._warps.get(node.sector_id) is not None
+                     and self._warps[node.sector_id].kind == "backtrack"),
+                    0,
+                )
+            elif focus_default == "unexplored":
+                self._idx = next(
+                    (i for i, node in enumerate(self._hits)
+                     if self._warps.get(node.sector_id) is not None
+                     and self._warps[node.sector_id].kind == "unexplored"),
+                    0,
+                )
             self.call_after_refresh(self.focus)
 
     def compose(self) -> ComposeResult:

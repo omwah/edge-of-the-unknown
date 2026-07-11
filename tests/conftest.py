@@ -54,7 +54,7 @@ TEST_OVERRIDES: dict[str, Any] = {
     },
     "ui": {
         "warp_columns": 3,
-        "warp_focus_default": "first",
+        "warp_focus_default": "backtrack",
         "sidebar_width": 33,
         "sidebar_min_screen_width": 90,
     },

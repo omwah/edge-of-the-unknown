@@ -62,7 +62,7 @@ def test_scene_art_is_optional_with_defaults() -> None:
 def test_default_ui_values() -> None:
     ui = load_default_config().ui
     assert ui.warp_columns == 3
-    assert ui.warp_focus_default == "first"
+    assert ui.warp_focus_default == "backtrack"
     assert ui.sidebar_width == 33
     assert ui.sidebar_min_screen_width == 90
 
@@ -237,5 +237,4 @@ def test_production_config_validates() -> None:
     cfg = getattr(edge.config, "original_load_config", edge.config.load_config)(prod_path)
     assert isinstance(cfg, GameConfig)
     assert cfg.roster is not None
-
 

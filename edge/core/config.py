@@ -1413,7 +1413,7 @@ class UIConfig(BaseModel):
     model_config = _FROZEN
 
     warp_columns: int = Field(default=3, gt=0)
-    warp_focus_default: Literal["first", "backtrack", "unexplored"] = "first"
+    warp_focus_default: Literal["first", "backtrack", "unexplored"] = "backtrack"
     # Which frame edge the nav rose's `Core` orientation anchor pins to (§11). Fixed —
     # not bearing-driven — so the anchor never jumps sides between sectors; the arrow
     # always faces the same way. `left` ⇒ `◄ Core` at the left edge; `right` ⇒ `Core ►`.

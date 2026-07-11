@@ -26,6 +26,8 @@ class StatusDrawerScreen(ModalScreen[DrawerPick | None]):
     BINDINGS = [
         Binding("i", "close", "Close", show=False),
         Binding("escape", "close", "Close"),
+        Binding("up", "move(-1)", "Previous object", show=False),
+        Binding("down", "move(1)", "Next object", show=False),
     ]
 
     DEFAULT_CSS = """
@@ -66,3 +68,16 @@ class StatusDrawerScreen(ModalScreen[DrawerPick | None]):
 
     def action_close(self) -> None:
         self.dismiss(None)
+
+    def action_move(self, delta: int) -> None:
+        """Walk object rows only; the ship readout is deliberately skipped."""
+        rows = list(self.query("SectorObjectList ObjectRow"))
+        if not rows:
+            return
+        try:
+            index = rows.index(self.focused)  # type: ignore[arg-type]
+        except ValueError:
+            index = 0 if delta > 0 else len(rows) - 1
+        else:
+            index = max(0, min(len(rows) - 1, index + delta))
+        rows[index].focus()
