@@ -113,6 +113,15 @@ async def test_nav_rose_focuses_the_return_warp_after_travel() -> None:
         selected = rose._hits[rose._idx].sector_id
         assert selected == start
         assert rose._warps[selected].kind == "backtrack"
+        # A second hop (back to the origin) re-homes on the sector just left again;
+        # selection follows the latest movement rather than a stale first route.
+        await pilot.press("enter")
+        await pilot.pause()
+        rose = app.screen.query_one(NavRose)
+        selected = rose._hits[rose._idx].sector_id
+        assert svc.game_view(1).sector.sector_id == start
+        assert selected == target
+        assert rose._warps[selected].kind == "backtrack"
 
 
 async def test_wormhole_art_is_clickable_and_warps() -> None:
@@ -151,6 +160,11 @@ async def test_wormhole_art_is_clickable_and_warps() -> None:
             ClickableEntry.Picked("wormhole", exit_sector))
         await pilot.pause()
         assert svc.game_view(1).sector.sector_id == exit_sector
+        # The source is not an outbound neighbour at a real one-way arrival, so
+        # backtrack-default focus safely falls back to the first available warp.
+        rose = app.screen.query_one(NavRose)
+        assert all(w.kind != "backtrack" for w in rose._warps.values())
+        assert rose._idx == 0
 
 
 async def test_log_hotkey_opens_computer_log() -> None:
