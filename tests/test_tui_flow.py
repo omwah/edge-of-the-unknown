@@ -1840,3 +1840,42 @@ async def test_contact_replies_are_responsive_and_keyboard_focusable() -> None:
             await pilot.press("down")
             assert app.focused is replies[1]
             await pilot.press("enter")  # no-service harness: dispatches safely
+
+
+async def test_compact_combat_dashboard_keeps_round_result_and_odds() -> None:
+    """WP-UI18: combat remains keyboard-playable with persistent reducer results."""
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    from edge.core.events import CombatRound
+    from edge.tui.dummy import sample_encounter_view
+    from edge.tui.screens.encounter import EncounterScreen
+
+    class CombatService:
+        def __init__(self) -> None:
+            self.view = sample_encounter_view()
+
+        def encounter_view(self, player_id: int):
+            return self.view
+
+        def engine_room_view(self, player_id: int):
+            return SimpleNamespace(subsystems=[])
+
+        def apply(self, player_id: int, command):
+            self.view = replace(self.view, round_no=self.view.round_no + 1,
+                                shields_pct=self.view.shields_pct - 4)
+            return [CombatRound(player_id, self.view.species_id, self.view.round_no,
+                                command.action, 12, 4, 3)]
+
+    service = CombatService()
+    app = EdgeApp(plain=True)
+    async with app.run_test(size=(80, 24)) as pilot:
+        app.push_screen(EncounterScreen(service, 1))
+        await pilot.pause()
+        assert app.screen.has_class("compact")
+        advice = app.screen.query_one("#enc-advice").render().plain
+        assert "hard floor 10%" in advice and "FIRING ARC" in advice
+        await pilot.press("f")
+        await pilot.pause()
+        result = app.screen.query_one("#enc-result").render().plain
+        assert "FIRE" in result and "damage dealt 12" in result and "damage taken 4" in result

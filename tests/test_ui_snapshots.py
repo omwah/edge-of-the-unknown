@@ -135,3 +135,27 @@ def test_contact_sizes(snap_compare, size: tuple[int, int]) -> None:
         await pilot.pause()
 
     assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_contact)
+
+
+class _StaticEncounterService:
+    def __init__(self) -> None:
+        from edge.tui.dummy import sample_encounter_view
+        self.view = sample_encounter_view()
+
+    def encounter_view(self, player_id: int):
+        return self.view
+
+    def engine_room_view(self, player_id: int):
+        from types import SimpleNamespace
+        return SimpleNamespace(subsystems=[])
+
+
+@pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
+def test_encounter_sizes(snap_compare, size: tuple[int, int]) -> None:
+    from edge.tui.screens.encounter import EncounterScreen
+
+    async def open_encounter(pilot: Pilot) -> None:
+        pilot.app.push_screen(EncounterScreen(_StaticEncounterService(), 1))
+        await pilot.pause()
+
+    assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_encounter)
