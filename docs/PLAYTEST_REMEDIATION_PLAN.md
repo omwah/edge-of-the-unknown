@@ -116,7 +116,7 @@ sector art, and credits the deterministic cache exactly once when salvaged.
 
 Commit: `playtest: WP-PR01 persistent combat wrecks`
 
-### WP-PR02 — Territory defenses on NPC cron movement
+### WP-PR02 — Territory defenses on NPC cron movement — complete
 
 **Goal:** movement by the NPC cron follows the same sector-entry defense rules as
 player movement.
@@ -140,7 +140,7 @@ seed; depletion and event ordering; replay equality; no friendly fire.
 
 Commit: `playtest: WP-PR02 NPC entry territory defenses`
 
-### WP-PR03 — Correct flee state and combat outcome language
+### WP-PR03 — Correct flee state and combat outcome language — complete
 
 **Goal:** successful alien flight changes world state and produces truthful copy.
 
@@ -161,7 +161,7 @@ determinism, no ghost ship in origin, event-log wording, encounter-screen Pilot 
 
 Commit: `playtest: WP-PR03 alien retreat state and copy`
 
-### WP-PR04 — Starbase recovery and integrity-gated services
+### WP-PR04 — Starbase recovery and integrity-gated services — complete
 
 **Goal:** let players work on abandoned bases before claiming them and prevent
 damaged bases from providing full services.
