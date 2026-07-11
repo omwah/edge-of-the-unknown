@@ -150,7 +150,7 @@ async def test_log_hotkey_opens_computer_log() -> None:
 
 async def test_computer_market_tab_shows_the_order_book() -> None:
     """WP48: the Computer's Market tab renders (fog-respecting) without error."""
-    from textual.widgets import DataTable, TabbedContent
+    from textual.widgets import DataTable
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -855,7 +855,7 @@ async def test_haggle_session_stays_open_across_a_rejected_round() -> None:
 
 
 async def test_computer_dossier_lists_a_met_species() -> None:
-    from textual.widgets import DataTable, TabbedContent
+    from textual.widgets import DataTable
 
     from edge.tui.screens.computer import ComputerScreen
 
@@ -964,7 +964,7 @@ async def test_stardock_shipyard_swaps_hull() -> None:
 
 async def test_trade_plot_route_and_engage() -> None:
     """WP14: Trade tab → [P] plots the round trip → [G] engages and travels (§11)."""
-    from textual.widgets import DataTable, TabbedContent
+    from textual.widgets import DataTable
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -996,7 +996,7 @@ async def test_trade_plot_route_and_engage() -> None:
 
 async def test_codex_plot_route_to_a_logged_find() -> None:
     """WP14: a logged discovery → Codex [P] routes to the find's sector (§11)."""
-    from textual.widgets import DataTable, TabbedContent
+    from textual.widgets import DataTable
 
     from edge.core.rules import Salvage, Warp
 
@@ -1043,7 +1043,7 @@ async def test_codex_plot_route_to_a_logged_find() -> None:
 async def test_leads_tab_lists_logged_tip_plots_and_engages_route() -> None:
     """§6.7: a logged tip shows on the Leads tab → [P] routes over the full graph → [G] flies it,
     charting the uncharted course without any manual warping (the coordinates are the map)."""
-    from textual.widgets import DataTable, TabbedContent
+    from textual.widgets import DataTable
 
     from edge.core.models import LocationRef
     from edge.core.rules import AcceptLead
@@ -1137,7 +1137,6 @@ async def test_map_tab_renders_local_graph_and_overlays_route() -> None:
 
 async def test_clicking_a_map_sector_plots_a_route() -> None:
     """A clicked sector node on the Map plots a route to it and opens the Route tab."""
-    from textual.widgets import TabbedContent
 
     from edge.tui.widgets import LocalMapView
 
@@ -1170,7 +1169,6 @@ async def test_clicking_a_map_sector_plots_a_route() -> None:
 
 async def test_map_arrow_keys_select_and_enter_plots_route() -> None:
     """Arrow keys move a sector cursor around the Map tab; Enter plots a route to it."""
-    from textual.widgets import TabbedContent
 
     from edge.tui.widgets import LocalMapView
 
@@ -1208,7 +1206,6 @@ async def test_map_arrow_keys_select_and_enter_plots_route() -> None:
 
 async def test_computer_screen_remembers_last_tab() -> None:
     """[C] reopens the Computer on whichever tab was last viewed (not always Trade)."""
-    from textual.widgets import TabbedContent
 
     from edge.tui.screens.computer import ComputerScreen
 
@@ -1237,7 +1234,7 @@ async def test_computer_screen_remembers_last_tab() -> None:
 
 async def test_ports_directory_lists_and_plots_route() -> None:
     """WP15: Ports tab lists charted ports → [P] plots a route to one (§11)."""
-    from textual.widgets import DataTable, TabbedContent
+    from textual.widgets import DataTable
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:

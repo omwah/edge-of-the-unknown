@@ -16,6 +16,8 @@ To give a screen richer help, declare on it:
 
 from __future__ import annotations
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
@@ -32,7 +34,7 @@ destructive acts always confirm first · pickers: [b]↑/↓[/] select, [b]Enter
 """
 
 
-def _binding_rows(host: Screen) -> list[str]:
+def _binding_rows(host: Screen[Any]) -> list[str]:
     """The host screen's advertised bindings as help rows (never drifts — live)."""
     rows: list[str] = []
     for descriptor in screen_actions(host):
@@ -64,7 +66,7 @@ class HelpScreen(ModalScreen[None]):
     HelpScreen #help-footer { color: $text-muted; margin-top: 1; }
     """
 
-    def __init__(self, host: Screen | None = None) -> None:
+    def __init__(self, host: Screen[Any] | None = None) -> None:
         super().__init__()
         self._host = host
 

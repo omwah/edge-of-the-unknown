@@ -42,6 +42,20 @@ from edge.core.dto import (
     WarpDTO,
 )
 
+# The deliberate re-export surface (strict mypy disables implicit re-export).
+__all__ = [
+    "Aspect", "CommodityLine", "ComputerDTO", "EngineRoomDTO", "GameState",
+    "Hold", "LocalMapDTO", "LogEntry", "MessagesDTO", "NavStripDTO",
+    "PlanetDTO", "PortDTO", "SectorDTO", "SectorPlanetDTO", "SectorPortDTO",
+    "SectorShipDTO", "ShipDTO", "Slot", "Subsystem", "SurfaceDTO",
+    "SurfaceSite", "TradePair", "WarpDTO", "dto",
+    "EnemyShip", "EncounterDTO",
+    "sample_planet", "sample_state", "sample_port", "sample_surface",
+    "sample_map", "sample_engine_room", "sample_computer", "sample_contact",
+    "sample_encounter", "sample_encounter_view", "sample_messages",
+    "sample_stardock_port",
+]
+
 
 def sample_planet() -> PlanetDTO:
     """The Terra Nova orbit scene (UI_MOCKUPS.md §3) for the screenshot harness."""

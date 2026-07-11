@@ -9,6 +9,8 @@ never import the service, reducers, or DTO modules.
 
 from __future__ import annotations
 
+from typing import Any, Literal, TypeVar, cast
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
@@ -50,7 +52,7 @@ class TitleBar(Static):
     }
     """
 
-    def __init__(self, title: str, context: str = "", **kwargs: object) -> None:
+    def __init__(self, title: str, context: str = "", **kwargs: Any) -> None:
         markup = title if not context else f"{title}        {context}"
         super().__init__(markup, **kwargs)
 
@@ -73,7 +75,7 @@ class EmptyState(Static):
     EmptyState { height: auto; padding: 0 1; color: $text-muted; }
     """
 
-    def __init__(self, message: str, hint: str = "", **kwargs: object) -> None:
+    def __init__(self, message: str, hint: str = "", **kwargs: Any) -> None:
         super().__init__(self._markup(message, hint), **kwargs)
 
     @staticmethod
@@ -128,14 +130,19 @@ class SizeNoticeScreen(ModalScreen[None]):
 
 # --- One-field form prompt (WP-UI07) -----------------------------------------
 
-class FieldPrompt(ModalScreen[object]):
+PromptResult = TypeVar("PromptResult")
+InputType = Literal["integer", "number", "text"]
+
+
+class FieldPrompt(ModalScreen[PromptResult]):
     """The shared one-field prompt: inline validation, no silent failures.
 
     Subclasses override `parse(raw) -> (value, error)`. An invalid submit keeps
     the modal open with the typed value intact and the reason shown under the
     field; only a valid submit (or Esc → None) dismisses. This replaces the old
     per-screen prompts that closed and returned None on bad input, losing what
-    the player typed.
+    the player typed. Generic over the parsed result, so `push_screen`
+    callbacks get the subclass's real value type (str / int / …).
     """
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
@@ -148,7 +155,8 @@ class FieldPrompt(ModalScreen[object]):
 
     def __init__(self, prompt: str, *, placeholder: str = "",
                  hint: str = "Enter to confirm · Esc to cancel",
-                 input_type: str = "text", submit_label: str | None = None) -> None:
+                 input_type: InputType = "text",
+                 submit_label: str | None = None) -> None:
         super().__init__()
         self._prompt = prompt
         self._placeholder = placeholder
@@ -168,9 +176,9 @@ class FieldPrompt(ModalScreen[object]):
     def on_mount(self) -> None:
         self.query_one("#field-input", Input).focus()
 
-    def parse(self, raw: str) -> tuple[object | None, str | None]:
+    def parse(self, raw: str) -> tuple[PromptResult | None, str | None]:
         """Return (value, None) to accept or (None, reason) to hold the form open."""
-        return raw.strip(), None
+        return cast("PromptResult", raw.strip()), None
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self._submit()
@@ -194,25 +202,26 @@ class FieldPrompt(ModalScreen[object]):
         self.dismiss(None)
 
 
-class TextPrompt(FieldPrompt):
+class TextPrompt(FieldPrompt[str]):
     """A required-text prompt (notes, notices, beacons, names)."""
 
-    def parse(self, raw: str) -> tuple[object | None, str | None]:
+    def parse(self, raw: str) -> tuple[str | None, str | None]:
         text = raw.strip()
         if not text:
             return None, "Type a message first — or press Esc to cancel."
         return text, None
 
 
-class AmountPrompt(FieldPrompt):
+class AmountPrompt(FieldPrompt[int]):
     """A positive-integer prompt (latinum amounts, quantities)."""
 
-    def __init__(self, prompt: str, **kwargs: object) -> None:
-        kwargs.setdefault("placeholder", "amount…")
-        kwargs.setdefault("input_type", "integer")
-        super().__init__(prompt, **kwargs)  # type: ignore[arg-type]
+    def __init__(self, prompt: str, *, placeholder: str = "amount…",
+                 hint: str = "Enter to confirm · Esc to cancel",
+                 submit_label: str | None = None) -> None:
+        super().__init__(prompt, placeholder=placeholder, hint=hint,
+                         input_type="integer", submit_label=submit_label)
 
-    def parse(self, raw: str) -> tuple[object | None, str | None]:
+    def parse(self, raw: str) -> tuple[int | None, str | None]:
         text = raw.strip()
         if not text.isdigit() or int(text) <= 0:
             return None, "Enter a positive whole number — or press Esc to cancel."

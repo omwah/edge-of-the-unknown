@@ -14,6 +14,7 @@ engine doesn't carry those overlays).
 from __future__ import annotations
 
 import random
+from typing import Any
 
 from rich.style import Style
 from rich.text import Text
@@ -92,7 +93,7 @@ class SurfaceTerrain(Static):
     pre-rendered rows, which already carry the server-side markers.
     """
 
-    def __init__(self, surface: SurfaceDTO, **kwargs: object) -> None:
+    def __init__(self, surface: SurfaceDTO, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._s = surface
 
@@ -138,7 +139,7 @@ class SiteArt(Static):
     `discovery` sprite for the site's kind, sized live to the panel.
     """
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._kind = ""
         self._seed = 0
@@ -162,7 +163,7 @@ class SiteArt(Static):
         return art_adapter.sprite("discovery", self._kind, seed=self._seed, width=w, height=h)
 
 
-class SurfaceScreen(Screen):
+class SurfaceScreen(Screen[None]):
     BINDINGS = [
         Binding("escape", "back", "Ascend to orbit"),
         Binding("e", "explore", "Survey site"),
@@ -242,7 +243,7 @@ class SurfaceScreen(Screen):
             if not surveyed:
                 find: Text = Text("hidden", style="dim")
             elif site.status == "logged":  # the taken indicator lives in the Find column now
-                find: Text = Text("taken", style="dim")
+                find = Text("taken", style="dim")
             else:
                 find = Text.from_markup("; ".join(site.payload))
             table.add_row(

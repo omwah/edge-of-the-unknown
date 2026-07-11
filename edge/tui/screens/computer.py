@@ -26,7 +26,7 @@ from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Static, TabbedContent, TabPane
 
-from edge.core.dto import RouteDTO
+from edge.core.dto import AllianceRowDTO, LocalMapDTO, RouteDTO
 from edge.core.economy import EconomyError
 from edge.core.movement import MovementError
 from edge.core.rules import TravelTo
@@ -61,7 +61,7 @@ SUBVIEW_LABELS = {
 _CATEGORY_OF = {sub: cat for cat, subs in CATEGORIES.items() for sub in subs}
 
 
-class ComputerScreen(Screen):
+class ComputerScreen(Screen[None]):
     BINDINGS = [
         Binding("escape", "back", "Back"),
         Binding("c", "back", "Back"),
@@ -128,7 +128,8 @@ row opens its full detail when columns are folded at 80×24."""
         else the category's remembered last subview (WP-UI20), else its first."""
         if _CATEGORY_OF.get(self._initial_tab) == category:
             return self._initial_tab
-        remembered = getattr(self.app, "computer_subviews", {}).get(category)
+        subviews: dict[str, str] = getattr(self.app, "computer_subviews", {})
+        remembered = subviews.get(category)
         if remembered in CATEGORIES[category]:
             return remembered
         return CATEGORIES[category][0]
@@ -555,7 +556,7 @@ row opens its full detail when columns are folded at 80×24."""
 
     # --- Alliances (§6.3, WP38 — surfaced WP72) --------------------------------
 
-    def _highlighted_alliance(self) -> object | None:
+    def _highlighted_alliance(self) -> AllianceRowDTO | None:
         """The AllianceRowDTO under the cursor on the Alliances tab, or None."""
         if self._active_subview() != "alliances":
             self.notify("Switch to the Alliances tab first.", timeout=2)
@@ -659,7 +660,7 @@ row opens its full detail when columns are folded at 80×24."""
             if category is not None:
                 self.query_one("#cats", TabbedContent).active = f"cat-{category}"
 
-        options = [(CATEGORY_LABELS[c] + "  [dim]" +
+        options: list[tuple[str, int | str]] = [(CATEGORY_LABELS[c] + "  [dim]" +
                     " · ".join(SUBVIEW_LABELS[s] for s in subs) + "[/]", c)
                    for c, subs in CATEGORIES.items()]
         self.app.push_screen(ListPicker("Computer category", options), _picked)
@@ -685,7 +686,7 @@ row opens its full detail when columns are folded at 80×24."""
             view._refit()
             self.call_after_refresh(view.focus)
 
-    def _map_for_width(self, width: int) -> object:
+    def _map_for_width(self, width: int) -> LocalMapDTO:
         """Bake the local map to fit `width`, overlaying the active route (§6.7/§11).
 
         full_graph=True is safe for any target: map_view only opens the full graph for a

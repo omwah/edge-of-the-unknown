@@ -11,6 +11,8 @@ StarDock (Devices tab / `F`/`M`); deployment is barred in the Core.
 
 from __future__ import annotations
 
+from typing import Any
+
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -90,7 +92,7 @@ class _DeployCard(Vertical):
         self.border_title = self._title
 
 
-class TerritoryScreen(Screen):
+class TerritoryScreen(Screen[None]):
     # Accelerators only — every deployable is a focusable card with a button.
     BINDINGS = [
         Binding("escape", "back", "Back"),
@@ -169,9 +171,9 @@ limpet mines tag passing hulls so their owner can track them."""
             rows.append(("Limpets on your hull",
                          f"{t.limpets} attached",  # type: ignore[attr-defined]
                          "[red]a rival[/]"))
-        children: list[Static | DataTable]
+        children: list[Static | DataTable[Any]]
         if rows:
-            table: DataTable = DataTable(id="deployed-table", zebra_stripes=True,
+            table: DataTable[Any] = DataTable(id="deployed-table", zebra_stripes=True,
                                          cursor_type="row")
             table.add_columns("Asset", "Details", "Owner")
             for asset, details, owner in rows:
@@ -273,9 +275,9 @@ limpet mines tag passing hulls so their owner can track them."""
             if mode == "toll":
                 self.app.push_screen(
                     _AmountInput("Toll per entrant?"),
-                    lambda toll: toll and self._issue(
+                    lambda toll: self._issue(
                         DeployFighters(count=count, mode="toll", toll=toll),
-                        f"Deployed {count} fighters (toll {toll})"))
+                        f"Deployed {count} fighters (toll {toll})") if toll else None)
                 return
             self._issue(DeployFighters(count=count, mode=mode),
                         f"Deployed {count} fighters ({mode})")

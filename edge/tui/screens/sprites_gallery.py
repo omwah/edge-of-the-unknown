@@ -60,7 +60,7 @@ class _SpriteCard(Vertical):
         yield art
 
 
-class SpriteGalleryScreen(Screen):
+class SpriteGalleryScreen(Screen[None]):
     BINDINGS = [Binding("escape", "back", "Back")]
 
     CSS = """

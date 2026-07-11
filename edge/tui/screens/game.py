@@ -25,7 +25,7 @@ from edge.core.rules import AttackPlayer, AttackSpecies, Dock, Hail, Salvage, Tr
 from edge.server.service import GameService
 from edge.tui.chrome import notify_warning
 from edge.tui.design import LayoutTier, layout_tier
-from edge.tui.dummy import SectorDTO
+from edge.tui.dummy import NavStripDTO, SectorDTO
 from edge.tui.onboarding import ObjectivesStrip, all_done
 from edge.tui.screens.computer import ComputerScreen
 from edge.tui.screens.confirm import ConfirmScreen
@@ -106,7 +106,8 @@ class SectorView(Container):
     SectorView #compact-objects { width: 1fr; height: 1fr; }
     """
 
-    def __init__(self, sector: SectorDTO, nav: object = None, compact: bool = False) -> None:
+    def __init__(self, sector: SectorDTO, nav: NavStripDTO | None = None,
+                 compact: bool = False) -> None:
         super().__init__()
         self._sector = sector
         self._nav = nav
@@ -138,7 +139,7 @@ class SectorView(Container):
         return "\n".join(lines)
 
 
-class GameScreen(Screen):
+class GameScreen(Screen[None]):
     # The overlay layer hosts the expanded event ticker, so it draws over the sector
     # view instead of reflowing it (the ticker sets `layer: overlay` when expanded).
     DEFAULT_CSS = "GameScreen { layers: overlay; }"
@@ -279,7 +280,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         elif msg.dest == "wormhole" and msg.ref is not None:
             await self._warp(int(msg.ref))  # the far side is a legal one-way warp
         elif msg.dest == "discovery" and msg.ref is not None:
-            await self._salvage(msg.ref)
+            await self._salvage(int(msg.ref))
         elif msg.dest == "contact" and msg.ref is not None:
             self._hail_species(int(msg.ref))
         elif msg.dest == "player" and msg.ref is not None:
@@ -378,6 +379,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
             return
         is_stardock = any(p.is_stardock for p in ports)
         base = self._service.current_starbase_view(self._pid)
+        screen: Screen[None]
         if is_stardock:
             screen = StarDockScreen(self._service, self._pid)
         elif base is not None:

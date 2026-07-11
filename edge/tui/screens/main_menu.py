@@ -29,7 +29,7 @@ _SUBTITLE = "\ntrade · discover · navigate the alien frontier"
 _FOOTER = "v0.1"
 
 
-class MainMenuScreen(Screen):
+class MainMenuScreen(Screen[None]):
     BINDINGS = [
         Binding("n", "new_game", "New game"),
         Binding("c", "continue_game", "Continue"),

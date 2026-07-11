@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import json
+from pathlib import Path
 from typing import Literal
 
 from edge.tui.saves import save_dir
@@ -26,7 +27,7 @@ class UISettings:
     objectives_done: tuple[str, ...] = ()
 
 
-def settings_path():
+def settings_path() -> Path:
     return save_dir() / "ui-settings.json"
 
 

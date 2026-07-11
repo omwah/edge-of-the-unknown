@@ -10,6 +10,8 @@ there is no way to walk away from the modal without resolving it.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -26,15 +28,17 @@ from edge.core.rules import CombatAction
 from edge.tui.chrome import notify_warning
 from edge.tui import art_adapter
 from edge.tui.widgets import bar
+from edge.server.service import GameService
 
-_OUTCOME_NOTES = {
+
+_OUTCOME_NOTES: "dict[str, tuple[str, Literal['information', 'warning', 'error']]]" = {
     "fled": ("Broke away — you escaped the engagement.", "warning"),
     "victory": ("Victory — the pack is destroyed.", "information"),
     "destroyed": ("Ship lost — the escape pod tumbles clear.", "error"),
 }
 
 
-class EncounterScreen(Screen):
+class EncounterScreen(Screen[None]):
     BINDINGS = [
         Binding("f", "fight", "Fire"),
         Binding("m", "missile", "Missile"),
@@ -91,7 +95,7 @@ configured floor; firing arcs decide who can answer."""
     EncounterScreen.wide #you { width: 2fr; }
     """
 
-    def __init__(self, service, player_id: int) -> None:
+    def __init__(self, service: GameService, player_id: int) -> None:
         super().__init__()
         self._service = service
         self._pid = player_id

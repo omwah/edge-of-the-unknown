@@ -11,6 +11,8 @@ pressing `O` on the game screen) dismisses it; the Options screen re-enables it.
 
 from __future__ import annotations
 
+from typing import Any
+
 from textual.widgets import Static
 
 # (id, label, hint) in teaching order — the first-trade-within-five-minutes path.
@@ -45,7 +47,7 @@ class ObjectivesStrip(Static):
     ObjectivesStrip:hover { background: $boost; }
     """
 
-    def __init__(self, done: tuple[str, ...], **kwargs: object) -> None:
+    def __init__(self, done: tuple[str, ...], **kwargs: Any) -> None:
         super().__init__(self._markup(done), **kwargs)
         self.tooltip = next_hint(done)
 
