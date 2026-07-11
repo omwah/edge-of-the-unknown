@@ -476,8 +476,9 @@ global StarDock shortcut performs a context-inappropriate action, combat/world
 state remains replay-deterministic, all primary workflows work at 80x24, and the
 documentation and Help accurately describe the resulting controls and rules.
 
-**Not yet met:** PT-06's station-concourse art is outstanding (see §8), so the
-remediation is not fully complete even once every WP is otherwise landed.
+**Not yet met:** several items in §8 are still open even where their WP has landed —
+PT-06's station-concourse art, PT-30's belt raw-mining output, and PT-23's per-row
+avoid action — so the remediation is not fully complete against the plan as written.
 
 ## 8. Outstanding follow-ups (deferred, still open)
 
@@ -494,3 +495,16 @@ They are tracked here so a struck-through playtest note never hides open work.
   clamped `TransferCargo`/`SettleColonists` per row; a single atomic batch command was
   left unbuilt (low value for the local single-player service). If added later, update
   codec/protocol/replay fixtures.
+- **WP-PR06 / PT-30 — belt raw-mining output.** The plan asked to "retain raw-mining
+  output through a dedicated extraction action or a clearly specified passive cache."
+  The implementation instead makes belts fully inert (always unowned ⇒ `planets.produce`
+  no-ops), so belts currently yield **nothing**, and a player belt-mining action is not
+  built. Documented in DESIGN §4.2. Follow-up: add the extraction action (or passive
+  cache) and its projection so belts are minable as the design intends. The `landable`/
+  capability model and the `asteroid_mining` config seam are already in place for it.
+- **WP-PR09 / PT-23 — per-row avoid action.** The plan enumerated a "row action on
+  route/port/planet tables" among the avoid-list affordances. Delivered: the Notes-tab
+  button, the route-context `V` hint, and Help — which meet the note's *discoverability*
+  acceptance. Not delivered: toggling the **highlighted row's** sector directly from the
+  ports/planets/route tables (`V` still opens a sector prompt). Follow-up if wanted: bind
+  the avoid toggle to the highlighted table row's sector.
