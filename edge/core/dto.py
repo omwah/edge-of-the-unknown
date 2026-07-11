@@ -457,12 +457,29 @@ class NoticeDTO:
 
 
 @dataclass(frozen=True)
+class BountyDTO:
+    """One structured bounty-board row (§14, WP-PR08 / PT-07).
+
+    A scannable record rather than a prose line: `target` (who), `kind` (why/type),
+    `reward` (the payout/threat text), `status` ("open" / "hunting you"), and a `detail`
+    prose line kept for the expanded view. `sector_display` names where to act, or None.
+    """
+
+    target: str
+    kind: str  # "kill" | "hunts_you" | "governance"
+    reward: str  # display: "300 slips/kill" or a threat descriptor
+    status: str  # "open" | "danger" | "info"
+    detail: str
+    sector_display: int | None = None
+
+
+@dataclass(frozen=True)
 class TavernDTO:
     """The StarDock tavern — rumors, the bounty board, and the noticeboard (§14, WP58)."""
 
     rumor_price: int
     rumor_available: bool  # a fresh tip can be bought right now (at the dock)
-    bounties: list[str] = field(default_factory=list)  # voiced bounty-board lines
+    bounties: list[BountyDTO] = field(default_factory=list)  # structured bounty-board rows
     notices: list[NoticeDTO] = field(default_factory=list)  # newest last
     contracts: list["ContractDTO"] = field(default_factory=list)  # the player's active favors
 
@@ -723,6 +740,26 @@ class ShipyardItem:
 
 
 @dataclass(frozen=True)
+class ArmamentItem:
+    """One row in the unified Devices & Armaments catalog (§10/§14, WP-PR08 / PT-02).
+
+    Folds the old scattered global buys — Genesis torpedo, homing missiles, sector fighters,
+    space mines — together with the special devices (probe / interdictor / mine-deflector)
+    into one projected catalog. `id` is the stable row key; `amount_based` items open an
+    amount prompt (a per-unit `price`), the rest buy one. `carried` is what the ship already
+    holds so the shopper sees stock at a glance.
+    """
+
+    id: str
+    label: str
+    price: int  # per unit (amount_based) or the flat one-off price
+    carried: int
+    affordable: bool
+    amount_based: bool
+    kind: str  # "genesis" | "missile" | "fighter" | "mine" | "device"
+
+
+@dataclass(frozen=True)
 class StarDockDTO:
     """The StarDock services catalog (hardware + shipyard), fog-of-war scoped (§3)."""
 
@@ -730,11 +767,16 @@ class StarDockDTO:
     latinum: int
     hardware: list[HardwareItem]
     shipyard: list[ShipyardItem]
-    # Special devices for sale (§10/§14, WP56): (device_id, price, affordable).
-    devices: list[tuple[str, int, bool]] = field(default_factory=list)
+    # The unified Devices & Armaments catalog (WP-PR08): devices + missiles/genesis/fighters/mines.
+    armaments: list[ArmamentItem] = field(default_factory=list)
     # The bank counter (§8 — surfaced WP71): balance + the daily interest rate.
     bank_balance: int = 0
     interest_per_day: float = 0.0
+    # Colonists tab (WP-PR08 / PT-06): the recruitment office readout.
+    colonist_incentive: int = 0  # latinum per head enlisted at the dock
+    ship_colonists: int = 0  # aboard now
+    ship_colonist_capacity: int = 0  # berth ceiling
+    colonists_recruitable: int = 0  # min(free berths, what the purse can afford)
 
 
 @dataclass(frozen=True)

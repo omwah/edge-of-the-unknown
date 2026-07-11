@@ -832,7 +832,7 @@ def tavern_view(state: UniverseState, player_id: int, config: GameConfig) -> dto
             state, player, speakers, aliens=config.aliens,
             entity=entity_species(state, config)) is not None
 
-    bounties: list[str] = []
+    bounties: list[dto.BountyDTO] = []
     if config.roster is not None:
         for rid in sorted(player.species_attitudes):
             sc = config.roster.species_by_id(rid)
@@ -840,11 +840,19 @@ def tavern_view(state: UniverseState, player_id: int, config: GameConfig) -> dto
             if sc is None or sp is None:
                 continue
             if disposition_band(effective_disposition(sp, player), config.aliens) == "hostile":
-                bounties.append(f"Bounty on {sp.name}: {config.aliens.bounty_per_kill} slips/kill.")
+                bounties.append(dto.BountyDTO(
+                    target=sp.name, kind="kill",
+                    reward=f"{config.aliens.bounty_per_kill:,} slips/kill", status="open",
+                    detail=f"The {sp.name} are hostile — kills pay the standing bounty.",
+                    sector_display=_display(state, sp.sector_id)))
     for rid, grudge in sorted(player.grudges.items()):
         name = next((s.name for s in state.species.values() if s.roster_id == rid), rid)
-        bounties.append(f"The {name} hunt you (grudge {grudge.severity:.2f}).")
-    bounties += _governance_intel(state, player)[:1]  # the current-governor line
+        bounties.append(dto.BountyDTO(
+            target=name, kind="hunts_you", reward=f"grudge {grudge.severity:.2f}", status="danger",
+            detail=f"The {name} hunt you (grudge {grudge.severity:.2f}) — travel carefully."))
+    for line in _governance_intel(state, player)[:1]:  # the current-governor line
+        bounties.append(dto.BountyDTO(target="Core governance", kind="governance",
+                                      reward="", status="info", detail=line))
 
     notices = [
         dto.NoticeDTO(
@@ -897,16 +905,46 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
             combat=a.combat_speed, affordable=player.latinum >= net, owned=klass.id == ship.type_id,
         ))
 
-    devices = [
-        (device_id, spec.price, player.latinum >= spec.price)
-        for device_id, spec in sorted(config.devices.items())
-    ]
+    armaments = _armaments_catalog(player, ship, config)
+    free_berths = max(0, ship.colonist_capacity - ship.colonists)
+    incentive = econ.colonist_incentive
+    affordable_heads = player.latinum // incentive if incentive > 0 else free_berths
     return dto.StarDockDTO(
         sector_display=_display(state, ship.sector_id),
-        latinum=player.latinum, hardware=hardware, shipyard=shipyard, devices=devices,
+        latinum=player.latinum, hardware=hardware, shipyard=shipyard, armaments=armaments,
         bank_balance=player.bank_balance,
         interest_per_day=config.economy.bank_interest_per_day,
+        colonist_incentive=incentive, ship_colonists=ship.colonists,
+        ship_colonist_capacity=ship.colonist_capacity,
+        colonists_recruitable=min(free_berths, affordable_heads),
     )
+
+
+def _armaments_catalog(player: Player, ship: Ship, config: GameConfig) -> list[dto.ArmamentItem]:
+    """The unified Devices & Armaments catalog (WP-PR08 / PT-02): munitions + special devices.
+
+    One projected list so the StarDock's `B` buys the highlighted row — no more scattered
+    global G/I/F/M hotkeys. Amount-based rows (missiles/fighters/mines) price per unit and
+    open an amount prompt; the one-offs (Genesis, each device) buy a single unit.
+    """
+    out: list[dto.ArmamentItem] = []
+    lat = player.latinum
+
+    def _add(id_: str, label: str, price: int, carried: int, amount_based: bool, kind: str) -> None:
+        out.append(dto.ArmamentItem(
+            id=id_, label=label, price=price, carried=carried,
+            affordable=lat >= price, amount_based=amount_based, kind=kind))
+
+    if config.genesis is not None:
+        _add("genesis", "Genesis torpedo", config.genesis.price,
+             ship.devices.get(config.genesis.device_id, 0), False, "genesis")
+    _add("missile", "Homing missile", config.combat.missile_price, ship.missiles, True, "missile")
+    _add("fighter", "Sector fighters", config.territory.fighter_price, ship.fighters, True, "fighter")
+    _add("mine", "Space mines", config.territory.mine_price, ship.mines, True, "mine")
+    for device_id, spec in sorted(config.devices.items()):
+        _add(device_id, device_id.replace("_", " ").title(), spec.price,
+             ship.devices.get(device_id, 0), False, "device")
+    return out
 
 
 def territory_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.TerritoryDTO:

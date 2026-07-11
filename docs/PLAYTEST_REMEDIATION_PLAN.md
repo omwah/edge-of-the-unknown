@@ -279,7 +279,12 @@ compact 80x24 geometry.
 
 Commit: `playtest: WP-PR07 planet transfer workbench`
 
-### WP-PR08 — StarDock information architecture and scoped actions
+### WP-PR08 — StarDock information architecture and scoped actions — complete
+
+**Deferred:** the bespoke DS9-style station-concourse raster (imagegen → image-to-ANSI
+pipeline) is not done — the `imagegen` skill was unavailable in this environment. The
+Colonists tab ships a compact ASCII concourse banner (`_CONCOURSE_ART`) as a stand-in;
+swapping in the generated raster is a follow-up. Everything else in PT-02..07/29 is done.
 
 **Goal:** make StarDock tabs self-contained, purchasable catalogs stable, and the
 Tavern/colonist workflows understandable.
