@@ -681,8 +681,10 @@ Small art or none in compact (per art-detail setting); selection survives
 refresh and tier changes.
 ```
 
-### Computer *(WP-UI20 landed: five categories with per-category subview
-memory, popup category selector in compact; WP-UI21 tables/filtering pending)*
+### Computer *(WP-UI20 + WP-UI21 landed: five categories with per-category
+subview memory and a popup category selector in compact; tables share one
+`DetailTable` — `/` filter, header/`O` sorting, folded columns with a row-detail
+overlay in compact, a persistent detail pane in wide, cursor kept by row key)*
 
 ```
 COMPACT: category popup            STANDARD/WIDE: category tabs + subview row

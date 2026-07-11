@@ -31,7 +31,8 @@ from edge.core.economy import EconomyError
 from edge.core.movement import MovementError
 from edge.core.rules import TravelTo
 from edge.server.service import GameService
-from edge.tui.chrome import EmptyState, notify_warning
+from edge.tui.chrome import notify_warning
+from edge.tui.detail_table import ColumnSpec, DetailTable
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.picker import ListPicker
 from edge.tui.screens.travel import TravelPromptScreen
@@ -88,7 +89,9 @@ Market), [b]Exploration[/] (Planets · Codex · Leads), [b]Relations[/] (Contrac
 Alliances · Dossier), [b]Records[/] (Log · Notes) — each remembers its last
 subview. Keys act on the [b]active subview[/] ([b]X[/] abandons a contract or
 removes a note, per subview). [b]J[/] joins/resigns a bloc; [b]V[/] toggles
-avoiding the highlighted sector on plotted routes."""
+avoiding the highlighted sector on plotted routes. In any table, [b]/[/]
+focuses the filter, [b]O[/] cycles the sort (or click a ↕ header); Enter on a
+row opens its full detail when columns are folded at 80×24."""
 
     CSS = """
     ComputerScreen #computer-title {
@@ -156,11 +159,27 @@ avoiding the highlighted sector on plotted routes."""
                 with TabbedContent(initial=self._inner_initial("commerce"), id="sub-commerce"):
                     with TabPane("Ports", id="ports"):
                         yield Static("[b]PORTS DIRECTORY[/]        [dim]charted ports, nearest first[/]")
-                        yield DataTable(id="ports-table", zebra_stripes=True, cursor_type="row")
+                        yield DetailTable("ports-table", (
+                            ColumnSpec("Sector", sortable=True),
+                            ColumnSpec("Port", sortable=True),
+                            ColumnSpec("Class"),
+                            ColumnSpec("Buys", fold=True),
+                            ColumnSpec("Sells", fold=True),
+                            ColumnSpec("Dist", sortable=True, right=True),
+                        ), empty=("No ports discovered yet.", "Explore to chart them."),
+                            detail_title="Port")
                         yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
                     with TabPane("Trade", id="trade"):
                         yield Static("[b]PAIR-TRADE FINDER[/]        [dim]scored by profit / turn[/]")
-                        yield DataTable(id="finder", zebra_stripes=True, cursor_type="row")
+                        yield DetailTable("finder", (
+                            ColumnSpec("Pair"),
+                            ColumnSpec("Goods", fold=True),
+                            ColumnSpec("Dist", sortable=True, right=True),
+                            ColumnSpec("Profit/rt", sortable=True, right=True),
+                            ColumnSpec("Per-turn", sortable=True, right=True),
+                        ), empty=("No profitable pair charted yet.",
+                                  "Chart opposed-class ports to score pairs."),
+                            detail_title="Trade pair")
                         yield Static(
                             f"selected: [cyan]{self._computer.selected}[/]   ·   "
                             "[b]P[/] Plot route   [b]A[/] Add note",
@@ -168,51 +187,97 @@ avoiding the highlighted sector on plotted routes."""
                         )
                     with TabPane("Market", id="market"):
                         yield Static(f"[b]ORDER BOOK[/]        [dim]{self._market.summary}[/]")
-                        market = DataTable(id="market-table", zebra_stripes=True, cursor_type="row")
-                        market_empty = self._market_empty()  # WP-UI19 shared empty state
-                        if market_empty is not None:
-                            market.display = False
-                        yield market
-                        if market_empty is not None:
-                            yield market_empty
+                        yield DetailTable("market-table", (
+                            ColumnSpec("Sector", sortable=True),
+                            ColumnSpec("Port"),
+                            ColumnSpec("Commodity", sortable=True),
+                            ColumnSpec("Side"),
+                            ColumnSpec("Qty", sortable=True, right=True),
+                            ColumnSpec("Limit", right=True, fold=True),
+                        ), empty=self._market_empty_copy(), detail_title="Order")
                         yield Static(self._market_note(), classes="note")
             with TabPane("Exploration", id="cat-exploration", classes="cat-pane"):
                 with TabbedContent(initial=self._inner_initial("exploration"),
                                    id="sub-exploration"):
                     with TabPane("Planets", id="planets"):
                         yield Static("[b]PLANETS DIRECTORY[/]        [dim]charted planets, nearest first[/]")
-                        yield DataTable(id="planets-table", zebra_stripes=True, cursor_type="row")
+                        yield DetailTable("planets-table", (
+                            ColumnSpec("Sector", sortable=True),
+                            ColumnSpec("Planet", sortable=True),
+                            ColumnSpec("Type"),
+                            ColumnSpec("Claim", fold=True),
+                            ColumnSpec("Pop", sortable=True, right=True, fold=True),
+                            ColumnSpec("Species", fold=True),
+                            ColumnSpec("Stores (F/O/E)", fold=True),
+                            ColumnSpec("Dist", sortable=True, right=True),
+                        ), empty=("No planets discovered yet.", "Explore to chart them."),
+                            detail_title="Planet")
                         yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
                     with TabPane("Codex", id="codex"):
                         yield Static("[b]DISCOVERY CODEX[/]        [dim]logged finds, richest first[/]")
-                        yield DataTable(id="codex-table", zebra_stripes=True, cursor_type="row")
+                        yield DetailTable("codex-table", (
+                            ColumnSpec("Find", sortable=True),
+                            ColumnSpec("Location"),
+                            ColumnSpec("Rarity", sortable=True),
+                            ColumnSpec("Detail", fold=True),
+                        ), empty=("No discoveries logged yet.",
+                                  "Scan and survey the frontier to fill the codex."),
+                            detail_title="Discovery")
                     with TabPane("Leads", id="leads"):
                         yield Static("[b]COORDINATE LEADS[/]        [dim]tips logged from contacts[/]")
-                        yield DataTable(id="leads-table", zebra_stripes=True, cursor_type="row")
+                        yield DetailTable("leads-table", (
+                            ColumnSpec("Tip"),
+                            ColumnSpec("From", fold=True),
+                            ColumnSpec("Location"),
+                            ColumnSpec("Dist", sortable=True, right=True),
+                            ColumnSpec("Turns", fold=True),
+                        ), empty=("No leads yet.",
+                                  "Ask a friendly species for coordinates."),
+                            detail_title="Lead")
                         yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
             with TabPane("Relations", id="cat-relations", classes="cat-pane"):
                 with TabbedContent(initial=self._inner_initial("relations"), id="sub-relations"):
                     with TabPane("Contracts", id="contracts"):
                         yield Static("[b]FAVORS[/]        [dim]jobs accepted from aliens[/]")
-                        jobs = DataTable(id="contracts-table", zebra_stripes=True, cursor_type="row")
-                        if not self._computer.contracts:  # WP-UI19 shared empty state
-                            jobs.display = False
-                        yield jobs
-                        if not self._computer.contracts:
-                            yield EmptyState("No favors accepted.",
-                                             "Ask a friendly species for work — accepted "
-                                             "jobs appear here.")
+                        yield DetailTable("contracts-table", (
+                            ColumnSpec("#"),
+                            ColumnSpec("Kind", sortable=True),
+                            ColumnSpec("From", fold=True),
+                            ColumnSpec("Task"),
+                            ColumnSpec("Reward", sortable=True, right=True),
+                            ColumnSpec("Due", fold=True),
+                        ), empty=("No favors accepted.",
+                                  "Ask a friendly species for work — accepted "
+                                  "jobs appear here."),
+                            detail_title="Favor")
                         yield Static("[dim][b]D[/] Deliver highlighted (dock at its target port first)"
                                      "   ·   [b]X[/] Abandon highlighted[/]", classes="note")
                     with TabPane("Alliances", id="alliances"):
                         yield Static("[b]ALLIANCES[/]        [dim]blocs, standings, admission — join one (§6.3)[/]")
-                        yield DataTable(id="alliances-table", zebra_stripes=True, cursor_type="row")
+                        yield DetailTable("alliances-table", (
+                            ColumnSpec("Bloc", sortable=True),
+                            ColumnSpec("Standing", sortable=True, right=True),
+                            ColumnSpec("Gate", fold=True),
+                            ColumnSpec("Fee", right=True, fold=True),
+                            ColumnSpec("Admission", fold=True),
+                            ColumnSpec(""),
+                        ), empty=("No blocs in this universe.", ""),
+                            detail_title="Alliance")
                         yield Static("[dim][b]J[/] Join highlighted (resigns any current bloc)   ·   "
                                      "[b]T[/] Log admission task   ·   [b]J[/] on your own bloc resigns[/]",
                                      classes="note")
                     with TabPane("Dossier", id="dossier"):
                         yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
-                        yield DataTable(id="dossier-table", zebra_stripes=True, cursor_type="row")
+                        yield DetailTable("dossier-table", (
+                            ColumnSpec("Species", sortable=True),
+                            ColumnSpec("Alliance", fold=True),
+                            ColumnSpec("Standing", sortable=True),
+                            ColumnSpec("Last seen", fold=True),
+                            ColumnSpec("Disp"),
+                            ColumnSpec("Tech offers", fold=True),
+                        ), empty=("No species met yet.",
+                                  "Hail a passing ship to open a dossier."),
+                            detail_title="Species")
                         yield Static(self._dossier_notes(), classes="note")
                         yield Static(self._governance_notes(), id="governance-panel", classes="note")
                         yield Static(self._seizure_notes(), id="seizure-panel", classes="note")
@@ -220,10 +285,18 @@ avoiding the highlighted sector on plotted routes."""
                 with TabbedContent(initial=self._inner_initial("records"), id="sub-records"):
                     with TabPane("Log", id="log"):
                         yield Static("[b]EVENT LOG[/]        [dim]newest first[/]")
-                        yield DataTable(id="log-table", zebra_stripes=True, cursor_type="row")
+                        yield DetailTable("log-table", (
+                            ColumnSpec("When"),
+                            ColumnSpec("Event"),
+                        ), empty=("No events yet.", "Your voyage writes the log."),
+                            detail_title="Event")
                     with TabPane("Notes", id="notes"):
                         yield Static("[b]CAPTAIN'S NOTES[/]        [dim]personal log + avoid list[/]")
-                        yield DataTable(id="notes-table", zebra_stripes=True, cursor_type="row")
+                        yield DetailTable("notes-table", (
+                            ColumnSpec("#", right=True),
+                            ColumnSpec("Note"),
+                        ), empty=("No notes yet.", "[b]A[/] writes one."),
+                            detail_title="Note")
                         avoid = (", ".join(f"S{d}" for d in self._computer.avoid)
                                  or "[dim]none[/]")
                         yield Static(f"[b]AVOID LIST[/] (route planner skips these): {avoid}",
@@ -232,123 +305,93 @@ avoiding the highlighted sector on plotted routes."""
                                      "[b]V[/] Toggle a sector on the avoid list[/]", classes="note")
         yield Footer()
 
+    def _dt(self, table_id: str) -> DetailTable:
+        return self.query_one(f"#{table_id}-panel", DetailTable)
+
     def on_mount(self) -> None:
-        finder = self.query_one("#finder", DataTable)
-        finder.add_columns("Pair", "Goods", "Dist", "Profit/rt", "Per-turn")
-        for p in self._computer.pairs:
-            finder.add_row(p.pair, p.goods, str(p.dist), str(p.profit_rt), f"{p.per_turn} ▾")
+        """Provision every subview's DetailTable (WP-UI21): rows carry stable
+        keys — a DTO id where one exists, else the index into the DTO list —
+        so actions resolve the highlighted row after sorting or filtering."""
+        self._dt("finder").set_rows([
+            (str(i), (p.pair, p.goods, str(p.dist), str(p.profit_rt), str(p.per_turn)))
+            for i, p in enumerate(self._computer.pairs)])
 
-        log = self.query_one("#log-table", DataTable)
-        log.add_columns("When", "Event")
-        if self._messages.events:
-            for entry in self._messages.events:
-                log.add_row(Text(entry.when, style="dim"), Text.from_markup(entry.text))
-        else:
-            log.add_row(Text(""), Text("no events yet", style="dim"))
+        self._dt("log-table").set_rows([
+            (str(i), (Text(entry.when, style="dim"), Text.from_markup(entry.text)))
+            for i, entry in enumerate(self._messages.events)])
 
-        codex = self.query_one("#codex-table", DataTable)
-        codex.add_columns("Find", "Location", "Rarity", "Detail")
-        if self._computer.codex:
-            for c in self._computer.codex:
-                codex.add_row(c.name, c.location, c.rarity, c.detail)
-        else:
-            codex.add_row(Text("no discoveries logged yet", style="dim"), Text(""), Text(""), Text(""))
+        self._dt("codex-table").set_rows([
+            (str(i), (c.name, c.location, c.rarity, c.detail))
+            for i, c in enumerate(self._computer.codex)])
 
-        leads = self.query_one("#leads-table", DataTable)
-        leads.add_columns("Tip", "From", "Location", "Dist", "Turns")
-        if self._computer.leads:
-            for ld in self._computer.leads:
-                # Off-origin + uncharted: point the player back to where the tip was obtained.
-                turns = (str(ld.turn_cost) if ld.reachable
-                         else f"plot from S{ld.origin_coords}" if not ld.at_origin
-                         else "unreachable")
-                # A roaming-Entity lead whose quarry has moved on reads as a cold trail (§7).
-                summary = (Text.assemble(ld.summary, ("  · trail gone cold", "italic yellow"))
-                           if ld.stale else ld.summary)
-                leads.add_row(summary, ld.source, f"S{ld.coords}",
-                              str(ld.distance) if ld.reachable else "—", turns)
-        else:
-            leads.add_row(
-                Text("No leads yet — ask a friendly species for coordinates.", style="dim"),
-                *(Text(""),) * 4)
+        lead_rows = []
+        for i, ld in enumerate(self._computer.leads):
+            # Off-origin + uncharted: point the player back to where the tip was obtained.
+            turns = (str(ld.turn_cost) if ld.reachable
+                     else f"plot from S{ld.origin_coords}" if not ld.at_origin
+                     else "unreachable")
+            # A roaming-Entity lead whose quarry has moved on reads as a cold trail (§7).
+            summary = (Text.assemble(ld.summary, ("  · trail gone cold", "italic yellow"))
+                       if ld.stale else Text(ld.summary))
+            lead_rows.append((str(i), (summary, ld.source, f"S{ld.coords}",
+                                       str(ld.distance) if ld.reachable else "—", turns)))
+        self._dt("leads-table").set_rows(lead_rows)
 
-        jobs = self.query_one("#contracts-table", DataTable)
-        jobs.add_columns("#", "Kind", "From", "Task", "Reward", "Due")
-        for c in self._computer.contracts:  # empty → the WP-UI19 EmptyState shows instead
-            jobs.add_row(str(c.contract_id), c.kind, c.issuer, c.summary,
-                         f"{c.reward:,}", f"day {c.deadline_day}",
-                         key=str(c.contract_id))
+        self._dt("contracts-table").set_rows([
+            (str(c.contract_id), (str(c.contract_id), c.kind, c.issuer, c.summary,
+                                  f"{c.reward:,}", f"day {c.deadline_day}"))
+            for c in self._computer.contracts])
 
-        ports = self.query_one("#ports-table", DataTable)
-        ports.add_columns("Sector", "Port", "Class", "Buys", "Sells", "Dist")
-        if self._computer.ports:
-            for e in self._computer.ports:
-                ports.add_row(f"S{e.sector_display}", e.name, e.klass, e.buys, e.sells,
-                              str(e.dist) if e.dist >= 0 else "—")
-        else:
-            ports.add_row(
-                Text("No ports discovered yet — explore to chart them.", style="dim"),
-                *(Text(""),) * 5)
+        self._dt("ports-table").set_rows([
+            (str(i), (f"S{e.sector_display}", e.name, e.klass, e.buys, e.sells,
+                      str(e.dist) if e.dist >= 0 else "—"))
+            for i, e in enumerate(self._computer.ports)])
 
-        planets = self.query_one("#planets-table", DataTable)
-        planets.add_columns("Sector", "Planet", "Type", "Claim", "Pop", "Species", "Stores (F/O/E)", "Dist")
-        if self._computer.planets:
-            for pl in self._computer.planets:
-                planets.add_row(
-                    f"S{pl.sector_display}", pl.name, pl.ptype, pl.owner,
-                    f"{pl.colonists:,}", pl.species, pl.stores,
-                    str(pl.dist) if pl.dist >= 0 else "—")
-        else:
-            planets.add_row(
-                Text("No planets discovered yet — explore to chart them.", style="dim"),
-                *(Text(""),) * 7)
+        self._dt("planets-table").set_rows([
+            (str(i), (f"S{pl.sector_display}", pl.name, pl.ptype, pl.owner,
+                      f"{pl.colonists:,}", pl.species, pl.stores,
+                      str(pl.dist) if pl.dist >= 0 else "—"))
+            for i, pl in enumerate(self._computer.planets)])
 
-        market = self.query_one("#market-table", DataTable)
-        market.add_columns("Sector", "Port", "Commodity", "Side", "Qty", "Limit")
-        for o in self._market.orders if self._market.enabled else ():
-            market.add_row(f"S{o.sector_display}", o.port_name, o.commodity,
-                           o.side, str(o.qty), str(o.limit))
+        # Market rows key on the logical order, so a refresh keeps the cursor
+        # on the same sector/port/commodity/side even when quantities move.
+        orders = self._market.orders if self._market.enabled else []
+        self._dt("market-table").set_rows([
+            (f"{o.sector_display}:{o.port_name}:{o.commodity}:{o.side}",
+             (f"S{o.sector_display}", o.port_name, o.commodity,
+              o.side, str(o.qty), str(o.limit)))
+            for o in orders])
 
         route = self.query_one("#route-table", DataTable)
         route.add_columns("Hop", "Sector", "Notes")
         self._render_route()
 
-        blocs = self.query_one("#alliances-table", DataTable)
-        blocs.add_columns("Bloc", "Standing", "Gate", "Fee", "Admission", "")
-        if self._computer.alliances:
-            for a in self._computer.alliances:
-                flags = "".join((
-                    "[green]⭐ sworn[/] " if a.member else "",
-                    "[cyan]⚑ governs Core[/] " if a.governs_core else "",
-                    "[yellow]covets Core[/]" if a.covets_core else "",
-                ))
-                progress = (f"{len(a.tasks_done)}/{len(a.tasks_needed)} "
-                            f"({', '.join(a.tasks_done) or '—'})"
-                            if a.tasks_needed else "open")
-                blocs.add_row(a.name, f"{a.standing:+.2f}", a.gate, f"{a.fee:,}",
-                              progress, Text.from_markup(flags),
-                              key=str(a.alliance_id))
-        else:
-            blocs.add_row(Text("no blocs in this universe", style="dim"), *(Text(""),) * 5)
+        bloc_rows = []
+        for a in self._computer.alliances:
+            flags = "".join((
+                "[green]⭐ sworn[/] " if a.member else "",
+                "[cyan]⚑ governs Core[/] " if a.governs_core else "",
+                "[yellow]covets Core[/]" if a.covets_core else "",
+            ))
+            progress = (f"{len(a.tasks_done)}/{len(a.tasks_needed)} "
+                        f"({', '.join(a.tasks_done) or '—'})"
+                        if a.tasks_needed else "open")
+            bloc_rows.append((str(a.alliance_id),
+                              (a.name, f"{a.standing:+.2f}", a.gate, f"{a.fee:,}",
+                               progress, Text.from_markup(flags))))
+        self._dt("alliances-table").set_rows(bloc_rows)
 
-        notes = self.query_one("#notes-table", DataTable)
-        notes.add_columns("#", "Note")
-        if self._computer.notes:
-            for i, text in enumerate(self._computer.notes):
-                notes.add_row(str(i + 1), text, key=str(i))
-        else:
-            notes.add_row(Text(""), Text("no notes yet — press A to write one", style="dim"))
+        self._dt("notes-table").set_rows([
+            (str(i), (str(i + 1), text))
+            for i, text in enumerate(self._computer.notes)])
 
-        dossier = self.query_one("#dossier-table", DataTable)
-        dossier.add_columns("Species", "Alliance", "Standing", "Last seen", "Disp", "Tech offers")
-        if self._computer.dossier:
-            for d in self._computer.dossier:
-                # Show a bloc member's role (leader / aspirant) so an intrigue coup is legible (WP51).
-                alliance = f"{d.alliance} · {d.role}" if d.role not in ("none", "member") else d.alliance
-                dossier.add_row(d.species, alliance, d.standing, f"S{d.last_seen}",
-                                bar(d.disposition_filled, 5), d.offers)
-        else:
-            dossier.add_row(*(Text("no species met yet", style="dim"), *(Text(""),) * 5))
+        dossier_rows = []
+        for i, d in enumerate(self._computer.dossier):
+            # Show a bloc member's role (leader / aspirant) so an intrigue coup is legible (WP51).
+            alliance = f"{d.alliance} · {d.role}" if d.role not in ("none", "member") else d.alliance
+            dossier_rows.append((str(i), (d.species, alliance, d.standing, f"S{d.last_seen}",
+                                          bar(d.disposition_filled, 5), d.offers)))
+        self._dt("dossier-table").set_rows(dossier_rows)
 
     def _dossier_notes(self) -> str:
         if not self._computer.dossier:
@@ -574,16 +617,14 @@ avoiding the highlighted sector on plotted routes."""
         self.notify(f"Recorded: {pending[0]}.", timeout=2)
         self._reopen_tab("alliances")
 
-    def _market_empty(self) -> EmptyState | None:
-        """The shared empty state for the order book, or None when rows exist (WP-UI19)."""
+    def _market_empty_copy(self) -> tuple[str, str]:
+        """The order book's empty-state copy (WP-UI19; rendered by DetailTable)."""
         if not self._market.enabled:
-            return EmptyState("The order-book market is disabled.",
-                              "The legacy port economy is running — there is no "
-                              "order book to show.")
-        if not self._market.orders:
-            return EmptyState("No open orders at charted ports.",
-                              "Dock somewhere to read its book.")
-        return None
+            return ("The order-book market is disabled.",
+                    "The legacy port economy is running — there is no "
+                    "order book to show.")
+        return ("No open orders at charted ports.",
+                "Dock somewhere to read its book.")
 
     def _market_note(self) -> str:
         if not self._market.enabled:
@@ -694,11 +735,21 @@ avoiding the highlighted sector on plotted routes."""
         self.show_subview("route")
 
     def _cursor_entry(self, table_id: str, items: list) -> object | None:  # type: ignore[type-arg]
-        """The DTO under the highlighted row of `table_id`, or None."""
-        row = self.query_one(table_id, DataTable).cursor_row
-        if not items or row is None or row >= len(items):
+        """The DTO under the highlighted row of `table_id`, or None.
+
+        WP-UI21: resolved through the row's stable key (its index into the DTO
+        list), never the cursor's visual position — sorting and filtering
+        reorder the display but must not change what an action targets."""
+        table = self.query_one(table_id, DataTable)
+        if not items or not table.row_count:
             return None
-        return items[row]
+        key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
+        if key is None:
+            return None
+        try:
+            return items[int(key)]
+        except (ValueError, IndexError):
+            return None
 
     def _current_sector(self) -> int:
         # Through the projection (not raw state) so it works over a remote client too (WP68).

@@ -74,8 +74,15 @@ class EmptyState(Static):
     """
 
     def __init__(self, message: str, hint: str = "", **kwargs: object) -> None:
-        markup = f"[i]{message}[/]" + (f"\n{hint}" if hint else "")
-        super().__init__(markup, **kwargs)
+        super().__init__(self._markup(message, hint), **kwargs)
+
+    @staticmethod
+    def _markup(message: str, hint: str) -> str:
+        return f"[i]{message}[/]" + (f"\n{hint}" if hint else "")
+
+    def set_content(self, message: str, hint: str = "") -> None:
+        """Swap the copy in place (e.g. 'nothing here' vs 'nothing matches')."""
+        self.update(self._markup(message, hint))
 
 
 class SizeNoticeScreen(ModalScreen[None]):
