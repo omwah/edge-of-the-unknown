@@ -69,7 +69,9 @@ class EdgeApp(App[None]):
         self.scene_art = SceneArtConfig()
         self.ui_config = UIConfig()
         self.max_warps_per_sector = 6  # TW2002 cap; reserves the warp grid's row count
-        self.computer_tab = "trade"  # last Computer tab, restored when reopened with [C]
+        self.computer_tab = "trade"  # last Computer subview, restored when reopened with [C]
+        # WP-UI20: each Computer category remembers its own last subview.
+        self.computer_subviews: dict[str, str] = {}
         self.ui_settings, self._settings_warning = load_settings()
         self.layout_tier = LayoutTier.STANDARD
 
