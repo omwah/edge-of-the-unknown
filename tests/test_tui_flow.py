@@ -1645,7 +1645,7 @@ async def test_help_is_contextual_to_the_current_screen() -> None:
         await pilot.pause()
         assert isinstance(app.screen, HelpScreen)
         text = " ".join(str(s.render()) for s in app.screen.query(Static))
-        assert "StarDock" in text and "Recruit colonists" in text
+        assert "StarDock" in text and "Recruit" in text
         assert "Warp Color" not in text  # the legend belongs to the sector view only
         await pilot.press("escape")
         await pilot.pause()

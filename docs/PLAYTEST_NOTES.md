@@ -93,12 +93,12 @@ acceptance criteria live in
 | ID | Area | Finding | Planned work |
 |---|---|---|---|
 | PT-01 | Combat aftermath | ~~Destroying a ship should visibly change the sector. Prefer creating a persistent wreck discovery and recovering salvage through that discovery, leaving evidence that a battle occurred here.~~ Implemented by `playtest: WP-PR01 persistent combat wrecks`. | WP-PR01 complete |
-| PT-02 | StarDock catalog | Move missiles and Genesis torpedoes into the Devices catalog and rename the tab **Devices & Armaments**. | WP-PR08 |
-| PT-03 | StarDock focus | After a Devices purchase, keep the purchased row highlighted instead of returning focus to the tab, matching Trade behavior. | WP-PR08 |
-| PT-04 | StarDock bindings | Rumor purchase and notice posting should be available only in the Tavern, not as screen-global actions. | WP-PR08 |
-| PT-05 | StarDock bindings | Deposit and withdrawal should be available only in the Bank tab, not as screen-global actions. | WP-PR08 |
-| PT-06 | Colonist recruitment | Add a StarDock Colonists tab. It should use station-concourse art showing people moving through a busy orbital station; generate a raster concept and convert it through the image-to-ANSI pipeline. | WP-PR08 |
-| PT-07 | Tavern | Improve the bounty board's information hierarchy and interactions; the current single-column prose list is difficult to scan. | WP-PR08 |
+| PT-02 | StarDock catalog | ~~Move missiles and Genesis torpedoes into the Devices catalog and rename the tab **Devices & Armaments**.~~ Fixed in `playtest: WP-PR08 StarDock scoped service UX`. | WP-PR08 |
+| PT-03 | StarDock focus | ~~After a Devices purchase, keep the purchased row highlighted instead of returning focus to the tab, matching Trade behavior.~~ Fixed in `playtest: WP-PR08 StarDock scoped service UX`. | WP-PR08 |
+| PT-04 | StarDock bindings | ~~Rumor purchase and notice posting should be available only in the Tavern, not as screen-global actions.~~ Fixed in `playtest: WP-PR08 StarDock scoped service UX`. | WP-PR08 |
+| PT-05 | StarDock bindings | ~~Deposit and withdrawal should be available only in the Bank tab, not as screen-global actions.~~ Fixed in `playtest: WP-PR08 StarDock scoped service UX`. | WP-PR08 |
+| PT-06 | Colonist recruitment | ~~Add a StarDock Colonists tab. It should use station-concourse art showing people moving through a busy orbital station; generate a raster concept and convert it through the image-to-ANSI pipeline.~~ Fixed in `playtest: WP-PR08 StarDock scoped service UX` (Colonists tab added; bespoke concourse raster deferred, ASCII stand-in for now). | WP-PR08 |
+| PT-07 | Tavern | ~~Improve the bounty board's information hierarchy and interactions; the current single-column prose list is difficult to scan.~~ Fixed in `playtest: WP-PR08 StarDock scoped service UX`. | WP-PR08 |
 | PT-08 | Computer / Planets | Sort player-owned planets ahead of the normal selected sort order and show their ownership clearly. | WP-PR09 |
 | PT-09 | Computer / Ports | Show when a port is attached to the player's starbase and sort those ports ahead of the normal selected sort order. | WP-PR09 |
 | PT-10 | Planet logistics | ~~Replace separate store-transfer prompts with one editor: a row per commodity, `−`/`+` controls stepping by 10, exact amount entry, and Load All / Unload All actions.~~ Fixed in `playtest: WP-PR07 planet transfer workbench`. | WP-PR07 |
@@ -120,7 +120,7 @@ acceptance criteria live in
 | PT-26 | Combat language | ~~Replace or explain “the pack is destroyed”; player-facing results should state concretely which enemies were destroyed or retreated.~~ Fixed in `playtest: WP-PR03 alien retreat state and copy`. | WP-PR03 |
 | PT-27 | Contracts | Retain completed contracts in the Computer and render them grey/dim with actions disabled instead of hiding them. | WP-PR09 |
 | PT-28 | Black holes | ~~First activation of a black hole can crash the game when gravity damage is applied to the player's ship. Reproduce with both mouse and keyboard and cover lethal and nonlethal damage.~~ Did not reproduce — the lethal-hazard crash was already closed by the WP26/WP75 escape pod; regression-locked in `playtest: WP-PR05 black-hole interaction crash`. | WP-PR05 |
-| PT-29 | StarDock Shipyard | The currently flown hull is shown as purchasable even though it cannot be bought. Mark it as current and disable its purchase action. | WP-PR08 |
+| PT-29 | StarDock Shipyard | ~~The currently flown hull is shown as purchasable even though it cannot be bought. Mark it as current and disable its purchase action.~~ Fixed in `playtest: WP-PR08 StarDock scoped service UX`. | WP-PR08 |
 | PT-30 | Asteroid belts | ~~Asteroid belts are not landable planets and must not expose colonies, citadels, colony stores, or planetary descent. Preserve only their intended scanning/mining interactions.~~ Fixed in `playtest: WP-PR06 asteroid-belt interaction model` — per-type `landable`/`colonizable` capabilities gate every seam; belts generate/normalize inert (unowned, base-less, no surface sites) and render an orbital view. | WP-PR06 |
 | PT-31 | Computer routing | Plotting a route from a non-Navigation subview briefly shows Route and then returns to the original subview. The completed action must remain on Route without a flash-back. | WP-PR09 |
 

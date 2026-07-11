@@ -15,9 +15,10 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.containers import Vertical
-from textual.widgets import DataTable, Footer, Static, TabbedContent
+from textual.widgets import Button, DataTable, Footer, Static, TabbedContent
 
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
@@ -34,28 +35,39 @@ from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.widgets import ServiceHub, TradePanel
 
 
+# Placeholder station-concourse banner for the Colonists tab (PT-06). A bespoke
+# DS9-style raster run through the image→ANSI pipeline is a deferred art follow-up;
+# this compact ASCII stand-in keeps the tab operable at 80x24 in the meantime.
+_CONCOURSE_ART = (
+    "[dim]╭──────────────── ORBITAL CONCOURSE ────────────────╮[/]\n"
+    "[dim]│[/]  [cyan]▟▙[/]   [cyan]▟▙[/]    [yellow]☺ ☺  ☺[/]   [cyan]▟▙[/]   [cyan]▟▙[/]  [dim]│[/]\n"
+    "[dim]│[/]  [cyan]██[/]   [cyan]██[/]   [yellow]☺  ☺ ☺ ☺[/]  [cyan]██[/]   [cyan]██[/]  [dim]│[/]\n"
+    "[dim]╰────────  colonists throng the promenade  ─────────╯[/]"
+)
+
+
 class StarDockScreen(Screen[None]):
     BINDINGS = [
         Binding("escape", "back", "Undock"),
         Binding("t", "trade", "Trade"),
         Binding("h", "haggle", "Haggle"),
         Binding("b", "buy", "Buy"),
-        Binding("g", "buy_genesis", "Buy Genesis"),
-        Binding("i", "buy_missiles", "Buy missile"),
-        Binding("k", "recruit", "Recruit colonists"),
         Binding("e", "engine_room", "Engine room"),
+        # Tab-scoped actions (WP-PR08 / PT-04/05): `check_action` hides each unless its
+        # tab is active, so a footer hint never implies an action on the wrong tab.
+        Binding("k", "recruit", "Recruit"),
         Binding("r", "buy_rumor", "Rumor"),
         Binding("n", "post_notice", "Notice"),
         Binding("d", "deposit", "Deposit"),
         Binding("w", "withdraw", "Withdraw"),
-        Binding("f", "buy_fighters", "Buy fighters"),
-        Binding("m", "buy_mines", "Buy mines"),
     ]
 
     HELP_TITLE = "StarDock"
     HELP = """\
-[b]B[/] buys from the active tab (hardware · shipyard · devices). The bank pays
-daily interest; deposits ride the same account everywhere."""
+[b]B[/] buys the highlighted row of the active buy tab (Hardware · Shipyard ·
+Devices & Armaments — munitions there prompt for a quantity). Tab-scoped keys only
+work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
+[b]R[/]/[b]N[/] buy rumours / post notices on the Tavern. The bank pays daily interest."""
 
     CSS = """
     StarDockScreen #dock-title {
@@ -66,6 +78,8 @@ daily interest; deposits ride the same account everywhere."""
     StarDockScreen TabPane { padding: 1 2; }
     StarDockScreen .note { color: $text-muted; margin-top: 1; }
     StarDockScreen DataTable { height: auto; max-height: 18; }
+    StarDockScreen #concourse-art { height: auto; margin-bottom: 1; }
+    StarDockScreen Button { margin-top: 1; margin-right: 1; }
     """
 
     # Buy tabs whose table cursor we preserve across a screen rebuild.
@@ -113,11 +127,12 @@ daily interest; deposits ride the same account everywhere."""
                 Static("[dim]B buys the highlighted part; slot it in the Engine Room (E). "
                        "Tier III is barter-only.[/]", classes="note"))
         devices = Vertical(
-                Static(f"[b]DEVICE BAY[/]        Latinum [b yellow]{latinum:,}[/] slips"),
+                Static(f"[b]DEVICES & ARMAMENTS[/]        Latinum [b yellow]{latinum:,}[/] slips"),
                 self._devices_table(dock),
-                Static("[dim]B buys the highlighted device (probe / interdictor / "
-                       "mine-deflector); F/M buy sector fighters / mines. Work them "
-                       "from the game screen's Deploy (D).[/]", classes="note"))
+                Static("[dim]B buys the highlighted row — munitions (missiles / fighters / "
+                       "mines) prompt for a quantity; devices and the Genesis torpedo buy one. "
+                       "Deploy them from the game screen's Deploy (D).[/]", classes="note"))
+        colonists = Vertical(*list(self._colonist_panels(dock)))
         rate = dock.interest_per_day * 100
         bank = Vertical(
                 Static(
@@ -133,7 +148,8 @@ daily interest; deposits ride the same account everywhere."""
             ("Commodities", "trade", trade, None),
             ("Shipyard", "shipyard", shipyard, None),
             ("Hardware", "hardware", hardware, None),
-            ("Devices", "devices", devices, None),
+            ("Devices & Armaments", "devices", devices, None),
+            ("Colonists", "colonists", colonists, None),
             ("Bank", "bank", bank, None),
             ("Tavern", "tavern", tavern, None),
         ]
@@ -150,10 +166,15 @@ daily interest; deposits ride the same account everywhere."""
         yield Static("[b]BOUNTY BOARD[/]")
         if tav.bounties:
             board: DataTable[Any] = DataTable(id="bounty-table", cursor_type="row")
-            board.add_columns("Notice")
-            for line in tav.bounties:
-                board.add_row(line)
+            board.add_columns("Target", "Type", "Reward / threat", "Where")
+            for b in tav.bounties:
+                icon = {"open": "[green]●[/]", "danger": "[red]▲[/]", "info": "[cyan]◆[/]"}.get(b.status, "")
+                kind = {"kill": "Bounty", "hunts_you": "Hunts you", "governance": "Notice"}.get(b.kind, b.kind)
+                where = f"({b.sector_display})" if b.sector_display is not None else "—"
+                board.add_row(f"{icon} {b.target}", kind, b.reward or b.detail, where,
+                              key=f"bounty:{b.target}:{b.kind}")
             yield board
+            yield Static("[dim]● bounty to collect   ▲ danger to you   ◆ notice[/]", classes="note")
         else:
             yield EmptyState("The board is quiet.",
                              "Bounties post here when raids put a price on someone.")
@@ -190,11 +211,32 @@ daily interest; deposits ride the same account everywhere."""
 
     def _devices_table(self, dock: object) -> DataTable[Any]:
         table: DataTable[Any] = DataTable(id="devices-table", cursor_type="row")
-        table.add_columns("Device", "Price", "")
-        for device_id, price, affordable in dock.devices:  # type: ignore[attr-defined]
-            mark = "" if affordable else "[red]✗[/]"
-            table.add_row(device_id, f"{price:,}", mark, key=device_id)
+        table.add_columns("Item", "Carried", "Price", "")
+        for item in dock.armaments:  # type: ignore[attr-defined]
+            mark = "" if item.affordable else "[red]✗[/]"
+            unit = " ea" if item.amount_based else ""
+            table.add_row(item.label, f"{item.carried:,}", f"{item.price:,}{unit}", mark, key=item.id)
         return table
+
+    def _colonist_panels(self, dock: object) -> ComposeResult:
+        """The recruitment office (§4.2, WP-PR08 / PT-06): berth occupancy + a recruit control."""
+        d = dock  # type: ignore[assignment]
+        free = max(0, d.ship_colonist_capacity - d.ship_colonists)  # type: ignore[attr-defined]
+        # NOTE: a bespoke DS9-style station-concourse raster (run through the image→ANSI
+        # pipeline) is a deferred art follow-up; this text banner stands in for now (PT-06).
+        yield Static(_CONCOURSE_ART, id="concourse-art")
+        yield Static(
+            f"[b]RECRUITMENT OFFICE[/]        Latinum [b yellow]{d.latinum:,}[/] slips\n\n"  # type: ignore[attr-defined]
+            f"Berths    [b]{d.ship_colonists:,}[/] / {d.ship_colonist_capacity:,}  "  # type: ignore[attr-defined]
+            f"([green]{free:,}[/] free)\n"
+            f"Incentive [yellow]{d.colonist_incentive:,}[/] slips per head\n"  # type: ignore[attr-defined]
+            f"Afford    up to [b]{d.colonists_recruitable:,}[/] more right now")  # type: ignore[attr-defined]
+        yield Static("[dim]Colonists are recruited, not bought — they ride their own berths, "
+                     "not cargo holds. Settle them onto a world you own from its orbit view.[/]",
+                     classes="note")
+        yield Button(f"Recruit up to {d.colonists_recruitable:,}", id="btn-recruit-all",  # type: ignore[attr-defined]
+                     variant="primary")
+        yield Button("Recruit an amount…", id="btn-recruit-some")
 
     def _shipyard_table(self, dock: object) -> DataTable[Any]:
         table: DataTable[Any] = DataTable(id="shipyard-table", cursor_type="row")
@@ -221,9 +263,30 @@ daily interest; deposits ride the same account everywhere."""
         elif active == "shipyard":
             self._buy_ship()
         elif active == "devices":
-            self._buy_device()
+            self._buy_armament()
         else:
-            self.notify("Switch to the Hardware, Shipyard, or Devices tab to buy.", timeout=2)
+            self.notify("Switch to the Hardware, Shipyard, or Devices & Armaments tab to buy.",
+                        timeout=2)
+
+    # --- tab scoping (PT-04/05): footer + bindings track the active tab ----------
+
+    _TAB_SCOPED = {
+        "buy_rumor": "tavern", "post_notice": "tavern",
+        "deposit": "bank", "withdraw": "bank", "recruit": "colonists",
+    }
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        want = self._TAB_SCOPED.get(action)
+        if want is None:
+            return True
+        try:
+            return self.query_one(TabbedContent).active == want
+        except NoMatches:
+            return True  # before mount — keep the binding until the tab is known
+
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        # Re-evaluate the scoped bindings so the footer only advertises what this tab allows.
+        self.refresh_bindings()
 
     def _buy_component(self) -> None:
         table = self.query_one("#hardware-table", DataTable)
@@ -233,29 +296,67 @@ daily interest; deposits ride the same account everywhere."""
         component, tier = row_key.value.split(":")
         self._issue(BuyComponent(Component(component), ComponentTier[tier]), f"Bought {component}")
 
+    # --- Colonists tab (PT-06) ---------------------------------------------------
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-recruit-all":
+            self._recruit_up_to(self._service.stardock_view(self._pid).colonists_recruitable)
+        elif event.button.id == "btn-recruit-some":
+            self.action_recruit()
+
     def action_recruit(self) -> None:
-        """Enlist colonists into the ship's free berths (the reducer clamps to capacity)."""
-        self._issue(RecruitColonists(count=10**9), "Recruited colonists")
+        """Prompt for a number of colonists to enlist into the ship's free berths."""
+        recruitable = self._service.stardock_view(self._pid).colonists_recruitable
+        if recruitable <= 0:
+            self.notify("No free berths or not enough latinum to recruit.", timeout=2)
+            return
 
-    def action_buy_genesis(self) -> None:
-        """Buy one Genesis torpedo (§4.2, WP10)."""
-        self._issue(BuyGenesis(), "Bought a genesis torpedo")
+        def _go(count: int | None) -> None:
+            if count:
+                self._recruit_up_to(count)
+        self.app.push_screen(_AmountInput(f"Recruit how many colonists? (up to {recruitable:,})"), _go)
 
-    def action_buy_missiles(self) -> None:
-        """Buy a homing missile at the hardware emporium (§10, WP25)."""
-        self._issue(BuyMissiles(count=1), "Bought a homing missile")
+    def _recruit_up_to(self, count: int) -> None:
+        if count <= 0:
+            self.notify("No free berths or not enough latinum to recruit.", timeout=2)
+            return
+        self._issue(RecruitColonists(count=count), f"Recruited {count:,} colonists")
 
-    def _buy_device(self) -> None:
+    # --- Devices & Armaments tab (PT-02) -----------------------------------------
+
+    def _buy_armament(self) -> None:
+        """Buy the highlighted armament/device row; amount-based rows prompt for a quantity."""
         table = self.query_one("#devices-table", DataTable)
         row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
         if row_key.value is None:
             return
-        self._issue(BuyDevice(row_key.value), f"Bought {row_key.value}")
+        item = next((a for a in self._service.stardock_view(self._pid).armaments
+                     if a.id == row_key.value), None)
+        if item is None:
+            return
+        if not item.amount_based:
+            command = BuyGenesis() if item.kind == "genesis" else BuyDevice(item.id)
+            self._issue(command, f"Bought {item.label.lower()}")
+            return
+
+        def _go(count: int | None) -> None:
+            if not count:
+                return
+            cmd = {"missile": BuyMissiles, "fighter": BuyFighters, "mine": BuyMines}[item.kind](count=count)
+            self._issue(cmd, f"Bought {count:,} {item.label.lower()}")
+        self.app.push_screen(_AmountInput(f"Buy how many {item.label.lower()}?"), _go)
 
     def _buy_ship(self) -> None:
         table = self.query_one("#shipyard-table", DataTable)
         row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
         if row_key.value is None:
+            return
+        # PT-29: the currently flown hull is shown for comparison but cannot be bought —
+        # explain here without rebuilding the screen (the reducer also rejects it).
+        item = next((s for s in self._service.stardock_view(self._pid).shipyard
+                     if s.class_id == row_key.value), None)
+        if item is not None and item.owned:
+            self.notify("You already fly this hull.", timeout=2)
             return
         self._issue(BuyShip(row_key.value), f"Acquired {row_key.value}")
 
@@ -287,20 +388,6 @@ daily interest; deposits ride the same account everywhere."""
             if amount:
                 self._issue(Withdraw(amount=amount), f"Withdrew {amount:,} slips")
         self.app.push_screen(_AmountInput("Withdraw how many slips?"), _go)
-
-    def action_buy_fighters(self) -> None:
-        """Buy sector-fighter stock (§10, WP41 — surfaced WP72)."""
-        def _go(count: int | None) -> None:
-            if count:
-                self._issue(BuyFighters(count=count), f"Bought {count} fighters")
-        self.app.push_screen(_AmountInput("Buy how many fighters?"), _go)
-
-    def action_buy_mines(self) -> None:
-        """Buy space-mine stock (§10, WP41 — surfaced WP72)."""
-        def _go(count: int | None) -> None:
-            if count:
-                self._issue(BuyMines(count=count), f"Bought {count} mines")
-        self.app.push_screen(_AmountInput("Buy how many mines?"), _go)
 
     def action_buy_rumor(self) -> None:
         """Buy a rumour at the tavern — logs a coordinate lead (§14, WP58)."""
