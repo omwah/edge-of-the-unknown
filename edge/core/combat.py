@@ -39,6 +39,7 @@ COMBAT_ACTIONS = ("fight", "flee", "launch_missile", "field_patch")
 FLED = "fled"
 VICTORY = "victory"
 DESTROYED = "destroyed"  # hull driven to zero — the reducer issues the escape pod
+RETREATED = "retreated"  # a bloodied pack breaks off — the reducer relocates the survivors
 
 
 class CombatError(Exception):
@@ -159,11 +160,20 @@ def _roll_knockout(
 def resolve_round(
     encounter: Encounter, ship: Ship, aspects: ShipAspects, interception: float,
     action: str, config: GameConfig, rng: random.Random, *, escape_floor: float,
+    npc_retreat_chance: float = 0.0,
 ) -> RoundResult:
     """Resolve one combat round: the player's `action`, then the surviving foes' fire.
 
     Field-patching consumes the player action (the kit spend itself is applied by the
     reducer before calling here); the pack still gets its volley.
+
+    `npc_retreat_chance` (§10, WP-PR03) is the per-round probability a *bloodied* surviving
+    pack breaks off. It is 0 in every fight where retreat is impossible or forbidden (a
+    fixed garrison, a fearsome pack, no legal warp out — the reducer decides), so the RNG
+    stream is only perturbed when a real retreat is on the table. The roll fires after the
+    volley/knockout draws and only once the pack's aggregate hull is at or below
+    `combat.npc_retreat_hull_frac`; on success the encounter ends `RETREATED` and the
+    reducer relocates the survivors and reports concrete counts.
     """
     cc = config.combat
     foes = list(encounter.foes)
@@ -245,6 +255,20 @@ def resolve_round(
     if hull_hit > 0:
         # Damage that defeats the screens may localize into a component (§4.1).
         new_ship, knockout = _roll_knockout(new_ship, cc, rng)
+
+    # A bloodied pack may break off (§10, WP-PR03). Gated by `npc_retreat_chance` (0 when
+    # retreat is impossible/forbidden) so the RNG stream is untouched in every other fight;
+    # the roll only fires once the survivors' aggregate hull is at or below the config floor.
+    if npc_retreat_chance > 0.0:
+        hull_now = sum(f.hull for f in alive)
+        hull_cap = sum(f.hull_max for f in alive)
+        if hull_cap > 0 and hull_now / hull_cap <= cc.npc_retreat_hull_frac \
+                and rng.random() < npc_retreat_chance:
+            return RoundResult(
+                encounter=None, ship=new_ship, outcome=RETREATED,
+                damage_dealt=dealt, damage_taken=taken, foes_destroyed=destroyed,
+                knockout=knockout,
+            )
 
     new_encounter = replace(
         encounter, foes=tuple(foes), round=next_round, player_shields=shields_left,

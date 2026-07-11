@@ -41,6 +41,7 @@ from edge.core.aliens import (
     effective_disposition,
     governor_hostile,
     is_criminal,
+    may_occupy,
     record_admission_task,
     record_seizure_task,
     seizure_progress,
@@ -89,6 +90,7 @@ from edge.core.enums import (
     Subsystem,
 )
 from edge.core.events import (
+    AlienMoved,
     AlienSpoke,
     AlienTraded,
     AttitudeChanged,
@@ -2498,6 +2500,47 @@ def _pvp_apply(state: UniverseState, attacker_id: int, enc: Encounter, result: c
     return _PvpDelta(new_attacker, new_attacker_ship, (new_defender,), (podded,), tuple(events))
 
 
+def _retreat_destinations(
+    state: UniverseState, species: AlienSpecies, sector_id: int, config: GameConfig
+) -> list[int]:
+    """Legal sectors a fleeing pack may warp to (§10, WP-PR03) — pure, stable order.
+
+    An outbound warp that keeps the species inside the alliance/Core occupancy rules
+    (`may_occupy`) and out of any interdictor-pinned origin. Sorted so the destination
+    draw is deterministic under replay.
+    """
+    interdicted = {
+        state.ships[p.ship_id].sector_id for p in state.players.values()
+        if p.ship_id in state.ships and state.ships[p.ship_id].interdictor_active
+    }
+    if sector_id in interdicted:
+        return []  # an active interdictor pins the pack — flight fails, combat continues
+    return [n for n in sorted(state.adjacency.get(sector_id, ()))
+            if may_occupy(state, species, n, config.aliens)]
+
+
+def _npc_retreat_chance(
+    enc: Encounter, species: AlienSpecies | None, sc: SpeciesConfig | None,
+    action: str, has_destination: bool, config: GameConfig,
+) -> float:
+    """The per-round chance the surviving pack breaks off (§10, WP-PR03), else 0.
+
+    Zero — the RNG stream is untouched — unless this is a real alien pack (not a sector-fighter
+    garrison, a base, a citadel, or PvP), the species' threat tier permits flight, a legal
+    outbound warp exists, and the player is pressing the attack (a fleeing/patching player is
+    not the trigger). Fixed emplacements never run; fearsome/special packs never run.
+    """
+    if species is None or sc is None or enc.species_id == 0:
+        return 0.0
+    if enc.starbase_id is not None or enc.citadel_planet_id is not None or enc.target_player_id is not None:
+        return 0.0
+    if not has_destination or action not in ("fight", "launch_missile", "field_patch"):
+        return 0.0
+    if sc.threat_tier not in config.combat.npc_retreat_tiers:
+        return 0.0
+    return config.combat.npc_retreat_chance
+
+
 def _combat_action(
     state: UniverseState, player_id: int, cmd: CombatAction, config: GameConfig
 ) -> ReduceResult:
@@ -2525,10 +2568,16 @@ def _combat_action(
         ship = patched.ships[0]
         events.extend(patched.events)
 
+    # A bloodied pack may break off to a legal adjacent sector (§10, WP-PR03). The
+    # destination is picked here (state RNG) *after* the round resolves; the chance is 0
+    # whenever retreat is impossible/forbidden, so the RNG stream is otherwise untouched.
+    retreat_dsts = _retreat_destinations(state, species, enc.sector_id, config) if species is not None else []
+    retreat_chance = _npc_retreat_chance(enc, species, sc, cmd.action, bool(retreat_dsts), config)
+
     aspects = derive_aspects(ship, config)
     result = combat.resolve_round(
         enc, ship, aspects, interception, cmd.action, config, state.rng,
-        escape_floor=config.aliens.escape_floor,
+        escape_floor=config.aliens.escape_floor, npc_retreat_chance=retreat_chance,
     )
     foes_left = (
         sum(1 for f in result.encounter.foes if f.hull > 0)
@@ -2607,6 +2656,7 @@ def _combat_action(
     extra_ships: tuple[Ship, ...] = ()
     wrecks: tuple[Discovery, ...] = ()
     removed_species_ids: tuple[int, ...] = ()
+    moved_species: tuple[AlienSpecies, ...] = ()
     plain_npc = (
         species is not None
         and enc.target_player_id is None
@@ -2660,6 +2710,12 @@ def _combat_action(
         new_player, spoke = _combat_speak(state, new_player, species, "flee_scorn", config,
                                           dialogue_facts.encounter_facts(enc))
         events.append(spoke)
+    elif result.outcome == combat.RETREATED and species is not None:
+        # PT-18: the pack breaks off — relocate the surviving species instance to a legal
+        # adjacent sector (state RNG) so it truly leaves the fight sector, and log the move.
+        dst = state.rng.choice(retreat_dsts)
+        moved_species = (replace(species, sector_id=dst),)
+        events.append(AlienMoved(species.id, enc.sector_id, dst))
     force_updates: tuple[SectorForce, ...] = ()
     if result.outcome is not None:
         if species is not None:
@@ -2690,9 +2746,24 @@ def _combat_action(
                 elif result.outcome == combat.FLED:
                     force_updates = (replace(
                         force, fighters=max(0, force.fighters - config.territory.retreat_fighter_cost)),)
-        events.append(EncounterEnded(player_id, enc.species_id, result.outcome))
+        # Concrete end-of-fight counts (PT-26) for a real alien pack — how many of the
+        # pack this fight downed and how many broke off — so the copy never says the
+        # generic "the pack is destroyed". Fixed emplacements/PvP keep the plain outcome.
+        end_destroyed = end_fled = 0
+        end_name = ""
+        if plain_npc and species is not None:
+            total = len(enc.foes)
+            alive_pre = sum(1 for f in enc.foes if f.hull > 0)
+            survivors = alive_pre - result.foes_destroyed  # fled the field
+            if result.outcome == combat.VICTORY:
+                end_destroyed, end_fled = total, 0
+            elif result.outcome == combat.RETREATED:
+                end_destroyed, end_fled = total - survivors, survivors
+            end_name = species.name
+        events.append(EncounterEnded(
+            player_id, enc.species_id, result.outcome, end_destroyed, end_fled, end_name))
     return ReduceResult(events=tuple(events), players=(new_player, *extra_players),
-                        ships=(new_ship, *extra_ships),
+                        ships=(new_ship, *extra_ships), species=moved_species,
                         starbases=razed_bases, planets=razed_planets + silenced_planets,
                         discoveries=wrecks, removed_species_ids=removed_species_ids,
                         sector_forces=force_updates)
