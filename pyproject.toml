@@ -46,7 +46,6 @@ pytest = "*"
 hypothesis = "*"
 pytest-asyncio = "*"
 pytest-cov = "*"
-pytest-textual-snapshot = "*"  # SVG visual-regression coverage for responsive TUI layouts
 
 [tool.pixi.pypi-dependencies]
 edge-of-the-unknown = { path = ".", editable = true }
@@ -54,6 +53,7 @@ textual-serve = "*"  # `--serve`: host the Textual app in a browser (DESIGN §15
 tracery = ">=0.1.1"  # offline-authored grammar realisation of alien dialogue (DESIGN §6.7)
 "chafa.py" = "*"     # Python binding to libchafa: render species portraits as terminal art (tui)
 pillow = "*"         # decode portrait images to pixels for chafa (tui)
+pytest-textual-snapshot = "*"  # PyPI wheel includes the HTML diff-report template; conda 1.1.0 does not
 
 [tool.pixi.tasks]
 edge = "python -m edge.tui"

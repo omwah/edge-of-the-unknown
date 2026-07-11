@@ -135,7 +135,7 @@ class FieldPrompt(ModalScreen[object]):
 
     DEFAULT_CSS = """
     FieldPrompt { align: center middle; background: $background 60%; }
-    FieldPrompt .form-error { color: $error; height: auto; }
+    FieldPrompt .form-error { color: $error; height: 1; }
     FieldPrompt Button { margin-top: 1; }
     """
 
@@ -167,6 +167,10 @@ class FieldPrompt(ModalScreen[object]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self._submit()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """A correction clears stale validation copy and restores stable form layout."""
+        self.query_one("#field-error", Static).update("")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self._submit()

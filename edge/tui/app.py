@@ -161,7 +161,9 @@ class EdgeApp(App[None]):
         if not self.screen_stack:
             return  # nothing mounted yet; on_mount re-syncs after the first screen
         showing = isinstance(self.screen, SizeNoticeScreen)
-        if self.layout_tier is LayoutTier.UNSUPPORTED and not showing:
+        notice_in_stack = any(isinstance(screen, SizeNoticeScreen)
+                              for screen in self.screen_stack)
+        if self.layout_tier is LayoutTier.UNSUPPORTED and not notice_in_stack:
             self.push_screen(SizeNoticeScreen())
         elif self.layout_tier is not LayoutTier.UNSUPPORTED and showing:
             self.pop_screen()

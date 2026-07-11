@@ -19,9 +19,9 @@ from rich.style import Style
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal
+from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Static
+from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.economy import EconomyError
 from edge.core.dto import SurfaceDTO, SurfaceSite
@@ -183,10 +183,23 @@ class SurfaceScreen(Screen):
     SurfaceScreen #sites-panel { height: 1fr; border: round $secondary; }
     SurfaceScreen #sites-row { height: 1fr; }
     SurfaceScreen #sites { width: 3fr; height: 1fr; }
+    SurfaceScreen #site-detail-column { width: 2fr; height: 1fr; }
     SurfaceScreen #site-art {
-        width: 2fr; height: 1fr; padding: 0 1; border-left: solid $secondary;
+        width: 1fr; height: 1fr; padding: 0 1; border-left: solid $secondary;
         content-align: center middle;
     }
+    SurfaceScreen #site-detail { height: auto; min-height: 5; padding: 0 1; }
+    SurfaceScreen #site-actions { height: auto; padding: 0 1; }
+    SurfaceScreen #site-actions Button { margin-right: 1; }
+    SurfaceScreen.compact #terrain { display: none; }
+    SurfaceScreen.compact #sites { width: 1fr; height: 1fr; }
+    SurfaceScreen.compact #sites-row { layout: vertical; }
+    SurfaceScreen.compact #site-detail-column { width: 1fr; height: auto; }
+    SurfaceScreen.compact #site-art { display: none; }
+    SurfaceScreen.compact #site-detail { min-height: 4; border-top: solid $secondary; }
+    SurfaceScreen.compact #site-actions { padding: 0; }
+    SurfaceScreen.wide #sites { width: 4fr; }
+    SurfaceScreen.wide #site-detail-column { width: 3fr; }
     """
 
     def __init__(self, surface: SurfaceDTO, service: GameService | None = None, pid: int = 1,
@@ -211,9 +224,14 @@ class SurfaceScreen(Screen):
         with Container(id="sites-panel"):
             with Horizontal(id="sites-row"):
                 yield DataTable(id="sites", cursor_type="row")
-                art = SiteArt(id="site-art")
-                art.border_title = "site"
-                yield art
+                with Vertical(id="site-detail-column"):
+                    yield Static("Select a site.", id="site-detail")
+                    with Horizontal(id="site-actions"):
+                        yield Button("Survey next [E]", id="btn-survey", variant="primary")
+                        yield Button("Collect [T]", id="btn-collect")
+                    art = SiteArt(id="site-art")
+                    art.border_title = "site"
+                    yield art
         yield Footer()
 
     def on_mount(self) -> None:
@@ -221,7 +239,9 @@ class SurfaceScreen(Screen):
         table.add_columns("", "Site", "Rarity", "Status", "Find")
         for site in self._surface.sites:
             surveyed = site.status != "unexplored"
-            if site.status == "logged":  # the taken indicator lives in the Find column now
+            if not surveyed:
+                find: Text = Text("hidden", style="dim")
+            elif site.status == "logged":  # the taken indicator lives in the Find column now
                 find: Text = Text("taken", style="dim")
             else:
                 find = Text.from_markup("; ".join(site.payload))
@@ -236,14 +256,42 @@ class SurfaceScreen(Screen):
             row = min(max(self._cursor, 0), len(self._surface.sites) - 1)
             table.move_cursor(row=row, animate=False)
             self._show_site(self._surface.sites[row])
+        else:
+            self.query_one("#btn-survey", Button).disabled = True
+            self.query_one("#btn-collect", Button).disabled = True
 
     def _show_site(self, site: SurfaceSite) -> None:
         self.query_one("#site-art", SiteArt).show(
             site.kind, site.discovery_id, site.status != "unexplored")
+        surveyed = site.status != "unexplored"
+        name = site.name if surveyed else "Unsurveyed site"
+        rarity = site.rarity if surveyed else "unknown"
+        status = _STATUS_LABEL.get(site.status, site.status)
+        if not surveyed:
+            required = "Survey this site to identify it and reveal its find."
+            reward = "Reward  hidden until surveyed"
+        elif site.salvageable:
+            required = "Survey complete · collect the find or leave it in place."
+            reward = "Reward  " + ("; ".join(site.payload) or "none")
+        else:
+            required = "Survey complete · find already collected."
+            reward = "Reward  collected"
+        self.query_one("#site-detail", Static).update(
+            f"[b]{site.marker} {name}[/]\nRarity  {rarity}   Status  {status}\n"
+            f"{required}\n{reward}"
+        )
+        self.query_one("#btn-survey", Button).disabled = not self._surface.explorable
+        self.query_one("#btn-collect", Button).disabled = not site.salvageable
 
     def on_data_table_row_highlighted(self, msg: DataTable.RowHighlighted) -> None:
         if 0 <= msg.cursor_row < len(self._surface.sites):
             self._show_site(self._surface.sites[msg.cursor_row])
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-survey":
+            self.action_explore()
+        elif event.button.id == "btn-collect":
+            self.action_take()
 
     def _highlighted(self) -> SurfaceSite | None:
         row = self.query_one("#sites", DataTable).cursor_row

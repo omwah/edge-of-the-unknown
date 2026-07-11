@@ -135,6 +135,15 @@ trips are the intended loop; the citadel art grows with its level."""
     PlanetScreen .orbit-panel Button { margin-right: 1; }
     PlanetScreen .citadel-art { height: auto; }
     PlanetScreen .section-tight { margin-top: 1; }
+    PlanetScreen #identity-panel { margin-top: 0; }
+    PlanetScreen.compact #orbit-body { width: 1fr; padding: 0 1; }
+    PlanetScreen.compact #orbit-art { display: none; }
+    PlanetScreen.compact .citadel-art { display: none; }
+    PlanetScreen.compact .orbit-panel { margin-top: 0; padding: 0 1; }
+    PlanetScreen.compact .orbit-panel DataTable { max-height: 5; }
+    PlanetScreen.compact .buttons { margin-top: 0; }
+    PlanetScreen.wide #orbit-body { width: 3fr; }
+    PlanetScreen.wide #orbit-art { width: 2fr; }
     """
 
     def __init__(self, planet: PlanetDTO, service: GameService | None = None, pid: int = 1) -> None:
@@ -148,14 +157,7 @@ trips are the intended loop; the citadel art grows with its level."""
         yield Static(f"ORBIT · {p.name} · {pretty_planet_type(p.ptype)}", id="orbit-title")
         with Horizontal(id="orbit-main"):
             with VerticalScroll(id="orbit-body"):
-                yield Static(f"Owner    [cyan]{p.owner}[/]")
-                cap = f"{p.habitability_cap:,}" if p.colonizable else "—"
-                yield Static(f"Habitability cap  {cap}      Colonists  {p.colonists:,}")
-                if p.owned_by_you:
-                    alloc = "   ".join(f"{label} {pct}%" for label, pct in p.allocation)
-                    if p.fighter_allocation_pct:
-                        alloc += f"   Garrison {p.fighter_allocation_pct}%"
-                    yield Static(f"Allocation   {alloc}", classes="section")
+                yield self._identity_panel(p)
                 yield self._stores_panel(p)
                 if p.owned_by_you and (p.citadel_level > 0 or p.can_build_citadel
                                        or p.citadel_build_target > 0):
@@ -171,9 +173,6 @@ trips are the intended loop; the citadel art grows with its level."""
                         f"[{colour}]#[/] Orbital starbase — {p.starbase}   "
                         f"[dim]\\[B] Enter base[/]",
                         dest="starbase", ref=p.starbase_id, classes="section")
-                hint = self._claim_hint()
-                if hint:
-                    yield Static(hint, classes="section")
                 if p.genesis_eligible and p.ship_genesis > 0:
                     yield Static(f"[green]\\[G] Genesis[/] — re-form this world (torpedoes: {p.ship_genesis})")
             detail = self.app.scene_art.planet_detail
@@ -187,6 +186,25 @@ trips are the intended loop; the citadel art grows with its level."""
             art.tooltip = "Click to descend to the surface"
             yield art
         yield Footer()
+
+    def _identity_panel(self, p: PlanetDTO) -> Vertical:
+        """Keep identity, ownership, habitability, and colony state together."""
+        cap = f"{p.habitability_cap:,}" if p.colonizable else "not colonizable"
+        children: list[Static] = [
+            Static(f"Type  [b]{pretty_planet_type(p.ptype)}[/]   Owner  [cyan]{p.owner}[/]"),
+            Static(f"Habitability  {cap}   Population  {p.colonists:,}"),
+        ]
+        if p.owned_by_you:
+            alloc = "   ".join(f"{label} {pct}%" for label, pct in p.allocation)
+            if p.fighter_allocation_pct:
+                alloc += f"   Garrison {p.fighter_allocation_pct}%"
+            children.append(Static(f"Production  {alloc}"))
+        hint = self._claim_hint()
+        if hint:
+            children.append(Static(hint))
+        panel = Vertical(*children, id="identity-panel", classes="orbit-panel")
+        panel.border_title = "World & colony"
+        return panel
 
     def on_planet_sprite_descend(self, msg: PlanetSprite.Descend) -> None:
         self.action_descend()

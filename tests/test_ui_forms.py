@@ -90,6 +90,8 @@ async def test_corp_charter_submits_via_button_and_validates() -> None:
         assert isinstance(app.screen, _FormCorpModal)
         assert _error_text(app)
         app.screen.query_one("#field-input", Input).value = "Void Runners"
+        await pilot.pause()  # settle the reactive value and validation-layout updates
+        await pilot.pause()
         await pilot.click("#field-submit")
         await pilot.pause()
         assert results == ["Void Runners"]
