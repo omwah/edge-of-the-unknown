@@ -121,7 +121,10 @@ limpet mines tag passing hulls so their owner can track them."""
         border: round $secondary; height: auto; padding: 0 1; margin-bottom: 1;
     }
     TerritoryScreen #deployed-panel DataTable { height: auto; max-height: 8; }
-    TerritoryScreen #deploy-grid { grid-size: 3; grid-gutter: 0 1; height: auto; }
+    /* WP-UI19: card columns follow the layout tier (1 / 2 / 3). */
+    TerritoryScreen #deploy-grid { grid-size: 2; grid-gutter: 0 1; height: auto; }
+    TerritoryScreen.compact #deploy-grid { grid-size: 1; }
+    TerritoryScreen.wide #deploy-grid { grid-size: 3; }
     TerritoryScreen .warn { color: $warning; margin-bottom: 1; }
     """
 

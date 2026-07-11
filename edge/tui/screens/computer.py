@@ -22,7 +22,7 @@ from edge.core.economy import EconomyError
 from edge.core.movement import MovementError
 from edge.core.rules import TravelTo
 from edge.server.service import GameService
-from edge.tui.chrome import notify_warning
+from edge.tui.chrome import EmptyState, notify_warning
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.widgets import LocalMapView, bar, preserve_cursor
@@ -106,7 +106,13 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
                 )
             with TabPane("Market", id="market"):
                 yield Static(f"[b]ORDER BOOK[/]        [dim]{self._market.summary}[/]")
-                yield DataTable(id="market-table", zebra_stripes=True, cursor_type="row")
+                market = DataTable(id="market-table", zebra_stripes=True, cursor_type="row")
+                market_empty = self._market_empty()  # WP-UI19 shared empty state
+                if market_empty is not None:
+                    market.display = False
+                yield market
+                if market_empty is not None:
+                    yield market_empty
                 yield Static(self._market_note(), classes="note")
             with TabPane("Log", id="log"):
                 yield Static("[b]EVENT LOG[/]        [dim]newest first[/]")
@@ -124,7 +130,14 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
                 yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
             with TabPane("Contracts", id="contracts"):
                 yield Static("[b]FAVORS[/]        [dim]jobs accepted from aliens[/]")
-                yield DataTable(id="contracts-table", zebra_stripes=True, cursor_type="row")
+                jobs = DataTable(id="contracts-table", zebra_stripes=True, cursor_type="row")
+                if not self._computer.contracts:  # WP-UI19 shared empty state
+                    jobs.display = False
+                yield jobs
+                if not self._computer.contracts:
+                    yield EmptyState("No favors accepted.",
+                                     "Ask a friendly species for work — accepted "
+                                     "jobs appear here.")
                 yield Static("[dim][b]D[/] Deliver highlighted (dock at its target port first)"
                              "   ·   [b]X[/] Abandon highlighted[/]", classes="note")
             with TabPane("Alliances", id="alliances"):
@@ -192,15 +205,10 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
 
         jobs = self.query_one("#contracts-table", DataTable)
         jobs.add_columns("#", "Kind", "From", "Task", "Reward", "Due")
-        if self._computer.contracts:
-            for c in self._computer.contracts:
-                jobs.add_row(str(c.contract_id), c.kind, c.issuer, c.summary,
-                             f"{c.reward:,}", f"day {c.deadline_day}",
-                             key=str(c.contract_id))
-        else:
-            jobs.add_row(
-                Text("No favors accepted — ask a friendly species for work.", style="dim"),
-                *(Text(""),) * 5)
+        for c in self._computer.contracts:  # empty → the WP-UI19 EmptyState shows instead
+            jobs.add_row(str(c.contract_id), c.kind, c.issuer, c.summary,
+                         f"{c.reward:,}", f"day {c.deadline_day}",
+                         key=str(c.contract_id))
 
         ports = self.query_one("#ports-table", DataTable)
         ports.add_columns("Sector", "Port", "Class", "Buys", "Sells", "Dist")
@@ -228,18 +236,9 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
 
         market = self.query_one("#market-table", DataTable)
         market.add_columns("Sector", "Port", "Commodity", "Side", "Qty", "Limit")
-        if not self._market.enabled:
-            market.add_row(Text("The order-book market is disabled.", style="dim"),
-                           *(Text(""),) * 5)
-        elif self._market.orders:
-            for o in self._market.orders:
-                market.add_row(f"S{o.sector_display}", o.port_name, o.commodity,
-                               o.side, str(o.qty), str(o.limit))
-        else:
-            market.add_row(
-                Text("No open orders at charted ports — dock somewhere to read its book.",
-                     style="dim"),
-                *(Text(""),) * 5)
+        for o in self._market.orders if self._market.enabled else ():
+            market.add_row(f"S{o.sector_display}", o.port_name, o.commodity,
+                           o.side, str(o.qty), str(o.limit))
 
         route = self.query_one("#route-table", DataTable)
         route.add_columns("Hop", "Sector", "Notes")
@@ -506,9 +505,20 @@ bloc; [b]V[/] toggles avoiding the highlighted sector on plotted routes."""
         self.notify(f"Recorded: {pending[0]}.", timeout=2)
         self._reopen_tab("alliances")
 
+    def _market_empty(self) -> EmptyState | None:
+        """The shared empty state for the order book, or None when rows exist (WP-UI19)."""
+        if not self._market.enabled:
+            return EmptyState("The order-book market is disabled.",
+                              "The legacy port economy is running — there is no "
+                              "order book to show.")
+        if not self._market.orders:
+            return EmptyState("No open orders at charted ports.",
+                              "Dock somewhere to read its book.")
+        return None
+
     def _market_note(self) -> str:
         if not self._market.enabled:
-            return "[dim]The legacy port economy is running — no order book to show.[/]"
+            return ""
         if not self._market.purses:
             return "[dim]Purses shown as of your last visit — dock to refresh a port's book.[/]"
         purses = "   ".join(f"S{d} {name} [cyan]{purse:,}[/]"

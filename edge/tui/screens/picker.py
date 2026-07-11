@@ -31,12 +31,11 @@ class ListPicker(ModalScreen[int | str | None]):
     ]
 
     CSS = """
-    /* Translucent so the screen underneath shows through behind the box. */
+    /* Translucent so the screen underneath shows through behind the box.
+       The box rides the shared .modal-box (WP-UI19), so tier-scoped widths and
+       the 80×24 scroll guarantee apply; callers may still override the width. */
     ListPicker { align: center middle; background: $background 60%; }
-    ListPicker #picker-box {
-        width: 50; max-width: 100%; max-height: 80%; height: auto; overflow-y: auto;
-        padding: 1 2; border: round $primary; background: $surface;
-    }
+    ListPicker #picker-box { max-height: 80%; }
     ListPicker #picker-title { margin-bottom: 1; }
     ListPicker #picker-hint { margin-top: 1; color: $text-muted; }
     """
@@ -52,7 +51,7 @@ class ListPicker(ModalScreen[int | str | None]):
         self._rows: list[ClickableEntry] = []
 
     def compose(self) -> ComposeResult:
-        box = Vertical(id="picker-box")
+        box = Vertical(id="picker-box", classes="modal-box")
         box.styles.width = self._width
         with box:
             yield Static(f"[b]{self._title}[/]", id="picker-title")

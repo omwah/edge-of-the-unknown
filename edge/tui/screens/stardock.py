@@ -26,7 +26,7 @@ from edge.core.rules import (
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
-from edge.tui.chrome import AmountPrompt, TextPrompt, notify_warning
+from edge.tui.chrome import AmountPrompt, EmptyState, TextPrompt, notify_warning
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.widgets import ServiceHub, TradePanel
@@ -146,20 +146,25 @@ daily interest; deposits ride the same account everywhere."""
         yield Static(f"[b]TAVERN[/]        rumour: [yellow]{tav.rumor_price:,}[/] slips — {buyable}")
         yield Static("[dim]R buys a rumour (logs a lead).  N posts a notice.[/]", classes="note")
         yield Static("[b]BOUNTY BOARD[/]")
-        board = DataTable(id="bounty-table", cursor_type="row")
-        board.add_columns("Notice")
-        for line in tav.bounties or ["[dim]The board is quiet.[/]"]:
-            board.add_row(line)
-        yield board
+        if tav.bounties:
+            board = DataTable(id="bounty-table", cursor_type="row")
+            board.add_columns("Notice")
+            for line in tav.bounties:
+                board.add_row(line)
+            yield board
+        else:
+            yield EmptyState("The board is quiet.",
+                             "Bounties post here when raids put a price on someone.")
         yield Static("[b]NOTICEBOARD[/]")
-        notices = DataTable(id="notices-table", cursor_type="row")
-        notices.add_columns("Day", "By", "Notice")
         if tav.notices:
+            notices = DataTable(id="notices-table", cursor_type="row")
+            notices.add_columns("Day", "By", "Notice")
             for n in tav.notices:
                 notices.add_row(f"d{n.day}", n.author, n.text)
+            yield notices
         else:
-            notices.add_row("", "", "[dim]nothing pinned yet[/]")
-        yield notices
+            yield EmptyState("Nothing pinned yet.",
+                             "[b]N[/] posts a notice every visitor will read.")
 
     def on_mount(self) -> None:
         # Restore the highlighted row on the buy tab we rebuilt from (see _issue),
