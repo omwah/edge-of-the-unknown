@@ -53,8 +53,8 @@ _WRITTEN: set[str] = set()
 
 _STARDOCK_TABS = ("trade", "shipyard", "hardware", "devices", "bank", "tavern")
 _COMPUTER_TABS = (
-    "map", "ports", "planets", "trade", "market", "log", "route", "codex",
-    "leads", "contracts", "alliances", "dossier", "notes",
+    "map", "route", "ports", "trade", "market", "planets", "codex", "leads",
+    "contracts", "alliances", "dossier", "log", "notes",
 )
 
 # Sprite-gallery tabs to capture, each to its own SVG: (TabPane id, file stem).
@@ -109,6 +109,14 @@ async def _tab_shots(
     for tab_id in tab_ids:
         tabs.active = tab_id
         await _shot(app, pilot, f"{screen}-{tab_id}.svg")
+
+
+async def _computer_shots(app: EdgeApp, pilot: Pilot[Any]) -> None:
+    """Capture nested WP-UI20 category/subview tabs by stable pane ID."""
+    screen = app.screen
+    for tab_id in _COMPUTER_TABS:
+        screen.show_subview(tab_id)
+        await _shot(app, pilot, f"computer-{tab_id}.svg")
 
 
 class _EncounterSampleService:
@@ -183,8 +191,8 @@ async def _capture() -> None:
         await pilot.press("escape")
         await pilot.pause()
 
-        await pilot.press("c")  # Ship computer: capture every live query tab.
-        await _tab_shots(app, pilot, "computer", _COMPUTER_TABS)
+        await pilot.press("c")  # Ship computer: capture every live query subview.
+        await _computer_shots(app, pilot)
         await pilot.press("escape")
         await pilot.pause()
 
