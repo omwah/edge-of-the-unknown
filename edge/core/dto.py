@@ -392,6 +392,12 @@ class PortDirEntry:
     buys: str  # "Org, Equ" — commodities the port buys
     sells: str  # "Fuel" — commodities the port sells
     dist: int  # hops from the player's current sector (BFS), -1 if unreachable
+    # Attached orbital starbase in the port's sector (WP-PR09 / PT-09): the base-hosted
+    # market's base, if any. `starbase_yours` sorts a player/corp base's port to the top.
+    starbase_id: int | None = None
+    starbase_name: str = ""
+    starbase_yours: bool = False
+    starbase_status: str = ""  # "operational" | "derelict" | "" (no base)
 
 
 @dataclass(frozen=True)
@@ -408,6 +414,7 @@ class PlanetDirEntry:
     species: str  # inhabiting species name, or "—"
     stores: str  # "Fuel 120  Org 40  Equ 0" — the trio in planetary stores
     dist: int  # hops from the player's current sector (BFS), -1 if unreachable
+    owned_by_you: bool = False  # player/corp holding — sorts to the top (WP-PR09 / PT-08)
 
 
 @dataclass(frozen=True)
@@ -445,6 +452,7 @@ class ContractDTO:
     reward: int  # slips on completion
     deadline_day: int
     dest_display: int  # spatial id of the destination sector (0 when not location-bound)
+    status: str = "active"  # "active" | "done" | "failed" — done/failed render dim, actions off (PT-27)
 
 
 @dataclass(frozen=True)

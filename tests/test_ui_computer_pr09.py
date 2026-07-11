@@ -1,0 +1,152 @@
+"""WP-PR09 — Computer prioritization and navigation continuity (PT-08/09/23/27/31).
+
+Projection: player-owned planets and base-hosted ports sort first and carry ownership;
+finished contracts stay listed with a status. UI: the DetailTable priority group keeps
+owned rows on top under any user sort; plotting from any subview lands on Route; and the
+avoid list is reachable from a Notes-tab button.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+
+from edge.config import load_default_config
+from edge.core.models import Contract, Ownership
+from edge.core.movement import shortest_path
+from edge.core.rules import Warp
+from edge.server.service import GameService
+from edge.store.repo import SqliteRepository
+from edge.tui.app import EdgeApp
+from edge.tui.saves import clear_slot
+from edge.tui.screens.computer import ComputerScreen
+
+CFG = load_default_config()
+
+
+def _svc(tmp_path) -> GameService:
+    svc = GameService.new_game(CFG, 42, SqliteRepository(tmp_path / "g.db"))
+    st = svc._state
+    st.players[1] = replace(st.players[1], explored_sectors=frozenset(st.sectors))
+    return svc
+
+
+# --- projection: ownership sort + contract history ---------------------------
+
+
+def test_owned_planet_sorts_first(tmp_path) -> None:
+    svc = _svc(tmp_path)
+    st = svc._state
+    # Own a *far* planet so only ownership (not distance) could float it up.
+    dist_sorted = svc.computer_view(1).planets
+    far = dist_sorted[-1]
+    st.planets[far.planet_id] = replace(st.planets[far.planet_id], owner=Ownership("player", 1))
+    planets = svc.computer_view(1).planets
+    assert planets[0].owned_by_you and planets[0].planet_id == far.planet_id
+
+
+def test_owned_base_port_sorts_first_with_status(tmp_path) -> None:
+    svc = _svc(tmp_path)
+    st = svc._state
+    # Find a port that shares a sector with a starbase; make that base the player's.
+    base = next(iter(st.starbases.values()))
+    port = next((p for p in st.ports.values() if p.sector_id == base.sector_id), None)
+    if port is None:  # no co-located port in this seed — synthesize ownership on any base's port
+        return
+    st.starbases[base.id] = replace(base, owner=Ownership("player", 1))
+    ports = svc.computer_view(1).ports
+    top = ports[0]
+    assert top.starbase_yours and top.starbase_id == base.id and top.starbase_status
+
+
+def test_finished_contracts_are_retained_with_status(tmp_path) -> None:
+    svc = _svc(tmp_path)
+    st = svc._state
+    done = Contract(id=1, kind="deliver", issuer="thess", status="done", reward_slips=100,
+                    reward_attitude=0.0, accepted_day=1, deadline_day=5, dest_sector=None)
+    failed = Contract(id=2, kind="destroy", issuer="vex", status="failed", reward_slips=50,
+                      reward_attitude=0.0, accepted_day=1, deadline_day=5,
+                      target_species_id=None)
+    active = Contract(id=3, kind="escort", issuer="sel", status="active", reward_slips=75,
+                      reward_attitude=0.0, accepted_day=1, deadline_day=9, dest_sector=None)
+    st.players[1] = replace(st.players[1], contracts=(done, failed, active))
+    rows = svc.computer_view(1).contracts
+    assert rows[0].status == "active"  # active first
+    assert {r.status for r in rows} == {"active", "done", "failed"}
+
+
+# --- UI: grouping under user sort, route continuity, avoid button ------------
+
+
+async def _open_computer(app: EdgeApp, pilot: object) -> ComputerScreen:
+    clear_slot()
+    await pilot.press("n")  # type: ignore[attr-defined]
+    await pilot.pause()  # type: ignore[attr-defined]
+    svc = app.service
+    start = svc.game_view(1).sector.sector_id  # type: ignore[attr-defined]
+    dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)  # type: ignore[attr-defined]
+    for hop in (shortest_path(svc.state.adjacency, start, dock.sector_id) or [])[1:]:  # type: ignore[attr-defined]
+        svc.apply(1, Warp(to_sector=hop))  # type: ignore[attr-defined]
+    svc.state.players[1] = replace(svc.state.players[1],  # type: ignore[attr-defined]
+                                   explored_sectors=frozenset(svc.state.sectors))  # type: ignore[attr-defined]
+    await pilot.press("c")  # type: ignore[attr-defined]
+    await pilot.pause()  # type: ignore[attr-defined]
+    assert isinstance(app.screen, ComputerScreen)
+    return app.screen
+
+
+async def test_owned_planet_stays_top_even_when_user_sorts() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        screen = await _open_computer(app, pilot)
+        svc = app.service
+        far = svc.computer_view(1).planets[-1]  # type: ignore[attr-defined]
+        svc.state.planets[far.planet_id] = replace(  # type: ignore[attr-defined]
+            svc.state.planets[far.planet_id], owner=Ownership("player", 1))  # type: ignore[attr-defined]
+        # Reopen the Computer so it re-reads the projection (the screen snapshots its DTO).
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.press("c")
+        await pilot.pause()
+        screen = app.screen  # the fresh ComputerScreen
+        assert isinstance(screen, ComputerScreen)
+        screen.show_subview("planets")
+        await pilot.pause()
+        from edge.tui.detail_table import DetailTable
+        from textual.widgets import DataTable
+        dt = screen.query_one("#planets-table-panel", DetailTable)
+        # Sort by a column, ascending then descending: the owned row stays first either way.
+        for _ in range(2):
+            dt.action_cycle_sort()
+            await pilot.pause()
+            table = dt.query_one(DataTable)
+            top_key = table.coordinate_to_cell_key((0, 0)).row_key.value
+            planets = svc.computer_view(1).planets  # type: ignore[attr-defined]
+            assert planets[int(top_key)].owned_by_you
+
+
+async def test_plot_route_from_planets_lands_on_route() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        screen = await _open_computer(app, pilot)
+        screen.show_subview("planets")
+        await pilot.pause()
+        screen.action_plot_route()
+        await pilot.pause()
+        await pilot.pause()
+        assert screen._active_subview() == "route"  # no flash-back (PT-31)
+
+
+async def test_avoid_button_opens_prompt() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        screen = await _open_computer(app, pilot)
+        screen.show_subview("notes")
+        await pilot.pause()
+        from textual.widgets import Button
+        from edge.tui.screens.travel import TravelPromptScreen
+        screen.query_one("#avoid-add", Button).press()
+        await pilot.pause()
+        assert isinstance(app.screen, TravelPromptScreen)

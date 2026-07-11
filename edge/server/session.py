@@ -122,6 +122,7 @@ from edge.core.events import (
 from edge.core import corp
 from edge.core.models import (
     AlienSpecies,
+    Contract,
     Ownership,
     Planet,
     Player,
@@ -1243,7 +1244,7 @@ def _port_klass_label(klass: PortClass) -> str:
     return f"Class {klass.value} ({mnemonic})"
 
 
-def _port_directory(state: UniverseState, player_id: int) -> list[dto.PortDirEntry]:
+def _port_directory(state: UniverseState, player_id: int, config: GameConfig) -> list[dto.PortDirEntry]:
     """Every known port (explored sectors), nearest first — the Ports tab (§11, WP15)."""
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
@@ -1254,14 +1255,21 @@ def _port_directory(state: UniverseState, player_id: int) -> list[dto.PortDirEnt
             continue  # fog of war: a port appears only once its sector is explored
         buys = [_LABEL[c] for c in Commodity if (ln := port.line(c)) and ln.mode is PortMode.BUY]
         sells = [_LABEL[c] for c in Commodity if (ln := port.line(c)) and ln.mode is PortMode.SELL]
+        base = next((b for b in state.starbases.values() if b.sector_id == port.sector_id), None)
+        base_yours = base is not None and corp.player_owns(state, base.owner, player_id)
+        base_status = "" if base is None else ("operational" if is_operational(base) else "derelict")
+        base_name = "" if base is None else config.ship_class(base.ship_class_id).name
         out.append(dto.PortDirEntry(
             port_id=port.id, sector_id=port.sector_id,
             sector_display=_display(state, port.sector_id), name=port.name,
             klass=_port_klass_label(port.klass),
             buys=", ".join(buys) or "—", sells=", ".join(sells) or "—",
             dist=dist.get(port.sector_id, -1),
+            starbase_id=base.id if base is not None else None,
+            starbase_name=base_name, starbase_yours=base_yours, starbase_status=base_status,
         ))
-    out.sort(key=lambda e: (e.dist if e.dist >= 0 else 1 << 30, e.sector_display))
+    # Player-base ports float to the top; the rest keep the nearest-first order (PT-09).
+    out.sort(key=lambda e: (not e.starbase_yours, e.dist if e.dist >= 0 else 1 << 30, e.sector_display))
     return out
 
 
@@ -1286,8 +1294,10 @@ def _planet_directory(state: UniverseState, player_id: int) -> list[dto.PlanetDi
             colonists=planet.colonists,
             species=species.name if species is not None else "—",
             stores=stores, dist=dist.get(planet.sector_id, -1),
+            owned_by_you=corp.player_owns(state, planet.owner, player_id),
         ))
-    out.sort(key=lambda e: (e.dist if e.dist >= 0 else 1 << 30, e.sector_display))
+    # Your worlds float to the top; the rest keep the nearest-first order (PT-08).
+    out.sort(key=lambda e: (not e.owned_by_you, e.dist if e.dist >= 0 else 1 << 30, e.sector_display))
     return out
 
 
@@ -1315,7 +1325,7 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     return dto.ComputerDTO(
         pairs=top, selected=top[0].pair if top else "—",
         codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
-        ports=_port_directory(state, player_id), planets=_planet_directory(state, player_id),
+        ports=_port_directory(state, player_id, config), planets=_planet_directory(state, player_id),
         leads=leads_view(state, player_id, config),
         contracts=_contracts_view(state, player),
         seizure=_seizure_status(state, player, config),
@@ -1362,18 +1372,29 @@ def _alliance_rows(state: UniverseState, player: Player,
     return rows
 
 
+_CONTRACT_HISTORY_MAX = 12  # bounded tail of finished favors kept on the board (PT-27)
+
+
 def _contracts_view(state: UniverseState, player: Player) -> list[dto.ContractDTO]:
-    """The player's active favors for the Computer's contracts panel (§6.7, WP57)."""
-    return [
-        dto.ContractDTO(
+    """The player's favors for the Computer's contracts panel (§6.7, WP57 / PT-27).
+
+    Active favors first (the actionable ones), then a bounded, most-recent tail of finished
+    ones (`done`/`failed`) rendered dim with actions off — completed work stays visible as a
+    record instead of vanishing. Never-accepted `offered` rows are not the player's, so omitted.
+    """
+    def _row(c: Contract) -> dto.ContractDTO:
+        return dto.ContractDTO(
             contract_id=c.id, kind=c.kind, issuer=c.issuer,
             summary=contracts.target_label(state, c), reward=c.reward_slips,
             deadline_day=c.deadline_day,
             dest_display=(state.spatial_ids.get(c.dest_sector, c.dest_sector)
                           if c.dest_sector is not None else 0),
+            status=c.status,
         )
-        for c in contracts.active(player)
-    ]
+
+    active = [_row(c) for c in contracts.active(player)]
+    finished = [_row(c) for c in reversed(player.contracts) if c.status in ("done", "failed")]
+    return active + finished[:_CONTRACT_HISTORY_MAX]
 
 
 def _governance_intel(state: UniverseState, player: Player) -> list[str]:

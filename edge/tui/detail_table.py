@@ -129,6 +129,7 @@ class DetailTable(Vertical):
         self._empty = empty
         self._detail_title = detail_title
         self._rows: list[tuple[str, tuple[object, ...]]] = []
+        self._group_first: frozenset[str] = frozenset()
         self._filter = ""
         self._sort_index: int | None = None
         self._sort_desc = False
@@ -178,10 +179,17 @@ class DetailTable(Vertical):
     # --- data ------------------------------------------------------------------
 
     def set_rows(self, rows: Sequence[tuple[str, tuple[object, ...]]], *,
-                 empty: tuple[str, str] | None = None) -> None:
+                 empty: tuple[str, str] | None = None,
+                 group_first: Sequence[str] = ()) -> None:
         """Replace the backing rows (presentation copy only), keeping the
-        cursor on the same logical row when it survives the refresh."""
+        cursor on the same logical row when it survives the refresh.
+
+        `group_first` names row keys that always sort ahead of the rest — the priority
+        group (owned planets/ports, active contracts, WP-PR09). User column sorts and
+        filtering apply *within* each group, so grouping never fights the chosen sort.
+        """
         self._rows = list(rows)
+        self._group_first = frozenset(group_first)
         if empty is not None:
             self._empty = empty
         if self.is_mounted:
@@ -202,6 +210,9 @@ class DetailTable(Vertical):
             index = self._sort_index
             rows = sorted(rows, key=lambda r: _sort_value(r[1][index]),
                           reverse=self._sort_desc)
+        if self._group_first:
+            # Stable partition: priority-group rows first, column order preserved within each.
+            rows = sorted(rows, key=lambda r: r[0] not in self._group_first)
         return rows
 
     def cursor_key(self) -> str | None:
