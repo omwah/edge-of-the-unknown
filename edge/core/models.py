@@ -284,7 +284,9 @@ class DiscoveryPayload:
     `kind` selects which field matters: COMPONENT uses `component` + `tier` (a loose
     part into the hold); LATINUM uses `latinum`; ARTIFACT uses `barter_tier` (a
     ComponentTier name the WP9 contact screen maps to a barter equivalence); LORE
-    carries only the `lore` fragment (codex flavor, no material gain).
+    carries only the `lore` fragment (codex flavor, no material gain). WRECK uses
+    `latinum` plus `components`; unlike generated single-reward discoveries, a
+    combat wreck is a small mixed cache collected atomically.
     """
 
     kind: PayloadKind
@@ -293,6 +295,7 @@ class DiscoveryPayload:
     latinum: int = 0
     barter_tier: str | None = None  # ComponentTier name for an artifact's barter value
     lore: str | None = None
+    components: tuple[tuple[Component, ComponentTier], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

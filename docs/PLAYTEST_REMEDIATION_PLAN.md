@@ -71,7 +71,7 @@ contract is not already stated there.
 
 ## 4. Work packages
 
-### WP-PR01 — Persistent combat wrecks
+### WP-PR01 — Persistent combat wrecks — complete
 
 **Goal:** make destroyed NPC hulls persist in the sector and defer recovery to the
 discovery interaction.

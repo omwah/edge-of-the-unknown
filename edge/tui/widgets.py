@@ -397,6 +397,8 @@ class AnomalyRow(Static):
         if d.collected:
             kind = f" · {d.kind}" if detail else ""
             return f"[cyan]✦[/] {d.label} [dim]— logged{kind}[/]"
+        if d.kind == "wreck":
+            return "[yellow]⚙[/] Wreckage [dim](Salvage)[/]"
         return "[cyan]✦[/] Anomaly detected [dim](Scan)[/]"
 
     def on_click(self) -> None:
@@ -735,7 +737,7 @@ class SectorScene(Static):
         elif disc is not None:
             # No caption until scanned — a sensor sweep (sidebar/Z) reveals the identity.
             span = w if disc_centered else half
-            if disc.collected:
+            if disc.collected or disc.kind == "wreck":
                 self._stamp_line(grid, f"[b cyan]{disc.label}[/]", name_row, 0, span)
             if disc.kind == "wormhole" and disc.warp_to is not None:
                 dest, ref = "wormhole", disc.warp_to  # click warps to the far side

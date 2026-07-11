@@ -106,4 +106,12 @@ def describe_payload(payload: DiscoveryPayload) -> str:
         return f"{payload.latinum:,} latinum"
     if payload.kind is PayloadKind.ARTIFACT and payload.barter_tier is not None:
         return f"an artifact (barter ≈ Tier {payload.barter_tier})"
+    if payload.kind is PayloadKind.WRECK:
+        parts = ", ".join(
+            f"Tier {tier.name} {component.value}" for component, tier in payload.components)
+        if payload.latinum and parts:
+            return f"{payload.latinum:,} latinum and {parts}"
+        if parts:
+            return parts
+        return f"{payload.latinum:,} latinum"
     return payload.lore or "a fragment of lore"

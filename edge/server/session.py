@@ -712,6 +712,13 @@ def _payload_lines(payload: object) -> list[str]:
         return [f"{payload.latinum:,} latinum"]
     if payload.kind is PayloadKind.ARTIFACT and payload.barter_tier is not None:
         return [f"artifact — barter ≈ Tier {payload.barter_tier}"]
+    if payload.kind is PayloadKind.WRECK:
+        lines = [f"{payload.latinum:,} latinum"]
+        lines.extend(
+            f"component: {component.value} (Tier {tier.name})"
+            for component, tier in payload.components
+        )
+        return lines
     return [payload.lore or "a fragment of lore"]
 
 
@@ -2058,7 +2065,7 @@ def format_event(event: Event) -> str:
         return f"[red]✖ The {event.lost_ship} breaks up — you take to the escape pod.[/]"
     if isinstance(event, SalvageCollected):
         parts = f" + {', '.join(event.components)}" if event.components else ""
-        return f"[green]⛏ Salvaged {event.latinum} latinum from the wrecks{parts}.[/]"
+        return f"[green]⛏ Recovered {event.latinum} latinum in combat salvage{parts}.[/]"
     if isinstance(event, GrudgeFormed):
         tail = "they will never forget" if event.permanent else "they will remember"
         return f"[red]☠ The {event.species_kind} mark you — {tail}.[/]"

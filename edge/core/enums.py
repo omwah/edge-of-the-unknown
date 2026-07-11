@@ -105,13 +105,15 @@ class PayloadKind(Enum):
 
     `component` → a loose part of a tier into the hold; `latinum` → cash; `artifact`
     → a barter good keyed to a component tier (consumed in WP9 barter); `lore` → a
-    log fragment only (phenomena, hints) — codex value, no material gain.
+    log fragment only (phenomena, hints) — codex value, no material gain; `wreck`
+    → the mixed latinum/component cache left by a destroyed NPC hull (PT-01).
     """
 
     COMPONENT = "component"
     LATINUM = "latinum"
     ARTIFACT = "artifact"
     LORE = "lore"
+    WRECK = "wreck"
 
 
 class PortMode(Enum):

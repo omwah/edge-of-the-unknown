@@ -92,7 +92,7 @@ acceptance criteria live in
 
 | ID | Area | Finding | Planned work |
 |---|---|---|---|
-| PT-01 | Combat aftermath | Destroying a ship should visibly change the sector. Prefer creating a persistent wreck discovery and recovering salvage through that discovery, leaving evidence that a battle occurred here. | WP-PR01 |
+| PT-01 | Combat aftermath | ~~Destroying a ship should visibly change the sector. Prefer creating a persistent wreck discovery and recovering salvage through that discovery, leaving evidence that a battle occurred here.~~ Implemented by `playtest: WP-PR01 persistent combat wrecks`. | WP-PR01 complete |
 | PT-02 | StarDock catalog | Move missiles and Genesis torpedoes into the Devices catalog and rename the tab **Devices & Armaments**. | WP-PR08 |
 | PT-03 | StarDock focus | After a Devices purchase, keep the purchased row highlighted instead of returning focus to the tab, matching Trade behavior. | WP-PR08 |
 | PT-04 | StarDock bindings | Rumor purchase and notice posting should be available only in the Tavern, not as screen-global actions. | WP-PR08 |

@@ -143,6 +143,8 @@ def _reward_phrase(state: UniverseState, ref: LocationRef) -> str:
         return "gold-pressed latinum"
     if payload.kind is PayloadKind.ARTIFACT:
         return "an artifact worth bartering"
+    if payload.kind is PayloadKind.WRECK:
+        return "recoverable wreckage"
     return "ancient lore"
 
 

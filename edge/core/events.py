@@ -432,7 +432,10 @@ class ShipDestroyed(Event):
 
 @dataclass(frozen=True)
 class SalvageCollected(Event):
-    """Post-victory wreck salvage (§10, WP26): latinum plus any loose components."""
+    """Immediate combat salvage for PvP/fixed set-pieces (§10, WP26).
+
+    Ordinary destroyed NPC hulls use persistent Discovery wrecks (PT-01).
+    """
 
     player_id: int
     latinum: int

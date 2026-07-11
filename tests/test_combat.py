@@ -20,12 +20,12 @@ from edge.config import load_default_config
 from edge.core import combat
 from edge.core.aliens import HOSTILE, disposition_band
 from edge.core.combat import CombatError, flee_chance
-from edge.core.engine_room import derive_aspects
-from edge.core.enums import Commodity, Subsystem
+from edge.core.engine_room import EngineRoomError, derive_aspects
+from edge.core.enums import Commodity, DiscoveryKind, PayloadKind, Subsystem
 from edge.core.events import (
     ComponentKnockedOut,
+    DiscoveryCollected,
     EncounterEnded,
-    SalvageCollected,
     ShipDestroyed,
 )
 from edge.core.models import Encounter, EncounterFoe
@@ -35,6 +35,7 @@ from edge.core.rules import (
     BuyMissiles,
     CombatAction,
     JoinGame,
+    Salvage,
     Warp,
     apply_result,
     reduce,
@@ -246,14 +247,12 @@ def test_field_patch_restores_the_knocked_component() -> None:
 
 
 def test_salvage_is_conserved_and_bounded() -> None:
-    """Victory salvage (§10/WP26): the latinum gained equals the event's amount and
-    sits inside the configured 10–20% window; forced component drops land as loose
-    Tier-I parts in the hold."""
+    """NPC victory leaves one bounded cache per hull; a later salvage transfers it."""
     cfg = SMALL.model_copy(update={"combat": SMALL.combat.model_copy(
         update={"salvage_component_chance": 1.0})})
     state = _fight_state()
     player = state.players[1]
-    before_latinum = player.latinum
+    existing_discoveries = set(state.discoveries)
     foes = (_foe(hull=1, shields=0, damage=1), _foe(hull=1, shields=0, damage=1))
     _engagement(state, foes)
     # Two 1-hull foes die to one gun rate-2 round? No — one fight action hits one
@@ -264,21 +263,31 @@ def test_salvage_is_conserved_and_bounded() -> None:
         if state.players[1].active_encounter is None:
             break
     assert state.players[1].active_encounter is None
-    salvage = [e for e in result.events if isinstance(e, SalvageCollected)]
-    assert len(salvage) == 1
-    ev = salvage[0]
-    assert state.players[1].latinum == before_latinum + ev.latinum
+    wrecks = [d for did, d in state.discoveries.items() if did not in existing_discoveries]
+    assert len(wrecks) == len(foes)
+    assert all(w.kind is DiscoveryKind.WRECK and w.payload.kind is PayloadKind.WRECK
+               and not w.hidden for w in wrecks)
     cc = cfg.combat
     lo = sum(round(f.hull_max * cc.salvage_hull_value * cc.salvage_frac_min) for f in foes)
     hi = sum(round(f.hull_max * cc.salvage_hull_value * cc.salvage_frac_max) for f in foes)
-    assert lo <= ev.latinum <= hi + 1  # per-wreck rounding
-    assert len(ev.components) == len(foes)  # chance forced to 1, holds are free
+    cache_latinum = sum(w.payload.latinum for w in wrecks)
+    assert lo <= cache_latinum <= hi + 1  # per-wreck rounding
+    assert sum(len(w.payload.components) for w in wrecks) == len(foes)
+
+    after_victory = state.players[1].latinum
+    collected = []
+    for wreck in wrecks:
+        salvage = reduce(state, 1, Salvage(wreck.id), cfg)
+        apply_result(state, salvage)
+        collected.extend(e for e in salvage.events if isinstance(e, DiscoveryCollected))
+    assert state.players[1].latinum == after_victory + cache_latinum
+    assert len(collected) == len(wrecks)
     ship = state.ships[player.ship_id]
-    assert sum(ship.components.values()) == len(ev.components)
+    assert sum(ship.components.values()) == len(foes)
 
 
 def test_salvage_components_need_a_free_hold() -> None:
-    """With the holds full the parts are left adrift — cargo is never overwritten."""
+    """A full hold leaves the mixed wreck cache intact and transfers nothing."""
     cfg = SMALL.model_copy(update={"combat": SMALL.combat.model_copy(
         update={"salvage_component_chance": 1.0})})
     state = _fight_state()
@@ -288,10 +297,29 @@ def test_salvage_components_need_a_free_hold() -> None:
     _engagement(state, (_foe(hull=1, shields=0, damage=1),))
     result = reduce(state, 1, CombatAction(action="fight"), cfg)
     apply_result(state, result)
-    salvage = [e for e in result.events if isinstance(e, SalvageCollected)]
-    assert salvage and salvage[0].components == ()
+    wreck = result.discoveries[0]
+    before_latinum = state.players[1].latinum
+    with pytest.raises(EngineRoomError, match="wreck's components"):
+        reduce(state, 1, Salvage(wreck.id), cfg)
+    assert state.players[1].latinum == before_latinum
     assert not state.ships[ship.id].components
-    assert salvage[0].latinum > 0  # the latinum still pays out
+    assert state.discoveries[wreck.id].found_by is None
+
+
+def test_partial_pack_kill_leaves_wreck_before_encounter_ends() -> None:
+    """A killed escort persists even if other pack members survive the round."""
+    state = _fight_state()
+    existing = set(state.discoveries)
+    _engagement(state, (
+        _foe(hull=1, shields=0, damage=1),
+        _foe(hull=10_000, hull_max=10_000, shields=0, damage=1),
+    ))
+    result = reduce(state, 1, CombatAction(action="fight"), SMALL)
+    apply_result(state, result)
+    assert state.players[1].active_encounter is not None
+    wrecks = [d for did, d in state.discoveries.items() if did not in existing]
+    assert len(wrecks) == 1
+    assert wrecks[0].kind is DiscoveryKind.WRECK
 
 
 def test_flee_eventually_succeeds_even_when_crippled() -> None:

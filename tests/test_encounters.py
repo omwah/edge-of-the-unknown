@@ -298,10 +298,10 @@ def test_kill_bounty_pays_only_for_hostile_kills() -> None:
 
 
 def test_destroying_a_hostile_ship_pays_a_bounty() -> None:
-    """Winning a fight against a hostile raider pays bounty_per_kill on top of salvage."""
-    from edge.core.events import SalvageCollected
+    """A hostile kill pays its bounty now and leaves its salvage in a visible wreck."""
+    from edge.core.enums import DiscoveryKind, PayloadKind
     from edge.core.models import AlienSpecies, Encounter, EncounterFoe
-    from edge.core.rules import CombatAction
+    from edge.core.rules import CombatAction, Salvage
 
     state = _state_with_player()
     ship = state.ships[state.players[1].ship_id]
@@ -321,9 +321,18 @@ def test_destroying_a_hostile_ship_pays_a_bounty() -> None:
     result = reduce(state, 1, CombatAction(action="fight"), SMALL)
     apply_result(state, result)
     assert state.players[1].active_encounter is None  # the raider is dead — victory
-    salvage = next(e for e in result.events if isinstance(e, SalvageCollected))
-    # The gain is exactly the bounty for the one kill plus the wreck salvage.
-    assert state.players[1].latinum == before + CFG.aliens.bounty_per_kill + salvage.latinum
+    assert state.players[1].latinum == before + CFG.aliens.bounty_per_kill
+    assert sp.id not in state.species
+    wreck = result.discoveries[0]
+    assert wreck.kind is DiscoveryKind.WRECK
+    assert wreck.payload.kind is PayloadKind.WRECK
+    from edge.server.session import game_view
+    sector = game_view(state, 1, SMALL).sector
+    assert any(d.discovery_id == wreck.id and d.salvageable for d in sector.discoveries)
+    assert all(ship.contact_id != sp.id for ship in sector.ships)
+    after_bounty = state.players[1].latinum
+    apply_result(state, reduce(state, 1, Salvage(wreck.id), SMALL))
+    assert state.players[1].latinum == after_bounty + wreck.payload.latinum
 
 
 @pytest.mark.parametrize("seed", range(12))
