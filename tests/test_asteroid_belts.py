@@ -26,8 +26,16 @@ from edge.core.models import (
     Ship,
     UniverseState,
 )
-from edge.core.planets import is_colonizable, is_extractable, is_landable, normalize_belt
-from edge.core.rules import Descend, DeployGenesis, Explore, apply_result, reduce
+from edge.core.events import BeltMined
+from edge.core.movement import MovementError
+from edge.core.planets import (
+    belt_mining_yield,
+    is_colonizable,
+    is_extractable,
+    is_landable,
+    normalize_belt,
+)
+from edge.core.rules import Descend, DeployGenesis, Explore, MineBelt, apply_result, reduce
 from edge.server.session import planet_view
 
 CFG = load_default_config()
@@ -136,6 +144,54 @@ def test_planet_view_carries_belt_capabilities() -> None:
     view = planet_view(state, 1, 1, CFG)
     assert not view.landable and not view.colonizable and view.extractable
     assert not view.claimable and not view.genesis_eligible
+    assert view.mine_yield == CFG.planets.asteroid_mining  # the hand-mining haul is projected
+
+
+# --- player belt mining (PT-30) ----------------------------------------------
+
+
+def test_mine_belt_fills_holds_and_spends_a_turn() -> None:
+    state = _state_with_belt()
+    before = state.players[1].turns_remaining
+    result = reduce(state, 1, MineBelt(planet_id=1), CFG)
+    apply_result(state, result)
+    ship = state.ships[1]
+    # holds_total is 20 < the 50-unit yield, so the haul is clamped to free space.
+    assert ship.cargo.get(Commodity.EQUIPMENT, 0) == ship.holds_total == 20
+    assert state.players[1].turns_remaining == before - CFG.planets.mining_turn_cost
+    mined = next(e for e in result.events if isinstance(e, BeltMined))
+    assert mined.commodity == "equipment" and mined.amount == 20
+
+
+def test_mine_belt_clamps_to_free_holds() -> None:
+    state = _state_with_belt()
+    # Pre-fill 15 of 20 holds → only 5 free, so mining takes exactly 5 more.
+    state.ships[1] = replace(state.ships[1], cargo={Commodity.ORGANICS: 15})
+    apply_result(state, reduce(state, 1, MineBelt(planet_id=1), CFG))
+    ship = state.ships[1]
+    assert ship.cargo.get(Commodity.EQUIPMENT, 0) == 5 and ship.holds_free == 0
+
+
+def test_mine_belt_rejects_full_holds() -> None:
+    state = _state_with_belt()
+    state.ships[1] = replace(state.ships[1], cargo={Commodity.ORGANICS: 20})  # holds full
+    with pytest.raises(EconomyError, match="holds are full"):
+        reduce(state, 1, MineBelt(planet_id=1), CFG)
+
+
+def test_mine_belt_rejects_out_of_turns() -> None:
+    state = _state_with_belt()
+    state.players[1] = replace(state.players[1], turns_remaining=0)
+    with pytest.raises(MovementError, match="out of turns"):
+        reduce(state, 1, MineBelt(planet_id=1), CFG)
+
+
+def test_mine_rejected_on_non_belt() -> None:
+    state = _state_with_belt()
+    state.planets[1] = replace(state.planets[1], planet_type="terrestrial_warm")
+    assert belt_mining_yield("terrestrial_warm", CFG) is None
+    with pytest.raises(EconomyError, match="cannot be mined"):
+        reduce(state, 1, MineBelt(planet_id=1), CFG)
 
 
 def test_belt_has_open_space_finds_but_no_surface_sites() -> None:

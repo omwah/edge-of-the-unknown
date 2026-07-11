@@ -96,6 +96,7 @@ from edge.core.events import (
     AttitudeChanged,
     Banked,
     BaseCommission,
+    BeltMined,
     Colonized,
     ColonistsSettled,
     AdmissionAdvanced,
@@ -160,6 +161,7 @@ from edge.core.events import (
 from edge.core.events import HazardDamage as HazardDamageEvent
 from edge.core.events import CombatRound as CombatRoundEvent
 from edge.core.planets import (
+    belt_mining_yield,
     genesis_blocker,
     is_colonizable,
     is_landable,
@@ -445,6 +447,18 @@ class Explore:
     Surveys site-by-site: each call reveals the lowest-slot still-hidden site the
     ship's sensors can resolve (obvious sites always; Rare+ sites need a sensor
     sweep). Revealed sites enter `Player.detected` and can then be logged (`Salvage`).
+    """
+
+    planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class MineBelt:
+    """Hand-mine an asteroid belt in the current sector for raw goods (§4.2, PT-30).
+
+    Costs turns and fills the ship's cargo holds with the belt's orbital yield (Equipment),
+    clamped to free hold space. Belts are unowned spatial features, so this is the player's
+    only way to collect their output — an owned world auto-collects via `produce` instead.
     """
 
     planet_id: int
@@ -933,7 +947,7 @@ Command = (
     | RecruitColonists | Colonize | SettleColonists | SetAllocation
     | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet | TransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
-    | Salvage | Descend | Explore | BuyGenesis | DeployGenesis
+    | Salvage | Descend | Explore | MineBelt | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
     | DeliverContract | AbandonContract | BuyRumor | PostNotice
@@ -1085,6 +1099,8 @@ def reduce(
             return _descend(state, player_id, command, config)
         case Explore():
             return _explore(state, player_id, command, config)
+        case MineBelt():
+            return _mine_belt(state, player_id, command, config)
         case BuyGenesis():
             return _buy_genesis(state, player_id, config)
         case DeployGenesis():
@@ -3442,6 +3458,41 @@ def _explore(
         events=(SiteExplored(player_id, cmd.planet_id, target.id,
                              target.kind.value, target.rarity_tier.name),),
         players=(new_player,),
+    )
+
+
+def _mine_belt(
+    state: UniverseState, player_id: int, cmd: MineBelt, config: GameConfig
+) -> ReduceResult:
+    """Hand-mine an asteroid belt for raw goods, taking them aboard (§4.2, PT-30).
+
+    A turn cost that fills free cargo holds with the belt's yield (Equipment). Belts are
+    unowned spatial features, so this is the player's only route to their output — the yield
+    reuses the same `asteroid_mining` config the owned-world `produce` path draws on.
+    """
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    ship = _ship(state, player)
+    planet = _planet_in_sector(state, ship, cmd.planet_id)
+    haul = belt_mining_yield(planet.planet_type, config)
+    if haul is None:
+        raise EconomyError(
+            f"a {pretty_planet_type(planet.planet_type).lower()} cannot be mined this way")
+    commodity, amount = haul
+    free = ship.holds_free
+    if free <= 0:
+        raise EconomyError("your cargo holds are full")
+    taken = min(amount, free)
+    cost = config.planets.mining_turn_cost
+    if player.turns_remaining < cost:
+        raise MovementError("out of turns")
+    cargo = dict(ship.cargo)
+    cargo[commodity] = cargo.get(commodity, 0) + taken
+    new_ship = replace(ship, cargo=cargo)
+    new_player = replace(player, turns_remaining=player.turns_remaining - cost)
+    return ReduceResult(
+        events=(BeltMined(player_id, planet.id, commodity.value, taken),),
+        players=(new_player,), ships=(new_ship,),
     )
 
 

@@ -506,9 +506,10 @@ global StarDock shortcut performs a context-inappropriate action, combat/world
 state remains replay-deterministic, all primary workflows work at 80x24, and the
 documentation and Help accurately describe the resulting controls and rules.
 
-**Not yet met:** several items in §8 are still open even where their WP has landed —
-PT-06's station-concourse art, PT-30's belt raw-mining output, and PT-23's per-row
-avoid action — so the remediation is not fully complete against the plan as written.
+**Not yet met:** two items in §8 are still open even where their WP has landed —
+PT-06's station-concourse art and PT-23's per-row avoid action — so the remediation is not
+fully complete against the plan as written. (PT-30's belt raw-mining output was closed
+2026-07-11 by the `MineBelt` action.)
 
 ## 8. Outstanding follow-ups (deferred, still open)
 
@@ -525,13 +526,14 @@ They are tracked here so a struck-through playtest note never hides open work.
   clamped `TransferCargo`/`SettleColonists` per row; a single atomic batch command was
   left unbuilt (low value for the local single-player service). If added later, update
   codec/protocol/replay fixtures.
-- **WP-PR06 / PT-30 — belt raw-mining output.** The plan asked to "retain raw-mining
-  output through a dedicated extraction action or a clearly specified passive cache."
-  The implementation instead makes belts fully inert (always unowned ⇒ `planets.produce`
-  no-ops), so belts currently yield **nothing**, and a player belt-mining action is not
-  built. Documented in DESIGN §4.2. Follow-up: add the extraction action (or passive
-  cache) and its projection so belts are minable as the design intends. The `landable`/
-  capability model and the `asteroid_mining` config seam are already in place for it.
+- ~~**WP-PR06 / PT-30 — belt raw-mining output.**~~ **Done (2026-07-11).** The `MineBelt`
+  command is the dedicated extraction action: a turn cost (`planets.mining_turn_cost`) that
+  hauls the belt's yield (Equipment, `planets.asteroid_mining`, clamped to free cargo holds)
+  aboard and emits `BeltMined`. The shared pure seam `planets.belt_mining_yield` is used by
+  the reducer, the owned-world `produce` auto-collect, and the `PlanetDTO.mine_yield`
+  projection; the PlanetScreen orbital panel shows an `[M] Mine belt` affordance (belt-only
+  via `check_action`). Wire bumped to v10. DESIGN §4.2 updated. Tests in
+  `tests/test_asteroid_belts.py` (fill/clamp/full-holds/out-of-turns/non-belt + projection).
 - **WP-PR09 / PT-23 — per-row avoid action.** The plan enumerated a "row action on
   route/port/planet tables" among the avoid-list affordances. Delivered: the Notes-tab
   button, the route-context `V` hint, and Help — which meet the note's *discoverability*

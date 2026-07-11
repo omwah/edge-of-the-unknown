@@ -490,6 +490,7 @@ class PlanetsConfig(BaseModel):
     starvation_rate: float = 0.05
     jovian_scoop: int = 50  # fuel-ore per tick from a gas giant (no colonists)
     asteroid_mining: int = 50  # equipment per tick from a belt (no colonists)
+    mining_turn_cost: int = 1  # turns a player spends hand-mining a belt (§4.2, PT-30)
     # Band-weighted ownership at generation (unowned fraction non-decreasing, §4.2).
     ownership: dict[str, OwnershipWeights] = Field(default_factory=dict)
 
