@@ -28,6 +28,34 @@ seizure-readiness — the fastest way to see whether the gate is open.
 `python -m edge.devtool flip_governor <alliance_id>` forces a flip (0 =
 ungoverned) to exercise the aftermath surfacing directly.
 
+## UI overhaul acceptance (WP-UI23, 2026-07-10)
+
+The game-wide responsive overhaul was closed with scripted Textual Pilot passes,
+a fixed-seed screenshot review, and the full regression suite. The review set is
+`docs/ui/shots/`; the deterministic regression matrix is
+`tests/test_ui_snapshots.py` (43 captures).
+
+| Pass | Evidence and result |
+|---|---|
+| New player | Main-menu/onboarding and live flow tests cover start → dock → first trade → engine room → scan/explore. The objective strip names the next action; first trade is reachable directly, with no external documentation or mandatory detour. Pass. |
+| Veteran/direct keys | Pilot exercises `P` dock, trade/haggle, Escape undock, nav selection and Enter warp. No additional screen was introduced. Pass. |
+| Keyboard-only | Form, table, category selector, contact, combat, route, and workbench tests exercise Tab/arrows/Enter/direct bindings. Pass. |
+| Mouse-only | Scene/nav hotspots, trade/service buttons, category popup, surface actions, forms, and workbench slot/component clicks dispatch the same actions as keys. Pass. |
+| Compact 80×24 | Responsive snapshots plus the geometry guard verify controls are visible or inside keyboard-scrollable containers; compact sector, Computer, contact, combat, planet, surface, lobby, and workbench are covered. Pass. |
+| Hosted/error recovery | Lobby tests cover register/login, connection progress, simulated `RemoteError`, retained field values, and retry; remote-client tests cover travel/trade projections. Pass. |
+| Shared workbench | Structural and interaction tests cover ship install/swap/repair and base repair/salvage through the same widget, including click and keyboard selection. Pass. |
+| Monochrome | Snapshot review covers sector danger/ownership, table selection, contact disabled replies, combat damage/actions, and workbench slot states using labels/glyphs in addition to color. Pass. |
+
+Resize preservation is covered for screen/focus, Computer category/subview and
+table row, sector warp selection, form values, and workbench selection. Dialogue
+position and plotted routes live on the existing screen object and are unaffected
+by CSS-tier changes. No severity-one gameplay issue was found. The acceptance run
+did find two stale fields in the screenshot-only combat service (`firing_arc` and
+`engine_room_view`); both were repaired before regenerating all 44 review shots.
+
+Final gates: snapshot matrix passed twice consecutively; `pixi run shots`
+completed; `pixi run check` passed all lint, strict typing, and 2,402 tests.
+
 ## WP77 readiness (the A10 hands-on pass — seams arc, July 2026)
 
 The precondition A10 named is met: the WP70–WP76 correction arc closed every
