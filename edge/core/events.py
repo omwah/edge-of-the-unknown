@@ -418,11 +418,20 @@ class CombatRound(Event):
 
 @dataclass(frozen=True)
 class EncounterEnded(Event):
-    """A hostile encounter resolved (§10, WP25/WP26): fled / victory / destroyed."""
+    """A hostile encounter resolved (§10, WP25/WP26/WP-PR03): fled / victory / destroyed / retreated.
+
+    `destroyed`/`fled` count the foes this end downed and the foes that broke off, and
+    `foe_name` names the pack — so the log/encounter screen state exactly what happened
+    ("2 of 3 destroyed, 1 retreated") instead of the generic "the pack is destroyed"
+    (PT-26). Defaulted so older persisted logs decode unchanged.
+    """
 
     player_id: int
     species_id: int
     outcome: str
+    destroyed: int = 0
+    fled: int = 0
+    foe_name: str = ""
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,7 @@ Drives the real `GameService`: each keypress issues one `CombatAction` command (
 combat round — the player's action plus the pack's volley) and recomposes from the
 fresh `encounter_view`. The flee chance shown is the same `combat.flee_chance` number
 the reducer rolls (the H4 view/reducer lockstep). The screen pops when the encounter
-resolves (fled / victory / destroyed); movement stays blocked while it is live, so
+resolves (fled / victory / destroyed / retreated); movement stays blocked while it is live, so
 there is no way to walk away from the modal without resolving it.
 """
 
@@ -31,11 +31,27 @@ from edge.tui.widgets import bar
 from edge.server.service import GameService
 
 
-_OUTCOME_NOTES: "dict[str, tuple[str, Literal['information', 'warning', 'error']]]" = {
-    "fled": ("Broke away — you escaped the engagement.", "warning"),
-    "victory": ("Victory — the pack is destroyed.", "information"),
-    "destroyed": ("Ship lost — the escape pod tumbles clear.", "error"),
-}
+def _outcome_note(
+    ended: EncounterEnded,
+) -> "tuple[str, Literal['information', 'warning', 'error']]":
+    """Concrete end-of-fight copy from the event's counts (PT-26/WP-PR03) — no generic "pack"."""
+    if ended.outcome == "fled":  # the *player* broke away
+        return "Broke away — you escaped the engagement.", "warning"
+    if ended.outcome == "destroyed":  # the player's ship was lost
+        return "Ship lost — the escape pod tumbles clear.", "error"
+    if ended.outcome == "victory":
+        if ended.destroyed > 0:
+            noun = "enemy" if ended.destroyed == 1 else "enemies"
+            return f"Victory — {ended.destroyed} {noun} destroyed.", "information"
+        return "Victory — all enemies destroyed.", "information"
+    if ended.outcome == "retreated":
+        if ended.destroyed > 0:
+            return (f"Enemies retreated — {ended.destroyed} destroyed, "
+                    f"{ended.fled} broke off and warped away."), "warning"
+        count = ended.fled or 1
+        noun = "enemy" if count == 1 else "enemies"
+        return f"Enemies retreated — {count} {noun} broke off and warped away.", "warning"
+    return ended.outcome, "information"
 
 
 class EncounterScreen(Screen[None]):
@@ -191,7 +207,7 @@ configured floor; firing arcs decide who can answer."""
             return
         ended = next((e for e in events if isinstance(e, EncounterEnded)), None)
         if ended is not None:
-            note, severity = _OUTCOME_NOTES.get(ended.outcome, (ended.outcome, "information"))
+            note, severity = _outcome_note(ended)
             self.notify(note, title="Encounter", severity=severity, timeout=4)
             self.app.pop_screen()
             return

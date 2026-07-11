@@ -321,6 +321,7 @@ EVENTS: list[Event] = [
     EncounterEvaded(1, 3, 55),                     # WP24 slipped away unseen
     CombatRound(1, 3, 2, "fight", 24, 11, 2),      # WP25 one resolved round
     EncounterEnded(1, 3, "fled"),                  # WP25 outcome
+    EncounterEnded(1, 3, "retreated", destroyed=2, fled=1, foe_name="Stryx pack"),  # WP-PR03
     ComponentKnockedOut(1, "thrusters", 1, "burner"),   # WP26 localized damage
     ShipDestroyed(1, 3, 55, "trailblazer"),             # WP26 hull 0 → escape pod
     SalvageCollected(1, 42, ("burner", "linkage")),     # WP26 wreck salvage

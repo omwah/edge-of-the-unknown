@@ -837,6 +837,7 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "EncounterEnded", {
                 "player_id": event.player_id, "species_id": event.species_id,
                 "outcome": event.outcome,
+                "destroyed": event.destroyed, "fled": event.fled, "foe_name": event.foe_name,
             }
         case ComponentKnockedOut():
             return "ComponentKnockedOut", {
@@ -1094,7 +1095,8 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
                                payload["foes_left"])
         case "EncounterEnded":
             return EncounterEnded(payload["player_id"], payload["species_id"],
-                                  payload["outcome"])
+                                  payload["outcome"], payload.get("destroyed", 0),
+                                  payload.get("fled", 0), payload.get("foe_name", ""))
         case "ComponentKnockedOut":
             return ComponentKnockedOut(payload["player_id"], payload["subsystem"],
                                        payload["slot_index"], payload["component"])

@@ -834,6 +834,13 @@ class CombatConfig(BaseModel):
     missile_price: int = 300         # per missile at the StarDock hardware emporium (§8)
     swarm_size_min: int = 3          # pack size for swarm/colony behaviors (§6.1)
     swarm_size_max: int = 5
+    # NPC retreat (§10, WP-PR03): a bloodied surviving pack may break off and warp to a
+    # legal adjacent sector rather than fight to the death. It only rolls once the pack's
+    # aggregate hull falls to `npc_retreat_hull_frac`, at `npc_retreat_chance` per round,
+    # and only for packs whose threat tier allows it (fearsome/special never run).
+    npc_retreat_hull_frac: float = 0.35
+    npc_retreat_chance: float = 0.4
+    npc_retreat_tiers: tuple[str, ...] = ("worthy", "feeble")
     # Localized damage (§4.1, WP26): a volley that reaches the hull may also knock out
     # one subsystem component, the pick weighted toward exposed/forward systems.
     knockout_chance: float = 0.35

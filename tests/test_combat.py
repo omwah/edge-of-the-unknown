@@ -543,3 +543,109 @@ def test_flee_scorn_spoken_when_the_player_escapes() -> None:
     assert state.players[1].dialogue_recency[(instance_key(sp), "flee_scorn")]
     names = [type(e).__name__ for e in result.events]
     assert names.index("AlienSpoke") < names.index("EncounterEnded")  # scorn, then the record
+
+
+# --- NPC retreat (WP-PR03) ------------------------------------------------------
+
+
+def _retreat_cfg():
+    """Config that always retreats a bloodied, retreat-tier pack (chance 1.0)."""
+    return SMALL.model_copy(update={"combat": SMALL.combat.model_copy(
+        update={"npc_retreat_chance": 1.0})})
+
+
+def test_resolve_round_bloodied_pack_breaks_off() -> None:
+    import random
+    state = _fight_state()
+    ship = state.ships[state.players[1].ship_id]
+    aspects = derive_aspects(ship, SMALL)
+    # Bloodied (5/100) but armour-plated so the player's volley can't finish it this round.
+    foe = _foe(hull=5, hull_max=100, shields=0, damage=1, defense=10_000)
+    enc = Encounter(species_id=1, sector_id=ship.sector_id, foes=(foe,), round=0,
+                    player_shields=ship.shields)
+    res = combat.resolve_round(enc, ship, aspects, 0.0, "fight", SMALL, random.Random(0),
+                               escape_floor=SMALL.aliens.escape_floor, npc_retreat_chance=1.0)
+    assert res.outcome == combat.RETREATED and res.encounter is None
+    # With retreat disabled (the default) the very same round simply continues.
+    cont = combat.resolve_round(enc, ship, aspects, 0.0, "fight", SMALL, random.Random(0),
+                                escape_floor=SMALL.aliens.escape_floor, npc_retreat_chance=0.0)
+    assert cont.outcome is None and cont.encounter is not None
+
+
+def test_healthy_pack_does_not_retreat() -> None:
+    import random
+    state = _fight_state()
+    ship = state.ships[state.players[1].ship_id]
+    aspects = derive_aspects(ship, SMALL)
+    foe = _foe(hull=100, hull_max=100, shields=0, damage=1, defense=10_000)  # full hull
+    enc = Encounter(species_id=1, sector_id=ship.sector_id, foes=(foe,), round=0,
+                    player_shields=ship.shields)
+    res = combat.resolve_round(enc, ship, aspects, 0.0, "fight", SMALL, random.Random(0),
+                               escape_floor=SMALL.aliens.escape_floor, npc_retreat_chance=1.0)
+    assert res.outcome is None  # not bloodied ⇒ never rolls to break off
+
+
+def _retreatable_species(state):
+    """A species whose tier permits flight and whose home sector has a legal warp out."""
+    from edge.core.rules import _retreat_destinations
+    tiers = SMALL.combat.npc_retreat_tiers
+    for sp in sorted(state.species.values(), key=lambda s: s.id):
+        cfg = SMALL.roster.species_by_id(sp.roster_id)
+        if cfg is not None and cfg.threat_tier in tiers and _retreat_destinations(state, sp, sp.sector_id, SMALL):
+            return sp
+    raise AssertionError("no retreat-capable species in this universe")
+
+
+def test_reducer_retreat_relocates_the_species_and_reports_it() -> None:
+    from edge.core.events import AlienMoved
+    cfg = _retreat_cfg()
+    state = generate(SMALL, 7)
+    apply_result(state, reduce(state, 1, JoinGame(name="T"), SMALL))
+    sp = _retreatable_species(state)
+    ship = state.ships[state.players[1].ship_id]
+    state.ships[ship.id] = replace(ship, sector_id=sp.sector_id, shields=100_000, hull_current=100_000)
+    foe = _foe(hull=5, hull_max=100, shields=0, damage=1, defense=10_000)
+    state.players[1] = replace(state.players[1], active_encounter=Encounter(
+        species_id=sp.id, sector_id=sp.sector_id, foes=(foe,), round=0, player_shields=100_000))
+    result = reduce(state, 1, CombatAction(action="fight"), cfg)
+    apply_result(state, result)
+    assert state.players[1].active_encounter is None  # fight is over
+    assert sp.id in state.species and state.species[sp.id].sector_id != sp.sector_id  # relocated
+    moved = [e for e in result.events if isinstance(e, AlienMoved) and e.species_id == sp.id]
+    assert moved and moved[0].from_sector == sp.sector_id
+    ended = next(e for e in result.events if isinstance(e, EncounterEnded))
+    assert ended.outcome == "retreated" and ended.fled == 1 and ended.destroyed == 0
+    assert ended.foe_name == sp.name
+
+
+def test_reducer_mixed_result_leaves_a_wreck_and_counts_both() -> None:
+    from edge.core.enums import DiscoveryKind
+    cfg = _retreat_cfg()
+    state = generate(SMALL, 7)
+    apply_result(state, reduce(state, 1, JoinGame(name="T"), SMALL))
+    sp = _retreatable_species(state)
+    ship = state.ships[state.players[1].ship_id]
+    state.ships[ship.id] = replace(ship, sector_id=sp.sector_id, shields=100_000, hull_current=100_000)
+    # This round: the player finishes one soft foe while a bloodied, armour-plated
+    # survivor breaks off — the mixed destroyed-and-fled case.
+    soft = _foe(hull=1, hull_max=100, shields=0, damage=1, defense=0)  # dies to the volley
+    survivor = _foe(hull=5, hull_max=100, shields=0, damage=1, defense=10_000)
+    state.players[1] = replace(state.players[1], active_encounter=Encounter(
+        species_id=sp.id, sector_id=sp.sector_id, foes=(soft, survivor), round=1,
+        player_shields=100_000))
+    result = reduce(state, 1, CombatAction(action="fight"), cfg)
+    apply_result(state, result)
+    ended = next(e for e in result.events if isinstance(e, EncounterEnded))
+    assert ended.outcome == "retreated" and ended.destroyed == 1 and ended.fled == 1
+    assert any(d.kind is DiscoveryKind.WRECK for d in result.discoveries)  # the dead one left a wreck
+
+
+def test_interdicted_origin_blocks_retreat() -> None:
+    from edge.core.rules import _retreat_destinations
+    state = generate(SMALL, 7)
+    apply_result(state, reduce(state, 1, JoinGame(name="T"), SMALL))
+    sp = _retreatable_species(state)
+    # Pin the pack's sector under a player interdictor ⇒ no legal warp ⇒ flight impossible.
+    ship = state.ships[state.players[1].ship_id]
+    state.ships[ship.id] = replace(ship, sector_id=sp.sector_id, interdictor_active=True)
+    assert _retreat_destinations(state, sp, sp.sector_id, SMALL) == []

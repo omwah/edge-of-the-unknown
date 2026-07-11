@@ -2058,11 +2058,7 @@ def format_event(event: Event) -> str:
         return (f"[red]⚔ Round {event.round}[/]: dealt {event.damage_dealt}, "
                 f"took {event.damage_taken} ({event.foes_left} foes left)")
     if isinstance(event, EncounterEnded):
-        return {
-            "fled": "[yellow]↯ Broke away — escaped the engagement.[/]",
-            "victory": "[green]⚔ Victory — the pack is destroyed.[/]",
-            "destroyed": "[red]✖ Ship lost — the escape pod tumbles clear.[/]",
-        }.get(event.outcome, f"Encounter ended: {event.outcome}")
+        return _encounter_ended_line(event)
     if isinstance(event, ComponentKnockedOut):
         return f"[red]✖ Direct hit — {event.subsystem} {event.component} knocked out![/]"
     if isinstance(event, ShipDestroyed):
@@ -2251,6 +2247,27 @@ def event_visible_to(state: UniverseState, event: Event, player_id: int) -> bool
         return sector in viewer.explored_sectors  # charted it — hears of it after the fact
     # Private / player-addressed (or an unowned, fog-safe-emitted event with no anchor).
     return owner is None or owner == player_id
+
+
+def _encounter_ended_line(event: EncounterEnded) -> str:
+    """Concrete end-of-fight copy (PT-26): counts and retreat, never a generic "pack" (§10)."""
+    if event.outcome == "fled":  # the *player* broke away
+        return "[yellow]↯ Broke away — escaped the engagement.[/]"
+    if event.outcome == "destroyed":  # the player's ship was lost
+        return "[red]✖ Ship lost — the escape pod tumbles clear.[/]"
+    if event.outcome == "victory":
+        if event.destroyed > 0:
+            noun = "enemy" if event.destroyed == 1 else "enemies"
+            return f"[green]⚔ Victory — {event.destroyed} {noun} destroyed.[/]"
+        return "[green]⚔ Victory — all enemies destroyed.[/]"
+    if event.outcome == "retreated":
+        if event.destroyed > 0:
+            return (f"[yellow]↯ Enemies retreated — {event.destroyed} destroyed, "
+                    f"{event.fled} broke off and warped away.[/]")
+        count = event.fled or 1
+        noun = "enemy" if count == 1 else "enemies"
+        return f"[yellow]↯ Enemies retreated — {count} {noun} broke off and warped away.[/]"
+    return f"Encounter ended: {event.outcome}"
 
 
 def format_log_line(event: Event, state: UniverseState) -> str:
