@@ -318,6 +318,21 @@ class AlienMoved(Event):
 
 
 @dataclass(frozen=True)
+class AlienDestroyed(Event):
+    """A drifting NPC was destroyed by a sector's territory defenses on entry (§10, WP-PR02).
+
+    Emitted by the `alien_drift` cron when a species wanders into a mined/garrisoned sector
+    whose owner opposes it and the defenses out-damage its hull. Surfaced only when the
+    sector touches a player (fog on the write side, like `AlienMoved`). `cause` is
+    ``"mine"`` / ``"fighter"`` / ``"mine+fighter"``.
+    """
+
+    species_id: int
+    sector_id: int
+    cause: str
+
+
+@dataclass(frozen=True)
 class AlienTraded(Event):
     """Bought or bartered alien tech (§6, §8, WP9).
 

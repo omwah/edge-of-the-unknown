@@ -9,6 +9,7 @@ from typing import get_args
 from edge.core.enums import Commodity, Component, ComponentTier, PortMode, Subsystem
 from edge.core.events import (
     AdmissionAdvanced,
+    AlienDestroyed,
     AlienHailed,
     AlienMoved,
     AlienSpoke,
@@ -294,6 +295,7 @@ EVENTS: list[Event] = [
     StockRegenerated(3, Commodity.EQUIPMENT, 480),
     AlienHailed(1, 3),
     AlienMoved(3, 7, 12),
+    AlienDestroyed(4, 12, "mine+fighter"),
     AlienSpoke(1, 3, "greeting", None),
     AlienSpoke(1, 3, "dossier_other", 5),
     AlienTraded(1, 3, "buy", "radiator (II)", 7_000),

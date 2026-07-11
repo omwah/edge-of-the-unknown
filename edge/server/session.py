@@ -53,6 +53,7 @@ from edge.core.enums import (
 )
 from edge.core.events import (
     AdmissionAdvanced,
+    AlienDestroyed,
     AlienMoved,
     AlienSpoke,
     AllianceJoined,
@@ -2040,6 +2041,9 @@ def format_event(event: Event) -> str:
     if isinstance(event, AlienMoved):
         # Only emitted for a move touching the player's sector (WP16), so it's always relevant.
         return "[cyan]✦ An alien vessel warps through the sector.[/]"
+    if isinstance(event, AlienDestroyed):
+        # A drifting alien blundered into a hostile-to-it minefield/garrison (WP-PR02).
+        return "[red]✦ An alien vessel strikes the sector defenses and is destroyed.[/]"
     if isinstance(event, EncounterStarted):
         if event.hostile:
             return f"[red]⚔ INTERCEPTED — a hostile pack (x{event.pack_size}) opens fire![/]"
@@ -2153,6 +2157,8 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
         return event.sector_id
     if isinstance(event, AlienMoved):
         return event.to_sector
+    if isinstance(event, AlienDestroyed):
+        return event.sector_id
     if isinstance(event, (EncounterStarted, EncounterEvaded)):
         return event.sector_id
     if isinstance(event, (ShipDestroyed, CoreLawNotice, StarbaseRazed,
@@ -2202,7 +2208,7 @@ _GLOBAL_EVENTS: tuple[type[Event], ...] = (
 # charted — the sector (the fog write-side twin, WP65). Every *other* event is private to its
 # acting player (their own ledger: trades, banking, purchases, contracts, colony ticks).
 _SECTOR_PUBLIC_EVENTS: tuple[type[Event], ...] = (
-    Warped, AlienMoved, ShipDestroyed, StarbaseRazed, TerritoryDeployed, HazardDamage,
+    Warped, AlienMoved, AlienDestroyed, ShipDestroyed, StarbaseRazed, TerritoryDeployed, HazardDamage,
     EncounterStarted, EncounterEvaded, EncounterEnded, CombatRound, ComponentKnockedOut,
     SalvageCollected, GrudgeFormed, GenesisDeployed, CitadelGunSilenced, PlanetInvaded,
     InvasionRepulsed, PortOrderFilled, PlayerAttacked,

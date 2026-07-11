@@ -17,8 +17,16 @@ Every function here is pure; the movement reducers pass state and apply the effe
 
 from __future__ import annotations
 
+from dataclasses import dataclass, replace
+
 from edge.core import corp
-from edge.core.aliens import alliance_standing, governor_hostile
+from edge.core.aliens import (
+    alliance_rivals,
+    alliance_standing,
+    effective_disposition,
+    governor_hostile,
+    is_friendly,
+)
 from edge.core.config import GameConfig
 from edge.core.enums import DiscoveryKind
 from edge.core.models import AlienSpecies, EncounterFoe, Ownership, Player, SectorForce, UniverseState
@@ -92,3 +100,119 @@ def sector_has_black_hole(state: UniverseState, sector_id: int) -> bool:
         d.kind is DiscoveryKind.BLACK_HOLE and d.planet_id is None and d.sector_id == sector_id
         for d in state.discoveries.values()
     )
+
+
+# --- NPC entry defenses (§10, WP-PR02) --------------------------------------
+#
+# Player warp resolves territory hazards in `rules._territory_entry` (a black hole
+# toll, an armid detonation, a fighter *engagement* the player answers interactively).
+# An NPC drifting on the cron has no interactive turn, so its entry resolves here
+# deterministically: the shared hostility rule below decides whether the garrison/
+# minefield bars the entrant, then the defenses fight to a conclusion in one pass —
+# either the NPC is destroyed or the forces it triggered are spent. The mine-damage
+# and fighter-hull formulas are the same `config.territory` constants the player path
+# uses, so the two never drift.
+
+
+def force_hostile_to_species(
+    state: UniverseState, force: SectorForce, species: AlienSpecies, config: GameConfig,
+) -> bool:
+    """Whether a deployed `force` bars an NPC `species` drifting into its sector (§10, WP-PR02).
+
+    The NPC mirror of `force_hostile_to_player`: a garrison/minefield engages an alien whose
+    bloc its owner opposes.
+    - An **alliance**-owned force (the Core governor's included) bars a species of a *rival*
+      bloc (rivalry symmetric, §6.3); the owner bloc's own members pass free.
+    - A **player**-owned force bars a species not friendly toward that player (effective
+      disposition below the amity band) — your fighters defend against a hostile wanderer.
+      An unknown/absent owner player bars nothing.
+    - **corp**-owned forces do not yet engage NPCs (deferred with NPC limpets, WP-PR02).
+    """
+    owner = force.owner
+    if owner.kind == "alliance" and owner.ref is not None:
+        if species.alliance_id is None or species.alliance_id == owner.ref:
+            return False
+        return species.alliance_id in alliance_rivals(config.roster, owner.ref)
+    if owner.kind == "player" and owner.ref is not None:
+        player = state.players.get(owner.ref)
+        if player is None:
+            return False
+        return not is_friendly(effective_disposition(species, player), config.aliens)
+    return False
+
+
+def _npc_combat_stats(species: AlienSpecies, config: GameConfig) -> tuple[int, int]:
+    """The NPC's territory-fight profile: (hull+shields pool, per-round return damage).
+
+    Derived from its fleet lead hull class × species threat (mirroring `encounters._foe`),
+    so a warship shrugs off a token garrison while a minefield can gut a light hull.
+    Returns ``(0, 0)`` for a shipless kind (the Entity, a pure contact) — never
+    destructible by territory.
+    """
+    roster = config.roster
+    sc = roster.species_by_id(species.roster_id) if roster is not None else None
+    if sc is None or not sc.fleet:
+        return 0, 0
+    try:
+        klass = config.ship_class(sc.fleet[0])
+    except (KeyError, ValueError):
+        return 0, 0
+    pool = klass.hull_max + klass.shields_max
+    weapon = config.weapons[klass.armament[0]] if klass.armament else None
+    threat_bonus = round(sc.threat_rating * config.combat.threat_damage_scale)
+    damage = (weapon.damage if weapon is not None else 1) + threat_bonus
+    return pool, max(0, damage)
+
+
+@dataclass(frozen=True, slots=True)
+class NpcEntry:
+    """The outcome of an NPC entering a defended sector (§10, WP-PR02).
+
+    `destroyed` — the defenses out-damaged the entrant's hull. `force` — the post-fight
+    garrison/minefield (armid spent, fighters attrited), or None when nothing changed.
+    `cause` — ``"mine"`` / ``"fighter"`` / ``"mine+fighter"`` for the log (empty when idle).
+    """
+
+    destroyed: bool
+    force: SectorForce | None
+    cause: str
+
+
+def resolve_npc_entry(
+    state: UniverseState, species: AlienSpecies, force: SectorForce | None, config: GameConfig,
+) -> NpcEntry:
+    """Resolve `force`'s defenses against `species` drifting in (§10, WP-PR02) — pure, no RNG.
+
+    A non-hostile or empty force is inert. Otherwise armid mines detonate first (NPCs carry
+    no deflector), then any fighter garrison fights to a conclusion: each round the garrison
+    volleys and, if the entrant survives, its return fire downs `damage // fighter_hull_each`
+    fighters — so either the NPC dies or the garrison is wiped (an NPC that entered cannot
+    retreat). Limpets never attach to an NPC (no tracking model), so a limpet-only field is
+    inert here — deferred with corp/NPC tags.
+    """
+    if force is None or not force_hostile_to_species(state, force, species, config):
+        return NpcEntry(False, None, "")
+    pool, npc_damage = _npc_combat_stats(species, config)
+    if pool <= 0:
+        return NpcEntry(False, None, "")  # shipless entrant — nothing to destroy
+    tc = config.territory
+    remaining = pool
+    causes: list[str] = []
+    new_armid = force.armid_mines
+    new_fighters = force.fighters
+    if force.armid_mines > 0:
+        remaining -= force.armid_mines * tc.mine_damage
+        new_armid = 0
+        causes.append("mine")
+    if remaining > 0 and force.fighters > 0:
+        causes.append("fighter")
+        fighters = force.fighters
+        while fighters > 0 and remaining > 0:
+            remaining -= fighters * tc.fighter_damage_each
+            if remaining <= 0:
+                break
+            fighters = max(0, fighters - max(1, npc_damage // tc.fighter_hull_each))
+        new_fighters = fighters
+    changed = new_armid != force.armid_mines or new_fighters != force.fighters
+    updated = replace(force, armid_mines=new_armid, fighters=new_fighters) if changed else None
+    return NpcEntry(remaining <= 0, updated, "+".join(causes))
