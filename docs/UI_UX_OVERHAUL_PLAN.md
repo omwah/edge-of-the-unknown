@@ -665,6 +665,8 @@ Commit: `ui: WP-UI22 responsive snapshot coverage`
 
 #### WP-UI23 — Conduct hands-on UX and accessibility passes
 
+Status: **complete** (`docs/PLAYTEST_NOTES.md`, 2026-07-10).
+
 Depends on: WP-UI22.
 
 Implementation:

@@ -19,6 +19,10 @@ import os
 # straight to its final state, a prerequisite for deterministic screenshots. The early
 # side-effect forces the imports past it, so E402 is suppressed file-wide for this script.
 os.environ.setdefault("TEXTUAL_ANIMATIONS", "none")
+# Match the snapshot fixture: documentation captures must not inherit the
+# invoking terminal's color policy (for example CI or a shell with NO_COLOR).
+os.environ["COLORTERM"] = "truecolor"
+os.environ.pop("NO_COLOR", None)
 
 # ruff: noqa: E402
 import asyncio
@@ -126,7 +130,7 @@ class _EncounterSampleService:
         e = sample_encounter()
         foes = [
             SimpleNamespace(name=x.name, hull_filled=x.hull_filled,
-                            hull_pct=x.hull_pct, alive=True)
+                            hull_pct=x.hull_pct, alive=True, firing_arc="ahead")
             for x in e.enemies
         ]
         return SimpleNamespace(
@@ -137,6 +141,9 @@ class _EncounterSampleService:
             round_no=e.round_no, flee_chance=e.flee_chance, flee_floor=e.flee_floor,
             gun_online=True, missiles=3, repair_kits=2,
         )
+
+    def engine_room_view(self, _player_id: int) -> object:
+        return sample_engine_room()
 
 
 async def _capture() -> None:

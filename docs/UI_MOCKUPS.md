@@ -37,9 +37,10 @@ pixel-exact spacing is not.
 
 ### Theme
 
-The `tw2002` theme (§11): cyan/yellow/magenta on black, CP437 box drawing,
-optional starfield on the title screen. A `--plain` flag drops animation/CRT
-flourishes.
+The default `edge-ansi` theme (§11) uses cyan/yellow/magenta on black and
+CP437-flavored box drawing. `edge-high-contrast` and `edge-monochrome` preserve
+the same semantic states without depending on hue. A `--plain` flag temporarily
+drops animation/CRT flourishes without overwriting saved preferences.
 
 ---
 
@@ -52,10 +53,12 @@ MainMenu -> Game -+- PortScreen
                   +- AlienContactScreen
                   +- EncounterScreen
                   +- EngineRoomScreen
-                  +- ComputerScreen   (tabs: Map . Ports . Trade . Route . Codex
-                  |                           . Dossier . Notes)
-                  +- MapScreen
-                  +- MessagesScreen
+                  +- ComputerScreen
+                     +- Navigation  (Map . Route)
+                     +- Commerce    (Ports . Trade . Market)
+                     +- Exploration (Planets . Codex . Leads)
+                     +- Relations   (Contracts . Alliances . Dossier)
+                     +- Records     (Log . Notes)
 ```
 
 Phase 1 builds: **MainMenu, Game, PortScreen, StarDockScreen, ComputerScreen,
@@ -456,7 +459,8 @@ see the "Computer" wireframe under "Responsive tier wireframes")*
 
 ```
 ┌─ SHIP COMPUTER ──────────────────────────────────────────────────────┐
-│ [ Map ][ Ports ][ Trade ][ Route ][ Codex ][ Dossier ][ Notes ]      │
+│ [Navigation] [Commerce] [Exploration] [Relations] [Records]          │
+│ Commerce: [Ports] [Trade] [Market]                                   │
 ├──────────────────────────────────────────────────────────────────────┤
 │  PAIR-TRADE FINDER                    scored by profit / turn        │
 │                                                                      │
@@ -475,14 +479,12 @@ see the "Computer" wireframe under "Responsive tier wireframes")*
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Tabs** (`TabbedContent`, §11): **Map** (Tree/DataTable of explored universe),
-  **Ports** (directory, last-seen stock + class), **Trade** (pair-trade finder —
-  scores opposed-class port pairs by round-trip profit per turn using the live
-  price model + shortest path), **Route** (shortest path, one-way aware,
-  hop-by-hop send with per-sector hazard confirm), **Codex** (every find + lore;
-  fragments become rumor pins on the map), **Dossier** (known species,
-  disposition, alliance/player standing, grudges, last-seen tech, threat-tier
-  bestiary), **Notes** (avoid lists).
+- **Categories and subviews** (nested `TabbedContent`, §11): **Navigation**
+  (Map, Route), **Commerce** (Ports, Trade, Market), **Exploration** (Planets,
+  Codex, Leads), **Relations** (Contracts, Alliances, Dossier), and **Records**
+  (Log, Notes). Each category remembers its last subview. Compact mode replaces
+  the category rail with a popup selector; direct hotkeys and deep links still
+  open the exact subview.
 - Because we own the engine these are first-class queries, not screen-scrapers.
 - DESIGN: §11, §8 (pricing for finder), §7 (codex), §6 (dossier).
 
