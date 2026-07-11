@@ -33,12 +33,12 @@
     }
 
     .terminal-r1 { fill: #c5c8c6 }
-.terminal-r2 { fill: #b0b0b0 }
+.terminal-r2 { fill: #fea62b }
 .terminal-r3 { fill: #e0e0e0 }
-.terminal-r4 { fill: #494949 }
-.terminal-r5 { fill: #c9c9c9 }
-.terminal-r6 { fill: #ededed }
-.terminal-r7 { fill: #656565 }
+.terminal-r4 { fill: #ff00ff }
+.terminal-r5 { fill: #00ffff }
+.terminal-r6 { fill: #ffff00 }
+.terminal-r7 { fill: #0178d4 }
 .terminal-r8 { fill: #a0a0a0;font-style: italic; }
 .terminal-r9 { fill: #a0a0a0 }
     </style>

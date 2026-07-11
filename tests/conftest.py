@@ -119,3 +119,17 @@ def _isolated_save_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Itera
     """
     monkeypatch.setenv("EDGE_SAVE_DIR", str(tmp_path / "saves"))
     yield
+
+
+@pytest.fixture(autouse=True)
+def _deterministic_color_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Pin terminal color detection so snapshot captures are machine-independent.
+
+    Rich/Textual sniff `COLORTERM`/`NO_COLOR` even under the headless test
+    driver, so the same screen captured in a truecolor tmux and in a color-less
+    CI shell produced different SVGs (WP-UI02's byte-stability held only within
+    one machine). Every baseline is captured as truecolor.
+    """
+    monkeypatch.setenv("COLORTERM", "truecolor")
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    yield
