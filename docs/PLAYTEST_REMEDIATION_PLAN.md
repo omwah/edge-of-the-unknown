@@ -512,36 +512,25 @@ They are tracked here so a struck-through playtest note never hides open work.
 ### 8.1 Post-hoc audit (2026-07-11) — undocumented gaps in landed WP-PR05–PR09
 
 A line-by-line re-diff of the implemented WPs against their plan bullets surfaced the
-following, which were **not** previously tracked. None break the behaviour that shipped;
-they are unmet plan bullets — mostly missing test coverage and minor spec deviations.
+following, which were **not** previously tracked. **All were closed** in the follow-up commit
+`playtest: WP-PR-followup close §8.1 audit gaps`; the entries are kept as a record.
 
-- **WP-PR05 — missing save/autosave-after-damage test.** The plan's acceptance listed
-  "save/autosave after damage"; `tests/test_ui_black_hole.py` covers mouse/keyboard ×
-  lethal/nonlethal + repeat, but not a save→reload (replay) after a black-hole toll. The
-  core hazard path is replay-tested in `test_territory.py`; the *TUI-driven* save/reload
-  case is uncovered. Follow-up: add a reload-after-damage assertion.
-- **WP-PR06 — sector-view belt labelling.** The plan said label belts as asteroid belts in
-  "Computer *and* Sector views". Computer (Planets directory) and the PlanetScreen orbit
-  title show "Asteroid Belt"; the **sector object list / caption** still shows only the
-  belt's name (the type rides `ptype` for art, not a visible label). Follow-up: tag the
-  belt row/caption in the sector view.
-- **WP-PR07 — workbench polish + test gaps.** (a) Control order is `[−] [field] [+]`; the
-  plan specified "row field, decrement, increment, then aggregate". (b) `Enter` in the
-  amount field does not submit (only the row buttons apply). (c) No commodity-conservation
-  **property** test and no explicit **80×24 geometry** test for the transfer modal (only
-  functional Pilot flows exist). Follow-up: reorder controls, wire Enter, add the two tests.
-- **WP-PR08 — cursor-by-index, no bounty detail panel, no new snapshots.** (a) `_issue`
-  restores the buy-tab cursor by **row index** (`DataTable.cursor_row`), not a stable row
-  key — the plan said "do not restore by index"; benign today because the StarDock catalogs
-  don't filter/reorder, but it's a latent drift if they ever do. (b) The bounty board is
-  structured rows only — the plan also wanted the full prose kept in a **detail panel**;
-  prose currently rides a column. (c) No new **compact/high-contrast/monochrome snapshots**
-  were added for the Colonists tab, the Devices & Armaments catalog, or the bounty board.
-- **WP-PR09 — port market status + thin route-plot test.** (a) `PortDirEntry` carries the
-  base's operational/derelict status but **not** the "market/service status" (market open?)
-  the plan asked for. (b) The PT-31 route-continuity regression covers plotting from
-  **Planets only**; the plan asked to test links from Ports, Planets, Leads, and Map.
-  Follow-up: add `market_open` to `PortDirEntry` and broaden the route-plot test.
+- ~~**WP-PR05 — missing save/autosave-after-damage test.**~~ **Done.**
+  `tests/test_ui_black_hole.py::test_black_hole_damage_survives_save_and_reload` warps into a
+  *generated* black hole (so the `Warp` replays it) and asserts `state_hash` round-trips.
+- ~~**WP-PR06 — sector-view belt labelling.**~~ **Done.** `SectorObjectList` now labels a belt
+  "— Asteroid Belt (Orbit)" (not "(Survey)"), so the sector view marks the type.
+- ~~**WP-PR07 — workbench polish + test gaps.**~~ **Done.** Control order is now
+  `[field] [−] [+]`; `Enter` in the amount field unloads/settles the row; added a
+  commodity-conservation **property** test and an **80×24 geometry** test.
+- ~~**WP-PR08 — cursor-by-index, no bounty detail panel, no new snapshots.**~~ **Done.**
+  The buy-tab cursor is restored by **stable row key** (`get_row_index`), not an index; the
+  bounty board has a **detail panel** mirroring the highlighted row's prose (updates on
+  `RowHighlighted`); added compact + high-contrast/monochrome **snapshots** for the Devices &
+  Armaments, Colonists, and Tavern tabs.
+- ~~**WP-PR09 — port market status + thin route-plot test.**~~ **Done.** `PortDirEntry` gained
+  `starbase_market_open` (surfaced in the port row); the route-plot regression now covers
+  plotting from **Ports, Planets, and Map**.
 
 **Not audited here:** the UI/UX overhaul (`UI_UX_OVERHAUL_PLAN.md`, WP-UI01–23) was
 completed in earlier sessions and closed by WP-UI23; this pass did not re-diff it bullet by

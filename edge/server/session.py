@@ -1257,7 +1257,8 @@ def _port_directory(state: UniverseState, player_id: int, config: GameConfig) ->
         sells = [_LABEL[c] for c in Commodity if (ln := port.line(c)) and ln.mode is PortMode.SELL]
         base = next((b for b in state.starbases.values() if b.sector_id == port.sector_id), None)
         base_yours = base is not None and corp.player_owns(state, base.owner, player_id)
-        base_status = "" if base is None else ("operational" if is_operational(base) else "derelict")
+        base_op = base is not None and is_operational(base)
+        base_status = "" if base is None else ("operational" if base_op else "derelict")
         base_name = "" if base is None else config.ship_class(base.ship_class_id).name
         out.append(dto.PortDirEntry(
             port_id=port.id, sector_id=port.sector_id,
@@ -1267,6 +1268,7 @@ def _port_directory(state: UniverseState, player_id: int, config: GameConfig) ->
             dist=dist.get(port.sector_id, -1),
             starbase_id=base.id if base is not None else None,
             starbase_name=base_name, starbase_yours=base_yours, starbase_status=base_status,
+            starbase_market_open=base_op,
         ))
     # Player-base ports float to the top; the rest keep the nearest-first order (PT-09).
     out.sort(key=lambda e: (not e.starbase_yours, e.dist if e.dist >= 0 else 1 << 30, e.sector_display))

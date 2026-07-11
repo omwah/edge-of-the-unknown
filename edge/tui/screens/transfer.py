@@ -79,10 +79,12 @@ class TransferWorkbenchScreen(ModalScreen[None]):
             for c in Commodity:
                 label = c.value.replace("_", " ").title()
                 a, s = aboard.get(label, 0), stores.get(label, 0)
+                # Tab order (WP-PR07): the amount field first, then decrement, increment, then
+                # the per-row actions — matching the spec's "field, −, +, then aggregate".
                 yield Horizontal(
                     Static(f"[b]{label}[/]\n[dim]aboard {a:,} · stores {s:,}[/]", classes="row-head"),
-                    Button("−", id=f"dec-{c.value}", classes="step"),
                     Input(value="0", id=f"amt-{c.value}", type="integer"),
+                    Button("−", id=f"dec-{c.value}", classes="step"),
                     Button("+", id=f"inc-{c.value}", classes="step"),
                     Button("Load", id=f"load-{c.value}", classes="act"),
                     Button("Unload", id=f"unload-{c.value}", classes="act"),
@@ -94,10 +96,9 @@ class TransferWorkbenchScreen(ModalScreen[None]):
                 yield Horizontal(
                     Static(f"[b]Colonists[/]\n[dim]berth {p.ship_colonists:,} · colony {p.colonists:,} "
                            f"· room {room:,}[/]", classes="row-head"),
-                    Button("−", id=f"dec-{_COLONIST_ROW}", classes="step"),
                     Input(value="0", id=f"amt-{_COLONIST_ROW}", type="integer"),
+                    Button("−", id=f"dec-{_COLONIST_ROW}", classes="step"),
                     Button("+", id=f"inc-{_COLONIST_ROW}", classes="step"),
-                    Static("", classes="act"),
                     Button("Settle", id=f"unload-{_COLONIST_ROW}", classes="act"),
                     classes="row",
                 )
@@ -152,6 +153,13 @@ class TransferWorkbenchScreen(ModalScreen[None]):
             self._do_row(bid[5:], to_planet=False)
         elif bid.startswith("unload-"):
             self._do_row(bid[7:], to_planet=True)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Enter in a row's amount field submits that row in the colony-supply direction
+        (unload goods to stores / settle colonists) — the dominant loop (WP-PR07)."""
+        iid = event.input.id or ""
+        if iid.startswith("amt-"):
+            self._do_row(iid[4:], to_planet=True)
 
     def _do_row(self, key: str, *, to_planet: bool) -> None:
         amount = self._amount(key)

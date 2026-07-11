@@ -315,12 +315,13 @@ detail when columns are folded at 80×24."""
 
     @staticmethod
     def _port_name_cell(e: object) -> "str | Text":
-        """A port row's name, marked with ⚓ when it carries the player's own base (PT-09)."""
+        """A port row's name, marked with ⚓ when it carries a base — with market status (PT-09)."""
         name = e.name  # type: ignore[attr-defined]
+        market = "market open" if e.starbase_market_open else "market dark"  # type: ignore[attr-defined]
         if e.starbase_yours:  # type: ignore[attr-defined]
-            return Text.from_markup(f"[cyan]⚓[/] {name}  [dim]your base[/]")
+            return Text.from_markup(f"[cyan]⚓[/] {name}  [dim]your base · {market}[/]")
         if e.starbase_status:  # type: ignore[attr-defined]
-            return Text.from_markup(f"{name}  [dim]⚓ {e.starbase_status}[/]")  # type: ignore[attr-defined]
+            return Text.from_markup(f"{name}  [dim]⚓ {e.starbase_status} · {market}[/]")  # type: ignore[attr-defined]
         return name
 
     def on_mount(self) -> None:

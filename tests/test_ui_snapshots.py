@@ -80,6 +80,35 @@ def test_lobby_sizes(snap_compare, size: tuple[int, int]) -> None:
     assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_lobby)
 
 
+def _open_stardock(tab: str):
+    """A run_before that starts the seeded game (docked at StarDock) on `tab` (WP-PR08)."""
+    async def _run(pilot: Pilot) -> None:
+        from edge.tui.screens.stardock import StarDockScreen
+        app = pilot.app
+        assert isinstance(app, EdgeApp)
+        service = app.start_new_game(seed=1986)
+        app.push_screen(StarDockScreen(service, app.player_id, initial_tab=tab))
+        await pilot.pause()
+    return _run
+
+
+@pytest.mark.parametrize("tab", ["devices", "colonists", "tavern"])
+def test_stardock_tabs_compact(snap_compare, tab: str) -> None:
+    # WP-PR08 §8.1: the reworked Devices & Armaments / Colonists / bounty-board tabs at 80x24.
+    assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["compact"],
+                        run_before=_open_stardock(tab))
+
+
+@pytest.mark.parametrize("theme", ["edge-high-contrast", "edge-monochrome"])
+def test_stardock_colonists_themes(snap_compare, theme: str) -> None:
+    async def run(pilot: Pilot) -> None:
+        await _open_stardock("colonists")(pilot)
+        pilot.app.theme = theme
+        await pilot.pause()
+
+    assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["standard"], run_before=run)
+
+
 def test_options_modal(snap_compare) -> None:
     assert snap_compare(EdgeApp(plain=True), press=["o"], terminal_size=SIZES["standard"])
 

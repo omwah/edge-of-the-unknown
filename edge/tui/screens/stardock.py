@@ -19,6 +19,7 @@ from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.containers import Vertical
 from textual.widgets import Button, DataTable, Footer, Static, TabbedContent
+from textual.widgets.data_table import RowDoesNotExist
 
 from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
@@ -87,12 +88,12 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
                    "devices": "#devices-table"}
 
     def __init__(self, service: GameService, player_id: int, initial_tab: str = "trade",
-                 initial_cursor: int = 0) -> None:
+                 initial_key: str | None = None) -> None:
         super().__init__()
         self._service = service
         self._pid = player_id
         self._initial_tab = initial_tab
-        self._initial_cursor = initial_cursor
+        self._initial_key = initial_key  # stable row key to re-highlight (WP-PR08), not an index
 
     def compose(self) -> ComposeResult:
         port = self._service.current_port_view(self._pid)
@@ -174,6 +175,10 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
                 board.add_row(f"{icon} {b.target}", kind, b.reward or b.detail, where,
                               key=f"bounty:{b.target}:{b.kind}")
             yield board
+            # Full prose for the highlighted bounty (WP-PR08): the structured rows scan fast,
+            # the detail panel keeps the voiced line that a single-column list used to carry.
+            first = tav.bounties[0]
+            yield Static(f"[dim]{first.detail}[/]", id="bounty-detail", classes="note")
             yield Static("[dim]● bounty to collect   ▲ danger to you   ◆ notice[/]", classes="note")
         else:
             yield EmptyState("The board is quiet.",
@@ -190,15 +195,18 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
                              "[b]N[/] posts a notice every visitor will read.")
 
     def on_mount(self) -> None:
-        # Restore the highlighted row on the buy tab we rebuilt from (see _issue),
-        # so repeated purchases of the same hull/component don't reset to the top.
+        # Restore the highlighted row on the buy tab we rebuilt from (see _issue) by its
+        # *stable key* (WP-PR08), so repeated purchases keep the same item highlighted even
+        # if the catalog reorders — never by a bare row index.
         table_id = self._BUY_TABLES.get(self._initial_tab)
-        if table_id is None or self._initial_cursor <= 0:
+        if table_id is None or self._initial_key is None:
             return
         table = self.query_one(table_id, DataTable)
-        if table.row_count:
-            table.move_cursor(
-                row=min(self._initial_cursor, table.row_count - 1), animate=False)
+        try:
+            index = table.get_row_index(self._initial_key)
+        except RowDoesNotExist:  # row gone (e.g. hull now owned / last of stock)
+            return
+        table.move_cursor(row=index, animate=False)
 
     def _hardware_table(self, dock: object) -> DataTable[Any]:
         table: DataTable[Any] = DataTable(id="hardware-table", cursor_type="row")
@@ -288,6 +296,19 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
         # Re-evaluate the scoped bindings so the footer only advertises what this tab allows.
         self.refresh_bindings()
 
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        # Mirror the highlighted bounty's full prose into the detail panel (WP-PR08).
+        if event.data_table.id != "bounty-table":
+            return
+        key = event.row_key.value or ""
+        bounty = next((b for b in self._service.tavern_view(self._pid).bounties
+                       if f"bounty:{b.target}:{b.kind}" == key), None)
+        if bounty is not None:
+            try:
+                self.query_one("#bounty-detail", Static).update(f"[dim]{bounty.detail}[/]")
+            except NoMatches:
+                pass
+
     def _buy_component(self) -> None:
         table = self.query_one("#hardware-table", DataTable)
         row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
@@ -368,12 +389,14 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
             return
         self.notify(ok, timeout=2)
         active = self.query_one(TabbedContent).active
-        cursor = 0
+        key: str | None = None
         if active in self._BUY_TABLES:
-            cursor = self.query_one(self._BUY_TABLES[active], DataTable).cursor_row
+            table = self.query_one(self._BUY_TABLES[active], DataTable)
+            if table.row_count:
+                key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
         self.app.pop_screen()
         self.app.push_screen(
-            StarDockScreen(self._service, self._pid, initial_tab=active, initial_cursor=cursor))
+            StarDockScreen(self._service, self._pid, initial_tab=active, initial_key=key))
 
     def action_deposit(self) -> None:
         """Prompt for an amount and bank it (§8 — surfaced WP71)."""

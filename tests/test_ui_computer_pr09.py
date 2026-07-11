@@ -125,17 +125,44 @@ async def test_owned_planet_stays_top_even_when_user_sorts() -> None:
             assert planets[int(top_key)].owned_by_you
 
 
-async def test_plot_route_from_planets_lands_on_route() -> None:
+async def test_plot_route_from_subviews_lands_on_route() -> None:
+    """PT-31 (§8.1): plotting from Planets, Ports, and the Map all end on Route, no flash-back."""
     app = EdgeApp()
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         screen = await _open_computer(app, pilot)
-        screen.show_subview("planets")
+        for sub in ("ports", "planets"):
+            screen.show_subview(sub)
+            await pilot.pause()
+            screen.action_plot_route()
+            await pilot.pause()
+            await pilot.pause()
+            assert screen._active_subview() == "route", f"plot from {sub} did not land on Route"
+        # Map: clicking a sector plots and shows Route too.
+        svc = app.service
+        here = svc.game_view(1).sector.sector_id  # type: ignore[attr-defined]
+        target = next(s for s in svc.state.sectors if s != here)  # type: ignore[attr-defined]
+        screen.on_local_map_view_picked(type("P", (), {"sector_id": target})())
         await pilot.pause()
-        screen.action_plot_route()
         await pilot.pause()
+        assert screen._active_subview() == "route"
+
+
+async def test_port_directory_shows_market_status() -> None:
+    """PT-09 (§8.1): a base-hosted port row carries its market open/dark status."""
+    app = EdgeApp()
+    async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
-        assert screen._active_subview() == "route"  # no flash-back (PT-31)
+        await _open_computer(app, pilot)  # explores every sector so ports populate
+        svc = app.service
+        ports = svc.computer_view(1).ports  # type: ignore[attr-defined]
+        based = [p for p in ports if p.starbase_id is not None]
+        assert based, "seed has no base-hosted port among explored sectors"
+        # market_open tracks the base's operational state.
+        st = svc.state  # type: ignore[attr-defined]
+        base_id = based[0].starbase_id
+        from edge.core.starbases import is_operational
+        assert based[0].starbase_market_open == is_operational(st.starbases[base_id])
 
 
 async def test_avoid_button_opens_prompt() -> None:

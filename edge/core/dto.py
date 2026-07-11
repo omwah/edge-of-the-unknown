@@ -398,6 +398,7 @@ class PortDirEntry:
     starbase_name: str = ""
     starbase_yours: bool = False
     starbase_status: str = ""  # "operational" | "derelict" | "" (no base)
+    starbase_market_open: bool = False  # the base-hosted market trades (dark while derelict, WP78)
 
 
 @dataclass(frozen=True)
