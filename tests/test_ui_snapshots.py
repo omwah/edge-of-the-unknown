@@ -1,11 +1,8 @@
 """WP-UI02/WP-UI22 — deterministic snapshot smoke matrix (pytest-textual-snapshot).
 
-Captures the static, seed-free surfaces — main menu, the shared component
-workbench in both host profiles, modals, and the below-minimum size notice —
-parameterized by terminal size and theme. Screens that need a live universe
-(game, Computer, contact, lobby) are exercised functionally in
-`test_tui_flow.py`; their visual matrix is WP-UI22's remit once per-screen
-responsive work (WP-UI11+) lands.
+Captures static sample surfaces and fixed-seed live screens. Compact and
+standard captures cover every screen family, while representative dense
+screens also have wide and alternate-theme baselines (WP-UI22).
 
 Regenerate accepted baselines with `pytest --snapshot-update`.
 """
@@ -41,6 +38,46 @@ def test_main_menu_themes(snap_compare, theme: str) -> None:
 
     assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["standard"],
                         run_before=apply_theme)
+
+
+async def _open_seeded_game(pilot: Pilot, *, computer: bool = False) -> None:
+    from edge.tui.screens.computer import ComputerScreen
+    from edge.tui.screens.game import GameScreen
+
+    app = pilot.app
+    assert isinstance(app, EdgeApp)
+    service = app.start_new_game(seed=1986)
+    screen = (ComputerScreen(service, app.player_id, initial_tab="ports") if computer
+              else GameScreen(service, app.player_id))
+    app.push_screen(screen)
+    await pilot.pause()
+
+
+@pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
+def test_sector_sizes(snap_compare, size: tuple[int, int]) -> None:
+    assert snap_compare(EdgeApp(plain=True), terminal_size=size,
+                        run_before=_open_seeded_game)
+
+
+@pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
+def test_computer_sizes(snap_compare, size: tuple[int, int]) -> None:
+    async def open_computer(pilot: Pilot) -> None:
+        await _open_seeded_game(pilot, computer=True)
+
+    assert snap_compare(EdgeApp(plain=True), terminal_size=size,
+                        run_before=open_computer)
+
+
+@pytest.mark.parametrize("size", [SIZES["compact"], SIZES["standard"]],
+                         ids=["compact", "standard"])
+def test_lobby_sizes(snap_compare, size: tuple[int, int]) -> None:
+    from edge.tui.screens.lobby import LobbyScreen
+
+    async def open_lobby(pilot: Pilot) -> None:
+        pilot.app.push_screen(LobbyScreen("ws://host.example:8765"))
+        await pilot.pause()
+
+    assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_lobby)
 
 
 def test_options_modal(snap_compare) -> None:
@@ -79,6 +116,11 @@ class _WorkbenchApp(App[None]):
         super().__init__()
         self._profile = profile
         self._loose = loose
+
+    def on_mount(self) -> None:
+        from edge.tui.design import EDGE_ANSI, EDGE_HIGH_CONTRAST, EDGE_MONOCHROME
+        for theme in (EDGE_ANSI, EDGE_HIGH_CONTRAST, EDGE_MONOCHROME):
+            self.register_theme(theme)
 
     def compose(self) -> ComposeResult:
         yield ComponentWorkbench(_sample_subsystems(self._profile), self._loose,
@@ -159,3 +201,35 @@ def test_encounter_sizes(snap_compare, size: tuple[int, int]) -> None:
         await pilot.pause()
 
     assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_encounter)
+
+
+@pytest.mark.parametrize("theme", ["edge-high-contrast", "edge-monochrome"])
+@pytest.mark.parametrize("surface", ["sector", "computer", "workbench", "contact", "combat"])
+def test_dense_screen_themes(snap_compare, theme: str, surface: str) -> None:
+    async def open_surface(pilot: Pilot) -> None:
+        pilot.app.theme = theme
+        if surface == "sector":
+            await _open_seeded_game(pilot)
+        elif surface == "computer":
+            await _open_seeded_game(pilot, computer=True)
+        elif surface == "contact":
+            from edge.tui.dummy import sample_contact
+            from edge.tui.screens.contact import AlienContactScreen
+            pilot.app.push_screen(AlienContactScreen(sample_contact()))
+        elif surface == "combat":
+            from edge.tui.screens.encounter import EncounterScreen
+            pilot.app.push_screen(EncounterScreen(_StaticEncounterService(), 1))
+        await pilot.pause()
+
+    if surface == "workbench":
+        app = _WorkbenchApp(SHIP_WORKBENCH_PROFILE,
+                            ["converter (I) x1", "burner (II) x2"])
+
+        async def theme_workbench(pilot: Pilot) -> None:
+            pilot.app.theme = theme
+
+        assert snap_compare(app, terminal_size=SIZES["standard"],
+                            run_before=theme_workbench)
+    else:
+        assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["standard"],
+                            run_before=open_surface)
