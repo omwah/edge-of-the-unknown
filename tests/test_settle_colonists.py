@@ -76,3 +76,51 @@ def test_settle_rejected_on_uncolonizable_world() -> None:
     state = _state(owner=Ownership("player", 1), ptype="barren", cap=0)
     with pytest.raises(EconomyError, match="cannot hold colonists"):
         reduce(state, 1, SettleColonists(1, 10), CFG)
+
+
+# --- WP-PR07 §8.1 follow-up: commodity conservation under transfer sequences ---
+
+from dataclasses import replace  # noqa: E402
+
+from hypothesis import given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
+
+from edge.core.enums import Commodity  # noqa: E402
+from edge.core.rules import TransferCargo  # noqa: E402
+
+
+def _transfer_state() -> UniverseState:
+    """An owned colony with stores + a ship with cargo and free holds, same sector."""
+    state = _state(owner=Ownership("player", 1))
+    planet = state.planets[1]
+    state.planets[1] = replace(planet, stores={Commodity.FUEL_ORE: 50, Commodity.EQUIPMENT: 20})
+    ship = state.ships[1]
+    state.ships[1] = replace(ship, holds_total=200,
+                             cargo={Commodity.ORGANICS: 40, Commodity.EQUIPMENT: 10})
+    return state
+
+
+@settings(max_examples=60, deadline=None)
+@given(steps=st.lists(
+    st.tuples(st.sampled_from(list(Commodity)), st.integers(-999, 999), st.booleans()),
+    max_size=25))
+def test_transfer_cargo_conserves_each_commodity(steps) -> None:
+    """Every `TransferCargo` moves goods between ship holds and colony stores without
+    minting or destroying any — the per-commodity total (aboard + in stores) is invariant."""
+    state = _transfer_state()
+
+    def totals() -> dict[Commodity, int]:
+        ship, planet = state.ships[1], state.planets[1]
+        return {c: ship.cargo.get(c, 0) + planet.stores.get(c, 0) for c in Commodity}
+
+    before = totals()
+    for commodity, units, to_planet in steps:
+        try:
+            apply_result(state, reduce(
+                state, 1, TransferCargo(1, commodity, units, to_planet=to_planet), CFG))
+        except EconomyError:
+            pass  # rejected transfers (non-positive / nothing to move) leave state untouched
+    assert totals() == before
+    # And nothing ever goes negative (the §13 invariant).
+    ship, planet = state.ships[1], state.planets[1]
+    assert all(v >= 0 for v in ship.cargo.values()) and all(v >= 0 for v in planet.stores.values())

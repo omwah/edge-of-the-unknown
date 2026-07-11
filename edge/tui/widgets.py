@@ -22,6 +22,7 @@ from rich.style import Style
 from edge.core.config import SceneArtConfig
 from edge.core.dto import SectorDiscovery
 from edge.core.enums import Commodity
+from edge.core.planets import pretty_planet_type
 
 from edge.tui import art_adapter
 from edge.tui.dummy import LocalMapDTO, NavStripDTO, PortDTO, SectorDTO, ShipDTO, WarpDTO
@@ -1111,7 +1112,14 @@ class SectorObjectList(Vertical):
         empty = True
         for planet in sec.planets:
             empty = False
-            yield ObjectRow(f"[green]@[/] {planet.name} [dim](Survey)[/]", "planet")
+            # Belts are spatial features, not landable colonies — label the type and use
+            # "Orbit" rather than "Survey" so the row never implies a descent (§4.2, WP-PR06).
+            if planet.ptype == "asteroid_belt":
+                yield ObjectRow(
+                    f"[green]@[/] {planet.name} [dim]— {pretty_planet_type(planet.ptype)} (Orbit)[/]",
+                    "planet")
+            else:
+                yield ObjectRow(f"[green]@[/] {planet.name} [dim](Survey)[/]", "planet")
         for b in getattr(sec, "starbases", ()) or ():
             empty = False
             status = "[green]operational[/]" if b.operational else "[yellow]derelict[/]"

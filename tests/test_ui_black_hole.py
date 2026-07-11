@@ -23,12 +23,19 @@ import pytest
 
 from edge.config import load_default_config
 from edge.core.enums import DiscoveryKind, PayloadKind, RarityTier
+from edge.core.events import HazardDamage
 from edge.core.models import Discovery, DiscoveryPayload
+from edge.core.movement import shortest_path
+from edge.core.rules import Warp
+from edge.server.service import GameService
+from edge.store.repo import SqliteRepository
+from edge.store.snapshots import state_hash
 from edge.tui.app import EdgeApp
 from edge.tui.screens.game import GameScreen
 from edge.tui.widgets import NavRose
 
-_POD = load_default_config().combat.escape_pod_class
+_CFG = load_default_config()
+_POD = _CFG.combat.escape_pod_class
 
 
 def _put_black_hole(svc: object, sector_id: int) -> int:
@@ -126,3 +133,32 @@ async def test_repeated_interaction_with_current_sector_black_hole_is_safe() -> 
         await pilot.pause()
         assert isinstance(app.screen, GameScreen)
         assert _ship(svc).hull_current == hull_after_entry
+
+
+def test_black_hole_damage_survives_save_and_reload(tmp_path) -> None:
+    """The gravity toll rides the command log: a save→reload (replay) after a black-hole
+    entry reconstructs the exact state (WP-PR05 acceptance — save/autosave after damage).
+
+    Uses a *generated* black hole (not an injected one) so the recorded `Warp` replays it —
+    an injected discovery would vanish on regeneration and could not round-trip.
+    """
+    db = tmp_path / "bh.db"
+    svc = GameService.new_game(_CFG, 4, SqliteRepository(db))  # seed 4 places black holes
+    state = svc.state
+    ship = state.ships[state.players[1].ship_id]
+    # Nearest open-space black hole, and a route to it.
+    dist = {d.sector_id: shortest_path(state.adjacency, ship.sector_id, d.sector_id)
+            for d in state.discoveries.values()
+            if d.kind is DiscoveryKind.BLACK_HOLE and d.planet_id is None}
+    target, path = min(((s, p) for s, p in dist.items() if p is not None),
+                       key=lambda kv: len(kv[1]))
+    took_toll = False
+    for hop in path[1:]:
+        events = svc.apply(1, Warp(to_sector=hop))
+        took_toll = took_toll or any(
+            isinstance(e, HazardDamage) and e.source == "black_hole" for e in events)
+    assert took_toll  # the route actually crossed the hole and applied the gravity toll
+
+    expected = state_hash(svc.state)
+    reloaded = GameService.load_game(_CFG, SqliteRepository(db))  # replays the command log
+    assert state_hash(reloaded.state) == expected

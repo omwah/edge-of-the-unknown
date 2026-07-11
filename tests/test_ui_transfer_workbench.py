@@ -102,3 +102,56 @@ async def test_workbench_refused_on_unowned_world() -> None:
         await pilot.pause()
         # No workbench opened over an unowned world.
         assert not isinstance(app.screen, TransferWorkbenchScreen)
+
+
+def _has_scrollable_ancestor(widget) -> bool:
+    from textual.widget import Widget
+    parent = widget.parent
+    while isinstance(parent, Widget):
+        if parent.is_scrollable:
+            return True
+        parent = parent.parent
+    return False
+
+
+async def test_workbench_controls_reachable_at_80x24() -> None:
+    """WP-PR07 §8.1: every control in the transfer modal is on-screen or inside a
+    keyboard-scrollable container at the compact 80x24 floor."""
+    app = EdgeApp()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        svc = await _new_game(app, pilot)
+        pid = _own_colony_here(svc)
+        app.push_screen(TransferWorkbenchScreen(svc, 1, pid))
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, TransferWorkbenchScreen)
+        region = screen.region
+        for widget in screen.query("*"):
+            if not widget.can_focus or not widget.display or widget.disabled:
+                continue
+            assert widget.region.intersection(region) or _has_scrollable_ancestor(widget), (
+                f"transfer control {widget.id or type(widget).__name__} is off-screen "
+                "with no scrollable ancestor at 80x24"
+            )
+
+
+async def test_enter_in_amount_field_submits_unload() -> None:
+    """WP-PR07 §8.1: Enter in a commodity's amount field unloads it to the colony."""
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game(app, pilot)
+        pid = _own_colony_here(svc)
+        app.push_screen(TransferWorkbenchScreen(svc, 1, pid))
+        await pilot.pause()
+        screen = app.screen
+        from textual.widgets import Input
+        field = screen.query_one("#amt-fuel_ore", Input)
+        field.focus()
+        field.value = "30"
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        planet = svc.state.planets[pid]
+        assert planet.stores.get(Commodity.FUEL_ORE, 0) == 30  # unloaded via Enter
