@@ -232,6 +232,28 @@ def test_encounter_sizes(snap_compare, size: tuple[int, int]) -> None:
     assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_encounter)
 
 
+@pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
+def test_territory_sizes(snap_compare, size: tuple[int, int]) -> None:
+    async def open_territory(pilot: Pilot) -> None:
+        from dataclasses import replace
+
+        from edge.tui.screens.territory import TerritoryScreen
+
+        app = pilot.app
+        assert isinstance(app, EdgeApp)
+        service = app.start_new_game(seed=1986)
+        ship = service.state.ships[service.state.players[app.player_id].ship_id]
+        outside = next(s.id for s in service.state.sectors.values()
+                       if not s.is_galactic_core)
+        service.state.ships[ship.id] = replace(
+            ship, sector_id=outside, fighters=40, mines=8,
+            devices={**ship.devices, "probe": 2, "interdictor": 1})
+        app.push_screen(TerritoryScreen(service, app.player_id))
+        await pilot.pause()
+
+    assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_territory)
+
+
 @pytest.mark.parametrize("theme", ["edge-high-contrast", "edge-monochrome"])
 @pytest.mark.parametrize("surface", ["sector", "computer", "workbench", "contact", "combat"])
 def test_dense_screen_themes(snap_compare, theme: str, surface: str) -> None:

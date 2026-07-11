@@ -955,6 +955,7 @@ def territory_view(state: UniverseState, player_id: int, config: GameConfig) -> 
     interdictor, attached limpets), whether deployment is barred (the Core), and the
     player's existing force in the sector — all the entrant's own knowledge.
     """
+    from edge.core import territory
     from edge.core.services import service_point
 
     player = state.players[player_id]
@@ -973,6 +974,13 @@ def territory_view(state: UniverseState, player_id: int, config: GameConfig) -> 
             bits.append(f"{force.limpet_mines} limpet mines")
         force_line = " · ".join(bits)
     devices = sorted((d, n) for d, n in ship.devices.items() if n > 0)
+    option_ids = ["fighters", "armid", "limpet", "beacon", "probe", "interdictor", "strip"]
+    options = []
+    for option_id in option_ids:
+        legal = territory.deployment_legality(state, player_id, option_id, config)
+        options.append(dto.DeploymentOptionDTO(
+            id=legal.id, quantity=legal.quantity, enabled=legal.enabled,
+            blocker=legal.blocker, active=legal.active))
     return dto.TerritoryDTO(
         sector_display=_display(state, ship.sector_id),
         in_core=sector.is_galactic_core,
@@ -985,6 +993,7 @@ def territory_view(state: UniverseState, player_id: int, config: GameConfig) -> 
         force_line=force_line,
         limpet_removal_fee=config.territory.limpet_removal_fee,
         at_service_point=service_point(state, player, ship, config) is not None,
+        options=options,
     )
 
 

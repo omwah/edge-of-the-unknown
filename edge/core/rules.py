@@ -3150,19 +3150,15 @@ def _buy_mines(
     )
 
 
-def _require_deployable_sector(state: UniverseState, ship: Ship) -> None:
-    """Territory may not be deployed in the Core (§10, WP41)."""
-    if state.sectors[ship.sector_id].is_galactic_core:
-        raise EconomyError("you cannot deploy in the Core")
-
-
 def _deploy_fighters(
     state: UniverseState, player_id: int, cmd: DeployFighters, config: GameConfig
 ) -> ReduceResult:
     """Garrison the current sector with carried fighters (§10, WP41)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
-    _require_deployable_sector(state, ship)
+    legal = territory.deployment_legality(state, player_id, "fighters", config)
+    if not legal.enabled:
+        raise EconomyError(legal.blocker)
     if cmd.mode not in territory.FIGHTER_MODES:
         raise EconomyError(f"unknown fighter mode {cmd.mode!r}")
     if cmd.count < 1 or ship.fighters < cmd.count:
@@ -3190,9 +3186,11 @@ def _deploy_mines(
     """Seed the current sector with carried mines — armid or limpet (§10, WP41/WP56)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
-    _require_deployable_sector(state, ship)
     if cmd.kind not in ("armid", "limpet"):
         raise EconomyError(f"unknown mine kind {cmd.kind!r}")
+    legal = territory.deployment_legality(state, player_id, cmd.kind, config)
+    if not legal.enabled:
+        raise EconomyError(legal.blocker)
     if cmd.count < 1 or ship.mines < cmd.count:
         raise EconomyError("not enough mines aboard")
     existing = state.sector_forces.get(ship.sector_id)
@@ -3224,7 +3222,9 @@ def _deploy_beacon(
     """Plant a comms beacon in the current sector — one per sector, overwrite (§10, WP41)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
-    _require_deployable_sector(state, ship)
+    legal = territory.deployment_legality(state, player_id, "beacon", config)
+    if not legal.enabled:
+        raise EconomyError(legal.blocker)
     cost = config.territory.beacon_price
     if player.latinum < cost:
         raise EconomyError(f"need {cost} latinum to plant a beacon")
@@ -3270,6 +3270,9 @@ def _launch_probe(
     """
     player = _player(state, player_id)
     ship = _ship(state, player)
+    legal = territory.deployment_legality(state, player_id, "probe", config)
+    if not legal.enabled:
+        raise EconomyError(legal.blocker)
     spec = config.devices.get("probe")
     if spec is None:
         raise EconomyError("probes are not sold in this universe")
@@ -3316,8 +3319,9 @@ def _toggle_interdictor(
     """Engage / disengage the carried interdictor (§14, WP56)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
-    if ship.devices.get("interdictor", 0) < 1:
-        raise EconomyError("no interdictor aboard")
+    legal = territory.deployment_legality(state, player_id, "interdictor", config)
+    if not legal.enabled:
+        raise EconomyError(legal.blocker)
     new_ship = replace(ship, interdictor_active=not ship.interdictor_active)
     return ReduceResult(
         events=(InterdictorToggled(player_id, new_ship.interdictor_active),),
@@ -3329,17 +3333,12 @@ def _remove_limpets(
     state: UniverseState, player_id: int, config: GameConfig
 ) -> ReduceResult:
     """Strip attached limpet mines at a service point for a fee (§10, §4.2, WP56)."""
-    from edge.core.services import service_point
-
     player = _player(state, player_id)
     ship = _ship(state, player)
-    if service_point(state, player, ship, config) is None:
-        raise EconomyError("limpets can only be removed at a StarDock or a base you own")
-    if not ship.limpets:
-        raise EconomyError("no limpets attached")
+    legal = territory.deployment_legality(state, player_id, "strip", config)
+    if not legal.enabled:
+        raise EconomyError(legal.blocker)
     fee = config.territory.limpet_removal_fee
-    if player.latinum < fee:
-        raise EconomyError(f"need {fee} latinum to strip the limpets")
     count = sum(ship.limpets.values())
     new_ship = replace(ship, limpets={})
     new_player = replace(player, latinum=player.latinum - fee)

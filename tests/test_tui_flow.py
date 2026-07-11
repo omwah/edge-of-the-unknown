@@ -1730,16 +1730,16 @@ async def test_corp_screen_charters_with_derived_tag_and_buttons() -> None:
         assert corp.bank_balance == before + 1_000
 
 
-async def test_territory_screen_cards_and_deployed_table() -> None:
-    """The deploy screen is card-driven: each deployable renders as a focusable
-    card (art + stock + purpose + button), deploying via the button chain works,
+async def test_territory_screen_rows_and_deployed_table() -> None:
+    """Each deployable renders as a stable vertical row with art, stock, purpose,
+    legality, and a focusable button; deploying via the button chain works,
     and the resulting force shows up in the 'Deployed in this sector' table."""
     from dataclasses import replace as _replace
 
     from textual.widgets import Button, DataTable
 
     from edge.tui.screens.stardock import _AmountInput
-    from edge.tui.screens.territory import TerritoryScreen, _DeployCard, _ModePicker
+    from edge.tui.screens.territory import TerritoryScreen, _DeployRow, _ModePicker
 
     app = EdgeApp()
     async with app.run_test(size=(120, 44)) as pilot:
@@ -1754,8 +1754,8 @@ async def test_territory_screen_cards_and_deployed_table() -> None:
         await pilot.press("d")  # game screen → deploy screen
         await pilot.pause()
         assert isinstance(app.screen, TerritoryScreen)
-        cards = list(app.screen.query(_DeployCard))
-        assert len(cards) >= 6  # fighters, armid, limpet, beacon, probe, interdictor
+        rows = list(app.screen.query(_DeployRow))
+        assert len(rows) >= 6  # fighters, armid, limpet, beacon, probe, interdictor
         await pilot.click("#go-fighters")
         await pilot.pause()
         assert isinstance(app.screen, _AmountInput)  # count prompt
@@ -1769,7 +1769,7 @@ async def test_territory_screen_cards_and_deployed_table() -> None:
         assert isinstance(app.screen, TerritoryScreen)
         table = app.screen.query_one("#deployed-table", DataTable)
         assert table.row_count >= 1
-        assert app.screen.query(Button)  # cards rendered with buttons
+        assert app.focused is app.screen.query_one("#go-fighters", Button)
 
 
 async def test_planet_citadel_panel_builds_via_button() -> None:
