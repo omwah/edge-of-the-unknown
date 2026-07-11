@@ -158,7 +158,7 @@ from edge.core.events import (
 )
 from edge.core.events import HazardDamage as HazardDamageEvent
 from edge.core.events import CombatRound as CombatRoundEvent
-from edge.core.planets import is_colonizable, retype_planet
+from edge.core.planets import is_colonizable, is_landable, pretty_planet_type, retype_planet
 from edge.core.starbases import is_operational
 from edge.core.models import (
     AlienSpecies,
@@ -3340,7 +3340,10 @@ def _descend(
     player = _player(state, player_id)
     _require_no_encounter(player)
     ship = _ship(state, player)
-    _planet_in_sector(state, ship, cmd.planet_id)
+    planet = _planet_in_sector(state, ship, cmd.planet_id)
+    if not is_landable(planet.planet_type, config):
+        raise EconomyError(
+            f"a {pretty_planet_type(planet.planet_type).lower()} has no surface to land on")
     cost = config.discovery.descent_turn_cost if config.discovery is not None else 1
     if player.turns_remaining < cost:
         raise MovementError("out of turns")
@@ -3354,7 +3357,10 @@ def _explore(
     """Reveal the next still-hidden surface site the ship's sensors can resolve (§7, WP6)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
-    _planet_in_sector(state, ship, cmd.planet_id)
+    planet = _planet_in_sector(state, ship, cmd.planet_id)
+    if not is_landable(planet.planet_type, config):
+        raise EconomyError(
+            f"a {pretty_planet_type(planet.planet_type).lower()} has no surface to explore")
     undetected = [d for d in _surface_sites(state, cmd.planet_id) if d.id not in player.detected]
     if not undetected:
         raise EconomyError("every site here is already surveyed")

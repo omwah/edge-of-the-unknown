@@ -14,7 +14,7 @@ from dataclasses import replace
 
 from edge.core.config import GameConfig
 from edge.core.enums import Commodity
-from edge.core.models import Planet
+from edge.core.models import UNOWNED, Planet
 
 
 _PLANET_TYPE_LABELS = {
@@ -36,9 +36,57 @@ def pretty_planet_type(planet_type: str) -> str:
 
 
 def is_colonizable(planet_type: str, config: GameConfig) -> bool:
-    """Whether a world of this type can be claimed and settled (§4.2)."""
+    """Whether a world of this type can be claimed and settled (§4.2).
+
+    Colonizable worlds are the only ones that hold colonists, colony stores, and
+    citadels — so this predicate also gates transfer/citadel/banking/invasion.
+    """
     profile = config.planets.types.get(planet_type)
     return bool(profile and profile.colonizable)
+
+
+def is_landable(planet_type: str, config: GameConfig) -> bool:
+    """Whether a ship can descend onto this world's surface (§4.2).
+
+    False for spatial "world objects" with no surface — asteroid belts — which are
+    scanned and mined in orbit but never landed on. Unknown types default to landable
+    so a new config type reads as an ordinary world without a code edit.
+    """
+    profile = config.planets.types.get(planet_type)
+    return profile is None or profile.landable
+
+
+def is_extractable(planet_type: str, config: GameConfig) -> bool:
+    """Whether this world yields raw goods in orbit without colonists (§4.2).
+
+    The uncolonizable dead worlds that auto-extract: a gas giant's fuel scoop and an
+    asteroid belt's mining. Barren worlds extract nothing.
+    """
+    cfg = config.planets
+    if planet_type == "jovian":
+        return cfg.jovian_scoop > 0
+    if planet_type == "asteroid_belt":
+        return cfg.asteroid_mining > 0
+    return False
+
+
+def normalize_belt(planet: Planet, config: GameConfig) -> Planet:
+    """Scrub colony/citadel/base affordances off a non-landable spatial world (§4.2).
+
+    Asteroid belts are spatial features, not colonies: they never hold colonists, stores,
+    allocation, a citadel, a treasury, a garrison, or an owner. Idempotent, so it runs both
+    at generation and on any legacy planet re-read without changing an already-clean belt.
+    Landable/colonizable worlds pass through untouched. `starbase_id` is cleared here; the
+    caller is responsible for dropping the referenced `Starbase` from world state.
+    """
+    if is_landable(planet.planet_type, config):
+        return planet
+    clean = replace(
+        planet, owner=UNOWNED, inhabited_by_species_id=None, colonists=0,
+        allocation={}, stores={}, citadel_level=0, citadel_progress=-1, treasury=0,
+        fighters=0, gun_integrity=0, fighter_allocation=0.0, starbase_id=None,
+    )
+    return planet if clean == planet else clean
 
 
 def retype_planet(planet: Planet, new_type: str, config: GameConfig) -> Planet:

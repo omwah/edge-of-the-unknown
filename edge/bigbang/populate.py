@@ -24,6 +24,7 @@ from edge.core.config import GameConfig
 from edge.core.economy import capacity_for_size
 from edge.core.engine_room import build_layouts
 from edge.core.movement import one_way_exits
+from edge.core.planets import is_landable, normalize_belt
 from edge.core.enums import PORT_CLASS_TRADES, Commodity, PortClass, Subsystem
 from edge.core.models import (
     Ownership,
@@ -173,6 +174,7 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     # ownership roll uses its own sub-RNG (golden-master ordering).
     _finalize_planets(state, config)
     _place_starbases(state, config)
+    _normalize_belts(state, config)  # belts are spatial features, never colonies/bases (§4.2)
     _host_markets(state, config)
     # The player is enrolled separately by the `JoinGame` reducer (`core.rules`), not
     # seeded here — joining is a recorded command, not seed-derived world generation.
@@ -274,6 +276,26 @@ def _place_starbases(state: UniverseState, config: GameConfig) -> None:
         state.planets[pid] = replace(planet, starbase_id=bid)
         bid += 1
     state.starbases = bases
+
+
+def _normalize_belts(state: UniverseState, config: GameConfig) -> None:
+    """Enforce the belt invariant (§4.2): asteroid belts are spatial features, not colonies.
+
+    A belt holds no owner, colonists, stores, allocation, citadel, treasury, garrison, or
+    orbital starbase — it is scanned and mined in orbit only. Run after starbase placement
+    (so a belt's base is dropped before markets are minted) and before the ownership/type
+    RNG-free, so it never perturbs golden-master ordering. `core.planets.normalize_belt`
+    is idempotent, so re-reading a legacy belt on load converges to the same clean world.
+    """
+    belt_pids = {pid for pid, p in state.planets.items()
+                 if not is_landable(p.planet_type, config)}
+    if not belt_pids:
+        return
+    # Drop any orbital base hung off a belt before it can host a market.
+    state.starbases = {bid: b for bid, b in state.starbases.items()
+                       if b.planet_id not in belt_pids}
+    for pid in belt_pids:
+        state.planets[pid] = normalize_belt(state.planets[pid], config)
 
 
 def _host_markets(state: UniverseState, config: GameConfig) -> None:

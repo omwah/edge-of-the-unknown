@@ -22,6 +22,7 @@ from edge.core.config import DiscoveryConfig, GameConfig
 from edge.core.enums import Component, ComponentTier, DiscoveryKind, PayloadKind, RarityTier
 from edge.core.models import Discovery, DiscoveryPayload, UniverseState
 from edge.core.movement import one_way_exits
+from edge.core.planets import is_landable
 
 _PHENOMENA = (DiscoveryKind.NEBULA, DiscoveryKind.BLACK_HOLE, DiscoveryKind.WORMHOLE)
 
@@ -110,6 +111,8 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
 
     for pid in sorted(state.planets):  # surface sites (descent + Explore reveal them, WP6)
         planet = state.planets[pid]
+        if not is_landable(planet.planet_type, config):
+            continue  # spatial features (asteroid belts) have no surface to descend onto (§4.2)
         if rng.random() >= dcfg.surface_site_chance:
             continue
         band = state.sectors[planet.sector_id].distance_band
@@ -174,7 +177,10 @@ def salt_raid_caches(state: UniverseState, config: GameConfig) -> None:
     next_id = (max(state.discoveries) + 1) if state.discoveries else 1
     planet_by_sector: dict[int, int] = {}
     for pid in sorted(state.planets):
-        planet_by_sector.setdefault(state.planets[pid].sector_id, pid)
+        planet = state.planets[pid]
+        if not is_landable(planet.planet_type, config):
+            continue  # a raid cache is a surface site — a belt has no surface to hide it on (§4.2)
+        planet_by_sector.setdefault(planet.sector_id, pid)
     seeded: set[int] = set()
     for sp in sorted(state.species.values(), key=lambda s: s.id):
         sector = sp.sector_id
