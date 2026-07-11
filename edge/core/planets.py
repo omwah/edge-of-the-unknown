@@ -102,6 +102,22 @@ def genesis_blocker(planet: Planet, has_device: bool, config: GameConfig) -> str
     return ""
 
 
+def belt_mining_yield(planet_type: str, config: GameConfig) -> tuple[Commodity, int] | None:
+    """The commodity + per-action amount a player pulls from hand-mining a belt (§4.2, PT-30).
+
+    Belts yield raw Equipment (metal, thin) in orbit without colonists. Returns None for any
+    world that can't be hand-mined this way (not an asteroid belt, or mining disabled in
+    config). The amount reuses `asteroid_mining` — the same seam the owned-world auto-collect
+    (`produce`) draws on — so the two extraction paths stay balanced by one config value.
+    """
+    if planet_type != "asteroid_belt":
+        return None
+    amount = config.planets.asteroid_mining
+    if amount <= 0:
+        return None
+    return (Commodity.EQUIPMENT, amount)
+
+
 def normalize_belt(planet: Planet, config: GameConfig) -> Planet:
     """Scrub colony/citadel/base affordances off a non-landable spatial world (§4.2).
 
@@ -179,8 +195,10 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
             colonists = max(0, colonists - round(colonists * cfg.starvation_rate))
     elif planet.planet_type == "jovian":
         _add(stores, Commodity.FUEL_ORE, cfg.jovian_scoop)
-    elif planet.planet_type == "asteroid_belt":
-        _add(stores, Commodity.EQUIPMENT, cfg.asteroid_mining)
+    else:
+        haul = belt_mining_yield(planet.planet_type, config)  # the shared belt-yield seam
+        if haul is not None:
+            _add(stores, *haul)
     # barren (and any other uncolonizable type) produces nothing.
 
     if (colonists == planet.colonists and fighters == planet.fighters

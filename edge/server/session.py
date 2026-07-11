@@ -79,6 +79,7 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     CoreLawNotice,
+    BeltMined,
     Descended,
     InterdictorToggled,
     InvasionRepulsed,
@@ -135,6 +136,7 @@ from edge.core.models import (
 )
 from edge.core.aliens import base_owner_hostile
 from edge.core.planets import (
+    belt_mining_yield,
     genesis_blocker,
     genesis_valid_target,
     is_colonizable,
@@ -703,6 +705,7 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         can_invade=can_invade, invade_blocker=invade_blocker, ship_fighters=ship.fighters,
         landable=is_landable(planet.planet_type, config),
         extractable=is_extractable(planet.planet_type, config),
+        mine_yield=(belt_mining_yield(planet.planet_type, config) or (None, 0))[1],
     )
 
 
@@ -2115,6 +2118,8 @@ def format_event(event: Event) -> str:
         return f"[green]✦ Genesis: world re-formed to {event.new_type.replace('_', ' ')}[/]"
     if isinstance(event, Descended):
         return "[magenta]▼ Descended to the surface.[/]"
+    if isinstance(event, BeltMined):
+        return f"[green]⛏ Mined {event.amount} {event.commodity.replace('_', ' ')} from the belt.[/]"
     if isinstance(event, SiteExplored):
         return f"[cyan]✦ Site surveyed: {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
     if isinstance(event, DiscoveryDetected):
@@ -2270,7 +2275,7 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
     if isinstance(event, (Traded, Haggled)):
         port = state.ports.get(event.port_id)
         return port.sector_id if port is not None else None
-    if isinstance(event, (GenesisDeployed, Descended, SiteExplored, Colonized, ColonistsSettled, ColonyGrew, PlanetProduced)):
+    if isinstance(event, (GenesisDeployed, Descended, BeltMined, SiteExplored, Colonized, ColonistsSettled, ColonyGrew, PlanetProduced)):
         planet = state.planets.get(event.planet_id)
         return planet.sector_id if planet is not None else None
     if isinstance(event, (DiscoveryDetected, DiscoveryCollected)):
@@ -2407,6 +2412,8 @@ def _event_turn_cost(event: Event, config: GameConfig) -> int:
         return disc.explore_turn_cost if disc is not None else 1
     if isinstance(event, DiscoveryCollected):
         return disc.salvage_turn_cost if disc is not None else 1
+    if isinstance(event, BeltMined):
+        return config.planets.mining_turn_cost
     return 0
 
 

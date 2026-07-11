@@ -174,6 +174,16 @@ class Descended(Event):
 
 
 @dataclass(frozen=True)
+class BeltMined(Event):
+    """The player hand-mined an asteroid belt, taking raw goods aboard (§4.2, PT-30)."""
+
+    player_id: int
+    planet_id: int
+    commodity: str  # Commodity value
+    amount: int  # units taken into the cargo hold
+
+
+@dataclass(frozen=True)
 class SiteExplored(Event):
     """A surface site revealed by exploration/sensor sweep on descent (§7, WP6)."""
 

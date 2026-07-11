@@ -33,7 +33,7 @@ from edge.core.dto import PlanetDTO
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import (
-    BuildCitadel, Colonize, DeployGenesis, Descend, InvadePlanet, PlanetDeposit,
+    BuildCitadel, Colonize, DeployGenesis, Descend, InvadePlanet, MineBelt, PlanetDeposit,
     PlanetWithdraw,
 )
 from edge.server.service import GameService
@@ -96,6 +96,7 @@ class PlanetScreen(Screen[None]):
         Binding("d", "descend", "Descend"),
         Binding("c", "colonize", "Claim/Colonize"),
         Binding("g", "genesis", "Genesis"),
+        Binding("m", "mine", "Mine belt"),
         Binding("k", "build_citadel", "Build citadel"),
         Binding("plus", "treasury_deposit", "Deposit"),
         Binding("minus", "treasury_withdraw", "Withdraw"),
@@ -203,6 +204,10 @@ runs in trips are the intended loop; the citadel art grows with its level."""
         # control never implies a landing that the reducer would reject (§4.2, WP-PR06).
         if action == "descend" and not self._planet.landable:
             return False
+        # Mining is belt-only (PT-30): hide the affordance/footer hint elsewhere so it never
+        # implies an extraction the reducer would reject.
+        if action == "mine" and self._planet.mine_yield <= 0:
+            return False
         return True
 
     def _identity_panel(self, p: PlanetDTO) -> Vertical:
@@ -237,7 +242,10 @@ runs in trips are the intended loop; the citadel art grows with its level."""
             "colonized, or given a citadel.[/]",
             "[cyan]Scan[/] the sector for finds; anything logged appears in your codex.",
         ]
-        if p.extractable:
+        if p.mine_yield > 0:
+            lines.append(f"[green]\\[M] Mine belt[/] — haul up to {p.mine_yield} equipment aboard "
+                         "(costs a turn).")
+        elif p.extractable:
             lines.append("[dim]Raw ore drifts here for the taking — orbital mining.[/]")
         panel = Vertical(*(Static(t) for t in lines), id="orbital-panel", classes="orbit-panel")
         panel.border_title = "Orbit"
@@ -482,6 +490,26 @@ runs in trips are the intended loop; the citadel art grows with its level."""
             return
         self.app.push_screen(SurfaceScreen(
             self._service.surface_view(self._pid, p.planet_id), self._service, self._pid))
+
+    def action_mine(self) -> None:
+        """Hand-mine an asteroid belt, taking raw goods aboard (§4.2, PT-30)."""
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        if p.mine_yield <= 0:
+            self.notify("There's nothing to mine here.", timeout=2)
+            return
+        service = self._service
+        try:
+            service.apply(self._pid, MineBelt(planet_id=p.planet_id))
+        except (EconomyError, MovementError) as exc:
+            notify_warning(self, str(exc))
+            return
+        self.notify("Mined the belt — raw goods stowed aboard.", timeout=2)
+        self.app.pop_screen()
+        self.app.push_screen(PlanetScreen(
+            service.planet_view(self._pid, p.planet_id), service, self._pid))
 
     def action_noop(self) -> None:
         self.notify("Not wired in the skeleton.", timeout=2)

@@ -23,6 +23,7 @@ from edge.core.events import (
     AttitudeChanged,
     Banked,
     BaseCommission,
+    BeltMined,
     CargoTransferred,
     CitadelBuildStarted,
     CitadelCompleted,
@@ -145,6 +146,7 @@ from edge.core.rules import (
     FieldPatch,
     Hail,
     HaggleOffer,
+    MineBelt,
     InstallComponent,
     InvadePlanet,
     JoinAlliance,
@@ -262,6 +264,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "Descend", {"planet_id": command.planet_id}
         case Explore():
             return "Explore", {"planet_id": command.planet_id}
+        case MineBelt():
+            return "MineBelt", {"planet_id": command.planet_id}
         case BuyGenesis():
             return "BuyGenesis", {}
         case DeployGenesis():
@@ -456,6 +460,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return Descend(planet_id=payload["planet_id"])
         case "Explore":
             return Explore(planet_id=payload["planet_id"])
+        case "MineBelt":
+            return MineBelt(planet_id=payload["planet_id"])
         case "BuyGenesis":
             return BuyGenesis()
         case "DeployGenesis":
@@ -643,6 +649,11 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             }
         case Descended():
             return "Descended", {"player_id": event.player_id, "planet_id": event.planet_id}
+        case BeltMined():
+            return "BeltMined", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "commodity": event.commodity, "amount": event.amount,
+            }
         case SiteExplored():
             return "SiteExplored", {
                 "player_id": event.player_id, "planet_id": event.planet_id,
@@ -981,6 +992,9 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return GenesisDeployed(payload["player_id"], payload["planet_id"], payload["new_type"])
         case "Descended":
             return Descended(payload["player_id"], payload["planet_id"])
+        case "BeltMined":
+            return BeltMined(payload["player_id"], payload["planet_id"],
+                             payload["commodity"], payload["amount"])
         case "SiteExplored":
             return SiteExplored(payload["player_id"], payload["planet_id"], payload["discovery_id"],
                                 payload["kind"], payload["rarity"])

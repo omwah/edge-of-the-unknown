@@ -890,6 +890,7 @@ class PlanetDTO:
     # legality from a label. Defaulted so older fixtures read as ordinary landable worlds.
     landable: bool = True
     extractable: bool = False
+    mine_yield: int = 0  # belt hand-mining haul per action, 0 ⇒ not minable this way (PT-30)
 
 
 @dataclass(frozen=True)
