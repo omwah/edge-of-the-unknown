@@ -866,7 +866,9 @@ class PlanetDTO:
     ship_colonists: int  # colonists aboard the player's ship (for the Colonize affordance)
     ship_colonist_capacity: int
     ship_genesis: int = 0  # genesis torpedoes aboard (drives the Genesis affordance, WP10)
-    genesis_eligible: bool = False  # this world can be re-formed by a genesis torpedo
+    genesis_eligible: bool = False  # valid_target axis: unowned + eligible type (WP-PR12)
+    genesis_has_device: bool = False  # a torpedo is aboard (the separate device axis, WP-PR12)
+    genesis_blocker: str = ""  # human reason a deploy is barred, "" when allowed (WP-PR12)
     starbase: str | None = None  # WP4 display status: "operational" | "derelict — salvageable"
     starbase_id: int | None = None  # click-through to the unified base view (WP79)
     starbase_derelict: bool = False
@@ -1027,3 +1029,9 @@ class EncounterDTO:
     # The pack's spoken combat beat (§6.7, WP31), rendered read-only in the species'
     # voice from the encounter's `speech_context`; "" when it carries none.
     speech: str = ""
+    # Set-piece target kind (WP-PR12): "ship" for an ordinary alien/PvP fight, "starbase"
+    # for a base assault — the encounter screen then draws the base's port sprite (its
+    # owner archetype + stable seed) instead of a ship sprite. Fog-safe: a public fact.
+    target_kind: str = "ship"
+    target_archetype: str = ""  # owner archetype palette for the starbase sprite
+    target_seed: int = 0  # stable art seed for the starbase sprite (its base id)

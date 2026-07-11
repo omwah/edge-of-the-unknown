@@ -159,7 +159,13 @@ from edge.core.events import (
 )
 from edge.core.events import HazardDamage as HazardDamageEvent
 from edge.core.events import CombatRound as CombatRoundEvent
-from edge.core.planets import is_colonizable, is_landable, pretty_planet_type, retype_planet
+from edge.core.planets import (
+    genesis_blocker,
+    is_colonizable,
+    is_landable,
+    pretty_planet_type,
+    retype_planet,
+)
 from edge.core.starbases import is_operational
 from edge.core.models import (
     AlienSpecies,
@@ -3534,20 +3540,17 @@ def _deploy_genesis(
     Deterministic: the world is re-typed to the configured `result_type` and its
     yield/habitability re-rolled from config (no RNG), so the change replays exactly.
     """
-    if config.genesis is None:
-        raise EconomyError("genesis torpedoes are not sold in this universe")
     player = _player(state, player_id)
     ship = _ship(state, player)
-    gen = config.genesis
-    if ship.devices.get(gen.device_id, 0) < 1:
-        raise EconomyError("no genesis torpedo aboard")
     planet = state.planets.get(cmd.planet_id)
     if planet is None or planet.sector_id != ship.sector_id:
         raise EconomyError("no such planet in this sector")
-    if planet.owner.is_owned:
-        raise EconomyError("that world is claimed — genesis only re-forms unclaimed worlds")
-    if planet.planet_type not in gen.eligible_types:
-        raise EconomyError(f"a {planet.planet_type} world cannot be re-formed by genesis")
+    gen = config.genesis
+    has_device = gen is not None and ship.devices.get(gen.device_id, 0) >= 1
+    blocker = genesis_blocker(planet, has_device, config)
+    if blocker:
+        raise EconomyError(blocker)
+    assert gen is not None  # an empty blocker guarantees the universe sells genesis
     new_devices = dict(ship.devices)
     new_devices[gen.device_id] = new_devices[gen.device_id] - 1
     if new_devices[gen.device_id] == 0:

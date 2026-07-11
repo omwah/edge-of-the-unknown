@@ -180,8 +180,11 @@ runs in trips are the intended loop; the citadel art grows with its level."""
                         f"[{colour}]#[/] Orbital starbase — {p.starbase}   "
                         f"[dim]\\[B] Enter base[/]",
                         dest="starbase", ref=p.starbase_id, classes="section")
-                if p.genesis_eligible and p.ship_genesis > 0:
+                if not p.genesis_blocker:
                     yield Static(f"[green]\\[G] Genesis[/] — re-form this world (torpedoes: {p.ship_genesis})")
+                elif p.genesis_has_device:
+                    # A torpedo aboard but this world can't take it — name the reason.
+                    yield Static(f"[dim]Genesis barred: {p.genesis_blocker}.[/]")
             detail = self.app.scene_art.planet_detail
             art = PlanetSprite(
                 art_adapter.sprite(
@@ -421,8 +424,8 @@ runs in trips are the intended loop; the citadel art grows with its level."""
             return
         service = self._service
         p = self._planet
-        if not p.genesis_eligible or p.ship_genesis <= 0:
-            self.notify("Can't deploy genesis here (need an eligible world + a torpedo).", timeout=2)
+        if p.genesis_blocker:
+            self.notify(f"Can't deploy Genesis: {p.genesis_blocker}.", timeout=2)
             return
 
         def _go(ok: bool | None) -> None:
