@@ -88,10 +88,13 @@ Five categories — [b]Navigation[/] (Map · Route), [b]Commerce[/] (Ports · Tr
 Market), [b]Exploration[/] (Planets · Codex · Leads), [b]Relations[/] (Contracts ·
 Alliances · Dossier), [b]Records[/] (Log · Notes) — each remembers its last
 subview. Keys act on the [b]active subview[/] ([b]X[/] abandons a contract or
-removes a note, per subview). [b]J[/] joins/resigns a bloc; [b]V[/] toggles
-avoiding the highlighted sector on plotted routes. In any table, [b]/[/]
-focuses the filter, [b]O[/] cycles the sort (or click a ↕ header); Enter on a
-row opens its full detail when columns are folded at 80×24."""
+removes a note, per subview). [b]J[/] joins/resigns a bloc. Your own worlds and
+base-hosted ports sort to the top of Planets/Ports (★ / ⚓); finished contracts stay
+listed but dim. [b]V[/] adds/removes a sector on the route-planner avoid list — from
+any subview, or the [b]Add … avoid list[/] button on the Notes tab; the avoid list is
+shown there and honoured on every plotted route. In any table, [b]/[/] focuses the
+filter, [b]O[/] cycles the sort (or click a ↕ header); Enter on a row opens its full
+detail when columns are folded at 80×24."""
 
     CSS = """
     ComputerScreen #computer-title {
@@ -302,12 +305,23 @@ row opens its full detail when columns are folded at 80×24."""
                                  or "[dim]none[/]")
                         yield Static(f"[b]AVOID LIST[/] (route planner skips these): {avoid}",
                                      classes="note", id="avoid-line")
+                        yield Button("Add / remove a sector on the avoid list…", id="avoid-add")
                         yield Static("[dim][b]A[/] Add note   ·   [b]X[/] Remove highlighted   ·   "
                                      "[b]V[/] Toggle a sector on the avoid list[/]", classes="note")
         yield Footer()
 
     def _dt(self, table_id: str) -> DetailTable:
         return self.query_one(f"#{table_id}-panel", DetailTable)
+
+    @staticmethod
+    def _port_name_cell(e: object) -> "str | Text":
+        """A port row's name, marked with ⚓ when it carries the player's own base (PT-09)."""
+        name = e.name  # type: ignore[attr-defined]
+        if e.starbase_yours:  # type: ignore[attr-defined]
+            return Text.from_markup(f"[cyan]⚓[/] {name}  [dim]your base[/]")
+        if e.starbase_status:  # type: ignore[attr-defined]
+            return Text.from_markup(f"{name}  [dim]⚓ {e.starbase_status}[/]")  # type: ignore[attr-defined]
+        return name
 
     def on_mount(self) -> None:
         """Provision every subview's DetailTable (WP-UI21): rows carry stable
@@ -338,21 +352,36 @@ row opens its full detail when columns are folded at 80×24."""
                                        str(ld.distance) if ld.reachable else "—", turns)))
         self._dt("leads-table").set_rows(lead_rows)
 
-        self._dt("contracts-table").set_rows([
-            (str(c.contract_id), (str(c.contract_id), c.kind, c.issuer, c.summary,
-                                  f"{c.reward:,}", f"day {c.deadline_day}"))
-            for c in self._computer.contracts])
+        # Contracts (PT-27): active first, finished ones dim with their status in the Due cell.
+        contract_rows = []
+        for c in self._computer.contracts:
+            done = c.status != "active"
+            def _c(text: str, _done: bool = done) -> "str | Text":
+                return Text.from_markup(f"[dim]{text}[/]") if _done else text
+            due = ({"done": "[green]✓ done[/]", "failed": "[red]✗ failed[/]"}.get(c.status)
+                   or f"day {c.deadline_day}")
+            contract_rows.append((str(c.contract_id), (
+                _c(str(c.contract_id)), _c(c.kind), _c(c.issuer), _c(c.summary),
+                _c(f"{c.reward:,}"), Text.from_markup(due))))
+        self._dt("contracts-table").set_rows(
+            contract_rows,
+            group_first=[str(c.contract_id) for c in self._computer.contracts if c.status == "active"])
 
+        # Ports (PT-09): a player-owned base's port floats to the top with a ⚓ marker.
         self._dt("ports-table").set_rows([
-            (str(i), (f"S{e.sector_display}", e.name, e.klass, e.buys, e.sells,
+            (str(i), (f"S{e.sector_display}", self._port_name_cell(e), e.klass, e.buys, e.sells,
                       str(e.dist) if e.dist >= 0 else "—"))
-            for i, e in enumerate(self._computer.ports)])
+            for i, e in enumerate(self._computer.ports)],
+            group_first=[str(i) for i, e in enumerate(self._computer.ports) if e.starbase_yours])
 
+        # Planets (PT-08): your worlds float to the top with a ★ marker.
         self._dt("planets-table").set_rows([
-            (str(i), (f"S{pl.sector_display}", pl.name, pl.ptype, pl.owner,
-                      f"{pl.colonists:,}", pl.species, pl.stores,
+            (str(i), (f"S{pl.sector_display}",
+                      Text.from_markup(f"[b yellow]★[/] {pl.name}") if pl.owned_by_you else pl.name,
+                      pl.ptype, pl.owner, f"{pl.colonists:,}", pl.species, pl.stores,
                       str(pl.dist) if pl.dist >= 0 else "—"))
-            for i, pl in enumerate(self._computer.planets)])
+            for i, pl in enumerate(self._computer.planets)],
+            group_first=[str(i) for i, pl in enumerate(self._computer.planets) if pl.owned_by_you])
 
         # Market rows key on the logical order, so a refresh keeps the cursor
         # on the same sector/port/commodity/side even when quantities move.
@@ -456,7 +485,10 @@ row opens its full detail when columns are folded at 80×24."""
     # --- Contracts (WP57 — surfaced WP71) -------------------------------------
 
     def _highlighted_contract(self) -> int | None:
-        """The contract id under the cursor on the Contracts tab, or None."""
+        """The *active* contract id under the cursor on the Contracts tab, or None.
+
+        A finished (done/failed) favor is a record only — its actions are disabled (PT-27),
+        so selecting one explains why instead of issuing a doomed command."""
         if self._active_subview() != "contracts":
             self.notify("Switch to the Contracts tab first.", timeout=2)
             return None
@@ -464,7 +496,15 @@ row opens its full detail when columns are folded at 80×24."""
         if not table.row_count:
             return None
         key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
-        return int(key.value) if key.value is not None else None
+        if key.value is None:
+            return None
+        cid = int(key.value)
+        contract = next((c for c in self._computer.contracts if c.contract_id == cid), None)
+        if contract is not None and contract.status != "active":
+            self.notify("That favor is finished — it stays on the board as a record only.",
+                        timeout=3)
+            return None
+        return cid
 
     def action_deliver_contract(self) -> None:
         """Fulfil the highlighted deliver favor at its destination port (§6.7, WP57)."""
@@ -653,6 +693,9 @@ row opens its full detail when columns are folded at 80×24."""
         self.query_one(f"#sub-{category}", TabbedContent).active = subview
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "avoid-add":
+            self.action_toggle_avoid()
+            return
         if event.button.id != "cat-button":
             return
 
@@ -725,10 +768,11 @@ row opens its full detail when columns are folded at 80×24."""
             )
             return
         head = f"[b]{dto.origin_display} → {dto.dest_display}[/]   [dim]{dto.summary}[/]"
+        avoid_hint = "   ·   [dim][b]V[/] avoid a sector[/]"  # PT-23: keep avoid discoverable in route context
         if dto.reachable and dto.affordable:
-            summary.update(f"{head}   ·   [green]G Engage[/]")
+            summary.update(f"{head}   ·   [green]G Engage[/]{avoid_hint}")
         else:
-            summary.update(f"{head}   ·   [red]{dto.reason}[/]")
+            summary.update(f"{head}   ·   [red]{dto.reason}[/]{avoid_hint}")
 
     def _show_route(self) -> None:
         self._render_route()

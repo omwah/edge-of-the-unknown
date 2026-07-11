@@ -321,7 +321,13 @@ current-hull rejection, compact/contrast snapshots.
 
 Commit: `playtest: WP-PR08 StarDock scoped service UX`
 
-### WP-PR09 — Computer prioritization and navigation continuity
+### WP-PR09 — Computer prioritization and navigation continuity — complete
+
+**Notes:** PT-31 (route flash-back) did not reproduce — plotting from Trade/Ports/Planets/
+Codex/Leads/Map already lands on Route (fixed by the WP-UI20/21 remembered-subview work);
+locked with a regression test. Grouping-under-sort is a new `DetailTable.set_rows(group_first=…)`
+priority-group (owned planets/base ports, active contracts) that survives any user column sort.
+Finished contracts are kept as a bounded (12) most-recent tail, dim, with actions disabled.
 
 **Goal:** make owned infrastructure and completed work visible, and eliminate
 surprising tab jumps.
