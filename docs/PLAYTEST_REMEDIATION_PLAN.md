@@ -475,3 +475,22 @@ tests, the scripted acceptance pass in `docs/PLAYTEST_NOTES.md` has been rerun, 
 global StarDock shortcut performs a context-inappropriate action, combat/world
 state remains replay-deterministic, all primary workflows work at 80x24, and the
 documentation and Help accurately describe the resulting controls and rules.
+
+**Not yet met:** PT-06's station-concourse art is outstanding (see §8), so the
+remediation is not fully complete even once every WP is otherwise landed.
+
+## 8. Outstanding follow-ups (deferred, still open)
+
+These were consciously deferred during implementation and are **not** resolved.
+They are tracked here so a struck-through playtest note never hides open work.
+
+- **PT-06 — station-concourse art (WP-PR08).** The bespoke DS9-style raster run
+  through the image-to-ANSI pipeline was not produced — the `imagegen` skill was
+  unavailable in the implementing environment. The Colonists tab ships a placeholder
+  ASCII banner (`edge/tui/screens/stardock.py::_CONCOURSE_ART`). Follow-up: generate
+  the raster, convert it, commit the asset with provenance/fallbacks per art policy,
+  and replace the banner (hide/shorten at compact size).
+- **WP-PR07 — batch transfer command (optional).** The transfer workbench issues one
+  clamped `TransferCargo`/`SettleColonists` per row; a single atomic batch command was
+  left unbuilt (low value for the local single-player service). If added later, update
+  codec/protocol/replay fixtures.
