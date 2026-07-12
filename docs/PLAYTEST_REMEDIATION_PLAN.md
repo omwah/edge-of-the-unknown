@@ -533,12 +533,10 @@ They are tracked here so a struck-through playtest note never hides open work.
   projection; the PlanetScreen orbital panel shows an `[M] Mine belt` affordance (belt-only
   via `check_action`). Wire bumped to v10. DESIGN §4.2 updated. Tests in
   `tests/test_asteroid_belts.py` (fill/clamp/full-holds/out-of-turns/non-belt + projection).
-- **WP-PR09 / PT-23 — per-row avoid action.** The plan enumerated a "row action on
-  route/port/planet tables" among the avoid-list affordances. Delivered: the Notes-tab
-  button, the route-context `V` hint, and Help — which meet the note's *discoverability*
-  acceptance. Not delivered: toggling the **highlighted row's** sector directly from the
-  ports/planets/route tables (`V` still opens a sector prompt). Follow-up if wanted: bind
-  the avoid toggle to the highlighted table row's sector.
+- ~~**WP-PR09 / PT-23 — per-row avoid action.**~~ **Done (2026-07-11).** `V` now
+  directly toggles the highlighted sector in the Ports, Planets, and Route tables; stable
+  row keys preserve the intended target across table sorting/repainting. Other subviews retain
+  the sector prompt, and the Notes button remains the explicit full-list entry point.
 
 ### 8.1 Post-hoc audit (2026-07-11) — undocumented gaps in landed WP-PR05–PR09
 

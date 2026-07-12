@@ -29,7 +29,7 @@ from textual.widgets import Button, DataTable, Footer, Static, TabbedContent, Ta
 from edge.core.dto import AllianceRowDTO, LocalMapDTO, RouteDTO
 from edge.core.economy import EconomyError
 from edge.core.movement import MovementError
-from edge.core.rules import TravelTo
+from edge.core.rules import ToggleAvoid, TravelTo
 from edge.server.service import GameService
 from edge.tui.chrome import notify_warning
 from edge.tui.detail_table import ColumnSpec, DetailTable
@@ -90,9 +90,9 @@ Alliances · Dossier), [b]Records[/] (Log · Notes) — each remembers its last
 subview. Keys act on the [b]active subview[/] ([b]X[/] abandons a contract or
 removes a note, per subview). [b]J[/] joins/resigns a bloc. Your own worlds and
 base-hosted ports sort to the top of Planets/Ports (★ / ⚓); finished contracts stay
-listed but dim. [b]V[/] adds/removes a sector on the route-planner avoid list — from
-any subview, or the [b]Add … avoid list[/] button on the Notes tab; the avoid list is
-shown there and honoured on every plotted route. In any table, [b]/[/] focuses the
+listed but dim. [b]V[/] directly toggles the highlighted Ports, Planets, or Route row;
+elsewhere it opens the sector prompt. The Notes tab also exposes the full avoid list,
+which every plotted route honours. In any table, [b]/[/] focuses the
 filter, [b]O[/] cycles the sort (or click a ↕ header); Enter on a row opens its full
 detail when columns are folded at 80×24."""
 
@@ -172,7 +172,8 @@ detail when columns are folded at 80×24."""
                             ColumnSpec("Dist", sortable=True, right=True),
                         ), empty=("No ports discovered yet.", "Explore to chart them."),
                             detail_title="Port")
-                        yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
+                        yield Static("[dim][b]P[/] Plot route   ·   [b]V[/] Toggle highlighted sector avoid[/]",
+                                     classes="note")
                     with TabPane("Trade", id="trade"):
                         yield Static("[b]PAIR-TRADE FINDER[/]        [dim]scored by profit / turn[/]")
                         yield DetailTable("finder", (
@@ -216,7 +217,8 @@ detail when columns are folded at 80×24."""
                             ColumnSpec("Dist", sortable=True, right=True),
                         ), empty=("No planets discovered yet.", "Explore to chart them."),
                             detail_title="Planet")
-                        yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
+                        yield Static("[dim][b]P[/] Plot route   ·   [b]V[/] Toggle highlighted sector avoid[/]",
+                                     classes="note")
                     with TabPane("Codex", id="codex"):
                         yield Static("[b]DISCOVERY CODEX[/]        [dim]logged finds, richest first[/]")
                         yield DetailTable("codex-table", (
@@ -573,7 +575,12 @@ detail when columns are folded at 80×24."""
         self._reopen_tab("notes")
 
     def action_toggle_avoid(self) -> None:
-        """Toggle a sector on the route-planner avoid list (§9 — WP73)."""
+        """Toggle the highlighted directory/route row, falling back to a prompt (PT-23)."""
+        sector = self._highlighted_avoid_sector()
+        if sector is not None:
+            self._toggle_avoid_sector(sector)
+            return
+
         def _go(shown: int | None) -> None:
             if shown is None:
                 return
@@ -581,14 +588,40 @@ detail when columns are folded at 80×24."""
             if internal is None:
                 notify_warning(self, f"No sector {shown}.")
                 return
-            from edge.core.rules import ToggleAvoid
-            try:
-                self._service.apply(self._pid, ToggleAvoid(sector_id=internal))
-            except EconomyError as exc:
-                notify_warning(self, str(exc))
-                return
-            self._reopen_tab("notes")
+            self._toggle_avoid_sector(internal, reopen="notes")
         self.app.push_screen(TravelPromptScreen(), _go)
+
+    def _highlighted_avoid_sector(self) -> int | None:
+        """Internal sector id under an avoid-capable highlighted row, if any."""
+        active = self._active_subview()
+        if active == "ports":
+            entry = self._cursor_entry("#ports-table", self._computer.ports)
+            return None if entry is None else entry.sector_id  # type: ignore[attr-defined]
+        if active == "planets":
+            entry = self._cursor_entry("#planets-table", self._computer.planets)
+            return None if entry is None else entry.sector_id  # type: ignore[attr-defined]
+        if active == "route":
+            table = self.query_one("#route-table", DataTable)
+            if not table.row_count:
+                return None
+            key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
+            return int(key) if key is not None else None
+        return None
+
+    def _toggle_avoid_sector(self, sector_id: int, *, reopen: str | None = None) -> None:
+        try:
+            self._service.apply(self._pid, ToggleAvoid(sector_id=sector_id))
+        except EconomyError as exc:
+            notify_warning(self, str(exc))
+            return
+        if reopen is not None:
+            self._reopen_tab(reopen)
+            return
+        self._computer = self._service.computer_view(self._pid)
+        avoided = any(self._service.resolve_display_id(shown) == sector_id
+                      for shown in self._computer.avoid)
+        state = "added to" if avoided else "removed from"
+        self.notify(f"Highlighted sector {state} the avoid list.", timeout=2)
 
     def _reopen_tab(self, tab: str) -> None:
         """Rebuild the screen on the given tab after a state change."""
@@ -761,7 +794,9 @@ detail when columns are folded at 80×24."""
             if dto is not None:
                 for i, hop in enumerate(dto.hops, 1):
                     note = Text("one-way ⚠", style="yellow") if hop.one_way else Text("")
-                    table.add_row(str(i), hop.label, note)
+                    internal = self._service.resolve_display_id(hop.display_id)
+                    table.add_row(str(i), hop.label, note,
+                                  key=str(internal if internal is not None else hop.display_id))
         if dto is None:
             summary.update(
                 "[dim]Plot a route from the Trade or Codex tab, "
@@ -769,7 +804,7 @@ detail when columns are folded at 80×24."""
             )
             return
         head = f"[b]{dto.origin_display} → {dto.dest_display}[/]   [dim]{dto.summary}[/]"
-        avoid_hint = "   ·   [dim][b]V[/] avoid a sector[/]"  # PT-23: keep avoid discoverable in route context
+        avoid_hint = "   ·   [dim][b]V[/] toggle highlighted sector avoid[/]"
         if dto.reachable and dto.affordable:
             summary.update(f"{head}   ·   [green]G Engage[/]{avoid_hint}")
         else:
