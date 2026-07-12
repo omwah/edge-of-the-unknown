@@ -590,12 +590,11 @@ not an exhaustive behavioural replay, so absence of a finding is not proof of fu
 
 **Unresolved — missing verification bullets (behaviour present, gate absent):**
 
-- **WP-UI03 — no automated contrast gate.** The three themes exist (`design.py`:
-  `EDGE_ANSI` / `EDGE_HIGH_CONTRAST` / `EDGE_MONOCHROME`) and are exercised by high-contrast and
-  monochrome *snapshots*. But the verification bullet "Automated tests fail when a semantic token
-  drops below its required contrast" (4.5:1 text, 3:1 focus/controls) has **no** implementation —
-  there is no WCAG/luminance contrast-ratio computation anywhere. Accessibility is snapshot-only,
-  not numerically gated. Follow-up: add a contrast-ratio test over the theme tokens.
+- ~~**WP-UI03 — no automated contrast gate.**~~ **Done (2026-07-11).** A numerical WCAG
+  relative-luminance suite now gates readable semantic text at 4.5:1 and focus, selection, and
+  disabled indicators at 3:1 across every background/surface/panel in all three themes. The
+  audit caught and corrected selection colors that
+  were slightly below 3:1 rather than merely adding a test around the existing palette.
 - **WP-UI04 — no corrupt-settings-recovery test.** `edge/tui/settings.py` does recover from a
   missing/corrupt/newer file (`try/except (OSError, TypeError, ValueError, JSONDecodeError)` →
   defaults), so the behaviour is present, but there is no test asserting the plan's "A corrupt
