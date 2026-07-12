@@ -6,9 +6,9 @@ an editable exact-amount field, and per-row Load/Unload actions — plus Load Al
 An owned colonizable world also gets a **colonist** row that *settles* people from the ship's
 berth into the colony (people are never loaded back aboard here, and never touch cargo holds).
 
-Every action goes straight to the service (`TransferCargo` / `SettleColonists`), which clamps
-to what fits, is aboard, or the world's remaining habitability — so the form can never
-over-commit, and the readouts refresh from fresh state after each move.
+Every action goes straight to the service (`TransferCargo`, `SettleColonists`, or atomic
+aggregate `BatchTransferCargo`), which clamps to what fits, is aboard, or the world's
+remaining habitability — so the form cannot over-commit, and readouts refresh after each move.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from textual.widgets import Button, Input, Static
 from edge.core.economy import EconomyError
 from edge.core.dto import PlanetDTO
 from edge.core.enums import Commodity
-from edge.core.rules import SettleColonists, TransferCargo
+from edge.core.rules import BatchTransferCargo, SettleColonists, TransferCargo
 from edge.server.service import GameService
 from edge.tui.amount_stepper import AmountStepper
 from edge.tui.chrome import notify_warning
@@ -164,14 +164,9 @@ class TransferWorkbenchScreen(ModalScreen[None]):
         self.dismiss(None)
 
     def action_load_all(self) -> None:
-        # A large number means "all" — the reducer clamps to free holds / available stores.
-        moved = any(self._apply(TransferCargo(self._planet_id, c, 10**9, to_planet=False),
-                                 refresh=False) for c in Commodity)
-        if moved:
-            self._refresh()
+        self._apply(BatchTransferCargo(
+            self._planet_id, {c.value: 10**9 for c in Commodity}, to_planet=False))
 
     def action_unload_all(self) -> None:
-        moved = any(self._apply(TransferCargo(self._planet_id, c, 10**9, to_planet=True),
-                                refresh=False) for c in Commodity)
-        if moved:
-            self._refresh()
+        self._apply(BatchTransferCargo(
+            self._planet_id, {c.value: 10**9 for c in Commodity}, to_planet=True))

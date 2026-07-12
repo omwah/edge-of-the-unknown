@@ -246,11 +246,10 @@ Commit: `playtest: WP-PR06 asteroid-belt interaction model`
 
 ### WP-PR07 — Planet logistics and colonist settlement — complete
 
-**Scope note:** the transfer editor issues one clamped reducer call per row (Load/Unload/
-Settle) and Load-all/Unload-all iterate the trio; each `TransferCargo`/`SettleColonists` is
-its own transaction, so no partial-mutation window exists. A single batch-transfer command
-(one event group) is left as a deferred optimisation — its atomicity value is low for the
-local single-player service, and it was not needed to close PT-10/PT-11.
+**Scope note:** the original transfer editor issued one clamped reducer call per row and
+Load-all/Unload-all iterated the trio. The §8 follow-up now routes those aggregate actions
+through `BatchTransferCargo`, producing one atomic command/event group; focused row Load /
+Unload / Settle actions remain `TransferCargo` / `SettleColonists`.
 
 **Goal:** provide one legible transfer editor and allow adding colonists to an
 already owned colony.
@@ -521,10 +520,11 @@ They are tracked here so a struck-through playtest note never hides open work.
   standard panel and 72×12 wide cinematic panel; compact 80×24 hides the decoration,
   and the prior ASCII banner remains the missing-asset/Chafa fallback. Provenance lives in
   `images/ui/stardock/PROVENANCE.md`.
-- **WP-PR07 — batch transfer command (optional).** The transfer workbench issues one
-  clamped `TransferCargo`/`SettleColonists` per row; a single atomic batch command was
-  left unbuilt (low value for the local single-player service). If added later, update
-  codec/protocol/replay fixtures.
+- ~~**WP-PR07 — batch transfer command (optional).**~~ **Done (2026-07-11).**
+  `BatchTransferCargo` now makes Load-all/Unload-all a single reducer result and persisted
+  command/event group, clamps all three rows against shared hold capacity in stable commodity
+  order, and preserves exact conservation. Row actions remain focused `TransferCargo` /
+  `SettleColonists` commands. Codec, wire v11, replay coverage, and DESIGN §4.2 are updated.
 - ~~**WP-PR06 / PT-30 — belt raw-mining output.**~~ **Done (2026-07-11).** The `MineBelt`
   command is the dedicated extraction action: a turn cost (`planets.mining_turn_cost`) that
   hauls the belt's yield (Equipment, `planets.asteroid_mining`, clamped to free cargo holds)

@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 10
+WIRE_VERSION = 11
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -61,6 +61,7 @@ eligibility + shared human blocker); `EncounterDTO` gains `target_kind`/`target_
 `target_seed` (starbase-assault set-piece draws port art, not a ship sprite).
 v10 (PT-30): `MineBelt` command + `BeltMined` event (player-driven asteroid-belt mining);
 `PlanetDTO.mine_yield` projects the per-action haul.
+v11 (WP-PR07 follow-up): `BatchTransferCargo` makes aggregate colony transfers one command.
 """
 
 

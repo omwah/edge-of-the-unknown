@@ -86,7 +86,7 @@ from hypothesis import given, settings  # noqa: E402
 from hypothesis import strategies as st  # noqa: E402
 
 from edge.core.enums import Commodity  # noqa: E402
-from edge.core.rules import TransferCargo  # noqa: E402
+from edge.core.rules import BatchTransferCargo, TransferCargo  # noqa: E402
 
 
 def _transfer_state() -> UniverseState:
@@ -124,3 +124,34 @@ def test_transfer_cargo_conserves_each_commodity(steps) -> None:
     # And nothing ever goes negative (the §13 invariant).
     ship, planet = state.ships[1], state.planets[1]
     assert all(v >= 0 for v in ship.cargo.values()) and all(v >= 0 for v in planet.stores.values())
+
+
+def test_batch_load_is_one_delta_and_shares_free_holds() -> None:
+    state = _transfer_state()
+    state.ships[1] = replace(state.ships[1], holds_total=60)  # 50 used: only 10 free
+    result = reduce(state, 1, BatchTransferCargo(
+        1, {commodity.value: 10**9 for commodity in Commodity}, to_planet=False), CFG)
+
+    assert len(result.ships) == len(result.planets) == 1
+    assert sum(event.units for event in result.events) == 10  # type: ignore[attr-defined]
+    before = {
+        commodity: state.ships[1].cargo.get(commodity, 0)
+        + state.planets[1].stores.get(commodity, 0)
+        for commodity in Commodity
+    }
+    apply_result(state, result)
+    after = {
+        commodity: state.ships[1].cargo.get(commodity, 0)
+        + state.planets[1].stores.get(commodity, 0)
+        for commodity in Commodity
+    }
+    assert before == after and state.ships[1].holds_free == 0
+
+
+def test_invalid_batch_is_atomic() -> None:
+    state = _transfer_state()
+    ship_before, planet_before = state.ships[1], state.planets[1]
+    with pytest.raises(EconomyError, match="unknown commodity"):
+        reduce(state, 1, BatchTransferCargo(
+            1, {"fuel_ore": 10, "dilithium": 10}, to_planet=True), CFG)
+    assert state.ships[1] == ship_before and state.planets[1] == planet_before

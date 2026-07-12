@@ -134,7 +134,7 @@ from edge.core.rules import (
     PostNotice,
     RemoveNote,
     ToggleAvoid,
-    TransferCargo,
+    BatchTransferCargo, TransferCargo,
     DeployBeacon,
     DeployFighters,
     DeployGenesis,
@@ -222,6 +222,11 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "TransferCargo", {
                 "planet_id": command.planet_id, "commodity": command.commodity.value,
                 "units": command.units, "to_planet": command.to_planet,
+            }
+        case BatchTransferCargo():
+            return "BatchTransferCargo", {
+                "planet_id": command.planet_id, "units": command.units,
+                "to_planet": command.to_planet,
             }
         case BuildCitadel():
             return "BuildCitadel", {"planet_id": command.planet_id}
@@ -418,6 +423,9 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return TransferCargo(planet_id=payload["planet_id"],
                                  commodity=Commodity(payload["commodity"]),
                                  units=payload["units"], to_planet=payload["to_planet"])
+        case "BatchTransferCargo":
+            return BatchTransferCargo(planet_id=payload["planet_id"], units=payload["units"],
+                                      to_planet=payload["to_planet"])
         case "BuildCitadel":
             return BuildCitadel(planet_id=payload["planet_id"])
         case "PlanetDeposit":
