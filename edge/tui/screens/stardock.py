@@ -36,6 +36,7 @@ from edge.tui.amount_stepper import AmountStepper
 from edge.tui.chrome import AmountPrompt, EmptyState, TextPrompt, notify_warning
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
+from edge.tui.screens.rumor import RumorModal
 from edge.tui.widgets import ServiceHub, TradePanel
 
 
@@ -518,8 +519,27 @@ C[b]o[/]lonists · Ta[b]v[/]ern); Enter on the tab rail does the same for the ac
         self.app.push_screen(_AmountInput("Withdraw how many slips?"), _go)
 
     def action_buy_rumor(self) -> None:
-        """Buy a rumour at the tavern — logs a coordinate lead (§14, WP58)."""
-        self._issue(BuyRumor(), "A rumour points the way — lead logged")
+        """Buy a rumour at the tavern, then reveal the lead it bought (§14, WP58; PT-35).
+
+        The reveal modal shows what you paid for instead of a silent "logged" line; the
+        lead itself stays filed in the computer exactly as before."""
+        try:
+            self._service.apply(self._pid, BuyRumor())
+        except (EconomyError, EngineRoomError) as exc:
+            notify_warning(self, str(exc))
+            return
+        # The rumour appends its lead last, so the freshest projected lead is its text
+        # (fog-safe: read through leads_view, never core state).
+        leads = self._service.leads_view(self._pid)
+        summary = leads[-1].summary if leads else ""
+        self.notify("A rumour points the way — lead logged", timeout=2)
+        # Rebuild so the tavern's "rumour available" line refreshes (the tip is now spent),
+        # then reveal the lead over the fresh screen.
+        active = self.query_one(TabbedContent).active
+        self.app.pop_screen()
+        self.app.push_screen(StarDockScreen(self._service, self._pid, initial_tab=active))
+        if summary:
+            self.app.push_screen(RumorModal(summary))
 
     def action_post_notice(self) -> None:
         """Prompt for a noticeboard message and pin it (§14, WP58)."""
