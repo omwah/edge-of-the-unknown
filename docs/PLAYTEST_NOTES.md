@@ -84,11 +84,10 @@ completed; `pixi run check` passed all lint, strict typing, and 2,402 tests.
 ## Hands-on findings after WP-UI23 (2026-07-10)
 
 The following findings were captured during the first hands-on pass after the UI
-overhaul. They were originally recorded in `~/edge_notes.txt`; this section is
-now the durable project copy. All findings are open at the time of capture. The
-detailed implementation sequence, architectural decisions, affected areas, and
-acceptance criteria live in
-[`PLAYTEST_REMEDIATION_PLAN.md`](PLAYTEST_REMEDIATION_PLAN.md).
+overhaul. All findings are open at the time of capture. The detailed implementation
+sequence, architectural decisions, affected areas, and acceptance criteria live in
+[`PLAYTEST_REMEDIATION_PLAN_01.md`](PLAYTEST_REMEDIATION_PLAN_01.md) (this pass
+is complete — every PT-01..PT-31 row below is struck through and closed).
 
 | ID | Area | Finding | Planned work |
 |---|---|---|---|
@@ -127,3 +126,54 @@ acceptance criteria live in
 When a finding is fixed, strike through its finding text and append the implementing
 commit. Do not remove closed findings; they are the acceptance history for the
 remediation pass.
+
+## Hands-on findings — second pass after the remediation round (2026-07-12)
+
+A second hands-on session with 25 observations) after the WP-PR01..PR12 remediation 
+round closed. These are **all open** at capture. The detailed, agent-followable
+implementation sequence — work packages, files touched, DESIGN/config/wire changes,
+and acceptance criteria — lives in [`PLAYTEST_REMEDIATION_PLAN_02.md`](PLAYTEST_REMEDIATION_PLAN_02.md).
+
+Four decision points from the raw notes were resolved by interview (2026-07-12):
+
+- **PT-32 tab-hotkey indicator** — a **colored/underlined accent letter** in the
+  tab title (with a monochrome-safe fallback), not parenthesized letters.
+- **PT-35 rumor feedback** — a **modal reveal** of the purchased rumor's lead
+  text on purchase, then filed to the computer as today.
+- **PT-54 Cloud City** — **build the full subsystem, split into ordered sub-work
+  packages** (rules/staging → art → UI), not a spec-only deferral.
+- **PT-36/44 scene compositing** — **split**: the transfer-modal overlay and the
+  clamped/greyed transfer controls (PT-45/46/47) are built directly; the
+  dock-over-planet scene compositing and its wreck slot (PT-36/44) get a
+  feasibility **spike** gate first.
+
+| ID | Area | Finding | Planned work |
+|---|---|---|---|
+| PT-32 | Tabbed screens | Computer/StarDock/Starbase tab (and Computer subtab) focus should have accent-letter hotkeys shown in the tab title; the hotkey and Enter-on-a-tab should both drop focus straight onto the tab's primary content (one step, not two). Per-tab action bindings show in the footer. | WP-PR2-01 |
+| PT-33 | StarDock hardware | Buying from the hardware/shipyard catalog still drops focus off the just-bought row (Devices was fixed in WP-PR08; hardware regressed/uncovered). | WP-PR2-02 |
+| PT-34 | StarDock Shipyard | The hull you are currently flying should read **"Flying"**; a hull you owned before but no longer possess should read **"Flown"**. | WP-PR2-02 |
+| PT-35 | Tavern rumor | Buying a rumor should reveal what you got (modal reveal, per interview), not just a "logged in your computer" line. | WP-PR2-03 |
+| PT-36 | Sector scene | Investigate compositing StarDock/starbase/port art **over** the planet art (hovering, centered) instead of side-by-side. Spike first (per interview). | WP-PR2-05 |
+| PT-37 | NPC movement | Cron drift piles hub-space ships into the StarDock sector over time; they should disperse, not accumulate in one sector. | WP-PR2-12 |
+| PT-38 | Species art | With multiple portrait variants the selector never picks the `_01`/`_1` image. | WP-PR2-11 |
+| PT-39 | Dialogue playtest | The playtest controls modal must be keyboard navigable. | WP-PR2-09 |
+| PT-40 | Dialogue playtest | Move the controls hotkey from `F2` to `c`. | WP-PR2-09 |
+| PT-41 | Dialogue playtest | Setting yourself hostile in the controls modal has no visible effect on the conversation. | WP-PR2-09 |
+| PT-42 | Dialogue screen | The art panel resets unnecessarily after each dialogue action. | WP-PR2-09 |
+| PT-43 | Attack screen | Button hotkeys must be indicated in the button text. | WP-PR2-10 |
+| PT-44 | Sector scene | The dock-over-planet composite must leave room for a wreck sprite when a planet already occupies the sector. | WP-PR2-05 |
+| PT-45 | Transfer modal | Draw the transfer modal over the planet screen without blanking the background — overlay it. | WP-PR2-06 |
+| PT-46 | Transfer modal | Grey out transfer buttons that are unavailable because there is nothing to move. | WP-PR2-06 |
+| PT-47 | Transfer modal | The `+`/`−` steppers must not exceed what is actually available. | WP-PR2-06 |
+| PT-48 | Nav compass | "One-way" in the nav rose is unclear and reads as superfluous; clarify or remove it. | WP-PR2-07 |
+| PT-49 | Discoveries | Space discoveries should have flavorful names, not "Wreck ∗ Common". Wrecks are named after a ship; a battle wreck takes the destroyed ship's name. | WP-PR2-04 |
+| PT-50 | Computer map | Per-sector content text (planet/port/starbase/…) should be colored to match the legend. | WP-PR2-08 |
+| PT-51 | Computer map | `P` should plot a route in the Map view too (parity with Enter and other sector tables). | WP-PR2-08 |
+| PT-52 | Asteroid mining | The mining interface needs limits — a finite belt resource that depletes, reflected in the art — not unlimited extraction. | WP-PR2-13 |
+| PT-53 | Invasion | Invading must not force committing **all** fighters; let the player choose how many. | WP-PR2-14 |
+| PT-54 | Jovian worlds | Gas giants become a **Cloud City** variant: a pre-built staging area gated before stores exist, one-haul build cost, size-scaled colonist berths, and distinct floating-city art. | WP-PR2-15 |
+| PT-55 | Nav compass | The nav-rose trail sector text colors should match the color convention used inside the rose itself. | WP-PR2-07 |
+| PT-56 | Computer map | The map draws edges between sectors that are not actually connected (repro: sector 11703 in seed 4). | WP-PR2-08 |
+
+When a finding is fixed, strike through its finding text and append the implementing
+commit, exactly as for the first-pass table above.
