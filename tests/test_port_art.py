@@ -62,21 +62,32 @@ def test_centre_columns_are_axis_legal(subtype: str) -> None:
     """Every part row's centre column (its last char) must read correctly on the
     mirror axis -- i.e. it must not be an asymmetric glyph that flips, or it would
     seam. Self-symmetric hull glyphs, spaces, beacons, and facets are all fine."""
-    for grammar in PORT_GRAMMAR[subtype]:
-        for slot in grammar:
-            for part in slot.parts:
-                for row in part.left:
-                    assert row, "part rows must be non-empty (need a centre column)"
-                    assert row[-1] not in _MIRROR, (subtype, row)
-                    if row[-1] in _SELF_SYMMETRIC:
-                        continue  # explicitly-enumerated axis-safe hull glyph
-                    # Otherwise it must be a facet (a non-hull decorative glyph),
-                    # which is a single cell on the axis and mirrors to itself.
+    for archetype, tiers in PORT_GRAMMAR[subtype].items():
+        for grammar in tiers:
+            for slot in grammar:
+                for part in slot.parts:
+                    for row in part.left:
+                        assert row, "part rows must be non-empty (need a centre column)"
+                        assert row[-1] not in _MIRROR, (subtype, archetype, row)
+                        if row[-1] in _SELF_SYMMETRIC:
+                            continue  # explicitly-enumerated axis-safe hull glyph
+                        # Otherwise it must be a facet (a non-hull decorative glyph),
+                        # which is a single cell on the axis and mirrors to itself.
 
 
 def test_grammar_covers_the_public_subtypes() -> None:
     for subtype in PORT_SUBTYPES:
         assert subtype in PORT_GRAMMAR
+        assert "default" in PORT_GRAMMAR[subtype]
+    assert set(PORT_GRAMMAR["stardock"]) == {"default"}
+
+
+def test_unknown_archetype_uses_subtype_default() -> None:
+    rng_a = random.Random(23)
+    rng_b = random.Random(23)
+    fallback = _GEN.generate(rng_a, "trading_port", 24, 8, "not_in_roster")
+    default = _GEN.generate(rng_b, "trading_port", 24, 8)
+    assert fallback.plain == default.plain
 
 
 # --- composition: symmetry & determinism -----------------------------------
@@ -84,12 +95,13 @@ def test_grammar_covers_the_public_subtypes() -> None:
 
 @pytest.mark.parametrize("subtype", _SUBTYPES)
 def test_composed_rows_are_symmetric(subtype: str) -> None:
-    for grammar in PORT_GRAMMAR[subtype]:  # every grammar tier
-        for seed in range(40):
-            for height in (3, 5, 9, 14, 20, 33):
-                rows = _compose(grammar, random.Random(seed), height)
-                for row in rows:
-                    assert row == _mirror_line(row), (subtype, seed, row)
+    for archetype, tiers in PORT_GRAMMAR[subtype].items():
+        for grammar in tiers:  # every grammar tier
+            for seed in range(40):
+                for height in (3, 5, 9, 14, 20, 33):
+                    rows = _compose(grammar, random.Random(seed), height)
+                    for row in rows:
+                        assert row == _mirror_line(row), (subtype, archetype, seed, row)
 
 
 @pytest.mark.parametrize("subtype", _SUBTYPES)
@@ -118,7 +130,7 @@ def test_compose_consumes_fixed_draws_regardless_of_height(subtype: str) -> None
     independent of target height, so the downstream beacon/window draw stream is
     identical across sizes -- two sprites of different heights share the same
     seeded details."""
-    grammar = PORT_GRAMMAR[subtype][0]  # the full-detail tier
+    grammar = PORT_GRAMMAR[subtype]["default"][0]  # the full-detail tier
     short = random.Random(11)
     _compose(grammar, short, 8)
     tall = random.Random(11)
@@ -131,7 +143,7 @@ def test_compose_consumes_fixed_draws_regardless_of_height(subtype: str) -> None
 
 @pytest.mark.parametrize("subtype", _SUBTYPES)
 def test_height_grows_monotonically_and_respects_bounds(subtype: str) -> None:
-    tiers = PORT_GRAMMAR[subtype]
+    tiers = PORT_GRAMMAR[subtype]["default"]
     prev = 0
     for height in range(3, 41):
         grammar = _select_grammar(tiers, height)
@@ -178,7 +190,7 @@ def test_canonical_selection_reproduces_original_stardock() -> None:
     """Choosing the first (canonical) part of every slot, with the body at its
     minimum repeat, must rebuild the exact historic StarDock art."""
     rows: list[str] = []
-    for slot in PORT_GRAMMAR["stardock"][0]:  # full-detail tier
+    for slot in PORT_GRAMMAR["stardock"]["default"][0]:  # full-detail tier
         rows.extend(_mirror_part(slot.parts[0]))
     assert tuple(rows) == _CANONICAL_STARDOCK
 
@@ -190,7 +202,7 @@ def test_canonical_selection_reproduces_original_stardock() -> None:
 def test_compact_tier_renders_legibly_in_tiny_boxes(subtype: str) -> None:
     """A 3-row box (and 4, 5) must fill exactly and keep its iconic top/bottom
     extremities -- the compact grammar is chosen instead of cropping the full one."""
-    tiers = PORT_GRAMMAR[subtype]
+    tiers = PORT_GRAMMAR[subtype]["default"]
     assert _grammar_floor(tiers[-1]) <= 3, "compact tier must reach down to 3 rows"
     for height in (3, 4, 5):
         # The selected grammar at this height is the compact tier.
