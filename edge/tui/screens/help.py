@@ -22,7 +22,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Static
+from textual.widgets import Button, Static
 
 from edge.tui.widgets import warp_legend_markup
 from edge.tui.design import screen_actions
@@ -52,6 +52,7 @@ class HelpScreen(ModalScreen[None]):
     BINDINGS = [
         Binding("escape", "close", "Close"),
         Binding("question_mark", "close", "Close"),
+        Binding("o", "show_objectives", "Show objectives"),
     ]
 
     CSS = """
@@ -64,6 +65,7 @@ class HelpScreen(ModalScreen[None]):
     HelpScreen #help-title { text-style: bold; color: $primary; margin-bottom: 1; }
     HelpScreen .help-section { text-style: bold; color: $secondary; margin-top: 1; }
     HelpScreen #help-footer { color: $text-muted; margin-top: 1; }
+    HelpScreen #help-objectives { margin-top: 1; width: auto; min-width: 30; }
     """
 
     def __init__(self, host: Screen[Any] | None = None) -> None:
@@ -98,7 +100,26 @@ class HelpScreen(ModalScreen[None]):
                 side = ui_config.nav_core_anchor_side if ui_config else "left"
                 yield Static("Warp legend", classes="help-section")
                 yield Static(warp_legend_markup(side))
+            settings = getattr(self.app, "ui_settings", None)
+            if settings is not None and not settings.show_onboarding:
+                yield Button("[O] Show Captain's objectives", id="help-objectives")
             yield Static("[dim]Esc to close[/]", id="help-footer")
 
     def action_close(self) -> None:
         self.dismiss(None)
+
+    async def action_show_objectives(self) -> None:
+        """Restore the dismissed onboarding strip and immediately refresh its host (WP-UI11)."""
+        settings = getattr(self.app, "ui_settings", None)
+        if settings is None or settings.show_onboarding:
+            return
+        self.app.update_ui_settings(show_onboarding=True)  # type: ignore[attr-defined]
+        host = self._host
+        self.dismiss(None)
+        if host is not None and host.is_mounted:
+            await host.recompose()
+        self.app.notify("Captain's objectives restored.", timeout=2)
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "help-objectives":
+            await self.action_show_objectives()

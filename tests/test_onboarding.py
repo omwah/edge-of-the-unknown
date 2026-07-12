@@ -60,6 +60,17 @@ async def test_objectives_mark_dismiss_and_persist() -> None:
         assert not app.screen.query(ObjectivesStrip)
         assert app.ui_settings.show_onboarding is False
         assert load_settings()[0].show_onboarding is False
+        # The contextual Help affordance restores both the persisted preference and
+        # the already-mounted Game screen immediately (the original WP-UI11 contract).
+        await pilot.press("question_mark")
+        await pilot.pause()
+        from edge.tui.screens.help import HelpScreen
+        assert isinstance(app.screen, HelpScreen)
+        await pilot.press("o")
+        await pilot.pause()
+        assert app.ui_settings.show_onboarding is True
+        assert load_settings()[0].show_onboarding is True
+        assert app.screen.query(ObjectivesStrip)
 
 
 async def test_menu_with_save_leads_with_continue_and_metadata() -> None:
