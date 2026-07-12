@@ -595,11 +595,10 @@ not an exhaustive behavioural replay, so absence of a finding is not proof of fu
   disabled indicators at 3:1 across every background/surface/panel in all three themes. The
   audit caught and corrected selection colors that
   were slightly below 3:1 rather than merely adding a test around the existing palette.
-- **WP-UI04 — no corrupt-settings-recovery test.** `edge/tui/settings.py` does recover from a
-  missing/corrupt/newer file (`try/except (OSError, TypeError, ValueError, JSONDecodeError)` →
-  defaults), so the behaviour is present, but there is no test asserting the plan's "A corrupt
-  preferences file does not prevent startup." Follow-up: add a focused loader test (garbage JSON
-  → defaults + one warning, startup proceeds).
+- ~~**WP-UI04 — no corrupt-settings-recovery test.**~~ **Done (2026-07-11).** A focused
+  startup regression writes garbage JSON, asserts exact `UISettings` defaults plus the non-fatal
+  reset warning, mounts `EdgeApp` through the main menu, and proves the deferred warning fires
+  exactly once rather than preventing startup.
 
 **Spot-verified present (no action):** WP-UI01 docs (`UI_MOCKUPS.md`, `UI_INSPIRATION.md`,
 `docs/ui/`, `docs/shots/`); WP-UI02 Textual **8.2.8** pinned in `pixi.lock` + `pytest-textual-snapshot`
