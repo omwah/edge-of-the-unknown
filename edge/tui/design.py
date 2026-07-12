@@ -72,7 +72,7 @@ EDGE_ANSI = Theme(
     foreground="#e6e6e6", background="#000000", surface="#10171b", panel="#172127",
     success="#5fe05f", warning="#f0d75f", error="#ff6565", dark=True,
     variables={
-        "edge-focus": "#ffffff", "edge-selection": "#315b68",
+        "edge-focus": "#ffffff", "edge-selection": "#407887",
         "edge-muted": "#a7b0b5", "edge-disabled": "#747d82",
         "footer-key-foreground": "#35d7d7",
     },
@@ -83,7 +83,7 @@ EDGE_HIGH_CONTRAST = Theme(
     foreground="#ffffff", background="#000000", surface="#080808", panel="#151515",
     success="#7dff7d", warning="#ffff66", error="#ff7d7d", dark=True,
     variables={
-        "edge-focus": "#ffffff", "edge-selection": "#005f87",
+        "edge-focus": "#ffffff", "edge-selection": "#007da8",
         "edge-muted": "#d0d0d0", "edge-disabled": "#8a8a8a",
         "footer-key-foreground": "#66ffff",
     },
@@ -94,7 +94,7 @@ EDGE_MONOCHROME = Theme(
     foreground="#ffffff", background="#000000", surface="#101010", panel="#202020",
     success="#ffffff", warning="#ffffff", error="#ffffff", dark=True,
     variables={
-        "edge-focus": "#ffffff", "edge-selection": "#505050",
+        "edge-focus": "#ffffff", "edge-selection": "#6a6a6a",
         "edge-muted": "#bcbcbc", "edge-disabled": "#808080",
         "footer-key-foreground": "#ffffff",
     },
