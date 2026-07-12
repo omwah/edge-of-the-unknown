@@ -44,6 +44,7 @@ from edge.tui.component_workbench import (
     STARBASE_WORKBENCH_PROFILE,
     WorkbenchCapabilities,
 )
+from edge.tui.station_art import StationArtHeader
 from edge.tui.widgets import ServiceHub, TradePanel
 
 _STANDING_STYLE = {
@@ -145,12 +146,22 @@ does the same for the active tab."""
         bank_reason = (None if "banking" in v.services else gate_reason or
                        "Banking requires a player-owned operational base with vault service.")
         return [
-            ("Status", "status", self._status_pane(v), None),
-            ("Station", "station", self._station_pane(v), station_reason),
-            ("Trade", "trade", self._trade_pane(v), trade_reason),
-            ("Hardware", "hardware", self._hardware_pane(v), hardware_reason),
-            ("Bank", "bank", self._bank_pane(v), bank_reason),
+            ("Status", "status", self._art_pane(v, "status", self._status_pane(v)), None),
+            ("Station", "station", self._art_pane(v, "station", self._station_pane(v)), station_reason),
+            ("Trade", "trade", self._art_pane(v, "trade", self._trade_pane(v)), trade_reason),
+            ("Hardware", "hardware", self._art_pane(v, "hardware", self._hardware_pane(v)), hardware_reason),
+            ("Bank", "bank", self._art_pane(v, "bank", self._bank_pane(v)), bank_reason),
         ]
+
+    @staticmethod
+    def _art_pane(v: StarbaseDTO, service: str, content: Widget) -> Vertical:
+        condition = v.standing if v.standing in ("derelict", "hostile") else "open"
+        return Vertical(
+            StationArtHeader(
+                "starbase", v.archetype_id or "humanoid_diplomat", service,
+                identity=v.starbase_id, condition=condition),
+            content,
+        )
 
     def _station_pane(self, v: StarbaseDTO) -> Vertical:
         on_hand = self._service.engine_room_view(self._pid).on_hand

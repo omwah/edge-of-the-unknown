@@ -21,7 +21,7 @@ from edge.core.economy import EconomyError
 from edge.core.rules import Trade
 from edge.server.service import GameService
 from edge.tui.chrome import notify_warning
-from edge.tui import art_adapter
+from edge.tui.station_art import StationArtHeader
 from edge.tui.screens.haggle import HaggleScreen
 from edge.tui.widgets import NAME_TO_COMMODITY, TRADE_CHUNK, TradePanel
 
@@ -39,16 +39,12 @@ class PortScreen(Screen[None]):
 Trading acts on the [b]highlighted[/] commodity row. Haggling wears the port's
 patience — too many rejected offers close negotiation for the day."""
 
-    # Mirror the StarDockScreen frame: a docked-top title bar, the port sprite
-    # centred beneath it, then the trade panel — so a plain port and a StarDock read
-    # the same (the title lives in the bar, so TradePanel's own title is suppressed).
+    # Mirror StarDock's icon + service-banner header, then the shared trade panel.
     CSS = """
     PortScreen #port-title {
         dock: top; height: 1; background: $primary; color: $background;
         text-style: bold; padding: 0 1;
     }
-    PortScreen #port-art { height: auto; content-align: center top; }
-    PortScreen.compact #port-art { display: none; }
     PortScreen.compact #port-body { height: 1fr; }
     """
 
@@ -64,18 +60,13 @@ patience — too many rejected offers close negotiation for the day."""
             yield Footer()
             return
         latinum = self._service.game_view(self._pid).ship.latinum
-        size = self.app.scene_art.port  # one canonical port footprint, shared with SectorView
         yield Static(
             f"TRADEPORT · {port.name} · {port.klass}        Sector {port.display_id}",
             id="port-title",
         )
-        yield Static(
-            art_adapter.sprite(
-                "port", art_adapter.port_subtype(port.klass),
-                seed=port.sector_id, width=size.max_width, height=size.max_height,
-                archetype_id=port.archetype_id,
-            ),
-            id="port-art",
+        yield StationArtHeader(
+            "port", port.archetype_id or "humanoid_diplomat", "trade",
+            identity=port.sector_id,
         )
         yield TradePanel(port, latinum=latinum, show_title=False, id="port-body")
         yield Footer()

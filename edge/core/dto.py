@@ -252,6 +252,8 @@ class SectorStarbaseDTO:
     owner: str  # display label (as SectorForceDTO.owner)
     operational: bool  # False reads "derelict — salvageable"
     planet_id: int | None  # the world it orbits (click-through to the planet screen)
+    condition: str = "open"  # open | hostile | derelict; sector icon treatment
+    archetype_id: str = ""  # fixed builder palette from the configured roster
 
 
 @dataclass(frozen=True)
@@ -867,6 +869,7 @@ class StarbaseDTO:
     missile_price: int  # per-missile latinum price at this base (fee-adjusted)
     latinum: int
     bank_balance: int
+    archetype_id: str = ""  # immutable builder palette from the configured roster
 
 
 @dataclass(frozen=True)

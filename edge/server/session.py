@@ -378,7 +378,8 @@ def _sector_dto(
     ports = [
         dto.SectorPortDTO(
             port_id=p.id, name=p.name, klass=_port_klass_label(p.klass),
-            is_stardock=p.klass is PortClass.STARDOCK, archetype_id=port_archetype,
+            is_stardock=p.klass is PortClass.STARDOCK,
+            archetype_id=p.archetype_id or port_archetype,
         )
         for p in state.ports.values() if p.sector_id == sector.id
     ]
@@ -485,6 +486,9 @@ def _sector_starbases(state: UniverseState, player: Player, sector_id: int,
             starbase_id=base.id, name=name,
             owner=_ownership_label(state, base.owner, player.id),
             operational=is_operational(base), planet_id=base.planet_id,
+            condition=("derelict" if not is_operational(base) else
+                       "hostile" if base_owner_hostile(state, base, player) else "open"),
+            archetype_id=base.archetype_id or _controlling_archetype(state, base.sector_id) or "",
         ))
     return out
 
@@ -524,7 +528,7 @@ def port_view(state: UniverseState, player_id: int, port_id: int, config: GameCo
     return dto.PortDTO(
         name=port.name, klass=f"Class {port.klass.value}", sector_id=port.sector_id,
         commodities=lines, display_id=_display(state, port.sector_id),
-        archetype_id=_controlling_archetype(state, port.sector_id),
+        archetype_id=port.archetype_id or _controlling_archetype(state, port.sector_id),
         purse=port.latinum, purse_enabled=config.economy.market.enabled,
         holds_used=ship.holds_used, holds_total=ship.holds_total,
     )
@@ -1162,6 +1166,7 @@ def starbase_view(
         market_open=market_open, market_notice=market_notice, trade_cut_pct=trade_cut_pct,
         services=services, fee_frac=fee_frac, hardware=hardware, missile_price=missile_price,
         latinum=player.latinum, bank_balance=player.bank_balance,
+        archetype_id=base.archetype_id or _controlling_archetype(state, base.sector_id) or "",
     )
 
 
@@ -2054,8 +2059,8 @@ def encounter_view(state: UniverseState, player_id: int, config: GameConfig) -> 
             extra=dialogue_facts.encounter_facts(enc))
         speech = _line(state, config.roster, species, player, enc.speech_context, config,
                        facts=beat_facts)
-    # Set-piece art (WP-PR12): a starbase assault draws the base's port sprite (its owner
-    # archetype + a stable per-base seed) instead of a ship. Ordinary fights stay "ship".
+    # Set-piece art (WP-PR12): a starbase assault draws the same immutable builder
+    # archetype as its sector and Base screens. Ordinary fights stay "ship".
     target_kind = "ship"
     target_archetype = ""
     target_seed = 0
@@ -2064,7 +2069,8 @@ def encounter_view(state: UniverseState, player_id: int, config: GameConfig) -> 
         if base is not None:
             target_kind = "starbase"
             target_seed = base.id
-            target_archetype = _controlling_archetype(state, base.sector_id) or ""
+            target_archetype = (base.archetype_id
+                                or _controlling_archetype(state, base.sector_id) or "")
     return dto.EncounterDTO(
         species_id=enc.species_id,
         title=title,

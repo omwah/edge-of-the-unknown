@@ -98,13 +98,33 @@ def _render_portrait_ansi(
     rows: int,
     symbols: str,
     font_ratio: float,
+    treatment: str,
     _mtime_ns: int,
 ) -> str:
     """Run image `path` through chafa and return its decoded ANSI string (the cached unit)."""
     from chafa import Canvas, CanvasConfig, PixelType, SymbolMap
-    from PIL import Image
+    from PIL import Image, ImageDraw, ImageEnhance, ImageOps
 
     image = Image.open(path).convert("RGBA")
+    effects = treatment.split("+") if treatment else []
+    if "high_contrast" in effects:
+        rgb = ImageEnhance.Contrast(image.convert("RGB")).enhance(1.45)
+        rgb = ImageEnhance.Color(rgb).enhance(1.3)
+        image = ImageOps.posterize(rgb, 5).convert("RGBA")
+    elif "monochrome" in effects:
+        image = ImageOps.autocontrast(ImageOps.grayscale(image)).convert("RGBA")
+    if "derelict" in effects:
+        image = ImageEnhance.Color(image).enhance(0.15)
+        image = ImageEnhance.Brightness(image).enhance(0.42)
+        draw = ImageDraw.Draw(image, "RGBA")
+        # Fixed damage scars: state treatment is stable across runs and resizes.
+        for offset in (1, 3, 5, 7):
+            x = image.width * offset // 9
+            draw.line((x, 0, max(0, x - image.width // 7), image.height),
+                      fill=(0, 0, 0, 150), width=max(2, image.width // 180))
+    elif "hostile" in effects:
+        alarm = Image.new("RGBA", image.size, (180, 0, 0, 48))
+        image = Image.alpha_composite(image, alarm)
 
     symbol_map = SymbolMap()
     symbol_map.apply_selectors(symbols)
@@ -184,6 +204,7 @@ def render_portrait(
     rows: int,
     symbols: str = DEFAULT_SYMBOLS,
     font_ratio: float = DEFAULT_FONT_RATIO,
+    treatment: str = "",
 ) -> Text:
     """Render image `path` to a Rich `Text` fitted within a `cols`×`rows` character-cell box.
 
@@ -201,6 +222,6 @@ def render_portrait(
     cols = max(1, cols)
     rows = max(1, rows)
     ansi = _render_portrait_ansi(
-        str(path), cols, rows, symbols, font_ratio, Path(path).stat().st_mtime_ns
+        str(path), cols, rows, symbols, font_ratio, treatment, Path(path).stat().st_mtime_ns
     )
     return Text.from_ansi(ansi)

@@ -100,6 +100,7 @@ class Port:
     size: int
     commodities: tuple[PortCommodity, ...]
     latinum: int = 0
+    archetype_id: str = ""  # immutable builder archetype; drives procedural palette
 
     def line(self, commodity: Commodity) -> PortCommodity | None:
         return next((c for c in self.commodities if c.commodity is commodity), None)
@@ -211,6 +212,7 @@ class Starbase:
     ship_class_id: str
     owner: Ownership = UNOWNED
     subsystems: Mapping[Subsystem, SubsystemState] = field(default_factory=dict)
+    archetype_id: str = ""  # immutable builder archetype; drives procedural palette
 
 
 @dataclass(frozen=True, slots=True)

@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 13
+WIRE_VERSION = 16
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -63,6 +63,9 @@ v10 (PT-30): `MineBelt` command + `BeltMined` event (player-driven asteroid-belt
 `PlanetDTO.mine_yield` projects the per-action haul.
 v11 (WP-PR07 follow-up): `BatchTransferCargo` makes aggregate colony transfers one command.
 v12 (WP-UI09 follow-up): `EngineRoomPreviewDTO` projects validated before/after ship aspects.
+v13 (WP-PR2-02): `ShipyardItem.flown` distinguishes historical hulls from the current one.
+v14-v16 (station builder identity): starbase DTOs carry the immutable roster archetype used
+by procedural icons and raster banners; sector projections carry the same identity and state.
 """
 
 
