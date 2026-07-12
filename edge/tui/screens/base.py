@@ -72,14 +72,28 @@ class BaseScreen(Screen[None]):
         Binding("m", "buy_missiles", "Missile"),
         Binding("d", "deposit", "Deposit 1k"),
         Binding("w", "withdraw", "Withdraw 1k"),
+        # Tab-focus accelerators (WP-PR2-01 / PT-32): jump to a tab + focus its content.
+        # Hardware shares its only free in-title letter ('e') with Trade, so it stays
+        # arrow/Enter-reachable rather than colliding.
+        Binding("u", "focus_tab('status')", "Status", show=False),
+        Binding("o", "focus_tab('station')", "Station", show=False),
+        Binding("e", "focus_tab('trade')", "Trade", show=False),
+        Binding("k", "focus_tab('bank')", "Bank", show=False),
     ]
+
+    # entry_id -> the letter emphasised in its tab title (WP-PR2-01 / PT-32).
+    _TAB_ACCEL = {"status": "u", "station": "o", "trade": "e", "bank": "k"}
     ACTION_DANGER = {"assault": "destructive"}  # WP-UI06: confirms before firing
 
     HELP_TITLE = "Starbase"
     HELP = """\
 Tabs follow your standing with the base (yours · open · hostile · derelict).
 Repair fills the [b]reactor keystone first[/] — waking a derelict also opens its
-market; a player-owned host earns a cut of outsider trades."""
+market; a player-owned host earns a cut of outsider trades.
+
+Jump to a tab and focus its contents with the [b]underlined letter[/] in each tab
+title (Stat[b]u[/]s · Stati[b]o[/]n · Trad[b]e[/] · Ban[b]k[/]); Enter on the tab rail
+does the same for the active tab."""
 
     CSS = """
     BaseScreen #base-title { background: $warning; }
@@ -110,7 +124,8 @@ market; a player-owned host earns a cut of outsider trades."""
         preferred = ("station" if v.standing in ("derelict", "yours") else
                      "trade" if v.market_port_id is not None and v.market_open else "status")
         initial = self._initial_tab or preferred
-        yield ServiceHub(entries, initial=initial, id="base-services")
+        yield ServiceHub(entries, initial=initial, accelerators=self._TAB_ACCEL,
+                         id="base-services")
         yield Footer()
 
     def _view(self) -> StarbaseDTO:
@@ -216,6 +231,10 @@ market; a player-owned host earns a cut of outsider trades."""
         return VerticalScroll(Static("\n".join(lines)))
 
     # --- actions ----------------------------------------------------------------
+
+    def action_focus_tab(self, entry_id: str) -> None:
+        """Jump to a service tab and focus its primary content (WP-PR2-01 / PT-32)."""
+        self.query_one(ServiceHub).activate_and_focus(entry_id)
 
     def _reopen(self) -> None:
         try:

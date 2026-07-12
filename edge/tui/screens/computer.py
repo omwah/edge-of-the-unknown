@@ -23,6 +23,7 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Static, TabbedContent, TabPane
 
@@ -36,7 +37,7 @@ from edge.tui.detail_table import ColumnSpec, DetailTable
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.picker import ListPicker
 from edge.tui.screens.travel import TravelPromptScreen
-from edge.tui.widgets import LocalMapView, bar, preserve_cursor
+from edge.tui.widgets import LocalMapView, accel_title, bar, first_focusable, preserve_cursor
 
 # WP-UI20: the five-category information architecture. Every legacy tab id maps
 # to exactly one category; pane ids are unchanged so hotkeys and links keep
@@ -75,7 +76,21 @@ class ComputerScreen(Screen[None]):
         Binding("x", "abandon_contract", "Abandon"),
         Binding("j", "join_alliance", "Join/Resign"),
         Binding("t", "log_admission_task", "Log task"),
+        # Category-focus accelerators (WP-PR2-01 / PT-32): jump to a category and focus
+        # its active subview's content in one step. Letters are underlined in the tab
+        # titles and kept off the footer (show=False). Enter on the tab rail focuses the
+        # active subview's content too.
+        Binding("n", "focus_category('navigation')", "Navigation", show=False),
+        Binding("m", "focus_category('commerce')", "Commerce", show=False),
+        Binding("e", "focus_category('exploration')", "Exploration", show=False),
+        Binding("l", "focus_category('relations')", "Relations", show=False),
+        Binding("o", "focus_category('records')", "Records", show=False),
+        Binding("enter", "focus_active_content", "Enter tab", show=False),
     ]
+
+    # category -> the letter underlined in its tab title (WP-PR2-01 / PT-32).
+    _CAT_ACCEL = {"navigation": "n", "commerce": "m", "exploration": "e",
+                  "relations": "l", "records": "o"}
     # WP-UI06: seize_core flips Core governance (destructive, always confirmed);
     # engage confirms only over known hazards; join_alliance confirms the resign
     # branch. Enforced statically by tests/test_ui_actions.py.
@@ -84,10 +99,12 @@ class ComputerScreen(Screen[None]):
 
     HELP_TITLE = "Ship's computer"
     HELP = """\
-Five categories — [b]Navigation[/] (Map · Route), [b]Commerce[/] (Ports · Trade ·
-Market), [b]Exploration[/] (Planets · Codex · Leads), [b]Relations[/] (Contracts ·
-Alliances · Dossier), [b]Records[/] (Log · Notes) — each remembers its last
-subview. Keys act on the [b]active subview[/] ([b]X[/] abandons a contract or
+Five categories — [b]N[/]avigation (Map · Route), Co[b]m[/]merce (Ports · Trade ·
+Market), [b]E[/]xploration (Planets · Codex · Leads), Re[b]l[/]ations (Contracts ·
+Alliances · Dossier), Rec[b]o[/]rds (Log · Notes) — each remembers its last
+subview. The [b]underlined letter[/] jumps to a category and focuses its contents in one
+step; Enter on the tab rail focuses the active subview's contents. Keys act on the
+[b]active subview[/] ([b]X[/] abandons a contract or
 removes a note, per subview). [b]J[/] joins/resigns a bloc. Your own worlds and
 base-hosted ports sort to the top of Planets/Ports (★ / ⚓); finished contracts stay
 listed but dim. [b]V[/] directly toggles the highlighted Ports, Planets, or Route row;
@@ -145,7 +162,8 @@ detail when columns are folded at 80×24."""
         with Horizontal(id="cat-strip"):
             yield Button(f"Category: {CATEGORY_LABELS[initial_cat]} ▾", id="cat-button")
         with TabbedContent(initial=f"cat-{initial_cat}", id="cats"):
-            with TabPane("Navigation", id="cat-navigation", classes="cat-pane"):
+            with TabPane(accel_title("Navigation", self._CAT_ACCEL["navigation"]),
+                         id="cat-navigation", classes="cat-pane"):
                 with TabbedContent(initial=self._inner_initial("navigation"),
                                    id="sub-navigation"):
                     with TabPane("Map", id="map"):
@@ -159,7 +177,8 @@ detail when columns are folded at 80×24."""
                         yield Static("[b]ROUTE PLANNER[/]        [dim]plot before you commit[/]")
                         yield DataTable(id="route-table", zebra_stripes=True, cursor_type="row")
                         yield Static("", id="route-summary", classes="note")
-            with TabPane("Commerce", id="cat-commerce", classes="cat-pane"):
+            with TabPane(accel_title("Commerce", self._CAT_ACCEL["commerce"]),
+                         id="cat-commerce", classes="cat-pane"):
                 with TabbedContent(initial=self._inner_initial("commerce"), id="sub-commerce"):
                     with TabPane("Ports", id="ports"):
                         yield Static("[b]PORTS DIRECTORY[/]        [dim]charted ports, nearest first[/]")
@@ -201,7 +220,8 @@ detail when columns are folded at 80×24."""
                             ColumnSpec("Limit", right=True, fold=True),
                         ), empty=self._market_empty_copy(), detail_title="Order")
                         yield Static(self._market_note(), classes="note")
-            with TabPane("Exploration", id="cat-exploration", classes="cat-pane"):
+            with TabPane(accel_title("Exploration", self._CAT_ACCEL["exploration"]),
+                         id="cat-exploration", classes="cat-pane"):
                 with TabbedContent(initial=self._inner_initial("exploration"),
                                    id="sub-exploration"):
                     with TabPane("Planets", id="planets"):
@@ -241,7 +261,8 @@ detail when columns are folded at 80×24."""
                                   "Ask a friendly species for coordinates."),
                             detail_title="Lead")
                         yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
-            with TabPane("Relations", id="cat-relations", classes="cat-pane"):
+            with TabPane(accel_title("Relations", self._CAT_ACCEL["relations"]),
+                         id="cat-relations", classes="cat-pane"):
                 with TabbedContent(initial=self._inner_initial("relations"), id="sub-relations"):
                     with TabPane("Contracts", id="contracts"):
                         yield Static("[b]FAVORS[/]        [dim]jobs accepted from aliens[/]")
@@ -287,7 +308,8 @@ detail when columns are folded at 80×24."""
                         yield Static(self._dossier_notes(), classes="note")
                         yield Static(self._governance_notes(), id="governance-panel", classes="note")
                         yield Static(self._seizure_notes(), id="seizure-panel", classes="note")
-            with TabPane("Records", id="cat-records", classes="cat-pane"):
+            with TabPane(accel_title("Records", self._CAT_ACCEL["records"]),
+                         id="cat-records", classes="cat-pane"):
                 with TabbedContent(initial=self._inner_initial("records"), id="sub-records"):
                     with TabPane("Log", id="log"):
                         yield Static("[b]EVENT LOG[/]        [dim]newest first[/]")
@@ -725,6 +747,27 @@ detail when columns are folded at 80×24."""
         category = _CATEGORY_OF[subview]
         self.query_one("#cats", TabbedContent).active = f"cat-{category}"
         self.query_one(f"#sub-{category}", TabbedContent).active = subview
+
+    # --- WP-PR2-01 / PT-32: category accelerators + Enter-to-content ------------
+
+    def action_focus_category(self, category: str) -> None:
+        """Jump to a category and focus its active subview's primary content."""
+        self.query_one("#cats", TabbedContent).active = f"cat-{category}"
+        self.call_after_refresh(self._focus_subview_content, category)
+
+    def _focus_subview_content(self, category: str) -> None:
+        try:
+            sub = self.query_one(f"#sub-{category}", TabbedContent)
+            pane = self.query_one(f"#{sub.active}", TabPane)
+        except NoMatches:
+            return
+        target = first_focusable(pane)
+        if target is not None:
+            target.focus()
+
+    def action_focus_active_content(self) -> None:
+        """Enter on the tab rail focuses the active subview's content (reaches it in one step)."""
+        self._focus_subview_content(self._active_category())
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "avoid-add":

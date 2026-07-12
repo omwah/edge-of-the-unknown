@@ -103,7 +103,18 @@ planning — confirm with a fresh search before editing.
 
 ---
 
-### WP-PR2-01 — Tabbed-screen keyboard model
+### WP-PR2-01 — Tabbed-screen keyboard model — landed (with deferrals)
+
+**Landed 2026-07-12** in `playtest: WP-PR2-01 tabbed-screen keyboard model`. A shared
+`ServiceHub` (StarDock + Base) and the Computer screen now underline an accelerator
+letter in each tab title, bind it to jump-to-tab-and-focus-content, and focus content
+on Enter while the tab rail is focused (`edge/tui/widgets.py` `accel_title` /
+`first_focusable` / `ServiceHub.activate_and_focus`). **Deferrals (see notes PT-32):**
+(a) per-*subview* single-letter hotkeys on Computer are not built — categories get
+letters, subviews are reached by arrows + Enter-to-content; (b) tabs whose only free
+in-title letter is already an action binding (StarDock **Bank**, Base **Hardware**)
+have no letter and stay arrow/Enter-reachable — closing these needs the action-binding
+relocation the note anticipates, deliberately out of scope for this additive pass.
 
 **Goal:** give Computer, StarDock, and Starbase tabs (and Computer subtabs) accent-
 letter focus hotkeys shown in the tab title, and make the hotkey **and** Enter-on-a-

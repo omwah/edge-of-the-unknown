@@ -108,14 +108,32 @@ class StarDockScreen(Screen[None]):
         Binding("n", "post_notice", "Notice"),
         Binding("d", "deposit", "Deposit"),
         Binding("w", "withdraw", "Withdraw"),
+        # Tab-focus accelerators (WP-PR2-01 / PT-32): jump to a tab and focus its
+        # primary content in one step. Letters are emphasised in the tab titles and
+        # kept off the footer (show=False). Bank has no free in-title letter under the
+        # action bindings above, so it stays arrow/Enter-reachable.
+        Binding("c", "focus_tab('trade')", "Commodities", show=False),
+        Binding("s", "focus_tab('shipyard')", "Shipyard", show=False),
+        Binding("a", "focus_tab('hardware')", "Hardware", show=False),
+        Binding("m", "focus_tab('devices')", "Devices", show=False),
+        Binding("o", "focus_tab('colonists')", "Colonists", show=False),
+        Binding("v", "focus_tab('tavern')", "Tavern", show=False),
     ]
+
+    # entry_id -> the letter emphasised in its tab title (WP-PR2-01 / PT-32).
+    _TAB_ACCEL = {"trade": "c", "shipyard": "s", "hardware": "a",
+                  "devices": "m", "colonists": "o", "tavern": "v"}
 
     HELP_TITLE = "StarDock"
     HELP = """\
 [b]B[/] buys the highlighted row of the active buy tab (Hardware · Shipyard ·
 Devices & Armaments — munitions there prompt for a quantity). Tab-scoped keys only
 work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
-[b]R[/]/[b]N[/] buy rumours / post notices on the Tavern. The bank pays daily interest."""
+[b]R[/]/[b]N[/] buy rumours / post notices on the Tavern. The bank pays daily interest.
+
+Jump to a tab and focus its contents with the [b]underlined letter[/] in each tab
+title ([b]C[/]ommodities · [b]S[/]hipyard · H[b]a[/]rdware · Devices & Ar[b]m[/]aments ·
+C[b]o[/]lonists · Ta[b]v[/]ern); Enter on the tab rail does the same for the active tab."""
 
     CSS = """
     StarDockScreen #dock-title {
@@ -211,7 +229,8 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
             ("Bank", "bank", bank, None),
             ("Tavern", "tavern", tavern, None),
         ]
-        yield ServiceHub(entries, initial=self._initial_tab, id="stardock-services")
+        yield ServiceHub(entries, initial=self._initial_tab, accelerators=self._TAB_ACCEL,
+                         id="stardock-services")
         yield Footer()
 
     def _tavern_panels(self) -> ComposeResult:
@@ -323,6 +342,10 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
         return table
 
     # --- actions -------------------------------------------------------------
+
+    def action_focus_tab(self, entry_id: str) -> None:
+        """Jump to a service tab and focus its primary content (WP-PR2-01 / PT-32)."""
+        self.query_one(ServiceHub).activate_and_focus(entry_id)
 
     def action_trade(self) -> None:
         _trade_highlighted(self, self._service, self._pid)
