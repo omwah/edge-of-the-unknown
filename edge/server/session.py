@@ -39,7 +39,7 @@ from edge.core.aliens import (
 from edge.core.config import DialogueChoice, GameConfig
 from edge.core.discovery import entity_contactable, entity_species, is_detectable
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
-from edge.core.engine_room import build_subsystems, derive_aspects
+from edge.core.engine_room import EngineRoomError, build_subsystems, derive_aspects
 from edge.core.movement import RoutePlan, one_way_exits, plan_route, plan_route_legs
 from edge.core.enums import (
     PORT_CLASS_TRADES,
@@ -120,6 +120,7 @@ from edge.core.events import (
     Traded,
     Warped,
 )
+from edge.core.rules import InstallComponent, SwapComponent, reduce
 from edge.core import corp
 from edge.core.models import (
     AlienSpecies,
@@ -620,6 +621,28 @@ def engine_room_view(state: UniverseState, player_id: int, config: GameConfig) -
     return dto.EngineRoomDTO(
         ship=ship.name, efficiency_bonus=f"+{aspects.efficiency_bonus} all",
         subsystems=panels, kits=ship.repair_kits, on_hand=on_hand,
+    )
+
+
+def engine_room_preview(
+    state: UniverseState, player_id: int, command: InstallComponent | SwapComponent,
+    config: GameConfig,
+) -> dto.EngineRoomPreviewDTO:
+    """Validate and project one engine-room change without mutating authoritative state."""
+    ship = state.ships[state.players[player_id].ship_id]
+    before = derive_aspects(ship, config)
+    result = reduce(state, player_id, command, config)
+    if len(result.ships) != 1:
+        raise EngineRoomError("engine-room preview produced no ship")
+    after = derive_aspects(result.ships[0], config)
+    return dto.EngineRoomPreviewDTO(
+        shields_before=before.shields, shields_after=after.shields,
+        warp_before=before.warp_speed, warp_after=after.warp_speed,
+        combat_before=before.combat_speed, combat_after=after.combat_speed,
+        turns_before=before.turns_per_warp, turns_after=after.turns_per_warp,
+        gun_damage_before=before.gun_damage, gun_damage_after=after.gun_damage,
+        gun_rate_before=before.gun_rate, gun_rate_after=after.gun_rate,
+        efficiency_before=before.efficiency_bonus, efficiency_after=after.efficiency_bonus,
     )
 
 
