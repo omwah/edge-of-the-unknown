@@ -740,6 +740,8 @@ def generate(
             populate_species(
                 state, config
             )  # §6 aliens + home clusters on an independent sub-RNG
+            from edge.bigbang.station_archetypes import assign_station_archetypes
+            assign_station_archetypes(state, config)  # fixed roster-driven builders (§5)
             salt_raid_caches(
                 state, config
             )  # §7/§10 legendary caches on hostile homeworlds (WP44)

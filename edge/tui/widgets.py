@@ -720,10 +720,16 @@ class SectorScene(Static):
 
     def _sprite_cells(self, entity: str, subtype: str, *, seed: int, sw: int, sh: int,
                       facing: str = "right",
-                      archetype_id: str | None = None) -> list[list[tuple[str, Style | None]]]:
-        return art_adapter.text_to_cells(art_adapter.sprite(
+                      archetype_id: str | None = None,
+                      treatment: str = "") -> list[list[tuple[str, Style | None]]]:
+        art = art_adapter.sprite(
             entity, subtype, seed=seed, width=sw, height=sh, facing=facing,
-            archetype_id=archetype_id))
+            archetype_id=archetype_id)
+        if treatment == "derelict":
+            art.stylize("dim")
+        elif treatment == "hostile":
+            art.stylize("on dark_red")
+        return art_adapter.text_to_cells(art)
 
     # --- render --------------------------------------------------------------
 
@@ -789,13 +795,16 @@ class SectorScene(Static):
         if base_in_orbit:
             self._paint(grid, self._sprite_cells("port", "starbase",
                                                  seed=bases[0].starbase_id,
-                                                 sw=portw, sh=porth),
+                                                 sw=portw, sh=porth,
+                                                 archetype_id=bases[0].archetype_id,
+                                                 treatment=bases[0].condition),
                         row + (band_h - porth) // 2, rcx - portw // 2)
         elif sec.ports:
             port = sec.ports[0]
             sub = art_adapter.port_subtype(port.klass)
+            archetype = port.archetype_id
             self._paint(grid, self._sprite_cells("port", sub, seed=sec.sector_id, sw=portw,
-                                                 sh=porth, archetype_id=port.archetype_id),
+                                                 sh=porth, archetype_id=archetype),
                         row + (band_h - porth) // 2, rcx - portw // 2)
 
         name_row = row + band_h

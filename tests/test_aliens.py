@@ -301,7 +301,11 @@ def test_species_placement_does_not_perturb_ports_or_planets() -> None:
     with_roster = SMALL
     a = generate(no_roster, 7)
     b = generate(with_roster, 7)
-    assert a.ports == b.ports
+    # Builder archetypes are assigned after species-controlled regions exist; all
+    # economic/generated port fields remain identical.
+    def strip_port_archetype(ports):  # type: ignore[no-untyped-def]
+        return {pid: replace(port, archetype_id="") for pid, port in ports.items()}
+    assert strip_port_archetype(a.ports) == strip_port_archetype(b.ports)
     # Home-cluster carving overlays alliance ownership on some planets (WP23), but the
     # planet *generation* (positions/types/stores) is unperturbed — compare ignoring owner.
     def strip(ps):  # type: ignore[no-untyped-def]

@@ -237,4 +237,3 @@ def test_production_config_validates() -> None:
     cfg = getattr(edge.config, "original_load_config", edge.config.load_config)(prod_path)
     assert isinstance(cfg, GameConfig)
     assert cfg.roster is not None
-
