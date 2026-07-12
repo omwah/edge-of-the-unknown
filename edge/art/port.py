@@ -79,8 +79,8 @@ PORT_SUBTYPES = ["trading_port", "starbase", "stardock"]
 _SELF_SYMMETRIC = (HULL_CHARS - frozenset(_MIRROR)) | frozenset(" RY")
 
 
-# Per-subtype band grammars. Each subtype maps to an ordered tuple of grammar
-# *tiers*, largest-floor first; ``_select_grammar`` picks the richest tier whose
+# Per-subtype band grammars. Each subtype maps archetype ids (plus ``default``)
+# to an ordered tuple of grammar *tiers*. ``_select_grammar`` picks the richest tier whose
 # minimum stack fits the requested height (so big boxes get the detailed art and
 # tiny boxes get a legible compact silhouette -- the platform/octagon don't shrink
 # to a few rows gracefully, so the small regime needs its own parts).
@@ -90,288 +90,270 @@ _SELF_SYMMETRIC = (HULL_CHARS - frozenset(_MIRROR)) | frozenset(" RY")
 # matches the historic height reproduces the original largest silhouette exactly
 # (this is "decompose what we had", not "redraw"). The remaining parts are
 # interchangeable variants that give repeat ports visible variety.
-PORT_GRAMMAR: dict[str | tuple[str, str], tuple[tuple[Slot, ...], ...]] = {
-    # The hero. Beacon + shoulders, docking-arm platform, tapering chevron body,
-    # engine glow -- the TW2002 StarDock shape.
-    "stardock": (
-        # --- full detail (floor 7) ---
-        (
-            # Cap: red beacon on a mast, widening to shoulders.
-            Slot((
-                Part(("       R", "       █", "      ██")),          # canonical
-                Part(("       R", "       █", "       █", "      ██")),  # tall mast
-                Part(("       R", "      ██")),                        # stubby
-            )),
-            # Platform: shoulder ridge + docking-arm deck.
-            Slot((
-                Part(("    ▟███", "╾─▓████◊")),  # canonical: arms + facet
-                Part(("    ▟███", "╾─▓█████")),  # plain deck
-                Part(("  ▟█████", "▓██████")),   # wide, armless platform
-            )),
-            # Body: tapering chevron, repeated to lengthen the hull.
-            Slot(
+# Nested subtype -> archetype grammar table. The legacy silhouettes live under
+# ``default`` and remain the fallback for unknown archetypes; StarDock has no
+# archetype variants and therefore contains only its default.
+PORT_GRAMMAR: dict[str, dict[str, tuple[tuple[Slot, ...], ...]]] = {
+    "stardock": {
+        "default": (
                 (
-                    Part(("    ▜██≡", "     ▓██"), repeatable=True),  # canonical: faceted
-                    Part(("    ▜███", "     ▓██"), repeatable=True),  # plain
-                    Part(("    ▜██◊", "    ▓███"), repeatable=True),  # alt facet, fuller
+                    Slot((
+                        Part(("       R", "       █", "      ██")),          # canonical
+                        Part(("       R", "       █", "       █", "      ██")),  # tall mast
+                        Part(("       R", "      ██")),                        # stubby
+                    )),
+                    Slot((
+                        Part(("    ▟███", "╾─▓████◊")),  # canonical: arms + facet
+                        Part(("    ▟███", "╾─▓█████")),  # plain deck
+                        Part(("  ▟█████", "▓██████")),   # wide, armless platform
+                    )),
+                    Slot(
+                        (
+                            Part(("    ▜██≡", "     ▓██"), repeatable=True),  # canonical: faceted
+                            Part(("    ▜███", "     ▓██"), repeatable=True),  # plain
+                            Part(("    ▜██◊", "    ▓███"), repeatable=True),  # alt facet, fuller
+                        ),
+                        min_repeat=1,
+                        max_repeat=5,
+                    ),
+                    Slot((
+                        Part(("      ▜█", "       Y")),               # canonical
+                        Part(("     ▜██", "      ▓█", "       Y")),   # longer taper
+                        Part(("       Y",)),                           # bare glow
+                    )),
                 ),
-                min_repeat=1,
-                max_repeat=5,
-            ),
-            # Base: final taper to the engine glow.
-            Slot((
-                Part(("      ▜█", "       Y")),               # canonical
-                Part(("     ▜██", "      ▓█", "       Y")),   # longer taper
-                Part(("       Y",)),                           # bare glow
-            )),
-        ),
-        # --- compact (floor 3, fills 3-6): beacon / hull band(s) / glow ---
-        (
-            Slot((Part(("    R",)),)),  # beacon
-            Slot(
                 (
-                    Part(("╾▟███",), repeatable=True),  # canonical: arm band
-                    Part(("╾████",), repeatable=True),  # plain arm band
-                    Part(("  ███",), repeatable=True),  # bare hull band
+                    Slot((Part(("    R",)),)),  # beacon
+                    Slot(
+                        (
+                            Part(("╾▟███",), repeatable=True),  # canonical: arm band
+                            Part(("╾████",), repeatable=True),  # plain arm band
+                            Part(("  ███",), repeatable=True),  # bare hull band
+                        ),
+                        min_repeat=1,
+                        max_repeat=4,
+                    ),
+                    Slot((Part(("    Y",)),)),  # engine glow
                 ),
-                min_repeat=1,
-                max_repeat=4,
             ),
-            Slot((Part(("    Y",)),)),  # engine glow
-        ),
-    ),
-    # Compact trading module: dish/antenna, boxed core with side solar panels.
-    "trading_port": (
-        # --- full detail (floor 7) ---
-        (
-            # Cap: antenna dish on a mast, down to the top box edge.
-            Slot((
-                Part(("     ▴", "     │", "   ┌──")),            # canonical
-                Part(("     ▴", "   ┌──")),                       # short mast
-                Part(("     ▴", "     │", "     │", "   ┌──")),  # tall mast
-            )),
-            # Core: solar-panel deck row + plain hull row, repeated to grow the box.
-            Slot(
+    },
+    "trading_port": {
+        "default": (
                 (
-                    Part(("▤──┤██", "   │██"), repeatable=True),  # canonical
-                    Part(("   │██", "   │██"), repeatable=True),  # plain (no panels)
-                    Part(("▦──┤██", "   │██"), repeatable=True),  # alt-panel
+                    Slot((
+                        Part(("     ▴", "     │", "   ┌──")),            # canonical
+                        Part(("     ▴", "   ┌──")),                       # short mast
+                        Part(("     ▴", "     │", "     │", "   ┌──")),  # tall mast
+                    )),
+                    Slot(
+                        (
+                            Part(("▤──┤██", "   │██"), repeatable=True),  # canonical
+                            Part(("   │██", "   │██"), repeatable=True),  # plain (no panels)
+                            Part(("▦──┤██", "   │██"), repeatable=True),  # alt-panel
+                        ),
+                        min_repeat=1,
+                        max_repeat=5,
+                    ),
+                    Slot((
+                        Part(("▤──┤██", "   └──", "     │", "     ▾")),  # canonical
+                        Part(("   └──", "     │", "     ▾")),             # no trailing deck
+                        Part(("▤──┤██", "   └──", "     ▾")),             # short mast
+                    )),
                 ),
-                min_repeat=1,
-                max_repeat=5,
-            ),
-            # Base: trailing panel deck, bottom box edge, mast, dish.
-            Slot((
-                Part(("▤──┤██", "   └──", "     │", "     ▾")),  # canonical
-                Part(("   └──", "     │", "     ▾")),             # no trailing deck
-                Part(("▤──┤██", "   └──", "     ▾")),             # short mast
-            )),
-        ),
-        # --- compact (floor 3, fills 3-6): top edge / core band(s) / bottom edge ---
-        (
-            Slot((Part(("  ┌─",)),)),  # top box edge
-            Slot(
                 (
-                    Part(("▦│█",), repeatable=True),  # canonical: panelled core
-                    Part(("  │█",), repeatable=True),  # plain core
-                    Part(("▤─█",), repeatable=True),  # deck-panel core
+                    Slot((Part(("  ┌─",)),)),  # top box edge
+                    Slot(
+                        (
+                            Part(("▦│█",), repeatable=True),  # canonical: panelled core
+                            Part(("  │█",), repeatable=True),  # plain core
+                            Part(("▤─█",), repeatable=True),  # deck-panel core
+                        ),
+                        min_repeat=1,
+                        max_repeat=4,
+                    ),
+                    Slot((Part(("  └─",)),)),  # bottom box edge
                 ),
-                min_repeat=1,
-                max_repeat=4,
             ),
-            Slot((Part(("  └─",)),)),  # bottom box edge
-        ),
-    ),
-    # Fortified octagonal bastion -- squat, armoured, distinct from the others.
-    "starbase": (
-        # --- full detail (floor 7) ---
-        (
-            # Cap: top arc widening through the bevel to the full belt.
-            Slot((
-                Part(("   ▄▄▄", "  ▟███", " ▟████", "▟█████")),            # canonical
-                Part(("   ▄▄▄", "  ▟███", "▟█████")),                       # squat
-                Part(("    ▄▄", "   ▟██", "  ▟███", " ▟████", "▟█████")),  # tall
-            )),
-            # Belt: full-width armoured band, repeated to fatten the bastion.
-            Slot(
+        "humanoid_diplomat": ((
+                Slot((Part(("     R", "    ▟█")),)),
+                Slot((Part(("╾─▟███", "  ▟███"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("  ▜███", "     Y")),)),
+            ),),
+        "tentacled_envoy": ((
+                Slot((Part(("     ◆", "   ▟██")),)),
+                Slot((Part(("╾▟█◇██", " ▟████"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("  ▜███", "    ◇")),)),
+            ),),
+        "brain_dome_automaton": ((
+                Slot((Part(("     R", "   ▟██")),)),
+                Slot((Part(("╾█████", "▒█≡███"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part((" ▜████", "     Y")),)),
+            ),),
+        "engineered_aesthete": ((
+                Slot((Part(("    ▴", "   ▟██")),)),
+                Slot((Part(("▦─┤███", "▒█◊███"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("╾─▜███", "    ▾")),)),
+            ),),
+        "telepath_aristocrat": ((
+                Slot((Part(("     ◇", "    ◢█")),)),
+                Slot((Part(("  ◢█◆█", "╾─████"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("  ◥█◇█", "     ◇")),)),
+            ),),
+        "temporal_broker": ((
+                Slot((Part(("     ◊", "    ▟█")),)),
+                Slot((Part(("  ▟█◊█", "╾─▒███"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("   ▜██", "     Y")),)),
+            ),),
+        "amorous_imp": ((
+                Slot((Part(("    ♥", "  ◢██")),)),
+                Slot((Part(("╾◢█♥██", " ▜████"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("  ◥███", "    ♦")),)),
+            ),),
+        "canid_technologist": ((
+                Slot((Part(("   ▴ ▴", "   ▟██")),)),
+                Slot((Part(("╾─┤███", "  █◇██"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("  ▜███", "    ▾")),)),
+            ),),
+        "colonial_broodmaster": ((
+                Slot((Part(("   ◢◆█", " ◢████")),)),
+                Slot((Part(("◢█◆███", "██◇███"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("◥█████", "   ◥◆█")),)),
+            ),),
+        "cosmic_arbiter": ((
+                Slot((Part(("   ╭─╮", "   │◆│")),)),
+                Slot((Part(("╾─┤◇██", "  │███"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("   │◆│", "   ╰─╯")),)),
+            ),),
+        "horned_grudgekeeper": ((
+                    Slot((Part(("◢    ◆", " ◢███")),)),
+                Slot((Part(("╾█████", "▒█≡███"), repeatable=True),), min_repeat=1, max_repeat=4),
+                    Slot((Part((" ◥████", "◥    ◆")),)),
+            ),),
+        "psionic_overlord": ((
+                Slot((Part(("  ╭──╮", "    ◆")),)),
+                Slot((Part(("  ▟█◇█", "╾─████"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("   ▜██", "  ╰──╯")),)),
+            ),),
+        "ribbon_salvager": ((
+                Slot((Part(("╭─╮  ▴", " ╰─▟█")),)),
+                Slot((Part(("╾─▒███", " ╭┤███"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part((" ╰─▜██", "╰─╯  ▾")),)),
+            ),),
+        "winged_schemer": ((
+                Slot((Part(("   ▴██", " ◢████")),)),
+                Slot((Part(("╾◢█◊██", "╾─████"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part((" ◥████", "   ▾██")),)),
+            ),),
+    },
+    "starbase": {
+        "default": (
                 (
-                    Part(("██████",), repeatable=True),   # canonical
-                    Part(("▒█████",), repeatable=True),   # shadow streak
-                    Part(("██≡███",), repeatable=True),   # facet band
+                    Slot((
+                        Part(("   ▄▄▄", "  ▟███", " ▟████", "▟█████")),            # canonical
+                        Part(("   ▄▄▄", "  ▟███", "▟█████")),                       # squat
+                        Part(("    ▄▄", "   ▟██", "  ▟███", " ▟████", "▟█████")),  # tall
+                    )),
+                    Slot(
+                        (
+                            Part(("██████",), repeatable=True),   # canonical
+                            Part(("▒█████",), repeatable=True),   # shadow streak
+                            Part(("██≡███",), repeatable=True),   # facet band
+                        ),
+                        min_repeat=1,
+                        max_repeat=8,
+                    ),
+                    Slot((
+                        Part(("▜█████", " ▜████", "  ▜███", "   ▀▀▀")),            # canonical
+                        Part(("▜█████", "  ▜███", "   ▀▀▀")),                       # squat
+                        Part(("▜█████", " ▜████", "  ▜███", "   ▀▀", "    ▀")),    # tall
+                    )),
                 ),
-                min_repeat=1,
-                max_repeat=8,
-            ),
-            # Base: bottom bevel narrowing through the arc.
-            Slot((
-                Part(("▜█████", " ▜████", "  ▜███", "   ▀▀▀")),            # canonical
-                Part(("▜█████", "  ▜███", "   ▀▀▀")),                       # squat
-                Part(("▜█████", " ▜████", "  ▜███", "   ▀▀", "    ▀")),    # tall
-            )),
-        ),
-        # --- compact (floor 3, fills 3-6): point cap / belt(s) / point base ---
-        (
-            Slot((Part((" ◢█",)),)),  # pointed cap
-            Slot(
                 (
-                    Part(("███",), repeatable=True),  # canonical: full belt
-                    Part(("▒██",), repeatable=True),  # shadow streak
-                    Part(("█≡█",), repeatable=True),  # facet belt
+                    Slot((Part((" ◢█",)),)),  # pointed cap
+                    Slot(
+                        (
+                            Part(("███",), repeatable=True),  # canonical: full belt
+                            Part(("▒██",), repeatable=True),  # shadow streak
+                            Part(("█≡█",), repeatable=True),  # facet belt
+                        ),
+                        min_repeat=1,
+                        max_repeat=4,
+                    ),
+                    Slot((Part((" ◥█",)),)),  # pointed base
                 ),
-                min_repeat=1,
-                max_repeat=4,
             ),
-            Slot((Part((" ◥█",)),)),  # pointed base
-        ),
-    ),
+        "humanoid_diplomat": ((
+                Slot((Part(("     R", "    ▟█", "  ▟███")),)),
+                Slot((Part(("╾─████", " ▟█◇██"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part((" ▜████", "   ▜██", "     Y")),)),
+            ),),
+        "tentacled_envoy": ((
+                Slot((Part(("     ◆", "   ▟██", " ▟█◇██")),)),
+                Slot((Part(("▟█████", "██◇███"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("▜█████", "  ▜███", "    ◇")),)),
+            ),),
+        "brain_dome_automaton": ((
+                Slot((Part(("    ▄▄", "  ▟███", "▟█████")),)),
+                Slot((Part(("██████", "▒█≡███"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("▜█████", "  ▜███", "    ▀▀")),)),
+            ),),
+        "engineered_aesthete": ((
+                Slot((Part(("    ▴", "  ▟███", "╾█████")),)),
+                Slot((Part(("▒█◊███", "██≡███"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("╾▜████", "  ▜███", "    ▾")),)),
+            ),),
+        "telepath_aristocrat": ((
+                Slot((Part(("     ◆", "    ◢█", "  ◢█◇█")),)),
+                Slot((Part(("◢██◆██", "██████"), repeatable=True),), min_repeat=1, max_repeat=4),
+                Slot((Part(("◥██◇██", "   ◥██", "     ◇")),)),
+            ),),
+        "temporal_broker": ((
+                Slot((Part(("     ◊", "    ▟█", "   ▟██")),)),
+                Slot((Part((" ▟█◊██", "╾─████"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("  ▜███", "    ▜█", "     Y")),)),
+            ),),
+        "amorous_imp": ((
+                Slot((Part(("    ♥", "  ◢██", "◢██♥██")),)),
+                Slot((Part(("██████", "▒█♥███"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("◥█████", "  ◥███", "    ♦")),)),
+            ),),
+        "canid_technologist": ((
+                Slot((Part(("   ▴ ▴", "  ▟███", "╾█████")),)),
+                Slot((Part(("██◇███", "██████"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("╾▜████", "  ▜███", "    ▾")),)),
+            ),),
+        "colonial_broodmaster": ((
+                Slot((Part(("   ◢◆█", " ◢████", "◢██◇██")),)),
+                Slot((Part(("█◆██◆█", "██████"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("◥█████", " ◥████", "   ◥◆█")),)),
+            ),),
+        "cosmic_arbiter": ((
+                Slot((Part(("   ╭─╮", "  ╭┤◆│", "╾─┤◇██")),)),
+                Slot((Part(("  │███", "╾─┤◆██"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("╾─┤◇██", "  ╰┤◆│", "   ╰─╯")),)),
+            ),),
+        "horned_grudgekeeper": ((
+                    Slot((Part(("◢    ◆", " ◢███", "◢█████")),)),
+                Slot((Part(("█≡████", "██████"), repeatable=True),), min_repeat=1, max_repeat=5),
+                    Slot((Part(("◥█████", " ◥████", "◥    ◆")),)),
+            ),),
+        "psionic_overlord": ((
+                Slot((Part(("  ╭──╮", "    ◆", "  ▟█◇█")),)),
+                Slot((Part(("╾─████", " ▟█◆██"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("  ▜███", "    ◇", "  ╰──╯")),)),
+            ),),
+        "ribbon_salvager": ((
+                Slot((Part(("╭─╮  ▴", " ╰─▟█", "╾─████")),)),
+                Slot((Part(("╭┤▒███", "╰─████"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("╾─▜███", " ╭─▜█", "╰─╯  ▾")),)),
+            ),),
+        "winged_schemer": ((
+                Slot((Part(("   ▴██", " ◢████", "╾◢█◊██")),)),
+                Slot((Part(("╾─████", "██◇███"), repeatable=True),), min_repeat=1, max_repeat=5),
+                Slot((Part(("╾◥████", " ◥████", "   ▾██")),)),
+            ),),
+    },
 }
-
-# Archetype-specific procedural silhouettes derived from the generated exterior
-# reference sheets in images/ui/{ports,starbases}/source. They intentionally keep
-# the existing mirrored band-composer: raster art guides the shape language, while
-# the runtime icon remains crisp deterministic BBS cell art.
-PORT_GRAMMAR.update({
-    ("trading_port", "humanoid_diplomat"): ((
-        Slot((Part(("     R", "    ▟█")),)),
-        Slot((Part(("╾─▟███", "  ▟███"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("  ▜███", "     Y")),)),
-    ),),
-    ("starbase", "humanoid_diplomat"): ((
-        Slot((Part(("     R", "    ▟█", "  ▟███")),)),
-        Slot((Part(("╾─████", " ▟█◇██"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part((" ▜████", "   ▜██", "     Y")),)),
-    ),),
-    ("trading_port", "tentacled_envoy"): ((
-        Slot((Part(("     ◆", "   ▟██")),)),
-        Slot((Part(("╾▟█◇██", " ▟████"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("  ▜███", "    ◇")),)),
-    ),),
-    ("starbase", "tentacled_envoy"): ((
-        Slot((Part(("     ◆", "   ▟██", " ▟█◇██")),)),
-        Slot((Part(("▟█████", "██◇███"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("▜█████", "  ▜███", "    ◇")),)),
-    ),),
-    ("trading_port", "brain_dome_automaton"): ((
-        Slot((Part(("     R", "   ▟██")),)),
-        Slot((Part(("╾█████", "▒█≡███"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part((" ▜████", "     Y")),)),
-    ),),
-    ("starbase", "brain_dome_automaton"): ((
-        Slot((Part(("    ▄▄", "  ▟███", "▟█████")),)),
-        Slot((Part(("██████", "▒█≡███"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("▜█████", "  ▜███", "    ▀▀")),)),
-    ),),
-    ("trading_port", "engineered_aesthete"): ((
-        Slot((Part(("    ▴", "   ▟██")),)),
-        Slot((Part(("▦─┤███", "▒█◊███"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("╾─▜███", "    ▾")),)),
-    ),),
-    ("starbase", "engineered_aesthete"): ((
-        Slot((Part(("    ▴", "  ▟███", "╾█████")),)),
-        Slot((Part(("▒█◊███", "██≡███"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("╾▜████", "  ▜███", "    ▾")),)),
-    ),),
-    ("trading_port", "telepath_aristocrat"): ((
-        Slot((Part(("     ◇", "    ◢█")),)),
-        Slot((Part(("  ◢█◆█", "╾─████"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("  ◥█◇█", "     ◇")),)),
-    ),),
-    ("starbase", "telepath_aristocrat"): ((
-        Slot((Part(("     ◆", "    ◢█", "  ◢█◇█")),)),
-        Slot((Part(("◢██◆██", "██████"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("◥██◇██", "   ◥██", "     ◇")),)),
-    ),),
-    ("trading_port", "temporal_broker"): ((
-        Slot((Part(("     ◊", "    ▟█")),)),
-        Slot((Part(("  ▟█◊█", "╾─▒███"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("   ▜██", "     Y")),)),
-    ),),
-    ("starbase", "temporal_broker"): ((
-        Slot((Part(("     ◊", "    ▟█", "   ▟██")),)),
-        Slot((Part((" ▟█◊██", "╾─████"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("  ▜███", "    ▜█", "     Y")),)),
-    ),),
-    ("trading_port", "amorous_imp"): ((
-        Slot((Part(("    ♥", "  ◢██")),)),
-        Slot((Part(("╾◢█♥██", " ▜████"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("  ◥███", "    ♦")),)),
-    ),),
-    ("starbase", "amorous_imp"): ((
-        Slot((Part(("    ♥", "  ◢██", "◢██♥██")),)),
-        Slot((Part(("██████", "▒█♥███"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("◥█████", "  ◥███", "    ♦")),)),
-    ),),
-    ("trading_port", "canid_technologist"): ((
-        Slot((Part(("   ▴ ▴", "   ▟██")),)),
-        Slot((Part(("╾─┤███", "  █◇██"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("  ▜███", "    ▾")),)),
-    ),),
-    ("starbase", "canid_technologist"): ((
-        Slot((Part(("   ▴ ▴", "  ▟███", "╾█████")),)),
-        Slot((Part(("██◇███", "██████"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("╾▜████", "  ▜███", "    ▾")),)),
-    ),),
-    ("trading_port", "colonial_broodmaster"): ((
-        Slot((Part(("   ◢◆█", " ◢████")),)),
-        Slot((Part(("◢█◆███", "██◇███"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("◥█████", "   ◥◆█")),)),
-    ),),
-    ("starbase", "colonial_broodmaster"): ((
-        Slot((Part(("   ◢◆█", " ◢████", "◢██◇██")),)),
-        Slot((Part(("█◆██◆█", "██████"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("◥█████", " ◥████", "   ◥◆█")),)),
-    ),),
-    ("trading_port", "cosmic_arbiter"): ((
-        Slot((Part(("   ╭─╮", "   │◆│")),)),
-        Slot((Part(("╾─┤◇██", "  │███"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("   │◆│", "   ╰─╯")),)),
-    ),),
-    ("starbase", "cosmic_arbiter"): ((
-        Slot((Part(("   ╭─╮", "  ╭┤◆│", "╾─┤◇██")),)),
-        Slot((Part(("  │███", "╾─┤◆██"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("╾─┤◇██", "  ╰┤◆│", "   ╰─╯")),)),
-    ),),
-    ("trading_port", "horned_grudgekeeper"): ((
-        Slot((Part(("◢    ◣", " ◢███")),)),
-        Slot((Part(("╾█████", "▒█≡███"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part((" ◥████", "◥    ◤")),)),
-    ),),
-    ("starbase", "horned_grudgekeeper"): ((
-        Slot((Part(("◢    ◣", " ◢███", "◢█████")),)),
-        Slot((Part(("█≡████", "██████"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("◥█████", " ◥████", "◥    ◤")),)),
-    ),),
-    ("trading_port", "psionic_overlord"): ((
-        Slot((Part(("  ╭──╮", "    ◆")),)),
-        Slot((Part(("  ▟█◇█", "╾─████"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part(("   ▜██", "  ╰──╯")),)),
-    ),),
-    ("starbase", "psionic_overlord"): ((
-        Slot((Part(("  ╭──╮", "    ◆", "  ▟█◇█")),)),
-        Slot((Part(("╾─████", " ▟█◆██"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("  ▜███", "    ◇", "  ╰──╯")),)),
-    ),),
-    ("trading_port", "ribbon_salvager"): ((
-        Slot((Part(("╭─╮  ▴", " ╰─▟█")),)),
-        Slot((Part(("╾─▒███", " ╭┤███"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part((" ╰─▜██", "╰─╯  ▾")),)),
-    ),),
-    ("starbase", "ribbon_salvager"): ((
-        Slot((Part(("╭─╮  ▴", " ╰─▟█", "╾─████")),)),
-        Slot((Part(("╭┤▒███", "╰─████"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("╾─▜███", " ╭─▜█", "╰─╯  ▾")),)),
-    ),),
-    ("trading_port", "winged_schemer"): ((
-        Slot((Part(("   ▴██", " ◢████")),)),
-        Slot((Part(("╾◢█◊██", "╾─████"), repeatable=True),), min_repeat=1, max_repeat=4),
-        Slot((Part((" ◥████", "   ▾██")),)),
-    ),),
-    ("starbase", "winged_schemer"): ((
-        Slot((Part(("   ▴██", " ◢████", "╾◢█◊██")),)),
-        Slot((Part(("╾─████", "██◇███"), repeatable=True),), min_repeat=1, max_repeat=5),
-        Slot((Part(("╾◥████", " ◥████", "   ▾██")),)),
-    ),),
-})
 
 
 def _mirror_row(left: str) -> str:
@@ -459,10 +441,8 @@ class PortGenerator:
     ) -> Text:
         """Generate a procedural space port sprite, hued by owner ``archetype_id``."""
         subtype = subtype.lower()
-        tiers = PORT_GRAMMAR.get(
-            (subtype, archetype_id or ""),
-            PORT_GRAMMAR.get(subtype, PORT_GRAMMAR["trading_port"]),
-        )
+        variants = PORT_GRAMMAR.get(subtype, PORT_GRAMMAR["trading_port"])
+        tiers = variants.get(archetype_id or "", variants["default"])
         grammar = _select_grammar(tiers, height)
         style = style_for(archetype_id)
 
