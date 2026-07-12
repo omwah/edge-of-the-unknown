@@ -283,6 +283,10 @@ C[b]o[/]lonists · Ta[b]v[/]ern); Enter on the tab rail does the same for the ac
         except RowDoesNotExist:  # row gone (e.g. hull now owned / last of stock)
             return
         table.move_cursor(row=index, animate=False)
+        # Return keyboard focus to the table too, not just its cursor — otherwise a
+        # rebuild after a purchase leaves focus on the tab rail (PT-33). Deferred so it
+        # wins over the screen's default initial focus.
+        self.call_after_refresh(table.focus)
 
     def _hardware_table(self, dock: object) -> DataTable[Any]:
         table: DataTable[Any] = DataTable(id="hardware-table", cursor_type="row")
@@ -335,7 +339,14 @@ C[b]o[/]lonists · Ta[b]v[/]ern); Enter on the tab rail does the same for the ac
         table: DataTable[Any] = DataTable(id="shipyard-table", cursor_type="row")
         table.add_columns("Hull", "Role", "Holds", "Shld", "Wrp", "Cbt", "Net", "")
         for item in dock.shipyard:  # type: ignore[attr-defined]
-            flag = "[green]flown[/]" if item.owned else ("" if item.affordable else "[red]✗[/]")
+            # "Flying" = the hull you occupy now; "Flown" = one you flew and traded away
+            # (PT-34). Neither is purchasable; the rest show affordability.
+            if item.owned:
+                flag = "[green]Flying[/]"
+            elif item.flown:
+                flag = "[cyan]Flown[/]"
+            else:
+                flag = "" if item.affordable else "[red]✗[/]"
             table.add_row(item.name, item.role, str(item.holds), str(item.shields),
                           str(item.warp), str(item.combat), f"{item.net_price:,}", flag,
                           key=item.class_id)

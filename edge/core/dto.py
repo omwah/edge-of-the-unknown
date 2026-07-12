@@ -777,7 +777,8 @@ class ShipyardItem:
     warp: int
     combat: int
     affordable: bool
-    owned: bool  # the hull the player currently flies
+    owned: bool  # the hull the player currently flies ("Flying")
+    flown: bool = False  # a hull flown before and traded away, not now ("Flown", WP-PR2-02)
 
 
 @dataclass(frozen=True)

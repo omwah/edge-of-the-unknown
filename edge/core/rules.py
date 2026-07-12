@@ -1887,7 +1887,11 @@ def _buy_ship(
             "returned components plus cargo exceed the new hull's holds — "
             "sell components down to make room first"
         )
-    new_player = replace(player, latinum=player.latinum - net_cost)
+    # The hull being traded away joins the "flown" set so the shipyard can mark it
+    # "Flown" vs the current hull's "Flying" (WP-PR2-02 / PT-34).
+    new_player = replace(
+        player, latinum=player.latinum - net_cost,
+        flown_classes=player.flown_classes | {ship.type_id})
     return ReduceResult(
         events=(ShipPurchased(player_id, new_class.id, net_cost, trade_in),),
         players=(new_player,), ships=(new_ship,),
