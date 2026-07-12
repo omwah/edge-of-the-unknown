@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from textual.widgets import DataTable
+
 from edge.config import load_default_config
 from edge.core.models import Contract, Ownership
 from edge.core.movement import shortest_path
@@ -100,6 +102,7 @@ async def test_owned_planet_stays_top_even_when_user_sorts() -> None:
         await pilot.pause()
         screen = await _open_computer(app, pilot)
         svc = app.service
+
         far = svc.computer_view(1).planets[-1]  # type: ignore[attr-defined]
         svc.state.planets[far.planet_id] = replace(  # type: ignore[attr-defined]
             svc.state.planets[far.planet_id], owner=Ownership("player", 1))  # type: ignore[attr-defined]
@@ -177,3 +180,41 @@ async def test_avoid_button_opens_prompt() -> None:
         screen.query_one("#avoid-add", Button).press()
         await pilot.pause()
         assert isinstance(app.screen, TravelPromptScreen)
+
+
+async def test_avoid_key_targets_highlighted_port_planet_and_route_rows() -> None:
+    """PT-23: V acts on the selected row without opening the numeric-sector prompt."""
+    app = EdgeApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        screen = await _open_computer(app, pilot)
+        svc = app.service
+
+        def is_avoided(internal: int) -> bool:
+            return any(svc.resolve_display_id(shown) == internal  # type: ignore[attr-defined]
+                       for shown in svc.computer_view(1).avoid)  # type: ignore[attr-defined]
+
+        for subview, table_id, entries in (
+            ("ports", "#ports-table", screen._computer.ports),
+            ("planets", "#planets-table", screen._computer.planets),
+        ):
+            screen.show_subview(subview)
+            await pilot.pause()
+            table = screen.query_one(table_id, DataTable)
+            key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
+            target = entries[int(key)].sector_id
+            screen.action_toggle_avoid()
+            await pilot.pause()
+            assert is_avoided(target)
+            assert isinstance(app.screen, ComputerScreen)
+
+        # Plot from the selected planet, then V targets the highlighted route hop.
+        screen.action_plot_route()
+        await pilot.pause()
+        route = screen.query_one("#route-table", DataTable)
+        route_target = int(route.coordinate_to_cell_key(route.cursor_coordinate).row_key.value)
+        was_avoided = is_avoided(route_target)
+        screen.action_toggle_avoid()
+        await pilot.pause()
+        assert is_avoided(route_target) is not was_avoided
+        assert isinstance(app.screen, ComputerScreen)
