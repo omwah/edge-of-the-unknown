@@ -937,6 +937,7 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
             class_id=klass.id, name=klass.name, role=klass.role, price=klass.price,
             net_price=net, holds=klass.holds_total, shields=a.shields, warp=a.warp_speed,
             combat=a.combat_speed, affordable=player.latinum >= net, owned=klass.id == ship.type_id,
+            flown=klass.id != ship.type_id and klass.id in player.flown_classes,
         ))
 
     armaments = _armaments_catalog(player, ship, config)

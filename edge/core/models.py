@@ -601,6 +601,10 @@ class Player:
     # it, landed here in the WP66 epoch batch so consumer and field ship in one milestone
     # (H17). Hashed state.
     bounty: int = 0
+    # Ship-class ids the player has flown and since traded away (WP-PR2-02 / PT-34) — the
+    # StarDock shipyard marks these "Flown" versus "Flying" for the current hull. Grows on
+    # BuyShip; reconstructs under (seed, command log). Hashed state.
+    flown_classes: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
