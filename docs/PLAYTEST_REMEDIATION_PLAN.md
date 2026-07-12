@@ -578,13 +578,11 @@ not an exhaustive behavioural replay, so absence of a finding is not proof of fu
 
 **Unresolved — feature/behaviour bullets:**
 
-- **WP-UI09 — no before/after derived-stat swap/install preview.** The plan required: "Show a
-  before/after derived-stat preview when exactly one legal swap or install target is selected."
-  `edge/tui/screens/engine_room.py::action_upgrade` selects one carried component + one slot and
-  applies immediately with only a post-action notification; neither `engine_room.py` nor
-  `component_workbench.py` renders projected shields/warp/combat deltas (no `derive_aspects`
-  preview). Follow-up: on a single legal selection, show the projected aspect delta using the
-  existing pure derive helper (presentation-only).
+- ~~**WP-UI09 — no before/after derived-stat swap/install preview.**~~ **Done (2026-07-11).**
+  Selecting exactly one carried component and one slot now shows reducer-validated before/after
+  deltas for shields, warp speed, combat speed, turns/warp, gun damage/rate, and efficiency.
+  Invalid pairings show the authoritative blocker. The read-only server projection derives from
+  the reducer's unapplied result, so preview numbers cannot diverge from the eventual command.
 - **WP-UI11 — objectives not reopenable *from Help*.** The plan said "Make objectives reopenable
   from Help." The strip is dismissible (`O`) and re-enable exists, but **via Options** (the
   `O`/toggle-onboarding row in `options.py`), not from the Help screen (`help.py` has no

@@ -684,6 +684,11 @@ async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
             if slot.state == "empty"
         )
         await pilot.click(list(screen.query(".workbench-slot"))[flat_index])
+        await pilot.pause()
+        from textual.widgets import Static
+        preview = screen.query_one("#engine-preview", Static)
+        assert "PROJECTED SHIP STATS" in str(preview.render())
+        assert sum(svc.state.ships[1].components.values()) == 1  # preview is read-only
         await pilot.press("u")
         await pilot.pause()
         assert sum(svc.state.ships[1].components.values()) == 0  # the loose part was installed

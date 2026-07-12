@@ -734,6 +734,26 @@ class EngineRoomDTO:
 
 
 @dataclass(frozen=True)
+class EngineRoomPreviewDTO:
+    """Presentation-only before/after aspects for one prospective install or swap (WP-UI09)."""
+
+    shields_before: int
+    shields_after: int
+    warp_before: int
+    warp_after: int
+    combat_before: int
+    combat_after: int
+    turns_before: int
+    turns_after: int
+    gun_damage_before: int
+    gun_damage_after: int
+    gun_rate_before: int
+    gun_rate_after: int
+    efficiency_before: int
+    efficiency_after: int
+
+
+@dataclass(frozen=True)
 class HardwareItem:
     """One row in the StarDock hardware emporium (UI_MOCKUPS.md §5, DESIGN §8)."""
 

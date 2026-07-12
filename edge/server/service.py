@@ -21,7 +21,9 @@ from edge.core.config import GameConfig
 from edge.core.enums import Commodity
 from edge.core.events import Event
 from edge.core.models import UniverseState
-from edge.core.rules import Command, JoinGame, ReduceResult, apply_result, reduce
+from edge.core.rules import (
+    Command, InstallComponent, JoinGame, ReduceResult, SwapComponent, apply_result, reduce,
+)
 from edge.dialogue import dialogue_fingerprint
 from edge.engine.cron import resolve_cron
 from edge.server import session
@@ -192,6 +194,11 @@ class GameService:
 
     def engine_room_view(self, player_id: int) -> dto.EngineRoomDTO:
         return session.engine_room_view(self._state, player_id, self._config)
+
+    def engine_room_preview(
+        self, player_id: int, command: InstallComponent | SwapComponent,
+    ) -> dto.EngineRoomPreviewDTO:
+        return session.engine_room_preview(self._state, player_id, command, self._config)
 
     def stardock_view(self, player_id: int) -> dto.StarDockDTO:
         return session.stardock_view(self._state, player_id, self._config)

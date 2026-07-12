@@ -5,7 +5,7 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import Footer
+from textual.widgets import Footer, Static
 
 from edge.core.dto import EngineRoomDTO, Slot
 from edge.core.economy import EconomyError
@@ -63,6 +63,10 @@ part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it
                 install=True, swap=True, field_patch=True, full_repair=True, salvage=True
             ),
             id="component-workbench",
+        )
+        yield Static(
+            "[dim]Select one carried component and one legal slot to preview ship stats.[/]",
+            id="engine-preview",
         )
         yield ContextStrip(
             f"Repair kits: {room.kits}  ·  [+] healthy  [!] knocked-out  [ ] empty  [✓] selected",
@@ -138,22 +142,60 @@ part and an empty or filled non-keystone slot, then [b]U[/] installs or swaps it
         subsystem = next(system for system in self._room.subsystems if system.name == name)
         return subsystem.slots[index]
 
-    async def action_upgrade(self) -> None:
-        if self._service is None:
-            self.notify("Preview only.", timeout=2)
-            return
+    def _selected_upgrade(self) -> tuple[InstallComponent | SwapComponent, Slot] | None:
         selection = self._workbench.selection
         if len(selection.loose_components) != 1 or len(selection.slots) != 1:
-            self.notify("Select one carried component and one destination slot.", timeout=3)
-            return
+            return None
         name, index = selection.slots[0]
         kind = _DISPLAY_TO_KIND.get(name)
         if kind is None:
-            return
+            return None
         component, tier = _parse_on_hand(selection.loose_components[0])
         slot = self._slot(name, index)
         command = (InstallComponent(kind, index, component, tier) if slot.state == "empty"
                    else SwapComponent(kind, index, component, tier))
+        return command, slot
+
+    def on_component_workbench_selection_changed(
+        self, _message: ComponentWorkbench.SelectionChanged,
+    ) -> None:
+        """Render a reducer-validated aspect preview for exactly one selected target."""
+        panel = self.query_one("#engine-preview", Static)
+        selected = self._selected_upgrade()
+        if selected is None or self._service is None:
+            panel.update(
+                "[dim]Select one carried component and one legal slot to preview ship stats.[/]"
+            )
+            return
+        command, _slot = selected
+        try:
+            preview = self._service.engine_room_preview(self._pid, command)
+        except (EngineRoomError, EconomyError) as exc:
+            panel.update(f"[yellow]Cannot install here:[/] {exc}")
+            return
+        fields = (
+            ("Shields", preview.shields_before, preview.shields_after),
+            ("Warp", preview.warp_before, preview.warp_after),
+            ("Combat", preview.combat_before, preview.combat_after),
+            ("Turns/warp", preview.turns_before, preview.turns_after),
+            ("Gun dmg", preview.gun_damage_before, preview.gun_damage_after),
+            ("Gun rate", preview.gun_rate_before, preview.gun_rate_after),
+            ("Efficiency", preview.efficiency_before, preview.efficiency_after),
+        )
+        changed = [f"[b]{label}[/] {before} → [green]{after}[/]"
+                   for label, before, after in fields if before != after]
+        panel.update("[b]PROJECTED SHIP STATS[/]  " + ("   ·   ".join(changed) or "No stat change"))
+
+    async def action_upgrade(self) -> None:
+        if self._service is None:
+            self.notify("Preview only.", timeout=2)
+            return
+        selected = self._selected_upgrade()
+        if selected is None:
+            self.notify("Select one carried component and one destination slot.", timeout=3)
+            return
+        command, slot = selected
+        component, tier = command.component, command.tier
         try:
             self._service.apply(self._pid, command)
         except (EngineRoomError, EconomyError) as exc:
