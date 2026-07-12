@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from typing import Any
 from contextlib import contextmanager
 
@@ -256,6 +256,32 @@ class TradePanel(Vertical):
         return None
 
 
+def first_focusable(node: Widget) -> Widget | None:
+    """The first focusable descendant of `node` (WP-PR2-01: jump-to-tab focus target).
+
+    Used to drop keyboard focus straight onto a tab's primary control (its table,
+    list, or form field) after a tab accelerator or Enter, so reaching a control is
+    one step, not two."""
+    for widget in node.query("*"):
+        if widget.focusable:
+            return widget
+    return None
+
+
+def accel_title(label: str, letter: str | None) -> Text:
+    """A tab title with its accelerator letter emphasised (WP-PR2-01).
+
+    The first case-insensitive occurrence of `letter` is bold-underlined so the
+    hotkey reads from the title itself — legible without colour (monochrome-safe),
+    which is why the tab-focus keys stay out of the crowded footer."""
+    title = Text(label)
+    if letter:
+        idx = label.lower().find(letter.lower())
+        if idx >= 0:
+            title.stylize("bold underline", idx, idx + 1)
+    return title
+
+
 class ServiceHub(Vertical):
     """Shared responsive service navigation for StarDock and orbital bases.
 
@@ -263,7 +289,14 @@ class ServiceHub(Vertical):
     rail with a keyboard/mouse Select; unavailable entries remain selectable and explain
     the prerequisite in their pane instead of disappearing. Hosts still issue commands
     through their reducers, which remain the eligibility authority.
+
+    Hosts may pass `accelerators` (entry_id → letter). Each is emphasised in the tab
+    title; the host binds the letter to `activate_and_focus`, which switches to the tab
+    and focuses its primary content in one step (WP-PR2-01). Enter while the tab rail is
+    focused does the same for the active tab.
     """
+
+    BINDINGS = [Binding("enter", "focus_active_content", "Enter tab", show=False)]
 
     DEFAULT_CSS = """
     ServiceHub { height: 1fr; }
@@ -279,12 +312,14 @@ class ServiceHub(Vertical):
         entries: Sequence[tuple[str, str, Widget, str | None]],
         *,
         initial: str,
+        accelerators: Mapping[str, str] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._entries = list(entries)
         ids = {entry_id for _, entry_id, _, _ in entries}
         self._initial = initial if initial in ids else entries[0][1]
+        self._accel = dict(accelerators or {})
         self._syncing = False
 
     def compose(self) -> ComposeResult:
@@ -296,7 +331,7 @@ class ServiceHub(Vertical):
                           id="service-selector")
         with TabbedContent(initial=self._initial):
             for label, entry_id, content, reason in self._entries:
-                with TabPane(label, id=entry_id):
+                with TabPane(accel_title(label, self._accel.get(entry_id)), id=entry_id):
                     if reason is not None:
                         yield Static(
                             f"[b]{label} unavailable[/]\n\n{reason}",
@@ -304,6 +339,32 @@ class ServiceHub(Vertical):
                         )
                     else:
                         yield content
+
+    def activate_and_focus(self, entry_id: str) -> None:
+        """Switch to `entry_id` and focus its primary content (tab accelerator target)."""
+        try:
+            self.query_one(TabbedContent).active = entry_id
+        except NoMatches:
+            return
+        self.call_after_refresh(self._focus_content, entry_id)
+
+    def _focus_content(self, entry_id: str) -> None:
+        try:
+            pane = self.query_one(f"#{entry_id}", TabPane)
+        except NoMatches:
+            return
+        target = first_focusable(pane)
+        if target is not None:
+            target.focus()
+
+    def action_focus_active_content(self) -> None:
+        """Enter on the tab rail drops focus onto the active tab's primary content."""
+        try:
+            active = self.query_one(TabbedContent).active
+        except NoMatches:
+            return
+        if active:
+            self._focus_content(active)
 
     def on_mount(self) -> None:
         self._sync_tier_class()
