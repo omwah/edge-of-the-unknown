@@ -191,7 +191,13 @@ Commit: `playtest: WP-PR2-02 hardware focus and Flying/Flown labels`
 
 ---
 
-### WP-PR2-03 — Rumor reveal modal
+### WP-PR2-03 — Rumor reveal modal — landed
+
+**Landed 2026-07-12** in `playtest: WP-PR2-03 rumor reveal modal`. No event/DTO
+schema change was needed: `action_buy_rumor` applies `BuyRumor`, reads the freshest
+lead's summary from the existing fog-safe `leads_view` (the rumour appends its lead
+last), then reveals it in `edge/tui/screens/rumor.py::RumorModal` over the rebuilt
+tavern. The no-fresh-rumour path is the reducer's existing rejection (no modal).
 
 **Goal:** reveal the purchased rumor's lead text in a dismissible modal on purchase.
 
