@@ -16,9 +16,10 @@ from typing import Any
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.css.query import NoMatches
+from textual.events import Resize
 from textual.screen import Screen
-from textual.containers import Vertical
-from textual.widgets import Button, DataTable, Footer, Static, TabbedContent
+from textual.containers import Horizontal, Vertical
+from textual.widgets import Button, DataTable, Footer, Input, Static, TabbedContent
 from textual.widgets.data_table import RowDoesNotExist
 
 from edge.core.economy import EconomyError
@@ -28,23 +29,69 @@ from edge.core.rules import (
     BuyComponent, BuyDevice, BuyFighters, BuyGenesis, BuyMines, BuyMissiles, BuyRumor,
     BuyShip, Deposit, PostNotice, RecruitColonists, Withdraw,
 )
+from edge.art.concourse import render_stardock_art
 from edge.server.service import GameService
 from edge.tui import art_adapter
+from edge.tui.amount_stepper import AmountStepper
 from edge.tui.chrome import AmountPrompt, EmptyState, TextPrompt, notify_warning
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.widgets import ServiceHub, TradePanel
 
 
-# Placeholder station-concourse banner for the Colonists tab (PT-06). A bespoke
-# DS9-style raster run through the image→ANSI pipeline is a deferred art follow-up;
-# this compact ASCII stand-in keeps the tab operable at 80x24 in the meantime.
+# Text-only failure fallback for missing assets or Chafa. The generated raster is
+# normally converted through edge.art.concourse; compact 80×24 hides decorative art.
 _CONCOURSE_ART = (
     "[dim]╭──────────────── ORBITAL CONCOURSE ────────────────╮[/]\n"
     "[dim]│[/]  [cyan]▟▙[/]   [cyan]▟▙[/]    [yellow]☺ ☺  ☺[/]   [cyan]▟▙[/]   [cyan]▟▙[/]  [dim]│[/]\n"
     "[dim]│[/]  [cyan]██[/]   [cyan]██[/]   [yellow]☺  ☺ ☺ ☺[/]  [cyan]██[/]   [cyan]██[/]  [dim]│[/]\n"
     "[dim]╰────────  colonists throng the promenade  ─────────╯[/]"
 )
+
+
+class _StarDockServiceArt(Static):
+    """Theme- and breakpoint-aware Chafa panel with a text-only fallback."""
+
+    def __init__(self, tab: str) -> None:
+        super().__init__(_CONCOURSE_ART, classes="service-art")
+        self._tab = tab
+
+    def on_mount(self) -> None:
+        self.app.theme_changed_signal.subscribe(self, lambda _theme: self._refresh_art())
+        self._refresh_art()
+
+    def on_resize(self, _event: Resize) -> None:
+        self._refresh_art()
+
+    def _refresh_art(self) -> None:
+        cinematic = getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "wide"
+        try:
+            self.update(render_stardock_art(self._tab, str(self.app.theme), cinematic=cinematic))
+        except (ImportError, OSError, ValueError):
+            self.update(_CONCOURSE_ART)
+
+
+class _DockStructureArt(Static):
+    """Responsive StarDock silhouette paired with each service banner."""
+
+    def __init__(self, sector_id: int, archetype_id: str | None) -> None:
+        super().__init__(classes="dock-structure-art")
+        self._sector_id = sector_id
+        self._archetype_id = archetype_id
+
+    def on_mount(self) -> None:
+        self._refresh_art()
+
+    def on_resize(self, _event: Resize) -> None:
+        self._refresh_art()
+
+    def _refresh_art(self) -> None:
+        wide = getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "wide"
+        width, height = (36, 12) if wide else (24, 8)
+        self.update(art_adapter.sprite(
+            "port", "stardock", seed=self._sector_id, width=width, height=height,
+            archetype_id=self._archetype_id,
+        ))
 
 
 class StarDockScreen(Screen[None]):
@@ -75,16 +122,25 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
         dock: top; height: 1; background: $primary; color: $background;
         text-style: bold; padding: 0 1;
     }
-    StarDockScreen #dock-art { height: auto; content-align: center top; }
+    StarDockScreen .service-art-header {
+        height: 8; margin-bottom: 1; content-align: left top;
+    }
+    StarDockScreen .dock-structure-art {
+        width: 24; height: 8; margin-right: 1; content-align: left top;
+    }
     StarDockScreen TabPane { padding: 1 2; }
     StarDockScreen .note { color: $text-muted; margin-top: 1; }
     StarDockScreen DataTable { height: auto; max-height: 18; }
-    StarDockScreen #concourse-art { height: auto; margin-bottom: 1; }
+    StarDockScreen .service-art { width: 56; height: 8; content-align: left top; }
     StarDockScreen Button { margin-top: 1; margin-right: 1; }
-    StarDockScreen.compact #dock-art { display: none; }
+    StarDockScreen .recruit-row { height: auto; margin-top: 1; }
+    StarDockScreen .recruit-row Button { margin-top: 0; }
+    StarDockScreen.compact .service-art-header { display: none; }
     StarDockScreen.compact TabPane { padding: 0 1; }
     StarDockScreen.compact DataTable { max-height: 10; }
-    StarDockScreen.compact #concourse-art { display: none; }
+    StarDockScreen.wide .service-art-header { height: 12; }
+    StarDockScreen.wide .dock-structure-art { width: 36; height: 12; }
+    StarDockScreen.wide .service-art { width: 72; height: 12; }
     """
 
     # Buy tabs whose table cursor we preserve across a screen rebuild.
@@ -108,17 +164,11 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
         dock = self._service.stardock_view(self._pid)
         latinum = dock.latinum
         yield Static(f"STARDOCK · Sector {dock.sector_display}", id="dock-title")
-        size = self.app.scene_art.port  # one canonical port footprint, shared with SectorView
-        yield Static(
-            art_adapter.sprite(
-                "port", "stardock", seed=port.sector_id,
-                width=size.max_width, height=size.max_height,
-                archetype_id=port.archetype_id,
-            ),
-            id="dock-art",
-        )
-        trade = TradePanel(port, latinum=latinum, show_title=False)
+        trade = Vertical(
+                self._service_art_header("commodities", port),
+                TradePanel(port, latinum=latinum, show_title=False))
         shipyard = Vertical(
+                self._service_art_header("shipyard", port),
                 Static(
                     f"[b]SHIPYARD[/]        Latinum [b yellow]{latinum:,}[/] slips        "
                     "[dim]net price shown after trade-in[/]"
@@ -126,20 +176,23 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
                 Static("[dim]B buys the highlighted hull (your parts return loose).[/]",
                        classes="note"))
         hardware = Vertical(
+                self._service_art_header("hardware", port),
                 Static(
                     f"[b]HARDWARE EMPORIUM[/]        Latinum [b yellow]{latinum:,}[/] slips"
                 ), self._hardware_table(dock),
                 Static("[dim]B buys the highlighted part; slot it in the Engine Room (E). "
                        "Tier III is barter-only.[/]", classes="note"))
         devices = Vertical(
+                self._service_art_header("devices", port),
                 Static(f"[b]DEVICES & ARMAMENTS[/]        Latinum [b yellow]{latinum:,}[/] slips"),
                 self._devices_table(dock),
                 Static("[dim]B buys the highlighted row — munitions (missiles / fighters / "
                        "mines) prompt for a quantity; devices and the Genesis torpedo buy one. "
                        "Deploy them from the game screen's Deploy (D).[/]", classes="note"))
-        colonists = Vertical(*list(self._colonist_panels(dock)))
+        colonists = Vertical(*list(self._colonist_panels(dock, port)))
         rate = dock.interest_per_day * 100
         bank = Vertical(
+                self._service_art_header("bank", port),
                 Static(
                     f"[b]BANK OF THE CORE[/]\n\n"
                     f"On hand   [b yellow]{latinum:,}[/] slips\n"
@@ -148,7 +201,7 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
                 ),
                 Static("[dim][b]D[/] Deposit an amount   ·   [b]W[/] Withdraw an amount[/]",
                        classes="note"))
-        tavern = Vertical(*list(self._tavern_panels()))
+        tavern = Vertical(self._service_art_header("tavern", port), *list(self._tavern_panels()))
         entries = [
             ("Commodities", "trade", trade, None),
             ("Shipyard", "shipyard", shipyard, None),
@@ -230,13 +283,19 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
             table.add_row(item.label, f"{item.carried:,}", f"{item.price:,}{unit}", mark, key=item.id)
         return table
 
-    def _colonist_panels(self, dock: object) -> ComposeResult:
+    def _service_art_header(self, tab: str, port: object) -> Horizontal:
+        """Left-aligned StarDock silhouette + the active service's ANSI banner."""
+        return Horizontal(
+            _DockStructureArt(port.sector_id, port.archetype_id),  # type: ignore[attr-defined]
+            _StarDockServiceArt(tab),
+            classes="service-art-header",
+        )
+
+    def _colonist_panels(self, dock: object, port: object) -> ComposeResult:
         """The recruitment office (§4.2, WP-PR08 / PT-06): berth occupancy + a recruit control."""
-        d = dock  # type: ignore[assignment]
+        d = dock
         free = max(0, d.ship_colonist_capacity - d.ship_colonists)  # type: ignore[attr-defined]
-        # NOTE: a bespoke DS9-style station-concourse raster (run through the image→ANSI
-        # pipeline) is a deferred art follow-up; this text banner stands in for now (PT-06).
-        yield Static(_CONCOURSE_ART, id="concourse-art")
+        yield self._service_art_header("concourse", port)
         yield Static(
             f"[b]RECRUITMENT OFFICE[/]        Latinum [b yellow]{d.latinum:,}[/] slips\n\n"  # type: ignore[attr-defined]
             f"Berths    [b]{d.ship_colonists:,}[/] / {d.ship_colonist_capacity:,}  "  # type: ignore[attr-defined]
@@ -246,9 +305,12 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
         yield Static("[dim]Colonists are recruited, not bought — they ride their own berths, "
                      "not cargo holds. Settle them onto a world you own from its orbit view.[/]",
                      classes="note")
-        yield Button(f"Recruit up to {d.colonists_recruitable:,}", id="btn-recruit-all",  # type: ignore[attr-defined]
-                     variant="primary")
-        yield Button("Recruit an amount…", id="btn-recruit-some")
+        yield Horizontal(
+            AmountStepper("recruit", step=10, maximum=d.colonists_recruitable),  # type: ignore[attr-defined]
+            Button("Recruit", id="btn-recruit", variant="primary"),
+            Button("Recruit all", id="btn-recruit-all"),
+            classes="recruit-row",
+        )
 
     def _shipyard_table(self, dock: object) -> DataTable[Any]:
         table: DataTable[Any] = DataTable(id="shipyard-table", cursor_type="row")
@@ -326,20 +388,25 @@ work on their tab: [b]K[/] recruits on Colonists, [b]D[/]/[b]W[/] bank on Bank,
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-recruit-all":
             self._recruit_up_to(self._service.stardock_view(self._pid).colonists_recruitable)
-        elif event.button.id == "btn-recruit-some":
-            self.action_recruit()
+        elif event.button.id == "btn-recruit":
+            self._recruit_entered_amount()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "amt-recruit":
+            self._recruit_entered_amount()
 
     def action_recruit(self) -> None:
-        """Prompt for a number of colonists to enlist into the ship's free berths."""
+        """Focus the inline exact-amount recruitment editor."""
         recruitable = self._service.stardock_view(self._pid).colonists_recruitable
         if recruitable <= 0:
             self.notify("No free berths or not enough latinum to recruit.", timeout=2)
             return
 
-        def _go(count: int | None) -> None:
-            if count:
-                self._recruit_up_to(count)
-        self.app.push_screen(_AmountInput(f"Recruit how many colonists? (up to {recruitable:,})"), _go)
+        self.query_one("#amt-recruit", Input).focus()
+
+    def _recruit_entered_amount(self) -> None:
+        count = self.query_one("#stepper-recruit", AmountStepper).amount
+        self._recruit_up_to(count)
 
     def _recruit_up_to(self, count: int) -> None:
         if count <= 0:
