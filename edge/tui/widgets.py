@@ -268,18 +268,18 @@ def first_focusable(node: Widget) -> Widget | None:
     return None
 
 
-def accel_title(label: str, letter: str | None) -> Text:
-    """A tab title with its accelerator letter emphasised (WP-PR2-01).
+def accel_title(label: str, letter: str | None) -> str:
+    """A tab title (Textual markup) with its accelerator letter emphasised (WP-PR2-01).
 
     The first case-insensitive occurrence of `letter` is bold-underlined so the
     hotkey reads from the title itself — legible without colour (monochrome-safe),
-    which is why the tab-focus keys stay out of the crowded footer."""
-    title = Text(label)
+    which is why the tab-focus keys stay out of the crowded footer. Returns a markup
+    string because a `TabPane` title must be markup/Content, not a Rich `Text`."""
     if letter:
         idx = label.lower().find(letter.lower())
         if idx >= 0:
-            title.stylize("bold underline", idx, idx + 1)
-    return title
+            return f"{label[:idx]}[bold underline]{label[idx]}[/]{label[idx + 1:]}"
+    return label
 
 
 class ServiceHub(Vertical):
