@@ -514,11 +514,11 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         self.app.push_screen(HelpScreen(self))
 
     def action_dismiss_objectives(self) -> None:
-        """Hide the Captain's-objectives strip (WP-UI11); Options re-enables it."""
+        """Hide the Captain's-objectives strip (WP-UI11); Help/Options re-enable it."""
         for strip in self.query(ObjectivesStrip):
             strip.remove()
         self.app.update_ui_settings(show_onboarding=False)  # type: ignore[attr-defined]
-        self.notify("Objectives hidden — re-enable in Options (main menu).", timeout=3)
+        self.notify("Objectives hidden — press ? then O to restore them.", timeout=3)
 
     # --- event ticker --------------------------------------------------------
 

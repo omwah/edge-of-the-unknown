@@ -583,11 +583,10 @@ not an exhaustive behavioural replay, so absence of a finding is not proof of fu
   deltas for shields, warp speed, combat speed, turns/warp, gun damage/rate, and efficiency.
   Invalid pairings show the authoritative blocker. The read-only server projection derives from
   the reducer's unapplied result, so preview numbers cannot diverge from the eventual command.
-- **WP-UI11 — objectives not reopenable *from Help*.** The plan said "Make objectives reopenable
-  from Help." The strip is dismissible (`O`) and re-enable exists, but **via Options** (the
-  `O`/toggle-onboarding row in `options.py`), not from the Help screen (`help.py` has no
-  objectives affordance). Partial: the capability exists, the specified entry point does not.
-  Follow-up: add an objectives reopen/toggle to Help, or amend the bullet to name Options.
+- ~~**WP-UI11 — objectives not reopenable *from Help*.**~~ **Done (2026-07-11).** When
+  objectives are hidden, contextual Help exposes a visible `[O] Show Captain's objectives`
+  button and binding. Restoring persists the preference and recomposes the underlying screen
+  immediately; Options retains its equivalent toggle.
 
 **Unresolved — missing verification bullets (behaviour present, gate absent):**
 
