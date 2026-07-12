@@ -371,6 +371,21 @@ class TransferCargo:
 
 
 @dataclass(frozen=True, slots=True)
+class BatchTransferCargo:
+    """Move several commodity rows in one atomic command (§4.2, WP-PR07 follow-up).
+
+    Keys are commodity values and values are requested units. Missing/zero rows are ignored;
+    positive rows clamp exactly like :class:`TransferCargo`. Loading shares the ship's free
+    holds in stable commodity order. The command either returns every accepted movement in one
+    reducer result/event group or raises without changing state.
+    """
+
+    planet_id: int
+    units: dict[str, int]
+    to_planet: bool = True
+
+
+@dataclass(frozen=True, slots=True)
 class PlanetDeposit:
     """Deposit latinum into an owned citadel world's treasury (§4.2, WP54). Owner-only, in-sector."""
 
@@ -945,7 +960,8 @@ Command = (
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SettleColonists | SetAllocation
-    | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet | TransferCargo
+    | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
+    | TransferCargo | BatchTransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | MineBelt | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
@@ -1077,6 +1093,8 @@ def reduce(
             return _build_citadel(state, player_id, command, config)
         case TransferCargo():
             return _transfer_cargo(state, player_id, command)
+        case BatchTransferCargo():
+            return _batch_transfer_cargo(state, player_id, command)
         case PlanetDeposit():
             return _planet_bank(state, player_id, command.planet_id, command.amount,
                                 config, withdraw_=False)
@@ -2095,6 +2113,50 @@ def _transfer_cargo(state: UniverseState, player_id: int, cmd: TransferCargo) ->
     return ReduceResult(
         events=(CargoTransferred(player_id, planet.id, cmd.commodity, moved, cmd.to_planet),),
         ships=(new_ship,), planets=(new_planet,),
+    )
+
+
+def _batch_transfer_cargo(
+    state: UniverseState, player_id: int, cmd: BatchTransferCargo,
+) -> ReduceResult:
+    """Apply the transfer workbench's aggregate action as one all-or-nothing delta."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    unknown = set(cmd.units) - {commodity.value for commodity in Commodity}
+    if unknown:
+        raise EconomyError(f"unknown commodity in batch: {sorted(unknown)[0]}")
+    if any(units < 0 for units in cmd.units.values()):
+        raise EconomyError("batch transfer amounts cannot be negative")
+
+    cargo = dict(ship.cargo)
+    stores = dict(planet.stores)
+    events: list[Event] = []
+    free_holds = ship.holds_free
+    for commodity in Commodity:
+        requested = cmd.units.get(commodity.value, 0)
+        if requested <= 0:
+            continue
+        if cmd.to_planet:
+            moved = min(requested, cargo.get(commodity, 0))
+            if moved:
+                cargo[commodity] = cargo.get(commodity, 0) - moved
+                stores[commodity] = stores.get(commodity, 0) + moved
+        else:
+            moved = min(requested, stores.get(commodity, 0), free_holds)
+            if moved:
+                stores[commodity] = stores.get(commodity, 0) - moved
+                cargo[commodity] = cargo.get(commodity, 0) + moved
+                free_holds -= moved
+        if moved:
+            events.append(CargoTransferred(
+                player_id, planet.id, commodity, moved, cmd.to_planet))
+    if not events:
+        raise EconomyError("no cargo can be transferred")
+    return ReduceResult(
+        events=tuple(events),
+        ships=(replace(ship, cargo=cargo),),
+        planets=(replace(planet, stores=stores),),
     )
 
 

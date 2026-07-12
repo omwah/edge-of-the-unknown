@@ -161,7 +161,7 @@ from edge.core.rules import (
     ToggleAvoid,
     ToggleInterdictor,
     Trade,
-    TransferCargo,
+    BatchTransferCargo, TransferCargo,
     TravelTo,
     Warp,
     Withdraw,
@@ -195,6 +195,7 @@ COMMANDS: list[Command] = [
     InvadePlanet(planet_id=5, fighters=200),         # WP55 ground assault
     TransferCargo(planet_id=5, commodity=Commodity.EQUIPMENT, units=120),  # §4.2 supply haul
     TransferCargo(planet_id=5, commodity=Commodity.ORGANICS, units=30, to_planet=False),
+    BatchTransferCargo(planet_id=5, units={"fuel_ore": 40, "equipment": 90}),
     InstallComponent(Subsystem.SPINDRIVE, 3, Component.TURBINE, ComponentTier.II),
     SwapComponent(Subsystem.SCREENS, 1, Component.RADIATOR, ComponentTier.III),
     Cannibalize(Subsystem.MAIN_GUN, 2),
