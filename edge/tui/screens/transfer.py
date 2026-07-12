@@ -20,9 +20,11 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Static
 
 from edge.core.economy import EconomyError
+from edge.core.dto import PlanetDTO
 from edge.core.enums import Commodity
 from edge.core.rules import SettleColonists, TransferCargo
 from edge.server.service import GameService
+from edge.tui.amount_stepper import AmountStepper
 from edge.tui.chrome import notify_warning
 
 _STEP = 10
@@ -40,8 +42,6 @@ class TransferWorkbenchScreen(ModalScreen[None]):
     }
     TransferWorkbenchScreen .row { height: auto; margin-bottom: 1; }
     TransferWorkbenchScreen .row-head { width: 1fr; }
-    TransferWorkbenchScreen Input { width: 11; }
-    TransferWorkbenchScreen .step { width: 5; min-width: 5; }
     TransferWorkbenchScreen .act { width: 10; min-width: 8; }
     TransferWorkbenchScreen #foot { height: auto; margin-top: 1; }
     """
@@ -60,7 +60,7 @@ class TransferWorkbenchScreen(ModalScreen[None]):
 
     # --- data -----------------------------------------------------------------
 
-    def _planet(self):
+    def _planet(self) -> PlanetDTO:
         return self._service.planet_view(self._pid, self._planet_id)
 
     def _aboard(self) -> dict[str, int]:
@@ -83,9 +83,7 @@ class TransferWorkbenchScreen(ModalScreen[None]):
                 # the per-row actions — matching the spec's "field, −, +, then aggregate".
                 yield Horizontal(
                     Static(f"[b]{label}[/]\n[dim]aboard {a:,} · stores {s:,}[/]", classes="row-head"),
-                    Input(value="0", id=f"amt-{c.value}", type="integer"),
-                    Button("−", id=f"dec-{c.value}", classes="step"),
-                    Button("+", id=f"inc-{c.value}", classes="step"),
+                    AmountStepper(c.value, step=_STEP),
                     Button("Load", id=f"load-{c.value}", classes="act"),
                     Button("Unload", id=f"unload-{c.value}", classes="act"),
                     classes="row",
@@ -96,9 +94,7 @@ class TransferWorkbenchScreen(ModalScreen[None]):
                 yield Horizontal(
                     Static(f"[b]Colonists[/]\n[dim]berth {p.ship_colonists:,} · colony {p.colonists:,} "
                            f"· room {room:,}[/]", classes="row-head"),
-                    Input(value="0", id=f"amt-{_COLONIST_ROW}", type="integer"),
-                    Button("−", id=f"dec-{_COLONIST_ROW}", classes="step"),
-                    Button("+", id=f"inc-{_COLONIST_ROW}", classes="step"),
+                    AmountStepper(_COLONIST_ROW, step=_STEP),
                     Button("Settle", id=f"unload-{_COLONIST_ROW}", classes="act"),
                     classes="row",
                 )
@@ -112,13 +108,10 @@ class TransferWorkbenchScreen(ModalScreen[None]):
     # --- helpers --------------------------------------------------------------
 
     def _amount(self, key: str) -> int:
-        try:
-            return max(0, int(self.query_one(f"#amt-{key}", Input).value or "0"))
-        except ValueError:
-            return 0
+        return self.query_one(f"#stepper-{key}", AmountStepper).amount
 
     def _set_amount(self, key: str, value: int) -> None:
-        self.query_one(f"#amt-{key}", Input).value = str(max(0, value))
+        self.query_one(f"#stepper-{key}", AmountStepper).set_amount(value)
 
     def _refresh(self) -> None:
         self.refresh(recompose=True)
@@ -143,12 +136,6 @@ class TransferWorkbenchScreen(ModalScreen[None]):
             self.action_load_all()
         elif bid == "unload-all":
             self.action_unload_all()
-        elif bid.startswith("dec-"):
-            key = bid[4:]
-            self._set_amount(key, self._amount(key) - _STEP)
-        elif bid.startswith("inc-"):
-            key = bid[4:]
-            self._set_amount(key, self._amount(key) + _STEP)
         elif bid.startswith("load-"):
             self._do_row(bid[5:], to_planet=False)
         elif bid.startswith("unload-"):

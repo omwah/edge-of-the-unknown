@@ -506,22 +506,21 @@ global StarDock shortcut performs a context-inappropriate action, combat/world
 state remains replay-deterministic, all primary workflows work at 80x24, and the
 documentation and Help accurately describe the resulting controls and rules.
 
-**Not yet met:** two items in §8 are still open even where their WP has landed —
-PT-06's station-concourse art and PT-23's per-row avoid action — so the remediation is not
-fully complete against the plan as written. (PT-30's belt raw-mining output was closed
-2026-07-11 by the `MineBelt` action.)
+**Not yet met:** PT-23's per-row avoid action in §8 remains open, so the remediation is
+not fully complete against the plan as written. (PT-06's station-concourse art and PT-30's
+belt raw-mining output were closed 2026-07-11.)
 
 ## 8. Outstanding follow-ups (deferred, still open)
 
 These were consciously deferred during implementation and are **not** resolved.
 They are tracked here so a struck-through playtest note never hides open work.
 
-- **PT-06 — station-concourse art (WP-PR08).** The bespoke DS9-style raster run
-  through the image-to-ANSI pipeline was not produced — the `imagegen` skill was
-  unavailable in the implementing environment. The Colonists tab ships a placeholder
-  ASCII banner (`edge/tui/screens/stardock.py::_CONCOURSE_ART`). Follow-up: generate
-  the raster, convert it, commit the asset with provenance/fallbacks per art policy,
-  and replace the banner (hide/shorten at compact size).
+- ~~**PT-06 — station-concourse art (WP-PR08).**~~ **Done (2026-07-11).** A generated,
+  DS9-like hopeful recruitment concourse now runs through the existing Chafa image-to-ANSI
+  seam. Explicit full-colour, high-contrast, and monochrome raster variants feed a 56×8
+  standard panel and 72×12 wide cinematic panel; compact 80×24 hides the decoration,
+  and the prior ASCII banner remains the missing-asset/Chafa fallback. Provenance lives in
+  `images/ui/stardock/PROVENANCE.md`.
 - **WP-PR07 — batch transfer command (optional).** The transfer workbench issues one
   clamped `TransferCargo`/`SettleColonists` per row; a single atomic batch command was
   left unbuilt (low value for the local single-player service). If added later, update

@@ -101,6 +101,30 @@ async def test_recruit_from_colonists_tab() -> None:
         assert ship.colonists > 0
 
 
+async def test_recruit_stepper_supports_steps_exact_amount_and_enter() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _dock(app, pilot)
+        screen = app.screen
+        assert isinstance(screen, StarDockScreen)
+        _select_tab(screen, "colonists")
+        await pilot.pause()
+        from textual.widgets import Button, Input
+        screen.query_one("#inc-recruit", Button).press()
+        await pilot.pause()
+        field = screen.query_one("#amt-recruit", Input)
+        assert field.value == "10"
+        field.value = "17"
+        field.focus()
+        before = svc.state.ships[svc.state.players[1].ship_id].colonists
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        after = svc.state.ships[svc.state.players[1].ship_id].colonists
+        assert after - before == 17
+
+
 async def test_current_hull_cannot_be_bought() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:

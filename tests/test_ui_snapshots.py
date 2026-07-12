@@ -109,6 +109,26 @@ def test_stardock_colonists_themes(snap_compare, theme: str) -> None:
     assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["standard"], run_before=run)
 
 
+@pytest.mark.parametrize("size", [SIZES["standard"], SIZES["wide"]],
+                         ids=["standard", "wide"])
+def test_stardock_concourse_sizes(snap_compare, size: tuple[int, int]) -> None:
+    """PT-06: compact and cinematic ANSI crops both retain the recruitment scene."""
+    assert snap_compare(EdgeApp(plain=True), terminal_size=size,
+                        run_before=_open_stardock("colonists"))
+
+
+@pytest.mark.parametrize("tab", ["trade", "shipyard", "hardware", "devices", "bank", "tavern"])
+def test_stardock_service_art_standard(snap_compare, tab: str) -> None:
+    assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["standard"],
+                        run_before=_open_stardock(tab))
+
+
+@pytest.mark.parametrize("tab", ["trade", "shipyard", "hardware", "devices", "bank", "tavern"])
+def test_stardock_service_art_wide(snap_compare, tab: str) -> None:
+    assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["wide"],
+                        run_before=_open_stardock(tab))
+
+
 def test_options_modal(snap_compare) -> None:
     assert snap_compare(EdgeApp(plain=True), press=["o"], terminal_size=SIZES["standard"])
 
