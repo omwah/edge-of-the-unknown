@@ -100,7 +100,9 @@ class PlanetScreen(EdgeScreen):
         Binding("plus", "treasury_deposit", "Deposit"),
         Binding("minus", "treasury_withdraw", "Withdraw"),
         Binding("i", "invade", "Invade"),
-        Binding("b", "enter_base", "Enter base"),
+        # `P` boards the base here too, as it does on the sector view — the verb keeps
+        # one key everywhere (a base *is* the port where it orbits, §4.2/WP80).
+        Binding("p", "enter_base", "Enter base"),
         Binding("t", "unload_cargo", "Unload cargo"),
         Binding("l", "load_cargo", "Load cargo"),
     ]
@@ -110,7 +112,7 @@ class PlanetScreen(EdgeScreen):
     HELP_TITLE = "Planet orbit"
     HELP = """\
 Colony matters live here; every starbase op (repair · salvage · claim · assault ·
-market · services) is on the base screen — [b]B[/] or click the base line.
+market · services) is on the base screen — [b]P[/] or click the base line.
 The Stores and Citadel panels are button-driven ([b]Tab[/] walks the buttons,
 [b]Enter[/] fires): [b]Transfer…[/] opens one editor to haul cargo between ship and
 stores and to settle colonists onto the colony; start builds and move the treasury
@@ -178,7 +180,7 @@ runs in trips are the intended loop; the citadel art grows with its level."""
                     colour = "yellow" if p.starbase_derelict else "green"
                     yield ClickableEntry(
                         f"[{colour}]#[/] Orbital starbase — {p.starbase}   "
-                        f"[dim]\\[B] Enter base[/]",
+                        f"[dim]\\[P] Enter base[/]",
                         dest="starbase", ref=p.starbase_id, classes="section")
                 if not p.genesis_blocker:
                     yield Static(f"[green]\\[G] Genesis[/] — re-form this world (torpedoes: {p.ship_genesis})")

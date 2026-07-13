@@ -145,8 +145,11 @@ class ComponentWorkbench(Widget):
         with Grid(id="workbench-grid"):
             for subsystem in self.subsystems:
                 yield _BayPanel(self, subsystem)
-        with Vertical(id="workbench-loose"):
-            yield Static(self.profile.loose_components_title, classes="section-heading")
+        # The panel names itself in its border, like the bays above it — a heading line
+        # inside the box only repeated what the frame could say for free.
+        loose = Vertical(id="workbench-loose")
+        loose.border_title = self.profile.loose_components_title
+        with loose:
             if self.loose_components:
                 for component in self.loose_components:
                     marker = self.profile.slot_glyphs.selected if component in self._selected_components else " "
@@ -217,7 +220,9 @@ SHIP_WORKBENCH_PROFILE = ComponentWorkbenchProfile(
 
 STARBASE_WORKBENCH_PROFILE = ComponentWorkbenchProfile(
     context="starbase", workbench_title="Station Systems",
-    loose_components_title="Components aboard your ship",
+    # Same panel, same name as in the Engine Room: it is the ship's loose parts either way,
+    # and the two hosts should not invent different words for one thing.
+    loose_components_title="Loose Components",
     subsystem_labels={
         "FUSION REACTOR": "Fusion Core", "SCREENS": "Defense Grid",
         "MAIN GUN": "Orbital Battery",

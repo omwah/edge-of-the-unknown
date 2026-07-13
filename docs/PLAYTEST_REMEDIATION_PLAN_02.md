@@ -160,10 +160,9 @@ screens should adopt:
   "Records" was taken by an action; the category was renamed rather than take a key away
   from the tables. Pane ids (`cat-records` / `log` / `notes`) are unchanged.
 
-**Still deferred:** the **Base** screen keeps screen-level bindings + `check_action`;
-porting it to `ActionPane`/`PANE_BINDINGS` through `ServiceHub` (as the Stardock now is)
-is the last step. Computer sub-tabs are no longer deferred: they are numbered `1`..`N`
-per category.
+**Nothing is deferred:** all three tabbed screens (Computer, Stardock, Base) are on the
+model. Computer sub-tabs are numbered `1`..`N` per category; the two services hubs take
+letters only.
 
 #### WP-PR2-01c — Stardock: tab-owned keys — landed
 
@@ -205,6 +204,38 @@ separate a category's sub-tabs, which the Stardock does not have.
   renames the projection DTO `StarDockDTO` → `StardockDTO`, which moves the wire
   fingerprint: **`WIRE_VERSION` 16 → 17**, `tests/fixtures/wire/{fingerprint.txt,
   envelopes.json}` regenerated. Projection-only, so no store migration.
+
+#### WP-PR2-01d — Starbase: tab-owned keys — landed
+
+**Landed 2026-07-12** in `playtest: WP-PR2-01d starbase tab-owned keys`. The last screen
+onto the WP-PR2-01b model, and the one that pays for it. It cost almost nothing: the model
+already lived in `ServiceHub` (WP-PR2-01c), so the screen just declares `PANE_BINDINGS`,
+passes it to the hub, and drops its `check_action`-flavoured "switch to the X tab first"
+guards, which are now unreachable — the key does not exist off its tab.
+
+- **Status is a panel, not a tab** (interview, 2026-07-12). Status and Station are merged:
+  Station leads with a bordered one-line **Status** panel (owner · standing · integrity),
+  because standing is what you read *while* you act, not a place you navigate to. That
+  makes **Station the one tab never withheld** — a hostile base shows nothing else, and
+  Assault is its door; the installations half explains itself when the base withholds it.
+  **Trade → Commodities**, matching the Stardock.
+- **Key map:** tabs **S**tation · **C**ommodities · **H**ardware · **B**ank. Moving the
+  verbs off the screen freed `H`, so **Hardware finally has an accelerator** (WP-PR2-01 had
+  to leave it letterless), and `C`/`H`/`B` name the same services they do at the Stardock.
+  Verbs: `R` repair, `V` salvage, `L` claim, `A` assault (Station); `T`/`G` trade, haggle
+  (Commodities); `P` purchase, `M` missile (Hardware); `A`/`W` bank. Salvage is `V` and
+  Claim is `L` because the accelerators took `S` and `C` — a pane key may never shadow one.
+  **`A` is Assault on Station and Deposit on Bank** — one key, two verbs, two tabs, which
+  is the reuse the whole model exists to allow.
+- **A withheld tab keeps no keys — and neither does an impossible verb.** The Base gates
+  its tabs by standing and service integrity; `ServiceHub` gives an unavailable entry *no*
+  bindings. `_pane_actions` then drops any single verb this base cannot honour: you cannot
+  **Assault** or **Claim** a base you already hold, repair a full rack, salvage an empty
+  one, or buy munitions a base does not sell, so none of those reach the footer (they used
+  to sit there and answer with a notification). Availability is now expressed by the
+  **absence of the keys** rather than by a per-action predicate — the cleanest statement
+  yet of why the model beats `check_action`.
+
 
 **Goal:** give Computer, Stardock, and Starbase tabs (and Computer subtabs) accent-
 letter focus hotkeys shown in the tab title, and make the hotkey **and** Enter-on-a-

@@ -109,8 +109,8 @@ def test_screen_actions_parity_with_footer_bindings() -> None:
     # These screens override `action_descriptors` because their verbs live on their tab
     # panes (PT-32): the descriptor list is assembled from the *active* tab, and its parity
     # with that tab's footer bindings is proven per-screen — tests/test_ui_computer_keys.py
-    # and tests/test_ui_stardock_keys.py.
-    _OVERRIDES_DESCRIPTORS = {"ComputerScreen", "StardockScreen"}
+    # tests/test_ui_stardock_keys.py and tests/test_ui_base_keys.py.
+    _OVERRIDES_DESCRIPTORS = {"ComputerScreen", "StardockScreen", "BaseScreen"}
     for cls in _screen_classes():
         if cls.__name__ in _OVERRIDES_DESCRIPTORS:
             assert "action_descriptors" in cls.__dict__, (
