@@ -165,7 +165,7 @@ class InstalledComponent:
 
     `knocked_out` is set true by Phase-3 combat (localized damage); in Phase 2 it
     is always false. A knocked-out component contributes nothing to derived aspects
-    until a field-patch (`repair_kit`) or StarDock restoration clears it.
+    until a field-patch (`repair_kit`) or Stardock restoration clears it.
     """
 
     kind: Component
@@ -253,7 +253,7 @@ class Ship:
     subsystems: Mapping[Subsystem, SubsystemState] | None = None
     components: Mapping[tuple[Component, ComponentTier], int] = field(default_factory=dict)
     # Counted special devices keyed by device id (e.g. "genesis_torpedo"); bought at
-    # StarDock, deployed by their own command (§4, WP10). Not cargo — no hold cost.
+    # Stardock, deployed by their own command (§4, WP10). Not cargo — no hold cost.
     devices: Mapping[str, int] = field(default_factory=dict)
     # Attached limpet mines (§10, WP56): owner tag ("alliance:2" / "player:3") → count.
     # A limpeted ship is trackable by that owner's hunters; removed for a fee at a service
@@ -604,7 +604,7 @@ class Player:
     # (H17). Hashed state.
     bounty: int = 0
     # Ship-class ids the player has flown and since traded away (WP-PR2-02 / PT-34) — the
-    # StarDock shipyard marks these "Flown" versus "Flying" for the current hull. Grows on
+    # Stardock shipyard marks these "Flown" versus "Flying" for the current hull. Grows on
     # BuyShip; reconstructs under (seed, command log). Hashed state.
     flown_classes: frozenset[str] = frozenset()
 

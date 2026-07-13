@@ -6,7 +6,7 @@ deliberately **structurally identical** to today's `edge/tui/dummy.py` fixtures,
 which are the de-facto contract — so when the real service lands, `dummy.py` is
 refactored to re-export these and the widget code is untouched (WP8).
 
-Scope: Phase-1 screens only (Game / Port / StarDock-commodities / Computer /
+Scope: Phase-1 screens only (Game / Port / Stardock-commodities / Computer /
 Map). DTOs use primitive types (str modes/names), not core enums — the
 projection converts enums to display strings. Phase 2–3 DTOs (surface, engine
 room, contact, encounter, messages) stay in `dummy.py` until their engines land.
@@ -178,7 +178,7 @@ class SectorPlanetDTO:
 class SectorPortDTO:
     """A port present in the current sector (§4).
 
-    `klass` is the display label (e.g. "Class 4 (BBS)" / "StarDock"); `is_stardock`
+    `klass` is the display label (e.g. "Class 4 (BBS)" / "Stardock"); `is_stardock`
     lets the docking flow branch without sniffing the name. `archetype_id` is the
     controlling species' palette (the sector's region controller), or None.
     """
@@ -486,7 +486,7 @@ class BountyDTO:
 
 @dataclass(frozen=True)
 class TavernDTO:
-    """The StarDock tavern — rumors, the bounty board, and the noticeboard (§14, WP58)."""
+    """The Stardock tavern — rumors, the bounty board, and the noticeboard (§14, WP58)."""
 
     rumor_price: int
     rumor_available: bool  # a fresh tip can be bought right now (at the dock)
@@ -757,7 +757,7 @@ class EngineRoomPreviewDTO:
 
 @dataclass(frozen=True)
 class HardwareItem:
-    """One row in the StarDock hardware emporium (UI_MOCKUPS.md §5, DESIGN §8)."""
+    """One row in the Stardock hardware emporium (UI_MOCKUPS.md §5, DESIGN §8)."""
 
     component: str
     tier: str
@@ -767,7 +767,7 @@ class HardwareItem:
 
 @dataclass(frozen=True)
 class ShipyardItem:
-    """One buyable hull in the StarDock shipyard, with a stat line (§8, §11)."""
+    """One buyable hull in the Stardock shipyard, with a stat line (§8, §11)."""
 
     class_id: str
     name: str
@@ -804,8 +804,8 @@ class ArmamentItem:
 
 
 @dataclass(frozen=True)
-class StarDockDTO:
-    """The StarDock services catalog (hardware + shipyard), fog-of-war scoped (§3)."""
+class StardockDTO:
+    """The Stardock services catalog (hardware + shipyard), fog-of-war scoped (§3)."""
 
     sector_display: int
     latinum: int

@@ -12,14 +12,15 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import Screen
+
+from edge.tui.chrome import EdgeScreen
 from textual.widgets import Button, Footer, Input, Label, Static
 
 from edge.server.client import RemoteError
 from edge.tui.remote import RemoteBridge
 
 
-class LobbyScreen(Screen[None]):
+class LobbyScreen(EdgeScreen):
     CSS = """
     LobbyScreen Vertical { width: 60; max-width: 100%; margin: 2 4; }
     LobbyScreen #lobby-title { text-style: bold; margin-bottom: 1; }

@@ -343,7 +343,7 @@ def test_flee_eventually_succeeds_even_when_crippled() -> None:
     raise AssertionError("never escaped in 400 attempts despite the 10% floor")
 
 
-# --- StarDock missiles ------------------------------------------------------------
+# --- Stardock missiles ------------------------------------------------------------
 
 
 def test_buy_missiles_at_stardock(tmp_path: Path) -> None:

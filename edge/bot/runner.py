@@ -99,7 +99,7 @@ class BotRunner:
     def current_port(self) -> dto.PortDTO | None:
         return self.service.current_port_view(self.player_id)
 
-    def stardock(self) -> dto.StarDockDTO:
+    def stardock(self) -> dto.StardockDTO:
         return self.service.stardock_view(self.player_id)
 
     # --- the run loop --------------------------------------------------------

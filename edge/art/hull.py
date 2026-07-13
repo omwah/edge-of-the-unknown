@@ -118,7 +118,7 @@ class HullStyle:
 
 
 # Hull palettes keyed by ``archetype_id`` (see config/alien_roster_default.yaml). The
-# Federation 'humanoid_diplomat' reads as the grey hull of the classic StarDock;
+# Federation 'humanoid_diplomat' reads as the grey hull of the classic Stardock;
 # every other archetype gets a distinct hull/beacon hue family. Unknown archetypes
 # fall back to 'default'. Ports and ships share these palettes.
 ARCHETYPE_STYLES: dict[str, HullStyle] = {

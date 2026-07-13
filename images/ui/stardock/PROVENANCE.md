@@ -1,4 +1,4 @@
-# StarDock service artwork provenance
+# Stardock service artwork provenance
 
 - Purpose: PT-06 Colonists-tab station-concourse art.
 - Generated: 2026-07-11 with OpenAI's built-in image generation tool.

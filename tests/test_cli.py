@@ -14,7 +14,7 @@ def test_stats_prints_report(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Cap
     monkeypatch.setattr("sys.argv", ["edge.bigbang", "--stats", "--sectors", "60", "--seed", "2"])
     cli.main()
     out = capsys.readouterr().out
-    assert "Sectors" in out and "60" in out and "StarDock" in out
+    assert "Sectors" in out and "60" in out and "Stardock" in out
 
 
 def test_render_web_writes_page(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -55,4 +55,4 @@ def test_no_arguments_prints_stats(monkeypatch: pytest.MonkeyPatch, capsys: pyte
     monkeypatch.setattr("sys.argv", ["edge.bigbang"])
     cli.main()
     out = capsys.readouterr().out
-    assert "Sectors" in out and "StarDock" in out
+    assert "Sectors" in out and "Stardock" in out

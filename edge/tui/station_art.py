@@ -55,7 +55,7 @@ class _StationArt(Static):
 
 
 class StationArtHeader(Horizontal):
-    """StarDock-model header: station exterior at left, active-service scene at right."""
+    """Stardock-model header: station exterior at left, active-service scene at right."""
 
     DEFAULT_CSS = """
     StationArtHeader { height: 8; margin-bottom: 1; content-align: left top; }

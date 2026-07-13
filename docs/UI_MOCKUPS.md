@@ -49,7 +49,8 @@ drops animation/CRT flourishes without overwriting saved preferences.
 ```
 MainMenu -> Game -+- PortScreen
                   +- PlanetScreen -> SurfaceScreen
-                  +- StarDockScreen   (tabs: Commodities . Shipyard . Hardware . Bank . Tavern)
+                  +- StardockScreen   (tabs: Commodities . Shipyard . Hardware . Devices
+                  |                           . Colonists . Bank . Tavern)
                   +- AlienContactScreen
                   +- EncounterScreen
                   +- EngineRoomScreen
@@ -58,10 +59,10 @@ MainMenu -> Game -+- PortScreen
                      +- Commerce    (Ports . Trade . Market)
                      +- Exploration (Planets . Codex . Leads)
                      +- Relations   (Contracts . Alliances . Dossier)
-                     +- Records     (Log . Notes)
+                     +- Logbook     (Log . Notes)
 ```
 
-Phase 1 builds: **MainMenu, Game, PortScreen, StarDockScreen, ComputerScreen,
+Phase 1 builds: **MainMenu, Game, PortScreen, StardockScreen, ComputerScreen,
 MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
 
 ---
@@ -143,7 +144,7 @@ MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
   disc reads round on the ~2:1 cell grid (`scene.planet`, distinct from
   `scene.planet_detail` used by the larger PlanetScreen orbit view, §3).
 - **Orbit / ship clicks** open the same screen as the key: planet -> PlanetScreen
-  (§3, `S`); a StarDock port -> StarDockScreen (§5) / a plain port -> PortScreen
+  (§3, `S`); a Stardock port -> StardockScreen (§5) / a plain port -> PortScreen
   (§2), the **same target as `P`**; a hailable ship -> AlienContactScreen (§6) for a
   friendly-band ship or EncounterScreen (§7) for a hostile one.
 - **Ships**: up to `scene.max_ships_shown` (default **2**) sprites side by side; when
@@ -176,8 +177,8 @@ MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
 ## 2. PortScreen  *(Phase 1)* — trading + haggling
 
 The trade UI is a reusable widget (`TradePanel`): the standalone `PortScreen`
-below wraps it for a **plain commodities port**, and the StarDock embeds the same
-widget as its **Commodities** tab (§5). So whether or not a port is a StarDock,
+below wraps it for a **plain commodities port**, and the Stardock embeds the same
+widget as its **Commodities** tab (§5). So whether or not a port is a Stardock,
 docking reaches an identical trade experience — only the container differs.
 
 ```
@@ -291,11 +292,12 @@ docking reaches an identical trade experience — only the container differs.
 
 ---
 
-## 5. StarDockScreen  *(Phase 1 shell; tabs fill in Phase 2)*
+## 5. StardockScreen  *(Phase 1 shell; tabs fill in Phase 2)*
 
 ```
 ┌─ STARDOCK . Sol ─────────────────────────────────────────────────────┐
-│ [ Commodities ][ Shipyard ][ Hardware ][ Bank ][ Tavern ]            │
+│ [ Commodities ][ Shipyard ][ Hardware ][ Devices ][ Colonists ]      │
+│ [ Bank ][ Tavern ]                                                   │
 ├──────────────────────────────────────────────────────────────────────┤
 │  HARDWARE EMPORIUM                          Latinum 14,250 slips     │
 │                                                                      │
@@ -311,15 +313,22 @@ docking reaches an identical trade experience — only the container differs.
 │                 Homing missile   ---     [Buy]                       │
 │                 Genesis torpedo  ---     [Buy]                       │
 │                                                                      │
-│  [R] Repair ship (-> Engine room)   [E] Engine room   [Esc] Undock   │
+│  [Esc] Undock   [P] Purchase highlighted   [E] Engine room           │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Tabs**: `TabbedContent` — **Commodities** (the default: the §2 `TradePanel`,
-  so a StarDock trades through a tab rather than a separate screen), **Shipyard**
+  so a Stardock trades through a tab rather than a separate screen), **Shipyard**
   (buy/sell hulls, §4), **Hardware** (components + consumables, the upgrade sink,
-  §8), **Bank** (deposit/withdraw, interest, §8), **Tavern** (rumors/contracts,
-  Phase 5).
+  §8), **Devices & Armaments**, **Colonists** (recruit, §4.2), **Bank**
+  (deposit/withdraw, interest, §8), **Tavern** (rumors/contracts, Phase 5).
+- **Keys follow the §11 tabbed-screen model — a tab owns its keys.** The screen binds
+  only `Esc` (undock) and the tab accelerators — the underlined letter of each title:
+  **C**ommodities · **S**hipyard · **H**ardware · **D**evices & Armaments · Co**l**onists ·
+  **B**ank · Ta**v**ern. Every verb is bound to its own tab's pane, so the footer offers
+  exactly what the visible tab can do: `T`/`G` trade and haggle, `P` purchases, `K`
+  recruits, `A`/`W` bank, `R`/`N` buy a rumour / post a notice. `E` (Engine Room) is
+  **Hardware's** key, not a screen key — buying a part and slotting it is one errand.
 - **Hardware tab** (shown): component list with tech tier + price; Tier II marks
   barter; Tier III is discovery/barter only and won't appear for straight cash
   (§8 constants). `[Install]` opens a slot picker in the Engine room (§8 below).
@@ -420,7 +429,7 @@ docking reaches an identical trade experience — only the container differs.
 │  ----------------------------------------------------------          │
 │  Repair-kits x2   On hand: converter x1, turbine x1                  │
 │  [P] Field-patch [!]   [I] Install in slot   [X] Cannibalize         │
-│  [U] Upgrade (StarDock/base only)            [Esc] Back              │
+│  [U] Upgrade (Stardock/base only)            [Esc] Back              │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -448,7 +457,7 @@ SPINDRIVE   THRUSTERS   SCREENS     MAIN GUN
   bar (§4.1).
 - **Actions**: `[P]` field-patch (repair-kit, minimal function), `[I]` install
   on-hand component, `[X]` cannibalize (strips a derelict base into parts),
-  `[U]` full swap/tier-upgrade (StarDock or friendly base only).
+  `[U]` full swap/tier-upgrade (Stardock or friendly base only).
 - DESIGN: §4.1 (subsystems/components/repair), §4.2 (starbase variant).
 
 ---
@@ -459,8 +468,8 @@ see the "Computer" wireframe under "Responsive tier wireframes")*
 
 ```
 ┌─ SHIP COMPUTER ──────────────────────────────────────────────────────┐
-│ [Navigation] [Commerce] [Exploration] [Relations] [Records]          │
-│ Commerce: [Ports] [Trade] [Market]                                   │
+│ [Navigation] [Commerce] [Exploration] [Relations] [Logbook]          │
+│ Commerce: [1 Ports] [2 Trade] [3 Market]                             │
 ├──────────────────────────────────────────────────────────────────────┤
 │  PAIR-TRADE FINDER                    scored by profit / turn        │
 │                                                                      │
@@ -470,21 +479,41 @@ see the "Computer" wireframe under "Responsive tier wireframes")*
 │   Sol <-> Mirach      Fuel/Equ     3      810       270              │
 │   Halaf-2 <-> Vega-9  Org/Fuel     4      900       225              │
 │                                                                      │
-│   selected: Sol <-> Halaf-2    [P] Plot route   [A] Add note         │
+│   selected: Sol <-> Halaf-2    [P] Plot route                        │
 │  ------------------------------------------------------------        │
 │  Other tabs: Map (explored-universe tree) . Ports (directory w/      │
 │  last-seen stock+class) . Route (shortest path, hazard confirm)      │
 │  . Codex (finds + lore) . Dossier (species/standing/grudges) .       │
 │  Notes (avoid lists)                                                 │
+├──────────────────────────────────────────────────────────────────────┤
+│ ^ Back leads; then only the visible tab's verbs: [Esc] Back         │
+│   [P] Plot route          (numbers/accelerators stay off the footer) │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Categories and subviews** (nested `TabbedContent`, §11): **Navigation**
   (Map, Route), **Commerce** (Ports, Trade, Market), **Exploration** (Planets,
-  Codex, Leads), **Relations** (Contracts, Alliances, Dossier), and **Records**
+  Codex, Leads), **Relations** (Contracts, Alliances, Dossier), and **Logbook**
   (Log, Notes). Each category remembers its last subview. Compact mode replaces
   the category rail with a popup selector; direct hotkeys and deep links still
   open the exact subview.
+- **A tab owns its keys** (PT-32). The screen binds only what is screen-wide —
+  `Esc` back, and the category accelerators (the underlined letter of each title:
+  **N**avigation, **C**ommerce, e**X**ploration, **R**elations, Log**b**ook).
+  Every per-tab verb is bound onto that subview's pane, and each **category** pane
+  owns the numbers `1`..`N` for its own sub-tabs (the number leads the sub-tab
+  title), so both are in the binding chain only while focus is inside that pane:
+  the footer, the `.` menu, `?` help and the palette advertise exactly the visible
+  tab's **verbs** and nothing else — the navigation keys stay off the footer. A key
+  may therefore mean two things on two tabs (`Del` abandons a favor on Contracts,
+  removes a note on Notes; `2` is a different tab in each category). **Back leads
+  the footer** on every screen (`chrome.EdgeScreen`) instead of trailing whatever
+  the focused widget owns. Accelerators, numbers, Enter-on-the-rail, deep links and
+  opening the screen all land focus on the tab's primary control — its **table**,
+  never the filter box above it — because that is what keeps the footer honest. An
+  accelerator may not reuse a key a focused table owns (`/` filter, `O` sort); that
+  is why Logbook is `B`. Cross-screen keys keep one meaning: `W` routes to a typed
+  sector here as on the sector view.
 - Because we own the engine these are first-class queries, not screen-scrapers.
 - DESIGN: §11, §8 (pricing for finder), §7 (codex), §6 (dossier).
 
@@ -607,14 +636,16 @@ follow this; collisions are bugs.
 
 | Key | Verb | Screens |
 |-----|------|---------|
-| `t` | Trade | Port, StarDock (Game: Corp — grandfathered, rename when corp gets a hub) |
-| `b` | Buy / Base | StarDock/Starbase buy; Game/Planet open the base view (WP80) |
-| `h` | Haggle / Hail | Ports haggle; Game hails |
-| `d` | Deposit / Deliver / Deploy | StarDock deposit, Port deliver, Game deploy, Planet descend |
-| `w` | Withdraw / Travel | banking withdraw everywhere (`y` is retired); Game travel |
-| `r` | Repair / Rumor / Route-to | context-local but always "restorative/plot" flavored |
-| `a` | Attack / Assault / Add | martial on Game/Planet; additive on Computer |
-| `g` | Genesis / enGage / loG | destructive `g` actions always confirm (D7) |
+| `t` | Trade | Port, Stardock (Game: Corp — grandfathered, rename when corp gets a hub) |
+| `g` | Haggle / enGage / Genesis / loG | haggling is `g` on **both** Port and Stardock (`h` names the Hardware tab); destructive `g` actions always confirm (D7) |
+| `p` | Purchase / Plot route / dock at Port | Stardock buy tabs purchase; Computer plots; Game docks |
+| `b` | Bank / Base | Stardock's Bank tab; Game/Planet open the base view (WP80) |
+| `h` | Hardware / Hail | Stardock's Hardware tab; Game hails |
+| `d` | Devices / Deliver / Deploy / Descend | Stardock's Devices tab, Port deliver, Game deploy, Planet descend |
+| `a` | Attack / Assault / Add / deposit | martial on Game/Planet; additive on Computer (Add note) and Stardock (Bank deposit) |
+| `w` | Withdraw / Travel / route-to | banking withdraw everywhere (`y` is retired); Game travel and Computer route-to (one key, one meaning) |
+| `r` | Repair / Rumor | context-local but always "restorative" flavored |
+| `k` | Recruit | Stardock's Colonists tab (people are recruited, never bought — §4.2) |
 
 **Destructive-confirm rule (D7):** Genesis, Seize Core, Invade, ResignAlliance,
 and any first strike (in-sector or from a conversation) go through `ConfirmScreen`
@@ -686,7 +717,9 @@ refresh and tier changes.
 ### Computer *(WP-UI20 + WP-UI21 landed: five categories with per-category
 subview memory and a popup category selector in compact; tables share one
 `DetailTable` — `/` filter, header/`O` sorting, folded columns with a row-detail
-overlay in compact, a persistent detail pane in wide, cursor kept by row key)*
+overlay in compact, a persistent detail pane in wide, cursor kept by row key.
+PT-32: per-tab action keys live on the tab's pane, so the footer only ever offers
+the visible tab's verbs — see §9)*
 
 ```
 COMPACT: category popup            STANDARD/WIDE: category tabs + subview row
@@ -697,10 +730,13 @@ COMPACT: category popup            STANDARD/WIDE: category tabs + subview row
 │ │ table (low-priority cols │ │   │ │ full table · zebra · sort  │ │ selected│
 │ │ folded into row detail)  │ │   │ │ `/` filter                 │ │ row)    │
 │ └──────────────────────────┘ │   │ └────────────────────────────┘ │         │
-│ P Plot · A Note · …          │   │ footer                         │         │
+│ Esc Back · P Plot            │   │ footer                         │         │
 └──────────────────────────────┘   └────────────────────────────────┴─────────┘
-Five categories (Navigation/Commerce/Exploration/Relations/Records); each
+Five categories (Navigation/Commerce/Exploration/Relations/Logbook); each
 remembers its last subview; `M`/`G` and links still open the right subview.
+The footer leads with `Esc` Back and then lists the *visible tab's* verbs only
+(PT-32) — they are bound to its pane, not the screen. Category letters and sub-tab
+numbers are navigation, so they stay off it.
 ```
 
 ### Alien contact *(target — WP-UI17)*

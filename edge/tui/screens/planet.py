@@ -23,7 +23,6 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
-from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.citadels import CitadelError
@@ -37,7 +36,7 @@ from edge.core.rules import (
     PlanetWithdraw,
 )
 from edge.server.service import GameService
-from edge.tui.chrome import notify_warning
+from edge.tui.chrome import EdgeScreen, notify_warning
 from edge.tui import art_adapter
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.dummy import sample_surface
@@ -90,7 +89,7 @@ class PlanetSprite(Static):
         self.post_message(self.Descend())
 
 
-class PlanetScreen(Screen[None]):
+class PlanetScreen(EdgeScreen):
     BINDINGS = [
         Binding("escape", "back", "Break orbit"),
         Binding("d", "descend", "Descend"),
@@ -262,7 +261,7 @@ runs in trips are the intended loop; the citadel art grows with its level."""
         if not p.claimable:
             return "[dim]Already claimed.[/]"
         if p.ship_colonists <= 0:
-            return "[yellow]Unclaimed — recruit colonists at a StarDock first.[/]"
+            return "[yellow]Unclaimed — recruit colonists at a Stardock first.[/]"
         return f"[green]\\[C] Colonize[/] — land {p.ship_colonists} colonists aboard."
 
     def _stores_panel(self, p: PlanetDTO) -> Vertical:

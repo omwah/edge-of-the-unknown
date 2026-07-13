@@ -133,7 +133,7 @@ def sample_state() -> GameState:
         flavor="the lanes hum with traffic",
         beacon='"Welcome to Sol"',
         band="Core",
-        ports=[SectorPortDTO(0, "Stardock", "StarDock", True)],
+        ports=[SectorPortDTO(0, "Stardock", "Stardock", True)],
         planets=[SectorPlanetDTO(7, "Terra Nova", "terrestrial_warm")],
         ships=[
             SectorShipDTO("Kestrel  free trader", "transport"),
@@ -398,13 +398,13 @@ def sample_messages() -> MessagesDTO:
 
 
 def sample_stardock_port() -> PortDTO:
-    """The StarDock's own commodities counter (its Commodities tab, §5).
+    """The Stardock's own commodities counter (its Commodities tab, §5).
 
-    A StarDock sells all three goods (Class 0), so every line is a SELL.
+    A Stardock sells all three goods (Class 0), so every line is a SELL.
     """
     return PortDTO(
-        name="Sol StarDock",
-        klass="Class 0 (StarDock)",
+        name="Sol Stardock",
+        klass="Class 0 (Stardock)",
         sector_id=7,
         commodities=[
             CommodityLine("Fuel Ore", "SELL", 880, 1000, 12, 11, 20),

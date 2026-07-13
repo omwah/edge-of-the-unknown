@@ -1,7 +1,7 @@
-"""Populate the universe: ports, the StarDock, and planets (DESIGN §5 step 7).
+"""Populate the universe: ports, the Stardock, and planets (DESIGN §5 step 7).
 
 Phase-1 subset: standard ports at config density with the terminal-space class
-split; one StarDock placed a few hops out; a *guaranteed* opposed-class port pair
+split; one Stardock placed a few hops out; a *guaranteed* opposed-class port pair
 near the Core so a new player can always earn (the §5 profitable-pair promise);
 band-weighted planet *types* (no production/ownership yet). Aliens, home clusters,
 discoveries, and planet ownership are deferred to Phase 2.
@@ -88,7 +88,7 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
     sector_ids = sorted(state.sectors)
     hops = bfs_distances(state.adjacency, 1)
 
-    # --- StarDock: a Class-9 port a few hops out from the Core ---------------
+    # --- Stardock: a Class-9 port a few hops out from the Core ---------------
     # Bias toward the *near* edge of the 2–5 hop band: a uniform choice would skew
     # far (the universe simply holds many more sectors at 4–5 hops than at 2–3), so
     # weight each candidate by (max_hops - hops + 1)**3 — the closest tier dominates
@@ -107,7 +107,7 @@ def populate(state: UniverseState, config: GameConfig, rng: random.Random) -> No
         dock_sector = min(non_core, key=lambda s: hops.get(s, 10**9))
 
     names_cfg = config.names
-    stardock_gen = NameGenerator(names_cfg.stardock if names_cfg else None, "StarDock", rng)
+    stardock_gen = NameGenerator(names_cfg.stardock if names_cfg else None, "Stardock", rng)
     port_gen = NameGenerator(names_cfg.ports if names_cfg else None, "Port", rng)
     
     planet_gens = defaultdict(lambda: NameGenerator(None, "Planet", rng))

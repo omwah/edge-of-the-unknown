@@ -15,7 +15,7 @@ from textual.containers import Grid, Vertical, Horizontal
 from textual.css.query import NoMatches
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import DataTable, Select, Static, TabbedContent, TabPane
+from textual.widgets import DataTable, Input, Select, Static, TabbedContent, TabPane, Tabs
 
 from rich.style import Style
 
@@ -125,9 +125,9 @@ class TradePanel(Vertical):
     """The commodities trade UI: a live pricing table over the docked port.
 
     Reusable as the body of the standalone `PortScreen` (a plain commodities
-    port) or as the **Commodities** tab of a `StarDockScreen` — so docking at a
-    port reaches one trade UI regardless of whether the port is a StarDock
-    (UI_MOCKUPS.md §2/§5). `show_title` is suppressed inside the StarDock tab,
+    port) or as the **Commodities** tab of a `StardockScreen` — so docking at a
+    port reaches one trade UI regardless of whether the port is a Stardock
+    (UI_MOCKUPS.md §2/§5). `show_title` is suppressed inside the Stardock tab,
     where the screen already carries a banner. `refresh_port` re-renders it after
     a trade; `cursor_commodity` is the highlighted row's commodity name.
     """
@@ -239,7 +239,7 @@ class TradePanel(Vertical):
         return (
             "[dim]^ port buys from you (you SELL)   v port sells to you (you BUY)[/]\n"
             f"Latinum [yellow]{self._latinum:,}[/]   ·   [b]T[/]rade highlighted   ·   "
-            "[b]H[/]aggle   ·   [b]Esc[/] leave dock"
+            "[b]G[/] Haggle   ·   [b]Esc[/] leave dock"
         )
 
     def refresh_port(self, port: PortDTO, latinum: int) -> None:
@@ -257,15 +257,39 @@ class TradePanel(Vertical):
 
 
 def first_focusable(node: Widget) -> Widget | None:
-    """The first focusable descendant of `node` (WP-PR2-01: jump-to-tab focus target).
+    """The primary focusable control of `node` (WP-PR2-01: jump-to-tab focus target).
 
     Used to drop keyboard focus straight onto a tab's primary control (its table,
     list, or form field) after a tab accelerator or Enter, so reaching a control is
-    one step, not two."""
-    for widget in node.query("*"):
-        if widget.focusable:
-            return widget
+    one step, not two.
+
+    A widget may nominate itself with the `focus-first` class, which wins outright.
+    Otherwise the first focusable widget in DOM order is taken — **except a text
+    `Input`**, which is never chosen automatically. A focused text field takes every
+    letter key as typing: the tab's action letters stop firing *and* Textual drops them
+    from the footer, so auto-focusing a filter box or an amount field silently disarms
+    the screen — it even swallows the accelerators that would let you leave the tab.
+    Nominate the field with `focus-first` if a tab really should open ready to type."""
+    for query in (".focus-first", "*"):
+        for widget in node.query(query):
+            if widget.focusable and not (query == "*" and isinstance(widget, Input)):
+                return widget
     return None
+
+
+def focus_content(node: Widget) -> None:
+    """Put keyboard focus on `node`'s primary control (see `first_focusable`).
+
+    When nothing inside can take focus — an `ActionPane` of pure text, like the
+    Stardock's Bank — the pane takes focus itself. It has to: a pane's keys are live only
+    while focus is inside it, so a pane that cannot hold focus could never fire its own
+    verbs (Deposit / Withdraw would be advertised in the footer but be dead keys).
+    """
+    target = first_focusable(node)
+    if target is None:
+        node.can_focus = True
+        target = node
+    target.focus()
 
 
 def accel_title(label: str, letter: str | None) -> str:
@@ -282,8 +306,35 @@ def accel_title(label: str, letter: str | None) -> str:
     return label
 
 
+class ActionPane(TabPane):
+    """A tab pane that owns the action keys belonging to its tab (PT-32).
+
+    Textual builds the binding chain outward from the focused widget, so bindings
+    declared here are live — and advertised in the footer — only while focus rests
+    inside this pane. That is the whole point: a tabbed screen keeps *no* global
+    binding for a per-tab verb, so the footer can never advertise an action that
+    would misfire on the tab you are looking at, and two tabs may reuse one letter
+    for different verbs without a `check_action` maze.
+
+    `actions` are `(key, action, description)` triples shown in the footer; `hidden` has
+    the same shape but stays off it — that is where a pane's *navigation* keys go (a
+    category pane's sub-tab numbers), which would otherwise crowd the verbs out of the
+    footer. Each is dispatched into the `screen.` namespace, so handlers stay on the
+    owning screen while the *keys* belong to the tab.
+    """
+
+    def __init__(self, title: str, *,
+                 actions: Sequence[tuple[str, str, str]] = (),
+                 hidden: Sequence[tuple[str, str, str]] = (), **kwargs: Any) -> None:
+        super().__init__(title, **kwargs)
+        for key, action, description in actions:
+            self._bindings.bind(key, f"screen.{action}", description)
+        for key, action, description in hidden:
+            self._bindings.bind(key, f"screen.{action}", description, show=False)
+
+
 class ServiceHub(Vertical):
-    """Shared responsive service navigation for StarDock and orbital bases.
+    """Shared responsive service navigation for Stardock and orbital bases.
 
     Standard/wide layouts expose Textual tabs. Compact replaces their overflowing tab
     rail with a keyboard/mouse Select; unavailable entries remain selectable and explain
@@ -294,6 +345,15 @@ class ServiceHub(Vertical):
     title; the host binds the letter to `activate_and_focus`, which switches to the tab
     and focuses its primary content in one step (WP-PR2-01). Enter while the tab rail is
     focused does the same for the active tab.
+
+    PT-32 — **a tab owns its keys.** Hosts pass `actions` (entry_id → `(key, action,
+    description)` triples), which are bound onto that entry's `ActionPane` rather than
+    onto the screen, so each key is live (and in the footer) only while focus rests
+    inside its tab. The hub keeps focus inside the visible pane for that to hold: it
+    lands focus on the initial tab's content at mount, follows the tab on every switch,
+    and blurs *before* switching — Textual re-activates whichever pane holds focus
+    (`TabbedContent._on_tab_pane_focused`), so focus left behind in the old pane would
+    silently drag the tab back.
     """
 
     BINDINGS = [Binding("enter", "focus_active_content", "Enter tab", show=False)]
@@ -313,6 +373,8 @@ class ServiceHub(Vertical):
         *,
         initial: str,
         accelerators: Mapping[str, str] | None = None,
+        actions: Mapping[str, Sequence[tuple[str, str, str]]] | None = None,
+        hidden: Mapping[str, Sequence[tuple[str, str, str]]] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -320,6 +382,8 @@ class ServiceHub(Vertical):
         ids = {entry_id for _, entry_id, _, _ in entries}
         self._initial = initial if initial in ids else entries[0][1]
         self._accel = dict(accelerators or {})
+        self._actions = dict(actions or {})
+        self._hidden = dict(hidden or {})  # same shape, kept off the footer
         self._syncing = False
 
     def compose(self) -> ComposeResult:
@@ -331,7 +395,13 @@ class ServiceHub(Vertical):
                           id="service-selector")
         with TabbedContent(initial=self._initial):
             for label, entry_id, content, reason in self._entries:
-                with TabPane(accel_title(label, self._accel.get(entry_id)), id=entry_id):
+                # An unavailable entry explains itself instead of acting, so it keeps
+                # none of its keys — the footer must not offer a verb that cannot fire.
+                unavailable = reason is not None
+                actions = () if unavailable else self._actions.get(entry_id, ())
+                hidden = () if unavailable else self._hidden.get(entry_id, ())
+                with ActionPane(accel_title(label, self._accel.get(entry_id)),
+                                id=entry_id, actions=actions, hidden=hidden):
                     if reason is not None:
                         yield Static(
                             f"[b]{label} unavailable[/]\n\n{reason}",
@@ -343,19 +413,40 @@ class ServiceHub(Vertical):
     def activate_and_focus(self, entry_id: str) -> None:
         """Switch to `entry_id` and focus its primary content (tab accelerator target)."""
         try:
+            self._blur_stale_pane()
             self.query_one(TabbedContent).active = entry_id
         except NoMatches:
             return
         self.call_after_refresh(self._focus_content, entry_id)
+
+    def _blur_stale_pane(self) -> None:
+        """Drop focus before a programmatic tab switch (see the class docstring)."""
+        screen = self.screen
+        if screen.focused is not None and not isinstance(screen.focused, Tabs):
+            screen.set_focus(None)
+
+    def _follow_focus_to_visible_pane(self) -> None:
+        """Never strand focus in a tab that is no longer showing — its keys would stay
+        in the footer. Focus resting on the tab rail is left alone (that is a player
+        arrowing along the tabs; stealing it would make the rail unusable)."""
+        focused = self.screen.focused
+        if focused is None or isinstance(focused, Tabs):
+            return
+        try:
+            active = self.query_one(TabbedContent).active
+            pane = self.query_one(f"#{active}", TabPane)
+        except NoMatches:
+            return
+        if pane not in focused.ancestors_with_self:
+            self.screen.set_focus(None)
+            self.call_after_refresh(self._focus_content, active)
 
     def _focus_content(self, entry_id: str) -> None:
         try:
             pane = self.query_one(f"#{entry_id}", TabPane)
         except NoMatches:
             return
-        target = first_focusable(pane)
-        if target is not None:
-            target.focus()
+        focus_content(pane)
 
     def action_focus_active_content(self) -> None:
         """Enter on the tab rail drops focus onto the active tab's primary content."""
@@ -368,6 +459,9 @@ class ServiceHub(Vertical):
 
     def on_mount(self) -> None:
         self._sync_tier_class()
+        # Open with focus already in the visible tab's content, so the footer advertises
+        # that tab's verbs from the first frame (PT-32).
+        self.call_after_refresh(self._focus_content, self._initial)
 
     def on_resize(self) -> None:
         self._sync_tier_class()
@@ -383,9 +477,10 @@ class ServiceHub(Vertical):
             return
         value = event.value
         if isinstance(value, str):
-            self.query_one(TabbedContent).active = value
+            self.activate_and_focus(value)
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        self._follow_focus_to_visible_pane()
         selector = self.query_one("#service-selector", Select)
         if selector.value == event.pane.id:
             return
@@ -398,7 +493,7 @@ _CODE_STYLE = {"S": "b magenta", "P": "magenta", "@": "green"}
 
 
 def _code_markup(codes: list[str]) -> str:
-    """Render content tokens (S/P StarDock-port, @ planet) colour-coded by type."""
+    """Render content tokens (S/P Stardock-port, @ planet) colour-coded by type."""
     return " ".join(f"[{_CODE_STYLE.get(c, 'white')}]{c}[/]" for c in codes)
 
 
@@ -433,7 +528,7 @@ def warp_legend_markup(core_anchor_side: str) -> str:
         "• [dim]■[/] Uncharted (unexplored)\n\n"
         "[bold cyan]Sector Codes[/]\n"
         "Discovered entities are shown as trailing symbols on warp labels:\n"
-        "• [green]@[/]   Planet       • [magenta]S[/]   StarDock       • [magenta]P[/]   Trade Port"
+        "• [green]@[/]   Planet       • [magenta]S[/]   Stardock       • [magenta]P[/]   Trade Port"
     )
 
 

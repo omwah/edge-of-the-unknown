@@ -14,7 +14,7 @@ pricing and haggling, SQLite persistence via command-log replay, an engine tick
 loop, and a Textual game screen wired to a real in-process `GameService`. The
 TUI already carries **stub screens** for everything Phase 2 fills in —
 `PlanetScreen`, `SurfaceScreen`, `AlienContactScreen`, `EngineRoomScreen`,
-`StarDockScreen`, `ComputerScreen` — currently fed by `edge/tui/dummy.py`
+`StardockScreen`, `ComputerScreen` — currently fed by `edge/tui/dummy.py`
 sample DTOs. Phase 2's TUI work is largely **replacing dummy data with real
 service projections**, not building screens from scratch.
 
@@ -47,7 +47,7 @@ mypy + pytest) and `pixi run cov` (~98%) are the gates.
 1. Engine-room subsystem/component model (§4.1) — slotted Spindrive / Thrusters /
    Screens / Main Gun, the shared component vocabulary with tech tiers, **derived
    aspects**, component install / swap / cannibalize upgrades.
-2. StarDock services (shipyard, hardware emporium, bank) + multiple ship types
+2. Stardock services (shipyard, hardware emporium, bank) + multiple ship types
    from config.
 3. Typed planets with band-weighted ownership, BNT-style production shaped by
    `planet_type` / habitability, and player colonization / claiming of unowned
@@ -77,8 +77,8 @@ but must leave clean seams:**
 - **Localized combat damage + field-kit repair.** Phase 2 builds the engine-room
   *model* (slots, derived aspects, install / swap / cannibalize) but components
   are never *knocked out* yet — there is no damage source. The knocked-out
-  state, the field-patch repair-kit action, and full StarDock restoration of
-  damaged components are wired structurally but exercised in Phase 3. (StarDock
+  state, the field-patch repair-kit action, and full Stardock restoration of
+  damaged components are wired structurally but exercised in Phase 3. (Stardock
   *upgrade/swap* is Phase 2; *repair of battle damage* is Phase 3.)
 - **Starbase planetary-system defense** and **repair/claim of derelict bases into
   forward footholds**. Phase 2 ships derelict bases as salvage caches only.
@@ -130,7 +130,7 @@ The RNG-ordering rule deserves emphasis: the big bang draws from `state.rng` in 
 fixed sequence, and golden-master replay depends on that order. **New generation
 steps append to the end of the existing draw sequence** (or take a derived
 sub-RNG, the §5 "perturbed sub-seed" pattern) so they do not shift the draws that
-ports/planets/StarDock already consume. Where a step is logically independent
+ports/planets/Stardock already consume. Where a step is logically independent
 (e.g. discovery salting), give it its own `random.Random(seed ^ salt)` so its
 draws never interleave with topology/economy draws.
 
@@ -138,8 +138,8 @@ draws never interleave with topology/economy draws.
 
 ## Milestones
 
-- **M6 — Engine room & StarDock economy.** WP1 + WP2. Ship aspects become derived
-  from slotted subsystems; StarDock sells components and hulls; the component
+- **M6 — Engine room & Stardock economy.** WP1 + WP2. Ship aspects become derived
+  from slotted subsystems; Stardock sells components and hulls; the component
   economy exists. *Playable: the Phase-1 "first upgrade" is replaced by real
   slotted upgrades and a hull purchase.* (M1–M5 were Phase 1.)
 - **M7 — Living worlds.** WP3 + WP4. Typed planets gain ownership and production;
@@ -162,7 +162,7 @@ The spine. Today `Ship` carries **flat aspect scalars** (models.py:97–126);
 Phase 2 makes the player ship's `shields` / `warp_speed` / `combat_speed` /
 main-gun aspects **derived from four slotted subsystems**, while NPC hulls keep
 flat aspects (the optional-`subsystems`-block rule, §4.1). This must land first
-because every later upgrade source (StarDock hardware, alien barter, derelict
+because every later upgrade source (Stardock hardware, alien barter, derelict
 salvage) installs *components*, and Phase 3 combat *damages* them.
 
 **Core data model (`edge/core/models.py`, `edge/core/enums.py`).**
@@ -245,7 +245,7 @@ round-trip for the new commands/events. **Regenerate golden masters** (Ship gain
 
 ---
 
-## WP2 — StarDock services & multiple ship types
+## WP2 — Stardock services & multiple ship types
 
 Replaces the Phase-1 single flat "first upgrade" (`BuyUpgrade`, rules.py:312) with
 the real services hub (DESIGN §11, §8).
@@ -273,7 +273,7 @@ prices (Tier I latinum per the economy block).
   command/event from `store/codec.py`, and the `Upgraded` event from
   `core/events.py`. The Phase-1 golden master / `test_tui_flow` hardware path is
   re-cut against `BuyComponent`+`InstallComponent` (the `U` hotkey now opens the
-  StarDock Hardware tab rather than firing a one-shot upgrade). Any saved command
+  Stardock Hardware tab rather than firing a one-shot upgrade). Any saved command
   log that referenced `BuyUpgrade` is a Phase-1 artifact and is regenerated.
 
 **Projection + TUI (`edge/tui/screens/stardock.py`).** The Hardware tab lists
@@ -331,7 +331,7 @@ the ship to an **unowned colonizable** world, setting `owner = player_id` (the �
 claim path; Core worlds off-limits). `SetAllocation(planet_id, allocation)`.
 **Colonists are recruited, not bought** (§4.2 — they are people with a choice, not
 a commodity), so the load path is `RecruitColonists(source, count)`, not a hardware
-purchase: two sources, (a) **StarDock's recruitment office** — pay a per-head
+purchase: two sources, (a) **Stardock's recruitment office** — pay a per-head
 latinum *incentive* (config `colonist_incentive`) to enlist willing recruits, and
 (b) **emigration from an inhabited world with positive disposition** toward the
 player (alliance member in good standing, or an unaligned species at amicable
@@ -568,7 +568,7 @@ reasons render. Dialogue lines come from the pack (WP8).
 
 A device that transforms a planet (the classic TW2002 terraform/create). Scope to
 the §4.2 planet-type model: `GenesisTorpedo` is a `Ship.devices` counted item
-(bought at StarDock); using it on an eligible target **creates or re-types** a
+(bought at Stardock); using it on an eligible target **creates or re-types** a
 planet (e.g. barren → a colonizable terrestrial), re-rolling its `yield_profile`/
 `habitability`. Reducer `DeployGenesis(target)`; validate eligibility; event
 `GenesisDeployed`. Codec + golden master (planet retype is a command-log effect,
@@ -670,7 +670,7 @@ The haggle **engine** shipped in Phase 1 — `HaggleOffer` + `_haggle` (rules.py
 `resolve_haggle`/`haggle_acceptance_probability` (economy.py), `HagglingConfig`
 (`insult_frac` / `max_rejections` / `history_penalty`), the `Haggled` event, codec,
 and tests. A follow-up wired a **single counter-offer** into the trade UI
-(`HaggleScreen` modal, `H` on the port / StarDock screens, the read-only
+(`HaggleScreen` modal, `H` on the port / Stardock screens, the read-only
 `haggle_quote` hint) so haggling is real and visible. What is **not** yet built is
 the full mini-game the design and the original mockup imply: an
 **accept / counter / walk-away loop over multiple rounds**, with the port's patience
@@ -714,7 +714,7 @@ regeneration together.
 
 1. `p2: WP1` engine room — subsystems, components, derived aspects (core + config
    + EngineRoomScreen). *Bump `config_version`; regenerate golden masters once.*
-2. `p2: WP2` StarDock hardware + shipyard + multiple ship classes.  → **M6**
+2. `p2: WP2` Stardock hardware + shipyard + multiple ship classes.  → **M6**
 3. `p2: WP3` typed planets — ownership, BNT production cron, colonization.
 4. `p2: WP4` orbital starbases + derelict salvage.  → **M7**
 4a. `p2: WP12` durable engine maintenance (cron effects survive reload).
@@ -768,14 +768,14 @@ any time after M7 but **must** precede the Phase-2 ship.
   planet placement is **unchanged** by the new generation steps (proves the new
   draws were appended / sub-RNG'd, not interleaved) — guards the golden-master
   rail at generation time.
-- **Textual Pilot (`test_tui_flow`).** Engine room install/cannibalize; StarDock
+- **Textual Pilot (`test_tui_flow`).** Engine room install/cannibalize; Stardock
   buy component + swap hull; planet colonize; descend → explore site → log
   discovery (§13 named flow); hail alien → buy/barter tech → verb-menu disable
   reasons. All read through the service projection only.
 - **Manual / exit criterion.** `pixi run edge`: a one-hour push-out run —
   trade near home, slot a first upgrade, push a band out, detect + salvage a
   discovery, descend a planet, hail a friendly species, barter an artifact for a
-  Tier-II/III component the StarDock does not sell, return. Confirm it is fun and
+  Tier-II/III component the Stardock does not sell, return. Confirm it is fun and
   yields tech trading alone could not buy (DESIGN §14 Phase-2 exit criterion).
 - **Gates.** `pixi run check` (ruff + mypy --strict on
   core/bigbang/store/server/engine) green; `pixi run cov` holds ~98%.

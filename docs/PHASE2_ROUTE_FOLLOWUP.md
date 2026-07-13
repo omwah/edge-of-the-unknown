@@ -443,7 +443,7 @@ the WP12 maintenance discipline:
   a sector only if it is **not Core Space** and **not owned by a rival alliance**
   (planet `Ownership` keyed to an alliance other than the species'). Unaligned
   neutrals avoid all alliance-owned sectors; governing-alliance members and
-  unaligned may never re-enter the Core (it stays protected/empty). StarDock-staged
+  unaligned may never re-enter the Core (it stays protected/empty). Stardock-staged
   contacts are **pinned** (they are the hub's standing welcome, §6.3 — they don't
   wander off).
 - A per-firing **sub-RNG** seeded from replay-durable inputs (below), so drift is
@@ -508,7 +508,7 @@ def alien_drift(state, config, *, firing: int) -> ReduceResult:
     rng = random.Random(f"{state.game.seed}|alien_drift|{firing}")  # sub-RNG, salted
     moved, events = [], []
     for sp in sorted(state.species.values(), key=lambda s: s.id):
-        if sp.id in pinned(state):                 # StarDock contacts don't wander
+        if sp.id in pinned(state):                 # Stardock contacts don't wander
             continue
         if rng.random() >= config.aliens.drift_move_chance:
             continue
@@ -566,7 +566,7 @@ are persisted to the event log) the codec — following the existing
   species' own-alliance holdings.
 - **Cron (`tests/test_cron.py` / `test_engine`)**: with `drift_move_chance=1.0`
   every unpinned species steps to a legal neighbour; with `0.0` none move; a
-  species hemmed in by Core/rival territory stays put; StarDock contacts never
+  species hemmed in by Core/rival territory stays put; Stardock contacts never
   move; the same `(seed, drift_seq)` reproduces the identical move set; drift never
   lands a species in a Core or rival-owned sector (property test over seeds).
 - **Replay / golden master (`tests/test_service.py`)**: a session that **ticks**
@@ -818,7 +818,7 @@ The **Terran Federation governs the Core but has no people of its own.** It is
 `alliance_id: 1` in the roster — the Core's governor, the bloc the player starts
 in — yet *every* species in `alien_roster_default.yaml` is either unaligned (`null`) or a
 member of a rival bloc (2/3/4). So the Core is contact-free except the WP-staged
-StarDock greeters (drawn from unaligned neutrals, since there were no Federation
+Stardock greeters (drawn from unaligned neutrals, since there were no Federation
 members to draw from). WP18 fixes that: it gives the Federation its **founding
 species** — Star-Trek-human-style **humanoid diplomats**, the warmest contacts in
 the game — and settles them through **Federation space** (the Core and the
@@ -833,7 +833,7 @@ This is the natural completion of three threads already in place:
   Federation is the default governor and the player is seeded into it — but with no
   member species, "you are a Federation member" is currently an abstraction with no
   faces attached.
-- **The StarDock-greeter staging** (shipped): `_place_stardock_contacts` already
+- **The Stardock-greeter staging** (shipped): `_place_stardock_contacts` already
   seeds **Core-welcome** species at the hub, and its comment notes the workaround —
   "the default roster names no species as Federation members, so the hub is seeded
   from the broader Core-welcome set." WP18 removes the need for that workaround by
@@ -868,7 +868,7 @@ and a voice to it.
 - **Placement in Federation space** (`bigbang/aliens.py`): a new generation step
   that settles governing-alliance members across the **Core and the governor's home
   lanes**, so the Core is populated by its own people. Generalises
-  `_place_stardock_contacts`; the StarDock greeter step then prefers real Federation
+  `_place_stardock_contacts`; the Stardock greeter step then prefers real Federation
   members over the unaligned-neutral fallback.
 - **Validation + drift relaxation**: the §13 "no contacts inside Core Space"
   invariant (`bigbang/validate.py`) is relaxed for **the governing alliance's own
@@ -971,7 +971,7 @@ near-Core home lanes**, guaranteeing the founding `leader` species appears. Coun
 config-driven (e.g. `RosterConfig.core_population` or reuse the
 `stardock_contacts` knob's sibling). The existing band-placement still skips Core for
 *non*-governing species; this step is the **only** way species enter the Core, and it
-admits only the governor's own members. The StarDock greeter step is updated to
+admits only the governor's own members. The Stardock greeter step is updated to
 prefer real governing-alliance members (now that they exist) over the unaligned
 fallback. Runs on the same `_SPECIES_SALT` sub-RNG, so it does not perturb the
 port/planet/discovery draw order (golden-master ordering).
@@ -1022,7 +1022,7 @@ port/planet/discovery draw order (golden-master ordering).
    `alien_roster_default.yaml` content; `test_aliens` integrity + `validate_dialogue`.
 2. `p2: WP18 (bigbang) settle governing-alliance members in Core + validation` —
    `_populate_governing_space`, the Core exemption + "Federation inhabits its capital"
-   invariant, StarDock greeter preference; `test_aliens` placement.
+   invariant, Stardock greeter preference; `test_aliens` placement.
 3. `p2: WP18 (drift) may_occupy lets governor members roam the Core` — the one-line
    WP16 relaxation + test (lands with or after WP16). → **The Federation has a face.**
 

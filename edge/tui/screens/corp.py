@@ -20,7 +20,6 @@ import re
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.economy import EconomyError
@@ -30,7 +29,7 @@ from edge.core.rules import (
     TransferPlanetToCorp,
 )
 from edge.server.service import GameService
-from edge.tui.chrome import EmptyState, TextPrompt, notify_warning
+from edge.tui.chrome import EdgeScreen, EmptyState, TextPrompt, notify_warning
 
 
 def _ceo_button(label: str, button_id: str, *, is_ceo: bool,
@@ -66,7 +65,7 @@ class _FormCorpModal(TextPrompt):
                          submit_label="Charter")
 
 
-class CorpScreen(Screen[None]):
+class CorpScreen(EdgeScreen):
     # Hotkeys are accelerators only — every verb is also a Button on its panel.
     BINDINGS = [
         Binding("escape", "back", "Back"),

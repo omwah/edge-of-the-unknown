@@ -160,7 +160,7 @@ def test_placement_is_seeded_and_deterministic() -> None:
 @pytest.mark.parametrize("seed", range(30))
 def test_hub_peaceable_and_placement_outside_core(seed: int) -> None:
     """Band-graded placement (§5/§6): the Hub is peaceable (every innermost-band species
-    friendly) and only the governor + StarDock sit in Core Space. Hostiles are allowed —
+    friendly) and only the governor + Stardock sit in Core Space. Hostiles are allowed —
     and expected — in the outer bands (asserted separately)."""
     state = generate(WIDE, seed)
     assert state.species  # the default roster always places some
@@ -171,7 +171,7 @@ def test_hub_peaceable_and_placement_outside_core(seed: int) -> None:
     for sp in state.species.values():
         if state.sectors[sp.sector_id].distance_band == innermost:
             assert is_friendly(sp.base_disposition, CFG.aliens)  # Hub stays peaceable
-        # No Core placement except the StarDock hub and the governor's own members,
+        # No Core placement except the Stardock hub and the governor's own members,
         # who inhabit their capital (WP18, §6.3).
         if sp.sector_id in core:
             assert sp.sector_id == dock_sector or sp.alliance_id == gov
@@ -238,7 +238,7 @@ def test_species_field_home_clusters_within_radius() -> None:
     """A drawn species is met as a *cluster* of ships near its home, not a lone contact.
 
     Checked on rival-bloc kinds (aligned, non-governor): they are never staged at the
-    StarDock or in the Core, so all their ships form a single BFS cluster around the home.
+    Stardock or in the Core, so all their ships form a single BFS cluster around the home.
     """
     from collections import defaultdict
 
@@ -421,7 +421,7 @@ def test_governing_alliance_inhabits_the_core(seed: int) -> None:
     gov_in_core = [sp for sp in in_core if sp.alliance_id == gov]
     assert gov_in_core  # the Federation inhabits its own capital
     assert any(sp.alliance_role == "leader" for sp in gov_in_core)  # incl. the founding leader
-    # The only non-governor in the Core is a StarDock greeter; no rival/unaligned drifts in.
+    # The only non-governor in the Core is a Stardock greeter; no rival/unaligned drifts in.
     for sp in in_core:
         assert sp.alliance_id == gov or sp.sector_id == dock_sector
 

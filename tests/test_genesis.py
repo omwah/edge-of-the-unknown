@@ -1,4 +1,4 @@
-"""WP10 — Genesis torpedoes: buy at StarDock, terraform an eligible world (§4.2)."""
+"""WP10 — Genesis torpedoes: buy at Stardock, terraform an eligible world (§4.2)."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def test_buy_genesis_at_stardock_costs_latinum() -> None:
 
 def test_buy_genesis_requires_stardock() -> None:
     state = generate_with_player(CONFIG, 7)  # type: ignore[arg-type]
-    # Sit somewhere that isn't a StarDock.
+    # Sit somewhere that isn't a Stardock.
     state.players[1] = replace(state.players[1], latinum=50_000)
     state.ships[1] = replace(state.ships[1], sector_id=1)
     with pytest.raises(Exception):

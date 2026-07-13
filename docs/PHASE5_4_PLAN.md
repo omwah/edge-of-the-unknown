@@ -39,7 +39,7 @@ Every Phase-5 seam was left deliberately and is verified against the code
   inert by design ("may seize the Core in Phase 5").
 - `Planet.citadel_level` exists on the model and in the §4 table but is
   **written nowhere and read nowhere** — a bare field awaiting WP54.
-- The StarDock screen ships placeholder `Bank`-style panes:
+- The Stardock screen ships placeholder `Bank`-style panes:
   `TabPane("Tavern")` literally says *"Rumors & contracts — Phase 5"*.
 - `RepairStarbase`/`ClaimStarbase` end at "operational, player-owned";
   DESIGN §4.2 explicitly defers *forward-base services* (refuel / repair /
@@ -131,7 +131,7 @@ it):**
 6. The Armid/limpet mine split (§10), probes, and the interdictor (§14).
 7. Richer alien interactions: favors and escort contracts (§14), issued
    through the §6.7 dialogue system.
-8. Tavern/noticeboard at StarDock: rumors (a latinum-for-`Lead` sink), the
+8. Tavern/noticeboard at Stardock: rumors (a latinum-for-`Lead` sink), the
    bounty board, player notices (§14).
 9. Sysop console (AAT's admin catalog as the menu, §A.4) — dev tooling.
 10. TWX-style scripting hooks for bots (§14) — a stable service protocol and
@@ -343,7 +343,7 @@ landed this plan).**
   (the residual faucet/sink), and the revised faucet/sink table.
 - **§6.3:** governance-flip mechanics: the seizure ledger, the petition
   command, NPC seizure conditions, the leadership-intrigue event, and the
-  full re-key list (planets, bases, species eviction, law, StarDock hub).
+  full re-key list (planets, bases, species eviction, law, Stardock hub).
 - **§4.2:** forward-base services (config-gated service set at player-owned
   operational bases); citadel levels, treasury, and the planetary-combat
   ladder (raze base → silence citadel → ground assault); dynamic ownership
@@ -526,7 +526,7 @@ changes (H11). Contents:
      *old* governor and whose `sector_id` is now illegal under `may_occupy`
      are relocated to the nearest legal sector by deterministic BFS from
      their current sector (ties broken by lowest sector id — no RNG, so the
-     flip is pure). StarDock-pinned contacts are re-evaluated: rival-bloc
+     flip is pure). Stardock-pinned contacts are re-evaluated: rival-bloc
      members leave the hub; `stardock_contacts` re-fills from Core-welcome
      species only if any are present (never invents new instances).
   5. Events: `GovernanceChanged(old, new, cause)` + a `CoreLawNotice` so the
@@ -632,7 +632,7 @@ Make a flip *legible* and the hostile Core survivable-but-hard.
   alliance section shows governor + `covets_core` intel.
 - **Hostile-Core mechanics tightened** (already mostly live via WP38's
   standing rule — this WP closes the service gaps): docking at the Core
-  StarDock is rejected while the governor is hostile (services denied, with
+  Stardock is rejected while the governor is hostile (services denied, with
   a clear reason — the §6.3 "denied the haven" promise); recruitment and
   bank access follow docking. Core-governor bases already engage via
   `base_owner_hostile` — add the encounter-open dialogue context reuse
@@ -659,7 +659,7 @@ Commit `p5: WP52 governance aftermath surfacing` — **M17 done.**
 
 The §4.2 payoff: a repaired, claimed base becomes a working home.
 
-- **The refactor (emphasized).** `core/rules.py` gates StarDock services
+- **The refactor (emphasized).** `core/rules.py` gates Stardock services
   through `_stardock(state, ship)` (raises unless docked at the Class-9
   port). Extract a **`ServicePoint` resolver** — new
   `edge/core/services.py`: `service_point(state, player, ship, config) ->
@@ -671,7 +671,7 @@ The §4.2 payoff: a repaired, claimed base becomes a working home.
   `…AtBase` command clones. Command names and payloads are unchanged, so
   the log/codec/goldens don't move; only rejection conditions widen. The
   resolver's docstring records the §4.1 promise it implements ("full
-  restoration… at StarDock or a friendly alien base") and that *friendly
+  restoration… at Stardock or a friendly alien base") and that *friendly
   alien base* service remains a future config extension of the same seam.
 - **Config.** `StarbaseConfig.services: BaseServicesConfig` — per-service
   bools (`repair`, `components`, `munitions`, `banking`) + `fee_frac`
@@ -681,10 +681,10 @@ The §4.2 payoff: a repaired, claimed base becomes a working home.
   in the sector of a planet whose operational (`starbases.is_operational`)
   base is `Ownership("player", player_id)` and the service is enabled.
   Component *purchases* at a base draw from a config catalog at
-  `fee_frac × StarDock price`; swaps/repairs reuse the engine-room reducers
+  `fee_frac × Stardock price`; swaps/repairs reuse the engine-room reducers
   unchanged (they never cared *where* the ship was based — verify and pin).
 - **TUI.** Docking at an owned base opens `StarbaseServicesScreen` reusing
-  the StarDock tab panes (hardware table, bank pane) — composition, not
+  the Stardock tab panes (hardware table, bank pane) — composition, not
   copy; the sector view labels the base "⌂ yours — services".
 
 Files: new `edge/core/services.py`, `edge/core/rules.py`,
@@ -693,7 +693,7 @@ Files: new `edge/core/services.py`, `edge/core/rules.py`,
 new `edge/tui/screens/starbase_services.py`, `tests/test_rules.py`,
 new `tests/test_services.py`.
 Tests: resolver truth table (dock/base/neither, each service toggle);
-StarDock behavior byte-identical post-refactor (regression suite untouched);
+Stardock behavior byte-identical post-refactor (regression suite untouched);
 fees applied exactly once; banking at a base rides the same
 `Player.bank_balance` invariants (property tests reuse `test_economy`).
 Commit `p5: WP53 forward-base services via ServicePoint resolver`.
@@ -811,7 +811,7 @@ Three §10/§14 devices, then the batched epoch.
   device, mechanically expressed through the planner that already exists.
   Removal at any `ServicePoint` (WP53 reuse) for a fee. Mine deflectors
   (`HardwareConfig` device, the §A.3 price list) absorb armid hits 1:1.
-- **Probes.** A consumable device (`HardwareConfig`, StarDock-bought).
+- **Probes.** A consumable device (`HardwareConfig`, Stardock-bought).
   `LaunchProbe(dest_sector)`: BFS over the **known-graph** rules of
   `TravelTo` *except* probes may path the full graph up to
   `probe_range` hops (they are how you buy knowledge); the reducer charts
@@ -867,7 +867,7 @@ context (`edge/dialogue/authoring/pipeline.py` `build_prompt` /
   targets from live state (a port the issuer's book shows short ⇒ deliver;
   a grudge target ⇒ destroy — the §6.5 `demand` finally cashable; a
   `trade_seek` merchant of the issuer's bloc ⇒ escort, never a
-  StarDock-pinned instance). Placeholders
+  Stardock-pinned instance). Placeholders
   (`{target}`, `{reward}`, `{deadline}`) bind into authored lines.
 - **Dialogue vocabulary.** One new intent context `contract_offer` (+
   `contract_report`) and one new `CHOICE_ACTIONS` entry `accept_contract`
@@ -896,7 +896,7 @@ context (`edge/dialogue/authoring/pipeline.py` `build_prompt` /
   (checked in the same movement reducer), releasing the merchant back to
   its rails. Edge cases pinned by test: farewell/abandon (an
   `AbandonContract` command releases + fails honestly), deadline expiry
-  mid-convoy, merchant pinned at StarDock never offered as escort.
+  mid-convoy, merchant pinned at Stardock never offered as escort.
 
 Files: new `edge/core/contracts.py`, `edge/core/models.py`,
 `edge/core/rules.py`, `edge/dialogue/intents.py`, `edge/dialogue/select.py`
@@ -917,7 +917,7 @@ Commit `p5: WP57 favors + escort contracts (dialogue-issued)`.
 
 ### WP58 — Tavern, rumors, noticeboard (M)
 
-The StarDock tavern pane goes live (§14; the placeholder names this WP).
+The Stardock tavern pane goes live (§14; the placeholder names this WP).
 
 - **Rumors.** `BuyRumor` command (config `tavern.rumor_price`, a latinum
   sink): draws from the union of Core-welcome species'

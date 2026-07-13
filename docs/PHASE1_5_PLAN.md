@@ -41,7 +41,7 @@ below.
 **Navigation — quick quality-of-life fixes (→ WP-A, WP-B, WP-C):**
 
 - Allow clicking on warp numbers in the sidebar.
-- Tell the player where StarDock is at the start of the game (in the logs).
+- Tell the player where Stardock is at the start of the game (in the logs).
 - On the sidebar map, once a sector is explored, indicate what is there with
   short codes for planets and/or ports, color-coded by type.
 - The sidebar map quick reference should also name the region of space (Hub,
@@ -86,7 +86,7 @@ below.
 
 **Amendments — round 2 (`changes_to_make2.md`) (→ WP-A, WP-B):**
 
-- StarDock should be an automatically known route (not just named in the log —
+- Stardock should be an automatically known route (not just named in the log —
   the path to it should already be uncovered).
 - Use the arrow keys to move focus between warp buttons by their on-screen
   layout: Up focuses the button rendered above the current one, Down the one
@@ -151,9 +151,9 @@ Right/Left and Down/Up geometry).
 
 ---
 
-## WP-B — Real event log + StarDock signpost + Computer reorg
+## WP-B — Real event log + Stardock signpost + Computer reorg
 
-Covers: "tell the player where StarDock is at game start (in the logs)"; "Map and
+Covers: "tell the player where Stardock is at game start (in the logs)"; "Map and
 log should be part of the ship's computer but keep direct hotkeys."
 
 **Message log backed by real events (`edge/server/session.py` + `service.py`)**
@@ -162,20 +162,20 @@ log should be part of the ship's computer but keep direct hotkeys."
   (shape already in `dummy.py:152–164`; promote it to `dto.py`). Reuse the
   formatting already in `game.py:_format` (lines 224–237) — extract it to a shared
   `format_event` helper so the ticker and the Log tab render identically.
-- **StarDock signpost:** at `GameService.new_game` (service.py:34), compute the
-  StarDock sector (the Class-9 port, `PortClass.STARDOCK`) and persist a synthetic
-  intro entry, e.g. `"Navigation beacon: StarDock lies in Sector N — <region>."`
+- **Stardock signpost:** at `GameService.new_game` (service.py:34), compute the
+  Stardock sector (the Class-9 port, `PortClass.STARDOCK`) and persist a synthetic
+  intro entry, e.g. `"Navigation beacon: Stardock lies in Sector N — <region>."`
   Surface it as the first line of both the game-screen ticker
   (`game.py:144`) and the Log tab. This is an intentional reveal (a known
-  landmark giving the player a goal), consistent with DESIGN §5's "StarDock
+  landmark giving the player a goal), consistent with DESIGN §5's "Stardock
   reachable" guarantee.
 
-**StarDock as an auto-known route (round-2 amendment).** Naming StarDock in the
+**Stardock as an auto-known route (round-2 amendment).** Naming Stardock in the
 log isn't enough — the *route* to it should already be uncovered so the player
 can `(W)` travel there from turn one (route-lock requires explored sectors).
 Adjacency and `core_hops` already exist before `populate` runs (generator.py:148–
 151), so in `populate.py` (where player 1 is built, populate.py:140) seed the
-opening fog with the StarDock path: `path = shortest_path(state.adjacency, 1,
+opening fog with the Stardock path: `path = shortest_path(state.adjacency, 1,
 dock.sector_id)`, then `explored_sectors = frozenset(path)` and a matching
 `entered_from` chain (`{path[i+1]: path[i]}`). Only the shortest path is revealed
 — everything off it stays fogged — so the frontier is still earned. This makes
@@ -333,10 +333,10 @@ only**; internal ids stay for code/persistence and `bigbang --inspect`.
   (+ `you_display` on `MapDTO`); `sector_id` stays the internal click/command payload.
 - **Projection (`session.py`):** a `_display(state, sid)` helper (`.get(…, sid)`
   fallback keeps fixture states rendering internal ids) fills `display_id` and the
-  StarDock signpost + `Warped` log line; `format_event` gained a `display` map.
+  Stardock signpost + `Warped` log line; `format_event` gained a `display` map.
 - **Service:** `resolve_display_id` (reverse lookup for the travel prompt) and
   `describe_event` (ticker text with spatial ids, no TUI→core reach).
-- **TUI:** warp labels, sector title, centre marker, sidebar, port/StarDock/map
+- **TUI:** warp labels, sector title, centre marker, sidebar, port/Stardock/map
   headers render `display_id`; the travel callback maps the typed spatial id back
   to internal. Clicks already carry internal ids — unchanged.
 - **Docs:** DESIGN §5.1 reframed to the dual-id model (no migration); this plan.
@@ -352,7 +352,7 @@ only**; internal ids stay for code/persistence and `bigbang --inspect`.
 
 1. `p1.5: WP-A` warp UI legibility (DTO + projection + widgets).
 2. `p1.5: WP-C` gravity arrows + breadcrumb + multi-hop/route-lock (core + TUI).
-3. `p1.5: WP-B` real event log + StarDock signpost + auto-known route + Computer reorg.
+3. `p1.5: WP-B` real event log + Stardock signpost + auto-known route + Computer reorg.
 4. `p1.5: WP-D` rename binary + `--serve`.
 5. `p1.5: WP-E` renumbering proposal (DESIGN.md) + prototype + tests.
 
@@ -370,11 +370,11 @@ arrow-key focus to WP-A and the auto-known route to WP-B.)
   tests must still pass — confirm `core_hops` (runtime-only) and the WP-A DTO
   changes do **not** alter `state_hash`; if `Player.entered_from` is included in
   the hash, regenerate the golden master and note it.
-- **Projection:** unit-test `messages_view` (StarDock intro present; events
+- **Projection:** unit-test `messages_view` (Stardock intro present; events
   formatted) and the gravity-arrow logic (`<<`/`>>`/`--`) against a tiny fixture
   universe.
 - **Bigbang (WP-B route):** assert the new game seeds `explored_sectors` with a
-  contiguous path from sector 1 to the StarDock sector (and a matching
+  contiguous path from sector 1 to the Stardock sector (and a matching
   `entered_from` chain), that the off-route remainder stays fogged, and that
   `TravelTo(stardock)` succeeds from the opening state.
 - **TUI (Textual Pilot, `test_tui_flow.py`):** click a sidebar neighbor → warp;
@@ -388,7 +388,7 @@ arrow-key focus to WP-A and the auto-known route to WP-B.)
   representative band), with Terra (sector 1) anchoring the lowest ID, across a
   seed sweep.
 - **Manual:** `pixi run edge` (renamed) and `pixi run edge --serve` then open the
-  browser; confirm the StarDock signpost appears in the opening log, gravity
+  browser; confirm the Stardock signpost appears in the opening log, gravity
   arrows point sensibly, and the backtrack color marks the way you came.
 - Gates: `pixi run check` (ruff + mypy --strict + pytest) green; `pixi run cov`
   holds ~98%.

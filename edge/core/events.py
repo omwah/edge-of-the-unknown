@@ -149,7 +149,7 @@ class DiscoveryDetected(Event):
 
 @dataclass(frozen=True)
 class DevicePurchased(Event):
-    """A special device bought at StarDock (§4, WP10), e.g. a genesis torpedo."""
+    """A special device bought at Stardock (§4, WP10), e.g. a genesis torpedo."""
 
     player_id: int
     device_id: str

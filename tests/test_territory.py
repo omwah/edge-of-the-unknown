@@ -105,7 +105,7 @@ def _generated():
     apply_result(state, reduce(state, 1, JoinGame(name="T"), SMALL))
     dock = next(p.sector_id for p in state.ports.values() if p.klass is PortClass.STARDOCK)
     ship = state.ships[state.players[1].ship_id]
-    state.ships[ship.id] = replace(ship, sector_id=dock)  # sit at the StarDock to buy
+    state.ships[ship.id] = replace(ship, sector_id=dock)  # sit at the Stardock to buy
     return state
 
 

@@ -106,17 +106,107 @@ planning — confirm with a fresh search before editing.
 ### WP-PR2-01 — Tabbed-screen keyboard model — landed (with deferrals)
 
 **Landed 2026-07-12** in `playtest: WP-PR2-01 tabbed-screen keyboard model`. A shared
-`ServiceHub` (StarDock + Base) and the Computer screen now underline an accelerator
+`ServiceHub` (Stardock + Base) and the Computer screen now underline an accelerator
 letter in each tab title, bind it to jump-to-tab-and-focus-content, and focus content
 on Enter while the tab rail is focused (`edge/tui/widgets.py` `accel_title` /
 `first_focusable` / `ServiceHub.activate_and_focus`). **Deferrals (see notes PT-32):**
 (a) per-*subview* single-letter hotkeys on Computer are not built — categories get
 letters, subviews are reached by arrows + Enter-to-content; (b) tabs whose only free
-in-title letter is already an action binding (StarDock **Bank**, Base **Hardware**)
+in-title letter is already an action binding (Stardock **Bank**, Base **Hardware**)
 have no letter and stay arrow/Enter-reachable — closing these needs the action-binding
 relocation the note anticipates, deliberately out of scope for this additive pass.
 
-**Goal:** give Computer, StarDock, and Starbase tabs (and Computer subtabs) accent-
+#### WP-PR2-01b — Computer: tab-owned keys — landed
+
+**Landed 2026-07-12** in `playtest: WP-PR2-01b computer tab-owned keys`. WP-PR2-01 fixed
+the accelerators but left the footer advertising every screen action on every tab. The
+model is now inverted for the **Computer**, and this is the pattern the other tabbed
+screens should adopt:
+
+- **A tab owns its keys.** `ComputerScreen.PANE_BINDINGS` maps each subview id → its
+  `(key, action, description)` triples, and the new shared `ActionPane` (`edge/tui/
+  widgets.py`) binds them onto that subview's pane, dispatching into the `screen.`
+  namespace so the handlers stay on the screen. Each **category** pane likewise owns the
+  numbers `1`..`N` for its own sub-tabs (hidden from the footer; the number leads the
+  sub-tab title), so `2` addresses a different tab in each category and can never reach
+  into another's. Textual builds the binding chain outward from the focused widget, so a
+  pane's keys are live — and in the footer — only while focus is inside it. **No
+  `check_action` scoping and no global per-tab bindings.** The screen keeps only `Esc`
+  (back), the category accelerators and Enter-to-content.
+- **Key map** (interview, 2026-07-12): categories are **N**avigation / **C**ommerce /
+  e**X**ploration / **R**elations / Log**b**ook. `C` is Commerce, so the old `C`-closes-
+  the-Computer alias is gone (Esc closes). `X` and `R` were freed by moving Abandon and
+  Remove-note onto **Delete** and Route-to onto **`W`** — the sector view's key for the
+  same verb, so it means one thing everywhere.
+- **Back leads the footer on every screen.** New `chrome.EdgeScreen` base (all 15 full
+  screens) reorders `active_bindings` so Esc/Back is first; Textual's chain order had it
+  trailing whatever the focused widget owned (on the Map tab it landed after Engage).
+- **Consequences (all tested in `tests/test_ui_computer_keys.py`):** the footer offers
+  exactly the visible tab's verbs and no navigation keys; a key may mean two things on
+  two tabs (Delete abandons a favor on Contracts, removes a note on Notes —
+  `action_remove_note` split out of the old dual-purpose `action_abandon_contract`);
+  `action_descriptors` scopes the `.` menu / `?` help / palette the same way (with a
+  parity test, and the guard in `tests/test_ui_actions.py` updated to allow the override
+  and to see pane bindings).
+- **Focus follows the visible tab**, because the scoping depends on it: accelerator,
+  Enter-on-rail, `show_subview()` deep links, and mount all land focus on the tab's
+  primary control, and `_follow_focus_to_visible_pane` never leaves it stranded in a
+  pane that is no longer showing. `first_focusable` now honours a `focus-first` class,
+  which `DetailTable` puts on its table — DOM order was handing focus to the filter
+  `Input` above it, where the tab's action letters would have been typed as filter text.
+- **`Records` → `Logbook` (accelerator `B`).** A focused `DetailTable` owns `O` (cycle
+  sort), which sits between the table and the screen in the binding chain, so the old
+  `O` accelerator was unreachable from the very place it had to work. Every letter of
+  "Records" was taken by an action; the category was renamed rather than take a key away
+  from the tables. Pane ids (`cat-records` / `log` / `notes`) are unchanged.
+
+**Still deferred:** the **Base** screen keeps screen-level bindings + `check_action`;
+porting it to `ActionPane`/`PANE_BINDINGS` through `ServiceHub` (as the Stardock now is)
+is the last step. Computer sub-tabs are no longer deferred: they are numbered `1`..`N`
+per category.
+
+#### WP-PR2-01c — Stardock: tab-owned keys — landed
+
+**Landed 2026-07-12** in `playtest: WP-PR2-01c stardock tab-owned keys`. The Stardock now
+uses the WP-PR2-01b model. It is a *flat* tab row (no category level), so it keeps letter
+accelerators and takes no sub-tab numbers — numbers exist on the Computer only to
+separate a category's sub-tabs, which the Stardock does not have.
+
+- **The shared `ServiceHub` carries the model**, so the Base screen inherits it for free
+  when it is ported: hosts pass `actions` (tab id → triples), the hub builds each tab as
+  an `ActionPane`, focuses the visible tab's content on mount and on every switch, and
+  blurs before a programmatic switch (Textual re-activates whichever pane holds focus, so
+  a stale focus silently reverts the switch). `StardockScreen` drops `check_action` /
+  `_TAB_SCOPED` entirely and gains `action_descriptors`, scoped like the footer.
+- **Key map** (interview, 2026-07-12): tabs are **C**ommodities · **S**hipyard ·
+  **H**ardware · **D**evices & Armaments · Co**l**onists · **B**ank · Ta**v**ern. Two verbs
+  moved to free those letters: **Haggle is `G`** (H names Hardware) and **Buy is
+  `P`/Purchase** (B names the Bank). `G` haggles on the **Port** screen too — the Stardock
+  hosts that same `TradePanel`, so the verb must not answer to two keys depending on the
+  route in. `E` (Engine Room) is **Hardware's own key**, not a screen key — you buy a part
+  and slot it in one errand. `Esc` (undock) is the only screen-wide verb left.
+- **A focused text `Input` disarms a screen**, and this is now enforced centrally:
+  `first_focusable` never auto-focuses an `Input` (only a `focus-first` nomination can).
+  Landing on the Colonists amount field took every letter key as typing — the tab's verbs
+  stopped firing, Textual dropped them from the footer, and even the accelerators that
+  would have let you *leave the tab* were swallowed. This generalizes the `DetailTable`
+  filter-box fix from WP-PR2-01b. Colonists nominates its Recruit button instead.
+- **A pane with no focusable content must hold focus itself** (`widgets.focus_content`):
+  the Bank is pure text, and a pane whose keys follow focus cannot fire them if it can
+  never be focused — Deposit/Withdraw would have been advertised but dead.
+- **Colonists typing affordance** (interview, 2026-07-12): the tab lands on its Recruit
+  button, which leaves the digits free — typing one **starts an amount** (it fills the
+  field and hands over focus, so the rest is ordinary typing and `Enter` recruits), and
+  `+`/`−` step it without entering the field. The digits are pane keys kept off the footer
+  (`PANE_HIDDEN`, carried by `ServiceHub` alongside `actions`). `AmountStepper`'s field is
+  now `select_on_focus=False`: focusing used to select the whole amount, so the next
+  keystroke *replaced* it instead of extending it — multi-digit typing was impossible.
+- **Spelling:** `StarDock` → **`Stardock`** repo-wide (identifiers, strings, docs). This
+  renames the projection DTO `StarDockDTO` → `StardockDTO`, which moves the wire
+  fingerprint: **`WIRE_VERSION` 16 → 17**, `tests/fixtures/wire/{fingerprint.txt,
+  envelopes.json}` regenerated. Projection-only, so no store migration.
+
+**Goal:** give Computer, Stardock, and Starbase tabs (and Computer subtabs) accent-
 letter focus hotkeys shown in the tab title, and make the hotkey **and** Enter-on-a-
 tab drop focus straight onto the tab's primary content.
 
@@ -133,7 +223,7 @@ tab drop focus straight onto the tab's primary content.
   widget id and calls `.focus()`.
 - On `TabActivated` (arrow-key navigation) plus an Enter binding while a tab header
   is focused, call the same `_focus_primary` so Enter-into-a-tab lands on content.
-- Keep per-tab action bindings footer-scoped via `check_action` (StarDock already
+- Keep per-tab action bindings footer-scoped via `check_action` (Stardock already
   does this at `edge/tui/screens/stardock.py:346`; mirror it in `base.py` and
   `computer.py`). Ensure the footer only shows bindings valid for the active tab.
 - Do not collide with existing global bindings (Escape/back, `?` help, `.` action
@@ -156,7 +246,7 @@ Commit: `playtest: WP-PR2-01 tabbed-screen keyboard model`
 
 ---
 
-### WP-PR2-02 — StarDock hardware focus and Flying/Flown labels
+### WP-PR2-02 — Stardock hardware focus and Flying/Flown labels
 
 **Goal:** keep the just-bought hardware/shipyard row focused after purchase, and
 label hulls **Flying** (current) vs **Flown** (formerly owned, not now).
@@ -219,7 +309,7 @@ tavern. The no-fresh-rumour path is the reducer's existing rejection (no modal).
 
 **Likely files:** `edge/tui/screens/stardock.py`, new
 `edge/tui/screens/rumor.py` (or inline modal), `edge/core/dto.py` /
-`edge/server/session.py` if the lead text needs a response field, StarDock Tavern
+`edge/server/session.py` if the lead text needs a response field, Stardock Tavern
 Pilot + snapshot tests.
 
 **Docs:** `PLAYTEST_NOTES.md` PT-35; Help "Tavern" copy if it mentions rumor flow.
@@ -277,7 +367,7 @@ Commit: `playtest: WP-PR2-04 named discoveries`
 
 ### WP-PR2-05 — Sector-scene compositing spike + wreck slot
 
-**Goal (spike-gated):** composite StarDock/starbase/port art **over** the planet art
+**Goal (spike-gated):** composite Stardock/starbase/port art **over** the planet art
 (hovering, centered), and reserve a slot for a wreck sprite when a planet already
 occupies the sector.
 
@@ -524,18 +614,18 @@ Commit: `playtest: WP-PR2-11 species portrait variant selection`
 
 ### WP-PR2-12 — NPC hub-drift dispersion
 
-**Goal:** stop cron drift from piling hub-space ships into the StarDock sector.
+**Goal:** stop cron drift from piling hub-space ships into the Stardock sector.
 
 **Changes**
 
 - The daily/periodic `alien_drift` cron (`edge/engine/cron.py:258`) moves non-pinned
-  species by `npc.plan_move` (`edge/core/npc.py:101`). StarDock-pinned species don't
+  species by `npc.plan_move` (`edge/core/npc.py:101`). Stardock-pinned species don't
   wander (`_pinned_species`, `:250`), so the pileup is drifting NPCs whose movement
   policy pulls them toward the hub — most likely `trade_seek` drifting to the nearest
-  port, and the StarDock (a port) acting as a sink, or `patrol`/`wander` lacking any
+  port, and the Stardock (a port) acting as a sink, or `patrol`/`wander` lacking any
   repulsion from an already-crowded sector.
 - Reproduce deterministically: run the drift cron many times on a fixed seed and
-  count ships per hub sector; assert the StarDock sector does not exceed a sane cap.
+  count ships per hub sector; assert the Stardock sector does not exceed a sane cap.
 - Fix in `plan_move` (pure core, so it stays testable and replay-stable): add a
   dispersion term — e.g. `trade_seek` picks among *several* nearby ports rather than
   always the single nearest, and/or any policy avoids a destination already crowded
@@ -709,8 +799,8 @@ them.
    (named discoveries), WP-PR2-13 (finite belts), WP-PR2-12 (NPC dispersion —
    movement/replay). Do WP-PR2-04 before WP-PR2-05 (the wreck slot benefits from
    named wrecks).
-3. **StarDock/Tavern UX**: WP-PR2-02, WP-PR2-03, then the tabbed-keyboard model
-   WP-PR2-01 (which touches StarDock/Computer/Base together — settle its DTO/binding
+3. **Stardock/Tavern UX**: WP-PR2-02, WP-PR2-03, then the tabbed-keyboard model
+   WP-PR2-01 (which touches Stardock/Computer/Base together — settle its DTO/binding
    scope once, last of this group).
 4. **Map and nav**: WP-PR2-08 (map colors/P-plot/edge fix), WP-PR2-07 (nav compass).
 5. **Scene and transfer visuals**: WP-PR2-06 (transfer overlay + clamps — no gate),

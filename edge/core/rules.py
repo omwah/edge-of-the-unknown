@@ -8,7 +8,7 @@ are delegated to `core.economy` and `core.movement`; randomness (haggling) is
 drawn from the state-owned RNG, so replay from `(seed, command log)` is exact.
 
 Command set: movement (Warp, TravelTo, Dock), trade (Trade, HaggleOffer), banking
-(Deposit, Withdraw), StarDock services (BuyComponent, BuyShip, RepairAtDock), and
+(Deposit, Withdraw), Stardock services (BuyComponent, BuyShip, RepairAtDock), and
 engine-room work (InstallComponent, SwapComponent, Cannibalize, FieldPatch).
 """
 
@@ -259,7 +259,7 @@ class Withdraw:
 
 @dataclass(frozen=True, slots=True)
 class BuyComponent:
-    """Buy a loose component from the StarDock hardware emporium (§8). Tier III is barter-only."""
+    """Buy a loose component from the Stardock hardware emporium (§8). Tier III is barter-only."""
 
     component: Component
     tier: ComponentTier
@@ -267,14 +267,14 @@ class BuyComponent:
 
 @dataclass(frozen=True, slots=True)
 class BuyShip:
-    """Trade the current hull for a buyable class at the StarDock shipyard (§8)."""
+    """Trade the current hull for a buyable class at the Stardock shipyard (§8)."""
 
     ship_class_id: str
 
 
 @dataclass(frozen=True, slots=True)
 class RepairAtDock:
-    """StarDock restoration of a knocked-out component (§4.1). Inert until Phase-3 combat."""
+    """Stardock restoration of a knocked-out component (§4.1). Inert until Phase-3 combat."""
 
     subsystem: Subsystem
     slot_index: int
@@ -284,7 +284,7 @@ class RepairAtDock:
 class RecruitColonists:
     """Recruit colonists into the ship's occupancy (§4.2). Recruited, never bought.
 
-    `from_planet` None ⇒ StarDock recruitment office (pay a per-head latinum incentive);
+    `from_planet` None ⇒ Stardock recruitment office (pay a per-head latinum incentive);
     a planet id ⇒ emigration from that inhabited world (the disposition gate lands in WP7).
     """
 
@@ -481,7 +481,7 @@ class MineBelt:
 
 @dataclass(frozen=True, slots=True)
 class BuyGenesis:
-    """Buy one Genesis torpedo from the StarDock (§4.2, WP10). A latinum sink."""
+    """Buy one Genesis torpedo from the Stardock (§4.2, WP10). A latinum sink."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -551,7 +551,7 @@ class AttackSpecies:
 
 @dataclass(frozen=True, slots=True)
 class BuyMissiles:
-    """Buy homing missiles at the StarDock hardware emporium (§8, §10, WP25)."""
+    """Buy homing missiles at the Stardock hardware emporium (§8, §10, WP25)."""
 
     count: int
 
@@ -653,10 +653,10 @@ class AbandonContract:
 
 @dataclass(frozen=True, slots=True)
 class BuyRumor:
-    """Buy a rumor at the StarDock tavern (§14, WP58) — a latinum-for-`Lead` sink.
+    """Buy a rumor at the Stardock tavern (§14, WP58) — a latinum-for-`Lead` sink.
 
     Draws the best undiscovered coordinate tip the Core-welcome species collectively know
-    and logs it as a `Lead`. Rejected off the StarDock, when unaffordable, or when the
+    and logs it as a `Lead`. Rejected off the Stardock, when unaffordable, or when the
     tavern has no fresh rumor (every tip the pinned species know is already logged).
     """
 
@@ -667,7 +667,7 @@ class PostNotice:
 
     `text` is sanitised at the reducer (printable-only, length-capped) and appended to the
     capped notice ring (oldest evicted). A captain's log single-player; the shared board in
-    Phase 4. Rejected off the StarDock or with empty text.
+    Phase 4. Rejected off the Stardock or with empty text.
     """
 
     text: str
@@ -793,14 +793,14 @@ class ClaimStarbase:
 
 @dataclass(frozen=True, slots=True)
 class BuyFighters:
-    """Buy sector-fighter stock at the StarDock (§10, WP41)."""
+    """Buy sector-fighter stock at the Stardock (§10, WP41)."""
 
     count: int
 
 
 @dataclass(frozen=True, slots=True)
 class BuyMines:
-    """Buy space-mine stock at the StarDock (§10, WP41)."""
+    """Buy space-mine stock at the Stardock (§10, WP41)."""
 
     count: int
 
@@ -842,7 +842,7 @@ class DeployBeacon:
 
 @dataclass(frozen=True, slots=True)
 class BuyDevice:
-    """Buy a special device (probe / interdictor / mine-deflector) at the StarDock (§10, WP56).
+    """Buy a special device (probe / interdictor / mine-deflector) at the Stardock (§10, WP56).
 
     Devices are counted in `Ship.devices` (not cargo). Priced from `config.devices`.
     """
@@ -1238,7 +1238,7 @@ def _spatial(state: UniverseState, sector_id: int) -> int:
 def _resolve_start_sector(
     state: UniverseState, config: GameConfig, dock_sector: int | None
 ) -> int:
-    """Resolve the configured start sector (DESIGN §5): the StarDock, a seeded random
+    """Resolve the configured start sector (DESIGN §5): the Stardock, a seeded random
     sector, or an explicit id. "random" draws from a *dedicated* sub-RNG so it never
     perturbs the build-RNG order the golden-master replays are keyed off."""
     start_cfg = config.bigbang.start_sector
@@ -1253,7 +1253,7 @@ def _join_game(
     state: UniverseState, player_id: int, command: JoinGame, config: GameConfig
 ) -> ReduceResult:
     """Enroll `player_id`: a starter hull at the config start sector, starting
-    balances/turns, membership of the Core's governing alliance, and the StarDock
+    balances/turns, membership of the Core's governing alliance, and the Stardock
     auto-known as a pre-explored route (DESIGN §3, §5 step 7).
 
     Player creation lives here — not in `bigbang.populate` — so a player is a recorded
@@ -1287,7 +1287,7 @@ def _join_game(
         ),
         config,
     )
-    # StarDock is an auto-known route: the shortest path from the start sector to the
+    # Stardock is an auto-known route: the shortest path from the start sector to the
     # dock opens pre-explored so the opening signpost is actionable on turn one; the
     # rest stays fogged. Recorded as the breadcrumb chain so the way back reads
     # correctly. Starting *at* the dock collapses to a single explored sector.
@@ -1320,7 +1320,7 @@ def _market_port(state: UniverseState, player: Player, ship: Ship, config: GameC
     the market. It trades only while the base is *service-operational* — powered and above
     the integrity gate (a derelict's or a battered base's market is closed until repaired,
     WP-PR04) — and its owner tolerates the player (the same WP40 defense predicate). A
-    StarDock is sovereign — never base-hosted.
+    Stardock is sovereign — never base-hosted.
     """
     port = _docked_port(state, ship)
     if port.klass is PortClass.STARDOCK:
@@ -1701,13 +1701,13 @@ def _dock(state: UniverseState, player_id: int, config: GameConfig) -> ReduceRes
     _require_no_encounter(player)
     ship = _ship(state, player)
     port = _market_port(state, player, ship, config)
-    # The Core StarDock is the governor's haven — a hunted player (§6.3 hostile-governor)
+    # The Core Stardock is the governor's haven — a hunted player (§6.3 hostile-governor)
     # is turned away at the airlock, which denies every dock-gated service (trade,
     # recruitment, bank) at one lever rather than per command (WP52).
     if (port.klass is PortClass.STARDOCK
             and state.sectors[ship.sector_id].is_galactic_core
             and governor_hostile(state, player)):
-        raise MovementError("the governor's forces bar you from the Core StarDock")
+        raise MovementError("the governor's forces bar you from the Core Stardock")
     if player.turns_remaining < 1:
         raise MovementError("out of turns")
     new_player = replace(player, turns_remaining=player.turns_remaining - 1)
@@ -1789,7 +1789,7 @@ def _bank(
 ) -> ReduceResult:
     # Banking stays ungated at the reducer (WP53): the plan's "rejection conditions only
     # widen" rule bars narrowing it, and it was never `_stardock`-gated. It is *surfaced*
-    # as a service at StarDock and player bases (`services.BANKING`) but the account is
+    # as a service at Stardock and player bases (`services.BANKING`) but the account is
     # reachable anywhere, riding the same `Player.bank_balance` invariants.
     player = _player(state, player_id)
     new_player = withdraw(player, amount) if withdraw_ else deposit(player, amount)
@@ -1800,14 +1800,14 @@ def _bank(
     )
 
 
-# --- StarDock services: buy component / buy hull / repair (§8, §11) ---------
+# --- Stardock services: buy component / buy hull / repair (§8, §11) ---------
 
 
 def _stardock(state: UniverseState, ship: Ship) -> Port:
-    """The StarDock in the ship's current sector, or raise (services are dock-only)."""
+    """The Stardock in the ship's current sector, or raise (services are dock-only)."""
     port = _docked_port(state, ship)
     if port.klass is not PortClass.STARDOCK:
-        raise EconomyError("that service is offered only at a StarDock")
+        raise EconomyError("that service is offered only at a Stardock")
     return port
 
 
@@ -1823,7 +1823,7 @@ def _buy_component(
     if cmd.component.value not in config.hardware.components or cmd.tier.name not in config.hardware.tiers:
         raise EconomyError(f"this dock does not stock {cmd.component.value} (tier {cmd.tier.name})")
     # A forward base stocks only the configured tiers (default I/II; §4.2, WP53) and
-    # charges the frontier markup; a StarDock stocks everything at fee_frac 1.0.
+    # charges the frontier markup; a Stardock stocks everything at fee_frac 1.0.
     if sp.kind == "player_base" and config.starbase is not None:
         if cmd.tier.name not in config.starbase.services.component_stock_tiers:
             raise EconomyError(f"this base does not stock tier {cmd.tier.name} components")
@@ -1912,7 +1912,7 @@ def _strip_installed(ship: Ship) -> dict[tuple[Component, ComponentTier], int]:
 def _repair_at_dock(
     state: UniverseState, player_id: int, cmd: RepairAtDock, config: GameConfig
 ) -> ReduceResult:
-    """Pay the StarDock to restore a knocked-out component (§4.1, §8).
+    """Pay the Stardock to restore a knocked-out component (§4.1, §8).
 
     Inert in Phase 2 (nothing is knocked out yet); the path is exercised in Phase 3.
     """
@@ -1961,7 +1961,7 @@ def _recruit_colonists(
     count = min(cmd.count, free)  # clamp to the ship's separate occupancy limit (§4.2)
 
     if cmd.from_planet is None:
-        # StarDock recruitment office — a per-head latinum incentive (not a purchase).
+        # Stardock recruitment office — a per-head latinum incentive (not a purchase).
         _stardock(state, ship)
         cost = count * config.economy.colonist_incentive
         if player.latinum < cost:
@@ -3201,7 +3201,7 @@ def _claim_starbase(
 def _buy_fighters(
     state: UniverseState, player_id: int, cmd: BuyFighters, config: GameConfig
 ) -> ReduceResult:
-    """Buy sector-fighter stock at the StarDock (§10, WP41)."""
+    """Buy sector-fighter stock at the Stardock (§10, WP41)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
     _stardock(state, ship)
@@ -3221,7 +3221,7 @@ def _buy_fighters(
 def _buy_mines(
     state: UniverseState, player_id: int, cmd: BuyMines, config: GameConfig
 ) -> ReduceResult:
-    """Buy space-mine stock at the StarDock (§10, WP41)."""
+    """Buy space-mine stock at the Stardock (§10, WP41)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
     _stardock(state, ship)
@@ -3328,7 +3328,7 @@ def _deploy_beacon(
 def _buy_device(
     state: UniverseState, player_id: int, cmd: BuyDevice, config: GameConfig
 ) -> ReduceResult:
-    """Buy a probe / interdictor / mine-deflector at the StarDock (§10, §14, WP56)."""
+    """Buy a probe / interdictor / mine-deflector at the Stardock (§10, §14, WP56)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
     _stardock(state, ship)
@@ -3439,7 +3439,7 @@ def _remove_limpets(
 def _buy_missiles(
     state: UniverseState, player_id: int, cmd: BuyMissiles, config: GameConfig
 ) -> ReduceResult:
-    """Buy homing missiles at a StarDock or a player base (§8, §10, WP25/WP53)."""
+    """Buy homing missiles at a Stardock or a player base (§8, §10, WP25/WP53)."""
     player = _player(state, player_id)
     ship = _ship(state, player)
     sp = require_service(state, player, ship, MUNITIONS, config)
@@ -3631,7 +3631,7 @@ def _salvage(
 
 
 def _buy_genesis(state: UniverseState, player_id: int, config: GameConfig) -> ReduceResult:
-    """Buy one Genesis torpedo from the StarDock (§4.2, WP10)."""
+    """Buy one Genesis torpedo from the Stardock (§4.2, WP10)."""
     if config.genesis is None:
         raise EconomyError("genesis torpedoes are not sold in this universe")
     player = _player(state, player_id)
@@ -4159,7 +4159,7 @@ def _abandon_contract(state: UniverseState, player_id: int, cmd: AbandonContract
 
 
 def _core_welcome_species(state: UniverseState, port: Port) -> list[AlienSpecies]:
-    """The Core-welcome species staged at the StarDock — the tavern's rumour-mongers (§14).
+    """The Core-welcome species staged at the Stardock — the tavern's rumour-mongers (§14).
 
     These are the species pinned to the hub (the governing alliance's friendly members and
     the peaceable wanderers stationed there); their pooled knowledge is what the tavern sells.
@@ -4170,7 +4170,7 @@ def _core_welcome_species(state: UniverseState, port: Port) -> list[AlienSpecies
 def _buy_rumor(state: UniverseState, player_id: int, config: GameConfig) -> ReduceResult:
     """Buy a rumour at the tavern — a latinum-for-`Lead` sink (§14, WP58).
 
-    Gated to the StarDock (the tavern is there); charges `tavern.rumor_price`; draws the best
+    Gated to the Stardock (the tavern is there); charges `tavern.rumor_price`; draws the best
     undiscovered tip the Core-welcome species collectively know (`pick_rumor`, deterministic +
     deduped against the player's leads/codex/explored, so repeat buys exhaust like repeated
     asks). Logs it as a `Lead` — intel for cash, the standing-free twin of asking a contact.

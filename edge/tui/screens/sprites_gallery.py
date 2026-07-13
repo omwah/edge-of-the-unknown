@@ -17,7 +17,8 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Vertical
-from textual.screen import Screen
+
+from edge.tui.chrome import EdgeScreen
 from textual.widgets import Footer, Static, TabbedContent, TabPane
 
 from edge.art.generator import available_subtypes
@@ -60,7 +61,7 @@ class _SpriteCard(Vertical):
         yield art
 
 
-class SpriteGalleryScreen(Screen[None]):
+class SpriteGalleryScreen(EdgeScreen):
     BINDINGS = [Binding("escape", "back", "Back")]
 
     CSS = """

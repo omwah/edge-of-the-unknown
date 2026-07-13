@@ -154,7 +154,7 @@ async def test_refresh_preserves_cursor_by_logical_key() -> None:
 
 async def test_note_removal_targets_the_filtered_row() -> None:
     """ComputerScreen actions resolve rows by key: filtering the notes table
-    down to one note and pressing X removes that note, not index zero."""
+    down to one note and pressing Del removes that note, not index zero."""
     from edge.core.rules import AddNote
     from edge.tui.app import EdgeApp
     from edge.tui.screens.computer import ComputerScreen
@@ -179,7 +179,7 @@ async def test_note_removal_targets_the_filtered_row() -> None:
         table = screen.query_one("#notes-table", DataTable)
         assert table.row_count == 1
         table.focus()
-        await pilot.press("x")  # remove highlighted note
+        await pilot.press("delete")  # remove highlighted note
         await pilot.pause()
         notes = svc.computer_view(1).notes
         assert notes == ["alpha note", "gamma note"]  # beta gone, others intact

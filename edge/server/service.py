@@ -173,7 +173,7 @@ class GameService:
         return session.computer_view(self._state, player_id, self._config)
 
     def tavern_view(self, player_id: int) -> dto.TavernDTO:
-        """The StarDock tavern: rumors, bounty board, noticeboard (§14, WP58)."""
+        """The Stardock tavern: rumors, bounty board, noticeboard (§14, WP58)."""
         return session.tavern_view(self._state, player_id, self._config)
 
     def corp_view(self, player_id: int) -> dto.CorpDTO | None:
@@ -200,7 +200,7 @@ class GameService:
     ) -> dto.EngineRoomPreviewDTO:
         return session.engine_room_preview(self._state, player_id, command, self._config)
 
-    def stardock_view(self, player_id: int) -> dto.StarDockDTO:
+    def stardock_view(self, player_id: int) -> dto.StardockDTO:
         return session.stardock_view(self._state, player_id, self._config)
 
     def territory_view(self, player_id: int) -> dto.TerritoryDTO:

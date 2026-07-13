@@ -15,7 +15,7 @@ def test_default_config_loads() -> None:
     assert cfg.config_version == 6  # Phase-4 M21 epoch (corp ownership kind + Player.corp_id/bounty, WP66)
     assert cfg.turns_per_day == 250
     assert cfg.seed == 4  # default.yaml pins a curated seed; empty ⇒ random at start
-    assert cfg.bigbang.start_sector == "stardock"  # the player starts at the StarDock
+    assert cfg.bigbang.start_sector == "stardock"  # the player starts at the Stardock
 
 
 def test_seed_accepts_null_for_random() -> None:

@@ -5,7 +5,8 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
-from textual.screen import Screen
+
+from edge.tui.chrome import EdgeScreen
 from textual.widgets import Button, Static
 
 from edge.tui.saves import has_save, save_summary
@@ -29,7 +30,7 @@ _SUBTITLE = "\ntrade · discover · navigate the alien frontier"
 _FOOTER = "v0.1"
 
 
-class MainMenuScreen(Screen[None]):
+class MainMenuScreen(EdgeScreen):
     BINDINGS = [
         Binding("n", "new_game", "New game"),
         Binding("c", "continue_game", "Continue"),

@@ -470,7 +470,7 @@ Depends on: WP-UI03–WP-UI07.
 
 Implementation:
 
-- Keep one `TradePanel` at ports, StarDock, and bases.
+- Keep one `TradePanel` at ports, Stardock, and bases.
 - Align numeric columns and use explicit “Port buys” and “Port sells” wording.
 - Show selected commodity, stock/capacity, unit price, estimated transaction total, player quantity, hold impact, and purse limitation.
 - Make Trade, Haggle, and Deliver visible context actions.
@@ -479,7 +479,7 @@ Implementation:
 
 Verification:
 
-- Port, StarDock, and base trade views render the same component.
+- Port, Stardock, and base trade views render the same component.
 - Goods and price direction cannot be confused from labels.
 - Existing trade/haggle behavior and conservation tests pass.
 
@@ -487,13 +487,13 @@ Commit: `ui: WP-UI14 unified commerce presentation`
 
 ### M5 — Progression, encounter, and social screens
 
-#### WP-UI15 — Consolidate StarDock and base service hubs
+#### WP-UI15 — Consolidate Stardock and base service hubs
 
 Depends on: WP-UI10, WP-UI14.
 
 Implementation:
 
-- Apply one service-hub pattern to StarDock and starbases.
+- Apply one service-hub pattern to Stardock and starbases.
 - Group commerce, ship, devices, finance, and social services consistently.
 - Use a scrollable selector in compact mode instead of overflowing tabs.
 - Show unavailable services with standing or prerequisite explanations.

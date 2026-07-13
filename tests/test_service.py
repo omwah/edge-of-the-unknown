@@ -36,7 +36,7 @@ def test_new_game_view_starts_at_core(tmp_path: Path) -> None:
 
 def test_warp_updates_view_and_reveals_fog(tmp_path: Path) -> None:
     svc = _service(tmp_path)
-    # Pick a neighbour off the pre-explored StarDock route so it's still fogged.
+    # Pick a neighbour off the pre-explored Stardock route so it's still fogged.
     explored = svc.state.players[1].explored_sectors
     target = next(s for s in svc.state.sectors[1].warps_out if s not in explored)
     # Before warping, the neighbour is an unexplored '?' warp.
@@ -67,7 +67,7 @@ def test_haggle_quote_labels_track_generosity(tmp_path: Path) -> None:
     svc.apply(1, Dock())
     fair = next(c for c in svc.port_view(1, dock.id).commodities if c.name == "Fuel Ore").price
 
-    # Fuel Ore at a StarDock is a player buy: paying fair (or more) is auto-accepted,
+    # Fuel Ore at a Stardock is a player buy: paying fair (or more) is auto-accepted,
     # paying a pittance is insulting, and a mild discount is a real negotiation.
     assert svc.haggle_quote(1, Commodity.FUEL_ORE, fair).label == "accepted"
     assert svc.haggle_quote(1, Commodity.FUEL_ORE, 1).label == "insulting"
@@ -323,7 +323,7 @@ def test_current_planet_view_finds_or_none(tmp_path: Path) -> None:
 
 def test_messages_view_lists_real_events(tmp_path: Path) -> None:
     svc = _service(tmp_path)
-    # Fresh game: no events yet (the opening StarDock beacon was removed).
+    # Fresh game: no events yet (the opening Stardock beacon was removed).
     assert svc.messages_view(1).events == []
     # After a warp, the newest event leads, its destination in the spatial-sector gutter.
     target = svc.state.sectors[1].warps_out[0]

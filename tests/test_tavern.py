@@ -1,4 +1,4 @@
-"""WP58 — the StarDock tavern: rumors, bounty board, noticeboard (DESIGN §14).
+"""WP58 — the Stardock tavern: rumors, bounty board, noticeboard (DESIGN §14).
 
 Rumors are a latinum-for-`Lead` sink drawn from the Core-welcome species' pooled knowledge
 (deduped, so repeat buys exhaust); the noticeboard is a capped, sanitised ring. These tests
@@ -43,7 +43,7 @@ CFG = load_default_config()
 
 
 def _world() -> UniverseState:
-    """A StarDock in sector 1 (player docked there) + a rare find out in sector 3."""
+    """A Stardock in sector 1 (player docked there) + a rare find out in sector 3."""
     state = UniverseState.new(Game(1, 1, CFG.config_version, "t"))
     state.sectors = {
         1: Sector(1, 1, (2,), "Hub", is_galactic_core=True),
@@ -54,7 +54,7 @@ def _world() -> UniverseState:
     state.core_hops = {1: 0, 2: 1, 3: 2}
     state.spatial_ids = {1: 1, 2: 2, 3: 3}
     state.ports = {
-        9: Port(9, 1, "StarDock", PortClass.STARDOCK, 9, (
+        9: Port(9, 1, "Stardock", PortClass.STARDOCK, 9, (
             PortCommodity(Commodity.FUEL_ORE, PortMode.BUY, 100, 5000, 11, 5),
         ), latinum=50_000),
     }
@@ -102,7 +102,7 @@ def test_rumor_exhausts_when_nothing_new() -> None:
 
 def test_rumor_rejected_off_dock() -> None:
     state = _world()
-    state.ships[1] = replace(state.ships[1], sector_id=2)  # not at the StarDock
+    state.ships[1] = replace(state.ships[1], sector_id=2)  # not at the Stardock
     with pytest.raises((EconomyError, MovementError)):
         reduce(state, 1, BuyRumor(), CFG)
 

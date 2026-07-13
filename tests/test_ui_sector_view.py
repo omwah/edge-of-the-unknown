@@ -5,14 +5,14 @@ and drops the sidebar (the `I` status drawer stands in); standard keeps the
 grouped sidebar; wide adds the objectives checklist. Every scene click hotspot
 has a keyboard/list equivalent: object rows post the identical
 `ClickableEntry.Picked` routing, exercised end-to-end below by docking at the
-StarDock from the drawer with Enter alone.
+Stardock from the drawer with Enter alone.
 """
 
 from __future__ import annotations
 
 from edge.tui.app import EdgeApp
 from edge.tui.screens.game import GameScreen
-from edge.tui.screens.stardock import StarDockScreen
+from edge.tui.screens.stardock import StardockScreen
 from edge.tui.screens.status_drawer import StatusDrawerScreen
 from edge.tui.widgets import ObjectRow, SectorObjectList, SectorScene, StatusSidebar
 
@@ -21,7 +21,7 @@ async def test_compact_tier_lists_objects_instead_of_art() -> None:
     app = EdgeApp()
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
-        await pilot.press("n")  # new game — starts at the StarDock sector
+        await pilot.press("n")  # new game — starts at the Stardock sector
         await pilot.pause()
         assert isinstance(app.screen, GameScreen)
         # Art and sidebar give way to gameplay information (plan contract).
@@ -38,7 +38,7 @@ async def test_compact_tier_lists_objects_instead_of_art() -> None:
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
-        assert isinstance(app.screen, StarDockScreen)
+        assert isinstance(app.screen, StardockScreen)
 
 
 async def test_status_drawer_opens_and_routes_a_pick() -> None:
@@ -72,7 +72,7 @@ async def test_status_drawer_opens_and_routes_a_pick() -> None:
         await pilot.press("enter")
         await pilot.pause()
         await pilot.pause()
-        assert isinstance(app.screen, StarDockScreen)
+        assert isinstance(app.screen, StardockScreen)
 
 
 async def test_status_drawer_up_down_walks_object_rows() -> None:

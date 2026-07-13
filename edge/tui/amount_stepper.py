@@ -26,7 +26,12 @@ class AmountStepper(Horizontal):
         self.initial_value = value
 
     def compose(self) -> ComposeResult:
-        yield Input(value=str(self.initial_value), id=f"amt-{self.key}", type="integer")
+        # `select_on_focus=False`: focusing must not select the whole amount, or the next
+        # keystroke silently *replaces* it instead of extending it — which breaks typing a
+        # multi-digit amount (the Stardock's Colonists tab types the first digit for you,
+        # then hands the field focus so the rest is ordinary typing).
+        yield Input(value=str(self.initial_value), id=f"amt-{self.key}", type="integer",
+                    select_on_focus=False)
         yield Button("−", id=f"dec-{self.key}", classes="step")
         yield Button("+", id=f"inc-{self.key}", classes="step")
 

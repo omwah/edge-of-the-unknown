@@ -1,10 +1,14 @@
 """PortScreen — a plain commodities port, wired to the live service (UI_MOCKUPS.md §2).
 
-Used when the docked port is *not* a StarDock (a StarDock hosts the same
+Used when the docked port is *not* a Stardock (a Stardock hosts the same
 `TradePanel` as its Commodities tab). Reads `service.current_port_view`; `T`
 trades a chunk of the highlighted commodity in the port's natural direction
-(quick-trade), and `H` opens a counter-offer haggle on it (§8). `D` delivers any
+(quick-trade), and `G` opens a counter-offer haggle on it (§8). `D` delivers any
 active deliver favor targeting this port (§6.7, WP57 — surfaced WP71).
+
+Haggle is `G`, not `H`: the Stardock hosts this same panel on its Commodities tab, where
+`H` names the Hardware tab (PT-32), and a verb should not answer to two keys depending
+on which screen you reached it from.
 """
 
 from __future__ import annotations
@@ -20,17 +24,17 @@ from edge.core.dto import CommodityLine, PortDTO, ShipDTO
 from edge.core.economy import EconomyError
 from edge.core.rules import Trade
 from edge.server.service import GameService
-from edge.tui.chrome import notify_warning
+from edge.tui.chrome import EdgeScreen, notify_warning
 from edge.tui.station_art import StationArtHeader
 from edge.tui.screens.haggle import HaggleScreen
 from edge.tui.widgets import NAME_TO_COMMODITY, TRADE_CHUNK, TradePanel
 
 
-class PortScreen(Screen[None]):
+class PortScreen(EdgeScreen):
     BINDINGS = [
         Binding("escape", "leave", "Leave dock"),
         Binding("t", "trade", "Trade highlighted"),
-        Binding("h", "haggle", "Haggle highlighted"),
+        Binding("g", "haggle", "Haggle highlighted"),
         Binding("d", "deliver", "Deliver favor"),
     ]
 
@@ -39,7 +43,7 @@ class PortScreen(Screen[None]):
 Trading acts on the [b]highlighted[/] commodity row. Haggling wears the port's
 patience — too many rejected offers close negotiation for the day."""
 
-    # Mirror StarDock's icon + service-banner header, then the shared trade panel.
+    # Mirror Stardock's icon + service-banner header, then the shared trade panel.
     CSS = """
     PortScreen #port-title {
         dock: top; height: 1; background: $primary; color: $background;

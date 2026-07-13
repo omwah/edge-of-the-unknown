@@ -254,7 +254,7 @@ COMMANDS: list[Command] = [
     CombatAction(action="fight"),                # WP25 one combat round
     CombatAction(action="flee"),
     CombatAction(action="field_patch", subsystem=Subsystem.SCREENS, slot_index=1),
-    BuyMissiles(count=3),                        # WP25 StarDock missile ammo
+    BuyMissiles(count=3),                        # WP25 Stardock missile ammo
     DevPatch("set", "latinum", 1_000_000),            # dev cheat: set a field
     DevPatch("grant", "component", 2, key="accelerator:III"),  # dev cheat: grant parts
     DevPatch("claim", "planet", ref=5),               # dev cheat: claim a world

@@ -277,7 +277,7 @@ async def test_computer_market_and_contracts_use_shared_empty_states() -> None:
 async def test_tavern_empty_board_and_noticeboard_use_empty_states() -> None:
     from edge.core.movement import shortest_path
     from edge.core.rules import Warp
-    from edge.tui.screens.stardock import StarDockScreen
+    from edge.tui.screens.stardock import StardockScreen
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -294,7 +294,7 @@ async def test_tavern_empty_board_and_noticeboard_use_empty_states() -> None:
             svc.apply(1, Warp(to_sector=hop))
         await pilot.press("p")
         await pilot.pause()
-        assert isinstance(app.screen, StarDockScreen)
+        assert isinstance(app.screen, StardockScreen)
         tav = svc.tavern_view(1)
         empties = list(app.screen.query(EmptyState))
         expected = (0 if tav.bounties else 1) + (0 if tav.notices else 1)

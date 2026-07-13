@@ -765,7 +765,7 @@ def summarize(state: UniverseState) -> str:
     # Helper function for title case conversion
     def to_title_case(name: str) -> str:
         if name.upper() == "STARDOCK":
-            return "StarDock"
+            return "Stardock"
         return name.replace("_", " ").title()
 
     # Spacing and table formatting helper
@@ -833,7 +833,7 @@ def summarize(state: UniverseState) -> str:
 
     def get_port_label(klass: PortClass) -> str:
         if klass is PortClass.STARDOCK:
-            return "StarDock"
+            return "Stardock"
         trades = PORT_CLASS_TRADES[klass]
         mnemonic = "".join("B" if trades[c] is PortMode.BUY else "S" for c in Commodity)
         return f"Class {klass.value} ({mnemonic})"
@@ -1058,7 +1058,7 @@ def summarize(state: UniverseState) -> str:
     economic_rows = [
         ("  Ports", str(len(state.ports))),
         ("  Planets", str(len(state.planets))),
-        ("  StarDock", stardock_val),
+        ("  Stardock", stardock_val),
     ]
 
     band_rows = [(f"  {to_title_case(b)}", str(bands[b])) for b in sorted_bands]

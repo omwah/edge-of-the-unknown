@@ -91,7 +91,7 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
         if sector.is_galactic_core:
             continue
         sectors_by_band.setdefault(sector.distance_band, []).append(sid)
-    # The StarDock sector is reserved for the curated Core-welcome greeting party
+    # The Stardock sector is reserved for the curated Core-welcome greeting party
     # (`_place_stardock_contacts`) — keep band homes and their clusters off it, so a
     # rival-bloc ship can never wander into the new player's first port of call.
     dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
@@ -146,7 +146,7 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     # Alliance members are **not** blanket-clamped here — their authored disposition_center
     # and the band bias apply normally, so a low-disposition bloc species placed in Deep
     # can be hostile by nature (§6). Alliance friendliness is localised: home clusters
-    # (_settle_cluster), the Core (_populate_governing_space), and the StarDock
+    # (_settle_cluster), the Core (_populate_governing_space), and the Stardock
     # (_place_stardock_contacts) each pass is_anchor=True independently (§6.3).
     for i, (sp, band) in enumerate(zip(chosen, assignment)):
         home = rng.choice(sectors_by_band[band])
@@ -328,7 +328,7 @@ def _cluster_sectors(state: UniverseState, home: int, radius: int,
 
     A bounded BFS over the directed warp graph (deterministic neighbour order), used to
     scatter a species' satellite ships around its home sector (§6.3 presence). The Core and
-    the reserved StarDock sector are excluded so clusters never breach curated space.
+    the reserved Stardock sector are excluded so clusters never breach curated space.
     """
     seen = {home}
     frontier = [home]
@@ -385,7 +385,7 @@ def _place_entity(state: UniverseState, config: GameConfig, roster: RosterConfig
     The roster's `singular_entity` species (the Concordance) is **always** drawn — never subject
     to the seeded subset or the per-band resupply accounting — and fielded as **one** instance in
     a deep band (its `home_band` hint, else the deepest live band with sectors), never in the Core
-    or on the reserved StarDock sector, and with no cluster satellites. It is drawn peaceable (an
+    or on the reserved Stardock sector, and with no cluster satellites. It is drawn peaceable (an
     impartial arbiter that greets whoever finds it); it fields no ships and never fights
     (`combatant: false` + empty `fleet`, honoured at contact/encounter time, WP24), so the
     encounter is always the conversation. A roster with no flagged species places nothing.
@@ -527,10 +527,10 @@ def _populate_governing_space(state: UniverseState, config: GameConfig, roster: 
 def _place_stardock_contacts(state: UniverseState, config: GameConfig, roster: RosterConfig,
                              rng: random.Random, placed: dict[int, AlienSpecies],
                              bases: dict[str, float]) -> None:
-    """Stage ≥`stardock_contacts` Core-welcome species at the StarDock (high-traffic hub, §6.3).
+    """Stage ≥`stardock_contacts` Core-welcome species at the Stardock (high-traffic hub, §6.3).
 
     The Core is otherwise free of placed contacts, but every game funnels through the
-    StarDock — so a brand-new player should meet friendly aliens there. "Core-welcome"
+    Stardock — so a brand-new player should meet friendly aliens there. "Core-welcome"
     means the governing alliance's own members plus unaligned neutrals (never a rival
     bloc). Prefer species not already met in a band so the hub adds variety, falling back
     to reuse only if the welcome pool is too small to field the requested count.

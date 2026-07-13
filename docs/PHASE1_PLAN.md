@@ -38,8 +38,8 @@ minutes and *visibly funds a first ship upgrade*. Single ship type.
 
 **In scope:** core models, the §8 economy (pricing + haggling + banking), the
 big bang (cluster+bridge+distance-bands+validate, Core Space sectors 1–10,
-StarDock placement), movement with turn costs, SQLite persistence, the engine
-tick loop (turn reset / stock regen / interest), and the Game / Port / StarDock /
+Stardock placement), movement with turn costs, SQLite persistence, the engine
+tick loop (turn reset / stock regen / interest), and the Game / Port / Stardock /
 Computer(Trade) / Map screens running on real state.
 
 ## 2. Scope discipline — what Phase 1 deliberately defers
@@ -66,7 +66,7 @@ on dummy data and does **not** build their engines:
 
 The exit criterion needs a latinum sink the player can save toward, but the real
 slotted-component model is Phase 2. **Decision:** Phase 1 ships a single
-flat-aspect StarDock **Hardware** purchase priced at the §8 Tier-I default
+flat-aspect Stardock **Hardware** purchase priced at the §8 Tier-I default
 (~2,000 latinum, against 2,000 starting capital) that bumps **one flat ship
 aspect**. The two candidate aspects are **cargo holds** and **shields**; which
 one (or both, as separate SKUs) is offered is a **config value**, so it is
@@ -110,7 +110,7 @@ in Phase 1.
 
 ### WP1 — `core/enums.py`, `core/models.py`, `core/dto.py`
 - **Enums:** `Commodity` (FUEL_ORE/ORGANICS/EQUIPMENT), `PortClass` (the 8 buy/sell
-  triples + StarDock Class 9), `PortMode` (BUY/SELL).
+  triples + Stardock Class 9), `PortMode` (BUY/SELL).
 - **Models** (frozen dataclasses, no I/O): `Game` (id, seed, day_number,
   core_governing_alliance_id), `Region`, `Sector` (warps_out, beacon_text,
   is_galactic_core, distance_band), `Port` (per-commodity {stock, capacity, mode,
@@ -135,7 +135,7 @@ in Phase 1.
 - Haggling mini-game (pure, seeded): quote → counter → acceptance prob falling with
   distance-from-fair + recent history; 2 rejections → final price; >~30% off → abort.
 - Banking: deposit/withdraw + interest calc (~0.5%/game-day); applied by engine cron.
-- Stock-regen helper (5% toward desired: 50% standard / 90% StarDock) — pure;
+- Stock-regen helper (5% toward desired: 50% standard / 90% Stardock) — pure;
   the engine calls it.
 
 ### WP3 — `core/movement.py`, `core/events.py`, `core/rules.py`
@@ -154,12 +154,12 @@ in Phase 1.
 - **topology.py:** light motif pass (a few tunnels/deadends — rings optional in P1),
   **Core Space carve** (sectors 1–10 interlinked around Terra, guaranteed exits),
   **distance bands** (BFS hop-distance from sector 1, bucket per config).
-- **populate.py:** StarDock (Class 9) 2–5 hops from Core; standard ports at ~45%
+- **populate.py:** Stardock (Class 9) 2–5 hops from Core; standard ports at ~45%
   density with the terminal-space 20/20/20/10/10/10/5/5 class split, initial stock
   `randint(200,2000)×size`; planets ~25% (type only). Seed the Federation alliance
   + player as member. *(Alien/home-cluster/discovery/ownership seeding deferred.)*
 - **validate.py — Phase-1 subset of §5 step 8 / §13:** single strongly-reachable
-  component from sector 1 (one-ways respected), max warps/sector ≤ 6, StarDock
+  component from sector 1 (one-ways respected), max warps/sector ≤ 6, Stardock
   reachable, **≥ 1 profitable opposed-class port pair within 5 hops of Core**,
   per-region port-class balance within tolerance. Regenerate with a perturbed
   sub-seed on failure (bounded retries, then error).
@@ -195,7 +195,7 @@ in Phase 1.
   the DTO shapes match `dummy.py`, widget changes are minimal.
 - Wire real commands: number-key/warp-grid → `Warp`; `P` → `Dock`; `TradePanel`
   buy/sell + haggle → `Trade`/`HaggleOffer`; bank tab → `Deposit`/`Withdraw`;
-  StarDock Hardware → `BuyUpgrade`. Live sidebar + event ticker fed by real events.
+  Stardock Hardware → `BuyUpgrade`. Live sidebar + event ticker fed by real events.
 - Out-of-scope screens (Planet/Surface/Engine/Contact/Encounter/Messages) keep
   reading samples.
 
@@ -226,7 +226,7 @@ in Phase 1.
 
 - **DTO duplication.** `dummy.py` shapes become `core/dto.py`. Keep them dataclasses
   (not Pydantic) to avoid reworking widget code; Pydantic is for config only in P1.
-- **"First upgrade" (§2).** A config-driven flat-aspect StarDock Hardware
+- **"First upgrade" (§2).** A config-driven flat-aspect Stardock Hardware
   purchase (~2,000 latinum), default **cargo-holds expansion**, shields as the
   config alternative. The `BuyUpgrade` command survives into Phase 2 unchanged;
   only its effect swaps to a component slot-fill.

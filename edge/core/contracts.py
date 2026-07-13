@@ -117,7 +117,7 @@ def _escort_target(state: UniverseState, speaker: AlienSpecies,
     """A bloc merchant + destination port sector for an escort job, or None (interview 9).
 
     The merchant is a `trade_seek` instance of the speaker's bloc, not the speaker itself
-    and not StarDock-pinned; the destination is a port sector other than the merchant's.
+    and not Stardock-pinned; the destination is a port sector other than the merchant's.
     Deterministic — lowest-id merchant, lowest-id eligible destination port.
     """
     if config.roster is None:

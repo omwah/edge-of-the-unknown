@@ -189,7 +189,7 @@ async def _capture() -> None:
             await pilot.press("escape")
             await pilot.pause()
 
-        # The StarDock -> services hub, every service tab.
+        # The Stardock -> services hub, every service tab.
         dock = next(s for s, p in ports.items() if p.klass.value == 9)
         await goto(dock)
         await pilot.press("p")

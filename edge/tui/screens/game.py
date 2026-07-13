@@ -23,7 +23,7 @@ from edge.core.events import DiscoveryCollected, EncounterStarted, Event
 from edge.core.movement import MovementError
 from edge.core.rules import AttackPlayer, AttackSpecies, Dock, Hail, Salvage, TravelTo, Warp
 from edge.server.service import GameService
-from edge.tui.chrome import notify_warning
+from edge.tui.chrome import EdgeScreen, notify_warning
 from edge.tui.design import LayoutTier, layout_tier
 from edge.tui.dummy import NavStripDTO, SectorDTO
 from edge.tui.onboarding import ObjectivesStrip, all_done
@@ -36,7 +36,7 @@ from edge.tui.screens.help import HelpScreen
 from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.screens.port import PortScreen
-from edge.tui.screens.stardock import StarDockScreen
+from edge.tui.screens.stardock import StardockScreen
 from edge.tui.screens.corp import CorpScreen
 from edge.tui.screens.base import BaseScreen
 from edge.tui.widgets import (
@@ -139,7 +139,7 @@ class SectorView(Container):
         return "\n".join(lines)
 
 
-class GameScreen(Screen[None]):
+class GameScreen(EdgeScreen):
     # The overlay layer hosts the expanded event ticker, so it draws over the sector
     # view instead of reflowing it (the ticker sets `layer: overlay` when expanded).
     DEFAULT_CSS = "GameScreen { layers: overlay; }"
@@ -245,7 +245,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         """The event-log lines, most recent last (a single fallback when empty)."""
         if self._log:
             return list(self._log)
-        return ["[dim]· New game — dock at the StarDock to trade and upgrade, then explore.[/]"]
+        return ["[dim]· New game — dock at the Stardock to trade and upgrade, then explore.[/]"]
 
     async def on_screen_resume(self) -> None:
         # Rebuild from fresh state when this screen becomes active again (after a
@@ -381,7 +381,7 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         base = self._service.current_starbase_view(self._pid)
         screen: Screen[None]
         if is_stardock:
-            screen = StarDockScreen(self._service, self._pid)
+            screen = StardockScreen(self._service, self._pid)
         elif base is not None:
             screen = BaseScreen(self._service, self._pid, base.starbase_id,
                                 initial_tab="trade")

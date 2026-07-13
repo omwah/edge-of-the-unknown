@@ -183,7 +183,7 @@ def test_drift_does_not_consume_the_shared_rng(tmp_path: Path) -> None:
 def test_drift_pins_stardock_contacts(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     pinned = cron._pinned_species(svc.state)
-    assert pinned  # the generated universe stages contacts at the StarDock
+    assert pinned  # the generated universe stages contacts at the Stardock
     result = alien_drift(svc.state, _with_drift(svc.config, 1.0))
     assert {s.id for s in result.species}.isdisjoint(pinned)  # staged contacts never wander
 

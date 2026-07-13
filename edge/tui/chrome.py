@@ -12,10 +12,31 @@ from __future__ import annotations
 from typing import Any, Literal, TypeVar, cast
 
 from textual.app import ComposeResult
-from textual.binding import Binding
+from textual.binding import ActiveBinding, Binding
 from textual.containers import Vertical
-from textual.screen import ModalScreen
+from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Input, Static
+
+
+class EdgeScreen(Screen[None]):
+    """The base every full screen uses: its footer always leads with **Back**.
+
+    Textual orders the footer by the binding chain — focused widget, then its
+    ancestors, then the screen — so a screen-wide key like Esc/Back is pushed behind
+    whatever the focused widget happens to own (on the Computer's Map tab, Back landed
+    after Engage). Back is the one key that means the same thing on every screen, so it
+    is pinned to the front of the footer everywhere instead of drifting with focus.
+    """
+
+    def _back_first(self, bindings: dict[str, ActiveBinding]) -> dict[str, ActiveBinding]:
+        back = {key: value for key, value in bindings.items() if key == "escape"}
+        if not back:
+            return bindings
+        return back | {key: value for key, value in bindings.items() if key != "escape"}
+
+    @property
+    def active_bindings(self) -> dict[str, ActiveBinding]:
+        return self._back_first(super().active_bindings)
 
 
 # --- Notifications (WP-UI07) -------------------------------------------------

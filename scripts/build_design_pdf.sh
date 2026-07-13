@@ -29,7 +29,7 @@ SHOTS=(
     "main-menu|Main Menu"
     "game|Game Screen — sector view, status sidebar, event ticker"
     "port|Trade Port"
-    "stardock|StarDock — services hub (Hardware tab)"
+    "stardock|Stardock — services hub (Hardware tab)"
     "planet|Planet — orbit view"
     "surface|Planet Surface — descent & site exploration"
     "contact|Alien Contact — dialogue & derived verb menu"

@@ -10,7 +10,7 @@
 ## Context
 
 Phase 2 (+ the route follow-up, WP1–WP18) shipped the exploration pivot: the
-engine-room component model with derived aspects, StarDock services and multiple
+engine-room component model with derived aspects, Stardock services and multiple
 hulls, typed/owned planets with colonization, derelict starbases as salvage
 caches, the banded discovery system with sensors and codex, friendly alien
 species with config-driven salience dialogue and authored reply menus, tech
@@ -84,7 +84,7 @@ green on `core/dialogue/bigbang/store/server/engine`; `tui/` is exempt.
 4. The encounter system: interrupt roll, cloak/nebula detection,
    greeting-vs-violence disposition roll, pack/escort spawns, fight/flee
    rounds, firing arcs, the ≥10% escape floor, homing missiles (§10).
-5. Localized component damage + field-kit repair + StarDock restoration,
+5. Localized component damage + field-kit repair + Stardock restoration,
    escape pods, salvage (§4.1, §10).
 6. Consequences: attitude souring, `memory_model`/`betrayal_model`, grudges,
    alignment/experience, Core law keyed to the governing alliance (static
@@ -310,7 +310,7 @@ made to stay populated and every hop-window check must still pass under
   four bands populated (25/25 seeds sampled) with an outward-growing gradient
   (Hub ≈ 130, outer bands ≈ 285–300).
 - **Hop-window checks re-verified under expansive:** `_check_profitable_pair`
-  (opposed pair ≤ 5 hops of the Core), StarDock placement within
+  (opposed pair ≤ 5 hops of the Core), Stardock placement within
   `stardock_min/max_hops`, `_check_discovery_gradient` strict monotonicity, ≥1
   contact per band, unowned-planet monotone fraction — all pass at 1000 sectors
   (10/10 seeds generate cleanly). *(Note: `bands.expansive` is tuned to the
@@ -348,7 +348,7 @@ The Phase-2 friendly clamp comes off, outside the Hub. **Shipped.**
   assigned to it) is drawn friendly; every other outer-band species takes the
   band's downward `band_disposition_bias`, so hostiles spawn and mean stance
   falls outward. A kind's base is memoised per-kind at its first placement
-  (reputation is per kind), so governing/StarDock Core-welcome contacts filter
+  (reputation is per kind), so governing/Stardock Core-welcome contacts filter
   out any kind already anchored hostile in a deep band. A **non-friendly
   cluster's satellites are kept out of the Hub** (they can dip one band inward
   at trunk's shallow scale — the case that first tripped the validator).
@@ -476,7 +476,7 @@ Per-round resolution in a new pure `edge/core/combat.py`. **Shipped.**
   rules stay in one place) and the pack still gets its volley.
 - **Player offense:** Main Gun `(gun_damage + efficiency_bonus) × gun_rate`
   from `derive_aspects`; finite arc-ignoring missiles (`missile_damage`),
-  bought via `BuyMissiles` at the StarDock (**i** key); hulls carry loadouts
+  bought via `BuyMissiles` at the Stardock (**i** key); hulls carry loadouts
   and ammo carries over on `BuyShip`.
 - **Arc rule:** `ahead`/`spinal` foe fire is evaded on a combat-speed contest
   (`evade_base + evade_speed_coeff·Δspeed`); `all_round` cannot be evaded;
@@ -500,7 +500,7 @@ Tests: **escape probability never below the floor under arbitrary
 damage/engine/interception values** (hypothesis, 300 examples); shields absorb
 before hull on both sides; missiles finite + conserved; spinal fires every
 other round; victory/crippled outcomes; the crippled clamp; flee succeeds from
-a wreck within bounded attempts (the floor in action); StarDock missile
+a wreck within bounded attempts (the floor in action); Stardock missile
 purchase; full-fight golden reload.
 
 ### WP26 — Localized damage, repair kits, escape pods, salvage (M)
@@ -849,9 +849,9 @@ identical `state_hash`; the sig corpus stays `validate_dialogue`-green.
   `config/default.yaml`; `DiscoveryKind.ENTITY` survives as an enum (codex art keys)
   but is never salted — `_roll_kind` reads the weights, so dropping it is sufficient.
 - `populate_species` special-cases the flag: excluded from the seeded subset `pool`
-  and the StarDock `welcome` list, then placed by the new `_place_entity` — always
+  and the Stardock `welcome` list, then placed by the new `_place_entity` — always
   drawn, **exactly one** instance, in a deep band (its `home_band` hint, else the
-  deepest live band inward), no cluster satellites, never Core/StarDock, drawn
+  deepest live band inward), no cluster satellites, never Core/Stardock, drawn
   peaceable (anchor draw — an impartial arbiter that greets whoever finds it).
   `combatant: false` + empty `fleet` are honored at contact (WP24 — no violence path).
 - Validator (`_check_species`): exactly one Entity instance; never in the Core.
@@ -859,7 +859,7 @@ identical `state_hash`; the sig corpus stays `validate_dialogue`-green.
   draw order (and the validation-retry cadence). Goldens re-baseline via
   self-consistency (no `config_version` bump). Two seed-pinned functional tests
   re-baselined to working seeds (`test_salvage_artifact_payload` 3→9;
-  `test_core_law_notice` 3→4 — seed 3 now places the small-universe StarDock outside
+  `test_core_law_notice` 3→4 — seed 3 now places the small-universe Stardock outside
   the Core). Full suite green.
 
 Files: `edge/core/config.py`, `config/default.yaml`,
@@ -988,7 +988,7 @@ The classic territory stack: deployable **sector fighters** (offensive /
 defensive / toll; entering a hostile-fighter sector forces engage-or-retreat,
 and retreat costs one fighter — the original rule); **mines** (damage on
 entry, deflector mitigation; the Armid/limpet split stays Phase 5);
-**beacons** per §10 (a finite `Ship.devices` item bought at StarDock,
+**beacons** per §10 (a finite `Ship.devices` item bought at Stardock,
 deployable to a controlled sector, one per sector, overwrite semantics, never
 in the Core); the **black-hole hazard** flag flips on (damage-on-approach /
 gravity-warp per config). Sector deployables live in a new hashed entity map

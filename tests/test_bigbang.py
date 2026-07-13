@@ -49,7 +49,7 @@ def test_universe_is_valid(config: object, seed: int) -> None:
     assert set(bfs_distances(state.adjacency, 1)) == set(state.sectors)
     # Warp-degree cap respected (TW2002 <= 6).
     assert all(len(s.warps_out) <= cfg.max_warps_per_sector for s in state.sectors.values())
-    # Exactly one StarDock, a few hops out.
+    # Exactly one Stardock, a few hops out.
     docks = [p for p in state.ports.values() if p.klass is PortClass.STARDOCK]
     assert len(docks) == 1
     # Core flagged on sectors 1..N.
@@ -315,7 +315,7 @@ def test_spatial_ids_wired_into_generate(seed: int) -> None:
 
 @pytest.mark.parametrize("seed", range(20))
 def test_stardock_route_starts_explored(seed: int) -> None:
-    """The path from the start sector to StarDock opens pre-explored (round-2).
+    """The path from the start sector to Stardock opens pre-explored (round-2).
 
     Only the shortest path is revealed — the rest of the universe stays fogged —
     and the breadcrumb chain matches it, so `TravelTo(dock)` works on turn one.

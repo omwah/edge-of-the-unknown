@@ -82,7 +82,9 @@ async def test_plotting_a_route_opens_navigation_route() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         screen = await _open_computer(app, pilot)
-        await pilot.press("r")  # Route to… prompt
+        await pilot.press("n")  # → Navigation, which owns the Route to… key
+        await pilot.pause()
+        await pilot.press("w")  # Route to… prompt (W, as on the sector view)
         await pilot.pause()
         from textual.widgets import Input
         svc = app.service

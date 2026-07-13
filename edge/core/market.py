@@ -100,7 +100,7 @@ class Settlement:
 def desired_stock_frac(port: Port, econ: EconomyConfig) -> float:
     """The port's desired-stock ratio — its §8 price pivot.
 
-    StarDock idles near-full (a reliable supplier); standard ports pivot at
+    Stardock idles near-full (a reliable supplier); standard ports pivot at
     half capacity. The same ratios the legacy regen used (twclone's model),
     lifted here so the order book and the hinterland drift share one pivot.
     """
