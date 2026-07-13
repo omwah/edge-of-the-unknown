@@ -2,20 +2,31 @@
 
 from __future__ import annotations
 
+from rich.text import Text
 from textual import events
 from textual.containers import Horizontal
 from textual.widgets import Static
 
 from edge.art.stations import render_station_art
 from edge.tui import art_adapter
+from edge.tui.art_memory import remember, remembered
 
 _FALLBACK = "[dim]◇═══ station link ═══◇[/]"
 
 
 class _StationArt(Static):
     def __init__(self, kind: str, archetype_id: str, service: str,
-                 condition: str, *, icon: bool, identity: int) -> None:
-        super().__init__(_FALLBACK, classes="station-icon" if icon else "station-banner")
+                 condition: str, *, icon: bool, identity: int,
+                 cinematic: bool = False, theme: str = "") -> None:
+        # Open on the art we drew last time, not the text fallback (PT-42): a screen that
+        # rebuilds itself on every action would otherwise flash the placeholder until
+        # `on_mount` re-rendered, which reads as the art "resetting" each time you act.
+        # Tier and theme are part of the key — they change the image, so remembering them
+        # apart stops a panel opening on the wrong-sized render and then snapping.
+        self._key = (kind, archetype_id, service, condition, icon, identity,
+                     cinematic, theme)
+        super().__init__(remembered(self._key) or _FALLBACK,
+                         classes="station-icon" if icon else "station-banner")
         self._kind = kind
         self._archetype = archetype_id
         self._service = service
@@ -32,7 +43,10 @@ class _StationArt(Static):
 
     def _refresh(self) -> None:
         cinematic = getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "wide"
+        self._key = (self._kind, self._archetype, self._service, self._condition,
+                     self._icon, self._identity, cinematic, str(self.app.theme))
         try:
+            art: Text
             if self._icon:
                 width, height = (36, 12) if cinematic else (24, 8)
                 subtype = "trading_port" if self._kind == "port" else "starbase"
@@ -44,14 +58,15 @@ class _StationArt(Static):
                     art.stylize("dim")
                 elif self._condition == "hostile":
                     art.stylize("on dark_red")
-                self.update(art)
             else:
-                self.update(render_station_art(
+                art = render_station_art(
                     self._kind, self._archetype, self._service, str(self.app.theme),
                     cinematic=cinematic, condition=self._condition,
-                ))
+                )
         except (ImportError, OSError, ValueError):
             self.update(_FALLBACK)
+            return
+        self.update(remember(self._key, art))
 
 
 class StationArtHeader(Horizontal):
@@ -75,11 +90,17 @@ class StationArtHeader(Horizontal):
 
     def __init__(self, kind: str, archetype_id: str, service: str, *,
                  identity: int, condition: str = "open") -> None:
+        # Read the tier/theme here, at compose time, where the app is reachable, so each
+        # panel opens on the art it last drew *at this size* (edge.tui.art_memory).
+        from textual.app import active_app
+        app = active_app.get(None)
+        cinematic = getattr(getattr(app, "layout_tier", None), "value", "standard") == "wide"
+        theme = str(getattr(app, "theme", ""))
         super().__init__(
             _StationArt(kind, archetype_id, service, condition,
-                        icon=True, identity=identity),
+                        icon=True, identity=identity, cinematic=cinematic, theme=theme),
             _StationArt(kind, archetype_id, service, condition,
-                        icon=False, identity=identity),
+                        icon=False, identity=identity, cinematic=cinematic, theme=theme),
         )
 
     def on_mount(self) -> None:

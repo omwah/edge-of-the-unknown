@@ -1392,6 +1392,49 @@ async def test_branching_choices_render_and_drive_transition() -> None:
         assert "trade" in actions and "leave" in actions
 
 
+async def test_a_reply_repaints_the_menu_without_rebuilding_the_portrait() -> None:
+    """PT-42 — the art panel must not reset on every dialogue step.
+
+    A reply used to pop the contact screen and push a fresh one, rebuilding the whole
+    widget tree — including the portrait, which is a chafa render — so the art visibly
+    reset at each step of a conversation. Between two nodes of one conversation the
+    speaker does not change and neither does their face: only the speech and the reply
+    menu do. So the very same `SpeciesPortrait` **instance** must still be mounted after
+    a reply, while the speech and menu have moved on.
+    """
+    from textual.widgets import Static
+
+    from edge.tui.portrait import SpeciesPortrait
+    from edge.tui.screens.contact import AlienContactScreen
+
+    app = EdgeApp()
+    async with app.run_test(size=(100, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+        svc = app.service
+        assert svc is not None
+        _inject_species(svc, "vesk")
+
+        await pilot.press("h")  # hail
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, AlienContactScreen)
+        portrait = screen.query_one(SpeciesPortrait)
+        speech_before = str(screen.query_one("#speech", Static).render())
+
+        await pilot.press("1")  # a reply — the conversation moves on
+        await pilot.pause()
+
+        assert app.screen is screen, "the reply rebuilt the screen instead of repainting it"
+        assert screen.query_one(SpeciesPortrait) is portrait, "the portrait was rebuilt"
+        assert screen._active_context == "branch.vesk_workshop"  # type: ignore[attr-defined]
+        assert str(screen.query_one("#speech", Static).render()) != speech_before
+        # …and the menu really was repainted (the workshop node offers different verbs).
+        actions = {c.action for c in screen._view().choices}  # type: ignore[attr-defined]
+        assert "trade" in actions
+
+
 async def test_log_coordinates_freezes_the_offer_line() -> None:
     """Logging a tip keeps the speech panel on the line just acted on — it must not auto-cycle
     to the next tip the alien would offer (§6.7). Selvani falls back to the generic baseline menu,

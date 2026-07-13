@@ -553,6 +553,40 @@ Commit: `playtest: WP-PR2-08 computer map colors, P-plot, and edge fix`
 
 ### WP-PR2-09 — Dialogue playtest tooling fixes (dev-only)
 
+> **PT-42 (art panel reset) landed 2026-07-12** in `playtest: WP-PR2-09 art panels stop
+> resetting`. It was **not** dev-only, and not one bug:
+>
+> - **Contact screen (the reported case).** `_reopen` popped the screen and pushed a fresh
+>   one on every reply, rebuilding the whole widget tree — portrait included. It now
+>   repaints the speech and the reply menu **in place** (`_verb_widgets` is shared by
+>   `compose` and `_reopen`, so a repaint cannot drift from a first paint) and leaves the
+>   portrait mounted. Between two nodes of one conversation the speaker does not change and
+>   neither does their face.
+> - **Station screens (Stardock · Port · Starbase).** These genuinely *do* rebuild after an
+>   action (`_issue` / `_reopen` pop and push), so every art panel returns as a new widget.
+>   Each opened on a text fallback and swapped the image in from `on_mount` — one frame of
+>   placeholder per action, which is the reset the player sees. New `edge/tui/art_memory.py`
+>   remembers the rendered `Text` per panel identity so a rebuilt panel opens on the art it
+>   had a moment ago; `on_mount` still re-renders, so a theme or tier change corrects itself
+>   on the next frame. It is a paint-time smoother, never the source of truth (copies in and
+>   out — Rich `Text` is mutable and callers `stylize()` it). The *chafa render* was already
+>   memoised in `edge.art.portrait`; what was missing was the frame.
+>
+> - **Every pushed screen resized itself just after opening** (reported alongside PT-42:
+>   "the dialogue screen and the rumour modal start smaller, then expand"). `EdgeApp.
+>   push_screen` stamped the responsive tier class with `call_after_refresh`, so a screen
+>   laid out **once under untiered CSS and again a frame later** once the class landed.
+>   Now stamped synchronously, before the new screen's first layout. This was not only a
+>   flicker: the tiers were *silently not applying* on first paint, so at 80×24 the
+>   Computer's tables were not folding their `fold=True` columns, and at ≥120 the
+>   `DetailTable` side detail panel never appeared. Both snapshot baselines changed to the
+>   correct, tier-aware layout.
+>
+> Tests: `tests/test_ui_art_refresh.py`, plus
+> `test_a_reply_repaints_the_menu_without_rebuilding_the_portrait` in the flow suite.
+> **Still open in this WP: PT-39 (keyboard-navigable controls), PT-40 (`F2` → `c`), PT-41
+> (hostile dial has no effect).**
+
 **Goal:** make the dialogue-authoring playtest harness usable: keyboard-navigable
 controls modal, move its hotkey `F2`→`c`, make the hostile dial actually affect the
 conversation, and stop the art panel resetting after each action. This is the
