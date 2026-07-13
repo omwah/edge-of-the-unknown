@@ -5,8 +5,10 @@ Phase-1 core screen: a tabbed query console over the owned game engine. The
 galactic map and the durable event log (WP-B — they live *inside* the computer
 but keep their direct `M`/`G` hotkeys on the game screen). Every tab is live:
 Ports/Route (WP15/WP14), Codex/Dossier (WP11), Contracts (WP57/WP71),
-Alliances (WP72), and Notes — captain's notes plus the route-planner avoid
-list (WP73).
+Alliances (WP72), **Corp** (§4/WP66 — the corporation is a relationship, so it sits
+with contracts, alliances and the dossier under Relations rather than behind a
+game-screen hotkey of its own), and Notes — captain's notes plus the route-planner
+avoid list (WP73).
 
 WP-UI20: the thirteen-tab strip is grouped into five categories (Navigation ·
 Commerce · Exploration · Relations · Logbook), each holding its subviews as an
@@ -51,6 +53,7 @@ from edge.tui.chrome import EdgeScreen, notify_warning
 from edge.tui.design import ActionDescriptor
 from edge.tui.detail_table import ColumnSpec, DetailTable
 from edge.tui.screens.confirm import ConfirmScreen
+from edge.tui.screens.corp import CorpActions, CorpPanels
 from edge.tui.screens.picker import ListPicker
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.widgets import (
@@ -64,7 +67,7 @@ CATEGORIES: dict[str, tuple[str, ...]] = {
     "navigation": ("map", "route"),
     "commerce": ("ports", "trade", "market"),
     "exploration": ("planets", "codex", "leads"),
-    "relations": ("contracts", "alliances", "dossier"),
+    "relations": ("contracts", "alliances", "dossier", "corp"),
     "records": ("log", "notes"),
 }
 CATEGORY_LABELS = {
@@ -75,12 +78,12 @@ SUBVIEW_LABELS = {
     "map": "Map", "route": "Route", "ports": "Ports", "trade": "Trade",
     "market": "Market", "planets": "Planets", "codex": "Codex", "leads": "Leads",
     "contracts": "Contracts", "alliances": "Alliances", "dossier": "Dossier",
-    "log": "Log", "notes": "Notes",
+    "corp": "Corp", "log": "Log", "notes": "Notes",
 }
 _CATEGORY_OF = {sub: cat for cat, subs in CATEGORIES.items() for sub in subs}
 
 
-class ComputerScreen(EdgeScreen):
+class ComputerScreen(CorpActions, EdgeScreen):
     # Screen-wide keys only: leaving, and reaching a category. Every *tab* verb lives on
     # its own pane in PANE_BINDINGS below — never here — so the footer advertises exactly
     # what the tab you are looking at can do. Back leads the footer on every screen
@@ -122,6 +125,19 @@ class ComputerScreen(EdgeScreen):
         "alliances": (("j", "join_alliance", "Join/Resign"),
                       ("t", "log_admission_task", "Log task")),
         "dossier": (("s", "seize_core", "Seize Core"),),
+        # The corp is a relationship, so it lives here beside contracts, alliances and the
+        # dossier rather than behind a game-screen hotkey of its own. Its keys are pure
+        # accelerators — every verb is also a button on its panel — and they are free to
+        # reuse letters the other tabs spend (D deposits here, delivers on Contracts; W
+        # withdraws here, routes on Map) because only one pane is ever in the focus chain.
+        # `X` and `O` are avoided: `X` is a category accelerator and `O` belongs to a
+        # focused table, so Expel is `K` and "world → CEO" is `U` (un-assign).
+        "corp": (("f", "form", "Charter"), ("d", "deposit", "Deposit 1k"),
+                 ("w", "withdraw", "Withdraw 1k"), ("l", "leave", "Leave corp"),
+                 ("i", "invite", "Invite"), ("a", "accept_invite", "Accept invite"),
+                 ("k", "expel", "Expel"), ("g", "declare_war", "Declare war"),
+                 ("e", "end_war", "End war"), ("p", "planet_to_corp", "World → corp"),
+                 ("u", "planet_from_corp", "World → CEO")),
         "log": (),
         "notes": (("a", "add_note", "Add note"), ("delete", "remove_note", "Remove note"),
                   ("v", "toggle_avoid", "Avoid sector")),
@@ -140,7 +156,7 @@ class ComputerScreen(EdgeScreen):
     HELP = """\
 Five categories — [b]N[/]avigation (Map · Route), [b]C[/]ommerce (Ports · Trade ·
 Market), e[b]X[/]ploration (Planets · Codex · Leads), [b]R[/]elations (Contracts ·
-Alliances · Dossier), Log[b]b[/]ook (Log · Notes) — each remembers its last subview.
+Alliances · Dossier · Corp), Log[b]b[/]ook (Log · Notes) — each remembers its last subview.
 The [b]underlined letter[/] jumps to a category and focuses its contents in one step.
 Inside a category, its sub-tabs are [b]numbered[/]: press [b]1[/]…[b]N[/] for the tab
 whose title carries that number. Enter on the tab rail focuses the active subview's
@@ -154,8 +170,10 @@ routes to a typed sector (Map, Route — [b]W[/] is the sector view's key for th
 thing); [b]V[/] toggles the highlighted row's sector on the avoid list (Ports, Planets,
 Route) or prompts for one on Notes, which also lists every avoided sector; [b]D[/]
 delivers a favor; [b]J[/] joins or resigns a bloc and [b]T[/] logs an admission task;
-[b]S[/] petitions to seize the Core from the Dossier. Only [b]Esc[/] (back) is
-screen-wide, and it always leads the footer.
+[b]S[/] petitions to seize the Core from the Dossier. The [b]Corp[/] tab is button-first —
+every verb there is a button on its panel, and its keys ([b]F[/] charter, [b]D[/]/[b]W[/]
+bank, [b]I[/] invite, [b]K[/] expel, [b]G[/]/[b]E[/] war, [b]L[/] leave) are accelerators
+for them. Only [b]Esc[/] (back) is screen-wide, and it always leads the footer.
 
 Your own worlds and base-hosted ports sort to the top of Planets/Ports (★ / ⚓);
 finished contracts stay listed but dim. In any table, [b]/[/] focuses the filter,
@@ -375,6 +393,8 @@ when columns are folded at 80×24."""
                         yield Static(self._dossier_notes(), classes="note")
                         yield Static(self._governance_notes(), id="governance-panel", classes="note")
                         yield Static(self._seizure_notes(), id="seizure-panel", classes="note")
+                    with self._pane("corp"):
+                        yield CorpPanels(self._service.corp_view(self._pid), id="corp-body")
             with self._category_pane("records"):
                 with TabbedContent(initial=self._inner_initial("records"), id="sub-records"):
                     with self._pane("log"):
@@ -901,7 +921,14 @@ when columns are folded at 80×24."""
                 for key, action, description in pane_actions]
         return out
 
+    def _reopen_corp(self) -> None:
+        """CorpActions rebuild hook — reopen the Computer on the Corp subview."""
+        self._reopen_tab("corp")
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        # The Corp panels are button-first, so give them the press before anything else.
+        if self.handle_corp_button(event.button.id or ""):
+            return
         if event.button.id == "avoid-add":
             self.action_toggle_avoid()
             return

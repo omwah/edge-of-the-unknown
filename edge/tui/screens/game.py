@@ -37,7 +37,6 @@ from edge.tui.screens.planet import PlanetScreen
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.screens.port import PortScreen
 from edge.tui.screens.stardock import StardockScreen
-from edge.tui.screens.corp import CorpScreen
 from edge.tui.screens.base import BaseScreen
 from edge.tui.widgets import (
     ClickableEntry,
@@ -158,7 +157,6 @@ class GameScreen(EdgeScreen):
         Binding("e", "engine_room", "Engine Room"),
         Binding("m", "map", "Map"),
         Binding("g", "messages", "Log"),
-        Binding("t", "corp", "Corp"),
         Binding("d", "territory", "Deploy"),
         # Captain's objectives (WP-UI11): hide the onboarding strip; re-enable
         # in Options. Unadvertised — the strip itself carries the affordance.
@@ -513,9 +511,6 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
 
     def action_messages(self) -> None:
         self.app.push_screen(ComputerScreen(self._service, self._pid, initial_tab="log"))
-
-    def action_corp(self) -> None:
-        self.app.push_screen(CorpScreen(self._service, self._pid))
 
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen(self))
