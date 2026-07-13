@@ -120,6 +120,7 @@ class EdgeApp(App[None]):
         self.theme = (self.ui_settings.theme if self.ui_settings.theme in self.available_themes
                       else "edge-ansi")
         self.layout_tier = layout_tier(self.size.width, self.size.height)
+        self._stamp_layout_class()  # before the first screen lays out, not a frame later
         if self._connect_url is not None:  # remote play (WP68): straight to the lobby turnstile
             from edge.tui.screens.lobby import LobbyScreen
             self.push_screen(LobbyScreen(self._connect_url))
@@ -135,6 +136,7 @@ class EdgeApp(App[None]):
         """Recompute the layout tier and apply its class across the screen stack."""
         tier = layout_tier(event.size.width, event.size.height)
         self.layout_tier = tier
+        self._stamp_layout_class()
         self.call_after_refresh(self._apply_layout_class)
 
     def push_screen(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore[override]
@@ -143,18 +145,29 @@ class EdgeApp(App[None]):
         Mount/resize alone would leave a screen pushed *between* resizes without
         the tier class, so tier-scoped CSS (e.g. `.compact .modal-box`) would
         silently not apply to it.
+
+        The stamp is **synchronous** (PT-42 follow-up). Deferring it to
+        `call_after_refresh` meant every pushed screen was laid out once with untiered
+        CSS and then *again* a frame later once the class landed — which the player sees
+        as the screen visibly resizing itself just after it opens (panels and modals
+        snapping to a new width, art panels re-rendering at a new size). The class has to
+        be on the screen before its first layout, not after it.
         """
         result = super().push_screen(*args, **kwargs)
-        self.call_after_refresh(self._apply_layout_class)
+        self._stamp_layout_class()
+        self.call_after_refresh(self._sync_size_notice)
         return result
 
-    def _apply_layout_class(self) -> None:
+    def _stamp_layout_class(self) -> None:
         # Every screen in the stack tracks the tier: a modal must not strand a
         # stale breakpoint class on the screen it will reveal when dismissed.
         for screen in self.screen_stack:
             for tier in LayoutTier:
                 screen.remove_class(tier.value)
             screen.add_class(self.layout_tier.value)
+
+    def _apply_layout_class(self) -> None:
+        self._stamp_layout_class()
         self._sync_size_notice()
 
     def _sync_size_notice(self) -> None:

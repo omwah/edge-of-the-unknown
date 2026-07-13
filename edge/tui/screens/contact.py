@@ -13,12 +13,13 @@ passed sample DTO.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.widget import Widget
 from textual.widgets import Footer, Static
 
 from edge.core import dto
@@ -159,19 +160,67 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
                                           self._active_context, self._active_subject)
 
     def _reopen(self, pinned_speech: str | None = None) -> None:
-        """Re-fetch the view and rebuild (mirrors the engine-room screen).
+        """Re-fetch the view and repaint the conversation **in place** (§6.7).
 
-        `pinned_speech` freezes the speech panel to a given line for the rebuilt screen;
+        `pinned_speech` freezes the speech panel to a given line for this repaint;
         callers that omit it clear any pin, so the recomputed opener shows as usual.
+
+        PT-42: this used to pop the screen and push a fresh one, which rebuilt the whole
+        widget tree — including the portrait, a chafa render — on *every* reply, so the
+        art panel visibly reset at each step of a conversation. Between two nodes of one
+        conversation the speaker does not change, and neither does their face: only the
+        speech and the reply menu do. So repaint those and leave the portrait mounted.
         """
-        if self._service is None:
+        if self._service is None or not self.is_mounted:
             return
-        self.app.pop_screen()
-        self.app.push_screen(AlienContactScreen(
-            self._view(), self._service, self._pid, self._species_id,
-            active_context=self._active_context, active_subject=self._active_subject,
-            pinned_speech=pinned_speech, history=self._history, on_exit=self._on_exit,
-            playtest_mode=self.playtest_mode))
+        self._pinned_speech = pinned_speech
+        c = self._view()
+        self._contact = c
+        self.query_one("#contact-title", Static).update(self._title_text(c))
+        self.query_one("#contact-standing", Static).update(self._standing_text(c))
+        self.query_one("#speech", Static).update(self._pinned_speech or c.opener)
+        verbs = self.query_one("#verbs", Vertical)
+        verbs.remove_children()
+        verbs.mount_all(list(self._verb_widgets(c)))
+        # Back comes and goes with the breadcrumb, so the footer has to be re-evaluated.
+        self.refresh_bindings()
+        self.call_after_refresh(self._focus_first_reply)
+
+    def _focus_first_reply(self) -> None:
+        """Land focus on the new menu — the old reply rows were just removed under it."""
+        replies = list(self.query(ContactReply))
+        if replies and not any(r.has_focus for r in replies):
+            replies[0].focus()
+
+    @staticmethod
+    def _title_text(c: dto.ContactDTO) -> str:
+        return (f"CONTACT · {c.species}        "
+                f"[dim]disposition[/] [green]{bar(c.disposition_filled, 5)}[/] {c.band}")
+
+    def _standing_text(self, c: dto.ContactDTO) -> str:
+        return (f"Standing  [green][b]{c.standing.upper()}[/] {bar(c.disposition_filled, 5)}[/]  "
+                f"{c.effective:.2f} · {self._relationship_text(c)}"
+                f"   [dim]base {c.base_disposition:.2f} {c.attitude:+.2f}[/]"
+                f"   Alliance [cyan]{c.alliance}[/]")
+
+    def _verb_widgets(self, c: dto.ContactDTO) -> Iterator[Widget]:
+        """The reply menu — the one thing that really changes between nodes.
+
+        Shared by `compose` and `_reopen`, so a repaint cannot drift from a first paint.
+        """
+        yield Static("Your reply", classes="heading")
+        for n, (_kind, item) in enumerate(self._menu_items(c), start=1):
+            yield ContactReply(self._choice_line(n, item, self.playtest_mode),
+                               dest="choice", ref=item.index)
+        if self._history:
+            yield ClickableEntry("  [dim]← Back (b)[/]", dest="back", classes="derived")
+        if c.alliance_id is not None:
+            verb = "Resign from" if c.alliance_member else "Join"
+            yield Static(f"  [dim][b]J[/] {verb} the {c.alliance} (§6.3)[/]",
+                         classes="derived")
+        if self.playtest_mode:
+            yield Static(f"\n  [dim]context = {c.debug_context} | when = {c.debug_when}[/]",
+                         classes="derived")
 
     def _break_contact(self) -> None:
         """End the conversation: run the host's exit hook, or pop back to the game by default."""
@@ -182,25 +231,16 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
 
     def compose(self) -> ComposeResult:
         c = self._view()
-        yield Static(
-            f"CONTACT · {c.species}        "
-            f"[dim]disposition[/] [green]{bar(c.disposition_filled, 5)}[/] {c.band}",
-            id="contact-title",
-        )
-        yield Static(
-            f"Standing  [green][b]{c.standing.upper()}[/] {bar(c.disposition_filled, 5)}[/]  "
-            f"{c.effective:.2f} · {self._relationship_text(c)}"
-            f"   [dim]base {c.base_disposition:.2f} {c.attitude:+.2f}[/]"
-            f"   Alliance [cyan]{c.alliance}[/]",
-            id="contact-standing",
-        )
+        yield Static(self._title_text(c), id="contact-title")
+        yield Static(self._standing_text(c), id="contact-standing")
         with Horizontal(id="contact-main"):
             with Vertical(id="portrait-box"):
                 symbols, font_ratio, images_dir = self._portrait_opts()
                 # variant keyed deterministically (seeded from the game seed + species
                 # instance id in contact_view) so a given alien keeps one face across
                 # screen rebuilds, while different individuals of the same species get
-                # different portraits.
+                # different portraits. Mounted once: a reply repaints the speech and the
+                # menu around it, never this (PT-42 — see `_reopen`).
                 yield SpeciesPortrait(c.roster_id, c.species, symbols, font_ratio,
                                       images_dir, c.portrait_variant, bloom=c.singular_entity)
             with VerticalScroll(id="right"):
@@ -208,19 +248,7 @@ trade posture, treaty, bloc membership, and mood all move what's on offer."""
                 speech.border_title = "they speak"
                 yield speech
                 with Vertical(id="verbs"):
-                    yield Static("Your reply", classes="heading")
-                    for n, (_kind, item) in enumerate(self._menu_items(c), start=1):
-                        yield ContactReply(self._choice_line(n, item, self.playtest_mode),
-                                           dest="choice", ref=item.index)
-                    if self._history:
-                        yield ClickableEntry("  [dim]← Back (b)[/]", dest="back",
-                                             classes="derived")
-                    if c.alliance_id is not None:
-                        verb = "Resign from" if c.alliance_member else "Join"
-                        yield Static(f"  [dim][b]J[/] {verb} the {c.alliance} (§6.3)[/]",
-                                     classes="derived")
-                    if self.playtest_mode:
-                        yield Static(f"\n  [dim]context = {c.debug_context} | when = {c.debug_when}[/]", classes="derived")
+                    yield from self._verb_widgets(c)
         yield Footer()
 
     @staticmethod

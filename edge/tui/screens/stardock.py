@@ -40,6 +40,7 @@ from edge.art.concourse import render_stardock_art
 from edge.server.service import GameService
 from edge.tui import art_adapter
 from edge.tui.amount_stepper import AmountStepper
+from edge.tui.art_memory import remember, remembered
 from edge.tui.chrome import AmountPrompt, EdgeScreen, EmptyState, TextPrompt, notify_warning
 from edge.tui.design import ActionDescriptor
 from edge.tui.screens.engine_room import EngineRoomScreen
@@ -61,8 +62,15 @@ _CONCOURSE_ART = (
 class _StardockServiceArt(Static):
     """Theme- and breakpoint-aware Chafa panel with a text-only fallback."""
 
-    def __init__(self, tab: str) -> None:
-        super().__init__(_CONCOURSE_ART, classes="service-art")
+    def __init__(self, tab: str, cinematic: bool, theme: str) -> None:
+        # Open on the art we drew last time rather than the ASCII fallback (PT-42): every
+        # purchase rebuilds this screen, so a fresh panel would otherwise flash the
+        # placeholder until `on_mount` re-rendered — the art "resetting" on each action.
+        # The key carries the tier and theme, because those change the *image*: remembering
+        # them apart is what stops a standard-tier panel opening on the wide render and
+        # then snapping to size.
+        self._key = ("stardock-service", tab, cinematic, theme)
+        super().__init__(remembered(self._key) or _CONCOURSE_ART, classes="service-art")
         self._tab = tab
 
     def on_mount(self) -> None:
@@ -74,17 +82,22 @@ class _StardockServiceArt(Static):
 
     def _refresh_art(self) -> None:
         cinematic = getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "wide"
+        theme = str(self.app.theme)
+        self._key = ("stardock-service", self._tab, cinematic, theme)
         try:
-            self.update(render_stardock_art(self._tab, str(self.app.theme), cinematic=cinematic))
+            art = render_stardock_art(self._tab, theme, cinematic=cinematic)
         except (ImportError, OSError, ValueError):
             self.update(_CONCOURSE_ART)
+            return
+        self.update(remember(self._key, art))
 
 
 class _DockStructureArt(Static):
     """Responsive Stardock silhouette paired with each service banner."""
 
-    def __init__(self, sector_id: int, archetype_id: str | None) -> None:
-        super().__init__(classes="dock-structure-art")
+    def __init__(self, sector_id: int, archetype_id: str | None, cinematic: bool) -> None:
+        self._key = ("dock-structure", sector_id, archetype_id, cinematic)
+        super().__init__(remembered(self._key) or "", classes="dock-structure-art")
         self._sector_id = sector_id
         self._archetype_id = archetype_id
 
@@ -96,11 +109,12 @@ class _DockStructureArt(Static):
 
     def _refresh_art(self) -> None:
         wide = getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "wide"
+        self._key = ("dock-structure", self._sector_id, self._archetype_id, wide)
         width, height = (36, 12) if wide else (24, 8)
-        self.update(art_adapter.sprite(
+        self.update(remember(self._key, art_adapter.sprite(
             "port", "stardock", seed=self._sector_id, width=width, height=height,
             archetype_id=self._archetype_id,
-        ))
+        )))
 
 
 class StardockScreen(EdgeScreen):
@@ -352,10 +366,16 @@ footer."""
         return table
 
     def _service_art_header(self, tab: str, port: object) -> Horizontal:
-        """Left-aligned Stardock silhouette + the active service's ANSI banner."""
+        """Left-aligned Stardock silhouette + the active service's ANSI banner.
+
+        The tier and theme are read *here* (compose time, where the app is reachable) and
+        handed to the panels, so each opens on the art it last drew **at this size** — see
+        `edge.tui.art_memory`."""
+        cinematic = getattr(self.app.layout_tier, "value", "standard") == "wide"
+        theme = str(self.app.theme)
         return Horizontal(
-            _DockStructureArt(port.sector_id, port.archetype_id),  # type: ignore[attr-defined]
-            _StardockServiceArt(tab),
+            _DockStructureArt(port.sector_id, port.archetype_id, cinematic),  # type: ignore[attr-defined]
+            _StardockServiceArt(tab, cinematic, theme),
             classes="service-art-header",
         )
 
