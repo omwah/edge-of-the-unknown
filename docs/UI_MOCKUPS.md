@@ -246,12 +246,26 @@ docking reaches an identical trade experience — only the container differs.
   allocation sliders shown **only to the owner** (§8 production).
 - **Orbital starbase row** (WP80): status only (operational / **derelict** = can't
   power or defend, §4.2); the row is a click-through (`B` / click) to the unified
-  **BaseScreen** — a state-gated tabbed screen (tabs by `standing`: Station with
-  engine-room-style slot panels in base colours for repair/salvage/claim, Trade
-  fronting the WP78 base-hosted market, Hardware and Bank for the WP53 forward-base
-  services, Assault on a hostile/foreign base). The planet screen keeps colony
+  **BaseScreen** — a state-gated tabbed screen (tabs by `standing`: Station, leading with
+  the one-line Status panel over engine-room-style slot panels in base colours for
+  repair/salvage/claim and carrying Assault on a hostile/foreign base; Commodities
+  fronting the WP78 base-hosted market; Hardware and Bank for the WP53 forward-base
+  services). The planet screen keeps colony
   matters only; the sector scene's base sprite (which takes the port's orbit slot)
   opens the same screen.
+- **Tabs:** **S**tation · **C**ommodities · **H**ardware · **B**ank. The base's **Status**
+  (owner · standing · integrity) is a bordered **one-line panel at the top of Station**,
+  not a tab: it is what you read *while* you act. Station is therefore the only tab never
+  withheld — a hostile base shows nothing else, and Assault is its door. `C`/`H`/`B` name
+  the same services they do at the Stardock.
+- **Keys follow the §11 tabbed-screen model — a tab owns its keys.** The screen binds only
+  `Esc` and the tab accelerators. Verbs live on their tab: `R` repair, `V` salvage, `L`
+  claim, `A` assault (Station); `T`/`G` trade and haggle (Commodities); `P` purchase, `M`
+  missile (Hardware); `A`/`W` bank. Salvage is `V` and Claim is `L` because `S` and `C`
+  name tabs — a pane key may never shadow an accelerator. `A` is Assault on Station and
+  Deposit on Bank: one key, two verbs, two tabs. **A tab the base withholds** (gated by
+  standing or service integrity) **keeps no keys at all**, so the footer can never offer a
+  verb the reducers would refuse.
 - **Actions**: `[D]` -> SurfaceScreen (§4); `[C]` claim if unowned & habitable
   (Core worlds off-limits); `[T]` colony trade.
 - DESIGN: §4.2 (types/ownership/starbases), §8 (production), §7 (sites).
@@ -638,14 +652,15 @@ follow this; collisions are bugs.
 |-----|------|---------|
 | `t` | Trade | Port, Stardock (Game: Corp — grandfathered, rename when corp gets a hub) |
 | `g` | Haggle / enGage / Genesis / loG | haggling is `g` on **both** Port and Stardock (`h` names the Hardware tab); destructive `g` actions always confirm (D7) |
-| `p` | Purchase / Plot route / dock at Port | Stardock buy tabs purchase; Computer plots; Game docks |
-| `b` | Bank / Base | Stardock's Bank tab; Game/Planet open the base view (WP80) |
+| `p` | Purchase / Plot route / Dock or Board | Stardock buy tabs purchase; Computer plots; Game docks at a port **or boards the starbase** — one key, because a base *is* the port where it orbits (WP80) |
+| `b` | Bank | the Bank tab at the Stardock and the Base (Game/Planet no longer have a Base key — `p` boards it) |
 | `h` | Hardware / Hail | Stardock's Hardware tab; Game hails |
 | `d` | Devices / Deliver / Deploy / Descend | Stardock's Devices tab, Port deliver, Game deploy, Planet descend |
 | `a` | Attack / Assault / Add / deposit | martial on Game/Planet; additive on Computer (Add note) and Stardock (Bank deposit) |
 | `w` | Withdraw / Travel / route-to | banking withdraw everywhere (`y` is retired); Game travel and Computer route-to (one key, one meaning) |
 | `r` | Repair / Rumor | context-local but always "restorative" flavored |
 | `k` | Recruit | Stardock's Colonists tab (people are recruited, never bought — §4.2) |
+| `m` | Missile | Base Hardware resupply |
 
 **Destructive-confirm rule (D7):** Genesis, Seize Core, Invade, ResignAlliance,
 and any first strike (in-sector or from a conversation) go through `ConfirmScreen`

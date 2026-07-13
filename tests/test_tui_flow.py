@@ -1518,7 +1518,7 @@ async def test_stale_encounter_screen_never_strands_the_player() -> None:
 
 
 async def test_base_key_opens_unified_base_screen() -> None:
-    """WP80 — `B` on the game screen opens the state-gated BaseScreen for the base here.
+    """WP80 — `P` on the game screen boards the base here (a base *is* the port).
 
     The player is teleported (state mutation, no Warp — no encounters/hazards) onto a
     starbase sector; the unified base view must open, and Esc must return to the game.
@@ -1539,7 +1539,7 @@ async def test_base_key_opens_unified_base_screen() -> None:
         base = svc.state.starbases[min(svc.state.starbases)]
         ship = svc.state.ships[svc.state.players[1].ship_id]
         svc.state.ships[ship.id] = _replace(ship, sector_id=base.sector_id)
-        await pilot.press("b")
+        await pilot.press("p")  # board the base — one key for the orbit slot
         await pilot.pause()
         assert isinstance(app.screen, BaseScreen)
         view = svc.current_starbase_view(1)
@@ -1631,7 +1631,7 @@ async def test_base_service_hub_explains_unavailable_facilities() -> None:
         base = next(b for b in svc.state.starbases.values()
                     if not svc.starbase_view(1, b.id).hardware)
         svc.state.ships[ship.id] = _replace(ship, sector_id=base.sector_id)
-        await pilot.press("b")
+        await pilot.press("p")  # board the base — one key for the orbit slot
         await pilot.pause()
         assert isinstance(app.screen, BaseScreen)
         hub = app.screen.query_one(ServiceHub)

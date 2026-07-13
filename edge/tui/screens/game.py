@@ -145,8 +145,9 @@ class GameScreen(EdgeScreen):
     DEFAULT_CSS = "GameScreen { layers: overlay; }"
 
     BINDINGS = [
-        Binding("p", "dock_port", "Dock"),
-        Binding("b", "base_services", "Base"),
+        # One key for whatever holds the orbit slot here (§4.2, WP80): a base *is* the
+        # port where it orbits, so `P` boards it — there is no separate Base key.
+        Binding("p", "dock_port", "Dock / Board"),
         Binding("w", "travel", "Travel"),
         Binding("h", "hail", "Hail"),
         Binding("a", "attack", "Attack"),
@@ -172,7 +173,7 @@ class GameScreen(EdgeScreen):
     HELP_LEGEND = True
     HELP = """\
 Click the planet, base, port, or a ship for the same actions as the keys.
-[b]B[/] opens the starbase here (station · trade · hardware · bank, by standing);
+[b]P[/] docks at a port — or [b]boards the starbase[/] here, which is the same key because a base *is* the port where it orbits (station · commodities · hardware · bank, by standing);
 [b]P[/] docks at a free-standing port; a base's market is entered through the base.
 The event ticker (bottom) expands on click; [b]Z[/] sweeps sensors for hidden finds.
 [b]I[/] opens the status drawer — the full ship readout plus a keyboard-navigable
@@ -367,31 +368,37 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         await self._dock()
 
     async def _dock(self) -> None:
+        # Where a base orbits, the base *is* the market (§4.2, WP80) — so boarding it is
+        # the whole interaction, and no `Dock` is issued: docking costs a turn and, at a
+        # derelict, `_market_port` rejects the dark market outright (which used to crash
+        # the screen). The base view opens regardless of standing; its Commodities tab is
+        # the thing that withholds itself when the market is dark.
+        base = self._service.current_starbase_view(self._pid)
+        if base is not None:
+            self.app.push_screen(BaseScreen(self._service, self._pid, base.starbase_id))
+            return
         view = self._service.game_view(self._pid)
         ports = view.sector.ports
         if not ports:
-            self.notify("No port to dock with here.", timeout=2)
+            self.notify("Nothing to dock with or board here.", timeout=2)
             return
         try:
             self._record(self._service.apply(self._pid, Dock()))
-        except MovementError as exc:
+        except (MovementError, EconomyError) as exc:
             notify_warning(self, str(exc))
             return
-        is_stardock = any(p.is_stardock for p in ports)
-        base = self._service.current_starbase_view(self._pid)
-        screen: Screen[None]
-        if is_stardock:
-            screen = StardockScreen(self._service, self._pid)
-        elif base is not None:
-            screen = BaseScreen(self._service, self._pid, base.starbase_id,
-                                initial_tab="trade")
-        else:
-            screen = PortScreen(self._service, self._pid)
+        screen: Screen[None] = (
+            StardockScreen(self._service, self._pid) if any(p.is_stardock for p in ports)
+            else PortScreen(self._service, self._pid))
         self.app.mark_objective("dock")  # type: ignore[attr-defined]
         self.app.push_screen(screen)
 
     def action_base_services(self) -> None:
-        """Open the unified base view for the starbase here, if any (§4.2, WP80)."""
+        """Open the unified base view for the starbase here (§4.2, WP80).
+
+        No longer a key of its own — `P` boards the base, because a base *is* the port
+        where it orbits. This stays as the target the scene hotspot and the object-list
+        row route to when you click the base."""
         view = self._service.current_starbase_view(self._pid)
         if view is None:
             self.notify("No starbase to visit here.", timeout=2)
