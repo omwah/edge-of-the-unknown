@@ -162,7 +162,7 @@ def test_engine_room_view_handles_a_flat_hull() -> None:
 
 def test_stardock_view_lists_hardware_and_shipyard() -> None:
     world = _world()
-    # Put a StarDock under the player and give them real buying power.
+    # Put a Stardock under the player and give them real buying power.
     world.ports[2] = _port(2, 2, PortClass.STARDOCK)
     world.players[1] = Player(1, "you", 1, 60_000, turns_remaining=250,
                               explored_sectors=frozenset({1, 2, 3}))

@@ -2,7 +2,7 @@
 
 These are *structural* game definitions (what a port class means), not tunable
 balance constants — prices/stock/distribution live in config (`default.yaml`).
-The eight buy/sell triples follow terminal-space (§A.2); Class 9 is the StarDock.
+The eight buy/sell triples follow terminal-space (§A.2); Class 9 is the Stardock.
 """
 
 from __future__ import annotations
@@ -129,7 +129,7 @@ class PortMode(Enum):
 
 
 class PortClass(Enum):
-    """TW2002 port classes 1–8 (the eight buy/sell triples) plus the StarDock.
+    """TW2002 port classes 1–8 (the eight buy/sell triples) plus the Stardock.
 
     The per-commodity buy/sell pattern of each class lives in `PORT_CLASS_TRADES`.
     """

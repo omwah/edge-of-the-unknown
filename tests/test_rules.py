@@ -54,7 +54,7 @@ CONFIG = load_default_config()
 
 
 def _universe() -> UniverseState:
-    """Sectors 1<->2; a StarDock (sells all) sits in sector 2 with the player."""
+    """Sectors 1<->2; a Stardock (sells all) sits in sector 2 with the player."""
     game = Game(id=1, seed=1, config_version=1, created_at="2026-06-15T00:00:00Z")
     state = UniverseState.new(game)
     from edge.core.models import Sector
@@ -66,7 +66,7 @@ def _universe() -> UniverseState:
     state.rebuild_adjacency()
     state.ports = {
         1: Port(
-            id=1, sector_id=2, name="Sol StarDock", klass=PortClass.STARDOCK, size=1,
+            id=1, sector_id=2, name="Sol Stardock", klass=PortClass.STARDOCK, size=1,
             commodities=(
                 PortCommodity(Commodity.FUEL_ORE, PortMode.SELL, 500, 1000, 11, 5),
                 PortCommodity(Commodity.ORGANICS, PortMode.SELL, 500, 1000, 5, 2),
@@ -246,13 +246,13 @@ def test_dock_costs_one_turn() -> None:
 
 
 def test_core_stardock_dock_rejection_matrix() -> None:
-    """A hunted player is turned away at the Core StarDock; others dock freely (WP52)."""
+    """A hunted player is turned away at the Core Stardock; others dock freely (WP52)."""
     from dataclasses import replace
 
     from edge.core.models import Alliance
     from edge.core.movement import MovementError
 
-    base = _universe()  # StarDock in Core sector 2, governor = alliance 1
+    base = _universe()  # Stardock in Core sector 2, governor = alliance 1
     base.game = replace(base.game, core_governing_alliance_id=1)
     base.alliances = {1: Alliance(1, "Federation"), 2: Alliance(2, "Cabal", covets_core=True)}
 

@@ -1,4 +1,4 @@
-"""Static StarDock service raster selection and ANSI rendering.
+"""Static Stardock service raster selection and ANSI rendering.
 
 The source artwork and its accessibility variants live under ``images/ui``.  This
 module stays in the presentation-only ``edge.art`` layer and reuses the portrait
@@ -28,7 +28,7 @@ _THEME_VARIANTS = {
 def stardock_asset(tab: str, theme: str, *, cinematic: bool) -> Path:
     """Return the tab, theme, and layout-specific crop."""
     if tab not in STARDOCK_ART_TABS:
-        raise ValueError(f"unknown StarDock art tab: {tab}")
+        raise ValueError(f"unknown Stardock art tab: {tab}")
     variant = _THEME_VARIANTS.get(theme, _THEME_VARIANTS["edge-ansi"])
     layout = "wide" if cinematic else "standard"
     return _ASSET_DIR / f"stardock_{tab}_{variant}_{layout}.png"

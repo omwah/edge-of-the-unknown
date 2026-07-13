@@ -15,7 +15,6 @@ from typing import Literal
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import Screen
 from textual.widgets import Button, Footer, Static
 
 from edge.core.combat import CombatError
@@ -25,7 +24,7 @@ from edge.core.enums import Subsystem
 from edge.core.events import CombatRound, EncounterEnded
 from edge.core.movement import MovementError
 from edge.core.rules import CombatAction
-from edge.tui.chrome import notify_warning
+from edge.tui.chrome import EdgeScreen, notify_warning
 from edge.tui import art_adapter
 from edge.tui.widgets import bar
 from edge.server.service import GameService
@@ -54,7 +53,7 @@ def _outcome_note(
     return ended.outcome, "information"
 
 
-class EncounterScreen(Screen[None]):
+class EncounterScreen(EdgeScreen):
     BINDINGS = [
         Binding("f", "fight", "Fire"),
         Binding("m", "missile", "Missile"),

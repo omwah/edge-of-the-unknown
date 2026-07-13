@@ -37,7 +37,7 @@ def _stardock(port_id: int, sector_id: int) -> Port:
     lines = tuple(
         PortCommodity(c, PortMode.SELL, 500, 1000, 11, 5) for c in Commodity
     )
-    return Port(port_id, sector_id, "StarDock", PortClass.STARDOCK, 1, lines)
+    return Port(port_id, sector_id, "Stardock", PortClass.STARDOCK, 1, lines)
 
 
 def _pair(port_id: int, sector_id: int, klass: PortClass) -> Port:
@@ -49,7 +49,7 @@ def _pair(port_id: int, sector_id: int, klass: PortClass) -> Port:
 
 
 def _good_world() -> UniverseState:
-    # 1<->2<->3; StarDock at 2, an opposed BBS/SSB pair at 1 and 3.
+    # 1<->2<->3; Stardock at 2, an opposed BBS/SSB pair at 1 and 3.
     sectors = {
         1: Sector(1, 1, (2,), "Hub", is_galactic_core=True),
         2: Sector(2, 1, (1, 3), "Hub"),
@@ -88,7 +88,7 @@ def test_degree_cap_rejected() -> None:
 
 def test_missing_stardock_rejected() -> None:
     world = _good_world()
-    del world.ports[2]  # remove the only StarDock
+    del world.ports[2]  # remove the only Stardock
     with pytest.raises(ValidationError):
         validate(world, CONFIG)
 

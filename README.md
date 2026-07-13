@@ -36,7 +36,7 @@ model laid out so multiplayer can follow later.
 - **Phase 2 (exploration & discovery).** The pivot phase: distance-banded discoveries
   (wrecks, nebulae, black holes) with sensor-gated detection and a codex; planet
   descent onto surface sites; the engine-room subsystem/component ship model with
-  derived aspects; StarDock services and multiple hulls; typed, ownable planets with
+  derived aspects; Stardock services and multiple hulls; typed, ownable planets with
   colonization and derelict-starbase salvage; friendly alien species with config-driven,
   standing-keyed dialogue and tech barter; and the Computer suite (pair-trade finder,
   route planner, codex, alien dossier).
@@ -85,7 +85,7 @@ pixi run serve      # or play in a browser (Textual web server; --host/--port)
 From the main menu, press **N** for a new game, then explore: click a warp in
 the grid (or a neighbour in the sidebar) to move one hop, **W** to travel a known
 multi-hop route, **P** to dock at a port and trade (**T** trades the highlighted
-commodity; at a StarDock, **U** buys an upgrade), **C** for the ship computer
+commodity; at a Stardock, **U** buys an upgrade), **C** for the ship computer
 (pair-trade finder), **M** for its galactic map, **G** for its event log.
 
 ## Development

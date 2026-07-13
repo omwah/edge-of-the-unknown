@@ -9,12 +9,26 @@ Alliances (WP72), and Notes — captain's notes plus the route-planner avoid
 list (WP73).
 
 WP-UI20: the thirteen-tab strip is grouped into five categories (Navigation ·
-Commerce · Exploration · Relations · Records), each holding its subviews as an
+Commerce · Exploration · Relations · Logbook), each holding its subviews as an
 inner tab row. Every category remembers its last subview (app-level, so `[C]`
 reopens where the player left off); direct hotkeys, plotted routes, codex and
 contract links target subviews by their unchanged pane ids via
 `show_subview()`. Compact terminals swap the category tab bar for a popup
 selector (the subview row stays), per the UI_MOCKUPS wireframe.
+
+PT-32 keyboard model — **a tab owns its keys.** The screen binds only what is
+screen-wide (Back, and the category accelerators — the underlined letter of each
+category title: **N**avigation, **C**ommerce, e**X**ploration, **R**elations,
+Log**b**ook). Every *tab* verb is declared in `PANE_BINDINGS` and bound onto that
+subview's `ActionPane`; each category pane likewise owns its **sub-tab numbers**
+(`1`..`N`, shown leading each sub-tab title). Both are live only while focus is inside
+that pane. Three things follow, and they are the point: the footer (and the `.` menu,
+`?` help and palette, via `action_descriptors`) advertise exactly the visible tab's
+verbs and nothing else — navigation keys stay off it; a key may mean two things on two
+tabs (Delete abandons a favor on Contracts, removes a note on Notes; `2` means a
+different tab in each category) with no `check_action` scoping maze; and focus is kept
+inside the visible pane — accelerators, numbers, Enter-on-the-rail, `show_subview()`
+and mount all land it on the tab's primary control.
 """
 
 from __future__ import annotations
@@ -24,20 +38,24 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.css.query import NoMatches
-from textual.screen import Screen
-from textual.widgets import Button, DataTable, Footer, Static, TabbedContent, TabPane
+from textual.widgets import (
+    Button, DataTable, Footer, Static, TabbedContent, TabPane, Tabs,
+)
 
 from edge.core.dto import AllianceRowDTO, LocalMapDTO, RouteDTO
 from edge.core.economy import EconomyError
 from edge.core.movement import MovementError
 from edge.core.rules import ToggleAvoid, TravelTo
 from edge.server.service import GameService
-from edge.tui.chrome import notify_warning
+from edge.tui.chrome import EdgeScreen, notify_warning
+from edge.tui.design import ActionDescriptor
 from edge.tui.detail_table import ColumnSpec, DetailTable
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.picker import ListPicker
 from edge.tui.screens.travel import TravelPromptScreen
-from edge.tui.widgets import LocalMapView, accel_title, bar, first_focusable, preserve_cursor
+from edge.tui.widgets import (
+    ActionPane, LocalMapView, accel_title, bar, focus_content, preserve_cursor,
+)
 
 # WP-UI20: the five-category information architecture. Every legacy tab id maps
 # to exactly one category; pane ids are unchanged so hotkeys and links keep
@@ -51,7 +69,7 @@ CATEGORIES: dict[str, tuple[str, ...]] = {
 }
 CATEGORY_LABELS = {
     "navigation": "Navigation", "commerce": "Commerce",
-    "exploration": "Exploration", "relations": "Relations", "records": "Records",
+    "exploration": "Exploration", "relations": "Relations", "records": "Logbook",
 }
 SUBVIEW_LABELS = {
     "map": "Map", "route": "Route", "ports": "Ports", "trade": "Trade",
@@ -62,35 +80,56 @@ SUBVIEW_LABELS = {
 _CATEGORY_OF = {sub: cat for cat, subs in CATEGORIES.items() for sub in subs}
 
 
-class ComputerScreen(Screen[None]):
+class ComputerScreen(EdgeScreen):
+    # Screen-wide keys only: leaving, and reaching a category. Every *tab* verb lives on
+    # its own pane in PANE_BINDINGS below — never here — so the footer advertises exactly
+    # what the tab you are looking at can do. Back leads the footer on every screen
+    # (chrome.EdgeScreen), so it is first here too.
     BINDINGS = [
         Binding("escape", "back", "Back"),
-        Binding("c", "back", "Back"),
-        Binding("p", "plot_route", "Plot route"),
-        Binding("g", "engage", "Engage"),
-        Binding("r", "route_prompt", "Route to…"),
-        Binding("s", "seize_core", "Seize Core"),
-        Binding("a", "add_note", "Add note"),
-        Binding("v", "toggle_avoid", "Avoid sector"),
-        Binding("d", "deliver_contract", "Deliver"),
-        Binding("x", "abandon_contract", "Abandon"),
-        Binding("j", "join_alliance", "Join/Resign"),
-        Binding("t", "log_admission_task", "Log task"),
         # Category-focus accelerators (WP-PR2-01 / PT-32): jump to a category and focus
         # its active subview's content in one step. Letters are underlined in the tab
         # titles and kept off the footer (show=False). Enter on the tab rail focuses the
         # active subview's content too.
         Binding("n", "focus_category('navigation')", "Navigation", show=False),
-        Binding("m", "focus_category('commerce')", "Commerce", show=False),
-        Binding("e", "focus_category('exploration')", "Exploration", show=False),
-        Binding("l", "focus_category('relations')", "Relations", show=False),
-        Binding("o", "focus_category('records')", "Records", show=False),
+        Binding("c", "focus_category('commerce')", "Commerce", show=False),
+        Binding("x", "focus_category('exploration')", "Exploration", show=False),
+        Binding("r", "focus_category('relations')", "Relations", show=False),
+        Binding("b", "focus_category('records')", "Logbook", show=False),
         Binding("enter", "focus_active_content", "Enter tab", show=False),
     ]
 
+    # subview pane id -> the (key, action, description) triples that pane owns (PT-32).
+    # `ActionPane` binds each into the `screen.` namespace, so the handlers below stay
+    # on the screen while the keys live on the tab and follow focus. Keys may repeat
+    # across panes (Delete abandons a favor on Contracts, removes a note on Notes)
+    # because only one pane is ever in the focus chain. Nothing here may collide with a
+    # screen binding above or with DetailTable's own table keys (`/` filter, `O` sort) —
+    # tests/test_ui_computer_keys.py enforces both. `W` is "route to…" here for the same
+    # reason it is on the sector view: one key, one meaning, across screens.
+    PANE_BINDINGS: dict[str, tuple[tuple[str, str, str], ...]] = {
+        "map": (("g", "engage", "Engage"), ("w", "route_prompt", "Route to…")),
+        "route": (("g", "engage", "Engage"), ("w", "route_prompt", "Route to…"),
+                  ("v", "toggle_avoid", "Avoid sector")),
+        "ports": (("p", "plot_route", "Plot route"), ("v", "toggle_avoid", "Avoid sector")),
+        "trade": (("p", "plot_route", "Plot route"),),
+        "market": (),
+        "planets": (("p", "plot_route", "Plot route"), ("v", "toggle_avoid", "Avoid sector")),
+        "codex": (("p", "plot_route", "Plot route"),),
+        "leads": (("p", "plot_route", "Plot route"),),
+        "contracts": (("d", "deliver_contract", "Deliver"),
+                      ("delete", "abandon_contract", "Abandon")),
+        "alliances": (("j", "join_alliance", "Join/Resign"),
+                      ("t", "log_admission_task", "Log task")),
+        "dossier": (("s", "seize_core", "Seize Core"),),
+        "log": (),
+        "notes": (("a", "add_note", "Add note"), ("delete", "remove_note", "Remove note"),
+                  ("v", "toggle_avoid", "Avoid sector")),
+    }
+
     # category -> the letter underlined in its tab title (WP-PR2-01 / PT-32).
-    _CAT_ACCEL = {"navigation": "n", "commerce": "m", "exploration": "e",
-                  "relations": "l", "records": "o"}
+    _CAT_ACCEL = {"navigation": "n", "commerce": "c", "exploration": "x",
+                  "relations": "r", "records": "b"}
     # WP-UI06: seize_core flips Core governance (destructive, always confirmed);
     # engage confirms only over known hazards; join_alliance confirms the resign
     # branch. Enforced statically by tests/test_ui_actions.py.
@@ -99,19 +138,29 @@ class ComputerScreen(Screen[None]):
 
     HELP_TITLE = "Ship's computer"
     HELP = """\
-Five categories — [b]N[/]avigation (Map · Route), Co[b]m[/]merce (Ports · Trade ·
-Market), [b]E[/]xploration (Planets · Codex · Leads), Re[b]l[/]ations (Contracts ·
-Alliances · Dossier), Rec[b]o[/]rds (Log · Notes) — each remembers its last
-subview. The [b]underlined letter[/] jumps to a category and focuses its contents in one
-step; Enter on the tab rail focuses the active subview's contents. Keys act on the
-[b]active subview[/] ([b]X[/] abandons a contract or
-removes a note, per subview). [b]J[/] joins/resigns a bloc. Your own worlds and
-base-hosted ports sort to the top of Planets/Ports (★ / ⚓); finished contracts stay
-listed but dim. [b]V[/] directly toggles the highlighted Ports, Planets, or Route row;
-elsewhere it opens the sector prompt. The Notes tab also exposes the full avoid list,
-which every plotted route honours. In any table, [b]/[/] focuses the
-filter, [b]O[/] cycles the sort (or click a ↕ header); Enter on a row opens its full
-detail when columns are folded at 80×24."""
+Five categories — [b]N[/]avigation (Map · Route), [b]C[/]ommerce (Ports · Trade ·
+Market), e[b]X[/]ploration (Planets · Codex · Leads), [b]R[/]elations (Contracts ·
+Alliances · Dossier), Log[b]b[/]ook (Log · Notes) — each remembers its last subview.
+The [b]underlined letter[/] jumps to a category and focuses its contents in one step.
+Inside a category, its sub-tabs are [b]numbered[/]: press [b]1[/]…[b]N[/] for the tab
+whose title carries that number. Enter on the tab rail focuses the active subview's
+contents.
+
+Every action key [b]belongs to its tab[/]: the footer only offers what the tab you are
+looking at can do, so a key is free to mean two things in two places — [b]Del[/]
+abandons a favor on Contracts and removes a note on Notes. [b]P[/] plots a route from
+Ports, Planets, Trade, Codex or Leads; [b]G[/] engages the plotted route and [b]W[/]
+routes to a typed sector (Map, Route — [b]W[/] is the sector view's key for the same
+thing); [b]V[/] toggles the highlighted row's sector on the avoid list (Ports, Planets,
+Route) or prompts for one on Notes, which also lists every avoided sector; [b]D[/]
+delivers a favor; [b]J[/] joins or resigns a bloc and [b]T[/] logs an admission task;
+[b]S[/] petitions to seize the Core from the Dossier. Only [b]Esc[/] (back) is
+screen-wide, and it always leads the footer.
+
+Your own worlds and base-hosted ports sort to the top of Planets/Ports (★ / ⚓);
+finished contracts stay listed but dim. In any table, [b]/[/] focuses the filter,
+[b]O[/] cycles the sort (or click a ↕ header); Enter on a row opens its full detail
+when columns are folded at 80×24."""
 
     CSS = """
     ComputerScreen #computer-title {
@@ -154,6 +203,28 @@ detail when columns are folded at 80×24."""
             return remembered
         return CATEGORIES[category][0]
 
+    def _pane(self, subview: str) -> ActionPane:
+        """A subview pane carrying its own action keys (PT-32) — the one place a
+        pane id, its label and its bindings are paired, so they cannot drift.
+
+        The title leads with the sub-tab's number, which is its hotkey inside the
+        category (bound on the category pane by `_category_pane`)."""
+        number = CATEGORIES[_CATEGORY_OF[subview]].index(subview) + 1
+        return ActionPane(f"[bold underline]{number}[/] {SUBVIEW_LABELS[subview]}",
+                          id=subview, actions=self.PANE_BINDINGS[subview])
+
+    def _category_pane(self, category: str) -> ActionPane:
+        """A category pane. It owns the sub-tab **numbers** (1..N) for its own subviews.
+
+        They live here, not on the screen, for the PT-32 reason everything else does: a
+        category pane is in the binding chain only while you are inside that category, so
+        `2` means "this category's second tab" and cannot reach into another's. They are
+        hidden from the footer — navigation, not verbs."""
+        numbers = tuple((str(i), f"focus_subview('{sub}')", SUBVIEW_LABELS[sub])
+                        for i, sub in enumerate(CATEGORIES[category], 1))
+        return ActionPane(accel_title(CATEGORY_LABELS[category], self._CAT_ACCEL[category]),
+                          id=f"cat-{category}", classes="cat-pane", hidden=numbers)
+
     def compose(self) -> ComposeResult:
         yield Static("SHIP COMPUTER", id="computer-title")
         initial_cat = _CATEGORY_OF.get(self._initial_tab, "commerce")
@@ -162,25 +233,23 @@ detail when columns are folded at 80×24."""
         with Horizontal(id="cat-strip"):
             yield Button(f"Category: {CATEGORY_LABELS[initial_cat]} ▾", id="cat-button")
         with TabbedContent(initial=f"cat-{initial_cat}", id="cats"):
-            with TabPane(accel_title("Navigation", self._CAT_ACCEL["navigation"]),
-                         id="cat-navigation", classes="cat-pane"):
+            with self._category_pane("navigation"):
                 with TabbedContent(initial=self._inner_initial("navigation"),
                                    id="sub-navigation"):
-                    with TabPane("Map", id="map"):
+                    with self._pane("map"):
                         yield Static(
                             f"[b]LOCAL MAP[/]   [dim]you @ Sector {self._map.you_display} · "
                             f"Band {self._map.you_band}   ·   ↑↓←→ select · ↵ plot route[/]",
                             id="map-header",
                         )
                         yield LocalMapView(self._map, rebake=self._map_for_width, id="local-map")
-                    with TabPane("Route", id="route"):
+                    with self._pane("route"):
                         yield Static("[b]ROUTE PLANNER[/]        [dim]plot before you commit[/]")
                         yield DataTable(id="route-table", zebra_stripes=True, cursor_type="row")
                         yield Static("", id="route-summary", classes="note")
-            with TabPane(accel_title("Commerce", self._CAT_ACCEL["commerce"]),
-                         id="cat-commerce", classes="cat-pane"):
+            with self._category_pane("commerce"):
                 with TabbedContent(initial=self._inner_initial("commerce"), id="sub-commerce"):
-                    with TabPane("Ports", id="ports"):
+                    with self._pane("ports"):
                         yield Static("[b]PORTS DIRECTORY[/]        [dim]charted ports, nearest first[/]")
                         yield DetailTable("ports-table", (
                             ColumnSpec("Sector", sortable=True),
@@ -193,7 +262,7 @@ detail when columns are folded at 80×24."""
                             detail_title="Port")
                         yield Static("[dim][b]P[/] Plot route   ·   [b]V[/] Toggle highlighted sector avoid[/]",
                                      classes="note")
-                    with TabPane("Trade", id="trade"):
+                    with self._pane("trade"):
                         yield Static("[b]PAIR-TRADE FINDER[/]        [dim]scored by profit / turn[/]")
                         yield DetailTable("finder", (
                             ColumnSpec("Pair"),
@@ -206,10 +275,10 @@ detail when columns are folded at 80×24."""
                             detail_title="Trade pair")
                         yield Static(
                             f"selected: [cyan]{self._computer.selected}[/]   ·   "
-                            "[b]P[/] Plot route   [b]A[/] Add note",
+                            "[b]P[/] Plot route",
                             classes="note",
                         )
-                    with TabPane("Market", id="market"):
+                    with self._pane("market"):
                         yield Static(f"[b]ORDER BOOK[/]        [dim]{self._market.summary}[/]")
                         yield DetailTable("market-table", (
                             ColumnSpec("Sector", sortable=True),
@@ -220,11 +289,10 @@ detail when columns are folded at 80×24."""
                             ColumnSpec("Limit", right=True, fold=True),
                         ), empty=self._market_empty_copy(), detail_title="Order")
                         yield Static(self._market_note(), classes="note")
-            with TabPane(accel_title("Exploration", self._CAT_ACCEL["exploration"]),
-                         id="cat-exploration", classes="cat-pane"):
+            with self._category_pane("exploration"):
                 with TabbedContent(initial=self._inner_initial("exploration"),
                                    id="sub-exploration"):
-                    with TabPane("Planets", id="planets"):
+                    with self._pane("planets"):
                         yield Static("[b]PLANETS DIRECTORY[/]        [dim]charted planets, nearest first[/]")
                         yield DetailTable("planets-table", (
                             ColumnSpec("Sector", sortable=True),
@@ -239,7 +307,7 @@ detail when columns are folded at 80×24."""
                             detail_title="Planet")
                         yield Static("[dim][b]P[/] Plot route   ·   [b]V[/] Toggle highlighted sector avoid[/]",
                                      classes="note")
-                    with TabPane("Codex", id="codex"):
+                    with self._pane("codex"):
                         yield Static("[b]DISCOVERY CODEX[/]        [dim]logged finds, richest first[/]")
                         yield DetailTable("codex-table", (
                             ColumnSpec("Find", sortable=True),
@@ -249,7 +317,7 @@ detail when columns are folded at 80×24."""
                         ), empty=("No discoveries logged yet.",
                                   "Scan and survey the frontier to fill the codex."),
                             detail_title="Discovery")
-                    with TabPane("Leads", id="leads"):
+                    with self._pane("leads"):
                         yield Static("[b]COORDINATE LEADS[/]        [dim]tips logged from contacts[/]")
                         yield DetailTable("leads-table", (
                             ColumnSpec("Tip"),
@@ -261,10 +329,9 @@ detail when columns are folded at 80×24."""
                                   "Ask a friendly species for coordinates."),
                             detail_title="Lead")
                         yield Static("[dim][b]P[/] Plot route to highlighted[/]", classes="note")
-            with TabPane(accel_title("Relations", self._CAT_ACCEL["relations"]),
-                         id="cat-relations", classes="cat-pane"):
+            with self._category_pane("relations"):
                 with TabbedContent(initial=self._inner_initial("relations"), id="sub-relations"):
-                    with TabPane("Contracts", id="contracts"):
+                    with self._pane("contracts"):
                         yield Static("[b]FAVORS[/]        [dim]jobs accepted from aliens[/]")
                         yield DetailTable("contracts-table", (
                             ColumnSpec("#"),
@@ -278,8 +345,8 @@ detail when columns are folded at 80×24."""
                                   "jobs appear here."),
                             detail_title="Favor")
                         yield Static("[dim][b]D[/] Deliver highlighted (dock at its target port first)"
-                                     "   ·   [b]X[/] Abandon highlighted[/]", classes="note")
-                    with TabPane("Alliances", id="alliances"):
+                                     "   ·   [b]Del[/] Abandon highlighted[/]", classes="note")
+                    with self._pane("alliances"):
                         yield Static("[b]ALLIANCES[/]        [dim]blocs, standings, admission — join one (§6.3)[/]")
                         yield DetailTable("alliances-table", (
                             ColumnSpec("Bloc", sortable=True),
@@ -293,7 +360,7 @@ detail when columns are folded at 80×24."""
                         yield Static("[dim][b]J[/] Join highlighted (resigns any current bloc)   ·   "
                                      "[b]T[/] Log admission task   ·   [b]J[/] on your own bloc resigns[/]",
                                      classes="note")
-                    with TabPane("Dossier", id="dossier"):
+                    with self._pane("dossier"):
                         yield Static("[b]ALIEN DOSSIER[/]        [dim]species you have met[/]")
                         yield DetailTable("dossier-table", (
                             ColumnSpec("Species", sortable=True),
@@ -308,17 +375,16 @@ detail when columns are folded at 80×24."""
                         yield Static(self._dossier_notes(), classes="note")
                         yield Static(self._governance_notes(), id="governance-panel", classes="note")
                         yield Static(self._seizure_notes(), id="seizure-panel", classes="note")
-            with TabPane(accel_title("Records", self._CAT_ACCEL["records"]),
-                         id="cat-records", classes="cat-pane"):
+            with self._category_pane("records"):
                 with TabbedContent(initial=self._inner_initial("records"), id="sub-records"):
-                    with TabPane("Log", id="log"):
+                    with self._pane("log"):
                         yield Static("[b]EVENT LOG[/]        [dim]newest first[/]")
                         yield DetailTable("log-table", (
                             ColumnSpec("When"),
                             ColumnSpec("Event"),
                         ), empty=("No events yet.", "Your voyage writes the log."),
                             detail_title="Event")
-                    with TabPane("Notes", id="notes"):
+                    with self._pane("notes"):
                         yield Static("[b]CAPTAIN'S NOTES[/]        [dim]personal log + avoid list[/]")
                         yield DetailTable("notes-table", (
                             ColumnSpec("#", right=True),
@@ -330,7 +396,7 @@ detail when columns are folded at 80×24."""
                         yield Static(f"[b]AVOID LIST[/] (route planner skips these): {avoid}",
                                      classes="note", id="avoid-line")
                         yield Button("Add / remove a sector on the avoid list…", id="avoid-add")
-                        yield Static("[dim][b]A[/] Add note   ·   [b]X[/] Remove highlighted   ·   "
+                        yield Static("[dim][b]A[/] Add note   ·   [b]Del[/] Remove highlighted   ·   "
                                      "[b]V[/] Toggle a sector on the avoid list[/]", classes="note")
         yield Footer()
 
@@ -448,6 +514,11 @@ detail when columns are folded at 80×24."""
                                           bar(d.disposition_filled, 5), d.offers)))
         self._dt("dossier-table").set_rows(dossier_rows)
 
+        # Open with focus already in the visible subview's content (PT-32): the footer
+        # then advertises that tab's verbs from the first frame, and the arrow keys drive
+        # its table rather than the tab rail.
+        self.call_after_refresh(self._focus_subview_content, self._active_category())
+
     def _dossier_notes(self) -> str:
         if not self._computer.dossier:
             return "[dim]Hail a friendly species to begin a dossier.[/]"
@@ -546,10 +617,10 @@ detail when columns are folded at 80×24."""
         self._reopen_tab("contracts")
 
     def action_abandon_contract(self) -> None:
-        """X: abandon the highlighted favor — or, on the Notes tab, remove a note."""
-        if self._active_subview() == "notes":
-            self._remove_note()
-            return
+        """X on Contracts: abandon the highlighted favor.
+
+        The Notes tab binds its own X to `remove_note` (PT-32) — the two verbs share a
+        letter because each lives on its own pane, never on the screen."""
         cid = self._highlighted_contract()
         if cid is None:
             return
@@ -565,7 +636,7 @@ detail when columns are folded at 80×24."""
     # --- Notes + avoid list (§9 Notes tab — WP73) ------------------------------
 
     def action_add_note(self) -> None:
-        """Write a captain's note (any tab; lands on the Notes tab)."""
+        """A on Notes: write a captain's note."""
         from edge.tui.screens.stardock import _NoticeInput
 
         def _go(text: str | None) -> None:
@@ -581,7 +652,8 @@ detail when columns are folded at 80×24."""
 
         self.app.push_screen(_NoticeInput("Write a note"), _go)
 
-    def _remove_note(self) -> None:
+    def action_remove_note(self) -> None:
+        """X on Notes: strike the highlighted note."""
         table = self.query_one("#notes-table", DataTable)
         if not table.row_count:
             return
@@ -743,17 +815,35 @@ detail when columns are folded at 80×24."""
         return self.query_one(f"#sub-{category}", TabbedContent).active
 
     def show_subview(self, subview: str) -> None:
-        """Open `subview` by its legacy pane id, switching category as needed."""
+        """Open `subview` by its legacy pane id, switching category as needed.
+
+        Focus follows the tab into its content (PT-32). It has to: a pane's action keys
+        are only live while focus is inside it, so leaving focus behind in the pane we
+        just navigated away from would keep the *old* tab's verbs in the footer."""
         category = _CATEGORY_OF[subview]
+        self._blur_stale_pane()
         self.query_one("#cats", TabbedContent).active = f"cat-{category}"
         self.query_one(f"#sub-{category}", TabbedContent).active = subview
+        self.call_after_refresh(self._focus_subview_content, category)
 
     # --- WP-PR2-01 / PT-32: category accelerators + Enter-to-content ------------
 
     def action_focus_category(self, category: str) -> None:
         """Jump to a category and focus its active subview's primary content."""
+        self._blur_stale_pane()
         self.query_one("#cats", TabbedContent).active = f"cat-{category}"
         self.call_after_refresh(self._focus_subview_content, category)
+
+    def _blur_stale_pane(self) -> None:
+        """Drop focus *before* switching tabs.
+
+        Textual re-activates whichever `TabPane` contains the focused widget
+        (`TabbedContent._on_tab_pane_focused`), so focus left behind in the pane we are
+        leaving drags the tab straight back — the switch silently reverts. Blurring first
+        lets the new tab stick; `_focus_subview_content` then puts focus in its content,
+        which re-activates the same (correct) pane harmlessly."""
+        if self.focused is not None and not isinstance(self.focused, Tabs):
+            self.set_focus(None)
 
     def _focus_subview_content(self, category: str) -> None:
         try:
@@ -761,13 +851,55 @@ detail when columns are folded at 80×24."""
             pane = self.query_one(f"#{sub.active}", TabPane)
         except NoMatches:
             return
-        target = first_focusable(pane)
-        if target is not None:
-            target.focus()
+        focus_content(pane)
+
+    def action_focus_subview(self, subview: str) -> None:
+        """A sub-tab number key: open that subview and focus its content."""
+        self.show_subview(subview)
 
     def action_focus_active_content(self) -> None:
         """Enter on the tab rail focuses the active subview's content (reaches it in one step)."""
         self._focus_subview_content(self._active_category())
+
+    def _follow_focus_to_visible_pane(self) -> None:
+        """Never strand focus in a pane that is no longer showing (PT-32).
+
+        A pane's action keys are in the footer — and fire — only while focus sits inside
+        it, so focus left behind in the tab you just navigated away from would advertise
+        the wrong verbs. Focus resting on a tab rail is left alone: that is a player
+        arrowing along the tabs, and stealing it would make the rail unusable."""
+        focused = self.focused
+        if focused is None or isinstance(focused, Tabs):
+            return
+        try:
+            pane = self.query_one(f"#{self._active_subview()}", TabPane)
+        except NoMatches:
+            return
+        if pane not in focused.ancestors_with_self:
+            self.set_focus(None)  # see _blur_stale_pane: a stale focus would revert the tab
+            self.call_after_refresh(self._focus_subview_content, self._active_category())
+
+    def action_descriptors(self) -> list[ActionDescriptor]:
+        """The `.` menu / `?` help / palette list, scoped exactly like the footer (PT-32).
+
+        The default list is derived from a screen's class `BINDINGS`; this screen keeps
+        its tab verbs on the panes instead, so it assembles the same thing from the
+        active subview. One source of truth, so the four surfaces cannot disagree —
+        parity is proven in tests/test_ui_computer_keys.py.
+        """
+        danger: dict[str, str] = self.ACTION_DANGER
+        shown = [b for b in self.BINDINGS if isinstance(b, Binding) and b.show]
+        out = [ActionDescriptor(id=b.action, title=b.description, help=b.description,
+                                key=b.key, action=b.action) for b in shown]
+        try:
+            pane_actions = self.PANE_BINDINGS[self._active_subview()]
+        except NoMatches:  # before mount — the tab rail is not up yet
+            pane_actions = ()
+        out += [ActionDescriptor(id=action, title=description, help=description, key=key,
+                                 danger=danger.get(action, "none"),  # type: ignore[arg-type]
+                                 action=action)
+                for key, action, description in pane_actions]
+        return out
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "avoid-add":
@@ -799,6 +931,7 @@ detail when columns are folded at 80×24."""
         # Remember the visible subview across screens so [C] reopens there.
         active = self._active_subview()
         self.app.computer_tab = active
+        self._follow_focus_to_visible_pane()
         if active == "map" and self._active_category() == "navigation":
             # The Map pane only has a real width once it is shown — fit + focus it now
             # so the arrow keys drive the sector cursor immediately.

@@ -31,7 +31,7 @@ These decisions remove ambiguity in the raw notes.
    what happened: all hostile ships destroyed, a named ship destroyed, enemies
    retreated, or combat ended with enemies remaining. An NPC that successfully
    flees must be moved to a legal adjacent sector before the encounter closes.
-3. **StarDock commands are tab-scoped.** Rumor/notice work only on Tavern; bank
+3. **Stardock commands are tab-scoped.** Rumor/notice work only on Tavern; bank
    commands only on Bank; recruitment only on Colonists; purchase commands only
    on their catalog tab. Hidden footer bindings must not imply actions elsewhere.
 4. **Asteroid belts remain spatial “world objects,” but are not planets in the
@@ -63,7 +63,7 @@ contract is not already stated there.
 | 28 first black-hole click crash | WP-PR05 |
 | 30 asteroid belts treated as planets | WP-PR06 |
 | 11 unload more colonists to owned world; 10 unified store transfer | WP-PR07 |
-| 2–7, 29 StarDock tabs, scope, colonists, bounty board, current hull | WP-PR08 |
+| 2–7, 29 Stardock tabs, scope, colonists, bounty board, current hull | WP-PR08 |
 | 8–9, 23, 27, 31 Computer sorting/status/route/avoid/contracts | WP-PR09 |
 | 12–16 objectives, compact art, drawer navigation, nav rose/help | WP-PR10 |
 | 19–20 deployment layout and disabled legality | WP-PR11 |
@@ -278,14 +278,14 @@ compact 80x24 geometry.
 
 Commit: `playtest: WP-PR07 planet transfer workbench`
 
-### WP-PR08 — StarDock information architecture and scoped actions — complete
+### WP-PR08 — Stardock information architecture and scoped actions — complete
 
 **Deferred:** the bespoke DS9-style station-concourse raster (imagegen → image-to-ANSI
 pipeline) is not done — the `imagegen` skill was unavailable in this environment. The
 Colonists tab ships a compact ASCII concourse banner (`_CONCOURSE_ART`) as a stand-in;
 swapping in the generated raster is a follow-up. Everything else in PT-02..07/29 is done.
 
-**Goal:** make StarDock tabs self-contained, purchasable catalogs stable, and the
+**Goal:** make Stardock tabs self-contained, purchasable catalogs stable, and the
 Tavern/colonist workflows understandable.
 
 - Rename Devices to **Devices & Armaments**. Put Genesis torpedoes, homing missiles,
@@ -318,7 +318,7 @@ Tavern/colonist workflows understandable.
 all catalog reducers, colonist capacity/affordability, structured bounty projection,
 current-hull rejection, compact/contrast snapshots.
 
-Commit: `playtest: WP-PR08 StarDock scoped service UX`
+Commit: `playtest: WP-PR08 Stardock scoped service UX`
 
 ### WP-PR09 — Computer prioritization and navigation continuity — complete
 
@@ -363,9 +363,9 @@ Commit: `playtest: WP-PR09 Computer ownership and route UX`
 backtrack edge the default NavRose selection (with first-edge fallback), adds
 explicit Up/Down traversal to the Status Drawer object list, verifies the shared
 onboarding visibility switch for both objective presentations, completes the Help
-legend, and removes Port/StarDock decorative art at 80x24. Compact StarDock
+legend, and removes Port/Stardock decorative art at 80x24. Compact Stardock
 snapshots were intentionally refreshed. The follow-up completes the parametric
-80x24 geometry inventory across Sector, Computer, Lobby, Port, StarDock, Planet,
+80x24 geometry inventory across Sector, Computer, Lobby, Port, Stardock, Planet,
 Surface, Contact, Encounter, Territory, Base, Help, and shared detail modals; it
 also adds high-contrast and monochrome baselines for the previously uncovered
 Port, Planet, Surface, Territory, and Base families. Multi-hop and generated
@@ -376,7 +376,7 @@ one-way-wormhole tests cover NavRose backtrack focus and its first-edge fallback
 - Objectives have one source of truth. When `show_onboarding` is false, remove both
   `ObjectivesStrip` and the sidebar objectives detail; when re-enabled, both return.
   Completion state remains persisted independently of visibility.
-- Inventory every art-bearing screen (at minimum Port, StarDock, Planet, Surface,
+- Inventory every art-bearing screen (at minimum Port, Stardock, Planet, Surface,
   Contact, Encounter, Territory, Base/service screens, and modal details). Add
   compact rules that hide/reduce decorative art and preserve controls in scrollable
   containers. Extend the WP-UI22 geometry test parametrically rather than adding
@@ -466,7 +466,7 @@ Commit: `playtest: WP-PR12 precise errors and assault art`
    projections used by later UI packages.
 3. WP-PR06 and WP-PR07 establish planet capabilities and logistics before their UI
    is polished elsewhere.
-4. WP-PR08 and WP-PR09 reshape StarDock and Computer DTOs.
+4. WP-PR08 and WP-PR09 reshape Stardock and Computer DTOs.
 5. WP-PR10 through WP-PR12 finish cross-screen accessibility, deployment, and copy.
 
 WP-PR01, WP-PR02, and WP-PR03 should be developed serially because they overlap
@@ -501,7 +501,7 @@ Each handoff should state:
 
 The remediation is complete when all 31 notes are covered by passing automated
 tests, the scripted acceptance pass in `docs/PLAYTEST_NOTES.md` has been rerun, no
-global StarDock shortcut performs a context-inappropriate action, combat/world
+global Stardock shortcut performs a context-inappropriate action, combat/world
 state remains replay-deterministic, all primary workflows work at 80x24, and the
 documentation and Help accurately describe the resulting controls and rules.
 
@@ -565,7 +565,7 @@ following, which were **not** previously tracked. **All were closed** in the fol
 completed in earlier sessions and closed by WP-UI23; this pass did not re-diff it bullet by
 bullet, so any latent gaps there remain unassessed. One cross-cutting intersection worth a
 look: WP-UI15's "changing tabs/subviews preserves selected rows" vs. WP-PR08's index-based
-StarDock cursor restore (above). *(That re-diff was subsequently done — see §8.2.)*
+Stardock cursor restore (above). *(That re-diff was subsequently done — see §8.2.)*
 
 ### 8.2 WP-UI01–UI22 audit (2026-07-11) — unresolved overhaul items
 
@@ -606,7 +606,7 @@ in `pyproject.toml`/DESIGN §15; WP-UI05/06 `LayoutTier` + `ActionDescriptor`/`s
 reserved-key, descriptor-parity, and destructive-confirmation guards (`test_ui_actions.py`);
 WP-UI10 `STARBASE_WORKBENCH_PROFILE` + structural test that both Engine Room and Station use the
 one `ComponentWorkbench` (`test_component_workbench.py`); WP-UI14 one `TradePanel` across port /
-StarDock / base; WP-UI17 standing meter + reasoned disabled replies; WP-UI21 `DetailTable`
+Stardock / base; WP-UI17 standing meter + reasoned disabled replies; WP-UI21 `DetailTable`
 sorting/filtering/stable-key; WP-UI22 geometry + collision + destructive checks.
 
 **Cross-check resolved:** the WP-UI15 "preserve selected rows" vs. WP-PR08 index-cursor concern

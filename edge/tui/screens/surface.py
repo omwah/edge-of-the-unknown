@@ -21,7 +21,6 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
-from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.economy import EconomyError
@@ -31,7 +30,7 @@ from edge.core.movement import MovementError
 from edge.core.events import DiscoveryCollected, SiteExplored
 from edge.core.rules import Explore, Salvage
 from edge.server.service import GameService
-from edge.tui.chrome import notify_warning
+from edge.tui.chrome import EdgeScreen, notify_warning
 from edge.tui import art_adapter
 
 # Site markers ride a solid light "plate" with dark text, so they read as labels on top
@@ -163,7 +162,7 @@ class SiteArt(Static):
         return art_adapter.sprite("discovery", self._kind, seed=self._seed, width=w, height=h)
 
 
-class SurfaceScreen(Screen[None]):
+class SurfaceScreen(EdgeScreen):
     BINDINGS = [
         Binding("escape", "back", "Ascend to orbit"),
         Binding("e", "explore", "Survey site"),

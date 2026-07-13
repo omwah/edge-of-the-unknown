@@ -1,7 +1,7 @@
 """Big-bang validation — the Phase-1 subset of DESIGN §5 step 8 / §13.
 
 Asserts the invariants a new game must satisfy: every sector reachable from
-sector 1, the warp-degree cap respected, exactly one reachable StarDock, and at
+sector 1, the warp-degree cap respected, exactly one reachable Stardock, and at
 least one profitable opposed-class port pair within 5 hops of the Core (so a new
 player can always earn). Richer §5 checks (home clusters, band monotonicity,
 ownership) arrive with their Phase-2/3 generation steps.
@@ -87,9 +87,9 @@ def _check_degree_cap(state: UniverseState, config: GameConfig) -> None:
 def _check_stardock(state: UniverseState) -> None:
     docks = [p for p in state.ports.values() if p.klass is PortClass.STARDOCK]
     if len(docks) != 1:
-        raise ValidationError(f"expected exactly one StarDock, found {len(docks)}")
+        raise ValidationError(f"expected exactly one Stardock, found {len(docks)}")
     if docks[0].sector_id not in bfs_distances(state.adjacency, 1):
-        raise ValidationError("StarDock is unreachable from sector 1")
+        raise ValidationError("Stardock is unreachable from sector 1")
 
 
 def _best_roundtrip_margin(sell_port: Port, buy_port: Port, config: GameConfig) -> int:
@@ -198,7 +198,7 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
     """Alien-placement invariants (§6 / §5 step 8).
 
     Reference integrity (the governing alliance and every species' `alliance_id` resolve);
-    Core placement (only the governor and the StarDock hub sit in Core Space, §6.3); the
+    Core placement (only the governor and the Stardock hub sit in Core Space, §6.3); the
     **Hub is peaceable** (every species in the innermost band is friendly, §5); and every
     non-empty band keeps at least one **friendly** contact (the §5 step-8 resupply
     invariant). Hostiles are permitted — and expected — in the outer bands; the
@@ -215,7 +215,7 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
         return
 
     core_ids = {s.id for s in state.sectors.values() if s.is_galactic_core}
-    # The StarDock is a sanctioned Core-side contact point (high-traffic hub); the
+    # The Stardock is a sanctioned Core-side contact point (high-traffic hub); the
     # governing alliance's own members also belong in the Core — it is their capital (WP18).
     dock_sector = next((p.sector_id for p in state.ports.values()
                         if p.klass is PortClass.STARDOCK), None)

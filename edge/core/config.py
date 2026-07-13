@@ -97,17 +97,17 @@ class EconomyConfig(BaseModel):
     organics: CommodityPricing = CommodityPricing(base=5, delta=2)
     equipment: CommodityPricing = CommodityPricing(base=15, delta=7)
 
-    # The component sink: StarDock hardware prices by tier (§8). Tier III is not
+    # The component sink: Stardock hardware prices by tier (§8). Tier III is not
     # latinum-buyable — it comes only from alien barter (WP9) or salvage (WP4).
     tier_i_component_latinum: int = 2_000
     tier_ii_component_latinum: int = 8_000
     repair_kit_latinum: int = 200
     # Fraction of a hull's purchase price credited as trade-in toward a new one,
-    # and StarDock battle-damage repair priced at this fraction of a tier price
+    # and Stardock battle-damage repair priced at this fraction of a tier price
     # (the repair path is inert until Phase-3 combat knocks components out, §8).
     ship_trade_in_frac: float = 0.5
     repair_cost_frac: float = 0.25
-    # Per-head latinum incentive paid to enlist a willing colonist at StarDock
+    # Per-head latinum incentive paid to enlist a willing colonist at Stardock
     # (colonists are recruited, not bought — §4.2; not a tradeable commodity).
     colonist_incentive: int = 5
 
@@ -131,7 +131,7 @@ class EconomyConfig(BaseModel):
         }[commodity]
 
     def component_price(self, tier: ComponentTier) -> int | None:
-        """The StarDock latinum price for a component tier, or None if barter-only.
+        """The Stardock latinum price for a component tier, or None if barter-only.
 
         Tier III has no latinum price (it is bartered for, not bought, §8).
         """
@@ -270,9 +270,9 @@ class BigBangConfig(BaseModel):
     # always smaller than the Core, never Core-adjacent, never warp-linked to a rival's.
     home_cluster_min: int = 3
     home_cluster_max: int = 6
-    # Where the player's ship starts: "stardock" (at the StarDock — no routing needed),
+    # Where the player's ship starts: "stardock" (at the Stardock — no routing needed),
     # "random" (a seeded random sector), or a specific sector id. The shortest path from
-    # the start to the StarDock opens pre-explored so the opening signpost stays actionable.
+    # the start to the Stardock opens pre-explored so the opening signpost stays actionable.
     start_sector: int | Literal["stardock", "random"] = "stardock"
     stardock_min_hops: int = 2
     stardock_max_hops: int = 5
@@ -412,7 +412,7 @@ class ShipClassConfig(BaseModel):
     sensor_rating: int
     hull_max: int
     colonist_capacity: int = 0  # life-support berths — recruited colonists (§4.2)
-    price: int = 0  # StarDock purchase price in latinum (0 = the free starter hull)
+    price: int = 0  # Stardock purchase price in latinum (0 = the free starter hull)
     subsystems: Mapping[str, SubsystemLayout] | None = None
     armament: list[str] = Field(default_factory=list)  # weapon ids (GameConfig.weapons)
     defenses: list[DefenseConfig] = Field(default_factory=list)
@@ -420,7 +420,7 @@ class ShipClassConfig(BaseModel):
 
 
 class HardwareConfig(BaseModel):
-    """The StarDock hardware emporium catalog (DESIGN §5, §8).
+    """The Stardock hardware emporium catalog (DESIGN §5, §8).
 
     `components` are the part kinds offered for sale (Component enum values) and
     `tiers` the tiers stocked (enum names). Prices come from the economy block
@@ -436,7 +436,7 @@ class HardwareConfig(BaseModel):
 class DeviceConfig(BaseModel):
     """One buyable special device (§10, §14, WP56): probe / interdictor / mine-deflector.
 
-    Bought at a StarDock into `Ship.devices` (not cargo). `probe_range` is a probe's max
+    Bought at a Stardock into `Ship.devices` (not cargo). `probe_range` is a probe's max
     hop reach; `turn_tax` is the interdictor's per-day upkeep. Unused fields stay 0.
     """
 
@@ -498,13 +498,13 @@ class PlanetsConfig(BaseModel):
 class BaseServicesConfig(BaseModel):
     """Forward-base service set at a player-owned operational orbital base (§4.2, WP53).
 
-    A repaired, claimed base becomes a working home: the same StarDock commands
+    A repaired, claimed base becomes a working home: the same Stardock commands
     (repair / component purchase / munitions resupply / banking) resolve through one
     service-point seam, differing only in availability and fee. Each service is a bool
-    toggle; `fee_frac` is the latinum markup over StarDock prices (frontier convenience
+    toggle; `fee_frac` is the latinum markup over Stardock prices (frontier convenience
     costs — default 1.25). `component_stock_tiers` caps which tiers a base sells
     (default I/II; Tier III stays barter-only per §8). Banking rides the same
-    `Player.bank_balance` invariants as StarDock — location is the value, not yield.
+    `Player.bank_balance` invariants as Stardock — location is the value, not yield.
     `trade_cut_frac` is the base-hosted-market commission (§4.2, WP78): the share of
     each commodity trade's value paid from the port's purse to a player/corp owner.
     """
@@ -515,7 +515,7 @@ class BaseServicesConfig(BaseModel):
     components: bool = True
     munitions: bool = True
     banking: bool = True
-    fee_frac: float = Field(default=1.25, ge=1.0)  # markup over StarDock (≥1: never cheaper)
+    fee_frac: float = Field(default=1.25, ge=1.0)  # markup over Stardock (≥1: never cheaper)
     component_stock_tiers: list[str] = Field(default_factory=lambda: ["I", "II"])
     trade_cut_frac: float = Field(default=0.05, ge=0.0, le=0.5)  # market commission (WP78)
 
@@ -599,7 +599,7 @@ class DiscoveryConfig(BaseModel):
 class GenesisConfig(BaseModel):
     """Genesis-torpedo device tunables (DESIGN §4.2, WP10).
 
-    A Genesis torpedo is bought at StarDock for `price` latinum and deployed on an
+    A Genesis torpedo is bought at Stardock for `price` latinum and deployed on an
     **unowned** planet of an `eligible_types` kind (the dead worlds — barren / belts /
     gas giants), transforming it into a `result_type` (a colonizable terrestrial) by
     re-rolling its yield/habitability from config. Deterministic, so it replays.
@@ -841,7 +841,7 @@ class CombatConfig(BaseModel):
     evade_cap: float = 0.9
     threat_damage_scale: float = 3.0  # species threat_rating → bonus damage per round
     missile_damage: int = 30
-    missile_price: int = 300         # per missile at the StarDock hardware emporium (§8)
+    missile_price: int = 300         # per missile at the Stardock hardware emporium (§8)
     swarm_size_min: int = 3          # pack size for swarm/colony behaviors (§6.1)
     swarm_size_max: int = 5
     # NPC retreat (§10, WP-PR03): a bloodied surviving pack may break off and warp to a
@@ -872,7 +872,7 @@ class CombatConfig(BaseModel):
 class TerritoryConfig(BaseModel):
     """Sector fighters / mines / beacons / hazards (DESIGN §10, WP41).
 
-    Deployable territory: `fighter_price`/`mine_price` are per-unit StarDock costs, and
+    Deployable territory: `fighter_price`/`mine_price` are per-unit Stardock costs, and
     `beacon_price` the flat cost to plant a comms beacon. A hostile mine field deals
     `mine_damage` per surviving mine on entry (shields absorb first), consuming the mines.
     Hostile fighters force engage-or-retreat — the garrison fights as a foe whose hull is
@@ -1216,7 +1216,7 @@ class SpeciesConfig(BaseModel):
     # The one roaming, dialogue-only singular being (DESIGN §7, WP34): an explicit flag
     # (not archetype-string matching, so rosters vary freely). The big bang always draws it
     # (outside the seeded subset), fields exactly one instance in a deep band, and excludes
-    # it from clustering / the per-band resupply guarantee / the Core + StarDock paths. It
+    # it from clustering / the per-band resupply guarantee / the Core + Stardock paths. It
     # replaces the salted `entity` discovery kind entirely; met only as a voice, never fought
     # (pair with `combatant: false` + empty `fleet`). Codex art keys off `DiscoveryKind.ENTITY`.
     singular_entity: bool = False
@@ -1252,7 +1252,7 @@ class RosterConfig(BaseModel):
     subset_min: int = 6
     subset_max: int = 12
     # High-traffic Core hub: at least this many distinct Core-welcome species (governing
-    # alliance members + unaligned neutrals) are staged at the StarDock so a brand-new
+    # alliance members + unaligned neutrals) are staged at the Stardock so a brand-new
     # player meets friendly aliens at the one place every game funnels through (§6.3).
     stardock_contacts: int = Field(default=2, ge=0)
     # How many governing-alliance members to settle in the Core + home lanes (WP18): the
@@ -1500,7 +1500,7 @@ class TickerConfig(BaseModel):
 
 
 class TavernConfig(BaseModel):
-    """The StarDock tavern — rumors + the noticeboard (DESIGN §14 — WP58).
+    """The Stardock tavern — rumors + the noticeboard (DESIGN §14 — WP58).
 
     Rumors are intel for cash (the contact-for-standing path's twin): `rumor_price` slips
     buys the best undiscovered coordinate tip the Core-welcome species collectively know,
@@ -1577,14 +1577,14 @@ class GameConfig(BaseModel):
     discovery: DiscoveryConfig | None = None  # WP5 discoveries (None ⇒ none salted)
     genesis: GenesisConfig | None = None  # WP10 genesis torpedoes (None ⇒ not sold)
     citadels: CitadelConfig | None = None  # WP54 citadels (None ⇒ not buildable)
-    tavern: TavernConfig = TavernConfig()  # WP58 rumors + noticeboard at the StarDock
+    tavern: TavernConfig = TavernConfig()  # WP58 rumors + noticeboard at the Stardock
     corp: CorpConfig = CorpConfig()  # WP66 player corporations (shared bank/assets + corp war)
     pvp: PvpConfig = PvpConfig()  # WP67 attacker-driven player-vs-player combat
     devices: dict[str, DeviceConfig] = Field(default_factory=dict)  # WP56 probes/interdictor/deflector
     roster: RosterConfig | None = None  # WP7 species roster (None ⇒ no aliens placed)
     names: NamesConfig | None = None  # Configurable name pools
     starter_ship: ShipClassConfig
-    ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (StarDock)
+    ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (Stardock)
     hardware: HardwareConfig
 
     def ship_class(self, class_id: str) -> ShipClassConfig:

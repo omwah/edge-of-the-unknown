@@ -63,9 +63,9 @@ canonical **sector display** and **port (CIM)** text format right.
 
 - **Break Into Chat — TW2002** (screenshots): <https://breakintochat.com/wiki/TradeWars_2002>
   - Title screen — `https://breakintochat.com/w/images/7/72/Tradewars-2002-title-1.png` → **MainMenu**
-  - StarDock docking — `https://breakintochat.com/w/images/5/50/Tradewars-2002-stardock.png` → **StarDockScreen**
+  - Stardock docking — `https://breakintochat.com/w/images/5/50/Tradewars-2002-stardock.png` → **StardockScreen**
   - Planet landing (Terra) — `https://breakintochat.com/w/images/6/6e/Tradewars-2002-terra.png` → **PlanetScreen / SurfaceScreen**
-  - StarDock in the TWTerm helper — `https://breakintochat.com/w/images/e/ef/Twterm-stardock.png` → **ComputerScreen** (the community helper overlays we're absorbing as first-class)
+  - Stardock in the TWTerm helper — `https://breakintochat.com/w/images/e/ef/Twterm-stardock.png` → **ComputerScreen** (the community helper overlays we're absorbing as first-class)
   - Alien derelict art — `https://breakintochat.com/w/images/c/c7/AlienDerelict1.gif` → discovery flavor
 - **MobyGames screenshots**: <https://www.mobygames.com/game/3340/trade-wars-2002/screenshots/>
 - **TradeWars Museum — Gypsy's Big Dummy's Guide** (canonical text walkthroughs of
@@ -73,7 +73,7 @@ canonical **sector display** and **port (CIM)** text format right.
 - **v1 documentation text**: <http://wiki.classictw.com/index.php/TradeWars_2002_v1_Documentation_Text>
 
 **What to borrow:** the sector-display block ordering (sector #, beacon, ports/
-planets/ships, warps line), the terse prompt cadence, and the StarDock framing —
+planets/ships, warps line), the terse prompt cadence, and the Stardock framing —
 for authenticity, then modernize with widgets.
 
 ---
@@ -87,7 +87,7 @@ reference: <https://textual.textualize.io/widget_gallery/>. Curated list:
 | App | Link | Idiom to borrow | Our screen |
 |-----|------|----------------|------------|
 | **Harlequin** (SQL IDE) | <https://harlequin.sh> · <https://github.com/tconbeer/harlequin> | Dense `DataTable`, results pane, tree sidebar | **ComputerScreen** (port directory, pair-trade finder), **MapScreen** tree |
-| **Posting** (HTTP client) | <https://posting.sh> · <https://github.com/darrenburns/posting> | `TabbedContent`, command palette, keyboard-first nav with mouse affordances | **StarDockScreen** / **ComputerScreen** tabs, our command grammar |
+| **Posting** (HTTP client) | <https://posting.sh> · <https://github.com/darrenburns/posting> | `TabbedContent`, command palette, keyboard-first nav with mouse affordances | **StardockScreen** / **ComputerScreen** tabs, our command grammar |
 | **Toolong** (log viewer) | <https://github.com/Textualize/toolong> | `RichLog` tailing, search, merge | **Game** event ticker, **MessagesScreen** |
 | **Dolphie** (DB dashboard) | <https://github.com/charles-001/dolphie> | Live `Sparkline`/bar dashboards, panels | **Game** status sidebar bars (shields/holds/aspects) |
 
@@ -147,7 +147,7 @@ What the `UI_UX_OVERHAUL_PLAN.md` work leans on beyond the original board:
 | Game | terminal-space scene + StatFrame (1); TW2002 sector display (2); Dolphie bars, Toolong ticker (3) |
 | PortScreen | terminal-space port table (1); TW2002 port/CIM (2); Harlequin DataTable (3) |
 | PlanetScreen / SurfaceScreen | TW2002 Terra landing (2) |
-| StarDockScreen | TW2002 stardock (2); Posting tabs (3) |
+| StardockScreen | TW2002 stardock (2); Posting tabs (3) |
 | AlienContactScreen | (new ground — §6.7; lean on Posting panels + dialogue layout) |
 | EncounterScreen | terminal-space battle scene `tspace/client/scene/battle.py` (1) |
 | EngineRoomScreen | (new ground — §4.1; Lightspeed engine-room layout, see Appendix B) |
@@ -172,7 +172,7 @@ conda-forge); all tooling runs through `pixi run`.
    DTOs lives in `edge/tui/`. Launch it with `pixi run edge`; regenerate the SVG
    screenshots in `docs/ui/shots/` with `pixi run shots`. It uses the StatFrame
    sidebar pattern and the Harlequin/Dolphie widget idioms above.
-3. **Add the remaining Phase-1 screens** to the skeleton — StarDock (tabs),
+3. **Add the remaining Phase-1 screens** to the skeleton — Stardock (tabs),
    Computer (pair-trade finder DataTable), Map — then iterate to taste.
 4. **Capture** any third-party screenshots worth pinning into
    `docs/ui/inspiration/img/` (prefer links for copyrighted game captures; only

@@ -387,7 +387,7 @@ def test_barter_yields_tier_iii_component_no_latinum_sale_offers() -> None:
     # The Tier-III component landed in the hold...
     assert sum(ship.components.values()) == 1
     assert any(tier is ComponentTier.III for _, tier in ship.components)
-    # ...and StarDock cannot sell Tier III for latinum — tech trading could not buy it.
+    # ...and Stardock cannot sell Tier III for latinum — tech trading could not buy it.
     assert CFG.economy.component_price(ComponentTier.III) is None
     assert player.artifacts.get("III", 0) == 0  # the artifact was spent
 

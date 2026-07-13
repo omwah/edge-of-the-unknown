@@ -121,11 +121,11 @@ Verified by grepping every command class for references under `edge/tui/`
 | B2 | **Starbase ops** (P3 WP40) | `AssaultStarbase`, `RepairStarbase`, `ClaimStarbase` | Can't raze a set-piece base (so `destroy` contracts and contract_kill payouts are unfulfillable); can't repair/claim a derelict into a forward foothold (a Phase-3 headline). Only component *scavenging* is wired (planet screen `S`). |
 | B3 | **Contract fulfilment** (P5 WP57) | `DeliverContract`, `AbandonContract` | You can *accept* a deliver favor in dialogue but never deliver it — it can only expire. The Computer's Contracts tab is a read-only list with no actions. (Escort completes reducer-side on arrival; destroy blocked by B2.) |
 | B4 | **Sector territory** (P3 WP41) | `BuyFighters`, `BuyMines`, `DeployFighters`, `DeployMines`, `DeployBeacon` | Fighters/mines/beacons — deploy modes, tolls, the classic TW sector game — fully dark. |
-| B5 | **Devices** (P5 WP56) | `LaunchProbe`, `ToggleInterdictor`, `RemoveLimpets` | The StarDock Devices tab *sells* probes/interdictor/deflectors and its caption says "Launch probes & toggle the interdictor in flight" — but there is no launch or toggle anywhere. Limpets can attach to you and can never be removed. |
+| B5 | **Devices** (P5 WP56) | `LaunchProbe`, `ToggleInterdictor`, `RemoveLimpets` | The Stardock Devices tab *sells* probes/interdictor/deflectors and its caption says "Launch probes & toggle the interdictor in flight" — but there is no launch or toggle anywhere. Limpets can attach to you and can never be removed. |
 | B6 | **PvP** (P4 WP67) | `AttackPlayer` | No attack affordance — and other players' ships are not even projected into `SectorDTO.ships` (`session.py:312` lists species only), so in hosted multiplayer another player in your sector is literally invisible. The WP67 plan's "Projection/TUI" bullet was not built. |
-| B7 | **Dock repair & upgrades** | `RepairAtDock`, `SwapComponent` | Engine-room `U` "Upgrade" is a noop; there is no way to repair hull/components at StarDock. After combat you're limited to field patches (in combat only, see B8) and cannibalize/install. |
+| B7 | **Dock repair & upgrades** | `RepairAtDock`, `SwapComponent` | Engine-room `U` "Upgrade" is a noop; there is no way to repair hull/components at Stardock. After combat you're limited to field patches (in combat only, see B8) and cannibalize/install. |
 | B8 | **Field patch outside combat** | `FieldPatch` | Wired in the encounter screen (`K`) but the engine room's advertised `P` Field-patch is a noop — you can't patch between fights. |
-| B9 | **Bank at StarDock** | `Deposit`, `Withdraw` (wired only at forward bases, fixed 1 000) | The StarDock Bank tab says "Deposit / withdraw / interest — Phase 2." while the core bank (`Player.bank_balance`, `_bank` reducer) has existed since Phase 5 and *is* usable at player forward bases — in fixed 1k increments only. |
+| B9 | **Bank at Stardock** | `Deposit`, `Withdraw` (wired only at forward bases, fixed 1 000) | The Stardock Bank tab says "Deposit / withdraw / interest — Phase 2." while the core bank (`Player.bank_balance`, `_bank` reducer) has existed since Phase 5 and *is* usable at player forward bases — in fixed 1k increments only. |
 | B10 | **Corp management** (P4 WP66) | `InviteToCorp`, `AcceptCorpInvite`, `ExpelFromCorp`, `DeclareCorpWar`, `EndCorpWar`, `TransferPlanetToCorp/From` | Corp screen wires form/deposit/withdraw/leave only. Invitations, war, and asset transfer are dark — corp war (a WP66 headline) can't be declared. |
 
 **Course of action (the core of the correction plan):** a "TUI surfacing" work
@@ -164,7 +164,7 @@ surface shape), **D3** (hotkey scheme these new affordances land in).
 ## 4. Category D — Hotkey audit (inconsistent, overloaded, undiscoverable)
 
 Full inventory extracted from every `BINDINGS` table. GameScreen alone has 13;
-StarDock 10; Planet 10. The complaints check out — the same key means different
+Stardock 10; Planet 10. The complaints check out — the same key means different
 things screen to screen, several advertised keys are noops, and multi-step
 features hide behind single letters with no discoverability beyond the footer.
 
@@ -172,13 +172,13 @@ features hide behind single letters with no discoverability beyond the footer.
 
 | Key | Meanings by screen |
 |-----|--------------------|
-| `g` | Game: open Log · Planet: **Genesis torpedo** (destructive!) · StarDock: Buy Genesis · Computer: Engage route · Messages: back |
-| `t` | Game: Corp screen · Port/StarDock: Trade · Planet: Trade (**noop**) · Surface: Take find |
+| `g` | Game: open Log · Planet: **Genesis torpedo** (destructive!) · Stardock: Buy Genesis · Computer: Engage route · Messages: back |
+| `t` | Game: Corp screen · Port/Stardock: Trade · Planet: Trade (**noop**) · Surface: Take find |
 | `s` | Game: Survey planet · Planet: Salvage · Computer: **Seize Core** (a petition, next to harmless keys) |
-| `k` | StarDock: Recruit colonists · Planet: Build citadel · Encounter: Field-patch |
-| `b` | Game: Base services · StarDock/Starbase: Buy · Contact: Back one |
-| `h` | Game: Hail · Port/StarDock: Haggle |
-| `m` | Game: Map · Encounter: fire Missile · Starbase: buy Missile (StarDock uses `i` for the same thing) · Messages: back |
+| `k` | Stardock: Recruit colonists · Planet: Build citadel · Encounter: Field-patch |
+| `b` | Game: Base services · Stardock/Starbase: Buy · Contact: Back one |
+| `h` | Game: Hail · Port/Stardock: Haggle |
+| `m` | Game: Map · Encounter: fire Missile · Starbase: buy Missile (Stardock uses `i` for the same thing) · Messages: back |
 | `q` | Main menu: quit app · Port/Help: close screen (elsewhere `escape`) |
 | `y` | Corp/Starbase: Withdraw (unmnemonic; planet treasury uses `+`/`-` instead) |
 | `p` | Game: Dock · Computer: Plot route · Engine room: Field-patch (**noop**) |
@@ -247,14 +247,14 @@ corp UI (WP76) ships in this arc. Sizes are relative (S/M/L).
   Computer Contracts tab gained `D` Deliver / `X` Abandon (row-keyed) and the
   port screen a `D` Deliver shortcut (B3); the engine room's `P` field-patch and
   `U` upgrade are live plus a new `R` dock repair (`RepairAtDock`; B7/B8); the
-  StarDock Bank tab is real — balance, typed-amount `D`/`W` deposit/withdraw via
+  Stardock Bank tab is real — balance, typed-amount `D`/`W` deposit/withdraw via
   `_AmountInput`, and the interest note (B9/D8 — the `interest_accrual` cron and
   `economy.bank_interest_per_day` already existed, so only the UI was missing).
   Tests: `tests/test_surfacing.py` (projection seam).
 - **WP72 — Surfacing pass 2: territory, devices, alliances (L) — SHIPPED.** New
   `TerritoryScreen` (game screen `D` Deploy) driven by a new `territory_view` /
   `TerritoryDTO`: deploy fighters (mode picker incl. toll), armid/limpet mines,
-  beacon, probe launch, interdictor toggle, limpet strip (B4+B5); StarDock `F`/`M`
+  beacon, probe launch, interdictor toggle, limpet strip (B4+B5); Stardock `F`/`M`
   buy fighters/mines. Alliances on both surfaces (B1/D9): contact screen `J`
   Join/Resign derived verb (`ContactDTO.alliance_id`/`alliance_member`) and a
   Computer **Alliances** tab (`ComputerDTO.alliances` / `AllianceRowDTO`: standing,

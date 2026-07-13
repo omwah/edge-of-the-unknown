@@ -268,7 +268,7 @@ def test_stardock_pivots_near_full() -> None:
     dock = _port(1, klass=PortClass.STARDOCK, stocks={c: 500 for c in Commodity})
     assert desired_stock_frac(dock, ECON) == ECON.desired_stock_frac_stardock
     orders = generate_orders(_state({1: dock}), ECON)
-    # Half-full is a deep shortage against StarDock's 90% pivot: it buys.
+    # Half-full is a deep shortage against Stardock's 90% pivot: it buys.
     assert {o.side for o in orders[1]} == {"buy"}
 
 

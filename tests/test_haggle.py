@@ -98,7 +98,7 @@ def test_attempt_counter_round_trips_through_reload(tmp_path: Path) -> None:
     for hop in path[1:]:
         svc.apply(1, Warp(to_sector=hop))
     svc.apply(1, Dock())
-    # The StarDock SELLS (the player buys), so a lowball counter of 1/u is insulting —
+    # The Stardock SELLS (the player buys), so a lowball counter of 1/u is insulting —
     # two of them bump the per-port, per-day attempt counter without any trade.
     for _ in range(2):
         svc.apply(1, HaggleOffer(Commodity.FUEL_ORE, units=1, counter_price=1))

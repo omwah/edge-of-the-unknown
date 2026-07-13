@@ -248,7 +248,7 @@ def planet_growth(state: UniverseState, config: GameConfig) -> ReduceResult:
 
 
 def _pinned_species(state: UniverseState) -> frozenset[int]:
-    """Species staged at the StarDock — the hub's standing welcome; they don't wander (§6.3)."""
+    """Species staged at the Stardock — the hub's standing welcome; they don't wander (§6.3)."""
     dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
     if dock is None:
         return frozenset()
@@ -262,7 +262,7 @@ def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
     and reproducible under replay without ever drawing from the shared command-stream
     `state.rng`. `drift_seq` (a counter on `Game`) advances each firing, so live and
     reloaded runs seed identically. Territory is gated by `may_occupy` (no Core, no rival
-    bloc); StarDock contacts are pinned. Non-Entity species pick their destination by their
+    bloc); Stardock contacts are pinned. Non-Entity species pick their destination by their
     **movement policy** (`core.npc.plan_move`, WP42 — one RNG draw, so `wander` stays
     byte-identical); the Entity roams by its own rules (§7, WP36). `AlienMoved` is emitted
     only for a move that touches a player's current sector, so the log isn't flooded.

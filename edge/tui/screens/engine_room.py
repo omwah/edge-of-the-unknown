@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.screen import Screen
 from textual.widgets import Footer, Static
 
 from edge.core.dto import EngineRoomDTO, Slot
@@ -13,7 +12,7 @@ from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier, Subsystem as SubsystemKind
 from edge.core.rules import Cannibalize, FieldPatch, InstallComponent, RepairAtDock, SwapComponent
 from edge.server.service import GameService
-from edge.tui.chrome import ContextStrip, TitleBar, notify_warning
+from edge.tui.chrome import ContextStrip, EdgeScreen, TitleBar, notify_warning
 from edge.tui.component_workbench import (
     ComponentWorkbench,
     SHIP_WORKBENCH_PROFILE,
@@ -29,7 +28,7 @@ _DISPLAY_TO_KIND = {
 }
 
 
-class EngineRoomScreen(Screen[None]):
+class EngineRoomScreen(EdgeScreen):
     BINDINGS = [
         Binding("escape", "back", "Back"),
         Binding("p", "field_patch", "Field-patch"),

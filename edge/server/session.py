@@ -166,7 +166,7 @@ def _display(state: UniverseState, sector_id: int) -> int:
 
 def _sector_codes(state: UniverseState, sector_id: int,
                   player: Player | None = None) -> list[str]:
-    """Short content tokens for an explored sector: port (S=StarDock/P), planet (@),
+    """Short content tokens for an explored sector: port (S=Stardock/P), planet (@),
     starbase (#), and known forces (×) — fighters are public, mines only yours (fog)."""
     codes: list[str] = []
     port = state.port_in_sector(sector_id)
@@ -852,7 +852,7 @@ def corp_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.C
 
 
 def tavern_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.TavernDTO:
-    """The StarDock tavern panel: rumors, the bounty board, and the noticeboard (§14, WP58).
+    """The Stardock tavern panel: rumors, the bounty board, and the noticeboard (§14, WP58).
 
     Read-only. Rumor availability is computed live against the Core-welcome species' pooled
     knowledge (the same deterministic pick the `BuyRumor` reducer makes, so the panel never
@@ -903,8 +903,8 @@ def tavern_view(state: UniverseState, player_id: int, config: GameConfig) -> dto
         bounties=bounties, notices=notices, contracts=_contracts_view(state, player))
 
 
-def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.StarDockDTO:
-    """The StarDock hardware + shipyard catalogs for the docked player (§8, §11).
+def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.StardockDTO:
+    """The Stardock hardware + shipyard catalogs for the docked player (§8, §11).
 
     Hardware prices come from the economy block; the shipyard shows each hull's
     derived stats and its trade-in-adjusted net price against the player's current
@@ -948,7 +948,7 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     free_berths = max(0, ship.colonist_capacity - ship.colonists)
     incentive = econ.colonist_incentive
     affordable_heads = player.latinum // incentive if incentive > 0 else free_berths
-    return dto.StarDockDTO(
+    return dto.StardockDTO(
         sector_display=_display(state, ship.sector_id),
         latinum=player.latinum, hardware=hardware, shipyard=shipyard, armaments=armaments,
         bank_balance=player.bank_balance,
@@ -962,7 +962,7 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
 def _armaments_catalog(player: Player, ship: Ship, config: GameConfig) -> list[dto.ArmamentItem]:
     """The unified Devices & Armaments catalog (WP-PR08 / PT-02): munitions + special devices.
 
-    One projected list so the StarDock's `B` buys the highlighted row — no more scattered
+    One projected list so the Stardock's `B` buys the highlighted row — no more scattered
     global G/I/F/M hotkeys. Amount-based rows (missiles/fighters/mines) price per unit and
     open an amount prompt; the one-offs (Genesis, each device) buy a single unit.
     """
@@ -1284,9 +1284,9 @@ def _dossier_entries(state: UniverseState, player: Player, config: GameConfig) -
 
 
 def _port_klass_label(klass: PortClass) -> str:
-    """A Ports-tab class label: 'Class 1 (BBS)' / 'StarDock' (§11, WP15)."""
+    """A Ports-tab class label: 'Class 1 (BBS)' / 'Stardock' (§11, WP15)."""
     if klass is PortClass.STARDOCK:
-        return "StarDock"
+        return "Stardock"
     trades = PORT_CLASS_TRADES[klass]
     mnemonic = "".join("B" if trades[c] is PortMode.BUY else "S" for c in Commodity)
     return f"Class {klass.value} ({mnemonic})"
@@ -1536,7 +1536,7 @@ def _hop_label(state: UniverseState, sector_id: int) -> str:
     did = _display(state, sector_id)
     words = []
     for code in _sector_codes(state, sector_id):
-        words.append({"S": "StarDock", "P": "port", "@": "planet"}.get(code, code))
+        words.append({"S": "Stardock", "P": "port", "@": "planet"}.get(code, code))
     return f"({did}) · {' '.join(words)}" if words else f"({did})"
 
 
@@ -2160,7 +2160,7 @@ def format_event(event: Event) -> str:
     if isinstance(event, LeadAccepted):
         return f"[cyan]✦ Coordinates logged — a {event.kind.replace('_', ' ')} lead.[/]"
     if isinstance(event, ColonistsRecruited):
-        via = "StarDock" if event.source == "stardock" else "emigration"
+        via = "Stardock" if event.source == "stardock" else "emigration"
         cost = f"  (-{event.cost} slips)" if event.cost else ""
         return f"Recruited {event.count} colonists ({via}){cost}"
     if isinstance(event, Colonized):

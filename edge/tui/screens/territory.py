@@ -6,7 +6,7 @@ the projection), and each deployable is a **card** in a grid below: a small art
 sprite, the carried stock, a one-line purpose, and its Deploy button. Buttons
 are Textual-focusable, so Tab/Shift-Tab walks the cards and Enter fires the
 focused one — the hotkeys stay as accelerators only. Stock is bought at the
-StarDock (Devices tab / `F`/`M`); deployment is barred in the Core.
+Stardock (Devices tab / `F`/`M`); deployment is barred in the Core.
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import Screen
 from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.economy import EconomyError
@@ -29,7 +28,7 @@ from edge.core.rules import (
 )
 from edge.server.service import GameService
 from edge.tui import art_adapter
-from edge.tui.chrome import TextPrompt, notify_success, notify_warning
+from edge.tui.chrome import EdgeScreen, TextPrompt, notify_success, notify_warning
 from edge.tui.screens.picker import ListPicker
 from edge.tui.screens.stardock import _AmountInput
 from edge.tui.screens.travel import TravelPromptScreen
@@ -103,7 +102,7 @@ class _DeployRow(Horizontal):
         yield button
 
 
-class TerritoryScreen(Screen[None]):
+class TerritoryScreen(EdgeScreen):
     # Accelerators only — every deployable is a focusable card with a button.
     BINDINGS = [
         Binding("escape", "back", "Back"),
@@ -237,7 +236,7 @@ limpet mines tag passing hulls so their owner can track them."""
         ]
         if t.limpets:
             where = ("here" if t.at_service_point
-                     else "at a StarDock or your own base")
+                     else "at a Stardock or your own base")
             specs.append(("strip", "Strip limpets", Text.from_markup(_GLYPH_ART["strip"]),
                 f"fee: {t.limpet_removal_fee:,} latinum",
                 f"Pay the yard to scrape off attached limpets — removable {where}.",

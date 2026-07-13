@@ -30,14 +30,14 @@ def test_planet_types_have_sprites() -> None:
 def test_port_classes_map_to_sprites() -> None:
     port_subtypes = set(available_subtypes("port"))
     for pc in PortClass:
-        # Ordinary ports route by their "Class N" display label; the StarDock is
+        # Ordinary ports route by their "Class N" display label; the Stardock is
         # routed separately (by name in the sector list / a hardcoded subtype).
         intended = "stardock" if pc is PortClass.STARDOCK else "trading_port"
         assert intended in port_subtypes, pc
         if pc is not PortClass.STARDOCK:
             assert art_adapter.port_subtype(f"Class {pc.value}") == intended
-    # The StarDock is identified by its port name in the sector listing.
-    assert art_adapter.port_subtype("StarDock Alpha") == "stardock"
+    # The Stardock is identified by its port name in the sector listing.
+    assert art_adapter.port_subtype("Stardock Alpha") == "stardock"
 
 
 def test_ship_roles_have_sprites() -> None:

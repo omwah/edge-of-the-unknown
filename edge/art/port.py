@@ -30,7 +30,7 @@ archetype (humanoid_diplomat, brain_dome_automaton, ...) is the stable visual
 identity, so the hull look stays put across roster edits.
 
 The flagship ``stardock`` silhouette deliberately evokes the classic TradeWars
-2002 Federation StarDock: a vertical, left/right-symmetric station with a red
+2002 Federation Stardock: a vertical, left/right-symmetric station with a red
 beacon up top, a control tower, a wide platform trailing thin docking arms, a
 tapering chevron body, and a yellow engine glow at the bottom.
 
@@ -91,7 +91,7 @@ _SELF_SYMMETRIC = (HULL_CHARS - frozenset(_MIRROR)) | frozenset(" RY")
 # (this is "decompose what we had", not "redraw"). The remaining parts are
 # interchangeable variants that give repeat ports visible variety.
 # Nested subtype -> archetype grammar table. The legacy silhouettes live under
-# ``default`` and remain the fallback for unknown archetypes; StarDock has no
+# ``default`` and remain the fallback for unknown archetypes; Stardock has no
 # archetype variants and therefore contains only its default.
 PORT_GRAMMAR: dict[str, dict[str, tuple[tuple[Slot, ...], ...]]] = {
     "stardock": {

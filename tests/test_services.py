@@ -1,9 +1,9 @@
 """WP53 — the ServicePoint resolver and forward-base services (DESIGN §4.1, §4.2).
 
 The resolver decides *which provider serves the ship's sector and at what fee*, so the
-dock-service reducers run one code path against two providers (StarDock, player base).
+dock-service reducers run one code path against two providers (Stardock, player base).
 These tests pin the resolver truth table, the fee/tier gating at a base, and that
-StarDock behaviour is byte-identical (fee_frac 1.0) after the refactor.
+Stardock behaviour is byte-identical (fee_frac 1.0) after the refactor.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def _operational_base(sector_id: int, owner: Ownership) -> Starbase:
 
 
 def _world(*, base_owner: Ownership, base_operational: bool = True) -> UniverseState:
-    """Sectors 1(StarDock) <-> 2(base) <-> 3(empty); player at sector 2 with a base."""
+    """Sectors 1(Stardock) <-> 2(base) <-> 3(empty); player at sector 2 with a base."""
     game = Game(id=1, seed=1, config_version=CONFIG.config_version, created_at="t")
     state = UniverseState.new(game)
     state.sectors = {
@@ -54,7 +54,7 @@ def _world(*, base_owner: Ownership, base_operational: bool = True) -> UniverseS
     }
     state.rebuild_adjacency()
     state.ports = {
-        1: Port(id=1, sector_id=1, name="StarDock", klass=PortClass.STARDOCK, size=1,
+        1: Port(id=1, sector_id=1, name="Stardock", klass=PortClass.STARDOCK, size=1,
                 commodities=(PortCommodity(Commodity.FUEL_ORE, PortMode.SELL, 500, 1000, 11, 5),)),
     }
     base = _operational_base(2, base_owner)
@@ -95,7 +95,7 @@ def test_resolver_ignores_a_derelict_or_rival_base() -> None:
 
 def test_resolver_prefers_stardock_and_charges_no_markup() -> None:
     state = _world(base_owner=Ownership("player", 1))
-    state.ships[1] = replace(state.ships[1], sector_id=1)  # move to the StarDock sector
+    state.ships[1] = replace(state.ships[1], sector_id=1)  # move to the Stardock sector
     sp = _sp(state)
     assert sp is not None and sp.kind == "stardock" and sp.fee_frac == 1.0
 

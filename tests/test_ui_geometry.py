@@ -61,8 +61,8 @@ async def test_compact_art_screen_controls_are_visible_or_scrollable(surface: st
             from edge.tui.screens.port import PortScreen
             screen = PortScreen(service, app.player_id)
         elif surface == "stardock":
-            from edge.tui.screens.stardock import StarDockScreen
-            screen = StarDockScreen(service, app.player_id, initial_tab="devices")
+            from edge.tui.screens.stardock import StardockScreen
+            screen = StardockScreen(service, app.player_id, initial_tab="devices")
         elif surface == "planet":
             from edge.tui.dummy import sample_planet
             from edge.tui.screens.planet import PlanetScreen

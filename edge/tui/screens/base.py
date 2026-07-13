@@ -21,7 +21,6 @@ from typing import Any
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
-from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import DataTable, Footer, Static, TabbedContent
 
@@ -36,7 +35,7 @@ from edge.core.rules import (
     RepairStarbase, Withdraw,
 )
 from edge.server.service import GameService
-from edge.tui.chrome import TitleBar, notify_success, notify_warning
+from edge.tui.chrome import EdgeScreen, TitleBar, notify_success, notify_warning
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.component_workbench import (
@@ -60,11 +59,13 @@ _DISPLAY_TO_KIND = {
     "MAIN GUN": Subsystem.MAIN_GUN,
 }
 
-class BaseScreen(Screen[None]):
+class BaseScreen(EdgeScreen):
     BINDINGS = [
         Binding("escape", "back", "Leave base"),
         Binding("t", "trade", "Trade highlighted"),
-        Binding("h", "haggle", "Haggle highlighted"),
+        # `G`, as on the Port and Stardock — this screen hosts the same `TradePanel`, so
+        # the verb cannot answer to a different key depending on the route in (PT-32).
+        Binding("g", "haggle", "Haggle highlighted"),
         Binding("r", "repair", "Repair slot"),
         Binding("s", "salvage", "Salvage"),
         Binding("c", "claim", "Claim"),
@@ -198,7 +199,7 @@ does the same for the active tab."""
         if v.market_open and port is not None:
             children.append(TradePanel(port, latinum=v.latinum, show_title=True,
                                        id="base-trade-panel"))
-            lines.append("[dim]T trades the highlighted row · H haggles.[/]")
+            lines.append("[dim]T trades the highlighted row · G haggles.[/]")
         else:
             lines.append(f"[red]Market closed[/] — {v.market_notice}.")
         if v.trade_cut_pct:

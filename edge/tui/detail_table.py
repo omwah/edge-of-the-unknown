@@ -142,8 +142,10 @@ class DetailTable(Vertical):
             with Vertical(classes="dt-main"):
                 yield Input(placeholder="/ filter…", classes="table-filter",
                             id=f"{self._table_id}-filter")
+                # `focus-first`: the table, not the filter box above it, is what a
+                # tab accelerator / Enter-into-a-tab should focus (widgets.first_focusable).
                 yield DataTable(id=self._table_id, zebra_stripes=True,
-                                cursor_type="row")
+                                cursor_type="row", classes="focus-first")
                 yield EmptyState(*self._empty, id=f"{self._table_id}-empty")
             detail = Static("", classes="table-detail",
                             id=f"{self._table_id}-detail")

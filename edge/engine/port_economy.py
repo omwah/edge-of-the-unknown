@@ -1,7 +1,7 @@
 """Hourly port stock regeneration (DESIGN §8, §9).
 
 A pure maintenance reducer: each port's commodity stock moves a fixed fraction
-toward its desired level (50% capacity standard, 90% StarDock). Regeneration is
+toward its desired level (50% capacity standard, 90% Stardock). Regeneration is
 silent state evolution — it emits no per-commodity events (which at scale would
 flood the log); the new ports are simply upserted.
 """

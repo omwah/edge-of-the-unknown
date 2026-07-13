@@ -58,5 +58,5 @@ def test_every_stardock_tab_has_responsive_accessible_art(
 
 
 def test_unknown_stardock_tab_is_rejected() -> None:
-    with pytest.raises(ValueError, match="unknown StarDock art tab"):
+    with pytest.raises(ValueError, match="unknown Stardock art tab"):
         stardock_asset("brig", "edge-ansi", cinematic=False)

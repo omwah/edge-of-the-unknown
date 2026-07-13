@@ -108,7 +108,7 @@ def deployment_legality(
         if quantity < 1:
             blocker = "no limpets attached"
         elif service_point(state, player, ship, config) is None:
-            blocker = "limpets can only be removed at a StarDock or a base you own"
+            blocker = "limpets can only be removed at a Stardock or a base you own"
         elif player.latinum < config.territory.limpet_removal_fee:
             blocker = f"need {config.territory.limpet_removal_fee} latinum to strip the limpets"
     else:

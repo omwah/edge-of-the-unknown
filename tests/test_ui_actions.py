@@ -43,6 +43,30 @@ def _bindings(cls: type[Screen]) -> list[Binding]:
     return [b for b in cls.__dict__.get("BINDINGS", []) if isinstance(b, Binding)]
 
 
+def _pane_bindings(cls: type[Screen]) -> dict[str, tuple[tuple[str, str, str], ...]]:
+    """A tabbed screen's per-tab action keys (PT-32).
+
+    Verbs that belong to one tab are declared in `PANE_BINDINGS` and bound onto that
+    tab's `ActionPane`, not onto the screen — so the footer only ever advertises the
+    visible tab. They are still the screen's actions, so every static guard below has
+    to see them; `_all_actions` is what those guards use.
+    """
+    return cls.__dict__.get("PANE_BINDINGS", {})
+
+
+def _action_name(action: str) -> str:
+    """`step_recruit(1)` -> `step_recruit`: a binding may carry parameters; the method name
+    is the part before them, and that is what ACTION_DANGER and the source guards key on."""
+    return action.split("(", 1)[0]
+
+
+def _all_actions(cls: type[Screen]) -> set[str]:
+    panes = {**_pane_bindings(cls), **cls.__dict__.get("PANE_HIDDEN", {})}
+    return ({_action_name(b.action) for b in _bindings(cls)}
+            | {_action_name(action) for triples in panes.values()
+               for _key, action, _description in triples})
+
+
 def test_layout_tier_breakpoints() -> None:
     assert layout_tier(79, 30) is LayoutTier.UNSUPPORTED
     assert layout_tier(100, 23) is LayoutTier.UNSUPPORTED
@@ -82,7 +106,17 @@ def test_screen_actions_parity_with_footer_bindings() -> None:
     an `action_descriptors` override. Any override must ship its own parity
     test proving descriptor keys match the screen's shown bindings.
     """
+    # These screens override `action_descriptors` because their verbs live on their tab
+    # panes (PT-32): the descriptor list is assembled from the *active* tab, and its parity
+    # with that tab's footer bindings is proven per-screen — tests/test_ui_computer_keys.py
+    # and tests/test_ui_stardock_keys.py.
+    _OVERRIDES_DESCRIPTORS = {"ComputerScreen", "StardockScreen"}
     for cls in _screen_classes():
+        if cls.__name__ in _OVERRIDES_DESCRIPTORS:
+            assert "action_descriptors" in cls.__dict__, (
+                f"{cls.__name__} no longer overrides action_descriptors — drop it from "
+                f"the exemption list so the parity guard covers it again")
+            continue
         assert "action_descriptors" not in cls.__dict__, (
             f"{cls.__name__} overrides action_descriptors — add a screen-specific "
             f"parity test (descriptor keys == shown binding keys) and update this guard"
@@ -112,7 +146,7 @@ def test_danger_map_actions_route_through_confirm_screen() -> None:
     """
     for cls in _screen_classes():
         danger = cls.__dict__.get("ACTION_DANGER", {})
-        bound = {b.action for b in _bindings(cls)}
+        bound = _all_actions(cls)  # screen bindings + per-tab pane bindings (PT-32)
         for action, level in danger.items():
             assert level in ("caution", "destructive"), (
                 f"{cls.__name__}.ACTION_DANGER[{action!r}] = {level!r}")
@@ -134,10 +168,10 @@ def test_confirming_actions_declare_their_danger() -> None:
         if issubclass(cls, ModalScreen):
             continue  # ConfirmScreen itself and other modals
         danger = cls.__dict__.get("ACTION_DANGER", {})
-        for binding in _bindings(cls):
-            if "ConfirmScreen(" in _method_source(cls, binding.action):
-                assert binding.action in danger, (
-                    f"{cls.__name__}.action_{binding.action} pushes ConfirmScreen "
+        for action in _all_actions(cls):  # incl. per-tab pane bindings (PT-32)
+            if "ConfirmScreen(" in _method_source(cls, action):
+                assert action in danger, (
+                    f"{cls.__name__}.action_{action} pushes ConfirmScreen "
                     f"but is missing from ACTION_DANGER — mark it caution or "
                     f"destructive so `.`/palette/help can badge it")
 

@@ -45,7 +45,7 @@ def _small_config() -> object:
 
 
 def _scripted_commands(state: object) -> list[tuple[int, Command]]:
-    """A deterministic run: warp to the StarDock, trade, haggle, and bank."""
+    """A deterministic run: warp to the Stardock, trade, haggle, and bank."""
     dock = next(p for p in state.ports.values() if p.klass is PortClass.STARDOCK)  # type: ignore[attr-defined]
     path = shortest_path(state.adjacency, 1, dock.sector_id)  # type: ignore[attr-defined]
     assert path is not None

@@ -82,20 +82,20 @@ economy:
   organics:  { base: 5,  delta: 2, elasticity: 1.0 }
   equipment: { base: 15, delta: 7, elasticity: 1.0 }
 
-  # The component sink: StarDock hardware prices by engine-room tier (§8). Tier III is
+  # The component sink: Stardock hardware prices by engine-room tier (§8). Tier III is
   # barter-only (alien trade / salvage), so it has no latinum price listed here.
-  tier_i_component_latinum: 2000   # flat price of any Tier-I component at StarDock
+  tier_i_component_latinum: 2000   # flat price of any Tier-I component at Stardock
   tier_ii_component_latinum: 8000  # flat price of any Tier-II component (the mid-game sink)
   repair_kit_latinum: 200          # a carried field-patch kit (restores a knocked-out component)
   ship_trade_in_frac: 0.5   # fraction of the old hull's price credited toward a new one
-  repair_cost_frac: 0.25    # StarDock battle-damage repair costs this × the component's tier price (Phase 3)
-  colonist_incentive: 5     # per-head latinum to enlist a StarDock colonist (recruited, not bought)
+  repair_cost_frac: 0.25    # Stardock battle-damage repair costs this × the component's tier price (Phase 3)
+  colonist_incentive: 5     # per-head latinum to enlist a Stardock colonist (recruited, not bought)
 
   # Banking + port stock regeneration (an engine cron applies these; the math itself is pure).
   bank_interest_per_day: 0.005      # daily interest on the bank balance (0.5%/day, compounds per turn-reset)
   regen_fraction: 0.05              # share of the gap to desired stock a port refills each economy tick
   desired_stock_frac_standard: 0.50 # a normal port settles toward 50% of capacity (its price pivot)
-  desired_stock_frac_stardock: 0.90 # StarDock stays near-full (90%) so it's a reliable supplier
+  desired_stock_frac_stardock: 0.90 # Stardock stays near-full (90%) so it's a reliable supplier
 
   # The Phase-5 order-book market (§8, WP46+): ports post buy/sell orders against their
   # desired-stock gaps each economy tick, and a daily settlement moves real goods and
@@ -187,7 +187,7 @@ combat:
   evade_cap: 0.9             # upper clamp on evade chance
   threat_damage_scale: 3.0   # an alien's per-shot damage = this × its threat rating
   missile_damage: 30         # damage of one homing missile (ignores firing arc, always hits)
-  missile_price: 300         # StarDock price per missile reload
+  missile_price: 300         # Stardock price per missile reload
   swarm_size_min: 3          # min ships when a pack/escort encounter spawns
   swarm_size_max: 5          # max ships in such a pack
   # Localized damage (§4.1, WP26): once a volley reaches the hull, it may knock out one
@@ -228,7 +228,7 @@ bigbang:
   home_cluster_min: 10       # alliance home cluster size range (each < Core), §5 step 6
   home_cluster_max: 20
   start_sector: stardock     # where the player starts: stardock | random | a specific sector number
-  stardock_min_hops: 2       # StarDock is placed this many warp hops from the Core, at least…
+  stardock_min_hops: 2       # Stardock is placed this many warp hops from the Core, at least…
   stardock_max_hops: 5       # …and at most this many (a short shakedown run from home)
   port_density: 0.45         # fraction of sectors that hold a trading port
   planet_density: 0.25       # fraction of sectors that hold a planet
@@ -351,15 +351,15 @@ starbase:
       base_components: [accelerator, linkage]
       legal_components: [accelerator, linkage, converter, secondary]
   # Forward-base services (§4.2, WP53): what a player-owned operational base offers, and at
-  # what markup. The same StarDock commands resolve here through the shared service-point
-  # seam. fee_frac ≥ 1 (never cheaper than StarDock); Tier III stays barter-only, so a base
+  # what markup. The same Stardock commands resolve here through the shared service-point
+  # seam. fee_frac ≥ 1 (never cheaper than Stardock); Tier III stays barter-only, so a base
   # stocks only I/II by default.
   services:
     repair: true
     components: true
     munitions: true
     banking: true
-    fee_frac: 1.25            # frontier convenience markup over StarDock latinum prices
+    fee_frac: 1.25            # frontier convenience markup over Stardock latinum prices
     component_stock_tiers: [I, II]
     # Base-hosted markets (WP78): a starbase sector's port is the base's trading post.
     # A player/corp owner skims this share of each outsider trade's value from the
@@ -405,11 +405,11 @@ discovery:
   black_hole_gravity_warp: false  # Phase-3 hazard seam (black holes fling you off-course); inert in Phase 2
   black_hole_warp_turn_cost: 5    # extra turns a black-hole gravity warp will cost once that hazard is live
 
-# Genesis torpedoes (§4.2, WP10): a StarDock device that terraforms a dead, unowned
+# Genesis torpedoes (§4.2, WP10): a Stardock device that terraforms a dead, unowned
 # world (barren / asteroid belt / gas giant) into a colonizable terrestrial, ready to
 # claim. A latinum sink at the high end of the economy.
 genesis:
-  device_id: genesis_torpedo   # the StarDock item id this rule applies to
+  device_id: genesis_torpedo   # the Stardock item id this rule applies to
   price: 15000                 # latinum cost of one Genesis torpedo (a high-end sink)
   result_type: terrestrial_warm  # what an eligible world is transformed into
   eligible_types: [barren, jovian, terrestrial_hot, terrestrial_cold]  # dead/marginal worlds a torpedo can terraform (asteroid belts have no surface to re-form)
@@ -436,7 +436,7 @@ citadels:
     - { cost_equipment: 400, cost_latinum: 12000, min_colonists: 300, build_colonist_days: 15000, garrison_mult: 2.0 }  # L2
     - { cost_equipment: 800, cost_latinum: 30000, min_colonists: 600, build_colonist_days: 40000, garrison_mult: 3.0 }  # L3
 
-# Special devices (§10, §14, WP56): bought at the StarDock into the ship's device bay.
+# Special devices (§10, §14, WP56): bought at the Stardock into the ship's device bay.
 # A probe is consumable (flies up to probe_range hops charting its path); the interdictor
 # is a toggled stance (turn_tax per day while engaged); the mine-deflector is passive
 # (absorbs armid mines one-for-one on entry).
@@ -487,11 +487,11 @@ starter_ship:
       base_components: [accelerator, linkage]
       legal_components: [accelerator, linkage, converter, secondary]
 
-# StarDock hardware emporium (§5, §8): which component kinds are stocked and at
+# Stardock hardware emporium (§5, §8): which component kinds are stocked and at
 # which tiers. Prices come from the economy block; Tier III is barter-only and is
 # deliberately absent here.
 hardware:
-  components: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]  # component kinds StarDock sells
+  components: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]  # component kinds Stardock sells
   tiers: [I, II]  # tiers offered for latinum here; Tier III is barter-only and intentionally absent
 
 # Buyable hulls beyond the free starter (§4 v1 set; price band ~20k–150k rising

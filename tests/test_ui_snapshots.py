@@ -81,13 +81,13 @@ def test_lobby_sizes(snap_compare, size: tuple[int, int]) -> None:
 
 
 def _open_stardock(tab: str):
-    """A run_before that starts the seeded game (docked at StarDock) on `tab` (WP-PR08)."""
+    """A run_before that starts the seeded game (docked at Stardock) on `tab` (WP-PR08)."""
     async def _run(pilot: Pilot) -> None:
-        from edge.tui.screens.stardock import StarDockScreen
+        from edge.tui.screens.stardock import StardockScreen
         app = pilot.app
         assert isinstance(app, EdgeApp)
         service = app.start_new_game(seed=1986)
-        app.push_screen(StarDockScreen(service, app.player_id, initial_tab=tab))
+        app.push_screen(StardockScreen(service, app.player_id, initial_tab=tab))
         await pilot.pause()
     return _run
 

@@ -172,7 +172,7 @@ def test_generate_fills_exact_box(subtype: str) -> None:
 
 # --- decompose, don't redraw -----------------------------------------------
 
-# The original largest StarDock silhouette (pre-refactor PORT_ART tier 0).
+# The original largest Stardock silhouette (pre-refactor PORT_ART tier 0).
 _CANONICAL_STARDOCK = (
     "       R       ",
     "       █       ",
@@ -188,7 +188,7 @@ _CANONICAL_STARDOCK = (
 
 def test_canonical_selection_reproduces_original_stardock() -> None:
     """Choosing the first (canonical) part of every slot, with the body at its
-    minimum repeat, must rebuild the exact historic StarDock art."""
+    minimum repeat, must rebuild the exact historic Stardock art."""
     rows: list[str] = []
     for slot in PORT_GRAMMAR["stardock"]["default"][0]:  # full-detail tier
         rows.extend(_mirror_part(slot.parts[0]))

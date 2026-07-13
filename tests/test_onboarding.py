@@ -33,7 +33,7 @@ async def test_objectives_mark_dismiss_and_persist() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
-        await pilot.press("n")  # new game (starts at the StarDock sector)
+        await pilot.press("n")  # new game (starts at the Stardock sector)
         await pilot.pause()
         assert app.screen.query(ObjectivesStrip), "fresh game shows the objectives strip"
         assert app.ui_settings.objectives_done == ()

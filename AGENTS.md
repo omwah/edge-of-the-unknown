@@ -85,7 +85,7 @@ armaments needed to push outward and discover things. Key pillars:
   (accelerator / converter / radiator / secondary / turbine / burner / linkage /
   navigator) in tech tiers I–III. Combat damage **knocks out components**
   (localized degradation); repair is hybrid (carried **repair-kits** field-patch;
-  full swaps/upgrades at StarDock or a friendly alien base). Spindrive efficiency
+  full swaps/upgrades at Stardock or a friendly alien base). Spindrive efficiency
   gives **one global combat bonus**. Weapons are the spinal **Main Gun** plus
   finite **homing missiles** (no point-defense). NPC hulls keep flat
   aspects/defenses via an optional `subsystems` block, so localized damage is
@@ -102,7 +102,7 @@ armaments needed to push outward and discover things. Key pillars:
   fraction rises monotonically with distance band**, so the frontier's reward is
   *claimable territory* as well as rarer finds. **Colonists are people, not a
   commodity** — never bought or sold like the Fuel Ore / Organics / Equipment trio.
-  They are **recruited** (they have a choice): enlisted at StarDock for a per-head
+  They are **recruited** (they have a choice): enlisted at Stardock for a per-head
   latinum *incentive*, or by emigration from inhabited worlds with a positive
   disposition toward the player. They ride a **separate occupancy limit**
   (`Ship.colonist_capacity`), not cargo holds, so peopling a colony never competes
@@ -258,7 +258,7 @@ spec-delta commit landing that plan; implementation starts at WP46.
 ## Roadmap (from DESIGN.md §14)
 
 - **Phase 1 (shipped):** core models, big bang (cluster+bridge+distance
-  bands+validate, Core Space sectors 1-10, StarDock), movement with turn
+  bands+validate, Core Space sectors 1-10, Stardock), movement with turn
   costs, port docking + trading with live pricing and haggling in latinum,
   SQLite persistence, Textual game screen (sector view, clickable warp
   list, status sidebar, port screen). Exit criterion: pair-trading loop is
@@ -267,7 +267,7 @@ spec-delta commit landing that plan; implementation starts at WP46.
   rarity, planet descent + surface sites, sensor detection, discovery
   codex, friendly-disposition alien species with tech barter/latinum sales of aspect upgrades,
   the engine-room subsystem/component model (§4.1: slotted upgrades, component
-  tiers, derived aspects, repair), StarDock services, multiple ship types,
+  tiers, derived aspects, repair), Stardock services, multiple ship types,
   **typed planets with band-weighted types/ownership and BNT-style production
   shaped by `planet_type`/habitability, player colonization of unowned worlds,
   derelict orbital starbases as scavengeable component caches** (DESIGN.md §4.2),

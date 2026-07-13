@@ -1,6 +1,6 @@
 """WP8/WP9 — Textual Pilot flow over the live service (DESIGN §13).
 
-Drives the real app: new game, navigate to the StarDock, dock, trade, and buy
+Drives the real app: new game, navigate to the Stardock, dock, trade, and buy
 the first upgrade — asserting the underlying game state changes through the UI.
 Navigation between sectors is done via the service (clicking each warp button is
 fiddly); the dock/trade/upgrade interactions are exercised through the UI.
@@ -12,7 +12,7 @@ from edge.core.movement import shortest_path
 from edge.core.rules import Warp
 from edge.tui.app import EdgeApp
 from edge.tui.screens.computer import ComputerScreen
-from edge.tui.screens.stardock import StarDockScreen
+from edge.tui.screens.stardock import StardockScreen
 from edge.tui.screens.travel import TravelPromptScreen
 from edge.tui.widgets import NavRose
 
@@ -27,9 +27,9 @@ async def _warp_player_to(svc: object, target: int) -> None:
 
 
 async def _new_game_at_stardock(app: EdgeApp, pilot: object) -> object:
-    """Press New game, then make sure the player is at the StarDock and dock (press P).
+    """Press New game, then make sure the player is at the Stardock and dock (press P).
 
-    The default config starts the player *at* the StarDock, so the warp is usually a
+    The default config starts the player *at* the Stardock, so the warp is usually a
     no-op; it still resolves for configs that start the player elsewhere.
     """
     await pilot.press("n")  # type: ignore[attr-defined]
@@ -38,7 +38,7 @@ async def _new_game_at_stardock(app: EdgeApp, pilot: object) -> object:
     assert svc is not None
     dock = next(p for p in svc.state.ports.values() if p.klass.value == 9)
     await _warp_player_to(svc, dock.sector_id)
-    await pilot.press("p")  # dock -> StarDockScreen  # type: ignore[attr-defined]
+    await pilot.press("p")  # dock -> StardockScreen  # type: ignore[attr-defined]
     await pilot.pause()  # type: ignore[attr-defined]
     return svc
 
@@ -51,7 +51,7 @@ async def test_new_game_pushes_live_game_screen() -> None:
         await pilot.pause()
         assert app.service is not None
         view = app.service.game_view(1)
-        # The default config starts the player at the StarDock.
+        # The default config starts the player at the Stardock.
         dock = next(p for p in app.service.state.ports.values() if p.klass.value == 9)
         assert view.sector.sector_id == dock.sector_id and view.turns == 250
 
@@ -241,7 +241,7 @@ async def test_sector_title_shows_spatial_id() -> None:
         await pilot.pause()
         svc = app.service
         assert svc is not None
-        start = svc.game_view(1).sector.sector_id  # the player's start sector (the StarDock)
+        start = svc.game_view(1).sector.sector_id  # the player's start sector (the Stardock)
         spatial = svc.state.spatial_ids[start]
         assert spatial != start  # the spatial id genuinely differs from the internal id
         title = app.screen.query_one(SectorScene).render().plain
@@ -435,7 +435,7 @@ async def test_dock_and_trade_buys_fuel() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         svc = await _new_game_at_stardock(app, pilot)
-        assert isinstance(app.screen, StarDockScreen)
+        assert isinstance(app.screen, StardockScreen)
         await pilot.press("t")  # trade the highlighted row (Fuel Ore) -> buy
         await pilot.pause()
         from edge.core.enums import Commodity
@@ -453,7 +453,7 @@ async def test_trade_keeps_highlighted_row() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         await _new_game_at_stardock(app, pilot)
-        assert isinstance(app.screen, StarDockScreen)
+        assert isinstance(app.screen, StardockScreen)
         table = app.screen.query_one("#commodities", DataTable)
         assert table.row_count > 1
         table.move_cursor(row=1, animate=False)  # highlight a non-top row
@@ -542,12 +542,12 @@ async def test_dock_and_haggle_accepts_fair_counter() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         svc = await _new_game_at_stardock(app, pilot)
-        assert isinstance(app.screen, StarDockScreen)
+        assert isinstance(app.screen, StardockScreen)
         port = svc.current_port_view(1)
         assert port is not None
         fair = next(c for c in port.commodities if c.name == "Fuel Ore").price
 
-        await pilot.press("h")  # open the haggle modal on the highlighted row (Fuel Ore)
+        await pilot.press("g")  # open the haggle modal on the highlighted row (Fuel Ore)
         await pilot.pause()
         assert isinstance(app.screen, HaggleScreen)
         # Countering at the fair price does not favour the player → accepted with p=1.0.
@@ -567,12 +567,12 @@ async def test_haggle_walk_away_makes_no_trade() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         svc = await _new_game_at_stardock(app, pilot)
-        await pilot.press("h")
+        await pilot.press("g")
         await pilot.pause()
         assert isinstance(app.screen, HaggleScreen)
         await pilot.press("escape")  # walk away — no offer made
         await pilot.pause()
-        assert isinstance(app.screen, StarDockScreen)
+        assert isinstance(app.screen, StardockScreen)
         assert svc.state.players[1].latinum == 2_000  # nothing spent
 
 
@@ -659,11 +659,11 @@ async def test_stardock_hardware_buys_then_engine_room_installs() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         svc = await _new_game_at_stardock(app, pilot)
-        assert isinstance(app.screen, StarDockScreen)
+        assert isinstance(app.screen, StardockScreen)
         app.screen.query_one(TabbedContent).active = "hardware"
         await pilot.pause()
         lat0 = svc.state.players[1].latinum
-        await pilot.press("b")  # buy the highlighted component (Tier-I, affordable)
+        await pilot.press("p")  # purchase the highlighted component (Tier-I, affordable)
         await pilot.pause()
         loose = sum(svc.state.ships[1].components.values())
         assert loose == 1 and svc.state.players[1].latinum < lat0
@@ -814,7 +814,7 @@ async def test_click_port_art_docks() -> None:
     """Clicking the port sprite docks, the same as pressing P or its text entry."""
     from edge.core.rules import Warp
     from edge.tui.screens.port import PortScreen
-    from edge.tui.screens.stardock import StarDockScreen
+    from edge.tui.screens.stardock import StardockScreen
     from edge.tui.widgets import SectorScene
 
     app = EdgeApp()
@@ -832,7 +832,7 @@ async def test_click_port_art_docks() -> None:
         await pilot.pause()
         scene = app.screen.query_one(SectorScene)
         await _click_hotspot(pilot, scene, dest="port")
-        assert isinstance(app.screen, (PortScreen, StarDockScreen))
+        assert isinstance(app.screen, (PortScreen, StardockScreen))
 
 
 async def test_sector_view_caps_ship_sprites_and_keeps_overflow_hailable() -> None:
@@ -849,7 +849,7 @@ async def test_sector_view_caps_ship_sprites_and_keeps_overflow_hailable() -> No
         assert svc is not None
         # Three contacts in one sector — one more than the sprite cap (default 2).
         sector_id = svc.state.ships[1].sector_id
-        # Clear any species the big bang staged here (the StarDock hub seeds contacts)
+        # Clear any species the big bang staged here (the Stardock hub seeds contacts)
         # so we control the exact set under test.
         svc.state.species = {i: sp for i, sp in svc.state.species.items() if sp.sector_id != sector_id}
         for sid, roster_id in ((1, "vesk"), (2, "selvani"), (3, "vesk")):
@@ -880,11 +880,11 @@ async def test_haggle_session_stays_open_across_a_rejected_round() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         svc = await _new_game_at_stardock(app, pilot)
-        assert isinstance(app.screen, StarDockScreen)
-        await pilot.press("h")  # open the multi-round haggle on the highlighted commodity
+        assert isinstance(app.screen, StardockScreen)
+        await pilot.press("g")  # open the multi-round haggle on the highlighted commodity
         await pilot.pause()
         assert isinstance(app.screen, HaggleScreen)
-        # A lowball counter (StarDock sells → the player buys) insults them: the round is
+        # A lowball counter (Stardock sells → the player buys) insults them: the round is
         # spent but the session stays open for another try.
         app.screen.query_one("#haggle-input", Input).value = "1"
         await pilot.press("enter")
@@ -995,7 +995,7 @@ async def test_stardock_shipyard_swaps_hull() -> None:
         svc.state.players[1] = replace(svc.state.players[1], latinum=50_000)  # afford a hull
         app.screen.query_one(TabbedContent).active = "shipyard"
         await pilot.pause()
-        await pilot.press("b")  # buy the highlighted hull (Scout Marauder)
+        await pilot.press("p")  # purchase the highlighted hull (Scout Marauder)
         await pilot.pause()
         assert svc.state.ships[1].type_id == "scout_marauder"
         assert svc.state.players[1].latinum < 50_000
@@ -1009,7 +1009,7 @@ async def test_trade_plot_route_and_engage() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         svc = await _new_game_at_stardock(app, pilot)
-        # Starting at the StarDock, only it is explored; chart the whole map so the
+        # Starting at the Stardock, only it is explored; chart the whole map so the
         # (fog-gated) pair finder scores a pair and the route can plot through it.
         from dataclasses import replace
         svc.state.players[1] = replace(
@@ -1261,7 +1261,7 @@ async def test_computer_screen_remembers_last_tab() -> None:
         app.screen.show_subview("codex")  # switch tabs
         await pilot.pause()
         assert app.computer_tab == "codex"  # the switch is remembered on the app
-        await pilot.press("c")  # [C] closes the Computer from within
+        await pilot.press("escape")  # Esc closes the Computer from within
         await pilot.pause()
         assert not isinstance(app.screen, ComputerScreen)
 
@@ -1280,7 +1280,7 @@ async def test_ports_directory_lists_and_plots_route() -> None:
         await pilot.pause()
         svc = await _new_game_at_stardock(app, pilot)
         directory = svc.computer_view(1).ports
-        assert directory  # at least the StarDock is charted
+        assert directory  # at least the Stardock is charted
         await pilot.press("escape")  # undock back to the game screen
         await pilot.pause()
         await pilot.press("c")  # open the Computer
@@ -1674,24 +1674,27 @@ async def test_list_picker_keyboard_navigation() -> None:
 
 async def test_help_is_contextual_to_the_current_screen() -> None:
     """`?` works on every screen (app-level) and shows *that* screen's keys: the
-    StarDock help lists dock verbs and skips the sector view's warp legend."""
+    Stardock help lists dock verbs and skips the sector view's warp legend."""
     from textual.widgets import Static
 
     from edge.tui.screens.help import HelpScreen
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
-        await _new_game_at_stardock(app, pilot)  # StarDockScreen on top
-        assert isinstance(app.screen, StarDockScreen)
+        await _new_game_at_stardock(app, pilot)  # StardockScreen on top
+        assert isinstance(app.screen, StardockScreen)
         await pilot.press("question_mark")
         await pilot.pause()
         assert isinstance(app.screen, HelpScreen)
         text = " ".join(str(s.render()) for s in app.screen.query(Static))
-        assert "StarDock" in text and "Recruit" in text
+        # Help is scoped to the *visible tab*, exactly like the footer (PT-32). The dock
+        # opens on Commodities, so it lists that tab's verbs — not Colonists' Recruit.
+        assert "Stardock" in text and "Haggle" in text
+        assert "Recruit" not in text
         assert "Warp Color" not in text  # the legend belongs to the sector view only
         await pilot.press("escape")
         await pilot.pause()
-        assert isinstance(app.screen, StarDockScreen)
+        assert isinstance(app.screen, StardockScreen)
 
 
 async def test_corp_screen_charters_with_derived_tag_and_buttons() -> None:

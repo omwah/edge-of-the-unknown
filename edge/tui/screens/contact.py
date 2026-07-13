@@ -19,14 +19,13 @@ from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import Screen
 from textual.widgets import Footer, Static
 
 from edge.core import dto
 from edge.core.rules import BarterArtifact, BuyAlienTech, Converse
 from edge.server.service import GameService
 from edge.art import portrait as art_portrait
-from edge.tui.chrome import notify_warning
+from edge.tui.chrome import EdgeScreen, notify_warning
 from edge.tui.portrait import SpeciesPortrait
 from edge.tui.screens.picker import ListPicker
 from edge.tui.widgets import ClickableEntry, bar
@@ -69,7 +68,7 @@ class OfferPickerScreen(ListPicker):
         super().__init__(title, options)
 
 
-class AlienContactScreen(Screen[None]):
+class AlienContactScreen(EdgeScreen):
     BINDINGS = [
         Binding("b", "back_one", "Back"),       # step back to the previous node (no-op at the opener)
         Binding("f", "farewell", "Farewell"),   # speak a parting line, then break contact

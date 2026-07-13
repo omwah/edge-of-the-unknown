@@ -1,7 +1,7 @@
 """WP71 — surfacing pass 1: the projection seams behind the new TUI affordances.
 
-The starbase assault/repair/claim affordances on the planet screen, and the StarDock
-bank tab, all read new projection fields (`PlanetDTO.base_*`, `StarDockDTO.bank_*`);
+The starbase assault/repair/claim affordances on the planet screen, and the Stardock
+bank tab, all read new projection fields (`PlanetDTO.base_*`, `StardockDTO.bank_*`);
 these tests pin that seam. The commands themselves (AssaultStarbase / RepairStarbase /
 ClaimStarbase / Deposit / Withdraw / DeliverContract / AbandonContract / RepairAtDock /
 SwapComponent / FieldPatch) are covered by their WP40/WP53/WP57 suites.
@@ -124,7 +124,7 @@ def test_territory_view_reports_stock_devices_and_own_force() -> None:
     assert t.limpets == 3 and t.limpet_removal_fee == CFG.territory.limpet_removal_fee
     assert "8 fighters (toll, toll 25)" in t.force_line and "2 armid mines" in t.force_line
     assert not t.in_core
-    assert not t.at_service_point  # no StarDock / owned base here
+    assert not t.at_service_point  # no Stardock / owned base here
 
 
 def test_alliance_rows_project_membership_admission_and_governor() -> None:
