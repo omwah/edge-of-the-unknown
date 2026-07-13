@@ -1703,7 +1703,8 @@ async def test_corp_screen_charters_with_derived_tag_and_buttons() -> None:
     commands without hotkeys."""
     from textual.widgets import Button, Input
 
-    from edge.tui.screens.corp import CorpScreen, _FormCorpModal, _derive_tag
+    from edge.tui.screens.computer import ComputerScreen
+    from edge.tui.screens.corp import _FormCorpModal, _derive_tag
 
     assert _derive_tag("Edge of the Unknown", 3) == "EOT"
     assert _derive_tag("Vanguard", 3) == "VAN"
@@ -1716,9 +1717,12 @@ async def test_corp_screen_charters_with_derived_tag_and_buttons() -> None:
         assert svc is not None
         from dataclasses import replace as _replace
         svc.state.players[1] = _replace(svc.state.players[1], latinum=50_000)  # afford the fee
-        await pilot.press("t")  # game screen → corp screen
+        await pilot.press("c")  # game screen → the Computer
         await pilot.pause()
-        assert isinstance(app.screen, CorpScreen)
+        screen = app.screen
+        assert isinstance(screen, ComputerScreen)
+        screen.show_subview("corp")  # Relations → Corp (the 4th sub-tab)
+        await pilot.pause()
         await pilot.click("#btn-form")
         await pilot.pause()
         assert isinstance(app.screen, _FormCorpModal)
@@ -1728,8 +1732,8 @@ async def test_corp_screen_charters_with_derived_tag_and_buttons() -> None:
         corp = next(iter(svc.state.corporations.values()))
         assert corp.name == "Edge of the Unknown"
         assert corp.tag == _derive_tag("Edge of the Unknown", svc.config.corp.tag_max_len)
-        # Back on the corp screen, the panels are up; Deposit is a button click.
-        assert isinstance(app.screen, CorpScreen)
+        # Back on the Corp subview, the panels are up; Deposit is a button click.
+        assert isinstance(app.screen, ComputerScreen)
         before = corp.bank_balance
         assert app.screen.query(Button)  # panels rendered with buttons
         await pilot.click("#btn-deposit")

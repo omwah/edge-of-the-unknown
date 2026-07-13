@@ -58,7 +58,7 @@ MainMenu -> Game -+- PortScreen
                      +- Navigation  (Map . Route)
                      +- Commerce    (Ports . Trade . Market)
                      +- Exploration (Planets . Codex . Leads)
-                     +- Relations   (Contracts . Alliances . Dossier)
+                     +- Relations   (Contracts . Alliances . Dossier . Corp)
                      +- Logbook     (Log . Notes)
 ```
 
@@ -507,7 +507,9 @@ see the "Computer" wireframe under "Responsive tier wireframes")*
 
 - **Categories and subviews** (nested `TabbedContent`, §11): **Navigation**
   (Map, Route), **Commerce** (Ports, Trade, Market), **Exploration** (Planets,
-  Codex, Leads), **Relations** (Contracts, Alliances, Dossier), and **Logbook**
+  Codex, Leads), **Relations** (Contracts, Alliances, Dossier, **Corp** — the
+  corporation is a relationship, so it lives here rather than behind a game-screen
+  hotkey of its own), and **Logbook**
   (Log, Notes). Each category remembers its last subview. Compact mode replaces
   the category rail with a popup selector; direct hotkeys and deep links still
   open the exact subview.
@@ -650,7 +652,7 @@ follow this; collisions are bugs.
 
 | Key | Verb | Screens |
 |-----|------|---------|
-| `t` | Trade | Port, Stardock (Game: Corp — grandfathered, rename when corp gets a hub) |
+| `t` | Trade | Port, Stardock, Base (the Game screen's grandfathered `t` = Corp is retired — the corp now has its hub under Computer → Relations) |
 | `g` | Haggle / enGage / Genesis / loG | haggling is `g` on **both** Port and Stardock (`h` names the Hardware tab); destructive `g` actions always confirm (D7) |
 | `p` | Purchase / Plot route / Dock or Board | Stardock buy tabs purchase; Computer plots; Game docks at a port **or boards the starbase** — one key, because a base *is* the port where it orbits (WP80) |
 | `b` | Bank | the Bank tab at the Stardock and the Base (Game/Planet no longer have a Base key — `p` boards it) |

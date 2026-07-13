@@ -18,9 +18,17 @@ _LEGACY_TABS = {"map", "ports", "planets", "trade", "market", "log", "route",
 
 
 def test_every_old_tab_maps_to_exactly_one_subview() -> None:
+    """The WP-UI20 migration guard: no legacy tab was lost or placed twice.
+
+    It is deliberately *not* an equality — the categories are allowed to grow. `corp`
+    joined Relations when the corporation moved under the Computer (it is a relationship,
+    like a contract or an alliance), and a future subview may do the same; what must never
+    happen is a legacy tab going missing or landing in two categories at once.
+    """
     placed = [sub for subs in CATEGORIES.values() for sub in subs]
-    assert sorted(placed) == sorted(_LEGACY_TABS)  # all present, none twice
-    assert set(SUBVIEW_LABELS) == _LEGACY_TABS
+    assert len(placed) == len(set(placed))            # none twice
+    assert _LEGACY_TABS <= set(placed)                # none lost
+    assert set(SUBVIEW_LABELS) == set(placed)         # every subview is labelled
 
 
 async def _open_computer(app: EdgeApp, pilot: object, key: str = "c") -> ComputerScreen:

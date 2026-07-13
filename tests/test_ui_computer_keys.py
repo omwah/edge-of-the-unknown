@@ -178,6 +178,39 @@ async def test_category_accelerators_reach_every_category() -> None:
             assert screen._active_category() == category, f"{key} did not reach {category}"
 
 
+async def test_corp_is_relations_fourth_sub_tab_with_its_own_keys() -> None:
+    """The corporation lives under Relations now, not behind a game-screen hotkey.
+
+    It is a relationship like a contract or an alliance, so it is the 4th sub-tab there —
+    reachable with `R` then `4` — and its verbs are pane-owned like every other tab's.
+    They freely reuse letters other tabs spend (`D` deposits here but delivers on
+    Contracts; `W` withdraws here but routes on Map), which is the whole point of the
+    model."""
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        screen = await _open_computer(app, pilot)
+
+        await pilot.press("r")  # → Relations
+        await pilot.pause()
+        await pilot.press("4")  # → its fourth sub-tab
+        await pilot.pause()
+        assert screen._active_subview() == "corp"
+
+        keys = _footer_keys(screen)
+        assert {"f", "d", "w", "l"} <= keys       # Charter / Deposit / Withdraw / Leave
+        assert "delete" not in keys               # Contracts' verb is gone
+        assert "s" not in keys                    # Dossier's Seize Core is gone
+
+        # The same letters mean other things on other tabs — no scoping needed.
+        screen.show_subview("contracts")
+        await pilot.pause()
+        assert screen.active_bindings["d"].binding.action == "screen.deliver_contract"
+        screen.show_subview("corp")
+        await pilot.pause()
+        assert screen.active_bindings["d"].binding.action == "screen.deposit"
+
+
 async def test_descriptors_match_the_footer_for_every_subview() -> None:
     """Parity guard for the `action_descriptors` override (tests/test_ui_actions.py
     delegates to this): the `.` menu, help and palette advertise the footer's keys."""

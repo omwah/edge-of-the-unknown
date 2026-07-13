@@ -118,17 +118,26 @@ async def test_territory_keyboard_traverses_enabled_rows_in_reading_order() -> N
 
 # --- Corporation states -------------------------------------------------------
 
-async def test_corp_empty_state_offers_charter_as_primary() -> None:
-    from edge.tui.screens.corp import CorpScreen
+async def _open_corp(app: EdgeApp, pilot: object) -> object:
+    """The corp is the Computer's Relations → Corp subview (4th sub-tab), not a screen."""
+    from edge.tui.screens.computer import ComputerScreen
 
+    await pilot.press("c")  # type: ignore[attr-defined]  (open the Computer)
+    await pilot.pause()  # type: ignore[attr-defined]
+    screen = app.screen
+    assert isinstance(screen, ComputerScreen)
+    screen.show_subview("corp")
+    await pilot.pause()  # type: ignore[attr-defined]
+    return screen
+
+
+async def test_corp_empty_state_offers_charter_as_primary() -> None:
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         await pilot.press("n")
         await pilot.pause()
-        await pilot.press("t")  # corpless → the empty state
-        await pilot.pause()
-        assert isinstance(app.screen, CorpScreen)
+        await _open_corp(app, pilot)  # corpless → the empty state
         assert app.screen.query(EmptyState)  # what's missing and what fills it
         charter = app.screen.query_one("#btn-form", Button)
         assert charter.variant == "primary" and not charter.disabled
@@ -138,7 +147,6 @@ async def test_corp_ceo_state_enables_gated_verbs_with_invite_primary() -> None:
     from dataclasses import replace as _replace
 
     from edge.core.rules import FormCorp
-    from edge.tui.screens.corp import CorpScreen
 
     app = EdgeApp()
     async with app.run_test(size=(120, 40)) as pilot:
@@ -149,9 +157,7 @@ async def test_corp_ceo_state_enables_gated_verbs_with_invite_primary() -> None:
         assert svc is not None
         svc.state.players[1] = _replace(svc.state.players[1], latinum=50_000)
         svc.apply(1, FormCorp(name="Void Runners", tag="VR"))
-        await pilot.press("t")
-        await pilot.pause()
-        assert isinstance(app.screen, CorpScreen)
+        await _open_corp(app, pilot)
         invite = app.screen.query_one("#btn-invite", Button)
         assert invite.variant == "primary" and not invite.disabled
         for bid in ("btn-expel", "btn-withdraw", "btn-world-from"):

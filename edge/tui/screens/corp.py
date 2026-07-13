@@ -1,14 +1,24 @@
-"""CorpScreen — the `T` screen: corporations (DESIGN §4, WP66; completed WP76).
+"""Corporations (DESIGN §4, WP66; completed WP76) — the Computer's **Corp** subview.
 
-Panel-first, mouse-first: three bordered panels (roster · treasury & holdings ·
-diplomacy) built on DataTables and Buttons, so every corp verb is a click on a
-button acting on the highlighted table row — the hotkeys remain as accelerators
-only. Chartering asks for a *name* only: the short uppercase tag is an internal
-identifier, derived from the name (initials, uniquified on collision). War is
-declared and ended against the corp selected in the diplomacy table — never by
-typing an index. Actions are the ordinary corp commands issued through the
-service, so single-player it manages a corp of one and the same screen serves
-multiplayer.
+No longer a screen of its own. The corp is a *relationship*, like a contract, an alliance
+or a dossier, so it lives with them under the Computer's Relations category rather than
+behind a game-screen hotkey of its own (which the UI_MOCKUPS verb table had long flagged
+as grandfathered, "rename when corp gets a hub" — this is that hub).
+
+Two pieces, so the Computer can host it without inheriting a screen:
+
+- `CorpPanels` — presentation. Three bordered panels (roster · treasury & holdings ·
+  diplomacy) built on DataTables and Buttons, or the corpless empty state. Panel-first and
+  mouse-first: every corp verb is a button acting on the highlighted row of its panel, and
+  the keys are accelerators for those same buttons.
+- `CorpActions` — the verbs, as a mixin. The host supplies `_service`, `_pid` and
+  `_reopen_corp()`; nothing here touches a screen stack directly.
+
+Chartering asks for a *name* only: the short uppercase tag is an internal identifier
+derived from it (initials, uniquified on collision). War is declared and ended against the
+corp selected in the diplomacy table — never by typing an index. Actions are the ordinary
+corp commands issued through the service, so single-player it manages a corp of one and
+the same panels serve multiplayer.
 """
 
 from __future__ import annotations
@@ -18,9 +28,10 @@ from typing import Any
 import re
 
 from textual.app import ComposeResult
-from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, DataTable, Footer, Static
+from textual.widgets import Button, DataTable, Static
+
+from textual.css.query import NoMatches
 
 from edge.core.economy import EconomyError
 from edge.core.rules import (
@@ -29,7 +40,7 @@ from edge.core.rules import (
     TransferPlanetToCorp,
 )
 from edge.server.service import GameService
-from edge.tui.chrome import EdgeScreen, EmptyState, TextPrompt, notify_warning
+from edge.tui.chrome import EmptyState, TextPrompt, notify_warning
 
 
 def _ceo_button(label: str, button_id: str, *, is_ceo: bool,
@@ -65,66 +76,46 @@ class _FormCorpModal(TextPrompt):
                          submit_label="Charter")
 
 
-class CorpScreen(EdgeScreen):
-    # Hotkeys are accelerators only — every verb is also a Button on its panel.
-    BINDINGS = [
-        Binding("escape", "back", "Back"),
-        Binding("f", "form", "Form corp"),
-        Binding("d", "deposit", "Deposit 1k"),
-        Binding("w", "withdraw", "Withdraw 1k"),
-        Binding("l", "leave", "Leave corp"),
-        Binding("i", "invite", "Invite"),
-        Binding("a", "accept_invite", "Accept invite"),
-        Binding("x", "expel", "Expel selected"),
-        Binding("g", "declare_war", "Declare war"),
-        Binding("e", "end_war", "End war"),
-        Binding("p", "planet_to_corp", "World → corp"),
-        Binding("o", "planet_from_corp", "World → CEO"),
-    ]
+class CorpPanels(Vertical):
+    """The corp's three panels — or the corpless empty state (presentation only).
 
-    HELP_TITLE = "Corporation"
-    HELP = """\
-Everything is clickable: buttons act on the [b]highlighted table row[/] of their
-panel (expel a roster member, declare/end war on a diplomacy row). Chartering
-asks only for a name — the ⟨TAG⟩ is derived internally. The keys listed above
-are accelerators for the same buttons."""
-
-    CSS = """
-    CorpScreen #corp-title {
-        dock: top; height: 1; background: $accent; color: $background;
-        text-style: bold; padding: 0 1;
-    }
-    CorpScreen #corp-panels { height: 1fr; padding: 1 1 0 1; }
-    CorpScreen .corp-panel {
-        width: 1fr; height: auto; max-height: 100%; border: round $primary;
-        padding: 0 1; margin: 0 1 0 0;
-    }
-    CorpScreen .corp-panel DataTable { height: auto; max-height: 12; margin-bottom: 1; }
-    CorpScreen .corp-panel Button { margin: 0 1 1 0; min-width: 14; }
-    CorpScreen .corp-panel .buttons { height: auto; }
-    CorpScreen .corp-panel Static.stat { margin-bottom: 1; }
-    CorpScreen .note { padding: 0 2; }
-    CorpScreen #corp-empty-box { padding: 1 2; height: auto; }
-    CorpScreen #corp-empty-box Button { margin: 1 1 0 0; min-width: 18; }
+    Rendered from a `CorpDTO`; it issues no commands. The host (the Computer's Corp
+    subview) routes its button presses into `CorpActions` and rebuilds this on any change.
     """
 
-    def __init__(self, service: GameService, player_id: int) -> None:
-        super().__init__()
-        self._service = service
-        self._pid = player_id
+    DEFAULT_CSS = """
+    CorpPanels { height: auto; }
+    CorpPanels #corp-title { height: 1; background: $accent; color: $background;
+        text-style: bold; padding: 0 1; margin-bottom: 1; }
+    CorpPanels #corp-panels { height: auto; }
+    CorpPanels .corp-panel {
+        width: 1fr; height: auto; border: round $primary;
+        padding: 0 1; margin: 0 1 0 0;
+    }
+    CorpPanels .corp-panel DataTable { height: auto; max-height: 8; margin-bottom: 1; }
+    CorpPanels .corp-panel Button { margin: 0 1 1 0; min-width: 14; }
+    CorpPanels .corp-panel .buttons { height: auto; }
+    CorpPanels .corp-panel Static.stat { margin-bottom: 1; }
+    CorpPanels #corp-empty-box { padding: 0; height: auto; }
+    CorpPanels #corp-empty-box Button { margin: 1 1 0 0; min-width: 18; }
+    """
+
+    def __init__(self, view: object, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._view = view
 
     # --- layout ----------------------------------------------------------------
 
     def compose(self) -> ComposeResult:
-        view = self._service.corp_view(self._pid)
-        if view is None or not view.corp_id:
-            yield Static("You have no corporation.", id="corp-title")
+        view = self._view
+        if view is None or not view.corp_id:  # type: ignore[attr-defined]
+            yield Static("[b]CORPORATION[/]        [dim]you fly alone[/]", id="corp-title")
             with Vertical(id="corp-empty-box"):
                 yield EmptyState(
                     "You fly alone — no charter, no shared treasury.",
                     "Charter a corporation to pool latinum, worlds, and bases "
                     "with other captains (a corp of one works too).")
-                invites = view.invites if view is not None else []
+                invites = view.invites if view is not None else []  # type: ignore[attr-defined]
                 if invites:
                     table: DataTable[Any] = DataTable(id="corp-invites", cursor_type="row")
                     table.add_columns("Standing invites")
@@ -135,15 +126,14 @@ are accelerators for the same buttons."""
                     yield Button("Charter a corporation…", id="btn-form", variant="primary")
                     if invites:
                         yield Button("Accept selected invite", id="btn-accept", variant="success")
-            yield Footer()
             return
-        role = "CEO" if view.is_ceo else "member"
-        yield Static(f"⟨{view.tag}⟩ {view.name} — you are {role}", id="corp-title")
+        role = "CEO" if view.is_ceo else "member"  # type: ignore[attr-defined]
+        yield Static(f"⟨{view.tag}⟩ {view.name} — you are {role}",  # type: ignore[attr-defined]
+                     id="corp-title")
         with Horizontal(id="corp-panels"):
             yield self._roster_panel(view)
             yield self._holdings_panel(view)
             yield self._diplomacy_panel(view)
-        yield Footer()
 
     def _roster_panel(self, view: object) -> Vertical:
         is_ceo: bool = view.is_ceo  # type: ignore[attr-defined]
@@ -219,49 +209,60 @@ are accelerators for the same buttons."""
         panel.border_title = "Diplomacy"
         return panel
 
-    # --- helpers ---------------------------------------------------------------
 
-    def _refresh(self) -> None:
-        self.app.pop_screen()
-        self.app.push_screen(CorpScreen(self._service, self._pid))
+class CorpActions:
+    """The corp verbs, as a mixin for the screen that hosts `CorpPanels` (the Computer).
+
+    The host supplies `_service`, `_pid`, and `_reopen_corp()` (rebuild on the Corp
+    subview). Keeping the verbs here — rather than on a screen — is what let the corp move
+    under the Computer without either half knowing about the other's chrome.
+    """
+
+    _service: GameService
+    _pid: int
+
+    def _reopen_corp(self) -> None:
+        raise NotImplementedError
 
     def _apply(self, command: object, ok: str | None = None) -> None:
         try:
             self._service.apply(self._pid, command)  # type: ignore[arg-type]
         except EconomyError as exc:
-            self.app.bell()
+            self.app.bell()  # type: ignore[attr-defined]
             notify_warning(self, str(exc))
             return
         if ok:
-            self.notify(ok, timeout=2)
-        self._refresh()
+            self.notify(ok, timeout=2)  # type: ignore[attr-defined]
+        self._reopen_corp()
 
     def _selected_key(self, table_id: str) -> int | None:
         """The int key of the highlighted row in `table_id`, or None."""
         try:
-            table = self.query_one(f"#{table_id}", DataTable)
-        except Exception:
+            table = self.query_one(f"#{table_id}", DataTable)  # type: ignore[attr-defined]
+        except NoMatches:
             return None
         if not table.row_count:
             return None
         key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
         return int(key.value) if key.value is not None else None
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        actions = {
-            "btn-form": self.action_form, "btn-accept": self.action_accept_invite,
-            "btn-invite": self.action_invite, "btn-expel": self.action_expel,
-            "btn-leave": self.action_leave, "btn-deposit": self.action_deposit,
-            "btn-withdraw": self.action_withdraw, "btn-world-to": self.action_planet_to_corp,
-            "btn-world-from": self.action_planet_from_corp, "btn-war": self.action_declare_war,
-            "btn-peace": self.action_end_war,
-        }
-        handler = actions.get(event.button.id or "")
-        if handler is not None:
-            handler()
+    # Button id -> action name. The host's `on_button_pressed` offers each press here
+    # first; anything unclaimed stays the host's own.
+    CORP_BUTTONS = {
+        "btn-form": "form", "btn-accept": "accept_invite", "btn-invite": "invite",
+        "btn-expel": "expel", "btn-leave": "leave", "btn-deposit": "deposit",
+        "btn-withdraw": "withdraw", "btn-world-to": "planet_to_corp",
+        "btn-world-from": "planet_from_corp", "btn-war": "declare_war",
+        "btn-peace": "end_war",
+    }
 
-    def action_back(self) -> None:
-        self.app.pop_screen()
+    def handle_corp_button(self, button_id: str) -> bool:
+        """Run the corp verb this button names; True if it was one of ours."""
+        action = self.CORP_BUTTONS.get(button_id)
+        if action is None:
+            return False
+        getattr(self, f"action_{action}")()
+        return True
 
     # --- charter / membership ----------------------------------------------------
 
@@ -278,11 +279,11 @@ are accelerators for the same buttons."""
             except EconomyError as exc:
                 if "already taken" in str(exc):
                     continue  # collision — try the next derived tag
-                self.app.bell()
+                self.app.bell()  # type: ignore[attr-defined]
                 notify_warning(self, str(exc))
                 return
-            self.notify(f"Chartered ⟨{tag}⟩ {name}.", timeout=2)
-            self._refresh()
+            self.notify(f"Chartered ⟨{tag}⟩ {name}.", timeout=2)  # type: ignore[attr-defined]
+            self._reopen_corp()
             return
         notify_warning(self, "Couldn't derive a free tag — try a different name.")
 
@@ -296,7 +297,7 @@ are accelerators for the same buttons."""
             if name:
                 self._form(name)
 
-        self.app.push_screen(_FormCorpModal(), _done)
+        self.app.push_screen(_FormCorpModal(), _done)  # type: ignore[attr-defined]
 
     def action_deposit(self) -> None:
         self._apply(CorpDeposit(amount=1_000))
@@ -316,13 +317,13 @@ are accelerators for the same buttons."""
         def _go(pid: int | None) -> None:
             if pid:
                 self._apply(InviteToCorp(invitee_player_id=pid), f"Invited captain #{pid}")
-        self.app.push_screen(_AmountInput("Invite which captain (player id)?"), _go)
+        self.app.push_screen(_AmountInput("Invite which captain (player id)?"), _go)  # type: ignore[attr-defined]
 
     def action_accept_invite(self) -> None:
         """Accept the invite selected in the invites table (or the only one)."""
         view = self._service.corp_view(self._pid)
         if view is None or view.corp_id or not view.invite_ids:
-            self.notify("No standing invite to accept.", timeout=2)
+            self.notify("No standing invite to accept.", timeout=2)  # type: ignore[attr-defined]
             return
         cid = self._selected_key("corp-invites") or view.invite_ids[0]
         label = dict(zip(view.invite_ids, view.invites)).get(cid, "the corporation")
@@ -332,7 +333,7 @@ are accelerators for the same buttons."""
         """CEO expels the roster member selected in the roster table."""
         member = self._selected_key("corp-members")
         if member is None:
-            self.notify("Select a roster member first.", timeout=2)
+            self.notify("Select a roster member first.", timeout=2)  # type: ignore[attr-defined]
             return
         self._apply(ExpelFromCorp(member_player_id=member))
 
@@ -340,7 +341,8 @@ are accelerators for the same buttons."""
         """The corp selected in the diplomacy table — war is picked, never typed."""
         target = self._selected_key("corp-others")
         if target is None:
-            self.notify("Select a corporation in the Diplomacy panel first.", timeout=2)
+            self.notify("Select a corporation in the Diplomacy panel first.",  # type: ignore[attr-defined]
+                        timeout=2)
         return target
 
     def action_declare_war(self) -> None:
@@ -356,7 +358,7 @@ are accelerators for the same buttons."""
     def _sector_planet_id(self) -> int | None:
         planet = self._service.current_planet_view(self._pid)
         if planet is None:
-            self.notify("No planet in this sector.", timeout=2)
+            self.notify("No planet in this sector.", timeout=2)  # type: ignore[attr-defined]
             return None
         return planet.planet_id
 
