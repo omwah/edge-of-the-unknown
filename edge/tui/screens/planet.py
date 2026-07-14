@@ -38,6 +38,7 @@ from edge.core.rules import (
 from edge.server.service import GameService
 from edge.tui.chrome import EdgeScreen, notify_warning
 from edge.tui import art_adapter
+from edge.tui.screens.amount import AmountPrompt
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.dummy import sample_surface
 from edge.tui.screens.surface import SurfaceScreen
@@ -46,6 +47,10 @@ from edge.tui.widgets import ClickableEntry
 
 # Citadel art, one structure per development stage (§4.2, WP54): an unbuilt survey
 # site, construction scaffolding, the L1 treasury keep, the L2 keep + planetary gun,
+# How much one −/+ press moves the invasion wing. Wings run to the hundreds, so stepping by one
+# would be useless; the exact figure is still typeable, and `[A]` commits the lot.
+_INVADE_STEP = 10
+
 # and the L3 siege fortress under its shield dome. Markup-safe (no '[' in the art).
 _CITADEL_ART = {
     "site": ("[dim] ·    ·    ·  [/]\n"
@@ -117,7 +122,9 @@ The Stores and Citadel panels are button-driven ([b]Tab[/] walks the buttons,
 [b]Enter[/] fires): [b]Transfer…[/] opens one editor to haul cargo between ship and
 stores and to settle colonists onto the colony; start builds and move the treasury
 from the citadel panel. Citadel builds draw equipment from [i]stores[/], so supply
-runs in trips are the intended loop; the citadel art grows with its level."""
+runs in trips are the intended loop; the citadel art grows with its level.
+[b]I[/] invades a hostile world once its defences are down, and asks how many of your
+fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard."""
 
     CSS = """
     PlanetScreen #orbit-title {
@@ -172,8 +179,9 @@ runs in trips are the intended loop; the citadel art grows with its level."""
                                        or p.citadel_build_target > 0):
                     yield self._citadel_panel(p)
                 if p.can_invade:
-                    yield Static(f"[red]\\[I] Invade[/] — land {p.ship_fighters} fighters "
-                                 f"against the garrison ({p.fighters}).", classes="section")
+                    yield Static(f"[red]\\[I] Invade[/] — land some or all of your "
+                                 f"{p.ship_fighters:,} fighters against the garrison "
+                                 f"({p.fighters:,}).", classes="section")
                 elif p.invade_blocker:
                     yield Static(f"[dim]Invasion barred: {p.invade_blocker}.[/]", classes="section")
                 if p.starbase:
@@ -367,7 +375,12 @@ runs in trips are the intended loop; the citadel art grows with its level."""
             self._service.planet_view(self._pid, self._planet.planet_id), self._service, self._pid))
 
     def action_invade(self) -> None:
-        """Land all carried fighters in a ground assault on this world (§4.2, WP55)."""
+        """Land a chosen number of carried fighters in a ground assault (§4.2, WP55).
+
+        The reducer has always taken an amount; the screen used to commit the whole wing, so a
+        failed assault cost every fighter aboard (PT-53). The prompt defaults to all — the
+        common case — but you may hold a reserve back, clamped to `1..ship_fighters`.
+        """
         if self._service is None:
             self.action_noop()
             return
@@ -377,19 +390,22 @@ runs in trips are the intended loop; the citadel art grows with its level."""
             self.notify(p.invade_blocker or "Nothing to invade here.", timeout=2)
             return
 
-        def _go(ok: bool | None) -> None:
-            if not ok:
+        def _go(fighters: int | None) -> None:
+            if not fighters:
                 return
             try:
-                service.apply(self._pid, InvadePlanet(p.planet_id, p.ship_fighters))
+                service.apply(self._pid, InvadePlanet(p.planet_id, fighters))
             except (EconomyError, CombatError, CitadelError) as exc:
                 notify_warning(self, str(exc))
                 return
             self._reopen()
 
-        self.app.push_screen(ConfirmScreen(
-            f"Invade {p.name} with {p.ship_fighters} fighters?\n"
-            "Committed troops do not come back."), _go)
+        self.app.push_screen(AmountPrompt(
+            f"Invade {p.name}?\n"
+            f"Garrison {p.fighters:,} · you carry {p.ship_fighters:,} fighters.\n"
+            "How many do you land? Committed troops do not come back.",
+            maximum=p.ship_fighters, step=_INVADE_STEP, commit_label="Invade",
+            dangerous=True), _go)
 
     def action_colonize(self) -> None:
         if self._service is None:

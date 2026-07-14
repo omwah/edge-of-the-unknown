@@ -136,11 +136,17 @@ def _method_source(cls: type, action: str) -> str:
         return ""
 
 
-def test_danger_map_actions_route_through_confirm_screen() -> None:
-    """WP-UI06: destructive descriptors always reach the shared confirmation.
+# The modals that ARE a confirmation. `AmountPrompt` (WP-PR2-14) confirms a destructive action
+# by asking *how much* of it to do — and honours the same safety rule, landing focus on Cancel
+# when `dangerous=True`, so a stray Enter commits nothing.
+_CONFIRMING_MODALS = ("ConfirmScreen", "AmountPrompt")
 
-    Every `ACTION_DANGER` entry must name a bound action whose method pushes
-    `ConfirmScreen` — directly or through one `self._helper()` level (the game
+
+def test_danger_map_actions_route_through_confirm_screen() -> None:
+    """WP-UI06: destructive descriptors always reach a shared confirmation.
+
+    Every `ACTION_DANGER` entry must name a bound action whose method pushes one of
+    `_CONFIRMING_MODALS` — directly or through one `self._helper()` level (the game
     screen's attack path). Static, so it holds for key, `.` menu, and palette
     entry points alike (they all invoke the same action method).
     """
@@ -154,12 +160,27 @@ def test_danger_map_actions_route_through_confirm_screen() -> None:
                 f"{cls.__name__}.ACTION_DANGER names unbound action {action!r}")
             src = _method_source(cls, action)
             assert src, f"{cls.__name__} has no action_{action} method"
-            if "ConfirmScreen" not in src:
+            if not any(modal in src for modal in _CONFIRMING_MODALS):
                 helpers = re.findall(r"self\.(_\w+)\(", src)
-                assert any("ConfirmScreen" in inspect.getsource(getattr(cls, h))
-                           for h in helpers if callable(getattr(cls, h, None))), (
-                    f"{cls.__name__}.action_{action} is marked {level!r} but "
-                    f"neither it nor its helpers reach ConfirmScreen")
+                assert any(
+                    modal in inspect.getsource(getattr(cls, h))
+                    for h in helpers if callable(getattr(cls, h, None))
+                    for modal in _CONFIRMING_MODALS), (
+                    f"{cls.__name__}.action_{action} is marked {level!r} but neither it nor "
+                    f"its helpers reach a confirming modal {_CONFIRMING_MODALS}")
+
+
+def test_a_dangerous_amount_prompt_defaults_to_cancel() -> None:
+    """The safety rule `ConfirmScreen` encodes, kept when the confirmation asks "how many?".
+
+    A destructive `AmountPrompt` must land focus on Cancel and bind no screen-wide Enter, so a
+    stray Enter after the hotkey presses Cancel — it can never commit the action.
+    """
+    from edge.tui.screens.amount import AmountPrompt
+
+    assert not any(b.key == "enter" for b in AmountPrompt.BINDINGS)
+    source = inspect.getsource(AmountPrompt.on_mount)
+    assert "amount-cancel" in source and "_dangerous" in source
 
 
 def test_confirming_actions_declare_their_danger() -> None:
@@ -169,9 +190,10 @@ def test_confirming_actions_declare_their_danger() -> None:
             continue  # ConfirmScreen itself and other modals
         danger = cls.__dict__.get("ACTION_DANGER", {})
         for action in _all_actions(cls):  # incl. per-tab pane bindings (PT-32)
-            if "ConfirmScreen(" in _method_source(cls, action):
+            src = _method_source(cls, action)
+            if any(f"{modal}(" in src for modal in _CONFIRMING_MODALS):
                 assert action in danger, (
-                    f"{cls.__name__}.action_{action} pushes ConfirmScreen "
+                    f"{cls.__name__}.action_{action} pushes a confirming modal "
                     f"but is missing from ACTION_DANGER — mark it caution or "
                     f"destructive so `.`/palette/help can badge it")
 
