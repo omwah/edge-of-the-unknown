@@ -1033,7 +1033,17 @@ staged one are visibly the same world — one of them has a city on it.
 
 Commit: `playtest: WP-PR2-15b Cloud City art`
 
-#### WP-PR2-15c — Cloud City UI
+#### WP-PR2-15c — Cloud City UI — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-15c Cloud City UI`. The orbit screen reads a gas
+giant as what it is: an unstaged one shows **no stores table at all** (nothing can be stored),
+a Cloud City panel stating the prerequisite, and a `[S] Build staging area — N equ` button that
+is replaced by the **projected blocker's own words** when the build is barred (so the greyed
+control and the reducer's refusal cannot drift); `check_action` retires the verb entirely once
+the city is built out. A staged one reads as the colony it now is — city size / berths /
+population in the identity panel, the stores table and the WP-PR2-06 transfer workbench (whose
+colonist clamp is the city's berths, because `PlanetDTO.habitability_cap` now projects *this
+world's* capacity), and `SettleColonists` through the same editor as any other colony.
 
 - In `PlanetScreen` (`edge/tui/screens/planet.py`), for a jovian: show the staging
   prerequisite and a `[Build staging area]` affordance (gated/greyed per capability
