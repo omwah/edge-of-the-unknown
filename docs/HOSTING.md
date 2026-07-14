@@ -43,6 +43,26 @@ In the lobby: pick a username/password and a game name. **Register + Join** crea
 same for a returning player. The first game must be created by a host account (create-game is
 host-gated server-side); other players **Join** it by name.
 
+## Serving the browser client off-box (`--public-url`)
+
+`--serve` bakes the session websocket URL **into the page** from the address it was told to
+serve on — it does not derive it from the incoming request. So the default
+(`--host localhost`) only works when the browser is on the *same machine*. Point any other
+browser at it — a LAN IP, a WSL or container host, an SSH port-forward — and the page it
+receives tells that browser to open `ws://localhost:8000/ws` against **itself**, which connects
+to nothing. The symptom is the textual-serve splash (the game title on a dark page) sitting
+there forever: the splash only clears when the app's first output arrives over that websocket.
+There is no button to click — the `Start` button in the markup is `display: none` by design.
+
+Bind wide and declare the address players actually type:
+
+```bash
+edge --serve --host 0.0.0.0 --port 8000 --public-url http://192.168.1.50:8000
+```
+
+Behind a TLS-terminating reverse proxy, `--public-url` is the **public** origin
+(`https://edge.example.com`), and textual-serve derives the `wss://` session URL from it.
+
 ## Ports
 
 - `8765` — the game server websocket (`edge-server`, change with `--port`).

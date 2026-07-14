@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import random
+import sys
 from typing import Any, Iterable
 
 from textual import events
@@ -282,21 +283,39 @@ class EdgeApp(App[None]):
         self.run_worker(client.run_ticker(), name="engine-ticker", group="engine")
 
 
-def _serve(host: str, port: int, *, plain: bool, connect: str | None = None) -> None:
+def _serve(
+    host: str,
+    port: int,
+    *,
+    plain: bool,
+    connect: str | None = None,
+    public_url: str | None = None,
+) -> None:
     """Host the app in a browser via `textual-serve` (DESIGN §11, §15; WP68 remote).
 
     The served subprocess runs the *plain* `edge` invocation (never `--serve`), so each browser
     session gets an ordinary app instance and there is no recursion. With `connect`, each served
     session is an `edge --connect ws://…` remote client — the hosted-play recipe (docs/HOSTING.md).
+
+    `public_url` is the address the *browser* reaches us on. textual-serve bakes the session
+    websocket URL into the page from this (falling back to `host:port`) rather than deriving it
+    from the request, so serving to any other machine — LAN, WSL, container, port-forward —
+    needs it set or the page dials `ws://localhost` on the viewer's box and hangs on the splash.
     """
     from textual_serve.server import Server
 
-    command = "python -m edge.tui"
+    command = f"{sys.executable} -m edge.tui"
     if plain:
         command += " --plain"
     if connect:
         command += f" --connect {connect}"
-    Server(command, host=host, port=port).serve()
+    Server(
+        command,
+        host=host,
+        port=port,
+        title="Edge of the Unknown",
+        public_url=public_url,
+    ).serve()
 
 
 def main() -> None:
@@ -309,11 +328,23 @@ def main() -> None:
     )
     parser.add_argument("--host", default="localhost", help="bind host for --serve")
     parser.add_argument("--port", type=int, default=8000, help="bind port for --serve")
+    parser.add_argument(
+        "--public-url",
+        metavar="URL",
+        help="address the browser reaches --serve on, e.g. http://192.168.1.50:8000; "
+        "required when viewing from another machine, WSL, or a container",
+    )
     parser.add_argument("--connect", metavar="URL",
                         help="play a hosted game over a websocket, e.g. ws://host:8765 (WP68)")
     args = parser.parse_args()
     if args.serve:
-        _serve(args.host, args.port, plain=args.plain, connect=args.connect)
+        _serve(
+            args.host,
+            args.port,
+            plain=args.plain,
+            connect=args.connect,
+            public_url=args.public_url,
+        )
         return
     EdgeApp(plain=args.plain, connect=args.connect).run()
 
