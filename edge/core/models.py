@@ -742,6 +742,11 @@ class AlienSpecies:
     trade_posture: str = "open"  # §6.1: open / earn / goods_only / barter / … / refuses
     treaty_mode: str = "open"  # §6.1: open / conditional / prove_intent / … / none
     persona: str = "generic"  # dialogue voice key (§6.7)
+    # Staged at the Stardock as the Core's standing welcome (§6.3, `_place_stardock_contacts`):
+    # this greeting party does not wander. It is an **identity**, not a position (PT-37) — the
+    # drift cron used to pin whoever happened to be *standing* in the dock sector, which made the
+    # hub a one-way trap that slowly swallowed every passing wanderer.
+    stardock_staged: bool = False
     # NPC-trader purse + hold (DESIGN §8, WP43). A friendly merchant species (movement
     # policy `trade_seek`) runs real trades on the `trader_step` cron: it buys cheap
     # stock and sells held goods through the §8 pricing, so `cash` (its latinum) rises and

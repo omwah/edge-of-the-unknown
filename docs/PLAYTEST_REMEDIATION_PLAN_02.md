@@ -780,7 +780,31 @@ Commit: `playtest: WP-PR2-11 species portrait variant selection`
 
 ---
 
-### WP-PR2-12 — NPC hub-drift dispersion
+### WP-PR2-12 — NPC hub-drift dispersion — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-12 the Stardock is not a trap`. **This WP's premise
+was wrong, and the real cause is a one-liner.** The pileup is not a movement-policy bias
+(`trade_seek` pulling toward the hub, `wander` lacking repulsion) — it is an **absorbing state**:
+
+- `cron._pinned_species` pinned **whoever was standing in the dock sector this tick**. The
+  Stardock sits *inside* Core Space, so governing-alliance ships may legally drift in — and the
+  moment one did, it matched the "pinned" test and never moved again. The hub was a one-way trap
+  that slowly swallowed the Core's traffic. Measured on seed 4: the 2 staged greeters became 7
+  ships and climbing over 200 drift firings, permanently the most crowded sector in the universe.
+- The greeting party is now pinned by **identity** — `AlienSpecies.stardock_staged`, set in
+  `_place_stardock_contacts` at generation — so a passer-by is free to leave. After the fix the
+  dock holds exactly its 2 greeters over 300 firings and **no sector exceeds 3 ships**.
+- **The dispersion knob this WP proposed (`aliens.drift_*`, crowd-avoidance in `plan_move`) is
+  therefore unnecessary and was not added.** `core.npc.plan_move` is untouched: `wander` stays
+  byte-identical, no movement output moves, and **no golden replay changes**. Adding a repulsion
+  term would have papered over the trap while leaving it in place.
+- No wire bump (the flag is on the model, not a DTO); no store migration (the world is
+  regenerated from the seed).
+
+Tests (`tests/test_engine.py`): the pin is by identity, a visitor that drifts into the dock can
+drift out again (chosen among species the Core actually admits — the Core rule hems everyone else
+in, which is not this bug), and a 200-firing soak asserts the dock never grows past its greeters
+plus a couple of passers-by.
 
 **Goal:** stop cron drift from piling hub-space ships into the Stardock sector.
 

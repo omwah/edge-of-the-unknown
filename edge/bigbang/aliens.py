@@ -555,5 +555,9 @@ def _place_stardock_contacts(state: UniverseState, config: GameConfig, roster: R
     next_id = max(placed, default=0) + 1
     for sp in pick_from[:want]:
         base = _base_for(bases, sp, band, True, config, rng)
-        placed[next_id] = _make_species(next_id, sp, dock.sector_id, band, base, config)
+        # `stardock_staged` marks the greeting party by identity, so the drift cron pins *these*
+        # contacts rather than whoever is standing on the dock sector this tick (PT-37).
+        placed[next_id] = replace(
+            _make_species(next_id, sp, dock.sector_id, band, base, config),
+            stardock_staged=True)
         next_id += 1
