@@ -223,6 +223,15 @@ def _finalize_planets(state: UniverseState, config: GameConfig) -> None:
             owner = UNOWNED if i < unowned else Ownership("alliance", gov)
             state.planets[pid] = replace(state.planets[pid], owner=owner)
 
+    # A gas giant an alliance holds already floats a Cloud City (§4.2, PT-54) — a bloc does not
+    # own a world it cannot stand on, and taking one by invasion should take a working city.
+    # RNG-free, so it cannot perturb the draw order above.
+    size = config.planets.cloud_city_npc_size
+    if size > 0:
+        for pid, planet in state.planets.items():
+            if planet.planet_type == "jovian" and planet.owner.is_owned:
+                state.planets[pid] = replace(planet, cloud_city_size=size)
+
 
 def _strip_reactor_keystone(subsystems: dict[Subsystem, SubsystemState]) -> dict[Subsystem, SubsystemState]:
     """Empty the fusion reactor's keystone slot — the minimal break that derelicts a base.

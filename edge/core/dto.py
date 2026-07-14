@@ -177,6 +177,9 @@ class SectorPlanetDTO:
     # is worked — the same sprite the orbit view draws. 0/0 on every other world.
     ore_reserve: int = 0
     ore_reserve_max: int = 0
+    # A gas giant's Cloud City (§4.2, PT-54): 0 ⇒ bare clouds. The scene paints the floating
+    # city from the same fact the orbit view does, so both show one world.
+    cloud_city_size: int = 0
 
 
 @dataclass(frozen=True)
@@ -926,6 +929,15 @@ class PlanetDTO:
     # empty field projects a 0 haul and the screen greys the affordance.
     ore_reserve: int = 0
     ore_reserve_max: int = 0
+    # The Cloud City on a gas giant (§4.2, PT-54). `colonizable`/`habitability_cap` above are
+    # *this world's* capacity, so a staged jovian reads as a colony and an unstaged one as an
+    # empty sky; these carry the build affordance itself. 0/"" on every other world.
+    cloud_city: bool = False  # this world can carry a city (a gas giant, cities enabled)
+    cloud_city_size: int = 0  # 0 ⇒ nothing built: no stores, no people
+    cloud_city_max_size: int = 0
+    cloud_city_next_cost: int = 0  # equipment (aboard) the next size costs, 0 ⇒ built out
+    cloud_city_blocker: str = ""  # why a build is barred, "" when allowed (the reducer's words)
+    ship_equipment: int = 0  # equipment in the hold, for the build affordance
 
 
 @dataclass(frozen=True)

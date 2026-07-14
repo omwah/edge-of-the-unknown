@@ -977,7 +977,20 @@ Read DESIGN §4.2 first. This introduces new planet state and a new build action
 **persisted** change touching codec/migration/replay across all three sub-WPs'
 data. Do the DESIGN §4.2 spec update in **WP-PR2-15a** before writing code.
 
-#### WP-PR2-15a — Cloud City rules and staging (core)
+#### WP-PR2-15a — Cloud City rules and staging (core) — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-15a Cloud City rules and staging`. A gas giant now
+carries `Planet.cloud_city_size` (0 ⇒ nothing built) and one **capability seam** in
+`core.planets` — `colonist_capacity` / `colonist_blocker` / `store_blocker` /
+`cloud_city_next_cost` / `cloud_city_blocker` — that `Colonize`, `SettleColonists`,
+`TransferCargo`/`BatchTransferCargo`, `produce`, and the `PlanetDTO` projection all ask, so
+legality and affordance are one fact. The new **`BuildStagingArea`** command is paid from the
+**hold** (50 equipment × the next size — one hold-load of the starting hull, and exactly one belt
+haul), claims the world on the first build, and grows the city to `cloud_city_max_size` 4;
+berths are `size × 5,000`. The scoop runs city or no city; a city's people produce on top of it
+against a yield profile with no Organics, so a sky city imports its food or starves. An
+alliance-owned jovian is generated with a city (`cloud_city_npc_size`), and Genesis re-forming a
+gas giant clears it. Wire **19 → 20**; no store migration (the world is regenerated from the seed).
 
 - Update **DESIGN §4.2** first: define the Cloud City variant, the staging-area
   prerequisite, its one-haul build cost (small enough to fit typical early ship

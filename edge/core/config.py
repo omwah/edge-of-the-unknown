@@ -499,6 +499,13 @@ class PlanetsConfig(BaseModel):
     belt_reserve_base: int = 600           # mean reserve (Equipment units) of a Hub belt
     belt_reserve_spread: float = Field(default=0.35, ge=0.0, lt=1.0)  # ± fraction, per belt
     belt_reserve_band_scale: dict[str, float] = Field(default_factory=dict)  # band → multiplier
+    # Cloud Cities (§4.2, PT-54): a gas giant has no ground, so it holds neither stores nor
+    # people until a staging area is built — and that build is paid from the ship's *hold*,
+    # since there are no stores to draw on yet. Size n costs n × `cloud_city_stage_cost`.
+    cloud_city_stage_cost: int = 50   # equipment aboard per size step (0 ⇒ no cities in this universe)
+    cloud_city_berths: int = 5000     # colonist berths per city size (capacity = size × this)
+    cloud_city_max_size: int = 4      # the ceiling a city can be built to
+    cloud_city_npc_size: int = 2      # the city an alliance-owned gas giant is generated with
     # Band-weighted ownership at generation (unowned fraction non-decreasing, §4.2).
     ownership: dict[str, OwnershipWeights] = Field(default_factory=dict)
 
