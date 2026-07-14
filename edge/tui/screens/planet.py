@@ -45,12 +45,12 @@ from edge.tui.screens.surface import SurfaceScreen
 from edge.tui.widgets import ClickableEntry
 
 
-# Citadel art, one structure per development stage (§4.2, WP54): an unbuilt survey
-# site, construction scaffolding, the L1 treasury keep, the L2 keep + planetary gun,
 # How much one −/+ press moves the invasion wing. Wings run to the hundreds, so stepping by one
 # would be useless; the exact figure is still typeable, and `[A]` commits the lot.
 _INVADE_STEP = 10
 
+# Citadel art, one structure per development stage (§4.2, WP54): an unbuilt survey
+# site, construction scaffolding, the L1 treasury keep, the L2 keep + planetary gun,
 # and the L3 siege fortress under its shield dome. Markup-safe (no '[' in the art).
 _CITADEL_ART = {
     "site": ("[dim] ·    ·    ·  [/]\n"
@@ -76,6 +76,13 @@ _STAGE_LABEL = {
     "site": "unbuilt site", "building": "under construction",
     "l1": "treasury keep (L1)", "l2": "planetary gun (L2)", "l3": "siege fortress (L3)",
 }
+
+
+def _depletion(p: PlanetDTO) -> float:
+    """The 0..1 fraction of a belt's ore already mined out (0.0 for any other world, PT-52)."""
+    if p.ore_reserve_max <= 0:
+        return 0.0
+    return max(0.0, min(1.0, 1.0 - p.ore_reserve / p.ore_reserve_max))
 
 
 def _citadel_stage(p: PlanetDTO) -> str:
@@ -200,6 +207,8 @@ fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard
                 art_adapter.sprite(
                     "planet", art_adapter.planet_subtype(p.ptype),
                     seed=p.planet_id, width=detail.max_width, height=detail.max_height,
+                    # A mined belt visibly empties: rocks thin with the reserve (PT-52).
+                    depletion=_depletion(p),
                 ),
                 id="orbit-art",
             )
@@ -251,9 +260,21 @@ fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard
             "colonized, or given a citadel.[/]",
             "[cyan]Scan[/] the sector for finds; anything logged appears in your codex.",
         ]
+        if p.ore_reserve_max > 0:
+            # The field is finite (PT-52): show what is left of it, and how much of it you took.
+            left = p.ore_reserve
+            pct = round(100 * left / p.ore_reserve_max)
+            bar = "█" * round(pct / 10) + "░" * (10 - round(pct / 10))
+            colour = "green" if pct >= 50 else ("yellow" if pct >= 20 else "red")
+            lines.append(f"[b]Ore reserve[/]  [{colour}]{bar}[/]  {left:,} of "
+                         f"{p.ore_reserve_max:,} equipment ({pct}%)")
         if p.mine_yield > 0:
             lines.append(f"[green]\\[M] Mine belt[/] — haul up to {p.mine_yield} equipment aboard "
                          "(costs a turn).")
+        elif p.ore_reserve_max > 0:
+            # Worked out for good: the reserve never regrows, so say so plainly.
+            lines.append("[dim]\\[M] Mine belt — [/][red]worked out[/][dim]: this field is "
+                         "spent, and it will not recover.[/]")
         elif p.extractable:
             lines.append("[dim]Raw ore drifts here for the taking — orbital mining.[/]")
         panel = Vertical(*(Static(t) for t in lines), id="orbital-panel", classes="orbit-panel")
@@ -515,7 +536,9 @@ fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard
             return
         p = self._planet
         if p.mine_yield <= 0:
-            self.notify("There's nothing to mine here.", timeout=2)
+            self.notify(
+                f"{p.name} is worked out — there is no ore left to mine." if p.ore_reserve_max
+                else "There's nothing to mine here.", timeout=2)
             return
         service = self._service
         try:

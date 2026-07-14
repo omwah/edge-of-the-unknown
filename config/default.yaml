@@ -300,7 +300,14 @@ planets:
   growth_rate: 0.02          # colonist population growth per tick while fed
   starvation_rate: 0.05      # colonist die-off per tick when the organics run out
   jovian_scoop: 50           # fuel ore auto-scooped per tick from a gas giant (no colonists needed)
-  asteroid_mining: 50        # equipment auto-mined per tick from an asteroid belt (no colonists needed)
+  asteroid_mining: 50        # equipment per hand-mining action (and per tick, where auto-collected)
+  mining_turn_cost: 1        # turns one hand-mining action costs
+  # A belt is FINITE (PT-52): a seeded ore reserve that mining draws down and that never
+  # regrows. Reserve = base × the band's scale × a per-belt spread draw, so the deep fields are
+  # the rich ones — worth the trip out, and worth moving on once you have worked one out.
+  belt_reserve_base: 600
+  belt_reserve_spread: 0.35
+  belt_reserve_band_scale: { Hub: 1.0, Frontier: 1.6, Deep: 2.4, Void: 3.5 }
   # Planet taxonomy. Each type fixes: whether colonists can live there (colonizable),
   # the population ceiling (habitability; 0 = extraction-only, no colonists), and a
   # yield_profile that multiplies per-commodity colonist output (§4.2).

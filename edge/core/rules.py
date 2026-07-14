@@ -3534,21 +3534,26 @@ def _explore(
 def _mine_belt(
     state: UniverseState, player_id: int, cmd: MineBelt, config: GameConfig
 ) -> ReduceResult:
-    """Hand-mine an asteroid belt for raw goods, taking them aboard (§4.2, PT-30).
+    """Hand-mine an asteroid belt for raw goods, taking them aboard (§4.2, PT-30/PT-52).
 
     A turn cost that fills free cargo holds with the belt's yield (Equipment). Belts are
     unowned spatial features, so this is the player's only route to their output — the yield
-    reuses the same `asteroid_mining` config the owned-world `produce` path draws on.
+    reuses the same `asteroid_mining` config the owned-world `produce` path draws on, clamped
+    to the belt's **finite `ore_reserve`** (PT-52). The haul is the least of the nominal yield,
+    the free holds, and the ore actually left in the field; it is subtracted from the reserve,
+    which never regrows. A worked-out belt rejects with its own error rather than yielding 0.
     """
     player = _player(state, player_id)
     _require_no_encounter(player)
     ship = _ship(state, player)
     planet = _planet_in_sector(state, ship, cmd.planet_id)
-    haul = belt_mining_yield(planet.planet_type, config)
+    haul = belt_mining_yield(planet, config)
     if haul is None:
         raise EconomyError(
             f"a {pretty_planet_type(planet.planet_type).lower()} cannot be mined this way")
     commodity, amount = haul
+    if amount <= 0:
+        raise EconomyError(f"{planet.name} is worked out — there is no ore left to mine")
     free = ship.holds_free
     if free <= 0:
         raise EconomyError("your cargo holds are full")
@@ -3560,9 +3565,10 @@ def _mine_belt(
     cargo[commodity] = cargo.get(commodity, 0) + taken
     new_ship = replace(ship, cargo=cargo)
     new_player = replace(player, turns_remaining=player.turns_remaining - cost)
+    new_planet = replace(planet, ore_reserve=max(0, planet.ore_reserve - taken))
     return ReduceResult(
         events=(BeltMined(player_id, planet.id, commodity.value, taken),),
-        players=(new_player,), ships=(new_ship,),
+        players=(new_player,), ships=(new_ship,), planets=(new_planet,),
     )
 
 

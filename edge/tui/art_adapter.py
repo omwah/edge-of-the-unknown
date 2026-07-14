@@ -122,6 +122,7 @@ def sprite(
     height: int,
     archetype_id: str | None = None,
     facing: str = "right",
+    depletion: float = 0.0,
 ) -> Text:
     """A procedural sprite as a Rich `Text` (a thin wrapper over the art engine).
 
@@ -130,7 +131,7 @@ def sprite(
     palette (see `_to_truecolor`).
     """
     return _to_truecolor(generate_sprite(
-        entity_type, subtype, seed, width, height, archetype_id, facing
+        entity_type, subtype, seed, width, height, archetype_id, facing, depletion
     ))
 
 

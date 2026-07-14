@@ -294,8 +294,19 @@ def _normalize_belts(state: UniverseState, config: GameConfig) -> None:
     # Drop any orbital base hung off a belt before it can host a market.
     state.starbases = {bid: b for bid, b in state.starbases.items()
                        if b.planet_id not in belt_pids}
-    for pid in belt_pids:
-        state.planets[pid] = normalize_belt(state.planets[pid], config)
+    # A belt is a *finite* body of ore (§4.2, PT-52): seed its reserve here, band-weighted, on
+    # its own sub-RNG — like every other post-pass, so it cannot perturb the planet-type draw
+    # order the golden masters depend on. Richer fields lie further out, so the deep bands pay
+    # for the trip; the reserve never regrows, so a mining camp is a place you exhaust.
+    cfg = config.planets
+    rng = random.Random(f"{state.game.seed}-beltreserve")
+    for pid in sorted(belt_pids):
+        planet = normalize_belt(state.planets[pid], config)
+        band = state.sectors[planet.sector_id].distance_band
+        scale = cfg.belt_reserve_band_scale.get(band, 1.0)
+        spread = rng.uniform(1.0 - cfg.belt_reserve_spread, 1.0 + cfg.belt_reserve_spread)
+        reserve = max(cfg.asteroid_mining, round(cfg.belt_reserve_base * scale * spread))
+        state.planets[pid] = replace(planet, ore_reserve=reserve, ore_reserve_max=reserve)
 
 
 def _host_markets(state: UniverseState, config: GameConfig) -> None:

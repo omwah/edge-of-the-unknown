@@ -819,10 +819,11 @@ class SectorScene(Static):
     def _sprite_cells(self, entity: str, subtype: str, *, seed: int, sw: int, sh: int,
                       facing: str = "right",
                       archetype_id: str | None = None,
-                      treatment: str = "") -> list[list[tuple[str, Style | None]]]:
+                      treatment: str = "",
+                      depletion: float = 0.0) -> list[list[tuple[str, Style | None]]]:
         art = art_adapter.sprite(
             entity, subtype, seed=seed, width=sw, height=sh, facing=facing,
-            archetype_id=archetype_id)
+            archetype_id=archetype_id, depletion=depletion)
         if treatment == "derelict":
             art.stylize("dim")
         elif treatment == "hostile":
@@ -877,7 +878,12 @@ class SectorScene(Static):
             sub = art_adapter.planet_subtype(planet.ptype)
             # Seed off the planet's own id (not the sector's) so this sprite matches the
             # PlanetScreen orbit view, which seeds with planet_id — same planet, same art.
-            self._paint(grid, self._sprite_cells("planet", sub, seed=planet.planet_id, sw=pw, sh=ph),
+            # A worked belt visibly empties in the sector view too (PT-52) — same sprite, same
+            # rocks, fewer of them.
+            mined = (1.0 - planet.ore_reserve / planet.ore_reserve_max
+                     if planet.ore_reserve_max > 0 else 0.0)
+            self._paint(grid, self._sprite_cells("planet", sub, seed=planet.planet_id, sw=pw,
+                                                 sh=ph, depletion=mined),
                         row, lcx - pw // 2)
         elif disc is not None:
             dleft = (w // 2 - pw // 2) if disc_centered else (lcx - pw // 2)

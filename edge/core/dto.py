@@ -173,6 +173,10 @@ class SectorPlanetDTO:
     planet_id: int
     name: str  # display name only, e.g. "Terra Nova"
     ptype: str  # planet_type key (art subtype), e.g. "terrestrial_warm"
+    # A belt's finite ore body (§4.2, PT-52), so the sector scene thins its rocks as the field
+    # is worked — the same sprite the orbit view draws. 0/0 on every other world.
+    ore_reserve: int = 0
+    ore_reserve_max: int = 0
 
 
 @dataclass(frozen=True)
@@ -916,7 +920,12 @@ class PlanetDTO:
     # legality from a label. Defaulted so older fixtures read as ordinary landable worlds.
     landable: bool = True
     extractable: bool = False
-    mine_yield: int = 0  # belt hand-mining haul per action, 0 ⇒ not minable this way (PT-30)
+    mine_yield: int = 0  # belt hand-mining haul per action — 0 ⇒ not minable, or worked out
+    # The belt's finite ore body (§4.2, PT-52): what is left, and what it held when seeded.
+    # 0/0 on every non-belt world. `mine_yield` is already clamped to `ore_reserve`, so an
+    # empty field projects a 0 haul and the screen greys the affordance.
+    ore_reserve: int = 0
+    ore_reserve_max: int = 0
 
 
 @dataclass(frozen=True)
