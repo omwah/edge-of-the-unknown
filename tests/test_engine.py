@@ -184,8 +184,57 @@ def test_drift_pins_stardock_contacts(tmp_path: Path) -> None:
     svc = _service(tmp_path)
     pinned = cron._pinned_species(svc.state)
     assert pinned  # the generated universe stages contacts at the Stardock
+    # Pinned by identity, not by standing on the dock sector (PT-37).
+    assert pinned == {s.id for s in svc.state.species.values() if s.stardock_staged}
     result = alien_drift(svc.state, _with_drift(svc.config, 1.0))
     assert {s.id for s in result.species}.isdisjoint(pinned)  # staged contacts never wander
+
+
+def test_a_wanderer_that_drifts_into_the_dock_can_drift_out_again(tmp_path: Path) -> None:
+    """PT-37: the Stardock sector was an absorbing state, and that was the whole pileup.
+
+    `_pinned_species` used to ask "is this species standing in the dock sector?", so any
+    wanderer that drifted in was pinned there for good and the hub slowly swallowed the
+    universe's traffic. A passer-by must be free to leave.
+    """
+    from edge.core.discovery import entity_species
+    from edge.core.enums import PortClass
+
+    svc = _service(tmp_path)
+    dock = next(p.sector_id for p in svc.state.ports.values() if p.klass is PortClass.STARDOCK)
+    entity = entity_species(svc.state, svc.config)  # the Entity roams by its own rules (§7)
+    # The dock sits inside Core Space, so only a species the Core admits can *be* there at all
+    # (`may_occupy`); anyone else is hemmed in by the Core rule, which is not this bug.
+    visitor = next(
+        s for s in svc.state.species.values()
+        if not s.stardock_staged and (entity is None or s.id != entity.id)
+        and any(may_occupy(svc.state, replace(s, sector_id=dock), n, svc.config.aliens)
+                for n in svc.state.adjacency[dock]))
+    svc.state.species[visitor.id] = replace(visitor, sector_id=dock)  # passing through, not staged
+
+    assert visitor.id not in cron._pinned_species(svc.state)
+    moved = alien_drift(svc.state, _with_drift(svc.config, 1.0)).species
+    assert visitor.id in {s.id for s in moved}, "a visitor is trapped at the Stardock"
+
+
+def test_hub_traffic_does_not_pile_up_over_time(tmp_path: Path) -> None:
+    """The symptom PT-37 reported: run the drift cron for a long while and count the crowd."""
+    from collections import Counter
+
+    from edge.core.enums import PortClass
+
+    svc = _service(tmp_path)
+    cfg = _with_drift(svc.config, 1.0)  # every species moves every firing — the worst case
+    dock = next(p.sector_id for p in svc.state.ports.values() if p.klass is PortClass.STARDOCK)
+    staged = sum(1 for s in svc.state.species.values() if s.stardock_staged)
+
+    for _ in range(200):
+        apply_result(svc.state, alien_drift(svc.state, cfg))
+
+    per_sector = Counter(s.sector_id for s in svc.state.species.values())
+    # The dock holds its greeting party plus, at most, a couple of passers-by — it never grows
+    # into the most crowded sector in the universe (it held 7 and climbing before the fix).
+    assert per_sector[dock] <= staged + 2
 
 
 @pytest.mark.parametrize("seed", range(8))

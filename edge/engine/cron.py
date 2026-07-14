@@ -248,11 +248,14 @@ def planet_growth(state: UniverseState, config: GameConfig) -> ReduceResult:
 
 
 def _pinned_species(state: UniverseState) -> frozenset[int]:
-    """Species staged at the Stardock — the hub's standing welcome; they don't wander (§6.3)."""
-    dock = next((p for p in state.ports.values() if p.klass is PortClass.STARDOCK), None)
-    if dock is None:
-        return frozenset()
-    return frozenset(s.id for s in state.species.values() if s.sector_id == dock.sector_id)
+    """Species staged at the Stardock — the hub's standing welcome; they don't wander (§6.3).
+
+    Pinned by **identity** (`stardock_staged`, set at generation), not by position (PT-37). The
+    old test — "is this species standing in the dock sector?" — made the hub an *absorbing state*:
+    any wanderer that drifted in was pinned there for the rest of the game, and the Stardock
+    silently accumulated ships until it was the most crowded sector in the universe.
+    """
+    return frozenset(s.id for s in state.species.values() if s.stardock_staged)
 
 
 def alien_drift(state: UniverseState, config: GameConfig) -> ReduceResult:
