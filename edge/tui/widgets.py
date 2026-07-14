@@ -820,10 +820,11 @@ class SectorScene(Static):
                       facing: str = "right",
                       archetype_id: str | None = None,
                       treatment: str = "",
-                      depletion: float = 0.0) -> list[list[tuple[str, Style | None]]]:
+                      depletion: float = 0.0,
+                      cloud_city: int = 0) -> list[list[tuple[str, Style | None]]]:
         art = art_adapter.sprite(
             entity, subtype, seed=seed, width=sw, height=sh, facing=facing,
-            archetype_id=archetype_id, depletion=depletion)
+            archetype_id=archetype_id, depletion=depletion, cloud_city=cloud_city)
         if treatment == "derelict":
             art.stylize("dim")
         elif treatment == "hostile":
@@ -883,7 +884,9 @@ class SectorScene(Static):
             mined = (1.0 - planet.ore_reserve / planet.ore_reserve_max
                      if planet.ore_reserve_max > 0 else 0.0)
             self._paint(grid, self._sprite_cells("planet", sub, seed=planet.planet_id, sw=pw,
-                                                 sh=ph, depletion=mined),
+                                                 sh=ph, depletion=mined,
+                                                 # A staged gas giant flies its city (PT-54).
+                                                 cloud_city=planet.cloud_city_size),
                         row, lcx - pw // 2)
         elif disc is not None:
             dleft = (w // 2 - pw // 2) if disc_centered else (lcx - pw // 2)

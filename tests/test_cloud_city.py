@@ -241,6 +241,43 @@ def test_the_orbit_projection_carries_the_city_and_its_affordance() -> None:
     assert staged.cloud_city_max_size == CFG.planets.cloud_city_max_size
 
 
+# --- the art (WP-PR2-15b) -----------------------------------------------------
+
+
+def test_the_city_structure_grows_with_the_city() -> None:
+    from edge.art.planet import cloud_city_art
+
+    sizes = [cloud_city_art(size, 40, 20) for size in (1, 2, 3, 4)]
+    assert all(art for art in sizes)
+    widths = [len(art[0]) for art in sizes]
+    assert widths == sorted(widths) and widths[0] < widths[-1]  # a bigger city is a bigger city
+    assert all(len({len(row) for row in art}) == 1 for art in sizes)  # rectangular, so it stamps
+    assert cloud_city_art(0, 40, 20) == ()  # bare clouds
+
+
+def test_the_structure_steps_down_to_fit_a_small_sprite() -> None:
+    """The sector scene draws a far smaller planet than the orbit view — the city shrinks."""
+    from edge.art.planet import cloud_city_art
+
+    big, cramped = cloud_city_art(4, 40, 20), cloud_city_art(4, 8, 5)
+    assert len(cramped[0]) < len(big[0])
+    assert cloud_city_art(4, 3, 2) == ()  # nowhere to put it at all
+
+
+def test_a_staged_gas_giant_renders_its_city_and_an_unstaged_one_does_not() -> None:
+    from edge.art.planet import CLOUD_CITY_TIERS
+    from edge.tui import art_adapter
+
+    def paint(size: int) -> str:
+        return art_adapter.sprite("planet", "jovian", seed=3, width=24, height=12,
+                                  cloud_city=size).plain
+
+    bare, staged = paint(0), paint(2)
+    assert bare != staged
+    deck = CLOUD_CITY_TIERS[1][2].strip()  # the city's landing deck row
+    assert deck in staged and deck not in bare
+
+
 def test_the_sector_scene_sees_the_city() -> None:
     """The scene paints the floating city from the same fact the orbit view reads."""
     from edge.server.session import game_view

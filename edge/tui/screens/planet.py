@@ -209,6 +209,8 @@ fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard
                     seed=p.planet_id, width=detail.max_width, height=detail.max_height,
                     # A mined belt visibly empties: rocks thin with the reserve (PT-52).
                     depletion=_depletion(p),
+                    # A staged gas giant flies its Cloud City; an unstaged one is bare clouds.
+                    cloud_city=p.cloud_city_size,
                 ),
                 id="orbit-art",
             )
