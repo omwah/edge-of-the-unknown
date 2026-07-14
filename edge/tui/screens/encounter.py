@@ -64,6 +64,16 @@ class EncounterScreen(EdgeScreen):
         Binding("escape", "close_if_over", "Close", show=False),
     ]
 
+    # Each action button and the action it fires — the same actions the bindings above name, so a
+    # button and its key can never drift apart (PT-43: the label advertises the key, and
+    # `tests/test_ui_encounter_hotkeys.py` asserts the letter in the label really is the binding).
+    BUTTON_ACTIONS = {
+        "btn-fight": "fight",
+        "btn-missile": "missile",
+        "btn-flee": "flee",
+        "btn-patch": "patch",
+    }
+
     HELP_TITLE = "Encounter"
     HELP = """\
 A live fight has no Esc — fight, missile, patch, or flee. Once it resolves,
@@ -170,26 +180,23 @@ configured floor; firing arcs decide who can answer."""
                 "Missiles ignore firing arcs.",
                 id="enc-advice",
             )
+            # A Button label is Rich markup, so the accelerator's bracket must be escaped —
+            # an unescaped `[F]` parses as a (meaningless) style tag and renders as nothing,
+            # which is exactly how the hotkeys went missing from these buttons (PT-43).
             with Horizontal(id="enc-actions"):
-                yield Button("▶ FIRE [F]", id="btn-fight", variant="error",
+                yield Button("▶ FIRE \\[F]", id="btn-fight", variant="error",
                              disabled=not e.gun_online)
-                yield Button(f"◆ MISSILE [M] ×{e.missiles}", id="btn-missile",
+                yield Button(f"◆ MISSILE \\[M] ×{e.missiles}", id="btn-missile",
                              disabled=e.missiles <= 0)
-                yield Button("↱ FLEE [R]", id="btn-flee", variant="warning")
-                yield Button(f"⚒ PATCH [K] ×{e.repair_kits}", id="btn-patch",
+                yield Button("↱ FLEE \\[R]", id="btn-flee", variant="warning")
+                yield Button(f"⚒ PATCH \\[K] ×{e.repair_kits}", id="btn-patch",
                              disabled=e.repair_kits <= 0 or self._first_knocked_out() is None)
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        actions = {
-            "btn-fight": self.action_fight,
-            "btn-missile": self.action_missile,
-            "btn-flee": self.action_flee,
-            "btn-patch": self.action_patch,
-        }
-        handler = actions.get(event.button.id or "")
-        if handler is not None:
-            self.run_worker(handler())
+        action = self.BUTTON_ACTIONS.get(event.button.id or "")
+        if action is not None:
+            self.run_worker(getattr(self, f"action_{action}")())
 
     # --- actions: one CombatAction command per keypress -----------------------
 

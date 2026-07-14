@@ -102,7 +102,7 @@ class HelpScreen(ModalScreen[None]):
                 yield Static(warp_legend_markup(side))
             settings = getattr(self.app, "ui_settings", None)
             if settings is not None and not settings.show_onboarding:
-                yield Button("[O] Show Captain's objectives", id="help-objectives")
+                yield Button("\\[O] Show Captain's objectives", id="help-objectives")
             yield Static("[dim]Esc to close[/]", id="help-footer")
 
     def action_close(self) -> None:

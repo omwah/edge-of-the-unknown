@@ -664,7 +664,24 @@ Commit: `playtest: WP-PR2-09 dialogue playtest tooling fixes`
 
 ---
 
-### WP-PR2-10 — Attack-screen button hotkeys in text
+### WP-PR2-10 — Attack-screen button hotkeys in text — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-10 attack-screen button hotkeys`. The labels already
+*said* `▶ FIRE [F]` in the source (since `ui: WP-UI18 combat dashboard`), which is why this
+looked at first like a note filed against a stale build — but they rendered as `▶ FIRE `. **A
+Button label is Rich markup**, so an unescaped `[F]` parses as a style tag and disappears; the
+shipped snapshot baseline had no accelerators in it at all. Escaping the bracket (`\[F]` — the
+convention `planet.py` already used for `\[I] Invade`) restores all four. The same trap had
+swallowed the **Help** (`[O]`) and **Surface** (`[E]`/`[T]`) accelerators, fixed in the same pass.
+
+`EncounterScreen.BUTTON_ACTIONS` is now a class-level id → action map (it was a dict rebuilt
+inside `on_button_pressed`), so the buttons and the `BINDINGS` table can be asserted against each
+other instead of drifting. `tests/test_ui_encounter_hotkeys.py` guards it three ways: the
+bracketed letter in each label *is* the key bound to the action that button fires; the key and
+the click issue the same command; and a **repo-wide scan** fails on any `Button` label whose
+hotkey Rich would eat. 10 snapshot baselines refreshed (encounter/surface/combat, all tiers plus
+high-contrast and monochrome) — the letters live in the text, not in colour, so monochrome loses
+nothing.
 
 **Goal:** show each attack/encounter button's hotkey in its label.
 
