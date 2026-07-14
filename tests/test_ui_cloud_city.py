@@ -70,7 +70,7 @@ async def test_a_blocked_build_greys_the_button_and_says_why() -> None:
     blocker = "need 50 equipment aboard to build (have 10)"
     async with _orbit(_jovian(blocker=blocker, equipment=10)) as screen:
         assert not screen.query("#btn-build-city")  # no button to press into a refusal
-        rendered = " ".join(str(getattr(w, "renderable", "")) for w in screen.query("Static"))
+        rendered = " ".join(str(w.render()) for w in screen.query("Static"))
         assert blocker in rendered
         # The key stays live — pressing it explains, rather than doing nothing silently.
         assert screen.check_action("build_city", ()) is True

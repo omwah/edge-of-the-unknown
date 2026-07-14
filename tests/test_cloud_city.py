@@ -106,7 +106,7 @@ def test_next_size_costs_more_than_the_last_and_stops_at_the_ceiling() -> None:
 
 def test_the_first_city_fits_one_hold_load_of_the_starting_hull() -> None:
     """The staging cost is a *one-haul* cost — the bootstrap must be reachable (§4.2)."""
-    assert STAGE <= CFG.ship.holds_total
+    assert STAGE <= CFG.starter_ship.holds_total
     assert STAGE <= CFG.planets.asteroid_mining * 1  # one belt haul also does it
 
 
@@ -289,7 +289,6 @@ def test_the_sector_scene_sees_the_city() -> None:
                   if p.planet_type == "jovian" and p.owner.is_owned)
     player = state.players[1]
     state.ships[player.ship_id] = replace(state.ships[player.ship_id], sector_id=jovian.sector_id)
-    state.players[1] = replace(player, sector_id=jovian.sector_id)
     scene = game_view(state, 1, CFG).sector
     city = next(p for p in scene.planets if p.planet_id == jovian.id)
     assert city.cloud_city_size == CFG.planets.cloud_city_npc_size
