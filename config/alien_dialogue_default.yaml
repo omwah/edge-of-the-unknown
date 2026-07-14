@@ -194,7 +194,13 @@
 # --- SELECTION (how one line is chosen at runtime) -------------------------------------------
 # Within the winning pack's entries for a context: keep entries whose `when` matches; among
 # those the MOST-SPECIFIC wins (an entry that pins more facts beats a vaguer one), ties broken by
-# `weight` through a seeded RNG. Then realise it:
+# `weight` through a seeded RNG. **A pinned `standing` counts double** (select.py
+# `STANDING_WEIGHT`): how the species feels about you outranks any one situational criterion, so
+# a `standing: hostile` greeting beats the same pack's "we have met before" or "your hull is
+# scarred" entry rather than tying with it. Consequence for authors: a pack that authors ANY
+# entry for a context claims that context outright (the chain does not blend packs), so a pack
+# with a catch-all greeting must also author its own `standing: hostile` opener — `generic`'s
+# standing-keyed lines will never be reached for that species. Then realise it:
 #   - variants: pick an index avoiding the last `recency_k` shown (the no-repeat "recency ring");
 #   - grammar:  expand `origin` (GRAMMAR_VARIANTS=8 seeded expansions, also recency-rotated).
 # Rings are kept per (CONTACT INSTANCE, context) — two ships of one species rephrase
@@ -429,6 +435,15 @@ personas:
   # and cooperation-minded. Allied-keyed lines address the player as a fellow citizen.
   humanoid_diplomat:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "This channel is open because protocol demands it, {player} — not because you are welcome."
+          - "Your record precedes you, {player}. The {species} will hear you out. Nothing more."
+          - "We extended a hand once. You know what you did with it. Speak, and be brief."
       - when: { standing: allied }
         variants:
           - "Welcome home, {player}. The Federation stands with you."
@@ -459,6 +474,15 @@ personas:
   # Vesk — introduces itself by serial-style name; warm, helpful technologists.
   serial_formal:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "Contact logged under protest. Your file carries a negative annotation, {player}."
+          - "This unit is obliged to answer you. It is not obliged to be glad of you."
+          - "The {species} rate your conduct as hostile and will price every word accordingly."
       - variants:
           - "Greetings, {player}. I am Veska VK-7 of the {species}. We are at your service."
           - "I am Veska VK-7 of the {species}. How may we be of service, {player}?"
@@ -503,6 +527,15 @@ personas:
   # Selvani — cautious, reserved, good-faith.
   reserved_honest:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "We will not lie to you, {player}: you are not welcome here."
+          - "We remember what your ship has done. We will not harm you. Nor will we help you."
+          - "The {species} keep the peace with you, and nothing else. Say what you came to say."
       - variants:
           - "We are the {species}. We are cautious, {player}, but mean you no harm."
           - "You may mean to harm the {species}. Yet we will hear you, {player}."
@@ -520,6 +553,15 @@ personas:
   # Cibelline — vain engineered aesthetes; condescending self-names.
   flowery_aesthete:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "You blot the composition, {player}. We receive you as one receives a stain."
+          - "Even ugliness may speak — briefly. Say your piece, and then restore the view."
+          - "We had thought you merely crude, {player}. We know now that you are worse."
       - variants:
           - "Felicitations, fortunate one. You behold Gold Moon Rising of the {species}."
           - "Your eyes descry Jade Flowerbud of the {species}. State your need, {player}."
@@ -537,6 +579,15 @@ personas:
   # Selvi — amorous, flirtatious, easily cowed.
   amorous:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "Oh, {player} — how you have wounded us. Adoration curdles so beautifully into loathing."
+          - "We loved the look of you once. Now the sight of your hull sours our whole hold."
+          - "Come no closer, delicious traitor. The {species} nurse heartbreak and grudge alike."
       - variants:
           - "Friendliest greetings, warm one! The {species} adore your shapely hull, {player}."
           - "Are you the female of your species, {player}? No matter — open your capsule!"
@@ -554,6 +605,15 @@ personas:
   # Dignar — telepathic concept-fragment speech.
   concept_fragments:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "* mind-touch: cold * we taste your wake * harm remembered * no peace offered *"
+          - "* recognition * revulsion * the {species} hold their thought apart from yours *"
+          - "* your shadow lies on our water * we do not welcome * we only listen *"
       - variants:
           - "* Auspicious * Cordial * * {player} * Amicable * Welcome *"
           - "* Prudence * Circumspection * * {player} * Attend * Speak *"
@@ -575,6 +635,15 @@ personas:
   # Thessbrood — oily servility masking conquest.
   oily_servile:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "Oh, {player}, how our claws tremble — not with delight this time. You used us so poorly."
+          - "We grovel still, captain, but we grovel with our teeth showing. The {species} forget nothing."
+          - "Such a shame, such a shame. We would serve you gladly, had you not taught us to hate you."
       - variants:
           - "I welcome you, powerful {player}. I am but a humble governor of the {species}."
           - "Have mercy upon me, {player}, and the {species} shall be your willing servants."
@@ -592,6 +661,15 @@ personas:
   # Helot — cold machine-logic, dictionary entries.
   dictionary_literal:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "Enemy (noun): a party whose approach the {species} log with regret. Current match: {player}."
+          - "1. Your hail is received. 2. Your standing is negative. 3. This exchange is a formality."
+          - "Hostility (noun): the present state of relations between the {species} and {player}."
       - variants:
           - "Query acknowledged. Unit of the {species} responds. State purpose, {player}."
           - "1. A greeting. 2. The {species} register your presence, {player}. Proceed."
@@ -611,6 +689,15 @@ personas:
   # Vennrith — inverted, grudge-keeping syntax.
   inverted_syntax:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "Welcome, you are not. Wronged us, you have, {player}. Speak, and quickly."
+          - "Long our memory is, and dark. Among the {species}, forgiven you are not."
+          - "Careful, {player}. Cross us again, and a reckoning there will be."
       - variants:
           - "The {species} we are. Suspicious your motives we are, {player}."
           - "Come why have you? What with the {species}, {player}, do you want?"
@@ -627,6 +714,15 @@ personas:
   # Concordance — archaic, biblical judgement.
   biblical_arbiter:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "Lo, the trespasser hails us. Thy deeds are weighed, {player}, and found wanting."
+          - "Speak, and know that the {species} judge every word. Mercy is not owed to such as thee."
+          - "Thou comest before us unclean. Repent, or begone from our stars."
       - variants:
           - "Thou hast come before the {species}, {player}. Let justice be weighed."
           - "I am the voice of the {species}. Thou art judged, {player}."
@@ -647,6 +743,15 @@ personas:
   # Stryx — mangled translator garble.
   garbled_translator:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "Signal-of-you: unwanted. The {species} open a channel and close a door."
+          - "Trust-packet: corrupted. We speak; we do not welcome. Vector away, carbon-unit."
+          - "Our ledgers hold your debt-of-harm, {player}. Words only. No gifts."
       - variants:
           - "Yuhaf fown da {species}. Shalwee trayd, {player}?"
           - "Meeno tyme. Wutyu wan, {player}? Speek da {species}."
@@ -663,6 +768,15 @@ personas:
   # Quill — predatory salvage, transactional menace.
   macabre_transactional:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "You return, soft-tissue. Your elements remain useful, {player}. Your company does not."
+          - "We greet the salvage, not the captain. The {species} weigh what you would fetch."
+          - "Warmth, meat, and grievance. Two of the three we can use, {player}."
       - variants:
           - "The {species} smell salvage. What do you bring us, {player}?"
           - "Fresh hull, fresh prey. Speak quickly, {player}, the {species} lose patience."
@@ -679,6 +793,15 @@ personas:
   # Thessarch — authoritarian gatekeeper.
   authoritarian_dogma:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "You hail us with blood upon your record, {player}. The {species} are not amused."
+          - "Lesser mind. You have defied us. Speak, and we will decide what defiance costs."
+          - "Obedience was demanded. It was refused. Do not mistake this channel for clemency."
       - variants:
           - "You stand before the {species}, {player}. We rule here. State your purpose."
           - "The {species} command this gate, {player}. Speak, and we shall judge."
@@ -695,6 +818,15 @@ personas:
   # Dacaran — false idealism, probing loyalty.
   false_idealist:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (SELECTION, above),
+      # and a pack that claims `greeting` claims it outright — so every persona owns a hostile
+      # voice rather than falling through to `generic`'s.
+      - when: { standing: hostile }
+        variants:
+          - "You stand before us an enemy of liberty, {player}. That is a costly thing to be."
+          - "The cause has no place for you now. The {species} name you a friend of the masters."
+          - "Freedom's ledger records your betrayal, {player}. Speak — and speak carefully."
       - variants:
           - "We the {species} have watched you, {player}. Your true opinion of our masters?"
           - "Friend {player}, think of liberty. Would not the {species} be better leaders?"

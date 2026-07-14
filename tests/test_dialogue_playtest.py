@@ -137,7 +137,7 @@ async def test_app_opens_controls_modal_and_toggles_dials() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
-        await pilot.press("f2")
+        await pilot.press("c")
         await pilot.pause()
         modal = app.screen
         assert isinstance(modal, PlaytestControls)
@@ -151,6 +151,108 @@ async def test_app_opens_controls_modal_and_toggles_dials() -> None:
         assert isinstance(app.screen, AlienContactScreen)
 
 
+async def test_controls_board_is_keyboard_navigable() -> None:
+    """PT-39/PT-40: `c` opens the board, ↑↓ walk the dials, Enter/←→ change the focused one."""
+    from edge.dialogue.authoring.playtest import PlaytestControls
+    from edge.tui.widgets import ObjectRow
+
+    svc = _service()
+    app = PlaytestApp(svc)
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        await pilot.press("c")
+        await pilot.pause()
+        assert isinstance(app.screen, PlaytestControls)
+        # Focus lands on a dial, not on the box, so the board is usable without a mouse.
+        assert isinstance(app.screen.focused, ObjectRow)
+        assert app.screen.focused.dest == "species"
+
+        first_species = svc.current
+        await pilot.press("enter")  # advance the focused (species) dial
+        await pilot.pause()
+        assert svc.current != first_species
+        assert isinstance(app.screen.focused, ObjectRow)  # focus survives the recompose
+        assert app.screen.focused.dest == "species"
+        await pilot.press("left")  # step it back the other way
+        await pilot.pause()
+        assert svc.current == first_species
+
+        await pilot.press("down")  # onto Standing
+        await pilot.pause()
+        assert app.screen.focused.dest == "band"
+        band = svc.band
+        await pilot.press("right")
+        await pilot.pause()
+        assert svc.band != band
+
+        await pilot.press("down", "space")  # Treaty toggles on Space
+        await pilot.pause()
+        assert svc.treaty is True
+        await pilot.press("c")  # the new hotkey closes it too
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+
+
+async def test_hostile_dial_changes_the_conversation() -> None:
+    """PT-41: standing is not just a bar — a hostile species greets you in a hostile voice."""
+    svc = _service()
+    app = PlaytestApp(svc)
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        friendly_opener = app.screen._contact.opener
+
+        svc.band = "hostile"
+        app._after_controls(None)  # what closing the dial board does
+        await pilot.pause()
+        assert isinstance(app.screen, AlienContactScreen)
+        assert app.screen._contact.standing == "hostile"
+        assert app.screen._contact.opener != friendly_opener
+
+
+def test_every_species_greets_an_enemy_in_its_own_voice() -> None:
+    """A pack that authors a greeting must author a hostile one (PT-41).
+
+    The chain never blends packs: a catch-all greeting claims the context outright, so
+    `generic`'s standing-keyed openers are unreachable for any species whose own pack (or
+    persona) speaks that beat. Without a hostile entry there, hostility is invisible in
+    conversation — the bug PT-41 reported. This exercises the persona layer, which is what the
+    test loader leaves in the chain (`edge/config.py` drops species sidecars under pytest);
+    `test_species_corpus_authors_a_hostile_greeting` covers the species packs themselves.
+    """
+    svc = _service()
+    for sid in svc.species_ids:
+        svc.current = sid
+        svc.band = "friendly"
+        friendly = svc.contact_view(svc.pid, sid).opener
+        svc.band = "hostile"
+        hostile = svc.contact_view(svc.pid, sid).opener
+        roster_id = svc.state.species[sid].roster_id
+        assert hostile.strip(), f"{roster_id} has no hostile opener"
+        assert hostile != friendly, f"{roster_id} greets an enemy exactly as it greets a friend"
+
+
+def test_species_corpus_authors_a_hostile_greeting() -> None:
+    """Every species pack that claims `greeting` claims the hostile standing too (PT-41).
+
+    Read straight off disk: the shipped species corpus is spliced out of the roster under pytest
+    (`edge/config.py`), so the loaded chain cannot see it — but a species greeting entry shadows
+    both the persona and generic packs in the *real game*, which is where the bug bit.
+    """
+    import yaml
+
+    from edge.config import DEFAULT_CONFIG_PATH
+
+    path = DEFAULT_CONFIG_PATH.parent / "dialogue" / "alien_dialogue_species.yaml"
+    grammars = yaml.safe_load(path.read_text(encoding="utf-8"))["species_grammars"]
+    for species_id, pack in grammars.items():
+        greeting = pack.get("greeting")
+        if not greeting:
+            continue  # a pack that doesn't claim the beat falls through to its persona
+        standings = [(entry.get("when") or {}).get("standing") for entry in greeting]
+        assert "hostile" in standings, f"{species_id} greets an enemy as it greets a friend"
+
+
 async def test_clicking_outside_controls_dismisses_it() -> None:
     from edge.dialogue.authoring.playtest import PlaytestControls
 
@@ -158,7 +260,7 @@ async def test_clicking_outside_controls_dismisses_it() -> None:
     app = PlaytestApp(svc)
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
-        await pilot.press("f2")
+        await pilot.press("c")
         await pilot.pause()
         assert isinstance(app.screen, PlaytestControls)
         await pilot.click(offset=(1, 1))  # the backdrop, well clear of the centred box
