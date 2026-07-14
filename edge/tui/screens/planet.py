@@ -32,8 +32,8 @@ from edge.core.dto import PlanetDTO
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import (
-    BuildCitadel, Colonize, DeployGenesis, Descend, InvadePlanet, MineBelt, PlanetDeposit,
-    PlanetWithdraw,
+    BuildCitadel, BuildStagingArea, Colonize, DeployGenesis, Descend, InvadePlanet, MineBelt,
+    PlanetDeposit, PlanetWithdraw,
 )
 from edge.server.service import GameService
 from edge.tui.chrome import EdgeScreen, notify_warning
@@ -109,6 +109,7 @@ class PlanetScreen(EdgeScreen):
         Binding("g", "genesis", "Genesis"),
         Binding("m", "mine", "Mine belt"),
         Binding("k", "build_citadel", "Build citadel"),
+        Binding("s", "build_city", "Build cloud city"),
         Binding("plus", "treasury_deposit", "Deposit"),
         Binding("minus", "treasury_withdraw", "Withdraw"),
         Binding("i", "invade", "Invade"),
@@ -131,7 +132,10 @@ stores and to settle colonists onto the colony; start builds and move the treasu
 from the citadel panel. Citadel builds draw equipment from [i]stores[/], so supply
 runs in trips are the intended loop; the citadel art grows with its level.
 [b]I[/] invades a hostile world once its defences are down, and asks how many of your
-fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard."""
+fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard.
+A gas giant has no ground: it holds nothing and nobody until [b]S[/] builds a
+[i]Cloud City[/] staging area, paid in equipment [i]from your hold[/] (the first build
+claims the world). Building again grows the city, and a bigger city berths more people."""
 
     CSS = """
     PlanetScreen #orbit-title {
@@ -181,7 +185,12 @@ fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard
                 if not p.landable:
                     yield self._orbital_panel(p)
                 else:
-                    yield self._stores_panel(p)
+                    # A gas giant explains itself before it offers anything: nothing can be
+                    # stored and nobody can live there until a Cloud City floats (§4.2, PT-54).
+                    if p.cloud_city:
+                        yield self._cloud_city_panel(p)
+                    if p.cloud_city_size > 0 or not p.cloud_city:
+                        yield self._stores_panel(p)
                 if p.landable and p.owned_by_you and (p.citadel_level > 0 or p.can_build_citadel
                                        or p.citadel_build_target > 0):
                     yield self._citadel_panel(p)
@@ -228,11 +237,18 @@ fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard
         # implies an extraction the reducer would reject.
         if action == "mine" and self._planet.mine_yield <= 0:
             return False
+        # Staging is a gas giant's verb alone, and only while the city can still grow (PT-54).
+        if action == "build_city" and self._planet.cloud_city_next_cost <= 0:
+            return False
         return True
 
     def _identity_panel(self, p: PlanetDTO) -> Vertical:
         """Keep identity, ownership, habitability, and colony state together."""
         cap = f"{p.habitability_cap:,}" if p.colonizable else "not colonizable"
+        if p.cloud_city:
+            # A gas giant's capacity is its city's berths, not a habitability it doesn't have.
+            cap = (f"{p.habitability_cap:,} city berths" if p.cloud_city_size
+                   else "no ground — needs a staging area")
         children: list[Static] = [
             Static(f"Type  [b]{pretty_planet_type(p.ptype)}[/]   Owner  [cyan]{p.owner}[/]"),
             Static(f"Habitability  {cap}   Population  {p.colonists:,}"),
@@ -283,12 +299,49 @@ fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard
         panel.border_title = "Orbit"
         return panel
 
+    def _cloud_city_panel(self, p: PlanetDTO) -> Vertical:
+        """A gas giant's Cloud City: what floats there, and what building more would cost."""
+        lines: list[str] = []
+        if p.cloud_city_size > 0:
+            lines.append(
+                f"[b]Cloud City[/] — size [cyan]{p.cloud_city_size}[/] of {p.cloud_city_max_size}"
+                f"   berths {p.habitability_cap:,}   population {p.colonists:,}")
+            lines.append("[dim]The city holds the stores and the people; the gas giant below "
+                         "holds neither. Its yield is fuel — food must be shipped in.[/]")
+        else:
+            lines.append("[yellow]No staging area.[/] A gas giant has no ground: until a city "
+                         "floats here it can hold no stores and no colonists.")
+        children: list[Static | Horizontal] = [Static(t) for t in lines]
+        cost = p.cloud_city_next_cost
+        if cost > 0:
+            verb = "Build staging area" if p.cloud_city_size == 0 else "Expand the city"
+            label = f"{verb} — {cost} equ"
+            if p.cloud_city_blocker:
+                # The reducer's own words, so the greyed button never promises a different
+                # refusal than the one it would get (§4.2).
+                children.append(Static(f"[dim]\\[S] {label} — [/][yellow]{p.cloud_city_blocker}[/]"))
+            else:
+                children.append(Horizontal(
+                    Button(f"{label} (aboard: {p.ship_equipment:,})",
+                           id="btn-build-city", variant="primary"), classes="buttons"))
+                children.append(Static(
+                    "[dim]Paid from the hold — there is nowhere here to have stockpiled it. "
+                    "Building also claims the world.[/]" if p.cloud_city_size == 0 else
+                    "[dim]Paid from the hold; a larger city berths more people.[/]"))
+        elif p.cloud_city_size > 0:
+            children.append(Static("[dim]The city is built out — it cannot grow further.[/]"))
+        panel = Vertical(*children, classes="orbit-panel")
+        panel.border_title = "Cloud City"
+        return panel
+
     def _claim_hint(self) -> str:
         p = self._planet
         if p.owned_by_you:
             return "[dim]Your colony.[/]"
         if not p.landable:
             return ""  # the orbital panel explains a belt; no colony hint applies
+        if p.cloud_city:
+            return ""  # the cloud-city panel is the hint on a gas giant
         if not p.colonizable:
             return "[dim]Uncolonizable — extraction only.[/]"
         if not p.claimable:
@@ -352,6 +405,7 @@ fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard
     def on_button_pressed(self, event: Button.Pressed) -> None:
         actions = {
             "btn-transfer": self.action_transfer,
+            "btn-build-city": self.action_build_city,
             "btn-build": self.action_build_citadel,
             "btn-cit-dep": self.action_treasury_deposit,
             "btn-cit-wd": self.action_treasury_withdraw,
@@ -359,6 +413,24 @@ fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard
         handler = actions.get(event.button.id or "")
         if handler is not None:
             handler()
+
+    def action_build_city(self) -> None:
+        """Build or grow the Cloud City on a gas giant (§4.2, PT-54)."""
+        if self._service is None:
+            self.action_noop()
+            return
+        p = self._planet
+        if p.cloud_city_blocker or p.cloud_city_next_cost <= 0:
+            self.notify(p.cloud_city_blocker or "Nothing to build here.", timeout=3)
+            return
+        try:
+            self._service.apply(self._pid, BuildStagingArea(p.planet_id))
+        except (EconomyError, MovementError) as exc:
+            notify_warning(self, str(exc))
+            return
+        self.notify("The city rises — it can hold stores and people now." if p.cloud_city_size == 0
+                    else "The city grows — more berths.", timeout=2)
+        self._reopen()
 
     def action_build_citadel(self) -> None:
         if self._service is None:
