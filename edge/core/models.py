@@ -317,6 +317,12 @@ class Discovery:
     rarity_tier: RarityTier
     sector_id: int
     payload: DiscoveryPayload
+    # What the thing is *called* (PT-49) — "the Cygnus Veil", not "Nebula ∗ Rare". Stamped at
+    # creation from a seeded name pool (`bigbang.naming.DiscoveryNamer`), so it is stable under
+    # `(seed, command log)` replay; a **combat wreck carries the destroyed ship's own name**, so
+    # the hulk you salvage is the raider you shot. Empty only for a nameless legacy row — the
+    # projection falls back to the kind, so a blank never reaches the player as "".
+    name: str = ""
     planet_id: int | None = None
     site_slot: int = 0
     hidden: bool = False

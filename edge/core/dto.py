@@ -152,10 +152,11 @@ class SectorDiscovery:
     """
 
     discovery_id: int
-    label: str  # "Drifting wreck · Rare"
+    label: str  # "the Cygnus Veil · Nebula · Rare" (PT-49: name first, kind/rarity as subtitle)
     kind: str  # DiscoveryKind value
     rarity: str  # RarityTier name
     salvageable: bool
+    name: str = ""  # the find's own name — "" only for a nameless legacy row
     collected: bool = False
     warp_to: int | None = None  # one-way exit sector (wormholes only) — clicking warps here
 
@@ -327,11 +328,12 @@ class TradePair:
 class CodexEntry:
     """One logged discovery for the Computer's Codex tab (§7, §11, WP11)."""
 
-    name: str  # "wreck · RARE"
+    name: str  # the find's own name — "Silent Kestrel" (PT-49); the kind/rarity line follows
     location: str  # "Sector 42" / "Planet 7 · site 2"
     rarity: str
     detail: str  # payload / lore fragment
     sector_id: int = -1  # internal id of the find's containing sector (WP14 route tie-in)
+    kind: str = ""  # "wreck · RARE" — what it *is*, now that `name` says what it is *called*
 
 
 @dataclass(frozen=True)

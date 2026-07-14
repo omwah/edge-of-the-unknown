@@ -283,10 +283,17 @@ def _warp_dto(
                        turn_cost=turn_cost)
 
 
-def _discovery_label(kind: str, rarity: str) -> str:
+def _discovery_label(kind: str, rarity: str, name: str = "") -> str:
+    """What the find is called, then what it is (PT-49) — "the Cygnus Veil · Nebula · Rare".
+
+    A named find leads with its name; the kind and rarity trail it as the subtitle they always
+    were. A nameless legacy row still reads as "Nebula · Rare", so a blank name never surfaces.
+    """
     if kind == DiscoveryKind.WORMHOLE.value:
-        return "Wormhole · one-way warp"  # shown only once scanned (warns of the one-way)
-    return f"{kind.replace('_', ' ').capitalize()} · {rarity.capitalize()}"
+        # Always leads with the warning: a wormhole's danger is the one-way warp, not its name.
+        return f"Wormhole · one-way warp{f' · {name}' if name else ''}"
+    what = f"{kind.replace('_', ' ').capitalize()} · {rarity.capitalize()}"
+    return f"{name} · {what}" if name else what
 
 
 def _sector_discoveries(state: UniverseState, player: Player, sector_id: int) -> list[dto.SectorDiscovery]:
@@ -311,8 +318,8 @@ def _sector_discoveries(state: UniverseState, player: Player, sector_id: int) ->
             exits = one_way_exits(state.adjacency, sector_id)
             warp_to = exits[0] if exits else None
         out.append(dto.SectorDiscovery(
-            discovery_id=d.id, label=_discovery_label(d.kind.value, d.rarity_tier.name),
-            kind=d.kind.value, rarity=d.rarity_tier.name,
+            discovery_id=d.id, label=_discovery_label(d.kind.value, d.rarity_tier.name, d.name),
+            kind=d.kind.value, rarity=d.rarity_tier.name, name=d.name,
             salvageable=visible and not collected, collected=collected, warp_to=warp_to,
         ))
     return out
@@ -1222,7 +1229,9 @@ def _codex_entries(state: UniverseState, player: Player) -> list[dto.CodexEntry]
         else:
             location = f"Sector {_display(state, disc.sector_id)}"
         entries.append((disc.rarity_tier.value, dto.CodexEntry(
-            name=f"{disc.kind.value} · {disc.rarity_tier.name}", location=location,
+            name=disc.name or f"{disc.kind.value} · {disc.rarity_tier.name}",
+            kind=f"{disc.kind.value.replace('_', ' ')} · {disc.rarity_tier.name}",
+            location=location,
             rarity=disc.rarity_tier.name, detail="; ".join(_payload_lines(disc.payload)),
             sector_id=disc.sector_id,
         )))

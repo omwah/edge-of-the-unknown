@@ -3039,6 +3039,10 @@ def _combat_wrecks(
             kind=DiscoveryKind.WRECK,
             rarity_tier=RarityTier.COMMON,
             sector_id=sector_id,
+            # The hulk is the ship you shot: a combat wreck takes the **destroyed foe's own
+            # name** rather than drawing from the salted-wreck pool (PT-49), so the wreckage in
+            # the sector view is recognisably the raider you just killed.
+            name=foe.name,
             payload=DiscoveryPayload(
                 kind=PayloadKind.WRECK,
                 latinum=latinum,

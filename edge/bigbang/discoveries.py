@@ -23,6 +23,7 @@ from edge.core.enums import Component, ComponentTier, DiscoveryKind, PayloadKind
 from edge.core.models import Discovery, DiscoveryPayload, UniverseState
 from edge.core.movement import one_way_exits
 from edge.core.planets import is_landable
+from edge.bigbang.naming import DiscoveryNamer
 
 _PHENOMENA = (DiscoveryKind.NEBULA, DiscoveryKind.BLACK_HOLE, DiscoveryKind.WORMHOLE)
 
@@ -67,6 +68,9 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
     if dcfg is None:
         return
     rng = random.Random(f"{state.game.seed}-disc-{attempt}")
+    # Names ride their own sub-RNG (PT-49): naming must never perturb the placement draw the
+    # §7 band gradient — and every golden replay — depends on.
+    namer = DiscoveryNamer(config.names, random.Random(f"{state.game.seed}-discnames-{attempt}"))
     discoveries: dict[int, Discovery] = {}
     did = 1
 
@@ -86,6 +90,7 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
             id=did, kind=DiscoveryKind.WORMHOLE, rarity_tier=tier, sector_id=sid,
             payload=_make_payload(DiscoveryKind.WORMHOLE, tier, dcfg, rng),
             hidden=DiscoveryKind.WORMHOLE.value in dcfg.hidden_kinds,
+            name=namer.draw(DiscoveryKind.WORMHOLE),
         )
         did += 1
 
@@ -106,6 +111,7 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
             id=did, kind=kind, rarity_tier=tier, sector_id=sid,
             payload=_make_payload(kind, tier, dcfg, rng),
             hidden=kind.value in dcfg.hidden_kinds,
+            name=namer.draw(kind),
         )
         did += 1
 
@@ -128,7 +134,7 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
             discoveries[did] = Discovery(
                 id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
                 payload=_make_payload(kind, tier, dcfg, rng), planet_id=pid, site_slot=slot,
-                hidden=hidden,
+                hidden=hidden, name=namer.draw(kind),
             )
             did += 1
 
@@ -152,7 +158,7 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
         discoveries[did] = Discovery(
             id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
             payload=_make_payload(kind, tier, dcfg, rng), planet_id=pid, site_slot=slot,
-            hidden=tier.value >= dcfg.surface_hidden_min_rank,
+            hidden=tier.value >= dcfg.surface_hidden_min_rank, name=namer.draw(kind),
         )
         did += 1
 
@@ -174,6 +180,8 @@ def salt_raid_caches(state: UniverseState, config: GameConfig) -> None:
     if dcfg is None or config.roster is None or not dcfg.component_pool:
         return
     rng = random.Random(f"{state.game.seed}-raidcache")
+    namer = DiscoveryNamer(config.names, random.Random(f"{state.game.seed}-raidcachenames"),
+                           used=[d.name for d in state.discoveries.values()])
     next_id = (max(state.discoveries) + 1) if state.discoveries else 1
     planet_by_sector: dict[int, int] = {}
     for pid in sorted(state.planets):
@@ -199,6 +207,6 @@ def salt_raid_caches(state: UniverseState, config: GameConfig) -> None:
             payload=DiscoveryPayload(kind=PayloadKind.COMPONENT,
                                      component=Component(rng.choice(dcfg.component_pool)),
                                      tier=ComponentTier.III),
-            hidden=True, raid_cache=True,
+            hidden=True, raid_cache=True, name=namer.draw(DiscoveryKind.ANCIENT_TECH),
         )
         next_id += 1

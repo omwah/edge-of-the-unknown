@@ -556,12 +556,15 @@ class AnomalyRow(Static):
 
     @staticmethod
     def _markup(d: SectorDiscovery, detail: bool = False) -> str:
-        # The find's identity stays hidden until scanned — pre-scan it reads generic.
+        # The find's identity stays hidden until scanned — pre-scan it reads generic. A **wreck**
+        # is the exception: a hulk is plainly a hulk, and the one you just shot down still wears
+        # its ship's name (PT-49), so naming it costs no fog and makes the kill legible.
         if d.collected:
             kind = f" · {d.kind}" if detail else ""
             return f"[cyan]✦[/] {d.label} [dim]— logged{kind}[/]"
         if d.kind == "wreck":
-            return "[yellow]⚙[/] Wreckage [dim](Salvage)[/]"
+            of = f" of the {d.name}" if d.name else ""
+            return f"[yellow]⚙[/] Wreckage{of} [dim](Salvage)[/]"
         return "[cyan]✦[/] Anomaly detected [dim](Scan)[/]"
 
     def on_click(self) -> None:

@@ -326,3 +326,43 @@ planets:
       - Shards
       - Fragments
       - Swarm
+
+# Discovery names (PT-49, DESIGN §7). Keyed by DiscoveryKind; drawn combinatorially
+# (first_part + second_part) without replacement, from a name-only sub-RNG seeded off the game
+# seed — so a find is a *place* you can talk about ("the Cygnus Veil") and two games with the
+# same seed name it identically. A kind with no pool here falls back to a numbered name; a
+# combat wreck ignores these entirely and takes the destroyed ship's own name.
+discoveries:
+  nebula:
+    first_part: [Cygnus, Halaf, Verdani, Tsoraan, Orin, Mirach, Drelb, Antares, Lyra, Kryptos,
+                 Caprico, Solaris, Corusca, Kobal, Gallifra, Termina]
+    second_part: [Veil, Shroud, Cradle, Mantle, Pillars, Bloom, Curtain, Reach]
+  black_hole:
+    first_part: [Kessrin, Drelb, Tsoraan, Nyx, Erebus, Halcyon, Charon, Vantablack, Morrow,
+                 Sable, Grendel, Tartarus]
+    second_part: [Maw, Abyss, Well, Throat, Sink, Descent, Gulf, Mouth]
+  wormhole:
+    first_part: [Halaf, Nexus, Corellis, Mandalia, Trantos, Kryptos, Verge, Meridian, Cygnus,
+                 Orin, Selvat, Kobal]
+    second_part: [Passage, Conduit, Threadway, Shortcut, Gate, Funnel, Crossing, Sluice]
+  wreck:
+    first_part: [Silent, Ashen, Broken, Drifting, Cold, Hollow, Sundered, Lost, Wandering,
+                 Forsaken, Quiet, Scuttled]
+    second_part: [Kestrel, Perdita, Halcyon, Meridian, Argo, Peregrine, Lantern, Corvid,
+                  Salamander, Vagrant, Wayfarer, Osprey]
+  ruins:
+    first_part: [Glass, Sunken, Weeping, Obsidian, Buried, Silent, Fallen, Wind-worn, Salt,
+                 Ash, Bone, Shadowed]
+    second_part: [Spires, Colonnade, Terraces, Ruins, Steps, Ziggurat, Amphitheatre, Causeway]
+  artifact:
+    first_part: [Sealed, Humming, Weeping, Untouched, Patient, Silent, Cold, Nameless]
+    second_part: [Reliquary, Cache, Vault, Idol, Coffer, Stele, Ossuary, Lantern]
+  ancient_tech:
+    first_part: [Silent, Coiled, Hollow, Sleeping, Unbroken, Buried, Singing, Cold]
+    second_part: [Engine, Lattice, Array, Forge, Loom, Spindle, Reactor, Foundry]
+  crashed_ship:
+    first_part: [Scorched, Buried, Broken, Half-sunk, Torn, Charred, Silent, Cold]
+    second_part: [Lander, Frigate, Cutter, Hauler, Skiff, Clipper, Tender, Barque]
+  entity:
+    first_part: [The Wandering, The Nameless, The Patient, The Watching]
+    second_part: [Presence, Signal, Visitor, Regard]
