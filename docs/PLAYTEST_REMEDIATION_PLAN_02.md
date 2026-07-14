@@ -687,7 +687,29 @@ Commit: `playtest: WP-PR2-10 attack-screen button hotkeys`
 
 ---
 
-### WP-PR2-11 — Species portrait `_01` selection
+### WP-PR2-11 — Species portrait `_01` selection — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-11 species portrait variant selection`. **The bug as
+filed does not exist**, and the investigation this package asked for is what closes it.
+`list_portraits` collects numbered-only variant sets correctly (no species ships a bare
+`<id>.<ext>`, so the "bare file is always index 0" hypothesis had nothing to bite on),
+`resolve_portrait(variant=0)` returns the first sorted file, and the seeded variant the
+projection draws (`session.contact_view:1962`) is uniform — index 0 comes up as often as any
+other across seeds. All four facts are now pinned by `tests/test_species_portrait.py`, against
+both a synthetic dir and the shipped assets.
+
+**The real cause:** a face is keyed to **(game seed, species instance id)**, so any *single*
+instance wears one variant forever. The report came from the dialogue play-test harness, which
+injects exactly **one** instance per species — so terran (the only multi-variant species) locks
+to one of its three faces for a given `--seed`, and `_01` (the newer curated Midjourney
+reference) simply never came up. In a real game each terran ship is its own instance and wears
+its own face, so nothing was broken there.
+
+**Fixed by making the variants reachable where they were being reviewed:** the play-test
+controls board gains a **Portrait** dial (`PlaytestService.cycle_portrait` / `portrait_label`)
+that steps a variant offset over the seeded draw and names the resolved image file, so an
+author can walk every face a species has — `_01` included — and knows which asset they are
+looking at.
 
 **Goal:** ensure the portrait variant selector can pick the `_01`/`_1` image.
 
@@ -949,3 +971,34 @@ all primary workflows work at 80×24; the Cloud City subsystem is documented in
 DESIGN §4.2 and reachable in-game; and Help + DESIGN accurately describe the resulting
 controls and rules. Deferred items, if any, are recorded in an appended
 "Outstanding follow-ups" section rather than left implicit.
+
+## 8. Outstanding follow-ups
+
+### FU-01 — The config loader strips the species dialogue sidecar under pytest (open)
+
+**Found during WP-PR2-09 / PT-41.** `edge/config.py:89` inspects `sys.modules` /
+`PYTEST_CURRENT_TEST` and, when it decides it is running under pytest, filters
+`dialogue_file:` down to `alien_dialogue_default.yaml` alone — dropping
+`config/dialogue/alien_dialogue_species.yaml`, the shipped **species** corpus. So the whole
+test suite resolves dialogue against the persona/generic chain only, and never sees the packs
+that win in a real game (a species pack shadows both).
+
+Why this matters, concretely: PT-41's bug (every species greeted an enemy like a friend) lived
+*in the species corpus*, and no test could have caught it — the fix had to be duplicated at the
+persona layer to be testable at all, and the species half is guarded by a test that parses the
+YAML off disk (`test_species_corpus_authors_a_hostile_greeting`) rather than through the loader.
+Any future corpus regression in `alien_dialogue_species.yaml` is similarly invisible.
+
+It is also **runtime code branching on the test runner**, which the layering rules otherwise
+forbid; the intent was presumably to pin the suite to a stable base corpus so a swapped/authored
+species sidecar cannot move golden lines.
+
+**Resolve by** making the corpus an explicit input rather than an ambient one: drop the
+`sys.modules` sniff from `edge/config.py`, and have the tests that need a pinned corpus load a
+config that names only the base dialogue file (a fixture, or a test config path), while the
+default load — the one the game uses — keeps the species sidecar. Then re-point the dialogue
+tests at the full shipped chain and confirm nothing in the corpus-driven suites (contact,
+encounter, snapshots) depends on the persona fallback being reachable where a species pack
+actually speaks.
+
+Sized as a small, self-contained package; not blocking any WP in §4.

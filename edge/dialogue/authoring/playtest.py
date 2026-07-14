@@ -7,6 +7,8 @@ branch nodes without launching a full game and grinding reputation. A one-key **
 modal** (`c`, keyboard-navigable) switches the simulated dials live:
 
 - **species** — cycle through the whole roster (one instance of each is injected);
+- **portrait** — step through the species' portrait variants (a face is otherwise pinned per
+  game seed + species instance, so the single injected instance would wear one forever, PT-38);
 - **standing band** — hostile / neutral / friendly / allied (wary is Phase-3 inert);
 - **treaty** / **intel available** — toggles that gate treaty- and coordinate-keyed lines;
 - **show disabled** — the existing `ui.show_disabled_options` (greys gated replies);
@@ -38,6 +40,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Footer, Static
 
 from edge import dialogue
+from edge.art.portrait import list_portraits, resolve_portrait
 from edge.bigbang.generator import generate
 from edge.config import (
     DEFAULT_CONFIG_PATH,
@@ -83,6 +86,10 @@ class PlaytestService:
         self.treaty: bool = False
         self.intel_on: bool = False
         self.force_enable: bool = False
+        # A species' face is pinned per (game seed, species instance), so the harness's
+        # one-instance-per-species cast would otherwise show a single variant forever — an
+        # author reviewing art never sees the rest (PT-38). This offset steps through them.
+        self.portrait_step: int = 0
 
     # --- construction --------------------------------------------------------
 
@@ -165,7 +172,8 @@ class PlaytestService:
         # not authored dialogue — session.contact_view injects it, but the authoring harness
         # keeps the dial meaningful by overriding with its own computation).
         view = dataclasses.replace(view, debug_context=shown, debug_when=debug_when_str,
-                                   intel_summary=(intel.summary() if intel is not None else ""))
+                                   intel_summary=(intel.summary() if intel is not None else ""),
+                                   portrait_variant=view.portrait_variant + self.portrait_step)
 
         return self._force(view) if self.force_enable else view
 
@@ -270,6 +278,25 @@ class PlaytestService:
         self._config = self._config.model_copy(
             update={"ui": self._config.ui.model_copy(update={"show_disabled_options": flag})})
 
+    def cycle_portrait(self, step: int) -> None:
+        self.portrait_step += step
+
+    def portrait_label(self) -> str:
+        """The face the current species is wearing, and how many it has to choose from (PT-38).
+
+        Names the resolved *file*, so an author reviewing art knows which asset they are
+        looking at (and can tell that `_01` really is reachable).
+        """
+        sp = self.state.species[self.current]
+        images_dir = self._config.ui.portrait_dir
+        faces = list_portraits(sp.roster_id, images_dir)
+        if not faces:
+            return "[dim]no portrait image[/]"
+        variant = self.contact_view(self.pid, self.current).portrait_variant
+        chosen = resolve_portrait(sp.roster_id, images_dir, variant)
+        name = chosen.name if chosen is not None else "?"
+        return f"{name} [dim]({(variant % len(faces)) + 1} of {len(faces)})[/]"
+
     def select_species_by_roster(self, roster_id: str) -> bool:
         for sid in self.species_ids:
             if self.state.species[sid].roster_id == roster_id:
@@ -324,6 +351,7 @@ class PlaytestControls(ModalScreen[None]):
         with Vertical(id="controls-box"):
             yield Static("[b]Playtest controls[/]  [dim](Esc / c to close)[/]", classes="title")
             yield ObjectRow(f"[b]Species[/]   {s.species_name(s.current)}", dest="species")
+            yield ObjectRow(f"[b]Portrait[/]  {s.portrait_label()}", dest="portrait")
             yield ObjectRow(f"[b]Standing[/]  [cyan]{s.band}[/]", dest="band")
             yield ObjectRow(f"[b]Treaty[/]    {flag(s.treaty)}", dest="treaty")
             yield ObjectRow(f"[b]Intel[/]     {flag(s.intel_on)}", dest="intel")
@@ -377,6 +405,8 @@ class PlaytestControls(ModalScreen[None]):
         match dest:
             case "species":
                 svc.cycle_species(step)
+            case "portrait":
+                svc.cycle_portrait(step)
             case "band":
                 svc.cycle_band(step)
             case "treaty":
