@@ -329,6 +329,7 @@ when columns are folded at 80×24."""
                         yield Static("[b]DISCOVERY CODEX[/]        [dim]logged finds, richest first[/]")
                         yield DetailTable("codex-table", (
                             ColumnSpec("Find", sortable=True),
+                            ColumnSpec("Kind", fold=True),
                             ColumnSpec("Location"),
                             ColumnSpec("Rarity", sortable=True),
                             ColumnSpec("Detail", fold=True),
@@ -447,7 +448,7 @@ when columns are folded at 80×24."""
             for i, entry in enumerate(self._messages.events)])
 
         self._dt("codex-table").set_rows([
-            (str(i), (c.name, c.location, c.rarity, c.detail))
+            (str(i), (c.name, c.kind, c.location, c.rarity, c.detail))
             for i, c in enumerate(self._computer.codex)])
 
         lead_rows = []

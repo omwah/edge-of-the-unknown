@@ -410,11 +410,11 @@ def _place_entity(state: UniverseState, config: GameConfig, roster: RosterConfig
         base = _base_for(bases, entity, band, True, config, rng)  # peaceable (anchor draw)
         next_id = max(placed, default=0) + 1
         placed[next_id] = _make_species(next_id, entity, home, band, base, config)
-        _reserve_entity_codex(state, home)
+        _reserve_entity_codex(state, home, entity.name)
         return
 
 
-def _reserve_entity_codex(state: UniverseState, home_sector: int) -> None:
+def _reserve_entity_codex(state: UniverseState, home_sector: int, name: str) -> None:
     """Create the reserved hidden Legendary codex row for the Entity (DESIGN §7, WP35).
 
     Not a spatial salvage object — it is stamped into the codex by the **first `Hail`** of
@@ -428,7 +428,7 @@ def _reserve_entity_codex(state: UniverseState, home_sector: int) -> None:
     next_id = max(state.discoveries, default=0) + 1
     state.discoveries[next_id] = Discovery(
         id=next_id, kind=DiscoveryKind.ENTITY, rarity_tier=RarityTier.LEGENDARY,
-        sector_id=home_sector, hidden=True,
+        sector_id=home_sector, hidden=True, name=name,  # the codex row wears the Entity's name
         payload=DiscoveryPayload(kind=PayloadKind.LORE,
                                  lore="first contact with the singular roaming Entity"),
     )

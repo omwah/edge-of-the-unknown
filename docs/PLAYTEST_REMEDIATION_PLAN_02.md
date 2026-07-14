@@ -353,7 +353,35 @@ Commit: `playtest: WP-PR2-03 rumor reveal modal`
 
 ---
 
-### WP-PR2-04 — Discovery names
+### WP-PR2-04 — Discovery names — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-04 named discoveries`.
+
+- **`Discovery.name` is live state** (in `state_hash`), stamped at creation. Pools live in
+  **config** per the constants rule: `names.discoveries` in `names_default.yaml`, keyed by
+  `DiscoveryKind`, drawn combinatorially by a new `bigbang.naming.DiscoveryNamer` **without
+  replacement** — no two finds in a universe share a name (the later raid-cache pass is seeded
+  with the names already spoken for), and an exhausted pool falls through to numbering
+  ("Black Hole 1"). A kind with no pool is legal.
+- **A combat wreck takes the destroyed foe's own name** (`_combat_wrecks` reads `foe.name`), so
+  the sector view reads "Wreckage of the Vesk Marauder VII" — the raider you just shot, not a
+  generic hulk. The sector row names a wreck **before** salvage (a hulk is plainly a hulk, so it
+  costs no fog); other finds stay "Anomaly detected" until scanned, as before.
+- **Naming rides a names-only sub-RNG**, so it is replay-deterministic *and* cannot perturb
+  placement. `test_naming_does_not_move_a_single_discovery` proves it by regenerating a seed
+  against a config with **no name pools** and asserting identical placement — which is why this
+  epoch needed no golden-replay churn at all.
+- **No store migration, contrary to §2.6/this WP's plan.** The save is `(seed, command log)` and
+  the universe is *regenerated* (`store.snapshots.rebuild`) — there is no discovery table, so
+  there is nothing to migrate and no legacy row to back-fill. Wire **17 → 18** (projection-only:
+  `SectorDiscovery.name`, `CodexEntry.kind`); fingerprint + envelope fixtures regenerated.
+- **Projection/TUI:** `_discovery_label` leads with the name and trails kind/rarity as the
+  subtitle it always was (a wormhole still leads with its one-way warning); the Codex's `name`
+  column is now the find's name and a new **Kind** column carries what it *is*.
+
+Tests: `tests/test_discovery_names.py` (named, unique, deterministic, placement-invariant,
+in `state_hash`, pool fallback + exhaustion) and
+`test_combat.py::test_a_combat_wreck_wears_the_destroyed_ship_s_name`.
 
 **Goal:** give space discoveries stored, deterministic, flavorful names; a combat
 wreck takes the **destroyed ship's** name.

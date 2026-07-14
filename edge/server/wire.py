@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 17
+WIRE_VERSION = 18
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -66,6 +66,9 @@ v12 (WP-UI09 follow-up): `EngineRoomPreviewDTO` projects validated before/after 
 v13 (WP-PR2-02): `ShipyardItem.flown` distinguishes historical hulls from the current one.
 v14-v16 (station builder identity): starbase DTOs carry the immutable roster archetype used
 by procedural icons and raster banners; sector projections carry the same identity and state.
+v17 (WP-PR2-01c): `StarDockDTO` renamed `StardockDTO` (spelling normalized repo-wide).
+v18 (WP-PR2-04/PT-49): discoveries are named — `SectorDiscovery.name` and `CodexEntry.kind`
+(the codex row's name is now the find's own name; `kind` carries what it *is*).
 """
 
 

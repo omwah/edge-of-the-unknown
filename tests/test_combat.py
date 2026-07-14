@@ -246,6 +246,21 @@ def test_field_patch_restores_the_knocked_component() -> None:
     assert derive_aspects(patched, cfg).combat_speed == healthy  # fully recovered
 
 
+def test_a_combat_wreck_wears_the_destroyed_ship_s_name() -> None:
+    """PT-49: the hulk you salvage is the raider you shot — not a generic drifting wreck."""
+    state = _fight_state()
+    existing = set(state.discoveries)
+    foes = (_foe(hull=1, shields=0, damage=1, name="Vesk Marauder VII"),
+            _foe(hull=1, shields=0, damage=1, name="Vesk Marauder IX"))
+    _engagement(state, foes)
+    for _ in range(4):
+        apply_result(state, reduce(state, 1, CombatAction(action="fight"), SMALL))
+        if state.players[1].active_encounter is None:
+            break
+    wrecks = [d for did, d in state.discoveries.items() if did not in existing]
+    assert [w.name for w in wrecks] == ["Vesk Marauder VII", "Vesk Marauder IX"]
+
+
 def test_salvage_is_conserved_and_bounded() -> None:
     """NPC victory leaves one bounded cache per hull; a later salvage transfers it."""
     cfg = SMALL.model_copy(update={"combat": SMALL.combat.model_copy(

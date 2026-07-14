@@ -1464,6 +1464,10 @@ class NamesConfig(BaseModel):
     ports: NameList = Field(default_factory=NameList)
     stardock: NameList = Field(default_factory=NameList)
     planets: PlanetNamesConfig = Field(default_factory=PlanetNamesConfig)
+    # Per-`DiscoveryKind` pools (keyed by the enum's value, e.g. "nebula"), so a find is a
+    # *place* — "the Cygnus Veil" — rather than "Nebula ∗ Rare" (PT-49). A kind with no pool
+    # falls back to a numbered name, so a roster need not fill every key.
+    discoveries: dict[str, NameList] = Field(default_factory=dict)
 
 
 class CronCadenceConfig(BaseModel):
