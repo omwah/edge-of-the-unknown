@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 19
+WIRE_VERSION = 20
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -71,6 +71,11 @@ v18 (WP-PR2-04/PT-49): discoveries are named — `SectorDiscovery.name` and `Cod
 (the codex row's name is now the find's own name; `kind` carries what it *is*).
 v19 (WP-PR2-13/PT-52): asteroid belts are finite — `PlanetDTO`/`SectorPlanetDTO` carry
 `ore_reserve`/`ore_reserve_max` (the readout, and the art's rock-thinning fraction).
+v20 (WP-PR2-15/PT-54): Cloud Cities — `BuildStagingArea` command + `CloudCityBuilt` event;
+`PlanetDTO` carries `cloud_city_size`/`cloud_city_max_size`/`cloud_city_next_cost`/
+`cloud_city_blocker` and projects `colonizable`/`habitability_cap` as *this world's* capacity
+(a staged gas giant holds people, an unstaged one holds nothing); `SectorPlanetDTO.cloud_city_size`
+so the sector scene paints the floating city.
 """
 
 

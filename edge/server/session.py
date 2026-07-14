@@ -138,9 +138,12 @@ from edge.core.models import (
 from edge.core.aliens import base_owner_hostile
 from edge.core.planets import (
     belt_mining_yield,
+    cloud_city_blocker,
+    cloud_city_next_cost,
+    colonist_capacity,
     genesis_blocker,
     genesis_valid_target,
-    is_colonizable,
+    is_cloud_city_world,
     is_extractable,
     is_landable,
     pretty_planet_type,
@@ -392,7 +395,8 @@ def _sector_dto(
     ]
     planets = [
         dto.SectorPlanetDTO(planet_id=pl.id, name=pl.name, ptype=pl.planet_type,
-                            ore_reserve=pl.ore_reserve, ore_reserve_max=pl.ore_reserve_max)
+                            ore_reserve=pl.ore_reserve, ore_reserve_max=pl.ore_reserve_max,
+                            cloud_city_size=pl.cloud_city_size)
         for pl in state.planets.values() if pl.sector_id == sector.id
     ]
     # A staged species shows as a present vessel so the player can see (and hail) it —
@@ -675,8 +679,15 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     """The orbit view of a planet for `player_id` (§4.2): type, owner, colony, stores."""
     planet = state.planets[planet_id]
     ship = state.ships[state.players[player_id].ship_id]
-    colonizable = is_colonizable(planet.planet_type, config)
+    # Capacity, not type (§4.2, PT-54): "colonizable" is what *this world* can take now — a
+    # staged gas giant holds people in its Cloud City, an unstaged one holds nobody at all — so
+    # the transfer workbench's clamps and the claim affordance read the reducer's own gate.
+    capacity = colonist_capacity(planet, config)
+    colonizable = capacity > 0
     owned_by_you = planet.owner.kind == "player" and planet.owner.ref == player_id
+    city_world = is_cloud_city_world(planet.planet_type, config)
+    city_owner_ok = (not planet.owner.is_owned) or owned_by_you
+    ship_equipment = ship.cargo.get(Commodity.EQUIPMENT, 0)
     genesis = config.genesis
     ship_genesis = ship.devices.get(genesis.device_id, 0) if genesis is not None else 0
     genesis_has_device = ship_genesis > 0
@@ -726,7 +737,7 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         planet_id=planet.id, name=planet.name, ptype=planet.planet_type,
         owner=_owner_label(state, planet, player_id), colonizable=colonizable,
         claimable=colonizable and not planet.owner.is_owned, owned_by_you=owned_by_you,
-        colonists=planet.colonists, habitability_cap=planet.habitability_cap,
+        colonists=planet.colonists, habitability_cap=capacity,
         stores=stores, allocation=allocation, ship_colonists=ship.colonists,
         ship_colonist_capacity=ship.colonist_capacity,
         ship_genesis=ship_genesis, genesis_eligible=genesis_eligible,
@@ -742,6 +753,14 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         extractable=is_extractable(planet.planet_type, config),
         mine_yield=(belt_mining_yield(planet, config) or (None, 0))[1],
         ore_reserve=planet.ore_reserve, ore_reserve_max=planet.ore_reserve_max,
+        # The Cloud City affordance (§4.2, PT-54) — the same blocker the reducer would raise,
+        # so the greyed button and the refusal say one thing.
+        cloud_city=city_world, cloud_city_size=planet.cloud_city_size,
+        cloud_city_max_size=config.planets.cloud_city_max_size if city_world else 0,
+        cloud_city_next_cost=cloud_city_next_cost(planet, config),
+        cloud_city_blocker=(cloud_city_blocker(planet, ship_equipment, city_owner_ok, config)
+                            if city_world else ""),
+        ship_equipment=ship_equipment,
     )
 
 

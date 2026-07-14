@@ -36,6 +36,7 @@ from edge.core.events import (
     BaseCommission,
     BeltMined,
     CargoTransferred,
+    CloudCityBuilt,
     CitadelBuildStarted,
     CitadelCompleted,
     CitadelGunSilenced,
@@ -118,6 +119,7 @@ from edge.core.rules import (
     BuyGenesis,
     BuyMissiles,
     BuyShip,
+    BuildStagingArea,
     BuyFighters,
     BuyMines,
     Cannibalize,
@@ -205,6 +207,7 @@ COMMANDS: list[Command] = [
     Descend(planet_id=5),         # WP6 descend to a planet surface
     Explore(planet_id=5),         # WP6 survey the next surface site
     MineBelt(planet_id=5),        # PT-30 hand-mine an asteroid belt
+    BuildStagingArea(planet_id=5),  # PT-54 stage a Cloud City on a gas giant
     BuyGenesis(),                 # WP10 buy a genesis torpedo
     DeployGenesis(planet_id=5),   # WP10 terraform a world
     Hail(species_id=3),                          # WP9 open alien contact
@@ -297,6 +300,7 @@ EVENTS: list[Event] = [
     DiscoveryCollected(1, 7, "wreck", "RARE", "artifact"),
     Descended(1, 5),
     BeltMined(1, 5, "equipment", 50),
+    CloudCityBuilt(1, 5, 1, 50),
     SiteExplored(1, 5, 9, "ruins", "RARE"),
     DevicePurchased(1, "genesis_torpedo", 15_000),
     GenesisDeployed(1, 5, "terrestrial_warm"),

@@ -25,6 +25,7 @@ from edge.core.events import (
     BaseCommission,
     BeltMined,
     CargoTransferred,
+    CloudCityBuilt,
     CitadelBuildStarted,
     CitadelCompleted,
     CitadelGunSilenced,
@@ -102,6 +103,7 @@ from edge.core.rules import (
     BuyFighters,
     BuyMines,
     BuildCitadel,
+    BuildStagingArea,
     BuyAlienTech,
     BuyComponent,
     BuyDevice,
@@ -213,6 +215,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "Colonize", {"planet_id": command.planet_id, "colonists": command.colonists}
         case SettleColonists():
             return "SettleColonists", {"planet_id": command.planet_id, "colonists": command.colonists}
+        case BuildStagingArea():
+            return "BuildStagingArea", {"planet_id": command.planet_id}
         case SetAllocation():
             return "SetAllocation", {
                 "planet_id": command.planet_id, "allocation": command.allocation,
@@ -416,6 +420,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return Colonize(planet_id=payload["planet_id"], colonists=payload["colonists"])
         case "SettleColonists":
             return SettleColonists(planet_id=payload["planet_id"], colonists=payload["colonists"])
+        case "BuildStagingArea":
+            return BuildStagingArea(planet_id=payload["planet_id"])
         case "SetAllocation":
             return SetAllocation(planet_id=payload["planet_id"], allocation=payload["allocation"],
                                  fighter=payload.get("fighter", 0.0))
@@ -657,6 +663,11 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             }
         case Descended():
             return "Descended", {"player_id": event.player_id, "planet_id": event.planet_id}
+        case CloudCityBuilt():
+            return "CloudCityBuilt", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "size": event.size, "cost": event.cost,
+            }
         case BeltMined():
             return "BeltMined", {
                 "player_id": event.player_id, "planet_id": event.planet_id,
@@ -1003,6 +1014,9 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "BeltMined":
             return BeltMined(payload["player_id"], payload["planet_id"],
                              payload["commodity"], payload["amount"])
+        case "CloudCityBuilt":
+            return CloudCityBuilt(payload["player_id"], payload["planet_id"],
+                                  payload["size"], payload["cost"])
         case "SiteExplored":
             return SiteExplored(payload["player_id"], payload["planet_id"], payload["discovery_id"],
                                 payload["kind"], payload["rarity"])

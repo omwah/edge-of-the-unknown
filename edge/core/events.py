@@ -244,6 +244,20 @@ class ColonistsSettled(Event):
 
 
 @dataclass(frozen=True)
+class CloudCityBuilt(Event):
+    """A staging area was built (or grown) on a gas giant (§4.2, PT-54).
+
+    `size` is the city's new size; `cost` the Equipment taken out of the ship's hold to
+    raise it. The first build also claims the world.
+    """
+
+    player_id: int
+    planet_id: int
+    size: int
+    cost: int
+
+
+@dataclass(frozen=True)
 class PlanetProduced(Event):
     planet_id: int
     owner_player_id: int  # only player-owned colonies announce (alliance output is silent)

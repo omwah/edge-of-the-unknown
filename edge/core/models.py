@@ -163,6 +163,10 @@ class Planet:
     # worked-out belt stays worked out. Both are 0 on every non-belt world.
     ore_reserve: int = 0
     ore_reserve_max: int = 0
+    # Gas giants only (§4.2, PT-54): the size of the floating Cloud City built here, 0 ⇒ none.
+    # A jovian has no ground — until a staging area is built it can hold no stores and no
+    # colonists; once built, the city berths `size × planets.cloud_city_berths` people.
+    cloud_city_size: int = 0
 
 
 @dataclass(frozen=True, slots=True)

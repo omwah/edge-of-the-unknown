@@ -97,6 +97,7 @@ from edge.core.events import (
     Banked,
     BaseCommission,
     BeltMined,
+    CloudCityBuilt,
     Colonized,
     ColonistsSettled,
     AdmissionAdvanced,
@@ -162,11 +163,15 @@ from edge.core.events import HazardDamage as HazardDamageEvent
 from edge.core.events import CombatRound as CombatRoundEvent
 from edge.core.planets import (
     belt_mining_yield,
+    cloud_city_blocker,
+    cloud_city_next_cost,
+    colonist_blocker,
+    colonist_capacity,
     genesis_blocker,
-    is_colonizable,
     is_landable,
     pretty_planet_type,
     retype_planet,
+    store_blocker,
 )
 from edge.core.starbases import is_operational
 from edge.core.models import (
@@ -312,6 +317,19 @@ class SettleColonists:
 
     planet_id: int
     colonists: int
+
+
+@dataclass(frozen=True, slots=True)
+class BuildStagingArea:
+    """Build (or grow) a Cloud City's staging area on a gas giant (§4.2, PT-54).
+
+    A jovian holds no stores and no people until this exists, so the cost is paid from the
+    ship's **cargo hold** — there is nowhere on a gas giant to have stockpiled it. In-sector,
+    on a world that is unowned (the first build **claims** it) or already the player's;
+    `planets.cloud_city_stage_cost × (next size)` Equipment aboard, up to `cloud_city_max_size`.
+    """
+
+    planet_id: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -960,6 +978,7 @@ Command = (
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SettleColonists | SetAllocation
+    | BuildStagingArea
     | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
     | TransferCargo | BatchTransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
@@ -1089,12 +1108,14 @@ def reduce(
             return _settle_colonists(state, player_id, command, config)
         case SetAllocation():
             return _set_allocation(state, player_id, command, config)
+        case BuildStagingArea():
+            return _build_staging_area(state, player_id, command, config)
         case BuildCitadel():
             return _build_citadel(state, player_id, command, config)
         case TransferCargo():
-            return _transfer_cargo(state, player_id, command)
+            return _transfer_cargo(state, player_id, command, config)
         case BatchTransferCargo():
-            return _batch_transfer_cargo(state, player_id, command)
+            return _batch_transfer_cargo(state, player_id, command, config)
         case PlanetDeposit():
             return _planet_bank(state, player_id, command.planet_id, command.amount,
                                 config, withdraw_=False)
@@ -1995,8 +2016,11 @@ def _colonize(
         raise EconomyError("no such world in this sector")
     if planet.owner.is_owned:
         raise EconomyError("that world is already claimed")  # Core worlds are governor-owned
-    if not is_colonizable(planet.planet_type, config):
-        raise EconomyError(f"a {planet.planet_type} world cannot be colonized")
+    # The capacity seam (§4.2, PT-54), not the raw type: a gas giant refuses people until its
+    # Cloud City exists — and a staged one is already owned, so it comes through SettleColonists.
+    blocker = colonist_blocker(planet, config)
+    if blocker:
+        raise EconomyError(blocker)
     if cmd.colonists <= 0:
         raise EconomyError("must land at least one colonist")
     if cmd.colonists > ship.colonists:
@@ -2030,20 +2054,62 @@ def _settle_colonists(
         raise EconomyError("no such world in this sector")
     if not corp.player_owns(state, planet.owner, player_id):
         raise EconomyError("you do not own that world")  # claim an unowned world with Colonize
-    if not is_colonizable(planet.planet_type, config):
-        raise EconomyError(f"a {planet.planet_type} world cannot hold colonists")
+    blocker = colonist_blocker(planet, config)  # the capacity seam (§4.2, PT-54)
+    if blocker:
+        raise EconomyError(blocker)
     if cmd.colonists <= 0:
         raise EconomyError("must land at least one colonist")
     if ship.colonists <= 0:
         raise EconomyError("no colonists aboard to settle")
-    headroom = max(0, planet.habitability_cap - planet.colonists)
+    # Headroom against *this world's* capacity: habitability on the ground, the Cloud City's
+    # berths in the clouds — so a full city says so, and growing it makes room (§4.2, PT-54).
+    headroom = max(0, colonist_capacity(planet, config) - planet.colonists)
     if headroom <= 0:
-        raise EconomyError("the colony is at its habitability cap")
+        raise EconomyError(
+            "the cloud city is full — build it larger to berth more"
+            if planet.cloud_city_size > 0 else "the colony is at its habitability cap")
     moved = min(cmd.colonists, ship.colonists, headroom)
     new_ship = replace(ship, colonists=ship.colonists - moved)
     new_planet = replace(planet, colonists=planet.colonists + moved)
     return ReduceResult(
         events=(ColonistsSettled(player_id, planet.id, moved),),
+        ships=(new_ship,), planets=(new_planet,),
+    )
+
+
+def _build_staging_area(
+    state: UniverseState, player_id: int, cmd: BuildStagingArea, config: GameConfig
+) -> ReduceResult:
+    """Build or grow a gas giant's Cloud City, paying from the hold (§4.2, PT-54).
+
+    A jovian has no ground: it can hold neither stores nor colonists until a staging area
+    floats there — which is why the cost is Equipment **aboard the ship**, not in stores
+    (there are none to draw on, the bootstrap a citadel never has to solve). The first build
+    also **claims** the world, so a gas giant is settled by hauling rather than by landing
+    people. Size *n* costs *n* × `cloud_city_stage_cost`, to a `cloud_city_max_size` ceiling.
+    `cloud_city_blocker` is the shared legality seam — the projection greys the same button
+    with the same words the reducer would raise.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    planet = state.planets.get(cmd.planet_id)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise EconomyError("no such world in this sector")
+    owner_ok = (not planet.owner.is_owned) or corp.player_owns(state, planet.owner, player_id)
+    aboard = ship.cargo.get(Commodity.EQUIPMENT, 0)
+    blocker = cloud_city_blocker(planet, aboard, owner_ok, config)
+    if blocker:
+        raise EconomyError(blocker)
+    cost = cloud_city_next_cost(planet, config)
+    size = planet.cloud_city_size + 1
+    new_ship = replace(ship, cargo={**ship.cargo, Commodity.EQUIPMENT: aboard - cost})
+    new_planet = replace(
+        planet, cloud_city_size=size,
+        owner=planet.owner if planet.owner.is_owned else Ownership("player", player_id),
+        allocation=planet.allocation or _even_allocation(),
+    )
+    return ReduceResult(
+        events=(CloudCityBuilt(player_id, planet.id, size, cost),),
         ships=(new_ship,), planets=(new_planet,),
     )
 
@@ -2082,7 +2148,9 @@ def _owned_planet_here(state: UniverseState, player_id: int, planet_id: int) -> 
     return planet
 
 
-def _transfer_cargo(state: UniverseState, player_id: int, cmd: TransferCargo) -> ReduceResult:
+def _transfer_cargo(
+    state: UniverseState, player_id: int, cmd: TransferCargo, config: GameConfig
+) -> ReduceResult:
     """Haul goods between the ship's hold and an owned world's stores (§4.2).
 
     Conserves goods exactly (the §13 invariant): one side debits what the other
@@ -2094,6 +2162,9 @@ def _transfer_cargo(state: UniverseState, player_id: int, cmd: TransferCargo) ->
     player = _player(state, player_id)
     ship = _ship(state, player)
     planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    blocked = store_blocker(planet, config)  # a gas giant stores nothing until it is staged
+    if blocked:
+        raise EconomyError(blocked)
     if cmd.units <= 0:
         raise EconomyError("transfer a positive amount")
     if cmd.to_planet:
@@ -2121,12 +2192,15 @@ def _transfer_cargo(state: UniverseState, player_id: int, cmd: TransferCargo) ->
 
 
 def _batch_transfer_cargo(
-    state: UniverseState, player_id: int, cmd: BatchTransferCargo,
+    state: UniverseState, player_id: int, cmd: BatchTransferCargo, config: GameConfig,
 ) -> ReduceResult:
     """Apply the transfer workbench's aggregate action as one all-or-nothing delta."""
     player = _player(state, player_id)
     ship = _ship(state, player)
     planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    blocked = store_blocker(planet, config)  # a gas giant stores nothing until it is staged
+    if blocked:
+        raise EconomyError(blocked)
     unknown = set(cmd.units) - {commodity.value for commodity in Commodity}
     if unknown:
         raise EconomyError(f"unknown commodity in batch: {sorted(unknown)[0]}")
