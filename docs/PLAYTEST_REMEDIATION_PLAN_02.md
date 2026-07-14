@@ -832,7 +832,32 @@ Commit: `playtest: WP-PR2-13 finite asteroid belts`
 
 ---
 
-### WP-PR2-14 — Partial-fighter invasion (UI)
+### WP-PR2-14 — Partial-fighter invasion (UI) — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-14 partial-fighter invasion`. UI-only, exactly as
+§2.7 predicted: `InvadePlanet` always took `cmd.fighters` and the core already leaves the
+remainder aboard (`test_citadels.py` commits 300 of 500 and asserts the ship keeps 200) — only
+the planet screen hard-coded `p.ship_fighters`.
+
+- New shared **`AmountPrompt`** (`edge/tui/screens/amount.py`): the *quantity* sibling of
+  `ConfirmScreen`, wrapping the same `AmountStepper` so typing, −/+ stepping, and clamping
+  behave as they do at the Stardock and in the transfer workbench. Dismisses with the amount or
+  `None`, so a caller reads it like a confirm. `[I]` opens it defaulting to the whole wing
+  (the common case stays cheap), clamped to `1..ship_fighters`, `[A]` commits them all, step 10.
+- **It is the destructive confirmation, so it inherits the safety rule.** `ACTION_DANGER` marks
+  `invade` destructive, and `ConfirmScreen` enforces "a stray Enter must not destroy" by focusing
+  *deny*. `AmountPrompt(dangerous=True)` therefore lands focus on **Cancel** and binds no
+  screen-wide Enter — Enter presses whatever is focused, so a stray Enter after the hotkey
+  cancels. Enter *inside* the amount field commits, since typing a number and pressing Enter is
+  unambiguous intent. `tests/test_ui_actions.py`'s danger guard (which caught the regression when
+  the prompt first bypassed `ConfirmScreen`) now accepts either confirming modal and asserts the
+  focus rule.
+- Planet-screen affordance and Help updated: the invasion line no longer promises to land *all*
+  fighters.
+
+Tests: `tests/test_ui_invade_amount.py` (prompt appears; a partial commit issues
+`InvadePlanet(id, n)`; clamps at 1 and at `ship_fighters`; `[A]` refills; cancel and stray-Enter
+land nobody; a blocked invasion never reaches the prompt).
 
 **Goal:** let the player choose how many fighters to commit to an invasion.
 
