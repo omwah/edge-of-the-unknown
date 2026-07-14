@@ -60,8 +60,16 @@ def test_extraction_types_produce_without_colonists() -> None:
     jovian = _colony("jovian", colonists=0, stores={})
     after = produce(jovian, CONFIG)
     assert after.stores[Commodity.FUEL_ORE] == CONFIG.planets.jovian_scoop
-    belt = _colony("asteroid_belt", colonists=0, stores={})
-    assert produce(belt, CONFIG).stores[Commodity.EQUIPMENT] == CONFIG.planets.asteroid_mining
+    # A belt draws from its finite reserve (PT-52) — auto-collect can no more mint ore out of a
+    # worked-out field than a player can. (Belts are always unowned, so this branch is
+    # unreachable in a real game; it stays correct in case one ever becomes ownable.)
+    belt = replace(_colony("asteroid_belt", colonists=0, stores={}),
+                   ore_reserve=500, ore_reserve_max=500)
+    mined = produce(belt, CONFIG)
+    assert mined.stores[Commodity.EQUIPMENT] == CONFIG.planets.asteroid_mining
+    assert mined.ore_reserve == 500 - CONFIG.planets.asteroid_mining
+    spent = replace(belt, ore_reserve=0)
+    assert produce(spent, CONFIG) is spent  # a spent field yields nothing
     barren = _colony("barren", colonists=0, stores={})
     assert produce(barren, CONFIG) is barren  # produces nothing
 

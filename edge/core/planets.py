@@ -102,20 +102,23 @@ def genesis_blocker(planet: Planet, has_device: bool, config: GameConfig) -> str
     return ""
 
 
-def belt_mining_yield(planet_type: str, config: GameConfig) -> tuple[Commodity, int] | None:
-    """The commodity + per-action amount a player pulls from hand-mining a belt (§4.2, PT-30).
+def belt_mining_yield(planet: Planet, config: GameConfig) -> tuple[Commodity, int] | None:
+    """The commodity + amount one mining action pulls from a belt (§4.2, PT-30/PT-52).
 
     Belts yield raw Equipment (metal, thin) in orbit without colonists. Returns None for any
-    world that can't be hand-mined this way (not an asteroid belt, or mining disabled in
-    config). The amount reuses `asteroid_mining` — the same seam the owned-world auto-collect
-    (`produce`) draws on — so the two extraction paths stay balanced by one config value.
+    world that can't be mined this way (not an asteroid belt, or mining disabled in config).
+    The nominal amount is `asteroid_mining` — the same seam the auto-collect (`produce`) draws
+    on — **clamped to what is left in the belt's finite `ore_reserve`** (PT-52), so the reducer,
+    the auto-collect, and the `PlanetDTO.mine_yield` projection can never disagree about what a
+    haul is worth. A worked-out belt yields `(EQUIPMENT, 0)` rather than None: it is still a
+    belt, it just has nothing left — the caller distinguishes "cannot be mined" from "empty".
     """
-    if planet_type != "asteroid_belt":
+    if planet.planet_type != "asteroid_belt":
         return None
     amount = config.planets.asteroid_mining
     if amount <= 0:
         return None
-    return (Commodity.EQUIPMENT, amount)
+    return (Commodity.EQUIPMENT, max(0, min(amount, planet.ore_reserve)))
 
 
 def normalize_belt(planet: Planet, config: GameConfig) -> Planet:
@@ -129,10 +132,19 @@ def normalize_belt(planet: Planet, config: GameConfig) -> Planet:
     """
     if is_landable(planet.planet_type, config):
         return planet
+    # A belt with no reserve *ceiling* was never seeded (a pre-PT-52 world, or a hand-built
+    # fixture) — not a worked-out one. Converge it on a full, band-agnostic field so "unseeded"
+    # can never read as "spent"; a genuinely exhausted belt keeps `ore_reserve_max > 0` with
+    # `ore_reserve == 0` and is left alone. The big bang overwrites this with the band-weighted
+    # draw immediately after, so this is only ever the legacy path.
+    reserve, reserve_max = planet.ore_reserve, planet.ore_reserve_max
+    if reserve_max <= 0:
+        reserve = reserve_max = config.planets.belt_reserve_base
     clean = replace(
         planet, owner=UNOWNED, inhabited_by_species_id=None, colonists=0,
         allocation={}, stores={}, citadel_level=0, citadel_progress=-1, treasury=0,
         fighters=0, gun_integrity=0, fighter_allocation=0.0, starbase_id=None,
+        ore_reserve=reserve, ore_reserve_max=reserve_max,
     )
     return planet if clean == planet else clean
 
@@ -144,9 +156,14 @@ def retype_planet(planet: Planet, new_type: str, config: GameConfig) -> Planet:
     profile = config.planets.types.get(new_type)
     if profile is None:
         raise ValueError(f"unknown planet_type {new_type!r}")
+    belt = new_type == "asteroid_belt"
     return replace(
         planet, planet_type=new_type, habitability_cap=profile.habitability,
         yield_profile={Commodity(k): v for k, v in profile.yield_profile.items()},
+        # An ore reserve belongs to a belt (§4.2, PT-52) — re-forming one into a world (or a
+        # world into one) must not carry a stale field along.
+        ore_reserve=planet.ore_reserve if belt else 0,
+        ore_reserve_max=planet.ore_reserve_max if belt else 0,
     )
 
 
@@ -172,6 +189,7 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
     stores = dict(planet.stores)
     colonists = planet.colonists
     fighters = planet.fighters
+    ore_reserve = planet.ore_reserve
 
     if profile.colonizable:
         effective = min(colonists, planet.habitability_cap)
@@ -196,12 +214,18 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
     elif planet.planet_type == "jovian":
         _add(stores, Commodity.FUEL_ORE, cfg.jovian_scoop)
     else:
-        haul = belt_mining_yield(planet.planet_type, config)  # the shared belt-yield seam
-        if haul is not None:
+        # The shared belt seam — already clamped to the finite reserve (PT-52), so an
+        # auto-collect can no more mint ore out of a worked-out field than a player can.
+        # (A belt is always unowned, so this branch is unreachable today; keeping it honest
+        # means it stays correct if a belt ever becomes ownable.)
+        haul = belt_mining_yield(planet, config)
+        if haul is not None and haul[1] > 0:
             _add(stores, *haul)
+            ore_reserve -= haul[1]
     # barren (and any other uncolonizable type) produces nothing.
 
     if (colonists == planet.colonists and fighters == planet.fighters
-            and stores == dict(planet.stores)):
+            and ore_reserve == planet.ore_reserve and stores == dict(planet.stores)):
         return planet  # nothing changed (e.g. an empty colony) — skip the rewrite
-    return replace(planet, stores=stores, colonists=colonists, fighters=fighters)
+    return replace(planet, stores=stores, colonists=colonists, fighters=fighters,
+                   ore_reserve=ore_reserve)

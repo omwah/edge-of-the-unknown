@@ -491,6 +491,14 @@ class PlanetsConfig(BaseModel):
     jovian_scoop: int = 50  # fuel-ore per tick from a gas giant (no colonists)
     asteroid_mining: int = 50  # equipment per tick from a belt (no colonists)
     mining_turn_cost: int = 1  # turns a player spends hand-mining a belt (§4.2, PT-30)
+    # A belt is a **finite** body of ore (§4.2, PT-52): each is seeded with a reserve that
+    # mining draws down and that **never regrows** — a worked-out belt stays worked out, so a
+    # mining camp is a place you exhaust and leave, which is the exploration-first pressure.
+    # Reserve = `belt_reserve_base` × the sector band's scale × a per-belt spread draw, so the
+    # deep bands hold the richer fields (the same "reward rises with distance" gradient §7 uses).
+    belt_reserve_base: int = 600           # mean reserve (Equipment units) of a Hub belt
+    belt_reserve_spread: float = Field(default=0.35, ge=0.0, lt=1.0)  # ± fraction, per belt
+    belt_reserve_band_scale: dict[str, float] = Field(default_factory=dict)  # band → multiplier
     # Band-weighted ownership at generation (unowned fraction non-decreasing, §4.2).
     ownership: dict[str, OwnershipWeights] = Field(default_factory=dict)
 

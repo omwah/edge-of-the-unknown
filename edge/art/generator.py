@@ -63,6 +63,7 @@ def generate_sprite(
     height: int,
     archetype_id: str | None = None,
     facing: str = "right",
+    depletion: float = 0.0,
 ) -> Text:
     """Generate a procedural ASCII sprite based on parameters.
 
@@ -76,6 +77,8 @@ def generate_sprite(
             (stable across species renames, unlike a species id/name)
         facing: For ships, "right" (canonical) or "left" -- the same ship flipped
             to point either way. Ignored by the other entity types.
+        depletion: For an asteroid-belt planet, the 0..1 fraction of its ore already
+            mined out -- rocks thin as the field empties (PT-52). Ignored elsewhere.
 
     Returns:
         A rich Text object representing the generated ASCII art.
@@ -93,7 +96,7 @@ def generate_sprite(
         return _TERRAIN_GEN.generate(rng, subtype, width, height)
 
     if entity_type == "planet":
-        return _PLANET_GEN.generate(rng, subtype, width, height)
+        return _PLANET_GEN.generate(rng, subtype, width, height, depletion)
 
     if entity_type == "starfield":
         return _STARFIELD_GEN.generate(rng, subtype, width, height)

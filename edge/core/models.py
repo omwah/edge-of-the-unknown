@@ -157,6 +157,12 @@ class Planet:
     gun_integrity: int = 0  # the citadel gun's health (L2+); 0 ⇒ no gun or gun silenced (WP55)
     fighter_allocation: float = 0.0  # share of production minting garrison fighters (WP55)
     starbase_id: int | None = None  # WP4 orbital base
+    # Asteroid belts only (§4.2, PT-52): the finite body of ore in the field. `ore_reserve` is
+    # what is left, `ore_reserve_max` what it was seeded with (the art and the readout show the
+    # remaining fraction against it). Mining draws the reserve down and it **never regrows** — a
+    # worked-out belt stays worked out. Both are 0 on every non-belt world.
+    ore_reserve: int = 0
+    ore_reserve_max: int = 0
 
 
 @dataclass(frozen=True, slots=True)

@@ -391,7 +391,8 @@ def _sector_dto(
         for p in state.ports.values() if p.sector_id == sector.id
     ]
     planets = [
-        dto.SectorPlanetDTO(planet_id=pl.id, name=pl.name, ptype=pl.planet_type)
+        dto.SectorPlanetDTO(planet_id=pl.id, name=pl.name, ptype=pl.planet_type,
+                            ore_reserve=pl.ore_reserve, ore_reserve_max=pl.ore_reserve_max)
         for pl in state.planets.values() if pl.sector_id == sector.id
     ]
     # A staged species shows as a present vessel so the player can see (and hail) it —
@@ -739,7 +740,8 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         can_invade=can_invade, invade_blocker=invade_blocker, ship_fighters=ship.fighters,
         landable=is_landable(planet.planet_type, config),
         extractable=is_extractable(planet.planet_type, config),
-        mine_yield=(belt_mining_yield(planet.planet_type, config) or (None, 0))[1],
+        mine_yield=(belt_mining_yield(planet, config) or (None, 0))[1],
+        ore_reserve=planet.ore_reserve, ore_reserve_max=planet.ore_reserve_max,
     )
 
 

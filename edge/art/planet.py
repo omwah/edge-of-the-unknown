@@ -64,6 +64,15 @@ SHADOW_BG_DEEP = "grey11"  # #1c1c1c -- darkest night side, still above the void
 SHADOW_BG_MID = "grey15"   # #262626
 SHADOW_BG_NEAR = "grey19"  # #303030 -- just inside the terminator
 
+def _rock_rank(x: int, y: int) -> float:
+    """A stable 0..1 rank per cell — the order in which an asteroid field is mined out.
+
+    Fixed per position (not drawn from the sprite's RNG), so a field at 40% depletion is the
+    field at 20% depletion minus more rocks: mining empties it, it never redraws it.
+    """
+    return random.Random(f"belt-rock|{x}|{y}").random()
+
+
 class PlanetGenerator:
     """Procedural planet generator using SDF masks over terrain fills."""
     
@@ -75,8 +84,15 @@ class PlanetGenerator:
         """Expose the terrain's biome registry for iteration in CLI."""
         return self.terrain_gen.biomes_registry
 
-    def generate(self, rng: random.Random, subtype: str, width: int, height: int) -> Text:
-        """Generate a procedural planet wrapped in a circular SDF."""
+    def generate(self, rng: random.Random, subtype: str, width: int, height: int,
+                 depletion: float = 0.0) -> Text:
+        """Generate a procedural planet wrapped in a circular SDF.
+
+        `depletion` (0..1) applies only to an asteroid field: the fraction of its rocks that
+        have been mined out. Rocks are removed by a **per-cell** threshold, so raising depletion
+        only ever takes *more* rocks away and never reshuffles the ones that remain — the same
+        field visibly empties as you work it, rather than becoming a different field.
+        """
         grid = self.terrain_gen.get_grid(rng, subtype, width, height)
         map_text = Text()
 
@@ -85,9 +101,12 @@ class PlanetGenerator:
 
         if is_asteroid:
             # Pass through directly without border or spherical mask.
+            mined = max(0.0, min(1.0, depletion))
             for y in range(height):
                 for x in range(width):
                     char, fg, _ = grid[y][x]
+                    if mined > 0.0 and char != " " and _rock_rank(x, y) < mined:
+                        char = " "  # this rock has been mined out of the field
                     map_text.append(char, style=fg)
                 if y < height - 1:
                     map_text.append("\n")

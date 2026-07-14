@@ -816,7 +816,37 @@ Commit: `playtest: WP-PR2-12 NPC hub-drift dispersion`
 
 ---
 
-### WP-PR2-13 — Asteroid mining limits and finite yield
+### WP-PR2-13 — Asteroid mining limits and finite yield — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-13 finite asteroid belts`.
+
+- **The reserve, and the regrowth decision (§2.5 left it open): no regrowth.** `Planet.ore_reserve`
+  / `ore_reserve_max` are seeded at generation as `belt_reserve_base` × the sector band's
+  `belt_reserve_band_scale` × a per-belt `belt_reserve_spread` draw (config), on **its own
+  sub-RNG** so seeding reserves cannot perturb the planet-type draw order. A worked-out belt
+  **stays worked out** — a mining camp is a place you exhaust and leave, not a renewable parking
+  spot, and the richer deep fields are what pull the player outward (seed 4: a Void belt holds
+  2,664 ore ≈ 54 hauls; a Hub belt about a third of that). Recorded in DESIGN §4.2.
+- **One clamp, three consumers.** `belt_mining_yield(planet, config)` (signature was
+  `planet_type`) now clamps the nominal `asteroid_mining` haul to the ore actually left, so the
+  `MineBelt` reducer, the owned-world auto-collect, and the `PlanetDTO.mine_yield` projection
+  cannot disagree. An exhausted belt **rejects with its own error** rather than yielding 0, and
+  projects `mine_yield == 0` so the screen greys `[M]` — legality and affordance from one fact.
+- **Art thins with the field.** The orbit view carries a reserve bar (`n of N, 40%`), and the
+  belt sprite drops rocks by a **stable per-cell rank**, so working a field empties *that* field
+  rather than redrawing it — in the sector scene as well as the orbit view (`SectorPlanetDTO`
+  carries the reserve too).
+- **"Unseeded" must never read as "spent".** A belt straight out of the constructor has no
+  reserve; `normalize_belt` — the existing idempotent legacy converger — now fills a
+  reserve-*less* belt to a full band-agnostic field, while leaving a genuinely exhausted one
+  (`ore_reserve_max > 0`, `ore_reserve == 0`) alone. This is what a pre-PT-52 save converges to.
+- **No store migration** (see FU-01's sibling correction in WP-PR2-04): the world is regenerated
+  from the seed. Wire **18 → 19** (`ore_reserve`/`ore_reserve_max` on `PlanetDTO` and
+  `SectorPlanetDTO`); fingerprint + envelope fixtures regenerated.
+
+Tests: `tests/test_asteroid_belts.py` (band-weighted seeding, draw-down, no regrowth, haul
+clamped to the ore left, worked-out rejection + greyed projection, unseeded-is-full, art thinning)
+and the corrected owned-belt production case in `tests/test_planets.py`.
 
 **Goal:** make a belt a finite, depletable resource with a mining cap, reflected in
 the art.
@@ -1072,3 +1102,22 @@ encounter, snapshots) depends on the persona fallback being reachable where a sp
 actually speaks.
 
 Sized as a small, self-contained package; not blocking any WP in §4.
+
+### FU-02 — Order-dependent flake: `test_corp_charter_submits_via_button_and_validates` (open)
+
+**Found during WP-PR2-04** (present on a clean tree — not introduced by any package here).
+`tests/test_ui_forms.py::test_corp_charter_submits_via_button_and_validates` **fails under
+`pytest-randomly`'s shuffled order and passes with `-p no:randomly`**: the full suite is
+2683 green in fixed order, while a shuffled `-x` run stops on this test with the submitted
+charter name never arriving (`assert [] == ["Void Runners"]` — the button press produced no
+result).
+
+So some earlier test leaks state the corp form then reads — an app/screen singleton, a stale
+`EdgeApp` focus, or a monkeypatched service that outlives its test. It is a **real defect in
+the test suite's isolation**, not a UI bug, but it makes every future `-x` run untrustworthy
+(it can mask an actual regression by stopping early on this).
+
+**Resolve by** finding the leaking neighbour (`pytest -p randomly --randomly-seed=<seed>` from a
+failing run reproduces the order; bisect with `-p no:randomly` plus an explicit test list), then
+fixing the leak at its source — an autouse fixture that resets whatever is shared, not an
+`@pytest.mark.order` or a `no:randomly` blanket, which would hide the next one.
