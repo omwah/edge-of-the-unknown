@@ -1,6 +1,14 @@
 species_grammars:
   terran:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "This channel is open only because protocol demands it, {player}. The Federation has not forgotten what you did."
+          - "Your transponder is flagged, {player}. Say what you came to say, then clear our lanes."
+          - "The {species} answer your hail under protest. Goodwill is spent; there is none left to extend to you."
       # CALLBACK fact (WP30): a returning captain is greeted as a known friend. The
       # catch-all grammar entry below still carries first-contact and every other visit.
       - when:
@@ -520,6 +528,14 @@ species_grammars:
             action: leave
   centaurian:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "We remember you, {player} — and we remember warmly no longer. Speak, and be brief."
+          - "The stars are wide, {player}. Wide enough that we would rather not share them with you."
+          - "Our welcome was real once. You spent it. State your business with the {species}."
       # CALLBACK fact (WP30): the player has already followed a tip this species gave to its
       # sector, so the greeting asks after the outcome. `lead_followed` is always present.
       - when:
@@ -1001,6 +1017,14 @@ species_grammars:
             action: barter
   vesk:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "Vesk-Fourteen speaking. Your file carries a negative annotation, {player}. Cooperation is presently deprecated."
+          - "Contact acknowledged, under protest. The {species} rate your conduct as hostile and will price accordingly."
+          - "This liaison unit is obliged to answer you. It is not obliged to be glad of you. Proceed, {player}."
       # CALLBACK fact (WP30): the Vesk family gave the player a coordinate tip that is still
       # unvisited, and they follow up on it. `lead_pending` is always present; the catch-all
       # grammar entry below covers a captain holding no Vesk lead.
@@ -1479,6 +1503,14 @@ species_grammars:
             action: attack
   selvani:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "We carry no weapons, {player}, and still we would rather you were elsewhere. Say what you must."
+          - "The {species} do not lie to you: you are not welcome here. We will not harm you. We will not help you either."
+          - "Our sensors know your ship, {player}, and we remember what it has done. Peace is not the same as friendship."
       - grammar:
           origin:
             - '#opener#, #honorific#. #detail# #aside#'
@@ -1935,6 +1967,14 @@ species_grammars:
             action: leave
   helot:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "Enemy (noun): a party whose approach the {species} log with regret. Current match: {player}."
+          - "1. Your hail is received. 2. Your standing is negative. 3. This exchange is a formality."
+          - "Hostility (noun): the present state of relations between the Helot covenant and {player}. Our records are exact."
       # SITUATIONAL fact (WP29): the literalist automaton notes the player's dwindling turn
       # budget as a plain defined fact. `low_turns` is always present; the catch-all grammar
       # entry below serves a well-provisioned captain.
@@ -2466,6 +2506,14 @@ species_grammars:
             action: leave
   quill:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "You return, soft-tissue. Your elements remain useful, {player}. Your company does not."
+          - "We greet the salvage, not the captain. Speak quickly — the {species} are weighing what you would fetch."
+          - "Warmth, meat, and grievance. Two of the three we can use, {player}."
       # SITUATIONAL facts (WP29): the salvager reads the live scene — a wreck already in the
       # sector, or a battered hull — and covets it. Both pin a true boolean/bucket that is
       # always present; the catch-all grammar entry below covers the ordinary approach.
@@ -2954,6 +3002,14 @@ species_grammars:
             action: leave
   stryx:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "We witness your vector, {player}. Trust-packet: corrupted. We speak; we do not welcome."
+          - "Signal-of-you: unwanted. The {species} open a channel and close a door."
+          - "Carbon-unit {player}: our ledgers hold your debt-of-harm. Words only. No gifts."
       # SITUATIONAL fact (WP29): a nebula fogs the sector, and the garbled broker leans into
       # the interference. `in_nebula` is always present; the catch-all grammar entry covers
       # clear space.
@@ -3379,6 +3435,14 @@ species_grammars:
             action: barter
   concordance:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "Lo, the trespasser hails us. Thy deeds are weighed, {player}, and found wanting."
+          - "The Cosmic One turns its face from thee. Speak, and know that the {species} judge every word."
+          - "Thou comest before the Concordance unclean, {player}. Mercy is not owed to such as thee."
       - grammar:
           origin:
             - '#opener#, #honorific#. #detail# #aside#.'
@@ -3831,6 +3895,14 @@ species_grammars:
             action: leave
   dignar:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "* mind-touch: cold * we taste your wake * harm remembered * speak, but no peace is offered *"
+          - "* recognition * revulsion * the {species} hold their thought apart from yours *"
+          - "* your shadow lies on our psionic water * we do not welcome * we only listen *"
       - grammar:
           origin:
             - '* #opener# * #honorific# * #detail# * #aside# *'
@@ -4271,6 +4343,14 @@ species_grammars:
             action: attack
   cibelline:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "You blot the composition, {player}. The {species} receive you as one receives a stain."
+          - "Even ugliness may speak, briefly. Say your piece, and then restore the view."
+          - "We had thought you merely undecorated, {player}. We know now that you are worse: crude in the deed."
       - grammar:
           origin:
             - '#opener#, #honorific#. #detail#—#aside#.'
@@ -4768,6 +4848,14 @@ species_grammars:
             action: leave
   selvi:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "Oh, {player} — how you have wounded us. Adoration curdles so beautifully into loathing."
+          - "We loved the look of you once, captain. Now the sight of your hull sours our whole hold."
+          - "Come no closer, delicious traitor. The {species} nurse their heartbreak and their grudge alike."
       - grammar:
           origin:
             - '#opener# #detail#, #honorific# #aside#'
@@ -5177,6 +5265,14 @@ species_grammars:
             action: trade
   vennrith:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "Welcome, you are not. Wronged us, you have, {player}. Speak, and quickly."
+          - "Long our memory is, and dark. Among the {species}, forgiven you are not."
+          - "Trophies of skulls, our redoubt keeps. Careful, {player}, that a place among them you do not earn."
       - grammar:
           origin:
             - '#opener# #detail# #honorific# #aside#'
@@ -5635,6 +5731,14 @@ species_grammars:
             action: barter
   thessarch:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "You hail us without fealty and with blood upon your record, {player}. The Iron Covenant is not amused."
+          - "Lesser mind. You have defied us. Speak, and the {species} will decide what defiance costs."
+          - "Obedience was demanded. It was refused. Do not mistake this channel for clemency, {player}."
       # SITUATIONAL fact (WP29): the Covenant sneers harder the deeper you have strayed from
       # protected space. `band` reads the sector's distance band; the catch-all below covers
       # every band this example does not pin.
@@ -6152,6 +6256,14 @@ species_grammars:
             action: leave
   thessbrood:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "Oh, {player}, how our claws tremble — not with delight, this time. You have used us so very poorly."
+          - "We grovel still, captain, but we grovel with our teeth showing. The {species} forget nothing."
+          - "Such a shame, such a shame. We would serve you gladly, had you not taught us to hate you."
       - grammar:
           origin:
             - '#opener# #detail#. #aside#'
@@ -6696,6 +6808,14 @@ species_grammars:
             action: attack
   dacaran:
     greeting:
+      # Standing-keyed opener (PT-41): a species you have wronged must not greet you like a
+      # friend. A pinned `standing` outranks any one situational criterion (select.py
+      # `STANDING_WEIGHT`), so this wins at hostile over the pack's other entries.
+      - when: { standing: hostile }
+        variants:
+          - "You stand before our wings an enemy of liberty, {player}. That is a costly thing to be."
+          - "The cause has no place for you now. The {species} name you a friend of the masters."
+          - "Freedom's ledger records your betrayal, {player}. Speak — and speak carefully."
       # ARC fact (WP30): once the player has pledged to the cause (the choice below sets
       # `arc.pledged_liberty`), later visits open on that oath. ABSENT until set, so this
       # entry simply never matches for a captain who has not pledged.

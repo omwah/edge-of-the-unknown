@@ -4,7 +4,7 @@ Reads the authored dialogue *in motion*: it drives the **real** `AlienContactScr
 **real** `server.session.contact_view` selection path against a synthetic single-game universe,
 so an author can hear every species' lines across standing bands, treaty/intel states, and
 branch nodes without launching a full game and grinding reputation. A one-key **controls
-modal** (F2) switches the simulated dials live:
+modal** (`c`, keyboard-navigable) switches the simulated dials live:
 
 - **species** — cycle through the whole roster (one instance of each is injected);
 - **standing band** — hostile / neutral / friendly / allied (wary is Phase-3 inert);
@@ -52,7 +52,7 @@ from edge.core.movement import shortest_path
 from edge.core.rules import Converse, JoinGame, apply_result, reduce
 from edge.server import session
 from edge.tui.screens.contact import AlienContactScreen
-from edge.tui.widgets import ClickableEntry
+from edge.tui.widgets import ClickableEntry, ObjectRow
 
 # Standing bands the harness can simulate. `wary` resolves to a neutral band in Phase 2 (it is
 # authored but inert), so it is omitted; `allied` needs the species to carry an alliance.
@@ -283,9 +283,23 @@ class PlaytestService:
 
 
 class PlaytestControls(ModalScreen[None]):
-    """The dial board (F2): clickable rows that flip the harness sim state in place."""
+    """The dial board (`c`): focusable rows that flip the harness sim state in place.
 
-    BINDINGS = [Binding("escape", "close", "Close"), Binding("f2", "close", "Close")]
+    Every row is an `ObjectRow` — the shared focusable/clickable row — so the board works
+    from the keyboard (up/down walks the dials, Enter/Space advances the focused one,
+    left/right steps a multi-valued dial like species or standing backward/forward) exactly
+    as it does from the mouse. Focus is restored to the row you were on after each flip,
+    since changing a dial recomposes the board.
+    """
+
+    BINDINGS = [
+        Binding("escape", "close", "Close"),
+        Binding("c", "close", "Close"),
+        Binding("up", "move(-1)", "Previous dial", show=False),
+        Binding("down", "move(1)", "Next dial", show=False),
+        Binding("left", "cycle(-1)", "Step back", show=False),
+        Binding("right", "cycle(1)", "Step forward", show=False),
+    ]
 
     CSS = """
     PlaytestControls { align: center middle; }
@@ -299,6 +313,7 @@ class PlaytestControls(ModalScreen[None]):
     def __init__(self, service: PlaytestService) -> None:
         super().__init__()
         self._svc = service
+        self._focus_dest = "species"  # the dial to land focus on (kept across recomposes)
 
     def compose(self) -> ComposeResult:
         s = self._svc
@@ -307,29 +322,63 @@ class PlaytestControls(ModalScreen[None]):
             return "[green]on[/]" if on else "[dim]off[/]"
 
         with Vertical(id="controls-box"):
-            yield Static("[b]Playtest controls[/]  [dim](Esc / F2 to close)[/]", classes="title")
-            yield ClickableEntry(
-                f"  [b]Species[/]   {s.species_name(s.current)}", dest="species")
-            yield ClickableEntry(f"  [b]Standing[/]  [cyan]{s.band}[/]", dest="band")
-            yield ClickableEntry(f"  [b]Treaty[/]    {flag(s.treaty)}", dest="treaty")
-            yield ClickableEntry(f"  [b]Intel[/]     {flag(s.intel_on)}", dest="intel")
-            yield ClickableEntry(
-                f"  [b]Show disabled[/]  {flag(s.config.ui.show_disabled_options)}",
+            yield Static("[b]Playtest controls[/]  [dim](Esc / c to close)[/]", classes="title")
+            yield ObjectRow(f"[b]Species[/]   {s.species_name(s.current)}", dest="species")
+            yield ObjectRow(f"[b]Standing[/]  [cyan]{s.band}[/]", dest="band")
+            yield ObjectRow(f"[b]Treaty[/]    {flag(s.treaty)}", dest="treaty")
+            yield ObjectRow(f"[b]Intel[/]     {flag(s.intel_on)}", dest="intel")
+            yield ObjectRow(
+                f"[b]Show disabled[/]  {flag(s.config.ui.show_disabled_options)}",
                 dest="show_disabled")
-            yield ClickableEntry(
-                f"  [b]Force-enable & traverse[/]  {flag(s.force_enable)}", dest="force_enable")
-            yield Static("[dim]Click a row to change it; close to apply to the conversation.[/]",
-                         classes="hint")
+            yield ObjectRow(
+                f"[b]Force-enable & traverse[/]  {flag(s.force_enable)}", dest="force_enable")
+            yield Static("[dim]↑↓ pick a dial · Enter/Space or ←→ change it · Esc/c applies it "
+                         "to the conversation.[/]", classes="hint")
         yield Footer()
+
+    def on_mount(self) -> None:
+        self._focus_row(self._focus_dest)
+
+    def _rows(self) -> list[ObjectRow]:
+        return list(self.query(ObjectRow))
+
+    def _focus_row(self, dest: str) -> None:
+        for row in self._rows():
+            if row.dest == dest:
+                row.focus()
+                return
+        if rows := self._rows():
+            rows[0].focus()
+
+    def action_move(self, delta: int) -> None:
+        rows = self._rows()
+        if not rows:
+            return
+        try:
+            index = rows.index(self.focused)  # type: ignore[arg-type]
+        except ValueError:
+            index = 0 if delta > 0 else len(rows) - 1
+        else:
+            index = max(0, min(len(rows) - 1, index + delta))
+        rows[index].focus()
+
+    async def action_cycle(self, step: int) -> None:
+        """Step the focused dial (left/right). A toggle flips whichever way you push it."""
+        focused = self.focused
+        if isinstance(focused, ObjectRow):
+            await self._flip(focused.dest, step)
 
     @on(ClickableEntry.Picked)
     async def _on_picked(self, msg: ClickableEntry.Picked) -> None:
+        await self._flip(msg.dest, 1)
+
+    async def _flip(self, dest: str, step: int) -> None:
         svc = self._svc
-        match msg.dest:
+        match dest:
             case "species":
-                svc.cycle_species(1)
+                svc.cycle_species(step)
             case "band":
-                svc.cycle_band(1)
+                svc.cycle_band(step)
             case "treaty":
                 svc.toggle_treaty()
             case "intel":
@@ -338,7 +387,11 @@ class PlaytestControls(ModalScreen[None]):
                 svc.toggle_show_disabled()
             case "force_enable":
                 svc.toggle_force_enable()
+            case _:
+                return
+        self._focus_dest = dest  # recompose rebuilds every row: come back to the one just flipped
         await self.recompose()
+        self._focus_row(dest)
 
     def on_click(self, event: events.Click) -> None:
         # Click outside the box (on the backdrop, i.e. the screen itself) to dismiss; clicks on a
@@ -351,11 +404,11 @@ class PlaytestControls(ModalScreen[None]):
 
 
 class PlaytestApp(App[None]):
-    """Hosts the real contact screen over the harness service; F2 opens the dial board."""
+    """Hosts the real contact screen over the harness service; `c` opens the dial board."""
 
     TITLE = "Edge — dialogue playtest"
     BINDINGS = [
-        Binding("f2", "controls", "Controls"),
+        Binding("c", "controls", "Controls"),
         Binding("ctrl+q", "quit", "Quit"),
     ]
 

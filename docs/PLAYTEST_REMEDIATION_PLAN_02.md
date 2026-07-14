@@ -551,7 +551,45 @@ Commit: `playtest: WP-PR2-08 computer map colors, P-plot, and edge fix`
 
 ---
 
-### WP-PR2-09 — Dialogue playtest tooling fixes (dev-only)
+### WP-PR2-09 — Dialogue playtest tooling fixes — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-09 dialogue playtest tooling fixes` (PT-39/40/41),
+after `playtest: WP-PR2-09 art panels stop resetting` (PT-42, below). Neither commit stayed
+inside the dev-only corner the package assumed.
+
+- **PT-39 keyboard nav.** Every dial on `PlaytestControls` is an `ObjectRow` — the shared
+  focusable/clickable row — so ↑↓ walk the dials, Enter/Space advances the focused one, and
+  ←→ step a multi-valued dial (species, standing) either way. Flipping a dial recomposes the
+  board, so focus is explicitly restored to the dial you were on. `ClickableEntry` grew a
+  public `dest` property so a keyboard caller can act on the focused row.
+- **PT-40 hotkey.** `F2` → **`c`**, on the board and its host (`c` was free on the contact
+  screen underneath, which owns `b`/`f`/`j`/`f5`/digits).
+- **PT-41 hostile has no effect — the dial was never broken; the corpus was.** The dial does
+  set effective disposition (standing, band, and the disposition bar all changed with it), but
+  the **greeting did not**, and that bug was in the *game*, not the harness. The fallback chain
+  never blends packs: a pack that authors `greeting` claims that context outright — and every
+  species pack and every persona pack authored **only a catch-all greeting**. `generic`'s
+  standing-keyed openers, which exist, were unreachable for all fifteen species, so a species
+  you had wronged still greeted you as a friend. Two changes:
+  - **Corpus:** every persona (`config/alien_dialogue_default.yaml`) *and* every species
+    (`config/dialogue/alien_dialogue_species.yaml`) now authors a `when: {standing: hostile}`
+    opener in its own voice.
+  - **Selector:** in `select._score` a pinned `standing` counts double (`STANDING_WEIGHT`), so
+    the hostile opener beats the same pack's situational colour ("we have met before", "your
+    hull is scarred") rather than tying at one criterion each and being settled by the weighted
+    RNG. **Replay-safe:** exactly one context in the shipped corpus mixed a standing entry with
+    a criteria entry (terran `dossier_self`) and its winner is unchanged, so no line selection —
+    and therefore no recency ring, and no `state_hash` — moves.
+  - Spec kept in sync per AGENTS.md: DESIGN §6.7, the `alien_dialogue_default.yaml` SELECTION
+    header, and the authoring prompt (`authoring/pipeline.py::_structure_brief`).
+- **Found on the way:** `edge/config.py:89` **strips species dialogue sidecars under pytest**,
+  so tests only ever see the persona/generic corpus. That is why the species-level fix alone
+  would have looked untested; the persona layer carries it under test, and
+  `test_species_corpus_authors_a_hostile_greeting` reads the species corpus straight off disk.
+
+Tests: `tests/test_dialogue_playtest.py` (keyboard flow on the board, `c` opens/closes, the
+hostile dial changes the conversation, every species/persona greets an enemy differently) and
+`tests/test_dialogue.py::test_standing_outranks_a_situational_criterion`.
 
 > **PT-42 (art panel reset) landed 2026-07-12** in `playtest: WP-PR2-09 art panels stop
 > resetting`. It was **not** dev-only, and not one bug:
@@ -584,8 +622,6 @@ Commit: `playtest: WP-PR2-08 computer map colors, P-plot, and edge fix`
 >
 > Tests: `tests/test_ui_art_refresh.py`, plus
 > `test_a_reply_repaints_the_menu_without_rebuilding_the_portrait` in the flow suite.
-> **Still open in this WP: PT-39 (keyboard-navigable controls), PT-40 (`F2` → `c`), PT-41
-> (hostile dial has no effect).**
 
 **Goal:** make the dialogue-authoring playtest harness usable: keyboard-navigable
 controls modal, move its hotkey `F2`→`c`, make the hostile dial actually affect the

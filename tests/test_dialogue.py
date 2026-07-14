@@ -33,9 +33,10 @@ CFG = load_default_config()
 
 
 def _line(*variants: str, standing: str | None = None, treaty: bool | None = None,
-          weight: int = 1) -> DialogueLine:
+          criteria: dict[str, object] | None = None, weight: int = 1) -> DialogueLine:
     return DialogueLine(variants=list(variants), weight=weight,
-                        when=DialogueWhen(standing=standing, treaty=treaty))
+                        when=DialogueWhen(standing=standing, treaty=treaty,
+                                          criteria=criteria or {}))
 
 
 # --- selection: fallback chain ---------------------------------------------------
@@ -86,6 +87,25 @@ def test_when_matches_standing_and_treaty() -> None:
                        recency=(), rng=rng)[0] == "treaty line"
     assert select_line([pack], "greeting", standing=NEUTRAL, treaty=False, ctx={},
                        recency=(), rng=rng)[0] == "default"
+
+
+def test_standing_outranks_a_situational_criterion() -> None:
+    # PT-41: a pinned standing counts double, so "you are my enemy" beats "we have met before"
+    # instead of tying with it at one criterion each and being settled by the weighted RNG.
+    pack = {"greeting": [
+        _line("we have met before", criteria={"met_before": True}),
+        _line("you are my enemy", standing=HOSTILE),
+        _line("default"),
+    ]}
+    facts = {"met_before": True}
+    for seed in range(8):  # every RNG draw agrees — it is specificity, not luck
+        got, _ = select_line([pack], "greeting", standing=HOSTILE, treaty=False, ctx={},
+                             recency=(), rng=random.Random(seed), facts=facts)
+        assert got == "you are my enemy"
+    # …and where standing does not pin the entry, the situational line still wins as before.
+    got, _ = select_line([pack], "greeting", standing=FRIENDLY, treaty=False, ctx={},
+                         recency=(), rng=random.Random(1), facts=facts)
+    assert got == "we have met before"
 
 
 def test_general_criteria_facts_gate_and_score() -> None:

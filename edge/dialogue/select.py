@@ -93,12 +93,19 @@ def standing_for(effective: float, *, allied: bool, aliens: AliensConfig) -> str
     return disposition_band(effective, aliens)  # hostile / neutral / friendly
 
 
+STANDING_WEIGHT = 2  # a pinned standing outranks any one situational criterion (see `_score`)
+
+
 def _score(when: object, facts: Mapping[str, object]) -> int | None:
     """Specificity of an entry whose criteria all hold, or `None` if it doesn't match.
 
     Specificity = the number of facts the `when` pins (standing + treaty + each general
-    `criteria` key). Phase 2 cannot evaluate the forward-compat `posture` / `stage` fields,
-    so an entry that sets either is **excluded** (it is a Phase-3 line) rather than matched.
+    `criteria` key), with **standing weighted `STANDING_WEIGHT`**: how a species feels about
+    you outranks any single situational colour, so a `standing: hostile` greeting beats the
+    same pack's "we have met before" / "you fly a scarred hull" line instead of tying with it
+    and being decided by a coin flip. Phase 2 cannot evaluate the forward-compat `posture` /
+    `stage` fields, so an entry that sets either is **excluded** (it is a Phase-3 line) rather
+    than matched.
     """
     if getattr(when, "posture", None) is not None or getattr(when, "stage", None) is not None:
         return None
@@ -107,7 +114,7 @@ def _score(when: object, facts: Mapping[str, object]) -> int | None:
     if standing is not None:
         if standing != facts.get("standing"):
             return None
-        score += 1
+        score += STANDING_WEIGHT
     treaty = getattr(when, "treaty", None)
     if treaty is not None:
         if treaty != facts.get("treaty"):

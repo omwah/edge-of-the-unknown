@@ -146,7 +146,8 @@ pixi run playtest-dialogue --species vesk --seed 7
 pixi run author-dialogue --playtest --sidecar config/dialogue/alien_dialogue.<backend>.yaml
 ```
 
-Press **F2** for the controls modal and flip the simulated dials live:
+Press **`c`** for the controls modal and flip the simulated dials live (**↑↓** walks the dials,
+**Enter/Space** or **←→** changes the focused one, **Esc**/**`c`** closes and applies):
 
 - **Species** — cycle through the whole roster.
 - **Standing** — hostile / neutral / friendly / allied (drives `when: {standing: …}` gating;

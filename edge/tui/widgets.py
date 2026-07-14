@@ -1235,6 +1235,11 @@ class ClickableEntry(Static):
         self._dest = dest
         self._ref = ref
 
+    @property
+    def dest(self) -> str:
+        """What this row points at — readable so a keyboard caller can act on the focused row."""
+        return self._dest
+
     def on_click(self) -> None:
         self.post_message(self.Picked(self._dest, self._ref))
 
