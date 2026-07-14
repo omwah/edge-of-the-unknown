@@ -1011,7 +1011,18 @@ gas giant clears it. Wire **19 → 20**; no store migration (the world is regene
 
 Commit: `playtest: WP-PR2-15a Cloud City rules and staging`
 
-#### WP-PR2-15b — Cloud City art (floating structure)
+#### WP-PR2-15b — Cloud City art (floating structure) — landed
+
+**Landed 2026-07-13** in `playtest: WP-PR2-15b Cloud City art`. `edge/art/planet.py` gains
+`CLOUD_CITY_TIERS` — one floating structure per city size, a landing deck on hover-pylons that
+grows into a tiered sky-city — stamped over the jovian's disc (never outside its silhouette, since
+the disc mask is tested first). The city is painted in bold bright ink with **no background**, so
+the *shape* carries it under the monochrome and high-contrast themes. `cloud_city_art` steps
+*down* to the largest tier that fits rather than clipping, so the sector scene's much smaller
+planet still flies a (smaller) city, and a planet too small for any structure is simply bare
+clouds. Threaded `cloud_city` through `generate_sprite` → `art_adapter.sprite` → the
+`SectorScene` planet stamp and the `PlanetScreen` orbit art, so an unstaged gas giant and a
+staged one are visibly the same world — one of them has a city on it.
 
 - Add a distinct floating-city art variant (`edge/art/planet.py` and/or a new
   concourse-style sprite) — a structure hovering in the jovian's clouds, visually

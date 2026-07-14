@@ -64,6 +64,7 @@ def generate_sprite(
     archetype_id: str | None = None,
     facing: str = "right",
     depletion: float = 0.0,
+    cloud_city: int = 0,
 ) -> Text:
     """Generate a procedural ASCII sprite based on parameters.
 
@@ -79,6 +80,8 @@ def generate_sprite(
             to point either way. Ignored by the other entity types.
         depletion: For an asteroid-belt planet, the 0..1 fraction of its ore already
             mined out -- rocks thin as the field empties (PT-52). Ignored elsewhere.
+        cloud_city: For a jovian planet, the size of the Cloud City built there (PT-54);
+            0 is bare clouds. Bigger cities are bigger structures. Ignored elsewhere.
 
     Returns:
         A rich Text object representing the generated ASCII art.
@@ -96,7 +99,7 @@ def generate_sprite(
         return _TERRAIN_GEN.generate(rng, subtype, width, height)
 
     if entity_type == "planet":
-        return _PLANET_GEN.generate(rng, subtype, width, height, depletion)
+        return _PLANET_GEN.generate(rng, subtype, width, height, depletion, cloud_city)
 
     if entity_type == "starfield":
         return _STARFIELD_GEN.generate(rng, subtype, width, height)
