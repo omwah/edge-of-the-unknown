@@ -227,8 +227,8 @@ class SurfaceScreen(EdgeScreen):
                 with Vertical(id="site-detail-column"):
                     yield Static("Select a site.", id="site-detail")
                     with Horizontal(id="site-actions"):
-                        yield Button("Survey next [E]", id="btn-survey", variant="primary")
-                        yield Button("Collect [T]", id="btn-collect")
+                        yield Button("Survey next \\[E]", id="btn-survey", variant="primary")
+                        yield Button("Collect \\[T]", id="btn-collect")
                     art = SiteArt(id="site-art")
                     art.border_title = "site"
                     yield art
