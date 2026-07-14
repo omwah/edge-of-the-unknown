@@ -150,6 +150,9 @@ Press **`c`** for the controls modal and flip the simulated dials live (**↑↓
 **Enter/Space** or **←→** changes the focused one, **Esc**/**`c`** closes and applies):
 
 - **Species** — cycle through the whole roster.
+- **Portrait** — step through the species' portrait variants, naming the resolved image file.
+  (A face is pinned per game seed + species instance, so the harness's single instance of each
+  species would otherwise wear one variant forever and the others would never be seen.)
 - **Standing** — hostile / neutral / friendly / allied (drives `when: {standing: …}` gating;
   `wary` is Phase-3-inert so it is omitted; `allied` needs the species to carry an alliance).
 - **Treaty** / **Intel** — toggles that gate treaty- and `offer_coordinates`-keyed lines.

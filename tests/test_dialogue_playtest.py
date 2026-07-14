@@ -177,7 +177,7 @@ async def test_controls_board_is_keyboard_navigable() -> None:
         await pilot.pause()
         assert svc.current == first_species
 
-        await pilot.press("down")  # onto Standing
+        await pilot.press("down", "down")  # past Portrait, onto Standing
         await pilot.pause()
         assert app.screen.focused.dest == "band"
         band = svc.band
@@ -191,6 +191,42 @@ async def test_controls_board_is_keyboard_navigable() -> None:
         await pilot.press("c")  # the new hotkey closes it too
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
+
+
+def test_portrait_dial_steps_through_a_species_variants() -> None:
+    """PT-38: the harness pins one face per species — the dial is how the others are seen."""
+    from edge.art.portrait import list_portraits
+
+    svc = _service()
+    assert svc.select_species_by_roster("terran")  # the multi-variant species in the corpus
+    faces = list_portraits("terran", svc.config.ui.portrait_dir)
+    assert len(faces) > 1
+
+    seen = set()
+    for _ in range(len(faces)):
+        view = svc.contact_view(svc.pid, svc.current)
+        seen.add(view.portrait_variant % len(faces))
+        svc.cycle_portrait(1)
+    assert seen == set(range(len(faces)))  # every face, `_01` included, is reachable
+    # A full lap returns to the face it started on, and the label names the resolved file.
+    assert svc.portrait_label().startswith("terran_")
+
+
+async def test_portrait_dial_repaints_the_contact_face() -> None:
+    """The dial reaches the mounted portrait, not just the DTO (PT-38)."""
+    from edge.tui.portrait import SpeciesPortrait
+
+    svc = _service()
+    assert svc.select_species_by_roster("terran")
+    app = PlaytestApp(svc)
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        before = app.screen.query_one(SpeciesPortrait)._path
+
+        svc.cycle_portrait(1)
+        app._after_controls(None)  # what closing the dial board does
+        await pilot.pause()
+        assert app.screen.query_one(SpeciesPortrait)._path != before
 
 
 async def test_hostile_dial_changes_the_conversation() -> None:
