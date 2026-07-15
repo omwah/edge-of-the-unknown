@@ -9,8 +9,20 @@ modal** (`c`, keyboard-navigable) switches the simulated dials live:
 - **species** — cycle through the whole roster (one instance of each is injected);
 - **portrait** — step through the species' portrait variants (a face is otherwise pinned per
   game seed + species instance, so the single injected instance would wear one forever, PT-38);
+- **location** — where the contact happens: a Core sector, or a representative sector of each
+  distance band (Hub / Frontier / Deep / Void). The harness enrolls the player in Core Space,
+  which is a sanctuary (`encounters.first_strike_block`), so every attack reply stays greyed
+  until you dial out of it;
 - **standing band** — hostile / neutral / friendly / allied (wary is Phase-3 inert);
-- **treaty** / **intel available** — toggles that gate treaty- and coordinate-keyed lines;
+- **treaty in force** / **intel available** — world facts: whether a treaty already exists and
+  whether the speaker has coordinates to give. They feed `when:` matching, so the *lines* the
+  species speaks change (its post-treaty voice, its coordinate-keyed beats);
+- **allow treaty audition** — reachability, not a world fact: it un-greys the reply into the
+  `treaty_offer` node, which `_gate_choice` refuses for every `treaty_mode` (the sign-here path
+  is unimplemented), so the node is otherwise unreachable without force-enabling *everything*;
+- **artifacts** — puts one artifact of every bartered tier in the hold, so BARTER (gated on
+  actually holding the goods, `_tech_offers`) becomes selectable and the barter offers show
+  as available;
 - **show disabled** — the existing `ui.show_disabled_options` (greys gated replies);
 - **force-enable & traverse** — makes gated replies *selectable* so you can walk every
   branch regardless of standing/treaty/Phase-3 gates.
@@ -81,11 +93,25 @@ class PlaytestService:
         # Instances are keyed 1..N in roster order; the contact screen targets a species id.
         self.species_ids: list[int] = sorted(self.state.species)
         self.current: int = self.species_ids[0]
+        # Where the conversation is happening. The harness enrolls the player via `JoinGame`,
+        # which spawns them in Core Space — a sanctuary, so `encounters.first_strike_block`
+        # greys every attack reply and the hostile branches can never be walked. This dial
+        # relocates the ship (and the species with it) so those branches come alive.
+        self.locations: list[tuple[str, int]] = self._locations()
+        self.location_index: int = 0
         # Sim dials (mutated by the controls modal).
         self.band: str = "friendly"
         self.treaty: bool = False
         self.intel_on: bool = False
         self.force_enable: bool = False
+        # A barter reply is gated on the player *holding* a matching-tier artifact (`_tech_offers`),
+        # and the harness player starts empty-handed, so BARTER is always greyed. This stocks the
+        # hold with one of every tier the roster asks for.
+        self.artifacts: bool = False
+        # TREATY is refused for every `treaty_mode` today (`_gate_choice` — the sign-here path is
+        # not implemented), so the node is unreachable without an override. This one un-greys the
+        # reply that walks into `treaty_offer`, leaving every other gate honest.
+        self.treaty_unlock: bool = False
         # A species' face is pinned per (game seed, species instance), so the harness's
         # one-instance-per-species cast would otherwise show a single variant forever — an
         # author reviewing art never sees the rest (PT-38). This offset steps through them.
@@ -115,6 +141,27 @@ class PlaytestService:
         state.players[pid] = dataclasses.replace(
             player, species_attitudes={sc.id: 0.0 for sc in config.roster.species})
         return state
+
+    def _locations(self) -> list[tuple[str, int]]:
+        """One representative sector per place a contact can happen: the Core, then each band.
+
+        Ordered Core-first (the real game's starting sanctuary), so the default dial position
+        matches what a player would see, and stepping off it opens up the attack branches.
+        """
+        core = sorted(s.id for s in self.state.sectors.values() if s.is_galactic_core)
+        places: list[tuple[str, int]] = [("Core (sanctuary)", core[0])] if core else []
+        by_band: dict[str, int] = {}
+        for sec in self.state.sectors.values():
+            if not sec.is_galactic_core:
+                by_band[sec.distance_band] = min(
+                    sec.id, by_band.get(sec.distance_band, sec.id))
+        bands = [b.name for b in self._config.bigbang.active_bands()]
+        places += [(band, by_band[band]) for band in bands if band in by_band]
+        return places
+
+    @property
+    def location(self) -> tuple[str, int]:
+        return self.locations[self.location_index]
 
     # --- the GameService surface the contact screen uses ---------------------
 
@@ -175,7 +222,14 @@ class PlaytestService:
                                    intel_summary=(intel.summary() if intel is not None else ""),
                                    portrait_variant=view.portrait_variant + self.portrait_step)
 
-        return self._force(view) if self.force_enable else view
+        if self.force_enable:
+            return self._force(view)
+        if self.treaty_unlock:
+            view = dataclasses.replace(view, choices=[
+                dataclasses.replace(c, enabled=True, reason="")
+                if c.next_context == "treaty_offer" else c
+                for c in view.choices])
+        return view
 
 
     def apply(self, player_id: int, command: object) -> tuple[object, ...]:
@@ -211,13 +265,25 @@ class PlaytestService:
         """Re-key the target species + player to realise the current band / intel before a view."""
         sp = self.state.species[species_id]
         allied = self.band == "allied" and sp.alliance_id is not None
+        # Meet here: the ship and the alien share the dialled sector, so sector-keyed rules
+        # (Core sanctuary above all) see the place the author picked.
+        _name, sector_id = self.location
         self.state.species[species_id] = dataclasses.replace(
-            sp, base_disposition=_BAND_BASE[self.band])
+            sp, base_disposition=_BAND_BASE[self.band], sector_id=sector_id)
         player = self.state.players[self.pid]
+        ship = self.state.ships[player.ship_id]
+        self.state.ships[ship.id] = dataclasses.replace(ship, sector_id=sector_id)
         self.state.players[self.pid] = dataclasses.replace(
-            player, alliance_id=(sp.alliance_id if allied else None))
+            player, alliance_id=(sp.alliance_id if allied else None),
+            artifacts=({t: 1 for t in self._barter_tiers()} if self.artifacts else {}))
         ref = self._far_discovery() if (self.intel_on and self.band in ("friendly", "allied")) else None
         self.state.species_knowledge[sp.roster_id] = (ref,) if ref is not None else ()
+
+    def _barter_tiers(self) -> set[str]:
+        """Every artifact tier the roster barters for — one of each is enough to unlock BARTER."""
+        assert self._config.roster is not None
+        return {o.tier for sc in self._config.roster.species for o in sc.tech_offers
+                if o.mode == "barter"}
 
     def _far_discovery(self) -> LocationRef | None:
         """A real, reachable, unvisited rare+ discovery to point a coordinate tip at (§6.7)."""
@@ -261,6 +327,15 @@ class PlaytestService:
         i = (self.species_ids.index(self.current) + step) % len(self.species_ids)
         self.current = self.species_ids[i]
 
+    def cycle_location(self, step: int) -> None:
+        self.location_index = (self.location_index + step) % len(self.locations)
+
+    def location_label(self) -> str:
+        name, sector_id = self.location
+        core = self.state.sectors[sector_id].is_galactic_core
+        note = " [dim](no attacks here)[/]" if core else ""
+        return f"[cyan]{name}[/] [dim]sector {sector_id}[/]{note}"
+
     def cycle_band(self, step: int) -> None:
         self.band = BANDS[(BANDS.index(self.band) + step) % len(BANDS)]
 
@@ -269,6 +344,12 @@ class PlaytestService:
 
     def toggle_intel(self) -> None:
         self.intel_on = not self.intel_on
+
+    def toggle_artifacts(self) -> None:
+        self.artifacts = not self.artifacts
+
+    def toggle_treaty_unlock(self) -> None:
+        self.treaty_unlock = not self.treaty_unlock
 
     def toggle_force_enable(self) -> None:
         self.force_enable = not self.force_enable
@@ -352,9 +433,14 @@ class PlaytestControls(ModalScreen[None]):
             yield Static("[b]Playtest controls[/]  [dim](Esc / c to close)[/]", classes="title")
             yield ObjectRow(f"[b]Species[/]   {s.species_name(s.current)}", dest="species")
             yield ObjectRow(f"[b]Portrait[/]  {s.portrait_label()}", dest="portrait")
+            yield ObjectRow(f"[b]Location[/]  {s.location_label()}", dest="location")
             yield ObjectRow(f"[b]Standing[/]  [cyan]{s.band}[/]", dest="band")
-            yield ObjectRow(f"[b]Treaty[/]    {flag(s.treaty)}", dest="treaty")
+            yield ObjectRow(f"[b]Treaty in force[/]  {flag(s.treaty)}", dest="treaty")
+            yield ObjectRow(
+                f"[b]Allow treaty audition[/]  {flag(s.treaty_unlock)}", dest="treaty_unlock")
             yield ObjectRow(f"[b]Intel[/]     {flag(s.intel_on)}", dest="intel")
+            yield ObjectRow(
+                f"[b]Artifacts (unlocks barter)[/]  {flag(s.artifacts)}", dest="artifacts")
             yield ObjectRow(
                 f"[b]Show disabled[/]  {flag(s.config.ui.show_disabled_options)}",
                 dest="show_disabled")
@@ -407,12 +493,18 @@ class PlaytestControls(ModalScreen[None]):
                 svc.cycle_species(step)
             case "portrait":
                 svc.cycle_portrait(step)
+            case "location":
+                svc.cycle_location(step)
             case "band":
                 svc.cycle_band(step)
             case "treaty":
                 svc.toggle_treaty()
+            case "treaty_unlock":
+                svc.toggle_treaty_unlock()
             case "intel":
                 svc.toggle_intel()
+            case "artifacts":
+                svc.toggle_artifacts()
             case "show_disabled":
                 svc.toggle_show_disabled()
             case "force_enable":
