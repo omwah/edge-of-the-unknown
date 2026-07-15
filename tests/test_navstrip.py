@@ -25,7 +25,8 @@ def _warp(sector_id: int, bearing: float, display_id: int, *,
 
 def _sector(warps: list[dto.WarpDTO], *, core_bearing: float = math.pi) -> dto.SectorDTO:
     return dto.SectorDTO(region="Region", sector_id=99, flavor="", beacon=None, band="Hub",
-                         warps=warps, display_id=999, core_bearing=core_bearing, trail=[11, 22])
+                         warps=warps, display_id=999, core_bearing=core_bearing,
+                         trail=[dto.TrailCrumb(11, "Hub"), dto.TrailCrumb(22, "Frontier")])
 
 
 def test_every_warp_becomes_a_node_on_its_label() -> None:
@@ -65,7 +66,7 @@ def test_collision_spill_keeps_all_nodes_disjoint() -> None:
 def test_core_anchor_and_trail_present() -> None:
     nav = navstrip.build_nav_strip(_sector([_warp(10, 0.0, 110)], core_bearing=math.pi))
     assert any("Core" in _strip(row) for row in nav.rows)  # global-orientation anchor drawn
-    assert nav.trail == [11, 22]  # breadcrumb passed through
+    assert nav.trail == [dto.TrailCrumb(11, "Hub"), dto.TrailCrumb(22, "Frontier")]  # passed through
     assert nav.you_display == 999
 
 

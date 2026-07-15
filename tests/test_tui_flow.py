@@ -1498,7 +1498,7 @@ async def test_question_mark_opens_help_with_warp_legend() -> None:
         assert isinstance(app.screen, HelpScreen)
         text = " ".join(str(s.render()) for s in app.screen.query(Static))
         assert "Warp Color" in text
-        for label in ("Coreward", "Outward", "Cross-band", "Backtrack", "One-way",
+        for label in ("Coreward", "Outward", "Cross-band", "Backtrack", "No return",
                       "Avoided", "Known hazard", "Unexplored", "Sector Codes"):
             assert label in text
         await pilot.press("escape")
