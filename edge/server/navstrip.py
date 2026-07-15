@@ -58,9 +58,13 @@ def _nearest_free(pref: int, used: set[int]) -> int:
 
 
 def _warp_label(warp: dto.WarpDTO) -> str:
-    """The cell text: spatial id plus content codes once charted (fog masks codes)."""
-    text = str(warp.display_id)
-    if warp.codes:
+    """The cell text: spatial id plus content codes once charted (fog masks codes).
+
+    A one-way warp to an uncharted sector hides its destination id behind `S?????` (PT-48) —
+    you can see there is a one-way exit, but not where it leads until you take it.
+    """
+    text = warp.address_label
+    if not warp.address_hidden and warp.codes:
         text += " " + "".join(warp.codes)
     return text
 

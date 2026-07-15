@@ -141,6 +141,23 @@ class WarpDTO:
     def explored(self) -> bool:
         return self.kind != "unexplored"
 
+    @property
+    def address_hidden(self) -> bool:
+        """A one-way warp to an uncharted sector hides its destination id (PT-48): sensors
+        reveal that the exit is one-way — like a wormhole — but not where it leads until you
+        take it. Once the target is charted the address is shown as normal.
+        """
+        return self.one_way and not self.explored
+
+    @property
+    def address_label(self) -> str:
+        """The destination as shown on the warp: the plain spatial id, or — when hidden —
+        `S` followed by one `?` per digit of the id (`S?????`), so an uncharted one-way exit
+        reads as a sector reference of the right shape without revealing which one (PT-48)."""
+        if self.address_hidden:
+            return "S" + "?" * len(str(self.display_id))
+        return str(self.display_id)
+
 
 @dataclass(frozen=True)
 class SectorDiscovery:

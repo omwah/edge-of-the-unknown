@@ -2,7 +2,8 @@
 
 `NavRose` bakes two client-side columns beside the compass: a recent-route *trail* and
 a selected-warp *detail* panel. These pin the two playtest fixes — the trail ids read in
-the same band palette as the rose cells, and a one-way warp reads as plain "no return".
+the same band palette as the rose cells, and a one-way warp is marked "one-way" while its
+destination id is masked until the target is charted.
 The column builders are pure (they read the DTO passed to `__init__`), so they are
 exercised directly without mounting the widget.
 """
@@ -41,19 +42,31 @@ def test_unknown_band_crumb_falls_back_to_dim() -> None:
     assert (col[3].plain, col[3].style) == ("7", "dim")
 
 
-def test_one_way_warp_reads_as_no_return_not_jargon() -> None:
-    # PT-48: the detail panel says "no return" in plain language, never the bare "one-way".
+def test_one_way_warp_to_a_charted_sector_shows_id_and_one_way() -> None:
+    # PT-48: a one-way warp to a sector you've already charted marks "one-way" and still
+    # shows the destination id — you know where it goes.
     warp = dto.WarpDTO(sector_id=5, arrow=">>", label="Rim", kind="explored",
                        display_id=105, band="Deep", one_way=True, turn_cost=2)
     rose = _rose(trail=[], warp=warp)
     detail = " ".join(line.plain for line in rose._detail_column(rose._hits[0]))
-    assert "no return" in detail
-    assert "one-way" not in detail
+    assert "one-way" in detail
+    assert "105" in detail  # charted → address shown
 
 
-def test_two_way_warp_shows_no_return_marker() -> None:
+def test_one_way_warp_to_an_uncharted_sector_hides_the_address() -> None:
+    # PT-48: sensors reveal the exit is one-way (like a wormhole), but the destination id is
+    # masked until you take it — the detail header reads `S?????` (one `?` per id digit).
+    warp = dto.WarpDTO(sector_id=5, arrow=">>", kind="unexplored",
+                       display_id=10547, one_way=True, turn_cost=2)
+    rose = _rose(trail=[], warp=warp)
+    detail = " ".join(line.plain for line in rose._detail_column(rose._hits[0]))
+    assert "one-way" in detail
+    assert "10547" not in detail and "S?????" in detail  # address hidden, one ? per digit
+
+
+def test_two_way_warp_shows_no_one_way_marker() -> None:
     warp = dto.WarpDTO(sector_id=5, arrow=">>", label="Rim", kind="explored",
                        display_id=105, band="Deep", one_way=False, turn_cost=1)
     rose = _rose(trail=[], warp=warp)
     detail = " ".join(line.plain for line in rose._detail_column(rose._hits[0]))
-    assert "no return" not in detail
+    assert "one-way" not in detail

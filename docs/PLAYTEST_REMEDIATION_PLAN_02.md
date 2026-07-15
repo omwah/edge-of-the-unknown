@@ -559,8 +559,11 @@ Commit: `playtest: WP-PR2-06 transfer overlay and clamped controls`
   showed everywhere. Fixed to test `sector.id` (follow-up commit `fix: one-way flag tested a
   hop count, not the sector id (PT-48)`); the projection test now also asserts a two-way warp
   is *not* flagged (the case the bug broke — the old test only checked a genuine one-way *is*
-  flagged, true under the bug too). Separately the jargon was clarified to plain "no return"
-  in the rose detail panel, the sector-view wormhole row, and the Help legend.
+  flagged, true under the bug too). **Final presentation:** the `one-way` marker stays (sensors
+  reveal a one-way exit), but a one-way warp to an **uncharted** sector **masks its destination
+  id** as `S?????` (one `?` per id digit — `WarpDTO.address_label`) in the rose cell and detail
+  header — you know there is a one-way exit, not where it leads until you take it; a charted
+  target shows its address as normal. Help: `⇢ One-way exit (destination hidden until taken)`.
 - **PT-55 — band-tinted trail.** `NavRose._trail_column` painted every crumb `dim`; it now
   tints each id by its band with the same `BAND_COLOR` the rose cells use (unknown → dim;
   "you" stays bold-cyan). Band per crumb required a DTO change: `NavStripDTO.trail` /
