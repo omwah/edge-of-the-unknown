@@ -139,6 +139,31 @@ async def test_back_leads_the_footer_on_every_tab() -> None:
             assert shown[0] == "escape", f"{subview} footer leads with {shown[0]!r}"
 
 
+async def test_p_plots_a_route_from_the_map_tab() -> None:
+    """PT-51: `P` on the Map plots a course to the highlighted sector and lands on the
+    Route sub-tab, the same verb the other sector tables bind."""
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        screen = await _open_computer(app, pilot)
+        await pilot.press("n")  # → Navigation
+        await pilot.pause()
+        screen.show_subview("map")
+        await pilot.pause()
+        assert screen._active_subview() == "map"
+        assert "p" in _footer_keys(screen)  # the Map now advertises Plot route
+        from edge.tui.widgets import LocalMapView
+        map_view = screen.query_one("#local-map", LocalMapView)
+        map_view.focus()
+        await pilot.pause()
+        assert map_view.selected_sector is not None  # a neighbour is highlighted
+        assert screen._route is None
+        await pilot.press("p")
+        await pilot.pause()
+        assert screen._active_subview() == "route"
+        assert screen._route is not None
+
+
 async def test_sub_tab_numbers_navigate_within_the_active_category() -> None:
     """Each category pane owns 1..N for its own sub-tabs — so `2` means a different tab
     in each category, and never reaches into another's."""

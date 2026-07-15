@@ -111,7 +111,8 @@ class ComputerScreen(CorpActions, EdgeScreen):
     # tests/test_ui_computer_keys.py enforces both. `W` is "route to…" here for the same
     # reason it is on the sector view: one key, one meaning, across screens.
     PANE_BINDINGS: dict[str, tuple[tuple[str, str, str], ...]] = {
-        "map": (("g", "engage", "Engage"), ("w", "route_prompt", "Route to…")),
+        "map": (("p", "plot_route", "Plot route"), ("g", "engage", "Engage"),
+                ("w", "route_prompt", "Route to…")),
         "route": (("g", "engage", "Engage"), ("w", "route_prompt", "Route to…"),
                   ("v", "toggle_avoid", "Avoid sector")),
         "ports": (("p", "plot_route", "Plot route"), ("v", "toggle_avoid", "Avoid sector")),
@@ -257,7 +258,7 @@ when columns are folded at 80×24."""
                     with self._pane("map"):
                         yield Static(
                             f"[b]LOCAL MAP[/]   [dim]you @ Sector {self._map.you_display} · "
-                            f"Band {self._map.you_band}   ·   ↑↓←→ select · ↵ plot route[/]",
+                            f"Band {self._map.you_band}   ·   ↑↓←→ select · ↵/P plot route[/]",
                             id="map-header",
                         )
                         yield LocalMapView(self._map, rebake=self._map_for_width, id="local-map")
@@ -981,9 +982,12 @@ when columns are folded at 80×24."""
         self.query_one("#local-map", LocalMapView)._refit()
 
     def on_local_map_view_picked(self, msg: LocalMapView.Picked) -> None:
-        """Clicking a sector on the Map plots a route to it (and shows the Route tab)."""
-        self._route = self._service.route_view(self._pid, msg.sector_id)
-        self._engage_target = msg.sector_id
+        """Clicking (or Enter/P on) a Map sector plots a route to it and shows Route."""
+        self._plot_map_sector(msg.sector_id)
+
+    def _plot_map_sector(self, sector_id: int) -> None:
+        self._route = self._service.route_view(self._pid, sector_id)
+        self._engage_target = sector_id
         self._show_route()
 
     # --- Route planner (WP14) ------------------------------------------------
@@ -1042,7 +1046,13 @@ when columns are folded at 80×24."""
 
     def action_plot_route(self) -> None:
         active = self._active_subview()
-        if active == "trade":
+        if active == "map":
+            sid = self.query_one("#local-map", LocalMapView).selected_sector
+            if sid is None:
+                self.notify("No sector selected.", timeout=2)
+                return
+            self._plot_map_sector(sid)
+        elif active == "trade":
             pair = self._cursor_entry("#finder", self._computer.pairs)
             if pair is None:
                 self.notify("No trade pair selected.", timeout=2)
