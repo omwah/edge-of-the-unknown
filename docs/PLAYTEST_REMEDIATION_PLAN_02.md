@@ -486,7 +486,33 @@ Commit: `playtest: WP-PR2-05 dock-over-planet composite and wreck slot`
 
 ---
 
-### WP-PR2-06 — Transfer modal overlay and clamped controls
+### WP-PR2-06 — Transfer modal overlay and clamped controls — landed
+
+**Landed 2026-07-14** in `playtest: WP-PR2-06 transfer overlay and clamped controls`
+(PT-45/46/47). Pure TUI — no DESIGN, wire, or store change.
+
+- **PT-45 overlay.** The workbench set no screen background, so it blanked the planet. It
+  now carries the `background: $background 60%` scrim the other overlay modals use —
+  crucially as **`CSS`, not `DEFAULT_CSS`**: a `DEFAULT_CSS` rule is lowest priority and
+  loses to the base `ModalScreen:ansi { background: transparent }` and app.tcss's `Screen
+  { background }`, so it rendered opaque until promoted to `CSS` (the pattern
+  ConfirmScreen/RumorModal/AmountPrompt already follow).
+- **PT-46 greyed buttons.** Load/Unload/Settle are `disabled` per direction, mirroring the
+  reducer clamps (`rules._transfer_cargo`/`_settle_colonists`) so a greyed button and a
+  rejected command never disagree.
+- **PT-47 clamped steppers.** Each `AmountStepper` gets a `maximum` (the larger of the two
+  directions the shared field feeds), so `+`/`−`/`set_amount` stop at the cap; a new
+  `AmountStepper.on_input_changed` clamps an over-cap *typed* value in place without losing
+  focus.
+- **Latent bug fixed en route:** the "aboard N" readout was keyed by the full commodity
+  name, but the ship hold DTO labels it `Fuel`/`Org`/`Equ`, so it had always displayed 0.
+  Now keyed by commodity (via `zip(Commodity, ship.holds)`). This is what the PT-47 clamp
+  surfaced.
+- **Tests** (`tests/test_ui_transfer_workbench.py`): disabled-per-direction buttons,
+  stepper + inline typed clamp with focus retained, and the overlay (planet stays in the
+  screen stack, screen background is a scrim). No new SVG snapshots were added — the
+  overlay reuses the already-snapshotted modal CSS pattern and the behaviour is covered
+  functionally; the maintainer may add a snapshot if desired.
 
 **Goal:** overlay the transfer modal on the planet screen without blanking the
 background; grey unavailable transfer buttons; clamp `+`/`−` to the available amount.

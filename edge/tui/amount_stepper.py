@@ -7,6 +7,13 @@ from textual.containers import Horizontal
 from textual.widgets import Button, Input
 
 
+def _as_int(text: str) -> int | None:
+    try:
+        return int(text or "0")
+    except ValueError:
+        return None
+
+
 class AmountStepper(Horizontal):
     """An integer input followed by decrement/increment buttons."""
 
@@ -56,3 +63,14 @@ class AmountStepper(Horizontal):
         elif event.button.id == f"inc-{self.key}":
             self.set_amount(self.amount + self.step)
             event.stop()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Clamp an over-cap typed value back to `maximum` in place, so the field can
+        never *show* more than is movable (PT-47). Focus and cursor stay put; re-setting
+        to `maximum` fires one more Changed whose value is already in range, so it settles.
+        """
+        if self.maximum is None:
+            return
+        value = _as_int(event.value)
+        if value is not None and value > self.maximum:
+            event.input.value = str(self.maximum)
