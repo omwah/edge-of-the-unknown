@@ -63,6 +63,20 @@ def test_collision_spill_keeps_all_nodes_disjoint() -> None:
                 assert a1 <= b0 or b1 <= a0  # no overlap on a shared row
 
 
+def test_one_way_uncharted_warp_masks_its_destination_id() -> None:
+    # PT-48: a one-way exit to an uncharted sector bakes as `S?????` (one `?` per id digit),
+    # not its spatial id — the exit is visible but the destination is unknown until taken. A
+    # charted one still shows its id.
+    hidden = dto.WarpDTO(sector_id=10, arrow="--", kind="unexplored", display_id=10547,
+                         one_way=True, bearing=0.0)
+    shown = dto.WarpDTO(sector_id=11, arrow="--", label="R", kind="explored", display_id=10801,
+                        one_way=True, band="Hub", bearing=math.pi / 2)
+    nav = navstrip.build_nav_strip(_sector([hidden, shown]))
+    blob = "\n".join(_strip(r) for r in nav.rows)
+    assert "10547" not in blob and "S?????" in blob  # uncharted one-way destination masked
+    assert "10801" in blob                            # the charted one-way destination is shown
+
+
 def test_core_anchor_and_trail_present() -> None:
     nav = navstrip.build_nav_strip(_sector([_warp(10, 0.0, 110)], core_bearing=math.pi))
     assert any("Core" in _strip(row) for row in nav.rows)  # global-orientation anchor drawn

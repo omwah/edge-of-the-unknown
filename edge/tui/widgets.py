@@ -518,7 +518,7 @@ def warp_legend_markup(core_anchor_side: str) -> str:
         "[bold cyan]Warp Symbols[/]\n"
         "• [b]<<[/] Coreward (closer)   • [b]>>[/] Outward (deeper)   "
         "• [b]--[/] Cross-band (level)\n"
-        "• [b]↩[/] Backtrack / the sector just left   • [b]⇢[/] No return (one-way — no warp back)\n"
+        "• [b]↩[/] Backtrack / the sector just left   • [b]⇢[/] One-way exit (destination hidden until taken)\n"
         "• [b yellow]⊘[/] Avoided by route plotting   • [b yellow]⚠[/] Known hazard\n"
         "• [dim]?[/] Unexplored destination (name and contents remain hidden)\n\n"
         "[bold cyan]Warp Color (Distance Bands)[/]\n"
@@ -1348,7 +1348,7 @@ class SectorObjectList(Vertical):
             label = d.label if d.collected else "Anomaly detected"
             if d.kind == "wormhole" and d.warp_to is not None:
                 # Same routing as the scene hotspot: entering IS the interaction.
-                yield ObjectRow(f"[cyan]✦[/] {label} [dim](Enter — no return)[/]",
+                yield ObjectRow(f"[cyan]✦[/] {label} [dim](Enter — one-way)[/]",
                                 "wormhole", d.warp_to)
             elif not d.collected:
                 yield ObjectRow("[cyan]✦[/] Anomaly detected [dim](Scan)[/]",
@@ -1783,7 +1783,10 @@ class NavRose(Vertical):
         node = self._hits[self._idx]
         warp = self._warps.get(node.sector_id)
         hdr = Text("▶ ", style="bold")
-        hdr.append(str(node.display_id), style="bold")
+        # A one-way warp to an uncharted sector masks its destination id as `S?????` (PT-48)
+        # — you know there's a one-way exit, not where it leads until you take it.
+        addr = warp.address_label if warp is not None else str(node.display_id)
+        hdr.append(addr, style="bold")
         direction = {"<<": "Coreward", ">>": "Outward", "--": "Cross-band"}.get(
             warp.arrow if warp is not None else "", "Warp")
         col[0] = hdr
@@ -1795,7 +1798,7 @@ class NavRose(Vertical):
         if warp is not None and warp.kind == "backtrack":
             state_bits.append("↩ backtrack")
         if warp is not None and warp.one_way:
-            state_bits.append("⇢ no return")  # plain-language for "one-way" (PT-48)
+            state_bits.append("⇢ one-way")
         col[2] = Text(" · ".join(state_bits), style="yellow" if warp and warp.one_way else "")
         if warp is not None and warp.band:
             band = Text(f"Band {warp.band}", style=BAND_COLOR.get(warp.band, ""))
