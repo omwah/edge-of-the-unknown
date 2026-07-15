@@ -136,6 +136,85 @@ async def test_workbench_controls_reachable_at_80x24() -> None:
             )
 
 
+async def test_empty_source_rows_disable_their_buttons() -> None:
+    """PT-46: a Load/Unload/Settle button is greyed when its direction has nothing to
+    move, mirroring the reducer so a disabled button and a rejected command never disagree.
+    The colony holds only Equipment; the ship carries only Fuel Ore and has free holds."""
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game(app, pilot)
+        pid = _own_colony_here(svc)  # aboard fuel_ore 30; stores equipment 40; free holds
+        app.push_screen(TransferWorkbenchScreen(svc, 1, pid))
+        await pilot.pause()
+        screen = app.screen
+        from textual.widgets import Button
+        d = lambda bid: screen.query_one(bid, Button).disabled  # noqa: E731
+        assert d("#load-fuel_ore") and not d("#unload-fuel_ore")   # can unload, nothing to load
+        assert not d("#load-equipment") and d("#unload-equipment")  # can load, nothing aboard
+        assert d("#load-organics") and d("#unload-organics")        # neither side has any
+        assert not d("#unload-colonists")  # 200 aboard, plenty of room → Settle live
+
+
+async def test_stepper_clamps_to_the_movable_maximum() -> None:
+    """PT-47: the shared amount field is capped at the larger direction (here unloading
+    30 fuel ore), so it can never show or submit more than is movable."""
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game(app, pilot)
+        pid = _own_colony_here(svc)
+        app.push_screen(TransferWorkbenchScreen(svc, 1, pid))
+        await pilot.pause()
+        screen = app.screen
+        screen._set_amount("fuel_ore", 999)  # type: ignore[attr-defined]
+        assert screen._amount("fuel_ore") == 30  # type: ignore[attr-defined]  clamped to aboard
+        from textual.widgets import Button
+        for _ in range(5):  # + past the cap keeps sitting at the cap
+            screen.query_one("#inc-fuel_ore", Button).press()
+            await pilot.pause()
+        assert screen._amount("fuel_ore") == 30  # type: ignore[attr-defined]
+
+
+async def test_over_cap_typing_is_clamped_inline_without_losing_focus() -> None:
+    """PT-47: typing over the cap into the field clamps the *displayed* value in place and
+    keeps focus, so the field never shows an amount that cannot move."""
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game(app, pilot)
+        pid = _own_colony_here(svc)
+        app.push_screen(TransferWorkbenchScreen(svc, 1, pid))
+        await pilot.pause()
+        screen = app.screen
+        from textual.widgets import Input
+        field = screen.query_one("#amt-fuel_ore", Input)
+        field.focus()
+        await pilot.pause()
+        field.value = "999"  # simulate typing over the cap
+        await pilot.pause()
+        assert field.value == "30"           # clamped inline to the movable maximum
+        assert app.screen.focused is field   # focus retained on the field
+
+
+async def test_transfer_modal_overlays_the_planet_screen() -> None:
+    """PT-45: the workbench is a translucent overlay, not an opaque screen — the planet
+    screen it was opened from stays in the stack and shows behind it."""
+    app = EdgeApp()
+    async with app.run_test(size=(100, 34)) as pilot:
+        await pilot.pause()
+        svc = await _new_game(app, pilot)
+        pid = _own_colony_here(svc)
+        from edge.tui.screens.planet import PlanetScreen
+        app.push_screen(PlanetScreen(svc.planet_view(1, pid), svc, 1))
+        await pilot.pause()
+        app.screen.action_transfer()  # type: ignore[attr-defined]
+        await pilot.pause()
+        assert isinstance(app.screen, TransferWorkbenchScreen)
+        assert app.screen.styles.background.a < 1.0            # a scrim, not opaque
+        assert isinstance(app.screen_stack[-2], PlanetScreen)  # the planet still renders behind
+
+
 async def test_enter_in_amount_field_submits_unload() -> None:
     """WP-PR07 §8.1: Enter in a commodity's amount field unloads it to the colony."""
     app = EdgeApp()

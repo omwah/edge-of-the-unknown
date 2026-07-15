@@ -34,8 +34,12 @@ _COLONIST_ROW = "colonists"
 class TransferWorkbenchScreen(ModalScreen[None]):
     """A modal transfer editor for the player-owned world in the current sector."""
 
-    DEFAULT_CSS = """
-    TransferWorkbenchScreen { align: center middle; }
+    # `CSS`, not `DEFAULT_CSS`: the scrim must outrank the base `ModalScreen:ansi
+    # { background: transparent }` and app.tcss's `Screen { background }`, which a
+    # lowest-priority DEFAULT_CSS rule loses to (so the overlay came out opaque). This
+    # matches the other overlay modals (ConfirmScreen / RumorModal / AmountPrompt).
+    CSS = """
+    TransferWorkbenchScreen { align: center middle; background: $background 60%; }
     TransferWorkbenchScreen #panel {
         width: 74; max-width: 96%; height: auto; max-height: 90%;
         border: round $accent; background: $surface; padding: 1 2;
@@ -63,39 +67,46 @@ class TransferWorkbenchScreen(ModalScreen[None]):
     def _planet(self) -> PlanetDTO:
         return self._service.planet_view(self._pid, self._planet_id)
 
-    def _aboard(self) -> dict[str, int]:
-        ship = self._service.game_view(self._pid).ship
-        return {h.label: h.qty for h in ship.holds}
-
     # --- layout ---------------------------------------------------------------
 
     def compose(self) -> ComposeResult:
         p = self._planet()
-        aboard = self._aboard()
+        ship = self._service.game_view(self._pid).ship
+        # The ship's holds DTO is built one-per-commodity in `Commodity` order (session
+        # `_ship_dto`), but its `label` is an abbreviation ("Fuel"/"Org"/"Equ"), so key the
+        # amounts by commodity here rather than by that display label.
+        aboard = {c: h.qty for c, h in zip(Commodity, ship.holds)}
+        free_holds = max(0, ship.holds_total - ship.holds_used)
         stores = dict(p.stores)
         with VerticalScroll(id="panel"):
             yield Static(f"[b]Transfer · {p.name}[/]", id="title")
             yield Static("[dim]Aboard ↔ colony stores. Steps of 10, or type an exact amount.[/]")
             for c in Commodity:
-                label = c.value.replace("_", " ").title()
-                a, s = aboard.get(label, 0), stores.get(label, 0)
-                # Tab order (WP-PR07): the amount field first, then decrement, increment, then
-                # the per-row actions — matching the spec's "field, −, +, then aggregate".
+                label = c.value.replace("_", " ").title()  # matches session `_FULL`, the stores key
+                a, s = aboard.get(c, 0), stores.get(label, 0)
+                # Mirror the reducer's clamp (rules._transfer_cargo) so a greyed button and a
+                # rejected command never disagree: loading stops at free holds *and* stores,
+                # unloading at what is aboard (colony stores are unbounded). The shared field
+                # is capped at the larger direction — neither action can be over-typed.
+                load_cap = min(s, free_holds)
+                unload_cap = a
                 yield Horizontal(
                     Static(f"[b]{label}[/]\n[dim]aboard {a:,} · stores {s:,}[/]", classes="row-head"),
-                    AmountStepper(c.value, step=_STEP),
-                    Button("Load", id=f"load-{c.value}", classes="act"),
-                    Button("Unload", id=f"unload-{c.value}", classes="act"),
+                    AmountStepper(c.value, step=_STEP, maximum=max(load_cap, unload_cap)),
+                    Button("Load", id=f"load-{c.value}", classes="act", disabled=load_cap == 0),
+                    Button("Unload", id=f"unload-{c.value}", classes="act", disabled=unload_cap == 0),
                     classes="row",
                 )
             # Colonists: settle from the berth into an owned colony (never loaded back here).
             if p.owned_by_you and p.colonizable:
                 room = max(0, p.habitability_cap - p.colonists)
+                settle_cap = min(p.ship_colonists, room)  # rules._settle_colonists clamp
                 yield Horizontal(
                     Static(f"[b]Colonists[/]\n[dim]berth {p.ship_colonists:,} · colony {p.colonists:,} "
                            f"· room {room:,}[/]", classes="row-head"),
-                    AmountStepper(_COLONIST_ROW, step=_STEP),
-                    Button("Settle", id=f"unload-{_COLONIST_ROW}", classes="act"),
+                    AmountStepper(_COLONIST_ROW, step=_STEP, maximum=settle_cap),
+                    Button("Settle", id=f"unload-{_COLONIST_ROW}", classes="act",
+                           disabled=settle_cap == 0),
                     classes="row",
                 )
             yield Horizontal(
