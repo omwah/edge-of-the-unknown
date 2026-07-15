@@ -42,6 +42,18 @@ class Canvas:
                 self._ch[y][xx] = char
                 self._st[y][xx] = style
 
+    def char_at(self, y: int, x: int) -> str:
+        """The glyph at `(y, x)`, or a space when out of bounds."""
+        if 0 <= y < self.h and 0 <= x < self.w:
+            return self._ch[y][x]
+        return " "
+
+    def erase(self, y: int, x: int) -> None:
+        """Blank a single cell (char and style), a no-op out of bounds."""
+        if 0 <= y < self.h and 0 <= x < self.w:
+            self._ch[y][x] = " "
+            self._st[y][x] = None
+
     def rows(self) -> list[str]:
         out: list[str] = []
         for y in range(self.h):

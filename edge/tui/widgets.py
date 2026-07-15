@@ -1204,6 +1204,11 @@ class LocalMapView(Static):
             self._idx = j
             self.refresh()
 
+    @property
+    def selected_sector(self) -> int | None:
+        """Internal id of the keyboard-highlighted sector, or None when empty."""
+        return self._hits[self._idx].sector_id if self._hits else None
+
     def action_pick(self) -> None:
         if self._hits:
             self.post_message(self.Picked(self._hits[self._idx].sector_id))

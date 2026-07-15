@@ -277,7 +277,26 @@ Commit: `playtest: WP-PR2-01 tabbed-screen keyboard model`
 
 ---
 
-### WP-PR2-02 — Stardock hardware focus and Flying/Flown labels
+### WP-PR2-02 — Stardock hardware focus and Flying/Flown labels — landed
+
+**Landed 2026-07-12** in `playtest: WP-PR2-02 hardware focus and Flying/Flown labels`
+(PT-33/PT-34).
+
+- **PT-33 — buy dropped focus.** WP-PR08 restored the buy-table *cursor* by stable key
+  after a purchase rebuild, but keyboard focus landed back on the tab rail.
+  `StardockScreen.on_mount` now also focuses the restored table (deferred so it wins over
+  the screen's default initial focus), so the just-bought row keeps focus — tightening the
+  Devices tab fixed in WP-PR08 as well.
+- **PT-34 — the shipyard labelled the current hull "flown".** Now distinguished: **Flying**
+  is the hull you occupy (owned); **Flown** is a hull class you flew and traded away, no
+  longer aboard. "Flown" needed history the model didn't keep, so a persisted
+  `Player.flown_classes` (`frozenset[str]`) was added; `_buy_ship` folds the outgoing hull's
+  class in. It reconstructs under `(seed, command log)` and is picked up by `state_hash` via
+  the generic dataclass walk (**no codec/migration needed**). A new `ShipyardItem.flown`
+  projection (`session.stardock_view`) drives the label; neither Flying nor Flown is
+  purchasable (the reducer already rejects the current hull).
+- Adding the DTO field moved the wire fingerprint: **`WIRE_VERSION` 12 → 13**,
+  `tests/fixtures/wire/fingerprint.txt` regenerated. Projection-only, no store migration.
 
 **Goal:** keep the just-bought hardware/shipyard row focused after purchase, and
 label hulls **Flying** (current) vs **Flown** (formerly owned, not now).
@@ -535,7 +554,31 @@ Commit: `playtest: WP-PR2-07 nav compass clarity and trail colors`
 
 ---
 
-### WP-PR2-08 — Computer map: legend colors, P-plot, phantom edges
+### WP-PR2-08 — Computer map: legend colors, P-plot, phantom edges — landed
+
+**Landed 2026-07-14** in `playtest: WP-PR2-08 computer map colors, P-plot, and edge fix`
+(PT-50/51/56). All three are pure TUI/projection — no wire bump, no DESIGN change.
+
+- **PT-50 legend colours.** A node's label was painted in one style. `_build_at_radius`
+  now overpaints the trailing content codes (`S`/`P`/`@`/`#`/`×`) in their legend colours
+  (`mapgraph._CODE_STYLE`, kept in step with `_codes`/`LEGEND`) while the `(id)` keeps its
+  band/here/route tint. Fog preserved — unexplored nodes carry no codes.
+- **PT-51 P to plot.** `PANE_BINDINGS["map"]` gains `("p", "plot_route", …)`;
+  `action_plot_route` handles the `map` subview by plotting to
+  `LocalMapView.selected_sector` (new property) and landing on Route — the same verb the
+  other sector tables bind, and what Enter/click already did (`_plot_map_sector` factored
+  out of the pick handler).
+- **PT-56 phantom edges — cause was different from the note's guess.** The drawn edge set
+  already equalled true adjacency; the artifact was a **one-way** warp (no return edge to
+  bound its BFS `core_hops`) whose ends sit many gravity columns apart, drawn as a long line
+  straight along an intervening node's row. `_draw_edges` now records per-cell edge
+  ownership and, after drawing, severs any connector cell abutting a **non-endpoint** label
+  (the note's blessed "occupied-margin" option; new `Canvas.char_at`/`erase`). A node's own
+  edge always keeps its cell. Seed-4/11703 regression: no visual bridge at widths 80–240.
+  Rare residuals remain only where a node's own *stepped* edge is exactly colinear with a
+  foreign long line (an inherent ASCII overlap — severing would hide a real edge).
+- **Snapshot impact:** any Computer-map snapshot changes (codes now coloured; a few dense
+  wide maps lose phantom bridges). Baselines to be refreshed by the maintainer.
 
 **Goal:** color per-sector content text to match the legend, add `P` to plot a route
 from the Map view, and fix edges drawn between unconnected sectors.

@@ -9,11 +9,12 @@ Rich-markup row strings the TUI renders verbatim (the established baked-rows
 contract) plus a one-line legend.
 
 Deterministic and I/O-free: a function of `(state, player, radius, route)` only,
-so it reconstructs identically under `(seed, command log)`. A key simplification
-makes the layout tractable: `core_hops` is a BFS distance from the Core, so any
-two warp-connected sectors differ by at most one hop — every edge therefore spans
-the same gravity column or an adjacent one, and no long cross-column edge routing
-is ever needed.
+so it reconstructs identically under `(seed, command log)`. A simplification keeps
+the layout tractable: `core_hops` is a BFS distance from the Core, so a *two-way*
+warp joins sectors differing by at most one hop — those edges span the same gravity
+column or an adjacent one. A **one-way** warp has no return edge to bound it, so its
+ends can sit many columns apart; such a long edge is drawn along one end's row and
+severed where it would read as passing *through* an unrelated node (see `_draw_edges`).
 """
 
 from __future__ import annotations
@@ -44,6 +45,13 @@ _VSTEP = 2  # blank rows between stacked nodes in a column
 _ROUTE_STYLE = "bold yellow"
 _UNEXPLORED_STYLE = "dim"  # a sector whose id is known (warp list shows it) but is uncharted
 _ONEWAY_STYLE = "dim"  # a warp with no return edge (one-way), drawn faintly
+
+# Per-content-code tint, so a node's contents read in the same colours as the legend
+# (PT-50). The `(id)` keeps the band/here/route/unexplored style; only these trailing
+# code glyphs are recoloured. Must stay in step with `_codes` and `LEGEND`.
+_CODE_STYLE: dict[str, str] = {
+    "S": "magenta", "P": "magenta", "@": "green", "#": "cyan", "×": "red",
+}
 
 LEGEND = (
     "[reverse bold cyan]@[/] you   [bold yellow]*[/] route   ─ warp   "
@@ -217,6 +225,7 @@ def _build_at_radius(
     canvas = _Canvas(width, height)
     occupied: set[tuple[int, int]] = set()  # node-label cells, off-limits to connectors
     boxes: list[tuple[int, int, int, int]] = []  # (sector_id, canvas_row, col0, col1)
+    spans: dict[int, tuple[int, int, int]] = {}  # sector_id -> (row, col0, col1)
 
     for node, (row, x) in placed.items():
         label = _label(state, player, node, here)
@@ -229,11 +238,19 @@ def _build_at_radius(
         else:
             style = _BAND_COLOR.get(state.sectors[node].distance_band)
         canvas.put(row, x, label, style)
+        # Recolour the trailing content codes to match the legend (PT-50); the `(id)`
+        # keeps `style`. Only charted, non-here nodes carry codes (see `_label`).
+        if node != here and node in player.explored_sectors:
+            codes = _codes(state, node, player)
+            base = len(label) - len(codes)
+            for k, ch in enumerate(codes):
+                canvas.put(row, x + base + k, ch, _CODE_STYLE.get(ch, style))
         occupied.update((row, x + k) for k in range(len(label)))
+        spans[node] = (row, x, x + len(label))
         if node != here:  # the current sector isn't a route target
             boxes.append((node, row, x, x + len(label)))
 
-    _draw_edges(state, canvas, placed, cell_w, route, occupied)
+    _draw_edges(state, canvas, placed, cell_w, route, occupied, spans)
 
     rows = canvas.rows()
     trim = 0
@@ -252,17 +269,31 @@ def _build_at_radius(
     return rows, LEGEND, hits, width
 
 
+# Glyphs whose drawn strokes reach toward a horizontal neighbour: a cell with a
+# RIGHT arm chains into a label on its right; a LEFT arm into a label on its left.
+_RIGHT_ARM = frozenset("─╭╰")
+_LEFT_ARM = frozenset("─╮╯")
+
+
 def _draw_edges(
     state: UniverseState, canvas: _Canvas, placed: dict[int, tuple[int, int]],
     cell_w: int, route: Sequence[int], occupied: set[tuple[int, int]],
+    spans: dict[int, tuple[int, int, int]],
 ) -> None:
     """Connect placed nodes; route legs are drawn in the route highlight.
 
-    Every warp-connected pair shares the same gravity column or an adjacent one
-    (neighbours differ by ≤1 Core hop), so edges are either a vertical run or a
-    single stepped connector across one gap — no long-haul routing. Connectors
-    never overwrite node-label cells (`occupied`), so a crossing wire can't mangle
-    a sector id.
+    Most warp-connected pairs share the same gravity column or an adjacent one
+    (BFS neighbours differ by ≤1 Core hop), so an edge is a vertical run or a single
+    stepped connector across one gap. **One-way** warps are the exception: with no
+    return edge to bound the other direction, their endpoints can sit many columns
+    apart, and such an edge is drawn as a long line along one endpoint's row.
+
+    Connectors never overwrite node-label cells (`occupied`). But a line running
+    along a non-endpoint node's row would resume on the far side of that label and
+    *read* as connecting through it (PT-56). So after drawing, any connector cell
+    that abuts a label whose sector is **not** one of the edge's endpoints is erased,
+    leaving a one-cell gap so the line clearly passes *behind* the node — the
+    occupied-margin the note calls for, applied only where a foreign wire intrudes.
     """
     route_legs = {(route[i], route[i + 1]) for i in range(len(route) - 1)}
     route_legs |= {(b, a) for a, b in route_legs}  # undirected, for drawing
@@ -273,8 +304,21 @@ def _draw_edges(
             if b in placed and (key := frozenset((a, b))) not in drawn:
                 drawn.add(key)
                 edges.append((a, b))
+
+    # Which edges (as endpoint pairs) painted each connector cell — a cell may be
+    # shared by several, so a node's own edge keeps a cell even where a foreign line
+    # crosses it. Route legs are re-drawn last (highlight wins), so record then too.
+    owners: dict[tuple[int, int], set[frozenset[int]]] = {}
+
+    def paint(y: int, x: int, ch: str, style: str | None, edge: frozenset[int]) -> None:
+        if (y, x) in occupied:
+            return  # a label cell — never a connector
+        canvas.put(y, x, ch, style, protect=occupied)
+        owners.setdefault((y, x), set()).add(edge)
+
     # Draw route legs last so the highlight wins on cells shared with plain edges.
     for a, b in sorted(edges, key=lambda e: e in route_legs):
+        edge = frozenset((a, b))
         ay, ax = placed[a]
         by, bx = placed[b]
         one_way = a not in state.adjacency.get(b, ())  # reverse edge absent
@@ -286,23 +330,32 @@ def _draw_edges(
             style = None
         if ax == bx:  # same column → vertical run
             for y in range(min(ay, by) + 1, max(ay, by)):
-                canvas.put(y, ax + cell_w // 2, "│", style, protect=occupied)
+                paint(y, ax + cell_w // 2, "│", style, edge)
             continue
-        # Adjacent columns: left node's right edge → right node's left edge.
+        # Left node's right edge → right node's left edge (one or more gaps wide).
         (ly, lx), (ry, rx) = ((ay, ax), (by, bx)) if ax < bx else ((by, bx), (ay, ax))
-        x0, x1 = lx + cell_w, rx - 1  # the gap span between the two cells
+        x0, x1 = lx + cell_w, rx - 1  # the span between the two cells
         mid = (x0 + x1) // 2
         for x in range(x0, mid):  # horizontal stub on the left node's row
-            canvas.put(ly, x, "─", style, protect=occupied)
+            paint(ly, x, "─", style, edge)
         for x in range(mid + 1, x1 + 1):  # horizontal stub on the right node's row
-            canvas.put(ry, x, "─", style, protect=occupied)
+            paint(ry, x, "─", style, edge)
         if ly == ry:
-            canvas.put(ly, mid, "─", style, protect=occupied)
+            paint(ly, mid, "─", style, edge)
         else:  # vertical step at the midpoint, with corners
-            canvas.put(ly, mid, "╮" if ly < ry else "╯", style, protect=occupied)
-            canvas.put(ry, mid, "╰" if ly < ry else "╭", style, protect=occupied)
+            paint(ly, mid, "╮" if ly < ry else "╯", style, edge)
+            paint(ry, mid, "╰" if ly < ry else "╭", style, edge)
             for y in range(min(ly, ry) + 1, max(ly, ry)):
-                canvas.put(y, mid, "│", style, protect=occupied)
+                paint(y, mid, "│", style, edge)
+
+    # Sever foreign wires that abut a non-endpoint label (PT-56): a cell touching a
+    # label's left border and reaching rightward, or its right border reaching left,
+    # is erased unless an edge incident to that node also owns it.
+    for node, (row, c0, c1) in spans.items():
+        for fx, arms in ((c0 - 1, _RIGHT_ARM), (c1, _LEFT_ARM)):
+            own = owners.get((row, fx))
+            if own and all(node not in e for e in own) and canvas.char_at(row, fx) in arms:
+                canvas.erase(row, fx)
 
 
 def _pointer_line(state: UniverseState, route: Sequence[int], hops: dict[int, int]) -> str:
