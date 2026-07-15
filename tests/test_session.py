@@ -424,6 +424,11 @@ def test_game_view_warps_carry_navigation_clarity_flags() -> None:
     assert by_id[3].one_way and by_id[3].avoided
     assert by_id[3].turn_cost == world.ships[1].turns_per_warp
     assert by_id[6].band == "?" and by_id[6].hazards == ()
+    # PT-48: a warp with a return leg must NOT read one-way. This is the case the bug
+    # broke — `one_way` was tested against the current sector's core-hop count instead of
+    # its id, so a hop count never matched an id set and nearly every warp read one-way.
+    assert not by_id[1].one_way  # 1 → 2 exists (backtrack), so the return leg is there
+    assert not by_id[6].one_way  # 6 → 2 exists too
 
 
 def test_game_view_sector_title_carries_band() -> None:

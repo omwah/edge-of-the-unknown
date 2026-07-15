@@ -258,7 +258,11 @@ def _warp_dto(
     arrow = _gravity_arrow(here, core_hops.get(target, here))
     brg = bearing
     tgt = state.sectors[target]
-    one_way = here not in state.adjacency.get(target, ())
+    # One-way iff the target has no warp *back* to the current sector. Test the sector's
+    # own id, not `here` — `here` is the current sector's core-hop count (for the gravity
+    # arrow), and comparing a hop count against a set of sector ids read one-way for nearly
+    # every warp (PT-48).
+    one_way = sector.id not in state.adjacency.get(target, ())
     avoided = target in player.avoid_sectors
     warnings: list[str] = []
     if target in player.explored_sectors:
