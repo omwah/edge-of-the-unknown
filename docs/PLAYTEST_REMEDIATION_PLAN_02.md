@@ -552,11 +552,15 @@ Commit: `playtest: WP-PR2-06 transfer overlay and clamped controls`
 **Landed 2026-07-14** in `playtest: WP-PR2-07 nav compass clarity and trail colors`
 (PT-48/PT-55).
 
-- **PT-48 — clarified, not removed.** A one-way warp is real navigational info *at pick
-  time* (the existing sensor warning only fires when a wormhole is later *scanned*), so
-  option (a): the jargon "one-way" became plain "no return" everywhere it faces a new
-  player — rose detail panel (`⇢ no return`), sector-view wormhole row (`(Enter — no
-  return)`), and the Help warp legend (`⇢ No return (one-way — no warp back)`).
+- **PT-48 — a data bug, then clarified.** The real complaint was that *nearly every* warp
+  read one-way. In `session._warp_dto` the flag was `here not in state.adjacency.get(target,
+  ())`, but `here` is the current sector's **core-hop count** (for the gravity arrow), not
+  its id — a hop count tested against a set of sector ids almost never matched, so one-way
+  showed everywhere. Fixed to test `sector.id` (follow-up commit `fix: one-way flag tested a
+  hop count, not the sector id (PT-48)`); the projection test now also asserts a two-way warp
+  is *not* flagged (the case the bug broke — the old test only checked a genuine one-way *is*
+  flagged, true under the bug too). Separately the jargon was clarified to plain "no return"
+  in the rose detail panel, the sector-view wormhole row, and the Help legend.
 - **PT-55 — band-tinted trail.** `NavRose._trail_column` painted every crumb `dim`; it now
   tints each id by its band with the same `BAND_COLOR` the rose cells use (unknown → dim;
   "you" stays bold-cyan). Band per crumb required a DTO change: `NavStripDTO.trail` /
