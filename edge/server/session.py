@@ -361,18 +361,21 @@ def _controlling_archetype(state: UniverseState, sector_id: int) -> str | None:
 _TRAIL_LEN = 4  # how many prior sectors the nav-rose breadcrumb shows (§11)
 
 
-def _trail(state: UniverseState, player: Player, here: int) -> list[int]:
-    """Recent-route breadcrumb: spatial ids of the last sectors travelled (oldest → newest).
+def _trail(state: UniverseState, player: Player, here: int) -> list[dto.TrailCrumb]:
+    """Recent-route breadcrumb: the last sectors travelled (oldest → newest), each carrying
+    its spatial id and distance band so the rose can tint the trail in the band palette (PT-55).
 
     Walked statelessly back through `player.entered_from` (already recorded per move),
     so it needs no new `Player` field and stays reproducible from `(seed, command log)`.
     Stops at a missing link or a cycle; the current sector is excluded (it's the `@`).
     """
-    crumbs: list[int] = []
+    crumbs: list[dto.TrailCrumb] = []
     seen = {here}
     cur = player.entered_from.get(here)
     while cur is not None and cur not in seen and len(crumbs) < _TRAIL_LEN:
-        crumbs.append(_display(state, cur))
+        sec = state.sectors.get(cur)
+        band = sec.distance_band if sec is not None else ""
+        crumbs.append(dto.TrailCrumb(display_id=_display(state, cur), band=band))
         seen.add(cur)
         cur = player.entered_from.get(cur)
     crumbs.reverse()  # oldest → newest

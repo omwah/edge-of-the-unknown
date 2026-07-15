@@ -547,7 +547,26 @@ Commit: `playtest: WP-PR2-06 transfer overlay and clamped controls`
 
 ---
 
-### WP-PR2-07 — Nav-compass clarity and trail colors
+### WP-PR2-07 — Nav-compass clarity and trail colors — landed
+
+**Landed 2026-07-14** in `playtest: WP-PR2-07 nav compass clarity and trail colors`
+(PT-48/PT-55).
+
+- **PT-48 — clarified, not removed.** A one-way warp is real navigational info *at pick
+  time* (the existing sensor warning only fires when a wormhole is later *scanned*), so
+  option (a): the jargon "one-way" became plain "no return" everywhere it faces a new
+  player — rose detail panel (`⇢ no return`), sector-view wormhole row (`(Enter — no
+  return)`), and the Help warp legend (`⇢ No return (one-way — no warp back)`).
+- **PT-55 — band-tinted trail.** `NavRose._trail_column` painted every crumb `dim`; it now
+  tints each id by its band with the same `BAND_COLOR` the rose cells use (unknown → dim;
+  "you" stays bold-cyan). Band per crumb required a DTO change: `NavStripDTO.trail` /
+  `SectorDTO.trail` now carry a new **`TrailCrumb`** (id + band), filled by `session._trail`
+  from state. Projection-only — **wire 20 → 21**, fingerprint + envelope fixtures
+  regenerated, no store migration.
+- **No snapshot baselines changed:** the trail history, a selected one-way warp, and a
+  wormhole row are all states the current snapshots don't capture (a fresh game has no trail
+  and no wormhole), so the SVG suite is untouched. New unit tests cover the behaviour
+  (`tests/test_ui_navrose.py`).
 
 **Goal:** clarify or remove the "one-way" nav-rose indicator, and make the nav-rose
 trail sector text use the same color convention as the rose interior.

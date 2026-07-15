@@ -265,6 +265,15 @@ class SectorStarbaseDTO:
 
 
 @dataclass(frozen=True)
+class TrailCrumb:
+    """One sector on the nav-rose trail breadcrumb (§11): its spatial id and distance
+    band, so the trail can tint each id in the same band palette as the rose cells (PT-55).
+    """
+    display_id: int
+    band: str = ""  # distance-band name of the visited sector; "" when unknown
+
+
+@dataclass(frozen=True)
 class SectorDTO:
     region: str
     sector_id: int
@@ -280,8 +289,8 @@ class SectorDTO:
     display_id: int = 0  # spatial id shown in the sector title (§5.1)
     core_bearing: float = 0.0  # direction from here to the Core, radians (§11 nav-rose anchor);
     #                            0.0 when no spatial embedding exists (fallback to gravity axis)
-    trail: list[int] = field(default_factory=list)  # recent route breadcrumb: spatial ids of the
-    #                                                  last sectors travelled, oldest → newest (§11)
+    trail: list[TrailCrumb] = field(default_factory=list)  # recent route breadcrumb: the last
+    #                                       sectors travelled (id + band), oldest → newest (§11)
     # Deployed forces here, classic-TW fogged (None when nothing is visible to this player).
     force: SectorForceDTO | None = None
     # Orbital starbases present (scene sprite + sidebar caption; click → planet screen).
@@ -693,7 +702,7 @@ class NavStripDTO:
     you_display: int = 0  # spatial id of the player's sector (§5.1)
     core_bearing: float = 0.0  # direction from here to the Core, radians (anchor placement)
     nodes: list[MapNodeDTO] = field(default_factory=list)
-    trail: list[int] = field(default_factory=list)
+    trail: list[TrailCrumb] = field(default_factory=list)  # id + band per crumb (PT-55)
 
 
 @dataclass(frozen=True)

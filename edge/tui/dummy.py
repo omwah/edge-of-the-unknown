@@ -39,6 +39,7 @@ from edge.core.dto import (
     SurfaceDTO,
     SurfaceSite,
     TradePair,
+    TrailCrumb,
     WarpDTO,
 )
 
@@ -149,7 +150,7 @@ def sample_state() -> GameState:
         ],
         display_id=7,
         core_bearing=3.14,  # the Core lies to the west of Sector 7
-        trail=[3, 6],
+        trail=[TrailCrumb(3, "Hub"), TrailCrumb(6, "Frontier")],
     )
     from edge.server.navstrip import build_nav_strip
 

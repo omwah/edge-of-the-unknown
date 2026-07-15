@@ -518,7 +518,7 @@ def warp_legend_markup(core_anchor_side: str) -> str:
         "[bold cyan]Warp Symbols[/]\n"
         "• [b]<<[/] Coreward (closer)   • [b]>>[/] Outward (deeper)   "
         "• [b]--[/] Cross-band (level)\n"
-        "• [b]↩[/] Backtrack / the sector just left   • [b]⇢[/] One-way exit\n"
+        "• [b]↩[/] Backtrack / the sector just left   • [b]⇢[/] No return (one-way — no warp back)\n"
         "• [b yellow]⊘[/] Avoided by route plotting   • [b yellow]⚠[/] Known hazard\n"
         "• [dim]?[/] Unexplored destination (name and contents remain hidden)\n\n"
         "[bold cyan]Warp Color (Distance Bands)[/]\n"
@@ -1348,7 +1348,7 @@ class SectorObjectList(Vertical):
             label = d.label if d.collected else "Anomaly detected"
             if d.kind == "wormhole" and d.warp_to is not None:
                 # Same routing as the scene hotspot: entering IS the interaction.
-                yield ObjectRow(f"[cyan]✦[/] {label} [dim](Enter — one-way)[/]",
+                yield ObjectRow(f"[cyan]✦[/] {label} [dim](Enter — no return)[/]",
                                 "wormhole", d.warp_to)
             elif not d.collected:
                 yield ObjectRow("[cyan]✦[/] Anomaly detected [dim](Scan)[/]",
@@ -1758,14 +1758,19 @@ class NavRose(Vertical):
             yield Static(self._nav.legend, id="rose-legend")
 
     def _trail_column(self) -> list[Text]:
-        """5 right-aligned trail lines: header, up to 3 history entries, you."""
+        """5 right-aligned trail lines: header, up to 3 history entries, you.
+
+        Each crumb's id is tinted by its distance band with the same `BAND_COLOR` the
+        rose cells use (PT-55), so the trail and the rose read as one palette; an unknown
+        band falls back to dim.
+        """
         col: list[Text] = [Text() for _ in range(5)]
         col[0] = Text("trail", style="dim")
         # Last ≤3 trail entries fill rows 1–3, packed toward the bottom.
         recent = self._nav.trail[-3:]
         start = 4 - len(recent)
-        for i, sid in enumerate(recent):
-            col[start + i] = Text(str(sid), style="dim")
+        for i, crumb in enumerate(recent):
+            col[start + i] = Text(str(crumb.display_id), style=BAND_COLOR.get(crumb.band) or "dim")
         col[4] = Text(str(self._nav.you_display), style="bold cyan")
         return col
 
@@ -1790,7 +1795,7 @@ class NavRose(Vertical):
         if warp is not None and warp.kind == "backtrack":
             state_bits.append("↩ backtrack")
         if warp is not None and warp.one_way:
-            state_bits.append("⇢ one-way")
+            state_bits.append("⇢ no return")  # plain-language for "one-way" (PT-48)
         col[2] = Text(" · ".join(state_bits), style="yellow" if warp and warp.one_way else "")
         if warp is not None and warp.band:
             band = Text(f"Band {warp.band}", style=BAND_COLOR.get(warp.band, ""))
