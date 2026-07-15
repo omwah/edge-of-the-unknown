@@ -17,7 +17,6 @@ from edge.core.aliens import attitude_locked, decay_grudges, effective_dispositi
 from edge.core.discovery import entity_species
 from edge.core.config import GameConfig
 from edge.core.economy import accrue_interest as _accrue
-from edge.core.enums import PortClass
 from edge.core.events import (
     AlienDestroyed, AlienMoved, AttitudeChanged, Banked, CitadelCompleted, ColonyGrew,
     ContractFailed, Event, MarketSettled, PlanetProduced, PortOrderFilled, TurnsReset,

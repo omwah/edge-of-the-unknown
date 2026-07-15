@@ -177,7 +177,7 @@ async def test_controls_board_is_keyboard_navigable() -> None:
         await pilot.pause()
         assert svc.current == first_species
 
-        await pilot.press("down", "down")  # past Portrait, onto Standing
+        await pilot.press("down", "down", "down")  # past Portrait and Location, onto Standing
         await pilot.pause()
         assert app.screen.focused.dest == "band"
         band = svc.band
