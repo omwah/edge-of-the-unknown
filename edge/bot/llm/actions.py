@@ -57,7 +57,9 @@ DECISION_SCHEMA: dict[str, Any] = {
         "reasoning": {"type": "string",
                       "description": "1-3 short sentences: why this action, ship's-log style"},
         "action": {"type": "string",
-                   "enum": [n for n, _ in _NORMAL_ACTIONS + _COMBAT_ACTIONS]},
+                   # `objective_done` is brain-level (it retires the operator's current
+                   # objective, `brain.Brain`), so it rides the enum but not the catalog.
+                   "enum": [n for n, _ in _NORMAL_ACTIONS + _COMBAT_ACTIONS] + ["objective_done"]},
         "sector": {"type": "integer", "description": "target sector id; 0 when unused"},
         "commodity": {"type": "string",
                       "description": "fuel_ore / organics / equipment; empty when unused"},

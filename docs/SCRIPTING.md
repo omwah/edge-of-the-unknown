@@ -84,10 +84,12 @@ This opens the **pilot console**, a Textual app (`edge/bot/llm/tui.py`):
   beside a **Reasoning** pane (the model's stated why), timestamped;
 - **▶ Start / ■ Stop** buttons (`ctrl+s` / `ctrl+x`) — Stop pauses after the current
   cycle, Start resumes;
-- an **operator chat**: type an instruction and the pilot answers it on its next cycle —
-  each instruction is responded to once (it then fades down the model's rolling context,
-  not a permanent standing order). Chatting with a **paused** pilot runs exactly one
-  answering cycle, then stays paused.
+- an **operator chat**: type an instruction and the pilot acknowledges it on its next
+  cycle; the latest instruction also becomes the pilot's **current objective**, rendered
+  into every prompt (so it outlives the rolling context window) until the pilot declares
+  it accomplished with the `objective_done` action or a newer instruction replaces it —
+  the objective lifecycle is reported in the chat pane. Chatting with a **paused** pilot
+  runs exactly one answering cycle, then stays paused.
 
 `--log-file path` appends every action / reasoning / result / chat record as timestamped
 plain-text lines. `--max-actions N` bounds a run; `--host` points at a non-default Ollama
