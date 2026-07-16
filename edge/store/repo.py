@@ -108,8 +108,11 @@ class Repository(ABC):
 
 
 class SqliteRepository(Repository):
-    def __init__(self, path: Path | str) -> None:
-        self._conn = sqlite3.connect(str(path))
+    def __init__(self, path: Path | str, *, check_same_thread: bool = True) -> None:
+        # `check_same_thread=False` lets a caller hand the whole service to a worker
+        # thread (the LLM pilot's brain loop, docs/SCRIPTING.md). sqlite3 serializes
+        # access internally; callers still must not use it from two threads at once.
+        self._conn = sqlite3.connect(str(path), check_same_thread=check_same_thread)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_SCHEMA_PATH.read_text(encoding="utf-8"))
         self._migrate()

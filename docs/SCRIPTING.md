@@ -63,6 +63,52 @@ Two example scripts ship in `edge/bot/scripts/`:
   "trade → fund the first upgrade" loop. This is the Phase-5 exit balance harness.
 - **`explorer.py`** — pushes into unexplored space, salvaging finds and fleeing fights.
 
+## The LLM pilot (`edge-llm-bot`)
+
+The LLM pilot is a bot whose "script" is a local **Ollama** model: each cycle it reads a
+text rendering of the ordinary fog-of-war projections, answers with one schema-constrained
+JSON decision (`reasoning` + one `action` from a closed vocabulary), and acts through the
+same `BotRunner` seam as any script — so a pilot run is still an ordinary, replayable
+command log. It plays **scaled to human speed**: `--pace N` guarantees a cycle never
+finishes faster than N seconds wall-clock (model latency counts toward it).
+
+```
+edge-llm-bot --save pilot.db --model gemma4:e4b-128k --pace 6 --log-file pilot.log
+```
+
+This opens the **pilot console**, a Textual app (`edge/bot/llm/tui.py`):
+
+- a condensed ship-status strip (the game sidebar's facts: sector/turns/latinum, aspects,
+  armament, holds, colonists), refreshed every cycle;
+- an **Actions** pane (what the pilot did, and each command's outcome — rejections in red)
+  beside a **Reasoning** pane (the model's stated why), timestamped;
+- **▶ Start / ■ Stop** buttons (`ctrl+s` / `ctrl+x`) — Stop pauses after the current
+  cycle, Start resumes;
+- an **operator chat**: type an instruction and the pilot answers it on its next cycle —
+  each instruction is responded to once (it then fades down the model's rolling context,
+  not a permanent standing order). Chatting with a **paused** pilot runs exactly one
+  answering cycle, then stays paused.
+
+`--log-file path` appends every action / reasoning / result / chat record as timestamped
+plain-text lines. `--max-actions N` bounds a run; `--host` points at a non-default Ollama
+server. The default model is `gemma4:e4b-128k` (any Ollama chat model works; small models
+benefit from the flat decision schema the pilot uses).
+
+### Hosted games
+
+The pilot can also take a seat on an `edge-server` game (docs/HOSTING.md) instead of a
+local save — the same wire the remote TUI client uses (WP68), bridged synchronously in
+`edge/bot/llm/remote.py`:
+
+```
+edge-llm-bot --connect ws://localhost:8765 --user pilot --password s3cret [--game 2]
+```
+
+It logs in (registering the account if new) and joins `--game`, the first hosted game, or
+creates one from `--seed` on an empty server. Rules rejections coming back over the wire
+(JSON-RPC code -32000) are translated back into the swallowable rejection the runner
+already handles, so remote play degrades exactly like local play.
+
 ## Trust model
 
 **There is no sandbox.** A bot script is ordinary Python executed with your privileges — it can

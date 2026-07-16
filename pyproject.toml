@@ -13,6 +13,7 @@ edge-author-dialogue = "edge.dialogue.authoring.cli:main"
 edge-playtest-dialogue = "edge.dialogue.authoring.playtest:main"
 edge-sysop = "edge.devtool.sysop:main"
 edge-bot = "edge.bot.__main__:main"
+edge-llm-bot = "edge.bot.llm.__main__:main"  # Ollama-piloted bot console (docs/SCRIPTING.md)
 edge-server = "edge.server.net:main"  # host a game over websocket JSON-RPC (Phase 4, WP63)
 
 # Dev-only extras for the cloud authoring backends (the Ollama backend is plain HTTP, no SDK).
@@ -67,6 +68,7 @@ bigbang = "python -m edge.bigbang"
 devtool = "python -m edge.devtool"
 art-gen = "python -m edge.art.cli"
 author-dialogue = "edge-author-dialogue"  # offline LLM dialogue authoring (DESIGN §6.7)
+llm-bot = "edge-llm-bot"  # the Ollama pilot console (docs/SCRIPTING.md)
 playtest-dialogue = "edge-playtest-dialogue"  # play-test authored dialogue in the contact TUI
 lint = "ruff check edge tests"
 test = "pytest"
