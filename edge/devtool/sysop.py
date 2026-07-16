@@ -9,7 +9,11 @@ itself, the twclone lesson), and dumps **Config**.
 
 Interventions reuse `devtool.__main__.apply_patch`, so a settlement pulse, a contract expiry,
 a notice deletion, a governor flip, and a latinum grant all persist and replay identically.
-Run `edge-sysop --save PATH`; run one report non-interactively with `--report NAME`.
+
+`edge-sysop --save PATH` opens the **Textual dashboard** (`sysop_tui.SysopApp`: two-pane
+nav, sortable report tables, modal intervention forms with a player picker, an audit-trail
+pane, auto-refresh). `--plain` keeps this module's classic text menu; `--report NAME` prints
+one report non-interactively and exits (unchanged, for scripting).
 """
 
 from __future__ import annotations
@@ -145,6 +149,37 @@ def menu(session: Session) -> None:
             _print(config_dump(session))
 
 
+def _lobby_hint(path: Path) -> str | None:
+    """A pointed error when the target is the multiplayer lobby registry, not a game save.
+
+    `edge-server --accounts accounts.db` keeps accounts/sessions and a **games index**
+    there; each hosted game world is its own save DB under `--games-dir`. If `path`
+    looks like that registry, return an error message listing the per-game DBs to open
+    instead; otherwise None.
+    """
+    import sqlite3
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return None
+    try:
+        tables = {row[0] for row in
+                  conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if not {"accounts", "games"} <= tables:
+            return None
+        rows = conn.execute("SELECT game_id, name, db_path FROM games ORDER BY game_id").fetchall()
+        listing = "\n".join(f"  #{gid} {name}: --save {db}" for gid, name, db in rows) \
+            or "  (no hosted games created yet)"
+        return (f"{path} is the multiplayer lobby registry (accounts/sessions/games index), "
+                f"not a game save.\nEach hosted game is its own save DB — open one of:\n{listing}\n"
+                "Reports are safe reads; stop (or snapshot) the server before intervening — "
+                "a running server holds live game state in memory.")
+    except sqlite3.Error:
+        return None
+    finally:
+        conn.close()
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="edge-sysop", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -152,16 +187,25 @@ def main(argv: list[str] | None = None) -> None:
                         help="save DB to open (default: the single ~/.edge/games slot)")
     parser.add_argument("--report", metavar="NAME", choices=sorted(_REPORTS),
                         help="print one report non-interactively and exit")
+    parser.add_argument("--plain", action="store_true",
+                        help="use the classic text menu instead of the Textual dashboard")
     args = parser.parse_args(argv)
     save_path = Path(args.save) if args.save else default_save()
     if not save_path.exists():
         parser.error(f"no save at {save_path} — start a game first (or pass --save PATH)")
-    session = Session(save_path)
+    try:
+        session = Session(save_path)
+    except LookupError:  # a DB with no game meta: a lobby registry, or not ours at all
+        parser.error(_lobby_hint(save_path)
+                     or f"{save_path} is not a game save (it has no game meta)")
     try:
         if args.report is not None:
             _print(run_report(session, args.report))
-        else:
+        elif args.plain:
             menu(session)
+        else:
+            from edge.devtool.sysop_tui import SysopApp  # lazy: Textual only when needed
+            SysopApp(session).run()
     finally:
         session.close()
 

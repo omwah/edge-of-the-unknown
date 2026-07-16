@@ -154,9 +154,9 @@ def _components(m: Any) -> str:
 # --- mutations --------------------------------------------------------------
 
 
-def _diff_after(session: Session, patch: DevPatch) -> list[str]:
+def _diff_after(session: Session, patch: DevPatch, player_id: int = _PLAYER_ID) -> list[str]:
     """Run the reducer (no persistence) and return human before→after change lines."""
-    result = reduce(session.state, _PLAYER_ID, patch, session.config)
+    result = reduce(session.state, player_id, patch, session.config)
     lines: list[str] = []
     for kind, news, live in (
         ("player", result.players, session.state.players),
@@ -177,21 +177,27 @@ def _diff_after(session: Session, patch: DevPatch) -> list[str]:
     return lines
 
 
+def apply_patch_lines(session: Session, patch: DevPatch,
+                      player_id: int = _PLAYER_ID) -> tuple[bool, list[str]]:
+    """Apply (or, in dry-run, preview) a DevPatch; return (ok, report lines).
+
+    The player-aware, non-printing form the sysop TUI drives (WP59): the patch is
+    reduced and applied *as* `player_id`, so an intervention can target any player.
+    """
+    try:
+        preview = _diff_after(session, patch, player_id)  # also validates before we persist
+    except DevPatchError as exc:
+        return False, [f"error: {exc}"]
+    if session.dry_run:
+        return True, ["dry-run (nothing written):", *preview]
+    session.service.apply(player_id, patch)
+    return True, ["applied:", *preview]
+
+
 def apply_patch(session: Session, patch: DevPatch) -> None:
     """Apply (or, in dry-run, preview) a DevPatch and report what changed."""
-    try:
-        preview = _diff_after(session, patch)  # also validates before we persist
-    except DevPatchError as exc:
-        print(f"error: {exc}")
-        return
-    if session.dry_run:
-        print("dry-run (nothing written):")
-        for line in preview:
-            print(line)
-        return
-    session.service.apply(_PLAYER_ID, patch)
-    print("applied:")
-    for line in preview:
+    _, lines = apply_patch_lines(session, patch)
+    for line in lines:
         print(line)
 
 
