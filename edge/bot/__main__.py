@@ -34,13 +34,19 @@ def load_script(path: Path) -> ModuleType:
     return module
 
 
-def open_service(save: Path, seed: int) -> GameService:
-    """Open the save (loading an existing game, or creating a fresh one from `seed`)."""
+def open_service(save: Path, seed: int, *, cross_thread: bool = False) -> GameService:
+    """Open the save (loading an existing game, or creating a fresh one from `seed`).
+
+    `cross_thread` relaxes SQLite's thread affinity for callers that drive the service
+    from a worker thread (the LLM pilot); access must still be one thread at a time.
+    """
     config = load_default_config()
-    repo = SqliteRepository(save)
-    if save.exists() and repo.load_meta() is not None:
-        return GameService.load_game(config, repo)
-    return GameService.new_game(config, seed, repo)
+    repo = SqliteRepository(save, check_same_thread=not cross_thread)  # creates the DB when absent
+    try:
+        repo.load_meta()
+    except LookupError:  # an empty/fresh DB has no meta row yet
+        return GameService.new_game(config, seed, repo)
+    return GameService.load_game(config, repo)
 
 
 def main(argv: list[str] | None = None) -> None:
