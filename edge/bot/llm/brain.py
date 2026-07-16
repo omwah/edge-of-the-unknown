@@ -20,7 +20,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from edge.bot.llm.actions import DECISION_SCHEMA, ActionCatalog
+from edge.bot.llm.actions import DECISION_SCHEMA, ActionCatalog, ActionOutcome
 from edge.bot.llm.describe import observe, sidebar
 from edge.bot.llm.ollama import OllamaChat, OllamaError
 from edge.bot.runner import BotRunner
@@ -33,9 +33,11 @@ ship can see and a list of available actions; you answer with a JSON decision: a
 with its arguments.
 
 Your standing goals, in order:
-1. Respond to a fresh operator instruction (the OPERATOR INSTRUCTIONS block, when present)
-   above all else — answer it in your reasoning and act on it now. Earlier OPERATOR lines
-   in the conversation are past context you already handled, not standing orders.
+1. Serve the CURRENT OBJECTIVE block, when present — it is the operator's standing order
+   and outranks every goal below, every cycle, until you retire it. When (and only when)
+   it is fully accomplished, choose the `objective_done` action to retire it; for a purely
+   conversational message ("what do you see?"), answer it in your reasoning, then retire
+   it with `objective_done` on the next cycle. A new operator instruction replaces it.
 2. Survive — flee fights you are losing; keep some latinum in reserve.
 3. Explore outward: chart unexplored warps, survey planets, salvage discoveries.
 4. Trade profitably (buy where a port sells cheap, sell where one buys dear) to fund upgrades.
@@ -81,7 +83,11 @@ class Brain:
         self.catalog = ActionCatalog(bot)
         self.actions_taken = 0
         self._orders: queue.SimpleQueue[str] = queue.SimpleQueue()
-        self._fresh_orders: list[str] = []  # drained this cycle; answered once, then history
+        self._fresh_orders: list[str] = []  # arrived this cycle; acknowledged once, then history
+        # The operator's standing order: rendered into EVERY prompt (not just the arrival
+        # cycle) until the model retires it with `objective_done` or a newer instruction
+        # replaces it — so a multi-cycle directive survives the rolling history window.
+        self._objective: str | None = None
         self._last_rejection: tuple[str, str, str] | None = None
         self._history: list[dict[str, str]] = []
         self._stop = threading.Event()
@@ -167,7 +173,10 @@ class Brain:
         self._emit("reasoning", reasoning)
         self._emit("action", f"{action} {json.dumps(args)}" if args else action)
 
-        outcome = self.catalog.execute(decision)
+        if action == "objective_done":  # brain-level: retire the standing order
+            outcome = self._retire_objective()
+        else:
+            outcome = self.catalog.execute(decision)
         self._emit("result", ("" if outcome.ok else "rejected: ") + outcome.summary)
         self._emit("sidebar", sidebar(self.bot))
         self.actions_taken += 1
@@ -197,19 +206,21 @@ class Brain:
 
     def _messages(self, observation: str) -> list[dict[str, str]]:
         parts = [observation, "", "== AVAILABLE ACTIONS ==", self.catalog.usage()]
-        if self._fresh_orders:  # answered this cycle only; kept as ordinary history after
-            parts += ["", "== OPERATOR INSTRUCTIONS (respond to these now) =="]
+        if self._objective:
+            parts += ["- objective_done — the CURRENT OBJECTIVE is fully accomplished; retire it",
+                      "", "== CURRENT OBJECTIVE (the operator's standing order) ==",
+                      self._objective]
+        if self._fresh_orders:  # arrival-cycle acknowledgment (then ordinary history)
+            parts += ["", "== OPERATOR INSTRUCTIONS (just received — respond now) =="]
             parts += [f"- {order}" for order in self._fresh_orders]
         parts += ["", "Choose exactly one action now."]
         user = {"role": "user", "content": "\n".join(parts)}
         return [{"role": "system", "content": SYSTEM_PROMPT}, *self._history, user]
 
     def _drain_orders(self) -> None:
-        """Move queued chat into this cycle's fresh-order list (each answered exactly once).
-
-        A consumed instruction then rides the rolling history as an ordinary message —
-        recent context, not a permanent standing order — and fades with the window.
-        """
+        """Take queued chat: acknowledged once this cycle, and the latest becomes the
+        CURRENT OBJECTIVE — rendered every cycle until `objective_done` retires it or a
+        newer instruction replaces it (so a directive outlives the history window)."""
         self._fresh_orders.clear()
         while True:
             try:
@@ -218,7 +229,16 @@ class Brain:
                 return
             if order:
                 self._fresh_orders.append(order)
-                self._emit("status", f"operator instruction received: {order}")
+                replaced = " (replaces the previous objective)" if self._objective else ""
+                self._objective = order
+                self._emit("status", f"objective set: {order}{replaced}")
+
+    def _retire_objective(self) -> ActionOutcome:
+        if self._objective is None:
+            return ActionOutcome(False, "there is no current objective to retire")
+        done, self._objective = self._objective, None
+        self._emit("status", f"objective retired: {done}")
+        return ActionOutcome(True, f"objective accomplished and retired: {done}")
 
     # --- plumbing ------------------------------------------------------------------
 
