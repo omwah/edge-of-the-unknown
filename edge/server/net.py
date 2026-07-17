@@ -39,7 +39,7 @@ from edge.core.enums import Commodity
 from edge.core.engine_room import EngineRoomError
 from edge.core.events import Event
 from edge.core.movement import MovementError
-from edge.core.rules import Command, JoinGame
+from edge.core.rules import Command, JoinGame, SetPlayerName
 from edge.engine.ticker import EngineTicker
 from edge.server import session as projection
 from edge.server import wire
@@ -235,6 +235,8 @@ class GameServer:
         try:
             if method == "apply":
                 command = wire.decode_command(params["command"])
+                if isinstance(command, SetPlayerName):
+                    raise RpcError(ERR_AUTH, "player names are controlled by account identity")
                 events = await self.submit(pid, command)
                 return [wire.encode_event(e) for e in events]
             if method == "events_since":
@@ -456,13 +458,16 @@ class LobbyServer:
         log entry, so the roster rebuilds under replay). The binding records account↔game↔seat.
         """
         server = self._open_game(game_id)
+        username = self._accounts.username(session.account_id)  # type: ignore[arg-type]
         existing = self._accounts.binding(session.account_id, game_id)  # type: ignore[arg-type]
         if existing is not None:
             # A server interruption between lobby binding and the logged JoinGame used to
             # leave a durable seat pointing at no player. Repair that legacy/partial state
             # through the same replayable command rail before exposing the seat.
             if existing not in server.service.state.players:
-                await server.submit(existing, JoinGame())
+                await server.submit(existing, JoinGame(name=username))
+            elif server.service.state.players[existing].name != username:
+                await server.submit(existing, SetPlayerName(username))
             session.game_id, session.player_id = game_id, existing
             server.register_session(session)
             return existing
@@ -473,9 +478,11 @@ class LobbyServer:
         free = sorted(pid for pid in server.service.state.players if pid not in bound)
         if free:
             player_id = free[0]
+            if server.service.state.players[player_id].name != username:
+                await server.submit(player_id, SetPlayerName(username))
         else:
             player_id = max(server.service.state.players, default=0) + 1
-            await server.submit(player_id, JoinGame())
+            await server.submit(player_id, JoinGame(name=username))
         self._accounts.bind(session.account_id, game_id, player_id)  # type: ignore[arg-type]
         session.game_id, session.player_id = game_id, player_id
         server.register_session(session)  # start receiving this game's broadcasts (WP65)
@@ -484,11 +491,14 @@ class LobbyServer:
     async def _resume(self, session: Session, game_id: int) -> int:
         """Re-bind an existing seat, repairing a stale binding through `JoinGame`."""
         server = self._open_game(game_id)
+        username = self._accounts.username(session.account_id)  # type: ignore[arg-type]
         existing = self._accounts.binding(session.account_id, game_id)  # type: ignore[arg-type]
         if existing is None:
             raise RpcError(ERR_AUTH, "no seat in that game — join it first")
         if existing not in server.service.state.players:
-            await server.submit(existing, JoinGame())
+            await server.submit(existing, JoinGame(name=username))
+        elif server.service.state.players[existing].name != username:
+            await server.submit(existing, SetPlayerName(username))
         session.game_id, session.player_id = game_id, existing
         server.register_session(session)  # resume receiving this game's broadcasts (WP65)
         return existing

@@ -23,6 +23,7 @@ def test_register_and_login_round_trip(tmp_path: Path) -> None:
     aid = store.register("ada", "hunter2")
     token = store.login("ada", "hunter2")
     assert store.authenticate(token) == aid
+    assert store.username(aid) == "ada"
 
 
 def test_first_account_is_host(tmp_path: Path) -> None:

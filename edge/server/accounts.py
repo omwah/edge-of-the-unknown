@@ -135,6 +135,15 @@ class AccountStore:
         row = self._conn.execute("SELECT is_host FROM accounts WHERE id = ?", (account_id,)).fetchone()
         return bool(row and row["is_host"])
 
+    def username(self, account_id: int) -> str:
+        """Return the immutable login name used as this account's player display name."""
+        row = self._conn.execute(
+            "SELECT username FROM accounts WHERE id = ?", (account_id,),
+        ).fetchone()
+        if row is None:
+            raise AuthError(f"no account {account_id}")
+        return str(row["username"])
+
     # --- games + bindings ----------------------------------------------------
 
     def create_game(self, name: str, db_path: str, seed: int) -> int:

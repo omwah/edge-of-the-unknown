@@ -150,6 +150,7 @@ from edge.core.rules import (
     ResignAlliance,
     Salvage,
     SetAllocation,
+    SetPlayerName,
     SettleColonists,
     SwapComponent,
     BuildCitadel,
@@ -174,6 +175,7 @@ from edge.store import codec
 COMMANDS: list[Command] = [
     JoinGame(),
     JoinGame(name="Pathfinder"),
+    SetPlayerName(name="ada"),
     Warp(to_sector=12),
     TravelTo(to_sector=20),
     Dock(),

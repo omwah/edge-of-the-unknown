@@ -222,6 +222,13 @@ class JoinGame:
 
 
 @dataclass(frozen=True, slots=True)
+class SetPlayerName:
+    """Synchronize a hosted player's display name with authenticated identity."""
+
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
 class Warp:
     to_sector: int
 
@@ -974,7 +981,7 @@ class EndCorpWar:
 
 
 Command = (
-    JoinGame
+    JoinGame | SetPlayerName
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SettleColonists | SetAllocation
@@ -1080,6 +1087,8 @@ def reduce(
     match command:
         case JoinGame():
             return _join_game(state, player_id, command, config)
+        case SetPlayerName():
+            return _set_player_name(state, player_id, command)
         case Warp():
             return _warp(state, player_id, command, config)
         case TravelTo():
@@ -1325,6 +1334,21 @@ def _join_game(
         explored_sectors=frozenset(dock_route), entered_from=entered_from,
     )
     return ReduceResult(players=(player,), ships=(ship,))
+
+
+def _set_player_name(
+    state: UniverseState, player_id: int, command: SetPlayerName,
+) -> ReduceResult:
+    """Apply an authenticated lobby identity as a replayable player-state change."""
+    player = state.players.get(player_id)
+    if player is None:
+        raise MovementError(f"player {player_id} has not joined")
+    name = command.name.strip()
+    if not name:
+        raise MovementError("player name cannot be empty")
+    if len(name) > 64 or any(ord(char) < 32 for char in name):
+        raise MovementError("player name must be at most 64 printable characters")
+    return ReduceResult(players=(replace(player, name=name),))
 
 
 def _docked_port(state: UniverseState, ship: Ship) -> Port:
