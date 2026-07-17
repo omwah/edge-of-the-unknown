@@ -18,6 +18,7 @@ class _Brain:
     def __init__(self) -> None:
         self.llm = SimpleNamespace(model="test-model")
         self.emit: Any = lambda _record: None
+        self.pace = 6.0
         self._running = threading.Event()
         self._stop = threading.Event()
         self.instructions: list[tuple[InstructionMode, str]] = []
@@ -36,6 +37,10 @@ class _Brain:
     def request_stop(self) -> None:
         self._stop.set()
 
+    def adjust_pace(self, delta: float) -> float:
+        self.pace = max(0.0, self.pace + delta)
+        return self.pace
+
     def instruct(self, text: str, *, mode: InstructionMode = "objective") -> None:
         self.instructions.append((mode, text))
 
@@ -50,6 +55,11 @@ def _toggle_description(app: LLMBotApp) -> str:
 def _footer_text(app: LLMBotApp) -> str:
     footer = app.query_one(Footer)
     return " ".join(str(widget.render()) for widget in footer.query("FooterKey"))
+
+
+def _footer_descriptions(app: LLMBotApp) -> list[str]:
+    footer = app.query_one(Footer)
+    return [widget.description for widget in footer.query("FooterKey")]
 
 
 def _rendered(app: LLMBotApp, selector: str) -> str:
@@ -70,6 +80,9 @@ async def test_start_stop_share_one_button_and_ctrl_s_updates_footer() -> None:
         assert _toggle_description(app) == "Start"
         assert "Start" in _footer_text(app)
         assert app.active_bindings["ctrl+x"].binding.action == "cut"
+        assert _footer_descriptions(app)[:5] == [
+            "Quit", "Start", "Pace −", "Pace +", "Query mode",
+        ]
 
         await pilot.press("ctrl+s")
         await pilot.pause()
@@ -106,6 +119,25 @@ async def test_ctrl_t_switches_query_mode_with_input_focused_and_submits_query()
         await pilot.press(*"what is here?", "enter")
         await pilot.pause()
         assert brain.instructions == [("query", "what is here?")]
+
+
+async def test_ctrl_d_and_u_adjust_live_pace_with_input_focused() -> None:
+    brain = _Brain()
+    app = LLMBotApp(brain)  # type: ignore[arg-type]
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.query_one("#chat-input").focus()
+
+        await pilot.press("ctrl+d")
+        await pilot.pause()
+        assert brain.pace == 5.0
+
+        await pilot.press("ctrl+u")
+        await pilot.pause()
+        assert brain.pace == 6.0
+        footer = _footer_text(app)
+        assert "Pace −" in footer and "Pace +" in footer
 
 
 async def test_direct_pilot_response_uses_operator_channel_not_reasoning() -> None:

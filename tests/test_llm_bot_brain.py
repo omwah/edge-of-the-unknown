@@ -97,6 +97,13 @@ def test_objective_prompt_requires_computer_coordinate_check() -> None:
     assert "Check SHIP'S COMPUTER for this objective's sector" in messages[-1]["content"]
 
 
+def test_live_pace_adjustment_clamps_at_zero() -> None:
+    brain = Brain(_Bot(), _LLM(), pace=0.5, emit=lambda _record: None)  # type: ignore[arg-type]
+
+    assert brain.adjust_pace(-1.0) == 0.0
+    assert brain.adjust_pace(1.0) == 1.0
+
+
 def test_query_does_not_replace_or_suppress_a_queued_objective() -> None:
     llm = _LLM(
         {"response": "The neighboring sector remains uncharted."},

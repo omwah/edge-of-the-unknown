@@ -134,6 +134,7 @@ class Brain:
         self._history: list[dict[str, str]] = []
         self._stop = threading.Event()
         self._running = threading.Event()
+        self._pace_lock = threading.Lock()
 
     # --- cross-thread controls (the TUI calls these) --------------------------
 
@@ -143,6 +144,12 @@ class Brain:
 
     def request_stop(self) -> None:
         self._stop.set()
+
+    def adjust_pace(self, delta: float) -> float:
+        """Change the live minimum seconds/action, clamped at no artificial delay."""
+        with self._pace_lock:
+            self.pace = max(0.0, self.pace + delta)
+            return self.pace
 
     @property
     def running(self) -> bool:
@@ -329,7 +336,9 @@ class Brain:
     def _pace_sleep(self, started: float) -> None:
         """Sleep out the remainder of the pace window, waking promptly on stop."""
         while not self._stop.is_set():
-            remaining = self.pace - (time.monotonic() - started)
+            with self._pace_lock:
+                pace = self.pace
+            remaining = pace - (time.monotonic() - started)
             if remaining <= 0:
                 return
             time.sleep(min(0.2, remaining))
