@@ -263,7 +263,7 @@ surrender or no. Speed wins, not attrition.\
 
     _DEPLOY_KEYS = [
         ("arrows/hjkl", "move the drop cursor (click works too)"),
-        ("w/a/s/d", "pan the map without moving the cursor"),
+        ("w/a/s/d", "pan the map (the cursor rides along)"),
         ("Tab / Shift+Tab", "next / previous unplaced trooper (placed ones leave the tab order)"),
         ("Enter", "drop the selected trooper's capsule at the cursor"),
         ("c", "scatter the rest of the stick around the cursor"),
@@ -273,7 +273,7 @@ surrender or no. Speed wins, not attrition.\
     _PLAY_KEYS = [
         ("arrows/hjkl", "move the cursor (click works too)"),
         ("H/J/K/L", "pan the cursor fast"),
-        ("w/a/s/d", "pan the map without moving the cursor"),
+        ("w/a/s/d", "pan the map (the cursor rides along)"),
         ("Tab / Shift+Tab", "next / previous ready trooper (spent ones leave the tab order)"),
         ("m / Enter", "move the selected trooper to the cursor (one action)"),
         ("g", "jump-jet to the cursor (one action; draws AA fire mid-air)"),
@@ -533,7 +533,15 @@ surrender or no. Speed wins, not attrition.\
         pans = {"w": (0, -1), "s": (0, 1), "a": (-1, 0), "d": (1, 0)}
         if event.key in pans:
             dx, dy = pans[event.key]
-            self.query_one(MapView).pan(dx * 8, dy * 4)
+            view = self.query_one(MapView)
+            old_x, old_y = view.cam_x, view.cam_y
+            view.pan(dx * 8, dy * 4)
+            # Drag the cursor by the camera's actual (clamped) shift so it keeps its
+            # place on screen — otherwise the next cursor move yanks the view back.
+            b = self.battle
+            self.cur_x = max(0, min(b.config.width - 1, self.cur_x + view.cam_x - old_x))
+            self.cur_y = max(0, min(b.config.height - 1, self.cur_y + view.cam_y - old_y))
+            self.refresh_ui()
             event.stop()
             return
         if self.deploying:
