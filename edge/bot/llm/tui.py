@@ -134,14 +134,14 @@ class LLMBotApp(App[None]):
         self._set_instruction_mode(mode)
 
     def action_decrease_pace(self) -> None:
-        """Reduce seconds/action by one, making the live pilot faster."""
-        pace = self._brain.adjust_pace(-self.PACE_STEP)
-        self._chat_note(f"pace decreased to {pace:g}s/action — faster")
+        """Decrease action frequency by adding one second to the live delay."""
+        pace = self._brain.adjust_pace(self.PACE_STEP)
+        self._chat_note(f"pace decreased — {pace:g}s/action (slower)")
 
     def action_increase_pace(self) -> None:
-        """Increase seconds/action by one, making the live pilot slower."""
-        pace = self._brain.adjust_pace(self.PACE_STEP)
-        self._chat_note(f"pace increased to {pace:g}s/action — slower")
+        """Increase action frequency by removing one second from the live delay."""
+        pace = self._brain.adjust_pace(-self.PACE_STEP)
+        self._chat_note(f"pace increased — {pace:g}s/action (faster)")
 
     def _set_instruction_mode(self, mode: InstructionMode) -> None:
         self._instruction_mode = mode
