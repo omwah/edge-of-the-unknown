@@ -263,10 +263,10 @@ surrender or no. Speed wins, not attrition.\
 
     _DEPLOY_KEYS = [
         ("arrows/hjkl", "move the drop cursor (click works too)"),
-        ("w/s/d", "pan the map without moving the cursor ('a' is scatter here)"),
+        ("w/a/s/d", "pan the map without moving the cursor"),
         ("Tab / Shift+Tab", "next / previous unplaced trooper (placed ones leave the tab order)"),
         ("Enter", "drop the selected trooper's capsule at the cursor"),
-        ("a", "scatter the rest of the stick around the cursor"),
+        ("c", "scatter the rest of the stick around the cursor"),
         ("u", "undo the last placement"),
         ("q", "abort back to setup"),
     ]
@@ -350,7 +350,7 @@ surrender or no. Speed wins, not attrition.\
         log.write(Text("MOBILE INFANTRY DROP — place your capsules. Tab picks the next "
                        "trooper from the roster (placed ones grey out); the cursor shows "
                        "the landing point: green = clear skies, red = inside AA cover "
-                       "(flak on the way down). Enter drops the capsule, 'a' scatters "
+                       "(flak on the way down). Enter drops the capsule, 'c' scatters "
                        "the rest, ? for help.", style="bold"))
         self.query_one(MapView).focus()
         self.refresh_ui()
@@ -456,7 +456,7 @@ surrender or no. Speed wins, not attrition.\
                      "bold red" if danger else "green")
             line("")
             line("tab next · Enter place", "grey66")
-            line("a scatter rest · u undo", "grey66")
+            line("c scatter rest · u undo", "grey66")
             return out
 
         left = p.retrieval_turns - b.turn + 1
@@ -531,8 +531,8 @@ surrender or no. Speed wins, not attrition.\
             event.stop()
             return
         pans = {"w": (0, -1), "s": (0, 1), "a": (-1, 0), "d": (1, 0)}
-        if event.key in pans and not (self.deploying and event.key == "a"):
-            dx, dy = pans[event.key]  # deploy keeps 'a' for scatter
+        if event.key in pans:
+            dx, dy = pans[event.key]
             self.query_one(MapView).pan(dx * 8, dy * 4)
             event.stop()
             return
@@ -570,7 +570,7 @@ surrender or no. Speed wins, not attrition.\
                 self.query_one("#log", RichLog).write(
                     Text("Can't land a capsule there.", style="grey66"))
             self._maybe_launch()
-        elif event.key == "a" and entry is not None:
+        elif event.key == "c" and entry is not None:
             rng = _random.Random(len(self.drop_order))
             while (entry := self.deploy_selected) is not None:
                 for radius in range(2, 14):
