@@ -453,6 +453,9 @@ class PlanetDirEntry:
     stores: str  # "Fuel 120  Org 40  Equ 0" — the trio in planetary stores
     dist: int  # hops from the player's current sector (BFS), -1 if unreachable
     owned_by_you: bool = False  # player/corp holding — sorts to the top (WP-PR09 / PT-08)
+    citadel_level: int = 0
+    cloud_city_size: int = 0
+    starbase_status: str = ""  # "operational" | "derelict" | "" (no associated base)
 
 
 @dataclass(frozen=True)

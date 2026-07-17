@@ -320,6 +320,8 @@ when columns are folded at 80×24."""
                             ColumnSpec("Claim", fold=True),
                             ColumnSpec("Pop", sortable=True, right=True, fold=True),
                             ColumnSpec("Species", fold=True),
+                            ColumnSpec("Colony", fold=True),
+                            ColumnSpec("Starbase", fold=True),
                             ColumnSpec("Stores (F/O/E)", fold=True),
                             ColumnSpec("Dist", sortable=True, right=True),
                         ), empty=("No planets discovered yet.", "Explore to chart them."),
@@ -491,7 +493,10 @@ when columns are folded at 80×24."""
         self._dt("planets-table").set_rows([
             (str(i), (f"S{pl.sector_display}",
                       Text.from_markup(f"[b yellow]★[/] {pl.name}") if pl.owned_by_you else pl.name,
-                      pl.ptype, pl.owner, f"{pl.colonists:,}", pl.species, pl.stores,
+                      pl.ptype, pl.owner, f"{pl.colonists:,}", pl.species,
+                      (f"Cloud City (size {pl.cloud_city_size})" if pl.cloud_city_size
+                       else f"Citadel L{pl.citadel_level}" if pl.citadel_level else "—"),
+                      pl.starbase_status or "—", pl.stores,
                       str(pl.dist) if pl.dist >= 0 else "—"))
             for i, pl in enumerate(self._computer.planets)],
             group_first=[str(i) for i, pl in enumerate(self._computer.planets) if pl.owned_by_you])

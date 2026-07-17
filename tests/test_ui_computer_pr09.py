@@ -46,6 +46,24 @@ def test_owned_planet_sorts_first(tmp_path) -> None:
     assert planets[0].owned_by_you and planets[0].planet_id == far.planet_id
 
 
+def test_planet_directory_projects_colony_infrastructure_and_starbase(tmp_path) -> None:
+    svc = _svc(tmp_path)
+    st = svc._state
+    planets = list(st.planets.values())
+    citadel, city = planets[:2]
+    st.planets[citadel.id] = replace(citadel, citadel_level=2, cloud_city_size=0)
+    st.planets[city.id] = replace(city, citadel_level=0, cloud_city_size=3)
+
+    rows = {row.planet_id: row for row in svc.computer_view(1).planets}
+    assert rows[citadel.id].citadel_level == 2 and rows[citadel.id].cloud_city_size == 0
+    assert rows[city.id].cloud_city_size == 3 and rows[city.id].citadel_level == 0
+
+    base = next(base for base in st.starbases.values() if base.planet_id in rows)
+    from edge.core.starbases import is_operational
+    expected = "operational" if is_operational(base) else "derelict"
+    assert rows[base.planet_id].starbase_status == expected
+
+
 def test_owned_base_port_sorts_first_with_status(tmp_path) -> None:
     svc = _svc(tmp_path)
     st = svc._state
@@ -126,6 +144,40 @@ async def test_owned_planet_stays_top_even_when_user_sorts() -> None:
             top_key = table.coordinate_to_cell_key((0, 0)).row_key.value
             planets = svc.computer_view(1).planets  # type: ignore[attr-defined]
             assert planets[int(top_key)].owned_by_you
+
+
+async def test_planets_table_labels_citadel_cloud_city_and_starbase() -> None:
+    app = EdgeApp()
+    async with app.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        screen = await _open_computer(app, pilot)
+        svc = app.service
+        st = svc.state  # type: ignore[union-attr]
+        base = next(base for base in st.starbases.values() if base.planet_id is not None)
+        base_planet = st.planets[base.planet_id]
+        city_planet = next(planet for planet in st.planets.values()
+                           if planet.id != base_planet.id and planet.starbase_id is None)
+        st.planets[base_planet.id] = replace(base_planet, citadel_level=2, cloud_city_size=0)
+        st.planets[city_planet.id] = replace(city_planet, citadel_level=0, cloud_city_size=3)
+
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.press("c")
+        await pilot.pause()
+        screen = app.screen  # type: ignore[assignment]
+        assert isinstance(screen, ComputerScreen)
+        screen.show_subview("planets")
+        await pilot.pause()
+        table = screen.query_one("#planets-table", DataTable)
+        rows = screen._computer.planets
+        base_key = str(next(i for i, row in enumerate(rows) if row.planet_id == base_planet.id))
+        city_key = str(next(i for i, row in enumerate(rows) if row.planet_id == city_planet.id))
+        base_row = table.get_row(base_key)
+        city_row = table.get_row(city_key)
+        assert str(base_row[6]) == "Citadel L2"
+        assert str(base_row[7]) in {"operational", "derelict"}
+        assert str(city_row[6]) == "Cloud City (size 3)"
+        assert str(city_row[7]) == "—"
 
 
 async def test_plot_route_from_subviews_lands_on_route() -> None:

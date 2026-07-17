@@ -33,7 +33,10 @@ _NORMAL_ACTIONS: list[tuple[str, str]] = [
     ("warp", "warp {sector} — jump through an adjacent warp shown in 'Warps out'"
              " (sector -1 takes an uncharted one-way exit)"),
     ("travel_to", "travel_to {sector} — autopilot a multi-hop route to any charted sector"),
-    ("dock", "dock — dock at this sector's port (required before trading)"),
+    ("dock_trading_port", "dock_trading_port — enter this sector's commodities market for"
+                          " trading only"),
+    ("dock_stardock", "dock_stardock — enter Stardock facilities: hardware, bank, colonists,"
+                      " rumors, and shipyard"),
     ("dock_starbase", "dock_starbase {starbase_id} — board the orbital starbase here"),
     ("trade", "trade {commodity, units} — trade at the docked port; commodity is"
              " fuel_ore / organics / equipment; direction follows the port's BUY/SELL side"),
@@ -130,6 +133,7 @@ class ActionCatalog:
         self.bot = bot
         self._boarded_starbase_id: int | None = None
         self._docked_port_sector_id: int | None = None
+        self._stardock_facilities_sector_id: int | None = None
 
     @property
     def boarded_starbase_id(self) -> int | None:
@@ -147,6 +151,15 @@ class ActionCatalog:
         if self.bot.game().sector.sector_id != self._docked_port_sector_id:
             self._docked_port_sector_id = None
         return self._docked_port_sector_id
+
+    @property
+    def stardock_facilities_sector_id(self) -> int | None:
+        """The Stardock whose non-market facilities the pilot explicitly entered."""
+        if self._stardock_facilities_sector_id is None:
+            return None
+        if self.bot.game().sector.sector_id != self._stardock_facilities_sector_id:
+            self._stardock_facilities_sector_id = None
+        return self._stardock_facilities_sector_id
 
     # --- what the model may do right now ---------------------------------
 
@@ -208,7 +221,7 @@ class ActionCatalog:
 
     def _at_stardock(self) -> bool:
         sector = self.bot.game().sector
-        return (self.docked_port_sector_id == sector.sector_id
+        return (self.stardock_facilities_sector_id == sector.sector_id
                 and any(port.is_stardock for port in sector.ports))
 
     def _bank_available(self) -> bool:
@@ -246,11 +259,12 @@ class ActionCatalog:
         if outcome.ok:
             self._boarded_starbase_id = None
             self._docked_port_sector_id = None
+            self._stardock_facilities_sector_id = None
         return outcome
 
     # --- port life --------------------------------------------------------------
 
-    def _do_dock(self, decision: dict[str, Any]) -> ActionOutcome:
+    def _do_dock_trading_port(self, decision: dict[str, Any]) -> ActionOutcome:
         base = self.bot.current_starbase()
         if base is not None:
             return ActionOutcome(False, f"this port is hosted by starbase_id {base.starbase_id} — "
@@ -259,7 +273,21 @@ class ActionCatalog:
         if outcome.ok:
             self._docked_port_sector_id = self.bot.game().sector.sector_id
             self._boarded_starbase_id = None
+            self._stardock_facilities_sector_id = None
         return outcome
+
+    def _do_dock_stardock(self, decision: dict[str, Any]) -> ActionOutcome:
+        sector = self.bot.game().sector
+        if not any(port.is_stardock for port in sector.ports):
+            return ActionOutcome(False, "there is no Stardock in this sector")
+        outcome = self._apply(Dock())
+        if not outcome.ok:
+            return outcome
+        self._docked_port_sector_id = sector.sector_id
+        self._stardock_facilities_sector_id = sector.sector_id
+        self._boarded_starbase_id = None
+        return ActionOutcome(True, f"{outcome.summary}; entered Stardock facilities — "
+                             "hardware, bank, colonists, rumors, and shipyard available")
 
     def _do_dock_starbase(self, decision: dict[str, Any]) -> ActionOutcome:
         starbase_id = self._int_arg(decision, "starbase_id")
@@ -268,6 +296,7 @@ class ActionCatalog:
             return ActionOutcome(False, f"starbase_id {starbase_id} is not in this sector")
         self._boarded_starbase_id = starbase_id
         self._docked_port_sector_id = None
+        self._stardock_facilities_sector_id = None
         return ActionOutcome(True, f"boarded {base.name} — standing {base.standing}; "
                              f"services: {', '.join(base.services) or 'none'}")
 
