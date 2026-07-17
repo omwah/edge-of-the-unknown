@@ -32,10 +32,13 @@ class LLMBotApp(App[None]):
     """Start/stop the pilot, read its actions and reasoning, talk to it."""
 
     TITLE = "Edge of the Unknown — LLM pilot"
+    PACE_STEP = 1.0
     BINDINGS = [
-        Binding("ctrl+s", "toggle_bot", "Start"),
-        Binding("ctrl+t", "toggle_instruction_mode", "Query mode"),
-        ("ctrl+q", "quit", "Quit"),
+        Binding("ctrl+q", "quit", "Quit", priority=True),
+        Binding("ctrl+s", "toggle_bot", "Start", priority=True),
+        Binding("ctrl+d", "decrease_pace", "Pace −", priority=True),
+        Binding("ctrl+u", "increase_pace", "Pace +", priority=True),
+        Binding("ctrl+t", "toggle_instruction_mode", "Query mode", priority=True),
     ]
     CSS = """
     #body { height: 1fr; }
@@ -95,10 +98,17 @@ class LLMBotApp(App[None]):
             self._log_handle.flush()
         chat = self.query_one("#chat", RichLog)
         chat.write("[bold]Operator channel.[/bold] Type instructions below; "
-                   "Ctrl-S runs/pauses the pilot and Ctrl-T switches objective / query mode.")
+                   "Ctrl-S runs/pauses the pilot, Ctrl-T switches objective / query mode, "
+                   "and Ctrl-D / Ctrl-U decrease / increase pace.")
+        operator_input = self.query_one("#chat-input", Input)
+        # These keys normally edit an Input. The app-level pace bindings intentionally
+        # replace them; removing the shadowed widget entries also lets Footer retain the
+        # app's declared Quit → Run → Pace → Mode order.
+        operator_input._bindings.key_to_bindings.pop("ctrl+d", None)
+        operator_input._bindings.key_to_bindings.pop("ctrl+u", None)
         self._set_run_control(self._pilot_active)
         self._set_instruction_mode(self._instruction_mode)
-        self.query_one("#chat-input", Input).focus()
+        operator_input.focus()
 
     def on_unmount(self) -> None:
         self._brain.request_stop()
@@ -122,6 +132,16 @@ class LLMBotApp(App[None]):
         """Switch the operator input between standing objectives and answer-only queries."""
         mode: InstructionMode = "query" if self._instruction_mode == "objective" else "objective"
         self._set_instruction_mode(mode)
+
+    def action_decrease_pace(self) -> None:
+        """Reduce seconds/action by one, making the live pilot faster."""
+        pace = self._brain.adjust_pace(-self.PACE_STEP)
+        self._chat_note(f"pace decreased to {pace:g}s/action — faster")
+
+    def action_increase_pace(self) -> None:
+        """Increase seconds/action by one, making the live pilot slower."""
+        pace = self._brain.adjust_pace(self.PACE_STEP)
+        self._chat_note(f"pace increased to {pace:g}s/action — slower")
 
     def _set_instruction_mode(self, mode: InstructionMode) -> None:
         self._instruction_mode = mode
