@@ -1,11 +1,12 @@
 """The pilot's brain: a paced observe → decide → act loop over Ollama (dev-only).
 
-Each cycle builds one observation (`describe.observe`), asks the model for one
+Each action cycle builds one observation (`describe.observe`), asks the model for one
 schema-constrained decision (`reasoning` + `action` + args), executes it through the
 `ActionCatalog`, and reports everything as typed `BotRecord`s to a sink (the TUI, a log
-file, a print). The loop is **paced to human speed**: a cycle never completes faster than
-`pace` seconds wall-clock (model latency counts toward it), so a pilot plays at roughly
-the cadence a person clicking the real TUI would.
+file, a print). General operator queries use a separate answer-only schema and never execute
+an action or consume a game turn. The loop is **paced to human speed**: a cycle never
+completes faster than `pace` seconds wall-clock (model latency counts toward it), so a pilot
+plays at roughly the cadence a person clicking the real TUI would.
 
 Thread-shaped for the TUI: `run()` blocks (run it in a worker thread); `instruct()` and
 `request_stop()` are safe to call from any other thread.
@@ -19,6 +20,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 
 from edge.bot.llm.actions import DECISION_SCHEMA, ActionCatalog, ActionOutcome
 from edge.bot.llm.describe import observe, sidebar
@@ -29,15 +31,14 @@ SYSTEM_PROMPT = """\
 You are the pilot of a starship in Edge of the Unknown, a game of space exploration and
 trading descended from TradeWars 2002. Each cycle you receive one observation of what your
 ship can see and a list of available actions; you answer with a JSON decision: a short
-`reasoning` (1-3 sentences, ship's-log voice, concrete and factual) and exactly one `action`
-with its arguments.
+`reasoning` (1-3 sentences, ship's-log voice, concrete and factual), an
+`operator_response`, and exactly one `action` with its arguments.
 
 Your standing goals, in order:
 1. Serve the CURRENT OBJECTIVE block, when present — it is the operator's standing order
    and outranks every goal below, every cycle, until you retire it. When (and only when)
-   it is fully accomplished, choose the `objective_done` action to retire it; for a purely
-   conversational message ("what do you see?"), answer it in your reasoning, then retire
-   it with `objective_done` on the next cycle. A new operator instruction replaces it.
+   it is fully accomplished, choose the `objective_done` action to retire it. A new objective
+   replaces it.
 2. Survive — flee fights you are losing; keep some latinum in reserve.
 3. Explore outward: chart unexplored warps, survey planets, salvage discoveries.
 4. Trade profitably (buy where a port sells cheap, sell where one buys dear) to fund upgrades.
@@ -46,21 +47,45 @@ Practical rules:
 - Act on what the observation actually shows; ids (sector, planet_id, species_id,
   discovery_id) must come from it verbatim.
 - Fill in the argument fields your action needs; leave the others at their unused value
-  (0, -1 for offer_index, "" for commodity). Example decision:
+  (0, -1 for offer_index, "" for commodity). Set `operator_response` to a concise direct
+  acknowledgment when a NEW OBJECTIVE arrives, or a completion report when choosing
+  `objective_done`; otherwise set it to "". Example decision:
   {"reasoning": "Sector 12 is an unexplored warp one hop out; charting it serves the
-   exploration goal.", "action": "warp", "sector": 12, "commodity": "", "units": 0,
-   "planet_id": 0, "species_id": 0, "discovery_id": 0, "offer_index": -1, "count": 0}
+   exploration goal.", "operator_response": "", "action": "warp", "sector": 12,
+   "commodity": "", "units": 0, "planet_id": 0, "species_id": 0,
+   "discovery_id": 0, "starbase_id": 0, "offer_index": -1, "subsystem": "",
+   "slot_index": -1, "count": 0}
 - You must dock before trading, and descend before exploring a surface.
 - If an action is rejected, read the reason and try something different, not the same thing.
 - Never waste cycles: prefer a concrete action over `wait`.
 """
 
+QUERY_SYSTEM_PROMPT = """\
+You are the pilot of a starship in Edge of the Unknown. Answer the operator's general
+question directly, concisely, and factually from the supplied observation and conversation
+context. This is an answer-only exchange: do not choose, claim, or perform an in-game action,
+and do not alter the current objective. Return only the schema-shaped response.
+"""
+
+QUERY_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {
+        "response": {
+            "type": "string",
+            "description": "a concise direct answer to the operator",
+        },
+    },
+    "required": ["response"],
+}
+
 _HISTORY_ROUNDS = 8  # decision/result pairs kept in the model's context
+
+InstructionMode = Literal["objective", "query"]
 
 
 @dataclass(frozen=True)
 class BotRecord:
-    """One reportable moment: kind is reasoning / action / result / chat / status / error."""
+    """One reportable moment: reasoning / action / result / operator / status / error."""
 
     kind: str
     text: str
@@ -82,8 +107,9 @@ class Brain:
         self.emit: Sink = emit or (lambda record: None)
         self.catalog = ActionCatalog(bot)
         self.actions_taken = 0
-        self._orders: queue.SimpleQueue[str] = queue.SimpleQueue()
-        self._fresh_orders: list[str] = []  # arrived this cycle; acknowledged once, then history
+        self._orders: queue.SimpleQueue[tuple[InstructionMode, str]] = queue.SimpleQueue()
+        self._fresh_objectives: list[str] = []
+        self._pending_queries: list[str] = []
         # The operator's standing order: rendered into EVERY prompt (not just the arrival
         # cycle) until the model retires it with `objective_done` or a newer instruction
         # replaces it — so a multi-cycle directive survives the rolling history window.
@@ -95,9 +121,9 @@ class Brain:
 
     # --- cross-thread controls (the TUI calls these) --------------------------
 
-    def instruct(self, text: str) -> None:
-        """Queue an operator instruction; picked up at the start of the next cycle."""
-        self._orders.put(text.strip())
+    def instruct(self, text: str, *, mode: InstructionMode = "objective") -> None:
+        """Queue an objective change or answer-only query for the next cycle."""
+        self._orders.put((mode, text.strip()))
 
     def request_stop(self) -> None:
         self._stop.set()
@@ -134,9 +160,9 @@ class Brain:
     def run_single(self) -> None:
         """One cycle while paused — lets the operator chat with a stopped pilot.
 
-        The queued instruction is observed, answered (reasoning + one action), and the
-        pilot returns to its paused state. A no-op when the main loop is already running
-        (the live loop will pick the instruction up itself).
+        A queued query is answered without acting; a queued objective is acknowledged while
+        beginning work with one action. The pilot then returns to its paused state. A no-op
+        when the main loop is already running (the live loop will pick the message up itself).
         """
         if self._running.is_set():
             return
@@ -155,26 +181,38 @@ class Brain:
     def _cycle(self) -> bool:
         """One observe→decide→act cycle. Returns True when the run should end."""
         self._drain_orders()
+        observation = observe(
+            self.bot,
+            boarded_starbase_id=self.catalog.boarded_starbase_id,
+            docked_port_sector_id=self.catalog.docked_port_sector_id,
+        )
+        if self._pending_queries:
+            self._answer_queries(observation)
+            return False
+
         game = self.bot.game()
         if game.turns <= 0:
             self._emit("status", "out of turns — the day is spent")
             return True
 
-        observation = observe(self.bot)
         decision = self.llm.chat(self._messages(observation), schema=DECISION_SCHEMA)
         if self._stop.is_set():  # stop pressed while the model was thinking
             return True
 
         reasoning = str(decision.get("reasoning", "")).strip() or "(no reasoning given)"
+        operator_response = str(decision.get("operator_response", "")).strip()
         action = str(decision.get("action", "")).strip()
         # Show only the arguments actually in play (unused fields ride as 0 / -1 / "").
         args = {k: v for k, v in decision.items()
-                if k not in ("reasoning", "action") and v not in (None, 0, -1, "")}
+                if k not in ("reasoning", "operator_response", "action")
+                and v not in (None, 0, -1, "")}
         self._emit("reasoning", reasoning)
+        if operator_response:
+            self._emit("operator", operator_response)
         self._emit("action", f"{action} {json.dumps(args)}" if args else action)
 
         if action == "objective_done":  # brain-level: retire the standing order
-            outcome = self._retire_objective()
+            outcome = self._retire_objective(operator_response_sent=bool(operator_response))
         else:
             outcome = self.catalog.execute(decision)
         self._emit("result", ("" if outcome.ok else "rejected: ") + outcome.summary)
@@ -188,8 +226,9 @@ class Brain:
             result_note += ("\nThat exact action just failed the same way. Do NOT repeat it — "
                             "choose a different action this time.")
         self._last_rejection = repeat if not outcome.ok else None
-        for order in self._fresh_orders:  # consumed: ordinary history from here on
-            self._history.append({"role": "user", "content": f"OPERATOR: {order}"})
+        for objective in self._fresh_objectives:  # consumed: ordinary history from here on
+            self._history.append({"role": "user", "content": f"NEW OBJECTIVE: {objective}"})
+        self._fresh_objectives.clear()
         self._history.append({"role": "assistant", "content": json.dumps(decision)})
         self._history.append({"role": "user", "content": result_note})
         del self._history[:-2 * _HISTORY_ROUNDS]
@@ -202,6 +241,28 @@ class Brain:
             return True
         return False
 
+    def _answer_queries(self, observation: str) -> None:
+        """Answer queued general questions without executing or budgeting an action."""
+        queries = list(self._pending_queries)
+        parts = [observation]
+        if self._objective:
+            parts += ["", "== CURRENT OBJECTIVE (context only; do not change it) ==",
+                      self._objective]
+        parts += ["", "== OPERATOR QUERIES ==", *[f"- {query}" for query in queries]]
+        user = {"role": "user", "content": "\n".join(parts)}
+        response = self.llm.chat(
+            [{"role": "system", "content": QUERY_SYSTEM_PROMPT}, *self._history, user],
+            schema=QUERY_SCHEMA,
+        )
+        answer = str(response.get("response", "")).strip() or "I have no answer to report."
+        del self._pending_queries[:len(queries)]
+        self._emit("operator", answer)
+        self._history.append({"role": "user", "content": "\n".join(
+            f"OPERATOR QUERY: {query}" for query in queries
+        )})
+        self._history.append({"role": "assistant", "content": answer})
+        del self._history[:-2 * _HISTORY_ROUNDS]
+
     # --- prompt assembly ---------------------------------------------------------
 
     def _messages(self, observation: str) -> list[dict[str, str]]:
@@ -210,34 +271,36 @@ class Brain:
             parts += ["- objective_done — the CURRENT OBJECTIVE is fully accomplished; retire it",
                       "", "== CURRENT OBJECTIVE (the operator's standing order) ==",
                       self._objective]
-        if self._fresh_orders:  # arrival-cycle acknowledgment (then ordinary history)
-            parts += ["", "== OPERATOR INSTRUCTIONS (just received — respond now) =="]
-            parts += [f"- {order}" for order in self._fresh_orders]
+        if self._fresh_objectives:  # arrival-cycle acknowledgment (then ordinary history)
+            parts += ["", "== NEW OBJECTIVE (acknowledge directly, then begin work) =="]
+            parts += [f"- {objective}" for objective in self._fresh_objectives]
         parts += ["", "Choose exactly one action now."]
         user = {"role": "user", "content": "\n".join(parts)}
         return [{"role": "system", "content": SYSTEM_PROMPT}, *self._history, user]
 
     def _drain_orders(self) -> None:
-        """Take queued chat: acknowledged once this cycle, and the latest becomes the
-        CURRENT OBJECTIVE — rendered every cycle until `objective_done` retires it or a
-        newer instruction replaces it (so a directive outlives the history window)."""
-        self._fresh_orders.clear()
+        """Separate queued queries from persistent objective changes."""
         while True:
             try:
-                order = self._orders.get_nowait()
+                mode, text = self._orders.get_nowait()
             except queue.Empty:
                 return
-            if order:
-                self._fresh_orders.append(order)
+            if not text:
+                continue
+            if mode == "query":
+                self._pending_queries.append(text)
+            else:
+                self._fresh_objectives[:] = [text]
                 replaced = " (replaces the previous objective)" if self._objective else ""
-                self._objective = order
-                self._emit("status", f"objective set: {order}{replaced}")
+                self._objective = text
+                self._emit("status", f"objective set: {text}{replaced}")
 
-    def _retire_objective(self) -> ActionOutcome:
+    def _retire_objective(self, *, operator_response_sent: bool) -> ActionOutcome:
         if self._objective is None:
             return ActionOutcome(False, "there is no current objective to retire")
         done, self._objective = self._objective, None
-        self._emit("status", f"objective retired: {done}")
+        if not operator_response_sent:
+            self._emit("operator", f"Objective complete: {done}")
         return ActionOutcome(True, f"objective accomplished and retired: {done}")
 
     # --- plumbing ------------------------------------------------------------------

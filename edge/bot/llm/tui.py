@@ -1,10 +1,10 @@
 """The LLM pilot's console — a Textual app watching and steering the brain (dev-only).
 
 Layout: an **Actions** pane (what the pilot did and what came of it) beside a
-**Reasoning** pane (why), a chat strip where the operator types instructions the brain
-folds into its next decision, and Start/Stop controls. The brain runs in a thread worker;
-every `BotRecord` crosses back onto the UI thread via `call_from_thread`. An optional log
-file receives every record as a timestamped line.
+**Reasoning** pane (why), an operator channel whose input toggles between persistent
+objectives and answer-only queries, and a shared Start/Stop control. The brain runs in a
+thread worker; every `BotRecord` crosses back onto the UI thread via `call_from_thread`.
+An optional log file receives every record as a timestamped line.
 
 This is the *pilot's* console, not the game client — it deliberately renders the bot's
 narration, not the game screen (run the real `edge` TUI on the same save afterwards to
@@ -25,7 +25,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Footer, Header, Input, RichLog, Static
 
-from edge.bot.llm.brain import BotRecord, Brain
+from edge.bot.llm.brain import BotRecord, Brain, InstructionMode
 
 
 class LLMBotApp(App[None]):
@@ -34,6 +34,7 @@ class LLMBotApp(App[None]):
     TITLE = "Edge of the Unknown — LLM pilot"
     BINDINGS = [
         Binding("ctrl+s", "toggle_bot", "Start"),
+        Binding("ctrl+t", "toggle_instruction_mode", "Query mode"),
         ("ctrl+q", "quit", "Quit"),
     ]
     CSS = """
@@ -48,7 +49,8 @@ class LLMBotApp(App[None]):
     #controls { height: 3; align-vertical: middle; }
     #controls Button { margin: 0 1; min-width: 12; }
     #chat-input { width: 1fr; margin: 0 1; }
-    #run-state { width: auto; padding: 1 2 0 1; color: $text-muted; }
+    #pilot-state { width: 16; height: 3; padding: 0 2 0 1; color: $text-muted; }
+    #run-state, #instruction-mode { height: 1; width: 1fr; text-align: right; }
     """
 
     def __init__(self, brain: Brain, *, log_file: Path | None = None) -> None:
@@ -58,6 +60,7 @@ class LLMBotApp(App[None]):
         self._log_path = log_file
         self._log_handle: TextIO | None = None
         self._pilot_active = brain.running
+        self._instruction_mode: InstructionMode = "objective"
 
     # --- layout -----------------------------------------------------------------
 
@@ -78,8 +81,10 @@ class LLMBotApp(App[None]):
                     yield Button("■ Stop", id="run-toggle", variant="error")
                 else:
                     yield Button("▶ Start", id="run-toggle", variant="success")
-                yield Input(placeholder="Instruct the pilot… (Enter to send)", id="chat-input")
-                yield Static("running" if self._pilot_active else "stopped", id="run-state")
+                yield Input(placeholder="Set an objective… (Enter to send)", id="chat-input")
+                with Vertical(id="pilot-state"):
+                    yield Static("running" if self._pilot_active else "stopped", id="run-state")
+                    yield Static("objective", id="instruction-mode")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -90,8 +95,10 @@ class LLMBotApp(App[None]):
             self._log_handle.flush()
         chat = self.query_one("#chat", RichLog)
         chat.write("[bold]Operator channel.[/bold] Type instructions below; "
-                   "Ctrl-S toggles ▶ Start / ■ Stop to run or pause the pilot.")
+                   "Ctrl-S runs/pauses the pilot and Ctrl-T switches objective / query mode.")
         self._set_run_control(self._pilot_active)
+        self._set_instruction_mode(self._instruction_mode)
+        self.query_one("#chat-input", Input).focus()
 
     def on_unmount(self) -> None:
         self._brain.request_stop()
@@ -110,6 +117,23 @@ class LLMBotApp(App[None]):
             self.action_stop_bot()
         else:
             self.action_start_bot()
+
+    def action_toggle_instruction_mode(self) -> None:
+        """Switch the operator input between standing objectives and answer-only queries."""
+        mode: InstructionMode = "query" if self._instruction_mode == "objective" else "objective"
+        self._set_instruction_mode(mode)
+
+    def _set_instruction_mode(self, mode: InstructionMode) -> None:
+        self._instruction_mode = mode
+        objective = mode == "objective"
+        self.query_one("#instruction-mode", Static).update(
+            "[bold cyan]objective[/bold cyan]" if objective else "[bold magenta]query[/bold magenta]"
+        )
+        self.query_one("#chat-input", Input).placeholder = (
+            "Set an objective… (Enter to send)" if objective
+            else "Ask the pilot… (Enter to send)"
+        )
+        self._set_binding_description("ctrl+t", "Query mode" if objective else "Objective mode")
 
     def action_start_bot(self) -> None:
         if self._brain.running:
@@ -141,10 +165,13 @@ class LLMBotApp(App[None]):
 
         # Textual bindings are immutable values; replace the toggle binding so Footer
         # advertises what Ctrl-S will do *now*, while the action and key stay fixed.
-        bindings = self._bindings.key_to_bindings.get("ctrl+s", [])
-        self._bindings.key_to_bindings["ctrl+s"] = [
-            replace(binding, description=label)
-            if binding.action == "toggle_bot" else binding
+        self._set_binding_description("ctrl+s", label)
+
+    def _set_binding_description(self, key: str, description: str) -> None:
+        """Replace one immutable binding and ask Footer to render its current meaning."""
+        bindings = self._bindings.key_to_bindings.get(key, [])
+        self._bindings.key_to_bindings[key] = [
+            replace(binding, description=description)
             for binding in bindings
         ]
         self.refresh_bindings()
@@ -155,8 +182,9 @@ class LLMBotApp(App[None]):
         if not text:
             return
         self._record_line("chat", f"[bold magenta]you[/bold magenta] ▸ {escape(text)}", "#chat")
-        self._write_log("CHAT", f"operator: {text}")
-        self._brain.instruct(text)
+        mode = self._instruction_mode
+        self._write_log("CHAT", f"operator {mode}: {text}")
+        self._brain.instruct(text, mode=mode)
         if not self._brain.running:
             # A paused pilot still answers: run exactly one cycle for this instruction.
             self._chat_note("pilot is paused — answering this instruction once")
@@ -183,6 +211,10 @@ class LLMBotApp(App[None]):
             self._record_line("result", f"{prefix}   [{color}]{text}[/{color}]", "#actions")
         elif record.kind == "reasoning":
             self._record_line("reasoning", f"{prefix} [italic]{text}[/italic]", "#reasoning")
+        elif record.kind == "operator":
+            self._record_line(
+                "operator", f"{prefix} [bold cyan]pilot[/bold cyan] ▸ {text}", "#chat"
+            )
         elif record.kind == "error":
             self._record_line("error", f"{prefix} [bold red]⚠ {text}[/bold red]", "#actions")
             self._record_line("error", f"[bold red]⚠ {text}[/bold red]", "#chat", log=False)

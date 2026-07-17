@@ -102,6 +102,15 @@ class BotRunner:
     def stardock(self) -> dto.StardockDTO:
         return self.service.stardock_view(self.player_id)
 
+    def current_starbase(self) -> dto.StarbaseDTO | None:
+        return self.service.current_starbase_view(self.player_id)
+
+    def engine_room(self) -> dto.EngineRoomDTO:
+        return self.service.engine_room_view(self.player_id)
+
+    def tavern(self) -> dto.TavernDTO:
+        return self.service.tavern_view(self.player_id)
+
     # --- the run loop --------------------------------------------------------
 
     def run(self, turns: int = 1000) -> int:

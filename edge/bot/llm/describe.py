@@ -34,8 +34,9 @@ def sidebar(bot: BotRunner) -> str:
     ])
 
 
-def observe(bot: BotRunner) -> str:
-    """One observation: status, combat (if live), sector, docked port, computer intel."""
+def observe(bot: BotRunner, *, boarded_starbase_id: int | None = None,
+            docked_port_sector_id: int | None = None) -> str:
+    """One observation: status, combat, sector, service point, and Computer intel."""
     g = bot.game()
     lines: list[str] = []
     _status(lines, g)
@@ -46,9 +47,18 @@ def observe(bot: BotRunner) -> str:
         return "\n".join(lines)  # combat narrows the world: nothing else is actionable
 
     _sector(lines, g.sector)
-    port = bot.current_port()
+    port = (bot.current_port()
+            if docked_port_sector_id == g.sector.sector_id else None)
     if port is not None:
         _docked_port(lines, port)
+        if any(p.is_stardock for p in g.sector.ports):
+            _stardock(lines, bot.stardock(), bot.tavern())
+    base = bot.current_starbase()
+    if base is not None and base.starbase_id == boarded_starbase_id:
+        _starbase(lines, base)
+    room = bot.engine_room()
+    if room.on_hand:
+        _engine_room(lines, room)
     _computer(lines, bot.computer())
     return "\n".join(lines)
 
@@ -138,7 +148,8 @@ def _sector(lines: list[str], s: dto.SectorDTO) -> None:
         lines.append(f"Discovery here: {d.label} — {status}")
     for sb in s.starbases:
         state = "operational" if sb.operational else "DERELICT (salvageable)"
-        lines.append(f"Starbase here: {sb.name} · owner {sb.owner} · {state}")
+        lines.append(f"Starbase here: starbase_id {sb.starbase_id} — {sb.name} · "
+                     f"owner {sb.owner} · {state} — board with dock_starbase")
     if s.force is not None:
         whose = "your" if s.force.yours else f"{s.force.owner}'s"
         lines.append(f"Deployed force here: {whose} {s.force.fighters} fighters ({s.force.mode})")
@@ -154,11 +165,64 @@ def _docked_port(lines: list[str], port: dto.PortDTO) -> None:
     lines.append("Trade here with: trade {commodity, units}.")
 
 
+def _stardock(lines: list[str], dock: dto.StardockDTO, tavern: dto.TavernDTO) -> None:
+    """The same actionable Stardock service projections the regular client receives."""
+    lines.append("")
+    lines.append("== STARDOCK SERVICES ==")
+    for index, item in enumerate(dock.hardware):
+        afford = "affordable" if item.affordable else "cannot afford"
+        lines.append(f"Hardware offer_index {index}: {item.component} tier {item.tier} · "
+                     f"{item.price:,} slips · {afford}")
+    lines.append(f"Bank: {dock.bank_balance:,} slips deposited · "
+                 f"cash {dock.latinum:,} · use deposit/withdraw {{count}}")
+    lines.append(f"Colonists: {dock.ship_colonists}/{dock.ship_colonist_capacity} aboard · "
+                 f"up to {dock.colonists_recruitable} recruitable at "
+                 f"{dock.colonist_incentive} slips each")
+    rumor = (f"available for {tavern.rumor_price:,} slips · use buy_rumor"
+             if tavern.rumor_available else "no fresh rumor available")
+    lines.append(f"Tavern rumor: {rumor}")
+
+
+def _starbase(lines: list[str], base: dto.StarbaseDTO) -> None:
+    """A boarded starbase's state-gated services, as projected for BaseScreen."""
+    lines.append("")
+    lines.append(f"== BOARDED STARBASE {base.starbase_id}: {base.name} ==")
+    lines.append(f"Owner {base.owner} · standing {base.standing} · integrity "
+                 f"{base.integrity_pct}% · services "
+                 f"{', '.join(base.services) if base.services else 'none'}")
+    if base.market_notice:
+        lines.append(f"Market: {base.market_notice}")
+    for index, item in enumerate(base.hardware):
+        afford = "affordable" if item.affordable else "cannot afford"
+        lines.append(f"Hardware offer_index {index}: {item.component} tier {item.tier} · "
+                     f"{item.price:,} slips · {afford}")
+    if "banking" in base.services:
+        lines.append(f"Bank: {base.bank_balance:,} slips deposited · cash {base.latinum:,} · "
+                     "use deposit/withdraw {count}")
+
+
+def _engine_room(lines: list[str], room: dto.EngineRoomDTO) -> None:
+    """Loose parts and numbered targets needed to install a purchased upgrade."""
+    lines.append("")
+    lines.append("== ENGINE ROOM UPGRADES ==")
+    lines.append("Loose hardware: " + " · ".join(
+        f"offer_index {index}: {label}" for index, label in enumerate(room.on_hand)
+    ))
+    for subsystem in room.subsystems:
+        slots = ", ".join(
+            f"slot {index} {slot.state}" + (f" {slot.component}" if slot.component else "")
+            for index, slot in enumerate(subsystem.slots)
+        )
+        lines.append(f"{subsystem.name.lower().replace(' ', '_')}: {subsystem.derived} · {slots}")
+    lines.append("Install or swap with install_component {subsystem, slot_index, offer_index}.")
+
+
 def _computer(lines: list[str], comp: dto.ComputerDTO) -> None:
     display = {p.sector_id: p.sector_display for p in comp.ports}
     pairs = [p for p in comp.pairs if p.buy_sector in display and p.sell_sector in display][:3]
     ports = sorted((p for p in comp.ports if p.dist >= 0), key=lambda p: p.dist)[:6]
-    if not pairs and not ports:
+    if not any((pairs, ports, comp.planets, comp.codex, comp.leads, comp.dossier,
+                comp.contracts, comp.governance_intel)):
         return
     lines.append("")
     lines.append("== SHIP'S COMPUTER ==")
@@ -169,3 +233,25 @@ def _computer(lines: list[str], comp: dto.ComputerDTO) -> None:
         lines.append("Known ports: " + "  |  ".join(
             f"sector {p.sector_display} ({p.dist} hops) sells [{p.sells or '-'}] "
             f"buys [{p.buys or '-'}]" for p in ports))
+    for planet in comp.planets[:8]:
+        lines.append(f"Known planet: planet_id {planet.planet_id} — {planet.name} "
+                     f"({planet.ptype}) at sector {planet.sector_display} ({planet.dist} hops) · "
+                     f"owner {planet.owner} · colonists {planet.colonists:,} · "
+                     f"stores {planet.stores}")
+    for entry in comp.codex[:8]:
+        lines.append(f"Codex: {entry.name} · {entry.kind or entry.rarity} · "
+                     f"{entry.location} · {entry.detail}")
+    for lead in comp.leads[:8]:
+        stale = " · STALE" if lead.stale else ""
+        route = f"{lead.distance} hops / {lead.turn_cost} turns" if lead.reachable else "unreachable"
+        lines.append(f"Lead: sector {lead.coords} — {lead.summary} · source {lead.source} · "
+                     f"{route}{stale}")
+    for species in comp.dossier[:6]:
+        lines.append(f"Dossier: {species.species} · {species.alliance} · "
+                     f"standing {species.standing} · last seen sector {species.last_seen} · "
+                     f"offers {species.offers or 'none known'}")
+    for contract in comp.contracts[:6]:
+        lines.append(f"Contract {contract.contract_id}: {contract.summary} · "
+                     f"reward {contract.reward:,} · due day {contract.deadline_day} · "
+                     f"status {contract.status}")
+    lines.extend(f"Governance intel: {fact}" for fact in comp.governance_intel)
