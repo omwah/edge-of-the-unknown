@@ -368,6 +368,30 @@ async def test_remote_client_login_join_play_and_push(tmp_path: Path) -> None:
         await ws_server.wait_closed()
 
 
+async def test_remote_rules_rejection_is_a_local_domain_error(tmp_path: Path) -> None:
+    """A hosted command denial is recoverable by the TUI's existing local-error catches."""
+    from edge.core.movement import MovementError
+    from edge.server.client import RemoteClient, RemoteRulesError
+
+    lobby, ws_server, port = await _served_lobby(tmp_path)
+    client = RemoteClient(f"ws://localhost:{port}")
+    try:
+        await client.connect()
+        await client.register("host", "pw")
+        await client.login("host", "pw")
+        gid = await client.create_game("alpha", seed=42)
+        await client.join_game(gid)
+
+        with pytest.raises(MovementError, match="warp") as rejected:
+            await client.apply(Warp(to_sector=999_999))
+        assert isinstance(rejected.value, RemoteRulesError)
+    finally:
+        await client.aclose()
+        await lobby.aclose()
+        ws_server.close()
+        await ws_server.wait_closed()
+
+
 async def test_remote_client_reconnect_catches_up(tmp_path: Path) -> None:
     from edge.server.client import RemoteClient
 

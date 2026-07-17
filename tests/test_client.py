@@ -14,7 +14,7 @@ import pytest
 from edge.config import load_default_config
 from edge.core.movement import shortest_path
 from edge.core.rules import Command, Warp
-from edge.server.client import GameClient, LocalClient
+from edge.server.client import GameClient, LocalClient, RemoteError, RemoteRulesError
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
 
@@ -88,3 +88,19 @@ async def test_apply_rejection_propagates(tmp_path: Path) -> None:
     bad: Command = Warp(to_sector=99999)
     with pytest.raises(MovementError):
         await client.apply(bad)
+
+
+def test_remote_rules_error_matches_local_domain_error_catches() -> None:
+    """Hosted denials follow the same warning-toast paths as embedded denials."""
+    from edge.core.citadels import CitadelError
+    from edge.core.combat import CombatError
+    from edge.core.dev import DevPatchError
+    from edge.core.economy import EconomyError
+    from edge.core.engine_room import EngineRoomError
+    from edge.core.movement import MovementError
+
+    exc = RemoteRulesError(-32000, "the Core is a sanctuary — no attacks here")
+    assert isinstance(exc, RemoteError)
+    assert all(isinstance(exc, kind) for kind in (
+        EconomyError, MovementError, CombatError, EngineRoomError, DevPatchError, CitadelError,
+    ))

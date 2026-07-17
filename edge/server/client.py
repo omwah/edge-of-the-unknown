@@ -33,10 +33,16 @@ from collections.abc import AsyncIterator, Sequence
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast, runtime_checkable
 
 from edge.core import dto
+from edge.core.citadels import CitadelError
+from edge.core.combat import CombatError
 from edge.core.config import GameConfig
+from edge.core.dev import DevPatchError
+from edge.core.economy import EconomyError
 from edge.core.enums import Commodity
+from edge.core.engine_room import EngineRoomError
 from edge.core.events import Event
 from edge.core.models import UniverseState
+from edge.core.movement import MovementError
 from edge.core.rules import Command
 from edge.engine.ticker import EngineTicker
 from edge.server import session, wire
@@ -282,6 +288,25 @@ class RemoteError(Exception):
         self.message = message
 
 
+class RemoteRulesError(
+    RemoteError,
+    EconomyError,
+    MovementError,
+    CombatError,
+    EngineRoomError,
+    DevPatchError,
+    CitadelError,
+):
+    """A remote rules rejection compatible with every local rule-error catch.
+
+    JSON-RPC deliberately exposes one stable rules-rejection code rather than the server's
+    Python exception type.  The synchronous TUI already catches the relevant local domain
+    errors and turns them into warning notifications, so this bridge exception belongs to all
+    of those marker families.  Hosted and embedded play therefore reject commands observably
+    alike without coupling the wire contract to Python class names.
+    """
+
+
 class LinkLost(RemoteError):
     """The websocket dropped mid-call — surfaced to the TUI as a retryable status, not a crash."""
 
@@ -377,7 +402,9 @@ class RemoteClient:
                     continue
                 if "error" in msg:
                     err = msg["error"]
-                    fut.set_exception(RemoteError(err.get("code", -1), err.get("message", "error")))
+                    code = err.get("code", -1)
+                    error_type = RemoteRulesError if code == -32000 else RemoteError
+                    fut.set_exception(error_type(code, err.get("message", "error")))
                 else:
                     fut.set_result(msg.get("result"))
         except Exception:  # noqa: BLE001 — a closed/broken socket ends the loop; fail pending calls
