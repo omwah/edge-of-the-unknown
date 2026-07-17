@@ -1,0 +1,163 @@
+# Balance for the space-battle POC (`edge-spacebattle`). All numbers live here,
+# not in code. Distances are in *placement cells* (the coarse tactical grid the
+# starfield is divided into); each cell renders as board.cell_w x cell_h chars.
+
+board:
+  width: 44        # placement cells across (~3 screens of chars at cell_w 7)
+  height: 22
+  cell_w: 7        # chars per cell, horizontal
+  cell_h: 3        # chars per cell, vertical
+
+turn:
+  ship_actions: 2      # actions per ship per turn, any mix (thrust/rotate/fire/launch/lay/recover)
+  fighter_actions: 2   # actions per fighter wing per turn (move/strafe/intercept)
+
+combat:
+  knockout_chance: 0.40   # chance a hull-reaching hit also disables a component in the struck quadrant
+  raking_bonus: 1.5       # damage multiplier for hits striking the fore or aft aspect (a rake)
+  velocity_evasion: 0.10  # dodge added per cell/turn of the *target's* current speed — keep your vector up under fire
+  mine_damage: 40
+  deploy_reach: 1         # in-combat deploy radius (mines, fighter launch, recovery) around the ship
+  # Missile balance (salvo-nerf interview, 2026-07-17):
+  salvo_action_cost: 2        # a launch is the ship's whole turn — no launch after maneuvering
+  point_defense: 0.20         # per-bird chance the target's PD splashes it on terminal approach
+  point_defense_open: 0.10    # PD when the approach quadrant's screen is already down
+  # On Basilisk Station kit (interview 2026-07-17):
+  screen_regen: 3             # sidewall generators rebuild each quadrant this much per own turn,
+                              # but only if the hull took no damage since the last own turn
+  kilt_bonus: 2.0             # aft-rake multiplier vs a ship fleeing directly away ("a stern
+                              # chase is a long chase" — but never show them your kilt)
+  damage_control_cost: 2      # whole-turn damage control brings one knocked-out component back
+
+# The gravity lance — PLAYER-ONLY experimental refit (the alien opponents never
+# field one). Chosen at setup: the flagship trades half its missile magazine for
+# a bow weapon that collapses the struck quadrant's screen to zero at knife
+# range — no hull damage; it opens the door for the follow-up rake or salvo.
+lance:
+  range: 2            # cells; suicidally close, as doctrine demands
+  recharge_turns: 3   # capacitor turns between discharges (firing takes the whole turn)
+  salvo_penalty: 0.5  # fraction of the magazine surrendered by the refit
+
+# Recon drone: a one-use probe that lights up hidden enemy mines around a
+# distant cell — Basilisk picket work. Stocked per hull (`recon_drones`).
+drone:
+  range: 12           # launch reach in cells
+  reveal_radius: 4    # enemy mines revealed around the probe point
+
+# Rocky debris (belt scenarios): a rock cell blocks main-gun/fighter fire lines,
+# destroys any missile salvo that flies onto it, refuses wings/mines/ships as a
+# station — and a hull that drifts onto one takes an impact keyed to how fast it
+# was going (the rock is pulverized; the ship stops dead in the debris cell).
+rocks:
+  impact_base: 12         # hull-ward damage for a dead-slow scrape
+  impact_per_speed: 10    # extra damage per cell/turn of the ship's speed at impact
+
+fighters:
+  wing_size: 6        # craft per wing; strength is craft remaining
+  speed: 3            # cells per move action
+  endurance: 8        # turns off the rack before fuel-out (reset by carrier recovery)
+  gun: {damage: 2, range: 2, accuracy: 0.65}   # per surviving craft, so a full wing stings
+  intercept_per_craft: 0.30   # chance per craft to splash one missile per intercept action
+  dogfight_bonus: 0.15        # extra accuracy vs other fighter wings
+
+# Missile salvos are board objects: they fly toward their target every owner turn,
+# can be out-run (endurance), body-blocked by terrain-free space only, or thinned
+# by fighter intercepts. On reaching the target's cell each remaining bird rolls to hit.
+#
+# Ship classes reference the real hull roster (hull_art keys the sprite set and is
+# a ship_classes id from config/default.yaml). Screens are per-quadrant ablative
+# pools; components live in quadrants and are knocked out only once that quadrant's
+# screen is down (fore: main_gun/sensors, aft: drive, flanks: launchers).
+ships:
+  frigate:
+    label: Missile Frigate
+    hull_art: missile_frigate
+    hull_max: 120
+    thrust: 2          # max delta-v per thrust action (chebyshev)
+    max_speed: 3       # velocity clamp, cells/turn per axis
+    sensor_range: 9    # cells; reveals hidden mines, resolves enemy status
+    main_gun: {damage: 24, range: 6, arc: ahead, accuracy: 0.85, falloff: 0.06}
+    salvos: 8          # missile salvos carried
+    salvo_size: 4
+    missile: {damage: 8, speed: 3, endurance: 4, accuracy: 0.70}
+    screens: {fore: 30, aft: 20, port: 26, starboard: 26}
+    components:
+      fore: [main_gun, sensors]
+      aft: [drive]
+      port: [launcher]
+      starboard: [launcher]
+    fighter_wings: 2
+    mine_stock: 6
+    recon_drones: 2
+  corvette:
+    label: Scout Corvette
+    hull_art: scout_marauder
+    hull_max: 70
+    thrust: 3
+    max_speed: 4
+    sensor_range: 11
+    main_gun: {damage: 14, range: 5, arc: ahead, accuracy: 0.90, falloff: 0.05}
+    salvos: 3
+    salvo_size: 2
+    missile: {damage: 8, speed: 3, endurance: 3, accuracy: 0.70}
+    screens: {fore: 16, aft: 12, port: 14, starboard: 14}
+    components:
+      fore: [main_gun, sensors]
+      aft: [drive]
+      port: [launcher]
+      starboard: [launcher]
+    fighter_wings: 0
+    mine_stock: 2
+    recon_drones: 1
+  battleship:
+    label: BattleShip
+    hull_art: battleship
+    hull_max: 200
+    thrust: 1
+    max_speed: 2
+    sensor_range: 8
+    main_gun: {damage: 40, range: 8, arc: spinal, accuracy: 0.80, falloff: 0.04}
+    salvos: 10
+    salvo_size: 5
+    missile: {damage: 8, speed: 3, endurance: 5, accuracy: 0.70}
+    screens: {fore: 44, aft: 28, port: 36, starboard: 36}
+    components:
+      fore: [main_gun, sensors]
+      aft: [drive]
+      port: [launcher]
+      starboard: [launcher]
+    fighter_wings: 3
+    mine_stock: 0
+    recon_drones: 1
+
+# Scenario fleets. `deploy` picks the pre-battle interface: `prepared` gets the
+# full peacetime deploy pass (ships + mines + pre-launched fighters anywhere in
+# the friendly zone); `ambushed` places ship positions/facings only, inside the
+# warp-in pocket, against an enemy that is already set up with mines seeded.
+scenarios:
+  prepared:
+    label: Prepared defense
+    blurb: Seed your sector — mines, fighter screens, gun lines — then meet the attack.
+    deploy: full
+    player: [frigate, corvette]
+    enemy: [frigate, corvette]
+    enemy_mines: 0
+    player_zone_frac: 0.55   # leftmost fraction of the board open to deployment
+  ambushed:
+    label: Ambushed on warp-in
+    blurb: You warp into their sector — position and facing are all you get to pick.
+    deploy: warp_in
+    player: [frigate, corvette]
+    enemy: [frigate, corvette]
+    enemy_mines: 8
+    warp_zone_cells: 6       # width of the left-edge warp-in pocket
+  belt:
+    label: Belt skirmish
+    blurb: Fight through an asteroid belt — rocks eat gunfire, missiles, and careless hulls.
+    deploy: full
+    player: [frigate, corvette]
+    enemy: [frigate, corvette]
+    enemy_mines: 0
+    player_zone_frac: 0.40   # the belt claims the middle of the board
+    rock_clusters: 8         # debris clumps seeded across the midfield
+    rock_cluster_size: 9     # cells per clump (random-walk blob)
