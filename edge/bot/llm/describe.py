@@ -35,7 +35,8 @@ def sidebar(bot: BotRunner) -> str:
 
 
 def observe(bot: BotRunner, *, boarded_starbase_id: int | None = None,
-            docked_port_sector_id: int | None = None) -> str:
+            docked_port_sector_id: int | None = None,
+            stardock_facilities_sector_id: int | None = None) -> str:
     """One observation: status, combat, sector, service point, and Computer intel."""
     g = bot.game()
     lines: list[str] = []
@@ -51,7 +52,8 @@ def observe(bot: BotRunner, *, boarded_starbase_id: int | None = None,
             if docked_port_sector_id == g.sector.sector_id else None)
     if port is not None:
         _docked_port(lines, port)
-        if any(p.is_stardock for p in g.sector.ports):
+        if (stardock_facilities_sector_id == g.sector.sector_id
+                and any(p.is_stardock for p in g.sector.ports)):
             _stardock(lines, bot.stardock(), bot.tavern())
     base = bot.current_starbase()
     if base is not None and base.starbase_id == boarded_starbase_id:
@@ -119,8 +121,12 @@ def _sector(lines: list[str], s: dto.SectorDTO) -> None:
         warps.append(" · ".join(bits))
     lines.append("Warps out: " + ("  |  ".join(warps) if warps else "none"))
     for p in s.ports:
-        dock_tag = " — the STARDOCK (shipyard, hardware, recruits)" if p.is_stardock else ""
-        lines.append(f"Port here: {p.name} ({p.klass}){dock_tag} — dock to trade")
+        if p.is_stardock:
+            lines.append(f"Port here: {p.name} ({p.klass}) — the STARDOCK; use "
+                         "dock_trading_port to trade, or dock_stardock for "
+                         "hardware/bank/colonists/rumors/shipyard")
+        else:
+            lines.append(f"Port here: {p.name} ({p.klass}) — use dock_trading_port to trade")
     for pl in s.planets:
         extra = ""
         if pl.ore_reserve_max:
@@ -169,6 +175,8 @@ def _stardock(lines: list[str], dock: dto.StardockDTO, tavern: dto.TavernDTO) ->
     """The same actionable Stardock service projections the regular client receives."""
     lines.append("")
     lines.append("== STARDOCK SERVICES ==")
+    lines.append("Stardock only: colonist recruitment, tavern rumors, and shipyard; "
+                 "hardware and its interest-bearing bank are also available here.")
     for index, item in enumerate(dock.hardware):
         afford = "affordable" if item.affordable else "cannot afford"
         lines.append(f"Hardware offer_index {index}: {item.component} tier {item.tier} · "
@@ -190,6 +198,8 @@ def _starbase(lines: list[str], base: dto.StarbaseDTO) -> None:
     lines.append(f"Owner {base.owner} · standing {base.standing} · integrity "
                  f"{base.integrity_pct}% · services "
                  f"{', '.join(base.services) if base.services else 'none'}")
+    lines.append("A starbase is not Stardock: only the services listed above are available; "
+                 "there is no colonist recruitment, tavern, rumor, or shipyard here.")
     if base.market_notice:
         lines.append(f"Market: {base.market_notice}")
     for index, item in enumerate(base.hardware):
@@ -226,6 +236,10 @@ def _computer(lines: list[str], comp: dto.ComputerDTO) -> None:
         return
     lines.append("")
     lines.append("== SHIP'S COMPUTER ==")
+    for dock in (p for p in comp.ports if p.klass == "Stardock"):
+        route = f"{dock.dist} hops" if dock.dist >= 0 else "currently unreachable"
+        lines.append(f"Stardock location: sector {dock.sector_display} ({route}) — use "
+                     "travel_to with this sector when an objective requires Stardock")
     for p in pairs:
         lines.append(f"Trade pair: {p.goods} — buy at sector {display[p.buy_sector]}, "
                      f"sell at sector {display[p.sell_sector]} · ~{p.per_turn} slips/turn")
@@ -234,10 +248,13 @@ def _computer(lines: list[str], comp: dto.ComputerDTO) -> None:
             f"sector {p.sector_display} ({p.dist} hops) sells [{p.sells or '-'}] "
             f"buys [{p.buys or '-'}]" for p in ports))
     for planet in comp.planets[:8]:
+        colony = (f"Cloud City size {planet.cloud_city_size}" if planet.cloud_city_size
+                  else f"Citadel L{planet.citadel_level}" if planet.citadel_level else "none")
+        starbase = planet.starbase_status or "none"
         lines.append(f"Known planet: planet_id {planet.planet_id} — {planet.name} "
                      f"({planet.ptype}) at sector {planet.sector_display} ({planet.dist} hops) · "
                      f"owner {planet.owner} · colonists {planet.colonists:,} · "
-                     f"stores {planet.stores}")
+                     f"colony {colony} · starbase {starbase} · stores {planet.stores}")
     for entry in comp.codex[:8]:
         lines.append(f"Codex: {entry.name} · {entry.kind or entry.rarity} · "
                      f"{entry.location} · {entry.detail}")
@@ -251,7 +268,9 @@ def _computer(lines: list[str], comp: dto.ComputerDTO) -> None:
                      f"standing {species.standing} · last seen sector {species.last_seen} · "
                      f"offers {species.offers or 'none known'}")
     for contract in comp.contracts[:6]:
-        lines.append(f"Contract {contract.contract_id}: {contract.summary} · "
+        destination = (f" · destination sector {contract.dest_display}"
+                       if contract.dest_display else "")
+        lines.append(f"Contract {contract.contract_id}: {contract.summary}{destination} · "
                      f"reward {contract.reward:,} · due day {contract.deadline_day} · "
                      f"status {contract.status}")
     lines.extend(f"Governance intel: {fact}" for fact in comp.governance_intel)

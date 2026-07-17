@@ -86,6 +86,17 @@ def test_query_answers_without_action_or_turn_budget() -> None:
     ]
 
 
+def test_objective_prompt_requires_computer_coordinate_check() -> None:
+    brain = Brain(_Bot(), _LLM(), emit=lambda _record: None)  # type: ignore[arg-type]
+    brain._objective = "Return to Stardock."
+
+    messages = brain._messages("== SHIP'S COMPUTER ==\nStardock location: sector 3")
+
+    assert "Before plotting movement for an objective" in messages[0]["content"]
+    assert "exact displayed sector with `travel_to`" in messages[0]["content"]
+    assert "Check SHIP'S COMPUTER for this objective's sector" in messages[-1]["content"]
+
+
 def test_query_does_not_replace_or_suppress_a_queued_objective() -> None:
     llm = _LLM(
         {"response": "The neighboring sector remains uncharted."},

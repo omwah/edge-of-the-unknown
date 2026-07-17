@@ -46,6 +46,12 @@ Your standing goals, in order:
 Practical rules:
 - Act on what the observation actually shows; ids (sector, planet_id, species_id,
   discovery_id) must come from it verbatim.
+- Before plotting movement for an objective, check the `SHIP'S COMPUTER` records for its
+  named destination. Match objectives against Stardock location, known ports and planets,
+  Codex discoveries, leads, dossier last-seen locations, and contract destinations; use the
+  exact displayed sector with `travel_to`. Do not guess a sector or wander when the computer
+  already supplies coordinates. If the destination is not in the computer or local sector
+  observation, explore for information instead of inventing coordinates.
 - Fill in the argument fields your action needs; leave the others at their unused value
   (0, -1 for offer_index, "" for commodity). Set `operator_response` to a concise direct
   acknowledgment when a NEW OBJECTIVE arrives, or a completion report when choosing
@@ -56,6 +62,16 @@ Practical rules:
    "discovery_id": 0, "starbase_id": 0, "offer_index": -1, "subsystem": "",
    "slot_index": -1, "count": 0}
 - You must dock before trading, and descend before exploring a surface.
+- Markets, Stardock facilities, and orbital starbases are different destinations. Use
+  `dock_trading_port` only to enter a port's commodities market and trade. At Stardock, use
+  `dock_stardock`
+  instead when you want hardware, the interest-bearing bank, colonist recruitment, tavern
+  rumors, or shipyard services; it costs the same one docking turn. Use `dock_starbase
+  {starbase_id}` only to board an orbital starbase; boarding itself costs no turn, and the
+  base offers only the services named in its observation.
+  Typically only your own operational starbase offers hardware and banking; an open foreign
+  base may offer its commodities market, while a hostile or damaged base withholds services.
+  Starbases never recruit colonists or sell tavern rumors.
 - If an action is rejected, read the reason and try something different, not the same thing.
 - Never waste cycles: prefer a concrete action over `wait`.
 """
@@ -185,6 +201,7 @@ class Brain:
             self.bot,
             boarded_starbase_id=self.catalog.boarded_starbase_id,
             docked_port_sector_id=self.catalog.docked_port_sector_id,
+            stardock_facilities_sector_id=self.catalog.stardock_facilities_sector_id,
         )
         if self._pending_queries:
             self._answer_queries(observation)
@@ -270,7 +287,8 @@ class Brain:
         if self._objective:
             parts += ["- objective_done — the CURRENT OBJECTIVE is fully accomplished; retire it",
                       "", "== CURRENT OBJECTIVE (the operator's standing order) ==",
-                      self._objective]
+                      self._objective,
+                      "Check SHIP'S COMPUTER for this objective's sector before navigating."]
         if self._fresh_objectives:  # arrival-cycle acknowledgment (then ordinary history)
             parts += ["", "== NEW OBJECTIVE (acknowledge directly, then begin work) =="]
             parts += [f"- {objective}" for objective in self._fresh_objectives]

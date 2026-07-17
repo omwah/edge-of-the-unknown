@@ -1374,6 +1374,8 @@ def _planet_directory(state: UniverseState, player_id: int) -> list[dto.PlanetDi
             if planet.inhabited_by_species_id is not None else None
         )
         stores = "  ".join(f"{_LABEL[c]} {planet.stores.get(c, 0)}" for c in Commodity)
+        base = state.starbases.get(planet.starbase_id) if planet.starbase_id is not None else None
+        base_status = "" if base is None else ("operational" if is_operational(base) else "derelict")
         out.append(dto.PlanetDirEntry(
             planet_id=planet.id, sector_id=planet.sector_id,
             sector_display=_display(state, planet.sector_id), name=planet.name,
@@ -1382,6 +1384,8 @@ def _planet_directory(state: UniverseState, player_id: int) -> list[dto.PlanetDi
             species=species.name if species is not None else "—",
             stores=stores, dist=dist.get(planet.sector_id, -1),
             owned_by_you=corp.player_owns(state, planet.owner, player_id),
+            citadel_level=planet.citadel_level, cloud_city_size=planet.cloud_city_size,
+            starbase_status=base_status,
         ))
     # Your worlds float to the top; the rest keep the nearest-first order (PT-08).
     out.sort(key=lambda e: (not e.owned_by_you, e.dist if e.dist >= 0 else 1 << 30, e.sector_display))
