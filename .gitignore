@@ -12,3 +12,6 @@ __pycache__/
 # runtime server state (lobby accounts + hosted game saves)
 accounts.db
 games/
+
+# snapshots unit test report file
+snapshot_report.html
