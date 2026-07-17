@@ -15,7 +15,7 @@ import pytest
 
 from edge.config import load_default_config
 from edge.core.dev import DevPatch
-from edge.core.rules import Dock, JoinGame, Warp
+from edge.core.rules import Dock, JoinGame, SetPlayerName, Warp
 from edge.server import wire
 from edge.server.accounts import AccountStore
 from edge.server.net import (
@@ -228,6 +228,7 @@ async def test_lobby_register_login_create_join_play(tmp_path: Path) -> None:
         gid = (await lobby.dispatch(session, "create_game", {"name": "alpha", "seed": 42}))["game_id"]
         joined = await lobby.dispatch(session, "join_game", {"game_id": gid})
         assert joined["player_id"] == 1  # first seat
+        assert lobby._games[gid].service.state.players[1].name == "host"  # type: ignore[attr-defined]
         # A game method now routes to the bound game as that seat.
         view = await lobby.dispatch(session, "game_view", {})
         assert wire.decode_dto(view) is not None
@@ -250,14 +251,19 @@ async def test_join_allocates_seat_via_logged_joingame(tmp_path: Path) -> None:
         await lobby.dispatch(guest, "login", {"username": "guest", "password": "pw"})
         p2 = (await lobby.dispatch(guest, "join_game", {"game_id": gid}))["player_id"]
         assert p2 == 2  # next free seat
+        server = lobby._games[gid]  # type: ignore[attr-defined]
+        assert server.service.state.players[1].name == "host"
+        assert server.service.state.players[2].name == "guest"
 
         # The roster rebuilds from the command log alone (the §3 seam: joins are logged).
-        server = lobby._games[gid]  # type: ignore[attr-defined]
         repo = server.service._repo  # type: ignore[attr-defined]
         meta = repo.load_meta()
         rebuilt = rebuild(_config(), meta.seed, repo.load_commands(), created_at=meta.created_at,
                           maintenance=repo.load_maintenance(), cron_resolver=resolve_cron)
         assert set(rebuilt.players) == {1, 2}
+        assert {pid: player.name for pid, player in rebuilt.players.items()} == {
+            1: "host", 2: "guest",
+        }
     finally:
         await lobby.aclose()
 
@@ -305,6 +311,7 @@ async def test_join_repairs_binding_whose_player_was_never_committed(tmp_path: P
         joined = await lobby.dispatch(guest, "join_game", {"game_id": gid})
         assert joined["player_id"] == 2
         assert 2 in lobby._games[gid].service.state.players  # type: ignore[attr-defined]
+        assert lobby._games[gid].service.state.players[2].name == "guest"  # type: ignore[attr-defined]
         assert wire.decode_dto(await lobby.dispatch(guest, "game_view", {})) is not None
     finally:
         await lobby.aclose()
@@ -371,7 +378,7 @@ async def _served_lobby(tmp_path: Path) -> tuple[LobbyServer, object, int]:
 
 
 async def test_remote_client_login_join_play_and_push(tmp_path: Path) -> None:
-    from edge.server.client import RemoteClient
+    from edge.server.client import RemoteClient, RemoteError
 
     lobby, ws_server, port = await _served_lobby(tmp_path)
     client = RemoteClient(f"ws://localhost:{port}")
@@ -382,6 +389,8 @@ async def test_remote_client_login_join_play_and_push(tmp_path: Path) -> None:
         gid = await client.create_game("alpha", seed=42)
         pid = await client.join_game(gid)
         assert pid == 1
+        with pytest.raises(RemoteError, match="controlled by account identity"):
+            await client.apply(SetPlayerName("impostor"))
 
         view = await client.game_view()  # a DTO decoded off the wire
         assert view.sector.sector_id > 0

@@ -164,6 +164,7 @@ from edge.core.rules import (
     RepairStarbase,
     Salvage,
     SetAllocation,
+    SetPlayerName,
     SettleColonists,
     SwapComponent,
     ToggleInterdictor,
@@ -179,6 +180,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
     match command:
         case JoinGame():
             return "JoinGame", {"name": command.name}
+        case SetPlayerName():
+            return "SetPlayerName", {"name": command.name}
         case Warp():
             return "Warp", {"to_sector": command.to_sector}
         case TravelTo():
@@ -382,6 +385,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
     match type_:
         case "JoinGame":
             return JoinGame(name=payload["name"])
+        case "SetPlayerName":
+            return SetPlayerName(name=payload["name"])
         case "Warp":
             return Warp(to_sector=payload["to_sector"])
         case "TravelTo":

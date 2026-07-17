@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 21
+WIRE_VERSION = 22
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -76,6 +76,7 @@ v20 (WP-PR2-15/PT-54): Cloud Cities — `BuildStagingArea` command + `CloudCityB
 `cloud_city_blocker` and projects `colonizable`/`habitability_cap` as *this world's* capacity
 (a staged gas giant holds people, an unstaged one holds nothing); `SectorPlanetDTO.cloud_city_size`
 so the sector scene paints the floating city.
+v22: `SetPlayerName` records authenticated multiplayer usernames in replayable player state.
 """
 
 
