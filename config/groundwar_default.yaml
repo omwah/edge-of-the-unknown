@@ -1,0 +1,150 @@
+# Ground-war proof-of-concept balance constants (edge-groundwar).
+#
+# A Starship-Troopers-flavored planetary raid: the player drops a platoon of
+# powered-armor Mobile Infantry against a defended, city-holding world and must
+# force a SURRENDER — a demonstration of power, not extermination — before the
+# retrieval boat arrives. Everything tunable lives here; the rules layer
+# (edge/groundwar/rules.py) reads only these numbers.
+
+battlefield:
+  width: 220        # cells; ~2-3 terminal screens wide
+  height: 56
+
+pressure:
+  retrieval_turns: 24       # boat pickup — surrender must land before this turn ends
+  casualty_ceiling: 0.5     # mission aborts (loss) past this fraction of the drop force dead
+  escalation_every: 5       # a sortie wave + defense stiffening every N turns
+  escalation_acc_bonus: 0.04  # turret/AA accuracy gained per escalation step
+  escalation_acc_cap: 0.16    # ... up to this much bonus
+
+resolve:
+  start: 100
+  surrender_threshold: 25   # planet capitulates at or below this (difficulty shifts it)
+  # Demonstrations of power (resolve LOST by the defenders):
+  turret_destroyed: 6
+  aa_destroyed: 8
+  sensor_destroyed: 5
+  wall_breached: 3          # per wall segment reduced to rubble
+  garrison_killed: 2
+  military_building_destroyed: 5
+  citadel_gun_destroyed: 15
+  city_cowed: 10            # a city's every active defense silenced
+  broadcast: 14             # a Command suit dictating terms over a cowed city
+  # Backfire (resolve GAINED by the defenders — hardened by atrocity/success):
+  civilian_building_destroyed: 4
+  trooper_killed: 1
+
+platoon:
+  budget: 200               # drop-boat tonnage, in points
+  max_troopers: 14
+  actions_per_turn: 2       # per trooper: any mix of move / jump / fire / missile / broadcast
+
+suits:
+  marauder:
+    label: Marauder
+    glyph: "M"
+    cost: 30
+    hp: 120
+    armor: 8                # flat damage soak per hit
+    move: 3                 # move points per turn (terrain costs apply)
+    jump_range: 8           # cells per jump, ignoring terrain
+    jump_charges: 4
+    sight: 8
+    signature: 1.4          # multiplier on enemy sensor radius against this suit
+    weapon: {range: 9, damage: 28, accuracy: 0.75, structure_mult: 2.0}
+    missiles: 3             # limited heavy shots
+    missile: {range: 13, damage: 60, accuracy: 0.85, structure_mult: 2.0}
+  scout:
+    label: Scout
+    glyph: "S"
+    cost: 12
+    hp: 55
+    armor: 3
+    move: 6
+    jump_range: 10
+    jump_charges: 5
+    sight: 14
+    signature: 0.5
+    weapon: {range: 11, damage: 12, accuracy: 0.80, structure_mult: 1.0}
+    missiles: 0
+    missile: {range: 0, damage: 0, accuracy: 0.0, structure_mult: 1.0}
+    jam_radius: 9           # city sensors inside this radius are suppressed
+  command:
+    label: Command
+    glyph: "C"
+    cost: 25
+    hp: 80
+    armor: 5
+    move: 4
+    jump_range: 8
+    jump_charges: 4
+    sight: 11
+    signature: 1.0
+    weapon: {range: 8, damage: 16, accuracy: 0.75, structure_mult: 1.0}
+    missiles: 1
+    missile: {range: 12, damage: 45, accuracy: 0.85, structure_mult: 2.0}
+    command_radius: 8       # friendly accuracy aura
+    command_acc_bonus: 0.10
+    broadcast_range: 14     # from a cowed city's center, to dictate terms
+
+defenses:
+  wall:    {hp: 80}
+  gate:    {hp: 60}
+  turret:  {hp: 60, range: 10, damage: 18, accuracy: 0.65}
+  aa:      {hp: 50, range: 14, damage: 35, accuracy: 0.55}   # anti-drop / anti-jump fire
+  sensor:  {hp: 40, radius: 16}
+  citadel_gun: {hp: 120, range: 16, damage: 40, accuracy: 0.70}
+  building_military_hp: 50
+  building_civilian_hp: 30
+
+garrison:
+  infantry: {hp: 40, armor: 1, move: 3, sight: 8, weapon: {range: 6, damage: 10, accuracy: 0.60, structure_mult: 1.0}}
+  armor:    {hp: 90, armor: 4, move: 4, sight: 9, weapon: {range: 8, damage: 22, accuracy: 0.65, structure_mult: 1.0}}
+  sortie_base: 2            # units in the first sortie wave
+  sortie_growth: 1          # extra units per later wave
+  armor_from_wave: 2        # waves before tanks join the sorties
+  undetected_first_strike: 0.15   # accuracy bonus firing while undetected
+
+# Terrain gameplay classes, keyed by edge.art.terrain feature names.
+# move_cost 0 = impassable on foot (jump jets clear it). cover soaks accuracy.
+terrain:
+  water_deep:    {move_cost: 0, cover: 0.0,  blocks_los: false}
+  water_shallow: {move_cost: 2, cover: 0.0,  blocks_los: false}
+  sand:          {move_cost: 1, cover: 0.0,  blocks_los: false}
+  grass:         {move_cost: 1, cover: 0.05, blocks_los: false}
+  forest:        {move_cost: 2, cover: 0.20, blocks_los: true}
+  mountain:      {move_cost: 0, cover: 0.10, blocks_los: true}
+  snow:          {move_cost: 2, cover: 0.0,  blocks_los: false}
+  ice:           {move_cost: 1, cover: 0.0,  blocks_los: false}
+  ash:           {move_cost: 1, cover: 0.05, blocks_los: false}
+  crater:        {move_cost: 2, cover: 0.15, blocks_los: false}
+  dust:          {move_cost: 1, cover: 0.0,  blocks_los: false}
+  rock:          {move_cost: 2, cover: 0.15, blocks_los: false}
+  debris:        {move_cost: 2, cover: 0.15, blocks_los: false}
+  void:          {move_cost: 1, cover: 0.0,  blocks_los: false}
+
+difficulties:
+  patrol:
+    label: "Patrol Raid"
+    cities: 2
+    citadel_level: 0
+    surrender_threshold: 30
+    garrison_mult: 0.8
+  raid:
+    label: "Planetary Raid"
+    cities: 3
+    citadel_level: 1
+    surrender_threshold: 25
+    garrison_mult: 1.0
+  siege:
+    label: "Hardened World"
+    cities: 3
+    citadel_level: 2
+    surrender_threshold: 20
+    garrison_mult: 1.25
+  fortress:
+    label: "Fortress World"
+    cities: 4
+    citadel_level: 3
+    surrender_threshold: 15
+    garrison_mult: 1.5
