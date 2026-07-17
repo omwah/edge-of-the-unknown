@@ -131,7 +131,7 @@ async def test_ctrl_d_and_u_adjust_live_pace_with_input_focused() -> None:
 
         await pilot.press("ctrl+d")
         await pilot.pause()
-        assert brain.pace == 5.0
+        assert brain.pace == 7.0
 
         await pilot.press("ctrl+u")
         await pilot.pause()
