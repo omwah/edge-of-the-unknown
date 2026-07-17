@@ -443,7 +443,27 @@ Commit: `playtest: WP-PR2-04 named discoveries`
 
 ---
 
-### WP-PR2-05 — Sector-scene compositing spike + wreck slot
+### WP-PR2-05 — Sector-scene compositing spike + wreck slot — landed (as the arrival view)
+
+**Landed 2026-07-17** in `playtest: WP-PR2-05 arrival-view sector scene`. By interview,
+the package outgrew its spike: instead of compositing the dock over the planet inside the
+old banded layout, the **whole scene layout was replaced** with an *arrival view* — one
+primary body (planet > space find > station) just right of centre at up to ~90% of the
+body height, the station hovering at its lower limb (`scene.port_scale`), ships in the
+open sky (`scene.ship_scale`, seeded jitter), wrecks berthed hard-left with a wide
+standoff, forces as scattered glyphs, and name-only floating tags (verbs/status moved to
+the sidebar, which gained a clickable **Ships** list). Sprites crop to their inked bbox
+before placement, every placement checks an occupancy map, and an object with no free sky
+degrades to a clickable text row — so the spike's risk (art quality of overlap) dissolved
+into a rule that overlap simply never happens. The compact 80×24 fallback question was
+answered by making the layout fully proportional instead of tier-forked. Belt art gained
+bold warm rock glyphs over blanked starfield (a same-day playtest note), the cloud-city
+fit box was capped at 30% of the disc, and a nebula primary gets an oversized box so the
+visible cloud lands past planet scale. **The placement theory is documented in
+`docs/SECTOR_SCENE_COMPOSITION.md`**; `python -m edge.tui.scene_preview` renders every
+composition at every tier for review. Pure TUI/config + art modules — no wire bump, no
+store change. Snapshot baselines and the ship-cap test expectations (`max_ships_shown`
+2→3) are left to the maintainer's verification run.
 
 **Goal (spike-gated):** composite Stardock/starbase/port art **over** the planet art
 (hovering, centered), and reserve a slot for a wreck sprite when a planet already

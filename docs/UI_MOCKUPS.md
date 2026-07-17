@@ -135,22 +135,33 @@ MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
   their own extent so words stay legible, with stars in the margins. Planet / port /
   ship / unlogged-discovery **click hotspots** post the same `ClickableEntry.Picked`
   the keys do. All sprite sizes come from config `scene:` (`SceneArtConfig`).
-  Top to bottom: a centred **header** (`[id] REGION (Band)` + flavor + beacon); a
-  two-column **orbit band** — **planet** left (name beneath), **port** right (name
-  beneath, sprite **vertically centred** against the taller planet); a blank
-  **margin**; a **ships row** (no heading); the **Discoveries** row; then the
-  **`WarpGrid`** beneath. A missing planet/port shows a muted placeholder so the two
-  columns stay put as you warp. The planet's width is always **2×its height** so the
-  disc reads round on the ~2:1 cell grid (`scene.planet`, distinct from
+  The composition is an **arrival view**, not a grid of layout bands (`_SceneComposer`,
+  WP-PR2-05): under the centred **header** (`[id] REGION (Band)` + flavor + beacon),
+  the **largest body present** — the planet, else a space find, else the station —
+  anchors toward the **right edge** at the biggest size that fits (its disc may crop
+  slightly, like a world filling a viewport); a **port/starbase hovers at its lower
+  limb** at ~half its scale (`scene.port_scale`); **ships ride the open sky** to its
+  left, smaller still (`scene.ship_scale`), staggered by a seeded jitter; a wreck or
+  other find beside a planet takes a small **secondary slot** in free sky; deployed
+  **fighters/mines** appear only as scattered single glyphs (`▴`/`✺` — counts, mode,
+  and toll live in the sidebar). **Name tags** float in free sky — centred just below
+  their sprite when it fits — and carry the object's *name only*; status/ownership
+  details are the sidebar's story. An object that finds no free sky degrades to a
+  clickable text row rather than painting over a neighbour. An asteroid-belt primary
+  sprawls **wide** (a field, not a body) over a blanked patch of starfield so rocks
+  never interleave with stars. The planet's width is **2×its height** so the disc
+  reads round on the ~2:1 cell grid (`scene.planet`, distinct from
   `scene.planet_detail` used by the larger PlanetScreen orbit view, §3).
 - **Orbit / ship clicks** open the same screen as the key: planet -> PlanetScreen
   (§3, `S`); a Stardock port -> StardockScreen (§5) / a plain port -> PortScreen
   (§2), the **same target as `P`**; a hailable ship -> AlienContactScreen (§6) for a
   friendly-band ship or EncounterScreen (§7) for a hostile one.
-- **Ships**: up to `scene.max_ships_shown` (default **2**) sprites side by side; when
-  two show, the second may be flipped to **face the first** (deterministic per
-  sector, `scene.ship_face_inward_chance`). Ships beyond the cap fall to a compact
-  **clickable text list** so every contact stays individually hailable.
+- **Ships**: up to `scene.max_ships_shown` (default **3**) sprites in the open sky,
+  facing the primary body they've arrived at; with no primary, the second of a pair
+  may be flipped to **face the first** (deterministic per sector,
+  `scene.ship_face_inward_chance`). Ships beyond the cap — or squeezed out of a
+  crowded sky — fall to compact **clickable text rows** so every contact stays
+  individually hailable.
 - **Warps**: the **`WarpGrid`** — a 3x3 grid with the **current sector pinned to the
   centre cell** (non-clickable `(7)`) and outbound warps in the eight cells around
   it (clickable, unexplored dimmed with `?`), **centred** below the scene so the

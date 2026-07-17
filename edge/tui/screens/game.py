@@ -210,7 +210,8 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
                               if wide and settings and settings.show_onboarding else None)
                 sidebar = StatusSidebar(view.ship, view.sector.discoveries, sidebar_width,
                                         presence=_presence_lines(view.sector),
-                                        detail=wide, objectives=objectives, id="sidebar")
+                                        detail=wide, objectives=objectives,
+                                        contacts=view.sector.ships, id="sidebar")
                 sidebar.display = self._sidebar_visible()  # also re-evaluated on resize
                 yield sidebar
         settings = getattr(self.app, "ui_settings", None)
