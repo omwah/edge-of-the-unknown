@@ -118,8 +118,13 @@ def cloud_city_art(size: int, width: int, height: int) -> tuple[str, ...]:
 
 
 def _cloud_city_cells(size: int, width: int, height: int) -> dict[tuple[int, int], str]:
-    """The city's glyphs by `(y, x)` cell, centred on the disc (empty when it cannot fit)."""
-    tier = cloud_city_art(size, width, height)
+    """The city's glyphs by `(y, x)` cell, centred on the disc (empty when it cannot fit).
+
+    The fit box is capped at ~30% of the disc's height: a structure is a settlement
+    *on* a gas giant, and letting it fill the disc made a small sector-scene planet
+    read as half city (playtest note, 2026-07-17).
+    """
+    tier = cloud_city_art(size, width, max(3, int(height * 0.3)))
     if not tier:
         return {}
     top = (height - len(tier)) // 2

@@ -20,7 +20,7 @@ from textual.widgets import DataTable, Input, Select, Static, TabbedContent, Tab
 from rich.style import Style
 
 from edge.core.config import SceneArtConfig
-from edge.core.dto import SectorDiscovery
+from edge.core.dto import SectorDiscovery, SectorPlanetDTO, SectorShipDTO
 from edge.core.enums import Commodity
 from edge.core.planets import pretty_planet_type
 
@@ -572,6 +572,39 @@ class AnomalyRow(Static):
             self.post_message(ClickableEntry.Picked("discovery", self._discovery_id))
 
 
+class ContactRow(Static):
+    """A clickable ship row in the sidebar 'Ships' list.
+
+    The scene tags ships by name alone; the verb lives here — clicking (or the
+    `(Hail)`/`(Engage)` affordance) posts the same `ClickableEntry.Picked` the
+    scene's ship hotspots post, so the GameScreen handler is untouched.
+    """
+
+    DEFAULT_CSS = """
+    ContactRow { height: 1; }
+    ContactRow.pick:hover { background: $boost; text-style: bold; }
+    """
+
+    def __init__(self, vessel: SectorShipDTO, **kwargs: Any) -> None:
+        cid = vessel.contact_id
+        pid = getattr(vessel, "player_id", None)
+        self._dest: str | None
+        self._ref: int | None
+        if cid is not None:
+            self._dest, self._ref, verb = "contact", cid, " [dim](Hail)[/]"
+        elif pid is not None:
+            self._dest, self._ref, verb = "player", pid, " [dim](Engage)[/]"
+        else:
+            self._dest, self._ref, verb = None, None, ""
+        super().__init__(f"[white]▸[/] {vessel.name}{verb}", **kwargs)
+        if self._dest is not None:
+            self.add_class("pick")
+
+    def on_click(self) -> None:
+        if self._dest is not None:
+            self.post_message(ClickableEntry.Picked(self._dest, self._ref))
+
+
 def force_lines(force: object) -> list[str]:
     """Hazard captions for deployed forces here (§10 — classic-TW fog pre-applied)."""
     lines: list[str] = []
@@ -609,6 +642,7 @@ class StatusSidebar(Vertical):
     def __init__(self, ship: ShipDTO, discoveries: list[SectorDiscovery],
                  width: int = 33, presence: list[str] | None = None,
                  detail: bool = False, objectives: tuple[str, ...] | None = None,
+                 contacts: list[SectorShipDTO] | None = None,
                  **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._ship = ship
@@ -617,6 +651,7 @@ class StatusSidebar(Vertical):
         self._presence = presence or []
         self._detail = detail
         self._objectives = objectives
+        self._contacts = contacts or []
 
     def on_mount(self) -> None:
         self.styles.width = self._width
@@ -627,6 +662,10 @@ class StatusSidebar(Vertical):
             yield Static("[b yellow]Presence[/]")
             for line in self._presence:
                 yield Static(line)
+        if self._contacts:  # every vessel here, individually hailable/engageable
+            yield Static("[b yellow]Ships[/]")
+            for vessel in self._contacts:
+                yield ContactRow(vessel)
         yield Static("[b yellow]Anomalies[/]")
         if self._discoveries:
             for discovery in self._discoveries:
@@ -737,45 +776,48 @@ class Ticker(Vertical):
         self.query_one("#ticker-body", Static).update(self._body_text())
 
 
-class SectorScene(Static):
-    """The whole sector scene composited into one grid (UI_MOCKUPS.md §1).
+class _SceneComposer:
+    """Composites one sector as an *arrival view* (UI_MOCKUPS.md §1, PT-36/PT-44).
 
-    A starfield base with the header, planet/port (port vertically centred against
-    the taller planet), ship sprites, and the discoveries list stamped over it. It
-    is one Static because a terminal cell holds a single glyph and Textual does not
-    blend overlapping widgets/layers — so the only way to show the starfield
-    *behind* the sprites and text is to composite them together here. Sprites'
-    negative-space cells are left transparent, so stars show through their gaps.
+    Instead of partitioning the canvas into reserved bands (planet half / port
+    half / ships row), the scene is composed like a viewport on the sector: the
+    largest body present — the planet, else a space find, else the station —
+    anchors toward the right edge at the biggest size that fits (its disc may
+    crop slightly, like a world filling the window); a port/starbase hovers at
+    its lower limb at roughly half its scale; ships ride the open sky smaller
+    still; deployed fighters/mines are single-glyph presence marks whose counts
+    live in the sidebar. Names float as short tags stamped into free sky beside
+    their sprite, so no object reserves a caption row of its own.
 
-    Planet / port / ship / unlogged-discovery click targets are recorded as
-    ``_hotspots`` and routed as ``ClickableEntry.Picked`` (mirroring the keys).
+    The scale hierarchy derives from `SceneArtConfig`: the primary body fills
+    most of the free height, and `port_scale` / `ship_scale` size the rest
+    relative to it. All placement randomness is seeded off the sector id, so a
+    sector always composes the same way.
+
+    Pure presentation: consumes only the `SectorDTO`, emits a `rich.Text` plus
+    the hotspot rects `SectorScene.on_click` routes. Usable without a running
+    app (see `edge.tui.scene_preview`).
     """
 
-    DEFAULT_CSS = """
-    SectorScene { width: 1fr; height: 1fr; background: transparent; }
-    """
+    def __init__(self, sector: SectorDTO, cfg: SceneArtConfig) -> None:
+        self.sec = sector
+        self.cfg = cfg
+        # (x0, y0, x1, y1, dest, ref) — the click targets, in paint order.
+        self.hotspots: list[tuple[int, int, int, int, str, int | str | None]] = []
+        self._grid: list[list[tuple[str, Style | None]]] = []
+        # Rects already holding a sprite/tag; tags and scattered glyphs steer clear.
+        self._occupied: list[tuple[int, int, int, int]] = []
+        # Objects that found no free sky degrade to text rows (still clickable).
+        self._deferred: list[tuple[str, str | None, int | str | None]] = []
+        self._w = 0
+        self._h = 0
 
-    _ORBIT_MARGIN = 3  # blank rows between the planet/port band and the ships row
-
-    def __init__(self, sector: SectorDTO, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self._sector = sector
-        # (x0, y0, x1, y1, dest, ref) recorded each render; on_click maps a hit to
-        # the same ClickableEntry.Picked the keyboard/text affordances post.
-        self._hotspots: list[tuple[int, int, int, int, str, int | str | None]] = []
-
-    def on_resize(self) -> None:
-        self.refresh()
-
-    def _scene_cfg(self) -> SceneArtConfig:
-        return getattr(self.app, "scene_art", None) or SceneArtConfig()
-
-    # --- grid helpers --------------------------------------------------------
+    # --- grid primitives ------------------------------------------------------
 
     def _starfield(self, w: int, h: int) -> list[list[tuple[str, Style | None]]]:
         """Base grid from the procedural `edge.art` starfield (seeded per sector)."""
         cells = art_adapter.text_to_cells(art_adapter.sprite(
-            "starfield", "standard", seed=self._sector.sector_id ^ 0x5EED, width=w, height=h))
+            "starfield", "standard", seed=self.sec.sector_id ^ 0x5EED, width=w, height=h))
         grid: list[list[tuple[str, Style | None]]] = [[(" ", None)] * w for _ in range(h)]
         for y in range(min(h, len(cells))):
             for x in range(min(w, len(cells[y]))):
@@ -784,37 +826,38 @@ class SectorScene(Static):
                     grid[y][x] = (ch, style)
         return grid
 
-    @staticmethod
-    def _paint(grid: list[list[tuple[str, Style | None]]],
-               rows: list[list[tuple[str, Style | None]]], top: int, left: int) -> None:
-        h, w = len(grid), len(grid[0])
+    def _paint(self, rows: list[list[tuple[str, Style | None]]], top: int, left: int) -> None:
         for r, row in enumerate(rows):
             y = top + r
-            if not 0 <= y < h:
+            if not 0 <= y < self._h:
                 continue
             for c, (ch, style) in enumerate(row):
                 x = left + c
-                if ch != " " and 0 <= x < w:  # spaces stay transparent -> stars show
-                    grid[y][x] = (ch, style)
+                if ch != " " and 0 <= x < self._w:  # spaces stay transparent -> stars show
+                    self._grid[y][x] = (ch, style)
 
-    def _stamp_line(self, grid: list[list[tuple[str, Style | None]]], markup: str,
-                    row: int, x0: int, span: int) -> None:
-        """Stamp one markup line centred within the horizontal span [x0, x0+span).
+    def _clear(self, x0: int, y0: int, x1: int, y1: int) -> None:
+        """Blank the starfield in a region (an asteroid belt's rocks would otherwise
+        interleave with the stars into one indistinguishable speckle)."""
+        for y in range(max(0, y0), min(self._h, y1)):
+            for x in range(max(0, x0), min(self._w, x1)):
+                self._grid[y][x] = (" ", None)
 
-        Unlike sprites, a text line clears the stars within its own extent (so a
-        star can't bleed through a space *inside* a word); stars still show in the
-        centring margins to either side.
-        """
-        line = art_adapter.text_to_cells(Text.from_markup(markup))[0:1]
-        cells = line[0] if line else []
-        if not (0 <= row < len(grid)):
+    def _stamp_at(self, markup: str, row: int, x0: int) -> None:
+        """Stamp one markup line at an exact position (blanks overwrite stars, so a
+        star can't bleed through a space *inside* a word)."""
+        if not 0 <= row < self._h:
             return
-        w = len(grid[0])
-        left = x0 + max(0, (span - len(cells)) // 2)
-        for c, (ch, style) in enumerate(cells):
-            x = left + c
-            if 0 <= x < w:
-                grid[row][x] = (ch, style)  # blanks included -> overwrite stars
+        line = art_adapter.text_to_cells(Text.from_markup(markup))[0:1]
+        for c, (ch, style) in enumerate(line[0] if line else []):
+            x = x0 + c
+            if 0 <= x < self._w:
+                self._grid[row][x] = (ch, style)
+
+    def _stamp_center(self, markup: str, row: int, x0: int, span: int) -> None:
+        """Stamp one markup line centred within the horizontal span [x0, x0+span)."""
+        n = Text.from_markup(markup).cell_len
+        self._stamp_at(markup, row, x0 + max(0, (span - n) // 2))
 
     def _sprite_cells(self, entity: str, subtype: str, *, seed: int, sw: int, sh: int,
                       facing: str = "right",
@@ -829,227 +872,435 @@ class SectorScene(Static):
             art.stylize("dim")
         elif treatment == "hostile":
             art.stylize("on dark_red")
-        return art_adapter.text_to_cells(art)
+        return self._crop(art_adapter.text_to_cells(art))
 
-    # --- render --------------------------------------------------------------
+    @staticmethod
+    def _crop(cells: list[list[tuple[str, Style | None]]]
+              ) -> list[list[tuple[str, Style | None]]]:
+        """Crop a sprite to its inked bounding box. Grammars render into the
+        requested box with transparent padding around a possibly smaller drawing;
+        placing and reserving that padding would fence off empty sky and starve
+        later placements."""
+        inked = [(y, x) for y, row in enumerate(cells)
+                 for x, (ch, _) in enumerate(row) if ch != " "]
+        if not inked:
+            return []
+        y0, y1 = min(y for y, _ in inked), max(y for y, _ in inked)
+        x0, x1 = min(x for _, x in inked), max(x for _, x in inked)
+        return [row[x0:x1 + 1] for row in cells[y0:y1 + 1]]
 
-    def render(self) -> Text:
-        self._hotspots = []
-        w, h = self.size.width, self.size.height
-        if w < 8 or h < 6:
-            return Text("")
-        sec = self._sector
-        cfg = self._scene_cfg()
-        grid = self._starfield(w, h)
-        half = w // 2
-        row = 0
+    @staticmethod
+    def _dims(cells: list[list[tuple[str, Style | None]]]) -> tuple[int, int]:
+        return max((len(r) for r in cells), default=0), len(cells)
+
+    # --- free-sky bookkeeping ---------------------------------------------------
+
+    def _reserve(self, x0: int, y0: int, x1: int, y1: int) -> None:
+        self._occupied.append((x0, y0, x1, y1))
+
+    def _is_free(self, x0: int, y0: int, x1: int, y1: int) -> bool:
+        """True when the rect lies on-canvas and overlaps nothing already placed."""
+        if x0 < 0 or y0 < 0 or x1 > self._w or y1 > self._h:
+            return False
+        return not any(x0 < ox1 and ox0 < x1 and y0 < oy1 and oy0 < y1
+                       for ox0, oy0, ox1, oy1 in self._occupied)
+
+    def _tag(self, markup: str, rect: tuple[int, int, int, int],
+             dest: str | None = None, ref: int | str | None = None) -> None:
+        """Float a name tag in free sky against `rect`: centred just below first
+        (the caption position the eye expects), then centred above, then beside —
+        first fit wins; a crowded scene falls back to below-left, clipped. Tags
+        carry the object's *name* only — status/ownership details live in the
+        sidebar, not the scene."""
+        n = Text.from_markup(markup).cell_len
+        x0, y0, x1, y1 = rect
+        cy = (y0 + y1) // 2
+        below = min(max(0, (x0 + x1 - n) // 2), max(0, self._w - n))
+        candidates = (
+            (below, y1 + 1), (below, y0 - 1),
+            (x1 + 2, cy), (x0 - n - 2, cy),
+            (x0, y1 + 1),
+        )
+        for tx, ty in candidates:
+            if self._is_free(tx - 1, ty, tx + n + 1, ty + 1):
+                break
+        else:
+            tx = min(max(0, x0), max(0, self._w - n))
+            ty = min(y1, self._h - 1)
+        self._stamp_at(markup, ty, tx)
+        self._reserve(tx, ty, tx + n, ty + 1)
+        if dest is not None:
+            self.hotspots.append((tx, ty, tx + n, ty + 1, dest, ref))
+
+    def _scatter(self, glyph: str, style: Style, count: int,
+                 rng: random.Random, top: int) -> None:
+        """Sprinkle single glyphs through free sky (padded a cell so they never hug
+        a sprite); each landing is reserved so later drops keep their distance."""
+        placed = 0
+        for _ in range(300):
+            if placed >= count or self._w < 4 or self._h - top < 2:
+                break
+            x = rng.randrange(1, self._w - 1)
+            y = rng.randrange(top, self._h - 1)
+            if self._is_free(x - 1, y, x + 2, y + 1):
+                self._grid[y][x] = (glyph, style)
+                self._reserve(x, y, x + 1, y + 1)
+                placed += 1
+
+    # --- the scene ---------------------------------------------------------------
+
+    def compose(self, w: int, h: int) -> Text:
+        sec, cfg = self.sec, self.cfg
+        self._w, self._h = w, h
+        self.hotspots = []
+        self._occupied = []
+        self._deferred = []
+        self._grid = self._starfield(w, h)
 
         # Header — sector + band, flavor, beacon; centred across the full width.
         title = f"[{sec.display_id}] {sec.region}" + (f" ({sec.band})" if sec.band else "")
-        self._stamp_line(grid, f"[b cyan]{title}[/]", row, 0, w)
-        row += 1
-        self._stamp_line(grid, f"[i #8a8a8a]░▒▓ {sec.flavor} ▓▒░[/]", row, 0, w)
-        row += 1
+        self._stamp_center(f"[b cyan]{title}[/]", 0, 0, w)
+        self._stamp_center(f"[i #8a8a8a]░▒▓ {sec.flavor} ▓▒░[/]", 1, 0, w)
+        row = 2
         if sec.beacon:
-            self._stamp_line(grid, f"[yellow]![/] {sec.beacon}", row, 0, w)
+            self._stamp_center(f"[yellow]![/] {sec.beacon}", row, 0, w)
             row += 1
-        row += 1  # blank
+        hdr = row + 1  # one blank line under the header
+        self._reserve(0, 0, w, hdr)
+        body_h = h - hdr - 1
 
-        # Orbit band — planet (left half) | port (right half). Sizes from config,
-        # clamped to the space left below `row` for the margin + ships + discoveries.
-        reserved = self._ORBIT_MARGIN + (cfg.ship.max_height + 1) + 3
-        ph = max(cfg.planet.min_height,
-                 min(cfg.planet.max_height, (half - 2) // 2, h - row - reserved))
-        pw = ph * 2  # width locked to 2*height so the disc reads round
-        portw = max(cfg.port.min_width, min(cfg.port.max_width, half - 2))
-        porth = max(cfg.port.min_height, min(cfg.port.max_height, ph))
-        band_h = max(ph, porth)
-        lcx, rcx = half // 2, half + half // 2  # column centres
-        # A sector with a visible discovery has no planet (bigbang keeps space finds
-        # off planet sectors), so the find takes the planet slot. A wormhole is the
-        # preferred primary — it's the navigable one. Centre it across the whole view
-        # when there's no port; otherwise keep it in the left (planet) half.
+        # A sector with a visible discovery usually has no planet (bigbang keeps
+        # space finds off planet sectors) — but a combat wreck can share a sector
+        # with one, so a find beside a planet takes the secondary slot (PT-44).
         disc = None
-        if sec.discoveries and not sec.planets:
-            disc = next((d for d in sec.discoveries if d.kind == "wormhole"), sec.discoveries[0])
-        disc_centered = disc is not None and not sec.ports
-        # Planet (or placeholder), top-aligned in the band.
+        if sec.discoveries:
+            disc = next((d for d in sec.discoveries if d.kind == "wormhole"),
+                        sec.discoveries[0])
+
+        primary: tuple[int, int, int, int] | None = None
         if sec.planets:
-            planet = sec.planets[0]
-            sub = art_adapter.planet_subtype(planet.ptype)
-            # Seed off the planet's own id (not the sector's) so this sprite matches the
-            # PlanetScreen orbit view, which seeds with planet_id — same planet, same art.
-            # A worked belt visibly empties in the sector view too (PT-52) — same sprite, same
-            # rocks, fewer of them.
-            mined = (1.0 - planet.ore_reserve / planet.ore_reserve_max
-                     if planet.ore_reserve_max > 0 else 0.0)
-            self._paint(grid, self._sprite_cells("planet", sub, seed=planet.planet_id, sw=pw,
-                                                 sh=ph, depletion=mined,
-                                                 # A staged gas giant flies its city (PT-54).
-                                                 cloud_city=planet.cloud_city_size),
-                        row, lcx - pw // 2)
+            primary = self._paint_planet(sec.planets[0], hdr, body_h)
         elif disc is not None:
-            dleft = (w // 2 - pw // 2) if disc_centered else (lcx - pw // 2)
-            self._paint(grid, self._sprite_cells("discovery", disc.kind, seed=sec.sector_id, sw=pw, sh=ph),
-                        row, dleft)
-
-        # Port (or placeholder), vertically centred against the taller planet. The
-        # controlling species' palette (`archetype_id`) styles the port sprite. A
-        # starbase **takes the place of a port** (§4.2, WP80): where a base orbits, the
-        # base sprite holds the slot and its market is entered through the base view.
-        bases = list(getattr(sec, "starbases", ()) or ())
-        base_in_orbit = bool(bases)
-        if base_in_orbit:
-            self._paint(grid, self._sprite_cells("port", "starbase",
-                                                 seed=bases[0].starbase_id,
-                                                 sw=portw, sh=porth,
-                                                 archetype_id=bases[0].archetype_id,
-                                                 treatment=bases[0].condition),
-                        row + (band_h - porth) // 2, rcx - portw // 2)
-        elif sec.ports:
-            port = sec.ports[0]
-            sub = art_adapter.port_subtype(port.klass)
-            archetype = port.archetype_id
-            self._paint(grid, self._sprite_cells("port", sub, seed=sec.sector_id, sw=portw,
-                                                 sh=porth, archetype_id=archetype),
-                        row + (band_h - porth) // 2, rcx - portw // 2)
-
-        name_row = row + band_h
-        if sec.planets:
-            self._stamp_line(grid, f"[b yellow]{sec.planets[0].name}[/]", name_row, 0, half)
-            self._hotspots.append((0, row, half, name_row + 1, "planet", None))
-        elif disc is not None:
-            # No caption until scanned — a sensor sweep (sidebar/Z) reveals the identity.
-            span = w if disc_centered else half
-            if disc.collected or disc.kind == "wreck":
-                self._stamp_line(grid, f"[b cyan]{disc.label}[/]", name_row, 0, span)
-            if disc.kind == "wormhole" and disc.warp_to is not None:
-                dest, ref = "wormhole", disc.warp_to  # click warps to the far side
-            else:
-                dest, ref = "discovery", disc.discovery_id  # click scans/salvages
-            self._hotspots.append((0, row, span, name_row + 1, dest, ref))
-        if base_in_orbit:
-            b = bases[0]
-            status = "[green]operational[/]" if b.operational else "[yellow]derelict[/]"
-            market = f" · [yellow]{sec.ports[0].name}[/]" if sec.ports else ""
-            self._stamp_line(grid, f"[b cyan]{b.name}[/] {status}{market} [dim]· {b.owner}[/]",
-                             name_row, half, half)
-            # Click-through to the unified base view (§4.2, WP80) — station, market,
-            # services, assault/repair/claim all live there.
-            self._hotspots.append((half, row, w, name_row + 1, "starbase", b.starbase_id))
-        elif sec.ports:
-            self._stamp_line(grid, f"[b yellow]{sec.ports[0].name}[/]", name_row, half, half)
-            self._hotspots.append((half, row, w, name_row + 1, "port", None))
-        row = name_row + 1 + self._ORBIT_MARGIN
-
-        # Ships — up to N sprites side by side (no heading), names beneath. The 2nd
-        # of a pair may face left so the two face inward (deterministic per sector).
-        shown = sec.ships[:cfg.max_ships_shown]
-        if shown:
-            n = len(shown)
-            sw = max(cfg.ship.min_width, min(cfg.ship.max_width, (w - 2) // max(1, n) - 2))
-            # Ship height isn't space-clamped (the layout reserves max_height), so it
-            # sits at max_height -- but never below the configured min.
-            sh = max(cfg.ship.min_height, cfg.ship.max_height)
-            col_w = w / n  # one equal-width column per ship
-            frng = random.Random(sec.sector_id)
-            for i, vessel in enumerate(shown):
-                entity, sub = art_adapter.ship_entity(vessel.role)
-                facing = "left" if (i == 1 and frng.random() < cfg.ship_face_inward_chance) else "right"
-                # Centre each ship within its own column, so a pair sits at the middle of
-                # its half rather than clustering against the other in the centre.
-                left = max(0, int(i * col_w + (col_w - sw) / 2))
-                self._paint(grid, self._sprite_cells(entity, sub, seed=sec.sector_id * 16 + i,
-                                                     sw=sw, sh=sh, facing=facing,
-                                                     archetype_id=vessel.archetype_id), row, left)
-                cid = vessel.contact_id
-                pid = getattr(vessel, "player_id", None)  # another player's ship (WP70)
-                tag = (" [dim](Hail)[/]" if cid is not None
-                       else " [dim](Engage)[/]" if pid is not None else "")
-                self._stamp_line(grid, f"{vessel.name}{tag}", row + sh, left, sw)
-                if cid is not None:
-                    self._hotspots.append((left, row, left + sw, row + sh + 1, "contact", cid))
-                elif pid is not None:
-                    self._hotspots.append((left, row, left + sw, row + sh + 1, "player", pid))
-            row += sh + 1
-        # Overflow ships beyond the sprite cap stay hailable as centred text rows.
-        for i in range(cfg.max_ships_shown, len(sec.ships)):
-            vessel = sec.ships[i]
-            cid = vessel.contact_id
-            pid = getattr(vessel, "player_id", None)
-            tag = (" [dim](Hail)[/]" if cid is not None
-                   else " [dim](Engage)[/]" if pid is not None else "")
-            self._stamp_line(grid, f"[white]>[/] {vessel.name}{tag}", row, 0, w)
-            if cid is not None:
-                self._hotspots.append((0, row, w, row + 1, "contact", cid))
-            elif pid is not None:
-                self._hotspots.append((0, row, w, row + 1, "player", pid))
-            row += 1
-
-        # The roaming Entity's presence hint (§7, WP35): always shown when it is here, but
-        # hailable only once sensors resolve it (Legendary gate). Fog-safe — never named.
-        anomaly = getattr(sec, "anomaly", None)
-        if anomaly is not None:
-            if anomaly.contactable:
-                self._stamp_line(grid, f"[b gold1]✶ {anomaly.label}[/] [dim](Hail)[/]", row, 0, w)
-                self._hotspots.append((0, row, w, row + 1, "contact", anomaly.contact_id))
-            else:
-                self._stamp_line(
-                    grid, f"[gold3]✶ {anomaly.label}[/] [dim](beyond sensor resolution)[/]",
-                    row, 0, w)
-            row += 1
-
-        # Presence band (§10/§4.2 — WP interview): deployed forces and a port-crowded
-        # starbase, as small sprites with captions (caption-only on a short terminal).
-        # The projection already applies classic-TW fog: fighters are public, foreign
-        # mines were zeroed, a mines-only foreign force never arrives here at all.
-        force = getattr(sec, "force", None)
-        entries: list[tuple[str, str, int, str, str, int | str | None]] = []
-        if force is not None and force.fighters > 0:
-            toll = f", toll {force.toll}" if force.mode == "toll" else ""
-            who = "[green]yours[/]" if force.yours else f"[red]{force.owner}[/]"
-            entries.append(("ship", "fighter", sec.sector_id * 31,
-                            f"[b]{force.fighters} fighters[/] [dim]({force.mode}{toll})[/] · {who}",
-                            "", None))
-        if force is not None and (force.armid_mines or force.limpet_mines):
-            kinds = []
-            if force.armid_mines:
-                kinds.append(f"{force.armid_mines} armid")
-            if force.limpet_mines:
-                kinds.append(f"{force.limpet_mines} limpet")
-            entries.append(("__mines__", "", sec.sector_id,
-                            f"[b]{' + '.join(kinds)} mines[/] · [green]yours[/]",
-                            "", None))
-        if entries:
-            sprite_h = 4 if h - row >= 6 else 0  # caption-only on a short terminal
-            col_w = w / len(entries)
-            for i, (entity, sub, seed, caption, fdest, fref) in enumerate(entries):
-                left = max(0, int(i * col_w))
-                span = max(8, int(col_w))
-                if sprite_h:
-                    if entity == "__mines__":
-                        cells = art_adapter.text_to_cells(Text.from_markup(
-                            "[red] ✺     ✺ [/]\n[red]    ✺    [/]\n[red] ✺     ✺ [/]"))
-                    else:
-                        sw = min(14, span - 2)
-                        cells = self._sprite_cells(entity, sub, seed=int(seed),
-                                                   sw=sw, sh=sprite_h)
-                    cw = max((len(r) for r in cells), default=0)
-                    self._paint(grid, cells, row, left + max(0, (span - cw) // 2))
-                self._stamp_line(grid, caption, row + sprite_h, left, span)
-                if fdest:
-                    self._hotspots.append((left, row, left + span,
-                                           row + sprite_h + 1, fdest, fref))
-            row += sprite_h + 1
-
-        # (Discoveries are listed in the sidebar's "Anomalies" panel, not the scene.)
+            primary = self._paint_discovery(disc, hdr, body_h, as_primary=True)
+            disc = None
+        station = self._paint_station(primary, hdr, body_h)
+        if primary is None:
+            primary = station
+        self._paint_ships(primary, hdr)
+        if disc is not None:
+            self._paint_discovery(disc, hdr, body_h, as_primary=False)
+        self._paint_text_rows()
+        self._paint_forces(hdr)
 
         out = Text()
         for y in range(h):
-            for ch, style in grid[y]:
+            for ch, style in self._grid[y]:
                 out.append(ch, style=style)
             if y < h - 1:
                 out.append("\n")
+        return out
+
+    def _paint_planet(self, planet: SectorPlanetDTO, hdr: int,
+                      body_h: int) -> tuple[int, int, int, int]:
+        """The world you've arrived at: a big disc anchored toward the right edge,
+        allowed to crop a little rather than shrink to fit a layout box."""
+        cfg, w, h = self.cfg, self._w, self._h
+        sub = art_adapter.planet_subtype(planet.ptype)
+        belt = sub in ("asteroid_belt", "asteroid")
+        ph = max(cfg.planet.min_height,
+                 min(cfg.planet.max_height, int(body_h * 0.9), (w - 4) // 2))
+        if belt:
+            # A belt is a field, not a body: let it sprawl wide across the sky.
+            pw = min(ph * 3, w - int(w * 0.3) - 1)
+            left = max(int(w * 0.3), w - pw - 2)
+        else:
+            pw = ph * 2  # width locked to 2*height so the disc reads round
+            # The disc rides just right of centre — the world is the scene's
+            # subject, not a wing decoration; the sky to its left is where
+            # ships and the station's tag breathe.
+            left = max(2, int(w * 0.6) - pw // 2)
+        top = hdr + max(0, (body_h - ph) // 3)
+        # A worked belt visibly empties in the sector view too (PT-52) — same
+        # sprite the orbit view draws, same rocks, fewer of them.
+        mined = (1.0 - planet.ore_reserve / planet.ore_reserve_max
+                 if planet.ore_reserve_max > 0 else 0.0)
+        if belt:
+            self._clear(left - 1, top, left + pw + 1, top + ph)
+        # Seed off the planet's own id (not the sector's) so this sprite matches
+        # the PlanetScreen orbit view — same planet, same art. A staged gas giant
+        # flies its city (PT-54).
+        self._paint(self._sprite_cells("planet", sub, seed=planet.planet_id,
+                                       sw=pw, sh=ph, depletion=mined,
+                                       cloud_city=planet.cloud_city_size), top, left)
+        rect = (left, top, min(w, left + pw), min(h, top + ph))
+        self._reserve(*rect)
+        self._tag(f"[b yellow]{planet.name}[/]", rect, "planet", None)
+        self.hotspots.append((*rect, "planet", None))
+        return rect
+
+    def _paint_station(self, primary: tuple[int, int, int, int] | None, hdr: int,
+                       body_h: int) -> tuple[int, int, int, int] | None:
+        """The port — or the starbase that takes its slot (§4.2, WP80). Beside a
+        planet it hovers at the lower limb at ~half scale, overlapping the disc's
+        bounding box a little so it reads as *at* the world; alone it is the scene's
+        primary body and anchors right like a planet would."""
+        sec, cfg, w, h = self.sec, self.cfg, self._w, self._h
+        bases = list(getattr(sec, "starbases", ()) or ())
+        if not bases and not sec.ports:
+            return None
+        p = cfg.port
+        if primary is not None:
+            _px0, py0, _px1, py1 = primary
+            ph = py1 - py0
+            sh = max(p.min_height, min(p.max_height, round(ph * cfg.port_scale)))
+            sw = max(p.min_width, min(p.max_width, int(sh * 2.4)))
+        else:
+            sh = max(p.min_height, min(p.max_height, int(body_h * 0.6)))
+            sw = max(p.min_width, min(p.max_width, int(sh * 2.6)))
+        if bases:
+            b = bases[0]
+            cells = self._sprite_cells("port", "starbase", seed=b.starbase_id,
+                                       sw=sw, sh=sh, archetype_id=b.archetype_id,
+                                       treatment=b.condition)
+        else:
+            port = sec.ports[0]
+            # The controlling species' palette (`archetype_id`) styles the sprite.
+            cells = self._sprite_cells("port", art_adapter.port_subtype(port.klass),
+                                       seed=sec.sector_id, sw=sw, sh=sh,
+                                       archetype_id=port.archetype_id)
+        cw, chh = self._dims(cells)
+        if primary is not None:
+            px0, py0, _px1, py1 = primary
+            ph = py1 - py0
+            top = min(py0 + int(ph * 0.55), h - chh - 1)
+            left = max(1, px0 - cw + max(2, cw // 3))
+        else:
+            # A lone station has no world to pin it, so its berth varies from
+            # sector to sector (seeded — the same sector always finds it in the
+            # same place), instead of every empty port hanging at centre-right.
+            prng = random.Random(sec.sector_id ^ 0x570A)
+            left = prng.randint(max(2, w // 8), max(2, max(2, w - cw - 4)))
+            top = prng.randint(hdr + 1, max(hdr + 1, h - chh - 3))
+        self._paint(cells, top, left)
+        rect = (left, top, min(w, left + cw), min(h, top + chh))
+        self._reserve(*rect)
+        if bases:
+            b = bases[0]
+            # Name only — status/owner/market live in the sidebar caption. Click
+            # routes to the unified base view (§4.2, WP80): station, market,
+            # services, assault/repair/claim all live there.
+            self._tag(f"[b cyan]{b.name}[/]", rect, "starbase", b.starbase_id)
+            self.hotspots.append((*rect, "starbase", b.starbase_id))
+        else:
+            self._tag(f"[b yellow]{sec.ports[0].name}[/]", rect, "port", None)
+            self.hotspots.append((*rect, "port", None))
+        return rect
+
+    def _paint_ships(self, primary: tuple[int, int, int, int] | None, hdr: int) -> None:
+        """Up to N ships riding the open sky left of the primary body, staggered by
+        a seeded jitter rather than laid out in equal columns. Ships face the world
+        they've arrived at; with nothing to face, the 2nd of a pair may face the 1st."""
+        sec, cfg, w, h = self.sec, self.cfg, self._w, self._h
+        shown = sec.ships[:cfg.max_ships_shown]
+        if not shown:
+            return
+        ref_h = (primary[3] - primary[1]) if primary is not None else cfg.ship.max_height * 3
+        sh = max(cfg.ship.min_height, min(cfg.ship.max_height, round(ref_h * cfg.ship_scale)))
+        sw = max(cfg.ship.min_width, min(cfg.ship.max_width, sh * 3))
+        sky_r = (primary[0] - 2) if primary is not None else w - 2
+        # A centred primary leaves a narrower sky: slim the ships to what it can
+        # hold rather than deferring them all to text rows.
+        sw = max(cfg.ship.min_width, min(sw, sky_r - 4))
+        rng = random.Random(sec.sector_id)
+        for i, vessel in enumerate(shown):
+            entity, sub = art_adapter.ship_entity(vessel.role)
+            facing = "right"
+            if primary is None and i == 1 and rng.random() < cfg.ship_face_inward_chance:
+                facing = "left"
+            cells = self._sprite_cells(entity, sub, seed=sec.sector_id * 16 + i,
+                                       sw=sw, sh=sh, facing=facing,
+                                       archetype_id=vessel.archetype_id)
+            cw, chh = self._dims(cells)
+            # A jittered column first, then the sky's left edge and middle — the
+            # first free anchorage (scanning down) wins.
+            span = max(1, min(sky_r, w - 1) - cw - 2)
+            cols = list(dict.fromkeys((2 + rng.randrange(0, span), 2, 2 + span // 2)))
+            spot = None
+            for t in range(hdr + 1, h - chh):
+                for left in cols:
+                    if self._is_free(left - 1, t - 1, left + cw + 1, t + chh + 1):
+                        spot = (left, t)
+                        break
+                if spot is not None:
+                    break
+            cid = vessel.contact_id
+            pid = getattr(vessel, "player_id", None)  # another player's ship (WP70)
+            dest, ref = (("contact", cid) if cid is not None
+                         else ("player", pid) if pid is not None else (None, None))
+            if spot is None:
+                # No free sky: the ship degrades to a text row rather than paint
+                # over something already placed. It stays hailable either way.
+                self._deferred.append((f"[white]>[/] {vessel.name}", dest, ref))
+                continue
+            left, top = spot
+            self._paint(cells, top, left)
+            rect = (left, top, min(w, left + cw), min(h, top + chh))
+            self._reserve(*rect)
+            self._tag(vessel.name, rect, dest, ref)
+            if dest is not None:
+                self.hotspots.append((*rect, dest, ref))
+
+    def _paint_discovery(self, disc: SectorDiscovery, hdr: int, body_h: int, *,
+                         as_primary: bool) -> tuple[int, int, int, int] | None:
+        """A space find: the scene's primary body when the sector has no planet,
+        else a small sprite in free sky beside the world — the wreck slot (PT-44)."""
+        sec, cfg, w, h = self.sec, self.cfg, self._w, self._h
+        if as_primary:
+            if disc.kind == "nebula":
+                # A nebula dwarfs a planet. Its soft SDF rim thins to nothing well
+                # inside the requested box (the crop then trims the blank margin),
+                # so the box is oversized ~40% past the body for the *visible*
+                # cloud to land at planet scale; the paint clips to the canvas.
+                dh = max(6, int(body_h * 1.4))
+                dw = min(dh * 3, w + w // 4)
+            else:
+                dh = max(4, min(cfg.planet.max_height - 4, int(body_h * 0.6)))
+                dw = dh * 2
+        else:
+            dh = max(3, min(6, body_h // 4))
+            dw = dh * 2 + 2
+        cells = self._sprite_cells("discovery", disc.kind, seed=sec.sector_id,
+                                   sw=dw, sh=dh)
+        cw, chh = self._dims(cells)
+        if disc.kind == "wormhole" and disc.warp_to is not None:
+            dest: str = "wormhole"
+            ref: int | str | None = disc.warp_to  # click warps to the far side
+        else:
+            dest, ref = "discovery", disc.discovery_id  # click scans/salvages
+        # No caption until scanned — a sensor sweep (sidebar/Z) reveals the
+        # identity; a hulk is plainly a hulk, so a wreck wears its name (PT-49).
+        named = disc.collected or disc.kind == "wreck"
+        if as_primary:
+            left = max(2, int(w * 0.6) - cw // 2)
+            top = hdr + max(0, (body_h - chh) // 3)
+        else:
+            # A wreck is something bases and ships keep their distance from: it
+            # berths hard against the screen's left edge with a wide standoff from
+            # everything already placed — relaxing the standoff (never the left
+            # bias) only when no isolated pocket of sky exists.
+            spot = None
+            for padx, pady in ((14, 5), (8, 3), (4, 2), (1, 1)):
+                for t in range(h - chh - 2, hdr, -1):
+                    if self._is_free(0, max(0, t - pady),
+                                     min(w, 1 + cw + padx),
+                                     min(h, t + chh + pady)):
+                        spot = (1, t)
+                        break
+                if spot is not None:
+                    break
+            if spot is None:
+                # No free sky beside the planet: the find degrades to a text row.
+                label = (disc.name or disc.label) if named else "unresolved anomaly"
+                self._deferred.append((f"[b cyan]◦ {label}[/]", dest, ref))
+                return None
+            left, top = spot
+        self._paint(cells, top, left)
+        rect = (left, top, min(w, left + cw), min(h, top + chh))
+        self._reserve(*rect)
+        if named:
+            # Name only (kind/rarity are the sidebar's story; the sprite shows
+            # what it is) — falling back to the label for a nameless legacy row.
+            self._tag(f"[b cyan]{disc.name or disc.label}[/]", rect, dest, ref)
+        self.hotspots.append((*rect, dest, ref))
+        return rect
+
+    def _paint_text_rows(self) -> None:
+        """Overflow ships beyond the sprite cap (still hailable) and the roaming
+        Entity's presence hint (§7, WP35 — hailable only once sensors resolve it,
+        fog-safe: never named), as text rows filled upward from the bottom."""
+        sec, cfg, w, h = self.sec, self.cfg, self._w, self._h
+        lines: list[tuple[str, str | None, int | str | None]] = list(self._deferred)
+        for vessel in sec.ships[cfg.max_ships_shown:]:
+            cid = vessel.contact_id
+            pid = getattr(vessel, "player_id", None)
+            dest, ref = (("contact", cid) if cid is not None
+                         else ("player", pid) if pid is not None else (None, None))
+            lines.append((f"[white]>[/] {vessel.name}", dest, ref))
+        anomaly = getattr(sec, "anomaly", None)
+        if anomaly is not None:
+            # Presence only — whether it can be hailed is the sidebar's story.
+            style = "b gold1" if anomaly.contactable else "gold3"
+            lines.append((f"[{style}]✶ {anomaly.label}[/]",
+                          "contact" if anomaly.contactable else None,
+                          anomaly.contact_id if anomaly.contactable else None))
+        row = h - 1
+        for markup, dest, ref in lines:
+            n = min(w, Text.from_markup(markup).cell_len + 2)
+            while row > 0 and not self._is_free(0, row, n, row + 1):
+                row -= 1
+            if row <= 0:
+                break
+            self._stamp_at(markup, row, 1)
+            self._reserve(0, row, n, row + 1)
+            if dest is not None:
+                self.hotspots.append((0, row, n, row + 1, dest, ref))
+            row -= 1
+
+    def _paint_forces(self, hdr: int) -> None:
+        """Deployed forces as glyph-scale presence marks — fighters flying patrol
+        through the open sky, mines seeded near the bodies. Counts, mode, and toll
+        live in the sidebar; here density alone hints at strength (capped). The
+        projection already applied classic-TW fog: fighters are public, foreign
+        mines arrived zeroed."""
+        force = getattr(self.sec, "force", None)
+        if force is None:
+            return
+        if force.fighters > 0:
+            style = Style.parse("bold green" if force.yours else "bold red")
+            self._scatter("▴", style, min(6, 1 + force.fighters // 25),
+                          random.Random(self.sec.sector_id ^ 0xF167), hdr)
+        if force.armid_mines or force.limpet_mines:  # own eyes only (fog)
+            self._scatter("✺", Style.parse("bold orange3"),
+                          min(5, 1 + (force.armid_mines + force.limpet_mines) // 8),
+                          random.Random(self.sec.sector_id ^ 0x313E5), hdr)
+
+
+class SectorScene(Static):
+    """The whole sector composited into one grid as an arrival view (UI_MOCKUPS.md §1).
+
+    One Static because a terminal cell holds a single glyph and Textual does not
+    blend overlapping widgets/layers — compositing everything over the starfield
+    here is the only way to show stars *behind* the sprites (their negative-space
+    cells stay transparent). The layout itself lives in `_SceneComposer`; this
+    widget feeds it the widget size and routes its hotspot rects as
+    ``ClickableEntry.Picked`` (mirroring the keys).
+    """
+
+    DEFAULT_CSS = """
+    SectorScene { width: 1fr; height: 1fr; background: transparent; }
+    """
+
+    def __init__(self, sector: SectorDTO, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._sector = sector
+        # (x0, y0, x1, y1, dest, ref) recorded each render; on_click maps a hit to
+        # the same ClickableEntry.Picked the keyboard/text affordances post.
+        self._hotspots: list[tuple[int, int, int, int, str, int | str | None]] = []
+
+    def on_resize(self) -> None:
+        self.refresh()
+
+    def _scene_cfg(self) -> SceneArtConfig:
+        return getattr(self.app, "scene_art", None) or SceneArtConfig()
+
+    def render(self) -> Text:
+        w, h = self.size.width, self.size.height
+        if w < 8 or h < 6:
+            self._hotspots = []
+            return Text("")
+        composer = _SceneComposer(self._sector, self._scene_cfg())
+        out = composer.compose(w, h)
+        self._hotspots = composer.hotspots
         return out
 
     def on_click(self, event: events.Click) -> None:

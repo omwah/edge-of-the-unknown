@@ -57,6 +57,19 @@ FEATURES_REGISTRY = {
     "debris": [
         ("*", 1), ("⸝", 1), ("⹁", 1), (".", 1),
     ],
+    # Asteroid-belt features carry heavier ink than the generic dust/rock/debris
+    # sets: a belt floats over the same black the starfield lives in, so thin
+    # glyphs (`.` `•` `*`) read as more stars. Solid geometric chips keep the
+    # field unmistakably *rock* (playtest note, 2026-07-17).
+    "belt_dust": [
+        ("·", 2), ("∙", 1), (" ", 2),
+    ],
+    "belt_rock": [
+        ("●", 3), ("◆", 2), ("⬢", 1), (" ", 3),
+    ],
+    "belt_debris": [
+        ("▪", 2), ("◦", 1), ("*", 1),
+    ],
     "gas_thick": [
         ("≓", 0.05), ("≑", 0.5), ("=", 2), 
     ],
@@ -137,12 +150,14 @@ BIOMES_REGISTRY = {
     },
     "asteroid_belt": {
         "scale_x": 8.0, "scale_y": 8.0,
+        # Warm mineral tones (not the starfield's cool white/grey) so the field
+        # separates from the stars by colour as well as by glyph weight.
         "bands": [
             (-0.3, "void", "black", "black"),
-            (0.3, "dust", "bright_black", "black"),
-            (0.6, "rock", "grey50", "black"),
-            (0.8, "rock", "white", "black"),
-            (1.0, "debris", "bright_white", "black"),
+            (0.3, "belt_dust", "grey62", "black"),
+            (0.6, "belt_rock", "tan", "black"),
+            (0.8, "belt_rock", "orange3", "black"),
+            (1.0, "belt_debris", "sandy_brown", "black"),
         ]
     },
     "barren": {

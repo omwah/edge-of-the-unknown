@@ -1405,12 +1405,18 @@ class SceneArtConfig(BaseModel):
 
     model_config = _FROZEN
 
-    planet: PlanetSpriteSize = PlanetSpriteSize()  # SectorView orbit-row planet
+    planet: PlanetSpriteSize = PlanetSpriteSize(max_height=26)  # SectorView primary body
     planet_detail: PlanetSpriteSize = PlanetSpriteSize(max_height=14)  # PlanetScreen orbit view
-    port: SpriteSize = SpriteSize(max_width=18, max_height=8)
+    port: SpriteSize = SpriteSize(max_width=20, max_height=9)
     ship: SpriteSize = SpriteSize(max_width=16, max_height=6)
-    max_ships_shown: int = Field(default=2, gt=0)  # sprites; extras list as text
+    max_ships_shown: int = Field(default=3, gt=0)  # sprites; extras list as text
     ship_face_inward_chance: float = Field(default=0.5, ge=0.0, le=1.0)
+    # Arrival-view scale hierarchy (PT-36): the primary body (planet, else a space
+    # find, else the station) takes most of the free height; a port/starbase and
+    # the ships derive from it, so everything in the scene is sized relative to
+    # the largest thing present rather than to a reserved layout band.
+    port_scale: float = Field(default=0.5, gt=0.0, le=1.0)  # of the primary body's height
+    ship_scale: float = Field(default=0.3, gt=0.0, le=1.0)  # of the primary body's height
 
 
 class UIConfig(BaseModel):

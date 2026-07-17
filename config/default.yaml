@@ -26,12 +26,16 @@ ticker:
 # SectorView sprite scene — sizes/counts only, no rules impact (presentation).
 # Sprites are sized to the space available, clamped to [min, max] per axis.
 scene:
-  planet: { min_height: 4, max_height: 14 }        # SectorView orbit-row planet (width = 2*height)
+  planet: { min_height: 4, max_height: 26 }        # SectorView primary body (width = 2*height)
   planet_detail: { min_height: 4, max_height: 16 } # PlanetScreen orbit view planet (independent of above)
-  port:   { min_width: 6, min_height: 4, max_width: 18, max_height: 8 }
+  port:   { min_width: 6, min_height: 4, max_width: 20, max_height: 9 }
   ship:   { min_width: 6, min_height: 3, max_width: 16, max_height: 6 }
-  max_ships_shown: 2           # sprites shown; extra ships fall to a clickable list
+  max_ships_shown: 3           # sprites shown; extra ships fall to a clickable list
   ship_face_inward_chance: 0.5 # chance the 2nd of two ships is flipped to face the 1st
+  # Arrival-view scale hierarchy: the primary body (planet > space find > station)
+  # takes most of the free height; everything else is sized relative to it.
+  port_scale: 0.5              # port/starbase height as a fraction of the primary body's
+  ship_scale: 0.3              # ship height as a fraction of the primary body's
 
 # TUI presentation — the sector-screen warp grid + status sidebar (no rules impact).
 ui:
