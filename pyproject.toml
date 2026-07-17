@@ -63,7 +63,7 @@ edge = "python -m edge.tui"
 serve = "python -m edge.tui --serve"
 # WP68 hosted play: run the game server (lobby+accounts) and the browser-served remote client.
 # Two terminals: `pixi run host` then `pixi run serve-remote` (see docs/HOSTING.md).
-host = "edge-server --accounts accounts.db --games-dir games"
+host = "edge-server"
 serve-remote = "python -m edge.tui --serve --connect ws://localhost:8765"  # browser → hosted game
 shots = "python -m edge.tui.shots"
 bigbang = "python -m edge.bigbang"

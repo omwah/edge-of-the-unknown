@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from edge.config import load_default_config
+from edge.core.dev import DevPatch
 from edge.core.rules import Dock, JoinGame, Warp
 from edge.server import wire
 from edge.server.accounts import AccountStore
@@ -211,7 +212,8 @@ async def test_catch_up_equals_the_live_pushed_stream(tmp_path: Path) -> None:
 
 def _lobby(tmp_path: Path) -> LobbyServer:
     store = AccountStore(tmp_path / "accounts.db")
-    return LobbyServer(store, _config(), tmp_path / "games", tick_seconds=1000.0)
+    return LobbyServer(store, _config(), tmp_path / "games", tick_seconds=1000.0,
+                       sysop_password="sysop-pw")
 
 
 async def test_lobby_register_login_create_join_play(tmp_path: Path) -> None:
@@ -273,6 +275,37 @@ async def test_resume_returns_same_seat(tmp_path: Path) -> None:
         again = Session(conn=None)
         await lobby.dispatch(again, "login", {"username": "host", "password": "pw"})
         assert (await lobby.dispatch(again, "resume", {"game_id": gid}))["player_id"] == first
+    finally:
+        await lobby.aclose()
+
+
+async def test_join_repairs_binding_whose_player_was_never_committed(tmp_path: Path) -> None:
+    """A partial legacy lobby binding cannot yield a seat absent from game state."""
+    (tmp_path / "games").mkdir()
+    lobby = _lobby(tmp_path)
+    try:
+        host = Session(conn=None)
+        host_id = (await lobby.dispatch(
+            host, "register", {"username": "host", "password": "pw"},
+        ))["account_id"]
+        await lobby.dispatch(host, "login", {"username": "host", "password": "pw"})
+        gid = (await lobby.dispatch(
+            host, "create_game", {"name": "alpha", "seed": 42},
+        ))["game_id"]
+        await lobby.dispatch(host, "join_game", {"game_id": gid})
+
+        guest = Session(conn=None)
+        guest_id = (await lobby.dispatch(
+            guest, "register", {"username": "guest", "password": "pw"},
+        ))["account_id"]
+        await lobby.dispatch(guest, "login", {"username": "guest", "password": "pw"})
+        assert host_id != guest_id
+        lobby._accounts.bind(guest_id, gid, 2)  # type: ignore[attr-defined]
+
+        joined = await lobby.dispatch(guest, "join_game", {"game_id": gid})
+        assert joined["player_id"] == 2
+        assert 2 in lobby._games[gid].service.state.players  # type: ignore[attr-defined]
+        assert wire.decode_dto(await lobby.dispatch(guest, "game_view", {})) is not None
     finally:
         await lobby.aclose()
 
@@ -363,6 +396,73 @@ async def test_remote_client_login_join_play_and_push(tmp_path: Path) -> None:
         assert (await client.game_view()).sector.sector_id == neighbour  # view re-reads live
     finally:
         await client.aclose()
+        await lobby.aclose()
+        ws_server.close()
+        await ws_server.wait_closed()
+
+
+async def test_llm_bot_remote_session_connects_to_hosted_server(tmp_path: Path) -> None:
+    """The synchronous LLM-bot bridge completes the ordinary lobby handshake."""
+    from edge.bot.llm.remote import RemoteSession
+
+    lobby, ws_server, port = await _served_lobby(tmp_path)
+    remote = RemoteSession(f"ws://localhost:{port}")
+    try:
+        player_id = await asyncio.to_thread(
+            remote.open, "pilot", "pw", game_id=None, game_name="alpha", seed=42,
+        )
+        view = await asyncio.to_thread(remote.service.game_view, player_id)
+        assert player_id == 1
+        assert view.ship.name
+    finally:
+        await asyncio.to_thread(remote.close)
+        await lobby.aclose()
+        ws_server.close()
+        await ws_server.wait_closed()
+
+
+async def test_host_sysop_patch_updates_authoritative_live_player_view(tmp_path: Path) -> None:
+    """A live intervention is visible immediately to a separately connected LLM/player."""
+    from edge.devtool.remote import LiveSysopService
+    from edge.server.client import RemoteClient, RemoteError
+
+    lobby, ws_server, port = await _served_lobby(tmp_path)
+    host = RemoteClient(f"ws://localhost:{port}")
+    bot = RemoteClient(f"ws://localhost:{port}")
+    sysop: LiveSysopService | None = None
+    try:
+        await host.connect()
+        await host.register("host", "pw")
+        await host.login("host", "pw")
+        gid = await host.create_game("alpha", seed=42)
+
+        await bot.connect()
+        await bot.register("pilot", "pw")
+        await bot.login("pilot", "pw")
+        pid = await bot.join_game(gid)
+        before = (await bot.game_view()).ship.latinum
+
+        sysop = await asyncio.to_thread(
+            LiveSysopService, f"ws://localhost:{port}", "sysop-pw", "alpha")
+        assert sysop.game_name == "alpha"
+        assert sysop.save_path == tmp_path / "games" / "alpha.db"
+        await asyncio.to_thread(sysop.apply, pid, DevPatch("add", "latinum", 7_500))
+
+        assert (await bot.game_view()).ship.latinum == before + 7_500
+        with pytest.raises(RemoteError, match="sysop authentication required"):
+            await bot.sysop_apply("alpha", pid, DevPatch("add", "latinum", 1))
+        with pytest.raises(RemoteError, match="sysop authentication required"):
+            await host.sysop_open("alpha")  # first account is not implicit sysop auth
+        with pytest.raises(RemoteError, match="invalid sysop password"):
+            await host.sysop_login("player-account-password-is-not-the-sysop-secret")
+        await host.sysop_login("sysop-pw")
+        with pytest.raises(RemoteError, match="only DevPatch"):
+            await host.sysop_apply("alpha", pid, Dock())  # type: ignore[arg-type]
+    finally:
+        if sysop is not None:
+            await asyncio.to_thread(sysop.close)
+        await host.aclose()
+        await bot.aclose()
         await lobby.aclose()
         ws_server.close()
         await ws_server.wait_closed()

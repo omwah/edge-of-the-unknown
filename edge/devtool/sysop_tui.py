@@ -205,7 +205,8 @@ class SysopApp(App[None]):
         nav.add_option(Option("[b yellow]INTERVENE[/b yellow]", disabled=True))
         for key, title in _INTERVENTIONS.items():
             nav.add_option(Option(f"  {title}", id=f"act:{key}"))
-        self._audit_note(f"[dim]session open — {self.session.dev_command_count()} dev "
+        mode = "LIVE hosted queue" if self.session.live else "offline save"
+        self._audit_note(f"[dim]session open — {mode} — {self.session.dev_command_count()} dev "
                          f"command(s) already in the log[/dim]")
         self._show_view(self._view)
         self.set_interval(_AUTO_REFRESH_SECS, self._auto_tick)
@@ -223,6 +224,7 @@ class SysopApp(App[None]):
     # --- views -----------------------------------------------------------------------
 
     def _show_view(self, view: str) -> None:
+        self.session.refresh()
         self._view = view
         state, config = self.session.state, self.session.config
         stamp = time.strftime("%H:%M:%S")
@@ -317,7 +319,8 @@ class SysopApp(App[None]):
 
     def _update_subtitle(self) -> None:
         auto = f"auto-refresh {_AUTO_REFRESH_SECS:g}s" if self._auto else "auto-refresh off"
-        self.sub_title = f"{auto} · every intervention is logged"
+        mode = "LIVE server queue" if self.session.live else "offline save"
+        self.sub_title = f"{mode} · {auto} · every intervention is logged"
 
     # --- interventions ------------------------------------------------------------------------
 
