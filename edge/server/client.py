@@ -36,7 +36,7 @@ from edge.core import dto
 from edge.core.citadels import CitadelError
 from edge.core.combat import CombatError
 from edge.core.config import GameConfig
-from edge.core.dev import DevPatchError
+from edge.core.dev import DevPatch, DevPatchError
 from edge.core.economy import EconomyError
 from edge.core.enums import Commodity
 from edge.core.engine_room import EngineRoomError
@@ -446,6 +446,25 @@ class RemoteClient:
 
     async def create_game(self, name: str, seed: int = 0) -> int:
         return int((await self._call("create_game", {"name": name, "seed": seed}))["game_id"])
+
+    async def sysop_login(self, password: str) -> None:
+        """Authenticate this connection with the server's dedicated operator secret."""
+        await self._call("sysop_login", {"password": password})
+
+    async def sysop_open(self, name: str) -> tuple[int, str]:
+        """Select an existing hosted game by its operator-facing lobby name."""
+        result = await self._call("sysop_open", {"name": name})
+        return int(result["game_id"]), str(result["db_path"])
+
+    async def sysop_apply(self, game_name: str, player_id: int,
+                          patch: DevPatch) -> tuple[Event, ...]:
+        """Apply one host-authorized intervention through a live game's writer queue."""
+        result = await self._call("sysop_apply", {
+            "name": game_name,
+            "player_id": player_id,
+            "command": wire.encode_command(patch),
+        })
+        return tuple(wire.decode_event(event) for event in result)
 
     async def join_game(self, game_id: int) -> int:
         """Join a game and bind this client's seat to the returned player id."""

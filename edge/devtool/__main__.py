@@ -31,7 +31,7 @@ import argparse
 import shlex
 from dataclasses import fields
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from edge.bigbang.inspect import resolve_sector
 from edge.config import load_default_config
@@ -39,10 +39,14 @@ from edge.core.dev import DevPatch, DevPatchError
 from edge.core.models import UniverseState
 from edge.core.rules import reduce
 from edge.server.service import GameService
+from edge.server.client import RemoteError
 from edge.store.repo import SqliteRepository
 from edge.tui.saves import default_save
 
 _PLAYER_ID = 1
+
+if TYPE_CHECKING:
+    from edge.devtool.remote import LiveSysopService
 
 
 # --- session: a loaded save + its repo --------------------------------------
@@ -54,17 +58,36 @@ class Session:
     def __init__(self, path: Path) -> None:
         self.config = load_default_config()
         self.repo = SqliteRepository(path)
-        self.service = GameService.load_game(self.config, self.repo)
+        self._local_service = GameService.load_game(self.config, self.repo)
+        self.service: GameService | LiveSysopService = self._local_service
+        self._live_service: LiveSysopService | None = None
         self.dry_run = False
 
     @property
     def state(self) -> UniverseState:
-        return self.service.state
+        return self._local_service.state
+
+    @property
+    def live(self) -> bool:
+        return self._live_service is not None
+
+    def attach_live(self, service: LiveSysopService) -> None:
+        """Route mutations to a hosted server while retaining local trusted reports."""
+        self._live_service = service
+        self.service = service
+        self.refresh()
+
+    def refresh(self) -> None:
+        """Replay newly committed hosted commands before producing an admin report/preview."""
+        if self._live_service is not None:
+            self._local_service = GameService.load_game(self.config, self.repo)
 
     def dev_command_count(self) -> int:
         return sum(1 for rc in self.repo.load_commands() if isinstance(rc.command, DevPatch))
 
     def close(self) -> None:
+        if self._live_service is not None:
+            self._live_service.close()
         self.repo.close()
 
 
@@ -184,13 +207,18 @@ def apply_patch_lines(session: Session, patch: DevPatch,
     The player-aware, non-printing form the sysop TUI drives (WP59): the patch is
     reduced and applied *as* `player_id`, so an intervention can target any player.
     """
+    session.refresh()
     try:
         preview = _diff_after(session, patch, player_id)  # also validates before we persist
-    except DevPatchError as exc:
+    except (DevPatchError, RemoteError) as exc:
         return False, [f"error: {exc}"]
     if session.dry_run:
         return True, ["dry-run (nothing written):", *preview]
-    session.service.apply(player_id, patch)
+    try:
+        session.service.apply(player_id, patch)
+    except (DevPatchError, RemoteError) as exc:
+        return False, [f"error: {exc}"]
+    session.refresh()
     return True, ["applied:", *preview]
 
 

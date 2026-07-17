@@ -104,6 +104,23 @@ def test_live_pace_adjustment_clamps_at_zero() -> None:
     assert brain.adjust_pace(1.0) == 1.0
 
 
+def test_startup_read_failure_is_reported_before_pilot_stops(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_sidebar(_bot: object) -> str:
+        raise RuntimeError("missing player seat")
+
+    monkeypatch.setattr(brain_module, "sidebar", fail_sidebar)
+    records: list[BotRecord] = []
+    brain = Brain(_Bot(), _LLM(), emit=records.append)  # type: ignore[arg-type]
+
+    brain.run()
+
+    assert [(record.kind, record.text) for record in records[-2:]] == [
+        ("error", "pilot halted during startup: RuntimeError('missing player seat')"),
+        ("status", "pilot stopped"),
+    ]
+
+
 def test_query_does_not_replace_or_suppress_a_queued_objective() -> None:
     llm = _LLM(
         {"response": "The neighboring sector remains uncharted."},

@@ -1,4 +1,6 @@
+# Checked out reference code
 references/**
+
 # generated PDFs are build artifacts — never commit them
 *.pdf
 # pixi environments
@@ -15,3 +17,6 @@ games/
 
 # snapshots unit test report file
 snapshot_report.html
+
+# Local process settings and secrets (server/sysop, edge-serve)
+.env

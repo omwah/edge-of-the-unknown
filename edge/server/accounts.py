@@ -160,6 +160,15 @@ class AccountStore:
             raise AuthError(f"no game {game_id}")
         return GameRecord(row["game_id"], row["name"], row["db_path"], row["seed"])
 
+    def game_named(self, name: str) -> GameRecord:
+        """Return the hosted game with the operator-facing lobby name."""
+        row = self._conn.execute(
+            "SELECT game_id, name, db_path, seed FROM games WHERE name = ?", (name,),
+        ).fetchone()
+        if row is None:
+            raise AuthError(f"no game named {name!r}")
+        return GameRecord(row["game_id"], row["name"], row["db_path"], row["seed"])
+
     def binding(self, account_id: int, game_id: int) -> int | None:
         """The player_id this account already holds in this game, or None (needs a fresh join)."""
         row = self._conn.execute(

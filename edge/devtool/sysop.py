@@ -12,18 +12,23 @@ a notice deletion, a governor flip, and a latinum grant all persist and replay i
 
 `edge-sysop --save PATH` opens the **Textual dashboard** (`sysop_tui.SysopApp`: two-pane
 nav, sortable report tables, modal intervention forms with a player picker, an audit-trail
-pane, auto-refresh). `--plain` keeps this module's classic text menu; `--report NAME` prints
-one report non-interactively and exits (unchanged, for scripting).
+pane, auto-refresh). For a running hosted game, use `--connect WS_URL --game NAME`:
+reports replay the local hosted-game DB while interventions go through the authenticated
+server's single-writer queue. `--plain` keeps this module's classic text menu; `--report NAME`
+prints one report non-interactively and exits (unchanged, for scripting).
 """
 
 from __future__ import annotations
 
 import argparse
+import sqlite3
 from pathlib import Path
 
 from edge.core.dev import DevPatch
 from edge.devtool import reports
 from edge.devtool.__main__ import Session, apply_patch
+from edge.server.client import RemoteError
+from edge.server.env import sysop_password as load_sysop_password
 from edge.tui.saves import default_save
 
 _PLAYER_ID = 1
@@ -42,6 +47,7 @@ _REPORTS: dict[str, str] = {
 
 def run_report(session: Session, name: str) -> list[str]:
     """Produce one report's lines (the single dispatch shared by the menu and `--report`)."""
+    session.refresh()
     state, config = session.state, session.config
     if name == "players":
         return reports.players_report(state)
@@ -157,7 +163,6 @@ def _lobby_hint(path: Path) -> str | None:
     looks like that registry, return an error message listing the per-game DBs to open
     instead; otherwise None.
     """
-    import sqlite3
     try:
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     except sqlite3.Error:
@@ -172,8 +177,8 @@ def _lobby_hint(path: Path) -> str | None:
             or "  (no hosted games created yet)"
         return (f"{path} is the multiplayer lobby registry (accounts/sessions/games index), "
                 f"not a game save.\nEach hosted game is its own save DB — open one of:\n{listing}\n"
-                "Reports are safe reads; stop (or snapshot) the server before intervening — "
-                "a running server holds live game state in memory.")
+                "Reports are safe reads. For live intervention, open the selected game DB with "
+                "--save and add --connect/--game so changes enter the server queue.")
     except sqlite3.Error:
         return None
     finally:
@@ -185,20 +190,51 @@ def main(argv: list[str] | None = None) -> None:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--save", metavar="PATH", default=None,
                         help="save DB to open (default: the single ~/.edge/games slot)")
+    parser.add_argument("--connect", metavar="WS_URL",
+                        help="administer a running hosted game through edge-server")
+    parser.add_argument("--password",
+                        help="operator secret (default $EDGE_SYSOP_PASSWORD, then ./.env)")
+    parser.add_argument("--env-file", type=Path,
+                        help="dotenv file for EDGE_SYSOP_PASSWORD (default: ./.env)")
+    parser.add_argument("--game", metavar="NAME",
+                        help="hosted game name (required with --connect)")
     parser.add_argument("--report", metavar="NAME", choices=sorted(_REPORTS),
                         help="print one report non-interactively and exit")
     parser.add_argument("--plain", action="store_true",
                         help="use the classic text menu instead of the Textual dashboard")
     args = parser.parse_args(argv)
-    save_path = Path(args.save) if args.save else default_save()
+    if args.connect:
+        args.password = load_sysop_password(args.password, dotenv_path=args.env_file)
+    if args.connect and (not args.password or args.game is None):
+        parser.error("--connect needs --game and a sysop password from --password, "
+                     "EDGE_SYSOP_PASSWORD, or the selected .env file")
+    live_service = None
+    if args.connect:
+        from edge.devtool.remote import LiveSysopService
+        try:
+            live_service = LiveSysopService(args.connect, args.password, args.game)
+        except (OSError, RemoteError, TimeoutError) as exc:
+            parser.error(f"live sysop connection failed: {exc}")
+    if args.save:
+        save_path = Path(args.save)
+    elif live_service is not None:
+        save_path = live_service.save_path
+    else:
+        save_path = default_save()
     if not save_path.exists():
+        if live_service is not None:
+            live_service.close()
         parser.error(f"no save at {save_path} — start a game first (or pass --save PATH)")
     try:
         session = Session(save_path)
     except LookupError:  # a DB with no game meta: a lobby registry, or not ours at all
+        if live_service is not None:
+            live_service.close()
         parser.error(_lobby_hint(save_path)
                      or f"{save_path} is not a game save (it has no game meta)")
     try:
+        if live_service is not None:
+            session.attach_live(live_service)
         if args.report is not None:
             _print(run_report(session, args.report))
         elif args.plain:

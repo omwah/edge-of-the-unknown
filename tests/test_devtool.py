@@ -142,6 +142,37 @@ def test_devpatch_survives_reload(tmp_path: Path) -> None:
     repo.close()
 
 
+def test_live_sysop_session_replays_authoritative_patch_for_reports(tmp_path: Path) -> None:
+    """The dashboard reloads the DB after its remote service applies through the live game."""
+    from edge.devtool.__main__ import Session, apply_patch_lines
+
+    config = _config()
+    path = tmp_path / "live.db"
+    live_repo = SqliteRepository(path)
+    live = GameService.new_game(config, 42, live_repo, created_at=_CREATED)
+
+    class _LiveService:
+        def apply(self, player_id: int, patch: DevPatch) -> tuple[object, ...]:
+            return live.apply(player_id, patch)
+
+        def close(self) -> None:
+            pass
+
+    session = Session(path)
+    try:
+        session.attach_live(_LiveService())  # type: ignore[arg-type]
+        before = session.state.players[1].latinum
+
+        ok, _lines = apply_patch_lines(session, DevPatch("add", "latinum", 2_500), 1)
+
+        assert ok
+        assert live.state.players[1].latinum == before + 2_500
+        assert session.state.players[1].latinum == before + 2_500
+    finally:
+        session.close()
+        live_repo.close()
+
+
 def test_codec_round_trip() -> None:
     for patch in (
         DevPatch("set", "latinum", 1_000_000),

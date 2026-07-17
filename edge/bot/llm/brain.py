@@ -176,6 +176,8 @@ class Brain:
                     self._emit("error", f"pilot halted on an unexpected error: {exc!r}")
                     break
                 self._pace_sleep(started)
+        except Exception as exc:  # noqa: BLE001 — surface failures before the first cycle
+            self._emit("error", f"pilot halted during startup: {exc!r}")
         finally:
             self._running.clear()
             self._emit("status", "pilot stopped")

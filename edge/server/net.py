@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import dataclasses
+import hmac
 import json
 import logging
 from dataclasses import dataclass, field
@@ -32,7 +33,7 @@ from typing import Any
 
 from edge.core.citadels import CitadelError
 from edge.core.combat import CombatError
-from edge.core.dev import DevPatchError
+from edge.core.dev import DevPatch, DevPatchError
 from edge.core.economy import EconomyError
 from edge.core.enums import Commodity
 from edge.core.engine_room import EngineRoomError
@@ -43,6 +44,7 @@ from edge.engine.ticker import EngineTicker
 from edge.server import session as projection
 from edge.server import wire
 from edge.server.accounts import AccountStore, AuthError
+from edge.server.env import sysop_password as load_sysop_password
 from edge.server.service import GameService
 
 log = logging.getLogger("edge.server.net")
@@ -108,6 +110,7 @@ class Session:
 
     conn: Any
     account_id: int | None = None  # set on login/resume_session (identity on this connection)
+    sysop_authorized: bool = False  # dedicated server secret; independent of player accounts
     game_id: int | None = None     # set on join_game/resume (which game this session is playing)
     player_id: int | None = None   # the seat in that game (from the binding, never from params)
     _hits: list[float] = field(default_factory=list)  # recent command times (rate limiter)
@@ -354,13 +357,15 @@ class LobbyServer:
     """
 
     def __init__(self, accounts: AccountStore, config: Any, games_dir: Path, *,
-                 rate_limit: int = 50, tick_seconds: float | None = None) -> None:
+                 rate_limit: int = 50, tick_seconds: float | None = None,
+                 sysop_password: str | None = None) -> None:
         self._accounts = accounts
         self._config = config
         self._games_dir = games_dir
         self._games: dict[int, GameServer] = {}
         self._rate_limit = rate_limit  # commands/second/connection — DoS hygiene, not security
         self._tick_seconds = tick_seconds
+        self._sysop_password = sysop_password
         self._sessions: set[Session] = set()
 
     # --- game registry -------------------------------------------------------
@@ -393,6 +398,31 @@ class LobbyServer:
         if method == "resume_session":
             session.account_id = self._accounts.authenticate(params["token"])
             return {"account_id": session.account_id}
+        if method == "sysop_login":
+            supplied = str(params.get("password", ""))
+            if self._sysop_password is None or not hmac.compare_digest(
+                    supplied, self._sysop_password):
+                raise RpcError(ERR_AUTH, "invalid sysop password")
+            session.sysop_authorized = True
+            return {"authorized": True}
+        if method in {"sysop_open", "sysop_apply"}:
+            if not session.sysop_authorized:
+                raise RpcError(ERR_AUTH, "sysop authentication required")
+            if method == "sysop_open":
+                record = self._accounts.game_named(str(params["name"]))
+                self._open_game(record.game_id)
+                return {"game_id": record.game_id, "name": record.name,
+                        "db_path": record.db_path}
+            record = self._accounts.game_named(str(params["name"]))
+            player_id = int(params["player_id"])
+            command = wire.decode_command(params["command"])
+            if not isinstance(command, DevPatch):
+                raise RpcError(ERR_INVALID_PARAMS, "sysop_apply accepts only DevPatch commands")
+            try:
+                events = await self._open_game(record.game_id).submit(player_id, command)
+            except _REJECTIONS as exc:
+                raise RpcError(ERR_RULES_REJECTION, str(exc)) from exc
+            return [wire.encode_event(event) for event in events]
 
         # Everything below requires a logged-in connection.
         if session.account_id is None:
@@ -407,7 +437,7 @@ class LobbyServer:
         if method == "join_game":
             return {"player_id": await self._join(session, int(params["game_id"]))}
         if method == "resume":
-            return {"player_id": self._resume(session, int(params["game_id"]))}
+            return {"player_id": await self._resume(session, int(params["game_id"]))}
 
         # A game method — delegate to the bound game's single-writer server (H14).
         if session.game_id is None or session.player_id is None:
@@ -428,7 +458,13 @@ class LobbyServer:
         server = self._open_game(game_id)
         existing = self._accounts.binding(session.account_id, game_id)  # type: ignore[arg-type]
         if existing is not None:
+            # A server interruption between lobby binding and the logged JoinGame used to
+            # leave a durable seat pointing at no player. Repair that legacy/partial state
+            # through the same replayable command rail before exposing the seat.
+            if existing not in server.service.state.players:
+                await server.submit(existing, JoinGame())
             session.game_id, session.player_id = game_id, existing
+            server.register_session(session)
             return existing
         # Prefer an already-enrolled but unclaimed seat — a fresh game's `new_game` enrolls
         # player 1, and that seat belongs to the first human to join (not an orphan). Only when
@@ -445,12 +481,14 @@ class LobbyServer:
         server.register_session(session)  # start receiving this game's broadcasts (WP65)
         return player_id
 
-    def _resume(self, session: Session, game_id: int) -> int:
-        """Re-bind a session to an account's existing seat (no new `JoinGame`)."""
+    async def _resume(self, session: Session, game_id: int) -> int:
+        """Re-bind an existing seat, repairing a stale binding through `JoinGame`."""
         server = self._open_game(game_id)
         existing = self._accounts.binding(session.account_id, game_id)  # type: ignore[arg-type]
         if existing is None:
             raise RpcError(ERR_AUTH, "no seat in that game — join it first")
+        if existing not in server.service.state.players:
+            await server.submit(existing, JoinGame())
         session.game_id, session.player_id = game_id, existing
         server.register_session(session)  # resume receiving this game's broadcasts (WP65)
         return existing
@@ -547,12 +585,16 @@ async def _amain(args: argparse.Namespace) -> None:
 
     config = load_default_config()
     if args.accounts:  # lobby mode: accounts + multi-game hosting (WP64)
+        accounts_path = Path(args.accounts)
+        accounts_path.parent.mkdir(parents=True, exist_ok=True)
         games_dir = Path(args.games_dir)
         games_dir.mkdir(parents=True, exist_ok=True)
         server: GameServer | LobbyServer = LobbyServer(
-            AccountStore(args.accounts), config, games_dir)
+            AccountStore(accounts_path), config, games_dir,
+            sysop_password=args.sysop_password)
         ws_server = await server.serve(args.host, args.port)
-        log.info("edge-server lobby on ws://%s:%d (accounts=%s)", args.host, args.port, args.accounts)
+        log.info("edge-server lobby on ws://%s:%d (accounts=%s)",
+                 args.host, args.port, accounts_path)
     else:  # single-game dev path (WP63): insecure seat, no accounts
         server = GameServer(_build_game(Path(args.game), config, args.seed),
                             insecure_player=args.insecure_player)
@@ -564,21 +606,40 @@ async def _amain(args: argparse.Namespace) -> None:
         await server.aclose()
 
 
-def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse server launch settings, including default storage and operator-secret sources."""
     parser = argparse.ArgumentParser(prog="edge-server", description="Host an Edge game over websockets.")
-    parser.add_argument("--game", help="single-game dev mode: path to the game .db (created if absent)")
-    parser.add_argument("--accounts", help="lobby mode: path to the accounts.db (enables auth + multi-game)")
-    parser.add_argument("--games-dir", default="games", help="lobby mode: directory for game .db files")
+    server_dir = Path.home() / ".edge" / "server"
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--game", help="single-game dev mode: path to the game .db")
+    mode.add_argument("--accounts", help="lobby accounts DB (default ~/.edge/server/accounts.db)")
+    parser.add_argument("--games-dir", default=str(server_dir / "games"),
+                        help="lobby game DB directory (default ~/.edge/server/games)")
+    parser.add_argument("--sysop-password",
+                        help="operator secret (default $EDGE_SYSOP_PASSWORD, then ./.env)")
+    parser.add_argument("--env-file", type=Path,
+                        help="dotenv file for EDGE_SYSOP_PASSWORD (default: ./.env)")
     parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--seed", type=int, default=0, help="seed for a fresh single-game")
     parser.add_argument("--insecure-player", type=int, default=1,
                         help="single-game dev: seat every hello binds to (lobby mode uses tokens)")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if not args.accounts and not args.game:
-        parser.error("pass --game (dev) or --accounts (lobby)")
-    asyncio.run(_amain(args))
+        args.accounts = str(server_dir / "accounts.db")
+    if args.accounts:
+        args.sysop_password = load_sysop_password(
+            args.sysop_password, dotenv_path=args.env_file,
+        )
+        if not args.sysop_password:
+            parser.error("set --sysop-password, export EDGE_SYSOP_PASSWORD, or put "
+                         "EDGE_SYSOP_PASSWORD in ./.env (or pass --env-file)")
+    return args
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(_amain(_parse_args()))
 
 
 if __name__ == "__main__":  # pragma: no cover
