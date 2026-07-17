@@ -14,12 +14,14 @@ sightsee what the pilot did).
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import TextIO
 
 from rich.markup import escape
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Footer, Header, Input, RichLog, Static
 
@@ -31,8 +33,7 @@ class LLMBotApp(App[None]):
 
     TITLE = "Edge of the Unknown — LLM pilot"
     BINDINGS = [
-        ("ctrl+s", "start_bot", "Start"),
-        ("ctrl+x", "stop_bot", "Stop"),
+        Binding("ctrl+s", "toggle_bot", "Start"),
         ("ctrl+q", "quit", "Quit"),
     ]
     CSS = """
@@ -55,7 +56,8 @@ class LLMBotApp(App[None]):
         self._brain = brain
         self._brain.emit = self._emit_from_worker
         self._log_path = log_file
-        self._log: TextIO | None = None
+        self._log_handle: TextIO | None = None
+        self._pilot_active = brain.running
 
     # --- layout -----------------------------------------------------------------
 
@@ -72,49 +74,80 @@ class LLMBotApp(App[None]):
             yield Static("awaiting first status readout…", id="ship-status")
             yield RichLog(id="chat", wrap=True, markup=True, auto_scroll=True)
             with Horizontal(id="controls"):
-                yield Button("▶ Start", id="start", variant="success")
-                yield Button("■ Stop", id="stop", variant="error")
+                if self._pilot_active:
+                    yield Button("■ Stop", id="run-toggle", variant="error")
+                else:
+                    yield Button("▶ Start", id="run-toggle", variant="success")
                 yield Input(placeholder="Instruct the pilot… (Enter to send)", id="chat-input")
-                yield Static("stopped", id="run-state")
+                yield Static("running" if self._pilot_active else "stopped", id="run-state")
         yield Footer()
 
     def on_mount(self) -> None:
         if self._log_path is not None:
-            self._log = self._log_path.open("a", encoding="utf-8")
-            self._log.write(f"\n=== pilot session {datetime.now():%Y-%m-%d %H:%M:%S} — "
-                            f"model {self._brain.llm.model} ===\n")
-            self._log.flush()
+            self._log_handle = self._log_path.open("a", encoding="utf-8")
+            self._log_handle.write(f"\n=== pilot session {datetime.now():%Y-%m-%d %H:%M:%S} — "
+                                   f"model {self._brain.llm.model} ===\n")
+            self._log_handle.flush()
         chat = self.query_one("#chat", RichLog)
         chat.write("[bold]Operator channel.[/bold] Type instructions below; "
-                   "▶ Start launches the pilot, ■ Stop pauses it (resume with Start).")
+                   "Ctrl-S toggles ▶ Start / ■ Stop to run or pause the pilot.")
+        self._set_run_control(self._pilot_active)
 
     def on_unmount(self) -> None:
         self._brain.request_stop()
-        if self._log is not None:
-            self._log.close()
+        if self._log_handle is not None:
+            self._log_handle.close()
 
     # --- controls -----------------------------------------------------------------
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "start":
-            self.action_start_bot()
-        elif event.button.id == "stop":
+        if event.button.id == "run-toggle":
+            self.action_toggle_bot()
+
+    def action_toggle_bot(self) -> None:
+        """Start or stop the pilot according to the control's current state."""
+        if self._pilot_active:
             self.action_stop_bot()
+        else:
+            self.action_start_bot()
 
     def action_start_bot(self) -> None:
         if self._brain.running:
             self._chat_note("pilot is already running")
+            self._set_run_control(True)
             return
-        self.query_one("#run-state", Static).update("[green]running[/green]")
+        self._set_run_control(True)
         self.run_worker(self._brain.run, thread=True, exclusive=True, group="brain",
                         exit_on_error=False)
 
     def action_stop_bot(self) -> None:
         if not self._brain.running:
             self._chat_note("pilot is not running")
+            self._set_run_control(False)
             return
         self._brain.request_stop()
         self._chat_note("stop requested — finishing the current cycle…")
+
+    def _set_run_control(self, active: bool) -> None:
+        """Keep the shared button and Ctrl-S footer label in sync with pilot state."""
+        self._pilot_active = active
+        label = "Stop" if active else "Start"
+        button = self.query_one("#run-toggle", Button)
+        button.label = f"■ {label}" if active else f"▶ {label}"
+        button.variant = "error" if active else "success"
+        self.query_one("#run-state", Static).update(
+            "[green]running[/green]" if active else "[red]stopped[/red]"
+        )
+
+        # Textual bindings are immutable values; replace the toggle binding so Footer
+        # advertises what Ctrl-S will do *now*, while the action and key stay fixed.
+        bindings = self._bindings.key_to_bindings.get("ctrl+s", [])
+        self._bindings.key_to_bindings["ctrl+s"] = [
+            replace(binding, description=label)
+            if binding.action == "toggle_bot" else binding
+            for binding in bindings
+        ]
+        self.refresh_bindings()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
@@ -156,7 +189,7 @@ class LLMBotApp(App[None]):
         else:  # status
             self._record_line("status", f"{prefix} [yellow]{text}[/yellow]", "#chat")
             if record.text == "pilot stopped":
-                self.query_one("#run-state", Static).update("[red]stopped[/red]")
+                self._set_run_control(False)
         self._write_log(record.kind.upper(), record.text, stamp=record.stamp)
 
     def _record_line(self, kind: str, markup: str, pane: str, *, log: bool = True) -> None:
@@ -166,8 +199,8 @@ class LLMBotApp(App[None]):
         self.query_one("#chat", RichLog).write(f"[dim]{text}[/dim]")
 
     def _write_log(self, kind: str, text: str, *, stamp: float | None = None) -> None:
-        if self._log is None:
+        if self._log_handle is None:
             return
         when = datetime.fromtimestamp(stamp) if stamp else datetime.now()
-        self._log.write(f"[{when:%H:%M:%S}] {kind:<9} {text}\n")
-        self._log.flush()
+        self._log_handle.write(f"[{when:%H:%M:%S}] {kind:<9} {text}\n")
+        self._log_handle.flush()
