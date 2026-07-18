@@ -50,9 +50,12 @@ range, raking fire down a ship's axis, fighter screens.
 - **Facing is armor and armament** — spinal guns bear dead ahead only, `ahead`
   arcs a forward wedge, turret arrays all round. Hits land on the aspect they
   arrive from: dead ahead/astern are **rakes** (config `raking_bonus`); screens
-  ablate per quadrant; once a quadrant is open, hits can knock out the
-  components homed there (fore: main gun + sensors, aft: drive, flanks:
-  launchers) — the engine-room localized-damage idea projected onto facings.
+  are **ablative shields** that soak damage before the hull, per quadrant; once
+  a quadrant is open, hits can knock out the components homed there (fore: main
+  gun + sensors, aft: drive, flanks: launchers, plus a `shield_<quad>`
+  **generator** behind each facing) — the engine-room localized-damage idea
+  projected onto facings. Knocking out a facing's shield generator stops that
+  facing's screen from regenerating until damage control restores it.
 - **Missile salvos** are board objects (`Salvo`) that chase their target a few
   cells per owner-turn until endurance runs out; each bird rolls to hit on
   arrival, degraded by target speed. Fighters alongside a salvo can intercept.
@@ -138,7 +141,10 @@ range, raking fire down a ship's axis, fighter screens.
     press it or lose it.
   - **Sidewall regeneration** — screens rebuild `screen_regen` (3) per
     quadrant per own turn, but only if the hull took no damage since the last
-    own turn. Standing off to let the generators catch up is a real tactic.
+    own turn **and** that facing's `shield_<quad>` generator is still online.
+    Standing off to let the generators catch up is a real tactic; knocking an
+    enemy's generator out (a hull hit to an already-open quadrant) leaves that
+    facing permanently exposed until they spend a turn on damage control.
   - **Damage-control parties** — `u` spends the whole turn to bring one
     knocked-out component back online (the bot does this too when out of gun
     range with systems down).
@@ -151,7 +157,6 @@ range, raking fire down a ship's axis, fighter screens.
 ## POC simplifications (knowingly cheap)
 
 - Recovering a battered wing rearms it to full strength (free repair).
-- Screens don't regenerate; no per-turn power management.
 - The bot never lays mines mid-fight and ignores player mines (it can blunder
   into them — that's the payoff for seeding lanes).
 - One piece per cell; ship collisions are prevented by sheering off (velocity

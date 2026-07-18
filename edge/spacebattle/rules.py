@@ -572,6 +572,8 @@ def begin_turn(b: Battle, side: Side, *, first: bool = False) -> None:
                       friendly=side == "player")
         if regen > 0 and not first and not s.hull_hit:
             for q, cap in s.cls.screens.items():
+                if f"shield_{q}" in s.down:
+                    continue  # that facing's shield generator is knocked out
                 if s.screens.get(q, 0) < cap:
                     s.screens[q] = min(cap, s.screens.get(q, 0) + regen)
         s.hull_hit = False
