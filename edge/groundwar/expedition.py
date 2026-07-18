@@ -456,29 +456,41 @@ def do_move(exp: Expedition, x: int, y: int) -> bool:
     return True
 
 
+def dig_trench(exp: Expedition) -> list[Vec]:
+    """The cells a dig from the explorer's stand opens (a disc, dig_radius)."""
+    r = exp.config.expedition.dig_radius
+    p = exp.explorer
+    return [(p.x + dx, p.y + dy)
+            for dy in range(-r, r + 1) for dx in range(-r, r + 1)
+            if dx * dx + dy * dy <= r * r and exp.in_bounds(p.x + dx, p.y + dy)]
+
+
 def do_dig(exp: Expedition) -> Site | None:
-    """Excavate the cell underfoot. The payoff only lands on the exact spot;
-    re-digging a spent hole is free — you notice, and don't."""
+    """Open a trench around where you stand; a site anywhere inside it pays
+    off. Re-digging fully spent ground is free — you notice, and don't."""
     if exp.outcome is not None:
         return None
     p = exp.explorer
-    if (p.x, p.y) in exp.dug:
+    trench = dig_trench(exp)
+    if all(c in exp.dug for c in trench):
         exp.log("info", "You already turned this ground over — nothing here.")
         return None
-    site = exp.site_at(p.x, p.y)
-    if site is not None and not site.found:
+    exp.dug.update(trench)
+    hits = [s for s in exp.unfound() if (s.x, s.y) in set(trench)]
+    if hits:
+        site = min(hits, key=lambda s: dist(p.x, p.y, s.x, s.y))
         site.found = True
         exp.log("find", f"Your spade rings on worked stone — {site.name}!",
-                p.x, p.y)
+                site.x, site.y)
         if not exp.unfound():
             exp.outcome = "complete"
             exp.log("outcome", "Every sensor contact resolved. A survey to be "
                                "proud of.", friendly=True)
         return site
-    exp.dug.add((p.x, p.y))
     _spend(exp, exp.config.expedition.dig_cost)
     if exp.outcome is None:
-        exp.log("info", "Nothing but soil and stones.", p.x, p.y)
+        exp.log("dig", "You open a trench: nothing but soil and stones.",
+                p.x, p.y)
     return None
 
 
