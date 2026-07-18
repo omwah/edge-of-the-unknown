@@ -451,7 +451,7 @@ when columns are folded at 80×24."""
             for i, entry in enumerate(self._messages.events)])
 
         self._dt("codex-table").set_rows([
-            (str(i), (c.name, c.kind, c.location, c.rarity, c.detail))
+            (str(i), (c.name, c.kind, c.location, c.rarity.title(), c.detail))
             for i, c in enumerate(self._computer.codex)])
 
         lead_rows = []

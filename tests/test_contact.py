@@ -551,6 +551,7 @@ def test_computer_codex_lists_logged_finds_richest_first() -> None:
     ranks = [RarityTier[e.rarity].value for e in cv.codex]
     assert ranks == sorted(ranks, reverse=True)  # richest first
     assert all(e.location for e in cv.codex)
+    assert all("·" not in e.kind and e.kind for e in cv.codex)
 
 
 # --- replay / golden master ------------------------------------------------------
