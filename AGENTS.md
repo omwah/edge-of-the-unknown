@@ -146,6 +146,19 @@ update **both** of those in the same change (and DESIGN.md §6.7/§13 as above) 
 the on-disk instructions stay correct and complete enough to author and validate
 a corpus.
 
+**Keep the sector-scene note in sync.** `docs/SECTOR_SCENE_COMPOSITION.md` is the
+authoritative note for the TUI arrival view (`edge/tui/widgets.py` →
+`_SceneComposer` / `SectorScene`) and the docked station headers
+(`edge/tui/station_art.py` → `StationArtRow` / `station_icon_dimensions`): the
+scale chain off the rendered primary body, the per-kind station caps and their
+non-saturation rule (`SceneArtConfig.station_dimensions`, `config/default.yaml
+→ scene:`), placement/occupancy/labels, determinism seeds, and the
+`sector_station_reference` publish/guard seam. Read it before touching scene
+composition, station sizing, or the `scene:` config block; when you change any
+of those, update the doc's rules *and* shipped numbers in the same change —
+its §2 cap rule exists because a stale cap once silently froze station
+responsiveness.
+
 ## Reference code (read-only)
 
 `references/` contains shallow clones of the analyzed codebases (recreate
