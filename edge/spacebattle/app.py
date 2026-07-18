@@ -340,6 +340,7 @@ behind it, through the perimeter, is the whole battle.\
         ("Enter", "place the selected ship at the cursor"),
         ("x", "pick the ship under the cursor back up"),
         ("u", "undo the last ship placement"),
+        ("y", "toggle the enemy threat overlay (their gun arcs)"),
         ("Space", "done — you are committed"),
         ("q", "abort back to setup"),
     ]
@@ -359,6 +360,7 @@ behind it, through the perimeter, is the whole battle.\
         ("c", "fire the grav lance at the cursor (refit only; whole turn, knife range)"),
         ("p", "launch a recon drone at the cursor (reveals mines around it)"),
         ("u", "damage control — whole turn, restores one knocked-out component"),
+        ("y", "toggle the enemy threat overlay (their gun arcs, dark red)"),
         ("m / Enter", "wing: dash to the cursor"),
         ("g", "wing: strafe/dogfight the target under the cursor"),
         ("e", "wing: intercept the salvo under the cursor"),
@@ -391,6 +393,7 @@ behind it, through the perimeter, is the whole battle.\
         self.deploy_idx = 0
         self.place_order: list[DeployShip] = []
         self.selected: Ship | FighterWing | None = None
+        self.show_threat = False  # enemy gun-arc threat overlay (T toggles)
         self.flashes: dict[tuple[int, int], tuple[str, float]] = {}
         # Main-game PortGenerator starbase art, rasterized once per station.
         self._station_art_cache: dict[int, list[tuple[int, int, str, str]]] = {}
@@ -577,15 +580,37 @@ behind it, through the perimeter, is the whole battle.\
                                   "black on green" if ok else "white on red")
         return out
 
+    def _threat_tints(self) -> dict[tuple[int, int], str]:
+        """Every cell an alive enemy gun currently bears on (arc + range) — the
+        mirror of the player's own selected-ship range tint, unioned over the
+        whole hostile force, including the all-round starbase battery."""
+        b = self.battle
+        out: dict[tuple[int, int], str] = {}
+        for s in b.fleet("enemy"):
+            if not s.gun_ok:
+                continue
+            rng = s.cls.main_gun.range
+            for dx in range(-rng, rng + 1):
+                for dy in range(-rng, rng + 1):
+                    x, y = s.x + dx, s.y + dy
+                    if (dx or dy) and b.in_bounds(x, y) and \
+                            rules.dist(s.x, s.y, x, y) <= rng and \
+                            rules.arc_ok(s, x, y):
+                        out[(x, y)] = "on #3a1414"
+        return out
+
     def cell_tints(self) -> dict[tuple[int, int], str]:
-        """Background tints per placement cell: zones, ranges, wing reach — with
-        the rock wash applied last so debris always keeps its regolith ground."""
+        """Background tints per placement cell: zones, ranges, wing reach, the
+        optional enemy-threat overlay — with the rock wash applied last so
+        debris always keeps its regolith ground."""
         tints: dict[tuple[int, int], str] = {}
         b = self.battle
         if self.deploying:
             for y in range(self.config.height):
                 for x in range(self._zone_max_x() + 1):
                     tints[(x, y)] = "on grey11"
+            if self.show_threat:
+                tints.update(self._threat_tints())
             tints.update(dict.fromkeys(b.rocks, ROCK_BG))
             tints.update(dict.fromkeys(b.debris, DEBRIS_BG))
             return tints
@@ -606,6 +631,8 @@ behind it, through the perimeter, is the whole battle.\
                     x, y = sel.x + dx, sel.y + dy
                     if (dx or dy) and b.in_bounds(x, y):
                         tints[(x, y)] = "on grey15"
+        if self.show_threat:
+            tints.update(self._threat_tints())
         tints.update(dict.fromkeys(b.rocks, ROCK_BG))
         tints.update(dict.fromkeys(b.debris, DEBRIS_BG))
         return tints
@@ -771,6 +798,8 @@ behind it, through the perimeter, is the whole battle.\
             line("v launch · o recover · g strafe", "grey66")
             line("c lance · p drone · u dmg-ctl", "grey66")
             line("e intercept · space end turn", "grey66")
+            line(f"y enemy threat overlay: {'ON' if self.show_threat else 'off'}",
+                 "bold bright_red" if self.show_threat else "grey66")
         return out
 
     def _mine_stock(self) -> int:
@@ -807,6 +836,11 @@ behind it, through the perimeter, is the whole battle.\
                                     self.cur_x + (view.cam_x - old_x) // cfg.cell_w))
             self.cur_y = max(0, min(cfg.height - 1,
                                     self.cur_y + (view.cam_y - old_y) // cfg.cell_h))
+            self.refresh_ui()
+            event.stop()
+            return
+        if event.key == "y":  # works in every mode; enemies exist on warp-in too
+            self.show_threat = not self.show_threat
             self.refresh_ui()
             event.stop()
             return
