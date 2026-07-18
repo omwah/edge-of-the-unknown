@@ -7,7 +7,7 @@ focus to the invoking widget when it closes, and fit inside an 80×24 terminal.
 
 from __future__ import annotations
 
-from textual.widgets import Input, Static
+from textual.widgets import Button, Input, Static
 
 from edge.tui.app import EdgeApp
 from edge.tui.chrome import AmountPrompt, FieldPrompt, TextPrompt
@@ -85,6 +85,9 @@ async def test_corp_charter_submits_via_button_and_validates() -> None:
         await pilot.pause()
         app.push_screen(_FormCorpModal(), results.append)
         await pilot.pause()
+        # Make the Button's cosmetic debounce deterministic: validation must re-arm the
+        # control rather than forcing the player to wait for this animation to expire.
+        app.screen.query_one("#field-submit", Button).active_effect_duration = 60
         await pilot.click("#field-submit")  # empty — must not dismiss
         await pilot.pause()
         assert isinstance(app.screen, _FormCorpModal)

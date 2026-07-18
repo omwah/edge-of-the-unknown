@@ -8,6 +8,7 @@ big bang and the rules engine take a `GameConfig` object, never a path.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -60,7 +61,11 @@ def _merge_dialogue(roster: dict[str, Any], dialogue: dict[str, Any]) -> None:
         species.setdefault("dialogue_pack", {}).update(pack)
 
 
-def load_config(path: Path | str) -> GameConfig:
+def load_config(
+    path: Path | str,
+    *,
+    dialogue_files: Sequence[Path | str] | None = None,
+) -> GameConfig:
     """Load and validate a YAML game config from `path`.
 
     A `roster_file:` pointer (relative to the config's directory) is resolved here —
@@ -71,8 +76,11 @@ def load_config(path: Path | str) -> GameConfig:
     may be a **single path or a list** of paths, applied in order: a base file supplies the
     `personas` / `recency_k` / shared `grammar`, and any later file may add a
     `species_grammars` block (an authoring-pipeline sidecar) that layers per-species grammar
-    overrides on top. All pointers are read at this I/O seam and injected as the `roster`
-    field; core never touches the filesystem.
+    overrides on top. Callers that need a deliberately pinned corpus (for example, a
+    persona-fallback unit test) may pass `dialogue_files`; those paths replace the config's
+    `dialogue_file` value and remain explicit rather than depending on ambient process state.
+    All pointers are read at this I/O seam and injected as the `roster` field; core never
+    touches the filesystem.
     """
     path = Path(path)
     with open(path, encoding="utf-8") as fh:
@@ -81,13 +89,12 @@ def load_config(path: Path | str) -> GameConfig:
     if roster_file is not None and "roster" not in data:
         with open(path.parent / roster_file, encoding="utf-8") as fh:
             data["roster"] = yaml.safe_load(fh)
-    dialogue_file = data.pop("dialogue_file", None)
+    configured_dialogue = data.pop("dialogue_file", None)
+    dialogue_file: Sequence[Path | str] | Path | str | None = (
+        dialogue_files if dialogue_files is not None else configured_dialogue
+    )
     if dialogue_file is not None and isinstance(data.get("roster"), dict):
-        files = [dialogue_file] if isinstance(dialogue_file, str) else dialogue_file
-        import os
-        import sys
-        if "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ:
-            files = [f for f in files if "alien_dialogue_default.yaml" in str(f)]
+        files = [dialogue_file] if isinstance(dialogue_file, (str, Path)) else dialogue_file
         for name in files:
             with open(path.parent / name, encoding="utf-8") as fh:
                 _merge_dialogue(data["roster"], yaml.safe_load(fh) or {})
@@ -103,9 +110,12 @@ def load_config(path: Path | str) -> GameConfig:
     return config
 
 
-def load_default_config() -> GameConfig:
+def load_default_config(
+    *,
+    dialogue_files: Sequence[Path | str] | None = None,
+) -> GameConfig:
     """Load the bundled default config (`config/default.yaml`)."""
-    return load_config(DEFAULT_CONFIG_PATH)
+    return load_config(DEFAULT_CONFIG_PATH, dialogue_files=dialogue_files)
 
 
 def load_config_with_sidecar(

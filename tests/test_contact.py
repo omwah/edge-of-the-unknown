@@ -40,6 +40,9 @@ from helpers import generate_with_player
 
 CFG = load_default_config()
 SMALL = CFG.model_copy(update={"bigbang": CFG.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1})})
+BRANCH_CFG = load_default_config(dialogue_files=("alien_dialogue_default.yaml",))
+BRANCH_SMALL = BRANCH_CFG.model_copy(update={
+    "bigbang": BRANCH_CFG.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1})})
 _CREATED = "2026-06-18T00:00:00Z"
 
 
@@ -189,11 +192,11 @@ def test_every_reachable_peaceful_context_speaks() -> None:
 def test_contact_view_exposes_branch_choices_and_plain_node_falls_back() -> None:
     state = _world()
     vesk = _inject(state, "vesk")  # serial_formal persona authors greeting choices
-    view = session.contact_view(state, 1, vesk.id, CFG)
+    view = session.contact_view(state, 1, vesk.id, BRANCH_CFG)
     assert view.choices and view.choices[0].next_context == "branch.vesk_workshop"
     # A species whose persona authors no choices falls back to the generic baseline menu.
     terran = _inject(state, "terran", sid=2)
-    choices = session.contact_view(state, 1, terran.id, CFG).choices
+    choices = session.contact_view(state, 1, terran.id, BRANCH_CFG).choices
     assert len(choices) > 0
     assert any(c.next_context == "dossier_other" for c in choices)
 
@@ -201,12 +204,14 @@ def test_contact_view_exposes_branch_choices_and_plain_node_falls_back() -> None
 def test_converse_choice_transitions_to_branch_node() -> None:
     state = _world()
     vesk = _inject(state, "vesk")
-    res = reduce(state, 1, Converse(vesk.id, "greeting", choice_index=0), CFG)
+    res = reduce(state, 1, Converse(vesk.id, "greeting", choice_index=0), BRANCH_CFG)
     apply_result(state, res)
     assert res.events[0].context == "branch.vesk_workshop"  # transitioned to the target node
     assert state.players[1].dialogue_recency[(instance_key(vesk), "branch.vesk_workshop")]  # spoken
     # The branch node then exposes its own replies (a trade gateway + a parting line).
-    view = session.contact_view(state, 1, vesk.id, CFG, active_context="branch.vesk_workshop")
+    view = session.contact_view(
+        state, 1, vesk.id, BRANCH_CFG, active_context="branch.vesk_workshop"
+    )
     actions = {c.action for c in view.choices}
     assert "trade" in actions and "leave" in actions
 
@@ -214,7 +219,9 @@ def test_converse_choice_transitions_to_branch_node() -> None:
 def test_converse_choice_leave_action_speaks_parting_line() -> None:
     state = _world()
     vesk = _inject(state, "vesk")
-    res = reduce(state, 1, Converse(vesk.id, "greeting", choice_index=1), CFG)  # "Safe travels."
+    res = reduce(
+        state, 1, Converse(vesk.id, "greeting", choice_index=1), BRANCH_CFG
+    )  # "Safe travels."
     assert res.events[0].context == "farewell"
 
 
@@ -233,11 +240,11 @@ def test_converse_choice_accept_lead_respects_next_context() -> None:
     state.species_knowledge[vesk.roster_id] = (ref,)
 
     # Inject a custom choice with accept_lead action and next_context
-    data = CFG.roster.model_dump()
+    data = BRANCH_CFG.roster.model_dump()
     data["personas"]["serial_formal"]["greeting"] = [
         {"variants": ["Hello"], "choices": [{"text": "Log coordinates", "action": "accept_lead", "next_context": "greeting"}]}
     ]
-    cfg = CFG.model_copy(update={"roster": RosterConfig.model_validate(data)})
+    cfg = BRANCH_CFG.model_copy(update={"roster": RosterConfig.model_validate(data)})
 
     res = reduce(state, 1, Converse(vesk.id, "greeting", choice_index=0), cfg)
     assert len(res.events) == 2
@@ -254,17 +261,17 @@ def test_converse_choice_rejects_bad_index_and_choiceless_node() -> None:
     state = _world()
     vesk = _inject(state, "vesk")
     with pytest.raises(EconomyError):  # out of range
-        reduce(state, 1, Converse(vesk.id, "greeting", choice_index=9), CFG)
+        reduce(state, 1, Converse(vesk.id, "greeting", choice_index=9), BRANCH_CFG)
     with pytest.raises(EconomyError):  # farewell carries no choices
-        reduce(state, 1, Converse(vesk.id, "farewell", choice_index=0), CFG)
+        reduce(state, 1, Converse(vesk.id, "farewell", choice_index=0), BRANCH_CFG)
 
 
 def _cfg_with_attack_choice() -> object:
     """A config whose Vesk workshop node also offers an `attack` reply (live since WP70)."""
-    data = CFG.roster.model_dump()
+    data = BRANCH_CFG.roster.model_dump()
     data["personas"]["serial_formal"]["branch.vesk_workshop"][0]["choices"].append(
         {"text": "Draw weapons.", "action": "attack"})
-    return CFG.model_copy(update={"roster": RosterConfig.model_validate(data)})
+    return BRANCH_CFG.model_copy(update={"roster": RosterConfig.model_validate(data)})
 
 
 def test_converse_choice_attack_is_core_gated() -> None:
@@ -301,7 +308,9 @@ def test_converse_choice_attack_opens_combat_outside_the_core() -> None:
 
 def test_converse_choice_chain_replays_into_identical_state(tmp_path: Path) -> None:
     """Hail → greeting choice → branch farewell choice reloads identically (no Player drift)."""
-    svc = GameService.new_game(SMALL, 3, SqliteRepository(tmp_path / "branch.db"), created_at=_CREATED)  # type: ignore[arg-type]
+    svc = GameService.new_game(
+        BRANCH_SMALL, 3, SqliteRepository(tmp_path / "branch.db"), created_at=_CREATED
+    )  # type: ignore[arg-type]
     found = _reachable_species_of(svc.state, "vesk")
     if found is None:
         pytest.skip("no reachable Vesk in this seed")
@@ -314,7 +323,9 @@ def test_converse_choice_chain_replays_into_identical_state(tmp_path: Path) -> N
     expected = state_hash(svc.state)
     assert svc.state.players[1].dialogue_recency[(instance_key(sp), "branch.vesk_workshop")]
 
-    reloaded = GameService.load_game(SMALL, SqliteRepository(tmp_path / "branch.db"))  # type: ignore[arg-type]
+    reloaded = GameService.load_game(
+        BRANCH_SMALL, SqliteRepository(tmp_path / "branch.db")
+    )  # type: ignore[arg-type]
     assert state_hash(reloaded.state) == expected
 
 
@@ -411,8 +422,8 @@ def test_buy_rejects_a_barter_only_offer() -> None:
 # --- projection ------------------------------------------------------------------
 
 def test_contact_view_renders_opener_choices_and_offers() -> None:
-    # Selvani (reserved_honest) authors no greeting replies of its own, so the menu falls back to
-    # the generic persona's `start_context` baseline (§6.7) — the whole menu is authored choices.
+    # The shipped Selvani species pack owns this menu; projection must expose those authored
+    # replies rather than the now-shadowed generic fallback.
     state = _world()
     sp = _inject(state, "selvani")
     apply_result(state, reduce(state, 1, Hail(sp.id), CFG))
@@ -420,33 +431,30 @@ def test_contact_view_renders_opener_choices_and_offers() -> None:
     assert view.species == "Selvani" and view.opener
     actions = {c.action for c in view.choices if c.action}
     nexts = {c.next_context for c in view.choices if c.next_context}
-    assert {"trade", "barter", "leave"} <= actions
-    assert {"dossier_other", "offer_coordinates", "treaty_offer"} <= nexts
-    # Attack (the old FIGHT verb) is authored but greyed in Phase 2, with a reason.
-    attack = next(c for c in view.choices if c.action == "attack")
-    assert not attack.enabled and attack.reason
+    assert {"trade", "leave"} <= actions
+    assert {"branch.exploration", "dossier_other", "offer_coordinates"} <= nexts
     assert view.offers and all(o.label for o in view.offers)
 
 
 def test_contact_view_uses_a_species_own_authored_replies_when_present() -> None:
-    # Vesk (serial_formal) authors its own greeting replies, so the menu is its branch, not the
-    # generic baseline — a pack's own choices override the fallback (§6.7).
+    # Vesk's shipped species pack shadows the serial_formal workshop greeting.
     state = _world()
     sp = _inject(state, "vesk")
     apply_result(state, reduce(state, 1, Hail(sp.id), CFG))
     view = session.contact_view(state, 1, sp.id, CFG)
     nexts = {c.next_context for c in view.choices if c.next_context}
-    assert any(n.startswith("branch.") for n in nexts)  # opens its workshop branch
+    assert {"trade_open", "treaty_offer", "dossier_other", "dossier_self"} <= nexts
+    assert not any(n.startswith("branch.vesk_workshop") for n in nexts)
 
 
 def test_contact_view_keeps_trade_live_for_a_refusing_trader() -> None:
-    # A `refuses` species no longer greys Trade out: the reply stays selectable and the screen
-    # routes an empty shelf to a spoken `trade_refuse` beat (§6.7).
+    # Dacaran authors the refusal as a selectable dialogue transition rather than a generic
+    # trade action; the full shipped corpus must keep that route live.
     state = _world()
     sp = _inject(state, "dacaran")  # trade_posture: refuses
     view = session.contact_view(state, 1, sp.id, CFG)
-    trade = next(c for c in view.choices if c.action == "trade")
-    assert trade.enabled
+    trade = next(c for c in view.choices if c.next_context == "trade_refuse")
+    assert trade.enabled and not trade.action
     assert not any(o.mode == "latinum" and o.available for o in view.offers)  # nothing to sell
 
 

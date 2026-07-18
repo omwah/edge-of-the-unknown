@@ -23,7 +23,9 @@ SMALL = CFG.model_copy(
 
 
 def _service() -> PlaytestService:
-    return PlaytestService(SMALL, seed=3)
+    # Several tests inject dialogue nodes. Pydantic's default model_copy is shallow, so handing
+    # the module-level config through directly leaks those mutations into later shuffled tests.
+    return PlaytestService(SMALL.model_copy(deep=True), seed=3)
 
 
 def test_injects_one_instance_per_roster_species() -> None:
@@ -52,12 +54,18 @@ def test_contact_view_resolves_for_every_species_and_band() -> None:
 
 
 def test_force_enable_makes_every_reply_selectable() -> None:
+    from edge.core.config import DialogueChoice, DialogueLine
+
     svc = _service()
     svc.band = "friendly"
-    # A species on the generic baseline menu carries Phase-2 disabled replies (Treaty / Attack),
-    # proving there is something for the toggle to flip. (Vesk authors its own enabled-only menu.)
-    svc.current = next(sid for sid in svc.species_ids
-                       if svc.state.species[sid].roster_id != "vesk")
+    # The shipped species packs own their greeting menus. Inject one explicitly gated reply
+    # into that winning pack rather than relying on an unreachable persona fallback.
+    roster_id = svc.state.species[svc.current].roster_id
+    pack = svc._config.roster.species_by_id(roster_id).dialogue_pack
+    pack["greeting"] = [DialogueLine(
+        variants=["Test greeting"],
+        choices=[DialogueChoice(text="Fight", action="attack")],
+    )]
     plain = svc.contact_view(svc.pid, svc.current)
     assert any(not c.enabled for c in plain.choices)
     svc.toggle_force_enable()
@@ -252,9 +260,8 @@ def test_every_species_greets_an_enemy_in_its_own_voice() -> None:
     The chain never blends packs: a catch-all greeting claims the context outright, so
     `generic`'s standing-keyed openers are unreachable for any species whose own pack (or
     persona) speaks that beat. Without a hostile entry there, hostility is invisible in
-    conversation — the bug PT-41 reported. This exercises the persona layer, which is what the
-    test loader leaves in the chain (`edge/config.py` drops species sidecars under pytest);
-    `test_species_corpus_authors_a_hostile_greeting` covers the species packs themselves.
+    conversation — the bug PT-41 reported. The default loader includes the complete shipped
+    species chain here, exactly as it does in the game.
     """
     svc = _service()
     for sid in svc.species_ids:
@@ -271,22 +278,15 @@ def test_every_species_greets_an_enemy_in_its_own_voice() -> None:
 def test_species_corpus_authors_a_hostile_greeting() -> None:
     """Every species pack that claims `greeting` claims the hostile standing too (PT-41).
 
-    Read straight off disk: the shipped species corpus is spliced out of the roster under pytest
-    (`edge/config.py`), so the loaded chain cannot see it — but a species greeting entry shadows
-    both the persona and generic packs in the *real game*, which is where the bug bit.
+    Inspect the loaded default roster so this also proves the shipped sidecar reached the chain.
     """
-    import yaml
-
-    from edge.config import DEFAULT_CONFIG_PATH
-
-    path = DEFAULT_CONFIG_PATH.parent / "dialogue" / "alien_dialogue_species.yaml"
-    grammars = yaml.safe_load(path.read_text(encoding="utf-8"))["species_grammars"]
-    for species_id, pack in grammars.items():
-        greeting = pack.get("greeting")
+    assert CFG.roster is not None
+    for species in CFG.roster.species:
+        greeting = species.dialogue_pack.get("greeting")
         if not greeting:
             continue  # a pack that doesn't claim the beat falls through to its persona
-        standings = [(entry.get("when") or {}).get("standing") for entry in greeting]
-        assert "hostile" in standings, f"{species_id} greets an enemy as it greets a friend"
+        standings = [entry.when.standing if entry.when else None for entry in greeting]
+        assert "hostile" in standings, f"{species.id} greets an enemy as it greets a friend"
 
 
 async def test_clicking_outside_controls_dismisses_it() -> None:
@@ -329,9 +329,9 @@ async def test_empty_trade_speaks_a_refusal_beat() -> None:
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
-        # Baseline menu: 1 Ask about… / 2 coordinates / 3 Trade. Trade with nothing to sell ⇒ a
-        # spoken refusal, not a picker.
-        await pilot.press("3")
+        choice = next(c for c in app.screen._contact.choices
+                      if c.next_context == "trade_refuse")
+        await pilot.press(str(choice.index + 1))
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
         assert app.screen._active_context == "trade_refuse"
@@ -344,8 +344,9 @@ async def test_say_reply_records_history_and_b_backtracks() -> None:
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
         assert app.screen._history == ()
-        # Open subject picker (Ask about... is 1)
-        await pilot.press("1")
+        choice = next(c for c in app.screen._contact.choices
+                      if c.next_context == "dossier_other")
+        await pilot.press(str(choice.index + 1))
         await pilot.pause()
         # Click the first subject in the picker
         await pilot.click("SubjectPickerScreen ClickableEntry")
@@ -363,8 +364,9 @@ async def test_back_row_is_clickable() -> None:
     app = PlaytestApp(svc)
     async with app.run_test(size=(100, 34)) as pilot:
         await pilot.pause()
-        # Open subject picker (Ask about... is 1)
-        await pilot.press("1")
+        choice = next(c for c in app.screen._contact.choices
+                      if c.next_context == "dossier_other")
+        await pilot.press(str(choice.index + 1))
         await pilot.pause()
         # Click the first subject in the picker
         await pilot.click("SubjectPickerScreen ClickableEntry")
@@ -379,9 +381,9 @@ async def test_back_row_is_clickable() -> None:
 async def test_choice_targets_back_performs_backtrack() -> None:
     from edge.core.config import DialogueChoice, DialogueLine
     svc = _service()
-    # Inject a branching node and a choice targeting it under the current species' persona pack
-    persona = svc.state.species[svc.current].persona
-    pack = svc._config.roster.personas[persona]
+    # The species pack owns greeting in the shipped chain, so override that winning pack.
+    roster_id = svc.state.species[svc.current].roster_id
+    pack = svc._config.roster.species_by_id(roster_id).dialogue_pack
     
     # We will define a branch context: "branch.test_back"
     # Greeting will have a choice to go to "branch.test_back"
@@ -431,8 +433,8 @@ async def test_accept_lead_respects_next_context() -> None:
     svc = _service()
     svc.toggle_intel()
     svc.band = "friendly"
-    persona = svc.state.species[svc.current].persona
-    pack = svc._config.roster.personas[persona]
+    roster_id = svc.state.species[svc.current].roster_id
+    pack = svc._config.roster.species_by_id(roster_id).dialogue_pack
     
     # greeting will have a choice with action="accept_lead" and next_context="greeting"
     pack["greeting"] = [

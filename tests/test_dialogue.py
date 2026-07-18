@@ -30,6 +30,7 @@ from edge.core.models import AlienSpecies, ContactSession, Game, Player, Univers
 from edge.dialogue import facts as dialogue_facts
 
 CFG = load_default_config()
+BASE_CFG = load_default_config(dialogue_files=("alien_dialogue_default.yaml",))
 
 
 def _line(*variants: str, standing: str | None = None, treaty: bool | None = None,
@@ -351,7 +352,9 @@ def _terran_entity() -> AlienSpecies:
 
 
 def test_federation_member_greets_a_fellow_citizen_as_allied() -> None:
-    roster = CFG.roster
+    # Isolate the base persona's allied branch; the full species corpus owns its own
+    # Terran greeting and is exercised by the corpus/playtest suites.
+    roster = BASE_CFG.roster
     assert roster is not None
     terran = _terran_entity()
     member = Player(id=1, name="Cap", ship_id=1, latinum=0, alliance_id=1)  # fellow citizen
@@ -360,9 +363,9 @@ def test_federation_member_greets_a_fellow_citizen_as_allied() -> None:
     allied_markers = ("stands with you", "fellow citizen", "friendly flag")
 
     member_lines = {speak(roster, terran, member, "greeting",
-                          aliens=CFG.aliens, rng=random.Random(s))[0] for s in range(20)}
+                          aliens=BASE_CFG.aliens, rng=random.Random(s))[0] for s in range(20)}
     outsider_lines = {speak(roster, terran, outsider, "greeting",
-                            aliens=CFG.aliens, rng=random.Random(s))[0] for s in range(20)}
+                            aliens=BASE_CFG.aliens, rng=random.Random(s))[0] for s in range(20)}
 
     def has_kin_line(lines: set[str]) -> bool:
         return any(any(m in line for m in allied_markers) for line in lines)
