@@ -11,6 +11,7 @@ import yaml
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "spacebattle_default.yaml"
 
 Arc = Literal["spinal", "ahead", "all_round"]
+Side = Literal["player", "enemy"]
 Quadrant = Literal["fore", "aft", "port", "starboard"]
 QUADRANTS: tuple[Quadrant, ...] = ("fore", "aft", "port", "starboard")
 
@@ -112,6 +113,7 @@ class Scenario:
     rock_clusters: int
     rock_cluster_size: int
     station: str | None       # ship-class key of the defended starbase (siege scenarios)
+    station_side: Side        # who owns the station: "enemy" (siege) or "player" (defense)
     debris_clusters: int      # drifting-wreckage clumps (graveyard scenarios)
     debris_cluster_size: int
 
@@ -217,6 +219,7 @@ def load_config(path: Path | None = None) -> SpacebattleConfig:
                 rock_clusters=int(d.get("rock_clusters", 0)),
                 rock_cluster_size=int(d.get("rock_cluster_size", 0)),
                 station=str(d["station"]) if "station" in d else None,
+                station_side=str(d.get("station_side", "enemy")),  # type: ignore[arg-type]
                 debris_clusters=int(d.get("debris_clusters", 0)),
                 debris_cluster_size=int(d.get("debris_cluster_size", 0)),
             )

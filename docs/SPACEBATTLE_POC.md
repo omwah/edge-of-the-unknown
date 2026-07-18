@@ -28,7 +28,7 @@ range, raking fire down a ship's axis, fighter screens.
 | Enemy | **Heuristic bot** in `rules.py` |
 | Movement | **Vector-lite** — velocity persists; thrust bends it (small integers) |
 | Rotation | **Free 90° with a thrust**; rotating to any facing otherwise costs an action |
-| Fleets | **Duel + escorts** — frigate + corvette per side |
+| Fleets | **Player-composed** — a per-side Ship×count table at setup; any mix of the four hull types (frigate / scout marauder / battleship / imperial starship), 0–8 a side (player may be 0 only in Starbase defense) |
 | Naming | `edge/spacebattle`, `edge-spacebattle`, `config/spacebattle_default.yaml` |
 
 ## The mechanics
@@ -36,7 +36,7 @@ range, raking fire down a ship's axis, fighter screens.
 - **Placement cells** — the starfield is divided into coarse cells (7×3 chars);
   every asset occupies one cell. Sprites are a new middle-scale ANSI set
   (`sprites.py`): hulls up to 7×3 chars keyed to real ship-class ids
-  (`missile_frigate`, `scout_marauder`, `battleship`), authored at E/N and
+  (`missile_frigate`, `scout_marauder`, `battleship`, `imperial_starship`), authored at E/N and
   glyph-aware-mirrored to the four cardinal facings; fighters are 3-char darts
   (which keep all 8 headings — triangles read fine diagonally). This art is
   deliberately not constrained by the sector-view art — the big art may later be
@@ -113,7 +113,27 @@ range, raking fire down a ship's axis, fighter screens.
   goes dark — *taken* by boarding parties without razing the hull. Razing it
   also wins, but leaves nothing to claim. Either way the surviving picket
   scatters (`_check_outcome` resolves the siege objective first).
-- **Deployment** replaces the old deploy system, two interfaces per the brief:
+- **Starbase defense** (`orbital_platform` scenario; `station_side: player`;
+  added 2026-07-18) — the assault **in reverse**: the platform is the player's.
+  `rules.setup_defense` pre-places it near the friendly edge facing the incoming
+  fleet (reactor quadrant to the rear, so an attacker must fight past it to
+  board), then the player runs the **ordinary full deploy** for guard ships,
+  perimeter mines, and fighter pickets — with the base's own `mine_stock`/
+  `fighter_wings` folded into the deployable pool (`_deploy_stations`), but the
+  base itself is not player-placed. The assault fleet (headed by the
+  `imperial_starship`) warps in from the far edge on `Space`. `_check_outcome`
+  gains a symmetric player-station branch: **defeat** the instant the base is
+  razed **or** its reactor is knocked out (boarded), even with guard ships
+  alive; **victory** by destroying the whole attacking fleet.
+- **Setup screen** — a compact scrolling `OptionList` of scenarios (replacing
+  the old wall of per-scenario buttons) plus a `DataTable` fleet editor: one row
+  per hull type, a Player and an Enemy column, `−`/`+` on the focused cell to set
+  how many of each type a side fields (capped at 8). Highlighting a scenario
+  reloads its designed fleet as the starting composition. A side may be empty
+  (enemy 0 = a starbase alone; player 0 is allowed only in Starbase defense,
+  where the platform fights on its own).
+- **Deployment** replaces the old deploy system, two base interfaces (full
+  peacetime pass / warp-in) per the brief, threaded across the scenarios:
   - **Prepared defense** — full peacetime pass: place ships with facings, then
     seed the whole friendly zone with mines and pre-launched fighter screens
     *without moving a ship around*; then the enemy warps in on the far edge.
@@ -129,6 +149,10 @@ range, raking fire down a ship's axis, fighter screens.
     drifting wreckage (smash-through rules above).
   - **Starbase assault** — the warp-in interface against the fortified base
     and its perimeter (guards, pickets, hidden mine ring).
+  - **Starbase defense** — the prepared-defense interface around your own
+    pre-placed platform: deploy the guard screen, perimeter mines, and fighter
+    pickets (the base's stock included), then meet the assault. No placement of
+    the platform itself.
 
 - **The Basilisk kit** (*On Basilisk Station* interview, 2026-07-17) — four
   additions, one of them player-only:

@@ -104,8 +104,8 @@ ships:
     fighter_wings: 2
     mine_stock: 6
     recon_drones: 2
-  corvette:
-    label: Scout Corvette
+  scout_marauder:
+    label: Scout Marauder
     hull_art: scout_marauder
     hull_max: 70
     thrust: 3
@@ -142,6 +142,30 @@ ships:
       port: [launcher, shield_port]
       starboard: [launcher, shield_starboard]
     fighter_wings: 3
+    mine_stock: 0
+    recon_drones: 1
+  # The elite capital of the main-game roster (config/default.yaml → imperial_starship:
+  # shields 400, hull 350, spinal_railgun). Cast here as a SLOW JUGGERNAUT: the
+  # heaviest hull and screens and the hardest-hitting spinal gun on the board, but
+  # battleship-slow — a siege engine, not a fast flagship.
+  imperial_starship:
+    label: Imperial StarShip
+    hull_art: imperial_starship
+    hull_max: 300
+    thrust: 1
+    max_speed: 2
+    sensor_range: 9
+    main_gun: {damage: 52, range: 10, arc: spinal, accuracy: 0.80, falloff: 0.03}
+    salvos: 12
+    salvo_size: 5
+    missile: {damage: 8, speed: 3, endurance: 5, accuracy: 0.70}
+    screens: {fore: 56, aft: 38, port: 46, starboard: 46}
+    components:
+      fore: [main_gun, sensors, shield_fore]
+      aft: [drive, shield_aft]
+      port: [launcher, shield_port]
+      starboard: [launcher, shield_starboard]
+    fighter_wings: 4
     mine_stock: 0
     recon_drones: 1
   # The siege set-piece: an immobile orbital starbase (main-game §4.2 model).
@@ -184,24 +208,24 @@ scenarios:
     label: Prepared defense
     blurb: Seed your sector — mines, fighter screens, gun lines — then meet the attack.
     deploy: full
-    player: [frigate, corvette]
-    enemy: [frigate, corvette]
+    player: [frigate, scout_marauder]
+    enemy: [frigate, scout_marauder]
     enemy_mines: 0
     player_zone_frac: 0.55   # leftmost fraction of the board open to deployment
   ambushed:
     label: Ambushed on warp-in
     blurb: You warp into their sector — position and facing are all you get to pick.
     deploy: warp_in
-    player: [frigate, corvette]
-    enemy: [frigate, corvette]
+    player: [frigate, scout_marauder]
+    enemy: [frigate, scout_marauder]
     enemy_mines: 8
     warp_zone_cells: 6       # width of the left-edge warp-in pocket
   belt:
     label: Belt skirmish
     blurb: Fight through an asteroid belt — rocks eat gunfire, missiles, and careless hulls.
     deploy: full
-    player: [frigate, corvette]
-    enemy: [frigate, corvette]
+    player: [frigate, scout_marauder]
+    enemy: [frigate, scout_marauder]
     enemy_mines: 0
     player_zone_frac: 0.40   # the belt claims the middle of the board
     rock_clusters: 8         # debris clumps seeded across the midfield
@@ -210,8 +234,8 @@ scenarios:
     label: Starbase assault
     blurb: Break a fortified starbase — knock out its reactor to take it, or raze it trying.
     deploy: warp_in
-    player: [battleship, frigate, corvette]
-    enemy: [corvette, corvette]   # the guard picket at anchor around the base
+    player: [battleship, frigate, scout_marauder]
+    enemy: [scout_marauder, scout_marauder]   # the guard picket at anchor around the base
     station: starbase
     enemy_mines: 0                # the base sows its own perimeter ring from mine_stock
     warp_zone_cells: 6
@@ -219,9 +243,26 @@ scenarios:
     label: Ship graveyard
     blurb: Fight through drifting wreckage — you can smash through it, but it costs hull.
     deploy: full
-    player: [frigate, corvette]
-    enemy: [frigate, corvette]
+    player: [frigate, scout_marauder]
+    enemy: [frigate, scout_marauder]
     enemy_mines: 0
     player_zone_frac: 0.40      # the graveyard claims the middle of the board
     debris_clusters: 10         # wreckage clumps seeded across the midfield
     debris_cluster_size: 8      # cells per clump (random-walk blob)
+  orbital_platform:
+    # The siege in REVERSE: the starbase is YOURS. `station_side: player` puts the
+    # base on your side, pre-placed by setup (you cannot move or reposition it),
+    # while you still get the full peacetime deploy pass for your guard ships,
+    # perimeter mines, and fighter pickets — the base's own mine/wing stock is
+    # yours to position. Then the assault fleet warps in from the far edge. You
+    # LOSE if the base is razed or its reactor is knocked out (boarded); you WIN
+    # by destroying the whole attacking fleet.
+    label: Starbase defense
+    blurb: Hold your orbital platform — deploy your guard screen, mines and fighters, then break the assault.
+    deploy: full
+    station: starbase
+    station_side: player
+    player: [frigate, scout_marauder]                 # your guard picket (you deploy these)
+    enemy: [imperial_starship, battleship, frigate]   # the incoming assault fleet
+    enemy_mines: 0
+    player_zone_frac: 0.55

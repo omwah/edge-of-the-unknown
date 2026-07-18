@@ -176,6 +176,19 @@ def _check_outcome(b: Battle) -> None:
             b.log("outcome", "The starbase is razed to drifting slag — nothing "
                              "left to claim, but the sector is yours.")
         return
+    # Defense objective (the siege in reverse): your own platform is the thing
+    # under attack — lose it (razed OR reactor knocked out / boarded) and the
+    # defense has failed, even if guard ships still live.
+    p_stations = [s for s in b.ships if s.side == "player" and s.cls.station]
+    if p_stations and all(not s.alive or not s.reactor_ok for s in p_stations):
+        b.outcome = "defeat"
+        if any(s.alive for s in p_stations):
+            b.log("outcome", "Your platform's reactor is out — boarders take the "
+                             "ring. The starbase is LOST.", friendly=False)
+        else:
+            b.log("outcome", "Your platform is razed to drifting slag. The "
+                             "defense has failed.", friendly=False)
+        return
     if not b.fleet("enemy"):
         b.outcome = "victory"
         b.log("outcome", "Enemy fleet destroyed — the sector is yours.")
@@ -831,6 +844,26 @@ def setup_siege(b: Battle) -> None:
     b.log("sensor", "The starbase's perimeter is live — pickets out, guard "
                     "ships at anchor, and the approaches are almost certainly "
                     "mined. Kill its reactor or raze it.", friendly=False)
+
+
+def setup_defense(b: Battle) -> None:
+    """Starbase defense — the siege in reverse. The player's own orbital platform
+    is pre-placed near the friendly edge facing the incoming assault, so its
+    reactor quadrant is to the rear (an attacker has to fight past it to board).
+    The base is NOT deployed by the player; everything else — guard ships, the
+    perimeter mine ring, fighter pickets — the player positions in the ordinary
+    full deploy pass (the base's own mine/wing stock is theirs to place). The
+    assault fleet warps in from the far edge once deployment is done."""
+    sc = b.config.scenarios[b.scenario_key]
+    assert sc.station is not None
+    cls = b.config.ships[sc.station]
+    bx = max(cls.size // 2, int(b.config.width * 0.14))
+    by = b.config.height // 2
+    spawn_ship(b, "player", cls, "Starbase AEGIS", bx, by, 0)  # facing E, reactor aft
+    b.log("sensor", "Long-range sensors: a hostile assault fleet is inbound on "
+                    "your platform. Deploy your guard screen, sow the perimeter, "
+                    "put your fighters up — then hold. Lose the base and it's over.",
+          friendly=True)
 
 
 def warp_in_enemy(b: Battle) -> None:
