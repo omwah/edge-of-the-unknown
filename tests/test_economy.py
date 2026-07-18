@@ -15,6 +15,7 @@ import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
+from edge.config import load_default_config
 from edge.core.economy import (
     EconomyError,
     HaggleStatus,
@@ -30,6 +31,8 @@ from edge.core.economy import (
 )
 from edge.core.enums import Commodity, PortClass, PortMode
 from edge.core.models import Player, Port, PortCommodity, Ship
+
+DEFAULT_CONFIG = load_default_config()
 
 # --- strategies -------------------------------------------------------------
 
@@ -168,9 +171,7 @@ def test_trade_rejects_unaffordable_and_overspend() -> None:
 
 
 def _default_econ() -> object:  # tiny shim so the property test reads cleanly
-    from edge.config import load_default_config
-
-    return load_default_config().economy
+    return DEFAULT_CONFIG.economy
 
 
 # --- haggling ---------------------------------------------------------------
@@ -358,11 +359,9 @@ def test_npc_trade_conserves_goods(
 ) -> None:
     """An NPC trade moves goods between port and merchant without minting or losing any —
     the §8 conservation invariant, now for the WP43 trader path (`core.npc.plan_trade`)."""
-    from edge.config import load_default_config
     from edge.core import npc
     from edge.core.models import AlienSpecies
 
-    config = load_default_config()
     port = Port(id=1, sector_id=2, name="Mkt", klass=PortClass.CLASS_1, size=1, commodities=(
         PortCommodity(Commodity.FUEL_ORE, PortMode.SELL, sell_stock, 1000, sell_base, sell_delta),
         PortCommodity(Commodity.ORGANICS, PortMode.BUY, buy_stock, 1000, buy_base, buy_delta),
@@ -374,7 +373,7 @@ def test_npc_trade_conserves_goods(
         cash=cash, cargo={Commodity.ORGANICS: held} if held else {})
     state = _npc_state(port, sp)
 
-    trade = npc.plan_trade(state, sp, config)  # type: ignore[arg-type]
+    trade = npc.plan_trade(state, sp, DEFAULT_CONFIG)  # type: ignore[arg-type]
     if trade is None:
         return
     old_line = port.line(trade.commodity)
