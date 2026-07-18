@@ -27,7 +27,7 @@ from textual.widgets import Button, Footer, Input, RichLog, Static
 from edge.spacebattle import rules
 from edge.spacebattle.config import Scenario, SpacebattleConfig, load_config
 from edge.spacebattle.model import (
-    DIRS, FACING_NAMES, Battle, FighterWing, Ship,
+    FACING_NAMES, Battle, FighterWing, Ship,
 )
 from edge.spacebattle.sprites import (
     FIGHTER_SPRITES, MINE_GLYPH, ROCK_BG, SALVO_GLYPH, rock_sprite, ship_sprite,
