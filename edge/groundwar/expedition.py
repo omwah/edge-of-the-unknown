@@ -482,6 +482,12 @@ def do_dig(exp: Expedition) -> Site | None:
         site.found = True
         exp.log("find", f"Your spade rings on worked stone — {site.name}!",
                 site.x, site.y)
+        e = exp.config.expedition
+        gained = min(e.supplies_start, p.supplies + e.find_resupply) - p.supplies
+        if gained > 0:
+            p.supplies += gained
+            exp.log("info", f"You make camp at the site and restock: "
+                            f"+{gained} supplies.")
         if not exp.unfound():
             exp.outcome = "complete"
             exp.log("outcome", "Every sensor contact resolved. A survey to be "
@@ -505,9 +511,11 @@ def do_talk(exp: Expedition) -> bool:
         exp.log("info", "No one to talk to out here.")
         return False
     e = exp.config.expedition
-    if p.supplies < e.supplies_start:
-        p.supplies = e.supplies_start
-        exp.log("info", f"The people of {town.name} refill your packs.")
+    gained = min(e.supplies_start, p.supplies + e.settlement_resupply) - p.supplies
+    if gained > 0:
+        p.supplies += gained
+        exp.log("info", f"The people of {town.name} refill your packs: "
+                        f"+{gained} supplies.")
     candidates = [s for s in exp.unfound() if not s.hinted]
     if town.hint_given or not candidates:
         exp.log("info", f"{town.name} wishes you fair digging.")

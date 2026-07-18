@@ -134,6 +134,8 @@ expedition:
   supplies_start: 55        # every move or dig spends 1; settlements refill it
   dig_cost: 1
   dig_radius: 2             # a dig opens a trench this wide — the site pays off anywhere inside
+  find_resupply: 6          # supplies regained at each successful find (capped at supplies_start)
+  settlement_resupply: 12   # supplies regained per settlement visit (capped at supplies_start)
   move: 7                   # move points per turn (terrain costs apply)
   sight: 11                 # you must be this close to *notice* disturbed ground
   area_radius: 14           # the ship-sensor "general area" circle
