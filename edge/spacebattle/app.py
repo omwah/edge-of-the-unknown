@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import random as _random
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from rich.text import Text
 from textual import events
@@ -1139,21 +1139,35 @@ through at a lighter cost in hull.
 its perimeter defense. Raze it, or fight around behind it and knock out its \
 reactor to take it intact.
 
+[b]Fleet size[/] — the [b]−[/] / [b]+[/] steppers set exactly how many hulls \
+each side brings before you launch. The hulls are drawn by cycling that \
+scenario's own ship mix, so its composition's flavour is preserved. The enemy \
+count can go to [b]0[/]: in a starbase assault that leaves just the base to \
+break, and the siege starbase itself is always present regardless.
+
 The same seed always builds the same battle.\
 """
 
     help_keys = [
         ("?", "this help"),
+        ("−/+ steppers", "set how many ships each side brings (enemy may be 0)"),
         ("Enter/click", "activate the focused button"),
     ]
 
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen(self))
 
+    # Explicit fleet sizes per side. The player always brings at least one hull;
+    # the enemy count may be 0 (e.g. a starbase assault against the base alone —
+    # the siege starbase itself is spawned separately and is always present).
+    _MAX_FLEET = 8
+
     def __init__(self, config: SpacebattleConfig) -> None:
         super().__init__()
         self.config = config
         self.lance_refit = False
+        self.player_count = 2
+        self.enemy_count = 2
 
     def compose(self) -> ComposeResult:
         with Vertical(id="setup"):
@@ -1163,6 +1177,16 @@ The same seed always builds the same battle.\
             yield Static(id="briefing")
             with Horizontal(classes="row"):
                 yield Input(placeholder="seed (blank = random)", id="seed")
+            with Horizontal(classes="row"):
+                yield Button("−", id="pf_dec", classes="step")
+                yield Button("+", id="pf_inc", classes="step")
+                yield Static(self._forces_label("player"), id="pf-label",
+                             classes="blurb")
+            with Horizontal(classes="row"):
+                yield Button("−", id="ef_dec", classes="step")
+                yield Button("+", id="ef_inc", classes="step")
+                yield Static(self._forces_label("enemy"), id="ef-label",
+                             classes="blurb")
             with Horizontal(classes="row"):
                 yield Button("Flagship: standard magazine", id="refit")
                 yield Static("  the experimental grav-lance refit trades half "
@@ -1180,6 +1204,20 @@ The same seed always builds the same battle.\
             "? for the rules of the road.\n", "grey70")
         self.query_one("#briefing", Static).update(brief)
 
+    def _forces_label(self, side: str) -> str:
+        count = self.player_count if side == "player" else self.enemy_count
+        who = "Player" if side == "player" else "Enemy"
+        ships = f"{count} ship{'' if count == 1 else 's'}"
+        if side == "enemy" and count == 0:
+            ships += " (starbase only, in a siege)"
+        return f"  {who} fleet: {ships}"
+
+    @staticmethod
+    def _fleet(base: tuple[str, ...], count: int) -> tuple[str, ...]:
+        """Build a fleet of exactly `count` hulls, cycling the scenario's ship
+        mix so its composition's flavour is preserved. `count` may be 0."""
+        return tuple(base[i % len(base)] for i in range(count))
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
         if bid == "refit":
@@ -1188,13 +1226,32 @@ The same seed always builds the same battle.\
                                   if self.lance_refit
                                   else "Flagship: standard magazine")
             return
+        if bid in ("pf_dec", "pf_inc", "ef_dec", "ef_inc"):
+            side = "player" if bid.startswith("pf") else "enemy"
+            step = 1 if bid.endswith("inc") else -1
+            if side == "player":
+                self.player_count = max(1, min(self._MAX_FLEET,
+                                               self.player_count + step))
+            else:
+                self.enemy_count = max(0, min(self._MAX_FLEET,
+                                              self.enemy_count + step))
+            label_id = "#pf-label" if side == "player" else "#ef-label"
+            self.query_one(label_id, Static).update(self._forces_label(side))
+            return
         if not bid.startswith("go-"):
             return
         key = bid[3:]
+        base = self.config.scenarios[key]
+        scenario = replace(
+            base,
+            player=self._fleet(base.player, self.player_count),
+            enemy=self._fleet(base.enemy, self.enemy_count),
+        )
+        config = replace(
+            self.config, scenarios={**self.config.scenarios, key: scenario})
         raw = self.query_one("#seed", Input).value.strip()
         seed = int(raw) if raw.lstrip("-").isdigit() else _random.randrange(1 << 31)
-        battle = rules.make_battle(self.config, seed, key)
-        scenario = self.config.scenarios[key]
+        battle = rules.make_battle(config, seed, key)
         rules.seed_rocks(battle)
         rules.seed_debris(battle)
         if scenario.station is not None:
@@ -1202,7 +1259,7 @@ The same seed always builds the same battle.\
         elif scenario.deploy == "warp_in":
             rules.setup_ambush(battle)
         self.app.push_screen(
-            BattleScreen(self.config, battle, scenario, self.lance_refit))
+            BattleScreen(config, battle, scenario, self.lance_refit))
 
 
 class SpacebattleApp(App[None]):
@@ -1218,6 +1275,7 @@ class SpacebattleApp(App[None]):
     #title { padding: 1 0; }
     #setup .row { height: 3; }
     #setup Button { margin-right: 1; min-width: 24; }
+    #setup Button.step { min-width: 5; width: 5; }
     #setup .blurb { padding: 1 0; color: $text-muted; }
     #seed { width: 40; }
     """
