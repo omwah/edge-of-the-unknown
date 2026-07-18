@@ -216,6 +216,11 @@ class FieldPrompt(ModalScreen[PromptResult]):
         if error is not None:
             self.query_one("#field-error", Static).update(error)
             self.query_one("#field-input", Input).focus()
+            # Button suppresses another press while its active animation is running. An
+            # invalid submit is not a completed action: re-arm it immediately so correcting
+            # the field and clicking again cannot be lost to that cosmetic debounce.
+            for button in self.query(Button):
+                button.remove_class("-active")
             return
         self.dismiss(value)
 

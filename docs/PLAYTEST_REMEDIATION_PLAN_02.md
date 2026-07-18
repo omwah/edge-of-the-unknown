@@ -1,6 +1,6 @@
 # Playtest Remediation Plan 02
 
-Status: proposed
+Status: complete (2026-07-17)
 Source: `~/edge-notes/playtest_notes_02.txt` (25 observations, 12 July 2026)
 Predecessor: [`PLAYTEST_REMEDIATION_PLAN_01.md`](PLAYTEST_REMEDIATION_PLAN_01.md) — **complete** (WP-PR01..PR12 + follow-ups all landed)
 Findings table: [`PLAYTEST_NOTES.md`](PLAYTEST_NOTES.md) → "Second pass" (PT-32..PT-56)
@@ -1245,11 +1245,19 @@ DESIGN §4.2 and reachable in-game; and Help + DESIGN accurately describe the re
 controls and rules. Deferred items, if any, are recorded in an appended
 "Outstanding follow-ups" section rather than left implicit.
 
-## 8. Outstanding follow-ups
+## 8. Resolved follow-ups
 
-### FU-01 — The config loader strips the species dialogue sidecar under pytest (open)
+### FU-01 — The config loader strips the species dialogue sidecar under pytest — resolved
 
-**Found during WP-PR2-09 / PT-41.** `edge/config.py:89` inspects `sys.modules` /
+**Resolved 2026-07-17.** `edge.config.load_config` no longer inspects `sys.modules` or
+`PYTEST_CURRENT_TEST`: the default loader now resolves the same complete species corpus in tests
+and in the game. Callers that deliberately exercise the base persona/fallback corpus pass an
+explicit `dialogue_files=("alien_dialogue_default.yaml",)` override. Corpus-driven contact,
+encounter, dialogue, intel, signature, and playtest coverage now runs against the shipped chain;
+tests that inject dialogue mutate a deep config copy so their authored nodes cannot leak between
+shuffled tests.
+
+**Original finding (WP-PR2-09 / PT-41).** `edge/config.py:89` inspected `sys.modules` /
 `PYTEST_CURRENT_TEST` and, when it decides it is running under pytest, filters
 `dialogue_file:` down to `alien_dialogue_default.yaml` alone — dropping
 `config/dialogue/alien_dialogue_species.yaml`, the shipped **species** corpus. So the whole
@@ -1266,7 +1274,7 @@ It is also **runtime code branching on the test runner**, which the layering rul
 forbid; the intent was presumably to pin the suite to a stable base corpus so a swapped/authored
 species sidecar cannot move golden lines.
 
-**Resolve by** making the corpus an explicit input rather than an ambient one: drop the
+**Planned resolution.** Make the corpus an explicit input rather than an ambient one: drop the
 `sys.modules` sniff from `edge/config.py`, and have the tests that need a pinned corpus load a
 config that names only the base dialogue file (a fixture, or a test config path), while the
 default load — the one the game uses — keeps the species sidecar. Then re-point the dialogue
@@ -1276,21 +1284,29 @@ actually speaks.
 
 Sized as a small, self-contained package; not blocking any WP in §4.
 
-### FU-02 — Order-dependent flake: `test_corp_charter_submits_via_button_and_validates` (open)
+### FU-02 — Corp charter's corrected second click is dropped — resolved
 
-**Found during WP-PR2-04** (present on a clean tree — not introduced by any package here).
+**Resolved 2026-07-17.** Repetition reproduced this failure with the test alone, disproving the
+original order-leak hypothesis below. Textual's `Button` ignores presses while its 200 ms active
+animation is present: after the first invalid submit, a fast correction and second click could
+arrive before that cosmetic debounce expired. `FieldPrompt` now removes the active class whenever
+validation rejects a submit, immediately re-arming the button. The regression test pins a long
+active duration so the old behavior fails deterministically, and the corrected flow passed twenty
+consecutive isolated runs.
+
+**Original finding (WP-PR2-04).** Present on a clean tree — not introduced by any package here.
 `tests/test_ui_forms.py::test_corp_charter_submits_via_button_and_validates` **fails under
 `pytest-randomly`'s shuffled order and passes with `-p no:randomly`**: the full suite is
 2683 green in fixed order, while a shuffled `-x` run stops on this test with the submitted
 charter name never arriving (`assert [] == ["Void Runners"]` — the button press produced no
 result).
 
-So some earlier test leaks state the corp form then reads — an app/screen singleton, a stale
+The original hypothesis was that some earlier test leaked state the corp form then read — an app/screen singleton, a stale
 `EdgeApp` focus, or a monkeypatched service that outlives its test. It is a **real defect in
 the test suite's isolation**, not a UI bug, but it makes every future `-x` run untrustworthy
 (it can mask an actual regression by stopping early on this).
 
-**Resolve by** finding the leaking neighbour (`pytest -p randomly --randomly-seed=<seed>` from a
+**Original planned resolution.** Find the leaking neighbour (`pytest -p randomly --randomly-seed=<seed>` from a
 failing run reproduces the order; bisect with `-p no:randomly` plus an explicit test list), then
 fixing the leak at its source — an autouse fixture that resets whatever is shared, not an
 `@pytest.mark.order` or a `no:randomly` blanket, which would hide the next one.

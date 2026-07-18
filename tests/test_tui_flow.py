@@ -1330,8 +1330,13 @@ async def test_say_do_menu_converse_and_trade() -> None:
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
 
-        # Ask about… (reply 1) → subject picker → pick Vesk → the speech narrates the Vesk.
-        await pilot.press("1")
+        # Follow the shipped Selvani pack's dossier reply → subject picker → pick Vesk.
+        choice = next(c for c in app.screen._view().choices  # type: ignore[attr-defined]
+                      if c.next_context == "dossier_other")
+        shown = app.screen._menu_items(app.screen._view())  # type: ignore[attr-defined]
+        key = next(n for n, (_kind, item) in enumerate(shown, start=1)
+                   if item.index == choice.index)
+        await pilot.press(str(key))
         await pilot.pause()
         assert isinstance(app.screen, SubjectPickerScreen)
         await pilot.click(app.screen.query(ClickableEntry).first())
@@ -1339,10 +1344,12 @@ async def test_say_do_menu_converse_and_trade() -> None:
         assert isinstance(app.screen, AlienContactScreen)
         assert "Vesk" in str(app.screen.query_one("#speech", Static).render())
 
-        # Back out of the dossier node (b), then buy tech (reply 3 → offer picker modal).
+        # Back out of the dossier node (b), then follow its authored Trade reply.
         await pilot.press("b")
         await pilot.pause()
-        await pilot.press("3")
+        choice = next(c for c in app.screen._view().choices  # type: ignore[attr-defined]
+                      if c.action == "trade")
+        await pilot.press(str(choice.index + 1))
         await pilot.pause()
         assert isinstance(app.screen, OfferPickerScreen)
         # Select the (only) available latinum offer from the picker modal.
@@ -1360,8 +1367,8 @@ async def test_say_do_menu_converse_and_trade() -> None:
 async def test_branching_choices_render_and_drive_transition() -> None:
     """§6.7: a node's authored choices show as numbered replies; '1' transitions.
 
-    The whole menu is authored choices now; a species that authors its own greeting replies
-    (Vesk) overrides the generic baseline. Here we drive the Vesk's greeting → workshop branch.
+    The whole menu is authored choices now. Here we drive the shipped Selvani species pack's
+    greeting → exploration branch rather than relying on a shadowed persona fallback.
     """
     from edge.tui.screens.contact import AlienContactScreen
     from edge.tui.widgets import ClickableEntry
@@ -1373,7 +1380,7 @@ async def test_branching_choices_render_and_drive_transition() -> None:
         await pilot.pause()
         svc = app.service
         assert svc is not None
-        _inject_species(svc, "vesk")  # serial_formal persona authors greeting choices
+        _inject_species(svc, "selvani")
 
         await pilot.press("h")  # hail → contact screen on the greeting node
         await pilot.pause()
@@ -1382,14 +1389,14 @@ async def test_branching_choices_render_and_drive_transition() -> None:
         body = " ".join(str(e.render()) for e in app.screen.query(ClickableEntry))
         assert "[1]" in body
         view = app.screen._view()  # type: ignore[attr-defined]
-        assert view.choices and view.choices[0].next_context == "branch.vesk_workshop"
+        assert view.choices and view.choices[0].next_context == "branch.exploration"
 
-        await pilot.press("1")  # pick the first reply → transition to the workshop node
+        await pilot.press("1")  # pick the first reply → transition to the exploration node
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
-        assert app.screen._active_context == "branch.vesk_workshop"  # type: ignore[attr-defined]
-        actions = {c.action for c in app.screen._view().choices}  # type: ignore[attr-defined]
-        assert "trade" in actions and "leave" in actions
+        assert app.screen._active_context == "branch.exploration"  # type: ignore[attr-defined]
+        nexts = {c.next_context for c in app.screen._view().choices}  # type: ignore[attr-defined]
+        assert {"offer_coordinates", "farewell", "dossier_self"} <= nexts
 
 
 async def test_a_reply_repaints_the_menu_without_rebuilding_the_portrait() -> None:
@@ -1414,7 +1421,7 @@ async def test_a_reply_repaints_the_menu_without_rebuilding_the_portrait() -> No
         await pilot.pause()
         svc = app.service
         assert svc is not None
-        _inject_species(svc, "vesk")
+        _inject_species(svc, "selvani")
 
         await pilot.press("h")  # hail
         await pilot.pause()
@@ -1428,17 +1435,17 @@ async def test_a_reply_repaints_the_menu_without_rebuilding_the_portrait() -> No
 
         assert app.screen is screen, "the reply rebuilt the screen instead of repainting it"
         assert screen.query_one(SpeciesPortrait) is portrait, "the portrait was rebuilt"
-        assert screen._active_context == "branch.vesk_workshop"  # type: ignore[attr-defined]
+        assert screen._active_context == "branch.exploration"  # type: ignore[attr-defined]
         assert str(screen.query_one("#speech", Static).render()) != speech_before
-        # …and the menu really was repainted (the workshop node offers different verbs).
-        actions = {c.action for c in screen._view().choices}  # type: ignore[attr-defined]
-        assert "trade" in actions
+        # …and the menu really was repainted (the exploration node offers different routes).
+        nexts = {c.next_context for c in screen._view().choices}  # type: ignore[attr-defined]
+        assert "offer_coordinates" in nexts
 
 
 async def test_log_coordinates_freezes_the_offer_line() -> None:
     """Logging a tip keeps the speech panel on the line just acted on — it must not auto-cycle
-    to the next tip the alien would offer (§6.7). Selvani falls back to the generic baseline menu,
-    so Ask-for-coordinates and (on the offer node) Log-coordinates are numbered replies."""
+    to the next tip the alien would offer (§6.7). The shipped Selvani pack authors both the
+    coordinate route and the offer node, so the test follows those choices by meaning."""
     from textual.widgets import Static
 
     from edge.core.models import LocationRef
@@ -1451,7 +1458,7 @@ async def test_log_coordinates_freezes_the_offer_line() -> None:
         await pilot.pause()
         svc = app.service
         assert svc is not None
-        sp = _inject_species(svc, "selvani")  # baseline menu; friendly, in the player's sector
+        sp = _inject_species(svc, "selvani")
         # Point the species at a real, reachable, unexplored rare+ discovery so it volunteers a tip.
         ship = svc.state.ships[1]
         player = svc.state.players[1]
@@ -1467,15 +1474,17 @@ async def test_log_coordinates_freezes_the_offer_line() -> None:
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
 
-        # Ask for coordinates (reply 1, with no other species met) → the offer line shows.
-        await pilot.press("1")
+        choice = next(c for c in app.screen._view().choices  # type: ignore[attr-defined]
+                      if c.next_context == "offer_coordinates")
+        await pilot.press(str(choice.index + 1))
         await pilot.pause()
         assert app.screen._active_context == "offer_coordinates"  # type: ignore[attr-defined]
         offer_line = str(app.screen.query_one("#speech", Static).render())
         assert any(ch.isdigit() for ch in offer_line)  # the line carries {coords}
 
-        # Log coordinates (reply 1 on the offer node).
-        await pilot.press("1")
+        choice = next(c for c in app.screen._view().choices  # type: ignore[attr-defined]
+                      if c.action == "accept_lead")
+        await pilot.press(str(choice.index + 1))
         await pilot.pause()
         assert isinstance(app.screen, AlienContactScreen)
         # Frozen on the logged line — it did NOT cycle to the next tip / the no-tip branch.

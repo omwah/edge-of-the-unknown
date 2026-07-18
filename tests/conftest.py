@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -79,7 +79,11 @@ def _recursive_update(d: dict[str, Any], u: dict[str, Any]) -> None:
         else:
             d[k] = v
 
-def _test_load_config(path: Path | str) -> edge.config.GameConfig:
+def _test_load_config(
+    path: Path | str,
+    *,
+    dialogue_files: Sequence[Path | str] | None = None,
+) -> edge.config.GameConfig:
     resolved_path = Path(path).resolve()
     is_default = resolved_path == Path(edge.config.DEFAULT_CONFIG_PATH).resolve()
     
@@ -95,11 +99,11 @@ def _test_load_config(path: Path | str) -> edge.config.GameConfig:
             
         yaml.safe_load = patched_safe_load
         try:
-            return _original_load_config(path)
+            return _original_load_config(path, dialogue_files=dialogue_files)
         finally:
             yaml.safe_load = _original_safe_load
     else:
-        return _original_load_config(path)
+        return _original_load_config(path, dialogue_files=dialogue_files)
 
 
 edge.config.load_config = _test_load_config

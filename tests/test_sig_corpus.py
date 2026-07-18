@@ -5,7 +5,8 @@ The six previously corpus-dark hooks are now routed from each carrier species'
 `Converse` path end-to-end: the choice transitions into the `sig.*` prompt, the hook
 runs with the right approach, bounded effects land, and the reprogram sub-seam flips
 the target kind's live trade posture (`mechanics.effective_trade_posture`).
-Under pytest the loader keeps only the base corpus, which is exactly what is under test.
+The suite explicitly pins the base corpus, which is exactly what these hand-authored
+signature routes exercise.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from edge.core.rules import Converse, apply_result, reduce
 from edge.server.session import contact_view
 from helpers import generate_with_player
 
-CFG = load_default_config()
+CFG = load_default_config(dialogue_files=("alien_dialogue_default.yaml",))
 SMALL = CFG.model_copy(
     update={"bigbang": CFG.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1})})
 # The sig routes live on each offer node's *catch-all* entry; disable WP57 favors so a live

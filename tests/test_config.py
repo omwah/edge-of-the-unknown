@@ -18,6 +18,22 @@ def test_default_config_loads() -> None:
     assert cfg.bigbang.start_sector == "stardock"  # the player starts at the Stardock
 
 
+def test_default_config_loads_shipped_species_dialogue_sidecar() -> None:
+    """Tests and production resolve the same complete, explicitly configured corpus."""
+    roster = load_default_config().roster
+    assert roster is not None
+    vesk = roster.species_by_id("vesk")
+    assert vesk.dialogue_pack
+    assert "greeting" in vesk.dialogue_pack
+
+
+def test_dialogue_corpus_can_be_pinned_explicitly() -> None:
+    roster = load_default_config(dialogue_files=("alien_dialogue_default.yaml",)).roster
+    assert roster is not None
+    # Roster-native signature nodes remain; the external species sidecar's greeting does not.
+    assert "greeting" not in roster.species_by_id("vesk").dialogue_pack
+
+
 def test_seed_accepts_null_for_random() -> None:
     cfg = GameConfig.model_validate({**load_default_config().model_dump(), "seed": None})
     assert cfg.seed is None  # empty seed ⇒ a random universe is rolled at start
