@@ -24,13 +24,15 @@ from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
 from textual.widgets import Button, Footer, Input, RichLog, Static
 
+from edge.art.port import PortGenerator
 from edge.spacebattle import rules
 from edge.spacebattle.config import Scenario, SpacebattleConfig, load_config
 from edge.spacebattle.model import (
     FACING_NAMES, Battle, FighterWing, Ship,
 )
 from edge.spacebattle.sprites import (
-    FIGHTER_SPRITES, MINE_GLYPH, ROCK_BG, SALVO_GLYPH, rock_sprite, ship_sprite,
+    DEBRIS_BG, FIGHTER_SPRITES, MINE_GLYPH, ROCK_BG, SALVO_GLYPH,
+    debris_sprite, rock_sprite, ship_sprite,
 )
 
 FLASH_SECONDS = 0.5
@@ -300,7 +302,22 @@ recharge, and the aliens have nothing like it.
 lines, shred any missile salvo that flies onto them, and can't be stationed \
 on. A hull that drifts into a rock ploughs through it: the rock is pulverized, \
 the ship stops dead, and the impact damage scales with how fast you were \
-going. Use the belt as cover — and mind your vector.\
+going. Use the belt as cover — and mind your vector.
+
+[b]Drifting wreckage[/] (graveyard scenarios) — torn hull plate behaves like \
+rock for fire lines, salvos, and stationing, but a ship that drifts onto it \
+[b]smashes through[/]: a lighter impact, the wreckage destroyed, and your \
+vector kept. Rocks stop you dead; wreckage just costs you skin — sometimes \
+the short way through the graveyard is worth the scrape.
+
+[b]Starbase assault[/] (siege scenarios) — the base is an immobile emplacement \
+with an all-round battery, ring-mounted launchers, fighter pickets, guard \
+ships, and a hidden perimeter minefield. Its screens cover four quadrants like \
+any hull, and its gun weakens as its components go down. Two ways to win: raze \
+the hull, or collapse the [b]far-side (aft) screen[/] and knock out the \
+[b]fusion reactor[/] homed there — reactor dark means the base is disabled and \
+boarded, the way an orbital base is taken in the main game. Fighting around \
+behind it, through the perimeter, is the whole battle.\
 """
 
     _DEPLOY_FULL_KEYS = [
@@ -375,6 +392,8 @@ going. Use the belt as cover — and mind your vector.\
         self.place_order: list[DeployShip] = []
         self.selected: Ship | FighterWing | None = None
         self.flashes: dict[tuple[int, int], tuple[str, float]] = {}
+        # Main-game PortGenerator starbase art, rasterized once per station.
+        self._station_art_cache: dict[int, list[tuple[int, int, str, str]]] = {}
         self.starfield = _make_starfield(
             battle.seed, config.width * config.cell_w,
             config.height * config.cell_h, config.cell_w, config.cell_h)
@@ -457,15 +476,48 @@ going. Use the belt as cover — and mind your vector.\
         return (cx * self.config.cell_w + self.config.cell_w // 2,
                 cy * self.config.cell_h + self.config.cell_h // 2)
 
+    def _station_art(self, s: Ship) -> list[tuple[int, int, str, str]]:
+        """The full main-game starbase art (`edge.art.port.PortGenerator`),
+        rasterized to (dx, dy, char, style) offsets over the station's
+        footprint. Deterministic per (battle seed, station id); cached."""
+        cached = self._station_art_cache.get(s.id)
+        if cached is None:
+            cfg = self.config
+            art = PortGenerator().generate(
+                _random.Random(self.battle.seed ^ (s.id * 0x9E3779B1)),
+                "starbase", s.cls.size * cfg.cell_w, s.cls.size * cfg.cell_h)
+            console = self.app.console
+            cached = []
+            for r, line in enumerate(art.split(allow_blank=True)):
+                for c, ch in enumerate(line.plain):
+                    if ch != " ":
+                        style = line.get_style_at_offset(console, c)
+                        cached.append((c, r, ch, str(style)))
+            self._station_art_cache[s.id] = cached
+        return cached
+
+    def _blit_station(self, overlay: dict[tuple[int, int], tuple[str, str]],
+                      s: Ship) -> None:
+        cfg = self.config
+        half = s.cls.size // 2
+        ox, oy = (s.x - half) * cfg.cell_w, (s.y - half) * cfg.cell_h
+        for dx, dy, ch, style in self._station_art(s):
+            overlay[(ox + dx, oy + dy)] = (ch, style)
+
     def overlay(self) -> dict[tuple[int, int], tuple[str, str]]:
         b = self.battle
         cfg = self.config
         out: dict[tuple[int, int], tuple[str, str]] = {}
-        # rocks under everything — pieces and ghosts draw over the rubble
+        # rocks and wreckage under everything — pieces and ghosts draw over the rubble
         for (rx, ry) in b.rocks:
             ox, oy = rx * cfg.cell_w, ry * cfg.cell_h
             for dx, dy, ch, style in rock_sprite(b.seed, rx, ry,
                                                  cfg.cell_w, cfg.cell_h):
+                out[(ox + dx, oy + dy)] = (ch, style)
+        for (rx, ry) in b.debris:
+            ox, oy = rx * cfg.cell_w, ry * cfg.cell_h
+            for dx, dy, ch, style in debris_sprite(b.seed, rx, ry,
+                                                   cfg.cell_w, cfg.cell_h):
                 out[(ox + dx, oy + dy)] = (ch, style)
         # drift ghosts next, so real pieces draw over them
         for s in b.ships:
@@ -495,6 +547,9 @@ going. Use the belt as cover — and mind your vector.\
             self._blit_sprite(out, w.x, w.y, (FIGHTER_SPRITES[w.facing],), style)
         for s in b.ships:
             if not s.alive:
+                continue
+            if s.cls.station:  # the full main-game art over its whole footprint
+                self._blit_station(out, s)
                 continue
             style = _SIDE_STYLE[s.side]
             if s.hull < s.cls.hull_max * 0.4:
@@ -532,6 +587,7 @@ going. Use the belt as cover — and mind your vector.\
                 for x in range(self._zone_max_x() + 1):
                     tints[(x, y)] = "on grey11"
             tints.update(dict.fromkeys(b.rocks, ROCK_BG))
+            tints.update(dict.fromkeys(b.debris, DEBRIS_BG))
             return tints
         sel = self.selected
         if isinstance(sel, Ship) and sel.gun_ok:
@@ -551,6 +607,7 @@ going. Use the belt as cover — and mind your vector.\
                     if (dx or dy) and b.in_bounds(x, y):
                         tints[(x, y)] = "on grey15"
         tints.update(dict.fromkeys(b.rocks, ROCK_BG))
+        tints.update(dict.fromkeys(b.debris, DEBRIS_BG))
         return tints
 
     # --- shared helpers ---------------------------------------------------------
@@ -685,6 +742,12 @@ going. Use the belt as cover — and mind your vector.\
         line("── CONTACTS ──", "bold")
         for s in b.fleet("enemy"):
             pct = round(100 * s.hull / s.cls.hull_max)
+            if s.cls.station:
+                integ = round(100 * rules.station_integrity(s))
+                line(f"  {s.name:<12} {pct:>3}%", "bright_red")
+                line(f"   ⌂ systems {integ:>3}% · reactor "
+                     f"{'LIVE' if s.reactor_ok else 'DARK'}", "red")
+                continue
             near = min((rules.dist(s.x, s.y, p.x, p.y) for p in b.fleet("player")),
                        default=99)
             line(f"  {s.name:<12} {pct:>3}% · {near}c", "bright_red")
@@ -696,8 +759,10 @@ going. Use the belt as cover — and mind your vector.\
         line("")
         if b.outcome is not None:
             won = b.outcome == "victory"
+            won_label = ("VICTORY — THE BASE HAS FALLEN"
+                         if self.scenario.station else "VICTORY — SECTOR SECURED")
             line("═" * 26, "bold")
-            line("VICTORY — SECTOR SECURED" if won else "DEFEAT — FLEET LOST",
+            line(won_label if won else "DEFEAT — FLEET LOST",
                  "bold bright_green" if won else "bold red")
             line("q to return to setup", "grey66")
         else:
@@ -1066,6 +1131,14 @@ where each ship tumbles out of warp inside the pocket, and which way it faces. \
 Their pickets are out and their minefield is already sown — and invisible \
 until your sensors paint it.
 
+[b]Belt skirmish[/] / [b]Ship graveyard[/] — the same fight threaded through \
+an obstacle field: rocks stop a drifting hull dead; wreckage can be smashed \
+through at a lighter cost in hull.
+
+[b]Starbase assault[/] — warp in against a fortified, immobile starbase behind \
+its perimeter defense. Raze it, or fight around behind it and knock out its \
+reactor to take it intact.
+
 The same seed always builds the same battle.\
 """
 
@@ -1123,7 +1196,10 @@ The same seed always builds the same battle.\
         battle = rules.make_battle(self.config, seed, key)
         scenario = self.config.scenarios[key]
         rules.seed_rocks(battle)
-        if scenario.deploy == "warp_in":
+        rules.seed_debris(battle)
+        if scenario.station is not None:
+            rules.setup_siege(battle)
+        elif scenario.deploy == "warp_in":
             rules.setup_ambush(battle)
         self.app.push_screen(
             BattleScreen(self.config, battle, scenario, self.lance_refit))

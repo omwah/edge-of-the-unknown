@@ -130,6 +130,38 @@ def rock_sprite(seed: int, cx: int, cy: int, cell_w: int,
     return out
 
 
+# Drifting wreckage, after `edge.art.discovery`'s debris-field vocabulary (a
+# broken hull mass with plate shards and drifting struts). Where the belt's
+# rocks wear warm regolith tans, wreckage is cold torn metal: steel greys over
+# a void-dark wash, so the two obstacle kinds never read as each other.
+_DEBRIS_CORES = (("▛", "bold grey70"), ("▟", "grey66"), ("▜", "grey62"),
+                 ("▙", "bold grey66"), ("▚", "grey58"))
+_DEBRIS_BITS = (("╱", "grey54"), ("╲", "grey54"), ("▖", "grey42"), ("▝", "grey46"),
+                ("=", "grey50"), ("·", "grey35"), ("'", "grey42"), ("-", "grey39"))
+
+DEBRIS_BG = "on #14181d"  # cold hull-steel wash behind a wreckage cell's footprint
+
+
+def debris_sprite(seed: int, cx: int, cy: int, cell_w: int,
+                  cell_h: int) -> list[tuple[int, int, str, str]]:
+    """Deterministic wreckage scatter for a debris cell — same contract as
+    `rock_sprite`, keyed on (battle seed, cell) with its own hash salt."""
+    rng = random.Random((seed * 40503) ^ (cx * 22801763) ^ (cy * 96556217))
+    out: list[tuple[int, int, str, str]] = []
+    core = rng.choice(_DEBRIS_CORES)
+    ccx = cell_w // 2 + rng.randint(-1, 1)
+    ccy = cell_h // 2
+    out.append((ccx, ccy, *core))
+    taken = {(ccx, ccy)}
+    for _ in range(rng.randint(3, 5)):
+        dx = rng.randint(1, cell_w - 2)
+        dy = rng.randint(0, cell_h - 1)
+        if (dx, dy) not in taken:
+            taken.add((dx, dy))
+            out.append((dx, dy, *rng.choice(_DEBRIS_BITS)))
+    return out
+
+
 def ship_sprite(hull_art: str, facing: int) -> Rows:
     sprites = SHIP_SPRITES.get(hull_art) or SHIP_SPRITES["missile_frigate"]
     return sprites[(facing % 8) & ~1]  # odd octants snap down to a cardinal

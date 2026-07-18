@@ -20,7 +20,7 @@ from random import Random
 
 from edge.spacebattle.config import Quadrant, ShipClass, SpacebattleConfig
 from edge.spacebattle.model import (
-    DIRS, FACING_NAMES, Battle, FighterWing, Mine, Rock, Salvo, Ship, Side,
+    DIRS, FACING_NAMES, Battle, Debris, FighterWing, Mine, Rock, Salvo, Ship, Side,
 )
 
 PLAYER_NAMES = ("EDS Resolute", "EDS Farlight", "EDS Kestrel", "EDS Vagrant")
@@ -58,7 +58,10 @@ def _octant_diff(a: int, b: int) -> int:
 def salvo_arc_ok(ship: Ship, tx: int, ty: int) -> bool:
     """Launchers are flank components: salvos launch at targets abeam or on the
     quarter (octant diff 2–3 off the bow) — never through the forward wedge or
-    dead astern. Guns want the nose on; missiles want the beam on."""
+    dead astern. Guns want the nose on; missiles want the beam on. A starbase's
+    launchers are ring mounts: every direction is abeam."""
+    if ship.cls.station:
+        return True
     diff = _octant_diff(octant(tx - ship.x, ty - ship.y), ship.facing)
     return diff in (2, 3)
 
@@ -73,15 +76,25 @@ def arc_ok(ship: Ship, tx: int, ty: int) -> bool:
 
 
 def los_blocked(b: Battle, x1: int, y1: int, x2: int, y2: int) -> bool:
-    """Does rocky debris sit on the fire line between two cells (exclusive)?
+    """Does rock or wreckage sit on the fire line between two cells (exclusive)?
     Walks the same diagonal-first step path salvos and drift use."""
     x, y = x1, y1
     while (x, y) != (x2, y2):
         x += 0 if x == x2 else (1 if x2 > x else -1)
         y += 0 if y == y2 else (1 if y2 > y else -1)
-        if (x, y) != (x2, y2) and (x, y) in b.rocks:
+        if (x, y) != (x2, y2) and ((x, y) in b.rocks or (x, y) in b.debris):
             return True
     return False
+
+
+def station_integrity(ship: Ship) -> float:
+    """Fraction of a station's components still online — the spacebattle
+    projection of `edge.core.starbases.component_integrity` (§4.2): a base's
+    defense strength scales with its surviving components."""
+    total = sum(len(comps) for comps in ship.cls.components.values())
+    if total == 0:
+        return 1.0
+    return max(0.0, 1.0 - len(ship.down) / total)
 
 
 def quadrant_struck(target: Ship, fx: int, fy: int, rng: Random) -> Quadrant:
@@ -139,10 +152,29 @@ def apply_damage(b: Battle, target: Ship, dmg: int, quad: Quadrant, label: str,
             target.down.add(comp)
             b.log("knockout", f"{target.name}: {comp.replace('_', ' ')} knocked out "
                               f"({quad} hit).", target.x, target.y, friendly=friendly)
+            if comp == "fusion_reactor":
+                # The §4.2 emergent-derelict rule: the reactor keystone is out,
+                # the base can no longer power itself — it is disabled, not razed.
+                b.log("destroyed", f"REACTOR SCRAM — {target.name} goes dark!",
+                      target.x, target.y, friendly=friendly)
+                _check_outcome(b)
 
 
 def _check_outcome(b: Battle) -> None:
     if b.outcome is not None:
+        return
+    # Siege objective first: a starbase falls when razed OR when its reactor
+    # keystone is knocked out (the main game's §4.2 disable rule) — and with the
+    # base gone, the surviving picket doesn't fight on.
+    stations = [s for s in b.ships if s.side == "enemy" and s.cls.station]
+    if stations and all(not s.alive or not s.reactor_ok for s in stations):
+        b.outcome = "victory"
+        if any(s.alive for s in stations):
+            b.log("outcome", "The starbase is dark — boarding parties take the "
+                             "ring, and the picket scatters. The base is YOURS.")
+        else:
+            b.log("outcome", "The starbase is razed to drifting slag — nothing "
+                             "left to claim, but the sector is yours.")
         return
     if not b.fleet("enemy"):
         b.outcome = "victory"
@@ -159,6 +191,9 @@ def do_thrust(b: Battle, ship: Ship, tx: int, ty: int) -> bool:
     """Bend velocity toward the cell (one action). Includes one free 45° of
     facing toward the burn — further rotation is its own action."""
     if ship.turn_taken:
+        return False
+    if ship.cls.station:
+        b.log("info", f"{ship.name} is a station — it holds its orbit.")
         return False
     dx, dy = tx - ship.x, ty - ship.y
     if dx == 0 and dy == 0:  # burn to a stop instead
@@ -191,6 +226,9 @@ def do_rotate(b: Battle, ship: Ship, facing: int) -> bool:
     facing = (facing % 8) & ~1  # snap odd octants down to a cardinal
     if ship.turn_taken or facing == ship.facing:
         return False
+    if ship.cls.station:
+        b.log("info", f"{ship.name} is a station — it does not come about.")
+        return False
     ship.facing = facing
     ship.actions -= 1
     b.log("thrust", f"{ship.name} comes about to {FACING_NAMES[ship.facing]}.",
@@ -222,11 +260,16 @@ def fire_gun(b: Battle, ship: Ship, tx: int, ty: int) -> bool:
         return False
     ship.actions -= 1
     friendly = ship.side == "player"
+    dmg = gun.damage
+    if ship.cls.station:
+        # A battered base hits softer — damage scales with surviving components,
+        # after `edge.core.starbases.assault_foe` (0.5 + 0.5 × integrity).
+        dmg = max(1, round(dmg * (0.5 + 0.5 * station_integrity(ship))))
     if target is not None:
         acc = gun.accuracy - gun.falloff * d \
             - b.config.combat.velocity_evasion * target.speed
         if b.rng.random() < max(0.05, acc):
-            apply_damage(b, target, gun.damage,
+            apply_damage(b, target, dmg,
                          quadrant_struck(target, ship.x, ship.y, b.rng),
                          f"{ship.name}'s main gun", attacker=(ship.x, ship.y))
         else:
@@ -234,7 +277,7 @@ def fire_gun(b: Battle, ship: Ship, tx: int, ty: int) -> bool:
                   tx, ty, friendly=friendly)
     elif wing is not None:
         if b.rng.random() < max(0.05, gun.accuracy - gun.falloff * d - 0.2):
-            lost = min(wing.strength, 1 + gun.damage // 8)
+            lost = min(wing.strength, 1 + dmg // 8)
             wing.strength -= lost
             b.log("hit", f"{ship.name}'s main gun rips through the fighter wing "
                          f"(-{lost} craft).", tx, ty, friendly=friendly)
@@ -275,8 +318,10 @@ def launch_salvo(b: Battle, ship: Ship, target: Ship) -> bool:
 
 
 def _reachable_deploy(b: Battle, ship: Ship, tx: int, ty: int) -> bool:
-    return b.in_bounds(tx, ty) and \
-        dist(ship.x, ship.y, tx, ty) <= b.config.combat.deploy_reach
+    # A station's footprint fills the adjacent cells, so its deploy ring sits
+    # just outside the hull.
+    reach = b.config.combat.deploy_reach + ship.cls.size // 2
+    return b.in_bounds(tx, ty) and dist(ship.x, ship.y, tx, ty) <= reach
 
 
 def launch_wing(b: Battle, ship: Ship, tx: int, ty: int, *, free: bool = False) -> bool:
@@ -329,7 +374,7 @@ def lay_mine(b: Battle, ship: Ship, tx: int, ty: int, *, free: bool = False) -> 
         b.log("info", "In combat, mines drop alongside the ship.")
         return False
     if not b.in_bounds(tx, ty) or b.mine_at(tx, ty) is not None \
-            or (tx, ty) in b.rocks:
+            or (tx, ty) in b.rocks or (tx, ty) in b.debris:
         b.log("info", "No room for a mine there.")
         return False
     ship.mines -= 1
@@ -563,6 +608,8 @@ def end_turn(b: Battle, side: Side) -> None:
 
 
 def _drift(b: Battle, ship: Ship) -> None:
+    if ship.cls.station:  # a station holds its orbit
+        return
     steps = max(abs(ship.vx), abs(ship.vy))
     for _ in range(steps):
         nx = ship.x + (0 if ship.vx == 0 else (1 if ship.vx > 0 else -1))
@@ -591,6 +638,20 @@ def _drift(b: Battle, ship: Ship) -> None:
             apply_damage(b, ship, rc.impact_base + rc.impact_per_speed * speed,
                          quad, "The impact")
             return
+        deb = b.debris.get((nx, ny))
+        if deb is not None:  # smash THROUGH the wreckage: lighter hit, vector kept
+            speed = ship.speed
+            quad = quadrant_struck(ship, nx, ny, b.rng)
+            del b.debris[(nx, ny)]
+            ship.x, ship.y = nx, ny
+            dc = b.config.debris
+            b.log("mine", f"{ship.name} smashes through drifting wreckage!",
+                  nx, ny, friendly=ship.side == "enemy")
+            apply_damage(b, ship, dc.impact_base + dc.impact_per_speed * speed,
+                         quad, "The wreckage")
+            if not ship.alive:
+                return
+            continue
         ship.x, ship.y = nx, ny
         mine = next((m for m in b.mines if (m.x, m.y) == (nx, ny)
                      and m.side != ship.side), None)
@@ -622,7 +683,12 @@ def _advance_salvos(b: Battle, side: Side) -> None:
                 b.log("info", "A salvo shreds itself against rocky debris.",
                       salvo.x, salvo.y)
                 break
-            if (salvo.x, salvo.y) == (target.x, target.y):
+            if (salvo.x, salvo.y) in b.debris:
+                b.salvos.remove(salvo)
+                b.log("info", "A salvo shreds itself against drifting wreckage.",
+                      salvo.x, salvo.y)
+                break
+            if (salvo.x, salvo.y) in target.cells:
                 _salvo_strike(b, salvo, target, px, py)
                 break
         else:
@@ -699,6 +765,72 @@ def seed_rocks(b: Battle) -> None:
             y = max(1, min(b.config.height - 2, y + dy))
 
 
+def seed_debris(b: Battle) -> None:
+    """Scatter drifting-wreckage clumps across the midfield (graveyard
+    scenarios) — same random-walk blobs as `seed_rocks`, different matter."""
+    sc = b.config.scenarios[b.scenario_key]
+    if sc.debris_clusters <= 0:
+        return
+    x_lo = int(b.config.width * 0.22)
+    x_hi = int(b.config.width * 0.88)
+    for _ in range(sc.debris_clusters):
+        x = b.rng.randint(x_lo, x_hi)
+        y = b.rng.randint(1, b.config.height - 2)
+        for _cell in range(sc.debris_cluster_size):
+            if b.in_bounds(x, y) and (x, y) not in b.debris \
+                    and not b.cell_occupied(x, y):
+                b.debris[(x, y)] = Debris(id=b.next_id(), x=x, y=y)
+            dx, dy = b.rng.choice(DIRS)
+            x = max(x_lo, min(x_hi, x + dx))
+            y = max(1, min(b.config.height - 2, y + dy))
+
+
+def setup_siege(b: Battle) -> None:
+    """Starbase assault: the base sits deep in the sector behind its perimeter
+    defense — a hidden mine ring sown from its own stock, fighter pickets
+    already out, guard ships at anchor. It spawns facing W (toward the warp-in),
+    so the reactor quadrant is the FAR side: the attacker has to fight around
+    behind it, through everything the perimeter can throw."""
+    sc = b.config.scenarios[b.scenario_key]
+    assert sc.station is not None
+    cls = b.config.ships[sc.station]
+    bx, by = int(b.config.width * 0.78), b.config.height // 2
+    base = spawn_ship(b, "enemy", cls, "Starbase VIGIL", bx, by, 4)
+    for i, key in enumerate(sc.enemy):  # the guard picket at anchor
+        gy = by + (i + 1) * 5 * (1 if i % 2 == 0 else -1)
+        gy = max(0, min(b.config.height - 1, gy))
+        spawn_ship(b, "enemy", b.config.ships[key],
+                   ENEMY_NAMES[i % len(ENEMY_NAMES)], bx - 3, gy, 4)
+    fc = b.config.fighters
+    while base.wings_docked > 0:  # fighter pickets ringing the base
+        for _try in range(40):
+            wx = bx + b.rng.randint(-4, 4)
+            wy = by + b.rng.randint(-4, 4)
+            if dist(wx, wy, bx, by) >= 2 and b.in_bounds(wx, wy) \
+                    and not b.cell_occupied(wx, wy):
+                base.wings_docked -= 1
+                b.wings.append(FighterWing(
+                    id=b.next_id(), side="enemy", x=wx, y=wy,
+                    strength=fc.wing_size, endurance=fc.endurance,
+                    carrier_id=base.id, facing=4))
+                break
+        else:
+            base.wings_docked -= 1  # nowhere to picket it; eat it
+    ring, base.mines = base.mines, 0  # the hidden perimeter mine ring
+    for _ in range(ring):
+        for _try in range(60):
+            ang = b.rng.uniform(0.0, 2.0 * math.pi)
+            r = b.rng.randint(4, 7)
+            mx, my = bx + round(math.cos(ang) * r), by + round(math.sin(ang) * r)
+            if b.in_bounds(mx, my) and b.mine_at(mx, my) is None \
+                    and not b.cell_occupied(mx, my):
+                b.mines.append(Mine(id=b.next_id(), side="enemy", x=mx, y=my))
+                break
+    b.log("sensor", "The starbase's perimeter is live — pickets out, guard "
+                    "ships at anchor, and the approaches are almost certainly "
+                    "mined. Kill its reactor or raze it.", friendly=False)
+
+
 def warp_in_enemy(b: Battle) -> None:
     """The attack arrives: enemy fleet materializes on the right edge, facing in."""
     sc = b.config.scenarios[b.scenario_key]
@@ -706,6 +838,7 @@ def warp_in_enemy(b: Battle) -> None:
         y = int(b.config.height / 2 + (i - (len(sc.enemy) - 1) / 2) * 4)
         y = max(0, min(b.config.height - 1, y))
         b.rocks.pop((b.config.width - 2, y), None)  # the warp flare clears the cell
+        b.debris.pop((b.config.width - 2, y), None)
         spawn_ship(b, "enemy", b.config.ships[key], ENEMY_NAMES[i % len(ENEMY_NAMES)],
                    b.config.width - 2, y, 4)
     b.log("sensor", "CONTACT — hostile fleet warping in on the sector's far side!",
@@ -772,12 +905,12 @@ def enemy_turn(b: Battle) -> None:
 
 
 def _drift_hits_rock(b: Battle, ship: Ship) -> bool:
-    """Would the ship's current vector carry it into debris next drift?"""
+    """Would the ship's current vector carry it into rock or wreckage next drift?"""
     x, y, vx, vy = ship.x, ship.y, ship.vx, ship.vy
     for _ in range(max(abs(vx), abs(vy))):
         x += 0 if vx == 0 else (1 if vx > 0 else -1)
         y += 0 if vy == 0 else (1 if vy > 0 else -1)
-        if (x, y) in b.rocks:
+        if (x, y) in b.rocks or (x, y) in b.debris:
             return True
     return False
 
@@ -790,7 +923,38 @@ def _beam_facing(ship: Ship, tx: int, ty: int) -> int:
         if options else ship.facing
 
 
+def _bot_station_action(b: Battle, ship: Ship) -> bool:
+    """The starbase fights from its anchorage: gun what's in range, salvo what
+    isn't, put its remaining wings out when the attack closes, and work damage
+    control between exchanges."""
+    players = sorted(b.fleet("player"),
+                     key=lambda s: dist(ship.x, ship.y, s.x, s.y))
+    if not players:
+        return False
+    target = players[0]
+    d = dist(ship.x, ship.y, target.x, target.y)
+    gun = ship.cls.main_gun
+    if d <= gun.range and ship.gun_ok \
+            and not los_blocked(b, ship.x, ship.y, target.x, target.y):
+        return fire_gun(b, ship, target.x, target.y)
+    if ship.salvos > 0 and ship.launcher_ok \
+            and ship.actions >= b.config.combat.salvo_action_cost \
+            and d <= ship.cls.missile.speed * ship.cls.missile.endurance:
+        return launch_salvo(b, ship, target)
+    if ship.wings_docked > 0 and d <= ship.cls.sensor_range + 6:
+        reach = b.config.combat.deploy_reach + ship.cls.size // 2
+        for ddx, ddy in DIRS:
+            wx, wy = ship.x + ddx * reach, ship.y + ddy * reach
+            if b.in_bounds(wx, wy) and not b.cell_occupied(wx, wy):
+                return launch_wing(b, ship, wx, wy)
+    if ship.down and ship.actions >= b.config.combat.damage_control_cost:
+        return damage_control(b, ship)
+    return False
+
+
 def _bot_ship_action(b: Battle, ship: Ship) -> bool:
+    if ship.cls.station:
+        return _bot_station_action(b, ship)
     players = sorted(b.fleet("player"),
                      key=lambda s: dist(ship.x, ship.y, s.x, s.y))
     if not players:
