@@ -76,8 +76,13 @@ fighters:
 #
 # Ship classes reference the real hull roster (hull_art keys the sprite set and is
 # a ship_classes id from config/default.yaml). Screens are per-quadrant ablative
-# pools; components live in quadrants and are knocked out only once that quadrant's
-# screen is down (fore: main_gun/sensors, aft: drive, flanks: launchers).
+# shields that soak damage before the hull; components live in quadrants and are
+# knocked out only once that quadrant's screen is down (fore: main_gun/sensors,
+# aft: drive, flanks: launchers). Each quadrant also carries a `shield_<quad>`
+# generator: it rebuilds that facing's screen `combat.screen_regen` per own turn
+# (hull unhurt), and once knocked out that facing no longer regenerates until
+# damage control brings it back. The starbase keeps its aft quadrant a pure
+# `fusion_reactor` keystone (the siege take-point), so it has no `shield_aft`.
 ships:
   frigate:
     label: Missile Frigate
@@ -92,10 +97,10 @@ ships:
     missile: {damage: 8, speed: 3, endurance: 4, accuracy: 0.70}
     screens: {fore: 30, aft: 20, port: 26, starboard: 26}
     components:
-      fore: [main_gun, sensors]
-      aft: [drive]
-      port: [launcher]
-      starboard: [launcher]
+      fore: [main_gun, sensors, shield_fore]
+      aft: [drive, shield_aft]
+      port: [launcher, shield_port]
+      starboard: [launcher, shield_starboard]
     fighter_wings: 2
     mine_stock: 6
     recon_drones: 2
@@ -112,10 +117,10 @@ ships:
     missile: {damage: 8, speed: 3, endurance: 3, accuracy: 0.70}
     screens: {fore: 16, aft: 12, port: 14, starboard: 14}
     components:
-      fore: [main_gun, sensors]
-      aft: [drive]
-      port: [launcher]
-      starboard: [launcher]
+      fore: [main_gun, sensors, shield_fore]
+      aft: [drive, shield_aft]
+      port: [launcher, shield_port]
+      starboard: [launcher, shield_starboard]
     fighter_wings: 0
     mine_stock: 2
     recon_drones: 1
@@ -132,10 +137,10 @@ ships:
     missile: {damage: 8, speed: 3, endurance: 5, accuracy: 0.70}
     screens: {fore: 44, aft: 28, port: 36, starboard: 36}
     components:
-      fore: [main_gun, sensors]
-      aft: [drive]
-      port: [launcher]
-      starboard: [launcher]
+      fore: [main_gun, sensors, shield_fore]
+      aft: [drive, shield_aft]
+      port: [launcher, shield_port]
+      starboard: [launcher, shield_starboard]
     fighter_wings: 3
     mine_stock: 0
     recon_drones: 1
@@ -162,10 +167,10 @@ ships:
     missile: {damage: 8, speed: 3, endurance: 4, accuracy: 0.70}
     screens: {fore: 40, aft: 40, port: 40, starboard: 40}
     components:
-      fore: [main_gun, sensors]
-      aft: [fusion_reactor]
-      port: [launcher]
-      starboard: [launcher]
+      fore: [main_gun, sensors, shield_fore]
+      aft: [fusion_reactor]        # aft stays the pure reactor keystone (the take-point)
+      port: [launcher, shield_port]
+      starboard: [launcher, shield_starboard]
     fighter_wings: 3
     mine_stock: 10           # sown at setup as the hidden perimeter mine ring
     recon_drones: 0

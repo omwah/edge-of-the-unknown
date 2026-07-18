@@ -271,8 +271,10 @@ real: line up broadsides, don't overshoot into their minefield.
 [b]Facing is armor and armament[/] — the main gun bears through its arc \
 (spinal: dead ahead only; ahead: a forward wedge). Hits strike the aspect they \
 arrive on: fore/aft hits are [b]rakes[/] (bonus damage), so keep your bows on \
-and your kilt clear. Screens ablate per quadrant; once one is down, hits knock \
-out what lives there — gun forward, drive aft, launchers on the flanks.
+and your kilt clear. Screens are [b]ablative shields[/] that soak damage before \
+the hull; once a facing's screen is down, hits knock out what lives there — gun \
+forward, drive aft, launchers on the flanks, and a [b]shield generator[/] behind \
+each facing.
 
 [b]Missiles[/] are traveling salvos: they chase their target a few cells per \
 turn until fuel-out. Launchers are [b]flank[/] mounts — the target must lie \
@@ -289,7 +291,10 @@ mines only inside sensor range. In combat you can drop one alongside \
 ([b]n[/]) — the full minefield picture is a peacetime luxury.
 
 [b]The Basilisk kit[/] — sidewall [b]screens regenerate[/] a little each turn \
-a ship's hull goes unhurt, so standing off pays; [b]u[/] spends the whole turn \
+a ship's hull goes unhurt, so standing off pays — but only while that facing's \
+[b]shield generator[/] is intact. Batter a quadrant's screen down and land a \
+hull hit and you may knock its generator out; that side then stops recovering \
+until [b]u[/] repairs it. [b]u[/] spends the whole turn \
 on damage control to restore one knocked-out component; [b]p[/] throws a recon \
 drone downrange to paint hidden mines; and a fleeing ship's kilt is wide open \
 (aft rakes hit doubly hard from dead astern). If you took the [b]grav-lance \
