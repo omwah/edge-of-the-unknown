@@ -1258,7 +1258,7 @@ def _codex_entries(state: UniverseState, player: Player) -> list[dto.CodexEntry]
             location = f"Sector {_display(state, disc.sector_id)}"
         entries.append((disc.rarity_tier.value, dto.CodexEntry(
             name=disc.name or f"{disc.kind.value} · {disc.rarity_tier.name}",
-            kind=f"{disc.kind.value.replace('_', ' ')} · {disc.rarity_tier.name}",
+            kind=disc.kind.value.replace("_", " "),
             location=location,
             rarity=disc.rarity_tier.name, detail="; ".join(_payload_lines(disc.payload)),
             sector_id=disc.sector_id,

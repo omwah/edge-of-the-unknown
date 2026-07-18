@@ -1038,6 +1038,7 @@ async def test_codex_plot_route_to_a_logged_find() -> None:
     from textual.widgets import DataTable
 
     from edge.core.rules import Salvage, Warp
+    from edge.tui.detail_table import DetailTable
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -1070,6 +1071,9 @@ async def test_codex_plot_route_to_a_logged_find() -> None:
 
         app.push_screen(ComputerScreen(svc, 1, initial_tab="codex"))
         await pilot.pause()
+        codex = app.screen.query_one("#codex-table-panel", DetailTable)
+        assert codex._rows[0][1][1] == disc.kind.value.replace("_", " ")
+        assert codex._rows[0][1][3] == disc.rarity_tier.name.title()
         await pilot.press("p")  # plot a route to the highlighted find
         await pilot.pause()
         assert app.screen._active_subview() == "route"

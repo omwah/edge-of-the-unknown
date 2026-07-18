@@ -366,7 +366,7 @@ class CodexEntry:
     rarity: str
     detail: str  # payload / lore fragment
     sector_id: int = -1  # internal id of the find's containing sector (WP14 route tie-in)
-    kind: str = ""  # "wreck · RARE" — what it *is*, now that `name` says what it is *called*
+    kind: str = ""  # "wreck" — what it *is*, now that `name` says what it is *called*
 
 
 @dataclass(frozen=True)
