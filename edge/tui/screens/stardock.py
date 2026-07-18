@@ -46,6 +46,7 @@ from edge.tui.design import ActionDescriptor
 from edge.tui.screens.engine_room import EngineRoomScreen
 from edge.tui.screens.port import _haggle_highlighted, _trade_highlighted
 from edge.tui.screens.rumor import RumorModal
+from edge.tui.station_art import StationArtRow, station_icon_dimensions
 from edge.tui.widgets import ServiceHub, TradePanel
 
 
@@ -95,11 +96,13 @@ class _StardockServiceArt(Static):
 class _DockStructureArt(Static):
     """Responsive Stardock silhouette paired with each service banner."""
 
-    def __init__(self, sector_id: int, archetype_id: str | None, cinematic: bool) -> None:
-        self._key = ("dock-structure", sector_id, archetype_id, cinematic)
+    def __init__(self, sector_id: int, archetype_id: str | None, cinematic: bool,
+                 icon_size: tuple[int, int]) -> None:
+        self._key = ("dock-structure", sector_id, archetype_id, cinematic, icon_size)
         super().__init__(remembered(self._key) or "", classes="dock-structure-art")
         self._sector_id = sector_id
         self._archetype_id = archetype_id
+        self.styles.width, self.styles.height = icon_size
 
     def on_mount(self) -> None:
         self._refresh_art()
@@ -109,8 +112,11 @@ class _DockStructureArt(Static):
 
     def _refresh_art(self) -> None:
         wide = getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "wide"
-        self._key = ("dock-structure", self._sector_id, self._archetype_id, wide)
-        width, height = (36, 12) if wide else (24, 8)
+        width, height = station_icon_dimensions(self.app, "stardock", wide,
+                                                expect_sector=self._sector_id)
+        self._key = ("dock-structure", self._sector_id, self._archetype_id,
+                     wide, (width, height))
+        self.styles.width, self.styles.height = width, height
         self.update(remember(self._key, art_adapter.sprite(
             "port", "stardock", seed=self._sector_id, width=width, height=height,
             archetype_id=self._archetype_id,
@@ -199,7 +205,7 @@ footer."""
         text-style: bold; padding: 0 1;
     }
     StardockScreen .service-art-header {
-        height: 8; margin-bottom: 1; content-align: left top;
+        height: 8; margin-bottom: 1; align: left middle;
     }
     StardockScreen .dock-structure-art {
         width: 24; height: 8; margin-right: 1; content-align: left top;
@@ -373,11 +379,18 @@ footer."""
         `edge.tui.art_memory`."""
         cinematic = getattr(self.app.layout_tier, "value", "standard") == "wide"
         theme = str(self.app.theme)
-        return Horizontal(
-            _DockStructureArt(port.sector_id, port.archetype_id, cinematic),  # type: ignore[attr-defined]
+        sector_id: int = port.sector_id  # type: ignore[attr-defined]
+        icon_size = station_icon_dimensions(self.app, "stardock", cinematic,
+                                            expect_sector=sector_id)
+        header = StationArtRow(
+            "stardock",
+            _DockStructureArt(sector_id, port.archetype_id, cinematic,  # type: ignore[attr-defined]
+                              icon_size),
             _StardockServiceArt(tab, cinematic, theme),
+            expect_sector=sector_id,
             classes="service-art-header",
         )
+        return header
 
     def _colonist_panels(self, dock: object, port: object) -> ComposeResult:
         """The recruitment office (§4.2, WP-PR08 / PT-06): berth occupancy + a recruit control."""

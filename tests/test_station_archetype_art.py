@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,12 +13,14 @@ from edge.art.stations import (
 from edge.art.generator import generate_sprite
 from edge.bigbang.station_archetypes import assign_station_archetypes
 from edge.config import load_default_config
+from edge.core.config import PlanetSpriteSize, SceneArtConfig, SpriteSize
 from edge.core.enums import PortClass
 from edge.core.models import (
     Game, Ownership, Port, Region, Sector, Starbase, UniverseState,
 )
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
+from edge.tui.station_art import station_icon_dimensions
 
 
 @pytest.mark.parametrize("kind,services", [
@@ -56,6 +59,98 @@ def test_archetype_icons_are_distinct_procedural_cell_art(subtype: str) -> None:
     ) for archetype in sorted(STATION_ARCHETYPES)]
     assert len({icon.plain for icon in icons}) == len(STATION_ARCHETYPES)
     assert all(len(icon.plain.splitlines()) <= 8 for icon in icons)
+
+
+def test_station_dimensions_preserve_original_primary_and_lone_branches() -> None:
+    cfg = SceneArtConfig(
+        planet=PlanetSpriteSize(min_height=4, max_height=20),
+        port=SpriteSize(min_width=1, min_height=1, max_width=30, max_height=10),
+        stardock=SpriteSize(min_width=1, min_height=1, max_width=36, max_height=12),
+        starbase=SpriteSize(min_width=1, min_height=1, max_width=40, max_height=20),
+        port_scale=0.25,
+        stardock_scale=0.5,
+        starbase_scale=0.75,
+    )
+    assert cfg.station_dimensions(
+        "port", primary_height=20, body_height=99) == (12, 5)
+    assert cfg.station_dimensions(
+        "stardock", primary_height=20, body_height=99) == (24, 10)
+    assert cfg.station_dimensions(
+        "starbase", primary_height=20, body_height=99) == (36, 15)
+    # No primary: exactly the old body_h * 0.6 / width * 2.6 branch; scales do not apply.
+    assert cfg.station_dimensions(
+        "port", primary_height=None, body_height=10) == (15, 6)
+
+
+def test_docked_header_reuses_the_sector_composers_resolved_size() -> None:
+    cfg = SceneArtConfig()
+    app = SimpleNamespace(
+        scene_art=cfg,
+        sector_station_reference=(7, 20, 99),
+    )
+    assert station_icon_dimensions(app, "port", False) == cfg.station_dimensions(
+        "port", primary_height=20, body_height=99)
+
+
+def test_docked_header_rejects_a_reference_from_another_sector() -> None:
+    """The published reference is only trusted for the sector being drawn: a caller
+    that names its sector must never be sized by a stale cache from elsewhere."""
+    cfg = SceneArtConfig()
+    app = SimpleNamespace(
+        scene_art=cfg,
+        sector_station_reference=(7, 20, 99),
+    )
+    assert station_icon_dimensions(app, "port", False, expect_sector=7) == (
+        cfg.station_dimensions("port", primary_height=20, body_height=99))
+    # Mismatch ⇒ fall back to the kind's bounds, exactly like a direct-open screen.
+    assert station_icon_dimensions(app, "port", False, expect_sector=8) == (
+        cfg.port.max_width, cfg.port.max_height)
+
+
+async def test_stardock_header_keeps_the_stardock_exterior(monkeypatch) -> None:
+    """Scaling the left-hand silhouette must never route it through port art."""
+    from edge.tui import art_adapter
+    from edge.tui.app import EdgeApp
+    from edge.tui.screens.stardock import _DockStructureArt
+
+    calls: list[tuple[str, str]] = []
+    real_sprite = art_adapter.sprite
+
+    def recording_sprite(entity: str, subtype: str, **kwargs):  # type: ignore[no-untyped-def]
+        calls.append((entity, subtype))
+        return real_sprite(entity, subtype, **kwargs)
+
+    monkeypatch.setattr(art_adapter, "sprite", recording_sprite)
+    app = EdgeApp()
+    async with app.run_test(size=(110, 36)) as pilot:
+        cinematic = app.layout_tier.value == "wide"
+        size = station_icon_dimensions(app, "stardock", cinematic)
+        await app.mount(_DockStructureArt(7, "humanoid_diplomat", cinematic, size))
+        await pilot.pause()
+
+    assert ("port", "stardock") in calls
+    assert ("port", "trading_port") not in calls
+
+
+async def test_station_header_vertically_centers_exterior_and_banner() -> None:
+    from edge.tui.app import EdgeApp
+    from edge.tui.station_art import StationArtHeader
+
+    app = EdgeApp()
+    async with app.run_test(size=(110, 36)) as pilot:
+        header = StationArtHeader(
+            "port", "humanoid_diplomat", "trade", identity=7,
+        )
+        await app.mount(header)
+        await pilot.pause()
+        icon, banner = list(header.children)
+        # A 9-row port beside an 8-row banner has no exact cell midpoint. Bias the
+        # shorter banner down one row instead of top-aligning it; doubled midpoints
+        # then differ by only one half-row.
+        assert banner.region.y == icon.region.y + 1
+        icon_midpoint = 2 * icon.region.y + icon.region.height
+        banner_midpoint = 2 * banner.region.y + banner.region.height
+        assert abs(icon_midpoint - banner_midpoint) == 1
 
 
 def test_assignment_is_seeded_roster_driven_and_fixed_after_capture() -> None:

@@ -60,19 +60,41 @@ def test_default_scene_art_values() -> None:
     assert (scene.planet_detail.min_height, scene.planet_detail.max_height) == (4, 16)
     assert (scene.port.min_width, scene.port.max_width) == (6, 18)
     assert (scene.port.min_height, scene.port.max_height) == (4, 8)
+    # The conftest override omits the station-specific blocks, so these come from
+    # default.yaml: caps sized so round(scale × planet.max_height) is never clipped
+    # (a lower cap pins the station at one size across most viewports).
+    assert (scene.stardock.max_width, scene.stardock.max_height) == (38, 16)
+    assert (scene.starbase.max_width, scene.starbase.max_height) == (22, 9)
     assert (scene.ship.min_width, scene.ship.max_width) == (6, 16)
     assert (scene.ship.min_height, scene.ship.max_height) == (3, 6)
     assert scene.max_ships_shown == 2
     assert scene.ship_face_inward_chance == 0.5
+    assert (scene.port_scale, scene.stardock_scale, scene.starbase_scale) == (0.25, 0.6, 0.35)
 
 
 def test_scene_art_is_optional_with_defaults() -> None:
     # The whole `scene:` block is optional — GameConfig.scene defaults to these,
     # so configs/saves predating it still validate.
     scene = SceneArtConfig()
-    assert scene.planet.max_width == 2 * scene.planet.max_height == 24
+    assert scene.planet.max_width == 2 * scene.planet.max_height == 52
     assert scene.planet.min_width == 2 * scene.planet.min_height
-    assert scene.max_ships_shown == 2
+    assert scene.max_ships_shown == 3
+    # Schema defaults mirror default.yaml so config-less saves get the same
+    # non-saturating station caps (max_height ≥ round(scale × planet.max_height)).
+    assert scene.port.max_height == 6
+    assert scene.stardock.max_height == 16
+    assert scene.starbase.max_height == 9
+    assert (scene.port_scale, scene.stardock_scale, scene.starbase_scale) == (0.25, 0.6, 0.35)
+    # Traffic must never outsize the port it visits: ship stays below port on
+    # both the scale and the cap, at every viewport.
+    assert scene.ship_scale < scene.port_scale
+    assert scene.ship.max_height < scene.port.max_height
+    for kind in ("port", "stardock", "starbase"):
+        size = scene.station_size(kind)
+        scale = {"port": scene.port_scale, "stardock": scene.stardock_scale,
+                 "starbase": scene.starbase_scale}[kind]
+        assert size.max_height >= round(scene.planet.max_height * scale)
+        assert size.max_width >= int(size.max_height * 2.4)
 
 
 def test_default_ui_values() -> None:

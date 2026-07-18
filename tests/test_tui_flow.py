@@ -831,8 +831,20 @@ async def test_click_port_art_docks() -> None:
         await app.screen.recompose()
         await pilot.pause()
         scene = app.screen.query_one(SectorScene)
+        scene.render()  # publishes the exact viewport-dependent station inputs
+        reference = app.sector_station_reference
+        assert reference is not None
+        _sector_id, primary_height, body_height = reference
+        kind = "stardock" if port.klass.value == 9 else "port"
+        rendered = app.scene_art.station_dimensions(
+            kind, primary_height=primary_height, body_height=body_height)
         await _click_hotspot(pilot, scene, dest="port")
         assert isinstance(app.screen, (PortScreen, StardockScreen))
+        await pilot.pause()
+        icon = (app.screen.query_one(".dock-structure-art")
+                if isinstance(app.screen, StardockScreen)
+                else app.screen.query_one(".station-icon"))
+        assert (icon.region.width, icon.region.height) == rendered
 
 
 async def test_sector_view_caps_ship_sprites_and_keeps_overflow_hailable() -> None:

@@ -68,6 +68,9 @@ class EdgeApp(App[None]):
         # SectorView sprite-scene sizes + warp-grid options; replaced from config
         # when a game starts.
         self.scene_art = SceneArtConfig()
+        # Last station sizing inputs from the rendered SectorScene. Docked headers
+        # feed them through the same resolver instead of guessing the hidden scene.
+        self.sector_station_reference: tuple[int, int | None, int] | None = None
         self.ui_config = UIConfig()
         self.max_warps_per_sector = 6  # TW2002 cap; reserves the warp grid's row count
         self.computer_tab = "trade"  # last Computer subview, restored when reopened with [C]

@@ -1407,16 +1407,47 @@ class SceneArtConfig(BaseModel):
 
     planet: PlanetSpriteSize = PlanetSpriteSize(max_height=26)  # SectorView primary body
     planet_detail: PlanetSpriteSize = PlanetSpriteSize(max_height=14)  # PlanetScreen orbit view
-    port: SpriteSize = SpriteSize(max_width=20, max_height=9)
-    ship: SpriteSize = SpriteSize(max_width=16, max_height=6)
+    # Station max_height must stay ≥ round(scale × planet.max_height) — a lower cap
+    # saturates while the planet is still growing, freezing the station at one size
+    # across most viewports (the responsiveness bug this guards against). max_width
+    # covers the 2.4 primary-branch aspect at max_height.
+    port: SpriteSize = SpriteSize(max_width=16, max_height=6)
+    stardock: SpriteSize = SpriteSize(max_width=38, max_height=16)
+    starbase: SpriteSize = SpriteSize(max_width=22, max_height=9)
+    ship: SpriteSize = SpriteSize(max_width=16, max_height=5)
     max_ships_shown: int = Field(default=3, gt=0)  # sprites; extras list as text
     ship_face_inward_chance: float = Field(default=0.5, ge=0.0, le=1.0)
-    # Arrival-view scale hierarchy (PT-36): the primary body (planet, else a space
-    # find, else the station) takes most of the free height; a port/starbase and
-    # the ships derive from it, so everything in the scene is sized relative to
-    # the largest thing present rather than to a reserved layout band.
-    port_scale: float = Field(default=0.5, gt=0.0, le=1.0)  # of the primary body's height
-    ship_scale: float = Field(default=0.3, gt=0.0, le=1.0)  # of the primary body's height
+    # Arrival-view scale hierarchy (PT-36): a station beside a rendered primary
+    # body scales from that body's actual height; a lone station scales from the
+    # scene body. The docked header reuses the Sector composer's resolved dimensions.
+    port_scale: float = Field(default=0.25, gt=0.0, le=1.0)
+    stardock_scale: float = Field(default=0.6, gt=0.0, le=1.0)
+    starbase_scale: float = Field(default=0.35, gt=0.0, le=1.0)
+    # Below port_scale so traffic never outsizes the port it visits (§ scale hierarchy).
+    ship_scale: float = Field(default=0.2, gt=0.0, le=1.0)  # of the primary body's height
+
+    def station_size(self, kind: Literal["port", "stardock", "starbase"]) -> SpriteSize:
+        """The per-type footprint bounds shared by Sector and docked station views."""
+        return {"port": self.port, "stardock": self.stardock,
+                "starbase": self.starbase}[kind]
+
+    def station_dimensions(
+        self, kind: Literal["port", "stardock", "starbase"],
+        *, primary_height: int | None, body_height: int,
+    ) -> tuple[int, int]:
+        """Resolve the original `_paint_station` sizing with per-kind config."""
+        size = self.station_size(kind)
+        scale = {"port": self.port_scale, "stardock": self.stardock_scale,
+                 "starbase": self.starbase_scale}[kind]
+        if primary_height is not None:
+            height = max(size.min_height,
+                         min(size.max_height, round(primary_height * scale)))
+            width = max(size.min_width, min(size.max_width, int(height * 2.4)))
+        else:
+            height = max(size.min_height,
+                         min(size.max_height, int(body_height * 0.6)))
+            width = max(size.min_width, min(size.max_width, int(height * 2.6)))
+        return width, height
 
 
 class UIConfig(BaseModel):

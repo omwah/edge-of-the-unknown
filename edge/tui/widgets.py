@@ -790,9 +790,10 @@ class _SceneComposer:
     their sprite, so no object reserves a caption row of its own.
 
     The scale hierarchy derives from `SceneArtConfig`: the primary body fills
-    most of the free height, and `port_scale` / `ship_scale` size the rest
-    relative to it. All placement randomness is seeded off the sector id, so a
-    sector always composes the same way.
+    most of the free height. Port, Stardock, and starbase use their own configured
+    sprite heights (shared with their docked screens), while `ship_scale` sizes
+    ships relative to the primary. All placement randomness is seeded off the
+    sector id, so a sector always composes the same way.
 
     Pure presentation: consumes only the `SectorDTO`, emits a `rich.Text` plus
     the hotspot rects `SectorScene.on_click` routes. Usable without a running
@@ -809,6 +810,7 @@ class _SceneComposer:
         self._occupied: list[tuple[int, int, int, int]] = []
         # Objects that found no free sky degrade to text rows (still clickable).
         self._deferred: list[tuple[str, str | None, int | str | None]] = []
+        self.station_reference: tuple[int | None, int] | None = None
         self._w = 0
         self._h = 0
 
@@ -955,6 +957,7 @@ class _SceneComposer:
         self.hotspots = []
         self._occupied = []
         self._deferred = []
+        self.station_reference = None
         self._grid = self._starfield(w, h)
 
         # Header — sector + band, flavor, beacon; centred across the full width.
@@ -1048,15 +1051,17 @@ class _SceneComposer:
         bases = list(getattr(sec, "starbases", ()) or ())
         if not bases and not sec.ports:
             return None
-        p = cfg.port
-        if primary is not None:
-            _px0, py0, _px1, py1 = primary
-            ph = py1 - py0
-            sh = max(p.min_height, min(p.max_height, round(ph * cfg.port_scale)))
-            sw = max(p.min_width, min(p.max_width, int(sh * 2.4)))
+        primary_height = ((primary[3] - primary[1]) if primary is not None else None)
+        if bases:
+            sw, sh = cfg.station_dimensions(
+                "starbase", primary_height=primary_height, body_height=body_h)
+        elif sec.ports[0].is_stardock:
+            sw, sh = cfg.station_dimensions(
+                "stardock", primary_height=primary_height, body_height=body_h)
         else:
-            sh = max(p.min_height, min(p.max_height, int(body_h * 0.6)))
-            sw = max(p.min_width, min(p.max_width, int(sh * 2.6)))
+            sw, sh = cfg.station_dimensions(
+                "port", primary_height=primary_height, body_height=body_h)
+        self.station_reference = (primary_height, body_h)
         if bases:
             b = bases[0]
             cells = self._sprite_cells("port", "starbase", seed=b.starbase_id,
@@ -1301,6 +1306,10 @@ class SectorScene(Static):
         composer = _SceneComposer(self._sector, self._scene_cfg())
         out = composer.compose(w, h)
         self._hotspots = composer.hotspots
+        if composer.station_reference is not None:
+            primary_height, body_height = composer.station_reference
+            self.app.sector_station_reference = (  # type: ignore[attr-defined]
+                self._sector.sector_id, primary_height, body_height)
         return out
 
     def on_click(self, event: events.Click) -> None:
