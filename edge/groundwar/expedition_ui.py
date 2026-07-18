@@ -214,8 +214,9 @@ ground [black on dark_goldenrod]◌[/] so you never dig it twice.
 one turn, far ones a multi-turn march. A march [b]halts itself[/] the moment \
 unseen disturbed ground comes into sight, so you won't tramp past the prize.
 
-[b]Supplies[/] — every turn of marching and every dig spends one. At zero the \
-shuttle recalls you — but anything found stays found, and the same planet (same \
+[b]Supplies[/] — every turn of marching and every dig spends one. Each \
+successful find restocks a share (you make camp at the site), so good \
+surveying keeps the expedition going. At zero the shuttle recalls you — but anything found stays found, and the same planet (same \
 seed) remembers across descents this session.
 
 [b]Settlements[/] — on inhabited worlds, walk inside a town and [b]talk[/]: \

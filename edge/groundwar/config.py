@@ -131,6 +131,8 @@ class ExpeditionConfig:
     supplies_start: int
     dig_cost: int
     dig_radius: int
+    find_resupply: int
+    settlement_resupply: int
     move: int
     sight: int
     area_radius: int
@@ -209,6 +211,8 @@ def _expedition(d: dict[str, object]) -> ExpeditionConfig:
         sites_min=int(d["sites_min"]), sites_max=int(d["sites_max"]),  # type: ignore[arg-type]
         supplies_start=int(d["supplies_start"]), dig_cost=int(d["dig_cost"]),  # type: ignore[arg-type]
         dig_radius=int(d["dig_radius"]),  # type: ignore[arg-type]
+        find_resupply=int(d["find_resupply"]),  # type: ignore[arg-type]
+        settlement_resupply=int(d["settlement_resupply"]),  # type: ignore[arg-type]
         move=int(d["move"]), sight=int(d["sight"]),  # type: ignore[arg-type]
         area_radius=int(d["area_radius"]), clue_radius=int(d["clue_radius"]),  # type: ignore[arg-type]
         clue_count=int(d["clue_count"]),  # type: ignore[arg-type]
