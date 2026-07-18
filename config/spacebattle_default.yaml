@@ -52,6 +52,16 @@ rocks:
   impact_base: 12         # hull-ward damage for a dead-slow scrape
   impact_per_speed: 10    # extra damage per cell/turn of the ship's speed at impact
 
+# Drifting wreckage (graveyard scenarios) — the space-debris sectors of the main
+# game (wreck discovery fields) as a tactical obstacle. Like rock it blocks fire
+# lines, shreds any salvo that flies onto it, and refuses ships/wings/mines as a
+# station — but it's torn hull plate, not a boulder: a hull that drifts onto it
+# smashes THROUGH, taking a lighter hit and KEEPING its vector (the wreckage
+# cell is destroyed). Rocks stop you dead; wreckage just costs you skin.
+debris:
+  impact_base: 6          # hull-ward damage for a dead-slow scrape
+  impact_per_speed: 6     # extra damage per cell/turn of the ship's speed at impact
+
 fighters:
   wing_size: 6        # craft per wing; strength is craft remaining
   speed: 3            # cells per move action
@@ -129,6 +139,36 @@ ships:
     fighter_wings: 3
     mine_stock: 0
     recon_drones: 1
+  # The siege set-piece: an immobile orbital starbase (main-game §4.2 model).
+  # `station: true` — it never thrusts, rotates, or drifts; its launchers are
+  # ring mounts (salvoes in any direction) and its gun is an all-round battery
+  # whose damage scales with surviving components (the assault_foe integrity
+  # rule). The `fusion_reactor` in the aft quadrant is the §4.2 keystone:
+  # collapse that screen and knock it out and the base goes dark — TAKEN —
+  # without having to raze the hull. Spawned facing W, so the reactor quadrant
+  # is the far side: you have to fight around behind it, through the perimeter.
+  starbase:
+    label: Orbital Starbase
+    hull_art: starbase       # rendered with the main game's PortGenerator art
+    station: true
+    size: 3                  # 3x3-cell footprint; the art fills it
+    hull_max: 320
+    thrust: 0
+    max_speed: 0
+    sensor_range: 12
+    main_gun: {damage: 30, range: 9, arc: all_round, accuracy: 0.85, falloff: 0.03}
+    salvos: 6
+    salvo_size: 4
+    missile: {damage: 8, speed: 3, endurance: 4, accuracy: 0.70}
+    screens: {fore: 40, aft: 40, port: 40, starboard: 40}
+    components:
+      fore: [main_gun, sensors]
+      aft: [fusion_reactor]
+      port: [launcher]
+      starboard: [launcher]
+    fighter_wings: 3
+    mine_stock: 10           # sown at setup as the hidden perimeter mine ring
+    recon_drones: 0
 
 # Scenario fleets. `deploy` picks the pre-battle interface: `prepared` gets the
 # full peacetime deploy pass (ships + mines + pre-launched fighters anywhere in
@@ -161,3 +201,22 @@ scenarios:
     player_zone_frac: 0.40   # the belt claims the middle of the board
     rock_clusters: 8         # debris clumps seeded across the midfield
     rock_cluster_size: 9     # cells per clump (random-walk blob)
+  siege:
+    label: Starbase assault
+    blurb: Break a fortified starbase — knock out its reactor to take it, or raze it trying.
+    deploy: warp_in
+    player: [battleship, frigate, corvette]
+    enemy: [corvette, corvette]   # the guard picket at anchor around the base
+    station: starbase
+    enemy_mines: 0                # the base sows its own perimeter ring from mine_stock
+    warp_zone_cells: 6
+  graveyard:
+    label: Ship graveyard
+    blurb: Fight through drifting wreckage — you can smash through it, but it costs hull.
+    deploy: full
+    player: [frigate, corvette]
+    enemy: [frigate, corvette]
+    enemy_mines: 0
+    player_zone_frac: 0.40      # the graveyard claims the middle of the board
+    debris_clusters: 10         # wreckage clumps seeded across the midfield
+    debris_cluster_size: 8      # cells per clump (random-walk blob)

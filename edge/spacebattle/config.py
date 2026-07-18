@@ -37,6 +37,8 @@ class ShipClass:
     key: str
     label: str
     hull_art: str        # sprite-set key, a ship_classes id from the main game config
+    station: bool        # immobile emplacement (starbase): no thrust/rotate/drift
+    size: int            # footprint edge in placement cells (ships 1, starbases 3)
     hull_max: int
     thrust: int
     max_speed: int
@@ -109,6 +111,9 @@ class Scenario:
     warp_zone_cells: int
     rock_clusters: int
     rock_cluster_size: int
+    station: str | None       # ship-class key of the defended starbase (siege scenarios)
+    debris_clusters: int      # drifting-wreckage clumps (graveyard scenarios)
+    debris_cluster_size: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +126,7 @@ class SpacebattleConfig:
     fighter_actions: int
     combat: CombatConfig
     rocks: RocksConfig
+    debris: RocksConfig
     lance: LanceConfig
     drone: DroneConfig
     fighters: FighterConfig
@@ -138,6 +144,7 @@ def _ship(key: str, d: dict[str, object]) -> ShipClass:
     ms = d["missile"]
     return ShipClass(
         key=key, label=str(d["label"]), hull_art=str(d["hull_art"]),
+        station=bool(d.get("station", False)), size=int(d.get("size", 1)),  # type: ignore[arg-type]
         hull_max=int(d["hull_max"]), thrust=int(d["thrust"]),  # type: ignore[arg-type]
         max_speed=int(d["max_speed"]), sensor_range=int(d["sensor_range"]),  # type: ignore[arg-type]
         main_gun=_gun(d["main_gun"]),  # type: ignore[arg-type]
@@ -179,6 +186,10 @@ def load_config(path: Path | None = None) -> SpacebattleConfig:
             impact_base=int(data["rocks"]["impact_base"]),
             impact_per_speed=int(data["rocks"]["impact_per_speed"]),
         ),
+        debris=RocksConfig(
+            impact_base=int(data["debris"]["impact_base"]),
+            impact_per_speed=int(data["debris"]["impact_per_speed"]),
+        ),
         lance=LanceConfig(
             range=int(data["lance"]["range"]),
             recharge_turns=int(data["lance"]["recharge_turns"]),
@@ -205,6 +216,9 @@ def load_config(path: Path | None = None) -> SpacebattleConfig:
                 warp_zone_cells=int(d.get("warp_zone_cells", 6)),
                 rock_clusters=int(d.get("rock_clusters", 0)),
                 rock_cluster_size=int(d.get("rock_cluster_size", 0)),
+                station=str(d["station"]) if "station" in d else None,
+                debris_clusters=int(d.get("debris_clusters", 0)),
+                debris_cluster_size=int(d.get("debris_cluster_size", 0)),
             )
             for key, d in data["scenarios"].items()
         },

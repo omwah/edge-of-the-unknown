@@ -65,6 +65,22 @@ class Ship:
         return self.actions <= 0
 
     @property
+    def cells(self) -> tuple[tuple[int, int], ...]:
+        """Every board cell of the piece's footprint (anchored on the centre).
+        Ships are one cell; a starbase spans a `cls.size`-square."""
+        r = self.cls.size // 2
+        if r == 0:
+            return ((self.x, self.y),)
+        return tuple((self.x + dx, self.y + dy)
+                     for dy in range(-r, r + 1) for dx in range(-r, r + 1))
+
+    @property
+    def reactor_ok(self) -> bool:
+        """Station power: the §4.2 fusion-reactor keystone is still online.
+        Knocking it out is how a starbase is *taken* rather than razed."""
+        return "fusion_reactor" not in self.down
+
+    @property
     def speed(self) -> int:
         return max(abs(self.vx), abs(self.vy))
 
@@ -123,6 +139,17 @@ class Rock:
 
 
 @dataclass(slots=True)
+class Debris:
+    """One cell of drifting wreckage (graveyard scenarios). Blocks fire lines
+    and stationing like rock and shreds salvos — but a hull that drifts onto it
+    smashes *through*: a lighter impact, vector kept, the wreckage destroyed."""
+
+    id: int
+    x: int
+    y: int
+
+
+@dataclass(slots=True)
 class Mine:
     id: int
     side: Side
@@ -169,6 +196,7 @@ class Battle:
     mines: list[Mine] = field(default_factory=list)
     salvos: list[Salvo] = field(default_factory=list)
     rocks: dict[tuple[int, int], Rock] = field(default_factory=dict)
+    debris: dict[tuple[int, int], Debris] = field(default_factory=dict)
     turn: int = 1
     deployed: bool = False           # pre-battle placement finished
     outcome: Outcome | None = None
@@ -186,7 +214,7 @@ class Battle:
 
     def ship_at(self, x: int, y: int) -> Ship | None:
         for s in self.ships:
-            if s.alive and s.x == x and s.y == y:
+            if s.alive and (x, y) in s.cells:
                 return s
         return None
 
@@ -223,11 +251,14 @@ class Battle:
     def rock_at(self, x: int, y: int) -> Rock | None:
         return self.rocks.get((x, y))
 
+    def debris_at(self, x: int, y: int) -> Debris | None:
+        return self.debris.get((x, y))
+
     def cell_occupied(self, x: int, y: int) -> bool:
-        """A ship, wing, or rock sits here (one piece per cell; nothing stations
-        itself inside debris)."""
+        """A ship (any footprint cell), wing, rock, or wreckage sits here — one
+        piece per cell; nothing stations itself inside rubble."""
         return self.ship_at(x, y) is not None or self.wing_at(x, y) is not None \
-            or (x, y) in self.rocks
+            or (x, y) in self.rocks or (x, y) in self.debris
 
     def log(self, kind: str, text: str, x: int = -1, y: int = -1,
             friendly: bool = True) -> None:
