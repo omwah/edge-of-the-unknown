@@ -4,7 +4,7 @@ Ships are multi-character sprites sized between groundwar's single glyphs and
 the big sector-view hulls: authored on a grid of up to `cell_w` x `cell_h`
 chars (7x3 by default) so each piece fills its placement cell. Sprite keys are
 real ship-class ids from the main game (`missile_frigate`, `scout_marauder`,
-`battleship`) but the art is new — deliberately unconstrained by the sector-view
+`battleship`, `imperial_starship`) but the art is new — deliberately unconstrained by the sector-view
 generator, per the POC brief (the big art may later be redrawn to match this).
 
 Ships face the four cardinals only (diagonal hull art at this scale read as
@@ -83,6 +83,16 @@ SHIP_SPRITES: dict[str, dict[int, Rows]] = {
         north=(" ▟▲▙ ",
                "▐█≣█▌",
                " ▀≡▀ "),
+    ),
+    # Elite capital: the heaviest hull on the board — full-beam slab with TWIN
+    # rail grooves (≣…≣) flanking the spine, a juggernaut alongside the battleship.
+    "imperial_starship": _facings(
+        east=("▗▄▄▄▄▄▖",
+              "≡█≣█≣█▶",
+              "▝▀▀▀▀▀▘"),
+        north=("▗▟▲▙▖",
+               "▐█≣█▌",
+               "▝▀≡▀▘"),
     ),
 }
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import random as _random
 import time
+from collections import Counter
 from dataclasses import dataclass, replace
 
 from rich.text import Text
@@ -22,7 +23,10 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, Footer, Input, RichLog, Static
+from textual.widgets import (
+    Button, DataTable, Footer, Input, OptionList, RichLog, Static,
+)
+from textual.widgets.option_list import Option
 
 from edge.art.port import PortGenerator
 from edge.spacebattle import rules
@@ -426,6 +430,12 @@ behind it, through the perimeter, is the whole battle.\
         return not self.battle.deployed
 
     @property
+    def defending(self) -> bool:
+        """Starbase-defense scenario: the station on the board is the player's."""
+        return (self.scenario.station is not None
+                and self.scenario.station_side == "player")
+
+    @property
     def deploy_selected(self) -> DeployShip | None:
         if not self.deploying:
             return None
@@ -450,7 +460,15 @@ behind it, through the perimeter, is the whole battle.\
     def on_mount(self) -> None:
         log = self.query_one("#log", RichLog)
         log.can_focus = False
-        if self.mode == "deploy_full":
+        if self.defending:
+            log.write(Text(
+                "STARBASE DEFENSE — your platform is already on station and you "
+                "can't move it. Deploy your guard ships around it, sow the "
+                "perimeter with 'n' mines and pre-launch fighter screens with "
+                "'v' (the base's own stock is yours to place), 'x' picks anything "
+                "back up. Space when the perimeter's set. Lose the base and it's "
+                "over. ? for help.", style="bold"))
+        elif self.mode == "deploy_full":
             log.write(Text(
                 "GENERAL QUARTERS IN YOUR OWN TIME — a hostile fleet is inbound. "
                 "Place your ships (r rotates facing), then seed the sector: 'n' "
@@ -709,6 +727,11 @@ behind it, through the perimeter, is the whole battle.\
         bar = "█" * round(8 * frac) + "░" * (8 - round(8 * frac))
         line(f"{mark}{s.name}  {'●' * s.actions}", style)
         line(f"  hull {bar} {s.hull:>3}", "orange1" if frac < 0.4 else style)
+        if s.cls.station:  # your platform — its reactor is the lose condition
+            integ = round(100 * rules.station_integrity(s))
+            line(f"  ⌂ systems {integ:>3}% · reactor "
+                 f"{'LIVE' if s.reactor_ok else 'DARK'}",
+                 style if s.reactor_ok else "bold red")
         sc = s.screens
         line(f"  scr F{sc.get('fore', 0):>2} A{sc.get('aft', 0):>2}"
              f" P{sc.get('port', 0):>2} S{sc.get('starboard', 0):>2}", style)
@@ -791,10 +814,15 @@ behind it, through the perimeter, is the whole battle.\
         line("")
         if b.outcome is not None:
             won = b.outcome == "victory"
-            won_label = ("VICTORY — THE BASE HAS FALLEN"
-                         if self.scenario.station else "VICTORY — SECTOR SECURED")
+            if self.defending:
+                won_label = "VICTORY — THE ASSAULT IS BROKEN"
+                lost_label = "DEFEAT — YOUR STARBASE HAS FALLEN"
+            elif self.scenario.station:
+                won_label, lost_label = "VICTORY — THE BASE HAS FALLEN", "DEFEAT — FLEET LOST"
+            else:
+                won_label, lost_label = "VICTORY — SECTOR SECURED", "DEFEAT — FLEET LOST"
             line("═" * 26, "bold")
-            line(won_label if won else "DEFEAT — FLEET LOST",
+            line(won_label if won else lost_label,
                  "bold bright_green" if won else "bold red")
             line("q to return to setup", "grey66")
         else:
@@ -807,13 +835,20 @@ behind it, through the perimeter, is the whole battle.\
                  "bold bright_red" if self.show_threat else "grey66")
         return out
 
+    def _deploy_stations(self) -> list[Ship]:
+        """Pre-placed player stations (the defense scenario's base) whose own
+        mine/fighter stock the player positions during the full deploy pass."""
+        return [s for s in self.battle.fleet("player") if s.cls.station]
+
     def _mine_stock(self) -> int:
-        return sum(self.config.ships[e.cls_key].mine_stock for e in self.roster) \
-            - self._mines_laid
+        roster = sum(self.config.ships[e.cls_key].mine_stock for e in self.roster)
+        base = sum(s.mines for s in self._deploy_stations())
+        return roster + base - self._mines_laid
 
     def _wing_stock(self) -> int:
-        return sum(self.config.ships[e.cls_key].fighter_wings for e in self.roster) \
-            - self._wings_out
+        roster = sum(self.config.ships[e.cls_key].fighter_wings for e in self.roster)
+        base = sum(s.wings_docked for s in self._deploy_stations())
+        return roster + base - self._wings_out
 
     # --- input -----------------------------------------------------------------
 
@@ -981,11 +1016,16 @@ behind it, through the perimeter, is the whole battle.\
             return
         b = self.battle
         laid, out = self._mines_laid, self._wings_out
+        spawned: list[Ship] = []
         for i, e in enumerate(self.roster):
             cls = self.config.ships[e.cls_key]
-            ship = rules.spawn_ship(b, "player", cls, e.name,
-                                    e.x, e.y, e.facing,  # type: ignore[arg-type]
-                                    lance=self.lance_refit and i == 0)
+            spawned.append(rules.spawn_ship(
+                b, "player", cls, e.name,
+                e.x, e.y, e.facing,  # type: ignore[arg-type]
+                lance=self.lance_refit and i == 0))
+        # Draw the laid mines / launched wings out of the stock that supplied
+        # them — the deployed guard ships and any pre-placed player base.
+        for ship in spawned + self._deploy_stations():
             take_m = min(ship.mines, laid)
             ship.mines -= take_m
             laid -= take_m
@@ -1153,109 +1193,173 @@ behind it, through the perimeter, is the whole battle.\
 
 
 class SetupScreen(Screen[None]):
-    """Scenario / seed pickers."""
+    """Compact scenario picker + a per-side fleet-composition table.
+
+    A scrolling [b]OptionList[/] replaces the old wall of per-scenario buttons;
+    a [b]DataTable[/] (Ship × Player × Enemy) lets each side field any mix of
+    hull types. Highlighting a scenario reloads its designed fleet as the
+    starting composition, which the player then tweaks."""
 
     BINDINGS = [Binding("question_mark", "help", "Help")]
 
     HELP_TITLE = "Battle setup"
     HELP = """\
-Two ways into the same fight, exercising the two deployment interfaces:
+Pick a scenario from the list, tune the fleets, and launch.
 
-[b]Prepared defense[/] — peacetime. You know they're coming: place your ships \
-with chosen facings, then seed your whole zone with mines and pre-launched \
-fighter screens [i]without[/] walking a ship around. Then the enemy warps in.
+[b]Scenarios[/]
+[b]Prepared defense[/] — peacetime. Place your ships, then seed your zone with \
+mines and pre-launched fighter screens; then the enemy warps in.
+[b]Ambushed on warp-in[/] — you arrive in [i]their[/] sector: position and \
+facing only, against pickets already out and a hidden minefield.
+[b]Belt skirmish[/] / [b]Ship graveyard[/] — the same fight threaded through an \
+obstacle field: rocks stop a drifting hull dead; wreckage can be smashed through.
+[b]Starbase assault[/] — warp in against a fortified enemy starbase; raze it, or \
+fight around behind it and knock out its reactor to take it intact.
+[b]Starbase defense[/] — the assault in reverse: the platform is [i]yours[/], \
+pre-placed. Deploy your guard screen, mines, and fighters, then break the \
+attack. Lose the base and it's over.
 
-[b]Ambushed on warp-in[/] — you arrive in [i]their[/] sector. You pick only \
-where each ship tumbles out of warp inside the pocket, and which way it faces. \
-Their pickets are out and their minefield is already sown — and invisible \
-until your sensors paint it.
+[b]Fleet composition[/] — Tab into the fleet table and move the cell cursor \
+with the arrows; [b]−[/] / [b]+[/] remove or add one hull of that type on that \
+side. Any mix of the four hull types is legal. A side is capped at 8 hulls. The \
+enemy may field [b]0[/] (a starbase alone); the player may field 0 [i]only[/] in \
+Starbase defense (the platform fights on its own). Highlighting a different \
+scenario reloads its default fleet.
 
-[b]Belt skirmish[/] / [b]Ship graveyard[/] — the same fight threaded through \
-an obstacle field: rocks stop a drifting hull dead; wreckage can be smashed \
-through at a lighter cost in hull.
-
-[b]Starbase assault[/] — warp in against a fortified, immobile starbase behind \
-its perimeter defense. Raze it, or fight around behind it and knock out its \
-reactor to take it intact.
-
-[b]Fleet size[/] — the [b]−[/] / [b]+[/] steppers set exactly how many hulls \
-each side brings before you launch. The hulls are drawn by cycling that \
-scenario's own ship mix, so its composition's flavour is preserved. The enemy \
-count can go to [b]0[/]: in a starbase assault that leaves just the base to \
-break, and the siege starbase itself is always present regardless.
-
-The same seed always builds the same battle.\
+[b]Flagship refit[/] — toggles the player flagship's experimental grav-lance \
+(it trades half the missile magazine). The same seed always builds the same \
+battle.\
 """
 
     help_keys = [
+        ("↑ / ↓ + Enter", "choose a scenario (Enter launches it)"),
+        ("Tab / Shift+Tab", "move between the list, the fleet table, and the buttons"),
+        ("↑ ↓ ← →", "move the cell cursor in the fleet table"),
+        ("− / +", "remove / add a hull of that type on that side"),
         ("?", "this help"),
-        ("−/+ steppers", "set how many ships each side brings (enemy may be 0)"),
-        ("Enter/click", "activate the focused button"),
     ]
 
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen(self))
 
-    # Explicit fleet sizes per side. The player always brings at least one hull;
-    # the enemy count may be 0 (e.g. a starbase assault against the base alone —
-    # the siege starbase itself is spawned separately and is always present).
-    _MAX_FLEET = 8
+    _MAX_FLEET = 8   # per-side hull cap (board placement room)
 
     def __init__(self, config: SpacebattleConfig) -> None:
         super().__init__()
         self.config = config
         self.lance_refit = False
-        self.player_count = 2
-        self.enemy_count = 2
+        # Non-station hulls are the selectable fleet types (the starbase is a
+        # scenario set-piece, never a fleet ship).
+        self.types = [k for k, c in config.ships.items() if not c.station]
+        self.scenario_key = next(iter(config.scenarios))
+        self.player_counts: dict[str, int] = {t: 0 for t in self.types}
+        self.enemy_counts: dict[str, int] = {t: 0 for t in self.types}
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="setup"):
+        with VerticalScroll(id="setup"):
             yield Static(
                 Text("EDGE OF THE UNKNOWN — FLEET ACTION", style="bold bright_cyan"),
                 id="title")
             yield Static(id="briefing")
             with Horizontal(classes="row"):
                 yield Input(placeholder="seed (blank = random)", id="seed")
-            with Horizontal(classes="row"):
-                yield Button("−", id="pf_dec", classes="step")
-                yield Button("+", id="pf_inc", classes="step")
-                yield Static(self._forces_label("player"), id="pf-label",
-                             classes="blurb")
-            with Horizontal(classes="row"):
-                yield Button("−", id="ef_dec", classes="step")
-                yield Button("+", id="ef_inc", classes="step")
-                yield Static(self._forces_label("enemy"), id="ef-label",
-                             classes="blurb")
-            with Horizontal(classes="row"):
                 yield Button("Flagship: standard magazine", id="refit")
-                yield Static("  the experimental grav-lance refit trades half "
-                             "the missile magazine", classes="blurb")
-            for key, sc in self.config.scenarios.items():
-                with Horizontal(classes="row"):
-                    yield Button(sc.label, id=f"go-{key}", variant="success")
-                    yield Static(f"  {sc.blurb}", classes="blurb")
+            yield Static("SCENARIO — ↑↓ to choose, Enter to launch", classes="head")
+            yield OptionList(id="scenarios")
+            yield Static("FLEET — Tab here, arrows to move, − / + to adjust",
+                         classes="head")
+            yield DataTable(id="composition")
+            with Horizontal(classes="row", id="launch-row"):
+                yield Button("Launch battle", id="launch", variant="success")
+                yield Static(id="launch-note", classes="blurb")
 
     def on_mount(self) -> None:
         brief = Text()
         brief.append(
             "Turn-based fleet combat: momentum, facing, arcs, screens, traveling "
             "missiles, fighter wings, hidden mines. Two actions per ship. "
-            "? for the rules of the road.\n", "grey70")
+            "? for the rules of the road.", "grey70")
         self.query_one("#briefing", Static).update(brief)
+        # Fleet table first (its cells must exist before a scenario loads them).
+        t = self.query_one("#composition", DataTable)
+        t.cursor_type = "cell"
+        t.zebra_stripes = True
+        t.add_column("Ship", key="ship", width=18)
+        t.add_column("Player", key="player", width=8)
+        t.add_column("Enemy", key="enemy", width=8)
+        for tk in self.types:
+            t.add_row(self.config.ships[tk].label, "0", "0", key=tk)
+        # Scenario list.
+        ol = self.query_one("#scenarios", OptionList)
+        for key, sc in self.config.scenarios.items():
+            label = Text.assemble((sc.label, "bold"), (f"  —  {sc.blurb}", "grey62"))
+            ol.add_option(Option(label, id=key))
+        ol.highlighted = 0
+        self._load_scenario(self.scenario_key)
+        ol.focus()
 
-    def _forces_label(self, side: str) -> str:
-        count = self.player_count if side == "player" else self.enemy_count
-        who = "Player" if side == "player" else "Enemy"
-        ships = f"{count} ship{'' if count == 1 else 's'}"
-        if side == "enemy" and count == 0:
-            ships += " (starbase only, in a siege)"
-        return f"  {who} fleet: {ships}"
+    # --- composition state ------------------------------------------------------
 
-    @staticmethod
-    def _fleet(base: tuple[str, ...], count: int) -> tuple[str, ...]:
-        """Build a fleet of exactly `count` hulls, cycling the scenario's ship
-        mix so its composition's flavour is preserved. `count` may be 0."""
-        return tuple(base[i % len(base)] for i in range(count))
+    def _defending(self) -> bool:
+        base = self.config.scenarios[self.scenario_key]
+        return base.station is not None and base.station_side == "player"
+
+    def _load_scenario(self, key: str) -> None:
+        """Reset both columns to a scenario's designed fleet composition."""
+        self.scenario_key = key
+        base = self.config.scenarios[key]
+        pc, ec = Counter(base.player), Counter(base.enemy)
+        self.player_counts = {t: pc.get(t, 0) for t in self.types}
+        self.enemy_counts = {t: ec.get(t, 0) for t in self.types}
+        t = self.query_one("#composition", DataTable)
+        for tk in self.types:
+            t.update_cell(tk, "player", str(self.player_counts[tk]))
+            t.update_cell(tk, "enemy", str(self.enemy_counts[tk]))
+        self._refresh_note()
+
+    def _refresh_note(self) -> None:
+        ptot, etot = sum(self.player_counts.values()), sum(self.enemy_counts.values())
+        note = self.query_one("#launch-note", Static)
+        if ptot == 0 and not self._defending():
+            note.update(Text("  add at least one player ship to launch",
+                             style="orange1"))
+        else:
+            base_only = " (platform alone)" if ptot == 0 else ""
+            note.update(Text(f"  player {ptot}{base_only} · enemy {etot}",
+                             style="grey62"))
+
+    def _compose_fleet(self, counts: dict[str, int]) -> tuple[str, ...]:
+        return tuple(t for t in self.types for _ in range(counts[t]))
+
+    # --- input ------------------------------------------------------------------
+
+    def on_option_list_option_highlighted(
+            self, event: OptionList.OptionHighlighted) -> None:
+        if event.option.id:
+            self._load_scenario(event.option.id)
+
+    def on_option_list_option_selected(
+            self, event: OptionList.OptionSelected) -> None:
+        self._launch()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key not in ("plus", "minus", "equals_sign"):
+            return
+        table = self.query_one("#composition", DataTable)
+        if self.app.focused is not table:
+            return
+        row, col = table.cursor_coordinate
+        if col == 0:                       # the Ship label column
+            return
+        delta = -1 if event.key == "minus" else 1
+        tk = self.types[row]
+        counts = self.player_counts if col == 1 else self.enemy_counts
+        if delta > 0 and sum(counts.values()) >= self._MAX_FLEET:
+            return
+        counts[tk] = max(0, counts[tk] + delta)
+        table.update_cell(tk, "player" if col == 1 else "enemy", str(counts[tk]))
+        self._refresh_note()
+        event.stop()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
@@ -1264,28 +1368,19 @@ The same seed always builds the same battle.\
             event.button.label = ("Flagship: GRAV-LANCE refit (½ salvos)"
                                   if self.lance_refit
                                   else "Flagship: standard magazine")
-            return
-        if bid in ("pf_dec", "pf_inc", "ef_dec", "ef_inc"):
-            side = "player" if bid.startswith("pf") else "enemy"
-            step = 1 if bid.endswith("inc") else -1
-            if side == "player":
-                self.player_count = max(1, min(self._MAX_FLEET,
-                                               self.player_count + step))
-            else:
-                self.enemy_count = max(0, min(self._MAX_FLEET,
-                                              self.enemy_count + step))
-            label_id = "#pf-label" if side == "player" else "#ef-label"
-            self.query_one(label_id, Static).update(self._forces_label(side))
-            return
-        if not bid.startswith("go-"):
-            return
-        key = bid[3:]
+        elif bid == "launch":
+            self._launch()
+
+    def _launch(self) -> None:
+        key = self.scenario_key
         base = self.config.scenarios[key]
-        scenario = replace(
-            base,
-            player=self._fleet(base.player, self.player_count),
-            enemy=self._fleet(base.enemy, self.enemy_count),
-        )
+        player = self._compose_fleet(self.player_counts)
+        enemy = self._compose_fleet(self.enemy_counts)
+        if not player and not self._defending():
+            self._refresh_note()
+            self.app.bell()
+            return
+        scenario = replace(base, player=player, enemy=enemy)
         config = replace(
             self.config, scenarios={**self.config.scenarios, key: scenario})
         raw = self.query_one("#seed", Input).value.strip()
@@ -1294,7 +1389,10 @@ The same seed always builds the same battle.\
         rules.seed_rocks(battle)
         rules.seed_debris(battle)
         if scenario.station is not None:
-            rules.setup_siege(battle)
+            if scenario.station_side == "player":
+                rules.setup_defense(battle)  # the base is yours to hold
+            else:
+                rules.setup_siege(battle)
         elif scenario.deploy == "warp_in":
             rules.setup_ambush(battle)
         self.app.push_screen(
@@ -1310,13 +1408,19 @@ class SpacebattleApp(App[None]):
     #sidebar { width: 36; height: 100%; padding: 0 1; background: $surface;
                border-left: solid $primary; }
     #log { height: 9; border-top: solid $primary; }
-    #setup { padding: 1 2; }
-    #title { padding: 1 0; }
-    #setup .row { height: 3; }
-    #setup Button { margin-right: 1; min-width: 24; }
-    #setup Button.step { min-width: 5; width: 5; }
+    #setup { padding: 1 2; height: 1fr; }
+    #title { padding: 0 0 1 0; }
+    #setup .row { height: auto; margin-bottom: 1; }
+    #setup .head { text-style: bold; color: $secondary; margin-top: 1; }
+    #setup Button { margin-right: 1; }
+    #setup #refit { min-width: 34; }
+    #setup #launch { min-width: 20; }
     #setup .blurb { padding: 1 0; color: $text-muted; }
-    #seed { width: 40; }
+    #setup #seed { width: 34; }
+    #scenarios { height: auto; max-height: 10; border: round $primary;
+                 margin-bottom: 1; }
+    #composition { height: auto; max-height: 12; }
+    #launch-row { margin-top: 1; }
     """
 
     def __init__(self, config: SpacebattleConfig | None = None) -> None:
