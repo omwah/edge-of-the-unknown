@@ -123,6 +123,30 @@ terrain:
   debris:        {move_cost: 2, cover: 0.15, blocks_los: false}
   void:          {move_cost: 1, cover: 0.0,  blocks_los: false}
 
+# The peaceful branch (Expedition mode): a lone surveyor on a friendly world
+# chasing ship-sensor archaeology leads. Smaller map than the battlefield —
+# the pacing is walking and searching, not a platoon assault.
+expedition:
+  width: 150
+  height: 52
+  sites_min: 2              # sensor contacts per descent
+  sites_max: 4
+  supplies_start: 55        # every move or dig spends 1; settlements refill it
+  dig_cost: 1
+  move: 7                   # move points per turn (terrain costs apply)
+  sight: 11                 # you must be this close to *notice* disturbed ground
+  area_radius: 14           # the ship-sensor "general area" circle
+  clue_radius: 3            # disturbed-ground clues lie within this of the true spot
+  clue_count: 4
+  settlements_min: 2        # inhabited worlds only
+  settlements_max: 3
+  city_hint_radius: 6       # a settlement's hint shrinks one search circle to this
+  scanner:                  # handheld reading vs. distance to the nearest unfound site
+    - {within: 8,  label: "SATURATED — it is close; look for disturbed ground"}
+    - {within: 15, label: "strong"}
+    - {within: 25, label: "moderate"}
+    - {within: 40, label: "faint"}
+
 difficulties:
   patrol:
     label: "Patrol Raid"

@@ -115,6 +115,33 @@ class GarrisonConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ScannerBand:
+    within: float  # reading applies out to this distance from the nearest unfound site
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class ExpeditionConfig:
+    """The peaceful archaeology mode — its own map size and search tuning."""
+
+    width: int
+    height: int
+    sites_min: int
+    sites_max: int
+    supplies_start: int
+    dig_cost: int
+    move: int
+    sight: int
+    area_radius: int
+    clue_radius: int
+    clue_count: int
+    settlements_min: int
+    settlements_max: int
+    city_hint_radius: int
+    scanner: tuple[ScannerBand, ...]  # sorted nearest-first
+
+
+@dataclass(frozen=True, slots=True)
 class Difficulty:
     key: str
     label: str
@@ -137,6 +164,7 @@ class GroundwarConfig:
     defenses: DefensesConfig
     garrison: GarrisonConfig
     terrain: dict[str, TerrainClass]
+    expedition: ExpeditionConfig
     difficulties: dict[str, Difficulty] = field(default_factory=dict)
 
 
@@ -167,6 +195,25 @@ def _emplacement(d: dict[str, float]) -> EmplacementStats:
     return EmplacementStats(
         hp=int(d["hp"]), range=int(d.get("range", 0)), damage=int(d.get("damage", 0)),
         accuracy=float(d.get("accuracy", 0.0)), radius=int(d.get("radius", 0)),
+    )
+
+
+def _expedition(d: dict[str, object]) -> ExpeditionConfig:
+    bands = tuple(
+        ScannerBand(within=float(b["within"]), label=str(b["label"]))  # type: ignore[index]
+        for b in sorted(d["scanner"], key=lambda b: float(b["within"]))  # type: ignore[union-attr, index, arg-type]
+    )
+    return ExpeditionConfig(
+        width=int(d["width"]), height=int(d["height"]),  # type: ignore[arg-type]
+        sites_min=int(d["sites_min"]), sites_max=int(d["sites_max"]),  # type: ignore[arg-type]
+        supplies_start=int(d["supplies_start"]), dig_cost=int(d["dig_cost"]),  # type: ignore[arg-type]
+        move=int(d["move"]), sight=int(d["sight"]),  # type: ignore[arg-type]
+        area_radius=int(d["area_radius"]), clue_radius=int(d["clue_radius"]),  # type: ignore[arg-type]
+        clue_count=int(d["clue_count"]),  # type: ignore[arg-type]
+        settlements_min=int(d["settlements_min"]),  # type: ignore[arg-type]
+        settlements_max=int(d["settlements_max"]),  # type: ignore[arg-type]
+        city_hint_radius=int(d["city_hint_radius"]),  # type: ignore[arg-type]
+        scanner=bands,
     )
 
 
@@ -214,6 +261,7 @@ def load_config(path: Path | None = None) -> GroundwarConfig:
                               blocks_los=bool(d["blocks_los"]))
             for key, d in data["terrain"].items()
         },
+        expedition=_expedition(data["expedition"]),
         difficulties={
             key: Difficulty(key=key, label=str(d["label"]), cities=int(d["cities"]),
                             citadel_level=int(d["citadel_level"]),
