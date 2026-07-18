@@ -144,13 +144,12 @@ async def test_station_header_vertically_centers_exterior_and_banner() -> None:
         await app.mount(header)
         await pilot.pause()
         icon, banner = list(header.children)
-        # A 9-row port beside an 8-row banner has no exact cell midpoint. Bias the
-        # shorter banner down one row instead of top-aligning it; doubled midpoints
-        # then differ by only one half-row.
-        assert banner.region.y == icon.region.y + 1
+        # The shipped direct-open port is 6 rows beside an 8-row banner, so the
+        # shorter exterior sits one row lower and their midpoints align exactly.
+        assert icon.region.y == banner.region.y + 1
         icon_midpoint = 2 * icon.region.y + icon.region.height
         banner_midpoint = 2 * banner.region.y + banner.region.height
-        assert abs(icon_midpoint - banner_midpoint) == 1
+        assert icon_midpoint == banner_midpoint
 
 
 def test_assignment_is_seeded_roster_driven_and_fixed_after_capture() -> None:

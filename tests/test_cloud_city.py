@@ -274,7 +274,9 @@ def test_a_staged_gas_giant_renders_its_city_and_an_unstaged_one_does_not() -> N
 
     bare, staged = paint(0), paint(2)
     assert bare != staged
-    deck = CLOUD_CITY_TIERS[1][2].strip()  # the city's landing deck row
+    # The arrival-view compositor caps a city to roughly 30% of its planet's
+    # height, so this 12-row sprite deliberately steps size 2 down to tier 1.
+    deck = CLOUD_CITY_TIERS[0][1].strip()  # the reduced city's landing deck row
     assert deck in staged and deck not in bare
 
 
