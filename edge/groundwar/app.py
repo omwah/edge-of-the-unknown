@@ -25,6 +25,8 @@ from textual.widgets import Button, Footer, Input, RichLog, Static
 
 from edge.groundwar import rules
 from edge.groundwar.config import GroundwarConfig, load_config
+from edge.groundwar.expedition import Site, generate_expedition
+from edge.groundwar.expedition_ui import ExpeditionScreen
 from edge.groundwar.mapgen import PLANET_TYPES, RUBBLE_ART, STRUCTURE_ART, generate_battle
 from edge.groundwar.model import Battle, Trooper
 
@@ -68,8 +70,9 @@ class HelpScreen(ModalScreen[None]):
     """Contextual how-to-play help (`?` anywhere), after `edge.tui.screens.help`.
 
     The host screen declares its help: a `help_keys` table of `(key, action)` rows
-    (kept next to the `on_key` handler that implements them), optional `HELP`
-    markup prose, and an optional `HELP_TITLE` display name.
+    (kept next to the `on_key` handler that implements them), an optional
+    `help_legend` table of `(symbol-markup, meaning)` rows for what's on the map,
+    optional `HELP` markup prose, and an optional `HELP_TITLE` display name.
     """
 
     BINDINGS = [
@@ -105,11 +108,16 @@ class HelpScreen(ModalScreen[None]):
                     for key, action in getattr(host, "help_keys", [])]
             prose = getattr(host, "HELP", "")
 
+        legend = [f"  {sym}  {meaning}"
+                  for sym, meaning in getattr(self._host, "help_legend", [])]
         with VerticalScroll(id="help-box"):
             yield Static(title, id="help-title")
             if rows:
                 yield Static("Keys", classes="help-section")
                 yield Static("\n".join(rows))
+            if legend:
+                yield Static("Legend", classes="help-section")
+                yield Static("\n".join(legend))
             if prose:
                 yield Static("How to play", classes="help-section")
                 yield Static(prose)
@@ -282,6 +290,23 @@ surrender or no. Speed wins, not attrition.\
         ("b", "broadcast terms (Command suit, over a cowed city)"),
         ("Space", "end turn — the planet takes its go"),
         ("q", "abort the mission"),
+    ]
+
+    help_legend = [
+        ("[black on green]M[/][black on green]S[/][black on green]C[/]",
+         "your troopers (Marauder/Scout/Command; [black on yellow]yellow[/] = "
+         "detected, [black on bright_green]green[/] = selected)"),
+        ("[white on dark_red]i[/] [white on dark_red]T[/]",
+         "garrison infantry / armor"),
+        ("[bright_red on grey30]╬[/]", "turret"),
+        ("[orange1 on grey23]⊕[/]", "AA battery (fires on drops and jumps)"),
+        ("[bright_cyan on grey23]⍑[/]", "sensor tower (lights you up)"),
+        ("[bright_magenta on grey30]✸[/]", "citadel gun"),
+        ("[grey66 on grey30]█[/] [gold3 on grey30]▒[/]", "city wall / gate"),
+        ("[indian_red on grey23]▪[/] [grey74 on grey23]⌂[/]",
+         "military block (drains resolve) / civilian block (atrocity — hardens it)"),
+        ("[grey42]▒[/]", "rubble (passable, decent cover)"),
+        ("[white on grey27] [/]", "tinted ground — where the selected trooper can walk"),
     ]
 
     @property
@@ -683,24 +708,31 @@ surrender or no. Speed wins, not attrition.\
 
 
 class SetupScreen(Screen[None]):
-    """Planet / difficulty / seed pickers and the point-budget platoon composer."""
+    """Mode / planet / seed pickers; platoon composer (assault) or world toggle
+    (expedition)."""
 
     BINDINGS = [Binding("question_mark", "help", "Help")]
 
     HELP_TITLE = "Mission setup"
     HELP = """\
-Compose the drop against the boat's point budget — the class [b]mixture[/] is \
-the puzzle, and what lands is all you get.
+[b]Mode[/] picks the branch of play. [b]Assault[/] is the Mobile Infantry raid; \
+[b]Expedition[/] is the peaceful archaeology survey on a friendly world — no \
+platoon, just you, a scanner, and the ground.
 
-[b]Marauder[/] — heavy combat armor: the guns and missiles that break turrets, \
-walls, and the citadel gun.
-[b]Scout[/] — light, fast, far-seeing: jams city sensors so the platoon can move \
-unseen; barely armed.
-[b]Command[/] — the officer's suit: an accuracy aura for nearby troopers and the \
-[b]broadcast[/] that dictates terms over a beaten city — usually how you win.
+[b]Assault[/] — compose the drop against the boat's point budget; the class \
+[b]mixture[/] is the puzzle, and what lands is all you get. \
+[b]Marauder[/]: heavy armor, the guns that break turrets and walls. \
+[b]Scout[/]: fast and far-seeing, jams city sensors; barely armed. \
+[b]Command[/]: an accuracy aura, and the [b]broadcast[/] that dictates terms \
+over a beaten city — usually how you win. Difficulty sets the city count, the \
+capital's citadel level, and how low resolve must fall.
 
-Difficulty sets the city count, the capital's citadel level, and how low resolve \
-must fall; the same seed always builds the same battle.\
+[b]Expedition[/] — pick inhabited (settlements resupply and hint, but sites \
+keep their distance from towns) or uninhabited (no help, sites anywhere). The \
+same seed rebuilds the same planet, and this session it [i]remembers what you \
+already found[/] there.
+
+The same seed always builds the same map, in either mode.\
 """
 
     help_keys = [
@@ -714,6 +746,8 @@ must fall; the same seed always builds the same battle.\
     def __init__(self, config: GroundwarConfig) -> None:
         super().__init__()
         self.config = config
+        self.mode = "assault"  # or "expedition"
+        self.inhabited = True
         self.planet_idx = 0
         self.difficulty_idx = 1  # default "raid"
         self.counts: dict[str, int] = {"marauder": 4, "scout": 3, "command": 1}
@@ -721,15 +755,17 @@ must fall; the same seed always builds the same battle.\
     def compose(self) -> ComposeResult:
         with Vertical(id="setup"):
             yield Static(
-                Text("EDGE OF THE UNKNOWN — MOBILE INFANTRY", style="bold bright_green"),
+                Text("EDGE OF THE UNKNOWN — PLANETFALL", style="bold bright_green"),
                 id="title")
             yield Static(id="briefing")
             with Horizontal(classes="row"):
+                yield Button("Mode", id="mode")
                 yield Button("Planet type", id="planet")
                 yield Button("Difficulty", id="difficulty")
+                yield Button("World", id="world")
             with Horizontal(classes="row"):
                 yield Input(placeholder="seed (blank = random)", id="seed")
-            with Horizontal(classes="row"):
+            with Horizontal(classes="row", id="platoon-row"):
                 for key in self.config.suits:
                     yield Button(f"-{self.config.suits[key].label}", id=f"minus-{key}")
                     yield Button(f"+{self.config.suits[key].label}", id=f"plus-{key}")
@@ -744,19 +780,48 @@ must fall; the same seed always builds the same battle.\
         return sum(self.config.suits[k].cost * n for k, n in self.counts.items())
 
     def _update(self) -> None:
+        expedition = self.mode == "expedition"
         planet = PLANET_TYPES[self.planet_idx]
         diff = list(self.config.difficulties.values())[self.difficulty_idx]
+        self.query_one("#mode", Button).label = \
+            f"Mode: {'Expedition' if expedition else 'Assault'}"
         self.query_one("#planet", Button).label = f"Planet: {planet}"
         self.query_one("#difficulty", Button).label = f"Difficulty: {diff.label}"
+        self.query_one("#world", Button).label = \
+            f"World: {'inhabited' if self.inhabited else 'uninhabited'}"
+        # Each mode owns its controls: the platoon composer is assault's,
+        # the inhabited toggle is expedition's.
+        self.query_one("#difficulty", Button).display = not expedition
+        self.query_one("#world", Button).display = expedition
+        self.query_one("#platoon-row", Horizontal).display = not expedition
         brief = Text()
-        brief.append(
-            "A demonstration raid, not extermination: drop, break their defenses, "
-            "dictate terms, and be gone before the boat lifts.\n", "grey70")
-        brief.append(
-            f"  {diff.cities} cities · citadel level {diff.citadel_level} · "
-            f"surrender at resolve ≤ {diff.surrender_threshold} · "
-            f"retrieval turn {self.config.pressure.retrieval_turns}\n", "grey70")
+        if expedition:
+            e = self.config.expedition
+            brief.append(
+                "A peaceful survey on a friendly world: follow the sensor circles, "
+                "run the scanner hot, read the ground, and dig on the exact spot.\n",
+                "grey70")
+            brief.append(
+                f"  {e.sites_min}–{e.sites_max} sensor contacts · "
+                f"{e.supplies_start} supplies · "
+                f"{'settlements resupply and hint' if self.inhabited else 'no help down there'}\n",
+                "grey70")
+        else:
+            brief.append(
+                "A demonstration raid, not extermination: drop, break their defenses, "
+                "dictate terms, and be gone before the boat lifts.\n", "grey70")
+            brief.append(
+                f"  {diff.cities} cities · citadel level {diff.citadel_level} · "
+                f"surrender at resolve ≤ {diff.surrender_threshold} · "
+                f"retrieval turn {self.config.pressure.retrieval_turns}\n", "grey70")
         self.query_one("#briefing", Static).update(brief)
+        launch = self.query_one("#launch", Button)
+        if expedition:
+            self.query_one("#loadout", Static).update("")
+            launch.label = "LAND!"
+            launch.disabled = False
+            return
+        launch.label = "DROP!"
         pts = self._points()
         total = sum(self.counts.values())
         over = pts > self.config.budget or total > self.config.max_troopers
@@ -770,11 +835,15 @@ must fall; the same seed always builds the same battle.\
         if not any(self.counts.values()):
             text.append("  — drop something!", "bold red")
         self.query_one("#loadout", Static).update(text)
-        self.query_one("#launch", Button).disabled = over or not any(self.counts.values())
+        launch.disabled = over or not any(self.counts.values())
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
-        if bid == "planet":
+        if bid == "mode":
+            self.mode = "expedition" if self.mode == "assault" else "assault"
+        elif bid == "world":
+            self.inhabited = not self.inhabited
+        elif bid == "planet":
             self.planet_idx = (self.planet_idx + 1) % len(PLANET_TYPES)
         elif bid == "difficulty":
             self.difficulty_idx = (self.difficulty_idx + 1) % len(self.config.difficulties)
@@ -790,12 +859,31 @@ must fall; the same seed always builds the same battle.\
     def _launch(self) -> None:
         raw = self.query_one("#seed", Input).value.strip()
         seed = int(raw) if raw.lstrip("-").isdigit() else _random.randrange(1 << 31)
+        planet = PLANET_TYPES[self.planet_idx]
+        if self.mode == "expedition":
+            self._launch_expedition(seed, planet)
+            return
         diff_key = list(self.config.difficulties)[self.difficulty_idx]
-        battle = generate_battle(self.config, seed=seed,
-                                 planet_type=PLANET_TYPES[self.planet_idx],
+        battle = generate_battle(self.config, seed=seed, planet_type=planet,
                                  difficulty_key=diff_key)
         loadout = {k: n for k, n in self.counts.items() if n > 0}
         self.app.push_screen(BattleScreen(self.config, battle, loadout))
+
+    def _launch_expedition(self, seed: int, planet: str) -> None:
+        # The same planet (seed/type/world) remembers its finds across descents
+        # this session — the app holds the registry, generation re-marks them.
+        app = self.app
+        assert isinstance(app, GroundwarApp)
+        key = (seed, planet, self.inhabited)
+        found = app.expedition_finds.setdefault(key, set())
+        exp = generate_expedition(self.config, seed=seed, planet_type=planet,
+                                  inhabited=self.inhabited,
+                                  found_ids=frozenset(found))
+
+        def on_found(site: Site) -> None:
+            found.add(site.id)
+
+        self.app.push_screen(ExpeditionScreen(exp, on_found))
 
 
 class GroundwarApp(App[None]):
@@ -818,6 +906,8 @@ class GroundwarApp(App[None]):
     def __init__(self, config: GroundwarConfig | None = None) -> None:
         super().__init__()
         self.config_data = config or load_config()
+        # (seed, planet_type, inhabited) -> found site ids; session-only memory.
+        self.expedition_finds: dict[tuple[int, str, bool], set[int]] = {}
 
     def on_mount(self) -> None:
         self.push_screen(SetupScreen(self.config_data))
