@@ -950,7 +950,7 @@ class _SceneComposer:
     # --- the scene ---------------------------------------------------------------
 
     def compose(self, w: int, h: int) -> Text:
-        sec, cfg = self.sec, self.cfg
+        sec = self.sec
         self._w, self._h = w, h
         self.hotspots = []
         self._occupied = []
