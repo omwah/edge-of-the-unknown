@@ -25,7 +25,7 @@ from edge.groundwar.findart import FIND_KINDS, LORE_PLACEHOLDER, generate_find_a
 FLASH_SECONDS = 0.5
 
 _EVENT_STYLES = {
-    "find": "bold bright_yellow", "hint": "bold bright_cyan",
+    "find": "bold bright_yellow", "hint": "bold bright_cyan", "dig": "wheat1",
     "outcome": "bold bright_magenta", "info": "grey66",
 }
 
@@ -205,10 +205,10 @@ warmer tint, nearer site ([b]o[/] cycles the overlay to a walk-range view or \
 off). Once the readout saturates the scanner can do no more: look at the \
 ground. [b]Disturbed earth[/] [black on dark_goldenrod]∴[/] appears on the map \
 only when you are close enough to notice it (the log calls it out too), and \
-clusters within a few cells of the true spot. Stand \
-on your best guess and [b]dig[/] — only the exact cell pays off; a dry hole \
-costs supplies and leaves a spent [black on dark_goldenrod]◌[/] so you never \
-dig it twice.
+clusters within a few cells of the true spot. Stand on your best guess and \
+[b]dig[/]: you open a [b]trench[/] a couple of cells around you, and a site \
+anywhere inside it pays off. A dry trench costs supplies and leaves spent \
+ground [black on dark_goldenrod]◌[/] so you never dig it twice.
 
 [b]Marching[/] — put the cursor anywhere walkable and [b]m[/]: near cells are \
 one turn, far ones a multi-turn march. A march [b]halts itself[/] the moment \
@@ -232,7 +232,7 @@ cursor on it and press [b]v[/] any time to revisit the find and its notes.\
         ("[white on dark_green] [/]", "narrowed circle (a settlement's hint)"),
         ("[black on dark_goldenrod]∴[/]",
          "disturbed ground — the dig spot is within a few cells"),
-        ("[black on dark_goldenrod]◌[/]", "a hole you already dug (nothing there)"),
+        ("[black on dark_goldenrod]◌[/]", "ground you already dug (nothing there)"),
         ("[bold gold1 on grey19]✦[/]", "found site (press v on it to revisit)"),
         ("[white on grey46] [/][white on dark_orange3] [/][white on red3] [/]",
          "scanner glow — ground inside your sweep, warmer = nearer a buried site"),
@@ -248,7 +248,7 @@ cursor on it and press [b]v[/] any time to revisit the find and its notes.\
         ("H/J/K/L", "pan the cursor fast"),
         ("w/a/s/d", "pan the map (the cursor rides along)"),
         ("m / Enter", "march to the cursor (a supply per turn; far cells take several)"),
-        ("x", "dig where you stand"),
+        ("x", "dig a trench where you stand"),
         ("o", "cycle the map overlay: scanner glow / walk range / off"),
         ("t", "talk (inside a settlement): resupply + a hint"),
         ("v", "view a found site under the cursor"),
@@ -471,7 +471,12 @@ cursor on it and press [b]v[/] any time to revisit the find and its notes.\
         self.refresh_ui()
 
     def _act_dig(self) -> None:
+        trench = ex.dig_trench(self.exp)
         site = ex.do_dig(self.exp)
+        # Flash the freshly opened trench so the spent-ground patch registers.
+        until = time.monotonic() + FLASH_SECONDS
+        for c in trench:
+            self.flashes[c] = ("on orange3", until)
         self.drain_events()
         self.refresh_ui()
         if site is not None:
