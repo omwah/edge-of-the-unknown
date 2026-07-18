@@ -1269,6 +1269,7 @@ battle.\
             yield Static("FLEET — Tab here, arrows to move, − / + to adjust",
                          classes="head")
             yield DataTable(id="composition")
+            yield Static("", id="launch-gap")
             with Horizontal(classes="row", id="launch-row"):
                 yield Button("Launch battle", id="launch", variant="success")
                 yield Static(id="launch-note", classes="blurb")
@@ -1420,7 +1421,7 @@ class SpacebattleApp(App[None]):
     #scenarios { height: auto; max-height: 10; border: round $primary;
                  margin-bottom: 1; }
     #composition { height: auto; max-height: 12; }
-    #launch-row { margin-top: 1; }
+    #launch-gap { height: 1; }
     """
 
     def __init__(self, config: SpacebattleConfig | None = None) -> None:
