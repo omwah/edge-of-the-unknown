@@ -1,0 +1,883 @@
+# Ground Operations — Survey and Planetary Assault Integration
+
+> Companion to `DESIGN.md`, `GROUNDWAR_POC.md`, `PHASE5_4_PLAN.md`, and
+> `SEAMS_PLAN.md`. `DESIGN.md` remains the authoritative *what*; this document
+> is the *how and in what order* for replacing the shipped abstract surface and
+> invasion paths with the `edge.groundwar` survey and tactical-assault systems.
+> Where implementation reality requires a design change, update `DESIGN.md` in
+> the same work package and record the reason here.
+>
+> **Status: reviewed plan — interview decisions resolved (July 2026).**
+
+## Context
+
+The live game currently has two deliberately different planetary interaction
+stacks:
+
+1. **Surface discovery** is abstract and replay-safe. `Descend(planet_id)` pays
+   a fixed turn cost, `Explore(planet_id)` reveals the next sensor-resolvable
+   surface `Discovery`, and `Salvage(discovery_id)` collects its payload. There
+   is no persisted descent session, map position, supply clock, or physical
+   relationship between a surface marker and the discovery it reveals.
+2. **Planetary invasion** is abstract and replay-safe. After the orbital base
+   and citadel gun fall, `InvadePlanet(planet_id, fighters)` resolves the whole
+   attacker-versus-garrison exchange in one reducer call. Victory flips
+   ownership and applies the existing treasury, colonist, citadel, garrison,
+   standing, and alignment consequences.
+
+The standalone `edge-groundwar` proof of concept has the missing embodied
+play:
+
+- **Expedition mode**: one surveyor walks a seeded terrain map, follows orbital
+  search circles and a handheld hot/cold scanner, notices nearby disturbed
+  ground, digs exact sites, and may visit friendly settlements for supplies and
+  hints.
+- **Assault mode**: a player-composed powered-armour platoon drops onto a
+  defended world, maneuvers over terrain with cover and line of sight, fights
+  emplacements and garrison sorties, and tries to break planetary Resolve and
+  broadcast surrender terms before retrieval.
+
+The POC is intentionally not a live-game subsystem. It invents its own sites,
+cities, force strength, difficulty, and RNG; holds mutable `Battle` /
+`Expedition` objects directly in Textual screens; remembers finds only in
+application memory; and has no command/event, state-hash, wire-codec, or
+multiplayer surface. Integration is therefore a promotion into the production
+architecture, not a direct screen import.
+
+This plan replaces the two abstract paths while preserving the systems they
+already get right: seeded universe discoveries, sensor progression, codex and
+payload ownership, the orbital siege ladder, persistent planetary defenses, conquest
+settlement, diplomacy consequences, command-log rebuild, fog-safe DTOs, and the
+single-writer multiplayer server.
+
+## Outcome and exit criterion
+
+A planet presents one coherent ground interaction derived from live state:
+
+- an uninhabited, friendly, or player/corp-owned landable world opens a survey
+  expedition against that world's actual seeded discoveries;
+- an explicitly hostile inhabited world opens a proper tactical assault after
+  its orbital defenses have been defeated;
+- every below-friendly inhabited world opens assault, including neutral/wary
+  standings below the configured amity threshold;
+- non-landable world objects remain orbital interactions;
+- every ground action is authoritative, replayable, remotely playable, and
+  resumable after reconnect/reload;
+- survey findings and assault outcomes settle through the existing discovery,
+  economy, ownership, citadel, diplomacy, and event rails rather than parallel
+  POC-only state.
+
+**Exit criterion:** a player can discover a real seeded artifact by reading the
+terrain and can conquer one defended non-Core world by forcing surrender; both
+command logs rebuild to identical state hashes, a remote client can complete
+both flows, and no legacy `Descend`/`Explore` or one-roll `InvadePlanet` path
+remains reachable.
+
+## Scope
+
+### In scope
+
+1. A single pure ground-access classifier shared by projection and reducers.
+2. Replayable active survey and assault state.
+3. Production survey generation from real `Discovery` records.
+4. Sensor gating and atomic artifact/codex logging on the terrain map.
+5. Friendly settlement resupply/hints keyed to live inhabitants and standing.
+6. Tactical assault generation from planet type, population, garrison,
+   citadel, gun, ownership, and diplomatic state.
+7. Powered-armour movement, jump/AA reactions, cover/LOS, detection/jamming,
+   emplacements, sorties, Resolve, broadcast, retrieval, and casualty limits.
+8. Strategic settlement of victory, defeat, extraction, defenders, attackers,
+   civilian harm, ownership/access, loot, and diplomatic consequences.
+9. Config integration, commands/events/codecs, DTOs, local/remote clients,
+   Textual screens, help/keymap, snapshots, and replay/property tests.
+10. Retirement of the abstract surface and invasion paths after parity.
+
+### Explicit non-goals
+
+- Real-time or simultaneous tactical turns. Assault remains IGOUGO.
+- A general army/4X logistics simulation beyond the interview-decided ground
+  force model.
+- Tactical orbital-base combat. The orbital base remains a space-combat siege
+  rung.
+- Core-world conquest. Core worlds remain non-invadable.
+- Asteroid-belt landing. Belts remain orbital spatial features.
+- Procedural alien dialogue inside tactical turns. Settlement and surrender
+  text may use existing species/persona flavor later, but dialogue mechanics
+  are not widened by this plan.
+- A tactical AI client for defending human players. The authoritative
+  attacker-driven model remains compatible with an offline defender.
+
+## Interview decision register
+
+All decisions below were resolved by design interview in July 2026 and are
+normative inputs to the work packages.
+
+### D1 — Which standing opens which branch? **RESOLVED**
+
+Every inhabited world below the configured **friendly/amity threshold** is
+assaultable. There is no neutral/wary permission branch: owned-by-player/corp,
+allied, or friendly-band inhabited worlds open survey; below-friendly inhabited
+worlds open assault; uninhabited landable worlds open survey. The continuous
+disposition value still drives other systems, but surface access deliberately
+uses the amity threshold as a hard boundary.
+
+### D2 — What does surrender grant on an unaligned inhabited world? **RESOLVED**
+
+Surrender first creates a **player-controlled protectorate** that retains its
+inhabiting species identity. It does not immediately become a player-owned
+colony. The player may later choose to take ownership through an explicit,
+consequence-bearing action whose gates and effects are specified by GW-WP01.
+
+Alliance-, corp-, and player-owned enemy worlds still follow their applicable
+conquest settlement, while an unaligned world's new protectorate state records
+control without misusing `owner=none` or erasing `inhabited_by_species_id`.
+
+### D3 — What is the player's ground force? **RESOLVED**
+
+Ground troops are **hired recruits equipped with purchased powered suits at
+Stardock**. They are persistent ship-carried assets:
+
+- recruits are people hired at Stardock;
+- suits are purchased equipment;
+- ground recruits occupy a new ship **passenger capacity distinct from both
+  cargo holds and the existing colonist capacity**;
+- the assault composer assigns an available suit to each deployed recruit;
+- when a platoon member dies, both that recruit and their equipped suit are
+  lost.
+
+Surviving recruits and suits return with the platoon under the extraction rules
+resolved by D8. Fighters remain space/sector-combat assets and are not
+reinterpreted as powered-armour infantry.
+
+### D4 — How do tactical actions consume macro turns? **RESOLVED**
+
+Ground operations consume a **fixed configurable number of main-game turns per
+configured multiple of local expedition/assault turns**. Tactical actions
+consume only local supplies, action points, and retrieval time; they do not each
+cost one main-game turn.
+
+The charge is applied **as tactical-turn thresholds are crossed**, using a
+configurable quantization such as `ceil(local_turns /
+local_turns_per_main_turn) × main_turn_cost`. An action that would enter a new
+threshold block is rejected when its main-game quantum cannot be paid; extraction
+remains available without crossing another threshold so the player cannot be
+stranded. The first threshold and any launch minimum are config and finalized in
+GW-WP01.
+
+### D5 — What survey progress persists between descents? **RESOLVED**
+
+When an expedition ends and the player later descends again:
+
+- the surveyor's **position persists** for that player/world;
+- settlement **hints persist** and continue to narrow the same sites;
+- resolved discoveries remain resolved through discovery/codex state;
+- **trenches reset**;
+- **supplies reset** to the configured starting amount.
+
+An active expedition persists exactly across reload/reconnect. This requires a
+small per-player/per-world survey-progress record outside the active operation
+for position and hints; trenches and supplies remain expedition-local.
+
+### D6 — What happens when a surface discovery is dug? **RESOLVED**
+
+A successful dig **reveals and logs the discovery automatically**. There is no
+second surface-collection action and no hold-capacity failure after excavation.
+Surface archaeology rewards move to an abstract model:
+
+- one artifact/research object is recorded for the player;
+- the discovery enters the codex with lore;
+- surface digs do **not** uncover latinum or loose ship parts.
+
+Artifacts retain a deliberate later seam for a research path that improves
+access to ship upgrades. Research itself is outside this plan, but GW-WP01 and
+GW-WP05 must preserve the minimum stable artifact identity/provenance needed so
+that later work does not require rewriting old saves. Open-space wreck and
+salvage rewards remain unchanged.
+
+### D7 — How does tactical defense relate to `Planet.fighters`? **RESOLVED**
+
+The ground-operations system **replaces the `Planet.fighters` invasion
+mechanism**. Fighters are no longer converted into tactical infantry/armour or
+used to resolve planetary conquest. They remain space-combat assets used in
+ship/space battle and to assault fighters already deployed in a sector.
+
+Planets therefore gain a distinct persistent ground-defense model for tactical
+defenders and emplacements. Its exact recruitment/production/recovery model is
+resolved separately (D11). Existing fighter production/stock must be migrated
+and surfaced as space-fighter logistics rather than silently deleted.
+
+### D8 — What happens on voluntary or forced assault extraction? **RESOLVED**
+
+Surviving attackers return if retrieval succeeds; dead/missing recruits, their
+equipped suits, and spent ordnance stay lost. Defender casualties and destroyed
+structures **persist** after failed, voluntary, forced, and casualty-ceiling
+extractions. Planetary Resolve partially recovers between assaults. Surrender
+is the only conquest/protectorate outcome; a failed operation never restores a
+pristine battlefield.
+
+### D9 — How should gas giants/Cloud Cities participate? **RESOLVED**
+
+Bare jovians and Cloud Cities remain **orbital-only until a dedicated Cloud City
+groundwar gate is crossed**. The classifier and data model retain an explicit
+future-assault seam; they must not reuse terrestrial terrain.
+
+The follow-up implementation uses a specialized tactical map resembling the
+**interior of a space station**, including new procedural/static art. It lands
+in later work packages after the terrestrial/barren replacement is complete.
+Friendly/owned Cloud City survey remains orbital-only unless separately expanded
+later; the committed follow-up here is the below-friendly assault interior.
+
+### D10 — What identity does a surface artifact retain? **RESOLVED**
+
+Each excavated artifact is a **unique provenance-bearing record**, never folded
+into a fungible count. It is keyed to its `Discovery.id` and retains rarity,
+origin planet/site, lore identity, and a configurable research domain/tag. A
+future research or alien-barter system may consume/use it without losing its
+history. Existing generic tier-count artifacts require an explicit compatibility
+path rather than silently absorbing new surface artifacts.
+
+### D11 — How are planetary ground defenders created and replenished? **RESOLVED**
+
+Planetary ground defense uses a **combination** of all three sources:
+
+- slow automatic population-based militia recovery supplies a baseline;
+- a dedicated colonist allocation trains/equips defenders faster on production
+  ticks, with any equipment/material cost made explicit and conserved;
+- owners reinforce worlds by deliberately transferring recruits and suits into
+  the local typed garrison under D15.
+
+The resulting typed ground garrison is persistent and distinct from
+`Planet.fighters`. Big-bang seeding derives its initial force from population,
+citadel, owner/species, and band. Tactical casualties reduce it directly; the
+D8 recovery rails rebuild it rather than regenerating a fresh force per assault.
+
+### D12 — When are macro-turn quanta charged? **RESOLVED**
+
+Main-game turn quanta are deducted **as local tactical-turn thresholds are
+crossed**, not reserved upfront and not deferred until extraction. The reducer
+checks affordability before an action advances into the next threshold block.
+When the player cannot pay, further time-advancing tactical actions are barred
+but extraction remains legal.
+
+### D13 — What rights does a protectorate grant before annexation? **RESOLVED**
+
+A protectorate grants **limited planetary exclusion**, not control of the
+surrounding sector:
+
+- warp transit through the sector remains open;
+- the controller has exclusive administration, defense management, production
+  share, and the future option to annex;
+- outsiders cannot colonize the world, withdraw its stores/treasury, manage its
+  defenses, or annex it peacefully;
+- friendly visitors may orbit, trade, survey/land when the inhabitants would
+  normally permit it, and use services their standing allows;
+- hostile visitors may assault after defeating the applicable orbital defenses;
+- defenses account for both the inhabitants' disposition and the controller's
+  wars when deciding whom to engage.
+
+The inhabitants retain their polity, stores/treasury, ordinary service gates,
+and control over local recruitment. The controller receives a configured
+production share rather than treating all planetary inventory as personally
+owned.
+
+### D14 — What gates and consequences apply to annexation? **RESOLVED**
+
+Annexation is not available immediately after surrender. It requires both:
+
+- a configured minimum time under protectorate control; and
+- planetary Resolve recovered to a configured threshold.
+
+Annexation is then an explicit command and ownership transition. Because it
+converts a retained local polity into player property, it carries additional
+species-attitude, grudge, relation-spillover, and alignment consequences beyond
+maintaining the protectorate. The reducer rechecks elapsed time, Resolve,
+controller identity, and current sovereignty/war state.
+
+### D15 — Can assault platoons be stationed as planetary defenders? **RESOLVED**
+
+After a survey/assault mission, **every surviving deployed recruit and their
+surviving suit returns to the ship**; they never remain on the battlefield by
+default.
+
+A separate reinforcement action may deliberately transfer recruits and suits
+from the ship into a player world/protectorate. On transfer they become
+persistent typed local defenders and are no longer individually tracked or
+retrievable. The action conserves passenger/suit inventory atomically and makes
+the irreversible conversion explicit before confirmation.
+
+## Ground-access contract
+
+One pure `ground_access` seam returns a tagged result, not loosely coordinated
+booleans:
+
+```text
+GroundAccess = orbital_only(reason)
+             | survey(settlements, reason)
+             | assault(owner, inhabitants, blockers)
+```
+
+Inputs include the planet capability/state, player/corp ownership, alliance
+membership/standing/rivalry, inhabiting species' effective disposition and
+grudge, Core status, and the orbital siege ladder. `PlanetDTO`, begin-operation
+reducers, bot/service queries, and the Computer planet directory consume the
+same result. The reducer always recomputes it; the DTO is advisory.
+
+The classifier distinguishes:
+
+- **inhabited**: live colonists, `inhabited_by_species_id`, or an inhabited
+  Cloud City under D9;
+- **friendly**: player/corp ownership, same alliance, or effective disposition
+  in the configured friendly band;
+- **hostile**: declared corp war, rival/negative alliance standing, or an
+  unaligned inhabiting species in the configured hostile band after attitude
+  and grudge effects;
+- **below friendly**: any inhabited world whose effective standing is below
+  the configured amity threshold; it routes to assault even when its narrower
+  disposition-band label is neutral/wary rather than hostile.
+
+## Cross-cutting invariants
+
+- **G1 — Server authority.** The TUI never owns or mutates a live
+  `Battle`/`Expedition`; every action is a command and every visible fact is a
+  DTO projection.
+- **G2 — Replay.** Starting and acting in a ground operation reconstructs from
+  `(seed, config, command log)` and yields an identical `state_hash` after
+  reload. Projection never draws RNG.
+- **G3 — RNG discipline.** The begin reducer draws an operation seed from
+  `state.rng`; deterministic static map generation uses that seed. Combat and
+  hint rolls either draw from `state.rng` inside their action reducer or from a
+  stored operation sequence with a proved replay contract—never UI RNG.
+- **G4 — Immutable core.** Production ground entities are frozen snapshots;
+  rules return deltas. Config and `random.Random` objects are not embedded in
+  hashed state.
+- **G5 — Static/dynamic split.** Terrain and immutable placement are
+  reproducible from the operation seed and inputs. Only gameplay-visible
+  dynamic state is hashed. Styled art is projection/TUI state.
+- **G6 — Real discoveries.** A survey site names exactly one existing
+  `Discovery.id`; ground generation never mints a parallel name. Successful
+  excavation atomically stamps its artifact reward and codex lore.
+- **G7 — Sensor integrity.** An unresolved hidden site cannot be inferred from
+  the DTO, map art, scanner, clue placement, action legality, or error text.
+- **G8 — Conservation.** Ground actions cannot mint troops, fighters,
+  components, cargo, artifacts, latinum, supplies, ammunition, or planetary
+  stores outside an explicit configured faucet/reward. The D6 surface artifact
+  is an explicit discovery faucet; surface latinum/components are not.
+- **G9 — One active interruption.** A player cannot move, dock, trade, hail,
+  start space combat, or begin a second ground operation while one is active.
+  Structural reducers clear/settle it; screen closure is never trusted.
+- **G10 — Concurrent world state.** The game server remains the single writer.
+  Starting or settling an operation revalidates the planet against live
+  ownership, defenses, discoveries, and other active operations.
+- **G11 — Consequence parity.** A tactical assault cannot evade the standing,
+  grudge, spillover, alignment, bounty, ownership, and corp-war effects of the
+  abstract invasion it replaces; civilian harm adds consequences rather than
+  bypassing the existing rail.
+- **G12 — No duplicate defenses.** A base razed in orbit never appears on the
+  ground map. A citadel gun with zero integrity never respawns tactically.
+- **G13 — Core sanctuary.** No Core world can enter assault mode, regardless of
+  crafted commands or stale DTOs.
+- **G14 — Wire parity.** Local and remote clients expose the same operation
+  views and legal commands. Every command/event/DTO change bumps and tests the
+  explicit wire version as required.
+
+## Architecture
+
+### Production package boundary
+
+Promote the rules-quality parts of the POC into a strict, core-level package:
+
+```text
+edge/core/groundwar/
+    models.py       frozen active-operation snapshots
+    access.py       world routing and siege blockers
+    terrain.py      gameplay feature generation, no Rich/Textual/art imports
+    survey.py       survey generation and pure action resolution
+    assault.py      assault generation and pure action resolution
+    settlement.py   strategic reconciliation and consequences
+```
+
+`edge/core/rules.py` remains the command dispatcher and only authoritative
+state-mutation seam. `edge/groundwar/` remains a developer play-test application
+and is refactored to consume the production package; its Textual widgets may be
+reused by the live TUI only after they use DTOs and a client facade.
+
+Biome feature definitions used by gameplay must move to, or be shared through,
+a lower pure module so `edge.core` never imports `edge.art`. Glyph/color
+resolution remains in `edge.art`/`edge.tui`.
+
+### Hashed state
+
+Add `Player.ground_operation: GroundOperation | None`, analogous to
+`active_encounter`. A discriminated operation stores only dynamic authoritative
+state and sufficient generation identity:
+
+- common: operation id/kind, planet/sector, seed, started day/command sequence,
+  local turn, outcome;
+- survey: explorer, supplies, visible/resolved discovery ids and dug cells;
+- assault: deployed platoon, surviving troopers, ordnance, structures/ground
+  defenders, Resolve, city states, retrieval clock, casualties, and the
+  operation's reserved defender snapshot.
+
+Large immutable terrain/art grids are regenerated from the stored seed and
+snapshotted generation inputs. A runtime cache may optimize regeneration but
+must be safely discardable and excluded from `state_hash`.
+
+`Player` also carries a compact per-world survey-progress map containing the D5
+position and persistent settlement/site hints. It is hashed because it changes
+future search information; trenches and replenished supplies stay only on the
+active operation.
+
+Surface rewards live as immutable `ArtifactRecord`s on the player (or an
+equivalent state-level inventory keyed by owner): discovery id, origin
+planet/site, rarity, research domain, lore key, and acquisition day. D10 records
+remain individually addressable; they are not collapsed into the legacy
+rarity-tier count map.
+
+### Command surface
+
+The exact command names may consolidate during implementation, but the wire
+must represent these actions explicitly:
+
+```text
+BeginSurvey(planet_id)
+GroundMove(operation_id, actor_id, x, y)
+SurveyDig(operation_id)
+SurveyTalk(operation_id)
+
+BeginGroundAssault(planet_id, loadout)
+GroundDrop(operation_id, placements)
+GroundJump(operation_id, actor_id, x, y)
+GroundFire(operation_id, actor_id, x, y, weapon)
+GroundBroadcast(operation_id, actor_id, city_id)
+EndGroundTurn(operation_id)
+
+ExtractGroundOperation(operation_id)
+```
+
+Every command validates the operation id, player, current planet/sector,
+operation phase, actor ownership, and live world preconditions.
+
+## Milestones
+
+| Milestone | Work packages | Result |
+|---|---|---|
+| **GW-M1 — Contract and core** | GW-WP01–04 | Decisions/spec fixed; replayable ground-operation state and access classifier |
+| **GW-M2 — Survey replacement** | GW-WP05–07 | Real discoveries excavated into unique artifacts and codex lore |
+| **GW-M3 — Assault replacement** | GW-WP08–11 | Defended worlds fought tactically and settled strategically |
+| **GW-M4 — Parity and retirement** | GW-WP12–14 | Remote/UI/bot parity, balance, legacy paths removed |
+| **GW-M5 — Cloud City interiors** | GW-WP15–16 | New station-interior art and gated Cloud City assaults |
+
+Each milestone leaves the ordinary sector/port/space game playable. GW-M2 may
+ship behind `groundwar.survey_enabled`; GW-M3 behind
+`groundwar.assault_enabled`. The flags are migration scaffolding, removed or
+defaulted permanently on in GW-M4.
+
+Cloud Cities retain a separate `groundwar.cloud_city_assault_enabled` gate. It
+stays off through GW-M4 and turns on only when GW-M5's specialized interior art,
+rules, DTO, and tests are complete.
+
+## Work packages
+
+### GW-WP01 — Interview decisions and authoritative spec delta (M)
+
+Resolve D1–D15. Update `DESIGN.md` §§3, 4, 4.2, 7, 10, 11, 13, and 14 with:
+
+- the ground-access matrix;
+- active ground-operation state and replay lifetime;
+- survey discovery/sensor/collection semantics;
+- troop/equipment/capacity and turn-economy decisions;
+- assault surrender, failed-extraction, garrison, civilian, and conquest rules;
+- Cloud City treatment;
+- the screen map and exit criterion.
+
+Update `GROUNDWAR_POC.md` from “standalone possible future” to the adopted
+prototype/source and state which POC choices survive or change.
+
+Files: `docs/DESIGN.md`, `docs/GROUNDWAR_POC.md`, this plan.
+Tests: none (docs).
+Commit `ground: GW-WP01 ground-operations decisions + spec`.
+
+### GW-WP02 — Production config and pure terrain seam (M)
+
+Move groundwar balance into frozen Pydantic `GameConfig` models. Keep one
+shipped YAML source of truth under `config/default.yaml`; the standalone app
+loads that block rather than a divergent loader. Split gameplay biome features
+from glyph/color rendering so core terrain generation has no upward import.
+
+Validate ranges and cross-field invariants: non-empty suit/terrain registries,
+reachable map dimensions, positive pressure clocks, scanner bands sorted and
+non-overlapping, conversion ratios nonzero, and costs/capacities bounded.
+
+Files: `edge/core/config.py`, `edge/config.py`, `config/default.yaml`,
+`edge/core/groundwar/terrain.py`, `edge/art/terrain.py`,
+`edge/groundwar/config.py`, `edge/groundwar/mapgen.py`.
+Tests: config rejection/golden loading; terrain determinism and passable-component
+properties across types/seeds.
+Commit `ground: GW-WP02 production config + pure terrain seam`.
+
+### GW-WP03 — Frozen operation models, generation identity, and state epoch (L)
+
+Add frozen survey/assault state models and `Player.ground_operation`. Define
+stable operation ids and derive the operation seed in the begin reducer from
+`state.rng`. Add `ReduceResult` support, state hashing, command/event codecs,
+wire schemas, and movement/docking/encounter blockers.
+
+Add the D5 per-world survey progress and D10 provenance-bearing artifact record
+in the same epoch, including an explicit compatibility policy for pre-existing
+generic barter artifacts.
+
+Batch hashed-field and config changes into one config-version/state-hash epoch.
+Golden replay regeneration happens in this WP, once.
+
+Files: `edge/core/groundwar/models.py`, `edge/core/models.py`,
+`edge/core/rules.py`, `edge/core/events.py`, `edge/store/codec.py`,
+`edge/store/snapshots.py`, wire codec/fixtures, `config/default.yaml`.
+Tests: model invariants; begin/clear lifetime; rejected commands leave no log;
+codec round trips; save/reload mid-operation; identical state hash.
+Commit `ground: GW-WP03 replayable active operations (config epoch)`.
+
+### GW-WP04 — Ground-access classifier and orbit projection (M)
+
+Implement the D1/D2/D9/D13/D14 access and protectorate contract in one pure
+seam. Cover player/corp ownership, corp war, alliances/governor, effective
+disposition/grudges, inhabitants, landability, Core sanctuary,
+base/gun/shield blockers, and any
+protectorate/access state chosen by D2.
+
+Add explicit protectorate and annexation commands/state rather than overloading
+`Planet.owner`. Project current controller, granted rights, annexation blockers,
+and consequences; reducers recompute every gate.
+
+Project the tagged mode and exact blocker through `PlanetDTO`; keep reducers
+authoritative by recomputing it. Update the planet directory and bot/service
+query surface so automation can distinguish survey and assault and explain
+their blockers.
+
+Files: `edge/core/groundwar/access.py`, `edge/core/aliens.py`,
+`edge/server/session.py`, `edge/core/dto.py`, `edge/server/client.py`,
+`edge/server/protocol.py`, bot service schema, `edge/tui/screens/planet.py`.
+Tests: table/property coverage for every ownership/standing/Core/defense
+combination; DTO/reducer lockstep.
+Commit `ground: GW-WP04 one ground-access contract` — **GW-M1 done.**
+
+### GW-WP05 — Survey generation from real discoveries (L)
+
+Port expedition generation and movement into immutable pure rules. Generate one
+stable site position per eligible existing surface `Discovery`, not POC find
+kinds. Preserve actual ids, names, kinds, rarity, payloads, global `found_by`,
+and player codex/detection state.
+
+Normalize generated surface-site rewards to the D6 archaeology contract:
+artifact/research provenance plus codex lore, never latinum or loose components.
+Keep open-space and combat-wreck payload generation byte-compatible. The
+artifact record must retain enough stable discovery identity for the deferred
+research system without implementing research here.
+
+Sensor-ineligible hidden sites leak no marker, circle, clue, scanner signal,
+pathing stop, action, or count. A later operation after a sensor upgrade can add
+the newly resolvable site without moving already known sites; use per-discovery
+placement salts rather than list-order RNG.
+
+Settlement placement depends on friendly live inhabitants. Sites stay outside
+settlement/landing keepouts and in the explorer's passable component.
+
+Files: `edge/core/groundwar/survey.py`, `edge/core/groundwar/terrain.py`,
+`edge/bigbang/discoveries.py`, `edge/core/models.py`, `edge/core/discovery.py`,
+`edge/core/rules.py`, `edge/core/events.py`.
+Tests: deterministic placement; real-id bijection; reachability; sensor
+non-leakage; upgrade-and-return; zero-site world; already-collected site;
+friendly versus uninhabited settlement generation; every surface find yields
+artifact+lore and never latinum/components; open-space payload regression.
+Commit `ground: GW-WP05 survey generation from universe discoveries`.
+
+### GW-WP06 — Survey actions, persistence, and reward settlement (L)
+
+Implement movement/march halting, scanner readings, clue visibility, digging,
+settlement talk/resupply/hints, supply exhaustion, excavation settlement, and
+extraction under D4–D6. A successful dig atomically updates detection, codex lore,
+experience, artifact state, and the discovery's collection marker through the
+existing discovery settlement rail; no second collect command or hold-space
+gate follows it.
+
+No UI close action settles or discards state. Reload/reconnect resumes the exact
+operation. Voluntary extraction clears active state while preserving the D5
+position/hints; a later descent restores those facts with fresh supplies and no
+trenches. Main-game turns settle in the configured D4 quanta, with no per-action
+macro charge. Under D12 the reducer deducts a quantum before crossing each local
+threshold, refuses unaffordable time-advancing actions, and always permits
+extraction. Movement from orbit remains impossible until extraction settles.
+
+Files: `edge/core/groundwar/survey.py`, `edge/core/discovery.py`,
+`edge/core/rules.py`, `edge/core/events.py`, `edge/store/codec.py`.
+Tests: supplies never negative; dry re-dig free; hint once; position/hint
+survive re-descent while trenches/supplies reset; artifact/codex/XP exactly once;
+simultaneous excavation race; macro-turn quantization; exhaustion; extraction; complete
+command-log rebuild golden.
+Commit `ground: GW-WP06 authoritative survey actions + rewards`.
+
+### GW-WP07 — Live expedition DTO and Textual replacement (L)
+
+Adapt the POC expedition screen to the async `GameClient` facade. It renders a
+fog-safe viewport DTO and sends commands; it never receives an `Expedition`
+object. Preserve keyboard/mouse cursor, hot/cold scanner, clues, march stopping,
+settlement interaction, find art/modal, responsive layouts, help, and theme.
+
+Orbit routes survey worlds into `BeginSurvey`; reconnect detects and resumes an
+active survey. Update the remote wire and event rendering. Retain the old surface
+screen only behind the migration flag until GW-M4.
+
+Files: `edge/core/dto.py`, `edge/server/session.py`, `edge/server/client.py`,
+wire codec, `edge/tui/screens/planet.py`, new/ported ground-operation screen,
+`edge/groundwar/expedition_ui.py`, help/keymap docs.
+Tests: DTO fog; local/remote parity; Textual Pilot keyboard/mouse flow;
+compact/standard/wide snapshots; reconnect mid-survey.
+Commit `ground: GW-WP07 live survey expedition UI` — **GW-M2 done.**
+
+### GW-WP08 — Ground-force economy and assault composer (XL)
+
+Implement the D3 force model: persistent recruits hired at Stardock, persistent
+powered suits purchased there, a new per-hull passenger capacity separate from
+colonist capacity and cargo, ammunition, casualty persistence, and loadout
+validation. Port the platoon composer to the client facade and project only
+affordances the player can actually fund/deploy.
+
+Define hiring and suit prices, the per-hull passenger cap, Stardock/base service
+availability, transfer/refit, and escape-pod behavior. The assault composer may
+deploy no more recruits than the ship carries and must assign one owned suit to
+each. A killed trooper atomically removes the recruit and equipped suit;
+survivors return under D8.
+
+Files depend on D3; expected: `edge/core/models.py`, `edge/core/config.py`,
+`config/default.yaml`, `edge/core/rules.py`, `edge/core/events.py`, service-point
+and Stardock/base DTO/screens, `edge/groundwar/widgets.py`.
+Tests: capacity and cost conservation; no negative balances/ammo; loadout
+round-trip; casualty persistence; service availability; property tests.
+Commit `ground: GW-WP08 ground force + assault composer`.
+
+### GW-WP09 — Persistent ground defense and assault generation (XL)
+
+Implement the D11 persistent planetary ground-defense model, its big-bang
+seeding, reinforcement/replenishment rail, player/protectorate management, DTO
+surface, and migration away from `Planet.fighters` as invasion defense.
+Planet-produced/stored fighters remain space assets; add any missing transfer
+path needed to move them between a planet, ship, and sector deployment.
+
+Ground garrisons combine D11's automatic population baseline, dedicated
+colonist allocation, and stationed recruit+suit reinforcements. Define exact
+production inputs, caps, the irreversible D15 reinforcement command,
+owner/protectorate rights,
+and how typed infantry/armour equipment maps onto tactical units without
+creating or destroying resources implicitly. Mission survivors return to the
+ship; only an explicit transfer merges them into local defense.
+
+Port battlefield/city/structure/garrison generation to frozen pure models.
+Difficulty is derived from live state rather than selected from a setup menu:
+planet type, population, band, the D11 persistent ground garrison, citadel level,
+surviving gun, owner/species, and config scaling curves.
+
+Enforce the orbital ladder at begin. Never stamp a razed base or silenced gun.
+Snapshot/reserve the ground defenders committed to the operation so another
+command cannot spend them twice. Keep `Planet.fighters` entirely outside this
+calculation under D7. Apply the D9 terrestrial-versus-Cloud-City gate.
+
+Files: `edge/core/groundwar/assault.py`, `edge/core/groundwar/access.py`,
+`edge/core/models.py`, `edge/core/planets.py`, `edge/bigbang/populate.py`,
+`edge/core/citadels.py`, `edge/core/rules.py`, `edge/core/events.py`, planet DTO/UI.
+Tests: seeded maps; live-state scaling; city reachability; no duplicate gun;
+base/gun/shield/Core rejection; ground-defender reserve conservation; fighters
+have no effect on assault odds; concurrent start race.
+Commit `ground: GW-WP09 assault maps from live worlds`.
+
+### GW-WP10 — Tactical assault actions and planetary AI (XL)
+
+Port drop placement and AA reaction, individual actions, movement/jump, cover,
+LOS, firing, missiles, Scout jamming/detection, Command aura/broadcast, city
+cowing, Resolve, defense phase, garrison movement/fire, escalating sorties,
+retrieval, casualty ceiling, surrender, and extraction. Each player/defense
+phase is a bounded logged command; animation events do not mutate state.
+
+The POC rules are a behavioral reference, not code exempt from production
+standards: freeze state, remove event draining and embedded RNG/config, typecheck
+strictly, and separate presentation labels from rules facts.
+
+Files: `edge/core/groundwar/assault.py`, `edge/core/rules.py`,
+`edge/core/events.py`, codecs.
+Tests: geometry; action economy; jump/AA; detection/jamming; Resolve directions;
+civilian harm; broadcast gates; AI determinism; escalation; every outcome;
+Hypothesis termination and bounds; reload at multiple tactical turns.
+Commit `ground: GW-WP10 authoritative tactical assault`.
+
+### GW-WP11 — Strategic assault settlement and consequences (XL)
+
+Settle surrender, retrieval, casualty abort, and wipe under D2/D3/D7/D8.
+Reconcile strategic defenders/attackers, persistent destroyed defenses, Resolve
+recovery, colonists/civilians, citadel downgrade/build progress, treasury,
+stores, ownership/protectorate/access, surviving ground defenders, and loot
+atomically.
+
+Reuse and extend existing invasion consequences: alliance standing, species
+attitude and grudges, relation spillover, alignment, experience, corp war,
+bounty/outlawry, and civilian-atrocity penalties. An unaligned inhabited world
+must receive a real species consequence path; the old owner-only invasion did
+not cover it.
+
+Files: `edge/core/groundwar/settlement.py`, `edge/core/citadels.py`,
+`edge/core/aliens.py`, `edge/core/corp.py`, `edge/core/rules.py`,
+`edge/core/events.py`.
+Tests: conservation and ownership properties; partial defender attrition;
+survivor return; every owner kind; unaligned species; betrayal/permanent grudge;
+civilian harm; failed assault; open citadel build; full siege replay golden.
+Commit `ground: GW-WP11 assault settlement + consequence parity` — **GW-M3 done.**
+
+### GW-WP12 — Live assault DTO, remote client, and Textual battle (XL)
+
+Adapt the POC battle screen and platoon composer to DTO/client authority.
+Viewport projection exposes only visible enemy units/structures, legal selected
+actions, local stats, Resolve/retrieval/casualties, and event FX. The remote
+attacker drives commands through the game's single-writer queue; defenders need
+not be online.
+
+Support keyboard and mouse drop placement, selection, move/jump/fire/missile,
+broadcast, end turn, extraction confirmation, reconnect/resume, responsive
+layouts, help, and accessibility copy. Orbit routes only assault-classified
+worlds to the composer and states every siege blocker.
+
+Files: DTO/session/client/wire layers, `edge/tui/screens/planet.py`, new/ported
+ground battle screen, `edge/groundwar/app.py`, `edge/groundwar/widgets.py`.
+Tests: fog and legal-action lockstep; local/remote parity; Pilot flows for win,
+loss, extract, and reconnect; responsive snapshots; stale-command rejection.
+Commit `ground: GW-WP12 live tactical assault UI`.
+
+### GW-WP13 — Balance, bots, performance, and multiplayer contention (L)
+
+Build deterministic survey and assault bots over the public client/service
+surface. Run seed matrices across planet types, bands, populations, citadel
+levels, ground-defense strengths, and loadouts. Tune search time, supply
+pressure, victory
+rates, casualties, suit costs, macro turn costs, rewards, and repeated-assault
+recovery.
+
+Profile terrain regeneration, state hashing, DTO viewport projection, command
+log growth, remote latency, and reload time. Add safe runtime caches only where
+measurement warrants them. Exercise two-player contention over discoveries,
+world ownership, and simultaneous operations under the single writer.
+
+Files: test/bot harnesses, config, balance notes.
+Tests: statistical bounds with fixed seed sets; performance budgets; bot golden
+logs; multiplayer contention/reconnect soak.
+Commit `ground: GW-WP13 ground-operations balance + soak`.
+
+### GW-WP14 — Legacy retirement, documentation, and exit gate (M/L)
+
+Default the new paths on and remove or migrate:
+
+- `Descend`, `Explore`, their events/codecs, and the old `SurfaceDTO` /
+  `SurfaceScreen`;
+- one-roll `InvadePlanet` and its direct TUI prompt;
+- separate POC config loading and mutable duplicate production rules;
+- feature flags and compatibility shims no longer needed.
+
+Keep reusable POC launcher/play-test support pointed at production rules. Update
+`DESIGN.md`, `GROUNDWAR_POC.md`, UI/keymap docs, scripting/service docs, wire
+fixtures, screenshots, and the project work-completed summary. Run the full
+quality suite and manually assess the exit criterion.
+
+Files: repository-wide removal/update set.
+Tests: no references to retired commands/views; full `pixi run check`; portable
+save/rebuild; hosted-client smoke; manual exit-criterion record.
+Commit `ground: GW-WP14 retire abstract surface/invasion paths` — **GW-M4 done.**
+
+### GW-WP15 — Cloud City station-interior terrain and art (L)
+
+Design and implement the D9 interior-map vocabulary without reusing planetary
+biomes: pressure hulls, bulkheads, corridors, lifts/shafts, plazas/habitation,
+engineering, security doors, cover, vacuum/fire/electrical hazards, defensive
+emplacements, and a command/citadel core. Define a pure gameplay-feature grid
+below core and a separate glyph/color/art resolver above it, preserving G5.
+
+Generation derives scale and district count from `cloud_city_size`, population,
+citadel/defense state, and seed. Every deployment zone, objective, and defender
+must share a traversable component, accounting for locked doors and jump/vertical
+movement rules. The standalone groundwar harness gains a Cloud City scenario for
+art/rules iteration while the live feature gate remains off.
+
+Files: new groundwar interior generator and art modules, `edge/art` station
+interior assets, config, standalone harness.
+Tests: deterministic generation; connectivity/reachability; feature/art registry
+coverage; compact/standard/wide viewport snapshots; visual review sheet.
+Commit `ground: GW-WP15 Cloud City station-interior maps + art`.
+
+### GW-WP16 — Gated Cloud City assault integration (L/XL)
+
+Adapt assault generation and tactics to the station interior: boarding/drop
+entry, doors and corridors, interior hazards, Cloud City defensive structures,
+Resolve objectives, retrieval/extraction, persistent damage, and D8 settlement.
+Reuse recruits/suits, ground defenders, diplomacy, protectorate, conquest, wire,
+DTO, and command rails; specialize only topology/art and rules that truly differ.
+
+When parity, balance, remote play, and persistence tests pass, enable
+`groundwar.cloud_city_assault_enabled`. Below-friendly inhabited Cloud Cities
+then route to assault; bare jovians and friendly/owned Cloud Cities remain
+orbital-only under D9.
+
+Files: core groundwar access/assault/settlement, DTO/session/client/wire, planet
+and battle TUI, config and docs.
+Tests: gate-off orbital behavior; gate-on access; assault win/fail/extract;
+persistent interior damage; protectorate/conquest; reload and remote-client
+goldens; fighter non-involvement.
+Commit `ground: GW-WP16 Cloud City interior assaults` — **GW-M5 done.**
+
+## Verification matrix
+
+| Concern | Required evidence |
+|---|---|
+| Determinism | Same seed + ground command log → identical hash, including mid-operation reload |
+| Discovery integrity | One ground site ↔ one real discovery; sensor-hidden sites leak nothing; dig atomically yields artifact+lore |
+| Economy | Troop/suit/loadout costs and rewards conserve or use explicit sinks/faucets |
+| Strategic reconciliation | Tactical casualties/defenses settle exactly once into planet/ship/player state |
+| Diplomacy | Alliance, species, grudge, corp-war, alignment, and civilian consequences covered |
+| Safety | Core/non-landable/defended gates rejected in reducers, not merely hidden in UI |
+| Multiplayer | Local and remote parity; contention serialized; reconnect resumes exact operation |
+| UI | Keyboard/mouse; compact/standard/wide; fog-correct viewport; destructive confirms |
+| Performance | Bounded generation, projection, hash, log, and reload costs at configured max map |
+
+## Principal risks
+
+1. **D3 force-model expansion.** Persistent troops and suits touch more systems
+   than surveying and may dominate the schedule. GW-WP08 is isolated so the
+   survey milestone can ship first.
+2. **Oversized hashed state/logs.** Storing full art/terrain or emitting one event
+   per cell would bloat hashes and wire traffic. Preserve the static/dynamic
+   split and viewport DTO.
+3. **Sensor leaks.** The POC assumes every generated site is a known orbital
+   contact; the live discovery system does not. G7 receives dedicated negative
+   tests at rule and DTO levels.
+4. **Strategic/tactical mismatch.** POC difficulty/garrison counts are invented,
+   while D7 removes fighters from invasion entirely. D11's persistent ground
+   defense must land before assault generation or failed assaults will have no
+   honest strategic aftermath.
+5. **Duplicate siege defenses.** POC citadel levels generate a gun while the live
+   ladder requires that gun already silenced. G12 makes surviving defense state
+   an explicit generation input.
+6. **Unaligned-world sovereignty.** Below-friendly inhabitants can exist on
+   `owner=none`; surrender must create the D2 protectorate without erasing
+   species identity, and later ownership must be an explicit action rather than
+   an accidental conquest side effect.
+7. **Cloud City semantics and art.** Walking on a bare gas giant is invalid and
+   terrestrial terrain cannot depict a station interior. D9 keeps the gate off
+   until GW-WP15–16 supply dedicated gameplay topology, new art, and integration.
+8. **Remote command volume.** Tactical play produces far more commands than the
+   abstract reducers. GW-WP13 measures log/wire/reload behavior before retirement.
+
+## Definition of done
+
+- D1–D15 are resolved and recorded in both this plan and authoritative DESIGN.
+- GW-WP01–16 acceptance tests pass.
+- `ruff`, strict `mypy` production layers, pytest/property tests, codec fixtures,
+  and Textual Pilot/snapshots are green.
+- Survey and assault work through local and remote clients.
+- A save can reload at any operation phase without state drift.
+- Abstract surface exploration and one-roll planetary invasion are unreachable
+  and removed.
+- `GROUNDWAR_POC.md` accurately describes the retained standalone harness and
+  the production subsystem it exercises.
