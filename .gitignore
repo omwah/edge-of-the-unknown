@@ -20,3 +20,7 @@ snapshot_report.html
 
 # Local process settings and secrets (server/sysop, edge-serve)
 .env
+
+# graphify
+graphify-out/cost.json
+graphify-out/cache/
