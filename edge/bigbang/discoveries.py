@@ -62,6 +62,22 @@ def _make_payload(kind: DiscoveryKind, tier: RarityTier, dcfg: DiscoveryConfig,
     return DiscoveryPayload(kind=PayloadKind.ARTIFACT, barter_tier=barter)
 
 
+def _make_surface_payload(kind: DiscoveryKind, tier: RarityTier, dcfg: DiscoveryConfig
+                          ) -> DiscoveryPayload:
+    """A surface-site payload under the D6 archaeology contract (GW-WP05).
+
+    Every excavated surface site yields **one provenance-bearing artifact plus codex
+    lore** — never latinum or loose ship parts (D6/D10). Barter value still scales with
+    rarity (`barter_equivalence`, §8) so a deep-band dig is worth more, and the lore
+    fragment gives the codex its flavour. Draws no RNG, so surface generation stays a pure
+    function of the (already-rolled) kind/tier — keeping the shared discovery RNG's later
+    draws stable. Open-space and combat-wreck payloads keep `_make_payload` unchanged.
+    """
+    barter = dcfg.barter_equivalence.get(tier.name, ComponentTier.II.name)
+    lore = f"survey log: a {tier.name.lower()} {kind.value.replace('_', ' ')}"
+    return DiscoveryPayload(kind=PayloadKind.ARTIFACT, barter_tier=barter, lore=lore)
+
+
 def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> None:
     """Populate `state.discoveries` deterministically from the seed (§7)."""
     dcfg = config.discovery
@@ -133,7 +149,7 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
             hidden = tier.value >= dcfg.surface_hidden_min_rank
             discoveries[did] = Discovery(
                 id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
-                payload=_make_payload(kind, tier, dcfg, rng), planet_id=pid, site_slot=slot,
+                payload=_make_surface_payload(kind, tier, dcfg), planet_id=pid, site_slot=slot,
                 hidden=hidden, name=namer.draw(kind),
             )
             did += 1
@@ -157,7 +173,7 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
         slot = max((d.site_slot for d in sites), default=-1) + 1
         discoveries[did] = Discovery(
             id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
-            payload=_make_payload(kind, tier, dcfg, rng), planet_id=pid, site_slot=slot,
+            payload=_make_surface_payload(kind, tier, dcfg), planet_id=pid, site_slot=slot,
             hidden=tier.value >= dcfg.surface_hidden_min_rank, name=namer.draw(kind),
         )
         did += 1
@@ -170,16 +186,18 @@ def salt_raid_caches(state: UniverseState, config: GameConfig) -> None:
 
     Runs **after** `populate_species` (it needs placed species) on its own sub-RNG, so it
     never shifts the §7 discovery draw order. A hostile-band species whose home (contact)
-    sector holds a planet gets one **legendary** Tier-III component cache on that world — the
-    reward for raiding the raiders — appended to `state.discoveries`. The cache is hidden
-    (sensor-gated) and `raid_cache`-marked, so it is descended-to and codex-logged like any
+    sector holds a planet gets one **legendary** artifact cache on that world — the reward
+    for raiding the raiders — appended to `state.discoveries`. Under the D6 archaeology
+    contract (GW-WP05) a surface dig yields a provenance-bearing artifact plus lore, never a
+    loose component, so the cache is an ANCIENT_TECH artifact whose research value (a future
+    tech-research seam, D10) replaces the old direct Tier-III part. The cache is hidden
+    (sensor-gated) and `raid_cache`-marked, so it is surveyed and codex-logged like any
     surface site but is excluded from the spatial rarity gradient (its placement follows
     hostile homeworlds, not the band curve). One per sector; never in the Core.
     """
     dcfg = config.discovery
     if dcfg is None or config.roster is None or not dcfg.component_pool:
         return
-    rng = random.Random(f"{state.game.seed}-raidcache")
     namer = DiscoveryNamer(config.names, random.Random(f"{state.game.seed}-raidcachenames"),
                            used=[d.name for d in state.discoveries.values()])
     next_id = (max(state.discoveries) + 1) if state.discoveries else 1
@@ -204,9 +222,7 @@ def salt_raid_caches(state: UniverseState, config: GameConfig) -> None:
         state.discoveries[next_id] = Discovery(
             id=next_id, kind=DiscoveryKind.ANCIENT_TECH, rarity_tier=RarityTier.LEGENDARY,
             sector_id=sector, planet_id=home_pid, site_slot=slot,
-            payload=DiscoveryPayload(kind=PayloadKind.COMPONENT,
-                                     component=Component(rng.choice(dcfg.component_pool)),
-                                     tier=ComponentTier.III),
+            payload=_make_surface_payload(DiscoveryKind.ANCIENT_TECH, RarityTier.LEGENDARY, dcfg),
             hidden=True, raid_cache=True, name=namer.draw(DiscoveryKind.ANCIENT_TECH),
         )
         next_id += 1
