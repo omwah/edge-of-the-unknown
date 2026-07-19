@@ -27,7 +27,19 @@ from helpers import generate_with_player
 _SIDECAR = DEFAULT_CONFIG_PATH.parent / "dialogue" / "alien_dialogue_species.yaml"
 CFG = load_config_with_sidecar(_SIDECAR)
 SMALL = CFG.model_copy(
-    update={"bigbang": CFG.bigbang.model_copy(update={"sector_count": 90, "start_sector": 1})})
+    update={
+        "bigbang": CFG.bigbang.model_copy(
+            update={
+                "sector_count": 90,
+                "start_sector": 1,
+                "home_cluster_min": 3,
+                "home_cluster_max": 5,
+                "core_sector_count": 5,
+            }
+        )
+    }
+)
+
 
 
 def _ctx(roster_id: str, *, alignment: int = 0, stage: str | None = None,
