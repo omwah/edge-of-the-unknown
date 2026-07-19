@@ -1,0 +1,3652 @@
+{
+  ".claude/settings.local.json": {
+    "mtime": 1781409380.347213,
+    "ast_hash": "0e38603e85a2c3ff6e7c4513f9034c4f",
+    "semantic_hash": "0e38603e85a2c3ff6e7c4513f9034c4f"
+  },
+  "edge/__init__.py": {
+    "mtime": 1781471532.533632,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "edge/art/__init__.py": {
+    "mtime": 1781967415.7528045,
+    "ast_hash": "daf926a901041bbee4ff42364d0b6044",
+    "semantic_hash": "daf926a901041bbee4ff42364d0b6044"
+  },
+  "edge/art/cli.py": {
+    "mtime": 1782274265.939012,
+    "ast_hash": "5ebe367b3d336e0e1d91be30bb5bb719",
+    "semantic_hash": "5ebe367b3d336e0e1d91be30bb5bb719"
+  },
+  "edge/art/concourse.py": {
+    "mtime": 1783902596.771297,
+    "ast_hash": "a088df34d6db33d8e9dafaf3e1847c24",
+    "semantic_hash": "a088df34d6db33d8e9dafaf3e1847c24"
+  },
+  "edge/art/discovery.py": {
+    "mtime": 1782312480.3185363,
+    "ast_hash": "5b654a66fe638561ebdefaf9a8ad4530",
+    "semantic_hash": "5b654a66fe638561ebdefaf9a8ad4530"
+  },
+  "edge/art/export.py": {
+    "mtime": 1783185433.0202062,
+    "ast_hash": "236ea17b2efb872df4896eecb8fa5fd9",
+    "semantic_hash": "236ea17b2efb872df4896eecb8fa5fd9"
+  },
+  "edge/art/generator.py": {
+    "mtime": 1784010475.5910716,
+    "ast_hash": "43dc67d2455416847b9072653e8db6d4",
+    "semantic_hash": "43dc67d2455416847b9072653e8db6d4"
+  },
+  "edge/art/hull.py": {
+    "mtime": 1783902596.7717996,
+    "ast_hash": "2b99b7868ee12488a5479f94efd6504f",
+    "semantic_hash": "2b99b7868ee12488a5479f94efd6504f"
+  },
+  "edge/art/noise.py": {
+    "mtime": 1781991209.2155013,
+    "ast_hash": "fa12cfe9a409f0406751939a298c6b7f",
+    "semantic_hash": "fa12cfe9a409f0406751939a298c6b7f"
+  },
+  "edge/art/planet.py": {
+    "mtime": 1784331555.4530253,
+    "ast_hash": "bb4639f805f0a0f2fc38d34b491fd76c",
+    "semantic_hash": "bb4639f805f0a0f2fc38d34b491fd76c"
+  },
+  "edge/art/port.py": {
+    "mtime": 1783902596.7715058,
+    "ast_hash": "a4ff21e580969a55db3a21d6b1b37973",
+    "semantic_hash": "a4ff21e580969a55db3a21d6b1b37973"
+  },
+  "edge/art/portrait.py": {
+    "mtime": 1783859085.3462856,
+    "ast_hash": "86f3097a60a5e5610e7b1bf2ae5eb2c7",
+    "semantic_hash": "86f3097a60a5e5610e7b1bf2ae5eb2c7"
+  },
+  "edge/art/ship.py": {
+    "mtime": 1782021159.386136,
+    "ast_hash": "ee945f3c0e85202256f6082a1fc7cc2c",
+    "semantic_hash": "ee945f3c0e85202256f6082a1fc7cc2c"
+  },
+  "edge/art/starfield.py": {
+    "mtime": 1781992457.502835,
+    "ast_hash": "5ced5f8f33eaa42c3532df3b5fbf13d5",
+    "semantic_hash": "5ced5f8f33eaa42c3532df3b5fbf13d5"
+  },
+  "edge/art/static.py": {
+    "mtime": 1782274235.0114799,
+    "ast_hash": "fa4447fe33633e4d8d544ebeb0470359",
+    "semantic_hash": "fa4447fe33633e4d8d544ebeb0470359"
+  },
+  "edge/art/stations.py": {
+    "mtime": 1783890548.192101,
+    "ast_hash": "0cb7e19aa8c62aa22ecb0076efc95943",
+    "semantic_hash": "0cb7e19aa8c62aa22ecb0076efc95943"
+  },
+  "edge/art/terrain.py": {
+    "mtime": 1784444230.5685163,
+    "ast_hash": "2854abfa26feee206fe52e5302df3402",
+    "semantic_hash": ""
+  },
+  "edge/bigbang/__init__.py": {
+    "mtime": 1783185428.6681364,
+    "ast_hash": "dcd80db676a6b2ccc3a22fd168859111",
+    "semantic_hash": "dcd80db676a6b2ccc3a22fd168859111"
+  },
+  "edge/bigbang/__main__.py": {
+    "mtime": 1784408242.977642,
+    "ast_hash": "93519b297f5a429abf1e620c9ffe62d7",
+    "semantic_hash": "93519b297f5a429abf1e620c9ffe62d7"
+  },
+  "edge/bigbang/aliens.py": {
+    "mtime": 1784005365.2256124,
+    "ast_hash": "127e55ea720901ef70efee2dd9600666",
+    "semantic_hash": "127e55ea720901ef70efee2dd9600666"
+  },
+  "edge/bigbang/discoveries.py": {
+    "mtime": 1784003247.2288065,
+    "ast_hash": "d12daf9af2f55f62afe581c4acb36b05",
+    "semantic_hash": "d12daf9af2f55f62afe581c4acb36b05"
+  },
+  "edge/bigbang/embedding.py": {
+    "mtime": 1783006614.791475,
+    "ast_hash": "c317e21d4f99a3c68c62a95a6e31c355",
+    "semantic_hash": "c317e21d4f99a3c68c62a95a6e31c355"
+  },
+  "edge/bigbang/generator.py": {
+    "mtime": 1784409778.8934486,
+    "ast_hash": "54b3a24c28a3b9ce2091c23c7fcf0680",
+    "semantic_hash": "54b3a24c28a3b9ce2091c23c7fcf0680"
+  },
+  "edge/bigbang/inspect.py": {
+    "mtime": 1782119802.802488,
+    "ast_hash": "2de08a92ca2cda94747cf5840bc92107",
+    "semantic_hash": "2de08a92ca2cda94747cf5840bc92107"
+  },
+  "edge/bigbang/naming.py": {
+    "mtime": 1784003247.2288065,
+    "ast_hash": "4599c6b2e76241a3ee32f4acd46aa522",
+    "semantic_hash": "4599c6b2e76241a3ee32f4acd46aa522"
+  },
+  "edge/bigbang/numbering.py": {
+    "mtime": 1784409833.8913317,
+    "ast_hash": "2a845af072d56fbb5c3e5eaae36500df",
+    "semantic_hash": "2a845af072d56fbb5c3e5eaae36500df"
+  },
+  "edge/bigbang/populate.py": {
+    "mtime": 1784010043.4271097,
+    "ast_hash": "8c63f2bc90f244d1bc9db7222584a895",
+    "semantic_hash": "8c63f2bc90f244d1bc9db7222584a895"
+  },
+  "edge/bigbang/station_archetypes.py": {
+    "mtime": 1783890548.686325,
+    "ast_hash": "214577ad22293ef93b609e6d86c32268",
+    "semantic_hash": "214577ad22293ef93b609e6d86c32268"
+  },
+  "edge/bigbang/topology.py": {
+    "mtime": 1781557897.6771026,
+    "ast_hash": "123b60ce5fd030ce072de86c5e1c4f0e",
+    "semantic_hash": "123b60ce5fd030ce072de86c5e1c4f0e"
+  },
+  "edge/bigbang/validate.py": {
+    "mtime": 1783902596.7660608,
+    "ast_hash": "9dc5994dcde257d8650884cd5ed63597",
+    "semantic_hash": "9dc5994dcde257d8650884cd5ed63597"
+  },
+  "edge/bigbang/webviz.py": {
+    "mtime": 1783185112.140035,
+    "ast_hash": "c35f62e51327ae22808ebac6b3386d9d",
+    "semantic_hash": "c35f62e51327ae22808ebac6b3386d9d"
+  },
+  "edge/bot/__init__.py": {
+    "mtime": 1783503151.0010002,
+    "ast_hash": "eb255e5e3e61a04cc5ddfaf468d933d2",
+    "semantic_hash": "eb255e5e3e61a04cc5ddfaf468d933d2"
+  },
+  "edge/bot/__main__.py": {
+    "mtime": 1784176639.5213118,
+    "ast_hash": "508751971fad64ce061f300e2ec2d6e5",
+    "semantic_hash": "508751971fad64ce061f300e2ec2d6e5"
+  },
+  "edge/bot/llm/__init__.py": {
+    "mtime": 1784176047.5732641,
+    "ast_hash": "0d6132b89fddd23ba6d6613f869bd162",
+    "semantic_hash": "0d6132b89fddd23ba6d6613f869bd162"
+  },
+  "edge/bot/llm/__main__.py": {
+    "mtime": 1784176786.1112247,
+    "ast_hash": "22eba8ce83cfdc9b58bbf421329e0778",
+    "semantic_hash": "22eba8ce83cfdc9b58bbf421329e0778"
+  },
+  "edge/bot/llm/actions.py": {
+    "mtime": 1784323235.7673683,
+    "ast_hash": "e6ee8dfaefd3996e90c7031987077658",
+    "semantic_hash": "e6ee8dfaefd3996e90c7031987077658"
+  },
+  "edge/bot/llm/brain.py": {
+    "mtime": 1784323598.6733701,
+    "ast_hash": "6e9e2699ba95272fb20ccc0aae017c32",
+    "semantic_hash": "6e9e2699ba95272fb20ccc0aae017c32"
+  },
+  "edge/bot/llm/describe.py": {
+    "mtime": 1784317529.882772,
+    "ast_hash": "3dd3074af9d942067e713e34a6965243",
+    "semantic_hash": "3dd3074af9d942067e713e34a6965243"
+  },
+  "edge/bot/llm/ollama.py": {
+    "mtime": 1784176070.1920543,
+    "ast_hash": "fada56354ee6c1082d197672c0175389",
+    "semantic_hash": "fada56354ee6c1082d197672c0175389"
+  },
+  "edge/bot/llm/remote.py": {
+    "mtime": 1784176757.6097736,
+    "ast_hash": "8b5e85e20731baf7168d22bb4b03c004",
+    "semantic_hash": "8b5e85e20731baf7168d22bb4b03c004"
+  },
+  "edge/bot/llm/tui.py": {
+    "mtime": 1784324325.783028,
+    "ast_hash": "735fcd59f2fe67806cd01c8056e16354",
+    "semantic_hash": "735fcd59f2fe67806cd01c8056e16354"
+  },
+  "edge/bot/runner.py": {
+    "mtime": 1784314529.7502973,
+    "ast_hash": "275dabfbbaf9fa7daeae18da955938d3",
+    "semantic_hash": "275dabfbbaf9fa7daeae18da955938d3"
+  },
+  "edge/bot/scripts/__init__.py": {
+    "mtime": 1783456977.636501,
+    "ast_hash": "26176f09d2c4c8bb4b8ee8914c7558a0",
+    "semantic_hash": "26176f09d2c4c8bb4b8ee8914c7558a0"
+  },
+  "edge/bot/scripts/explorer.py": {
+    "mtime": 1783456990.4197142,
+    "ast_hash": "e38373a033c754756c66ddb67855e009",
+    "semantic_hash": "e38373a033c754756c66ddb67855e009"
+  },
+  "edge/bot/scripts/pair_trader.py": {
+    "mtime": 1783457159.5715327,
+    "ast_hash": "4570cc430a38703d8e38a9a4ca830ff3",
+    "semantic_hash": "4570cc430a38703d8e38a9a4ca830ff3"
+  },
+  "edge/bot/swarm.py": {
+    "mtime": 1783503138.6667953,
+    "ast_hash": "4a1c51d07d61972b6a616c04bdff6708",
+    "semantic_hash": "4a1c51d07d61972b6a616c04bdff6708"
+  },
+  "edge/config.py": {
+    "mtime": 1784444392.8499672,
+    "ast_hash": "2597325fe0edf12cd55544c6d6ac6dbc",
+    "semantic_hash": ""
+  },
+  "edge/core/__init__.py": {
+    "mtime": 1781551249.9499502,
+    "ast_hash": "aa1985bef4ca16b4bdd2648862a65429",
+    "semantic_hash": "aa1985bef4ca16b4bdd2648862a65429"
+  },
+  "edge/core/aliens.py": {
+    "mtime": 1783841573.6259964,
+    "ast_hash": "bc272a806ac78472c1eead75d0ef1be6",
+    "semantic_hash": "bc272a806ac78472c1eead75d0ef1be6"
+  },
+  "edge/core/citadels.py": {
+    "mtime": 1783513321.6607041,
+    "ast_hash": "60ee47be760fc0be4f452a6b0c4e60ea",
+    "semantic_hash": "60ee47be760fc0be4f452a6b0c4e60ea"
+  },
+  "edge/core/combat.py": {
+    "mtime": 1783841573.6260626,
+    "ast_hash": "c00b8be29092228886d192508fe097d7",
+    "semantic_hash": "c00b8be29092228886d192508fe097d7"
+  },
+  "edge/core/config.py": {
+    "mtime": 1784444376.3202984,
+    "ast_hash": "0ab7d299a8393548a15f182856d0714c",
+    "semantic_hash": ""
+  },
+  "edge/core/contracts.py": {
+    "mtime": 1783902596.7679048,
+    "ast_hash": "e7d256142398b20d4b97216f03a10a3c",
+    "semantic_hash": "e7d256142398b20d4b97216f03a10a3c"
+  },
+  "edge/core/corp.py": {
+    "mtime": 1783481136.455336,
+    "ast_hash": "bb6b2c536db7f0e90d005d63fe941dc5",
+    "semantic_hash": "bb6b2c536db7f0e90d005d63fe941dc5"
+  },
+  "edge/core/dev.py": {
+    "mtime": 1783513330.5828433,
+    "ast_hash": "1c8ad6c473532c1ed82607b947a21acd",
+    "semantic_hash": "1c8ad6c473532c1ed82607b947a21acd"
+  },
+  "edge/core/discovery.py": {
+    "mtime": 1783841573.6264312,
+    "ast_hash": "f3aa31f50b369a356a061676e5bb848b",
+    "semantic_hash": "f3aa31f50b369a356a061676e5bb848b"
+  },
+  "edge/core/dto.py": {
+    "mtime": 1784346519.5430422,
+    "ast_hash": "a6ac298085ad2f9d801ccfc222f7b675",
+    "semantic_hash": "a6ac298085ad2f9d801ccfc222f7b675"
+  },
+  "edge/core/economy.py": {
+    "mtime": 1783415916.8554623,
+    "ast_hash": "74824e43cc15a5374545b04413cc12f3",
+    "semantic_hash": "74824e43cc15a5374545b04413cc12f3"
+  },
+  "edge/core/encounters.py": {
+    "mtime": 1783564743.741061,
+    "ast_hash": "70a87aac7840cb1fa697faf74a4e719e",
+    "semantic_hash": "70a87aac7840cb1fa697faf74a4e719e"
+  },
+  "edge/core/engine_room.py": {
+    "mtime": 1781706858.5283763,
+    "ast_hash": "e73003616fa6680b48a732488a00bb64",
+    "semantic_hash": "e73003616fa6680b48a732488a00bb64"
+  },
+  "edge/core/enums.py": {
+    "mtime": 1783902596.7670004,
+    "ast_hash": "e68280de1e435811a5a00da2b94b8440",
+    "semantic_hash": "e68280de1e435811a5a00da2b94b8440"
+  },
+  "edge/core/events.py": {
+    "mtime": 1784009940.5262253,
+    "ast_hash": "d136666331a9ed8de96abfe05cde3b07",
+    "semantic_hash": "d136666331a9ed8de96abfe05cde3b07"
+  },
+  "edge/core/governance.py": {
+    "mtime": 1783513285.3891373,
+    "ast_hash": "a42da7e3a5082f8c173ac0107808dc50",
+    "semantic_hash": "a42da7e3a5082f8c173ac0107808dc50"
+  },
+  "edge/core/market.py": {
+    "mtime": 1783902596.7680671,
+    "ast_hash": "829f663ffc48a6c6652d7273c3a2cc7c",
+    "semantic_hash": "829f663ffc48a6c6652d7273c3a2cc7c"
+  },
+  "edge/core/mechanics.py": {
+    "mtime": 1783660072.3940678,
+    "ast_hash": "25541dabc93f7bef4e3c5e05082cd2e4",
+    "semantic_hash": "25541dabc93f7bef4e3c5e05082cd2e4"
+  },
+  "edge/core/models.py": {
+    "mtime": 1784009884.5211978,
+    "ast_hash": "d0f8c4731d818310998cc0f35a100668",
+    "semantic_hash": "d0f8c4731d818310998cc0f35a100668"
+  },
+  "edge/core/movement.py": {
+    "mtime": 1782237143.97317,
+    "ast_hash": "c1d7e99f5454848f1fb6a334c1b34154",
+    "semantic_hash": "c1d7e99f5454848f1fb6a334c1b34154"
+  },
+  "edge/core/npc.py": {
+    "mtime": 1783436535.60115,
+    "ast_hash": "241fefa386d4d2e8f362fa57e0480517",
+    "semantic_hash": "241fefa386d4d2e8f362fa57e0480517"
+  },
+  "edge/core/planets.py": {
+    "mtime": 1784009932.2450736,
+    "ast_hash": "7a28b69deeeb3e619e9e28887d752f87",
+    "semantic_hash": "7a28b69deeeb3e619e9e28887d752f87"
+  },
+  "edge/core/rules.py": {
+    "mtime": 1784323950.6038501,
+    "ast_hash": "b7eff573118904b07ab7880d2eeba2a7",
+    "semantic_hash": "b7eff573118904b07ab7880d2eeba2a7"
+  },
+  "edge/core/services.py": {
+    "mtime": 1783902596.7685568,
+    "ast_hash": "7c5cd4db0438b8b82f2b424fdfc7a5d4",
+    "semantic_hash": "7c5cd4db0438b8b82f2b424fdfc7a5d4"
+  },
+  "edge/core/starbases.py": {
+    "mtime": 1783841573.6277652,
+    "ast_hash": "16df8b8e0b23ef714b3e409023f735e1",
+    "semantic_hash": "16df8b8e0b23ef714b3e409023f735e1"
+  },
+  "edge/core/territory.py": {
+    "mtime": 1783902596.7687047,
+    "ast_hash": "4115969efe3d1259df7b7ce61bf60737",
+    "semantic_hash": "4115969efe3d1259df7b7ce61bf60737"
+  },
+  "edge/devtool/__init__.py": {
+    "mtime": 1782118618.0418417,
+    "ast_hash": "c41af64889a57ea29214d7cc8259e36d",
+    "semantic_hash": "c41af64889a57ea29214d7cc8259e36d"
+  },
+  "edge/devtool/__main__.py": {
+    "mtime": 1784321090.71727,
+    "ast_hash": "3e98595220dd20f26ec3c1610cbad9c0",
+    "semantic_hash": "3e98595220dd20f26ec3c1610cbad9c0"
+  },
+  "edge/devtool/remote.py": {
+    "mtime": 1784322569.4218876,
+    "ast_hash": "ef7e101262d178ccaa0df8c055f60b83",
+    "semantic_hash": "ef7e101262d178ccaa0df8c055f60b83"
+  },
+  "edge/devtool/reports.py": {
+    "mtime": 1784178318.6198258,
+    "ast_hash": "db2523ce406591ba8d997fb66499ce26",
+    "semantic_hash": "db2523ce406591ba8d997fb66499ce26"
+  },
+  "edge/devtool/sysop.py": {
+    "mtime": 1784322640.2021806,
+    "ast_hash": "bfe336bae23da0fcbe1147d60e0f5a47",
+    "semantic_hash": "bfe336bae23da0fcbe1147d60e0f5a47"
+  },
+  "edge/devtool/sysop_tui.py": {
+    "mtime": 1784321260.256236,
+    "ast_hash": "28f690f4fb7674da5277391ee10db37c",
+    "semantic_hash": "28f690f4fb7674da5277391ee10db37c"
+  },
+  "edge/dialogue/__init__.py": {
+    "mtime": 1783065503.8601093,
+    "ast_hash": "f51c7aa56e009ecac5c7e5bface28ea7",
+    "semantic_hash": "f51c7aa56e009ecac5c7e5bface28ea7"
+  },
+  "edge/dialogue/authoring/__init__.py": {
+    "mtime": 1782355786.8293526,
+    "ast_hash": "fe99e3aeca708cdeccb3656ae2e678c3",
+    "semantic_hash": "fe99e3aeca708cdeccb3656ae2e678c3"
+  },
+  "edge/dialogue/authoring/backends.py": {
+    "mtime": 1782357884.000451,
+    "ast_hash": "f0f242d7424733b87d342ee32b8a6940",
+    "semantic_hash": "f0f242d7424733b87d342ee32b8a6940"
+  },
+  "edge/dialogue/authoring/cli.py": {
+    "mtime": 1782575674.210358,
+    "ast_hash": "eb6d04332490347363b902dd601ff7a6",
+    "semantic_hash": "eb6d04332490347363b902dd601ff7a6"
+  },
+  "edge/dialogue/authoring/pipeline.py": {
+    "mtime": 1783988659.4887831,
+    "ast_hash": "5e0a215672abba745341c12b272dcdc7",
+    "semantic_hash": "5e0a215672abba745341c12b272dcdc7"
+  },
+  "edge/dialogue/authoring/playtest.py": {
+    "mtime": 1784042535.570268,
+    "ast_hash": "96e3bbe4f909e6debdca58c698744e6c",
+    "semantic_hash": "96e3bbe4f909e6debdca58c698744e6c"
+  },
+  "edge/dialogue/facts.py": {
+    "mtime": 1783095426.6381626,
+    "ast_hash": "6d950460d35e54ebe49e69e59cf29da5",
+    "semantic_hash": "6d950460d35e54ebe49e69e59cf29da5"
+  },
+  "edge/dialogue/intel.py": {
+    "mtime": 1783841573.6279056,
+    "ast_hash": "3a6b4f8d0af07310bc01204f10e91879",
+    "semantic_hash": "3a6b4f8d0af07310bc01204f10e91879"
+  },
+  "edge/dialogue/intents.py": {
+    "mtime": 1783564743.7418432,
+    "ast_hash": "2ff54cc0889393397ef6760f23b1a915",
+    "semantic_hash": "2ff54cc0889393397ef6760f23b1a915"
+  },
+  "edge/dialogue/render.py": {
+    "mtime": 1782338094.830088,
+    "ast_hash": "5f0bcd1ae25650cd9e804a7c398b0033",
+    "semantic_hash": "5f0bcd1ae25650cd9e804a7c398b0033"
+  },
+  "edge/dialogue/select.py": {
+    "mtime": 1783988488.623967,
+    "ast_hash": "10539017b890de460a33e758f067060c",
+    "semantic_hash": "10539017b890de460a33e758f067060c"
+  },
+  "edge/engine/__init__.py": {
+    "mtime": 1781551269.1292906,
+    "ast_hash": "9e96f5227aecd2b4ced906f92a4ffb9b",
+    "semantic_hash": "9e96f5227aecd2b4ced906f92a4ffb9b"
+  },
+  "edge/engine/cron.py": {
+    "mtime": 1784090021.4235365,
+    "ast_hash": "d126e88505b2e786612b32d47755e42d",
+    "semantic_hash": "d126e88505b2e786612b32d47755e42d"
+  },
+  "edge/engine/port_economy.py": {
+    "mtime": 1783902596.7687738,
+    "ast_hash": "e992477eee474a04e5b587be908b5eba",
+    "semantic_hash": "e992477eee474a04e5b587be908b5eba"
+  },
+  "edge/engine/ticker.py": {
+    "mtime": 1783419553.7191563,
+    "ast_hash": "c13b457a80f367e0f9e4750dfdf5a79c",
+    "semantic_hash": "c13b457a80f367e0f9e4750dfdf5a79c"
+  },
+  "edge/groundwar/__init__.py": {
+    "mtime": 1784255274.2371116,
+    "ast_hash": "a34edb2528428fdf817872f694ee6130",
+    "semantic_hash": "a34edb2528428fdf817872f694ee6130"
+  },
+  "edge/groundwar/__main__.py": {
+    "mtime": 1784255741.4428728,
+    "ast_hash": "46d1bc12ea6a9c60500def7a7824f6d8",
+    "semantic_hash": "46d1bc12ea6a9c60500def7a7824f6d8"
+  },
+  "edge/groundwar/app.py": {
+    "mtime": 1784430534.9094162,
+    "ast_hash": "fbbb50d31a8021189a60d320e9424366",
+    "semantic_hash": "fbbb50d31a8021189a60d320e9424366"
+  },
+  "edge/groundwar/config.py": {
+    "mtime": 1784444448.5499935,
+    "ast_hash": "60d8008a803926cc3c6deb1181f6faa1",
+    "semantic_hash": ""
+  },
+  "edge/groundwar/expedition.py": {
+    "mtime": 1784356423.0353498,
+    "ast_hash": "6b4da7ef8c46144721e5a86dfc7f45fd",
+    "semantic_hash": "6b4da7ef8c46144721e5a86dfc7f45fd"
+  },
+  "edge/groundwar/expedition_ui.py": {
+    "mtime": 1784356123.7960296,
+    "ast_hash": "ad2a4cf38e36344659e6e503ff2045b7",
+    "semantic_hash": "ad2a4cf38e36344659e6e503ff2045b7"
+  },
+  "edge/groundwar/findart.py": {
+    "mtime": 1784353713.2552478,
+    "ast_hash": "9d0e6f0a0c1c9a2aed49594a6ad3d869",
+    "semantic_hash": "9d0e6f0a0c1c9a2aed49594a6ad3d869"
+  },
+  "edge/groundwar/mapgen.py": {
+    "mtime": 1784444483.4348252,
+    "ast_hash": "9080ca84e4df6d47ce91cc837294823b",
+    "semantic_hash": ""
+  },
+  "edge/groundwar/model.py": {
+    "mtime": 1784267569.888918,
+    "ast_hash": "650f4d3026493065cbd496beaae90d2f",
+    "semantic_hash": "650f4d3026493065cbd496beaae90d2f"
+  },
+  "edge/groundwar/rules.py": {
+    "mtime": 1784426588.111352,
+    "ast_hash": "91d191732a06423d0651ad27edebde02",
+    "semantic_hash": "91d191732a06423d0651ad27edebde02"
+  },
+  "edge/groundwar/widgets.py": {
+    "mtime": 1784432575.9043097,
+    "ast_hash": "667ffcb5d4cf46380c494b42f604c9f2",
+    "semantic_hash": "667ffcb5d4cf46380c494b42f604c9f2"
+  },
+  "edge/server/__init__.py": {
+    "mtime": 1781551264.6262107,
+    "ast_hash": "70575b80098c6a81293f96d0146dea2c",
+    "semantic_hash": "70575b80098c6a81293f96d0146dea2c"
+  },
+  "edge/server/accounts.py": {
+    "mtime": 1784323950.7698529,
+    "ast_hash": "57e7d199f14109f3241ad9c166d22237",
+    "semantic_hash": "57e7d199f14109f3241ad9c166d22237"
+  },
+  "edge/server/canvas.py": {
+    "mtime": 1784090021.4235365,
+    "ast_hash": "48b6b57c2352a8fe11cfd3f9d2895ca3",
+    "semantic_hash": "48b6b57c2352a8fe11cfd3f9d2895ca3"
+  },
+  "edge/server/client.py": {
+    "mtime": 1784322569.1498828,
+    "ast_hash": "6b06eeea68d39d41ede60be3f0cad099",
+    "semantic_hash": "6b06eeea68d39d41ede60be3f0cad099"
+  },
+  "edge/server/env.py": {
+    "mtime": 1784321821.290276,
+    "ast_hash": "354e03f2c057a3591275a8e61bff38fa",
+    "semantic_hash": "354e03f2c057a3591275a8e61bff38fa"
+  },
+  "edge/server/mapgraph.py": {
+    "mtime": 1784423693.899074,
+    "ast_hash": "21641eb1db213f3ae331116f566be975",
+    "semantic_hash": "21641eb1db213f3ae331116f566be975"
+  },
+  "edge/server/navstrip.py": {
+    "mtime": 1784113930.7513006,
+    "ast_hash": "5c943d8d0d129d3a35cf98b72d4688d9",
+    "semantic_hash": "5c943d8d0d129d3a35cf98b72d4688d9"
+  },
+  "edge/server/net.py": {
+    "mtime": 1784323950.9298553,
+    "ast_hash": "1aeb79376e9bd5429e1ec347ddfb0bd9",
+    "semantic_hash": "1aeb79376e9bd5429e1ec347ddfb0bd9"
+  },
+  "edge/server/protocol.py": {
+    "mtime": 1783902596.7668788,
+    "ast_hash": "2cca151e221e2d27780ceb5304cac608",
+    "semantic_hash": "2cca151e221e2d27780ceb5304cac608"
+  },
+  "edge/server/service.py": {
+    "mtime": 1783902596.7676148,
+    "ast_hash": "37d6d655a06f5d9b53df50e025a1411a",
+    "semantic_hash": "37d6d655a06f5d9b53df50e025a1411a"
+  },
+  "edge/server/session.py": {
+    "mtime": 1784346519.6640437,
+    "ast_hash": "46870a3c2bee84bd81fac77c19830bf2",
+    "semantic_hash": "46870a3c2bee84bd81fac77c19830bf2"
+  },
+  "edge/server/terrain.py": {
+    "mtime": 1781934456.9304478,
+    "ast_hash": "b934a797587ee49947138e3b8f1a3d32",
+    "semantic_hash": "b934a797587ee49947138e3b8f1a3d32"
+  },
+  "edge/server/wire.py": {
+    "mtime": 1784323963.502058,
+    "ast_hash": "d9b6a3dcb223161dba8988d857ad6152",
+    "semantic_hash": "d9b6a3dcb223161dba8988d857ad6152"
+  },
+  "edge/spacebattle/__init__.py": {
+    "mtime": 1784303580.3997495,
+    "ast_hash": "e2ee04393d997690ac347a2b3ae5601d",
+    "semantic_hash": "e2ee04393d997690ac347a2b3ae5601d"
+  },
+  "edge/spacebattle/__main__.py": {
+    "mtime": 1784303581.8127706,
+    "ast_hash": "355966ac9afd8be969765002535d2db3",
+    "semantic_hash": "355966ac9afd8be969765002535d2db3"
+  },
+  "edge/spacebattle/app.py": {
+    "mtime": 1784427683.1022983,
+    "ast_hash": "fae35623aab29a6001a6aefcc7bda496",
+    "semantic_hash": "fae35623aab29a6001a6aefcc7bda496"
+  },
+  "edge/spacebattle/config.py": {
+    "mtime": 1784401021.7748935,
+    "ast_hash": "a976e5b9f9c092721fecf718fc00cdd7",
+    "semantic_hash": "a976e5b9f9c092721fecf718fc00cdd7"
+  },
+  "edge/spacebattle/model.py": {
+    "mtime": 1784388035.7202373,
+    "ast_hash": "1ed2c1313726a19ff1af7ddcd49172dc",
+    "semantic_hash": "1ed2c1313726a19ff1af7ddcd49172dc"
+  },
+  "edge/spacebattle/rules.py": {
+    "mtime": 1784401093.209352,
+    "ast_hash": "ca029c22bd42c9118f704d742151c303",
+    "semantic_hash": "ca029c22bd42c9118f704d742151c303"
+  },
+  "edge/spacebattle/sprites.py": {
+    "mtime": 1784401309.7585227,
+    "ast_hash": "3264d873b8ce2ba62cc37973019f8939",
+    "semantic_hash": "3264d873b8ce2ba62cc37973019f8939"
+  },
+  "edge/store/__init__.py": {
+    "mtime": 1781551259.6141217,
+    "ast_hash": "52c678d86d3ca9bc08ff4294898c335f",
+    "semantic_hash": "52c678d86d3ca9bc08ff4294898c335f"
+  },
+  "edge/store/codec.py": {
+    "mtime": 1784323963.4120567,
+    "ast_hash": "1017213df24fc808d9205a3be776d65d",
+    "semantic_hash": "1017213df24fc808d9205a3be776d65d"
+  },
+  "edge/store/repo.py": {
+    "mtime": 1784176631.8685322,
+    "ast_hash": "2a054d4aeaef58846bd87ac9d97f6cee",
+    "semantic_hash": "2a054d4aeaef58846bd87ac9d97f6cee"
+  },
+  "edge/store/schema.sql": {
+    "mtime": 1782498565.539013,
+    "ast_hash": "c94f63859031948e3e2341435c75bc6f",
+    "semantic_hash": "c94f63859031948e3e2341435c75bc6f"
+  },
+  "edge/store/snapshots.py": {
+    "mtime": 1783481116.2576907,
+    "ast_hash": "631bdf7dff31e29a7c6f016aa0220897",
+    "semantic_hash": "631bdf7dff31e29a7c6f016aa0220897"
+  },
+  "edge/tui/__init__.py": {
+    "mtime": 1781471532.533632,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "edge/tui/__main__.py": {
+    "mtime": 1781471663.539797,
+    "ast_hash": "7e1c597e002f32da89b3543f66ec22f7",
+    "semantic_hash": "7e1c597e002f32da89b3543f66ec22f7"
+  },
+  "edge/tui/amount_stepper.py": {
+    "mtime": 1784090616.2650928,
+    "ast_hash": "15a8038d2550a83d99ff10fad13f326f",
+    "semantic_hash": "15a8038d2550a83d99ff10fad13f326f"
+  },
+  "edge/tui/app.py": {
+    "mtime": 1784350084.716097,
+    "ast_hash": "85b52d2a4ae9e88f0ce506710bb0efa1",
+    "semantic_hash": "85b52d2a4ae9e88f0ce506710bb0efa1"
+  },
+  "edge/tui/art_adapter.py": {
+    "mtime": 1784010475.5911767,
+    "ast_hash": "0c6c22117d9e348957c8c27ed0ed17b8",
+    "semantic_hash": "0c6c22117d9e348957c8c27ed0ed17b8"
+  },
+  "edge/tui/art_memory.py": {
+    "mtime": 1783918131.4072983,
+    "ast_hash": "1c04b94a97c3c91986e62cbedb3a1b69",
+    "semantic_hash": "1c04b94a97c3c91986e62cbedb3a1b69"
+  },
+  "edge/tui/chrome.py": {
+    "mtime": 1784345122.8918648,
+    "ast_hash": "bae064d4dca7a1a0c22b63ae22c87e47",
+    "semantic_hash": "bae064d4dca7a1a0c22b63ae22c87e47"
+  },
+  "edge/tui/component_workbench.py": {
+    "mtime": 1783911548.9008327,
+    "ast_hash": "92606a4b6df904f60dd1ab6c4e0cdc39",
+    "semantic_hash": "92606a4b6df904f60dd1ab6c4e0cdc39"
+  },
+  "edge/tui/design.py": {
+    "mtime": 1783841573.6289763,
+    "ast_hash": "23a98a8b2a371e9add92afb11db7f498",
+    "semantic_hash": "23a98a8b2a371e9add92afb11db7f498"
+  },
+  "edge/tui/detail_table.py": {
+    "mtime": 1783899326.0622928,
+    "ast_hash": "731826121d6d324f9ec14535e616289a",
+    "semantic_hash": "731826121d6d324f9ec14535e616289a"
+  },
+  "edge/tui/dummy.py": {
+    "mtime": 1784091975.5072663,
+    "ast_hash": "5eb76ee8a7a954463bb6055809e05efc",
+    "semantic_hash": "5eb76ee8a7a954463bb6055809e05efc"
+  },
+  "edge/tui/onboarding.py": {
+    "mtime": 1783841573.6291573,
+    "ast_hash": "1610654eacfd2e0637996a77ed0fdda6",
+    "semantic_hash": "1610654eacfd2e0637996a77ed0fdda6"
+  },
+  "edge/tui/portrait.py": {
+    "mtime": 1783841573.629187,
+    "ast_hash": "219966e88cc1e09bc6a3d86c888c0657",
+    "semantic_hash": "219966e88cc1e09bc6a3d86c888c0657"
+  },
+  "edge/tui/remote.py": {
+    "mtime": 1783841573.6292238,
+    "ast_hash": "a8e153fa0060d8d379c166346d6f09fc",
+    "semantic_hash": "a8e153fa0060d8d379c166346d6f09fc"
+  },
+  "edge/tui/saves.py": {
+    "mtime": 1783841573.6292553,
+    "ast_hash": "654867f308e6d01a7dcb66d4d61782dd",
+    "semantic_hash": "654867f308e6d01a7dcb66d4d61782dd"
+  },
+  "edge/tui/scene_preview.py": {
+    "mtime": 1784332450.7350435,
+    "ast_hash": "705f94c222af617176afd962e892ec0c",
+    "semantic_hash": "705f94c222af617176afd962e892ec0c"
+  },
+  "edge/tui/screens/__init__.py": {
+    "mtime": 1781471594.6386583,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "edge/tui/screens/action_menu.py": {
+    "mtime": 1783841573.6292946,
+    "ast_hash": "4f702d372c862eee402cc4b5c5ac95cf",
+    "semantic_hash": "4f702d372c862eee402cc4b5c5ac95cf"
+  },
+  "edge/tui/screens/amount.py": {
+    "mtime": 1784001855.4763765,
+    "ast_hash": "c0d48210e5a44ba1452913f66662ab86",
+    "semantic_hash": "c0d48210e5a44ba1452913f66662ab86"
+  },
+  "edge/tui/screens/base.py": {
+    "mtime": 1784351435.2846262,
+    "ast_hash": "cb5e36ec8ca16308a055510542b4142f",
+    "semantic_hash": "cb5e36ec8ca16308a055510542b4142f"
+  },
+  "edge/tui/screens/computer.py": {
+    "mtime": 1784346519.879046,
+    "ast_hash": "6c3dd6169aba4253a8ecdde54f6159ef",
+    "semantic_hash": "6c3dd6169aba4253a8ecdde54f6159ef"
+  },
+  "edge/tui/screens/confirm.py": {
+    "mtime": 1783841573.6295652,
+    "ast_hash": "389895f92fc2498f84ee2e669e83923b",
+    "semantic_hash": "389895f92fc2498f84ee2e669e83923b"
+  },
+  "edge/tui/screens/contact.py": {
+    "mtime": 1783917882.3933172,
+    "ast_hash": "f6958a4faaf05a58e3d815d25f010004",
+    "semantic_hash": "f6958a4faaf05a58e3d815d25f010004"
+  },
+  "edge/tui/screens/corp.py": {
+    "mtime": 1783914803.6978583,
+    "ast_hash": "7484028dd309177d3aebd8ecb5e76371",
+    "semantic_hash": "7484028dd309177d3aebd8ecb5e76371"
+  },
+  "edge/tui/screens/encounter.py": {
+    "mtime": 1784001017.8530333,
+    "ast_hash": "f80850cc02f0ef867471b0a7932c241b",
+    "semantic_hash": "f80850cc02f0ef867471b0a7932c241b"
+  },
+  "edge/tui/screens/engine_room.py": {
+    "mtime": 1783900326.209445,
+    "ast_hash": "123b8adfaf8c00815b3f2b822ebb00be",
+    "semantic_hash": "123b8adfaf8c00815b3f2b822ebb00be"
+  },
+  "edge/tui/screens/game.py": {
+    "mtime": 1784332325.5588636,
+    "ast_hash": "d37981bff84c491c7c62cf4b5f0e0e3e",
+    "semantic_hash": "d37981bff84c491c7c62cf4b5f0e0e3e"
+  },
+  "edge/tui/screens/haggle.py": {
+    "mtime": 1783841573.629995,
+    "ast_hash": "02bf3726f264a5dabd7e8fac9aa009b6",
+    "semantic_hash": "02bf3726f264a5dabd7e8fac9aa009b6"
+  },
+  "edge/tui/screens/help.py": {
+    "mtime": 1784001082.4580731,
+    "ast_hash": "74f20256d2307ed73f3c49a948ba5312",
+    "semantic_hash": "74f20256d2307ed73f3c49a948ba5312"
+  },
+  "edge/tui/screens/lobby.py": {
+    "mtime": 1783900326.206445,
+    "ast_hash": "7c2950b0abc456074102a898fdc9e25e",
+    "semantic_hash": "7c2950b0abc456074102a898fdc9e25e"
+  },
+  "edge/tui/screens/main_menu.py": {
+    "mtime": 1783900326.206445,
+    "ast_hash": "a13a66879799b6eefaedc6c32b98783a",
+    "semantic_hash": "a13a66879799b6eefaedc6c32b98783a"
+  },
+  "edge/tui/screens/options.py": {
+    "mtime": 1783841573.630157,
+    "ast_hash": "815fe99eeb57bcd4b060253c6e6d4769",
+    "semantic_hash": "815fe99eeb57bcd4b060253c6e6d4769"
+  },
+  "edge/tui/screens/picker.py": {
+    "mtime": 1783841573.6301928,
+    "ast_hash": "8ed59afc25bd25d3560001ef5fec88db",
+    "semantic_hash": "8ed59afc25bd25d3560001ef5fec88db"
+  },
+  "edge/tui/screens/planet.py": {
+    "mtime": 1784010613.5904891,
+    "ast_hash": "9bb14a868dbac9cb8c85552fc1e6b512",
+    "semantic_hash": "9bb14a868dbac9cb8c85552fc1e6b512"
+  },
+  "edge/tui/screens/port.py": {
+    "mtime": 1784351404.2218578,
+    "ast_hash": "64cbb91f708c836891bf0af5dfb61210",
+    "semantic_hash": "64cbb91f708c836891bf0af5dfb61210"
+  },
+  "edge/tui/screens/rumor.py": {
+    "mtime": 1783844063.3481586,
+    "ast_hash": "7198839b0cb415ac5df12d346b38215e",
+    "semantic_hash": "7198839b0cb415ac5df12d346b38215e"
+  },
+  "edge/tui/screens/sprites_gallery.py": {
+    "mtime": 1783900326.206445,
+    "ast_hash": "052c05de801b229e8cb63aba4eff7ba9",
+    "semantic_hash": "052c05de801b229e8cb63aba4eff7ba9"
+  },
+  "edge/tui/screens/stardock.py": {
+    "mtime": 1784351424.2025487,
+    "ast_hash": "52481b541c17bf86aa0b996a185be224",
+    "semantic_hash": "52481b541c17bf86aa0b996a185be224"
+  },
+  "edge/tui/screens/status_drawer.py": {
+    "mtime": 1783841573.6305034,
+    "ast_hash": "c329a955c839d54463a1aedf94cfa4ad",
+    "semantic_hash": "c329a955c839d54463a1aedf94cfa4ad"
+  },
+  "edge/tui/screens/surface.py": {
+    "mtime": 1784001087.0731475,
+    "ast_hash": "c62ceda110f90fbff7039a82b7c82c6f",
+    "semantic_hash": "c62ceda110f90fbff7039a82b7c82c6f"
+  },
+  "edge/tui/screens/territory.py": {
+    "mtime": 1783902596.765877,
+    "ast_hash": "fc446a4631592996e46914012afc0e56",
+    "semantic_hash": "fc446a4631592996e46914012afc0e56"
+  },
+  "edge/tui/screens/transfer.py": {
+    "mtime": 1784091195.2677293,
+    "ast_hash": "19506fc3689601d9fffa2018788daf25",
+    "semantic_hash": "19506fc3689601d9fffa2018788daf25"
+  },
+  "edge/tui/screens/travel.py": {
+    "mtime": 1783841573.6307158,
+    "ast_hash": "bed83a5140547a34b3f792f54fe37cba",
+    "semantic_hash": "bed83a5140547a34b3f792f54fe37cba"
+  },
+  "edge/tui/settings.py": {
+    "mtime": 1783841573.6307406,
+    "ast_hash": "237b3fcda81c74330077ff53dbb75e13",
+    "semantic_hash": "237b3fcda81c74330077ff53dbb75e13"
+  },
+  "edge/tui/shots.py": {
+    "mtime": 1783902596.7624736,
+    "ast_hash": "2d24076dc695e4718e886b94eea2270a",
+    "semantic_hash": "2d24076dc695e4718e886b94eea2270a"
+  },
+  "edge/tui/sprites.py": {
+    "mtime": 1782023421.9676573,
+    "ast_hash": "4de8f91418594bd5d28a2872bdf19a2a",
+    "semantic_hash": "4de8f91418594bd5d28a2872bdf19a2a"
+  },
+  "edge/tui/station_art.py": {
+    "mtime": 1784351398.7065856,
+    "ast_hash": "2cdd34432d3e69c0feebeee172ab0edd",
+    "semantic_hash": "2cdd34432d3e69c0feebeee172ab0edd"
+  },
+  "edge/tui/widgets.py": {
+    "mtime": 1784350085.0241032,
+    "ast_hash": "6991af71759b27055df43a9979870b0a",
+    "semantic_hash": "6991af71759b27055df43a9979870b0a"
+  },
+  "pyproject.toml": {
+    "mtime": 1784444438.426426,
+    "ast_hash": "e61d249aa0f34f340ecdeaccc9e11ffe",
+    "semantic_hash": ""
+  },
+  "scripts/build_design_pdf.sh": {
+    "mtime": 1783902596.782894,
+    "ast_hash": "ff64c6914435777afda56c5b0e0fb52f",
+    "semantic_hash": "ff64c6914435777afda56c5b0e0fb52f"
+  },
+  "scripts/build_station_archetype_art.py": {
+    "mtime": 1783890608.6551187,
+    "ast_hash": "b81fff6a5e7659f3ef5cb13b69e52aec",
+    "semantic_hash": "b81fff6a5e7659f3ef5cb13b69e52aec"
+  },
+  "scripts/clone_references.sh": {
+    "mtime": 1781497025.864507,
+    "ast_hash": "82e696d146a799b7e08e3c9984fea7ed",
+    "semantic_hash": "82e696d146a799b7e08e3c9984fea7ed"
+  },
+  "tests/conftest.py": {
+    "mtime": 1784344830.9064696,
+    "ast_hash": "f32d2fbd1533312bff900561eeb49548",
+    "semantic_hash": "f32d2fbd1533312bff900561eeb49548"
+  },
+  "tests/fixtures/wire/envelopes.json": {
+    "mtime": 1784323963.5850594,
+    "ast_hash": "04e2c05c8075b4e32554bfbd9a31ad0d",
+    "semantic_hash": "04e2c05c8075b4e32554bfbd9a31ad0d"
+  },
+  "tests/helpers.py": {
+    "mtime": 1782179904.3638082,
+    "ast_hash": "7017d65bebb2ec425be61c65908fa01e",
+    "semantic_hash": "7017d65bebb2ec425be61c65908fa01e"
+  },
+  "tests/test_accounts.py": {
+    "mtime": 1784323969.2951517,
+    "ast_hash": "456ef8f98c9253d97484b02eaf88b8b7",
+    "semantic_hash": "456ef8f98c9253d97484b02eaf88b8b7"
+  },
+  "tests/test_aliens.py": {
+    "mtime": 1783902596.777849,
+    "ast_hash": "cd747960839b7c84c73d50984c6672f0",
+    "semantic_hash": "cd747960839b7c84c73d50984c6672f0"
+  },
+  "tests/test_alliances.py": {
+    "mtime": 1783128962.2922244,
+    "ast_hash": "25f58be82628d9c3755e978954ac3a0e",
+    "semantic_hash": "25f58be82628d9c3755e978954ac3a0e"
+  },
+  "tests/test_app.py": {
+    "mtime": 1784090241.4354482,
+    "ast_hash": "573c95b6cf9e3ff64ec76001a2ac6ef2",
+    "semantic_hash": "573c95b6cf9e3ff64ec76001a2ac6ef2"
+  },
+  "tests/test_art_coverage.py": {
+    "mtime": 1783902596.7736275,
+    "ast_hash": "d924194afd9208518b647d0806853d9e",
+    "semantic_hash": "d924194afd9208518b647d0806853d9e"
+  },
+  "tests/test_asteroid_belts.py": {
+    "mtime": 1784004275.4258392,
+    "ast_hash": "6ffc7ea5a0fc90b0c2dbc2adc2ae4b48",
+    "semantic_hash": "6ffc7ea5a0fc90b0c2dbc2adc2ae4b48"
+  },
+  "tests/test_attack_species.py": {
+    "mtime": 1783564743.7479274,
+    "ast_hash": "338684c4473ea4d6eb37d1b731d8f5ae",
+    "semantic_hash": "338684c4473ea4d6eb37d1b731d8f5ae"
+  },
+  "tests/test_base_market.py": {
+    "mtime": 1783677871.5804443,
+    "ast_hash": "29b019a508b3bff3b539f7d92678039f",
+    "semantic_hash": "29b019a508b3bff3b539f7d92678039f"
+  },
+  "tests/test_bigbang.py": {
+    "mtime": 1784409867.0848656,
+    "ast_hash": "2100ea39ae92f13f823d4bef9dff246b",
+    "semantic_hash": "2100ea39ae92f13f823d4bef9dff246b"
+  },
+  "tests/test_bot.py": {
+    "mtime": 1783457093.7724369,
+    "ast_hash": "08d942a97ace5c24d127ae54b6bb85c5",
+    "semantic_hash": "08d942a97ace5c24d127ae54b6bb85c5"
+  },
+  "tests/test_citadels.py": {
+    "mtime": 1783513285.3911374,
+    "ast_hash": "b0727c261df3b6187c341dc7ca27f18d",
+    "semantic_hash": "b0727c261df3b6187c341dc7ca27f18d"
+  },
+  "tests/test_cli.py": {
+    "mtime": 1783902596.7751873,
+    "ast_hash": "e080598ccd8ae13edd363b64a1a9ec3c",
+    "semantic_hash": "e080598ccd8ae13edd363b64a1a9ec3c"
+  },
+  "tests/test_client.py": {
+    "mtime": 1784309624.0065663,
+    "ast_hash": "07b62e97efa99ba9e0f7560411c2c925",
+    "semantic_hash": "07b62e97efa99ba9e0f7560411c2c925"
+  },
+  "tests/test_cloud_city.py": {
+    "mtime": 1784406704.1150587,
+    "ast_hash": "5d11df4a2ea1cfaf4498037ab60901c3",
+    "semantic_hash": "5d11df4a2ea1cfaf4498037ab60901c3"
+  },
+  "tests/test_codec.py": {
+    "mtime": 1784323990.7154982,
+    "ast_hash": "49aa9d6fd563ab075795d70604bdfee0",
+    "semantic_hash": "49aa9d6fd563ab075795d70604bdfee0"
+  },
+  "tests/test_combat.py": {
+    "mtime": 1784003247.2318065,
+    "ast_hash": "0c53a48105a655609282715e74c01c53",
+    "semantic_hash": "0c53a48105a655609282715e74c01c53"
+  },
+  "tests/test_component_workbench.py": {
+    "mtime": 1783841573.7948081,
+    "ast_hash": "ff394c7487bb6a908bd29d7e37915190",
+    "semantic_hash": "ff394c7487bb6a908bd29d7e37915190"
+  },
+  "tests/test_concourse_art.py": {
+    "mtime": 1783902596.7735271,
+    "ast_hash": "ced7ef5cec685bffbac6085b16a9aa60",
+    "semantic_hash": "ced7ef5cec685bffbac6085b16a9aa60"
+  },
+  "tests/test_config.py": {
+    "mtime": 1784409138.2824352,
+    "ast_hash": "234b49d4d246ecf2af336be8ce5ad105",
+    "semantic_hash": "234b49d4d246ecf2af336be8ce5ad105"
+  },
+  "tests/test_contact.py": {
+    "mtime": 1784346520.0370479,
+    "ast_hash": "00422d1d559fd304d5b0936015153d52",
+    "semantic_hash": "00422d1d559fd304d5b0936015153d52"
+  },
+  "tests/test_contact_menu.py": {
+    "mtime": 1783734547.9179542,
+    "ast_hash": "58d33f1899e8700d84f5cc9f75951acf",
+    "semantic_hash": "58d33f1899e8700d84f5cc9f75951acf"
+  },
+  "tests/test_contracts.py": {
+    "mtime": 1783513285.3901374,
+    "ast_hash": "8bdf8dcea940265ff8c5b17f729f5f2c",
+    "semantic_hash": "8bdf8dcea940265ff8c5b17f729f5f2c"
+  },
+  "tests/test_corp.py": {
+    "mtime": 1783513285.3891373,
+    "ast_hash": "b2fdd21e7b9234bbb7a6fab6941c4602",
+    "semantic_hash": "b2fdd21e7b9234bbb7a6fab6941c4602"
+  },
+  "tests/test_danger_polish.py": {
+    "mtime": 1783650621.1486788,
+    "ast_hash": "45c1ade6ac4385d0c4fadbffb18ae23d",
+    "semantic_hash": "45c1ade6ac4385d0c4fadbffb18ae23d"
+  },
+  "tests/test_devtool.py": {
+    "mtime": 1784321224.3006032,
+    "ast_hash": "a757b7b7f402960370a883f73baaa8b9",
+    "semantic_hash": "a757b7b7f402960370a883f73baaa8b9"
+  },
+  "tests/test_dialogue.py": {
+    "mtime": 1784344914.2990108,
+    "ast_hash": "69fb2267131b00a260a6fedffc58a73d",
+    "semantic_hash": "69fb2267131b00a260a6fedffc58a73d"
+  },
+  "tests/test_dialogue_authoring.py": {
+    "mtime": 1783455256.806634,
+    "ast_hash": "b6af3077529dfee17499e2b6e7d3e643",
+    "semantic_hash": "b6af3077529dfee17499e2b6e7d3e643"
+  },
+  "tests/test_dialogue_intel.py": {
+    "mtime": 1783120318.671495,
+    "ast_hash": "5a516f416c8bc5d74797a39c1995dc93",
+    "semantic_hash": "5a516f416c8bc5d74797a39c1995dc93"
+  },
+  "tests/test_dialogue_playtest.py": {
+    "mtime": 1784345013.8158495,
+    "ast_hash": "212c5cccd0c0db4739514b421ae0f87d",
+    "semantic_hash": "212c5cccd0c0db4739514b421ae0f87d"
+  },
+  "tests/test_dialogue_render.py": {
+    "mtime": 1782338205.4407747,
+    "ast_hash": "c32a17ce10c6a60fb7221cd70eb9639b",
+    "semantic_hash": "c32a17ce10c6a60fb7221cd70eb9639b"
+  },
+  "tests/test_discovery.py": {
+    "mtime": 1783116522.8210733,
+    "ast_hash": "ee9bd7037e1cbfaab91715bdd1cae64c",
+    "semantic_hash": "ee9bd7037e1cbfaab91715bdd1cae64c"
+  },
+  "tests/test_discovery_art.py": {
+    "mtime": 1782281915.7586765,
+    "ast_hash": "c52712cd4245038743d6e9cd3a6a2d7c",
+    "semantic_hash": "c52712cd4245038743d6e9cd3a6a2d7c"
+  },
+  "tests/test_discovery_names.py": {
+    "mtime": 1784003033.5534773,
+    "ast_hash": "c0ef34b13fbdff3dd473ec0bdf5dae57",
+    "semantic_hash": "c0ef34b13fbdff3dd473ec0bdf5dae57"
+  },
+  "tests/test_economy.py": {
+    "mtime": 1784406704.6520674,
+    "ast_hash": "540af541c4e38b037649fb1f93782c83",
+    "semantic_hash": "540af541c4e38b037649fb1f93782c83"
+  },
+  "tests/test_embedding.py": {
+    "mtime": 1783006783.3910196,
+    "ast_hash": "b96d30e0c29569b4374f9052ab757c54",
+    "semantic_hash": "b96d30e0c29569b4374f9052ab757c54"
+  },
+  "tests/test_encounters.py": {
+    "mtime": 1783841573.7949684,
+    "ast_hash": "8e85b126c89826d7228964f84e8caf94",
+    "semantic_hash": "8e85b126c89826d7228964f84e8caf94"
+  },
+  "tests/test_engine.py": {
+    "mtime": 1784005534.183411,
+    "ast_hash": "899ae09ff79cf39311cea5f14724f2f1",
+    "semantic_hash": "899ae09ff79cf39311cea5f14724f2f1"
+  },
+  "tests/test_engine_room.py": {
+    "mtime": 1781665703.988911,
+    "ast_hash": "8452c5b3a67e3f9848b2e58dffcb5909",
+    "semantic_hash": "8452c5b3a67e3f9848b2e58dffcb5909"
+  },
+  "tests/test_genesis.py": {
+    "mtime": 1783902596.775113,
+    "ast_hash": "ee0578a04103aa768bd59dda421da8f1",
+    "semantic_hash": "ee0578a04103aa768bd59dda421da8f1"
+  },
+  "tests/test_governance.py": {
+    "mtime": 1783513305.2814484,
+    "ast_hash": "9c7fec1a3646d46ea0e92343f498db3b",
+    "semantic_hash": "9c7fec1a3646d46ea0e92343f498db3b"
+  },
+  "tests/test_haggle.py": {
+    "mtime": 1783902596.7747087,
+    "ast_hash": "d6ff38fa846b81f0d090fc20631c91a3",
+    "semantic_hash": "d6ff38fa846b81f0d090fc20631c91a3"
+  },
+  "tests/test_intel_contact.py": {
+    "mtime": 1783120208.458304,
+    "ast_hash": "4b98297cc0fa0cd6f45bd895fb8e368a",
+    "semantic_hash": "4b98297cc0fa0cd6f45bd895fb8e368a"
+  },
+  "tests/test_llm_bot_brain.py": {
+    "mtime": 1784323622.5717275,
+    "ast_hash": "aaabe549fb361eca9ef15b8930215b23",
+    "semantic_hash": "aaabe549fb361eca9ef15b8930215b23"
+  },
+  "tests/test_llm_bot_services.py": {
+    "mtime": 1784317552.0771954,
+    "ast_hash": "f4d307592912e422c0320d8a8ab3f2a1",
+    "semantic_hash": "f4d307592912e422c0320d8a8ab3f2a1"
+  },
+  "tests/test_llm_bot_tui.py": {
+    "mtime": 1784324326.0710328,
+    "ast_hash": "732fd81b6fcd82e4dc5250b0a1cbe2ba",
+    "semantic_hash": "732fd81b6fcd82e4dc5250b0a1cbe2ba"
+  },
+  "tests/test_mapgraph.py": {
+    "mtime": 1784423701.1651897,
+    "ast_hash": "6a85ed54ec6f8fb55e4c73ca93620ea1",
+    "semantic_hash": "6a85ed54ec6f8fb55e4c73ca93620ea1"
+  },
+  "tests/test_market.py": {
+    "mtime": 1783902596.7768452,
+    "ast_hash": "6f5e18f5a23ea84d1725e717c9a1f22b",
+    "semantic_hash": "6f5e18f5a23ea84d1725e717c9a1f22b"
+  },
+  "tests/test_mechanics.py": {
+    "mtime": 1783117781.904584,
+    "ast_hash": "dc32654c25355a0a76a3ea009efc8d31",
+    "semantic_hash": "dc32654c25355a0a76a3ea009efc8d31"
+  },
+  "tests/test_models.py": {
+    "mtime": 1781555314.6655047,
+    "ast_hash": "e65abf608bb0c652d8d612500b43fd1e",
+    "semantic_hash": "e65abf608bb0c652d8d612500b43fd1e"
+  },
+  "tests/test_movement.py": {
+    "mtime": 1781906620.9575536,
+    "ast_hash": "044f0aa940fb7f0748cac57397c68e99",
+    "semantic_hash": "044f0aa940fb7f0748cac57397c68e99"
+  },
+  "tests/test_multiplayer.py": {
+    "mtime": 1783503317.9357738,
+    "ast_hash": "fd69f6db53c5111d1f72909c33ff750f",
+    "semantic_hash": "fd69f6db53c5111d1f72909c33ff750f"
+  },
+  "tests/test_navstrip.py": {
+    "mtime": 1784113977.8309991,
+    "ast_hash": "b6159056b09a64887016d91658629a7e",
+    "semantic_hash": "b6159056b09a64887016d91658629a7e"
+  },
+  "tests/test_net.py": {
+    "mtime": 1784324018.9979572,
+    "ast_hash": "e16bc38e744e92b44f8934af04c79235",
+    "semantic_hash": "e16bc38e744e92b44f8934af04c79235"
+  },
+  "tests/test_numbering.py": {
+    "mtime": 1783100361.5310287,
+    "ast_hash": "f8728e117622344545a1b6e1359a4a0e",
+    "semantic_hash": "f8728e117622344545a1b6e1359a4a0e"
+  },
+  "tests/test_onboarding.py": {
+    "mtime": 1783902596.7765186,
+    "ast_hash": "6684c7250dd549447401627028c6ecf2",
+    "semantic_hash": "6684c7250dd549447401627028c6ecf2"
+  },
+  "tests/test_planets.py": {
+    "mtime": 1784004321.6537783,
+    "ast_hash": "87dd08900be3515815109027f7f2934c",
+    "semantic_hash": "87dd08900be3515815109027f7f2934c"
+  },
+  "tests/test_port_art.py": {
+    "mtime": 1783902596.7774148,
+    "ast_hash": "56285a73b07691c4cb3735c41cf91ad4",
+    "semantic_hash": "56285a73b07691c4cb3735c41cf91ad4"
+  },
+  "tests/test_pvp.py": {
+    "mtime": 1783513308.6765013,
+    "ast_hash": "2cac0d4c59e94fb183cdfcca20f50844",
+    "semantic_hash": "2cac0d4c59e94fb183cdfcca20f50844"
+  },
+  "tests/test_rules.py": {
+    "mtime": 1783902596.777132,
+    "ast_hash": "cb88c66a4289161c17c320e635b638e5",
+    "semantic_hash": "cb88c66a4289161c17c320e635b638e5"
+  },
+  "tests/test_server_env.py": {
+    "mtime": 1784322334.068593,
+    "ast_hash": "e295e686cdb8dca29bad7b070ded77d8",
+    "semantic_hash": "e295e686cdb8dca29bad7b070ded77d8"
+  },
+  "tests/test_service.py": {
+    "mtime": 1783902596.7745037,
+    "ast_hash": "6d8359d534d09faa403560960d000edf",
+    "semantic_hash": "6d8359d534d09faa403560960d000edf"
+  },
+  "tests/test_services.py": {
+    "mtime": 1783902596.7772315,
+    "ast_hash": "f231145deebdc2224920b6f9a2a6e33d",
+    "semantic_hash": "f231145deebdc2224920b6f9a2a6e33d"
+  },
+  "tests/test_session.py": {
+    "mtime": 1784092725.8920658,
+    "ast_hash": "8cddb4ddd80b55ca1a5e1854e40fc375",
+    "semantic_hash": "8cddb4ddd80b55ca1a5e1854e40fc375"
+  },
+  "tests/test_settings.py": {
+    "mtime": 1783841573.79514,
+    "ast_hash": "6a443dc36349079f572a9ea3e292bed6",
+    "semantic_hash": "6a443dc36349079f572a9ea3e292bed6"
+  },
+  "tests/test_settle_colonists.py": {
+    "mtime": 1783841573.7951777,
+    "ast_hash": "9a019ed094407100df55e2ba20379361",
+    "semantic_hash": "9a019ed094407100df55e2ba20379361"
+  },
+  "tests/test_ship_art.py": {
+    "mtime": 1782018574.3385906,
+    "ast_hash": "d7502c0cd75cf6978c5c63b948623580",
+    "semantic_hash": "d7502c0cd75cf6978c5c63b948623580"
+  },
+  "tests/test_sig_corpus.py": {
+    "mtime": 1784344914.6060164,
+    "ast_hash": "bfa3339cc73b391e452f649511960fc7",
+    "semantic_hash": "bfa3339cc73b391e452f649511960fc7"
+  },
+  "tests/test_species_portrait.py": {
+    "mtime": 1783997949.694557,
+    "ast_hash": "e2fd659243e94faecc19885765d677ac",
+    "semantic_hash": "e2fd659243e94faecc19885765d677ac"
+  },
+  "tests/test_starbases.py": {
+    "mtime": 1783841573.7952454,
+    "ast_hash": "abb16c2bb27a7186e9b79e83d151c0ca",
+    "semantic_hash": "abb16c2bb27a7186e9b79e83d151c0ca"
+  },
+  "tests/test_station_archetype_art.py": {
+    "mtime": 1784406704.387063,
+    "ast_hash": "0ea535d5ad21f7acde0f440a878c9f42",
+    "semantic_hash": "0ea535d5ad21f7acde0f440a878c9f42"
+  },
+  "tests/test_store.py": {
+    "mtime": 1783902596.774616,
+    "ast_hash": "56324e34a7f14ff17dacbd90fd460bd4",
+    "semantic_hash": "56324e34a7f14ff17dacbd90fd460bd4"
+  },
+  "tests/test_surfacing.py": {
+    "mtime": 1783902596.7750208,
+    "ast_hash": "41b7b4ab76ab812ea2efdcc09d40ef9d",
+    "semantic_hash": "41b7b4ab76ab812ea2efdcc09d40ef9d"
+  },
+  "tests/test_tavern.py": {
+    "mtime": 1783902596.7775126,
+    "ast_hash": "52848cb12d500152436f05d3ddaa43a8",
+    "semantic_hash": "52848cb12d500152436f05d3ddaa43a8"
+  },
+  "tests/test_territory.py": {
+    "mtime": 1783902596.7748652,
+    "ast_hash": "dc6d39ccc9146d5b56159036c576751a",
+    "semantic_hash": "dc6d39ccc9146d5b56159036c576751a"
+  },
+  "tests/test_theme_contrast.py": {
+    "mtime": 1783841573.7953625,
+    "ast_hash": "75b8ef8bac8f19dc13b6306340f4a29e",
+    "semantic_hash": "75b8ef8bac8f19dc13b6306340f4a29e"
+  },
+  "tests/test_tui_flow.py": {
+    "mtime": 1784350085.5071125,
+    "ast_hash": "399c674c7a458fb645db90739b617f3f",
+    "semantic_hash": "399c674c7a458fb645db90739b617f3f"
+  },
+  "tests/test_ui_actions.py": {
+    "mtime": 1784001886.5318677,
+    "ast_hash": "95c2dd8b6321806b0a3675c914daa6bc",
+    "semantic_hash": "95c2dd8b6321806b0a3675c914daa6bc"
+  },
+  "tests/test_ui_art_refresh.py": {
+    "mtime": 1783919162.0969534,
+    "ast_hash": "8c326b82cee2d743db8e5ae7c04412b7",
+    "semantic_hash": "8c326b82cee2d743db8e5ae7c04412b7"
+  },
+  "tests/test_ui_asteroid_belt.py": {
+    "mtime": 1783841573.7956991,
+    "ast_hash": "ab8b10df8742ce4b8dcf306f79a1ec95",
+    "semantic_hash": "ab8b10df8742ce4b8dcf306f79a1ec95"
+  },
+  "tests/test_ui_base_keys.py": {
+    "mtime": 1783911322.0966103,
+    "ast_hash": "09c70a58daa2ba8c1e070aaa7bed5868",
+    "semantic_hash": "09c70a58daa2ba8c1e070aaa7bed5868"
+  },
+  "tests/test_ui_black_hole.py": {
+    "mtime": 1783841573.79574,
+    "ast_hash": "c9ca7a24f9353e5cc346656e15c84f74",
+    "semantic_hash": "c9ca7a24f9353e5cc346656e15c84f74"
+  },
+  "tests/test_ui_cloud_city.py": {
+    "mtime": 1784032393.49814,
+    "ast_hash": "31bdf32360a67f0145f6610751d86907",
+    "semantic_hash": "31bdf32360a67f0145f6610751d86907"
+  },
+  "tests/test_ui_computer_ia.py": {
+    "mtime": 1783915088.8164456,
+    "ast_hash": "eaf026afa76ac30167abb6854fa83d67",
+    "semantic_hash": "eaf026afa76ac30167abb6854fa83d67"
+  },
+  "tests/test_ui_computer_keys.py": {
+    "mtime": 1784090021.4255366,
+    "ast_hash": "1221f01d8e829aec9956c9d02523eedd",
+    "semantic_hash": "1221f01d8e829aec9956c9d02523eedd"
+  },
+  "tests/test_ui_computer_pr09.py": {
+    "mtime": 1784316276.7720973,
+    "ast_hash": "45f07f3ee77e6464cde261984fec7bfc",
+    "semantic_hash": "45f07f3ee77e6464cde261984fec7bfc"
+  },
+  "tests/test_ui_computer_tables.py": {
+    "mtime": 1783900696.7639742,
+    "ast_hash": "11c48a358f290a52c2aab35298c6127c",
+    "semantic_hash": "11c48a358f290a52c2aab35298c6127c"
+  },
+  "tests/test_ui_encounter_hotkeys.py": {
+    "mtime": 1784001098.9193377,
+    "ast_hash": "f2e6c67abcd64c972c2d011c3ca148e0",
+    "semantic_hash": "f2e6c67abcd64c972c2d011c3ca148e0"
+  },
+  "tests/test_ui_forms.py": {
+    "mtime": 1784345122.9878666,
+    "ast_hash": "5c794458663eb1be18e9b3e0f849f641",
+    "semantic_hash": "5c794458663eb1be18e9b3e0f849f641"
+  },
+  "tests/test_ui_geometry.py": {
+    "mtime": 1783902596.777312,
+    "ast_hash": "3226c4348065ce14f0bf052d1cb3e249",
+    "semantic_hash": "3226c4348065ce14f0bf052d1cb3e249"
+  },
+  "tests/test_ui_invade_amount.py": {
+    "mtime": 1784001901.831819,
+    "ast_hash": "05b5a89783d988a7c713ff0603e0e70e",
+    "semantic_hash": "05b5a89783d988a7c713ff0603e0e70e"
+  },
+  "tests/test_ui_minor_screens.py": {
+    "mtime": 1783914867.6251907,
+    "ast_hash": "d04a913d9b51cd49872cf0ef9504cc8c",
+    "semantic_hash": "d04a913d9b51cd49872cf0ef9504cc8c"
+  },
+  "tests/test_ui_navrose.py": {
+    "mtime": 1784113959.102721,
+    "ast_hash": "4eb18e1c777418e288a61cb3586a07e3",
+    "semantic_hash": "4eb18e1c777418e288a61cb3586a07e3"
+  },
+  "tests/test_ui_sector_view.py": {
+    "mtime": 1783902596.775498,
+    "ast_hash": "17a6cee902f01b643cbb4a20bcd4fe91",
+    "semantic_hash": "17a6cee902f01b643cbb4a20bcd4fe91"
+  },
+  "tests/test_ui_snapshots.py": {
+    "mtime": 1783902596.776431,
+    "ast_hash": "99ceb0dd4fb761ed10afe63b2581e12d",
+    "semantic_hash": "99ceb0dd4fb761ed10afe63b2581e12d"
+  },
+  "tests/test_ui_stardock_keys.py": {
+    "mtime": 1783904071.9716208,
+    "ast_hash": "7fcf45e1d716b5cbc15be99918ecb3eb",
+    "semantic_hash": "7fcf45e1d716b5cbc15be99918ecb3eb"
+  },
+  "tests/test_ui_stardock_pr08.py": {
+    "mtime": 1783902909.554857,
+    "ast_hash": "98f96178123d6a3fe30cfb112763c683",
+    "semantic_hash": "98f96178123d6a3fe30cfb112763c683"
+  },
+  "tests/test_ui_transfer_workbench.py": {
+    "mtime": 1784090929.6735494,
+    "ast_hash": "60f517e594a430a0adac4c8ead299195",
+    "semantic_hash": "60f517e594a430a0adac4c8ead299195"
+  },
+  "tests/test_validate.py": {
+    "mtime": 1783902596.7779503,
+    "ast_hash": "005c2e3828404a6b6afa05d788e40d21",
+    "semantic_hash": "005c2e3828404a6b6afa05d788e40d21"
+  },
+  "tests/test_wire.py": {
+    "mtime": 1783841573.796177,
+    "ast_hash": "8543196c6d4ed527f641989cc69cb4bf",
+    "semantic_hash": "8543196c6d4ed527f641989cc69cb4bf"
+  },
+  "tests/test_wp_pr12.py": {
+    "mtime": 1783841573.7962127,
+    "ast_hash": "a690c19b1a8cfe1fcca1561349f3674a",
+    "semantic_hash": "a690c19b1a8cfe1fcca1561349f3674a"
+  },
+  "AGENTS.md": {
+    "mtime": 1784443066.2245774,
+    "ast_hash": "b14ffbaff5f3a02bc85aca4942a59c54",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1784443117.052881,
+    "ast_hash": "5c27369b226fcf2be8a6cfe52224e767",
+    "semantic_hash": "5c27369b226fcf2be8a6cfe52224e767"
+  },
+  "README.md": {
+    "mtime": 1783902596.763246,
+    "ast_hash": "ce712f5affa21ee48465b443c4a2bdc3",
+    "semantic_hash": "ce712f5affa21ee48465b443c4a2bdc3"
+  },
+  "config/alien_dialogue_default.yaml": {
+    "mtime": 1783988844.0104606,
+    "ast_hash": "95d45ad0a8eac1273f2205c69bcb5b36",
+    "semantic_hash": "95d45ad0a8eac1273f2205c69bcb5b36"
+  },
+  "config/alien_roster_default.yaml": {
+    "mtime": 1783419614.5692763,
+    "ast_hash": "d9c7565ed363b4fad49474c646739a50",
+    "semantic_hash": "d9c7565ed363b4fad49474c646739a50"
+  },
+  "config/default.yaml": {
+    "mtime": 1784444405.5243056,
+    "ast_hash": "c7eb0b1d912cbb623ea665e4c216d0de",
+    "semantic_hash": ""
+  },
+  "config/dialogue/alien_dialogue_species.yaml": {
+    "mtime": 1783988601.009822,
+    "ast_hash": "2b425f757910dc0b9d8452a0cd8728ee",
+    "semantic_hash": "2b425f757910dc0b9d8452a0cd8728ee"
+  },
+  "config/groundwar_default.yaml": {
+    "mtime": 1784426528.695359,
+    "ast_hash": "c937d927009fca4702895140621097a9",
+    "semantic_hash": "c937d927009fca4702895140621097a9"
+  },
+  "config/names_default.yaml": {
+    "mtime": 1784003247.2278063,
+    "ast_hash": "311522e7c7a586d64f4bcddfac82b94d",
+    "semantic_hash": "311522e7c7a586d64f4bcddfac82b94d"
+  },
+  "config/spacebattle_default.yaml": {
+    "mtime": 1784400996.191359,
+    "ast_hash": "b56d7a0ba0923f032492024bada0fb1d",
+    "semantic_hash": "b56d7a0ba0923f032492024bada0fb1d"
+  },
+  "docs/DESIGN.md": {
+    "mtime": 1784438833.6015036,
+    "ast_hash": "3bb5e728c9afdf089c1fb891711c7c3f",
+    "semantic_hash": "3bb5e728c9afdf089c1fb891711c7c3f"
+  },
+  "docs/DESIGN_ARTGEN.md": {
+    "mtime": 1783902596.7827606,
+    "ast_hash": "2677b1b0a692e54be4772e2359a15a28",
+    "semantic_hash": "2677b1b0a692e54be4772e2359a15a28"
+  },
+  "docs/DIALOGUE_CHECKING.md": {
+    "mtime": 1782516547.9482238,
+    "ast_hash": "9fb5efc4c001626dece65970ec12e22b",
+    "semantic_hash": "9fb5efc4c001626dece65970ec12e22b"
+  },
+  "docs/GROUNDWAR_INTEGRATION_PLAN.md": {
+    "mtime": 1784438850.1537747,
+    "ast_hash": "de53399e91c062c480daa0af2dd8a741",
+    "semantic_hash": "de53399e91c062c480daa0af2dd8a741"
+  },
+  "docs/GROUNDWAR_POC.md": {
+    "mtime": 1784438774.6215374,
+    "ast_hash": "ae1c96ae67636828f25f629e6f866f03",
+    "semantic_hash": "ae1c96ae67636828f25f629e6f866f03"
+  },
+  "docs/HOSTING.md": {
+    "mtime": 1784322707.7374146,
+    "ast_hash": "65393d50e6014eeda1b86f6327deff93",
+    "semantic_hash": "65393d50e6014eeda1b86f6327deff93"
+  },
+  "docs/NEBULA_ART_REWRITE.md": {
+    "mtime": 1782239246.087913,
+    "ast_hash": "3c2a1eb305f9c1233df78923af1305a7",
+    "semantic_hash": "3c2a1eb305f9c1233df78923af1305a7"
+  },
+  "docs/PHASE1_5_PLAN.md": {
+    "mtime": 1783902596.7809396,
+    "ast_hash": "617983607b31e03658dacf10aa916bfa",
+    "semantic_hash": "617983607b31e03658dacf10aa916bfa"
+  },
+  "docs/PHASE1_PLAN.md": {
+    "mtime": 1783902596.7804797,
+    "ast_hash": "fac7284391ad8c7ea9d71894000a5978",
+    "semantic_hash": "fac7284391ad8c7ea9d71894000a5978"
+  },
+  "docs/PHASE2_PLAN.md": {
+    "mtime": 1783902596.7814896,
+    "ast_hash": "251d48c8b5f9f19df74f3034f8fbc369",
+    "semantic_hash": "251d48c8b5f9f19df74f3034f8fbc369"
+  },
+  "docs/PHASE2_ROUTE_FOLLOWUP.md": {
+    "mtime": 1783902596.7812111,
+    "ast_hash": "5a89b6c4687b937bf5f390846da24c9d",
+    "semantic_hash": "5a89b6c4687b937bf5f390846da24c9d"
+  },
+  "docs/PHASE3_PLAN.md": {
+    "mtime": 1783902596.7817183,
+    "ast_hash": "edbaeb07695b0addfc5587c6fd4f8a85",
+    "semantic_hash": "edbaeb07695b0addfc5587c6fd4f8a85"
+  },
+  "docs/PHASE5_4_PLAN.md": {
+    "mtime": 1783902596.783211,
+    "ast_hash": "1df2888dfacc0f473f008ec0f17a9f3a",
+    "semantic_hash": "1df2888dfacc0f473f008ec0f17a9f3a"
+  },
+  "docs/PLAYTEST_NOTES.md": {
+    "mtime": 1784332671.6729195,
+    "ast_hash": "e9baf1cd31e6f7832d556f6a1c5dc96c",
+    "semantic_hash": "e9baf1cd31e6f7832d556f6a1c5dc96c"
+  },
+  "docs/PLAYTEST_REMEDIATION_PLAN_01.md": {
+    "mtime": 1783902596.780826,
+    "ast_hash": "9ea3a7484ea905699bb7b0d5b6afc7f2",
+    "semantic_hash": "9ea3a7484ea905699bb7b0d5b6afc7f2"
+  },
+  "docs/PLAYTEST_REMEDIATION_PLAN_02.md": {
+    "mtime": 1784346108.2511246,
+    "ast_hash": "d0991b4a1e35dba7eef3aeb48ed49a80",
+    "semantic_hash": "d0991b4a1e35dba7eef3aeb48ed49a80"
+  },
+  "docs/SCRIPTING.md": {
+    "mtime": 1784178788.0695448,
+    "ast_hash": "e481a17e7c1b33fd0a55e5bbeccf9550",
+    "semantic_hash": "e481a17e7c1b33fd0a55e5bbeccf9550"
+  },
+  "docs/SEAMS_PLAN.md": {
+    "mtime": 1783902596.7813199,
+    "ast_hash": "5dbcfd4955d13177a41455a8ae80bd53",
+    "semantic_hash": "5dbcfd4955d13177a41455a8ae80bd53"
+  },
+  "docs/SECTOR_SCENE_COMPOSITION.md": {
+    "mtime": 1784352554.2688768,
+    "ast_hash": "bbeff4a7e1be4ae9778ef00371e64bc6",
+    "semantic_hash": "bbeff4a7e1be4ae9778ef00371e64bc6"
+  },
+  "docs/SPACEBATTLE_POC.md": {
+    "mtime": 1784405503.1346269,
+    "ast_hash": "1e8eb2f3c2bcccdee42c3a842f7c06c6",
+    "semantic_hash": "1e8eb2f3c2bcccdee42c3a842f7c06c6"
+  },
+  "docs/TRADING_ENJOYABILITY_PLAN.md": {
+    "mtime": 1783915345.654852,
+    "ast_hash": "8a35665099151d3d53e29c4fd07ff1b9",
+    "semantic_hash": "8a35665099151d3d53e29c4fd07ff1b9"
+  },
+  "docs/TRADING_ENJOYABILITY_PLAN_02.md": {
+    "mtime": 1783977061.5055177,
+    "ast_hash": "11967de3587cc2d94accdf57d14e6c3b",
+    "semantic_hash": "11967de3587cc2d94accdf57d14e6c3b"
+  },
+  "docs/TRADING_ENJOYABILITY_PLAN_03.md": {
+    "mtime": 1783977170.0003085,
+    "ast_hash": "65ae35bf90adb62871d7ae2b0253f23d",
+    "semantic_hash": "65ae35bf90adb62871d7ae2b0253f23d"
+  },
+  "docs/TRADING_ENJOYABILITY_PLAN_04.md": {
+    "mtime": 1783980222.0815673,
+    "ast_hash": "73f29bb4f529f2be19f80a5e85e4a2dc",
+    "semantic_hash": "73f29bb4f529f2be19f80a5e85e4a2dc"
+  },
+  "docs/UI_INSPIRATION.md": {
+    "mtime": 1783902596.782059,
+    "ast_hash": "6d929b1eae86c7f11b3787aba56443d6",
+    "semantic_hash": "6d929b1eae86c7f11b3787aba56443d6"
+  },
+  "docs/UI_MOCKUPS.md": {
+    "mtime": 1784331601.6467483,
+    "ast_hash": "a756ef39db39ef4199a20200749d5099",
+    "semantic_hash": "a756ef39db39ef4199a20200749d5099"
+  },
+  "docs/UI_UX_OVERHAUL_PLAN.md": {
+    "mtime": 1783902596.7806797,
+    "ast_hash": "c2a424868a4ca95482f7a9cae9eb78db",
+    "semantic_hash": "c2a424868a4ca95482f7a9cae9eb78db"
+  },
+  "edge/bigbang/webviz_template.html": {
+    "mtime": 1783902596.7667775,
+    "ast_hash": "6f28c66b334018a3498817725feaa551",
+    "semantic_hash": "6f28c66b334018a3498817725feaa551"
+  },
+  "edge/dialogue/authoring/README.md": {
+    "mtime": 1783997997.3819864,
+    "ast_hash": "0a23a6bf17cc319ee28cf259157ff4d8",
+    "semantic_hash": "0a23a6bf17cc319ee28cf259157ff4d8"
+  },
+  "images/species/references/gemini/image_prompts.txt": {
+    "mtime": 1782605248.2958534,
+    "ast_hash": "104ab1c04602c9724cfcb84d5f7fbf9b",
+    "semantic_hash": "104ab1c04602c9724cfcb84d5f7fbf9b"
+  },
+  "images/ui/ports/PROVENANCE.md": {
+    "mtime": 1783891288.0783513,
+    "ast_hash": "250ee04d8d59cb87f53908a68b272885",
+    "semantic_hash": "250ee04d8d59cb87f53908a68b272885"
+  },
+  "images/ui/starbases/PROVENANCE.md": {
+    "mtime": 1783891288.3083549,
+    "ast_hash": "cf6676c40f78d0ec6275e94f3d82ab51",
+    "semantic_hash": "cf6676c40f78d0ec6275e94f3d82ab51"
+  },
+  "images/ui/stardock/PROVENANCE.md": {
+    "mtime": 1783902596.780123,
+    "ast_hash": "37c0ae4fef36066dc8b4816a574ba779",
+    "semantic_hash": "37c0ae4fef36066dc8b4816a574ba779"
+  },
+  "tests/fixtures/wire/fingerprint.txt": {
+    "mtime": 1784323969.0311475,
+    "ast_hash": "255e73ff71b8d67ce99b19e2285cb87f",
+    "semantic_hash": "255e73ff71b8d67ce99b19e2285cb87f"
+  },
+  ".claude/settings.json": {
+    "mtime": 1784443058.538657,
+    "ast_hash": "1aab5ccfde10290b18bfdedb7b8bb804",
+    "semantic_hash": ""
+  },
+  ".codex/hooks.json": {
+    "mtime": 1784443066.224761,
+    "ast_hash": "b175cac11d8f8a0cf06a49a064388308",
+    "semantic_hash": ""
+  },
+  ".opencode/opencode.json": {
+    "mtime": 1784443504.4539733,
+    "ast_hash": "abcc8b9dcd80bca5f9dde6d9f0c3ae79",
+    "semantic_hash": ""
+  },
+  ".opencode/plugins/graphify.js": {
+    "mtime": 1784443510.4458137,
+    "ast_hash": "3ea725724bc8ebe483c9f13d6aa1124f",
+    "semantic_hash": ""
+  },
+  "edge/core/groundwar/__init__.py": {
+    "mtime": 1784444143.426063,
+    "ast_hash": "912874fae65b2c231d244c95b9ac6119",
+    "semantic_hash": ""
+  },
+  "edge/core/groundwar/terrain.py": {
+    "mtime": 1784444307.7519705,
+    "ast_hash": "02e2a51c43f15099dcfebf490999434e",
+    "semantic_hash": ""
+  },
+  ".agents/rules/graphify.md": {
+    "mtime": 1784443076.2355888,
+    "ast_hash": "f1e53ecc9194573d3c28fc116c743a2e",
+    "semantic_hash": ""
+  },
+  ".agents/workflows/graphify.md": {
+    "mtime": 1784443076.2356784,
+    "ast_hash": "0bc020d491fca99550c1ea3de0a5f862",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/action-menu.svg": {
+    "mtime": 1783841573.6201441,
+    "ast_hash": "a0468332c0850070b6d17621068d2d54",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/base-bank.svg": {
+    "mtime": 1783841573.6202164,
+    "ast_hash": "bc597dbeabee2776d11e7d4b230a2364",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/base-hardware.svg": {
+    "mtime": 1783841573.6203105,
+    "ast_hash": "13e38c784d10d98668ea6438f7c77f10",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/base-station.svg": {
+    "mtime": 1783841573.6204212,
+    "ast_hash": "c5493cabff8163e9ac6d45de25326bbd",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/base-status.svg": {
+    "mtime": 1783841573.6204858,
+    "ast_hash": "04bb0df0bc79af96d5881976028ef11f",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/base-trade.svg": {
+    "mtime": 1783841573.6205754,
+    "ast_hash": "57331493e4395c7b5ff9dcb164f3c4f6",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-alliances.svg": {
+    "mtime": 1783841573.6206596,
+    "ast_hash": "d37509ac7b6f0ced2932b37bbe710744",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-codex.svg": {
+    "mtime": 1783841573.6207237,
+    "ast_hash": "87d60ed69ffa38aabb77bc57a175c514",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-contracts.svg": {
+    "mtime": 1783841573.620789,
+    "ast_hash": "36a827486080443db8af81b3083f24c5",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-dossier.svg": {
+    "mtime": 1783841573.620857,
+    "ast_hash": "d491385af652a625596d57335422747f",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-leads.svg": {
+    "mtime": 1783841573.6209207,
+    "ast_hash": "4d83afcc4072a5cac980dcfa495e91ae",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-log.svg": {
+    "mtime": 1783841573.6210024,
+    "ast_hash": "143da058274a017e9f8d46f2f335fdad",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-map.svg": {
+    "mtime": 1783841573.6210804,
+    "ast_hash": "73bd708797c94bbc92d1e4d2acf73cfe",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-market.svg": {
+    "mtime": 1783841573.6211467,
+    "ast_hash": "7147e03aef66cff74ce311202e61a8e5",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-notes.svg": {
+    "mtime": 1783841573.6212125,
+    "ast_hash": "6f29800c587469c6afc232604476acbd",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-planets.svg": {
+    "mtime": 1783841573.6212935,
+    "ast_hash": "4a0005756bbe6a3d34ab0fc1055f0f53",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-ports.svg": {
+    "mtime": 1783902596.7826936,
+    "ast_hash": "7093783f452bdf1e306b2843d3163f57",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-route.svg": {
+    "mtime": 1783841573.621434,
+    "ast_hash": "49d550d4056f0587ab37e3ba91629a3c",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/computer-trade.svg": {
+    "mtime": 1783841573.6215112,
+    "ast_hash": "61f0d6fcc532014c2d79864f9a5b0056",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/contact.svg": {
+    "mtime": 1783841573.6216033,
+    "ast_hash": "7fbb02b12e0766f938cb5ec6365bcfab",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/corp.svg": {
+    "mtime": 1783841573.6216643,
+    "ast_hash": "63a95048bdb0f428f49e64e05966b3b9",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/encounter.svg": {
+    "mtime": 1783841573.6217816,
+    "ast_hash": "f2fc06b27d91cb8e92b675b321fe345a",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/engine-room.svg": {
+    "mtime": 1783841573.6218915,
+    "ast_hash": "bfc584f17d57554ee3799eb22b6149bd",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/gallery-discoveries.svg": {
+    "mtime": 1783841573.622299,
+    "ast_hash": "b8e577c26590b69db54b759e5e6c6bb0",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/gallery-planets.svg": {
+    "mtime": 1783841573.6227343,
+    "ast_hash": "ee9dcfc940fa0a1124e1398c7fa217ad",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/gallery-ports.svg": {
+    "mtime": 1783841573.622867,
+    "ast_hash": "80105aec5a1d48e800d02cbd593e6768",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/gallery-ships.svg": {
+    "mtime": 1783841573.623024,
+    "ast_hash": "dc9dfdcf62a97bb4962a3528674e6999",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/gallery-subsystems.svg": {
+    "mtime": 1783841573.6231318,
+    "ast_hash": "cac74a3bceff3a56825314bc58170418",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/gallery-terrain.svg": {
+    "mtime": 1783841573.623546,
+    "ast_hash": "2720681d54f85c4e662f3fd5498e0f38",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/game.svg": {
+    "mtime": 1783902596.7834792,
+    "ast_hash": "3d21792fde3f3c944ccbec7ebef21268",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/help.svg": {
+    "mtime": 1783841573.6239526,
+    "ast_hash": "6a757744130b0e3cd671d0600ab630ac",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/lobby.svg": {
+    "mtime": 1783841573.6240227,
+    "ast_hash": "686793719bc1e212ad960d097efbf988",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/main-menu.svg": {
+    "mtime": 1783841573.6241248,
+    "ast_hash": "fc4c0547621c0414fe8f247bb965ee1e",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/options.svg": {
+    "mtime": 1783841573.6242242,
+    "ast_hash": "9934def9d0ecdf28e378f2be6b82b412",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/planet.svg": {
+    "mtime": 1783841573.6244094,
+    "ast_hash": "e104077a71213f512a96c3c4bf538b1e",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/port.svg": {
+    "mtime": 1783841573.6244974,
+    "ast_hash": "fdbc8bac54fa6c236e866a2288518944",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/stardock-bank.svg": {
+    "mtime": 1783841573.6245828,
+    "ast_hash": "ce0de177d359bb6b59df3d4cebf42546",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/stardock-devices.svg": {
+    "mtime": 1783841573.6246672,
+    "ast_hash": "0e512d6113279d846032d3bfe362d28e",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/stardock-hardware.svg": {
+    "mtime": 1783841573.6247675,
+    "ast_hash": "5e460d2b90efae567407e282ad1ed43f",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/stardock-shipyard.svg": {
+    "mtime": 1783841573.6248627,
+    "ast_hash": "6a6d83cfd219ee49f6a3fb7fe7441e32",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/stardock-tavern.svg": {
+    "mtime": 1783841573.6249447,
+    "ast_hash": "b7a1db2108d928a70203047f492572ea",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/stardock-trade.svg": {
+    "mtime": 1783841573.6250358,
+    "ast_hash": "0c2d9cfaa5567560ac9233dbf6726fce",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/surface.svg": {
+    "mtime": 1783841573.6254585,
+    "ast_hash": "9050a86509d539a1904379c0e2554403",
+    "semantic_hash": ""
+  },
+  "docs/ui/shots/territory.svg": {
+    "mtime": 1783841573.6256013,
+    "ast_hash": "d7752674cec0289818345364d5a1b04f",
+    "semantic_hash": ""
+  },
+  "images/species/centaurian_01.png": {
+    "mtime": 1782707210.799031,
+    "ast_hash": "12b75a791f11e1162efa85366cf8eaca",
+    "semantic_hash": ""
+  },
+  "images/species/cibelline_01.png": {
+    "mtime": 1782701676.0,
+    "ast_hash": "e484a878cdcc30ac29be1fa11706cb8b",
+    "semantic_hash": ""
+  },
+  "images/species/concordance_01.png": {
+    "mtime": 1782701114.0,
+    "ast_hash": "5498525da0be19047b1bc6d7ebc934a3",
+    "semantic_hash": ""
+  },
+  "images/species/dacaran_01.png": {
+    "mtime": 1782707113.8485537,
+    "ast_hash": "99eee8920e319605760fee2786ebacb3",
+    "semantic_hash": ""
+  },
+  "images/species/dignar_01.png": {
+    "mtime": 1782707113.9075546,
+    "ast_hash": "21ee34fa466e739df145bdbf4beefa4f",
+    "semantic_hash": ""
+  },
+  "images/species/helot_01.png": {
+    "mtime": 1782699094.0,
+    "ast_hash": "86f85f83542874064ef3b6f5bdb82f3f",
+    "semantic_hash": ""
+  },
+  "images/species/quill_01.png": {
+    "mtime": 1782699736.0,
+    "ast_hash": "a8ca028b19429ca68ddf91eab95aa0aa",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/centaurian_01.jpg": {
+    "mtime": 1782578324.5453255,
+    "ast_hash": "52ef511035cdf51cbfe351ebec009b0c",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/centaurian_02.png": {
+    "mtime": 1782629612.6471121,
+    "ast_hash": "5ee127b124c43f97c2b7ca636c0fe228",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/centaurian_03.png": {
+    "mtime": 1782665131.0196443,
+    "ast_hash": "1f55bb5c62a7797bbe9895145f4eeba3",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/cibelline_01.jpg": {
+    "mtime": 1782578561.3594244,
+    "ast_hash": "21f63748cf6876a31dc65c761fa9dbd4",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/cibelline_02.png": {
+    "mtime": 1782629740.4812436,
+    "ast_hash": "0527d8bf9125adc1b3c06475bc7c27f6",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/cibelline_03.png": {
+    "mtime": 1782665219.0901127,
+    "ast_hash": "d4e36e4101a46045789dac58927edb92",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/concordance_01.jpg": {
+    "mtime": 1782578495.117273,
+    "ast_hash": "8dcf38da841d70c6b5867a9460d0bb43",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/concordance_02.png": {
+    "mtime": 1782629674.085136,
+    "ast_hash": "4f4da6b4faf6da6f1abedf4d4da3c12f",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/concordance_03.png": {
+    "mtime": 1782665218.9511104,
+    "ast_hash": "613916ec62e01bbf54a9c155da3c167a",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/dacaran_01.png": {
+    "mtime": 1782604874.0053475,
+    "ast_hash": "cf553d9260877a83361772d5fae07e39",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/dacaran_02.png": {
+    "mtime": 1782629793.7921338,
+    "ast_hash": "08526cd98e4aff533ec601903c0150c8",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/dacaran_03.png": {
+    "mtime": 1782665342.9031613,
+    "ast_hash": "45a9132bcf5f2153e6b73b5e28d750b8",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/dignar_01.jpg": {
+    "mtime": 1782578525.0767934,
+    "ast_hash": "f17ed1bd4d1b2be059280ef06d89baaf",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/dignar_02.png": {
+    "mtime": 1782629674.1541371,
+    "ast_hash": "81006c97c4195172d3ebb2ada45b9104",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/dignar_03.png": {
+    "mtime": 1782665219.0201116,
+    "ast_hash": "e356a05a55a6649e7377294fcebfc588",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/helot_01.jpg": {
+    "mtime": 1782578410.0638,
+    "ast_hash": "ac966c30c931fc8bf04eec56955f79b9",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/helot_02.png": {
+    "mtime": 1782629612.8641157,
+    "ast_hash": "ad1b140376c3f6363534b35c8d5d324a",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/helot_03.png": {
+    "mtime": 1782665131.2236478,
+    "ast_hash": "eede02e67212da68242a2ec688d1592a",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/quill_01.jpg": {
+    "mtime": 1782578437.6872778,
+    "ast_hash": "b3316b987aaa1509f904042582d8d8cd",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/quill_02.png": {
+    "mtime": 1782629673.9511337,
+    "ast_hash": "d89737f52966e738971734f2e1d8a011",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/quill_03.png": {
+    "mtime": 1782665218.805108,
+    "ast_hash": "60a4774679cbf60fb74ef85ca53251e9",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/selvani_01.jpg": {
+    "mtime": 1782578383.136335,
+    "ast_hash": "ffb92f06490b9e60212b2520b13ffd27",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/selvani_02.png": {
+    "mtime": 1782629612.7911146,
+    "ast_hash": "44394a2f06ca47dee124cbae0f6b7c82",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/selvani_03.png": {
+    "mtime": 1782665131.1576467,
+    "ast_hash": "d135d2cf333ec771fff858124bf02849",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/selvi_01.jpg": {
+    "mtime": 1782578596.6530392,
+    "ast_hash": "eefd029afb281ae0e3c247aa9d28557f",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/selvi_02.png": {
+    "mtime": 1782629740.555245,
+    "ast_hash": "07d673fa6863a3cd9631a4c461744c93",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/selvi_03.png": {
+    "mtime": 1782665342.6121566,
+    "ast_hash": "ad41e4dcae705c4de71804100c99ad8b",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/stryx_01.jpg": {
+    "mtime": 1782578464.205737,
+    "ast_hash": "afc41ae559c71b7e4da4bb6cfbe34f33",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/stryx_02.png": {
+    "mtime": 1782629674.0181348,
+    "ast_hash": "234fda1534c81954027fbb0a152794a7",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/stryx_03.png": {
+    "mtime": 1782665218.8741093,
+    "ast_hash": "ba3719b90e9de14f12a5b1e5b7d29f60",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/terran_01.jpg": {
+    "mtime": 1782578303.2359595,
+    "ast_hash": "9384c64bf1497e0d37a0a468c912eb6e",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/terran_02.png": {
+    "mtime": 1782629567.9393682,
+    "ast_hash": "17102592f3300064c55f38b9b922a1c4",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/terran_03.png": {
+    "mtime": 1782665130.9456432,
+    "ast_hash": "94c1fcdd32fb2e053ebedd5b5617f421",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/thessarch_01.jpg": {
+    "mtime": 1782578674.1823921,
+    "ast_hash": "e142246db03e83149c61b4bd71b15c20",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/thessarch_02.png": {
+    "mtime": 1782629740.7012472,
+    "ast_hash": "e2ec60f7813cec8c3960ea5b6dd1f85c",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/thessarch_03.png": {
+    "mtime": 1782665342.758159,
+    "ast_hash": "f7223145cdd1839ac99a4df2e44305ac",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/thessbrood_01.png": {
+    "mtime": 1782604874.073349,
+    "ast_hash": "00193c62f0852ce85cbe8a501fb70e7d",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/thessbrood_02.png": {
+    "mtime": 1782629793.7061324,
+    "ast_hash": "132105580ddf55c6755dbe8c00494af8",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/thessbrood_03.png": {
+    "mtime": 1782665342.8261602,
+    "ast_hash": "97003374e9c55663ef25ae81217b70ba",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/vennrith_01.jpg": {
+    "mtime": 1782578634.9397068,
+    "ast_hash": "86e4e694973ecbf8a2045eb92f4a1920",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/vennrith_02.png": {
+    "mtime": 1782629740.628246,
+    "ast_hash": "2b528af731184ce91cf6441ffeffe674",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/vennrith_03.png": {
+    "mtime": 1782665342.6881578,
+    "ast_hash": "0e8ac2a5ca3049799db3a4db7f1e8460",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/vesk_01.jpg": {
+    "mtime": 1782578349.1617494,
+    "ast_hash": "dd900498b41647592661b61b170e1c15",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/vesk_02.png": {
+    "mtime": 1782629612.7211134,
+    "ast_hash": "c0c7518124dcf71fa4bb51dd4cf5bedc",
+    "semantic_hash": ""
+  },
+  "images/species/references/gemini/vesk_03.png": {
+    "mtime": 1782665131.0876455,
+    "ast_hash": "406a222d3e578b5fdf6969bd9014bcf7",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/centaurian_ref.png": {
+    "mtime": 1782707210.799031,
+    "ast_hash": "12b75a791f11e1162efa85366cf8eaca",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/cibelline_ref.png": {
+    "mtime": 1782701676.0,
+    "ast_hash": "e484a878cdcc30ac29be1fa11706cb8b",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/concordance_ref.png": {
+    "mtime": 1782701114.0,
+    "ast_hash": "5498525da0be19047b1bc6d7ebc934a3",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/dacaran_ref.png": {
+    "mtime": 1782707113.8485537,
+    "ast_hash": "99eee8920e319605760fee2786ebacb3",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/dignar_ref.png": {
+    "mtime": 1782707113.9075546,
+    "ast_hash": "21ee34fa466e739df145bdbf4beefa4f",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/helot_ref.png": {
+    "mtime": 1782699094.0,
+    "ast_hash": "86f85f83542874064ef3b6f5bdb82f3f",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/quill_ref.png": {
+    "mtime": 1782699736.0,
+    "ast_hash": "a8ca028b19429ca68ddf91eab95aa0aa",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/selvani_ref.png": {
+    "mtime": 1782698896.0,
+    "ast_hash": "31a9b640f6693374277f84420748603e",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/selvi_ref.png": {
+    "mtime": 1782701808.0,
+    "ast_hash": "f4ad481bd4f494b6314b0dbc7b66146d",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/stryx_ref.png": {
+    "mtime": 1782700372.0,
+    "ast_hash": "932be51efdad0220ad47c5a8789473b2",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/terran_ref.png": {
+    "mtime": 1782697392.0,
+    "ast_hash": "b6fad35f652614fbad1411bd7d7e7451",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/thessarch_ref.png": {
+    "mtime": 1782702178.0,
+    "ast_hash": "1d863cb7d9e28829443ac4b94c0e3e86",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/thessbrood_ref.png": {
+    "mtime": 1782704958.0,
+    "ast_hash": "ddfd084e703d9fd8a9f424946bfe31c2",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/vennrith_ref.png": {
+    "mtime": 1782701942.0,
+    "ast_hash": "9fc0dfdfbcdee73094fb8daa55ddf52c",
+    "semantic_hash": ""
+  },
+  "images/species/references/midjourney/vesk_ref.png": {
+    "mtime": 1782707114.125558,
+    "ast_hash": "dc3d6344446a1c766006217d5a27808a",
+    "semantic_hash": ""
+  },
+  "images/species/selvani_01.png": {
+    "mtime": 1782698896.0,
+    "ast_hash": "31a9b640f6693374277f84420748603e",
+    "semantic_hash": ""
+  },
+  "images/species/selvi_01.png": {
+    "mtime": 1782701808.0,
+    "ast_hash": "f4ad481bd4f494b6314b0dbc7b66146d",
+    "semantic_hash": ""
+  },
+  "images/species/stryx_01.png": {
+    "mtime": 1782700372.0,
+    "ast_hash": "932be51efdad0220ad47c5a8789473b2",
+    "semantic_hash": ""
+  },
+  "images/species/terran_01.png": {
+    "mtime": 1782697392.0,
+    "ast_hash": "b6fad35f652614fbad1411bd7d7e7451",
+    "semantic_hash": ""
+  },
+  "images/species/terran_02.png": {
+    "mtime": 1782709114.0,
+    "ast_hash": "8e491b44db8ace85cf0c3f449b9e07f9",
+    "semantic_hash": ""
+  },
+  "images/species/terran_03.png": {
+    "mtime": 1782710092.0,
+    "ast_hash": "f3f2f760ac166fcf56f4f35fb19df372",
+    "semantic_hash": ""
+  },
+  "images/species/thessarch_01.png": {
+    "mtime": 1782702178.0,
+    "ast_hash": "1d863cb7d9e28829443ac4b94c0e3e86",
+    "semantic_hash": ""
+  },
+  "images/species/thessbrood_01.png": {
+    "mtime": 1782704958.0,
+    "ast_hash": "ddfd084e703d9fd8a9f424946bfe31c2",
+    "semantic_hash": ""
+  },
+  "images/species/vennrith_01.png": {
+    "mtime": 1782701942.0,
+    "ast_hash": "9fc0dfdfbcdee73094fb8daa55ddf52c",
+    "semantic_hash": ""
+  },
+  "images/species/vesk_01.png": {
+    "mtime": 1782707114.125558,
+    "ast_hash": "dc3d6344446a1c766006217d5a27808a",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/amorous_imp_trade_standard.png": {
+    "mtime": 1783890723.5229216,
+    "ast_hash": "c9bfe5c7eecd45fb679e23e22bd51060",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/amorous_imp_trade_wide.png": {
+    "mtime": 1783890723.6153986,
+    "ast_hash": "1e064d263fd8d89984685a2d16849ee6",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/brain_dome_automaton_trade_standard.png": {
+    "mtime": 1783890724.4100618,
+    "ast_hash": "be09e0d1d23cc92337e2af7b91bc34dc",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/brain_dome_automaton_trade_wide.png": {
+    "mtime": 1783890724.5385041,
+    "ast_hash": "2f58d5da9b1474742ac7ac3f2dd50532",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/canid_technologist_trade_standard.png": {
+    "mtime": 1783890725.3085675,
+    "ast_hash": "de19bbcee9438d8e77af706d76ffc885",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/canid_technologist_trade_wide.png": {
+    "mtime": 1783890725.3679235,
+    "ast_hash": "e4b21361621a57cc8d2a870569297190",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/colonial_broodmaster_trade_standard.png": {
+    "mtime": 1783890725.9175153,
+    "ast_hash": "3f63690446f375a9bb18840d78fc4ccb",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/colonial_broodmaster_trade_wide.png": {
+    "mtime": 1783890725.9775581,
+    "ast_hash": "c2f9d597d7a90220ad4ec6ea88e3acf5",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/cosmic_arbiter_trade_standard.png": {
+    "mtime": 1783890726.4650962,
+    "ast_hash": "88230d81a9fcd0fd0ad1b1d5d9c40e3b",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/cosmic_arbiter_trade_wide.png": {
+    "mtime": 1783890726.5481522,
+    "ast_hash": "5c395cc54cf76ec1e82e689132d8c9b9",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/engineered_aesthete_trade_standard.png": {
+    "mtime": 1783890727.1610563,
+    "ast_hash": "25674fe3f71778691329da8a6231badf",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/engineered_aesthete_trade_wide.png": {
+    "mtime": 1783890727.276241,
+    "ast_hash": "c65cdfff9a82175132d4db8de7f76908",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/horned_grudgekeeper_trade_standard.png": {
+    "mtime": 1783890727.9606886,
+    "ast_hash": "f67109976b9e0be76122982b168e4a49",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/horned_grudgekeeper_trade_wide.png": {
+    "mtime": 1783890728.0371351,
+    "ast_hash": "4d951486714845bdf71420e147a1da6e",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/humanoid_diplomat_trade_standard.png": {
+    "mtime": 1783890728.8394816,
+    "ast_hash": "104cf9585dd77be0daece44a61cc8f96",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/humanoid_diplomat_trade_wide.png": {
+    "mtime": 1783890728.9971385,
+    "ast_hash": "41f593d4d1b8f6fae94f6fe06cb3c91b",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/psionic_overlord_trade_standard.png": {
+    "mtime": 1783890730.0846124,
+    "ast_hash": "d0c3d772193c6eacd67ddbba92c1bf1e",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/psionic_overlord_trade_wide.png": {
+    "mtime": 1783890730.2106316,
+    "ast_hash": "2cb86f5a5f815a753eb6fd0a6eb97f5d",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/ribbon_salvager_trade_standard.png": {
+    "mtime": 1783890731.0806193,
+    "ast_hash": "e71812990e9dcc1b9103a1ea4fc3c71c",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/ribbon_salvager_trade_wide.png": {
+    "mtime": 1783890731.1415796,
+    "ast_hash": "4c22fa3c0ce2858ddcb963c822f6698d",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/telepath_aristocrat_trade_standard.png": {
+    "mtime": 1783890731.7344131,
+    "ast_hash": "5ac772076a7e50140ae006681471d611",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/telepath_aristocrat_trade_wide.png": {
+    "mtime": 1783890731.8449976,
+    "ast_hash": "2471fb53bcf7d7899dc1570f080d434b",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/temporal_broker_trade_standard.png": {
+    "mtime": 1783890732.6502817,
+    "ast_hash": "a3fbb7d84faae66f7e674f19ab71ac9b",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/temporal_broker_trade_wide.png": {
+    "mtime": 1783890732.7948616,
+    "ast_hash": "d26115ea2458b653e4c24f8232cf06e6",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/tentacled_envoy_trade_standard.png": {
+    "mtime": 1783890733.8225825,
+    "ast_hash": "82d17b89556b50df370b7bc597f36dfd",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/tentacled_envoy_trade_wide.png": {
+    "mtime": 1783890733.906221,
+    "ast_hash": "a1eaea019b63e486468275cdd29b555c",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/winged_schemer_trade_standard.png": {
+    "mtime": 1783890734.625405,
+    "ast_hash": "2367e546bb80a80defe13255db543fd5",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/banners/winged_schemer_trade_wide.png": {
+    "mtime": 1783890734.730617,
+    "ast_hash": "8783cecab3d17090b7e56756b149f64d",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/brain_dome_automaton_standard.png": {
+    "mtime": 1783858052.7191665,
+    "ast_hash": "370306304faca572538280e0bc8602cc",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/brain_dome_automaton_wide.png": {
+    "mtime": 1783858052.8401685,
+    "ast_hash": "172990c31189d6a8af904b26109f589b",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/engineered_aesthete_standard.png": {
+    "mtime": 1783858053.957186,
+    "ast_hash": "ec74a124ea138b17a09448c8fdb8a12b",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/engineered_aesthete_wide.png": {
+    "mtime": 1783858054.080188,
+    "ast_hash": "2dc0954f445506d8de4e99848aa95abb",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/humanoid_diplomat_standard.png": {
+    "mtime": 1783858049.7321193,
+    "ast_hash": "0674c50a8cb2a4628166260c3fe6b39e",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/humanoid_diplomat_wide.png": {
+    "mtime": 1783858049.9531229,
+    "ast_hash": "8ecbca4d808c458203b157c183990433",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/telepath_aristocrat_standard.png": {
+    "mtime": 1783858055.1212046,
+    "ast_hash": "4fa3da179be489e6544f5ea5b12b1670",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/telepath_aristocrat_wide.png": {
+    "mtime": 1783858055.2492065,
+    "ast_hash": "53515d62f85d82c4f8d7bed340b0156e",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/temporal_broker_standard.png": {
+    "mtime": 1783858056.3611314,
+    "ast_hash": "b3cb674f02eb46e79a4375cf85b72275",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/temporal_broker_wide.png": {
+    "mtime": 1783858056.4932263,
+    "ast_hash": "325e9b15f5c2b33ea2d929364babb2de",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/tentacled_envoy_standard.png": {
+    "mtime": 1783858051.5201476,
+    "ast_hash": "9e1e3087da488926f3b2123ffb4a0466",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/icons/tentacled_envoy_wide.png": {
+    "mtime": 1783858051.6561496,
+    "ast_hash": "5a60402b4878b9c0fc85e853adc57c55",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/amorous_imp_exterior_sheet.png": {
+    "mtime": 1783890273.429143,
+    "ast_hash": "102ebb0f9f6909075ac068ab3ea64f04",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/brain_dome_automaton_exterior_sheet.png": {
+    "mtime": 1783857595.155939,
+    "ast_hash": "a0aba124e89d51cf5e3b614ec9c20971",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/canid_technologist_exterior_sheet.png": {
+    "mtime": 1783890273.4373605,
+    "ast_hash": "957ce81d455031a2426d2877f9b09290",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/colonial_broodmaster_exterior_sheet.png": {
+    "mtime": 1783890273.4475362,
+    "ast_hash": "1cf953b3efa3489b52b0630855995e83",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/cosmic_arbiter_exterior_sheet.png": {
+    "mtime": 1783890273.4564881,
+    "ast_hash": "d73e63acc5db31118a50dafc3142cb67",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/engineered_aesthete_exterior_sheet.png": {
+    "mtime": 1783857595.1669393,
+    "ast_hash": "56432e34a9f1cd9efe7e0dcf1ca8bdf4",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/horned_grudgekeeper_exterior_sheet.png": {
+    "mtime": 1783890273.4687104,
+    "ast_hash": "fe628ca7f811465490e3209d4811f680",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/humanoid_diplomat_exterior_sheet.png": {
+    "mtime": 1783857595.1339386,
+    "ast_hash": "f6cd46ce03e57767ce80430ac85ba7e8",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/psionic_overlord_exterior_sheet.png": {
+    "mtime": 1783890273.479283,
+    "ast_hash": "05ed3ddca58095b934361a2563f5c4c5",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/ribbon_salvager_exterior_sheet.png": {
+    "mtime": 1783890273.4842522,
+    "ast_hash": "ffb5dfb0432aee5b3ce3400ab65468f8",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/telepath_aristocrat_exterior_sheet.png": {
+    "mtime": 1783857595.1780512,
+    "ast_hash": "26b03852c6ff4cdc97146f7363f87bff",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/temporal_broker_exterior_sheet.png": {
+    "mtime": 1783857595.1909397,
+    "ast_hash": "97c282c92f6ab3a8a52384b5e2af424f",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/tentacled_envoy_exterior_sheet.png": {
+    "mtime": 1783857595.144939,
+    "ast_hash": "61420a78f11463d2e130a560dad0095c",
+    "semantic_hash": ""
+  },
+  "images/ui/ports/source/winged_schemer_exterior_sheet.png": {
+    "mtime": 1783890273.4874458,
+    "ast_hash": "cb4d8084b8e3d9c73e4751ac742e7f42",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_bank_standard.png": {
+    "mtime": 1783890724.2260587,
+    "ast_hash": "0575f878ed78eafd338634e5c72c7a89",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_bank_wide.png": {
+    "mtime": 1783890724.32758,
+    "ast_hash": "2bbb22ed1d6f934a22d120fd5773e0de",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_hardware_standard.png": {
+    "mtime": 1783890724.0450556,
+    "ast_hash": "66bb55b75e53b7541963c433ae109f43",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_hardware_wide.png": {
+    "mtime": 1783890724.181058,
+    "ast_hash": "ec9ec3556fc8879c970959d6e65d2d65",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_station_standard.png": {
+    "mtime": 1783890723.7796242,
+    "ast_hash": "85c81b4315cc378389711ba2218707ec",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_station_wide.png": {
+    "mtime": 1783890723.8786771,
+    "ast_hash": "46ff6c4a62e406acaba2acaad610d425",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_status_standard.png": {
+    "mtime": 1783890723.651049,
+    "ast_hash": "2edc5a4bbf65e6af7c359770bea08f19",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_status_wide.png": {
+    "mtime": 1783890723.7380505,
+    "ast_hash": "fb42c0314b36bf84a75b787ae321a401",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_trade_standard.png": {
+    "mtime": 1783890723.9080534,
+    "ast_hash": "b56965e6e67073017c9b7674d5f59b05",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/amorous_imp_trade_wide.png": {
+    "mtime": 1783890723.9850545,
+    "ast_hash": "a0ddc1a9e12c0708f8a244aea55e1a23",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_bank_standard.png": {
+    "mtime": 1783890725.1309745,
+    "ast_hash": "b1065c7f21c7f52680689d89c73e2c63",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_bank_wide.png": {
+    "mtime": 1783890725.2534306,
+    "ast_hash": "1afddbff3fefbc197e7ed3cb0360e5d6",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_hardware_standard.png": {
+    "mtime": 1783890724.9946568,
+    "ast_hash": "955e1866a78c36c60acb82c79b218539",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_hardware_wide.png": {
+    "mtime": 1783890725.0811563,
+    "ast_hash": "92c33a5cf2ed9684c73703e986a63683",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_station_standard.png": {
+    "mtime": 1783890724.7497978,
+    "ast_hash": "43ef354507433445767f950ed4056d8d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_station_wide.png": {
+    "mtime": 1783890724.8429275,
+    "ast_hash": "8251af01ab0d7fa5327c3a3ad5b75c36",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_status_standard.png": {
+    "mtime": 1783890724.587095,
+    "ast_hash": "201ebc21b45f26e8a771dc47a6814e45",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_status_wide.png": {
+    "mtime": 1783890724.7049239,
+    "ast_hash": "9d83bf86d37496b711595fe32e579746",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_trade_standard.png": {
+    "mtime": 1783890724.8766773,
+    "ast_hash": "466ac878e7b196cafb8ae8c754a13f18",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/brain_dome_automaton_trade_wide.png": {
+    "mtime": 1783890724.960352,
+    "ast_hash": "39034393fc52a2302425350d6258f679",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_bank_standard.png": {
+    "mtime": 1783890725.7880847,
+    "ast_hash": "4e94f939aa219f4befe4454c90effa97",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_bank_wide.png": {
+    "mtime": 1783890725.868086,
+    "ast_hash": "64c0a89d9ebd98b0f209d5ad0c00c990",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_hardware_standard.png": {
+    "mtime": 1783890725.6756172,
+    "ast_hash": "7c20c51258617f872cd7868bd6c8e25b",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_hardware_wide.png": {
+    "mtime": 1783890725.757606,
+    "ast_hash": "2a594342e29b5c076d8dd5efdd6f65b4",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_station_standard.png": {
+    "mtime": 1783890725.4984171,
+    "ast_hash": "498564d0ff456b1391e11bdb05f34e5f",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_station_wide.png": {
+    "mtime": 1783890725.5632849,
+    "ast_hash": "0cecef763cd897bd6387e96b72df8402",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_status_standard.png": {
+    "mtime": 1783890725.398513,
+    "ast_hash": "39ea815d1cadf598f523e5524c241430",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_status_wide.png": {
+    "mtime": 1783890725.4716895,
+    "ast_hash": "19657dd23c46512d5e0321bb7c64fc44",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_trade_standard.png": {
+    "mtime": 1783890725.5865605,
+    "ast_hash": "7fbb428f4ea059fb3d50b897365c1dd8",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/canid_technologist_trade_wide.png": {
+    "mtime": 1783890725.641668,
+    "ast_hash": "5120494f158ae95647c71235ac7e17bf",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_bank_standard.png": {
+    "mtime": 1783890726.3503976,
+    "ast_hash": "4e85a72208d423a3d48cf163082f1fc7",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_bank_wide.png": {
+    "mtime": 1783890726.403647,
+    "ast_hash": "28f49738bf087469b88539072825315f",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_hardware_standard.png": {
+    "mtime": 1783890726.271093,
+    "ast_hash": "7c23404b2837ee8c9d7b7a1bde7d3fb4",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_hardware_wide.png": {
+    "mtime": 1783890726.328739,
+    "ast_hash": "c1f61c7c5e378726c48757b7b30516be",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_station_standard.png": {
+    "mtime": 1783890726.1010902,
+    "ast_hash": "d1eb668d0a56ec6bfd93e84b43c9c742",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_station_wide.png": {
+    "mtime": 1783890726.1730912,
+    "ast_hash": "b6677a99f1da42f68572f3b7dbff7cab",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_status_standard.png": {
+    "mtime": 1783890726.0052629,
+    "ast_hash": "d4ae0ae6f2933bb085df1602f8ab05ce",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_status_wide.png": {
+    "mtime": 1783890726.0730896,
+    "ast_hash": "20ed8da14e0d3796f449e2af0dc8ad07",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_trade_standard.png": {
+    "mtime": 1783890726.1953623,
+    "ast_hash": "6939ddfff569bf87b0a48ac423f63372",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/colonial_broodmaster_trade_wide.png": {
+    "mtime": 1783890726.2480927,
+    "ast_hash": "b5bf8b4fcfbe0a674f51892e1f8778b4",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_bank_standard.png": {
+    "mtime": 1783890726.9962287,
+    "ast_hash": "f78b1933fc64f48250bedf727c09cc6b",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_bank_wide.png": {
+    "mtime": 1783890727.0813744,
+    "ast_hash": "65c9217c8b1eb9d3a70206e46d93ca58",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_hardware_standard.png": {
+    "mtime": 1783890726.8883765,
+    "ast_hash": "6365974403d0909756500374fadbc5fe",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_hardware_wide.png": {
+    "mtime": 1783890726.9610136,
+    "ast_hash": "cd0389637dfc06689cf3719b8f7bb48e",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_station_standard.png": {
+    "mtime": 1783890726.6971476,
+    "ast_hash": "386c5f5230a00b54f859b2d6b3e0bcfe",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_station_wide.png": {
+    "mtime": 1783890726.7699618,
+    "ast_hash": "8a0d1c679eee67e92bf73f227327ad31",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_status_standard.png": {
+    "mtime": 1783890726.581723,
+    "ast_hash": "74ddefd48e103e93bb02e2ed3af3f16d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_status_wide.png": {
+    "mtime": 1783890726.6678264,
+    "ast_hash": "26fbc36b7d0f40454b92b091e1e68333",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_trade_standard.png": {
+    "mtime": 1783890726.795277,
+    "ast_hash": "787306766f3d025de094050bb627a159",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/cosmic_arbiter_trade_wide.png": {
+    "mtime": 1783890726.859736,
+    "ast_hash": "f4c50d0bcd3fcd9279190c840977b45a",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_bank_standard.png": {
+    "mtime": 1783890727.8067849,
+    "ast_hash": "8d6aa91cdd66518c38555886a66a5181",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_bank_wide.png": {
+    "mtime": 1783890727.902889,
+    "ast_hash": "d0768215d8ba509e2770f76f610bb4b2",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_hardware_standard.png": {
+    "mtime": 1783890727.6913393,
+    "ast_hash": "003f28d51636392763e140e9a6308e3d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_hardware_wide.png": {
+    "mtime": 1783890727.767999,
+    "ast_hash": "d36e2293aa4906aee832aae41d08d8b9",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_station_standard.png": {
+    "mtime": 1783890727.4453938,
+    "ast_hash": "2c565bd208a3281b50b2b3c9b52787a5",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_station_wide.png": {
+    "mtime": 1783890727.5348065,
+    "ast_hash": "19fc49e82b525fb419335a3b5e70091b",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_status_standard.png": {
+    "mtime": 1783890727.315029,
+    "ast_hash": "e54581507b9ca2bfe916f4d45dbb39a0",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_status_wide.png": {
+    "mtime": 1783890727.408112,
+    "ast_hash": "bde5ea74714290fd750657193d69f3dc",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_trade_standard.png": {
+    "mtime": 1783890727.570843,
+    "ast_hash": "926a99d710577df7de8a647619dd10c2",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/engineered_aesthete_trade_wide.png": {
+    "mtime": 1783890727.6614177,
+    "ast_hash": "388542f7b941598a13a7cb331f72805f",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_bank_standard.png": {
+    "mtime": 1783890728.6351326,
+    "ast_hash": "01614ce7edfac28251f53eda98029416",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_bank_wide.png": {
+    "mtime": 1783890728.7361343,
+    "ast_hash": "5d7b815331d5d07978072c93077a1aa9",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_hardware_standard.png": {
+    "mtime": 1783890728.4831185,
+    "ast_hash": "94123e22ef874d346b3df4110c943b92",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_hardware_wide.png": {
+    "mtime": 1783890728.594132,
+    "ast_hash": "0f3c7a73be7ea8fd4c099ef1f228f20b",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_station_standard.png": {
+    "mtime": 1783890728.2257211,
+    "ast_hash": "97c87ad665c44fded66b2804d36a65c7",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_station_wide.png": {
+    "mtime": 1783890728.3215296,
+    "ast_hash": "0aa283942d0a43b3b0b6bc02c4149000",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_status_standard.png": {
+    "mtime": 1783890728.0795755,
+    "ast_hash": "f0b68d852913c9fd7240e709104a6c6a",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_status_wide.png": {
+    "mtime": 1783890728.1879525,
+    "ast_hash": "2b570b41e059e8fbee9b8c0dafb7ab00",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_trade_standard.png": {
+    "mtime": 1783890728.3543255,
+    "ast_hash": "c4acafb1a33ae895ea7720fc12ce19c4",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/horned_grudgekeeper_trade_wide.png": {
+    "mtime": 1783890728.4369242,
+    "ast_hash": "5a94320ebb2ed50040e7f88e2a24c22f",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_bank_standard.png": {
+    "mtime": 1783890729.8441527,
+    "ast_hash": "e0ef9d6062a958997c5a7574a5ec8c2f",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_bank_wide.png": {
+    "mtime": 1783890729.998144,
+    "ast_hash": "6d5a9828c15d5bfbcf7351816c4053ed",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_hardware_standard.png": {
+    "mtime": 1783890729.633001,
+    "ast_hash": "b36fd3fce9ad58040c3a3801dfc27ad5",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_hardware_wide.png": {
+    "mtime": 1783890729.7705016,
+    "ast_hash": "f57d6659c61e0911a703e6539dbc2bc8",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_station_standard.png": {
+    "mtime": 1783890729.2545083,
+    "ast_hash": "432c24665959db1d5f1e79a5f81e0bf6",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_station_wide.png": {
+    "mtime": 1783890729.4029384,
+    "ast_hash": "49fe500956b3bb7033fdfd0e88e712eb",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_status_standard.png": {
+    "mtime": 1783890729.054158,
+    "ast_hash": "5a14302f23d04dc9c7d1052540f0873e",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_status_wide.png": {
+    "mtime": 1783890729.1833856,
+    "ast_hash": "2df91376eb97099706d99350e7d5dee9",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_trade_standard.png": {
+    "mtime": 1783890729.448146,
+    "ast_hash": "f4dd38cf0114da706faaec1cb3fc7cbc",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/humanoid_diplomat_trade_wide.png": {
+    "mtime": 1783890729.5641482,
+    "ast_hash": "e0f31e7103eb35cb51a7bebd6b9067a6",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_bank_standard.png": {
+    "mtime": 1783890730.8979137,
+    "ast_hash": "2e015086144d3abed63c584ce8dfd63a",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_bank_wide.png": {
+    "mtime": 1783890731.0274098,
+    "ast_hash": "319dd015284505244cd2bb8b47f954e8",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_hardware_standard.png": {
+    "mtime": 1783890730.7340345,
+    "ast_hash": "a5eb53b3af7f20afe0fa7e2daf5f6122",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_hardware_wide.png": {
+    "mtime": 1783890730.8458872,
+    "ast_hash": "c6386bed0936c0a1013a3f015dfeb5cb",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_station_standard.png": {
+    "mtime": 1783890730.4411628,
+    "ast_hash": "597802e8b43c51f49acfc4e4ee53cd53",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_station_wide.png": {
+    "mtime": 1783890730.5639584,
+    "ast_hash": "074d78b3ec1a06305d69eb9395468626",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_status_standard.png": {
+    "mtime": 1783890730.2634141,
+    "ast_hash": "b5bf2d17681bf608fdbe5e6c86fafa21",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_status_wide.png": {
+    "mtime": 1783890730.3950446,
+    "ast_hash": "a40600127d34eb0df5174332b7ab19b7",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_trade_standard.png": {
+    "mtime": 1783890730.5981655,
+    "ast_hash": "49bd0dffe47f561ab63f6ece0c5afdf3",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/psionic_overlord_trade_wide.png": {
+    "mtime": 1783890730.6881669,
+    "ast_hash": "0e1be320f4eb85c183650fed33c329c4",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_bank_standard.png": {
+    "mtime": 1783890731.5684264,
+    "ast_hash": "d204fe17b6a4b177826d0d3eb407b3f1",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_bank_wide.png": {
+    "mtime": 1783890731.6614797,
+    "ast_hash": "e310a3bf27bae464e9bf0172840d9b73",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_hardware_standard.png": {
+    "mtime": 1783890731.4481657,
+    "ast_hash": "468c31cfb37beddbe2996b5828f3d10f",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_hardware_wide.png": {
+    "mtime": 1783890731.5321102,
+    "ast_hash": "eab6f51e4a4a0fc6f43cf5b826ba361d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_station_standard.png": {
+    "mtime": 1783890731.2596836,
+    "ast_hash": "eca53ea3cf6b683c8e47e687c8929f85",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_station_wide.png": {
+    "mtime": 1783890731.3235466,
+    "ast_hash": "6ee0c2b613e2943d185c7c22ff5ba25f",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_status_standard.png": {
+    "mtime": 1783890731.1675596,
+    "ast_hash": "3e7dc4179da3119e38a598fd3b2cf478",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_status_wide.png": {
+    "mtime": 1783890731.233176,
+    "ast_hash": "11f680363976d25d6400ef0b5fb6aad3",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_trade_standard.png": {
+    "mtime": 1783890731.3495212,
+    "ast_hash": "e2b6fd1d1aa25d5ff945acfe5ab86e3a",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/ribbon_salvager_trade_wide.png": {
+    "mtime": 1783890731.413819,
+    "ast_hash": "3798bba4e8aeb004731df01ad4463b1e",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_bank_standard.png": {
+    "mtime": 1783890732.4428422,
+    "ast_hash": "11dd1c2327946c8b71acbc291eb345ee",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_bank_wide.png": {
+    "mtime": 1783890732.556324,
+    "ast_hash": "7ee4a25ecbf4bc83a34b073723bc13c1",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_hardware_standard.png": {
+    "mtime": 1783890732.269717,
+    "ast_hash": "db4f85b6a960daf1c0378b457eb6a801",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_hardware_wide.png": {
+    "mtime": 1783890732.3986843,
+    "ast_hash": "de085ca5d260a2088c8503f580382348",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_station_standard.png": {
+    "mtime": 1783890732.0311198,
+    "ast_hash": "4a51a957aed92e5be35dbde05bded4a9",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_station_wide.png": {
+    "mtime": 1783890732.1189556,
+    "ast_hash": "f6e12017e4674aa0b7396a250048f055",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_status_standard.png": {
+    "mtime": 1783890731.8880312,
+    "ast_hash": "e5fce2262f82a6fedba2b7d4d607277d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_status_wide.png": {
+    "mtime": 1783890731.9958715,
+    "ast_hash": "b5e4c350b2ea64317d3cec98a9333d23",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_trade_standard.png": {
+    "mtime": 1783890732.1469853,
+    "ast_hash": "1fc7faa4555682c05c86d4048b8f3ca4",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/telepath_aristocrat_trade_wide.png": {
+    "mtime": 1783890732.2195358,
+    "ast_hash": "1b0da27faad23bd1a1a0b90ed709ed4d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_bank_standard.png": {
+    "mtime": 1783890733.5678294,
+    "ast_hash": "f94bdd3b99a19c07978da36cf9dd4fb9",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_bank_wide.png": {
+    "mtime": 1783890733.7592964,
+    "ast_hash": "10d9855b5e924313c352652cd9024642",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_hardware_standard.png": {
+    "mtime": 1783890733.3338015,
+    "ast_hash": "99d2f9533f4edb0a000698add1c2df40",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_hardware_wide.png": {
+    "mtime": 1783890733.479154,
+    "ast_hash": "60c0a04ea671788d2982a04fe8644f60",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_station_standard.png": {
+    "mtime": 1783890732.979565,
+    "ast_hash": "0f915c16d5c34ee0e1519c666787a8c4",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_station_wide.png": {
+    "mtime": 1783890733.1092327,
+    "ast_hash": "18a243419e579336b45d35bcdd7bcfef",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_status_standard.png": {
+    "mtime": 1783890732.8315701,
+    "ast_hash": "97e40c480e96f7b5605607342e19a956",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_status_wide.png": {
+    "mtime": 1783890732.9279866,
+    "ast_hash": "4ceb82dfde9fe039c364960d07bbea0d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_trade_standard.png": {
+    "mtime": 1783890733.1533632,
+    "ast_hash": "1f4a86dce90a283a18fbc5cf08e623bc",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/temporal_broker_trade_wide.png": {
+    "mtime": 1783890733.2667048,
+    "ast_hash": "9e2abc2196d862ece5abe11fa8676721",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_bank_standard.png": {
+    "mtime": 1783890734.4658225,
+    "ast_hash": "45514fbacef25f9689d08c3447c3497f",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_bank_wide.png": {
+    "mtime": 1783890734.5564704,
+    "ast_hash": "e0fc3eb3c8f99e6be3c2986ee6123706",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_hardware_standard.png": {
+    "mtime": 1783890734.3469338,
+    "ast_hash": "7f01c0ce59c94c9e939c804c7ad4dfc7",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_hardware_wide.png": {
+    "mtime": 1783890734.4298744,
+    "ast_hash": "61a22168de9d571ab37b177f6196793d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_station_standard.png": {
+    "mtime": 1783890734.1455762,
+    "ast_hash": "f3c0fcf1b2b7c9ba6b939cb96b4406ef",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_station_wide.png": {
+    "mtime": 1783890734.2255602,
+    "ast_hash": "3ad0d7796189dfffe67d848059bfc55d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_status_standard.png": {
+    "mtime": 1783890733.973222,
+    "ast_hash": "9246f264e81d124ca45862f9c78af7a7",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_status_wide.png": {
+    "mtime": 1783890734.1134698,
+    "ast_hash": "683b9e77abc5176063918a968b5a4c48",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_trade_standard.png": {
+    "mtime": 1783890734.2518394,
+    "ast_hash": "a182f3e60611b2e150682cb62e558b35",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/tentacled_envoy_trade_wide.png": {
+    "mtime": 1783890734.3144243,
+    "ast_hash": "3f33022d8f14d134726fce5bf3aabf25",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_bank_standard.png": {
+    "mtime": 1783890735.325522,
+    "ast_hash": "5da567b8b27e0615707be6e5d5d698bc",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_bank_wide.png": {
+    "mtime": 1783890735.4121377,
+    "ast_hash": "afb6e122fde595cd061679a1e487afe3",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_hardware_standard.png": {
+    "mtime": 1783890735.1677258,
+    "ast_hash": "6925616ad2df036499d980ca0dc3c0df",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_hardware_wide.png": {
+    "mtime": 1783890735.291066,
+    "ast_hash": "ccdb53b942085f8fdbf03a55d2043094",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_station_standard.png": {
+    "mtime": 1783890734.9045515,
+    "ast_hash": "5fa04f3d53ad9e384e685e49dc28dadd",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_station_wide.png": {
+    "mtime": 1783890734.995754,
+    "ast_hash": "349c75ef8ae9bd54936135eb7cf578e3",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_status_standard.png": {
+    "mtime": 1783890734.771289,
+    "ast_hash": "399422c5ad6c684008ed60f5dee38f39",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_status_wide.png": {
+    "mtime": 1783890734.8691306,
+    "ast_hash": "1dd50f7cfd06a21c74abbaefac5c6da8",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_trade_standard.png": {
+    "mtime": 1783890735.030874,
+    "ast_hash": "7610b6b1bc15ffadc908e75d552ca7e0",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/banners/winged_schemer_trade_wide.png": {
+    "mtime": 1783890735.117639,
+    "ast_hash": "e2a1964ec4502d2052064a45237f7808",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/brain_dome_automaton_standard.png": {
+    "mtime": 1783858052.8991694,
+    "ast_hash": "fa383b6c936386687db527cedc0faeea",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/brain_dome_automaton_wide.png": {
+    "mtime": 1783858053.0131712,
+    "ast_hash": "687640f192b856e08ba85b8693691a84",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/engineered_aesthete_standard.png": {
+    "mtime": 1783858054.143189,
+    "ast_hash": "c5c91965d8b0df2e433229840bfd13f6",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/engineered_aesthete_wide.png": {
+    "mtime": 1783858054.2531908,
+    "ast_hash": "9579a91653eefdfb2c289d7ab91b3245",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/humanoid_diplomat_standard.png": {
+    "mtime": 1783858050.0441241,
+    "ast_hash": "321e6656fe6dd9ac8c9f18a9427f813d",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/humanoid_diplomat_wide.png": {
+    "mtime": 1783858050.222127,
+    "ast_hash": "bbebc24bddfee4516500477a003b58b1",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/telepath_aristocrat_standard.png": {
+    "mtime": 1783858055.3042073,
+    "ast_hash": "4861c06e3863a16169ab1c9d354ef78e",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/telepath_aristocrat_wide.png": {
+    "mtime": 1783858055.405209,
+    "ast_hash": "50538bfcda68be075f684ecc346100c0",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/temporal_broker_standard.png": {
+    "mtime": 1783858056.5562272,
+    "ast_hash": "60bc4636f61da18fde440779a5e62aed",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/temporal_broker_wide.png": {
+    "mtime": 1783858056.672229,
+    "ast_hash": "10fffd6516bfaecaac4096bd6cb79e85",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/tentacled_envoy_standard.png": {
+    "mtime": 1783858051.737151,
+    "ast_hash": "1ab92d5da889d26451a1ad654a8f69db",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/icons/tentacled_envoy_wide.png": {
+    "mtime": 1783858051.875153,
+    "ast_hash": "4ed319a257e58fdbf0d20a56e09c08f6",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/amorous_imp_services_sheet.png": {
+    "mtime": 1783890273.4334447,
+    "ast_hash": "24ac45bb201c018ad7132dc4d4dd77ca",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/brain_dome_automaton_services_sheet.png": {
+    "mtime": 1783857595.1619391,
+    "ast_hash": "f89c91cf73e9897d498ca229d6986297",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/canid_technologist_services_sheet.png": {
+    "mtime": 1783890273.4414449,
+    "ast_hash": "28805daa8d850c7f364a0184241b8a93",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/colonial_broodmaster_services_sheet.png": {
+    "mtime": 1783890273.4544451,
+    "ast_hash": "1b87320df93d3c4423f5e8217d391555",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/cosmic_arbiter_services_sheet.png": {
+    "mtime": 1783890273.4624453,
+    "ast_hash": "d35f290496885eaae26388fa5308c450",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/engineered_aesthete_services_sheet.png": {
+    "mtime": 1783857595.1729393,
+    "ast_hash": "4a52343daf88cc1c5974a2c8a04e1ecc",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/horned_grudgekeeper_services_sheet.png": {
+    "mtime": 1783890273.4754455,
+    "ast_hash": "0b519f4e06d4a3ada0f0ef78f13c1c91",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/humanoid_diplomat_services_sheet.png": {
+    "mtime": 1783857595.1399388,
+    "ast_hash": "8673f408c779b185cebf9901f971551f",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/psionic_overlord_services_sheet.png": {
+    "mtime": 1783890273.4819698,
+    "ast_hash": "407beb555fc5a5cf65a61654c872d6bf",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/ribbon_salvager_services_sheet.png": {
+    "mtime": 1783890273.4858882,
+    "ast_hash": "c4781a51a74c2bea74411a9d413b9111",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/telepath_aristocrat_services_sheet.png": {
+    "mtime": 1783857595.1849394,
+    "ast_hash": "00f984cd7389a45a52902cd7e386ec58",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/temporal_broker_services_sheet.png": {
+    "mtime": 1783857595.1969397,
+    "ast_hash": "46a6441a9b13bf8012dd77d8a0c7daa5",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/tentacled_envoy_services_sheet.png": {
+    "mtime": 1783857595.150939,
+    "ast_hash": "62fb56bdc60032054986a84ba1de07f7",
+    "semantic_hash": ""
+  },
+  "images/ui/starbases/source/winged_schemer_services_sheet.png": {
+    "mtime": 1783890273.4896667,
+    "ast_hash": "15c994698a3129fed0b4776212eb6ced",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_bank_high_contrast_standard.png": {
+    "mtime": 1783841573.6509275,
+    "ast_hash": "0dc79186ba872980b2167ebb1bb8b4cf",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_bank_high_contrast_wide.png": {
+    "mtime": 1783841573.6529276,
+    "ast_hash": "eca7273815bbe9bd95b434c4e7bc884e",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_bank_monochrome_standard.png": {
+    "mtime": 1783841573.6539276,
+    "ast_hash": "96b539ecc7e7f2fdc6eb6914ad8c64ec",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_bank_monochrome_wide.png": {
+    "mtime": 1783841573.6549277,
+    "ast_hash": "96849324422088ab649930ca1a937f77",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_bank_source.png": {
+    "mtime": 1783841573.6589277,
+    "ast_hash": "f794d716f6a2dfe9694e5d60c811b363",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_bank_source_standard.png": {
+    "mtime": 1783841573.6619277,
+    "ast_hash": "408018f1f93bc2363f506fc3d321b6e7",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_bank_source_wide.png": {
+    "mtime": 1783841573.6644082,
+    "ast_hash": "d05214fef5cfdfd47c3ea40182941489",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_commodities_high_contrast_standard.png": {
+    "mtime": 1783841573.6649277,
+    "ast_hash": "46a91dafe421c1d5118945c65c02ada9",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_commodities_high_contrast_wide.png": {
+    "mtime": 1783841573.6669278,
+    "ast_hash": "380cc784ceccf6dfa37f0f639fd47f60",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_commodities_monochrome_standard.png": {
+    "mtime": 1783841573.667928,
+    "ast_hash": "253c607a66b9f79dc8c349cc437946b8",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_commodities_monochrome_wide.png": {
+    "mtime": 1783841573.6707573,
+    "ast_hash": "acae3a943f26df9b1af2136316b7f038",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_commodities_source.png": {
+    "mtime": 1783841573.673928,
+    "ast_hash": "77023e01ead3a339956903bae5cea777",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_commodities_source_standard.png": {
+    "mtime": 1783841573.677928,
+    "ast_hash": "0bfc07c941820a8a9a20088c37ad1136",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_commodities_source_wide.png": {
+    "mtime": 1783841573.680928,
+    "ast_hash": "25054172fa556406041920c9b156aee1",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_concourse_high_contrast.png": {
+    "mtime": 1783841573.682928,
+    "ast_hash": "2e0ef676c8dd252af0a8f52deee935d8",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_concourse_high_contrast_standard.png": {
+    "mtime": 1783841573.6849282,
+    "ast_hash": "a9970f4298f3df4ac411baa19da0a61c",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_concourse_high_contrast_wide.png": {
+    "mtime": 1783841573.6869283,
+    "ast_hash": "010e4725ea7c7a0458a8833a48d9fbff",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_concourse_monochrome.png": {
+    "mtime": 1783841573.6889281,
+    "ast_hash": "b90fa087225fc65c8f1f4a325249d6ea",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_concourse_monochrome_standard.png": {
+    "mtime": 1783841573.6909282,
+    "ast_hash": "7705fd5f5a107596f0475a35d21d3279",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_concourse_monochrome_wide.png": {
+    "mtime": 1783841573.6919281,
+    "ast_hash": "15e7f0fe22011e7d3456f08c69e11dba",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_concourse_source.png": {
+    "mtime": 1783841573.6969283,
+    "ast_hash": "2ee84a44790b2f6146b899450967ba84",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_concourse_source_standard.png": {
+    "mtime": 1783841573.7019284,
+    "ast_hash": "f606e00a7c2b8b45d42d6f929d312b80",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_concourse_source_wide.png": {
+    "mtime": 1783841573.7059286,
+    "ast_hash": "a01d34225fdaa2aef2ba758aebc8b65b",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_devices_high_contrast_standard.png": {
+    "mtime": 1783841573.7079284,
+    "ast_hash": "122988f4958952e1c34fe36e971ace4d",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_devices_high_contrast_wide.png": {
+    "mtime": 1783841573.7089286,
+    "ast_hash": "534f8ad5a1a8795922266cb392ff8990",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_devices_monochrome_standard.png": {
+    "mtime": 1783841573.7099285,
+    "ast_hash": "09ef0250eaca8505ab27375f1160435a",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_devices_monochrome_wide.png": {
+    "mtime": 1783841573.7109284,
+    "ast_hash": "aad578f1867370bb44d8ae9430b98977",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_devices_source.png": {
+    "mtime": 1783841573.7149286,
+    "ast_hash": "4a03aa47012ca7089349c31ca75d13f2",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_devices_source_standard.png": {
+    "mtime": 1783841573.7189286,
+    "ast_hash": "3d0db484168296a792883e0ef53fa76e",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_devices_source_wide.png": {
+    "mtime": 1783841573.7219288,
+    "ast_hash": "d29194f25ea2818a1c46d6d159f27324",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_hardware_high_contrast_standard.png": {
+    "mtime": 1783841573.7239287,
+    "ast_hash": "7cab27acf48c8465168ea2b668470600",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_hardware_high_contrast_wide.png": {
+    "mtime": 1783841573.7259288,
+    "ast_hash": "235c947d0606ea1440ebeca04b9bed59",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_hardware_monochrome_standard.png": {
+    "mtime": 1783841573.7279289,
+    "ast_hash": "7b16600e52af69f0fdb6628315bdcc29",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_hardware_monochrome_wide.png": {
+    "mtime": 1783841573.7299287,
+    "ast_hash": "9436d00aa8f3f52710a03444afe8d459",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_hardware_source.png": {
+    "mtime": 1783841573.733929,
+    "ast_hash": "4c1f27598bd6563c511fc330a3d83134",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_hardware_source_standard.png": {
+    "mtime": 1783841573.736929,
+    "ast_hash": "28b7af9daabcd602cca84dca13d75644",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_hardware_source_wide.png": {
+    "mtime": 1783841573.7409291,
+    "ast_hash": "91b38f16b0beeca1c0c932c98bcf3792",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_shipyard_high_contrast_standard.png": {
+    "mtime": 1783841573.742929,
+    "ast_hash": "00d79f90367472a78ded52bd58e11495",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_shipyard_high_contrast_wide.png": {
+    "mtime": 1783841573.744929,
+    "ast_hash": "67e4d9c9edad8f2cbc0b9c555d6c175c",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_shipyard_monochrome_standard.png": {
+    "mtime": 1783841573.745929,
+    "ast_hash": "77e849a1a106a1915bff241282ff9425",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_shipyard_monochrome_wide.png": {
+    "mtime": 1783841573.7489293,
+    "ast_hash": "6035b2f92b0ec740dd0ceecf1d47b002",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_shipyard_source.png": {
+    "mtime": 1783841573.7519293,
+    "ast_hash": "ad906194be0ce94b0aa4c5bb2e76f708",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_shipyard_source_standard.png": {
+    "mtime": 1783841573.7559292,
+    "ast_hash": "c32b086cd692754ae3a915a0a349409c",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_shipyard_source_wide.png": {
+    "mtime": 1783841573.7599294,
+    "ast_hash": "2a6b2ab182d0f776f3e7bdb2b059b2e9",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_tavern_high_contrast_standard.png": {
+    "mtime": 1783841573.7619293,
+    "ast_hash": "cfd0c0ef176145fcbbd801320faec491",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_tavern_high_contrast_wide.png": {
+    "mtime": 1783841573.7629294,
+    "ast_hash": "6b33db797ca7d68483f1a9e3d9289a62",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_tavern_monochrome_standard.png": {
+    "mtime": 1783841573.7639294,
+    "ast_hash": "c62516a9f250e354db7beb45ff91860c",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_tavern_monochrome_wide.png": {
+    "mtime": 1783841573.7649293,
+    "ast_hash": "3ef2b613eb4d733e8bbab58a01da1a34",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_tavern_source.png": {
+    "mtime": 1783841573.7719295,
+    "ast_hash": "6093fecb4f5595d19e6a78085f283a4d",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_tavern_source_standard.png": {
+    "mtime": 1783841573.7749295,
+    "ast_hash": "f626f4f1bbbfdc20907da6d52a174e6e",
+    "semantic_hash": ""
+  },
+  "images/ui/stardock/stardock_tavern_source_wide.png": {
+    "mtime": 1783841573.7769296,
+    "ast_hash": "14382e767b85cb55af48b41799f3e1d1",
+    "semantic_hash": ""
+  }
+}

@@ -85,8 +85,8 @@
     "semantic_hash": "0cb7e19aa8c62aa22ecb0076efc95943"
   },
   "edge/art/terrain.py": {
-    "mtime": 1784444230.5685163,
-    "ast_hash": "2854abfa26feee206fe52e5302df3402",
+    "mtime": 1784444889.7865,
+    "ast_hash": "0658ab0bf26a099085f3cc6dd8a5b37a",
     "semantic_hash": ""
   },
   "edge/bigbang/__init__.py": {
@@ -310,9 +310,9 @@
     "semantic_hash": "e68280de1e435811a5a00da2b94b8440"
   },
   "edge/core/events.py": {
-    "mtime": 1784009940.5262253,
-    "ast_hash": "d136666331a9ed8de96abfe05cde3b07",
-    "semantic_hash": "d136666331a9ed8de96abfe05cde3b07"
+    "mtime": 1784445285.7730935,
+    "ast_hash": "4050766b5113e769dc22c662d2d7462d",
+    "semantic_hash": ""
   },
   "edge/core/governance.py": {
     "mtime": 1783513285.3891373,
@@ -330,9 +330,9 @@
     "semantic_hash": "25541dabc93f7bef4e3c5e05082cd2e4"
   },
   "edge/core/models.py": {
-    "mtime": 1784009884.5211978,
-    "ast_hash": "d0f8c4731d818310998cc0f35a100668",
-    "semantic_hash": "d0f8c4731d818310998cc0f35a100668"
+    "mtime": 1784445275.472922,
+    "ast_hash": "963f1a4562b5c29ff74a7b64792d2e91",
+    "semantic_hash": ""
   },
   "edge/core/movement.py": {
     "mtime": 1782237143.97317,
@@ -350,9 +350,9 @@
     "semantic_hash": "7a28b69deeeb3e619e9e28887d752f87"
   },
   "edge/core/rules.py": {
-    "mtime": 1784323950.6038501,
-    "ast_hash": "b7eff573118904b07ab7880d2eeba2a7",
-    "semantic_hash": "b7eff573118904b07ab7880d2eeba2a7"
+    "mtime": 1784445418.6278243,
+    "ast_hash": "aa94c50ba9048714e7a4e10d24bb37a2",
+    "semantic_hash": ""
   },
   "edge/core/services.py": {
     "mtime": 1783902596.7685568,
@@ -590,9 +590,9 @@
     "semantic_hash": "b934a797587ee49947138e3b8f1a3d32"
   },
   "edge/server/wire.py": {
-    "mtime": 1784323963.502058,
-    "ast_hash": "d9b6a3dcb223161dba8988d857ad6152",
-    "semantic_hash": "d9b6a3dcb223161dba8988d857ad6152"
+    "mtime": 1784445506.8489828,
+    "ast_hash": "98231a6c62d98a0b712dcdec0327b931",
+    "semantic_hash": ""
   },
   "edge/spacebattle/__init__.py": {
     "mtime": 1784303580.3997495,
@@ -635,9 +635,9 @@
     "semantic_hash": "52c678d86d3ca9bc08ff4294898c335f"
   },
   "edge/store/codec.py": {
-    "mtime": 1784323963.4120567,
-    "ast_hash": "1017213df24fc808d9205a3be776d65d",
-    "semantic_hash": "1017213df24fc808d9205a3be776d65d"
+    "mtime": 1784445492.0015268,
+    "ast_hash": "18788de136fb63461a68415d6ead2a58",
+    "semantic_hash": ""
   },
   "edge/store/repo.py": {
     "mtime": 1784176631.8685322,
@@ -1000,9 +1000,9 @@
     "semantic_hash": "5d11df4a2ea1cfaf4498037ab60901c3"
   },
   "tests/test_codec.py": {
-    "mtime": 1784323990.7154982,
-    "ast_hash": "49aa9d6fd563ab075795d70604bdfee0",
-    "semantic_hash": "49aa9d6fd563ab075795d70604bdfee0"
+    "mtime": 1784445595.433476,
+    "ast_hash": "fa536124f26466dbf4d2e890c874c06d",
+    "semantic_hash": ""
   },
   "tests/test_combat.py": {
     "mtime": 1784003247.2318065,
@@ -1020,9 +1020,9 @@
     "semantic_hash": "ced7ef5cec685bffbac6085b16a9aa60"
   },
   "tests/test_config.py": {
-    "mtime": 1784409138.2824352,
-    "ast_hash": "234b49d4d246ecf2af336be8ce5ad105",
-    "semantic_hash": "234b49d4d246ecf2af336be8ce5ad105"
+    "mtime": 1784445515.480284,
+    "ast_hash": "991f72a88c90e491c844be3317900a8d",
+    "semantic_hash": ""
   },
   "tests/test_contact.py": {
     "mtime": 1784346520.0370479,
@@ -1455,8 +1455,8 @@
     "semantic_hash": "d9c7565ed363b4fad49474c646739a50"
   },
   "config/default.yaml": {
-    "mtime": 1784444405.5243056,
-    "ast_hash": "c7eb0b1d912cbb623ea665e4c216d0de",
+    "mtime": 1784445498.8818512,
+    "ast_hash": "6c8918bfee05e99ffd16b70f9580f343",
     "semantic_hash": ""
   },
   "config/dialogue/alien_dialogue_species.yaml": {
@@ -1645,9 +1645,9 @@
     "semantic_hash": "37c0ae4fef36066dc8b4816a574ba779"
   },
   "tests/fixtures/wire/fingerprint.txt": {
-    "mtime": 1784323969.0311475,
-    "ast_hash": "255e73ff71b8d67ce99b19e2285cb87f",
-    "semantic_hash": "255e73ff71b8d67ce99b19e2285cb87f"
+    "mtime": 1784445606.9169433,
+    "ast_hash": "1d18339741cbd49ab6d1287730270073",
+    "semantic_hash": ""
   },
   ".claude/settings.json": {
     "mtime": 1784443058.538657,
@@ -3647,6 +3647,11 @@
   "images/ui/stardock/stardock_tavern_source_wide.png": {
     "mtime": 1783841573.7769296,
     "ast_hash": "14382e767b85cb55af48b41799f3e1d1",
+    "semantic_hash": ""
+  },
+  "edge/core/groundwar/models.py": {
+    "mtime": 1784445239.8853421,
+    "ast_hash": "18fbcb7f8d7e837a2436132996819ba3",
     "semantic_hash": ""
   }
 }
