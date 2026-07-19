@@ -35,7 +35,13 @@ resolve:
   trooper_killed: 1
 
 platoon:
-  budget: 200               # drop-boat tonnage, in points
+  # The squad is bought with gold-pressed latinum — the main game's universal
+  # currency — so a raid can be funded straight out of the player's purse when
+  # edge-groundwar is embedded. Suit `cost` below is a latinum price; `latinum`
+  # is the drop-boat's outfitting budget (a standalone default the main game can
+  # override with the player's actual balance). Scale reference: a Tier-I ship
+  # component is 2000 latinum, Tier-II 8000 (config/default.yaml → economy).
+  latinum: 12000            # latinum available to outfit the drop
   max_troopers: 14
   actions_per_turn: 2       # per trooper: any mix of move / jump / fire / missile / broadcast
 
@@ -43,7 +49,7 @@ suits:
   marauder:
     label: Marauder
     glyph: "M"
-    cost: 30
+    cost: 1800              # latinum
     hp: 120
     armor: 8                # flat damage soak per hit
     move: 3                 # move points per turn (terrain costs apply)
@@ -57,7 +63,7 @@ suits:
   scout:
     label: Scout
     glyph: "S"
-    cost: 12
+    cost: 700              # latinum
     hp: 55
     armor: 3
     move: 6
@@ -72,7 +78,7 @@ suits:
   command:
     label: Command
     glyph: "C"
-    cost: 25
+    cost: 1500             # latinum
     hp: 80
     armor: 5
     move: 4
@@ -90,8 +96,16 @@ suits:
 defenses:
   wall:    {hp: 80}
   gate:    {hp: 60}
-  turret:  {hp: 60, range: 10, damage: 18, accuracy: 0.65}
-  aa:      {hp: 50, range: 14, damage: 35, accuracy: 0.55}   # anti-drop / anti-jump fire
+  # Turrets are the ground gauntlet: the on-foot approach past them should cost
+  # blood but stay survivable behind cover and by silencing them one at a time.
+  turret:  {hp: 60, range: 12, damage: 24, accuracy: 0.72}
+  # AA is the aerial defense. Dropping or jumping into its umbrella is meant to be
+  # punishing, worse the deeper you land — `point_blank_bonus` ramps accuracy from
+  # the base value at the edge of `range` up to (accuracy + bonus) at the muzzle,
+  # so a capsule landing in the heart of a city (usually under several overlapping
+  # AA) is near-certain death. The intended play is to land clear of the umbrella
+  # and march in, taking the risk only for the jumps you truly need.
+  aa:      {hp: 50, range: 15, damage: 48, accuracy: 0.60, point_blank_bonus: 0.35}
   sensor:  {hp: 40, radius: 16}
   citadel_gun: {hp: 120, range: 16, damage: 40, accuracy: 0.70}
   building_military_hp: 50

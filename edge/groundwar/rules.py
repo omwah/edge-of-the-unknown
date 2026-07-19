@@ -14,7 +14,7 @@ from __future__ import annotations
 import heapq
 import math
 
-from edge.groundwar.config import WeaponStats
+from edge.groundwar.config import EmplacementStats, WeaponStats
 from edge.groundwar.model import Battle, GarrisonUnit, Structure, Trooper
 
 TROOPER_NAMES = (
@@ -275,6 +275,17 @@ def do_move(battle: Battle, trooper: Trooper, x: int, y: int) -> bool:
     return True
 
 
+def _aa_reaction_acc(aa_cfg: EmplacementStats, distance: float,
+                     escalation: float = 0.0) -> float:
+    """AA hit chance against a drop/jump: base accuracy, plus a point-blank ramp
+    that fades from full bonus at the muzzle to nothing at the edge of range,
+    plus any escalation stiffening. Landing in the heart of the umbrella is deadly."""
+    prox = 0.0
+    if aa_cfg.range > 0:
+        prox = aa_cfg.point_blank_bonus * (1.0 - min(1.0, distance / aa_cfg.range))
+    return aa_cfg.accuracy + prox + escalation
+
+
 def do_jump(battle: Battle, trooper: Trooper, x: int, y: int) -> bool:
     """One action: jump-jet hop — ignores terrain, draws AA reaction fire."""
     if battle.outcome is not None or trooper.actions <= 0 or trooper.jump_charges <= 0:
@@ -291,8 +302,9 @@ def do_jump(battle: Battle, trooper: Trooper, x: int, y: int) -> bool:
     for s in battle.structures.values():
         if s.kind != "aa" or not s.alive or trooper.hp <= 0:
             continue
-        if dist(s.x, s.y, x, y) <= aa_cfg.range:
-            if battle.rng.random() < aa_cfg.accuracy + _escalation_bonus(battle):
+        d = dist(s.x, s.y, x, y)
+        if d <= aa_cfg.range:
+            if battle.rng.random() < _aa_reaction_acc(aa_cfg, d, _escalation_bonus(battle)):
                 _trooper_hit(battle, trooper, aa_cfg.damage, "AA fire mid-air")
             else:
                 battle.log("miss", "AA fire bursts wide of the jump arc", x, y,
@@ -315,8 +327,11 @@ def resolve_drop(battle: Battle, drops: list[tuple[str, int, int]]) -> None:
         battle.troopers.append(t)
         battle.log("drop", f"{t.name} ({suit.label}) capsule down", x, y)
         for s in battle.structures.values():
-            if s.kind == "aa" and s.alive and dist(s.x, s.y, x, y) <= aa_cfg.range:
-                if battle.rng.random() < aa_cfg.accuracy:
+            if s.kind != "aa" or not s.alive:
+                continue
+            d = dist(s.x, s.y, x, y)
+            if d <= aa_cfg.range:
+                if battle.rng.random() < _aa_reaction_acc(aa_cfg, d):
                     _trooper_hit(battle, t, aa_cfg.damage, "anti-drop fire")
                 else:
                     battle.log("miss", f"flak brackets {t.name}'s capsule", x, y,
