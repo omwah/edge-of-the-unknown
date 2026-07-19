@@ -807,8 +807,9 @@ class SetupScreen(Screen[None]):
 [b]Expedition[/] is the peaceful archaeology survey on a friendly world — no \
 platoon, just you, a scanner, and the ground.
 
-[b]Assault[/] — compose the drop in the platoon table (Tab into it, arrows to \
-move, [b]−[/] / [b]+[/] to adjust) against your latinum budget; the class \
+[b]Assault[/] — compose the drop in the squad table (Tab to it, [b]↑↓[/] to \
+select a suit, [b]−[/] / [b]+[/] to adjust — or click the row buttons) against \
+your latinum budget; the class \
 [b]mixture[/] is the puzzle, and what lands is all you get. \
 [b]Marauder[/]: heavy armor, the guns that break turrets and walls. \
 [b]Scout[/]: fast and far-seeing, jams city sensors; barely armed. \
@@ -825,9 +826,9 @@ The same seed always builds the same map, in either mode.\
 """
 
     help_keys = [
-        ("Tab / Shift+Tab", "move between the buttons, the platoon table, and DROP"),
-        ("↑ ↓", "move the platoon-table cursor"),
-        ("− / +", "remove / add one trooper of that suit"),
+        ("Tab / Shift+Tab", "move between the pickers, the squad table, and DROP"),
+        ("↑ ↓", "select a suit row in the squad table"),
+        ("− / +", "adjust the selected suit (or click the row's − / + buttons)"),
         ("Enter/click", "activate the focused button"),
         ("?", "this help"),
     ]
