@@ -72,6 +72,8 @@ from edge.core.events import (
     EncounterStarted,
     Event,
     GenesisDeployed,
+    GroundOperationBegan,
+    GroundOperationEnded,
     GrudgeFormed,
     Haggled,
     HazardDamage,
@@ -142,9 +144,11 @@ from edge.core.rules import (
     DeployGenesis,
     DeployMines,
     Deposit,
+    BeginSurvey,
     Descend,
     Dock,
     Explore,
+    ExtractGroundOperation,
     FieldPatch,
     Hail,
     HaggleOffer,
@@ -276,6 +280,10 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "Descend", {"planet_id": command.planet_id}
         case Explore():
             return "Explore", {"planet_id": command.planet_id}
+        case BeginSurvey():
+            return "BeginSurvey", {"planet_id": command.planet_id}
+        case ExtractGroundOperation():
+            return "ExtractGroundOperation", {"operation_id": command.operation_id}
         case MineBelt():
             return "MineBelt", {"planet_id": command.planet_id}
         case BuyGenesis():
@@ -479,6 +487,10 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return Descend(planet_id=payload["planet_id"])
         case "Explore":
             return Explore(planet_id=payload["planet_id"])
+        case "BeginSurvey":
+            return BeginSurvey(planet_id=payload["planet_id"])
+        case "ExtractGroundOperation":
+            return ExtractGroundOperation(operation_id=payload["operation_id"])
         case "MineBelt":
             return MineBelt(planet_id=payload["planet_id"])
         case "BuyGenesis":
@@ -668,6 +680,16 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             }
         case Descended():
             return "Descended", {"player_id": event.player_id, "planet_id": event.planet_id}
+        case GroundOperationBegan():
+            return "GroundOperationBegan", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "kind": event.kind, "planet_id": event.planet_id,
+            }
+        case GroundOperationEnded():
+            return "GroundOperationEnded", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "kind": event.kind, "outcome": event.outcome,
+            }
         case CloudCityBuilt():
             return "CloudCityBuilt", {
                 "player_id": event.player_id, "planet_id": event.planet_id,
@@ -1016,6 +1038,12 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return GenesisDeployed(payload["player_id"], payload["planet_id"], payload["new_type"])
         case "Descended":
             return Descended(payload["player_id"], payload["planet_id"])
+        case "GroundOperationBegan":
+            return GroundOperationBegan(payload["player_id"], payload["operation_id"],
+                                        payload["kind"], payload["planet_id"])
+        case "GroundOperationEnded":
+            return GroundOperationEnded(payload["player_id"], payload["operation_id"],
+                                        payload["kind"], payload["outcome"])
         case "BeltMined":
             return BeltMined(payload["player_id"], payload["planet_id"],
                              payload["commodity"], payload["amount"])

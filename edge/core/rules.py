@@ -143,6 +143,8 @@ from edge.core.events import (
     EncounterStarted,
     Event,
     GenesisDeployed,
+    GroundOperationBegan,
+    GroundOperationEnded,
     GrudgeFormed,
     Haggled,
     LeadAccepted,
@@ -199,6 +201,7 @@ from edge.core.models import (
     UNOWNED,
     UniverseState,
 )
+from edge.core.groundwar.models import SurveyOperation, SurveyProgress
 from edge.core.market import PortOrder
 from edge.core.movement import MovementError, can_warp, shortest_path
 from edge.dialogue import facts as dialogue_facts
@@ -490,6 +493,34 @@ class Explore:
     """
 
     planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class BeginSurvey:
+    """Open a surface-survey expedition on a landable planet (GW-WP03, GW plan D1/D4-D6).
+
+    Replaces the abstract `Descend`/`Explore` path with a persisted, replayable
+    operation (`Player.ground_operation`). The begin reducer draws the operation seed
+    from `state.rng` (G3), resumes the surveyor's saved position/hints for this world
+    (D5), and refills supplies. The site generation and walk/dig/talk action commands
+    land in GW-WP05/06; extraction is `ExtractGroundOperation`.
+    """
+
+    planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractGroundOperation:
+    """End the active ground operation and clear `Player.ground_operation` (GW-WP03, D5/D8).
+
+    Settling a survey persists the surveyor's position and hints into
+    `Player.ground_survey_progress` (trenches and supplies reset next descent). Always
+    legal while an operation is live — extraction is never barred (D4/D12) — and
+    validates `operation_id` against the active operation. Rich win/loss settlement for
+    assaults arrives with GW-WP11.
+    """
+
+    operation_id: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -989,7 +1020,8 @@ Command = (
     | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
     | TransferCargo | BatchTransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
-    | Salvage | Descend | Explore | MineBelt | BuyGenesis | DeployGenesis
+    | Salvage | Descend | Explore | BeginSurvey | ExtractGroundOperation
+    | MineBelt | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
     | DeliverContract | AbandonContract | BuyRumor | PostNotice
@@ -1147,6 +1179,10 @@ def reduce(
             return _descend(state, player_id, command, config)
         case Explore():
             return _explore(state, player_id, command, config)
+        case BeginSurvey():
+            return _begin_survey(state, player_id, command, config)
+        case ExtractGroundOperation():
+            return _extract_ground_operation(state, player_id, command, config)
         case MineBelt():
             return _mine_belt(state, player_id, command, config)
         case BuyGenesis():
@@ -1489,9 +1525,17 @@ def _warp(state: UniverseState, player_id: int, cmd: Warp, config: GameConfig) -
 
 
 def _require_no_encounter(player: Player) -> None:
-    """Movement, docking, and descent are rejected while an encounter is live (§10)."""
+    """Reject the busy actions while an encounter *or* a ground operation is live.
+
+    The universal "you are occupied" guard at every movement/dock/trade/hail/combat
+    seam (§10, GW-WP03 G9). A live ground operation blocks the same set — you are on
+    the surface — and blocks opening a *second* operation; the extract reducer settles
+    it structurally, so screen closure is never trusted.
+    """
     if player.active_encounter is not None:
         raise MovementError("you are engaged — fight or flee first")
+    if player.ground_operation is not None:
+        raise MovementError("you are on the surface — extract first")
 
 
 def _convoy_step(state: UniverseState, player: Player, from_sector: int, to_sector: int,
@@ -3572,6 +3616,79 @@ def _surface_sites(state: UniverseState, planet_id: int) -> list[Discovery]:
     """A planet's surface-site discoveries, in slot order (§7, WP6)."""
     sites = [d for d in state.discoveries.values() if d.planet_id == planet_id]
     return sorted(sites, key=lambda d: d.site_slot)
+
+
+def _begin_survey(
+    state: UniverseState, player_id: int, cmd: BeginSurvey, config: GameConfig
+) -> ReduceResult:
+    """Open a surface-survey expedition (GW-WP03, GW plan D1/D4-D6).
+
+    Draws the operation seed and a stable operation id from `state.rng` (G3), so both
+    replay identically from the command log — the recorded `ExtractGroundOperation`
+    then matches. Resumes the surveyor's saved position/hints for this world (D5) and
+    refills supplies to the configured start. `_require_no_encounter` doubles as the
+    G9 guard: it rejects opening a survey while an encounter or another ground
+    operation is already live.
+    """
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    ship = _ship(state, player)
+    planet = _planet_in_sector(state, ship, cmd.planet_id)
+    if not is_landable(planet.planet_type, config):
+        raise EconomyError(
+            f"a {pretty_planet_type(planet.planet_type).lower()} has no surface to survey")
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    exp = config.groundwar.expedition
+    seed = state.rng.getrandbits(63)
+    operation_id = state.rng.getrandbits(63)
+    prior = player.ground_survey_progress.get(cmd.planet_id)
+    start_x = prior.last_x if prior is not None else exp.width // 2
+    start_y = prior.last_y if prior is not None else exp.height // 2
+    hinted = prior.hinted_discovery_ids if prior is not None else frozenset()
+    operation = SurveyOperation(
+        operation_id=operation_id, planet_id=cmd.planet_id, sector_id=ship.sector_id,
+        planet_type=planet.planet_type, seed=seed, started_day=state.game.day_number,
+        explorer_x=start_x, explorer_y=start_y, supplies=exp.supplies_start,
+        hinted_discovery_ids=hinted,
+    )
+    new_player = replace(player, ground_operation=operation)
+    return ReduceResult(
+        events=(GroundOperationBegan(player_id, operation_id, "survey", cmd.planet_id),),
+        players=(new_player,),
+    )
+
+
+def _extract_ground_operation(
+    state: UniverseState, player_id: int, cmd: ExtractGroundOperation, config: GameConfig
+) -> ReduceResult:
+    """Settle and clear the active ground operation (GW-WP03, GW plan D5/D8).
+
+    Always legal while an operation is live (extraction is never barred — D4/D12), so
+    this deliberately does not call `_require_no_encounter`. Persists a survey's
+    surveyor position and hints into `Player.ground_survey_progress` (D5) while
+    trenches/supplies reset next descent; the assault win/loss reconciliation lands
+    with GW-WP11.
+    """
+    player = _player(state, player_id)
+    operation = player.ground_operation
+    if operation is None:
+        raise MovementError("you have no ground operation to extract from")
+    if operation.operation_id != cmd.operation_id:
+        raise MovementError("that ground operation is not the active one")
+    progress = dict(player.ground_survey_progress)
+    if isinstance(operation, SurveyOperation):
+        progress[operation.planet_id] = SurveyProgress(
+            last_x=operation.explorer_x, last_y=operation.explorer_y,
+            hinted_discovery_ids=operation.hinted_discovery_ids,
+        )
+    new_player = replace(player, ground_operation=None, ground_survey_progress=progress)
+    return ReduceResult(
+        events=(GroundOperationEnded(
+            player_id, operation.operation_id, operation.kind,
+            operation.outcome or "extracted"),),
+        players=(new_player,),
+    )
 
 
 def _descend(

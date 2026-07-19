@@ -174,6 +174,26 @@ class Descended(Event):
 
 
 @dataclass(frozen=True)
+class GroundOperationBegan(Event):
+    """A ground operation (survey/assault) opened on a planet (GW-WP03)."""
+
+    player_id: int
+    operation_id: int
+    kind: str  # "survey" | "assault"
+    planet_id: int
+
+
+@dataclass(frozen=True)
+class GroundOperationEnded(Event):
+    """A ground operation settled/extracted, clearing `Player.ground_operation` (GW-WP03)."""
+
+    player_id: int
+    operation_id: int
+    kind: str  # "survey" | "assault"
+    outcome: str  # e.g. "extracted"; richer outcomes land with GW-WP06/WP11
+
+
+@dataclass(frozen=True)
 class BeltMined(Event):
     """The player hand-mined an asteroid belt, taking raw goods aboard (§4.2, PT-30)."""
 

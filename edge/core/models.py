@@ -31,6 +31,11 @@ from edge.core.enums import (
     RarityTier,
     Subsystem,
 )
+from edge.core.groundwar.models import (  # leaf module (stdlib only) — no import cycle
+    ArtifactRecord,
+    GroundOperation,
+    SurveyProgress,
+)
 
 if TYPE_CHECKING:  # PortOrder lives in core.market (which imports this module) — annotation only
     from edge.core.market import PortOrder
@@ -623,6 +628,22 @@ class Player:
     # Stardock shipyard marks these "Flown" versus "Flying" for the current hull. Grows on
     # BuyShip; reconstructs under (seed, command log). Hashed state.
     flown_classes: frozenset[str] = frozenset()
+    # The live ground operation, if any (GW-WP03, GROUNDWAR_INTEGRATION_PLAN §Hashed state) —
+    # a surface survey or a tactical assault, set by the begin reducers and cleared by the
+    # extract reducer. Analogous to `active_encounter`: movement/docking/hail/combat and a
+    # second ground op are rejected while it is set (G9). Its large terrain grids regenerate
+    # from the stored operation seed (G5), so only dynamic state is hashed here.
+    ground_operation: GroundOperation | None = None
+    # Per-world survey memory that outlives an expedition (GW plan D5): planet_id → the
+    # surveyor's last position + persistent settlement hints, so a later descent resumes
+    # where it left off and keeps narrowing the same sites. Trenches/supplies reset each
+    # descent and stay on the active operation. Hashed — it changes future search info.
+    ground_survey_progress: Mapping[int, SurveyProgress] = field(default_factory=dict)
+    # Provenance-bearing surface artifacts (GW plan D6/D10) — each excavated find kept as its
+    # own record (discovery id, origin, rarity, research domain, lore, day), never folded into
+    # the fungible `artifacts` barter-tier map above. The explicit compatibility path: the two
+    # coexist, so old tier-count barter goods survive while new surface digs land here. Hashed.
+    artifact_records: tuple[ArtifactRecord, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
