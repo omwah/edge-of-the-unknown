@@ -967,6 +967,13 @@ class PlanetDTO:
     cloud_city_next_cost: int = 0  # equipment (aboard) the next size costs, 0 ⇒ built out
     cloud_city_blocker: str = ""  # why a build is barred, "" when allowed (the reducer's words)
     ship_equipment: int = 0  # equipment in the hold, for the build affordance
+    # The one ground-access contract projected (GW-WP04, GW plan §contract): the tagged
+    # mode ("orbital_only" | "survey" | "assault") and the exact human blocker/reason, so
+    # a bot or the TUI can distinguish survey from assault and explain why each is barred.
+    # Advisory only — the begin reducers recompute `ground_access` and stay authoritative.
+    ground_mode: str = "orbital_only"
+    ground_blocker: str = ""  # reason (orbital-only) / first standing siege rung (assault) / ""
+    ground_settlements: bool = False  # survey only: friendly inhabitants are visitable (D5/D6)
 
 
 @dataclass(frozen=True)

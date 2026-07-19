@@ -136,6 +136,7 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.aliens import base_owner_hostile
+from edge.core.groundwar.access import Assault, Survey, ground_access
 from edge.core.planets import (
     belt_mining_yield,
     cloud_city_blocker,
@@ -740,6 +741,18 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
             invade_blocker = "no fighters aboard to commit"
         else:
             can_invade = True
+    # The one ground-access contract projected (GW-WP04): the tagged mode + exact blocker,
+    # recomputed here from the same pure seam the begin reducer enforces (H4 lockstep). The
+    # blocker is the orbital-only/assault-disabled reason, or the first standing siege rung.
+    access = ground_access(state, state.players[player_id], planet, config)
+    ground_mode = access.mode
+    ground_settlements = isinstance(access, Survey) and access.settlements
+    if isinstance(access, Assault):
+        ground_blocker = access.blockers[0] if access.blockers else ""
+    elif isinstance(access, Survey):
+        ground_blocker = ""
+    else:
+        ground_blocker = access.reason
     return dto.PlanetDTO(
         planet_id=planet.id, name=planet.name, ptype=planet.planet_type,
         owner=_owner_label(state, planet, player_id), colonizable=colonizable,
@@ -768,6 +781,8 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         cloud_city_blocker=(cloud_city_blocker(planet, ship_equipment, city_owner_ok, config)
                             if city_world else ""),
         ship_equipment=ship_equipment,
+        ground_mode=ground_mode, ground_blocker=ground_blocker,
+        ground_settlements=ground_settlements,
     )
 
 
