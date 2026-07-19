@@ -5,7 +5,7 @@
 # game constant lives here, not in code (CLAUDE.md). Omitted fields fall back to
 # the schema defaults; the values below are spelled out so the balance is legible.
 
-config_version: 7  # GW-M1 epoch (GW-WP03: Player.ground_operation/survey-progress/artifact records)
+config_version: 8  # GW-WP06 epoch (D4/D12 macro-turn quanta: expedition local_turns_per_main_turn/main_turn_cost)
 seed: 4             # universe seed for a new game; leave empty (seed:) for a random seed
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 

@@ -66,11 +66,15 @@ from edge.core.events import (
     EncounterEvaded,
     EncounterStarted,
     GenesisDeployed,
+    GroundMoved,
     GroundOperationBegan,
     GroundOperationEnded,
     GrudgeFormed,
     HazardDamage,
     SiteExplored,
+    SurveyDug,
+    SurveySiteExcavated,
+    SurveyTalked,
     Event,
     AllianceLeadershipChanged,
     GovernanceChanged,
@@ -141,6 +145,7 @@ from edge.core.rules import (
     Explore,
     ExtractGroundOperation,
     FieldPatch,
+    GroundMove,
     Hail,
     HaggleOffer,
     MineBelt,
@@ -156,6 +161,8 @@ from edge.core.rules import (
     SetAllocation,
     SetPlayerName,
     SettleColonists,
+    SurveyDig,
+    SurveyTalk,
     SwapComponent,
     BuildCitadel,
     BuyDevice,
@@ -214,6 +221,9 @@ COMMANDS: list[Command] = [
     Explore(planet_id=5),         # WP6 survey the next surface site
     BeginSurvey(planet_id=5),     # GW-WP03 open a surface-survey expedition
     ExtractGroundOperation(operation_id=123),  # GW-WP03 settle/clear a ground op
+    GroundMove(operation_id=123, x=40, y=20, actor_id=0),  # GW-WP06 march the explorer
+    SurveyDig(operation_id=123),  # GW-WP06 open a trench
+    SurveyTalk(operation_id=123),  # GW-WP06 settlement resupply/hint
     MineBelt(planet_id=5),        # PT-30 hand-mine an asteroid belt
     BuildStagingArea(planet_id=5),  # PT-54 stage a Cloud City on a gas giant
     BuyGenesis(),                 # WP10 buy a genesis torpedo
@@ -309,6 +319,10 @@ EVENTS: list[Event] = [
     Descended(1, 5),
     GroundOperationBegan(1, 123, "survey", 5),
     GroundOperationEnded(1, 123, "survey", "extracted"),
+    GroundMoved(1, 123, 40, 20, 2),
+    SurveyDug(1, 123, 40, 20, 9),
+    SurveySiteExcavated(1, 123, 9, "ruins", "RARE"),
+    SurveyTalked(1, 123, 1, 9),
     BeltMined(1, 5, "equipment", 50),
     CloudCityBuilt(1, 5, 1, 50),
     SiteExplored(1, 5, 9, "ruins", "RARE"),

@@ -25,15 +25,18 @@ no RNG owned by anyone but the local `Random` seeded from the operation seed her
 
 from __future__ import annotations
 
+import heapq
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from random import Random
 
 from edge.core.config import GameConfig
 from edge.core.discovery import is_detectable, sector_has_nebula
+from edge.core.groundwar.models import SurveyOperation
 from edge.core.groundwar.terrain import generate_feature_grid
 from edge.core.models import Discovery, UniverseState
+from edge.core.movement import MovementError
 
 Vec = tuple[int, int]
 
@@ -228,17 +231,27 @@ def _site_position(
 
 def _build_site(
     feature: list[list[str]], blocked: set[Vec], config: GameConfig,
-    disc: Discovery, x: int, y: int, width: int, height: int, salt: Random, *, found: bool,
+    disc: Discovery, x: int, y: int, width: int, height: int, salt: Random, *,
+    found: bool, hinted: bool,
 ) -> SurveySite:
     exp = config.groundwar.expedition  # type: ignore[union-attr]
-    # The sensor circle contains the true spot but is not centred on it.
+    # The sensor circle contains the true spot but is not centred on it. A settlement hint
+    # (GW-WP06 talk) tightens it to `city_hint_radius` and re-centres it near the truth, so a
+    # hinted site's narrowed circle is reproduced purely from `hinted_discovery_ids` (D5) — no
+    # circle state is stored. The true dig cell `(x, y)` is fixed upstream and never moves.
     while True:
         ox = salt.randint(-(exp.area_radius - 3), exp.area_radius - 3)
         oy = salt.randint(-(exp.area_radius - 3), exp.area_radius - 3)
         if math.hypot(ox, oy) <= exp.area_radius - 3:
             break
-    cx = max(2, min(width - 3, x + ox))
-    cy = max(2, min(height - 3, y + oy))
+    if hinted:
+        area_r = exp.city_hint_radius
+        cx = max(2, min(width - 3, x + salt.randint(-2, 2)))
+        cy = max(2, min(height - 3, y + salt.randint(-2, 2)))
+    else:
+        area_r = exp.area_radius
+        cx = max(2, min(width - 3, x + ox))
+        cy = max(2, min(height - 3, y + oy))
     clues: list[Vec] = []
     for _ in range(60):
         if len(clues) >= exp.clue_count:
@@ -252,7 +265,7 @@ def _build_site(
     return SurveySite(
         discovery_id=disc.id, kind=disc.kind.value, name=disc.name or disc.kind.value,
         rarity=disc.rarity_tier.name, x=x, y=y, area_cx=cx, area_cy=cy,
-        area_r=exp.area_radius, clues=tuple(clues), found=found,
+        area_r=area_r, clues=tuple(clues), found=found,
     )
 
 
@@ -295,6 +308,7 @@ def eligible_surface_site_ids(
 def generate_survey(
     config: GameConfig, *, seed: int, planet_type: str, inhabited: bool,
     sites: Sequence[Discovery], resolved_ids: frozenset[int] = frozenset(),
+    hinted_ids: frozenset[int] = frozenset(),
 ) -> SurveyMap:
     """Lay out a survey map for the given *visible* surface discoveries (pure, G5/G6/G7).
 
@@ -339,7 +353,8 @@ def generate_survey(
         if spot is None:
             continue  # no passable cell found — the site simply does not place this map
         site = _build_site(feature, blocked, config, disc, spot[0], spot[1],
-                           width, height, salt, found=disc.id in resolved_ids)
+                           width, height, salt, found=disc.id in resolved_ids,
+                           hinted=disc.id in hinted_ids)
         placed.append(site)
     lx, ly = _landing(labels, comp, width, height)
     return SurveyMap(
@@ -347,3 +362,289 @@ def generate_survey(
         feature=tuple(tuple(row) for row in feature), blocked=frozenset(blocked),
         settlements=tuple(settlements), sites=tuple(placed), landing_x=lx, landing_y=ly,
     )
+
+
+def survey_map_for(state: UniverseState, op: SurveyOperation, config: GameConfig) -> SurveyMap:
+    """Regenerate the live map for an active survey operation (G5) — the projection seam.
+
+    Turns the operation's stored seed + visible/resolved/hinted id sets back into positions;
+    the begin/dig/talk reducers and the DTO all read the same layout. `inhabited` (settlement
+    presence) is recomputed from the world's live population, so a survey of a peopled world
+    gets its towns.
+    """
+    sites = [state.discoveries[i] for i in sorted(op.visible_discovery_ids)
+             if i in state.discoveries]
+    planet = state.planets.get(op.planet_id)
+    inhabited = planet is not None and (
+        planet.colonists > 0 or planet.inhabited_by_species_id is not None)
+    return generate_survey(
+        config, seed=op.seed, planet_type=op.planet_type, inhabited=inhabited, sites=sites,
+        resolved_ids=op.resolved_discovery_ids, hinted_ids=op.hinted_discovery_ids)
+
+
+# --- live queries (pure, projection- and reducer-shared) ---------------------
+
+
+def _cell_cost(smap: SurveyMap, config: GameConfig, x: int, y: int) -> int:
+    """Foot-entry cost on the live map; 0 == impassable. Reads the frozen `SurveyMap`."""
+    if (x, y) in smap.blocked:
+        return 0
+    assert config.groundwar is not None
+    tc = config.groundwar.terrain.get(smap.feature[y][x])
+    return tc.move_cost if tc else 1
+
+
+def path_to(smap: SurveyMap, config: GameConfig, sx: int, sy: int, tx: int, ty: int
+            ) -> list[Vec] | None:
+    """Cheapest walking path (excluding the start cell) over the whole map, or None."""
+    if not _in_bounds(smap.width, smap.height, tx, ty) or _cell_cost(smap, config, tx, ty) <= 0:
+        return None
+    start = (sx, sy)
+    if (tx, ty) == start:
+        return None
+    best: dict[Vec, int] = {start: 0}
+    prev: dict[Vec, Vec] = {}
+    heap: list[tuple[int, Vec]] = [(0, start)]
+    while heap:
+        cost, (cx, cy) = heapq.heappop(heap)
+        if (cx, cy) == (tx, ty):
+            break
+        if cost > best.get((cx, cy), 1 << 30):
+            continue
+        for nx, ny in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
+            if not _in_bounds(smap.width, smap.height, nx, ny):
+                continue
+            step = _cell_cost(smap, config, nx, ny)
+            if step <= 0:
+                continue
+            nc = cost + step
+            if nc < best.get((nx, ny), 1 << 30):
+                best[(nx, ny)] = nc
+                prev[(nx, ny)] = (cx, cy)
+                heapq.heappush(heap, (nc, (nx, ny)))
+    if (tx, ty) not in prev:
+        return None
+    path: list[Vec] = []
+    cell = (tx, ty)
+    while cell != start:
+        path.append(cell)
+        cell = prev[cell]
+    path.reverse()
+    return path
+
+
+def dig_trench(smap: SurveyMap, config: GameConfig, x: int, y: int) -> list[Vec]:
+    """The cells a dig from `(x, y)` opens — a disc of `dig_radius`, clipped to the map."""
+    assert config.groundwar is not None
+    r = config.groundwar.expedition.dig_radius
+    return [(x + dx, y + dy)
+            for dy in range(-r, r + 1) for dx in range(-r, r + 1)
+            if dx * dx + dy * dy <= r * r and _in_bounds(smap.width, smap.height, x + dx, y + dy)]
+
+
+def settlement_at(smap: SurveyMap, x: int, y: int) -> SurveySettlement | None:
+    return next((s for s in smap.settlements if s.inside(x, y)), None)
+
+
+def _unfound(smap: SurveyMap) -> list[SurveySite]:
+    return [s for s in smap.sites if not s.found]
+
+
+def scanner_reading(op: SurveyOperation, smap: SurveyMap, config: GameConfig
+                    ) -> tuple[str, SurveySite | None]:
+    """The handheld gradient: a banded reading against the nearest unfound site."""
+    assert config.groundwar is not None
+    sites = _unfound(smap)
+    if not sites:
+        return "all contacts resolved", None
+    near = min(sites, key=lambda s: _dist(op.explorer_x, op.explorer_y, s.x, s.y))
+    d = _dist(op.explorer_x, op.explorer_y, near.x, near.y)
+    for band in config.groundwar.expedition.scanner:
+        if d <= band.within:
+            return band.label, near
+    return "no signal", near
+
+
+def visible_clues(op: SurveyOperation, smap: SurveyMap, config: GameConfig) -> set[Vec]:
+    """Disturbed-ground cells the explorer is close enough to notice (unfound sites only)."""
+    assert config.groundwar is not None
+    sight = config.groundwar.expedition.sight
+    out: set[Vec] = set()
+    for s in _unfound(smap):
+        for c in s.clues:
+            if _dist(op.explorer_x, op.explorer_y, *c) <= sight:
+                out.add(c)
+    return out
+
+
+# --- actions (pure; the reducer applies turn/reward settlement, G1) -----------
+
+
+@dataclass(frozen=True, slots=True)
+class SurveyActionResult:
+    """The delta a survey action produces — the reducer owns state mutation and events.
+
+    `operation` is the new (frozen) `SurveyOperation`; `main_turns` are main-game turns to
+    charge (movement only, D4/D12); `excavated_id` is the discovery a dig uncovered (the
+    reducer settles its artifact/codex reward, D6); `resupply` and `logs` are for the event
+    log / UI.
+    """
+
+    operation: SurveyOperation
+    main_turns: int = 0
+    excavated_id: int | None = None
+    resupply: int = 0
+    logs: tuple[str, ...] = ()
+
+
+def _threshold_cost(local_from: int, local_to: int, config: GameConfig) -> int:
+    """Main-game turns owed for advancing the local-turn count `local_from → local_to` (D4).
+
+    `ceil(local/L) × main_turn_cost` is the running charge; this returns the increment as a
+    threshold boundary is crossed, so marching burns turns in quanta and digging/talking (no
+    local-turn advance) burn none.
+    """
+    assert config.groundwar is not None
+    exp = config.groundwar.expedition
+    before = math.ceil(local_from / exp.local_turns_per_main_turn)
+    after = math.ceil(local_to / exp.local_turns_per_main_turn)
+    return (after - before) * exp.main_turn_cost
+
+
+def survey_move(op: SurveyOperation, smap: SurveyMap, config: GameConfig,
+                turns_remaining: int, x: int, y: int) -> SurveyActionResult:
+    """March the explorer toward `(x, y)` (GW-WP06, D4/D12).
+
+    One supply per local turn, however many turns the march takes. The march halts early on
+    supply exhaustion, on newly-sighted disturbed ground (no walking blindly past the prize),
+    or when the next local turn would cross an **unaffordable** macro-turn threshold (D12:
+    the quantum is paid before the threshold is crossed; extraction stays free). Raises when
+    the target is unreachable or no progress at all can be paid for.
+    """
+    if op.outcome is not None:
+        raise MovementError("the expedition has ended — extract to orbit")
+    assert config.groundwar is not None
+    exp = config.groundwar.expedition
+    path = path_to(smap, config, op.explorer_x, op.explorer_y, x, y)
+    if path is None:
+        raise MovementError("no path to there")
+    seen = visible_clues(op, smap, config)
+    ex, ey, supplies, local_turn = op.explorer_x, op.explorer_y, op.supplies, op.local_turn
+    charged = 0
+    turns = 0
+    halt: str | None = None
+    i = 0
+    while i < len(path):
+        owed = _threshold_cost(local_turn, local_turn + 1, config)
+        if owed > turns_remaining - charged:
+            halt = "turns"
+            break
+        budget = exp.move
+        moved = False
+        while i < len(path):
+            step = _cell_cost(smap, config, *path[i])
+            if step > budget:
+                break
+            budget -= step
+            ex, ey = path[i]
+            i += 1
+            moved = True
+        if not moved:
+            break
+        local_turn += 1
+        turns += 1
+        charged += owed
+        supplies = max(0, supplies - 1)
+        if supplies <= 0:
+            halt = "supplies"
+            break
+        fresh = visible_clues(replace(op, explorer_x=ex, explorer_y=ey), smap, config) - seen
+        if fresh:
+            halt = "clue"
+            break
+    if turns == 0:
+        raise MovementError("not enough turns to advance the march — extract to orbit")
+    logs: list[str] = []
+    outcome = op.outcome
+    if halt == "supplies":
+        outcome = "exhausted"
+        logs.append("Supplies spent — the shuttle recalls you to orbit. What you found stays found.")
+    elif halt == "clue":
+        logs.append("Disturbed ground catches your eye — you halt the march.")
+    if turns > 1:
+        logs.append(f"A march of {turns} turns.")
+    op2 = replace(op, explorer_x=ex, explorer_y=ey, supplies=supplies,
+                  local_turn=local_turn, outcome=outcome)
+    return SurveyActionResult(operation=op2, main_turns=charged, logs=tuple(logs))
+
+
+def survey_dig(op: SurveyOperation, smap: SurveyMap, config: GameConfig) -> SurveyActionResult:
+    """Open a trench where the explorer stands (GW-WP06, D6).
+
+    A site anywhere in the trench is uncovered — `excavated_id` names it and the reducer
+    settles its artifact + codex reward (no second collect step, no hold gate). Re-digging
+    ground already fully turned over is free (no supply spent). A dry dig spends `dig_cost`
+    supplies and can exhaust the expedition. Digging costs no main-game turns (local only).
+    """
+    if op.outcome is not None:
+        raise MovementError("the expedition has ended — extract to orbit")
+    assert config.groundwar is not None
+    exp = config.groundwar.expedition
+    trench = dig_trench(smap, config, op.explorer_x, op.explorer_y)
+    trench_set = set(trench)
+    if trench_set <= op.dug_cells:
+        return SurveyActionResult(
+            operation=op, logs=("You already turned this ground over — nothing here.",))
+    dug = op.dug_cells | frozenset(trench)
+    hits = [s for s in smap.sites if not s.found and (s.x, s.y) in trench_set]
+    if hits:
+        site = min(hits, key=lambda s: _dist(op.explorer_x, op.explorer_y, s.x, s.y))
+        gained = max(0, min(exp.supplies_start, op.supplies + exp.find_resupply) - op.supplies)
+        resolved = op.resolved_discovery_ids | {site.discovery_id}
+        outcome = op.outcome
+        if all(s.discovery_id in resolved for s in smap.sites):
+            outcome = "complete"
+        op2 = replace(op, dug_cells=dug, supplies=op.supplies + gained,
+                      resolved_discovery_ids=resolved, outcome=outcome)
+        return SurveyActionResult(
+            operation=op2, excavated_id=site.discovery_id, resupply=gained,
+            logs=(f"Your spade rings on worked stone — {site.name}!",))
+    supplies = max(0, op.supplies - exp.dig_cost)
+    outcome = op.outcome
+    logs = ["You open a trench: nothing but soil and stones."]
+    if supplies <= 0 and outcome is None:
+        outcome = "exhausted"
+        logs.append("Supplies spent — the shuttle recalls you to orbit.")
+    op2 = replace(op, dug_cells=dug, supplies=supplies, outcome=outcome)
+    return SurveyActionResult(operation=op2, logs=tuple(logs))
+
+
+def survey_talk(op: SurveyOperation, smap: SurveyMap, config: GameConfig) -> SurveyActionResult:
+    """Talk to a settlement the explorer stands in (GW-WP06, D5).
+
+    Resupplies (capped at the start amount) and, if any unhinted unfound site remains, narrows
+    the nearest one's search circle — recorded in `hinted_discovery_ids`, which persists across
+    descents (D5). A site is hinted at most once. Costs no main-game turns.
+    """
+    if op.outcome is not None:
+        raise MovementError("the expedition has ended — extract to orbit")
+    assert config.groundwar is not None
+    exp = config.groundwar.expedition
+    town = settlement_at(smap, op.explorer_x, op.explorer_y)
+    if town is None:
+        raise MovementError("no settlement here to talk to")
+    gained = max(0, min(exp.supplies_start, op.supplies + exp.settlement_resupply) - op.supplies)
+    logs: list[str] = []
+    if gained > 0:
+        logs.append(f"The people of {town.name} refill your packs: +{gained} supplies.")
+    candidates = [s for s in smap.sites
+                  if not s.found and s.discovery_id not in op.hinted_discovery_ids]
+    hinted = op.hinted_discovery_ids
+    if candidates:
+        site = min(candidates, key=lambda s: _dist(town.cx, town.cy, s.x, s.y))
+        hinted = op.hinted_discovery_ids | {site.discovery_id}
+        logs.append(f"An elder of {town.name} recalls old stones nearby — your chart circle tightens.")
+    else:
+        logs.append(f"{town.name} wishes you fair digging.")
+    op2 = replace(op, supplies=op.supplies + gained, hinted_discovery_ids=hinted)
+    return SurveyActionResult(operation=op2, resupply=gained, logs=tuple(logs))

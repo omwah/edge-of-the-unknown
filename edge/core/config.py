@@ -1796,6 +1796,12 @@ class GwExpedition(BaseModel):
     settlements_max: int = Field(ge=0)
     city_hint_radius: int = Field(ge=0)  # a settlement's hint shrinks one search circle to this
     scanner: tuple[GwScannerBand, ...]  # nearest-first, non-overlapping
+    # Macro-turn economy (GW plan D4/D12): tactical actions cost only local supplies, but
+    # marching burns main-game turns in quanta — `main_turn_cost` turns are charged each time
+    # the running local-turn count crosses a `local_turns_per_main_turn` threshold. The reducer
+    # refuses a march that would cross an unaffordable threshold; extraction is never charged.
+    local_turns_per_main_turn: int = Field(gt=0)
+    main_turn_cost: int = Field(ge=0)
 
     @model_validator(mode="after")
     def _check(self) -> GwExpedition:

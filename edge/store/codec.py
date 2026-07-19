@@ -72,6 +72,7 @@ from edge.core.events import (
     EncounterStarted,
     Event,
     GenesisDeployed,
+    GroundMoved,
     GroundOperationBegan,
     GroundOperationEnded,
     GrudgeFormed,
@@ -86,6 +87,9 @@ from edge.core.events import (
     ShipDestroyed,
     ShipPurchased,
     SiteExplored,
+    SurveyDug,
+    SurveySiteExcavated,
+    SurveyTalked,
     StarbaseClaimed,
     StarbaseRazed,
     StarbaseRepaired,
@@ -150,10 +154,13 @@ from edge.core.rules import (
     Explore,
     ExtractGroundOperation,
     FieldPatch,
+    GroundMove,
     Hail,
     HaggleOffer,
     MineBelt,
     InstallComponent,
+    SurveyDig,
+    SurveyTalk,
     InvadePlanet,
     JoinAlliance,
     LaunchProbe,
@@ -284,6 +291,13 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "BeginSurvey", {"planet_id": command.planet_id}
         case ExtractGroundOperation():
             return "ExtractGroundOperation", {"operation_id": command.operation_id}
+        case GroundMove():
+            return "GroundMove", {"operation_id": command.operation_id, "x": command.x,
+                                  "y": command.y, "actor_id": command.actor_id}
+        case SurveyDig():
+            return "SurveyDig", {"operation_id": command.operation_id}
+        case SurveyTalk():
+            return "SurveyTalk", {"operation_id": command.operation_id}
         case MineBelt():
             return "MineBelt", {"planet_id": command.planet_id}
         case BuyGenesis():
@@ -491,6 +505,13 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return BeginSurvey(planet_id=payload["planet_id"])
         case "ExtractGroundOperation":
             return ExtractGroundOperation(operation_id=payload["operation_id"])
+        case "GroundMove":
+            return GroundMove(operation_id=payload["operation_id"], x=payload["x"],
+                              y=payload["y"], actor_id=payload.get("actor_id", 0))
+        case "SurveyDig":
+            return SurveyDig(operation_id=payload["operation_id"])
+        case "SurveyTalk":
+            return SurveyTalk(operation_id=payload["operation_id"])
         case "MineBelt":
             return MineBelt(planet_id=payload["planet_id"])
         case "BuyGenesis":
@@ -689,6 +710,26 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "GroundOperationEnded", {
                 "player_id": event.player_id, "operation_id": event.operation_id,
                 "kind": event.kind, "outcome": event.outcome,
+            }
+        case GroundMoved():
+            return "GroundMoved", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "x": event.x, "y": event.y, "main_turns": event.main_turns,
+            }
+        case SurveyDug():
+            return "SurveyDug", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "x": event.x, "y": event.y, "discovery_id": event.discovery_id,
+            }
+        case SurveySiteExcavated():
+            return "SurveySiteExcavated", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "discovery_id": event.discovery_id, "kind": event.kind, "rarity": event.rarity,
+            }
+        case SurveyTalked():
+            return "SurveyTalked", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "settlement_id": event.settlement_id, "hinted_id": event.hinted_id,
             }
         case CloudCityBuilt():
             return "CloudCityBuilt", {
@@ -1044,6 +1085,18 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "GroundOperationEnded":
             return GroundOperationEnded(payload["player_id"], payload["operation_id"],
                                         payload["kind"], payload["outcome"])
+        case "GroundMoved":
+            return GroundMoved(payload["player_id"], payload["operation_id"],
+                               payload["x"], payload["y"], payload["main_turns"])
+        case "SurveyDug":
+            return SurveyDug(payload["player_id"], payload["operation_id"],
+                             payload["x"], payload["y"], payload["discovery_id"])
+        case "SurveySiteExcavated":
+            return SurveySiteExcavated(payload["player_id"], payload["operation_id"],
+                                       payload["discovery_id"], payload["kind"], payload["rarity"])
+        case "SurveyTalked":
+            return SurveyTalked(payload["player_id"], payload["operation_id"],
+                                payload["settlement_id"], payload["hinted_id"])
         case "BeltMined":
             return BeltMined(payload["player_id"], payload["planet_id"],
                              payload["commodity"], payload["amount"])

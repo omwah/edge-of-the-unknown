@@ -7,7 +7,7 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–05 shipped; interview decisions resolved (July 2026).**
+> **Status: implementation underway — GW-WP01–06 shipped; interview decisions resolved (July 2026).**
 
 ## Context
 
@@ -643,7 +643,29 @@ friendly versus uninhabited settlement generation; every surface find yields
 artifact+lore and never latinum/components; open-space payload regression.
 Commit `ground: GW-WP05 survey generation from universe discoveries`.
 
-### GW-WP06 — Survey actions, persistence, and reward settlement (L)
+### GW-WP06 — Survey actions, persistence, and reward settlement (L) — SHIPPED
+
+**Status:** shipped July 2026. Pure action functions in `edge/core/groundwar/survey.py`
+(`survey_move` / `survey_dig` / `survey_talk` + `survey_map_for` / `path_to` /
+`scanner_reading` / `visible_clues`, returning a frozen `SurveyActionResult`) resolve the
+POC's walk/dig/talk against the frozen `SurveyOperation` + regenerated `SurveyMap`. The
+reducers `GroundMove` / `SurveyDig` / `SurveyTalk` (rules.py) drive them; a dig settles the
+D6/D10 reward **atomically through the existing discovery rail** — detection + codex +
+experience + `found_by`, plus a provenance-bearing `ArtifactRecord` — with no second collect
+step, no hold gate, and never latinum/components. A multiplayer excavation race mints exactly
+one artifact (G8). **D4/D12** macro-turn quanta land as config on `GwExpedition`
+(`local_turns_per_main_turn` / `main_turn_cost`): marching charges `ceil(local/L)×cost` main
+turns as thresholds cross, refusing a march that would cross an unaffordable one; digging and
+talking cost only local supplies; extraction is never charged. Extraction persists the D5
+position/hints while trenches and supplies reset next descent (WP03 `_extract` rail). New
+events `GroundMoved`/`SurveyDug`/`SurveySiteExcavated`/`SurveyTalked` + codecs; wire v25.
+Epoch: config_version 7→8 (the D4 config). Covered by
+`tests/test_groundwar_survey_actions.py` (10 tests incl. a command-log replay golden). The
+live DTO/Textual is GW-WP07.
+
+**Deviation:** the D4 macro-turn config was not present after the WP02/WP03 config epoch, so
+WP06 also touches `config.py`/`default.yaml` (config_version 7→8) beyond its listed files.
+Recorded here per the plan's change rule.
 
 Implement movement/march halting, scanner readings, clue visibility, digging,
 settlement talk/resupply/hints, supply exhaustion, excavation settlement, and

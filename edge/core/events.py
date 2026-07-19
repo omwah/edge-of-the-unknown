@@ -215,6 +215,49 @@ class SiteExplored(Event):
 
 
 @dataclass(frozen=True)
+class GroundMoved(Event):
+    """The survey explorer marched to a new cell (GW-WP06). `main_turns` = macro turns spent."""
+
+    player_id: int
+    operation_id: int
+    x: int
+    y: int
+    main_turns: int
+
+
+@dataclass(frozen=True)
+class SurveyDug(Event):
+    """A dig at `(x, y)` opened a trench (GW-WP06). `discovery_id` is -1 for a dry hole."""
+
+    player_id: int
+    operation_id: int
+    x: int
+    y: int
+    discovery_id: int
+
+
+@dataclass(frozen=True)
+class SurveySiteExcavated(Event):
+    """A surface site was excavated — its artifact + codex lore recorded (GW-WP06, D6)."""
+
+    player_id: int
+    operation_id: int
+    discovery_id: int
+    kind: str  # DiscoveryKind value
+    rarity: str  # RarityTier name
+
+
+@dataclass(frozen=True)
+class SurveyTalked(Event):
+    """The explorer spoke with a settlement (GW-WP06, D5). `hinted_id` -1 when no hint given."""
+
+    player_id: int
+    operation_id: int
+    settlement_id: int
+    hinted_id: int
+
+
+@dataclass(frozen=True)
 class DiscoveryCollected(Event):
     """A discovery logged into the codex, its payload taken aboard (§7, WP5)."""
 
