@@ -1,4 +1,12 @@
-"""Procedural terrain generation using OpenSimplex noise."""
+"""Procedural terrain generation using OpenSimplex noise.
+
+The *gameplay* band layout (which feature name sits in which noise band, and the
+per-planet noise scale) is owned by the pure core seam
+`edge.core.groundwar.terrain.BIOME_BANDS`; this module holds only the styling —
+per-band colours (`BIOME_COLORS`) and per-feature glyphs (`FEATURES_REGISTRY`) —
+and reconstructs the historical `BIOMES_REGISTRY` by zipping the two together, so
+band structure has a single source of truth and `edge.core` never imports
+`edge.art` (GW-WP02)."""
 
 import colorsys
 import random
@@ -7,6 +15,7 @@ from rich.color import Color
 from rich.text import Text
 
 from edge.art.noise import fractal_noise
+from edge.core.groundwar.terrain import BIOME_BANDS
 
 # FEATURES_REGISTRY maps a generic feature name to a list of its visual representations.
 # Format: "feature_name": [("character", relative_frequency_weight), ...]
@@ -83,94 +92,57 @@ FEATURES_REGISTRY = {
     ],
 }
 
-# BIOMES_REGISTRY maps a planet subtype to its noise generation parameters and visual bands.
-# Format:
-#   "subtype_name": {
-#       "scale_x": float,  # Noise stretching factor along the X axis
-#       "scale_y": float,  # Noise stretching factor along the Y axis
-#       "bands": [
-#           (noise_threshold_float, "feature_name", "fg_color", "bg_color"),
-#           ...
-#       ]
-#   }
+# BIOME_COLORS maps a planet subtype to its per-band (fg, bg) colour pair,
+# index-aligned to `edge.core.groundwar.terrain.BIOME_BANDS[subtype].bands` (the
+# gameplay band structure). The historical `BIOMES_REGISTRY` — a subtype -> {
+# "scale_x", "scale_y", "bands": [(threshold, feature_name, fg, bg), ...] } map —
+# is reconstructed from the two below so band structure has one authority in core
+# while colours stay here in the art layer (GW-WP02).
+BIOME_COLORS: dict[str, list[tuple[str, str]]] = {
+    "terrestrial_warm": [
+        ("bright_blue", "blue"), ("bright_cyan", "cyan"), ("yellow", "bright_yellow"),
+        ("bright_green", "green"), ("#af5f00", "green"), ("white", "bright_black"),
+    ],
+    "terrestrial_cool": [
+        ("bright_blue", "blue"), ("bright_cyan", "cyan"), ("bright_white", "white"),
+        ("green", "dark_green"), ("bright_green", "green"), ("white", "bright_black"),
+        ("bright_white", "white"),
+    ],
+    "terrestrial_hot": [
+        ("bright_red", "red"), ("yellow", "bright_red"), ("yellow", "bright_yellow"),
+        ("grey35", "black"), ("bright_black", "black"), ("bright_red", "bright_black"),
+        ("yellow", "red"),
+    ],
+    "terrestrial_cold": [
+        ("cyan", "blue"), ("bright_white", "white"), ("bright_white", "cyan"),
+        ("white", "cyan"), ("bright_cyan", "blue"),
+    ],
+    "jovian": [
+        ("black", "#8B4513"), ("black", "#D2691E"), ("black", "#F4A460"),
+        ("black", "#FFDEAD"), ("black", "#D2691E"), ("black", "#8B4513"),
+    ],
+    # Warm mineral tones (not the starfield's cool white/grey) so the field
+    # separates from the stars by colour as well as by glyph weight.
+    "asteroid_belt": [
+        ("black", "black"), ("grey62", "black"), ("tan", "black"),
+        ("orange3", "black"), ("sandy_brown", "black"),
+    ],
+    "barren": [
+        ("bright_yellow", "yellow"), ("yellow", "bright_black"), ("bright_red", "red"),
+        ("white", "bright_red"),
+    ],
+}
+
 BIOMES_REGISTRY = {
-    "terrestrial_warm": {
-        "scale_x": 15.0, "scale_y": 15.0,
+    subtype: {
+        "scale_x": layout.scale_x,
+        "scale_y": layout.scale_y,
         "bands": [
-            (-0.2, "water_deep", "bright_blue", "blue"),
-            (-0.05, "water_shallow", "bright_cyan", "cyan"),
-            (0.05, "sand", "yellow", "bright_yellow"),
-            (0.3, "grass", "bright_green", "green"),
-            (0.6, "forest", "#af5f00", "green"),
-            (0.7, "mountain", "white", "bright_black"),
-        ]
-    },
-    "terrestrial_cool": {
-        "scale_x": 15.0, "scale_y": 15.0,
-        "bands": [
-            (-0.1, "water_deep", "bright_blue", "blue"),
-            (0.1, "water_shallow", "bright_cyan", "cyan"),
-            (0.3, "dust", "bright_white", "white"),
-            (0.5, "grass", "green", "dark_green"),
-            (0.7, "forest", "bright_green", "green"),
-            (0.9, "mountain", "white", "bright_black"),
-            (1.0, "snow", "bright_white", "white"),
-        ]
-    },
-    "terrestrial_hot": {
-        "scale_x": 12.0, "scale_y": 12.0,
-        "bands": [
-            (-0.2, "water_deep", "bright_red", "red"),
-            (0.0, "water_shallow", "yellow", "bright_red"),
-            (0.1, "sand", "yellow", "bright_yellow"),
-            (0.2, "ash", "grey35", "black"),
-            (0.5, "dust", "bright_black", "black"),
-            (0.8, "mountain", "bright_red", "bright_black"),
-            (1.0, "snow", "yellow", "red"),
-        ]
-    },
-    "terrestrial_cold": {
-        "scale_x": 18.0, "scale_y": 18.0,
-        "bands": [
-            (-0.2, "water_shallow", "cyan", "blue"),
-            (0.1, "ice", "bright_white", "white"),
-            (0.4, "snow", "bright_white", "cyan"),
-            (0.7, "mountain", "white", "cyan"),
-            (1.0, "ice", "bright_cyan", "blue"),
-        ]
-    },
-    "jovian": {
-        "scale_x": 50.0, "scale_y": 5.0,
-        "bands": [
-            (-0.4, "gas_thick", "black", "#8B4513"),
-            (-0.1, "gas_thin", "black", "#D2691E"),
-            (0.2, "gas_thin", "black", "#F4A460"),
-            (0.5, "gas_thick", "black", "#FFDEAD"),
-            (0.8, "gas_thin", "black", "#D2691E"),
-            (1.0, "gas_thick", "black", "#8B4513"),
-        ]
-    },
-    "asteroid_belt": {
-        "scale_x": 8.0, "scale_y": 8.0,
-        # Warm mineral tones (not the starfield's cool white/grey) so the field
-        # separates from the stars by colour as well as by glyph weight.
-        "bands": [
-            (-0.3, "void", "black", "black"),
-            (0.3, "belt_dust", "grey62", "black"),
-            (0.6, "belt_rock", "tan", "black"),
-            (0.8, "belt_rock", "orange3", "black"),
-            (1.0, "belt_debris", "sandy_brown", "black"),
-        ]
-    },
-    "barren": {
-        "scale_x": 15.0, "scale_y": 15.0,
-        "bands": [
-            (-0.1, "dust", "bright_yellow", "yellow"),
-            (0.2, "rock", "yellow", "bright_black"),
-            (0.6, "crater", "bright_red", "red"),
-            (1.0, "mountain", "white", "bright_red"),
-        ]
+            (threshold, feature_name, fg, bg)
+            for (threshold, feature_name), (fg, bg) in zip(layout.bands, BIOME_COLORS[subtype])
+        ],
     }
+    for subtype, layout in BIOME_BANDS.items()
 }
 
 # Some biome bands authored a foreground glyph colour that sits too close to its
@@ -229,6 +201,31 @@ def resolve_feature_char(rng: random.Random, feature_name: str, features_registr
     weights = [c[1] for c in choices]
     return rng.choices(chars, weights=weights, k=1)[0]
 
+
+def style_grid(
+    rng: random.Random, noise_seed: int, planet_type: str, width: int, height: int
+) -> list[list[tuple[str, str, str]]]:
+    """A styled (char, fg, bg) backdrop aligned cell-for-cell with the core grid.
+
+    Seeded from the same `noise_seed` and using the same band thresholds as
+    `edge.core.groundwar.terrain.generate_feature_grid`, so every cell resolves to
+    the same feature name the gameplay grid records — this only adds the glyph and
+    colour the core seam deliberately omits. `rng` drives glyph selection only.
+    """
+    biome = BIOMES_REGISTRY[planet_type]
+    bands = biome["bands"]
+    sx, sy = biome["scale_x"], biome["scale_y"]
+    gen = OpenSimplex(seed=noise_seed)
+    grid: list[list[tuple[str, str, str]]] = []
+    for y in range(height):
+        row: list[tuple[str, str, str]] = []
+        for x in range(width):
+            val = gen.noise2(x / sx, y / sy)
+            name, fg, bg = get_biome_feature(val, bands)
+            row.append((resolve_feature_char(rng, name, FEATURES_REGISTRY), fg, bg))
+        grid.append(row)
+    return grid
+
 class TerrainGenerator:
     """Procedural terrain generator using configured noise and biomes."""
     
@@ -259,7 +256,7 @@ class TerrainGenerator:
         
         chars = []
         colors = []
-        for _, feature_name, fg, bg in belt_bands:
+        for _, feature_name, fg, _bg in belt_bands:
             if feature_name != "void":
                 for char, _ in self.features_registry.get(feature_name, []):
                     if char.strip():

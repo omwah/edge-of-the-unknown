@@ -102,6 +102,12 @@ def load_config(
     if names_file is not None and "names" not in data:
         with open(path.parent / names_file, encoding="utf-8") as fh:
             data["names"] = yaml.safe_load(fh)
+    # Ground-operations balance (GW-WP02) lives in its own file so a game can vary
+    # its survey/assault tuning independently, on the same seam as the roster/names.
+    groundwar_file = data.pop("groundwar_file", None)
+    if groundwar_file is not None and "groundwar" not in data:
+        with open(path.parent / groundwar_file, encoding="utf-8") as fh:
+            data["groundwar"] = yaml.safe_load(fh)
     config = GameConfig.from_mapping(data)
     # Dialogue integrity (§13): only when the roster actually authors dialogue packs,
     # so a minimal/in-authoring roster still loads.

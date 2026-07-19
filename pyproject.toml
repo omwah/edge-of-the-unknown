@@ -101,9 +101,11 @@ ignore_missing_imports = true
 
 # matplotlib ships no type stubs; it is used only by the dev-only sprite-sheet
 # export (edge/art/export.py), isolated behind lazy imports. tracery ships no stubs
-# either; it is used only behind edge/dialogue/render.py.
+# either; it is used only behind edge/dialogue/render.py. opensimplex ships no
+# stubs; the pure core terrain seam (edge/core/groundwar/terrain.py) noise-generates
+# gameplay feature grids with it (GW-WP02).
 [[tool.mypy.overrides]]
-module = ["matplotlib.*", "tracery.*"]
+module = ["matplotlib.*", "tracery.*", "opensimplex.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
