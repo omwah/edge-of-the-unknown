@@ -1,280 +1,45 @@
-"""Typed loader for `config/groundwar_default.yaml` — all balance lives there, not here."""
+"""Groundwar POC config — a thin adapter over the production schema (GW-WP02).
+
+Balance no longer lives in a divergent loader here: it is the frozen Pydantic
+`GroundwarConfig` validated by `edge.core.config` from the single YAML source of
+truth (`config/groundwar_default.yaml`, merged into the default config as the
+`groundwar:` block). This module only re-exports the production models under the
+names the standalone app already imports, and loads that block through the
+production config loader so the standalone and the live game read identical
+numbers.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
+from edge.core.config import (
+    GroundwarConfig as GroundwarConfig,
+)
+from edge.core.config import (
+    GwEmplacement as EmplacementStats,
+)
+from edge.core.config import (
+    GwSuit as SuitClass,
+)
+from edge.core.config import (
+    GwWeapon as WeaponStats,
+)
 
-DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "groundwar_default.yaml"
-
-
-@dataclass(frozen=True, slots=True)
-class WeaponStats:
-    range: int
-    damage: int
-    accuracy: float
-    structure_mult: float = 1.0
-
-
-@dataclass(frozen=True, slots=True)
-class SuitClass:
-    key: str
-    label: str
-    glyph: str
-    cost: int
-    hp: int
-    armor: int
-    move: int
-    jump_range: int
-    jump_charges: int
-    sight: int
-    signature: float
-    weapon: WeaponStats
-    missiles: int
-    missile: WeaponStats
-    jam_radius: int = 0
-    command_radius: int = 0
-    command_acc_bonus: float = 0.0
-    broadcast_range: int = 0
-
-
-@dataclass(frozen=True, slots=True)
-class GarrisonClass:
-    key: str
-    hp: int
-    armor: int
-    move: int
-    sight: int
-    weapon: WeaponStats
-
-
-@dataclass(frozen=True, slots=True)
-class TerrainClass:
-    move_cost: int  # 0 == impassable on foot (jump jets clear it)
-    cover: float
-    blocks_los: bool
-
-
-@dataclass(frozen=True, slots=True)
-class PressureConfig:
-    retrieval_turns: int
-    casualty_ceiling: float
-    escalation_every: int
-    escalation_acc_bonus: float
-    escalation_acc_cap: float
-
-
-@dataclass(frozen=True, slots=True)
-class ResolveConfig:
-    start: int
-    surrender_threshold: int
-    turret_destroyed: int
-    aa_destroyed: int
-    sensor_destroyed: int
-    wall_breached: int
-    garrison_killed: int
-    military_building_destroyed: int
-    citadel_gun_destroyed: int
-    city_cowed: int
-    broadcast: int
-    civilian_building_destroyed: int
-    trooper_killed: int
-
-
-@dataclass(frozen=True, slots=True)
-class EmplacementStats:
-    hp: int
-    range: int = 0
-    damage: int = 0
-    accuracy: float = 0.0
-    radius: int = 0
-    point_blank_bonus: float = 0.0  # accuracy added at the muzzle, fading to 0 at `range`
-
-
-@dataclass(frozen=True, slots=True)
-class DefensesConfig:
-    wall: EmplacementStats
-    gate: EmplacementStats
-    turret: EmplacementStats
-    aa: EmplacementStats
-    sensor: EmplacementStats
-    citadel_gun: EmplacementStats
-    building_military_hp: int
-    building_civilian_hp: int
-
-
-@dataclass(frozen=True, slots=True)
-class GarrisonConfig:
-    infantry: GarrisonClass
-    armor: GarrisonClass
-    sortie_base: int
-    sortie_growth: int
-    armor_from_wave: int
-    undetected_first_strike: float
-
-
-@dataclass(frozen=True, slots=True)
-class ScannerBand:
-    within: float  # reading applies out to this distance from the nearest unfound site
-    label: str
-
-
-@dataclass(frozen=True, slots=True)
-class ExpeditionConfig:
-    """The peaceful archaeology mode — its own map size and search tuning."""
-
-    width: int
-    height: int
-    sites_min: int
-    sites_max: int
-    supplies_start: int
-    dig_cost: int
-    dig_radius: int
-    find_resupply: int
-    settlement_resupply: int
-    move: int
-    sight: int
-    area_radius: int
-    clue_radius: int
-    clue_count: int
-    settlements_min: int
-    settlements_max: int
-    city_hint_radius: int
-    scanner: tuple[ScannerBand, ...]  # sorted nearest-first
-
-
-@dataclass(frozen=True, slots=True)
-class Difficulty:
-    key: str
-    label: str
-    cities: int
-    citadel_level: int
-    surrender_threshold: int
-    garrison_mult: float
-
-
-@dataclass(frozen=True, slots=True)
-class GroundwarConfig:
-    width: int
-    height: int
-    pressure: PressureConfig
-    resolve: ResolveConfig
-    latinum_budget: int       # latinum available to outfit the drop squad
-    max_troopers: int
-    actions_per_turn: int
-    suits: dict[str, SuitClass]
-    defenses: DefensesConfig
-    garrison: GarrisonConfig
-    terrain: dict[str, TerrainClass]
-    expedition: ExpeditionConfig
-    difficulties: dict[str, Difficulty] = field(default_factory=dict)
-
-
-def _weapon(data: dict[str, float]) -> WeaponStats:
-    return WeaponStats(
-        range=int(data["range"]), damage=int(data["damage"]),
-        accuracy=float(data["accuracy"]),
-        structure_mult=float(data.get("structure_mult", 1.0)),
-    )
-
-
-def _suit(key: str, d: dict[str, object]) -> SuitClass:
-    return SuitClass(
-        key=key, label=str(d["label"]), glyph=str(d["glyph"]), cost=int(d["cost"]),  # type: ignore[arg-type]
-        hp=int(d["hp"]), armor=int(d["armor"]), move=int(d["move"]),  # type: ignore[arg-type]
-        jump_range=int(d["jump_range"]), jump_charges=int(d["jump_charges"]),  # type: ignore[arg-type]
-        sight=int(d["sight"]), signature=float(d["signature"]),  # type: ignore[arg-type]
-        weapon=_weapon(d["weapon"]),  # type: ignore[arg-type]
-        missiles=int(d["missiles"]), missile=_weapon(d["missile"]),  # type: ignore[arg-type]
-        jam_radius=int(d.get("jam_radius", 0)),  # type: ignore[arg-type]
-        command_radius=int(d.get("command_radius", 0)),  # type: ignore[arg-type]
-        command_acc_bonus=float(d.get("command_acc_bonus", 0.0)),  # type: ignore[arg-type]
-        broadcast_range=int(d.get("broadcast_range", 0)),  # type: ignore[arg-type]
-    )
-
-
-def _emplacement(d: dict[str, float]) -> EmplacementStats:
-    return EmplacementStats(
-        hp=int(d["hp"]), range=int(d.get("range", 0)), damage=int(d.get("damage", 0)),
-        accuracy=float(d.get("accuracy", 0.0)), radius=int(d.get("radius", 0)),
-        point_blank_bonus=float(d.get("point_blank_bonus", 0.0)),
-    )
-
-
-def _expedition(d: dict[str, object]) -> ExpeditionConfig:
-    bands = tuple(
-        ScannerBand(within=float(b["within"]), label=str(b["label"]))  # type: ignore[index]
-        for b in sorted(d["scanner"], key=lambda b: float(b["within"]))  # type: ignore[union-attr, index, arg-type]
-    )
-    return ExpeditionConfig(
-        width=int(d["width"]), height=int(d["height"]),  # type: ignore[arg-type]
-        sites_min=int(d["sites_min"]), sites_max=int(d["sites_max"]),  # type: ignore[arg-type]
-        supplies_start=int(d["supplies_start"]), dig_cost=int(d["dig_cost"]),  # type: ignore[arg-type]
-        dig_radius=int(d["dig_radius"]),  # type: ignore[arg-type]
-        find_resupply=int(d["find_resupply"]),  # type: ignore[arg-type]
-        settlement_resupply=int(d["settlement_resupply"]),  # type: ignore[arg-type]
-        move=int(d["move"]), sight=int(d["sight"]),  # type: ignore[arg-type]
-        area_radius=int(d["area_radius"]), clue_radius=int(d["clue_radius"]),  # type: ignore[arg-type]
-        clue_count=int(d["clue_count"]),  # type: ignore[arg-type]
-        settlements_min=int(d["settlements_min"]),  # type: ignore[arg-type]
-        settlements_max=int(d["settlements_max"]),  # type: ignore[arg-type]
-        city_hint_radius=int(d["city_hint_radius"]),  # type: ignore[arg-type]
-        scanner=bands,
-    )
+__all__ = ["EmplacementStats", "GroundwarConfig", "SuitClass", "WeaponStats", "load_config"]
 
 
 def load_config(path: Path | None = None) -> GroundwarConfig:
-    with open(path or DEFAULT_CONFIG_PATH, encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
+    """The `groundwar:` block from the production config (default, or from `path`).
 
-    bf = data["battlefield"]
-    pr = data["pressure"]
-    rs = data["resolve"]
-    df = data["defenses"]
-    ga = data["garrison"]
-    return GroundwarConfig(
-        width=int(bf["width"]), height=int(bf["height"]),
-        pressure=PressureConfig(
-            retrieval_turns=int(pr["retrieval_turns"]),
-            casualty_ceiling=float(pr["casualty_ceiling"]),
-            escalation_every=int(pr["escalation_every"]),
-            escalation_acc_bonus=float(pr["escalation_acc_bonus"]),
-            escalation_acc_cap=float(pr["escalation_acc_cap"]),
-        ),
-        resolve=ResolveConfig(**{k: int(v) for k, v in rs.items()}),
-        latinum_budget=int(data["platoon"]["latinum"]),
-        max_troopers=int(data["platoon"]["max_troopers"]),
-        actions_per_turn=int(data["platoon"].get("actions_per_turn", 2)),
-        suits={key: _suit(key, d) for key, d in data["suits"].items()},
-        defenses=DefensesConfig(
-            wall=_emplacement(df["wall"]), gate=_emplacement(df["gate"]),
-            turret=_emplacement(df["turret"]), aa=_emplacement(df["aa"]),
-            sensor=_emplacement(df["sensor"]), citadel_gun=_emplacement(df["citadel_gun"]),
-            building_military_hp=int(df["building_military_hp"]),
-            building_civilian_hp=int(df["building_civilian_hp"]),
-        ),
-        garrison=GarrisonConfig(
-            infantry=GarrisonClass(key="infantry", weapon=_weapon(ga["infantry"]["weapon"]),
-                                   **{k: int(v) for k, v in ga["infantry"].items() if k != "weapon"}),
-            armor=GarrisonClass(key="armor", weapon=_weapon(ga["armor"]["weapon"]),
-                                **{k: int(v) for k, v in ga["armor"].items() if k != "weapon"}),
-            sortie_base=int(ga["sortie_base"]), sortie_growth=int(ga["sortie_growth"]),
-            armor_from_wave=int(ga["armor_from_wave"]),
-            undetected_first_strike=float(ga["undetected_first_strike"]),
-        ),
-        terrain={
-            key: TerrainClass(move_cost=int(d["move_cost"]), cover=float(d["cover"]),
-                              blocks_los=bool(d["blocks_los"]))
-            for key, d in data["terrain"].items()
-        },
-        expedition=_expedition(data["expedition"]),
-        difficulties={
-            key: Difficulty(key=key, label=str(d["label"]), cities=int(d["cities"]),
-                            citadel_level=int(d["citadel_level"]),
-                            surrender_threshold=int(d["surrender_threshold"]),
-                            garrison_mult=float(d["garrison_mult"]))
-            for key, d in data["difficulties"].items()
-        },
-    )
+    Loads the full `GameConfig` — the same seam the live game uses — and returns
+    its validated ground-operations block, so the standalone play-test app cannot
+    drift from shipped balance. `path`, when given, is a full game config file.
+    """
+    from edge.config import load_config as load_full_config
+    from edge.config import load_default_config
+
+    config = load_full_config(path) if path is not None else load_default_config()
+    if config.groundwar is None:
+        raise ValueError("config has no `groundwar:` block")
+    return config.groundwar

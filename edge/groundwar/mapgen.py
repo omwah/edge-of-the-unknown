@@ -14,20 +14,14 @@ from __future__ import annotations
 
 from random import Random
 
-from opensimplex import OpenSimplex
-
-from edge.art.terrain import (
-    BIOMES_REGISTRY,
-    FEATURES_REGISTRY,
-    get_biome_feature,
-    resolve_feature_char,
-)
+from edge.art.terrain import style_grid
+from edge.core.groundwar.terrain import LANDABLE_BIOMES, generate_feature_grid
 from edge.groundwar.config import GroundwarConfig
 from edge.groundwar.model import Battle, City, Structure, StructureKind
 
-# Planet types offered by the setup screen (populated worlds only — the game's premise).
-PLANET_TYPES = ("terrestrial_warm", "terrestrial_cool", "terrestrial_hot",
-                "terrestrial_cold", "barren")
+# Planet types offered by the setup screen (populated worlds only — the game's
+# premise). Sourced from the core terrain seam so gameplay and setup agree.
+PLANET_TYPES = LANDABLE_BIOMES
 
 CITY_NAMES = (
     "Klendathu Down", "Port Joel", "Zegema Beach", "New Cyrene", "Uxmal",
@@ -53,23 +47,15 @@ STREET_FEATURE = "dust"  # what city ground plays as (move 1, no cover)
 def _terrain_grids(
     rng: Random, planet_type: str, width: int, height: int,
 ) -> tuple[list[list[str]], list[list[tuple[str, str, str]]]]:
-    """The gameplay feature grid and the styled art grid, from one noise field."""
-    biome = BIOMES_REGISTRY[planet_type]
-    bands = biome["bands"]
-    sx, sy = biome["scale_x"], biome["scale_y"]
-    gen = OpenSimplex(seed=rng.randint(0, 2**31 - 1))
-    feature: list[list[str]] = []
-    art: list[list[tuple[str, str, str]]] = []
-    for y in range(height):
-        frow: list[str] = []
-        arow: list[tuple[str, str, str]] = []
-        for x in range(width):
-            val = gen.noise2(x / sx, y / sy)
-            name, fg, bg = get_biome_feature(val, bands)
-            frow.append(name)
-            arow.append((resolve_feature_char(rng, name, FEATURES_REGISTRY), fg, bg))
-        feature.append(frow)
-        art.append(arow)
+    """The gameplay feature grid (pure core seam) and the styled art grid (art layer).
+
+    Both derive from the same `noise_seed`, so the styled backdrop is aligned
+    cell-for-cell with the feature names the rules price for movement/cover/LOS —
+    the core half draws no game RNG, `rng` drives only glyph selection.
+    """
+    noise_seed = rng.randint(0, 2**31 - 1)
+    feature = generate_feature_grid(noise_seed, planet_type, width, height)
+    art = style_grid(rng, noise_seed, planet_type, width, height)
     return feature, art
 
 

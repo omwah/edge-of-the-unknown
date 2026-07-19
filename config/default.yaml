@@ -76,6 +76,9 @@ dialogue_file:
     - alien_dialogue_default.yaml
     - dialogue/alien_dialogue_species.yaml
 names_file: names_default.yaml
+# Ground-operations (survey + assault) balance — its own file so a game can vary
+# its ground tuning independently (GW-WP02). Merged in as the `groundwar:` block.
+groundwar_file: groundwar_default.yaml
 
 economy:
   starting_latinum: 2000   # latinum in hand for a brand-new player (the trade-loop seed)

@@ -1620,6 +1620,292 @@ class CorpConfig(BaseModel):
     war_cooldown_days: int = Field(default=3, ge=0)  # re-declare delay after withdrawal
 
 
+# --------------------------------------------------------------------------- #
+# Ground operations (GROUNDWAR_INTEGRATION_PLAN GW-WP02).                       #
+#                                                                              #
+# Production schema for the survey/assault balance the standalone `edge.groundwar`
+# play-test app pioneered. The single YAML source of truth lives in
+# `config/groundwar_default.yaml`, resolved by `edge.config` via the
+# `groundwar_file:` pointer and validated here — the standalone app now consumes
+# this block rather than its own divergent loader. Gameplay terrain feature names
+# come from the pure `edge.core.groundwar.terrain` seam; glyph/colour styling
+# stays in `edge.art`. Field names mirror the YAML; flattened accessors on
+# `GroundwarConfig` (`width`, `latinum_budget`, …) match how the rules read it.
+# --------------------------------------------------------------------------- #
+
+
+class GwWeapon(BaseModel):
+    """A suit/garrison weapon or missile (§ ground combat)."""
+
+    model_config = _FROZEN
+
+    range: int = Field(ge=0)
+    damage: int = Field(ge=0)
+    accuracy: float = Field(ge=0.0, le=1.0)
+    structure_mult: float = Field(default=1.0, ge=0.0)  # damage multiplier vs. structures
+
+
+class GwSuit(BaseModel):
+    """A purchasable powered-armour suit class (GW plan D3)."""
+
+    model_config = _FROZEN
+
+    label: str
+    glyph: str
+    cost: int = Field(ge=0)  # latinum
+    hp: int = Field(gt=0)
+    armor: int = Field(ge=0)  # flat damage soak per hit
+    move: int = Field(gt=0)  # move points per turn (terrain costs apply)
+    jump_range: int = Field(ge=0)
+    jump_charges: int = Field(ge=0)
+    sight: int = Field(gt=0)
+    signature: float = Field(gt=0.0)  # multiplier on enemy sensor radius — must be nonzero
+    weapon: GwWeapon
+    missiles: int = Field(ge=0)
+    missile: GwWeapon
+    jam_radius: int = Field(default=0, ge=0)
+    command_radius: int = Field(default=0, ge=0)
+    command_acc_bonus: float = Field(default=0.0, ge=0.0)
+    broadcast_range: int = Field(default=0, ge=0)
+
+
+class GwGarrisonClass(BaseModel):
+    """A planetary ground-defender unit type (infantry / armour)."""
+
+    model_config = _FROZEN
+
+    hp: int = Field(gt=0)
+    armor: int = Field(ge=0)
+    move: int = Field(gt=0)
+    sight: int = Field(gt=0)
+    weapon: GwWeapon
+
+
+class GwTerrain(BaseModel):
+    """Gameplay class for a terrain feature name (keyed by `terrain` feature names)."""
+
+    model_config = _FROZEN
+
+    move_cost: int = Field(ge=0)  # 0 == impassable on foot (jump jets clear it)
+    cover: float = Field(ge=0.0, le=1.0)  # accuracy soaked by occupying the cell
+    blocks_los: bool
+
+
+class GwPressure(BaseModel):
+    """The retrieval clock and escalation ramp bounding an assault."""
+
+    model_config = _FROZEN
+
+    retrieval_turns: int = Field(gt=0)  # boat pickup — surrender must land before this
+    casualty_ceiling: float = Field(gt=0.0, le=1.0)  # abort past this fraction of the drop dead
+    escalation_every: int = Field(gt=0)  # a sortie wave + defense stiffening every N turns
+    escalation_acc_bonus: float = Field(ge=0.0)  # accuracy gained per escalation step
+    escalation_acc_cap: float = Field(ge=0.0)  # ... up to this much bonus
+
+
+class GwResolve(BaseModel):
+    """Planetary Resolve start value and the deltas each event applies to it."""
+
+    model_config = _FROZEN
+
+    start: int
+    surrender_threshold: int
+    turret_destroyed: int
+    aa_destroyed: int
+    sensor_destroyed: int
+    wall_breached: int
+    garrison_killed: int
+    military_building_destroyed: int
+    citadel_gun_destroyed: int
+    city_cowed: int
+    broadcast: int
+    civilian_building_destroyed: int
+    trooper_killed: int
+
+
+class GwEmplacement(BaseModel):
+    """A static defensive structure (wall/gate/turret/AA/sensor/citadel gun)."""
+
+    model_config = _FROZEN
+
+    hp: int = Field(gt=0)
+    range: int = Field(default=0, ge=0)
+    damage: int = Field(default=0, ge=0)
+    accuracy: float = Field(default=0.0, ge=0.0, le=1.0)
+    radius: int = Field(default=0, ge=0)
+    point_blank_bonus: float = Field(default=0.0, ge=0.0)  # accuracy added at the muzzle
+
+
+class GwDefenses(BaseModel):
+    """The static-defense catalog stamped into a defended city."""
+
+    model_config = _FROZEN
+
+    wall: GwEmplacement
+    gate: GwEmplacement
+    turret: GwEmplacement
+    aa: GwEmplacement
+    sensor: GwEmplacement
+    citadel_gun: GwEmplacement
+    building_military_hp: int = Field(gt=0)
+    building_civilian_hp: int = Field(gt=0)
+
+
+class GwGarrison(BaseModel):
+    """Garrison unit stats and the escalating-sortie schedule."""
+
+    model_config = _FROZEN
+
+    infantry: GwGarrisonClass
+    armor: GwGarrisonClass
+    sortie_base: int = Field(ge=0)  # units in the first sortie wave
+    sortie_growth: int = Field(ge=0)  # extra units per later wave
+    armor_from_wave: int = Field(ge=0)  # waves before tanks join the sorties
+    undetected_first_strike: float = Field(ge=0.0)  # accuracy bonus firing while undetected
+
+
+class GwScannerBand(BaseModel):
+    """One handheld-scanner reading band, applying out to `within` cells."""
+
+    model_config = _FROZEN
+
+    within: float = Field(gt=0.0)  # applies out to this distance from the nearest unfound site
+    label: str
+
+
+class GwExpedition(BaseModel):
+    """The peaceful archaeology mode — its own map size and search tuning (GW plan D4-D6)."""
+
+    model_config = _FROZEN
+
+    width: int = Field(ge=2)
+    height: int = Field(ge=2)
+    sites_min: int = Field(ge=1)  # sensor contacts per descent
+    sites_max: int = Field(ge=1)
+    supplies_start: int = Field(gt=0)  # every move or dig spends 1; settlements refill it
+    dig_cost: int = Field(ge=0)
+    dig_radius: int = Field(ge=0)  # a dig opens a trench this wide
+    find_resupply: int = Field(ge=0)  # supplies regained at each successful find
+    settlement_resupply: int = Field(ge=0)  # supplies regained per settlement visit
+    move: int = Field(gt=0)  # move points per turn (terrain costs apply)
+    sight: int = Field(gt=0)  # you must be this close to notice disturbed ground
+    area_radius: int = Field(gt=0)  # the ship-sensor "general area" circle
+    clue_radius: int = Field(ge=0)  # disturbed-ground clues lie within this of the true spot
+    clue_count: int = Field(ge=0)
+    settlements_min: int = Field(ge=0)  # inhabited worlds only
+    settlements_max: int = Field(ge=0)
+    city_hint_radius: int = Field(ge=0)  # a settlement's hint shrinks one search circle to this
+    scanner: tuple[GwScannerBand, ...]  # nearest-first, non-overlapping
+
+    @model_validator(mode="after")
+    def _check(self) -> GwExpedition:
+        if self.sites_max < self.sites_min:
+            raise ValueError("expedition sites_max must be ≥ sites_min")
+        if self.settlements_max < self.settlements_min:
+            raise ValueError("expedition settlements_max must be ≥ settlements_min")
+        if not self.scanner:
+            raise ValueError("expedition scanner must define at least one band")
+        withins = [b.within for b in self.scanner]
+        if withins != sorted(withins) or len(set(withins)) != len(withins):
+            raise ValueError(
+                "expedition scanner bands must be sorted nearest-first and non-overlapping"
+            )
+        return self
+
+
+class GwDifficulty(BaseModel):
+    """A standalone setup-screen difficulty preset (superseded by live state in production)."""
+
+    model_config = _FROZEN
+
+    label: str
+    cities: int = Field(gt=0)
+    citadel_level: int = Field(ge=0)
+    surrender_threshold: int
+    garrison_mult: float = Field(gt=0.0)  # a conversion ratio — must be nonzero
+
+
+class GwBattlefield(BaseModel):
+    """Assault battlefield dimensions."""
+
+    model_config = _FROZEN
+
+    width: int = Field(ge=2)
+    height: int = Field(ge=2)
+
+
+class GwPlatoon(BaseModel):
+    """Drop-squad budget and size caps."""
+
+    model_config = _FROZEN
+
+    latinum: int = Field(ge=0)  # latinum available to outfit the drop
+    max_troopers: int = Field(gt=0)
+    actions_per_turn: int = Field(default=2, gt=0)
+
+
+class GroundwarConfig(BaseModel):
+    """Ground-operations balance (survey + assault), one YAML source of truth.
+
+    Field names mirror `config/groundwar_default.yaml`. The flattened accessors
+    (`width`, `height`, `latinum_budget`, `max_troopers`, `actions_per_turn`)
+    match how `edge.groundwar` reads the config, so promoting the standalone app
+    onto this schema needs no call-site churn.
+    """
+
+    model_config = _FROZEN
+
+    battlefield: GwBattlefield
+    pressure: GwPressure
+    resolve: GwResolve
+    platoon: GwPlatoon
+    suits: dict[str, GwSuit]
+    defenses: GwDefenses
+    garrison: GwGarrison
+    terrain: dict[str, GwTerrain]
+    expedition: GwExpedition
+    difficulties: dict[str, GwDifficulty] = Field(default_factory=dict)
+
+    @property
+    def width(self) -> int:
+        return self.battlefield.width
+
+    @property
+    def height(self) -> int:
+        return self.battlefield.height
+
+    @property
+    def latinum_budget(self) -> int:
+        return self.platoon.latinum
+
+    @property
+    def max_troopers(self) -> int:
+        return self.platoon.max_troopers
+
+    @property
+    def actions_per_turn(self) -> int:
+        return self.platoon.actions_per_turn
+
+    @model_validator(mode="after")
+    def _check(self) -> GroundwarConfig:
+        if not self.suits:
+            raise ValueError("groundwar.suits must define at least one suit")
+        if not self.terrain:
+            raise ValueError("groundwar.terrain must define at least one terrain class")
+        # Every feature a landable biome can emit must have a terrain class, or a
+        # generated cell would silently read as impassable (no move cost lookup).
+        from edge.core.groundwar.terrain import BIOME_BANDS, LANDABLE_BIOMES
+
+        needed = {name for pt in LANDABLE_BIOMES for _, name in BIOME_BANDS[pt].bands}
+        missing = needed - set(self.terrain)
+        if missing:
+            raise ValueError(
+                "groundwar.terrain missing classes for landable biome features: "
+                f"{', '.join(sorted(missing))}"
+            )
+        return self
+
+
 class GameConfig(BaseModel):
     """Top-level config bundle, validated from the parsed YAML mapping."""
 
@@ -1655,6 +1941,7 @@ class GameConfig(BaseModel):
     starter_ship: ShipClassConfig
     ship_classes: list[ShipClassConfig] = Field(default_factory=list)  # buyable hulls (Stardock)
     hardware: HardwareConfig
+    groundwar: GroundwarConfig | None = None  # GW-WP02 ground operations (None ⇒ not configured)
 
     def ship_class(self, class_id: str) -> ShipClassConfig:
         """The ship-class config for `class_id` — the starter hull or a buyable one."""
