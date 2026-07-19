@@ -337,9 +337,12 @@ def test_destroying_a_hostile_ship_pays_a_bounty() -> None:
 
 @pytest.mark.parametrize("seed", range(12))
 def test_raid_caches_sit_on_hostile_homeworlds(seed: int) -> None:
-    """Every salted raid cache is a hidden legendary Tier-III tech cache on a hostile
-    species' homeworld planet, off the Core and off the spatial gradient (§7/§10, WP44)."""
-    from edge.core.enums import ComponentTier, DiscoveryKind, PayloadKind, RarityTier
+    """Every salted raid cache is a hidden legendary tech artifact on a hostile species'
+    homeworld planet, off the Core and off the spatial gradient (§7/§10, WP44; D6 GW-WP05).
+
+    Under the D6 archaeology contract the cache is a provenance-bearing ANCIENT_TECH
+    artifact (barter/research value) plus codex lore — no longer a loose Tier-III part."""
+    from edge.core.enums import DiscoveryKind, PayloadKind, RarityTier
 
     state = generate(SMALL, seed)
     hostile_sectors = {s.sector_id for s in state.species.values()
@@ -350,7 +353,7 @@ def test_raid_caches_sit_on_hostile_homeworlds(seed: int) -> None:
             continue
         assert d.rarity_tier is RarityTier.LEGENDARY
         assert d.kind is DiscoveryKind.ANCIENT_TECH and d.hidden
-        assert d.payload.kind is PayloadKind.COMPONENT and d.payload.tier is ComponentTier.III
+        assert d.payload.kind is PayloadKind.ARTIFACT and d.payload.lore  # artifact + lore (D6)
         assert d.planet_id is not None                       # cached on a homeworld
         assert not state.sectors[d.sector_id].is_galactic_core
         assert d.sector_id in hostile_sectors                # at a hostile species' home

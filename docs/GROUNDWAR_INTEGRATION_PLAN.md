@@ -7,7 +7,7 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–04 shipped; interview decisions resolved (July 2026).**
+> **Status: implementation underway — GW-WP01–05 shipped; interview decisions resolved (July 2026).**
 
 ## Context
 
@@ -591,7 +591,29 @@ Tests: `tests/test_groundwar_access.py` — table coverage over
 ownership/standing/Core/defense; DTO/reducer lockstep.
 Commit `ground: GW-WP04 one ground-access contract` — **GW-M1 done.**
 
-### GW-WP05 — Survey generation from real discoveries (L)
+### GW-WP05 — Survey generation from real discoveries (L) — SHIPPED
+
+**Status:** shipped July 2026. New pure `edge/core/groundwar/survey.py` builds a frozen,
+non-hashed `SurveyMap` (regenerated from the operation seed, G5) from a world's **real**
+surface `Discovery` records: one `SurveySite` per visible discovery keyed to its
+`Discovery.id` (G6), terrain + optional friendly settlements + landing confined to one
+passable component (reachability). Each site's position/circle/clues draw from a
+**per-discovery salt** (`{seed}|site|{id}`), so a later descent after a sensor upgrade
+adds the newly resolvable site **without moving** known ones (upgrade-and-return, G7).
+`eligible_surface_site_ids` snapshots the sensor/detection window; `_begin_survey` stores
+it in `SurveyOperation.visible_discovery_ids` (+ `resolved_discovery_ids` for already-
+collected sites), so a hidden out-of-reach site leaks nothing. D6 landed in
+`edge/bigbang/discoveries.py`: surface sites **and** hostile-homeworld raid caches now
+yield an artifact + codex lore (never latinum/loose components); open-space and combat-
+wreck payloads are untouched (`_make_payload` unchanged; a separate `_make_surface_payload`
+draws no RNG so later shared-RNG draws stay stable). Movement/dig/talk **actions** and
+reward settlement are GW-WP06; the live DTO/Textual is GW-WP07. Covered by
+`tests/test_groundwar_survey.py`; `test_encounters.py` raid-cache assertion updated to the
+artifact contract.
+
+Files (as shipped): `edge/core/groundwar/survey.py` (new), `edge/core/rules.py`
+(`_begin_survey` snapshot), `edge/bigbang/discoveries.py` (D6). No hashed-state/config or
+wire change (`SurveyOperation` fields already existed from GW-WP03).
 
 Port expedition generation and movement into immutable pure rules. Generate one
 stable site position per eligible existing surface `Discovery`, not POC find

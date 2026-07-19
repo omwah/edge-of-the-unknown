@@ -203,6 +203,7 @@ from edge.core.models import (
 )
 from edge.core.groundwar.access import Survey, ground_access
 from edge.core.groundwar.models import SurveyOperation, SurveyProgress
+from edge.core.groundwar.survey import eligible_surface_site_ids
 from edge.core.market import PortOrder
 from edge.core.movement import MovementError, can_warp, shortest_path
 from edge.dialogue import facts as dialogue_facts
@@ -3650,11 +3651,20 @@ def _begin_survey(
     start_x = prior.last_x if prior is not None else exp.width // 2
     start_y = prior.last_y if prior is not None else exp.height // 2
     hinted = prior.hinted_discovery_ids if prior is not None else frozenset()
+    # Snapshot the sensor/detection window now (G7): only these surface sites are ever
+    # placed on the map, so a hidden out-of-reach site leaks nothing — and a later descent
+    # after a sensor upgrade widens the set (GW-WP05). Already-collected sites show `found`.
+    visible = eligible_surface_site_ids(
+        state, cmd.planet_id, ship.sensor_rating, player.detected, config)
+    resolved = frozenset(
+        d.id for d in state.discoveries.values()
+        if d.planet_id == cmd.planet_id and d.found_by == player_id and d.id in visible)
     operation = SurveyOperation(
         operation_id=operation_id, planet_id=cmd.planet_id, sector_id=ship.sector_id,
         planet_type=planet.planet_type, seed=seed, started_day=state.game.day_number,
         explorer_x=start_x, explorer_y=start_y, supplies=exp.supplies_start,
-        hinted_discovery_ids=hinted,
+        hinted_discovery_ids=hinted, visible_discovery_ids=visible,
+        resolved_discovery_ids=resolved,
     )
     new_player = replace(player, ground_operation=operation)
     return ReduceResult(
