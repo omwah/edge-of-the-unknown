@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 23  # GW-WP03: BeginSurvey/ExtractGroundOperation commands + ground-op events
+WIRE_VERSION = 24  # GW-WP04: PlanetDTO ground-access projection (ground_mode/blocker/settlements)
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -77,6 +77,9 @@ v20 (WP-PR2-15/PT-54): Cloud Cities — `BuildStagingArea` command + `CloudCityB
 (a staged gas giant holds people, an unstaged one holds nothing); `SectorPlanetDTO.cloud_city_size`
 so the sector scene paints the floating city.
 v22: `SetPlayerName` records authenticated multiplayer usernames in replayable player state.
+v24 (GW-WP04): `PlanetDTO` projects the one ground-access contract — `ground_mode`
+(orbital_only / survey / assault), `ground_blocker` (the orbital-only/assault-disabled
+reason or first standing siege rung), and `ground_settlements` (survey resupply available).
 """
 
 

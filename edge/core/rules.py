@@ -201,6 +201,7 @@ from edge.core.models import (
     UNOWNED,
     UniverseState,
 )
+from edge.core.groundwar.access import Survey, ground_access
 from edge.core.groundwar.models import SurveyOperation, SurveyProgress
 from edge.core.market import PortOrder
 from edge.core.movement import MovementError, can_warp, shortest_path
@@ -3634,9 +3635,12 @@ def _begin_survey(
     _require_no_encounter(player)
     ship = _ship(state, player)
     planet = _planet_in_sector(state, ship, cmd.planet_id)
-    if not is_landable(planet.planet_type, config):
-        raise EconomyError(
-            f"a {pretty_planet_type(planet.planet_type).lower()} has no surface to survey")
+    # The one ground-access contract is authoritative (GW-WP04, G1/G13): a survey opens
+    # only on a world the classifier routes to survey; a hostile or orbital-only world is
+    # rejected with its own tagged reason, so the reducer never disagrees with the DTO.
+    access = ground_access(state, player, planet, config)
+    if not isinstance(access, Survey):
+        raise EconomyError(access.reason)
     if config.groundwar is None:
         raise EconomyError("ground operations are not configured")
     exp = config.groundwar.expedition

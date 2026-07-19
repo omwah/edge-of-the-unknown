@@ -1,6 +1,6 @@
 {
   "command": {
-    "v": 23,
+    "v": 24,
     "kind": "command",
     "type": "JoinGame",
     "payload": {
@@ -8,7 +8,7 @@
     }
   },
   "event": {
-    "v": 23,
+    "v": 24,
     "kind": "event",
     "type": "Warped",
     "payload": {
@@ -20,7 +20,7 @@
     }
   },
   "dto": {
-    "v": 23,
+    "v": 24,
     "kind": "dto",
     "payload": {
       "__dto__": "MapNodeDTO",

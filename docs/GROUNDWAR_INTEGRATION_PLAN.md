@@ -7,7 +7,7 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01 shipped; interview decisions resolved (July 2026).**
+> **Status: implementation underway — GW-WP01–04 shipped; interview decisions resolved (July 2026).**
 
 ## Context
 
@@ -540,28 +540,55 @@ Tests: model invariants; begin/clear lifetime; rejected commands leave no log;
 codec round trips; save/reload mid-operation; identical state hash.
 Commit `ground: GW-WP03 replayable active operations (config epoch)`.
 
-### GW-WP04 — Ground-access classifier and orbit projection (M)
+### GW-WP04 — Ground-access classifier and orbit projection (M) — SHIPPED
 
-Implement the D1/D2/D9/D13/D14 access and protectorate contract in one pure
-seam. Cover player/corp ownership, corp war, alliances/governor, effective
-disposition/grudges, inhabitants, landability, Core sanctuary,
-base/gun/shield blockers, and any
-protectorate/access state chosen by D2.
+**Status:** shipped July 2026. The pure `ground_access` classifier
+(`edge/core/groundwar/access.py`) returns the tagged
+`OrbitalOnly | Survey | Assault` result and is now the authoritative routing seam:
+`_begin_survey` recomputes it and rejects any non-survey world with the tagged
+reason (G1/G13 lockstep), and `PlanetDTO` projects `ground_mode` / `ground_blocker`
+/ `ground_settlements` for the bot/service surface (wire v24). Covered by
+`tests/test_groundwar_access.py` (landability, D1 inhabited/friendly/below-friendly
+split, D9 Cloud City seam, G13 Core sanctuary, G12 siege blockers, assault-disabled,
+DTO/reducer lockstep).
 
-Add explicit protectorate and annexation commands/state rather than overloading
-`Planet.owner`. Project current controller, granted rights, annexation blockers,
-and consequences; reducers recompute every gate.
+**Scope deviation (recorded per the plan's own change rule).** The D2/D13/D14
+**protectorate and annexation *commands and hashed state*** are **deferred to the
+settlement work (GW-WP11)**, where surrender first *creates* a protectorate. Three
+reasons: (1) no protectorate can exist until GW-WP11, so an `Annex` command / a
+hashed `Planet` protectorate field would be unreachable dead code today; (2) GW-WP03
+declared all hashed-field/config changes batched into a *single* state-hash epoch
+("Golden replay regeneration happens in this WP, once") — minting a protectorate
+field here would force a second golden/wire epoch for no live behaviour; (3) GW-WP04's
+own Files list omits `models.py`, the `rules.py` command surface, `codec.py`,
+`events.py`, and the wire fixtures, i.e. the pure classifier + projection *is* the
+intended WP04 deliverable. The classifier's `Assault` arm already carries `owner` /
+`inhabited` so GW-WP11 can settle protectorate vs. conquest without reshaping the
+contract. DESIGN.md's protectorate/annexation matrix (authored in GW-WP01) is
+unchanged; only the implementation *order* moves.
+
+Implement the D1/D9/D13 access contract in one pure seam. Cover player/corp
+ownership, corp war, alliances/governor, effective
+disposition/grudges, inhabitants, landability, Core sanctuary, and
+base/gun/shield blockers.
 
 Project the tagged mode and exact blocker through `PlanetDTO`; keep reducers
 authoritative by recomputing it. Update the planet directory and bot/service
 query surface so automation can distinguish survey and assault and explain
 their blockers.
 
-Files: `edge/core/groundwar/access.py`, `edge/core/aliens.py`,
-`edge/server/session.py`, `edge/core/dto.py`, `edge/server/client.py`,
-`edge/server/protocol.py`, bot service schema, `edge/tui/screens/planet.py`.
-Tests: table/property coverage for every ownership/standing/Core/defense
-combination; DTO/reducer lockstep.
+*Deferred to GW-WP11 (see Status above):* explicit protectorate/annexation
+commands + hashed state, and the projection of current controller / granted
+rights / annexation blockers. Represented in the contract's shape (`Assault.owner`
+/ `inhabited`) so no reshaping is needed when surrender first creates a
+protectorate.
+
+Files (as shipped): `edge/core/groundwar/access.py`, `edge/core/rules.py`
+(`_begin_survey` lockstep), `edge/server/session.py`, `edge/core/dto.py`,
+`edge/server/wire.py` (v24). Deferred surface (`client.py` / `protocol.py` /
+`planet.py` UI) lands with the survey/assault screens in GW-WP07/WP12.
+Tests: `tests/test_groundwar_access.py` — table coverage over
+ownership/standing/Core/defense; DTO/reducer lockstep.
 Commit `ground: GW-WP04 one ground-access contract` — **GW-M1 done.**
 
 ### GW-WP05 — Survey generation from real discoveries (L)
