@@ -227,7 +227,7 @@ weapons:
 
 bigbang:
   sector_count: 1000          # total sectors (nodes) in the generated warp graph
-  topology_mode: mesh         # graph shape: trunk (chokepoints) | expansive (band-lattice) | planar (spiderweb) | mesh (grid), §5
+  topology_mode: spiral       # graph shape: trunk | expansive | planar | mesh | spiral (dense concentric rings), §5
 
   # === Shared across every topology mode ===
   # These knobs mean the same thing regardless of `topology_mode` above.
@@ -235,8 +235,8 @@ bigbang:
   cluster_max: 15            # largest such cluster (clusters are then bridged together, §5)
   intra_group_degree: 3.5    # average warp connections per sector inside a cluster (density)
   inter_group_degree: 3.5    # average inter-cluster warp connections per cluster (density)
-  one_way_chance: 0.15       # probability a given bridge is one-way (a trap/wormhole seam)
-  max_warps_per_sector: 6    # hard cap on a sector's outbound warps (keeps the UI grid readable)
+  one_way_chance: 0.15       # one-way density; spiral rewires this share of non-Core sectors as wormholes
+  max_warps_per_sector: 8    # outbound-warp cap; configurable up to the nav rose's hard limit of 8
   core_sector_count: 25      # sectors reserved as the protected Core Space (sectors 1–10), §5
   home_cluster_min: 10       # alliance home cluster size range (each < Core), §5 step 6
   home_cluster_max: 20
@@ -283,6 +283,12 @@ bigbang:
         - { name: Frontier, min_hops: 9,  max_hops: 16 }
         - { name: Deep,     min_hops: 17, max_hops: 24 }
         - { name: Void,     min_hops: 25, max_hops: 9999 }
+    spiral:     # dense concentric rings, numbered outward from sector 1 (six-warp default)
+      bands:
+        - { name: Hub,      min_hops: 0,  max_hops: 4 }
+        - { name: Frontier, min_hops: 5,  max_hops: 9 }
+        - { name: Deep,     min_hops: 10, max_hops: 14 }
+        - { name: Void,     min_hops: 15, max_hops: 9999 }
 
 # Engine room (§4.1): the game-global formulas turning a hull's slotted parts into
 # derived aspects. Per-subsystem layouts live on each ship class below. The

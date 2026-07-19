@@ -23,7 +23,7 @@ from edge.bigbang.aliens import HomeClusterError, populate_species
 from edge.bigbang.discoveries import salt_discoveries, salt_raid_caches
 from edge.bigbang.embedding import compute_embedding
 from edge.bigbang.naming import NameGenerator
-from edge.bigbang.numbering import assign_spatial_ids
+from edge.bigbang.numbering import assign_spatial_ids, assign_spiral_spatial_ids
 from edge.bigbang.topology import (
     OutEdges,
     add_bidirectional,
@@ -42,6 +42,7 @@ _Coord = tuple[int, int]  # a grid cell (row, col), used only by the mesh topolo
 
 _last_mesh_coords: dict[int, _Coord] = {}
 _last_mesh_grid_size: tuple[int, int] = (0, 0)
+_last_spiral_coords: dict[int, tuple[float, float]] = {}
 
 _MAX_ATTEMPTS = 16
 
@@ -375,6 +376,215 @@ class PlanarTopology(ClusteredTopology):
                 _link_clusters(g_outer, best_inner)
 
 
+class SpiralTopology(TopologyMode):
+    """Dense concentric rings numbered outward from sector 1.
+
+    Sector 1 has ``max_warps_per_sector`` neighbours, ring ``r`` has
+    ``max_warps_per_sector * r`` sectors, and IDs advance around one ring before
+    continuing onto the next.  The canonical six-warp configuration resembles a
+    hexagonal tiling; larger caps add short ring chords to keep most sectors full.
+    """
+
+    def build(self, out: OutEdges) -> list[list[int]]:
+        cap = self.max_warps_per_sector
+        if cap < 6:
+            raise ValueError("spiral topology requires max_warps_per_sector >= 6")
+        if self.sector_count <= cap:
+            raise ValueError(
+                "spiral topology requires more sectors than max_warps_per_sector"
+            )
+
+        rings = self._concentric_rings()
+
+        # Every ring is a cycle in internal-id order.  Ring 1 is therefore the
+        # requested 2-3-4-5-6-7-2 neighbourhood around sector 1.
+        for ring in rings[1:]:
+            if len(ring) == 2:
+                add_bidirectional(out, ring[0], ring[1], cap)
+            elif len(ring) >= 3:
+                for idx, sector_id in enumerate(ring):
+                    add_bidirectional(out, sector_id, ring[(idx + 1) % len(ring)], cap)
+
+        if len(rings) > 1:
+            for sector_id in rings[1]:
+                add_bidirectional(out, 1, sector_id, cap)
+
+        # Close the numerical spiral between rings.  Edges inside a ring already
+        # connect n <-> n+1; this seam connects the last ID of ring r to the first
+        # ID of ring r+1, making monotonically increasing sector/spatial IDs one
+        # continuous navigable path through the whole universe.
+        for ring_index in range(1, len(rings) - 1):
+            add_bidirectional(
+                out,
+                rings[ring_index][-1],
+                rings[ring_index + 1][0],
+                cap,
+            )
+
+        # Triangulate each annulus.  The first pass gives every outer sector an
+        # inward warp; the second gives every inner sector one additional outward
+        # warp.  Together with the two ring neighbours this fills every completed
+        # interior sector to degree six without crossing or exceeding the cap.
+        for ring_index in range(2, len(rings)):
+            inner = rings[ring_index - 1]
+            outer = rings[ring_index]
+            inner_count = len(inner)
+            outer_count = len(outer)
+            for idx, sector_id in enumerate(outer):
+                inward = inner[(idx * inner_count) // outer_count]
+                add_bidirectional(out, sector_id, inward, cap)
+            for idx, sector_id in enumerate(inner):
+                outer_idx = (
+                    (idx * outer_count + inner_count - 1) // inner_count - 1
+                ) % outer_count
+                add_bidirectional(out, sector_id, outer[outer_idx], cap)
+
+        self._densify_rings(out, rings)
+        self._rewire_wormholes(out)
+
+        self._cache_spiral_coords(rings)
+        core = list(range(1, min(self.core_sector_count, self.sector_count) + 1))
+        other = _cluster_groups(
+            list(range(len(core) + 1, self.sector_count + 1)),
+            self.cluster_min,
+            self.cluster_max,
+            self.rng,
+        )
+        return [core, *other]
+
+    def _concentric_rings(self) -> list[list[int]]:
+        """Partition sequential IDs into rings of size ``cap * radius``."""
+        rings = [[1]]
+        next_sector = 2
+        radius = 1
+        while next_sector <= self.sector_count:
+            stop = min(
+                self.sector_count + 1,
+                next_sector + self.max_warps_per_sector * radius,
+            )
+            rings.append(list(range(next_sector, stop)))
+            next_sector = stop
+            radius += 1
+        return rings
+
+    def _densify_rings(self, out: OutEdges, rings: list[list[int]]) -> None:
+        """Add increasingly long ring chords until endpoints reach the warp cap.
+
+        Short offsets are attempted first, retaining the concentric local shape.
+        A simple undirected graph can leave a small parity residue on the outer
+        boundary; every addition still passes through the shared degree-cap guard.
+        """
+        cap = self.max_warps_per_sector
+        for ring in rings[1:]:
+            for offset in range(2, len(ring) // 2 + 1):
+                for idx, sector_id in enumerate(ring):
+                    add_bidirectional(
+                        out,
+                        sector_id,
+                        ring[(idx + offset) % len(ring)],
+                        cap,
+                    )
+
+    def _rewire_wormholes(self, out: OutEdges) -> None:
+        """Replace eligible two-way chords with paired, distant one-way exits.
+
+        The numerical backbone ``n <-> n+1`` is never eligible, so spatial IDs
+        remain traversable in order.  Both ends of a selected chord become
+        wormhole sources, and neither sources nor destinations may be in Core
+        Space.  The discovery pass recognizes these one-way exits and force-places
+        the corresponding ``WORMHOLE`` discoveries later in generation.
+        """
+        if self.one_way_chance <= 0.0:
+            return
+        core_last = min(self.core_sector_count, self.sector_count)
+        candidates = [
+            (source, target)
+            for source in range(core_last + 1, self.sector_count + 1)
+            for target in out[source]
+            if source < target
+            and target > core_last
+            and source in out[target]
+            and target - source > 1
+        ]
+        self.rng.shuffle(candidates)
+        wormhole_sources: set[int] = set()
+        min_jump = max(self.max_warps_per_sector * 3, self.sector_count // 4)
+        non_core_count = self.sector_count - core_last
+        break_budget = round(self.one_way_chance * non_core_count / 2)
+        breaks_made = 0
+
+        for source, other_end in candidates:
+            if breaks_made >= break_budget:
+                break
+            if source in wormhole_sources or other_end in wormhole_sources:
+                continue
+            source_target = self._distant_target(
+                out, source, core_last, min_jump, {source, other_end}
+            )
+            if source_target is None:
+                continue
+            other_target = self._distant_target(
+                out,
+                other_end,
+                core_last,
+                min_jump,
+                {source, other_end, source_target},
+            )
+            if other_target is None:
+                continue
+
+            out[source].remove(other_end)
+            out[other_end].remove(source)
+            source_added = add_directed(
+                out, source, source_target, self.max_warps_per_sector
+            )
+            other_added = add_directed(
+                out, other_end, other_target, self.max_warps_per_sector
+            )
+            if not source_added or not other_added:
+                out[source].discard(source_target)
+                out[other_end].discard(other_target)
+                add_bidirectional(
+                    out, source, other_end, self.max_warps_per_sector
+                )
+                continue
+            wormhole_sources.update((source, other_end))
+            breaks_made += 1
+
+    def _distant_target(
+        self,
+        out: OutEdges,
+        source: int,
+        core_last: int,
+        min_jump: int,
+        blocked: set[int],
+    ) -> int | None:
+        """Choose a non-Core, genuinely one-way destination far along the spiral."""
+        choices = [
+            target
+            for target in range(core_last + 1, self.sector_count + 1)
+            if target not in blocked
+            and abs(target - source) >= min_jump
+            and target not in out[source]
+            and source not in out[target]
+        ]
+        return self.rng.choice(choices) if choices else None
+
+    @staticmethod
+    def _cache_spiral_coords(rings: list[list[int]]) -> None:
+        """Cache an exact concentric layout for the inspector and nav bearings."""
+        coords: dict[int, tuple[float, float]] = {1: (0.0, 0.0)}
+        for radius, ring in enumerate(rings[1:], start=1):
+            for idx, sector_id in enumerate(ring):
+                angle = 2.0 * math.pi * idx / len(ring)
+                coords[sector_id] = (
+                    radius * math.cos(angle),
+                    radius * math.sin(angle),
+                )
+        global _last_spiral_coords
+        _last_spiral_coords = coords
+
+
 _MESH_NEIGHBOR_OFFSETS: tuple[_Coord, ...] = (
     (-1, 0),
     (1, 0),
@@ -650,6 +860,7 @@ TOPOLOGY_MODES: dict[str, type[TopologyMode]] = {
     "expansive": ExpansiveTopology,
     "planar": PlanarTopology,
     "mesh": MeshTopology,
+    "spiral": SpiralTopology,
 }
 
 
@@ -718,8 +929,10 @@ def generate(
         }
         state.rebuild_adjacency()
         state.core_hops = bfs_distances(out, 1)  # gravity-arrow cache (§11, WP-C)
-        state.spatial_ids = assign_spatial_ids(
-            groups, state.core_hops, active_bands
+        state.spatial_ids = (
+            assign_spiral_spatial_ids(out)
+            if cfg.topology_mode == "spiral"
+            else assign_spatial_ids(groups, state.core_hops, active_bands)
         )  # §5.1 display ids
         if cfg.topology_mode == "mesh":
             global _last_mesh_coords, _last_mesh_grid_size
@@ -728,6 +941,8 @@ def generate(
                 sid: (float(coord[1] - C / 2.0), float(coord[0] - R / 2.0))
                 for sid, coord in _last_mesh_coords.items()
             }
+        elif cfg.topology_mode == "spiral":
+            state.sector_pos = dict(_last_spiral_coords)
         else:
             state.sector_pos = compute_embedding(
                 out, state.core_hops, seed=seed

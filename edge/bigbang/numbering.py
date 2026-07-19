@@ -7,17 +7,17 @@ Derives human-legible, band-monotone sector ids from the warp topology. These ar
 only at the `server/session.py` projection boundary. Because it is derived, nothing
 authored or persisted changes — no cutover, no golden-master regeneration.
 
-The scheme is a **multi-level, gapped, band-monotone integer**: a band digit, then
-a region prefix, then a local ordinal — encoded so that a numerically larger id
-always means a region farther from the Core. It is a *pure* function of topology
-(no RNG): determinism comes from the inputs, not the build random stream — and a
-**bijection**, so the travel prompt can map a typed spatial id back to internal.
+Clustered modes use a **multi-level, gapped, band-monotone integer**: a band digit,
+then a region prefix, then a local ordinal. Spiral mode instead uses a contiguous
+`10000 + ordinal` sequence so increasing display IDs trace its numerical backbone.
+Both projections are pure, deterministic **bijections**, so the travel prompt can
+map a typed spatial id back to internal.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from edge.bigbang.topology import band_for_hops
 from edge.core.config import DistanceBand
@@ -84,3 +84,16 @@ def assign_spatial_ids(
             for ordinal, sid in enumerate(ordered, start=1):
                 new_id[sid] = (band_idx + 1) * band_stride + region_local * region_stride + ordinal
     return new_id
+
+
+def assign_spiral_spatial_ids(sector_ids: Iterable[int]) -> dict[int, int]:
+    """Assign the spiral's contiguous display sequence beginning at ``S10001``.
+
+    Unlike the region-gapped IDs used by the clustered topology modes, the spiral
+    is itself the wayfinding hierarchy: following increasing display IDs traces
+    its guaranteed numerical backbone without a region-prefix discontinuity.
+    """
+    return {
+        sector_id: 10_000 + ordinal
+        for ordinal, sector_id in enumerate(sorted(sector_ids), start=1)
+    }

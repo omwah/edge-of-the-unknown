@@ -6,9 +6,12 @@ invariants hold every time, plus determinism from the seed.
 
 from __future__ import annotations
 
+import random
+
 import pytest
 
-from edge.bigbang.generator import generate
+from edge.bigbang.generator import build_graph, generate
+from edge.bigbang.numbering import assign_spiral_spatial_ids
 from edge.bigbang.topology import bfs_distances
 from edge.config import load_default_config
 from edge.core.enums import PortClass
@@ -370,3 +373,157 @@ def test_mesh_topology_generation() -> None:
             dr = abs(ru - rv)
             dc = abs(cu - cv)
             assert (dr == 1 and dc == 0) or (dr == 1 and dc == 1), f"Invalid mesh edge {u} ({ru},{cu}) -> {v} ({rv},{cv})"
+
+
+def test_spiral_topology_builds_dense_sequential_rings() -> None:
+    cfg = CONFIG.bigbang.model_copy(  # type: ignore[attr-defined]
+        update={
+            "topology_mode": "spiral",
+            "sector_count": 1_000,
+            "one_way_chance": 0.0,
+        }
+    )
+    adjacency, groups = build_graph(cfg, random.Random(4))
+
+    assert adjacency[1] == set(range(2, 8))
+    first_ring = list(range(2, 8))
+    for idx, sector_id in enumerate(first_ring):
+        assert first_ring[idx - 1] in adjacency[sector_id]
+        assert first_ring[(idx + 1) % len(first_ring)] in adjacency[sector_id]
+    hops = bfs_distances(adjacency, 1)
+    assert set(hops) == set(adjacency)
+    assert {sector_id: hops[sector_id] for sector_id in range(2, 8)} == {
+        sector_id: 1 for sector_id in range(2, 8)
+    }
+    assert all(hops[sector_id] == 2 for sector_id in range(8, 20))
+    assert max(map(len, adjacency.values())) == cfg.max_warps_per_sector
+    assert sum(len(warps) == cfg.max_warps_per_sector for warps in adjacency.values()) > 850
+    assert groups[0] == list(range(1, cfg.core_sector_count + 1))
+    spatial_ids = assign_spiral_spatial_ids(adjacency)
+    assert spatial_ids[1] == 10_001
+    assert spatial_ids[25] == 10_025
+    assert spatial_ids[26] == 10_026
+    assert 26 in adjacency[25] and 25 in adjacency[26]
+    spatial_order = sorted(spatial_ids, key=spatial_ids.__getitem__)
+    assert spatial_order == list(range(1, cfg.sector_count + 1))
+    assert all(
+        next_sector in adjacency[sector_id]
+        for sector_id, next_sector in zip(spatial_order, spatial_order[1:])
+    )
+
+
+@pytest.mark.parametrize("cap", [7, 8])
+def test_spiral_topology_uses_a_larger_configured_warp_cap(cap: int) -> None:
+    cfg = CONFIG.bigbang.model_copy(  # type: ignore[attr-defined]
+        update={
+            "topology_mode": "spiral",
+            "max_warps_per_sector": cap,
+            "sector_count": 1_000,
+        }
+    )
+    adjacency, _ = build_graph(cfg, random.Random(4))
+
+    assert adjacency[1] == set(range(2, cap + 2))
+    assert max(map(len, adjacency.values())) == cap
+    assert sum(len(warps) == cap for warps in adjacency.values()) >= 0.95 * len(adjacency)
+
+
+def test_spiral_topology_rejects_a_cap_too_small_for_dense_annuli() -> None:
+    cfg = CONFIG.bigbang.model_copy(  # type: ignore[attr-defined]
+        update={"topology_mode": "spiral", "max_warps_per_sector": 5}
+    )
+    with pytest.raises(ValueError, match="requires max_warps_per_sector >= 6"):
+        build_graph(cfg, random.Random(4))
+
+
+def test_spiral_wormholes_rewire_both_ends_of_nonconsecutive_edges() -> None:
+    from edge.core.movement import one_way_exits
+
+    base_cfg = CONFIG.bigbang.model_copy(  # type: ignore[attr-defined]
+        update={
+            "topology_mode": "spiral",
+            "sector_count": 1_000,
+            "one_way_chance": 0.0,
+        }
+    )
+    wormhole_cfg = base_cfg.model_copy(update={"one_way_chance": 1.0})
+    base, _ = build_graph(base_cfg, random.Random(4))
+    rewired, _ = build_graph(wormhole_cfg, random.Random(4))
+    runtime_adjacency = {
+        sector_id: tuple(sorted(targets))
+        for sector_id, targets in rewired.items()
+    }
+
+    sources = {
+        sector_id: one_way_exits(runtime_adjacency, sector_id)
+        for sector_id in rewired
+        if one_way_exits(runtime_adjacency, sector_id)
+    }
+    removed = {
+        (source, target)
+        for source, targets in base.items()
+        for target in targets
+        if source < target
+        and target not in rewired[source]
+        and source not in rewired[target]
+    }
+    removed_ends = {sector_id for edge in removed for sector_id in edge}
+
+    assert sources
+    assert removed_ends == set(sources)
+    assert all(abs(source - target) > 1 for source, target in removed)
+    assert all(source > wormhole_cfg.core_sector_count for source in sources)
+    assert all(len(targets) == 1 for targets in sources.values())
+    assert all(
+        target > wormhole_cfg.core_sector_count
+        and abs(target - source) >= wormhole_cfg.sector_count // 4
+        for source, targets in sources.items()
+        for target in targets
+    )
+    assert all(
+        next_sector in rewired[sector_id] and sector_id in rewired[next_sector]
+        for sector_id, next_sector in zip(range(1, 1_000), range(2, 1_001))
+    )
+
+
+def test_generated_spiral_wormholes_stay_outside_core_and_preserve_spatial_order() -> None:
+    from edge.core.enums import DiscoveryKind
+    from edge.core.movement import one_way_exits
+
+    cfg = CONFIG.model_copy(  # type: ignore[attr-defined]
+        update={
+            "bigbang": CONFIG.bigbang.model_copy(  # type: ignore[attr-defined]
+                update={
+                    "topology_mode": "spiral",
+                    "sector_count": 1_000,
+                    "one_way_chance": 0.15,
+                    "start_sector": 1,
+                }
+            )
+        }
+    )
+    state = generate(cfg, 4)  # type: ignore[arg-type]
+    sources = {
+        sector_id
+        for sector_id in state.sectors
+        if one_way_exits(state.adjacency, sector_id)
+    }
+    wormhole_sectors = {
+        discovery.sector_id
+        for discovery in state.discoveries.values()
+        if discovery.kind is DiscoveryKind.WORMHOLE
+    }
+    spatial_order = sorted(state.spatial_ids, key=state.spatial_ids.__getitem__)
+
+    assert wormhole_sectors == sources
+    assert sources
+    assert all(not state.sectors[sector_id].is_galactic_core for sector_id in sources)
+    assert all(
+        not state.sectors[target].is_galactic_core
+        for source in sources
+        for target in one_way_exits(state.adjacency, source)
+    )
+    assert all(
+        next_sector in state.adjacency[sector_id]
+        for sector_id, next_sector in zip(spatial_order, spatial_order[1:])
+    )

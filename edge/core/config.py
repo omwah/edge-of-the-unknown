@@ -187,6 +187,15 @@ def _mesh_bands() -> list[DistanceBand]:
     ]
 
 
+def _spiral_bands() -> list[DistanceBand]:
+    return [
+        DistanceBand(name="Hub", min_hops=0, max_hops=4),
+        DistanceBand(name="Frontier", min_hops=5, max_hops=9),
+        DistanceBand(name="Deep", min_hops=10, max_hops=14),
+        DistanceBand(name="Void", min_hops=15, max_hops=9_999),
+    ]
+
+
 class TopologyModeConfig(BaseModel):
     """The parameters specific to one `topology_mode` (DESIGN §5).
 
@@ -230,11 +239,14 @@ class TopologySet(BaseModel):
     mesh: TopologyModeConfig = Field(
         default_factory=lambda: TopologyModeConfig(bands=_mesh_bands())
     )
+    spiral: TopologyModeConfig = Field(
+        default_factory=lambda: TopologyModeConfig(bands=_spiral_bands())
+    )
 
     @model_validator(mode="after")
     def _check_names_match(self) -> TopologySet:
         names = [b.name for b in self.trunk.bands]
-        for mode_name in ("expansive", "planar", "mesh"):
+        for mode_name in ("expansive", "planar", "mesh", "spiral"):
             got = [b.name for b in getattr(self, mode_name).bands]
             if got != names:
                 raise ValueError(
@@ -256,14 +268,15 @@ class BigBangConfig(BaseModel):
     # band-lattice web: each group bridges to same-ring peers plus ≥2 inner
     # bridges, so every ring is a widening lattice with no single-bridge
     # chokepoint. The default stays `trunk`; the flip rides the WP22 config epoch.
-    topology_mode: Literal["trunk", "expansive", "planar", "mesh"] = "trunk"
+    topology_mode: Literal["trunk", "expansive", "planar", "mesh", "spiral"] = "trunk"
     # --- shared across all topology modes ---
     cluster_min: int = 5
     cluster_max: int = 25
     intra_group_degree: float = 2.5  # avg warps per sector inside a cluster (all modes)
     inter_group_degree: float = 2.5  # avg inter-cluster warps per cluster (all modes)
-    one_way_chance: float = 0.15  # probability a bridge is one-way (all modes)
-    max_warps_per_sector: int = 6  # TW2002 canon
+    one_way_chance: float = Field(default=0.15, ge=0.0, le=1.0)
+    # The nav rose has eight bearing slots; values above eight cannot be rendered.
+    max_warps_per_sector: int = Field(default=6, ge=1, le=8)  # TW2002 default: 6
     core_sector_count: int = 10  # Core Space = sectors 1..N
     # Alliance home clusters (§5 step 6, §6.3): each non-governing bloc in the cast gets
     # one compact cluster of [min, max] connected sectors in the Hub/inner-Frontier —
