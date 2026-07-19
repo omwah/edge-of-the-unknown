@@ -783,6 +783,11 @@ surrender or no. Speed wins, not attrition.\
     def _end_turn(self) -> None:
         rules.defense_phase(self.battle)
         self.drain_events()
+        if self.battle.outcome is None:  # new round: highlight the first platoon member
+            first = self._next_ready(after=None)
+            self.selected = first
+            if first is not None:
+                self.set_cursor(first.x, first.y)
         self.refresh_ui()
 
     def action_quit_battle(self) -> None:
