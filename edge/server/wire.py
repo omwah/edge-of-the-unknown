@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 24  # GW-WP04: PlanetDTO ground-access projection (ground_mode/blocker/settlements)
+WIRE_VERSION = 25  # GW-WP06: survey action commands/events (GroundMove/SurveyDig/SurveyTalk)
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -80,6 +80,8 @@ v22: `SetPlayerName` records authenticated multiplayer usernames in replayable p
 v24 (GW-WP04): `PlanetDTO` projects the one ground-access contract — `ground_mode`
 (orbital_only / survey / assault), `ground_blocker` (the orbital-only/assault-disabled
 reason or first standing siege rung), and `ground_settlements` (survey resupply available).
+v25 (GW-WP06): survey action commands `GroundMove`/`SurveyDig`/`SurveyTalk` + events
+`GroundMoved`/`SurveyDug`/`SurveySiteExcavated`/`SurveyTalked` (walk/dig/talk, D4-D6).
 """
 
 

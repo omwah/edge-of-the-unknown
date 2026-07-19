@@ -143,6 +143,7 @@ from edge.core.events import (
     EncounterStarted,
     Event,
     GenesisDeployed,
+    GroundMoved,
     GroundOperationBegan,
     GroundOperationEnded,
     GrudgeFormed,
@@ -153,6 +154,9 @@ from edge.core.events import (
     ShipDestroyed,
     ShipPurchased,
     SiteExplored,
+    SurveyDug,
+    SurveySiteExcavated,
+    SurveyTalked,
     StarbaseClaimed,
     StarbaseRazed,
     StarbaseRepaired,
@@ -202,7 +206,8 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.groundwar.access import Survey, ground_access
-from edge.core.groundwar.models import SurveyOperation, SurveyProgress
+from edge.core.groundwar.models import ArtifactRecord, SurveyOperation, SurveyProgress
+from edge.core.groundwar import survey as gw_survey
 from edge.core.groundwar.survey import eligible_surface_site_ids
 from edge.core.market import PortOrder
 from edge.core.movement import MovementError, can_warp, shortest_path
@@ -520,6 +525,45 @@ class ExtractGroundOperation:
     legal while an operation is live — extraction is never barred (D4/D12) — and
     validates `operation_id` against the active operation. Rich win/loss settlement for
     assaults arrives with GW-WP11.
+    """
+
+    operation_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class GroundMove:
+    """March the survey explorer toward `(x, y)` (GW-WP06, D4/D12).
+
+    The pure `survey_move` walks the cheapest path, one supply per local turn, halting on
+    exhaustion, newly-sighted disturbed ground, or an unaffordable macro-turn threshold.
+    Main-game turns are charged in the configured D4 quanta (movement only). `actor_id` is
+    the explorer (a survey has one); it is carried for wire parity with the tactical assault.
+    """
+
+    operation_id: int
+    x: int
+    y: int
+    actor_id: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class SurveyDig:
+    """Open a trench where the explorer stands (GW-WP06, D6).
+
+    A site inside the trench is uncovered and its artifact + codex reward settled atomically
+    (no second collect step, no hold gate). A dry dig spends supplies; re-digging spent ground
+    is free. Costs no main-game turns.
+    """
+
+    operation_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class SurveyTalk:
+    """Talk to a settlement the explorer stands in (GW-WP06, D5).
+
+    Resupplies and narrows one still-unhinted site's search circle (persisted in the survey
+    progress). Costs no main-game turns.
     """
 
     operation_id: int
@@ -1023,6 +1067,7 @@ Command = (
     | TransferCargo | BatchTransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BeginSurvey | ExtractGroundOperation
+    | GroundMove | SurveyDig | SurveyTalk
     | MineBelt | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
@@ -1185,6 +1230,12 @@ def reduce(
             return _begin_survey(state, player_id, command, config)
         case ExtractGroundOperation():
             return _extract_ground_operation(state, player_id, command, config)
+        case GroundMove():
+            return _ground_move(state, player_id, command, config)
+        case SurveyDig():
+            return _survey_dig(state, player_id, command, config)
+        case SurveyTalk():
+            return _survey_talk(state, player_id, command, config)
         case MineBelt():
             return _mine_belt(state, player_id, command, config)
         case BuyGenesis():
@@ -3701,6 +3752,107 @@ def _extract_ground_operation(
         events=(GroundOperationEnded(
             player_id, operation.operation_id, operation.kind,
             operation.outcome or "extracted"),),
+        players=(new_player,),
+    )
+
+
+def _active_survey(
+    state: UniverseState, player_id: int, operation_id: int
+) -> tuple[Player, SurveyOperation]:
+    """The player's live survey operation, validated against `operation_id` (GW-WP06, G9/G10).
+
+    Rejects a stale/mismatched id or an assault operation, so a crafted command cannot act on
+    someone else's or a settled operation.
+    """
+    player = _player(state, player_id)
+    op = player.ground_operation
+    if not isinstance(op, SurveyOperation):
+        raise MovementError("you have no active survey")
+    if op.operation_id != operation_id:
+        raise MovementError("that is not your active survey operation")
+    return player, op
+
+
+def _ground_move(
+    state: UniverseState, player_id: int, cmd: GroundMove, config: GameConfig
+) -> ReduceResult:
+    """March the survey explorer, charging macro-turns in the D4/D12 quanta (GW-WP06)."""
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _active_survey(state, player_id, cmd.operation_id)
+    smap = gw_survey.survey_map_for(state, op, config)
+    result = gw_survey.survey_move(op, smap, config, player.turns_remaining, cmd.x, cmd.y)
+    new_player = replace(player, ground_operation=result.operation,
+                         turns_remaining=player.turns_remaining - result.main_turns)
+    return ReduceResult(
+        events=(GroundMoved(player_id, op.operation_id, result.operation.explorer_x,
+                            result.operation.explorer_y, result.main_turns),),
+        players=(new_player,),
+    )
+
+
+def _survey_dig(
+    state: UniverseState, player_id: int, cmd: SurveyDig, config: GameConfig
+) -> ReduceResult:
+    """Dig a trench; a hit settles the discovery's artifact + codex reward atomically (D6/D10).
+
+    The reward rides the existing discovery rail (detection + codex + experience + `found_by`),
+    plus a provenance-bearing `ArtifactRecord` (D10) — never latinum or loose parts, and never
+    a second collect step. A site already collected by another player is re-logged to *this*
+    player's codex but mints no second artifact (conservation, G8).
+    """
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _active_survey(state, player_id, cmd.operation_id)
+    smap = gw_survey.survey_map_for(state, op, config)
+    result = gw_survey.survey_dig(op, smap, config)
+    new_player = replace(player, ground_operation=result.operation)
+    if result.excavated_id is None:
+        return ReduceResult(
+            events=(SurveyDug(player_id, op.operation_id, op.explorer_x, op.explorer_y, -1),),
+            players=(new_player,),
+        )
+    disc = state.discoveries.get(result.excavated_id)
+    events: list[Event] = [
+        SurveyDug(player_id, op.operation_id, op.explorer_x, op.explorer_y, result.excavated_id)]
+    if disc is None:  # defensive: the site named a discovery that no longer exists
+        return ReduceResult(events=tuple(events), players=(new_player,))
+    if disc.found_by is not None:
+        # Already excavated (a multiplayer race, G8): log knowledge, mint no second artifact.
+        new_player = replace(new_player, detected=new_player.detected | frozenset({disc.id}),
+                             codex=new_player.codex | frozenset({disc.id}))
+        return ReduceResult(events=tuple(events), players=(new_player,))
+    xp = config.aliens.experience_per_discovery if disc.id not in player.codex else 0
+    record = ArtifactRecord(
+        discovery_id=disc.id, origin_planet_id=disc.planet_id if disc.planet_id is not None else op.planet_id,
+        origin_site=disc.name or disc.kind.value, rarity=disc.rarity_tier.name,
+        research_domain=disc.kind.value, lore_key=disc.payload.lore or disc.name or disc.kind.value,
+        acquired_day=state.game.day_number)
+    new_player = replace(
+        new_player, detected=new_player.detected | frozenset({disc.id}),
+        codex=new_player.codex | frozenset({disc.id}), experience=new_player.experience + xp,
+        artifact_records=(*new_player.artifact_records, record))
+    events.append(SurveySiteExcavated(player_id, op.operation_id, disc.id,
+                                      disc.kind.value, disc.rarity_tier.name))
+    return ReduceResult(events=tuple(events), players=(new_player,),
+                        discoveries=(replace(disc, found_by=player_id),))
+
+
+def _survey_talk(
+    state: UniverseState, player_id: int, cmd: SurveyTalk, config: GameConfig
+) -> ReduceResult:
+    """Resupply and take one settlement hint (GW-WP06, D5)."""
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _active_survey(state, player_id, cmd.operation_id)
+    smap = gw_survey.survey_map_for(state, op, config)
+    town = gw_survey.settlement_at(smap, op.explorer_x, op.explorer_y)
+    result = gw_survey.survey_talk(op, smap, config)
+    new_player = replace(player, ground_operation=result.operation)
+    hinted_id = next(iter(result.operation.hinted_discovery_ids - op.hinted_discovery_ids), -1)
+    return ReduceResult(
+        events=(SurveyTalked(player_id, op.operation_id,
+                             town.id if town is not None else -1, hinted_id),),
         players=(new_player,),
     )
 
