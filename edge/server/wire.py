@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 22
+WIRE_VERSION = 23  # GW-WP03: BeginSurvey/ExtractGroundOperation commands + ground-op events
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
