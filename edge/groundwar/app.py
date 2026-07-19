@@ -1,7 +1,7 @@
 """`edge-groundwar` — the ground-war POC's Textual shell.
 
 Throwaway UI (the `tui`-tier exemption) over the pure `config`/`mapgen`/`rules`
-stack: a setup screen (planet type, difficulty, seed, point-budget platoon), then
+stack: a setup screen (planet type, difficulty, seed, latinum-budget platoon), then
 a battle screen — a scrolling viewport over the full terrain-art battlefield with
 a deploy mode (place the drop), IGOUGO play, a status sidebar, a combat log, and
 modest cell-flash FX. The UI only *reads* `Battle` and drains `Battle.events`;
@@ -58,6 +58,13 @@ _FLASH_KINDS = {"hit": "on red", "killed": "on bright_red", "destroyed": "on yel
                 "shot": "on grey54", "missile": "on orange1", "miss": "on grey35",
                 "drop": "on green", "jump": "on green", "broadcast": "on cyan",
                 "sortie": "on red"}
+
+# Radar overlay (y): background washes for cells an enemy weapon bears on. The AA
+# umbrella (anti-drop / anti-jump) is drawn in amber and last, so it dominates any
+# overlap — steering the drop and jumps clear of it is the whole point; ground guns
+# (turret / citadel gun / garrison) wash dark red.
+AA_THREAT_BG = "on #3a2708"
+GROUND_THREAT_BG = "on #3a1414"
 
 
 _CONVENTIONS = """\
@@ -178,6 +185,7 @@ class MapView(Widget, can_focus=True):
         scr.flashes = {k: v for k, v in scr.flashes.items() if v[1] > now}
         sel = scr.selected
         reach = scr.reachable_cache
+        scr.threat_cache = scr.threat_tints() if scr.show_threat else {}
         out = Text(no_wrap=True)
         for row in range(h):
             y = self.cam_y + row
@@ -223,6 +231,9 @@ class MapView(Widget, can_focus=True):
         style = f"{fg} on {bg}" if bg and bg != "black" else fg
         if sel is not None and (x, y) in reach:
             style = f"{fg} on grey27"
+        tint = scr.threat_cache.get((x, y))
+        if tint is not None:  # radar overlay wins on open ground (structures keep theirs)
+            style = f"{fg} {tint}"
         return ch, style or "white"
 
     async def _on_click(self, event: events.Click) -> None:
@@ -262,7 +273,12 @@ a cowed city ([b]b[/], within range of its center).
 [b]Detection[/] — sensor towers light you up (Scouts jam them up close); unseen \
 suits shoot with a first-strike bonus, but firing reveals you. Jumping is fast \
 and clears any terrain, but live AA fires on you mid-air — as it does at your \
-drop capsules.
+drop capsules, hardest at point-blank. Land clear of the AA umbrella and march \
+in; jump only when you must.
+
+[b]Radar[/] ([b]y[/]) — washes every cell an enemy weapon covers: [orange1]amber[/] \
+is the AA umbrella (drop/jump danger), [red]red[/] is gun range (turrets, the \
+citadel gun, garrison). Use it to pick a safe landing zone and a route in.
 
 [b]The clock[/] — sorties spawn and defenses stiffen every few turns; casualties \
 past the doctrine ceiling abort the mission; and the boat leaves on schedule, \
@@ -276,6 +292,7 @@ surrender or no. Speed wins, not attrition.\
         ("Enter", "drop the selected trooper's capsule at the cursor"),
         ("c", "scatter the rest of the stick around the cursor"),
         ("u", "undo the last placement"),
+        ("y", "toggle the enemy-range radar (amber = AA umbrella, red = gun range)"),
         ("q", "abort back to setup"),
     ]
     _PLAY_KEYS = [
@@ -288,6 +305,7 @@ surrender or no. Speed wins, not attrition.\
         ("f", "fire at the cursor cell"),
         ("i", "fire a homing missile at the cursor cell"),
         ("b", "broadcast terms (Command suit, over a cowed city)"),
+        ("y", "toggle the enemy-range radar (amber = AA umbrella, red = gun range)"),
         ("Space", "end turn — the planet takes its go"),
         ("q", "abort the mission"),
     ]
@@ -307,6 +325,8 @@ surrender or no. Speed wins, not attrition.\
          "military block (drains resolve) / civilian block (atrocity — hardens it)"),
         ("[grey42]▒[/]", "rubble (passable, decent cover)"),
         ("[white on grey27] [/]", "tinted ground — where the selected trooper can walk"),
+        ("[white on #3a2708] [/] [white on #3a1414] [/]",
+         "radar (y): AA umbrella (amber) / enemy gun range (red)"),
     ]
 
     @property
@@ -332,6 +352,8 @@ surrender or no. Speed wins, not attrition.\
         self.selected: Trooper | None = None
         self.reachable_cache: dict[tuple[int, int], int] = {}
         self.flashes: dict[tuple[int, int], tuple[str, float]] = {}
+        self.show_threat = False  # enemy-range radar overlay (y toggles)
+        self.threat_cache: dict[tuple[int, int], str] = {}
 
     @staticmethod
     def _first_landable(battle: Battle) -> tuple[int, int]:
@@ -375,8 +397,9 @@ surrender or no. Speed wins, not attrition.\
         log.write(Text("MOBILE INFANTRY DROP — place your capsules. Tab picks the next "
                        "trooper from the roster (placed ones grey out); the cursor shows "
                        "the landing point: green = clear skies, red = inside AA cover "
-                       "(flak on the way down). Enter drops the capsule, 'c' scatters "
-                       "the rest, ? for help.", style="bold"))
+                       "(flak on the way down). Press 'y' for the enemy-range radar to "
+                       "see the AA umbrella at a glance. Enter drops the capsule, 'c' "
+                       "scatters the rest, ? for help.", style="bold"))
         self.query_one(MapView).focus()
         self.refresh_ui()
 
@@ -449,6 +472,42 @@ surrender or no. Speed wins, not attrition.\
         self.query_one(MapView).refresh()
         self.query_one("#sidebar", Static).update(self._sidebar())
 
+    # --- radar overlay ---------------------------------------------------------
+
+    def threat_tints(self) -> dict[tuple[int, int], str]:
+        """Every cell an alive enemy weapon bears on — the radar overlay (y).
+        Ground guns (turret, citadel gun, garrison) wash dark red; the AA umbrella
+        (anti-drop / anti-jump) washes amber over the top. Pure weapon range, not
+        line of sight, so it reads as a stable danger radius while you plan."""
+        b = self.battle
+        d = b.config.defenses
+        out: dict[tuple[int, int], str] = {}
+
+        def paint(cx: int, cy: int, rng: int, tint: str) -> None:
+            for dx in range(-rng, rng + 1):
+                for dy in range(-rng, rng + 1):
+                    x, y = cx + dx, cy + dy
+                    if (dx or dy) and b.in_bounds(x, y) and rules.dist(cx, cy, x, y) <= rng:
+                        out[(x, y)] = tint
+
+        # Ground fire first...
+        for s in b.structures.values():
+            if not s.alive:
+                continue
+            if s.kind == "turret":
+                paint(s.x, s.y, d.turret.range, GROUND_THREAT_BG)
+            elif s.kind == "citadel_gun":
+                paint(s.x, s.y, d.citadel_gun.range, GROUND_THREAT_BG)
+        for g in b.garrison.values():
+            if g.alive:
+                gcls = getattr(b.config.garrison, g.kind)
+                paint(g.x, g.y, gcls.weapon.range, GROUND_THREAT_BG)
+        # ...then the AA umbrella last, so it dominates any overlap.
+        for s in b.structures.values():
+            if s.alive and s.kind == "aa":
+                paint(s.x, s.y, d.aa.range, AA_THREAT_BG)
+        return out
+
     # --- sidebar ---------------------------------------------------------------
 
     def _sidebar(self) -> Text:
@@ -480,6 +539,8 @@ surrender or no. Speed wins, not attrition.\
                 line("cursor: " + ("IN AA COVER — flak!" if danger else "clear skies"),
                      "bold red" if danger else "green")
             line("")
+            line(f"y radar: {'ON — steer clear of amber' if self.show_threat else 'off'}",
+                 "bold orange1" if self.show_threat else "grey66")
             line("tab next · Enter place", "grey66")
             line("c scatter rest · u undo", "grey66")
             return out
@@ -535,6 +596,8 @@ surrender or no. Speed wins, not attrition.\
                  "bold bright_green" if won else "bold red")
             line("q to return to setup", "grey66")
         else:
+            line(f"y radar: {'ON' if self.show_threat else 'off'}",
+                 "bold orange1" if self.show_threat else "grey66")
             line("tab select · m move · g jump", "grey66")
             line("f fire · i missile · b terms", "grey66")
             line("space end turn · q abort", "grey66")
@@ -566,6 +629,11 @@ surrender or no. Speed wins, not attrition.\
             b = self.battle
             self.cur_x = max(0, min(b.config.width - 1, self.cur_x + view.cam_x - old_x))
             self.cur_y = max(0, min(b.config.height - 1, self.cur_y + view.cam_y - old_y))
+            self.refresh_ui()
+            event.stop()
+            return
+        if event.key == "y":  # enemy-range radar — usable in deploy and play
+            self.show_threat = not self.show_threat
             self.refresh_ui()
             event.stop()
             return
@@ -719,7 +787,7 @@ class SetupScreen(Screen[None]):
 [b]Expedition[/] is the peaceful archaeology survey on a friendly world — no \
 platoon, just you, a scanner, and the ground.
 
-[b]Assault[/] — compose the drop against the boat's point budget; the class \
+[b]Assault[/] — compose the drop against your latinum budget; the class \
 [b]mixture[/] is the puzzle, and what lands is all you get. \
 [b]Marauder[/]: heavy armor, the guns that break turrets and walls. \
 [b]Scout[/]: fast and far-seeing, jams city sensors; barely armed. \
@@ -776,7 +844,7 @@ The same seed always builds the same map, in either mode.\
     def on_mount(self) -> None:
         self._update()
 
-    def _points(self) -> int:
+    def _latinum(self) -> int:
         return sum(self.config.suits[k].cost * n for k, n in self.counts.items())
 
     def _update(self) -> None:
@@ -822,15 +890,15 @@ The same seed always builds the same map, in either mode.\
             launch.disabled = False
             return
         launch.label = "DROP!"
-        pts = self._points()
+        spent = self._latinum()
         total = sum(self.counts.values())
-        over = pts > self.config.budget or total > self.config.max_troopers
+        over = spent > self.config.latinum_budget or total > self.config.max_troopers
         text = Text()
         for k, n in self.counts.items():
             s = self.config.suits[k]
-            text.append(f"  {s.label:<9} ×{n}  ({s.cost} pts — "
+            text.append(f"  {s.label:<9} ×{n}  ({s.cost} lat — "
                         f"{'heavy firepower' if k == 'marauder' else 'recon/jam' if k == 'scout' else 'aura/terms'})\n")
-        text.append(f"\n  {total} troopers · {pts}/{self.config.budget} points",
+        text.append(f"\n  {total} troopers · {spent}/{self.config.latinum_budget} latinum",
                     "bold red" if over else "bold bright_green")
         if not any(self.counts.values()):
             text.append("  — drop something!", "bold red")

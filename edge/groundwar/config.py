@@ -90,6 +90,7 @@ class EmplacementStats:
     damage: int = 0
     accuracy: float = 0.0
     radius: int = 0
+    point_blank_bonus: float = 0.0  # accuracy added at the muzzle, fading to 0 at `range`
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,7 +161,7 @@ class GroundwarConfig:
     height: int
     pressure: PressureConfig
     resolve: ResolveConfig
-    budget: int
+    latinum_budget: int       # latinum available to outfit the drop squad
     max_troopers: int
     actions_per_turn: int
     suits: dict[str, SuitClass]
@@ -198,6 +199,7 @@ def _emplacement(d: dict[str, float]) -> EmplacementStats:
     return EmplacementStats(
         hp=int(d["hp"]), range=int(d.get("range", 0)), damage=int(d.get("damage", 0)),
         accuracy=float(d.get("accuracy", 0.0)), radius=int(d.get("radius", 0)),
+        point_blank_bonus=float(d.get("point_blank_bonus", 0.0)),
     )
 
 
@@ -242,7 +244,7 @@ def load_config(path: Path | None = None) -> GroundwarConfig:
             escalation_acc_cap=float(pr["escalation_acc_cap"]),
         ),
         resolve=ResolveConfig(**{k: int(v) for k, v in rs.items()}),
-        budget=int(data["platoon"]["budget"]),
+        latinum_budget=int(data["platoon"]["latinum"]),
         max_troopers=int(data["platoon"]["max_troopers"]),
         actions_per_turn=int(data["platoon"].get("actions_per_turn", 2)),
         suits={key: _suit(key, d) for key, d in data["suits"].items()},
