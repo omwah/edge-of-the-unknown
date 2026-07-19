@@ -245,8 +245,14 @@ class BattleScreen(Screen[None]):
 
     BINDINGS = [
         ("q", "quit_battle", "Abort"),
+        Binding("z", "toggle_log", "Log"),
         Binding("question_mark", "help", "Help"),
     ]
+
+    # Log panel heights: a 2-line peek by default (height = 2 lines + the top
+    # border), expandable to the full readable size with `z`.
+    LOG_COLLAPSED_H = 3
+    LOG_EXPANDED_H = 9
 
     HELP_TITLE = "Battle"
     HELP = """\
@@ -293,6 +299,7 @@ surrender or no. Speed wins, not attrition.\
         ("c", "scatter the rest of the stick around the cursor"),
         ("u", "undo the last placement"),
         ("y", "toggle the enemy-range radar (amber = AA umbrella, red = gun range)"),
+        ("z", "expand / collapse the combat-log panel"),
         ("q", "abort back to setup"),
     ]
     _PLAY_KEYS = [
@@ -306,6 +313,7 @@ surrender or no. Speed wins, not attrition.\
         ("i", "fire a homing missile at the cursor cell"),
         ("b", "broadcast terms (Command suit, over a cowed city)"),
         ("y", "toggle the enemy-range radar (amber = AA umbrella, red = gun range)"),
+        ("z", "expand / collapse the combat-log panel"),
         ("Space", "end turn — the planet takes its go"),
         ("q", "abort the mission"),
     ]
@@ -336,6 +344,11 @@ surrender or no. Speed wins, not attrition.\
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen(self))
 
+    def action_toggle_log(self) -> None:
+        self.log_expanded = not self.log_expanded
+        self.query_one("#log", RichLog).styles.height = (
+            self.LOG_EXPANDED_H if self.log_expanded else self.LOG_COLLAPSED_H)
+
     def __init__(self, config: GroundwarConfig, battle: Battle,
                  loadout: dict[str, int]) -> None:
         super().__init__()
@@ -354,6 +367,7 @@ surrender or no. Speed wins, not attrition.\
         self.flashes: dict[tuple[int, int], tuple[str, float]] = {}
         self.show_threat = False  # enemy-range radar overlay (y toggles)
         self.threat_cache: dict[tuple[int, int], str] = {}
+        self.log_expanded = False  # combat-log panel starts as a 2-line peek (z expands)
 
     @staticmethod
     def _first_landable(battle: Battle) -> tuple[int, int]:
@@ -962,7 +976,7 @@ class GroundwarApp(App[None]):
     #map { width: 1fr; height: 100%; }
     #sidebar { width: 34; height: 100%; padding: 0 1; background: $surface;
                border-left: solid $primary; }
-    #log { height: 9; border-top: solid $primary; }
+    #log { height: 3; border-top: solid $primary; }
     #setup { padding: 1 2; }
     #title { padding: 1 0; }
     #setup .row { height: 3; }

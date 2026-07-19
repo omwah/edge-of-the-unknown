@@ -258,8 +258,14 @@ class BattleScreen(Screen[None]):
 
     BINDINGS = [
         ("q", "quit_battle", "Abort"),
+        Binding("z", "toggle_log", "Log"),
         Binding("question_mark", "help", "Help"),
     ]
+
+    # Log panel heights: a 2-line peek by default (height = 2 lines + the top
+    # border), expandable to the full readable size with `z`.
+    LOG_COLLAPSED_H = 3
+    LOG_EXPANDED_H = 9
 
     HELP_TITLE = "Space battle"
     HELP = """\
@@ -339,6 +345,7 @@ behind it, through the perimeter, is the whole battle.\
         ("v", "pre-launch a fighter wing at the cursor"),
         ("x", "pick the asset under the cursor back up (ship/mine/wing)"),
         ("u", "undo the last ship placement"),
+        ("z", "expand / collapse the combat-log panel"),
         ("Space", "done — sound general quarters"),
         ("q", "abort back to setup"),
     ]
@@ -350,6 +357,7 @@ behind it, through the perimeter, is the whole battle.\
         ("x", "pick the ship under the cursor back up"),
         ("u", "undo the last ship placement"),
         ("y", "toggle the enemy threat overlay (their gun arcs)"),
+        ("z", "expand / collapse the combat-log panel"),
         ("Space", "done — you are committed"),
         ("q", "abort back to setup"),
     ]
@@ -370,6 +378,7 @@ behind it, through the perimeter, is the whole battle.\
         ("p", "launch a recon drone at the cursor (reveals mines around it)"),
         ("u", "damage control — whole turn, restores one knocked-out component"),
         ("y", "toggle the enemy threat overlay (their gun arcs, dark red)"),
+        ("z", "expand / collapse the combat-log panel"),
         ("m / Enter", "wing: dash to the cursor"),
         ("g", "wing: strafe/dogfight the target under the cursor"),
         ("e", "wing: intercept the salvo under the cursor"),
@@ -388,6 +397,11 @@ behind it, through the perimeter, is the whole battle.\
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen(self))
 
+    def action_toggle_log(self) -> None:
+        self.log_expanded = not self.log_expanded
+        self.query_one("#log", RichLog).styles.height = (
+            self.LOG_EXPANDED_H if self.log_expanded else self.LOG_COLLAPSED_H)
+
     def __init__(self, config: SpacebattleConfig, battle: Battle,
                  scenario: Scenario, lance_refit: bool = False) -> None:
         super().__init__()
@@ -403,6 +417,7 @@ behind it, through the perimeter, is the whole battle.\
         self.place_order: list[DeployShip] = []
         self.selected: Ship | FighterWing | None = None
         self.show_threat = False  # enemy gun-arc threat overlay (T toggles)
+        self.log_expanded = False  # combat-log panel starts as a 2-line peek (z expands)
         self.flashes: dict[tuple[int, int], tuple[str, float]] = {}
         # Main-game PortGenerator starbase art, rasterized once per station.
         self._station_art_cache: dict[int, list[tuple[int, int, str, str]]] = {}
@@ -1408,7 +1423,7 @@ class SpacebattleApp(App[None]):
     #map { width: 1fr; height: 100%; }
     #sidebar { width: 36; height: 100%; padding: 0 1; background: $surface;
                border-left: solid $primary; }
-    #log { height: 9; border-top: solid $primary; }
+    #log { height: 3; border-top: solid $primary; }
     #setup { padding: 1 2; height: 1fr; }
     #title { padding: 0 0 1 0; }
     #setup .row { height: auto; margin-bottom: 1; }
