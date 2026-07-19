@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 
 from edge.core.models import Game, Planet, Player, Sector, Ship, UniverseState
@@ -141,6 +142,51 @@ def test_layout_is_deterministic() -> None:
     assert _rows(a) == _rows(b)
 
 
+def test_spiral_layout_spreads_same_radius_sectors_across_columns() -> None:
+    """Dense spiral rings use their radial/tangential embedding, not one tall hop column."""
+    state = UniverseState.new(Game(id=1, seed=1, config_version=1, created_at="t"))
+    side = 7
+    sector_at = {(x, y): y * side + x + 1 for y in range(side) for x in range(side)}
+    center = sector_at[(3, 3)]
+    state.sectors = {}
+    for (x, y), sector_id in sector_at.items():
+        neighbors = tuple(
+            sector_at[(nx, ny)]
+            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1))
+            if (nx, ny) in sector_at
+        )
+        state.sectors[sector_id] = Sector(
+            id=sector_id, region_id=1, warps_out=neighbors, distance_band="Frontier"
+        )
+    state.rebuild_adjacency()
+    state.topology_mode = "spiral"
+    state.core_hops = {sector_id: 5 for sector_id in state.sectors}
+    state.spatial_ids = {sector_id: 10_000 + sector_id for sector_id in state.sectors}
+    state.sector_pos = {
+        sector_id: (5.0 + x - 3, float(y - 3))
+        for (x, y), sector_id in sector_at.items()
+    }
+    state.ships = {
+        1: Ship(
+            id=1, type_id="t", name="S", owner_player_id=1,
+            sector_id=center, holds_total=10, turns_per_warp=1,
+        )
+    }
+    state.players = {
+        1: Player(
+            id=1, name="you", ship_id=1, latinum=0, turns_remaining=99,
+            explored_sectors=frozenset(state.sectors),
+        )
+    }
+
+    placed, _hops, _cell_w, present, _col_x, _center_row, _width, height = (
+        mapgraph._layout_map_nodes(state, state.players[1], center, radius=3)
+    )
+    assert present == list(range(-3, 4))
+    assert len(placed) == 25  # the radius-3 Manhattan diamond
+    assert height <= 15       # seven short columns, not one 51-row column
+
+
 def test_fit_to_width_grows_reach_to_fill_the_screen() -> None:
     # Sectors 4 and 6 sit two hops out (offset +2) — only a reach ≥ 2 includes them.
     state = _world(explored=frozenset({1, 2, 3, 4, 5, 6}))
@@ -224,3 +270,51 @@ def test_fit_to_width_never_exceeds_the_budget() -> None:
         rows, _legend, _nodes = mapgraph.build_local_map(
             state, state.players[1], max_width=budget)
         assert max(len(_strip(r)) for r in rows) <= budget
+
+
+def test_fit_to_width_also_caps_dense_map_height() -> None:
+    """A graph can fit horizontally while exploding vertically; fitting bounds both axes."""
+    state = UniverseState.new(Game(id=1, seed=1, config_version=1, created_at="t"))
+    count = 200
+    state.sectors = {}
+    for sector_id in range(1, count + 1):
+        neighbors = {
+            (sector_id - 2) % count + 1,
+            sector_id % count + 1,
+            (sector_id - 3) % count + 1,
+            (sector_id + 1) % count + 1,
+            (sector_id - 4) % count + 1,
+            (sector_id + 2) % count + 1,
+        }
+        state.sectors[sector_id] = Sector(
+            id=sector_id, region_id=1, warps_out=tuple(sorted(neighbors)),
+            distance_band="Frontier",
+        )
+    state.rebuild_adjacency()
+    state.topology_mode = "spiral"
+    state.core_hops = {sector_id: 10 for sector_id in state.sectors}
+    state.spatial_ids = {sector_id: 10_000 + sector_id for sector_id in state.sectors}
+    state.sector_pos = {
+        sector_id: (
+            10.0 * math.cos(2.0 * math.pi * (sector_id - 1) / count),
+            10.0 * math.sin(2.0 * math.pi * (sector_id - 1) / count),
+        )
+        for sector_id in state.sectors
+    }
+    state.ships = {
+        1: Ship(
+            id=1, type_id="t", name="S", owner_player_id=1,
+            sector_id=1, holds_total=10, turns_per_warp=1,
+        )
+    }
+    state.players = {
+        1: Player(
+            id=1, name="you", ship_id=1, latinum=0, turns_remaining=99,
+            explored_sectors=frozenset(state.sectors),
+        )
+    }
+
+    rows, _legend, _nodes = mapgraph.build_local_map(
+        state, state.players[1], max_width=180
+    )
+    assert len(rows) <= mapgraph._MAX_FIT_ROWS
