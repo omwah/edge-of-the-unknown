@@ -1,7 +1,9 @@
 """Procedural terrain generation using OpenSimplex noise."""
 
+import colorsys
 import random
 from opensimplex import OpenSimplex
+from rich.color import Color
 from rich.text import Text
 
 from edge.art.noise import fractal_noise
@@ -171,12 +173,54 @@ BIOMES_REGISTRY = {
     }
 }
 
+# Some biome bands authored a foreground glyph colour that sits too close to its
+# background to read (e.g. `green` on `dark_green`). `readable_fg` measures the
+# perceived-luminance gap and, only when a band falls below `_CONTRAST_TRIGGER`,
+# nudges the foreground to a hue-preserving lighter/darker variant just past
+# `_CONTRAST_TARGET`. Enforcing the "fg must read against bg" convention in code
+# keeps every biome and roster legible without per-band colour tables.
+_CONTRAST_TRIGGER = 0.20  # correct a band only when its fg/bg gap is below this
+_CONTRAST_TARGET = 0.35   # push the adjusted fg at least this far from the bg
+
+
+def _luminance(rgb: tuple[float, float, float]) -> float:
+    """Rec.601 perceived luminance of an (r, g, b) triple in 0..1."""
+    r, g, b = rgb
+    return 0.299 * r + 0.587 * g + 0.114 * b
+
+
+def readable_fg(fg: str, bg: str) -> str:
+    """`fg` unchanged if it reads against `bg`, else a hue-preserving variant
+    (lighter over a dark bg, darker over a light one) with enough contrast."""
+    try:
+        f = Color.parse(fg).get_truecolor()
+        b = Color.parse(bg).get_truecolor()
+    except Exception:  # unknown colour name — leave it to the terminal
+        return fg
+    frgb = (f.red / 255, f.green / 255, f.blue / 255)
+    bg_lum = _luminance((b.red / 255, b.green / 255, b.blue / 255))
+    if abs(_luminance(frgb) - bg_lum) >= _CONTRAST_TRIGGER:
+        return fg
+    h, ell, s = colorsys.rgb_to_hls(*frgb)
+    direction = 1.0 if bg_lum < 0.5 else -1.0  # move away from the background
+    best = frgb
+    for step in range(1, 21):
+        new_l = min(1.0, max(0.0, ell + direction * step * 0.05))
+        best = colorsys.hls_to_rgb(h, new_l, s)
+        if abs(_luminance(best) - bg_lum) >= _CONTRAST_TARGET:
+            break
+        if new_l in (0.0, 1.0):  # ran out of lightness room in this direction
+            break
+    r, g, bl = (round(c * 255) for c in best)
+    return f"#{r:02x}{g:02x}{bl:02x}"
+
+
 def get_biome_feature(val: float, biomes: list[tuple[float, str, str, str]]) -> tuple[str, str, str]:
-    """Return the feature name, fg, and bg color for a given noise value."""
+    """Return the feature name, and a legible fg/bg colour pair, for a noise value."""
     for threshold, feature_name, fg, bg in biomes:
         if val <= threshold:
-            return feature_name, fg, bg
-    return biomes[-1][1], biomes[-1][2], biomes[-1][3]
+            return feature_name, readable_fg(fg, bg), bg
+    return biomes[-1][1], readable_fg(biomes[-1][2], biomes[-1][3]), biomes[-1][3]
 
 def resolve_feature_char(rng: random.Random, feature_name: str, features_registry: dict[str, list[tuple[str, int]]]) -> str:
     """Resolve a feature name to a specific character based on frequencies."""
