@@ -157,6 +157,10 @@ def load_config_with_sidecar(
     if names_file is not None and "names" not in data:
         with open(config_path.parent / names_file, encoding="utf-8") as fh:
             data["names"] = yaml.safe_load(fh)
+    groundwar_file = data.pop("groundwar_file", None)
+    if groundwar_file is not None and "groundwar" not in data:
+        with open(config_path.parent / groundwar_file, encoding="utf-8") as fh:
+            data["groundwar"] = yaml.safe_load(fh)
     with open(sidecar, encoding="utf-8") as fh:
         _merge_dialogue(data["roster"], yaml.safe_load(fh) or {})
     return GameConfig.from_mapping(data)

@@ -233,7 +233,8 @@ def _check_species(state: UniverseState, config: GameConfig) -> None:
                 gov_in_core += 1
         band = state.sectors[sp.sector_id].distance_band
         friendly = is_friendly(sp.base_disposition, config.aliens)
-        if band == innermost and not friendly:
+        is_in_home_cluster = any(sp.sector_id in sectors for sectors in state.home_clusters.values())
+        if band == innermost and not friendly and not is_in_home_cluster:
             raise ValidationError(f"species {sp.id} is not friendly in the peaceable Hub")
         if friendly:
             friendly_bands.add(band)

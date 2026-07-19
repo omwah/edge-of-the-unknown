@@ -38,9 +38,9 @@
 .terminal-r4 { fill: #ffffff }
 .terminal-r5 { fill: #808000 }
 .terminal-r6 { fill: #00ffff }
-.terminal-r7 { fill: #0000ff }
+.terminal-r7 { fill: #6666ff }
 .terminal-r8 { fill: #00ff00 }
-.terminal-r9 { fill: #af5f00 }
+.terminal-r9 { fill: #ff9416 }
 .terminal-r10 { fill: #1c1c1c;font-weight: bold }
 .terminal-r11 { fill: #0000d7;font-weight: bold }
 .terminal-r12 { fill: #c0c0c0 }

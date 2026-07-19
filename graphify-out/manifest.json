@@ -150,9 +150,9 @@
     "semantic_hash": "123b60ce5fd030ce072de86c5e1c4f0e"
   },
   "edge/bigbang/validate.py": {
-    "mtime": 1783902596.7660608,
-    "ast_hash": "9dc5994dcde257d8650884cd5ed63597",
-    "semantic_hash": "9dc5994dcde257d8650884cd5ed63597"
+    "mtime": 1784474894.7438626,
+    "ast_hash": "705d7c55c548a056c6515475d65117b2",
+    "semantic_hash": ""
   },
   "edge/bigbang/webviz.py": {
     "mtime": 1783185112.140035,
@@ -235,8 +235,8 @@
     "semantic_hash": "4a1c51d07d61972b6a616c04bdff6708"
   },
   "edge/config.py": {
-    "mtime": 1784444392.8499672,
-    "ast_hash": "2597325fe0edf12cd55544c6d6ac6dbc",
+    "mtime": 1784446178.8092754,
+    "ast_hash": "0ed8492fa9113f46c851e985a6656025",
     "semantic_hash": ""
   },
   "edge/core/__init__.py": {
@@ -920,9 +920,9 @@
     "semantic_hash": "f32d2fbd1533312bff900561eeb49548"
   },
   "tests/fixtures/wire/envelopes.json": {
-    "mtime": 1784323963.5850594,
-    "ast_hash": "04e2c05c8075b4e32554bfbd9a31ad0d",
-    "semantic_hash": "04e2c05c8075b4e32554bfbd9a31ad0d"
+    "mtime": 1784474823.0728135,
+    "ast_hash": "2ef5b58080310d03402de87d5b0c82ea",
+    "semantic_hash": ""
   },
   "tests/helpers.py": {
     "mtime": 1782179904.3638082,
@@ -1165,9 +1165,9 @@
     "semantic_hash": "6f5e18f5a23ea84d1725e717c9a1f22b"
   },
   "tests/test_mechanics.py": {
-    "mtime": 1783117781.904584,
-    "ast_hash": "dc32654c25355a0a76a3ea009efc8d31",
-    "semantic_hash": "dc32654c25355a0a76a3ea009efc8d31"
+    "mtime": 1784474910.7260985,
+    "ast_hash": "71b6de57f8ab8ceaacaaaf70c82291c2",
+    "semantic_hash": ""
   },
   "tests/test_models.py": {
     "mtime": 1781555314.6655047,
