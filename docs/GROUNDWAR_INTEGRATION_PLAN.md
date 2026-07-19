@@ -7,7 +7,7 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: reviewed plan — interview decisions resolved (July 2026).**
+> **Status: implementation underway — GW-WP01 shipped; interview decisions resolved (July 2026).**
 
 ## Context
 
@@ -56,10 +56,10 @@ A planet presents one coherent ground interaction derived from live state:
 
 - an uninhabited, friendly, or player/corp-owned landable world opens a survey
   expedition against that world's actual seeded discoveries;
-- an explicitly hostile inhabited world opens a proper tactical assault after
-  its orbital defenses have been defeated;
-- every below-friendly inhabited world opens assault, including neutral/wary
-  standings below the configured amity threshold;
+- an inhabited world below the configured friendly threshold opens a proper
+  tactical assault after its orbital defenses have been defeated;
+- neutral/wary standings below that threshold are included; there is no separate
+  neutral-permission branch;
 - non-landable world objects remain orbital interactions;
 - every ground action is authoritative, replayable, remotely playable, and
   resumable after reconnect/reload;
@@ -478,7 +478,11 @@ rules, DTO, and tests are complete.
 
 ## Work packages
 
-### GW-WP01 — Interview decisions and authoritative spec delta (M)
+### GW-WP01 — Interview decisions and authoritative spec delta (M) — SHIPPED
+
+**Status:** shipped July 2026. The authoritative delta records D1–D15 and
+adopts the prototype as the source for the production system; implementation
+begins with GW-WP02.
 
 Resolve D1–D15. Update `DESIGN.md` §§3, 4, 4.2, 7, 10, 11, 13, and 14 with:
 

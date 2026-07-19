@@ -1,9 +1,12 @@
-# Ground-war POC (`edge-groundwar`)
+# Ground-war prototype and production source (`edge-groundwar`)
 
 A standalone, Starship-Troopers-inspired turn-based tactical game built from Edge
-of the Unknown parts, as a proof of concept. **Not integrated** with the live game:
-if it proves out, it would replace the surface screen for *populated* planets (the
-discovery mini-game expanding to cover uninhabited/conquered worlds instead).
+of the Unknown parts. The prototype has been **adopted** as the mechanical and
+visual source for the production ground-operation system specified in
+`DESIGN.md` §§3–4.2, 7, 10–11, 13–14 and
+`GROUNDWAR_INTEGRATION_PLAN.md`. It is not yet wired to live universe state: the
+existing entry point remains a deterministic playtest and balance harness while
+the GW work packages move its pure mechanics into `edge/core/groundwar/`.
 
 Run it: `edge-groundwar` (or `python -m edge.groundwar`).
 
@@ -38,7 +41,7 @@ hardens), as does losing troopers.
 - IGOUGO turns; seeded generator + setup menu (planet type / difficulty / seed);
   modest FX (cell flashes + combat log).
 
-## Layout
+## Current prototype layout
 
 - `config/groundwar_default.yaml` — every balance constant.
 - `edge/groundwar/config.py` — typed loader.
@@ -52,6 +55,42 @@ hardens), as does losing troopers.
 Deterministic from `(seed, planet_type, difficulty)` plus the battle's own rng
 stream; all randomness flows through `Battle.rng`.
 
+## Adopted production contract
+
+The prototype establishes the tactical vocabulary we are retaining:
+
+- terrain-as-board, scrolling viewport, cover/movement/LOS, seeded map identity;
+- individual Marauder, Scout, and Command suits; point-budget composition and
+  contested drop placement;
+- IGOUGO assault turns, military-target pressure, city cowing, broadcast terms,
+  civilian harm backfiring, retrieval pressure, and Resolve-based surrender;
+- the survey sibling's movement, scanner bands, hints, trenches, supplies, and
+  automatic dig resolution; and
+- its procedural terrain and tactical art as the reference look, with a separate
+  station-interior map and new art reserved for the later Cloud City gate.
+
+Production deliberately changes the prototype's surrounding economy and state:
+
+- real `Planet`/`Player`/`Ship` state replaces the setup menu, and one active
+  operation is hashed, command-logged, saveable, reconnectable server state;
+- one access classifier chooses survey for uninhabited/friendly/allied/owned
+  landable worlds, assault for every inhabited landable world below the friendly
+  threshold, and orbital-only for belts, gated jovians, and Core worlds;
+- Stardock hires persistent recruits and sells suits; recruits use ship passenger
+  capacity distinct from cargo and colonists, and a death loses recruit plus suit;
+- local actions consume tactical resources, with main turns charged only at
+  configurable local-turn thresholds and extraction always remaining possible;
+- repeat survey visits retain position/hints/resolved discoveries but reset
+  trenches and supplies; digging grants a unique provenance artifact and codex
+  lore automatically, never latinum or loose parts;
+- persistent planetary ground defense replaces `Planet.fighters` as invasion
+  strength; fighters move wholly to space/sector combat;
+- assault aftermath persists, surrender creates a limited protectorate, and later
+  annexation requires elapsed time, recovered Resolve, and explicit political
+  consequences; and
+- mission survivors return to the ship, while a separate confirmed reinforcement
+  action irreversibly converts recruits+suits into typed local defenders.
+
 ## Balance snapshot
 
 A scripted competent bot (drop outside AA range, missile priority targets,
@@ -59,9 +98,12 @@ advance/broadcast) wins ~2/10 raids at `raid` difficulty, in 12–18 of 24 turns
 when it wins — losses are clock/approach failures, not attrition. Humans should
 land somewhat higher; tune in the YAML (`pressure`, `resolve`, suit costs).
 
-## Integration path (later, if adopted)
+## Productionization path
 
-Feed real `Planet` state instead of the setup menu: `planet_type` → terrain,
-citadel level/gun from the planet, garrison from `Planet.fighters`, ownership →
-who you're raiding; surrender outcome → ownership flip / tribute at the
-service-layer seam. Resolve events would become command-log events.
+`GROUNDWAR_INTEGRATION_PLAN.md` is the executable work plan. Its milestones move
+configuration and terrain into the production dependency graph, add frozen replay
+models and ground access, ship the survey loop, replace fighter invasion with the
+recruit/suit assault and persistent defense economy, then complete UI/migration/
+multiplayer parity and the separately gated Cloud City interior. Until the
+relevant work package lands, code under `edge/groundwar/` remains a prototype
+harness rather than an authority over live game state.
