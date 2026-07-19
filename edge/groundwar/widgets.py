@@ -86,6 +86,7 @@ class CountSelector(Widget, can_focus=True):
         height: 1; width: auto; text-style: bold; background: $panel; color: $foreground;
     }
     CountSelector .cs-head > Static { height: 1; }
+    /* Full-row highlight — it runs under the − / + buttons too. */
     CountSelector .cs-row.selected {
         background: $block-cursor-blurred-background;
         color: $block-cursor-blurred-foreground;
@@ -98,6 +99,14 @@ class CountSelector(Widget, can_focus=True):
     }
     CountSelector Button.cs-pm {
         width: 5; min-width: 5; height: 3; margin: 0 0 0 1; padding: 0;
+    }
+    /* Keep hover identical to the resting look — the mouse rests on the button
+       after a click, and the default hover tint otherwise reads as stuck 'pressed'
+       until the pointer leaves. */
+    CountSelector Button.cs-pm:hover {
+        background: $surface;
+        border-top: tall $surface-lighten-1;
+        border-bottom: tall $surface-darken-1;
     }
     CountSelector #cs-note { padding: 1 0; height: auto; }
     """
