@@ -29,6 +29,7 @@ from edge.groundwar.expedition import Site, generate_expedition
 from edge.groundwar.expedition_ui import ExpeditionScreen
 from edge.groundwar.mapgen import PLANET_TYPES, RUBBLE_ART, STRUCTURE_ART, generate_battle
 from edge.groundwar.model import Battle, Trooper
+from edge.groundwar.widgets import PlatoonComposer
 
 
 @dataclass
@@ -806,7 +807,8 @@ class SetupScreen(Screen[None]):
 [b]Expedition[/] is the peaceful archaeology survey on a friendly world — no \
 platoon, just you, a scanner, and the ground.
 
-[b]Assault[/] — compose the drop against your latinum budget; the class \
+[b]Assault[/] — compose the drop in the platoon table (Tab into it, arrows to \
+move, [b]−[/] / [b]+[/] to adjust) against your latinum budget; the class \
 [b]mixture[/] is the puzzle, and what lands is all you get. \
 [b]Marauder[/]: heavy armor, the guns that break turrets and walls. \
 [b]Scout[/]: fast and far-seeing, jams city sensors; barely armed. \
@@ -823,12 +825,19 @@ The same seed always builds the same map, in either mode.\
 """
 
     help_keys = [
-        ("?", "this help"),
+        ("Tab / Shift+Tab", "move between the buttons, the platoon table, and DROP"),
+        ("↑ ↓", "move the platoon-table cursor"),
+        ("− / +", "remove / add one trooper of that suit"),
         ("Enter/click", "activate the focused button"),
+        ("?", "this help"),
     ]
 
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen(self))
+
+    # Short role blurb per suit, shown in the platoon composer's Role column.
+    _ROLE_BLURB = {"marauder": "heavy firepower", "scout": "recon/jam",
+                   "command": "aura/terms"}
 
     def __init__(self, config: GroundwarConfig) -> None:
         super().__init__()
@@ -837,10 +846,9 @@ The same seed always builds the same map, in either mode.\
         self.inhabited = True
         self.planet_idx = 0
         self.difficulty_idx = 1  # default "raid"
-        self.counts: dict[str, int] = {"marauder": 4, "scout": 3, "command": 1}
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="setup"):
+        with VerticalScroll(id="setup"):
             yield Static(
                 Text("EDGE OF THE UNKNOWN — PLANETFALL", style="bold bright_green"),
                 id="title")
@@ -852,19 +860,17 @@ The same seed always builds the same map, in either mode.\
                 yield Button("World", id="world")
             with Horizontal(classes="row"):
                 yield Input(placeholder="seed (blank = random)", id="seed")
-            with Horizontal(classes="row", id="platoon-row"):
-                for key in self.config.suits:
-                    yield Button(f"-{self.config.suits[key].label}", id=f"minus-{key}")
-                    yield Button(f"+{self.config.suits[key].label}", id=f"plus-{key}")
-            yield Static(id="loadout")
-            with Horizontal(classes="row"):
-                yield Button("DROP!", id="launch", variant="success")
+            # The drop table + DROP button, packaged for reuse in the main game.
+            yield PlatoonComposer(
+                self.config.suits, budget=self.config.latinum_budget,
+                max_troopers=self.config.max_troopers,
+                initial={"marauder": 4, "scout": 3, "command": 1},
+                role_blurbs=self._ROLE_BLURB, id="composer")
+            with Horizontal(classes="row", id="land-row"):
+                yield Button("LAND!", id="land", variant="success")
 
     def on_mount(self) -> None:
         self._update()
-
-    def _latinum(self) -> int:
-        return sum(self.config.suits[k].cost * n for k, n in self.counts.items())
 
     def _update(self) -> None:
         expedition = self.mode == "expedition"
@@ -877,10 +883,11 @@ The same seed always builds the same map, in either mode.\
         self.query_one("#world", Button).label = \
             f"World: {'inhabited' if self.inhabited else 'uninhabited'}"
         # Each mode owns its controls: the platoon composer is assault's,
-        # the inhabited toggle is expedition's.
+        # the inhabited toggle + LAND button are expedition's.
         self.query_one("#difficulty", Button).display = not expedition
         self.query_one("#world", Button).display = expedition
-        self.query_one("#platoon-row", Horizontal).display = not expedition
+        self.query_one("#composer", PlatoonComposer).display = not expedition
+        self.query_one("#land-row", Horizontal).display = expedition
         brief = Text()
         if expedition:
             e = self.config.expedition
@@ -902,27 +909,10 @@ The same seed always builds the same map, in either mode.\
                 f"surrender at resolve ≤ {diff.surrender_threshold} · "
                 f"retrieval turn {self.config.pressure.retrieval_turns}\n", "grey70")
         self.query_one("#briefing", Static).update(brief)
-        launch = self.query_one("#launch", Button)
-        if expedition:
-            self.query_one("#loadout", Static).update("")
-            launch.label = "LAND!"
-            launch.disabled = False
-            return
-        launch.label = "DROP!"
-        spent = self._latinum()
-        total = sum(self.counts.values())
-        over = spent > self.config.latinum_budget or total > self.config.max_troopers
-        text = Text()
-        for k, n in self.counts.items():
-            s = self.config.suits[k]
-            text.append(f"  {s.label:<9} ×{n}  ({s.cost} lat — "
-                        f"{'heavy firepower' if k == 'marauder' else 'recon/jam' if k == 'scout' else 'aura/terms'})\n")
-        text.append(f"\n  {total} troopers · {spent}/{self.config.latinum_budget} latinum",
-                    "bold red" if over else "bold bright_green")
-        if not any(self.counts.values()):
-            text.append("  — drop something!", "bold red")
-        self.query_one("#loadout", Static).update(text)
-        launch.disabled = over or not any(self.counts.values())
+
+    def _seed(self) -> int:
+        raw = self.query_one("#seed", Input).value.strip()
+        return int(raw) if raw.lstrip("-").isdigit() else _random.randrange(1 << 31)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
@@ -934,27 +924,18 @@ The same seed always builds the same map, in either mode.\
             self.planet_idx = (self.planet_idx + 1) % len(PLANET_TYPES)
         elif bid == "difficulty":
             self.difficulty_idx = (self.difficulty_idx + 1) % len(self.config.difficulties)
-        elif bid.startswith("plus-"):
-            self.counts[bid[5:]] += 1
-        elif bid.startswith("minus-"):
-            self.counts[bid[6:]] = max(0, self.counts[bid[6:]] - 1)
-        elif bid == "launch":
-            self._launch()
+        elif bid == "land":
+            self._launch_expedition(self._seed(), PLANET_TYPES[self.planet_idx])
             return
         self._update()
 
-    def _launch(self) -> None:
-        raw = self.query_one("#seed", Input).value.strip()
-        seed = int(raw) if raw.lstrip("-").isdigit() else _random.randrange(1 << 31)
+    def on_platoon_composer_dropped(self, event: PlatoonComposer.Dropped) -> None:
+        """The reusable composer committed a squad — build the raid and drop in."""
         planet = PLANET_TYPES[self.planet_idx]
-        if self.mode == "expedition":
-            self._launch_expedition(seed, planet)
-            return
         diff_key = list(self.config.difficulties)[self.difficulty_idx]
-        battle = generate_battle(self.config, seed=seed, planet_type=planet,
+        battle = generate_battle(self.config, seed=self._seed(), planet_type=planet,
                                  difficulty_key=diff_key)
-        loadout = {k: n for k, n in self.counts.items() if n > 0}
-        self.app.push_screen(BattleScreen(self.config, battle, loadout))
+        self.app.push_screen(BattleScreen(self.config, battle, event.loadout))
 
     def _launch_expedition(self, seed: int, planet: str) -> None:
         # The same planet (seed/type/world) remembers its finds across descents
@@ -986,7 +967,6 @@ class GroundwarApp(App[None]):
     #title { padding: 1 0; }
     #setup .row { height: 3; }
     #setup Button { margin-right: 1; }
-    #loadout { padding: 1 0; height: auto; }
     #seed { width: 40; }
     """
 
