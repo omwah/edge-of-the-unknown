@@ -135,8 +135,16 @@ def test_default_bigbang_and_ship() -> None:
     assert sum(cfg.bigbang.port_class_distribution) == 100
     assert len(cfg.bigbang.topology.trunk.bands) == 4
     assert len(cfg.bigbang.topology.expansive.bands) == 4
+    assert len(cfg.bigbang.topology.spiral.bands) == 4
     assert len(cfg.bigbang.active_bands()) == 4
     assert cfg.starter_ship.holds_total == 60
+
+
+def test_bigbang_rejects_more_warps_than_the_nav_rose_can_show() -> None:
+    data = load_default_config().model_dump()
+    data["bigbang"]["max_warps_per_sector"] = 9
+    with pytest.raises(ValidationError, match="less than or equal to 8"):
+        GameConfig.from_mapping(data)
 
 
 def test_species_home_bands_are_valid_distance_bands() -> None:

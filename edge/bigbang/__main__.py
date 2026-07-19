@@ -27,8 +27,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=None, help="override the config seed")
     parser.add_argument("--sectors", type=int, default=None, help="override sector_count")
     parser.add_argument(
-        "--mode", choices=("trunk", "expansive", "planar", "mesh"), default=None,
-        help="override topology_mode (trunk chokepoints | expansive band-lattice | planar spiderweb | mesh grid, §5)",
+        "--mode", choices=("trunk", "expansive", "planar", "mesh", "spiral"), default=None,
+        help="override topology_mode (trunk | expansive | planar | mesh | spiral, §5)",
     )
     # Generation-parameter overrides. The shared knobs apply to every mode; --bridges-min/max
     # are trunk-only and land in the active mode's topology block (a no-op for the others).
