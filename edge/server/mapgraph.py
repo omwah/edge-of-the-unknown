@@ -15,6 +15,12 @@ warp joins sectors differing by at most one hop — those edges span the same gr
 column or an adjacent one. A **one-way** warp has no return edge to bound it, so its
 ends can sit many columns apart; such a long edge is drawn along one end's row and
 severed where it would read as passing *through* an unrelated node (see `_draw_edges`).
+
+The dense ``spiral`` topology is the exception to gravity-column grouping: many
+nearby sectors intentionally share one Core-hop radius.  Its generated
+``sector_pos`` coordinates are projected into radial/tangential displacement from
+the current sector, preserving Coreward-left/outward-right while spreading a ring
+around the vertical axis instead of stacking it into one enormous column.
 """
 
 from __future__ import annotations
@@ -38,6 +44,13 @@ LOCAL_RADIUS = 3
 # Upper bound on the reach the fit-to-width search will try (so a very wide terminal
 # can't grow the ego-graph without limit). A presentation tuning, not a game rule.
 MAX_FIT_RADIUS = 20
+
+# Width-only fitting lets a dense graph keep growing while hundreds of nodes pile
+# into a few columns.  Derive a conservative viewport-height proxy from width: an
+# 80-column compact map gets 16 rows, scaling to at most 31 on wide terminals.
+_FIT_ASPECT_DIVISOR = 5
+_MIN_FIT_ROWS = 15
+_MAX_FIT_ROWS = 31
 
 _CELL_GAP = 5  # blank columns between node columns — room for edge connectors
 _VSTEP = 2  # blank rows between stacked nodes in a column
@@ -132,13 +145,17 @@ def build_local_map(
         return rows, legend, hits
     best: tuple[list[str], str, list[dto.MapNodeDTO], int] | None = None
     best_nodes = -1
+    max_rows = max(
+        _MIN_FIT_ROWS,
+        min(_MAX_FIT_ROWS, max_width // _FIT_ASPECT_DIVISOR),
+    )
     for r in range(1, MAX_FIT_RADIUS + 1):
         cand = _build_at_radius(state, player, r, route)
         rows, _legend, hits, width = cand
-        if width <= max_width and len(hits) >= best_nodes:
+        if width <= max_width and len(rows) <= max_rows and len(hits) >= best_nodes:
             best, best_nodes = cand, len(hits)
-        if width > max_width:
-            break  # wider reach only lays out wider — stop growing
+        if width > max_width or len(rows) > max_rows:
+            break  # wider reach only grows the laid-out graph — stop expanding
     if best is None:  # even reach 1 overflows the width; show it anyway
         best = _build_at_radius(state, player, 1, route)
     return best[0], best[1], best[2]
@@ -167,10 +184,30 @@ def _layout_map_nodes(
         hops = {n: d for n, d in hops.items() if d <= 1 or n in player.explored_sectors}
     here_core = state.core_hops.get(here, 0)
 
-    # Group nodes into gravity columns: offset = clamp(core_hops - here_core).
+    def spiral_axes(node: int) -> tuple[float, float] | None:
+        """Return (radial, tangential) displacement in the spiral's local frame."""
+        if state.topology_mode != "spiral":
+            return None
+        here_pos = state.sector_pos.get(here)
+        node_pos = state.sector_pos.get(node)
+        if here_pos is None or node_pos is None:
+            return None
+        hx, hy = here_pos
+        length = math.hypot(hx, hy)
+        outward_x, outward_y = ((1.0, 0.0) if length == 0.0
+                                 else (hx / length, hy / length))
+        dx, dy = node_pos[0] - hx, node_pos[1] - hy
+        radial = dx * outward_x + dy * outward_y
+        tangential = dx * -outward_y + dy * outward_x
+        return radial, tangential
+
+    # Group ordinary topologies into gravity columns. Spiral mode instead projects
+    # its exact ring coordinates onto the current sector's outward radial axis.
     columns: dict[int, list[int]] = {}
     for node in hops:
-        offset = state.core_hops.get(node, here_core) - here_core
+        axes = spiral_axes(node)
+        offset = (round(axes[0]) if axes is not None
+                  else state.core_hops.get(node, here_core) - here_core)
         offset = max(-radius, min(radius, offset))
         columns.setdefault(offset, []).append(node)
     present = sorted(columns)
@@ -199,7 +236,12 @@ def _layout_map_nodes(
 
     # Place columns centre-outward
     for off in sorted(present, key=lambda o: (abs(o), o)):
-        nodes = sorted(columns[off], key=lambda n: (barycentre(n), state.spatial_ids.get(n, n)))
+        def row_order(node: int) -> tuple[float, int]:
+            axes = spiral_axes(node)
+            primary = axes[1] if axes is not None else barycentre(node)
+            return primary, state.spatial_ids.get(node, node)
+
+        nodes = sorted(columns[off], key=row_order)
         if off == 0 and here in nodes:  # keep the current sector dead-centre
             nodes.remove(here)
             nodes.insert(len(nodes) // 2, here)
@@ -374,7 +416,7 @@ def local_layout_bearings(state: UniverseState, player: Player, here: int) -> di
     derived from the same topological gravity-column layout used by the Local Map.
     """
     placed, _, _, _, _, py, _, _ = _layout_map_nodes(state, player, here, radius=1)
-    here_core = state.core_hops.get(here, 0)
+    here_x = placed.get(here, (py, 0))[1]
 
     bearings: dict[int, float] = {}
     for node, (ny, nx) in placed.items():
@@ -382,10 +424,8 @@ def local_layout_bearings(state: UniverseState, player: Player, here: int) -> di
             continue
         # Use logical column offset (dx) and row offset (dy) so the aspect ratio
         # matches the compact nav rose and does not squash angles horizontally.
-        off = state.core_hops.get(node, here_core) - here_core
-        dx = max(-1, min(1, off))
+        dx = max(-1, min(1, nx - here_x))
         dy = py - ny  # negate row diff so up is positive y
         bearings[node] = math.atan2(dy, dx)
 
     return bearings
-
