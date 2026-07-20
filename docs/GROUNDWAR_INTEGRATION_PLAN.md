@@ -764,6 +764,84 @@ Tests: DTO fog; local/remote parity; Textual Pilot keyboard/mouse flow;
 compact/standard/wide snapshots; reconnect mid-survey.
 Commit `ground: GW-WP07 live survey expedition UI` — **GW-M2 done.**
 
+### GW-WP07-FU1 — POC presentation parity and terrain legibility (M) — SHIPPED
+
+**Status:** shipped July 2026 (commit `3649bc0`, wire v27). Playtest follow-up closing the
+gap between `GroundExpeditionScreen` and the POC `expedition_ui.py`, plus two terrain
+colouring defects found while doing it.
+
+**Legibility (both were invisible glyphs, not dim ones).** (a) Overlays repaint the
+backdrop while keeping the terrain foreground, but `readable_fg` had corrected that
+foreground against the *terrain's* background — 16 of 91 terrain x overlay combinations
+were unreadable, `water_deep` on the `dark_orange3` scanner band at a 0.002 luminance gap,
+with the scanner overlay on by default. Contrast is now checked against the winning
+backdrop (0 of 320 unreadable, worst gap 0.203). (b) Named ANSI colours are
+theme-dependent, so contrast measured on rich's nominal 4-bit palette did not describe
+what the terminal painted: `terrestrial_cool` forest is authored `bright_green on green`,
+whose nominal gap clears the correction threshold, so it was emitted as *names* and a
+terminal theme collapsed the pair — trees visible only under the cursor. Styles are pinned
+to truecolor hex so measured and rendered contrast are the same thing.
+
+**Terrain glyphs.** Selection took the first non-space registry entry per feature and
+reused it everywhere, discarding the authored weights and the blank entries (forest is 40
+of 89 parts blank), so forest painted as a solid run of one glyph. Glyphs now draw against
+the cumulative weights keyed on feature + cell coordinates + `planet_id` — all public DTO
+fields, so texture costs nothing in fog of war and the operation seed still never crosses
+the boundary (G5) — via CRC32, not `hash()`, whose per-process salt would make snapshots
+irreproducible.
+
+**DTO.** `GroundCellDTO.gate` (town wall gates were indistinguishable from masonry, so the
+way in was invisible), `SurveySettlementDTO.plaza_x/plaza_y` (replacing an `(x+y+id) % 11`
+plaza guess) and `.hint_available`, `SurveyExpeditionDTO.scanner_band`.
+
+**Screen.** Full POC help prose plus a symbol legend, carried by a new generic
+`HELP_LEGEND_ROWS` hook on the shared `HelpScreen`; `z` log expand; log lines coloured by
+event type; trench/find/hint cell flashes; outcome summary and key cheatsheet.
+
+**Known gaps, deliberately deferred:** `_feature_colors` matches the *first* band with a
+given feature name, so where a biome repeats one (`terrestrial_cold` ice, jovian,
+asteroid_belt) the later band's colours are unreachable — fixing it needs a band index on
+`GroundCellDTO`. And `_CONTRAST_TRIGGER` (0.20, `edge/art/terrain.py`) leaves
+mountain/dust/snow honestly dim at ~0.25; raising it is shared with the world-art screens.
+
+### GW-WP07-FU2 — Player-chosen survey drop site (M) — SHIPPED
+
+**Status:** shipped July 2026. Playtest follow-up: `_begin_survey` placed the explorer at
+`(width // 2, height // 2)` — the map centre — regardless of terrain, discarding the
+`SurveyMap.landing_x/landing_y` that `_landing()` had already computed inside the sites'
+passable component. A descent could therefore start in open water, on a peak, or on an
+island with no walking route to any contact.
+
+**The drop site is now the player's choice.** `SurveyOperation.landed` starts False: the
+shuttle holds inbound, `explorer_*` is only where the cursor should rest, and
+march/dig/talk are refused by `_active_survey` until touchdown (extraction stays legal
+throughout, so a descent can be aborted from orbit). `SurveyLand(operation_id, x, y)` +
+`SurveyLanded` commit the choice, validated in the reducer against the pure
+`landing_sites(smap, config)`: the flood of the region containing the generated landing
+zone — guaranteed by `generate_survey` to hold every site, so **no legal drop site can
+strand a survey away from its contacts** — minus the new config list
+`expedition.landing_blocked_features` (open water, peaks, ice). `suggested_landing` rests
+the cursor on the remembered position when it is still legal, else the generated zone.
+
+**Decision (interview, July 2026):** every descent chooses afresh. D5's remembered position
+seeds the cursor rather than skipping the choice, so a return trip can deliberately land
+somewhere new; `_begin_survey` still persists and restores that position.
+
+**Screen.** Pre-landing the drop zone is lit, the explorer is not drawn (there is no
+explorer yet), the cursor turns red over illegal ground, and the sidebar becomes a
+SELECT DROP SITE panel. Enter commits in both phases (`action_confirm`) — note no letter
+key can: `l` is vim-right in `on_key`, which stops the event before bindings run.
+Touchdown plays a descent + dust-plume animation with staged log beats, skippable with any
+key; it overrides glyphs rather than styles, so it invalidates the cached frame via an
+animation step counter in the frame key.
+
+Epoch: config_version 10→11 (`landing_blocked_features`), wire v27→v28
+(`SurveyLand`/`SurveyLanded`, `SurveyExpeditionDTO.landed`/`can_land`/`suggested_landing_*`,
+`GroundCellDTO.landing_site`).
+Tests: drop zone excludes unsafe terrain and keeps every contact reachable from its
+extremes; survey begins inbound with actions refused and extraction legal; landing
+validates the cell and happens once.
+
 ### GW-WP08 — Ground-force economy and assault composer (XL)
 
 Implement the D3 force model: persistent recruits hired at Stardock, persistent

@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 27  # GW-WP08: survey gate/plaza/hint/scanner-band presentation fields
+WIRE_VERSION = 28  # GW-WP07-FU2: player-chosen survey drop site
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -84,7 +84,7 @@ v25 (GW-WP06): survey action commands `GroundMove`/`SurveyDig`/`SurveyTalk` + ev
 `GroundMoved`/`SurveyDug`/`SurveySiteExcavated`/`SurveyTalked` (walk/dig/talk, D4-D6).
 v26 (GW-WP07): `SurveyExpeditionDTO` and its nested cell/contact/settlement shapes; the
 `ground_operation_view` read projects a cropped, fog-safe live survey for local/remote parity.
-v27 (GW-WP08): survey presentation parity with the POC — `GroundCellDTO.gate` (the walkable
+v27 (GW-WP07-FU1): survey presentation parity with the POC — `GroundCellDTO.gate` (the walkable
 break in a town wall, previously indistinguishable from masonry), `SurveySettlementDTO`
 gains `plaza_x`/`plaza_y`/`hint_available` (the real talking-place and whether a hint is
 still on offer), and `SurveyExpeditionDTO.scanner_band` (the banded reading's ordinal, so

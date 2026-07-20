@@ -165,6 +165,11 @@ expedition:
     - {within: 40, label: "faint"}
   local_turns_per_main_turn: 4  # D4/D12: charge main-game turns every N local expedition turns
   main_turn_cost: 1             # ...this many main-game turns per threshold crossed (marching only)
+  landing_blocked_features:     # terrain the shuttle will not set down on (you pick the drop site)
+    - water_deep
+    - water_shallow
+    - mountain
+    - ice
 
 difficulties:
   patrol:

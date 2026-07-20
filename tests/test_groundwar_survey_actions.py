@@ -23,7 +23,7 @@ from edge.core.models import (
 )
 from edge.core.movement import MovementError
 from edge.core.rules import (
-    BeginSurvey, ExtractGroundOperation, GroundMove, SurveyDig, SurveyTalk,
+    BeginSurvey, ExtractGroundOperation, GroundMove, SurveyDig, SurveyLand, SurveyTalk,
     apply_result, reduce,
 )
 from edge.core.surface_finds import surface_find_name
@@ -55,8 +55,21 @@ def _world(*, inhabited: bool = False, sites: int = 1, seed: int = 3) -> Univers
     return st
 
 
+def _land(st: UniverseState, pid: int) -> None:
+    """Set the shuttle down on the generated landing zone (GW-WP07-FU2).
+
+    Choosing a drop site is covered in test_groundwar_expedition_view; these tests are
+    about what happens once the survey is on the ground, so they take the default.
+    """
+    op = st.players[pid].ground_operation
+    smap = gw.survey_map_for(st, op, CFG)
+    x, y = gw.suggested_landing(smap, CFG, op.explorer_x, op.explorer_y)
+    apply_result(st, reduce(st, pid, SurveyLand(op.operation_id, x, y), CFG))
+
+
 def _begin(st: UniverseState) -> None:
     apply_result(st, reduce(st, 1, BeginSurvey(1), CFG))
+    _land(st, 1)
 
 
 def _op(st: UniverseState):
@@ -161,6 +174,7 @@ def test_simultaneous_excavation_mints_one_artifact() -> None:
     st.ships[2] = replace(st.ships[1], id=2, owner_player_id=2)  # type: ignore[index]
     for pid in (1, 2):
         apply_result(st, reduce(st, pid, BeginSurvey(1), CFG))
+        _land(st, pid)
         site = gw.survey_map_for(st, st.players[pid].ground_operation, CFG).sites[0]
         _stand_on(st, pid, site.x, site.y)
         apply_result(st, reduce(st, pid, SurveyDig(st.players[pid].ground_operation.operation_id), CFG))

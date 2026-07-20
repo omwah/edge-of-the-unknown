@@ -74,6 +74,7 @@ from edge.core.events import (
     SiteExplored,
     SurveyDug,
     SurveySiteExcavated,
+    SurveyLanded,
     SurveyTalked,
     Event,
     AllianceLeadershipChanged,
@@ -162,6 +163,7 @@ from edge.core.rules import (
     SetPlayerName,
     SettleColonists,
     SurveyDig,
+    SurveyLand,
     SurveyTalk,
     SwapComponent,
     BuildCitadel,
@@ -223,6 +225,7 @@ COMMANDS: list[Command] = [
     ExtractGroundOperation(operation_id=123),  # GW-WP03 settle/clear a ground op
     GroundMove(operation_id=123, x=40, y=20, actor_id=0),  # GW-WP06 march the explorer
     SurveyDig(operation_id=123),  # GW-WP06 open a trench
+    SurveyLand(operation_id=123, x=17, y=9),  # GW-WP07-FU2 player-chosen drop site
     SurveyTalk(operation_id=123),  # GW-WP06 settlement resupply/hint
     MineBelt(planet_id=5),        # PT-30 hand-mine an asteroid belt
     BuildStagingArea(planet_id=5),  # PT-54 stage a Cloud City on a gas giant
@@ -322,6 +325,7 @@ EVENTS: list[Event] = [
     GroundMoved(1, 123, 40, 20, 2),
     SurveyDug(1, 123, 40, 20, 9),
     SurveySiteExcavated(1, 123, 9, "ruins", "RARE"),
+    SurveyLanded(1, 123, 17, 9),
     SurveyTalked(1, 123, 1, 9),
     BeltMined(1, 5, "equipment", 50),
     CloudCityBuilt(1, 5, 1, 50),

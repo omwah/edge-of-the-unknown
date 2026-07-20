@@ -91,6 +91,11 @@ class SurveyOperation:
     resolved_discovery_ids: frozenset[int] = frozenset()
     hinted_discovery_ids: frozenset[int] = frozenset()
     dug_cells: frozenset[tuple[int, int]] = frozenset()
+    # The shuttle holds in the upper atmosphere until the player picks a drop site: while
+    # `landed` is False, `explorer_*` is only the *suggested* cursor rest, not a position,
+    # and marching/digging/talking are refused. Every descent chooses afresh (a remembered
+    # position seeds the cursor rather than skipping the choice).
+    landed: bool = False
     outcome: str | None = None
     kind: Literal["survey"] = "survey"
 

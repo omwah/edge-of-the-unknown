@@ -248,6 +248,16 @@ class SurveySiteExcavated(Event):
 
 
 @dataclass(frozen=True)
+class SurveyLanded(Event):
+    """The shuttle set down on the player's chosen drop site, opening the survey."""
+
+    player_id: int
+    operation_id: int
+    x: int
+    y: int
+
+
+@dataclass(frozen=True)
 class SurveyTalked(Event):
     """The explorer spoke with a settlement (GW-WP06, D5). `hinted_id` -1 when no hint given."""
 
