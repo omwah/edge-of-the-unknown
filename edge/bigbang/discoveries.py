@@ -151,7 +151,7 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
             discoveries[did] = Discovery(
                 id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
                 payload=_make_surface_payload(kind, tier, dcfg), planet_id=pid, site_slot=slot,
-                hidden=hidden, name=surface_find_name(kind, did) or namer.draw(kind),
+                hidden=hidden, name=namer.draw_surface(kind, did),
             )
             did += 1
 
@@ -176,7 +176,7 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
             id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
             payload=_make_surface_payload(kind, tier, dcfg), planet_id=pid, site_slot=slot,
             hidden=tier.value >= dcfg.surface_hidden_min_rank,
-            name=surface_find_name(kind, did) or namer.draw(kind),
+            name=namer.draw_surface(kind, did),
         )
         did += 1
 
@@ -226,7 +226,6 @@ def salt_raid_caches(state: UniverseState, config: GameConfig) -> None:
             sector_id=sector, planet_id=home_pid, site_slot=slot,
             payload=_make_surface_payload(DiscoveryKind.ANCIENT_TECH, RarityTier.LEGENDARY, dcfg),
             hidden=True, raid_cache=True,
-            name=surface_find_name(DiscoveryKind.ANCIENT_TECH, next_id)
-            or namer.draw(DiscoveryKind.ANCIENT_TECH),
+            name=namer.draw_surface(DiscoveryKind.ANCIENT_TECH, next_id),
         )
         next_id += 1

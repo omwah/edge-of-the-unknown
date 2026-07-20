@@ -236,6 +236,8 @@ claims the world). Building again grows the city, and a bigger city berths more 
         yield Footer()
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "descend" and not self._planet.landable:
+            return False
         # Mining is belt-only (PT-30): hide the affordance/footer hint elsewhere so it never
         # implies an extraction the reducer would reject.
         if action == "mine" and self._planet.mine_yield <= 0:
