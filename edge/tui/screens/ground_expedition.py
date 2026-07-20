@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 from binascii import crc32
 from collections.abc import Iterable
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
@@ -20,15 +21,28 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical, VerticalScroll
 from textual.screen import ModalScreen
+from textual.timer import Timer
 from textual.widgets import Footer, RichLog, Static
 
 from edge.art.terrain import BIOME_COLORS, FEATURES_REGISTRY, readable_fg
 from edge.core.dto import GroundCellDTO, SurveyContactDTO, SurveyExpeditionDTO
 from edge.core.enums import DiscoveryKind
-from edge.core.events import GroundMoved, SurveyDug, SurveySiteExcavated, SurveyTalked
+from edge.core.events import (
+    GroundMoved,
+    SurveyDug,
+    SurveyLanded,
+    SurveySiteExcavated,
+    SurveyTalked,
+)
 from edge.core.groundwar.terrain import BIOME_BANDS
 from edge.core.movement import MovementError
-from edge.core.rules import ExtractGroundOperation, GroundMove, SurveyDig, SurveyTalk
+from edge.core.rules import (
+    ExtractGroundOperation,
+    GroundMove,
+    SurveyDig,
+    SurveyLand,
+    SurveyTalk,
+)
 from edge.core.surface_finds import FIND_KINDS, surface_find_kind
 from edge.groundwar.findart import generate_find_art
 from edge.server.client import GameClient
@@ -47,12 +61,61 @@ _LOG_EXPANDED_H = 14
 # How long a cell stays tinted after the event that touched it.
 _FLASH_SECONDS = 0.5
 
+# The surveyor. Cyrillic big yus reads as a figure with arms and legs out, and unlike the
+# obvious pictographic candidates it is single-cell everywhere: emoji-presentation glyphs
+# (⛑, ♟, ☺ in some fonts) and East-Asian-ambiguous ones (Ω, ∩ under a CJK width setting)
+# render double-width and would shear the map grid.
+_EXPLORER = "Ѫ"
+_EXPLORER_STYLE = "black on bright_green"
+
+
+@dataclass(frozen=True)
+class _LandingFrame:
+    """One tick of the touchdown animation: glyph overrides plus an optional log beat."""
+
+    cells: dict[tuple[int, int], tuple[str, str]]
+    log: str = ""
+
+
+_LANDING_TICK = 0.17  # seconds per frame; the whole descent runs a bit over a second
+
+
+def _landing_frames(x: int, y: int) -> list[_LandingFrame]:
+    """The shuttle falling onto `(x, y)`: descent, plume, then the explorer standing there.
+
+    Coordinates above the target are clamped by the renderer (cells off the viewport simply
+    do not draw), so a drop site near the top edge just shows a shorter fall.
+    """
+    shuttle = "bold bright_white on grey15"
+    frames = [
+        _LandingFrame({(x, y - 4): ("╱▲╲"[1], shuttle)}, "[b]Shuttle away.[/]"),
+        _LandingFrame({(x, y - 3): ("▲", shuttle)}),
+        _LandingFrame({(x, y - 2): ("▲", shuttle)}, "Entering atmosphere…"),
+        _LandingFrame({(x, y - 1): ("▼", shuttle)}),
+    ]
+    plume = "bold wheat1 on dark_goldenrod"
+    ring = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
+    wide = [(x - 2, y), (x + 2, y), (x - 1, y - 1), (x + 1, y - 1),
+            (x - 1, y + 1), (x + 1, y + 1)]
+    frames.append(_LandingFrame(
+        {(x, y): ("▼", shuttle), **{c: ("░", plume) for c in ring}}))
+    frames.append(_LandingFrame(
+        {(x, y): (_EXPLORER, _EXPLORER_STYLE),
+         **{c: ("▒", plume) for c in ring},
+         **{c: ("░", plume) for c in wide}},
+        "[b]Touchdown[/] — survey deployed."))
+    frames.append(_LandingFrame(
+        {(x, y): (_EXPLORER, _EXPLORER_STYLE), **{c: ("░", plume) for c in ring}}))
+    return frames
+
+
 # Log emphasis by event type — a find must not read like a dry hole.
 _EVENT_STYLES: dict[type, str] = {
     SurveySiteExcavated: "bold bright_yellow",
     SurveyDug: "wheat1",
     SurveyTalked: "bold bright_cyan",
     GroundMoved: "grey66",
+    SurveyLanded: "bold bright_green",
 }
 
 
@@ -102,6 +165,38 @@ def _styled(fg: str, bg: str) -> str:
     if not bg:
         return _hex(fg)
     return f"{_hex(readable_fg(fg, bg))} on {_hex(bg)}"
+
+
+@lru_cache(maxsize=None)
+def _dim(color: str, factor: float) -> str:
+    """Push a colour toward black, keeping its hue."""
+    try:
+        rgb = Color.parse(color).get_truecolor()
+    except Exception:
+        return color
+    return (f"#{round(rgb.red * factor):02x}"
+            f"{round(rgb.green * factor):02x}{round(rgb.blue * factor):02x}")
+
+
+@lru_cache(maxsize=None)
+def _styled_excluded(fg: str, bg: str) -> str:
+    """Terrain the shuttle cannot set down on, while inbound.
+
+    The same colours as the real terrain, dimmed toward black — so the map still reads as
+    a map (water is still blue, peaks still grey) while the unusable ground plainly sits
+    behind the ground you can pick.
+
+    Contrast is re-checked *after* dimming rather than assumed: the two factors differ, so
+    on a band whose foreground is already darker than its background (`sand` is
+    `yellow on bright_yellow`) dimming alone drives the pair together — it measured a 0.063
+    luminance gap before this correction.
+    """
+    lit = _styled(fg, bg)
+    if " on " not in lit:
+        return _dim(lit, 0.55)
+    front, back = lit.split(" on ")
+    front, back = _dim(front, 0.62), _dim(back, 0.38)
+    return f"{_hex(readable_fg(front, back))} on {back}"
 
 
 @lru_cache(maxsize=None)
@@ -208,7 +303,9 @@ class SurveyMapView(Static, can_focus=True):
         if view is not self._cells_view:
             self._cells_view = view
             self._cells = {(cell.x, cell.y): cell for cell in view.cells}
-        frame_key = id(view), self.host_screen.overlay
+        # The landing animation replaces glyphs, not just styles, so it has to invalidate
+        # the cached frame — hence the step counter in the key.
+        frame_key = id(view), self.host_screen.overlay, self.host_screen.anim_step
         if frame_key != self._frame_key:
             self._frame_key = frame_key
             self._frame = self._render_frame(view)
@@ -224,7 +321,12 @@ class SurveyMapView(Static, can_focus=True):
 
         for (fx, fy), (style, _until) in self.host_screen.live_flashes().items():
             restyle(fx, fy, style)
-        restyle(self.host_screen.cursor_x, self.host_screen.cursor_y, "black on bright_white")
+        # While inbound the cursor is a drop-site picker, so it has to say whether the cell
+        # under it is one — a white cursor over open water would read as a legal choice.
+        cursor = "black on bright_white"
+        if view.can_land and not self.host_screen.cursor_is_landable():
+            cursor = "bright_white on red3"
+        restyle(self.host_screen.cursor_x, self.host_screen.cursor_y, cursor)
         return out
 
     def _render_frame(self, view: SurveyExpeditionDTO) -> Text:
@@ -245,8 +347,13 @@ class SurveyMapView(Static, can_focus=True):
         return out
 
     def _cell(self, cell: GroundCellDTO, view: SurveyExpeditionDTO) -> tuple[str, str]:
-        if (cell.x, cell.y) == (view.explorer_x, view.explorer_y):
-            return "@", "black on bright_green"
+        animated = self.host_screen.anim_cells.get((cell.x, cell.y))
+        if animated is not None:
+            return animated
+        # No explorer on the map until the shuttle is down — `explorer_*` is only the
+        # suggested cursor rest while inbound.
+        if view.landed and (cell.x, cell.y) == (view.explorer_x, view.explorer_y):
+            return _EXPLORER, _EXPLORER_STYLE
         if cell.found_contact_id:
             return "✦", "bold gold1 on grey19"
         if cell.dug:
@@ -264,6 +371,13 @@ class SurveyMapView(Static, can_focus=True):
         char = _feature_glyph(view.planet_id, cell.feature, cell.x, cell.y)
         # Overlays keep the terrain's foreground and repaint the backdrop; `_styled` then
         # re-checks legibility against that new backdrop rather than the terrain's own.
+        if view.can_land:
+            # Inbound, you are reading terrain to choose a spot, so terrain keeps its own
+            # colours; the ground the shuttle cannot use recedes instead. (Painting the
+            # legal cells was backwards — they are the majority, and a flat wash over them
+            # hid the very biome detail the choice depends on.) The scanner/range overlays
+            # stay off until there is an explorer to centre them on.
+            return char, _styled(fg, bg) if cell.landing_site else _styled_excluded(fg, bg)
         if cell.search_ring:
             bg = "dark_green" if cell.search_ring == "hinted" else "grey35"
         elif self.host_screen.overlay == "scanner" and cell.heat:
@@ -284,8 +398,10 @@ class GroundExpeditionScreen(EdgeScreen):
 
     BINDINGS = [
         Binding("escape", "extract", "Extract"),
+        # No letter key for landing: `l` is vim-right in `on_key`, which stops the event
+        # before bindings run. Enter commits the cursor in both phases.
+        Binding("enter", "confirm", "Land / March"),
         Binding("m", "march", "March"),
-        Binding("enter", "march", "March", show=False),
         Binding("x", "dig", "Dig"),
         Binding("t", "talk", "Talk"),
         Binding("v", "view_find", "View find"),
@@ -297,6 +413,16 @@ class GroundExpeditionScreen(EdgeScreen):
 A [b]peaceful survey[/], not a raid: orbital sensors marked each [b]search circle[/] \
 before you descended — a buried site lies somewhere [i]inside[/] one, but the circle \
 is not centred on it.
+
+[b]Choosing where to land[/] — you arrive in the upper atmosphere, and the first thing \
+you do is pick a drop site. Terrain reads in its normal colours; ground the shuttle will \
+[b]not[/] take is [b]darkened[/]. What is left is open, level terrain inside the region \
+that holds every contact, so a landing can never strand you across water from your own \
+sites. Open water, mountain peaks and ice are refused, and the cursor turns \
+[bright_white on red3] red [/] over anything it cannot take. \
+Put the cursor on your chosen spot and press [b]Enter[/]. You choose afresh on every \
+descent — a returning survey starts the cursor where you left off, but nothing stops \
+you setting down on the far side of the map instead.
 
 [b]Finding a site[/] — march toward a circle and watch the sidebar [b]SCANNER[/]: it \
 reads hotter as you close on the nearest unfound site. As you close in, the \
@@ -326,7 +452,9 @@ and press [b]V[/] any time to revisit the find and its notes. [b]O[/] cycles the
 overlay and [b]Z[/] expands the log when you want the full narration."""
 
     HELP_LEGEND_ROWS = [
-        ("[black on bright_green]@[/]", "you, the surveyor"),
+        ("[#4a4a4a on #1a1a1a]░[/]",
+         "darkened ground — the shuttle will not set down (inbound view only)"),
+        (f"[{_EXPLORER_STYLE}]{_EXPLORER}[/]", "you, the surveyor"),
         ("[white on grey35] [/]", "sensor search circle — a site lies somewhere inside"),
         ("[white on dark_green] [/]", "narrowed circle (an elder's hint tightened it)"),
         ("[black on dark_goldenrod]∴[/]",
@@ -366,9 +494,15 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         self.cursor_y = 0
         self.camera_x = 0
         self.camera_y = 0
-        self.overlay = "scanner"
+        # Off by default: the glow tints a wide sweep of ground, and the sidebar readout
+        # already carries the signal. `O` cycles it on when you want it.
+        self.overlay = "off"
         self.log_expanded = False
         self._flashes: dict[tuple[int, int], tuple[str, float]] = {}
+        self.anim_cells: dict[tuple[int, int], tuple[str, str]] = {}
+        self.anim_step = 0
+        self._anim_frames: list[_LandingFrame] = []
+        self._anim_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
         with Container(id="survey-main"):
@@ -383,7 +517,12 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         self.query_one(SurveyMapView).focus()
         log = self.query_one("#survey-log", RichLog)
         log.can_focus = False
-        log.write("[b]Survey deployed.[/] Follow the scanner and marked circles; ? opens help.")
+        if self.view is not None and self.view.can_land:
+            log.write("[b]Approach.[/] Pick a drop site — darkened ground is refused; "
+                      "[b]Enter[/] sets down, ? opens help.")
+        else:
+            log.write("[b]Survey deployed.[/] Follow the scanner and marked circles; "
+                      "? opens help.")
 
     async def on_resize(self) -> None:
         if self.view is not None:
@@ -401,9 +540,15 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
             if first is None:
                 self.app.pop_screen()
                 return
-            self.cursor_x, self.cursor_y = first.explorer_x, first.explorer_y
-            self.camera_x = max(0, first.explorer_x - width // 2)
-            self.camera_y = max(0, first.explorer_y - height // 2)
+            # Inbound, the cursor rests on the suggested drop site (a remembered position
+            # when it is still legal); once landed it starts on the explorer.
+            start_x, start_y = (
+                (first.suggested_landing_x, first.suggested_landing_y)
+                if first.can_land else (first.explorer_x, first.explorer_y)
+            )
+            self.cursor_x, self.cursor_y = start_x, start_y
+            self.camera_x = max(0, start_x - width // 2)
+            self.camera_y = max(0, start_y - height // 2)
         view = await self._client.ground_operation_view(
             viewport_x=self.camera_x, viewport_y=self.camera_y,
             viewport_width=width, viewport_height=height)
@@ -478,6 +623,16 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         v = self.view
         out = Text()
         out.append(f"SURVEY · {v.planet}\n", "bold")
+        if v.can_land:
+            out.append("\nSELECT DROP SITE\n", "bold bright_yellow")
+            out.append("Darkened ground is refused — water, peaks, ice, or cut off from\n"
+                       "the contacts. Anything in normal colour will take the shuttle.\n",
+                       "grey70")
+            here = "this cell will do" if self.cursor_is_landable() else "not here"
+            out.append(f"cursor: {here}\n",
+                       "bright_green" if self.cursor_is_landable() else "red")
+            out.append("\nEnter to set down · Esc aborts to orbit\n", "grey66")
+            return out
         out.append(f"local turn {v.local_turn} · main turns {v.turns_remaining}\n", "grey58")
         frac = v.supplies / v.supplies_max if v.supplies_max else 0
         filled = round(14 * frac)
@@ -529,6 +684,10 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         return town is not None and (cell.x, cell.y) == (town.plaza_x, town.plaza_y)
 
     async def on_key(self, event: events.Key) -> None:
+        if self._landing_playing:  # any key skips the descent
+            self._end_landing()
+            event.stop()
+            return
         moves = {
             "up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0),
             "k": (0, -1), "j": (0, 1), "h": (-1, 0), "l": (1, 0),
@@ -563,6 +722,13 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
                 log.write(Text.from_markup(
                     line, style=_EVENT_STYLES.get(type(event), "white")))
         return events_out
+
+    async def action_confirm(self) -> None:
+        """Enter means "commit the cursor": set down while inbound, march once landed."""
+        if self.view is not None and self.view.can_land:
+            await self.action_land()
+            return
+        await self.action_march()
 
     async def action_march(self) -> None:
         if self.view is None or not self.view.can_move:
@@ -633,6 +799,60 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
             self._flashes[cell] = (style, until)
         if self._flashes:
             self.set_timer(_FLASH_SECONDS + 0.05, self._refresh_widgets)
+
+    def cursor_is_landable(self) -> bool:
+        """Whether the cell under the cursor is an advertised drop site."""
+        if self.view is None:
+            return False
+        cell = next((c for c in self.view.cells
+                     if (c.x, c.y) == (self.cursor_x, self.cursor_y)), None)
+        return cell is not None and cell.landing_site
+
+    async def action_land(self) -> None:
+        if self.view is None or not self.view.can_land:
+            return
+        if not self.cursor_is_landable():
+            notify_warning(self, "The shuttle cannot set down there — pick open, level ground.")
+            return
+        target = (self.cursor_x, self.cursor_y)
+        if await self._apply(
+            SurveyLand(self.view.operation_id, *target)
+        ) is None:
+            return
+        await self._load(cursor_to_explorer=True)
+        self._play_landing(*target)
+
+    def _play_landing(self, x: int, y: int) -> None:
+        self._anim_frames = _landing_frames(x, y)
+        self._advance_landing()
+
+    def _advance_landing(self) -> None:
+        if not self._anim_frames:
+            self._end_landing()
+            return
+        frame = self._anim_frames.pop(0)
+        self.anim_cells = frame.cells
+        self.anim_step += 1
+        if frame.log:
+            self.query_one("#survey-log", RichLog).write(Text.from_markup(frame.log))
+        self.query_one(SurveyMapView).refresh()
+        self._anim_timer = self.set_timer(_LANDING_TICK, self._advance_landing)
+
+    def _end_landing(self) -> None:
+        """Clear the overlay and stop the clock — also the skip path, so a keypress during
+        the descent lands you immediately rather than replaying the rest."""
+        if self._anim_timer is not None:
+            self._anim_timer.stop()
+            self._anim_timer = None
+        self._anim_frames = []
+        if self.anim_cells:
+            self.anim_cells = {}
+            self.anim_step += 1
+        self._refresh_widgets()
+
+    @property
+    def _landing_playing(self) -> bool:
+        return bool(self._anim_frames or self.anim_cells)
 
     def action_log_expand(self) -> None:
         self.log_expanded = not self.log_expanded

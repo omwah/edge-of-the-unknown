@@ -476,6 +476,56 @@ def settlement_at(smap: SurveyMap, x: int, y: int) -> SurveySettlement | None:
     return next((s for s in smap.settlements if s.inside(x, y)), None)
 
 
+def landing_sites(smap: SurveyMap, config: GameConfig) -> frozenset[Vec]:
+    """Every cell the shuttle may set down on — the player's drop-site choice.
+
+    Two constraints, in this order. First **reachability**: flood the passable region
+    containing `smap.landing_*`, which `generate_survey` guarantees is the one holding
+    every site, so no legal drop site can strand the survey on an island away from its
+    contacts. Then **terrain**: drop `landing_blocked_features` (open water, peaks, ice),
+    which are walkable-or-not but never somewhere a shuttle sets down.
+
+    Pure and deterministic from the regenerated map, so the reducer validating a landing
+    and the projection advertising the drop zone agree by construction.
+    """
+    assert config.groundwar is not None
+    blocked_features = frozenset(config.groundwar.expedition.landing_blocked_features)
+    start = (smap.landing_x, smap.landing_y)
+    if _cell_cost(smap, config, *start) <= 0:
+        return frozenset()
+    region: set[Vec] = {start}
+    stack = [start]
+    while stack:
+        x, y = stack.pop()
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if (nx, ny) in region or not _in_bounds(smap.width, smap.height, nx, ny):
+                continue
+            if _cell_cost(smap, config, nx, ny) <= 0:
+                continue
+            region.add((nx, ny))
+            stack.append((nx, ny))
+    return frozenset(
+        cell for cell in region if smap.feature[cell[1]][cell[0]] not in blocked_features
+    )
+
+
+def is_landing_site(smap: SurveyMap, config: GameConfig, x: int, y: int) -> bool:
+    """Whether `(x, y)` is a legal drop site (see `landing_sites`)."""
+    return (x, y) in landing_sites(smap, config)
+
+
+def suggested_landing(smap: SurveyMap, config: GameConfig, x: int, y: int) -> Vec:
+    """Where to rest the drop cursor: the remembered spot when it is still legal, else the
+    generated landing zone. A prior descent's position can become illegal — the sensor
+    window widens between descents, so the map is not identical run to run."""
+    sites = landing_sites(smap, config)
+    if (x, y) in sites:
+        return x, y
+    if (smap.landing_x, smap.landing_y) in sites:
+        return smap.landing_x, smap.landing_y
+    return min(sites, default=(smap.landing_x, smap.landing_y))
+
+
 def _unfound(smap: SurveyMap) -> list[SurveySite]:
     return [s for s in smap.sites if not s.found]
 

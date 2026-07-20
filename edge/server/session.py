@@ -862,6 +862,9 @@ def ground_operation_view(
         gates |= {(town.x0, town.cy), (town.x1, town.cy),
                   (town.cx, town.y0), (town.cx, town.y1)}
 
+    # The drop zone is only meaningful (and only worth flooding the map for) while inbound.
+    landing = ground_survey.landing_sites(smap, config) if not op.landed else frozenset()
+
     cells: list[dto.GroundCellDTO] = []
     for y in range(vy, vy + vh):
         for x in range(vx, vx + vw):
@@ -891,6 +894,7 @@ def ground_operation_view(
                 reachable=(x, y) in reachable,
                 settlement_id=settlement.id if settlement is not None else 0,
                 found_contact_id=contact_ids[found.discovery_id] if found is not None else 0,
+                landing_site=(x, y) in landing,
             ))
 
     contacts = [
@@ -912,6 +916,10 @@ def ground_operation_view(
     charge_due_next = next_main_turn_at == op.local_turn + 1
     can_afford_next = expedition.main_turn_cost == 0 or not charge_due_next \
         or player.turns_remaining >= expedition.main_turn_cost
+    suggested_x, suggested_y = (
+        ground_survey.suggested_landing(smap, config, op.explorer_x, op.explorer_y)
+        if not op.landed else (op.explorer_x, op.explorer_y)
+    )
     scanner, _ = ground_survey.scanner_reading(op, smap, config)
     scanner_band = ground_survey.scanner_band_index(op, smap, config)
     # Talking narrows a circle whenever *any* unhinted unfound site is left (survey_talk),
@@ -954,9 +962,13 @@ def ground_operation_view(
             for town in smap.settlements
         ],
         outcome=op.outcome,
-        can_move=live and op.supplies > 0 and can_afford_next,
-        can_dig=live and op.supplies > 0,
-        can_talk=live and town_here is not None,
+        landed=op.landed,
+        can_land=live and not op.landed,
+        suggested_landing_x=suggested_x,
+        suggested_landing_y=suggested_y,
+        can_move=live and op.landed and op.supplies > 0 and can_afford_next,
+        can_dig=live and op.landed and op.supplies > 0,
+        can_talk=live and op.landed and town_here is not None,
         can_extract=True,
     )
 

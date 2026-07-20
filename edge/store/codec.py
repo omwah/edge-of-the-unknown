@@ -89,6 +89,7 @@ from edge.core.events import (
     SiteExplored,
     SurveyDug,
     SurveySiteExcavated,
+    SurveyLanded,
     SurveyTalked,
     StarbaseClaimed,
     StarbaseRazed,
@@ -160,6 +161,7 @@ from edge.core.rules import (
     MineBelt,
     InstallComponent,
     SurveyDig,
+    SurveyLand,
     SurveyTalk,
     InvadePlanet,
     JoinAlliance,
@@ -296,6 +298,9 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
                                   "y": command.y, "actor_id": command.actor_id}
         case SurveyDig():
             return "SurveyDig", {"operation_id": command.operation_id}
+        case SurveyLand():
+            return "SurveyLand", {"operation_id": command.operation_id,
+                                  "x": command.x, "y": command.y}
         case SurveyTalk():
             return "SurveyTalk", {"operation_id": command.operation_id}
         case MineBelt():
@@ -510,6 +515,9 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
                               y=payload["y"], actor_id=payload.get("actor_id", 0))
         case "SurveyDig":
             return SurveyDig(operation_id=payload["operation_id"])
+        case "SurveyLand":
+            return SurveyLand(operation_id=payload["operation_id"],
+                              x=payload["x"], y=payload["y"])
         case "SurveyTalk":
             return SurveyTalk(operation_id=payload["operation_id"])
         case "MineBelt":
@@ -725,6 +733,11 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "SurveySiteExcavated", {
                 "player_id": event.player_id, "operation_id": event.operation_id,
                 "discovery_id": event.discovery_id, "kind": event.kind, "rarity": event.rarity,
+            }
+        case SurveyLanded():
+            return "SurveyLanded", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "x": event.x, "y": event.y,
             }
         case SurveyTalked():
             return "SurveyTalked", {
@@ -1094,6 +1107,9 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "SurveySiteExcavated":
             return SurveySiteExcavated(payload["player_id"], payload["operation_id"],
                                        payload["discovery_id"], payload["kind"], payload["rarity"])
+        case "SurveyLanded":
+            return SurveyLanded(payload["player_id"], payload["operation_id"],
+                                payload["x"], payload["y"])
         case "SurveyTalked":
             return SurveyTalked(payload["player_id"], payload["operation_id"],
                                 payload["settlement_id"], payload["hinted_id"])

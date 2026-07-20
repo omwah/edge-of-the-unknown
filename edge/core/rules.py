@@ -156,6 +156,7 @@ from edge.core.events import (
     SiteExplored,
     SurveyDug,
     SurveySiteExcavated,
+    SurveyLanded,
     SurveyTalked,
     StarbaseClaimed,
     StarbaseRazed,
@@ -557,6 +558,20 @@ class SurveyDig:
     """
 
     operation_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class SurveyLand:
+    """Set the shuttle down on a chosen drop site, starting the survey proper.
+
+    Legal only once per operation and only on a cell in `landing_sites` — safe terrain
+    inside the region that holds every contact. Costs no turns and no supplies: the
+    descent is the start of the expedition, not an action within it.
+    """
+
+    operation_id: int
+    x: int
+    y: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -1068,7 +1083,7 @@ Command = (
     | TransferCargo | BatchTransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BeginSurvey | ExtractGroundOperation
-    | GroundMove | SurveyDig | SurveyTalk
+    | GroundMove | SurveyDig | SurveyLand | SurveyTalk
     | MineBelt | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
@@ -1235,6 +1250,8 @@ def reduce(
             return _ground_move(state, player_id, command, config)
         case SurveyDig():
             return _survey_dig(state, player_id, command, config)
+        case SurveyLand():
+            return _survey_land(state, player_id, command, config)
         case SurveyTalk():
             return _survey_talk(state, player_id, command, config)
         case MineBelt():
@@ -3767,6 +3784,20 @@ def _active_survey(
     Rejects a stale/mismatched id or an assault operation, so a crafted command cannot act on
     someone else's or a settled operation.
     """
+    player, op = _survey_op(state, player_id, operation_id)
+    if not op.landed:
+        raise MovementError("the shuttle is still inbound — choose a drop site first")
+    return player, op
+
+
+def _survey_op(
+    state: UniverseState, player_id: int, operation_id: int
+) -> tuple[Player, SurveyOperation]:
+    """As `_active_survey`, minus the landed check — for the landing command itself.
+
+    Extraction deliberately does not come through here: aborting a descent before the
+    shuttle sets down stays legal.
+    """
     player = _player(state, player_id)
     op = player.ground_operation
     if not isinstance(op, SurveyOperation):
@@ -3840,6 +3871,27 @@ def _survey_dig(
                                       disc.kind.value, disc.rarity_tier.name))
     return ReduceResult(events=tuple(events), players=(new_player,),
                         discoveries=(replace(disc, found_by=player_id),))
+
+
+def _survey_land(
+    state: UniverseState, player_id: int, cmd: SurveyLand, config: GameConfig
+) -> ReduceResult:
+    """Set the shuttle down on the chosen drop site (costs no turns, no supplies)."""
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _survey_op(state, player_id, cmd.operation_id)
+    if op.landed:
+        raise MovementError("the shuttle has already set down")
+    if op.outcome is not None:
+        raise MovementError("the expedition has ended — extract to orbit")
+    smap = gw_survey.survey_map_for(state, op, config)
+    if not gw_survey.is_landing_site(smap, config, cmd.x, cmd.y):
+        raise MovementError("the shuttle cannot set down there")
+    operation = replace(op, explorer_x=cmd.x, explorer_y=cmd.y, landed=True)
+    return ReduceResult(
+        events=(SurveyLanded(player_id, op.operation_id, cmd.x, cmd.y),),
+        players=(replace(player, ground_operation=operation),),
+    )
 
 
 def _survey_talk(

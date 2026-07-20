@@ -23,7 +23,15 @@ from edge.core.models import (
     Ship,
     UniverseState,
 )
-from edge.core.rules import BeginSurvey, SurveyDig, apply_result, reduce
+from edge.core.movement import MovementError
+from edge.core.rules import (
+    BeginSurvey,
+    GroundMove,
+    SurveyDig,
+    SurveyLand,
+    apply_result,
+    reduce,
+)
 from edge.server import session, wire
 from edge.server.client import LocalClient, RemoteClient
 from edge.server.service import GameService
@@ -72,6 +80,27 @@ def _world(*, sites: int = 2) -> UniverseState:
         for i in range(sites)
     }
     apply_result(state, reduce(state, 1, BeginSurvey(1), CFG))
+    return state
+
+
+
+def _landed(state: UniverseState, x: int | None = None, y: int | None = None) -> UniverseState:
+    """Put the survey on the ground at `(x, y)`, defaulting to the map centre.
+
+    The pre-drop-site starting condition, for the tests that are about viewport, keys, and
+    excavation rather than about choosing a drop site.
+    """
+    op = state.players[1].ground_operation
+    assert op is not None
+    exp = CFG.groundwar.expedition  # type: ignore[union-attr]
+    state.players[1] = replace(
+        state.players[1],
+        ground_operation=replace(
+            op, landed=True,
+            explorer_x=exp.width // 2 if x is None else x,
+            explorer_y=exp.height // 2 if y is None else y,
+        ),
+    )
     return state
 
 
@@ -126,10 +155,7 @@ def test_excavation_reveals_only_the_settled_contact_and_marker() -> None:
     op = state.players[1].ground_operation
     assert op is not None
     site = gw.survey_map_for(state, op, CFG).sites[0]
-    state.players[1] = replace(
-        state.players[1],
-        ground_operation=replace(op, explorer_x=site.x, explorer_y=site.y),
-    )
+    _landed(state, site.x, site.y)
     apply_result(state, reduce(state, 1, SurveyDig(op.operation_id), CFG))
 
     view = session.ground_operation_view(state, 1, CFG)
@@ -181,7 +207,7 @@ async def test_remote_client_decodes_the_same_cropped_view() -> None:
 
 
 async def test_textual_keyboard_mouse_and_extract_flow(tmp_path: Path) -> None:
-    state = _world()
+    state = _landed(_world())  # cursor/pan mechanics, not drop-site selection
     service = GameService(state, CFG, SqliteRepository(tmp_path / "pilot.db"))
     client = LocalClient(service)
     app = EdgeApp(plain=True)
@@ -221,8 +247,7 @@ async def test_excavation_keeps_the_same_map_and_viewport(tmp_path: Path) -> Non
     op = state.players[1].ground_operation
     assert op is not None
     site = gw.survey_map_for(state, op, CFG).sites[0]
-    state.players[1] = replace(
-        state.players[1], ground_operation=replace(op, explorer_x=site.x, explorer_y=site.y))
+    _landed(state, site.x, site.y)
     service = GameService(state, CFG, SqliteRepository(tmp_path / "excavate.db"))
     client = LocalClient(service)
     app = EdgeApp(plain=True)
@@ -309,7 +334,7 @@ def test_expedition_responsive_snapshots(
     )
 
 
-# --- GW-WP08 presentation fields ---------------------------------------------
+# --- GW-WP07-FU1 presentation fields ---------------------------------------------
 
 
 def _inhabited_view() -> object:
@@ -457,3 +482,109 @@ def test_terrain_styles_pin_concrete_colours_not_theme_names() -> None:
     fg, bg = _feature_colors("terrestrial_cool", "forest")
     rendered_fg, rendered_bg = _styled(fg, bg).split(" on ")
     assert rendered_fg != rendered_bg
+
+
+# --- GW-WP07-FU2 player-chosen drop site -----------------------------------------
+
+
+def test_drop_zone_excludes_unsafe_terrain_and_unreachable_ground() -> None:
+    """The reported bug: the explorer was placed at the map centre regardless of terrain,
+    so a descent could start in water or on an island away from every contact."""
+    state = _world(sites=3)
+    op = state.players[1].ground_operation
+    assert op is not None
+    smap = gw.survey_map_for(state, op, CFG)
+    drops = gw.landing_sites(smap, CFG)
+    assert drops
+
+    blocked = set(CFG.groundwar.expedition.landing_blocked_features)  # type: ignore[union-attr]
+    assert blocked, "the fixture config must actually name unsafe terrain"
+    assert not any(smap.feature[y][x] in blocked for x, y in drops)
+
+    # Every contact stays reachable on foot from the extremes of the drop zone.
+    for probe in (min(drops), max(drops)):
+        for site in smap.sites:
+            assert gw.path_to(smap, CFG, probe[0], probe[1], site.x, site.y) is not None
+
+
+def test_survey_begins_inbound_and_actions_wait_for_touchdown() -> None:
+    state = _world()
+    op = state.players[1].ground_operation
+    assert op is not None and not op.landed
+
+    view = session.ground_operation_view(state, 1, CFG)
+    assert view is not None
+    assert view.can_land and not view.landed
+    assert not (view.can_move or view.can_dig or view.can_talk)
+    assert view.can_extract, "aborting before touchdown must stay legal"
+    # The suggested rest for the cursor is itself a legal drop site.
+    assert (view.suggested_landing_x, view.suggested_landing_y) in gw.landing_sites(
+        gw.survey_map_for(state, op, CFG), CFG)
+
+    with pytest.raises(MovementError):
+        reduce(state, 1, GroundMove(op.operation_id, 20, 20), CFG)
+
+
+def test_landing_validates_the_chosen_cell_and_happens_once() -> None:
+    state = _world()
+    op = state.players[1].ground_operation
+    assert op is not None
+    smap = gw.survey_map_for(state, op, CFG)
+    drops = gw.landing_sites(smap, CFG)
+    illegal = next((x, y) for y in range(smap.height) for x in range(smap.width)
+                   if (x, y) not in drops)
+
+    with pytest.raises(MovementError):
+        reduce(state, 1, SurveyLand(op.operation_id, *illegal), CFG)
+
+    chosen = max(drops)  # deliberately not the generated landing zone
+    apply_result(state, reduce(state, 1, SurveyLand(op.operation_id, *chosen), CFG))
+    landed_op = state.players[1].ground_operation
+    assert landed_op is not None
+    assert landed_op.landed and (landed_op.explorer_x, landed_op.explorer_y) == chosen
+
+    with pytest.raises(MovementError):
+        reduce(state, 1, SurveyLand(op.operation_id, *chosen), CFG)
+
+    view = session.ground_operation_view(state, 1, CFG)
+    assert view is not None
+    assert view.landed and not view.can_land and view.can_move
+    # The drop zone is only advertised while inbound.
+    assert not any(cell.landing_site for cell in view.cells)
+
+
+def test_inbound_view_keeps_terrain_colour_and_dims_only_refused_ground() -> None:
+    """Choosing a drop site means reading terrain, so terrain must keep its own colours.
+
+    An earlier pass washed every landable cell with a flat grey, which covered more than
+    half the map and hid the biome detail the choice depends on. Legal ground now renders
+    exactly as it does once landed; only refused ground recedes.
+    """
+    from rich.color import Color
+
+    from edge.art.terrain import BIOME_COLORS, _luminance
+    from edge.core.groundwar.terrain import BIOME_BANDS
+    from edge.tui.screens.ground_expedition import (
+        _feature_colors,
+        _styled,
+        _styled_excluded,
+    )
+
+    def luminance(color: str) -> float:
+        rgb = Color.parse(color).get_truecolor()
+        return _luminance((rgb.red / 255, rgb.green / 255, rgb.blue / 255))
+
+    for ptype, layout in BIOME_BANDS.items():
+        colors = BIOME_COLORS.get(ptype, [])
+        for index, (_threshold, feature) in enumerate(layout.bands):
+            if index >= len(colors):
+                continue
+            fg, bg = _feature_colors(ptype, feature)
+            normal, excluded = _styled(fg, bg), _styled_excluded(fg, bg)
+            assert excluded != normal, f"{ptype}/{feature} does not recede when refused"
+            # Refused ground still has to be readable — dimming fg and bg by different
+            # amounts collapsed `sand` (fg darker than bg) to a 0.063 gap before the
+            # post-dim contrast correction.
+            front, back = excluded.split(" on ")
+            assert luminance(front) != pytest.approx(luminance(back), abs=0.15), (
+                f"{ptype}/{feature} is unreadable when dimmed")

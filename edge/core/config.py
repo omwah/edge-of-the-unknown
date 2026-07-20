@@ -1802,6 +1802,11 @@ class GwExpedition(BaseModel):
     # refuses a march that would cross an unaffordable threshold; extraction is never charged.
     local_turns_per_main_turn: int = Field(gt=0)
     main_turn_cost: int = Field(ge=0)
+    # The drop site is the player's choice, but the shuttle refuses open water, peaks, and
+    # ice: these feature names are excluded from the landable set (and the set is further
+    # confined to the sites' own passable region, so a descent can never strand you on an
+    # island away from every contact).
+    landing_blocked_features: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def _check(self) -> GwExpedition:

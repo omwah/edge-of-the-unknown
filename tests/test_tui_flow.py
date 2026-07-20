@@ -619,6 +619,13 @@ async def test_descend_explore_log_flow() -> None:
         await pilot.pause()
         assert isinstance(app.screen, GroundExpeditionScreen)
         screen = app.screen
+        # The survey begins inbound: commit the offered drop site, then skip the
+        # touchdown animation (any key does) before marching.
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("space")
+        await pilot.pause()
+        assert svc.state.players[1].ground_operation.landed
         op = svc.state.players[1].ground_operation
         site = next(s for s in ground_survey.survey_map_for(svc.state, op, svc.config).sites
                     if s.discovery_id == target.id)

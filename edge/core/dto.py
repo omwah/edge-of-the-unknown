@@ -116,6 +116,7 @@ class GroundCellDTO:
     reachable: bool = False
     settlement_id: int = 0
     found_contact_id: int = 0
+    landing_site: bool = False  # the shuttle may set down here (pre-landing drop-zone paint)
 
 
 @dataclass(frozen=True)
@@ -181,6 +182,13 @@ class SurveyExpeditionDTO:
     contacts: list[SurveyContactDTO] = field(default_factory=list)
     settlements: list[SurveySettlementDTO] = field(default_factory=list)
     outcome: str | None = None
+    # Until the player picks a drop site the shuttle is still inbound: `explorer_x/y` is
+    # only where the cursor should rest, and marching/digging/talking are refused. Aborting
+    # back to orbit stays legal throughout.
+    landed: bool = False
+    can_land: bool = False
+    suggested_landing_x: int = 0
+    suggested_landing_y: int = 0
     can_move: bool = True
     can_dig: bool = True
     can_talk: bool = False
