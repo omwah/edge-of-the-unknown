@@ -855,6 +855,13 @@ def ground_operation_view(
                     if rings.get(cell) != "hinted":
                         rings[cell] = label
 
+    # The gated breaks `_stamp_settlement` leaves in each wall, re-derived from the frozen
+    # town box (mid-edge on all four sides) so the client can paint an enterable doorway.
+    gates: set[tuple[int, int]] = set()
+    for town in smap.settlements:
+        gates |= {(town.x0, town.cy), (town.x1, town.cy),
+                  (town.cx, town.y0), (town.cx, town.y1)}
+
     cells: list[dto.GroundCellDTO] = []
     for y in range(vy, vy + vh):
         for x in range(vx, vx + vw):
@@ -876,6 +883,7 @@ def ground_operation_view(
                 y=y,
                 feature=smap.feature[y][x],
                 blocked=(x, y) in smap.blocked,
+                gate=(x, y) in gates and (x, y) not in smap.blocked,
                 dug=(x, y) in op.dug_cells,
                 clue=(x, y) in clues,
                 search_ring=rings.get((x, y), ""),
@@ -905,6 +913,13 @@ def ground_operation_view(
     can_afford_next = expedition.main_turn_cost == 0 or not charge_due_next \
         or player.turns_remaining >= expedition.main_turn_cost
     scanner, _ = ground_survey.scanner_reading(op, smap, config)
+    scanner_band = ground_survey.scanner_band_index(op, smap, config)
+    # Talking narrows a circle whenever *any* unhinted unfound site is left (survey_talk),
+    # so hint availability is a survey-wide fact rather than a per-town one.
+    hint_available = any(
+        not site.found and site.discovery_id not in op.hinted_discovery_ids
+        for site in ordered_sites
+    )
     return dto.SurveyExpeditionDTO(
         operation_id=op.operation_id,
         planet_id=op.planet_id,
@@ -926,8 +941,18 @@ def ground_operation_view(
         next_main_turn_at=next_main_turn_at,
         main_turn_cost=expedition.main_turn_cost,
         scanner=scanner,
+        scanner_band=scanner_band,
         contacts=contacts,
-        settlements=[dto.SurveySettlementDTO(town.id, town.name) for town in smap.settlements],
+        settlements=[
+            dto.SurveySettlementDTO(
+                settlement_id=town.id,
+                name=town.name,
+                plaza_x=town.cx,
+                plaza_y=town.cy,
+                hint_available=hint_available,
+            )
+            for town in smap.settlements
+        ],
         outcome=op.outcome,
         can_move=live and op.supplies > 0 and can_afford_next,
         can_dig=live and op.supplies > 0,
