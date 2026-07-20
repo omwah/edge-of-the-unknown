@@ -19,7 +19,7 @@ from textual.screen import Screen
 from edge.config import load_default_config
 from edge.server.service import DialogueConfigMismatchError
 from edge.core.config import SceneArtConfig, UIConfig
-from edge.server.client import LocalClient
+from edge.server.client import GameClient, LocalClient
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
 from edge.tui.chrome import notify_error, notify_warning
@@ -61,10 +61,10 @@ class EdgeApp(App[None]):
         self._remote_bridge: object | None = None
         # The app talks to the game exclusively through a `GameClient` (WP61); single-player
         # is a `LocalClient` wrapping the in-process service. `service` stays exposed as a
-        # back-compat property (screens/tests read the synchronous `GameService` through it —
-        # Textual's compose/render are synchronous, so the screen-level await migration is
-        # deferred; the load-bearing seam is that the *client* now owns the ticker).
-        self.client: LocalClient | None = None
+        # back-compat property (older screens/tests still read the synchronous `GameService`
+        # through it). GroundExpeditionScreen is the first live screen moved end-to-end onto
+        # the async facade (GW-WP07); the client also owns the embedded ticker.
+        self.client: GameClient | None = None
         # SectorView sprite-scene sizes + warp-grid options; replaced from config
         # when a game starts.
         self.scene_art = SceneArtConfig()
@@ -116,7 +116,7 @@ class EdgeApp(App[None]):
         """
         if self._remote_service is not None:
             return self._remote_service  # type: ignore[return-value]
-        return self.client.service if self.client is not None else None
+        return self.client.service if isinstance(self.client, LocalClient) else None
 
     def on_mount(self) -> None:
         for theme in EDGE_THEMES:

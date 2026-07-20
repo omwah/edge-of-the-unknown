@@ -93,6 +93,87 @@ class SurfaceDTO:
 
 
 @dataclass(frozen=True)
+class GroundCellDTO:
+    """One server-projected cell in a survey viewport (GW-WP07).
+
+    The client receives presentation-safe terrain and overlays, never a survey seed or an
+    unresolved site's exact position. ``search_ring`` is ``"marked"`` / ``"hinted"`` /
+    ``""`` and ``heat`` is the nearest scanner-band index (0 means no glow). Resolved
+    overlays remain as earned chart history.
+    """
+
+    x: int
+    y: int
+    feature: str
+    blocked: bool = False
+    dug: bool = False
+    clue: bool = False
+    search_ring: str = ""
+    heat: int = 0
+    reachable: bool = False
+    settlement_id: int = 0
+    found_contact_id: int = 0
+
+
+@dataclass(frozen=True)
+class SurveyContactDTO:
+    """One sensor contact, masked until excavation settles the real discovery (G6/G7)."""
+
+    contact_id: int
+    discovery_id: int = 0  # deliberately 0 until found; the ordinal is the public identity
+    found: bool = False
+    hinted: bool = False
+    name: str = ""
+    kind: str = ""
+    rarity: str = ""
+
+
+@dataclass(frozen=True)
+class SurveySettlementDTO:
+    """A friendly settlement visible on the projected survey map."""
+
+    settlement_id: int
+    name: str
+
+
+@dataclass(frozen=True)
+class SurveyExpeditionDTO:
+    """Fog-safe live survey view consumed by local and remote clients (GW-WP07).
+
+    Only the requested viewport is projected.  Static terrain outside it, the operation
+    seed, unresolved dig cells, and sensor-ineligible discoveries never cross the boundary.
+    """
+
+    operation_id: int
+    planet_id: int
+    planet: str
+    ptype: str
+    map_width: int
+    map_height: int
+    viewport_x: int
+    viewport_y: int
+    viewport_width: int
+    viewport_height: int
+    cells: list[GroundCellDTO]
+    explorer_x: int
+    explorer_y: int
+    supplies: int
+    supplies_max: int
+    local_turn: int
+    turns_remaining: int
+    next_main_turn_at: int
+    main_turn_cost: int
+    scanner: str
+    contacts: list[SurveyContactDTO] = field(default_factory=list)
+    settlements: list[SurveySettlementDTO] = field(default_factory=list)
+    outcome: str | None = None
+    can_move: bool = True
+    can_dig: bool = True
+    can_talk: bool = False
+    can_extract: bool = True
+
+
+@dataclass(frozen=True)
 class HaggleQuote:
     """A read-only read on a counter-offer before the player commits it (§8).
 

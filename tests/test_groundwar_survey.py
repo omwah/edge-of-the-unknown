@@ -26,6 +26,7 @@ from edge.core.groundwar.survey import (
     generate_survey,
 )
 from edge.core.models import Discovery, DiscoveryPayload
+from edge.core.surface_finds import surface_find_name
 from edge.bigbang.generator import generate
 
 CFG = load_default_config()
@@ -59,9 +60,10 @@ def test_one_site_per_real_discovery_id() -> None:
     sites = [_disc(i) for i in (3, 8, 11)]
     m = _survey(sites)
     assert sorted(s.discovery_id for s in m.sites) == [3, 8, 11]
-    for s in m.sites:  # identity copied off the record, never invented (G6)
+    for s in m.sites:  # POC presentation decorates the record without changing its id (G6)
         src = next(d for d in sites if d.id == s.discovery_id)
-        assert s.name == src.name and s.rarity == src.rarity_tier.name
+        assert s.name == surface_find_name(src.kind, src.id)
+        assert s.rarity == src.rarity_tier.name
 
 
 def test_sites_and_landing_share_one_passable_component() -> None:

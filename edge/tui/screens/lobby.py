@@ -119,6 +119,7 @@ class LobbyScreen(EdgeScreen):
         service = bridge.service()
         app = self.app
         app.player_id = pid  # type: ignore[attr-defined]
+        app.client = bridge.game_client()  # type: ignore[attr-defined]
         app._remote_service = service  # type: ignore[attr-defined]
         app.pop_screen()
         app.push_screen(GameScreen(service, pid))  # type: ignore[arg-type]

@@ -8,9 +8,12 @@ with the find rendered at the excavation. Deterministic from `(kind, seed)`.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
 
 from rich.text import Text
+
+from edge.core.surface_finds import FIND_KINDS, site_name
+
+__all__ = ["ART_H", "ART_W", "FIND_KINDS", "LORE_PLACEHOLDER", "generate_find_art", "site_name"]
 
 ART_W = 48
 ART_H = 15
@@ -19,54 +22,10 @@ Cell = tuple[str, str]
 Canvas = list[list[Cell]]
 
 
-@dataclass(frozen=True, slots=True)
-class FindKind:
-    key: str
-    label: str
-    blurb: str  # one-line descriptor under the name in the modal
-    accent: str  # rich color anchoring the render
-
-
-FIND_KINDS: dict[str, FindKind] = {
-    "colonnade": FindKind(
-        "colonnade", "Sunken Colonnade",
-        "A processional avenue, its pillars snapped like reeds.", "light_goldenrod2"),
-    "cache": FindKind(
-        "cache", "Artifact Cache",
-        "Sealed vessels, packed in ash and deliberately hidden.", "orchid"),
-    "obelisk": FindKind(
-        "obelisk", "Inscribed Obelisk",
-        "One standing stone, written top to bottom in an unread script.", "sky_blue1"),
-    "leviathan": FindKind(
-        "leviathan", "Fossil Leviathan",
-        "A ribcage the size of a hangar, older than the mountains.", "wheat1"),
-    "beacon": FindKind(
-        "beacon", "Precursor Beacon",
-        "A machine that has waited a long time. It is still warm.", "spring_green2"),
-}
-
 LORE_PLACEHOLDER = (
     "Lore entry pending — the Institute's xenoarchaeologists are still "
     "translating what you found."
 )
-
-_ADJ = ("Sunken", "Silent", "Broken", "Painted", "First", "Sleeping", "Veiled",
-        "Hollow", "Amber", "Drowned")
-_NOUN = {
-    "colonnade": ("Colonnade", "Avenue", "Processional"),
-    "cache": ("Cache", "Hoard", "Reliquary"),
-    "obelisk": ("Obelisk", "Needle", "Standing Stone"),
-    "leviathan": ("Leviathan", "Titan", "Great Bones"),
-    "beacon": ("Beacon", "Signal", "Waking Engine"),
-}
-_SYL_A = ("Ves", "Kor", "Ana", "Thel", "Ur", "Mira", "Osh", "Cael", "Dun", "Ilo")
-_SYL_B = ("sara", "eth", "ione", "gart", "ume", "adin", "ka", "or", "eshi", "van")
-
-
-def site_name(rng: random.Random, kind: str) -> str:
-    who = rng.choice(_SYL_A) + rng.choice(_SYL_B)
-    return f"the {rng.choice(_ADJ)} {rng.choice(_NOUN[kind])} of {who}"
-
 
 # --- canvas helpers ----------------------------------------------------------
 

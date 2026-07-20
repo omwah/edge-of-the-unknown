@@ -1,0 +1,308 @@
+"""GW-WP07 — fog-safe expedition DTO, client parity, and live Textual flow."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+from edge.config import load_default_config
+from edge.core.enums import DiscoveryKind, PayloadKind, RarityTier
+from edge.core.groundwar import survey as gw
+from edge.core.models import (
+    Discovery,
+    DiscoveryPayload,
+    Game,
+    Ownership,
+    Planet,
+    Player,
+    Region,
+    Sector,
+    Ship,
+    UniverseState,
+)
+from edge.core.rules import BeginSurvey, SurveyDig, apply_result, reduce
+from edge.server import session, wire
+from edge.server.client import LocalClient, RemoteClient
+from edge.server.service import GameService
+from edge.store.repo import SqliteRepository
+from edge.tui.app import EdgeApp
+from edge.tui.screens.ground_expedition import GroundExpeditionScreen, SurveyMapView
+
+
+CFG = load_default_config()
+
+
+def _world(*, sites: int = 2) -> UniverseState:
+    state = UniverseState.new(Game(1, 91, CFG.config_version, "t"))
+    state.sectors = {1: Sector(1, 1, (), "Frontier")}
+    state.regions = {1: Region(1, "Frontier")}
+    state.rebuild_adjacency()
+    state.planets = {
+        1: Planet(
+            1, 1, "Morrow", "terrestrial_warm", habitability_cap=1_000,
+            owner=Ownership("none"),
+        )
+    }
+    state.ships = {
+        1: Ship(
+            id=1, type_id="trailblazer", name="S", owner_player_id=1,
+            sector_id=1, holds_total=60, turns_per_warp=1, sensor_rating=9,
+        )
+    }
+    state.players = {
+        1: Player(id=1, name="you", ship_id=1, latinum=100, turns_remaining=250)
+    }
+    state.discoveries = {
+        10 + i: Discovery(
+            id=10 + i,
+            kind=DiscoveryKind.RUINS,
+            rarity_tier=RarityTier.RARE,
+            sector_id=1,
+            payload=DiscoveryPayload(
+                kind=PayloadKind.ARTIFACT, barter_tier="II", lore=f"lore-{i}"
+            ),
+            planet_id=1,
+            site_slot=i,
+            hidden=False,
+            name=f"Buried Site {i}",
+        )
+        for i in range(sites)
+    }
+    apply_result(state, reduce(state, 1, BeginSurvey(1), CFG))
+    return state
+
+
+def test_view_is_cropped_and_masks_unresolved_site_identity() -> None:
+    state = _world(sites=2)
+    op = state.players[1].ground_operation
+    assert op is not None
+    # Simulate the begin snapshot excluding one sensor-ineligible discovery: projection must
+    # not recover it by scanning live universe records (G7).
+    state.players[1] = replace(
+        state.players[1], ground_operation=replace(op, visible_discovery_ids=frozenset({10}))
+    )
+
+    view = session.ground_operation_view(
+        state, 1, CFG, viewport_x=3, viewport_y=4, viewport_width=11, viewport_height=7
+    )
+    assert view is not None
+    assert (view.viewport_x, view.viewport_y, view.viewport_width, view.viewport_height) == (
+        3, 4, 11, 7,
+    )
+    assert len(view.cells) == 77
+    assert all(3 <= cell.x < 14 and 4 <= cell.y < 11 for cell in view.cells)
+    assert len(view.contacts) == 1
+    contact = view.contacts[0]
+    assert (contact.discovery_id, contact.name, contact.kind, contact.rarity) == (0, "", "", "")
+    assert not any(cell.found_contact_id for cell in view.cells)
+    assert not hasattr(view, "seed")
+
+
+def test_viewport_pans_reuse_the_generated_survey_map(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = _world()
+    session._SURVEY_MAP_CACHE.clear()
+    generated = 0
+    original = gw.survey_map_for
+
+    def counted(*args: object, **kwargs: object) -> object:
+        nonlocal generated
+        generated += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(gw, "survey_map_for", counted)
+    for viewport_x in (0, 8, 16, 24):
+        assert session.ground_operation_view(
+            state, 1, CFG, viewport_x=viewport_x,
+            viewport_width=66, viewport_height=25,
+        ) is not None
+    assert generated == 1
+
+
+def test_excavation_reveals_only_the_settled_contact_and_marker() -> None:
+    state = _world(sites=2)
+    op = state.players[1].ground_operation
+    assert op is not None
+    site = gw.survey_map_for(state, op, CFG).sites[0]
+    state.players[1] = replace(
+        state.players[1],
+        ground_operation=replace(op, explorer_x=site.x, explorer_y=site.y),
+    )
+    apply_result(state, reduce(state, 1, SurveyDig(op.operation_id), CFG))
+
+    view = session.ground_operation_view(state, 1, CFG)
+    assert view is not None
+    found = next(contact for contact in view.contacts if contact.found)
+    assert found.discovery_id == site.discovery_id
+    assert found.name == site.name and found.kind == "ruins" and found.rarity == "RARE"
+    marker = next(cell for cell in view.cells if cell.found_contact_id == found.contact_id)
+    assert (marker.x, marker.y) == (site.x, site.y)
+    unresolved = [contact for contact in view.contacts if not contact.found]
+    assert all(contact.discovery_id == 0 and not contact.name for contact in unresolved)
+
+
+async def test_local_client_and_wire_round_trip_match_service(tmp_path: Path) -> None:
+    state = _world()
+    service = GameService(state, CFG, SqliteRepository(tmp_path / "survey.db"))
+    client = LocalClient(service)
+    expected = service.ground_operation_view(
+        1, viewport_x=5, viewport_y=2, viewport_width=17, viewport_height=9
+    )
+    actual = await client.ground_operation_view(
+        viewport_x=5, viewport_y=2, viewport_width=17, viewport_height=9
+    )
+    assert actual == expected
+    assert actual is not None
+    assert wire.decode_dto(wire.encode_dto(actual)) == actual
+
+
+async def test_remote_client_decodes_the_same_cropped_view() -> None:
+    state = _world()
+    expected = session.ground_operation_view(
+        state, 1, CFG, viewport_x=9, viewport_y=6, viewport_width=13, viewport_height=8
+    )
+    assert expected is not None
+    remote = RemoteClient("ws://unused")
+
+    async def fake_call(method: str, params: dict[str, object]) -> object:
+        assert method == "ground_operation_view"
+        assert params == {
+            "viewport_x": 9, "viewport_y": 6,
+            "viewport_width": 13, "viewport_height": 8,
+        }
+        return wire.encode_dto(expected)
+
+    remote._call = fake_call  # type: ignore[method-assign]
+    assert await remote.ground_operation_view(
+        viewport_x=9, viewport_y=6, viewport_width=13, viewport_height=8
+    ) == expected
+
+
+async def test_textual_keyboard_mouse_and_extract_flow(tmp_path: Path) -> None:
+    state = _world()
+    service = GameService(state, CFG, SqliteRepository(tmp_path / "pilot.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.client = client
+        app.push_screen(GroundExpeditionScreen(client))
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GroundExpeditionScreen)
+        start_cursor = (screen.cursor_x, screen.cursor_y)
+        await pilot.press("right")
+        await pilot.pause()
+        assert (screen.cursor_x, screen.cursor_y) != start_cursor
+
+        before_pan = (screen.camera_x, screen.camera_y, screen.cursor_x, screen.cursor_y)
+        await pilot.press("d")
+        await pilot.pause()
+        assert screen.camera_x == before_pan[0] + 8
+        assert screen.cursor_x == before_pan[2] + 8
+
+        map_widget = screen.query_one(SurveyMapView)
+        assert screen.view is not None
+        clicked = screen.view.viewport_x + 2, screen.view.viewport_y + 2
+        await pilot.click(map_widget, offset=(2, 2))
+        await pilot.pause()
+        assert (screen.cursor_x, screen.cursor_y) == clicked
+
+        await pilot.press("escape")
+        await pilot.pause()
+        assert state.players[1].ground_operation is None
+        assert not isinstance(app.screen, GroundExpeditionScreen)
+
+
+async def test_excavation_keeps_the_same_map_and_viewport(tmp_path: Path) -> None:
+    state = _world(sites=2)
+    op = state.players[1].ground_operation
+    assert op is not None
+    site = gw.survey_map_for(state, op, CFG).sites[0]
+    state.players[1] = replace(
+        state.players[1], ground_operation=replace(op, explorer_x=site.x, explorer_y=site.y))
+    service = GameService(state, CFG, SqliteRepository(tmp_path / "excavate.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.client = client
+        screen = GroundExpeditionScreen(client)
+        app.push_screen(screen)
+        await pilot.pause()
+        assert screen.view is not None
+        before = screen.view
+        before_size = screen.query_one(SurveyMapView).size
+        before_render = screen.query_one(SurveyMapView).render().plain.splitlines()
+        before_camera = screen.camera_x, screen.camera_y
+        before_features = {(cell.x, cell.y): cell.feature for cell in before.cells}
+        before_overlays = {
+            (cell.x, cell.y): (cell.heat, cell.clue)
+            for cell in before.cells
+        }
+        before_ring_cells = sum(bool(cell.search_ring) for cell in before.cells)
+
+        await pilot.press("x")
+        await pilot.pause()
+        assert not isinstance(app.screen, GroundExpeditionScreen)
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert app.screen is screen
+        assert screen.view is not None
+        after = screen.view
+        assert screen.query_one(SurveyMapView).size == before_size
+        after_render = screen.query_one(SurveyMapView).render().plain.splitlines()
+        assert len(after_render) == len(before_render)
+        assert [len(line) for line in after_render] == [len(line) for line in before_render]
+        assert (screen.camera_x, screen.camera_y) == before_camera
+        assert (after.viewport_x, after.viewport_y) == (before.viewport_x, before.viewport_y)
+        assert (after.viewport_width, after.viewport_height) == (
+            before.viewport_width, before.viewport_height)
+        assert {(cell.x, cell.y): cell.feature for cell in after.cells} == before_features
+        assert {
+            (cell.x, cell.y): (cell.heat, cell.clue)
+            for cell in after.cells
+        } == before_overlays
+        assert sum(bool(cell.search_ring) for cell in after.cells) < before_ring_cells
+
+
+async def test_game_screen_resumes_an_active_survey(tmp_path: Path) -> None:
+    """A loaded/reconnected session cannot strand the player behind the G9 blocker."""
+    from edge.tui.screens.game import GameScreen
+
+    state = _world()
+    service = GameService(state, CFG, SqliteRepository(tmp_path / "resume.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.client = client
+        app.push_screen(GameScreen(service, 1))
+        await pilot.pause()
+        assert isinstance(app.screen, GroundExpeditionScreen)
+        assert app.screen.view is not None
+        assert app.screen.view.operation_id == state.players[1].ground_operation.operation_id  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(
+    ("label", "size"),
+    (("compact", (80, 24)), ("standard", (100, 34)), ("wide", (140, 42))),
+    ids=("compact", "standard", "wide"),
+)
+def test_expedition_responsive_snapshots(
+    snap_compare: object, tmp_path: Path, label: str, size: tuple[int, int]
+) -> None:
+    state = _world()
+    service = GameService(state, CFG, SqliteRepository(tmp_path / f"{label}.db"))
+    client = LocalClient(service)
+
+    async def open_expedition(pilot: object) -> None:
+        pilot.app.client = client  # type: ignore[attr-defined]
+        pilot.app.push_screen(GroundExpeditionScreen(client))  # type: ignore[attr-defined]
+        await pilot.pause()  # type: ignore[attr-defined]
+
+    assert snap_compare(  # type: ignore[operator]
+        EdgeApp(plain=True), terminal_size=size, run_before=open_expedition
+    )

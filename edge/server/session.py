@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import random
+from collections import OrderedDict
 from collections.abc import Mapping
 
 from edge.bigbang.topology import bfs_distances
@@ -97,8 +98,14 @@ from edge.core.events import (
     GenesisDeployed,
     GovernanceChanged,
     GrudgeFormed,
+    GroundMoved,
+    GroundOperationBegan,
+    GroundOperationEnded,
     HazardDamage,
     SiteExplored,
+    SurveyDug,
+    SurveySiteExcavated,
+    SurveyTalked,
     Event,
     Haggled,
     LeadAccepted,
@@ -137,6 +144,8 @@ from edge.core.models import (
 )
 from edge.core.aliens import base_owner_hostile
 from edge.core.groundwar.access import Assault, Survey, ground_access
+from edge.core.groundwar.models import SurveyOperation
+from edge.core.groundwar import survey as ground_survey
 from edge.core.planets import (
     belt_mining_yield,
     cloud_city_blocker,
@@ -784,6 +793,182 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         ground_mode=ground_mode, ground_blocker=ground_blocker,
         ground_settlements=ground_settlements,
     )
+
+
+def ground_operation_view(
+    state: UniverseState,
+    player_id: int,
+    config: GameConfig,
+    *,
+    viewport_x: int = 0,
+    viewport_y: int = 0,
+    viewport_width: int | None = None,
+    viewport_height: int | None = None,
+) -> dto.SurveyExpeditionDTO | None:
+    """Project the player's active survey without exposing its generation identity (GW-WP07).
+
+    The immutable map is regenerated server-side, then cropped.  Site positions influence only
+    the intended search-ring/scanner/clue overlays; an unresolved site's coordinates, real id,
+    name, kind, rarity, and the operation seed never enter the DTO (G1/G5/G7).
+    """
+    player = state.players[player_id]
+    op = player.ground_operation
+    if not isinstance(op, SurveyOperation):
+        return None
+    if config.groundwar is None:
+        return None
+    expedition = config.groundwar.expedition
+    smap = _cached_survey_map_for(state, op, config)
+    planet = state.planets[op.planet_id]
+
+    vx = max(0, min(viewport_x, smap.width - 1))
+    vy = max(0, min(viewport_y, smap.height - 1))
+    requested_width = smap.width if viewport_width is None else max(1, viewport_width)
+    requested_height = smap.height if viewport_height is None else max(1, viewport_height)
+    vw = min(requested_width, smap.width - vx)
+    vh = min(requested_height, smap.height - vy)
+
+    ordered_sites = sorted(smap.sites, key=lambda site: site.discovery_id)
+    contact_ids = {site.discovery_id: index for index, site in enumerate(ordered_sites, 1)}
+    clues = ground_survey.visible_clues(op, smap, config)
+    # Excavation adds a marker; it must not visually erase the chart patch that led
+    # there. These resolved clues were already earned, while core movement stopping
+    # continues to use the unresolved-only `visible_clues` rule.
+    for site in ordered_sites:
+        if not site.found:
+            continue
+        for clue in site.clues:
+            if math.hypot(clue[0] - op.explorer_x, clue[1] - op.explorer_y) <= expedition.sight:
+                clues.add(clue)
+    reachable = ground_survey.reachable_cells(smap, config, op.explorer_x, op.explorer_y)
+
+    rings: dict[tuple[int, int], str] = {}
+    for site in (site for site in ordered_sites if not site.found):
+        radius = site.area_r
+        label = "hinted" if site.discovery_id in op.hinted_discovery_ids else "marked"
+        for dy in range(-radius - 1, radius + 2):
+            for dx in range(-radius - 1, radius + 2):
+                if abs(math.hypot(dx, dy) - radius) >= 0.5:
+                    continue
+                cell = site.area_cx + dx, site.area_cy + dy
+                if vx <= cell[0] < vx + vw and vy <= cell[1] < vy + vh:
+                    if rings.get(cell) != "hinted":
+                        rings[cell] = label
+
+    cells: list[dto.GroundCellDTO] = []
+    for y in range(vy, vy + vh):
+        for x in range(vx, vx + vw):
+            settlement = next(
+                (town for town in smap.settlements
+                 if town.x0 <= x <= town.x1 and town.y0 <= y <= town.y1),
+                None,
+            )
+            found = next((site for site in ordered_sites if site.found and (site.x, site.y) == (x, y)), None)
+            heat = 0
+            if ordered_sites and math.hypot(x - op.explorer_x, y - op.explorer_y) <= expedition.sight:
+                nearest = min(math.hypot(x - site.x, y - site.y) for site in ordered_sites)
+                for index, band in enumerate(expedition.scanner, 1):
+                    if nearest <= band.within:
+                        heat = index
+                        break
+            cells.append(dto.GroundCellDTO(
+                x=x,
+                y=y,
+                feature=smap.feature[y][x],
+                blocked=(x, y) in smap.blocked,
+                dug=(x, y) in op.dug_cells,
+                clue=(x, y) in clues,
+                search_ring=rings.get((x, y), ""),
+                heat=heat,
+                reachable=(x, y) in reachable,
+                settlement_id=settlement.id if settlement is not None else 0,
+                found_contact_id=contact_ids[found.discovery_id] if found is not None else 0,
+            ))
+
+    contacts = [
+        dto.SurveyContactDTO(
+            contact_id=contact_ids[site.discovery_id],
+            discovery_id=site.discovery_id if site.found else 0,
+            found=site.found,
+            hinted=site.discovery_id in op.hinted_discovery_ids,
+            name=site.name if site.found else "",
+            kind=site.kind if site.found else "",
+            rarity=site.rarity if site.found else "",
+        )
+        for site in ordered_sites
+    ]
+    live = op.outcome is None
+    town_here = ground_survey.settlement_at(smap, op.explorer_x, op.explorer_y)
+    period = expedition.local_turns_per_main_turn
+    next_main_turn_at = 1 if op.local_turn == 0 else math.ceil(op.local_turn / period) * period + 1
+    charge_due_next = next_main_turn_at == op.local_turn + 1
+    can_afford_next = expedition.main_turn_cost == 0 or not charge_due_next \
+        or player.turns_remaining >= expedition.main_turn_cost
+    scanner, _ = ground_survey.scanner_reading(op, smap, config)
+    return dto.SurveyExpeditionDTO(
+        operation_id=op.operation_id,
+        planet_id=op.planet_id,
+        planet=planet.name,
+        ptype=op.planet_type,
+        map_width=smap.width,
+        map_height=smap.height,
+        viewport_x=vx,
+        viewport_y=vy,
+        viewport_width=vw,
+        viewport_height=vh,
+        cells=cells,
+        explorer_x=op.explorer_x,
+        explorer_y=op.explorer_y,
+        supplies=op.supplies,
+        supplies_max=expedition.supplies_start,
+        local_turn=op.local_turn,
+        turns_remaining=player.turns_remaining,
+        next_main_turn_at=next_main_turn_at,
+        main_turn_cost=expedition.main_turn_cost,
+        scanner=scanner,
+        contacts=contacts,
+        settlements=[dto.SurveySettlementDTO(town.id, town.name) for town in smap.settlements],
+        outcome=op.outcome,
+        can_move=live and op.supplies > 0 and can_afford_next,
+        can_dig=live and op.supplies > 0,
+        can_talk=live and town_here is not None,
+        can_extract=True,
+    )
+
+
+# OpenSimplex generation and passable-component labelling cover the full map. Viewport
+# pans must not repeat them: G5 permits this bounded, discardable cache because its key
+# is derived entirely from authoritative generation identity and placement inputs.
+_SURVEY_MAP_CACHE_MAX = 64
+_SURVEY_MAP_CACHE: OrderedDict[tuple[object, ...], ground_survey.SurveyMap] = OrderedDict()
+
+
+def _cached_survey_map_for(
+    state: UniverseState, op: SurveyOperation, config: GameConfig,
+) -> ground_survey.SurveyMap:
+    planet = state.planets.get(op.planet_id)
+    inhabited = bool(planet is not None and (
+        planet.colonists > 0 or planet.inhabited_by_species_id is not None))
+    discoveries = tuple(
+        (disc.id, disc.kind.value, disc.rarity_tier.name, disc.name)
+        for discovery_id in sorted(op.visible_discovery_ids)
+        if (disc := state.discoveries.get(discovery_id)) is not None
+    )
+    key: tuple[object, ...] = (
+        id(config), state.game.seed, op.seed, op.planet_id, op.planet_type, inhabited,
+        discoveries, op.visible_discovery_ids, op.resolved_discovery_ids,
+        op.hinted_discovery_ids,
+    )
+    cached = _SURVEY_MAP_CACHE.get(key)
+    if cached is not None:
+        _SURVEY_MAP_CACHE.move_to_end(key)
+        return cached
+    smap = ground_survey.survey_map_for(state, op, config)
+    _SURVEY_MAP_CACHE[key] = smap
+    _SURVEY_MAP_CACHE.move_to_end(key)
+    while len(_SURVEY_MAP_CACHE) > _SURVEY_MAP_CACHE_MAX:
+        _SURVEY_MAP_CACHE.popitem(last=False)
+    return smap
 
 
 _SITE_NAME = {
@@ -2204,6 +2389,23 @@ def format_event(event: Event) -> str:
         return f"[green]✦ Genesis: world re-formed to {event.new_type.replace('_', ' ')}[/]"
     if isinstance(event, Descended):
         return "[magenta]▼ Descended to the surface.[/]"
+    if isinstance(event, GroundOperationBegan):
+        return "[magenta]▼ Survey expedition deployed.[/]" if event.kind == "survey" \
+            else "[red]▼ Ground assault deployed.[/]"
+    if isinstance(event, GroundMoved):
+        cost = f"  (-{event.main_turns} main turn)" if event.main_turns else ""
+        return f"[cyan]↝ Marched to {event.x},{event.y}.[/]{cost}"
+    if isinstance(event, SurveyDug):
+        return ("[green]✦ Excavation struck a buried site.[/]" if event.discovery_id >= 0
+                else "[yellow]⛏ Opened a dry trench.[/]")
+    if isinstance(event, SurveySiteExcavated):
+        return (f"[green]✦ Excavated {event.kind.replace('_', ' ')} "
+                f"({event.rarity.lower()}); artifact and lore recorded.[/]")
+    if isinstance(event, SurveyTalked):
+        hint = " — a search circle was narrowed" if event.hinted_id >= 0 else ""
+        return f"[cyan]◇ Spoke with the settlement{hint}.[/]"
+    if isinstance(event, GroundOperationEnded):
+        return f"[magenta]▲ Ground operation {event.outcome}.[/]"
     if isinstance(event, BeltMined):
         return f"[green]⛏ Mined {event.amount} {event.commodity.replace('_', ' ')} from the belt.[/]"
     if isinstance(event, SiteExplored):
@@ -2369,7 +2571,9 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
         return disc.sector_id if disc is not None else None
     if isinstance(event, (ComponentPurchased, ShipPurchased, ComponentInstalled, ComponentRemoved,
                           Repaired, DevicePurchased, StarbaseSalvaged, ColonistsRecruited,
-                          LeadAccepted, Banked, TurnsReset)):
+                          LeadAccepted, Banked, TurnsReset, GroundOperationBegan,
+                          GroundOperationEnded, GroundMoved, SurveyDug,
+                          SurveySiteExcavated, SurveyTalked)):
         player = state.players.get(event.player_id)
         if player is None:
             return None
@@ -2500,6 +2704,8 @@ def _event_turn_cost(event: Event, config: GameConfig) -> int:
         return disc.salvage_turn_cost if disc is not None else 1
     if isinstance(event, BeltMined):
         return config.planets.mining_turn_cost
+    if isinstance(event, GroundMoved):
+        return event.main_turns
     return 0
 
 

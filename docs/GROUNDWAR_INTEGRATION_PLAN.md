@@ -7,7 +7,7 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–06 shipped; interview decisions resolved (July 2026).**
+> **Status: implementation underway — GW-WP01–07 shipped; interview decisions resolved (July 2026).**
 
 ## Context
 
@@ -343,8 +343,10 @@ The classifier distinguishes:
 - **G2 — Replay.** Starting and acting in a ground operation reconstructs from
   `(seed, config, command log)` and yields an identical `state_hash` after
   reload. Projection never draws RNG.
-- **G3 — RNG discipline.** The begin reducer draws an operation seed from
-  `state.rng`; deterministic static map generation uses that seed. Combat and
+- **G3 — RNG discipline.** The first survey descent on a world draws its map seed
+  from `state.rng` and persists it in that player's per-world survey progress;
+  later descents reuse it. Other ground-operation begins draw their operation seed
+  from `state.rng`. Deterministic static map generation uses that seed. Combat and
   hint rolls either draw from `state.rng` inside their action reducer or from a
   stored operation sequence with a proved replay contract—never UI RNG.
 - **G4 — Immutable core.** Production ground entities are frozen snapshots;
@@ -522,8 +524,9 @@ Commit `ground: GW-WP02 production config + pure terrain seam`.
 ### GW-WP03 — Frozen operation models, generation identity, and state epoch (L)
 
 Add frozen survey/assault state models and `Player.ground_operation`. Define
-stable operation ids and derive the operation seed in the begin reducer from
-`state.rng`. Add `ReduceResult` support, state hashing, command/event codecs,
+stable operation ids and derive the survey map seed on first descent from
+`state.rng`, persisting it in per-world progress for reuse; assault seeds remain
+per-operation. Add `ReduceResult` support, state hashing, command/event codecs,
 wire schemas, and movement/docking/encounter blockers.
 
 Add the D5 per-world survey progress and D10 provenance-bearing artifact record
@@ -657,7 +660,8 @@ one artifact (G8). **D4/D12** macro-turn quanta land as config on `GwExpedition`
 (`local_turns_per_main_turn` / `main_turn_cost`): marching charges `ceil(local/L)×cost` main
 turns as thresholds cross, refusing a march that would cross an unaffordable one; digging and
 talking cost only local supplies; extraction is never charged. Extraction persists the D5
-position/hints while trenches and supplies reset next descent (WP03 `_extract` rail). New
+map identity/position/hints while trenches and supplies reset next descent (WP03 `_extract`
+rail). New
 events `GroundMoved`/`SurveyDug`/`SurveySiteExcavated`/`SurveyTalked` + codecs; wire v25.
 Epoch: config_version 7→8 (the D4 config). Covered by
 `tests/test_groundwar_survey_actions.py` (10 tests incl. a command-log replay golden). The
@@ -690,7 +694,59 @@ simultaneous excavation race; macro-turn quantization; exhaustion; extraction; c
 command-log rebuild golden.
 Commit `ground: GW-WP06 authoritative survey actions + rewards`.
 
-### GW-WP07 — Live expedition DTO and Textual replacement (L)
+### GW-WP07 — Live expedition DTO and Textual replacement (L) — SHIPPED
+
+**Status:** in progress July 2026. `SurveyExpeditionDTO` and its cell/contact/settlement
+children project a cropped live viewport without the operation seed, unresolved
+discovery identity, or exact dig positions; search rings, scanner heat, clues, one-turn
+reachability, legal actions, supplies, and the next macro-turn threshold are computed at
+the server boundary. `ground_operation_view` is present on the service, async local and
+remote clients, JSON-RPC whitelist, and wire v26. The production
+`GroundExpeditionScreen` consumes only that async `GameClient` view and commands, with
+keyboard/mouse cursor, keyboard march/dig/talk/extract, find modal/art, contextual
+help, event copy, responsive compact/standard/wide snapshots, and automatic resume from
+`GameScreen`. `PlanetScreen` renders the classifier's exact Survey / Assault / Orbital-only
+route and starts `BeginSurvey` for Survey worlds.
+
+**Correction:** strict POC/plan parity review found that the initial implementation drew a
+fresh survey-map seed on every descent and saved only position/hints. `SurveyProgress` now
+persists the first descent's map seed, so terrain and known site coordinates remain fixed on
+return while supplies and trenches reset as D5 requires. This hashed-state addition advances
+`config_version` 8→9. The replacement screen also restores the POC-sized standard viewport
+(no extra title row, a three-row event log) and uses keyboard actions without an action-button
+row. WP07 remains in progress pending the rest of the recorded POC-parity audit.
+The server projection now also uses the bounded discardable G5 survey-map cache promised by
+the architecture, so viewport pans do not regenerate OpenSimplex terrain and passability.
+The client reuses the POC camera contract (cursor follow, HJKL fast cursor, wasd manual pan
+with the cursor riding along), while cursor-only movement redraws only the map widget and
+its immutable frame is cached. This restores responsive navigation without giving the
+client authoritative state.
+Excavation preserves the earned visual chart: a resolved contact continues to project its
+scanner field and already-seen nearby clues, with the trench and find marker added on top;
+its approximate search circle disappears because the exact site is now marked. Scanner text
+and march stopping remain unresolved-contact rules, so retaining the presentation layer
+cannot create false action behavior or leak an unseen site.
+The POC archaeological corpus is promoted into the production discovery presentation rather
+than rewritten: its five find identities, name generator, blurbs, and exact 48×15 procedural
+field sketches now decorate compatible existing `Discovery` records. A deterministic
+`(Discovery.kind, Discovery.id)` adapter maps ruins/artifacts/ancient technology onto those
+identities; crashed ships retain their existing generator because the POC has no equivalent.
+Newly generated surface records store the POC-style name; compatible existing records are
+decorated with that same deterministic name when projected into a survey, and excavation
+carries it into artifact provenance. This generation-visible identity correction advances
+`config_version` 9→10.
+
+**Migration note:** the former `SurfaceScreen` remains in-tree for its static screenshot
+and historical Phase-2 harness, but no live service route reaches it after this WP. The
+optional `groundwar.survey_enabled` scaffolding mentioned above never landed in GW-WP02/03;
+rather than add a second config/state epoch solely for a disabled-by-default legacy route,
+the authoritative replacement is directly enabled. GW-WP14 still removes the legacy
+commands/DTO/screen and their historical tests as planned.
+
+Covered by `tests/test_groundwar_expedition_view.py` (fog/crop, excavation reveal,
+local/remote wire parity, Pilot keyboard/mouse/extract and active-operation resume,
+and three responsive snapshots). The historical named flow in `tests/test_tui_flow.py` now follows
+orbit → survey → march → dig → automatic codex settlement.
 
 Adapt the POC expedition screen to the async `GameClient` facade. It renders a
 fog-safe viewport DTO and sends commands; it never receives an `Expedition`

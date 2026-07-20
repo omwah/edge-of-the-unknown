@@ -12,7 +12,7 @@ from edge.core.config import GameConfig, SceneArtConfig
 def test_default_config_loads() -> None:
     cfg = load_default_config()
     assert isinstance(cfg, GameConfig)
-    assert cfg.config_version == 8  # GW-WP06 epoch (D4/D12 macro-turn quanta)
+    assert cfg.config_version == 10  # GW-WP07 persistent maps + POC archaeological identity
     assert cfg.turns_per_day == 250
     assert cfg.seed == 4  # default.yaml pins a curated seed; empty ⇒ random at start
     assert cfg.bigbang.start_sector == "stardock"  # the player starts at the Stardock

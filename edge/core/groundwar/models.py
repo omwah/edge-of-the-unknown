@@ -47,6 +47,9 @@ class ArtifactRecord:
 class SurveyProgress:
     """Per-player, per-world survey memory that outlives an expedition (GW plan D5).
 
+    `map_seed` is the per-player/per-world generation identity: the first descent
+    draws it from the authoritative game RNG and every later descent reuses it, so
+    returning to a planet cannot redraw its terrain or move known sites.
     `last_x`/`last_y` persist so a later descent resumes where the surveyor stood;
     `hinted_discovery_ids` persist so settlement hints keep narrowing the same
     sites. Trenches and supplies do **not** live here — they reset each descent and
@@ -57,6 +60,7 @@ class SurveyProgress:
     last_x: int
     last_y: int
     hinted_discovery_ids: frozenset[int] = frozenset()
+    map_seed: int = 0
 
 
 @dataclass(frozen=True, slots=True)

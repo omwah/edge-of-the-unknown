@@ -26,6 +26,7 @@ from edge.core.rules import (
     BeginSurvey, ExtractGroundOperation, GroundMove, SurveyDig, SurveyTalk,
     apply_result, reduce,
 )
+from edge.core.surface_finds import surface_find_name
 from edge.store.snapshots import state_hash
 
 CFG = load_default_config()
@@ -136,6 +137,7 @@ def test_dig_settles_artifact_codex_xp_exactly_once() -> None:
     assert len(p.artifact_records) == 1
     rec = p.artifact_records[0]
     assert rec.discovery_id == 10 and rec.rarity == "RARE" and rec.research_domain == "ruins"
+    assert rec.origin_site == surface_find_name(DiscoveryKind.RUINS, 10)
     assert st.discoveries[10].found_by == 1
     # A second dig on the same (now spent) ground mints nothing more (exactly once).
     apply_result(st, reduce(st, 1, SurveyDig(_op(st).operation_id), CFG))
@@ -214,12 +216,19 @@ def test_position_and_hints_persist_while_trenches_and_supplies_reset() -> None:
     apply_result(st, reduce(st, 1, SurveyTalk(_op(st).operation_id), CFG))
     apply_result(st, reduce(st, 1, SurveyDig(_op(st).operation_id), CFG))
     before = _op(st)
+    before_map = gw.survey_map_for(st, before, CFG)
     saved_pos = (before.explorer_x, before.explorer_y)
     saved_hints = before.hinted_discovery_ids
     assert before.dug_cells  # a trench was laid
     apply_result(st, reduce(st, 1, ExtractGroundOperation(before.operation_id), CFG))
     apply_result(st, reduce(st, 1, BeginSurvey(1), CFG))
     after = _op(st)
+    after_map = gw.survey_map_for(st, after, CFG)
+    assert after.seed == before.seed                              # terrain identity persists
+    assert after_map.feature == before_map.feature
+    assert [(s.discovery_id, s.x, s.y) for s in after_map.sites] == [
+        (s.discovery_id, s.x, s.y) for s in before_map.sites
+    ]
     assert (after.explorer_x, after.explorer_y) == saved_pos  # position persists (D5)
     assert after.hinted_discovery_ids == saved_hints          # hints persist (D5)
     assert after.dug_cells == frozenset()                     # trenches reset
