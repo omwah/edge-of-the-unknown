@@ -61,6 +61,16 @@ class DiscoveryNamer:
                 self._used.add(name)
                 return name
 
+    def draw_surface(self, kind: DiscoveryKind, discovery_id: int) -> str:
+        """Draw a POC surface name if available and unused; fall back to kind namer."""
+        from edge.core.surface_finds import surface_find_name
+
+        sname = surface_find_name(kind, discovery_id)
+        if sname and sname not in self._used:
+            self._used.add(sname)
+            return sname
+        return self.draw(kind)
+
 
 def _fallback_prefix(kind: DiscoveryKind) -> str:
     """"black_hole" → "Black Hole" — the numbered fallback when a kind's pool runs dry."""

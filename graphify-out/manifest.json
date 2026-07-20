@@ -105,8 +105,8 @@
     "semantic_hash": "127e55ea720901ef70efee2dd9600666"
   },
   "edge/bigbang/discoveries.py": {
-    "mtime": 1784510516.4198241,
-    "ast_hash": "e5c623efd0e4b60649d7b35af2688564",
+    "mtime": 1784524803.9305716,
+    "ast_hash": "274c902d8cbfc1819aa1573c057f3905",
     "semantic_hash": ""
   },
   "edge/bigbang/embedding.py": {
@@ -125,9 +125,9 @@
     "semantic_hash": "2de08a92ca2cda94747cf5840bc92107"
   },
   "edge/bigbang/naming.py": {
-    "mtime": 1784003247.2288065,
-    "ast_hash": "4599c6b2e76241a3ee32f4acd46aa522",
-    "semantic_hash": "4599c6b2e76241a3ee32f4acd46aa522"
+    "mtime": 1784524799.2254844,
+    "ast_hash": "249079bdb64c0aa1e334d1907b717db5",
+    "semantic_hash": ""
   },
   "edge/bigbang/numbering.py": {
     "mtime": 1784409833.8913317,
@@ -820,8 +820,8 @@
     "semantic_hash": "8ed59afc25bd25d3560001ef5fec88db"
   },
   "edge/tui/screens/planet.py": {
-    "mtime": 1784494860.4286222,
-    "ast_hash": "d2b74f58dc1579f7e52050cdfd93070c",
+    "mtime": 1784524791.555342,
+    "ast_hash": "92bc8f7ab4bdc25de4f1bd8d0cd78f32",
     "semantic_hash": ""
   },
   "edge/tui/screens/port.py": {
@@ -1305,8 +1305,8 @@
     "semantic_hash": "75b8ef8bac8f19dc13b6306340f4a29e"
   },
   "tests/test_tui_flow.py": {
-    "mtime": 1784494419.0420537,
-    "ast_hash": "6f5bcbeee261a923a98b6d7f91a4f7c3",
+    "mtime": 1784522917.064406,
+    "ast_hash": "9752298bed875c4b5d212409aaab523a",
     "semantic_hash": ""
   },
   "tests/test_ui_actions.py": {
@@ -3680,8 +3680,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/ground_expedition.py": {
-    "mtime": 1784522602.6857567,
-    "ast_hash": "d787c58bb49866eab6aab272d42e0702",
+    "mtime": 1784523085.4999266,
+    "ast_hash": "772afdb4f2b5c3156e3fdca5b519e567",
     "semantic_hash": ""
   },
   "tests/test_groundwar_expedition_view.py": {
