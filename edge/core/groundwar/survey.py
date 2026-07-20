@@ -37,6 +37,7 @@ from edge.core.groundwar.models import SurveyOperation
 from edge.core.groundwar.terrain import generate_feature_grid
 from edge.core.models import Discovery, UniverseState
 from edge.core.movement import MovementError
+from edge.core.surface_finds import surface_find_name
 
 Vec = tuple[int, int]
 
@@ -263,7 +264,8 @@ def _build_site(
         if _move_cost(feature, blocked, config, *c) > 0:
             clues.append(c)
     return SurveySite(
-        discovery_id=disc.id, kind=disc.kind.value, name=disc.name or disc.kind.value,
+        discovery_id=disc.id, kind=disc.kind.value,
+        name=surface_find_name(disc.kind, disc.id) or disc.name or disc.kind.value,
         rarity=disc.rarity_tier.name, x=x, y=y, area_cx=cx, area_cy=cy,
         area_r=area_r, clues=tuple(clues), found=found,
     )
@@ -431,6 +433,34 @@ def path_to(smap: SurveyMap, config: GameConfig, sx: int, sy: int, tx: int, ty: 
         cell = prev[cell]
     path.reverse()
     return path
+
+
+def reachable_cells(
+    smap: SurveyMap, config: GameConfig, sx: int, sy: int,
+) -> dict[Vec, int]:
+    """Cells reachable in one local movement turn, with their cheapest entry cost.
+
+    The live DTO uses this same terrain-cost query for its walk-range overlay, so the client
+    never approximates reducer pathfinding (GW-WP07/G1).  The start is included at cost 0.
+    """
+    assert config.groundwar is not None
+    budget = config.groundwar.expedition.move
+    best: dict[Vec, int] = {(sx, sy): 0}
+    heap: list[tuple[int, Vec]] = [(0, (sx, sy))]
+    while heap:
+        cost, (cx, cy) = heapq.heappop(heap)
+        if cost > best.get((cx, cy), budget + 1):
+            continue
+        for nx, ny in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
+            if not _in_bounds(smap.width, smap.height, nx, ny):
+                continue
+            step = _cell_cost(smap, config, nx, ny)
+            next_cost = cost + step
+            if step <= 0 or next_cost > budget or next_cost >= best.get((nx, ny), budget + 1):
+                continue
+            best[(nx, ny)] = next_cost
+            heapq.heappush(heap, (next_cost, (nx, ny)))
+    return best
 
 
 def dig_trench(smap: SurveyMap, config: GameConfig, x: int, y: int) -> list[Vec]:

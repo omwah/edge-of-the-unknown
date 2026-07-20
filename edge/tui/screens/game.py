@@ -261,6 +261,11 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         # would strand the player once the top one pops at the encounter's end.
         if self._service.encounter_view(self._pid) is not None:
             self._push_encounter()
+        # A loaded/reconnected captain may already be deployed planetside.  The operation is
+        # authoritative server state, so resume the DTO-driven screen instead of leaving the
+        # player at an orbit view whose movement commands core will reject (GW-WP07/G9).
+        if self._service.ground_operation_view(self._pid) is not None:
+            self._push_ground_operation()
 
     def _push_encounter(self) -> None:
         """Open the fight screen, never a duplicate (WP-fix): a confirm-modal dismiss can
@@ -268,6 +273,14 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
         stale EncounterScreen would strand the player once the top one pops."""
         if not any(isinstance(s, EncounterScreen) for s in self.app.screen_stack):
             self.app.push_screen(EncounterScreen(self._service, self._pid))
+
+    def _push_ground_operation(self) -> None:
+        """Resume one live survey screen, never stacking duplicates."""
+        from edge.tui.screens.ground_expedition import GroundExpeditionScreen
+        client = getattr(self.app, "client", None)
+        if (client is not None
+                and not any(isinstance(s, GroundExpeditionScreen) for s in self.app.screen_stack)):
+            self.app.push_screen(GroundExpeditionScreen(client))
 
     # --- commands ------------------------------------------------------------
 

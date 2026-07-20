@@ -23,6 +23,7 @@ from edge.core.enums import Component, ComponentTier, DiscoveryKind, PayloadKind
 from edge.core.models import Discovery, DiscoveryPayload, UniverseState
 from edge.core.movement import one_way_exits
 from edge.core.planets import is_landable
+from edge.core.surface_finds import surface_find_name
 from edge.bigbang.naming import DiscoveryNamer
 
 _PHENOMENA = (DiscoveryKind.NEBULA, DiscoveryKind.BLACK_HOLE, DiscoveryKind.WORMHOLE)
@@ -150,7 +151,7 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
             discoveries[did] = Discovery(
                 id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
                 payload=_make_surface_payload(kind, tier, dcfg), planet_id=pid, site_slot=slot,
-                hidden=hidden, name=namer.draw(kind),
+                hidden=hidden, name=surface_find_name(kind, did) or namer.draw(kind),
             )
             did += 1
 
@@ -174,7 +175,8 @@ def salt_discoveries(state: UniverseState, config: GameConfig, attempt: int) -> 
         discoveries[did] = Discovery(
             id=did, kind=kind, rarity_tier=tier, sector_id=planet.sector_id,
             payload=_make_surface_payload(kind, tier, dcfg), planet_id=pid, site_slot=slot,
-            hidden=tier.value >= dcfg.surface_hidden_min_rank, name=namer.draw(kind),
+            hidden=tier.value >= dcfg.surface_hidden_min_rank,
+            name=surface_find_name(kind, did) or namer.draw(kind),
         )
         did += 1
 
@@ -223,6 +225,8 @@ def salt_raid_caches(state: UniverseState, config: GameConfig) -> None:
             id=next_id, kind=DiscoveryKind.ANCIENT_TECH, rarity_tier=RarityTier.LEGENDARY,
             sector_id=sector, planet_id=home_pid, site_slot=slot,
             payload=_make_surface_payload(DiscoveryKind.ANCIENT_TECH, RarityTier.LEGENDARY, dcfg),
-            hidden=True, raid_cache=True, name=namer.draw(DiscoveryKind.ANCIENT_TECH),
+            hidden=True, raid_cache=True,
+            name=surface_find_name(DiscoveryKind.ANCIENT_TECH, next_id)
+            or namer.draw(DiscoveryKind.ANCIENT_TECH),
         )
         next_id += 1

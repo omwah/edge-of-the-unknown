@@ -48,7 +48,8 @@ drops animation/CRT flourishes without overwriting saved preferences.
 
 ```
 MainMenu -> Game -+- PortScreen
-                  +- PlanetScreen -> SurfaceScreen
+                  +- PlanetScreen -> GroundExpeditionScreen (survey)
+                  |                -> GroundAssaultScreen (later GW milestone)
                   +- StardockScreen   (tabs: Commodities . Shipyard . Hardware . Devices
                   |                           . Colonists . Bank . Tavern)
                   +- AlienContactScreen
@@ -239,9 +240,9 @@ docking reaches an identical trade experience — only the container differs.
 │  Stores      Ore 8,200   Org 31,400   Equ 5,100   Ftrs 900           │
 │  Allocation  [Ore 20%][Org 60%][Equ 15%][Ftrs 5%]  (owner only)      │
 │                                                                      │
-│  Surface sites detected:  * 2   (1 hidden - sensors Tier II)         │
+│  Ground access  SURVEY  - friendly settlements expected             │
 │                                                                      │
-│  [D] Descend to surface    [T] Trade w/ colony    [C] Claim          │
+│  [D] Ground: Survey         [T] Trade w/ colony    [C] Claim          │
 │  [G] Genesis / terraform   [Esc] Break orbit                         │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -277,42 +278,47 @@ docking reaches an identical trade experience — only the container differs.
   Deposit on Bank: one key, two verbs, two tabs. **A tab the base withholds** (gated by
   standing or service integrity) **keeps no keys at all**, so the footer can never offer a
   verb the reducers would refuse.
-- **Actions**: `[D]` -> SurfaceScreen (§4); `[C]` claim if unowned & habitable
-  (Core worlds off-limits); `[T]` colony trade.
+- **Ground action**: the server-projected access classifier labels the one route
+  **Survey**, **Assault**, or **Orbital only**. `[D]` starts `BeginSurvey` and opens
+  `GroundExpeditionScreen` for Survey; Assault remains gated until its GW milestone;
+  Orbital-only displays the exact blocker. `[C]` claims if unowned and habitable
+  (Core worlds off-limits); `[T]` opens colony transfer.
 - DESIGN: §4.2 (types/ownership/starbases), §8 (production), §7 (sites).
 
 ---
 
-## 4. SurfaceScreen  *(Phase 2)* — descent & site exploration
+## 4. GroundExpeditionScreen *(GW-WP07)* — live survey expedition
 
 ```
-┌─ SURFACE . Terra Nova ─────────────────────────── descent fuel: n/a ─┐
+┌─ SURVEY . Terra Nova . local turn 8 . main turns 247 ───────────────┐
 │                                                                      │
-│  +--------------------------------------+  Site: Ruined Spire        │
-│  | . ^    *?       ^^                   |  rarity  *** Rare          │
-│  |   ^^^  [1]     .      *              |  status  unexplored        │
-│  | ~~~~~   ^     [2]    ^^^             |                            │
-│  |   .  crashed-ship    ~~~~            |  Payload (on explore)      │
-│  |     ^^     .       .                 |   - ancient_tech ?         │
-│  +--------------------------------------+   - lore fragment          │
+│  +--------------------------------------+  SUPPLIES ███████░ 42      │
+│  | ~~ ψψ . .       grey search circle   |  SCANNER  strong           │
+│  |  ψψψ   @    ∴ disturbed ground       |  next main charge: turn 11│
+│  | ~~~~       ◌ spent trench             |                            │
+│  |   .      ◇ Wayrest       ✦ find       |  CONTACTS                 │
+│  |     ^^     .       .                 |   ? 1 - area marked       │
+│  +--------------------------------------+   ✦ Ruined Spire           │
 │                                                                      │
-│  Sites    [1] * Ruined Spire    Rare      unexplored                 │
-│           [2] * Crashed Ship    Uncommon  explored -> ancient        │
-│           [?] hidden - needs a sensor sweep                          │
-│                                                                      │
-│  [E] Explore selected   [S] Sensor sweep   [L] Log to codex          │
-│  [Esc] Ascend to orbit                                               │
+│  [M] March   [X] Dig   [T] Talk   [O] Overlay   [Esc] Extract        │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Reached** from PlanetScreen's `[D]` Descend (§3); `[Esc]` ascends to orbit.
-- **Terrain panel**: simple top-down `Static` map; site markers `[n]`, hidden
-  sites shown as `*?` only after a successful sensor sweep.
-- **Site detail**: the highlighted site's kind, rarity tier, status, and
-  (post-explore) payload — tech item / latinum / lore fragment (§7 Discovery);
-  driven by `DataTable` row highlighting.
-- **Site list**: `DataTable`/`ListView`; `[S]` sensor sweep reveals hidden finds
-  (sensor-rating check, §7/§10 detection); `[L]` logs to the codex.
+- **Reached/resumed** from PlanetScreen's `[D]` Survey route, or automatically
+  after reconnect/load while `Player.ground_operation` is active. `[Esc]` submits
+  `ExtractGroundOperation`; closing a window never settles state.
+- **DTO boundary**: the async `GameClient` returns only the requested viewport,
+  masking unresolved discovery ids/names/kinds/rarities and never exposing the
+  operation seed or exact dig coordinates. Local and remote clients use the same DTO.
+- **Map and cursor**: arrows/`hjkl` or mouse move the cursor; `[M]`/Enter submits a
+  march to it. The server performs pathfinding, supply/turn charging, and automatic
+  clue halts. `[O]` cycles scanner glow / approximate walk range / clear overlays.
+- **Survey actions**: `[X]` digs at the explorer, `[T]` talks when inside a friendly
+  settlement, `[V]` reopens an excavated find, and every action has a button. A hit
+  opens the discovery modal after the reducer has atomically recorded artifact+lore.
+- **Responsive layout**: compact stacks map/status while keyboard bindings remain available;
+  standard places status beside the map; wide gives the map and contact list more room.
+  `SurfaceScreen` remains only as the legacy migration implementation until GW-M4.
 - DESIGN: §7 (discovery kinds/rarity/hidden), §4.2 (surface_sites).
 
 ---
@@ -668,7 +674,7 @@ follow this; collisions are bugs.
 | `p` | Purchase / Plot route / Dock or Board | Stardock buy tabs purchase; Computer plots; Game docks at a port **or boards the starbase** — one key, because a base *is* the port where it orbits (WP80) |
 | `b` | Bank | the Bank tab at the Stardock and the Base (Game/Planet no longer have a Base key — `p` boards it) |
 | `h` | Hardware / Hail | Stardock's Hardware tab; Game hails |
-| `d` | Devices / Deliver / Deploy / Descend | Stardock's Devices tab, Port deliver, Game deploy, Planet descend |
+| `d` | Devices / Deliver / Deploy / ground access | Stardock's Devices tab, Port deliver, Game deploy, Planet Survey/Assault/Orbital-only route |
 | `a` | Attack / Assault / Add / deposit | martial on Game/Planet; additive on Computer (Add note) and Stardock (Bank deposit) |
 | `w` | Withdraw / Travel / route-to | banking withdraw everywhere (`y` is retired); Game travel and Computer route-to (one key, one meaning) |
 | `r` | Repair / Rumor | context-local but always "restorative" flavored |

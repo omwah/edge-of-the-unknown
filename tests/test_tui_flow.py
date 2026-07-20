@@ -577,12 +577,13 @@ async def test_haggle_walk_away_makes_no_trade() -> None:
 
 
 async def test_descend_explore_log_flow() -> None:
-    """The §13 named flow: survey a planet → descend → explore a site → log it."""
+    """The §13 named flow: survey a planet → expedition → excavate artifact+lore."""
     from collections import defaultdict
 
     from edge.core.rules import Warp
+    from edge.core.groundwar import survey as ground_survey
+    from edge.tui.screens.ground_expedition import GroundExpeditionScreen
     from edge.tui.screens.planet import PlanetScreen
-    from edge.tui.screens.surface import SurfaceScreen
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -592,8 +593,7 @@ async def test_descend_explore_log_flow() -> None:
         svc = app.service
         assert svc is not None
 
-        # A reachable planet whose lowest-slot site is obvious (so one Explore at the
-        # starter sensor reveals the row-0 site, which Log then collects).
+        # A reachable survey-mode planet with an eligible real surface discovery.
         by_planet: dict[int, list[object]] = defaultdict(list)
         for d in svc.state.discoveries.values():
             if d.planet_id is not None:
@@ -601,7 +601,11 @@ async def test_descend_explore_log_flow() -> None:
         target = None
         for _pid, ds in by_planet.items():
             slot0 = min(ds, key=lambda d: d.site_slot)
-            if not slot0.hidden and shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, slot0.sector_id) is not None:
+            planet = svc.state.planets[_pid]
+            if (not slot0.hidden
+                    and svc.planet_view(1, planet.id).ground_mode == "survey"
+                    and shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id,
+                                      slot0.sector_id) is not None):
                 target = slot0
                 break
         assert target is not None
@@ -611,12 +615,22 @@ async def test_descend_explore_log_flow() -> None:
         await pilot.press("s")  # survey planet -> PlanetScreen
         await pilot.pause()
         assert isinstance(app.screen, PlanetScreen)
-        await pilot.press("d")  # descend -> SurfaceScreen
+        await pilot.press("d")  # deploy -> live expedition
         await pilot.pause()
-        assert isinstance(app.screen, SurfaceScreen)
-        await pilot.press("e")  # survey the next site (the obvious slot-0 one)
-        await pilot.pause()
-        await pilot.press("l")  # log the highlighted (now revealed) site
+        assert isinstance(app.screen, GroundExpeditionScreen)
+        screen = app.screen
+        op = svc.state.players[1].ground_operation
+        site = next(s for s in ground_survey.survey_map_for(svc.state, op, svc.config).sites
+                    if s.discovery_id == target.id)
+        # Marches may halt on a clue; reselecting the intended dig cell continues the walk.
+        for _ in range(30):
+            op = svc.state.players[1].ground_operation
+            if (op.explorer_x, op.explorer_y) == (site.x, site.y):
+                break
+            await screen.set_cursor(site.x, site.y)
+            await pilot.press("m")
+            await pilot.pause()
+        await pilot.press("x")
         await pilot.pause()
         assert target.id in svc.state.players[1].codex
 
@@ -624,8 +638,8 @@ async def test_descend_explore_log_flow() -> None:
 async def test_clicking_planet_descends() -> None:
 
     from edge.core.rules import Warp
+    from edge.tui.screens.ground_expedition import GroundExpeditionScreen
     from edge.tui.screens.planet import PlanetScreen, PlanetSprite
-    from edge.tui.screens.surface import SurfaceScreen
 
     app = EdgeApp()
     async with app.run_test(size=(100, 34)) as pilot:
@@ -637,7 +651,9 @@ async def test_clicking_planet_descends() -> None:
         # A reachable planet — survey it to open the orbit view, then click its sprite.
         planet = next(
             pl for pl in svc.state.planets.values()
-            if shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, pl.sector_id) is not None
+            if (svc.planet_view(1, pl.id).ground_mode == "survey"
+                and shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id,
+                                  pl.sector_id) is not None)
         )
         for hop in shortest_path(svc.state.adjacency, svc.game_view(1).sector.sector_id, planet.sector_id)[1:]:
             svc.apply(1, Warp(to_sector=hop))
@@ -646,7 +662,7 @@ async def test_clicking_planet_descends() -> None:
         assert isinstance(app.screen, PlanetScreen)
         await pilot.click(app.screen.query_one(PlanetSprite))  # click descends
         await pilot.pause()
-        assert isinstance(app.screen, SurfaceScreen)
+        assert isinstance(app.screen, GroundExpeditionScreen)
 
 
 async def test_stardock_hardware_buys_then_engine_room_installs() -> None:

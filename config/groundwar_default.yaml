@@ -141,10 +141,10 @@ terrain:
 # chasing ship-sensor archaeology leads. Smaller map than the battlefield —
 # the pacing is walking and searching, not a platoon assault.
 expedition:
-  width: 150
-  height: 52
-  sites_min: 2              # sensor contacts per descent
-  sites_max: 4
+  width: 220
+  height: 56
+  sites_min: 3              # sensor contacts per descent
+  sites_max: 6
   supplies_start: 55        # every move or dig spends 1; settlements refill it
   dig_cost: 1
   dig_radius: 2             # a dig opens a trench this wide — the site pays off anywhere inside

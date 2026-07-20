@@ -32,7 +32,7 @@ from edge.core.dto import PlanetDTO
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import (
-    BuildCitadel, BuildStagingArea, Colonize, DeployGenesis, Descend, InvadePlanet, MineBelt,
+    BeginSurvey, BuildCitadel, BuildStagingArea, Colonize, DeployGenesis, InvadePlanet, MineBelt,
     PlanetDeposit, PlanetWithdraw,
 )
 from edge.server.service import GameService
@@ -104,7 +104,7 @@ class PlanetSprite(Static):
 class PlanetScreen(EdgeScreen):
     BINDINGS = [
         Binding("escape", "back", "Break orbit"),
-        Binding("d", "descend", "Descend"),
+        Binding("d", "descend", "Ground"),
         Binding("c", "colonize", "Claim/Colonize"),
         Binding("g", "genesis", "Genesis"),
         Binding("m", "mine", "Mine belt"),
@@ -126,6 +126,9 @@ class PlanetScreen(EdgeScreen):
     HELP = """\
 Colony matters live here; every starbase op (repair · salvage · claim · assault ·
 market · services) is on the base screen — [b]P[/] or click the base line.
+The Ground access panel is the server's one authoritative route: [b]Survey[/] deploys
+the walking expedition with [b]D[/] or its button; [b]Assault[/] and [b]Orbital only[/]
+name the current blocker instead of offering the old abstract descent.
 The Stores and Citadel panels are button-driven ([b]Tab[/] walks the buttons,
 [b]Enter[/] fires): [b]Transfer…[/] opens one editor to haul cargo between ship and
 stores and to settle colonists onto the colony; start builds and move the treasury
@@ -180,6 +183,8 @@ claims the world). Building again grows the city, and a bigger city berths more 
         with Horizontal(id="orbit-main"):
             with VerticalScroll(id="orbit-body"):
                 yield self._identity_panel(p)
+                if self._service is not None:
+                    yield self._ground_panel(p)
                 # A belt is a spatial feature, not a colony: no descent, no colony stores
                 # or citadel — only its orbital scan/mining note (§4.2, WP-PR06).
                 if not p.landable:
@@ -223,16 +228,14 @@ claims the world). Building again grows the city, and a bigger city berths more 
                 ),
                 id="orbit-art",
             )
-            art.tooltip = ("Scan for finds in orbit" if not p.landable
-                           else "Click to descend to the surface")
+            art.tooltip = {
+                "survey": "Click to deploy a survey expedition",
+                "assault": "Ground access requires an assault",
+            }.get(p.ground_mode, "Orbital only — no ground route")
             yield art
         yield Footer()
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        # A belt has no surface — hide the Descend affordance (and its footer hint) so the
-        # control never implies a landing that the reducer would reject (§4.2, WP-PR06).
-        if action == "descend" and not self._planet.landable:
-            return False
         # Mining is belt-only (PT-30): hide the affordance/footer hint elsewhere so it never
         # implies an extraction the reducer would reject.
         if action == "mine" and self._planet.mine_yield <= 0:
@@ -265,11 +268,35 @@ claims the world). Building again grows the city, and a bigger city berths more 
         panel.border_title = "World & colony"
         return panel
 
-    def on_planet_sprite_descend(self, msg: PlanetSprite.Descend) -> None:
+    def _ground_panel(self, p: PlanetDTO) -> Vertical:
+        """The classifier's one truthful orbit route: survey, assault, or orbital-only."""
+        children: list[Static | Horizontal] = []
+        if p.ground_mode == "survey":
+            detail = "Friendly settlements are open to visitors." if p.ground_settlements \
+                else "No inhabited settlement is expected on the surface."
+            children.extend([
+                Static(f"[green]Survey[/] — deploy a walking archaeological expedition.  "
+                       f"[dim]{detail}[/]"),
+                Horizontal(Button("Survey surface", id="btn-ground", variant="primary"),
+                           classes="buttons"),
+            ])
+            title = "Ground access — Survey"
+        elif p.ground_mode == "assault":
+            reason = p.ground_blocker or "ground-force deployment is required"
+            children.append(Static(f"[red]Assault[/] — {reason}."))
+            title = "Ground access — Assault"
+        else:
+            children.append(Static(f"[dim]Orbital only[/] — {p.ground_blocker or 'no landing route'}."))
+            title = "Ground access — Orbital only"
+        panel = Vertical(*children, classes="orbit-panel")
+        panel.border_title = title
+        return panel
+
+    async def on_planet_sprite_descend(self, msg: PlanetSprite.Descend) -> None:
         if not self._planet.landable:
             self.notify("No surface to land on — scan for finds in orbit instead.", timeout=3)
             return
-        self.action_descend()
+        await self.action_descend()
 
     def _orbital_panel(self, p: PlanetDTO) -> Vertical:
         """A belt's orbital readout (§4.2, WP-PR06): a spatial feature, scanned/mined, not landed on."""
@@ -402,7 +429,10 @@ claims the world). Building again grows the city, and a bigger city berths more 
         panel.border_title = f"Citadel — {_STAGE_LABEL[stage]}"
         return panel
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-ground":
+            await self.action_descend()
+            return
         actions = {
             "btn-transfer": self.action_transfer,
             "btn-build-city": self.action_build_city,
@@ -590,18 +620,28 @@ claims the world). Building again grows the city, and a bigger city berths more 
     def action_back(self) -> None:
         self.app.pop_screen()
 
-    def action_descend(self) -> None:
+    async def action_descend(self) -> None:
         if self._service is None:
             self.app.push_screen(SurfaceScreen(sample_surface()))  # screenshot harness
             return
         p = self._planet
+        if p.ground_mode == "orbital_only":
+            self.notify(p.ground_blocker or "This world is orbital-only.", timeout=3)
+            return
+        if p.ground_mode == "assault":
+            self.notify(p.ground_blocker or "Ground assault deployment is not available yet.", timeout=3)
+            return
+        client = getattr(self.app, "client", None)
+        if client is None:
+            self.notify("No game client is connected.", timeout=3)
+            return
         try:
-            self._service.apply(self._pid, Descend(planet_id=p.planet_id))
+            await client.apply(BeginSurvey(planet_id=p.planet_id))
         except (EconomyError, MovementError) as exc:
             notify_warning(self, str(exc))
             return
-        self.app.push_screen(SurfaceScreen(
-            self._service.surface_view(self._pid, p.planet_id), self._service, self._pid))
+        from edge.tui.screens.ground_expedition import GroundExpeditionScreen
+        self.app.push_screen(GroundExpeditionScreen(client))
 
     def action_mine(self) -> None:
         """Hand-mine an asteroid belt, taking raw goods aboard (§4.2, PT-30)."""

@@ -105,8 +105,8 @@
     "semantic_hash": "127e55ea720901ef70efee2dd9600666"
   },
   "edge/bigbang/discoveries.py": {
-    "mtime": 1784489647.5681756,
-    "ast_hash": "4cf0acb5c07286d300c7b5ed1dbcb5db",
+    "mtime": 1784510516.4198241,
+    "ast_hash": "e5c623efd0e4b60649d7b35af2688564",
     "semantic_hash": ""
   },
   "edge/bigbang/embedding.py": {
@@ -285,8 +285,8 @@
     "semantic_hash": "f3aa31f50b369a356a061676e5bb848b"
   },
   "edge/core/dto.py": {
-    "mtime": 1784487126.665315,
-    "ast_hash": "1ee181201353b4f85489df703fb7f819",
+    "mtime": 1784509993.870599,
+    "ast_hash": "b112f23a08b98c84ac3652de21014b6b",
     "semantic_hash": ""
   },
   "edge/core/economy.py": {
@@ -350,8 +350,8 @@
     "semantic_hash": "7a28b69deeeb3e619e9e28887d752f87"
   },
   "edge/core/rules.py": {
-    "mtime": 1784491804.2977307,
-    "ast_hash": "8bd4c48314d400997fb36ec5c537f032",
+    "mtime": 1784510541.340254,
+    "ast_hash": "3cbaa52b35e91974c5ae104806e4cd9e",
     "semantic_hash": ""
   },
   "edge/core/services.py": {
@@ -505,9 +505,9 @@
     "semantic_hash": "ad2a4cf38e36344659e6e503ff2045b7"
   },
   "edge/groundwar/findart.py": {
-    "mtime": 1784353713.2552478,
-    "ast_hash": "9d0e6f0a0c1c9a2aed49594a6ad3d869",
-    "semantic_hash": "9d0e6f0a0c1c9a2aed49594a6ad3d869"
+    "mtime": 1784510631.334802,
+    "ast_hash": "90def1e550aab9f798feda7a73b95ec4",
+    "semantic_hash": ""
   },
   "edge/groundwar/mapgen.py": {
     "mtime": 1784444483.4348252,
@@ -545,9 +545,9 @@
     "semantic_hash": "48b6b57c2352a8fe11cfd3f9d2895ca3"
   },
   "edge/server/client.py": {
-    "mtime": 1784322569.1498828,
-    "ast_hash": "6b06eeea68d39d41ede60be3f0cad099",
-    "semantic_hash": "6b06eeea68d39d41ede60be3f0cad099"
+    "mtime": 1784493629.0670536,
+    "ast_hash": "099da7eec84638830c6f0b419d7c96cb",
+    "semantic_hash": ""
   },
   "edge/server/env.py": {
     "mtime": 1784321821.290276,
@@ -565,23 +565,23 @@
     "semantic_hash": "5c943d8d0d129d3a35cf98b72d4688d9"
   },
   "edge/server/net.py": {
-    "mtime": 1784323950.9298553,
-    "ast_hash": "1aeb79376e9bd5429e1ec347ddfb0bd9",
-    "semantic_hash": "1aeb79376e9bd5429e1ec347ddfb0bd9"
+    "mtime": 1784493629.364059,
+    "ast_hash": "270e595b0b42d890708274656b902dd1",
+    "semantic_hash": ""
   },
   "edge/server/protocol.py": {
-    "mtime": 1783902596.7668788,
-    "ast_hash": "2cca151e221e2d27780ceb5304cac608",
-    "semantic_hash": "2cca151e221e2d27780ceb5304cac608"
+    "mtime": 1784493628.8070488,
+    "ast_hash": "c1a2022e12a2d1f894a95b20ab216295",
+    "semantic_hash": ""
   },
   "edge/server/service.py": {
-    "mtime": 1783902596.7676148,
-    "ast_hash": "37d6d655a06f5d9b53df50e025a1411a",
-    "semantic_hash": "37d6d655a06f5d9b53df50e025a1411a"
+    "mtime": 1784493628.5210435,
+    "ast_hash": "ad6badc1b2ab5ba711f19e4f6dc2bc7b",
+    "semantic_hash": ""
   },
   "edge/server/session.py": {
-    "mtime": 1784487158.8219454,
-    "ast_hash": "d63a606018458ad4c9ac96df4208e92b",
+    "mtime": 1784510144.4313095,
+    "ast_hash": "07ac5728b5cfedb7a0ab7fb2e4d77ca5",
     "semantic_hash": ""
   },
   "edge/server/terrain.py": {
@@ -590,8 +590,8 @@
     "semantic_hash": "b934a797587ee49947138e3b8f1a3d32"
   },
   "edge/server/wire.py": {
-    "mtime": 1784491947.1046598,
-    "ast_hash": "137182d09e7aefe83a2734edacb86226",
+    "mtime": 1784493629.6530643,
+    "ast_hash": "da672a0b3a720e2274c5b085e64842af",
     "semantic_hash": ""
   },
   "edge/spacebattle/__init__.py": {
@@ -670,9 +670,9 @@
     "semantic_hash": "15a8038d2550a83d99ff10fad13f326f"
   },
   "edge/tui/app.py": {
-    "mtime": 1784350084.716097,
-    "ast_hash": "85b52d2a4ae9e88f0ce506710bb0efa1",
-    "semantic_hash": "85b52d2a4ae9e88f0ce506710bb0efa1"
+    "mtime": 1784494699.8728786,
+    "ast_hash": "8b5c72b17d1f8e5636ad8eff679231f7",
+    "semantic_hash": ""
   },
   "edge/tui/art_adapter.py": {
     "mtime": 1784010475.5911767,
@@ -720,9 +720,9 @@
     "semantic_hash": "219966e88cc1e09bc6a3d86c888c0657"
   },
   "edge/tui/remote.py": {
-    "mtime": 1783841573.6292238,
-    "ast_hash": "a8e153fa0060d8d379c166346d6f09fc",
-    "semantic_hash": "a8e153fa0060d8d379c166346d6f09fc"
+    "mtime": 1784494824.747013,
+    "ast_hash": "3573369b7778625681afde81ec3cd47e",
+    "semantic_hash": ""
   },
   "edge/tui/saves.py": {
     "mtime": 1783841573.6292553,
@@ -785,9 +785,9 @@
     "semantic_hash": "123b8adfaf8c00815b3f2b822ebb00be"
   },
   "edge/tui/screens/game.py": {
-    "mtime": 1784332325.5588636,
-    "ast_hash": "d37981bff84c491c7c62cf4b5f0e0e3e",
-    "semantic_hash": "d37981bff84c491c7c62cf4b5f0e0e3e"
+    "mtime": 1784493952.7749083,
+    "ast_hash": "9b461e06ae39f57aed3d322198028c49",
+    "semantic_hash": ""
   },
   "edge/tui/screens/haggle.py": {
     "mtime": 1783841573.629995,
@@ -800,9 +800,9 @@
     "semantic_hash": "74f20256d2307ed73f3c49a948ba5312"
   },
   "edge/tui/screens/lobby.py": {
-    "mtime": 1783900326.206445,
-    "ast_hash": "7c2950b0abc456074102a898fdc9e25e",
-    "semantic_hash": "7c2950b0abc456074102a898fdc9e25e"
+    "mtime": 1784493930.594514,
+    "ast_hash": "9d25a27dcd0f89456a155d3b9d8c137b",
+    "semantic_hash": ""
   },
   "edge/tui/screens/main_menu.py": {
     "mtime": 1783900326.206445,
@@ -820,9 +820,9 @@
     "semantic_hash": "8ed59afc25bd25d3560001ef5fec88db"
   },
   "edge/tui/screens/planet.py": {
-    "mtime": 1784010613.5904891,
-    "ast_hash": "9bb14a868dbac9cb8c85552fc1e6b512",
-    "semantic_hash": "9bb14a868dbac9cb8c85552fc1e6b512"
+    "mtime": 1784494860.4286222,
+    "ast_hash": "d2b74f58dc1579f7e52050cdfd93070c",
+    "semantic_hash": ""
   },
   "edge/tui/screens/port.py": {
     "mtime": 1784351404.2218578,
@@ -920,8 +920,8 @@
     "semantic_hash": "f32d2fbd1533312bff900561eeb49548"
   },
   "tests/fixtures/wire/envelopes.json": {
-    "mtime": 1784491979.6535785,
-    "ast_hash": "ea4c77251048e9dff8734f3ab0ca490d",
+    "mtime": 1784494561.5995078,
+    "ast_hash": "222f5fbe42b4db564ca14e18338ffe72",
     "semantic_hash": ""
   },
   "tests/helpers.py": {
@@ -1020,8 +1020,8 @@
     "semantic_hash": "ced7ef5cec685bffbac6085b16a9aa60"
   },
   "tests/test_config.py": {
-    "mtime": 1784491397.1400182,
-    "ast_hash": "1c1e15333151707be7f7980fcdeb74d6",
+    "mtime": 1784510602.0121922,
+    "ast_hash": "430ebf83e6a2e77491b4a390dc2e9112",
     "semantic_hash": ""
   },
   "tests/test_contact.py": {
@@ -1305,9 +1305,9 @@
     "semantic_hash": "75b8ef8bac8f19dc13b6306340f4a29e"
   },
   "tests/test_tui_flow.py": {
-    "mtime": 1784350085.5071125,
-    "ast_hash": "399c674c7a458fb645db90739b617f3f",
-    "semantic_hash": "399c674c7a458fb645db90739b617f3f"
+    "mtime": 1784494419.0420537,
+    "ast_hash": "6f5bcbeee261a923a98b6d7f91a4f7c3",
+    "semantic_hash": ""
   },
   "tests/test_ui_actions.py": {
     "mtime": 1784001886.5318677,
@@ -1455,8 +1455,8 @@
     "semantic_hash": "d9c7565ed363b4fad49474c646739a50"
   },
   "config/default.yaml": {
-    "mtime": 1784491386.6796348,
-    "ast_hash": "bbb461f06551d3c97a2bd2840a859318",
+    "mtime": 1784510541.7892618,
+    "ast_hash": "eebe42b0e10eba2031989ff94f5376cb",
     "semantic_hash": ""
   },
   "config/dialogue/alien_dialogue_species.yaml": {
@@ -1465,8 +1465,8 @@
     "semantic_hash": "2b425f757910dc0b9d8452a0cd8728ee"
   },
   "config/groundwar_default.yaml": {
-    "mtime": 1784491378.0190341,
-    "ast_hash": "dba25294c5d60b12cb36af5a87405bdc",
+    "mtime": 1784508526.8567712,
+    "ast_hash": "1ebfb2137cee25189013bcf1de7b82e1",
     "semantic_hash": ""
   },
   "config/names_default.yaml": {
@@ -1480,9 +1480,9 @@
     "semantic_hash": "b56d7a0ba0923f032492024bada0fb1d"
   },
   "docs/DESIGN.md": {
-    "mtime": 1784438833.6015036,
-    "ast_hash": "3bb5e728c9afdf089c1fb891711c7c3f",
-    "semantic_hash": "3bb5e728c9afdf089c1fb891711c7c3f"
+    "mtime": 1784510601.5072896,
+    "ast_hash": "c86f35949260d652b0bea91e842b3b9c",
+    "semantic_hash": ""
   },
   "docs/DESIGN_ARTGEN.md": {
     "mtime": 1783902596.7827606,
@@ -1495,8 +1495,8 @@
     "semantic_hash": "9fb5efc4c001626dece65970ec12e22b"
   },
   "docs/GROUNDWAR_INTEGRATION_PLAN.md": {
-    "mtime": 1784492253.4313931,
-    "ast_hash": "450e8f09d155b5caaad6862eeae4d309",
+    "mtime": 1784510601.7792945,
+    "ast_hash": "43d1c56d73a81cfe3623b659bd0383ed",
     "semantic_hash": ""
   },
   "docs/GROUNDWAR_POC.md": {
@@ -1605,9 +1605,9 @@
     "semantic_hash": "6d929b1eae86c7f11b3787aba56443d6"
   },
   "docs/UI_MOCKUPS.md": {
-    "mtime": 1784331601.6467483,
-    "ast_hash": "a756ef39db39ef4199a20200749d5099",
-    "semantic_hash": "a756ef39db39ef4199a20200749d5099"
+    "mtime": 1784508209.6057134,
+    "ast_hash": "5b059d72c3ca6e630059471204ef0bf9",
+    "semantic_hash": ""
   },
   "docs/UI_UX_OVERHAUL_PLAN.md": {
     "mtime": 1783902596.7806797,
@@ -1645,8 +1645,8 @@
     "semantic_hash": "37c0ae4fef36066dc8b4816a574ba779"
   },
   "tests/fixtures/wire/fingerprint.txt": {
-    "mtime": 1784491979.6534524,
-    "ast_hash": "8841de7ae3b09fb6810f75dc2158eec0",
+    "mtime": 1784494630.1736846,
+    "ast_hash": "563682bddbf5e07ffc6ca7621fed81b9",
     "semantic_hash": ""
   },
   ".claude/settings.json": {
@@ -3650,8 +3650,8 @@
     "semantic_hash": ""
   },
   "edge/core/groundwar/models.py": {
-    "mtime": 1784445239.8853421,
-    "ast_hash": "18fbcb7f8d7e837a2436132996819ba3",
+    "mtime": 1784508170.34609,
+    "ast_hash": "4c78c2cfc125665f46946ca5310a28bf",
     "semantic_hash": ""
   },
   "edge/core/groundwar/access.py": {
@@ -3665,18 +3665,38 @@
     "semantic_hash": ""
   },
   "edge/core/groundwar/survey.py": {
-    "mtime": 1784491671.699855,
-    "ast_hash": "616cc4d7220a1428cb6bef122cd82f6f",
+    "mtime": 1784510516.6638284,
+    "ast_hash": "ada8e3147a5ef8701e2ace2bd3f521b9",
     "semantic_hash": ""
   },
   "tests/test_groundwar_survey.py": {
-    "mtime": 1784489793.437764,
-    "ast_hash": "b03b1e007934af237e60c1f934dff6db",
+    "mtime": 1784510602.2093017,
+    "ast_hash": "45003e54376e8227b3b039c30a089be9",
     "semantic_hash": ""
   },
   "tests/test_groundwar_survey_actions.py": {
-    "mtime": 1784492200.2554376,
-    "ast_hash": "c56b871f9170f64397a978fbe087e241",
+    "mtime": 1784510602.505307,
+    "ast_hash": "cb0e4a796f45a917ccaff537e1a4a30b",
+    "semantic_hash": ""
+  },
+  "edge/tui/screens/ground_expedition.py": {
+    "mtime": 1784510541.574258,
+    "ast_hash": "2182fad0628c147c50f9dbe762f06a97",
+    "semantic_hash": ""
+  },
+  "tests/test_groundwar_expedition_view.py": {
+    "mtime": 1784510144.524311,
+    "ast_hash": "8432aed84fd9dcf41e1be518407650c3",
+    "semantic_hash": ""
+  },
+  "edge/core/surface_finds.py": {
+    "mtime": 1784510434.8304117,
+    "ast_hash": "2320729482f0d7430052ccf740428ccd",
+    "semantic_hash": ""
+  },
+  "tests/test_surface_finds.py": {
+    "mtime": 1784510602.68331,
+    "ast_hash": "842a46c55745e42e4ca7efc28d6fc872",
     "semantic_hash": ""
   }
 }

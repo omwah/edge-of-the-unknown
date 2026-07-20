@@ -179,6 +179,7 @@ from edge.core.planets import (
     retype_planet,
     store_blocker,
 )
+from edge.core.surface_finds import surface_find_name
 from edge.core.starbases import is_operational
 from edge.core.models import (
     AlienSpecies,
@@ -3676,12 +3677,13 @@ def _begin_survey(
 ) -> ReduceResult:
     """Open a surface-survey expedition (GW-WP03, GW plan D1/D4-D6).
 
-    Draws the operation seed and a stable operation id from `state.rng` (G3), so both
-    replay identically from the command log — the recorded `ExtractGroundOperation`
-    then matches. Resumes the surveyor's saved position/hints for this world (D5) and
-    refills supplies to the configured start. `_require_no_encounter` doubles as the
-    G9 guard: it rejects opening a survey while an encounter or another ground
-    operation is already live.
+    Draws the world's survey seed on its first descent and reuses that saved generation
+    identity thereafter; the operation id is always drawn from `state.rng` (G3). Both
+    replay identically from the command log, while returning to a planet cannot redraw
+    its terrain or move known sites. Resumes the surveyor's saved position/hints for
+    this world (D5) and refills supplies to the configured start. `_require_no_encounter`
+    doubles as the G9 guard: it rejects opening a survey while an encounter or another
+    ground operation is already live.
     """
     player = _player(state, player_id)
     _require_no_encounter(player)
@@ -3696,9 +3698,9 @@ def _begin_survey(
     if config.groundwar is None:
         raise EconomyError("ground operations are not configured")
     exp = config.groundwar.expedition
-    seed = state.rng.getrandbits(63)
-    operation_id = state.rng.getrandbits(63)
     prior = player.ground_survey_progress.get(cmd.planet_id)
+    seed = prior.map_seed if prior is not None and prior.map_seed else state.rng.getrandbits(63)
+    operation_id = state.rng.getrandbits(63)
     start_x = prior.last_x if prior is not None else exp.width // 2
     start_y = prior.last_y if prior is not None else exp.height // 2
     hinted = prior.hinted_discovery_ids if prior is not None else frozenset()
@@ -3746,6 +3748,7 @@ def _extract_ground_operation(
         progress[operation.planet_id] = SurveyProgress(
             last_x=operation.explorer_x, last_y=operation.explorer_y,
             hinted_discovery_ids=operation.hinted_discovery_ids,
+            map_seed=operation.seed,
         )
     new_player = replace(player, ground_operation=None, ground_survey_progress=progress)
     return ReduceResult(
@@ -3823,10 +3826,11 @@ def _survey_dig(
                              codex=new_player.codex | frozenset({disc.id}))
         return ReduceResult(events=tuple(events), players=(new_player,))
     xp = config.aliens.experience_per_discovery if disc.id not in player.codex else 0
+    site_name = surface_find_name(disc.kind, disc.id) or disc.name or disc.kind.value
     record = ArtifactRecord(
         discovery_id=disc.id, origin_planet_id=disc.planet_id if disc.planet_id is not None else op.planet_id,
-        origin_site=disc.name or disc.kind.value, rarity=disc.rarity_tier.name,
-        research_domain=disc.kind.value, lore_key=disc.payload.lore or disc.name or disc.kind.value,
+        origin_site=site_name, rarity=disc.rarity_tier.name,
+        research_domain=disc.kind.value, lore_key=disc.payload.lore or site_name,
         acquired_day=state.game.day_number)
     new_player = replace(
         new_player, detected=new_player.detected | frozenset({disc.id}),

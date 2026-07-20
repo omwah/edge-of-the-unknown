@@ -90,6 +90,10 @@ class GameClient(Protocol):
     async def current_starbase_view(self) -> dto.StarbaseDTO | None: ...
     async def planet_view(self, planet_id: int) -> dto.PlanetDTO: ...
     async def current_planet_view(self) -> dto.PlanetDTO | None: ...
+    async def ground_operation_view(
+        self, *, viewport_x: int = ..., viewport_y: int = ...,
+        viewport_width: int | None = ..., viewport_height: int | None = ...,
+    ) -> dto.SurveyExpeditionDTO | None: ...
     async def surface_view(self, planet_id: int) -> dto.SurfaceDTO: ...
     async def contact_view(self, species_id: int, active_context: str = ...,
                            active_subject: int | None = ...) -> dto.ContactDTO: ...
@@ -229,6 +233,15 @@ class LocalClient:
 
     async def current_planet_view(self) -> dto.PlanetDTO | None:
         return self._service.current_planet_view(self.player_id)
+
+    async def ground_operation_view(
+        self, *, viewport_x: int = 0, viewport_y: int = 0,
+        viewport_width: int | None = None, viewport_height: int | None = None,
+    ) -> dto.SurveyExpeditionDTO | None:
+        return self._service.ground_operation_view(
+            self.player_id, viewport_x=viewport_x, viewport_y=viewport_y,
+            viewport_width=viewport_width, viewport_height=viewport_height,
+        )
 
     async def surface_view(self, planet_id: int) -> dto.SurfaceDTO:
         return self._service.surface_view(self.player_id, planet_id)
@@ -557,6 +570,15 @@ class RemoteClient:
 
     async def current_planet_view(self) -> dto.PlanetDTO | None:
         return await self._read("current_planet_view")
+
+    async def ground_operation_view(
+        self, *, viewport_x: int = 0, viewport_y: int = 0,
+        viewport_width: int | None = None, viewport_height: int | None = None,
+    ) -> dto.SurveyExpeditionDTO | None:
+        return await self._read(
+            "ground_operation_view", viewport_x=viewport_x, viewport_y=viewport_y,
+            viewport_width=viewport_width, viewport_height=viewport_height,
+        )
 
     async def surface_view(self, planet_id: int) -> dto.SurfaceDTO:
         return await self._read("surface_view", planet_id=planet_id)

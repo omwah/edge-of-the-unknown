@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 25  # GW-WP06: survey action commands/events (GroundMove/SurveyDig/SurveyTalk)
+WIRE_VERSION = 26  # GW-WP07: fog-safe live survey expedition DTO/read method
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -82,6 +82,8 @@ v24 (GW-WP04): `PlanetDTO` projects the one ground-access contract — `ground_m
 reason or first standing siege rung), and `ground_settlements` (survey resupply available).
 v25 (GW-WP06): survey action commands `GroundMove`/`SurveyDig`/`SurveyTalk` + events
 `GroundMoved`/`SurveyDug`/`SurveySiteExcavated`/`SurveyTalked` (walk/dig/talk, D4-D6).
+v26 (GW-WP07): `SurveyExpeditionDTO` and its nested cell/contact/settlement shapes; the
+`ground_operation_view` read projects a cropped, fog-safe live survey for local/remote parity.
 """
 
 

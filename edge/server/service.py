@@ -232,6 +232,17 @@ class GameService:
             return None
         return session.planet_view(self._state, player_id, planet.id, self._config)
 
+    def ground_operation_view(
+        self, player_id: int, *, viewport_x: int = 0, viewport_y: int = 0,
+        viewport_width: int | None = None, viewport_height: int | None = None,
+    ) -> dto.SurveyExpeditionDTO | None:
+        """The active survey's fog-safe viewport, or ``None`` while in orbit (GW-WP07)."""
+        return session.ground_operation_view(
+            self._state, player_id, self._config,
+            viewport_x=viewport_x, viewport_y=viewport_y,
+            viewport_width=viewport_width, viewport_height=viewport_height,
+        )
+
     def surface_view(self, player_id: int, planet_id: int) -> dto.SurfaceDTO:
         """The descended-planet surface view: terrain + sites (§7, WP6)."""
         return session.surface_view(self._state, player_id, planet_id, self._config)
