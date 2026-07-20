@@ -99,13 +99,16 @@ class GroundCellDTO:
     The client receives presentation-safe terrain and overlays, never a survey seed or an
     unresolved site's exact position. ``search_ring`` is ``"marked"`` / ``"hinted"`` /
     ``""`` and ``heat`` is the nearest scanner-band index (0 means no glow). Resolved
-    overlays remain as earned chart history.
+    overlays remain as earned chart history. ``gate`` marks the walkable break in a
+    settlement's wall — without it a client paints every perimeter cell as solid masonry
+    and the player cannot see where a town is enterable.
     """
 
     x: int
     y: int
     feature: str
     blocked: bool = False
+    gate: bool = False
     dug: bool = False
     clue: bool = False
     search_ring: str = ""
@@ -130,10 +133,20 @@ class SurveyContactDTO:
 
 @dataclass(frozen=True)
 class SurveySettlementDTO:
-    """A friendly settlement visible on the projected survey map."""
+    """A friendly settlement visible on the projected survey map.
+
+    ``plaza_x``/``plaza_y`` are the town's open centre, so a client marks the real
+    talking-place instead of guessing one. ``hint_available`` reports whether talking
+    could still narrow a circle — under the current rule that is a survey-wide fact
+    (any unhinted unfound site remains), not a per-town budget, so every listed town
+    reports the same value.
+    """
 
     settlement_id: int
     name: str
+    plaza_x: int = 0
+    plaza_y: int = 0
+    hint_available: bool = False
 
 
 @dataclass(frozen=True)
@@ -164,6 +177,7 @@ class SurveyExpeditionDTO:
     next_main_turn_at: int
     main_turn_cost: int
     scanner: str
+    scanner_band: int = 0  # 1 = saturated/hottest, 0 = nothing to read (see scanner_band_index)
     contacts: list[SurveyContactDTO] = field(default_factory=list)
     settlements: list[SurveySettlementDTO] = field(default_factory=list)
     outcome: str | None = None

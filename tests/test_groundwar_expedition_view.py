@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
@@ -306,3 +307,153 @@ def test_expedition_responsive_snapshots(
     assert snap_compare(  # type: ignore[operator]
         EdgeApp(plain=True), terminal_size=size, run_before=open_expedition
     )
+
+
+# --- GW-WP08 presentation fields ---------------------------------------------
+
+
+def _inhabited_view() -> object:
+    """A live survey reprojected against a peopled world, so towns exist."""
+    state = _world()
+    state.planets[1] = replace(state.planets[1], colonists=50_000)
+    return session.ground_operation_view(state, 1, CFG)
+
+
+def test_town_gates_project_as_walkable_breaks_in_the_wall() -> None:
+    view = _inhabited_view()
+    assert view is not None
+    gates = [cell for cell in view.cells if cell.gate]
+    # `_stamp_settlement` leaves one mid-edge gate per side of every town.
+    assert len(gates) == 4 * len(view.settlements)
+    # A gate the client paints as a doorway must actually be enterable.
+    assert not any(cell.blocked for cell in gates)
+
+
+def test_settlement_projects_its_real_plaza_and_hint_offer() -> None:
+    view = _inhabited_view()
+    assert view is not None
+    assert view.settlements
+    by_cell = {(cell.x, cell.y): cell for cell in view.cells}
+    for town in view.settlements:
+        plaza = by_cell[(town.plaza_x, town.plaza_y)]
+        assert plaza.settlement_id == town.settlement_id
+        assert not plaza.blocked  # the plaza is the open centre, never masonry
+    # Nothing has been hinted yet, so talking is still worth a circle.
+    assert all(town.hint_available for town in view.settlements)
+
+
+def test_hint_offer_closes_once_every_contact_is_hinted() -> None:
+    state = _world(sites=2)
+    state.planets[1] = replace(state.planets[1], colonists=50_000)
+    op = state.players[1].ground_operation
+    assert op is not None
+    state.players[1] = replace(
+        state.players[1],
+        ground_operation=replace(op, hinted_discovery_ids=frozenset({10, 11})),
+    )
+    view = session.ground_operation_view(state, 1, CFG)
+    assert view is not None
+    assert view.settlements
+    assert not any(town.hint_available for town in view.settlements)
+
+
+def test_scanner_band_matches_the_authored_reading() -> None:
+    state = _world()
+    view = session.ground_operation_view(state, 1, CFG)
+    assert view is not None
+    bands = CFG.groundwar.expedition.scanner  # type: ignore[union-attr]
+    assert 1 <= view.scanner_band <= len(bands)
+    # The band ordinal is the index of the very label the reading reports.
+    assert bands[view.scanner_band - 1].label == view.scanner
+
+
+def test_terrain_glyphs_follow_the_authored_weights() -> None:
+    """Foliage reads as foliage only if the blank-weighted entries survive.
+
+    The old renderer took the first non-space glyph for a feature and used it for every
+    cell, so a forest painted as a solid wall of one glyph and its clearings (40 of the
+    feature's 89 authored parts) vanished.
+    """
+    from edge.art.terrain import FEATURES_REGISTRY
+    from edge.tui.screens.ground_expedition import _feature_glyph
+
+    drawn = Counter(_feature_glyph(1, "forest", x, y) for y in range(60) for x in range(60))
+    authored = dict(FEATURES_REGISTRY["forest"])
+    total = sum(authored.values())
+    assert drawn[" "] / 3600 == pytest.approx(authored[" "] / total, abs=0.03)
+    assert set(drawn) == set(authored)  # every authored glyph is reachable
+
+
+def test_terrain_glyphs_are_stable_and_positional() -> None:
+    from edge.tui.screens.ground_expedition import _feature_glyph
+
+    # Stable: the same cell renders identically every call (and, via crc32 rather than
+    # a salted hash(), across processes — which the snapshot tests rely on).
+    assert _feature_glyph(1, "forest", 7, 9) == _feature_glyph(1, "forest", 7, 9)
+    # Positional: a feature is not one fixed glyph everywhere.
+    assert len({_feature_glyph(1, "forest", x, 0) for x in range(60)}) > 1
+    # Per-planet: two worlds of the same type do not share a texture.
+    assert any(_feature_glyph(1, "forest", x, 0) != _feature_glyph(2, "forest", x, 0)
+               for x in range(60))
+
+
+def test_terrain_stays_legible_under_every_overlay_backdrop() -> None:
+    """Overlays repaint the backdrop, so contrast must be re-checked against it.
+
+    Correcting the foreground against the terrain's own background and then swapping
+    that background for an overlay's defeated the correction: `water_deep` on the
+    `dark_orange3` scanner band measured a 0.002 luminance gap — an invisible glyph, on
+    the overlay that is on by default.
+    """
+    from rich.color import Color
+
+    from edge.art.terrain import BIOME_COLORS, _luminance
+    from edge.core.groundwar.terrain import BIOME_BANDS
+    from edge.tui.screens.ground_expedition import _HEAT, _feature_colors, _styled
+
+    def luminance(color: str) -> float:
+        rgb = Color.parse(color).get_truecolor()
+        return _luminance((rgb.red / 255, rgb.green / 255, rgb.blue / 255))
+
+    backdrops = ["dark_green", "grey35", "grey27", *(h for h in _HEAT if h)]
+    for ptype, layout in BIOME_BANDS.items():
+        colors = BIOME_COLORS.get(ptype, [])
+        for index, (_threshold, feature) in enumerate(layout.bands):
+            if index >= len(colors):
+                continue
+            fg, terrain_bg = _feature_colors(ptype, feature)
+            for bg in [*backdrops, terrain_bg]:
+                if not bg:
+                    continue
+                rendered_fg = _styled(fg, bg).split(" on ")[0]
+                assert luminance(rendered_fg) != pytest.approx(luminance(bg), abs=0.15), (
+                    f"{ptype}/{feature} is unreadable on {bg}"
+                )
+
+
+def test_terrain_styles_pin_concrete_colours_not_theme_names() -> None:
+    """Named ANSI colours are theme-dependent, so contrast math on the nominal palette
+    does not describe what the terminal paints.
+
+    `terrestrial_cool` forest is authored `bright_green` on `green`: the nominal gap
+    clears the correction threshold, but a terminal theme renders the pair as one colour
+    and the trees vanish until the cursor lands on them. Emitting truecolor keeps the
+    measured contrast and the rendered contrast the same thing.
+    """
+    from edge.art.terrain import BIOME_COLORS
+    from edge.core.groundwar.terrain import BIOME_BANDS
+    from edge.tui.screens.ground_expedition import _feature_colors, _styled
+
+    for ptype, layout in BIOME_BANDS.items():
+        colors = BIOME_COLORS.get(ptype, [])
+        for index, (_threshold, feature) in enumerate(layout.bands):
+            if index >= len(colors):
+                continue
+            fg, bg = _feature_colors(ptype, feature)
+            for part in _styled(fg, bg).split(" on "):
+                assert part.startswith("#"), f"{ptype}/{feature} emits themeable {part!r}"
+
+    # The reported case: forest must not render as its own background.
+    fg, bg = _feature_colors("terrestrial_cool", "forest")
+    rendered_fg, rendered_bg = _styled(fg, bg).split(" on ")
+    assert rendered_fg != rendered_bg

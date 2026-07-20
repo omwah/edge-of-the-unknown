@@ -480,15 +480,39 @@ def _unfound(smap: SurveyMap) -> list[SurveySite]:
     return [s for s in smap.sites if not s.found]
 
 
+def _nearest_unfound(op: SurveyOperation, smap: SurveyMap) -> tuple[SurveySite | None, float]:
+    """The nearest unfound site and its distance; `(None, 0.0)` when all are resolved."""
+    sites = _unfound(smap)
+    if not sites:
+        return None, 0.0
+    near = min(sites, key=lambda s: _dist(op.explorer_x, op.explorer_y, s.x, s.y))
+    return near, _dist(op.explorer_x, op.explorer_y, near.x, near.y)
+
+
+def scanner_band_index(op: SurveyOperation, smap: SurveyMap, config: GameConfig) -> int:
+    """The reading's 1-based band ordinal — 1 is the hottest (saturated) band.
+
+    `0` means there is nothing to read: every contact resolved, or the nearest one
+    lies beyond the coldest band. Presentation keys emphasis off this rather than
+    matching `scanner_reading`'s authored label text.
+    """
+    assert config.groundwar is not None
+    near, d = _nearest_unfound(op, smap)
+    if near is None:
+        return 0
+    for index, band in enumerate(config.groundwar.expedition.scanner, 1):
+        if d <= band.within:
+            return index
+    return 0
+
+
 def scanner_reading(op: SurveyOperation, smap: SurveyMap, config: GameConfig
                     ) -> tuple[str, SurveySite | None]:
     """The handheld gradient: a banded reading against the nearest unfound site."""
     assert config.groundwar is not None
-    sites = _unfound(smap)
-    if not sites:
+    near, d = _nearest_unfound(op, smap)
+    if near is None:
         return "all contacts resolved", None
-    near = min(sites, key=lambda s: _dist(op.explorer_x, op.explorer_y, s.x, s.y))
-    d = _dist(op.explorer_x, op.explorer_y, near.x, near.y)
     for band in config.groundwar.expedition.scanner:
         if d <= band.within:
             return band.label, near

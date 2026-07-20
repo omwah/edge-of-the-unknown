@@ -12,6 +12,11 @@ To give a screen richer help, declare on it:
     HELP = "[b]...[/] markup paragraphs"   # optional prose under the key table
     HELP_TITLE = "Sector view"             # optional display name (else class name)
     HELP_LEGEND = True                     # optional: append the warp legend
+    HELP_LEGEND_ROWS = [("[b]@[/]", "you")]  # optional: a screen's own symbol table
+
+`HELP_LEGEND_ROWS` is for screens that draw a map of their own (the survey
+expedition, say) whose glyphs the warp legend cannot describe: a list of
+`(symbol-markup, meaning)` rows rendered under a "Legend" heading.
 """
 
 from __future__ import annotations
@@ -78,18 +83,23 @@ class HelpScreen(ModalScreen[None]):
         rows: list[str] = []
         prose = ""
         legend = False
+        legend_rows: list[tuple[str, str]] = []
         if host is not None:
             name = getattr(type(host), "HELP_TITLE", None) or type(host).__name__
             title = f"Help — {name}"
             rows = _binding_rows(host)
             prose = getattr(type(host), "HELP", "")
             legend = bool(getattr(type(host), "HELP_LEGEND", False))
+            legend_rows = list(getattr(type(host), "HELP_LEGEND_ROWS", ()))
 
         with VerticalScroll(id="help-box"):
             yield Static(title, id="help-title")
             if rows:
                 yield Static("Keys", classes="help-section")
                 yield Static("\n".join(rows))
+            if legend_rows:
+                yield Static("Legend", classes="help-section")
+                yield Static("\n".join(f"  {sym}  {meaning}" for sym, meaning in legend_rows))
             if prose:
                 yield Static("Notes", classes="help-section")
                 yield Static(prose)
