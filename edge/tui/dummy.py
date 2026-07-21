@@ -67,6 +67,7 @@ def sample_planet() -> PlanetDTO:
                                             ("Equipment", 5_100)],
         allocation=[("Fuel Ore", 20), ("Organics", 60), ("Equipment", 20)],
         ship_colonists=0, ship_colonist_capacity=100, starbase="operational",
+        species="Terrans",
     )
 
 

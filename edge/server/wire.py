@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 29  # GW-WP08: ground force (recruits/suits/ordnance, barracks, loadouts)
+WIRE_VERSION = 30  # GW-WP09-PRE: PlanetDTO.species (who lives on a world)
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -89,6 +89,15 @@ break in a town wall, previously indistinguishable from masonry), `SurveySettlem
 gains `plaza_x`/`plaza_y`/`hint_available` (the real talking-place and whether a hint is
 still on offer), and `SurveyExpeditionDTO.scanner_band` (the banded reading's ordinal, so
 emphasis keys off the band rather than matching authored label text).
+v28 (GW-WP07-FU2): the survey drop site is the player's choice — `SurveyLand` command +
+`SurveyLanded` event; `SurveyExpeditionDTO.landed`/`can_land`/`suggested_landing_*` and
+`GroundCellDTO.landing_site` (which ground the shuttle will accept).
+v29 (GW-WP08): the ground force — `HireRecruits`/`DismissRecruits`/`BuySuits`/`SellSuits`/
+`BuyGroundOrdnance` commands and their events; `ShipDTO` carries recruits/suits/passenger
+berths/ordnance; new `BarracksItem`, `LoadoutOptionDTO` and `GroundForceDTO` (the Stardock
+barracks catalog and the platoon composer's honest affordances).
+v30 (GW-WP09-PRE): `PlanetDTO.species` — who lives on a world, now that the big bang seeds
+native peoples (a world the player settled names their own people).
 """
 
 

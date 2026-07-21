@@ -1090,6 +1090,10 @@ class PlanetDTO:
     allocation: list[tuple[str, int]]  # (commodity label, percent)
     ship_colonists: int  # colonists aboard the player's ship (for the Colonize affordance)
     ship_colonist_capacity: int
+    # Who lives here (GW-WP09-PRE): the inhabiting species' name, or the player's own
+    # people on a world they colonized (their colonists came from Stardock). "" when
+    # nobody lives here at all.
+    species: str = ""
     ship_genesis: int = 0  # genesis torpedoes aboard (drives the Genesis affordance, WP10)
     genesis_eligible: bool = False  # valid_target axis: unowned + eligible type (WP-PR12)
     genesis_has_device: bool = False  # a torpedo is aboard (the separate device axis, WP-PR12)

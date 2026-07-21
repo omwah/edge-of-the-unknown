@@ -16,6 +16,10 @@
 # The Terran Federation governs Core Space; the player starts as one of its members.
 core_governing_alliance_id: 1
 
+# The player's own people: the citizens the Stardock recruitment office enlists, and so
+# the people living on any world the player colonizes (its orbit view names them).
+player_species_id: terran
+
 # How many species the big bang draws from the pool (clamped to the pool size and to
 # at least one-per-live-band so every band has a friendly contact, §5 step 8).
 subset_min: 7

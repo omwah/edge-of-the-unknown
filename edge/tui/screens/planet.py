@@ -254,9 +254,14 @@ claims the world). Building again grows the city, and a bigger city berths more 
             # A gas giant's capacity is its city's berths, not a habitability it doesn't have.
             cap = (f"{p.habitability_cap:,} city berths" if p.cloud_city_size
                    else "no ground — needs a staging area")
+        # Who lives here qualifies the population rather than taking a row of its own
+        # (GW-WP09-PRE): this panel is already full at 120x44, and a third line pushed
+        # the citadel Build button below the fold. "Population 1,240,000 Terrans" says
+        # the same thing in the space the count already occupied.
+        people = f" [b]{p.species}[/]" if p.species else ""
         children: list[Static] = [
             Static(f"Type  [b]{pretty_planet_type(p.ptype)}[/]   Owner  [cyan]{p.owner}[/]"),
-            Static(f"Habitability  {cap}   Population  {p.colonists:,}"),
+            Static(f"Habitability  {cap}   Population  {p.colonists:,}{people}"),
         ]
         if p.owned_by_you:
             alloc = "   ".join(f"{label} {pct}%" for label, pct in p.allocation)

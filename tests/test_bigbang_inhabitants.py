@@ -179,3 +179,44 @@ def test_the_invariant_rejects_a_universe_that_could_field_targets_but_does_not(
         stripped.planets[pid] = replace(planet, inhabited_by_species_id=None, colonists=0)
     with pytest.raises(ValidationError, match="assaultable"):
         validate(stripped, CFG)
+
+
+# --- the orbit view names who lives there -------------------------------------
+
+
+def test_the_orbit_view_names_a_worlds_people() -> None:
+    """The World & colony panel reads the inhabiting species off the projection."""
+    from edge.server import session
+
+    state = generate_with_player(CFG, 1986)
+    inhabited = next(p for p in state.planets.values()
+                     if p.inhabited_by_species_id is not None)
+    view = session.planet_view(state, 1, inhabited.id, CFG)
+    assert view.species == state.species[inhabited.inhabited_by_species_id].name
+
+
+def test_a_world_the_player_settles_is_peopled_by_their_own_kind() -> None:
+    """A colony's people came from the Stardock recruitment office, so the orbit view
+    names the roster's `player_species_id` rather than leaving the world blank — it has
+    a population, so it is not uninhabited (GW-WP09-PRE)."""
+    from dataclasses import replace
+
+    from edge.core.models import Ownership
+    from edge.server import session
+
+    state = generate_with_player(CFG, 1986)
+    target = next(p for p in state.planets.values()
+                  if p.inhabited_by_species_id is None and colonist_capacity(p, CFG) > 0)
+    state.planets[target.id] = replace(target, owner=Ownership("player", 1), colonists=500)
+    view = session.planet_view(state, 1, target.id, CFG)
+    assert CFG.roster is not None and CFG.roster.player_species_id == "terran"
+    assert view.species == "Terrans"
+
+
+def test_an_empty_world_names_nobody() -> None:
+    from edge.server import session
+
+    state = generate_with_player(CFG, 1986)
+    empty = next(p for p in state.planets.values()
+                 if p.inhabited_by_species_id is None and p.colonists == 0)
+    assert session.planet_view(state, 1, empty.id, CFG).species == ""
