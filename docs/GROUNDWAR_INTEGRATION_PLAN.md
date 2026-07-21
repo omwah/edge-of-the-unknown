@@ -7,7 +7,9 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–08 shipped; interview decisions resolved (July 2026).**
+> **Status: implementation underway — GW-WP01–08 shipped; interview decisions resolved (July 2026).
+> Next: GW-WP09-PRE (NPC-inhabited worlds at big bang), a prerequisite for GW-WP09 —
+> no generated world can route to `Assault` until it lands.**
 
 ## Context
 
@@ -465,7 +467,7 @@ operation phase, actor ownership, and live world preconditions.
 |---|---|---|
 | **GW-M1 — Contract and core** | GW-WP01–04 | Decisions/spec fixed; replayable ground-operation state and access classifier |
 | **GW-M2 — Survey replacement** | GW-WP05–07 | Real discoveries excavated into unique artifacts and codex lore |
-| **GW-M3 — Assault replacement** | GW-WP08–11 | Defended worlds fought tactically and settled strategically |
+| **GW-M3 — Assault replacement** | GW-WP08, GW-WP09-PRE, GW-WP09–11 | Defended worlds fought tactically and settled strategically |
 | **GW-M4 — Parity and retirement** | GW-WP12–14 | Remote/UI/bot parity, balance, legacy paths removed |
 | **GW-M5 — Cloud City interiors** | GW-WP15–16 | New station-interior art and gated Cloud City assaults |
 
@@ -916,6 +918,80 @@ Tests: capacity and cost conservation; no negative balances/ammo; loadout
 round-trip; casualty persistence; service availability; property tests.
 Commit `ground: GW-WP08 ground force + assault composer`.
 
+### GW-WP09-PRE — NPC-inhabited worlds at big bang (L) — NEXT
+
+**Why this exists.** Found while extending the bigbang inspector (July 2026):
+**nothing in the codebase ever sets `Planet.inhabited_by_species_id`.** The only
+writer is `edge/core/planets.py:233`, and it *clears* the field (the belt
+normalizer). A fresh 1000-sector universe (seed 1986) generates 195 planets with
+**0 inhabited worlds, 0 colonists, 0 citadels, 0 garrison fighters, 0 treasury**.
+
+That is not a cosmetic gap — it removes the entire target set of GW-M3. The
+classifier's `_is_inhabited` (`access.py:100`) counts live colonists, an
+inhabiting species, or a built Cloud City. In a generated universe every world is
+therefore either uninhabited (→ `Survey`) or a Cloud City (→ `OrbitalOnly` under
+D9); a world the player colonizes is their own, hence friendly (→ `Survey`).
+**No world can route to `Assault` at all.** GW-WP09–WP12 would build tactical
+generation, actions, settlement, and a battle UI against a universe that contains
+nothing to assault, verifiable only through hand-built test states — and D2's
+protectorate arc, whose whole subject is the *unaligned inhabited* world, would
+have no instance to apply to.
+
+The same gap silently disables shipped behaviour: `RecruitColonists(from_planet=…)`
+emigration requires an inhabiting species, survey settlements require friendly live
+inhabitants, `populate.py:274`'s "an inhabited world gets no derelict base" branch
+never fires, and `validate.py:161`'s companion check is unreachable. D11 already
+assumes this data exists — it derives initial ground defense "from population,
+citadel, owner/species, and band" — so the population it reads must be seeded
+before it can read it.
+
+**Scope.** Seed the inhabited universe at generation:
+
+- **Inhabitants.** Assign `inhabited_by_species_id` from the generated species
+  subset across a band-weighted fraction of landable worlds. A species' home
+  cluster is populated by that species (§5 step 6, §6.3); worlds beyond it draw
+  from species whose `home_band` and disposition make them plausible there. The
+  Core stays governor-owned and friendly (G13 is unaffected either way).
+- **Population.** Draw native `colonists` against `planet_type`/`habitability_cap`,
+  so an inhabited world reads as a real polity rather than a flag.
+- **Holdings.** Seed `citadel_level`, `gun_integrity`, `treasury`, and stores on
+  inhabited and alliance-held worlds, so the orbital siege ladder has something to
+  defeat and GW-WP09's ground garrison has live inputs to scale from. The **ground**
+  garrison itself remains GW-WP09's (D11); this WP supplies what it reads.
+- **Reachability invariant.** `validate.py` gains a check that a generated universe
+  contains at least a configured minimum of **assault-eligible** worlds (inhabited,
+  below-friendly, non-Core, landable) outside the Core, and of friendly inhabited
+  worlds (which give the shipped survey path real settlements). A seed that cannot
+  produce a target set is a generation failure, not a surprise at GW-WP12.
+- **Ownership coherence.** An unaligned inhabited world keeps `owner=none` with a
+  species id (risk 6's exact shape, and the D2 protectorate's subject); a bloc's
+  world is alliance-owned *and* inhabited. Neither may contradict the other.
+
+**Ordering.** Must land **before GW-WP09**. WP09 derives assault difficulty from
+population, citadel, owner/species and band; without this, every derivation reads
+zero and the tuning work in GW-WP13 would be measuring an empty universe.
+
+**Epoch.** Generation-visible hashed `Planet` fields change, so this is a
+`config_version` bump with golden-replay/state-hash regeneration and a snapshot
+pass — batched into this one WP, as GW-WP03 established.
+
+**Acceptance readout.** `python -m edge.bigbang --list planets` shows populated
+`species` / `pop` / `cit` / `gun` / `treasury` columns on a fresh seed (they are
+empty by construction today), and `--stats` reports the inhabited/assaultable
+counts.
+
+Files: `edge/bigbang/populate.py`, `edge/bigbang/validate.py`,
+`edge/bigbang/generator.py` (summary counts), `edge/core/config.py`,
+`config/default.yaml`, `edge/core/planets.py` if the belt normalizer needs to stay
+consistent, golden/wire fixtures.
+Tests: band-weighted inhabited distribution; Core exclusion; home-cluster species
+consistency; unaligned worlds keep `owner=none` with a species id; population within
+habitability; determinism across seeds; the minimum assault-eligible and friendly
+inhabited counts hold over a seed matrix; `ground_access` returns `Assault` for a
+real generated world (the case that cannot be written today without hand-building
+state).
+Commit `ground: GW-WP09-PRE seed NPC-inhabited worlds`.
+
 ### GW-WP09 — Persistent ground defense and assault generation (XL)
 
 Implement the D11 persistent planetary ground-defense model, its big-bang
@@ -1130,11 +1206,19 @@ Commit `ground: GW-WP16 Cloud City interior assaults` — **GW-M5 done.**
    until GW-WP15–16 supply dedicated gameplay topology, new art, and integration.
 8. **Remote command volume.** Tactical play produces far more commands than the
    abstract reducers. GW-WP13 measures log/wire/reload behavior before retirement.
+9. **An empty target set.** The big bang seeds no inhabitants, population, or
+   planetary holdings, so today *no generated world routes to `Assault`* and the
+   whole of GW-M3 could be built and "passing" against hand-built test states
+   only. GW-WP09-PRE seeds the inhabited universe and adds a generation-time
+   invariant that a minimum target set exists, so the milestone is verified
+   against real seeds rather than fixtures.
 
 ## Definition of done
 
 - D1–D15 are resolved and recorded in both this plan and authoritative DESIGN.
-- GW-WP01–16 acceptance tests pass.
+- GW-WP01–16 (with GW-WP09-PRE) acceptance tests pass.
+- A **generated** universe contains inhabited worlds that route to survey and to
+  assault; neither path is reachable only through hand-built state.
 - `ruff`, strict `mypy` production layers, pytest/property tests, codec fixtures,
   and Textual Pilot/snapshots are green.
 - Survey and assault work through local and remote clients.
