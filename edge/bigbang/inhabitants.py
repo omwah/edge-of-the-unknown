@@ -38,10 +38,11 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, replace
 
+from edge.core.aliens import resolve_species_by_kind
 from edge.core.config import GameConfig, InhabitantsConfig
 from edge.core.enums import Commodity
 from edge.core.models import AlienSpecies, Planet, UniverseState
-from edge.core.planets import colonist_capacity, is_cloud_city_world, is_landable
+from edge.core.planets import any_population_key, colonist_capacity, is_cloud_city_world, is_landable
 from edge.core.starbases import is_operational
 
 _INHABITANTS_SALT = 0x494E4841  # "INHA"
@@ -78,7 +79,7 @@ def seed_inhabitants(state: UniverseState, config: GameConfig) -> None:
             if bias_roll < cfg.unaligned_wary_bias:
                 candidates = cast.wary_pool(sector.distance_band) or candidates
         species_id = candidates[rng.randrange(len(candidates))]
-        state.planets[pid] = _settle(planet, species_id, config, rng)
+        state.planets[pid] = _settle(state, planet, species_id, config, rng)
 
     _guarantee_targets(state, config, rng, cast)
 
@@ -185,7 +186,7 @@ def _guarantee_targets(state: UniverseState, config: GameConfig, rng: random.Ran
         band = state.sectors[planet.sector_id].distance_band
         pool = cast.wary_pool(band)
         species_id = pool[rng.randrange(len(pool))]
-        state.planets[pid] = _settle(planet, species_id, config, rng)
+        state.planets[pid] = _settle(state, planet, species_id, config, rng)
 
 
 def _can_hold_a_people(state: UniverseState, planet: Planet, config: GameConfig) -> bool:
@@ -208,10 +209,17 @@ def _can_hold_a_people(state: UniverseState, planet: Planet, config: GameConfig)
     return True
 
 
-def _settle(planet: Planet, species_id: int, config: GameConfig,
+def _settle(state: UniverseState, planet: Planet, species_id: int, config: GameConfig,
             rng: random.Random) -> Planet:
-    """Give `planet` its people, their stores, and any citadel they have raised."""
+    """Give `planet` its people, their stores, and any citadel they have raised.
+
+    `species_id` names a placed **instance** (`_Cast`'s pools are drawn from
+    `state.species`); `population` is keyed by the kind (`roster_id`, GW-WP09-PRE
+    follow-up), so it is resolved here once rather than carried as an instance id a
+    later kill could orphan.
+    """
     cfg = config.planets.inhabitants
+    roster_id = state.species[species_id].roster_id
     capacity = colonist_capacity(planet, config)
     frac = rng.uniform(cfg.population_min_frac, cfg.population_max_frac)
     colonists = max(1, int(capacity * frac))
@@ -234,8 +242,7 @@ def _settle(planet: Planet, species_id: int, config: GameConfig,
 
     return replace(
         planet,
-        inhabited_by_species_id=species_id,
-        colonists=colonists,
+        population={roster_id: colonists},
         stores={c: q for c, q in stores.items() if q > 0},
         allocation={c: 1.0 / len(Commodity) for c in Commodity},
         citadel_level=level,
@@ -259,7 +266,7 @@ def is_assaultable_for_a_fresh_player(
     amity threshold, and honours the two hard boundaries a player cannot move:
     Core sanctuary (G13) and the Cloud City gate (D9).
     """
-    species = _inhabitant(state, planet)
+    species = _inhabitant(state, planet, config)
     if species is None:
         return False
     if state.sectors[planet.sector_id].is_galactic_core:  # G13
@@ -271,14 +278,23 @@ def is_assaultable_for_a_fresh_player(
 
 def is_friendly_inhabited(state: UniverseState, planet: Planet, config: GameConfig) -> bool:
     """Whether this world's survey would find settlements to visit (D5/D6)."""
-    species = _inhabitant(state, planet)
+    species = _inhabitant(state, planet, config)
     return species is not None and species.base_disposition >= config.aliens.amity_threshold
 
 
-def _inhabitant(state: UniverseState, planet: Planet) -> AlienSpecies | None:
-    if planet.inhabited_by_species_id is None:
+def _inhabitant(state: UniverseState, planet: Planet, config: GameConfig) -> AlienSpecies | None:
+    """*Some* of the world's people, live if possible, durable otherwise (§6, §4.2).
+
+    `any_population_key`, not `native_population_key`: this asks "is there a plausible
+    people to describe" for the generation-time assault/friendly *counts*, not "is
+    there a hostility subject" — a Terran-peopled Core capital genuinely has
+    settlements, it just can never be assaultable (Core sanctuary, checked before this
+    is even reached) or read as hostile (Terran's disposition is always friendly-band).
+    """
+    key = any_population_key(planet, config)
+    if key is None:
         return None
-    return state.species.get(planet.inhabited_by_species_id)
+    return resolve_species_by_kind(state, key, config.roster)
 
 
 def ground_target_counts(state: UniverseState, config: GameConfig) -> tuple[int, int]:
@@ -298,7 +314,7 @@ def _settleable_worlds(state: UniverseState, config: GameConfig) -> list[int]:
     """
     return [
         pid for pid in sorted(state.planets)
-        if state.planets[pid].inhabited_by_species_id is None
+        if not state.planets[pid].population
         and not state.planets[pid].owner.is_owned
         and not state.sectors[state.planets[pid].sector_id].is_galactic_core
         and not is_cloud_city_world(state.planets[pid].planet_type, config)

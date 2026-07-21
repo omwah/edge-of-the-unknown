@@ -392,6 +392,41 @@ def alliance_standing(player: Player, alliance_id: int | None) -> float:
     return player.alliance_standing.get(alliance_id, 0.0)
 
 
+def resolve_species_by_kind(
+    state: UniverseState, roster_id: str, roster: RosterConfig | None,
+) -> AlienSpecies | None:
+    """A species-like view of `roster_id`, live if one exists, durable otherwise (§6).
+
+    A `Planet.population` entry names a species **kind**, not a specific roaming ship
+    (GW-WP09-PRE follow-up) — `state.species.get(instance_id)` is the wrong lookup for
+    it. Prefer an actual live instance when one exists (a real `id`/`sector_id`, in case
+    a caller wants to route a hail or dialogue at it); otherwise synthesize a view from
+    the per-generation `species_home_disposition` draw (`bigbang.aliens._base_for`,
+    memoised once and durable) plus the roster's authored params, so a native people's
+    standing stays resolvable even after every one of their ships has been destroyed
+    (`removed_species_ids` pops `state.species`, but a world's population outlives its
+    roaming kin). `id=0`/`sector_id=0` mark the synthetic case — the same "no live
+    instance" sentinel `rules.py` already uses for citadel-gun/starbase foes.
+    """
+    live = next((s for s in state.species.values() if s.roster_id == roster_id), None)
+    if live is not None:
+        return live
+    base = state.species_home_disposition.get(roster_id)
+    if base is None or roster is None:
+        return None
+    sc = next((s for s in roster.species if s.id == roster_id), None)
+    if sc is None:
+        return None
+    return AlienSpecies(
+        id=0, roster_id=sc.id, name=sc.name, archetype_id=sc.archetype_id,
+        sector_id=0, home_band=sc.home_band or "", tech_level=sc.tech_level,
+        base_disposition=base, disposition_center=sc.disposition_center,
+        disposition_variance=sc.disposition_variance, alliance_id=sc.alliance_id,
+        alliance_role=sc.alliance_role, threat_tier=sc.threat_tier,
+        trade_posture=sc.trade_posture, treaty_mode=sc.treaty_mode, persona=sc.persona,
+    )
+
+
 def alliance_standing_shift(player: Player, species: AlienSpecies) -> float:
     """The greeting-vs-violence penalty from ill standing with a species' bloc (§6.3).
 

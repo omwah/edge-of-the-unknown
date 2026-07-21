@@ -160,7 +160,7 @@ def _check_starbases(state: UniverseState) -> None:
             raise ValidationError(f"starbase {base.id} not in its planet's sector")
         if planet.owner.is_owned and not is_operational(base):
             raise ValidationError(f"starbase {base.id} on owned planet {planet.id} is derelict")
-        if not is_operational(base) and (planet.owner.is_owned or planet.inhabited_by_species_id is not None):
+        if not is_operational(base) and (planet.owner.is_owned or planet.population):
             raise ValidationError(f"derelict starbase {base.id} is not on an unowned, uninhabited world")
         # Base-hosted markets (§4.2, WP78): every base sector holds a port — the base
         # *is* the sector's trading post (minted by `populate._host_markets`).

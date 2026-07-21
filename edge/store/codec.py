@@ -236,7 +236,10 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
                 "subsystem": command.subsystem.value, "slot_index": command.slot_index,
             }
         case RecruitColonists():
-            return "RecruitColonists", {"count": command.count, "from_planet": command.from_planet}
+            return "RecruitColonists", {
+                "count": command.count, "from_planet": command.from_planet,
+                "species_id": command.species_id,
+            }
         case HireRecruits():
             return "HireRecruits", {"count": command.count}
         case DismissRecruits():
@@ -248,9 +251,15 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
         case BuyGroundOrdnance():
             return "BuyGroundOrdnance", {"count": command.count}
         case Colonize():
-            return "Colonize", {"planet_id": command.planet_id, "colonists": command.colonists}
+            return "Colonize", {
+                "planet_id": command.planet_id, "colonists": command.colonists,
+                "species_id": command.species_id,
+            }
         case SettleColonists():
-            return "SettleColonists", {"planet_id": command.planet_id, "colonists": command.colonists}
+            return "SettleColonists", {
+                "planet_id": command.planet_id, "colonists": command.colonists,
+                "species_id": command.species_id,
+            }
         case BuildStagingArea():
             return "BuildStagingArea", {"planet_id": command.planet_id}
         case SetAllocation():
@@ -467,7 +476,10 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
                 subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
             )
         case "RecruitColonists":
-            return RecruitColonists(count=payload["count"], from_planet=payload["from_planet"])
+            return RecruitColonists(
+                count=payload["count"], from_planet=payload["from_planet"],
+                species_id=payload.get("species_id"),
+            )
         case "HireRecruits":
             return HireRecruits(count=payload["count"])
         case "DismissRecruits":
@@ -479,9 +491,15 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
         case "BuyGroundOrdnance":
             return BuyGroundOrdnance(count=payload["count"])
         case "Colonize":
-            return Colonize(planet_id=payload["planet_id"], colonists=payload["colonists"])
+            return Colonize(
+                planet_id=payload["planet_id"], colonists=payload["colonists"],
+                species_id=payload.get("species_id"),
+            )
         case "SettleColonists":
-            return SettleColonists(planet_id=payload["planet_id"], colonists=payload["colonists"])
+            return SettleColonists(
+                planet_id=payload["planet_id"], colonists=payload["colonists"],
+                species_id=payload.get("species_id"),
+            )
         case "BuildStagingArea":
             return BuildStagingArea(planet_id=payload["planet_id"])
         case "SetAllocation":

@@ -104,7 +104,7 @@ def test_starbases_placed_and_consistent(seed: int) -> None:
             assert is_operational(base)  # owned worlds keep working bases
         elif not is_operational(base):
             # A derelict sits only on an unowned, uninhabited world…
-            assert not planet.owner.is_owned and planet.inhabited_by_species_id is None
+            assert not planet.owner.is_owned and not planet.population
             # …and still holds salvageable components (a cache, not an empty husk).
             assert any(c is not None for sub in base.subsystems.values() for c in sub.slots)
 

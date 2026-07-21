@@ -68,7 +68,7 @@ def test_belt_removed_from_genesis_eligibility() -> None:
 def _dirty_belt() -> Planet:
     return Planet(
         id=1, sector_id=1, name="Rubble", planet_type="asteroid_belt",
-        owner=Ownership("alliance", 4), colonists=500, habitability_cap=0,
+        owner=Ownership("alliance", 4), population={"terran": 500}, habitability_cap=0,
         allocation={Commodity.EQUIPMENT: 1.0}, stores={Commodity.EQUIPMENT: 9000},
         citadel_level=2, treasury=1234, fighters=40, starbase_id=7,
     )
@@ -85,7 +85,7 @@ def test_normalize_belt_scrubs_colony_state_and_is_idempotent() -> None:
 
 def test_normalize_leaves_landable_worlds_untouched() -> None:
     colony = Planet(id=2, sector_id=1, name="Eden", planet_type="terrestrial_warm",
-                    owner=Ownership("player", 1), colonists=1000)
+                    owner=Ownership("player", 1), population={"terran": 1000})
     assert normalize_belt(colony, CFG) is colony
 
 

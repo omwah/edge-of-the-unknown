@@ -1282,7 +1282,7 @@ def summarize(state: UniverseState) -> str:
     # would make the bare name local for the whole body and unbound up here.)
     from edge.config import load_default_config as _default_config
 
-    inhabited = sum(1 for p in state.planets.values() if p.inhabited_by_species_id is not None)
+    inhabited = sum(1 for p in state.planets.values() if p.population)
     population = sum(p.colonists for p in state.planets.values())
     assaultable, friendly_inhabited = ground_target_counts(state, _default_config())
     economic_rows = [

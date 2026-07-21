@@ -181,6 +181,7 @@ from edge.core.planets import (
     colonist_capacity,
     genesis_blocker,
     is_landable,
+    player_species_key,
     pretty_planet_type,
     retype_planet,
     store_blocker,
@@ -314,12 +315,17 @@ class RepairAtDock:
 class RecruitColonists:
     """Recruit colonists into the ship's occupancy (§4.2). Recruited, never bought.
 
-    `from_planet` None ⇒ Stardock recruitment office (pay a per-head latinum incentive);
-    a planet id ⇒ emigration from that inhabited world (the disposition gate lands in WP7).
+    `from_planet` None ⇒ Stardock recruitment office (pay a per-head latinum incentive;
+    the recruits are tagged the player's own people, `planets.player_species_key`); a
+    planet id ⇒ emigration from that inhabited world (the disposition gate lands in
+    WP7), tagged with `species_id` — the people of `from_planet` to draw from. `species_id`
+    may be omitted when the world holds only one people; required and validated against
+    `Planet.population` when it holds more than one (GW-WP09-PRE follow-up).
     """
 
     count: int
     from_planet: int | None = None
+    species_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -380,10 +386,17 @@ class BuyGroundOrdnance:
 
 @dataclass(frozen=True, slots=True)
 class Colonize:
-    """Settle recruited colonists onto an unowned colonizable world, claiming it (§8)."""
+    """Settle recruited colonists onto an unowned colonizable world, claiming it (§8).
+
+    `species_id` names which of the ship's aboard peoples to land — may be omitted when
+    the ship carries only one (the common case); required when it carries more than one
+    (GW-WP09-PRE follow-up). Landing atop a world that already carries a native people
+    (§4.2) does not displace them — both populations settle side by side.
+    """
 
     planet_id: int
     colonists: int
+    species_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -393,11 +406,13 @@ class SettleColonists:
     The top-up counterpart to `Colonize` (which *claims* an unowned world): this only adds
     people to an existing colony. Owner-only (player or their corp), in-sector, colonizable.
     `colonists` is clamped to what is aboard and the world's remaining habitability headroom,
-    so "settle all" is a large number — the accepted count moves atomically.
+    so "settle all" is a large number — the accepted count moves atomically. `species_id`
+    names which of the ship's aboard peoples to land (see `Colonize`).
     """
 
     planet_id: int
     colonists: int
+    species_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -2188,6 +2203,44 @@ def _even_allocation() -> dict[Commodity, float]:
     return {c: share for c in Commodity}
 
 
+def _add_population(population: Mapping[str, int], species_id: str, count: int) -> dict[str, int]:
+    """`population` with `count` more of `species_id` (§4.2, GW-WP09-PRE follow-up)."""
+    merged = dict(population)
+    merged[species_id] = merged.get(species_id, 0) + count
+    return merged
+
+
+def _remove_population(population: Mapping[str, int], species_id: str, count: int) -> dict[str, int]:
+    """`population` with `count` fewer of `species_id`, dropping the key at zero."""
+    left = dict(population)
+    remaining = left.get(species_id, 0) - count
+    if remaining > 0:
+        left[species_id] = remaining
+    else:
+        left.pop(species_id, None)
+    return left
+
+
+def _resolve_species(population: Mapping[str, int], species_id: str | None, *, what: str) -> str:
+    """Which people a partial transfer moves, from a possibly-mixed ledger (§4.2).
+
+    `species_id` names it explicitly; omitted, it must be unambiguous — exactly one
+    people present. A ship or world realistically carries a single people almost
+    always today, so this only ever asks the caller to disambiguate the rare mix
+    (GW-WP09-PRE follow-up leaves fuller multi-species transfer UI for later).
+    """
+    present = sorted(k for k, v in population.items() if v > 0)
+    if species_id is not None:
+        if species_id not in present:
+            raise EconomyError(f"no {what} of that people to move")
+        return species_id
+    if len(present) == 1:
+        return present[0]
+    if not present:
+        raise EconomyError(f"no {what} aboard")
+    raise EconomyError(f"more than one people aboard {what} — specify which")
+
+
 def _recruit_colonists(
     state: UniverseState, player_id: int, cmd: RecruitColonists, config: GameConfig
 ) -> ReduceResult:
@@ -2201,13 +2254,15 @@ def _recruit_colonists(
     count = min(cmd.count, free)  # clamp to the ship's separate occupancy limit (§4.2)
 
     if cmd.from_planet is None:
-        # Stardock recruitment office — a per-head latinum incentive (not a purchase).
+        # Stardock recruitment office — a per-head latinum incentive (not a purchase);
+        # the recruits are the player's own people (§4.2).
         _stardock(state, ship)
         cost = count * config.economy.colonist_incentive
         if player.latinum < cost:
             raise EconomyError("insufficient latinum for the recruitment incentive")
         new_player = replace(player, latinum=player.latinum - cost)
-        new_ship = replace(ship, colonists=ship.colonists + count)
+        home = player_species_key(config)
+        new_ship = replace(ship, population=_add_population(ship.population, home, count))
         return ReduceResult(
             events=(ColonistsRecruited(player_id, "stardock", count, cost),),
             players=(new_player,), ships=(new_ship,),
@@ -2217,9 +2272,13 @@ def _recruit_colonists(
     planet = state.planets.get(cmd.from_planet)
     if planet is None or planet.sector_id != ship.sector_id:
         raise EconomyError("no such world here to recruit from")
-    if planet.inhabited_by_species_id is None:
+    if not planet.population:
         raise EconomyError("that world has no population to emigrate")
-    new_ship = replace(ship, colonists=ship.colonists + count)
+    # Emigrants keep the identity of the people they left — never folded into the
+    # player's own (§4.2, GW-WP09-PRE follow-up). The source world's own count is left
+    # untouched: emigration is a trickle of the willing, not a drain on the colony.
+    species_id = _resolve_species(planet.population, cmd.species_id, what="to emigrate")
+    new_ship = replace(ship, population=_add_population(ship.population, species_id, count))
     return ReduceResult(
         events=(ColonistsRecruited(player_id, "emigration", count, 0),), ships=(new_ship,),
     )
@@ -2373,12 +2432,13 @@ def _colonize(
         raise EconomyError(blocker)
     if cmd.colonists <= 0:
         raise EconomyError("must land at least one colonist")
-    if cmd.colonists > ship.colonists:
+    species_id = _resolve_species(ship.population, cmd.species_id, what="to land")
+    if cmd.colonists > ship.population.get(species_id, 0):
         raise EconomyError("not enough colonists aboard")
-    new_ship = replace(ship, colonists=ship.colonists - cmd.colonists)
+    new_ship = replace(ship, population=_remove_population(ship.population, species_id, cmd.colonists))
     new_planet = replace(
         planet, owner=Ownership("player", player_id),
-        colonists=planet.colonists + cmd.colonists,
+        population=_add_population(planet.population, species_id, cmd.colonists),
         allocation=planet.allocation or _even_allocation(),
     )
     return ReduceResult(
@@ -2411,6 +2471,7 @@ def _settle_colonists(
         raise EconomyError("must land at least one colonist")
     if ship.colonists <= 0:
         raise EconomyError("no colonists aboard to settle")
+    species_id = _resolve_species(ship.population, cmd.species_id, what="to settle")
     # Headroom against *this world's* capacity: habitability on the ground, the Cloud City's
     # berths in the clouds — so a full city says so, and growing it makes room (§4.2, PT-54).
     headroom = max(0, colonist_capacity(planet, config) - planet.colonists)
@@ -2418,9 +2479,9 @@ def _settle_colonists(
         raise EconomyError(
             "the cloud city is full — build it larger to berth more"
             if planet.cloud_city_size > 0 else "the colony is at its habitability cap")
-    moved = min(cmd.colonists, ship.colonists, headroom)
-    new_ship = replace(ship, colonists=ship.colonists - moved)
-    new_planet = replace(planet, colonists=planet.colonists + moved)
+    moved = min(cmd.colonists, ship.population.get(species_id, 0), headroom)
+    new_ship = replace(ship, population=_remove_population(ship.population, species_id, moved))
+    new_planet = replace(planet, population=_add_population(planet.population, species_id, moved))
     return ReduceResult(
         events=(ColonistsSettled(player_id, planet.id, moved),),
         ships=(new_ship,), planets=(new_planet,),
@@ -3405,7 +3466,7 @@ def _escape_pod(wreck: Ship, config: GameConfig) -> Ship:
         cloak_rating=pod.cloak_rating, sensor_rating=pod.sensor_rating,
         shields=pod.shields_max, warp_speed=pod.warp_speed,
         combat_speed=pod.combat_speed, turns_per_warp=pod.turns_per_warp,
-        colonist_capacity=pod.colonist_capacity, colonists=0,
+        colonist_capacity=pod.colonist_capacity, population={},
         passenger_capacity=pod.passenger_capacity, recruits=0, suits={}, ground_missiles=0,
         cargo={}, components={}, devices={}, missiles=0, repair_kits=0,
         subsystems=build_subsystems(pod),

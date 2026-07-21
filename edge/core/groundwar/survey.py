@@ -377,8 +377,7 @@ def survey_map_for(state: UniverseState, op: SurveyOperation, config: GameConfig
     sites = [state.discoveries[i] for i in sorted(op.visible_discovery_ids)
              if i in state.discoveries]
     planet = state.planets.get(op.planet_id)
-    inhabited = planet is not None and (
-        planet.colonists > 0 or planet.inhabited_by_species_id is not None)
+    inhabited = planet is not None and bool(planet.population)
     return generate_survey(
         config, seed=op.seed, planet_type=op.planet_type, inhabited=inhabited, sites=sites,
         resolved_ids=op.resolved_discovery_ids, hinted_ids=op.hinted_discovery_ids)

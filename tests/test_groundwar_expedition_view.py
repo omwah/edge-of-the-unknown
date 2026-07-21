@@ -340,7 +340,7 @@ def test_expedition_responsive_snapshots(
 def _inhabited_view() -> object:
     """A live survey reprojected against a peopled world, so towns exist."""
     state = _world()
-    state.planets[1] = replace(state.planets[1], colonists=50_000)
+    state.planets[1] = replace(state.planets[1], population={"terran": 50_000})
     return session.ground_operation_view(state, 1, CFG)
 
 
@@ -369,7 +369,7 @@ def test_settlement_projects_its_real_plaza_and_hint_offer() -> None:
 
 def test_hint_offer_closes_once_every_contact_is_hinted() -> None:
     state = _world(sites=2)
-    state.planets[1] = replace(state.planets[1], colonists=50_000)
+    state.planets[1] = replace(state.planets[1], population={"terran": 50_000})
     op = state.players[1].ground_operation
     assert op is not None
     state.players[1] = replace(

@@ -23,7 +23,8 @@ def _colony(ptype: str = "terrestrial_warm", colonists: int = 1000, owner: Owner
     return Planet(
         id=1, sector_id=1, name="P", planet_type=ptype,
         owner=owner if owner is not None else Ownership("player", 1),
-        colonists=colonists, habitability_cap=profile.habitability,
+        population={"terran": colonists} if colonists else {},
+        habitability_cap=profile.habitability,
         yield_profile={Commodity(k): v for k, v in profile.yield_profile.items()},
         allocation={c: 1 / 3 for c in Commodity},
         stores=dict(stores or {Commodity.ORGANICS: 10_000}),

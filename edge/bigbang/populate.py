@@ -271,7 +271,7 @@ def _place_starbases(state: UniverseState, config: GameConfig) -> None:
             if srng.random() >= sbcfg.owned_base_chance:
                 continue
             owner = planet.owner
-        elif planet.inhabited_by_species_id is None:
+        elif not planet.population:
             if srng.random() >= sbcfg.derelict_chance:
                 continue
             owner = UNOWNED

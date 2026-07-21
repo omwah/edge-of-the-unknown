@@ -105,21 +105,21 @@ def test_uninhabited_landable_world_surveys_without_settlements() -> None:
 
 
 def test_player_owned_inhabited_world_surveys_with_settlements() -> None:
-    state, planet = _pair(_planet(owner=Ownership("player", 1), colonists=500))
+    state, planet = _pair(_planet(owner=Ownership("player", 1), population={"terran": 500}))
     access = ground_access(state, state.players[1], planet, CFG)
     assert isinstance(access, Survey)
     assert access.settlements is True
 
 
 def test_own_alliance_world_surveys() -> None:
-    state, planet = _pair(_planet(owner=Ownership("alliance", 5), colonists=500),
+    state, planet = _pair(_planet(owner=Ownership("alliance", 5), population={"terran": 500}),
                           player_alliance=5)
     access = ground_access(state, state.players[1], planet, CFG)
     assert isinstance(access, Survey)
 
 
 def test_friendly_species_world_surveys() -> None:
-    planet = _planet(inhabited_by_species_id=7)
+    planet = _planet(population={"vesk": 500})
     state = _state(planet)
     state.species = {7: _species(AMITY + 0.2)}
     access = ground_access(state, state.players[1], planet, CFG)
@@ -131,7 +131,7 @@ def test_friendly_species_world_surveys() -> None:
 
 
 def test_hostile_species_world_assaults() -> None:
-    planet = _planet(inhabited_by_species_id=7)
+    planet = _planet(population={"vesk": 500})
     state = _state(planet)
     state.species = {7: _species(0.1)}
     access = ground_access(state, state.players[1], planet, CFG)
@@ -142,7 +142,7 @@ def test_hostile_species_world_assaults() -> None:
 
 def test_neutral_species_world_still_assaults() -> None:
     # Below amity but above hostility — D1 routes it to assault all the same.
-    planet = _planet(inhabited_by_species_id=7)
+    planet = _planet(population={"vesk": 500})
     state = _state(planet)
     state.species = {7: _species(AMITY - 0.05)}
     access = ground_access(state, state.players[1], planet, CFG)
@@ -150,7 +150,7 @@ def test_neutral_species_world_still_assaults() -> None:
 
 
 def test_rival_alliance_world_assaults() -> None:
-    state, planet = _pair(_planet(owner=Ownership("alliance", 6), colonists=500),
+    state, planet = _pair(_planet(owner=Ownership("alliance", 6), population={"terran": 500}),
                           player_alliance=5)
     access = ground_access(state, state.players[1], planet, CFG)
     assert isinstance(access, Assault)
@@ -159,7 +159,7 @@ def test_rival_alliance_world_assaults() -> None:
 
 def test_grudge_pushes_a_mild_species_into_assault() -> None:
     from edge.core.models import Grudge
-    planet = _planet(inhabited_by_species_id=7)
+    planet = _planet(population={"vesk": 500})
     state = _state(planet)
     state.species = {7: _species(AMITY + 0.05)}  # nominally friendly...
     grudged = replace(state.players[1], grudges={"vesk": Grudge(
@@ -172,7 +172,7 @@ def test_grudge_pushes_a_mild_species_into_assault() -> None:
 
 
 def test_core_world_never_assaults() -> None:
-    planet = _planet(inhabited_by_species_id=7)
+    planet = _planet(population={"vesk": 500})
     state = _state(planet, core=True)
     state.species = {7: _species(0.05)}  # deeply hostile
     access = ground_access(state, state.players[1], planet, CFG)
@@ -184,7 +184,7 @@ def test_core_world_never_assaults() -> None:
 
 
 def test_live_citadel_gun_blocks_the_drop() -> None:
-    planet = _planet(inhabited_by_species_id=7, citadel_level=GUN_MIN, gun_integrity=50)
+    planet = _planet(population={"vesk": 500}, citadel_level=GUN_MIN, gun_integrity=50)
     state = _state(planet)
     state.species = {7: _species(0.1)}
     access = ground_access(state, state.players[1], planet, CFG)
@@ -198,7 +198,7 @@ def test_live_citadel_gun_blocks_the_drop() -> None:
 
 def test_hostile_world_is_orbital_only_when_citadels_disabled() -> None:
     cfg = CFG.model_copy(update={"citadels": None})
-    planet = _planet(inhabited_by_species_id=7)
+    planet = _planet(population={"vesk": 500})
     state = _state(planet)
     state.species = {7: _species(0.1)}
     access = ground_access(state, state.players[1], planet, cfg)
@@ -224,7 +224,7 @@ def test_planet_dto_mode_matches_classifier(build) -> None:
 
 
 def test_begin_survey_rejects_assault_world_with_classifier_reason() -> None:
-    planet = _planet(inhabited_by_species_id=7)
+    planet = _planet(population={"vesk": 500})
     state = _state(planet)
     state.species = {7: _species(0.1)}
     access = ground_access(state, state.players[1], planet, CFG)
@@ -235,7 +235,7 @@ def test_begin_survey_rejects_assault_world_with_classifier_reason() -> None:
 
 
 def test_begin_survey_opens_on_a_friendly_world() -> None:
-    planet = _planet(inhabited_by_species_id=7)
+    planet = _planet(population={"vesk": 500})
     state = _state(planet)
     state.species = {7: _species(AMITY + 0.2)}
     result = reduce(state, 1, BeginSurvey(planet.id), CFG)

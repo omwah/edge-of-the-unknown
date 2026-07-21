@@ -43,7 +43,7 @@ def _world(*, colonists: int = 200, equipment: int = 1000, latinum: int = 50_000
     state.rebuild_adjacency()
     state.planets = {
         1: Planet(1, 1, "Bastion", "terrestrial_warm", owner=Ownership("player", 1),
-                  colonists=colonists, habitability_cap=100_000,
+                  population={"terran": colonists} if colonists else {}, habitability_cap=100_000,
                   stores={Commodity.EQUIPMENT: equipment}, citadel_level=level),
     }
     state.ships = {1: Ship(id=1, type_id="trailblazer", name="S.S.", owner_player_id=1,
@@ -85,7 +85,7 @@ def test_timed_build_accrues_and_completes_exactly_once() -> None:
     state = _world(colonists=L1.min_colonists)
     apply_result(state, reduce(state, 1, BuildCitadel(1), CFG))
     # Freeze growth so accrual is exactly `colonists` per firing (isolates the build math).
-    state.planets[1] = replace(state.planets[1], colonists=L1.min_colonists,
+    state.planets[1] = replace(state.planets[1], population={"terran": L1.min_colonists},
                                habitability_cap=L1.min_colonists)
     completed_events = 0
     fired = 0
@@ -106,7 +106,7 @@ def test_timed_build_accrues_and_completes_exactly_once() -> None:
 def test_build_stalls_without_colonists() -> None:
     state = _world(colonists=L1.min_colonists)
     apply_result(state, reduce(state, 1, BuildCitadel(1), CFG))
-    state.planets[1] = replace(state.planets[1], colonists=0)
+    state.planets[1] = replace(state.planets[1], population={})
     p, completed = citadels.advance_build(state.planets[1], CFG)
     assert not completed and p.citadel_progress == 0  # no labour → no progress
 
@@ -170,7 +170,7 @@ def _enemy_world(*, fighters: int = 100, level: int = 0, gun: int = 0) -> Univer
     state.alliances = {}
     state.planets = {
         1: Planet(1, 1, "Redoubt", "terrestrial_warm", owner=Ownership("alliance", 2),
-                  colonists=1000, habitability_cap=100_000, citadel_level=level,
+                  population={"terran": 1000}, habitability_cap=100_000, citadel_level=level,
                   fighters=fighters, gun_integrity=gun),
     }
     state.ships = {1: Ship(id=1, type_id="trailblazer", name="S.S.", owner_player_id=1,
@@ -231,6 +231,6 @@ def test_set_allocation_with_fighter_share_normalizes_to_one() -> None:
 def test_garrison_production_mints_fighters() -> None:
     from edge.core.planets import produce
     state = _world(level=1)
-    state.planets[1] = replace(state.planets[1], colonists=1000, fighter_allocation=1.0, allocation={})
+    state.planets[1] = replace(state.planets[1], population={"terran": 1000}, fighter_allocation=1.0, allocation={})
     grown = produce(state.planets[1], CFG)
     assert grown.fighters > 0  # the fighter share minted defenders

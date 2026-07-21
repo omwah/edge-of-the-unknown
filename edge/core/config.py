@@ -494,8 +494,8 @@ class OwnershipWeights(BaseModel):
 class InhabitantsConfig(BaseModel):
     """Who already lives in the universe when it is generated (GW-WP09-PRE, §4.2).
 
-    The big bang seeds **native polities**: an inhabited world carries
-    `inhabited_by_species_id`, a population, and — sometimes — the citadel/treasury
+    The big bang seeds **native polities**: an inhabited world carries a `population`
+    entry keyed to its native species, and — sometimes — the citadel/treasury
     holdings that make it worth taking. Three populations, because their politics
     differ: the governor's **Core** worlds, a bloc's **home-cluster** worlds, and the
     **unaligned** worlds beyond them, which keep `owner=none` while holding a people

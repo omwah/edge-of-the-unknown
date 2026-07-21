@@ -438,7 +438,7 @@ def test_colonize_claims_unowned_world_and_moves_colonists() -> None:
     from dataclasses import replace
 
     state = _universe()
-    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=50)
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, population={"terran": 50})
     _with_colony_world(state)
     result = _do(state, Colonize(planet_id=1, colonists=30))
     assert isinstance(result.events[0], Colonized)  # type: ignore[attr-defined]
@@ -452,7 +452,7 @@ def test_colonize_rejects_owned_and_uncolonizable() -> None:
     from dataclasses import replace
 
     state = _universe()
-    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=50)
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, population={"terran": 50})
     _with_colony_world(state, "barren")  # uncolonizable
     with pytest.raises(EconomyError):
         _do(state, Colonize(planet_id=1, colonists=10))
@@ -467,7 +467,7 @@ def test_recruit_emigration_from_inhabited_world_is_free() -> None:
 
     state = _universe()
     state.ships[1] = replace(state.ships[1], colonist_capacity=100)
-    state.planets = {1: Planet(1, 2, "Homeworld", "terrestrial_warm", inhabited_by_species_id=7)}
+    state.planets = {1: Planet(1, 2, "Homeworld", "terrestrial_warm", population={"vesk": 500})}
     _do(state, RecruitColonists(count=20, from_planet=1))
     assert state.ships[1].colonists == 20
     assert state.players[1].latinum == 10_000  # emigration costs no incentive
@@ -489,7 +489,7 @@ def test_colonize_requires_colonists_and_presence() -> None:
     from dataclasses import replace
 
     state = _universe()
-    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=5)
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, population={"terran": 5})
     _with_colony_world(state)
     with pytest.raises(EconomyError):
         _do(state, Colonize(planet_id=1, colonists=10))  # more than aboard
@@ -503,7 +503,7 @@ def test_buy_ship_refused_when_colonists_exceed_new_berths() -> None:
 
     state = _universe()
     state.players[1] = replace(state.players[1], latinum=60_000)
-    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=80)
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, population={"terran": 80})
     with pytest.raises(EconomyError):  # Scout Marauder berths only 50
         _do(state, BuyShip("scout_marauder"))
 
@@ -512,7 +512,7 @@ def test_set_allocation_normalizes_and_requires_ownership() -> None:
     from dataclasses import replace
 
     state = _universe()
-    state.ships[1] = replace(state.ships[1], colonist_capacity=100, colonists=50)
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, population={"terran": 50})
     _with_colony_world(state)
     _do(state, Colonize(planet_id=1, colonists=30))
     _do(state, SetAllocation(planet_id=1, allocation={"fuel_ore": 1.0, "organics": 3.0}))

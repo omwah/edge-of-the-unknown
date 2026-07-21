@@ -186,7 +186,8 @@ def test_planet_view_reports_ownership_and_claimability() -> None:
         1: Planet(1, 2, "Eden", "terrestrial_warm", owner=Ownership("none"), habitability_cap=100_000),
         2: Planet(2, 3, "Gasworld", "jovian", owner=Ownership("alliance", 1)),
     }
-    world.ships[1] = Ship(1, "trailblazer", "S.S.", 1, 2, 60, colonist_capacity=100, colonists=20)
+    world.ships[1] = Ship(1, "trailblazer", "S.S.", 1, 2, 60, colonist_capacity=100,
+                          population={"terran": 20})
     eden = session.planet_view(world, 1, 1, CONFIG)
     assert eden.owner == "unowned" and eden.colonizable and eden.claimable
     assert eden.ship_colonists == 20

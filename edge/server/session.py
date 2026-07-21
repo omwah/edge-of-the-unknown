@@ -35,6 +35,7 @@ from edge.core.aliens import (
     core_status,
     disposition_band,
     effective_disposition,
+    resolve_species_by_kind,
     seizure_progress,
 )
 from edge.core.config import DialogueChoice, GameConfig
@@ -157,6 +158,7 @@ from edge.core.planets import (
     is_cloud_city_world,
     is_extractable,
     is_landable,
+    player_species_key,
     pretty_planet_type,
 )
 from edge.core.starbases import component_integrity, is_operational, services_operational
@@ -698,24 +700,28 @@ def _owner_label(state: UniverseState, planet: Planet, player_id: int) -> str:
 def _inhabitants_label(state: UniverseState, planet: Planet, config: GameConfig) -> str:
     """Who lives on this world, for the orbit view's World & colony panel.
 
-    A native polity names its own species (GW-WP09-PRE). A world the **player** settled
-    has no `inhabited_by_species_id` — its people were recruited at Stardock — so it
-    names the roster's `player_species_id`, the player's own people, rather than reading
-    as an unpeopled world with a population. Empty when nobody lives here.
+    A native polity names its own species (GW-WP09-PRE); the player's own recruited
+    people name the roster's `player_species_id` (or "your colonists" with no roster
+    home named). A world may hold more than one people at once once a player settles
+    atop natives (GW-WP09-PRE follow-up) — named most-populous first, comma-joined, so
+    "Population 1,540,000 Terrans, Vesk" still fits the one line this panel budgets it
+    (adding a labelled row of its own once pushed the citadel Build button below the
+    fold at 120x44). Empty when nobody lives here.
     """
-    if planet.inhabited_by_species_id is not None:
-        species = state.species.get(planet.inhabited_by_species_id)
+    home = player_species_key(config)
+    ranked = sorted(planet.population.items(), key=lambda kv: (-kv[1], kv[0]))
+    names = []
+    for roster_id, count in ranked:
+        if count <= 0:
+            continue
+        species = resolve_species_by_kind(state, roster_id, config.roster)
         if species is not None:
-            return species.name
-    if planet.colonists <= 0:
-        return ""
-    roster = config.roster
-    home = roster.player_species_id if roster is not None else None
-    if home is not None and roster is not None:
-        named = next((s for s in roster.species if s.id == home), None)
-        if named is not None:
-            return named.name
-    return "your colonists"
+            names.append(species.name)
+        elif roster_id == home:
+            names.append("your colonists")  # no roster home species named — the fallback key
+        else:
+            names.append(roster_id)
+    return ", ".join(names)
 
 
 def planet_view(state: UniverseState, player_id: int, planet_id: int, config: GameConfig) -> dto.PlanetDTO:
@@ -1011,8 +1017,7 @@ def _cached_survey_map_for(
     state: UniverseState, op: SurveyOperation, config: GameConfig,
 ) -> ground_survey.SurveyMap:
     planet = state.planets.get(op.planet_id)
-    inhabited = bool(planet is not None and (
-        planet.colonists > 0 or planet.inhabited_by_species_id is not None))
+    inhabited = bool(planet is not None and planet.population)
     discoveries = tuple(
         (disc.id, disc.kind.value, disc.rarity_tier.name, disc.name)
         for discovery_id in sorted(op.visible_discovery_ids)
@@ -1691,7 +1696,9 @@ def _port_directory(state: UniverseState, player_id: int, config: GameConfig) ->
     return out
 
 
-def _planet_directory(state: UniverseState, player_id: int) -> list[dto.PlanetDirEntry]:
+def _planet_directory(
+    state: UniverseState, player_id: int, config: GameConfig,
+) -> list[dto.PlanetDirEntry]:
     """Every charted planet (explored sectors), nearest first — the Planets tab (§11, §4.2)."""
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
@@ -1700,10 +1707,6 @@ def _planet_directory(state: UniverseState, player_id: int) -> list[dto.PlanetDi
     for planet in state.planets.values():
         if planet.sector_id not in player.explored_sectors:
             continue  # fog of war: a planet appears only once its sector is explored
-        species = (
-            state.species.get(planet.inhabited_by_species_id)
-            if planet.inhabited_by_species_id is not None else None
-        )
         stores = "  ".join(f"{_LABEL[c]} {planet.stores.get(c, 0)}" for c in Commodity)
         base = state.starbases.get(planet.starbase_id) if planet.starbase_id is not None else None
         base_status = "" if base is None else ("operational" if is_operational(base) else "derelict")
@@ -1712,7 +1715,7 @@ def _planet_directory(state: UniverseState, player_id: int) -> list[dto.PlanetDi
             sector_display=_display(state, planet.sector_id), name=planet.name,
             ptype=pretty_planet_type(planet.planet_type), owner=_owner_label(state, planet, player_id),
             colonists=planet.colonists,
-            species=species.name if species is not None else "—",
+            species=_inhabitants_label(state, planet, config) or "—",
             stores=stores, dist=dist.get(planet.sector_id, -1),
             owned_by_you=corp.player_owns(state, planet.owner, player_id),
             citadel_level=planet.citadel_level, cloud_city_size=planet.cloud_city_size,
@@ -1747,7 +1750,8 @@ def computer_view(state: UniverseState, player_id: int, config: GameConfig) -> d
     return dto.ComputerDTO(
         pairs=top, selected=top[0].pair if top else "—",
         codex=_codex_entries(state, player), dossier=_dossier_entries(state, player, config),
-        ports=_port_directory(state, player_id, config), planets=_planet_directory(state, player_id),
+        ports=_port_directory(state, player_id, config),
+        planets=_planet_directory(state, player_id, config),
         leads=leads_view(state, player_id, config),
         contracts=_contracts_view(state, player),
         seizure=_seizure_status(state, player, config),

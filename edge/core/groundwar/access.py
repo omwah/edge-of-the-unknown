@@ -35,7 +35,7 @@ from edge.core import aliens, corp
 from edge.core.citadels import has_gun, siege_shielded
 from edge.core.config import GameConfig
 from edge.core.models import AlienSpecies, Ownership, Planet, Player, UniverseState
-from edge.core.planets import is_cloud_city_world, is_landable, pretty_planet_type
+from edge.core.planets import is_cloud_city_world, is_landable, native_population_key, pretty_planet_type
 from edge.core.starbases import is_operational
 
 
@@ -90,22 +90,30 @@ class Assault:
 GroundAccess = OrbitalOnly | Survey | Assault
 
 
-def _inhabiting_species(state: UniverseState, planet: Planet) -> AlienSpecies | None:
-    """The unaligned species inhabiting `planet` (D2 holdings), or None."""
-    if planet.inhabited_by_species_id is None:
+def _inhabiting_species(
+    state: UniverseState, planet: Planet, config: GameConfig,
+) -> AlienSpecies | None:
+    """The native species inhabiting `planet` (D2 holdings), or None (§4.2).
+
+    Named by `native_population_key` — the non-player people in `population` — since a
+    world may now hold the player's own colonists alongside a native polity
+    (GW-WP09-PRE follow-up); ownership alone (checked first in `_friendly`) already
+    decides friendliness for a player-owned world, so this is only ever asked about an
+    unowned holding.
+    """
+    key = native_population_key(planet, config)
+    if key is None:
         return None
-    return state.species.get(planet.inhabited_by_species_id)
+    return aliens.resolve_species_by_kind(state, key, config.roster)
 
 
 def _is_inhabited(state: UniverseState, planet: Planet) -> bool:
     """Whether a world has a live populace (GW plan §Ground-access contract).
 
-    Live colonists (an owned colony), an unaligned inhabiting species (a D2 holding),
-    or a built Cloud City. A bare, unpeopled world is not inhabited and always surveys.
+    Live colonists (an owned colony), a native people (a D2 holding), or a built
+    Cloud City. A bare, unpeopled world is not inhabited and always surveys.
     """
-    return (planet.colonists > 0
-            or planet.inhabited_by_species_id is not None
-            or planet.cloud_city_size > 0)
+    return bool(planet.population) or planet.cloud_city_size > 0
 
 
 def species_effective_standing(
@@ -140,7 +148,7 @@ def _friendly(state: UniverseState, player: Player, planet: Planet, config: Game
         return True
     if owner.kind == "alliance" and owner.ref is not None and owner.ref == player.alliance_id:
         return True
-    species = _inhabiting_species(state, planet)
+    species = _inhabiting_species(state, planet, config)
     if species is not None and config.aliens is not None:
         return aliens.is_friendly(
             species_effective_standing(species, player, config), config.aliens)
