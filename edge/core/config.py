@@ -425,6 +425,7 @@ class ShipClassConfig(BaseModel):
     sensor_rating: int
     hull_max: int
     colonist_capacity: int = 0  # life-support berths — recruited colonists (§4.2)
+    passenger_capacity: int = 0  # passenger berths — ground recruits + their suits (GW plan D3)
     price: int = 0  # Stardock purchase price in latinum (0 = the free starter hull)
     subsystems: Mapping[str, SubsystemLayout] | None = None
     armament: list[str] = Field(default_factory=list)  # weapon ids (GameConfig.weapons)
@@ -1824,6 +1825,30 @@ class GwExpedition(BaseModel):
         return self
 
 
+class GwGroundForce(BaseModel):
+    """The player's persistent ground force — recruits, suits, ordnance (GW plan D3).
+
+    Ground troops are *people hired* at Stardock (a per-head incentive, exactly as
+    colonists are recruited rather than bought, §4.2) wearing *equipment purchased*
+    there (`GwSuit.cost`). Both ride a hull's **passenger berths**
+    (`ShipClassConfig.passenger_capacity`) — a third occupancy limit, distinct from cargo
+    holds and from colonist berths, so a platoon never competes with trade goods or
+    with peopling a colony.
+
+    Ordnance is the suits' heavy shots. Its magazine is the force itself: a ship may
+    carry no more ground missiles than its owned suits can chamber
+    (`sum(count × suit.missiles)`), so selling suits spills the surplus rather than
+    letting ammunition accumulate off the books (G8).
+    """
+
+    model_config = _FROZEN
+
+    recruit_price: int = Field(default=250, ge=0)  # latinum incentive per head hired
+    recruit_severance: int = Field(default=50, ge=0)  # paid out when a recruit is released
+    suit_resale_frac: float = Field(default=0.5, ge=0.0, le=1.0)  # refund when a suit is sold
+    missile_price: int = Field(default=400, ge=0)  # latinum per ground missile
+
+
 class GwDifficulty(BaseModel):
     """A standalone setup-screen difficulty preset (superseded by live state in production)."""
 
@@ -1875,6 +1900,7 @@ class GroundwarConfig(BaseModel):
     garrison: GwGarrison
     terrain: dict[str, GwTerrain]
     expedition: GwExpedition
+    ground_force: GwGroundForce = GwGroundForce()
     difficulties: dict[str, GwDifficulty] = Field(default_factory=dict)
 
     @property

@@ -5,7 +5,7 @@
 # game constant lives here, not in code (CLAUDE.md). Omitted fields fall back to
 # the schema defaults; the values below are spelled out so the balance is legible.
 
-config_version: 11  # GW-WP07-FU2: expedition.landing_blocked_features (drop site)
+config_version: 12  # GW-WP08: ground force (passenger_capacity, groundwar.ground_force)
 seed: 4             # universe seed for a new game; leave empty (seed:) for a random seed
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 
@@ -499,6 +499,7 @@ starter_ship:
   sensor_rating: 2         # detection strength for hidden finds and cloaked foes
   hull_max: 100            # hull hit points before destruction (drops to the escape pod)
   colonist_capacity: 100   # colonists carried (a separate limit from cargo holds)
+  passenger_capacity: 8           # ground recruits + suits carried (passenger berths, GW D3)
   # Engine room: the four slotted subsystems whose filled parts derive the live aspects above.
   # slot_count = total slots; keystone = the part whose loss disables the subsystem;
   # base_components = pre-filled at Tier I; legal_components = what may be slotted here.
@@ -552,6 +553,7 @@ ship_classes:
     sensor_rating: 3
     hull_max: 80
     colonist_capacity: 50
+    passenger_capacity: 6           # ground recruits + suits carried (passenger berths, GW D3)
     price: 20000
     armament: [nose_cannon]           # fast hull, forward gun — strafe it (§10)
     defenses: [{ type: speed_and_size, value: 2 }]
@@ -589,6 +591,7 @@ ship_classes:
     sensor_rating: 2
     hull_max: 140
     colonist_capacity: 150
+    passenger_capacity: 12          # ground recruits + suits carried (passenger berths, GW D3)
     price: 50000
     armament: [turret_array]
     defenses: [{ type: armour, value: 3 }]
@@ -626,6 +629,7 @@ ship_classes:
     sensor_rating: 2
     hull_max: 250
     colonist_capacity: 300
+    passenger_capacity: 24          # ground recruits + suits carried (passenger berths, GW D3)
     price: 100000
     armament: [heavy_lance, light_blaster]
     defenses: [{ type: armour, value: 5 }, { type: energy_plates, value: 3 }]
@@ -663,6 +667,7 @@ ship_classes:
     sensor_rating: 3
     hull_max: 350
     colonist_capacity: 500
+    passenger_capacity: 30          # ground recruits + suits carried (passenger berths, GW D3)
     price: 150000
     armament: [spinal_railgun, turret_array]
     defenses: [{ type: screens, value: 4 }, { type: armour, value: 4 }]
@@ -704,6 +709,7 @@ ship_classes:
     sensor_rating: 1
     hull_max: 20
     colonist_capacity: 0
+    passenger_capacity: 0
     price: 0
     subsystems:
       spindrive:
@@ -742,6 +748,7 @@ ship_classes:
     sensor_rating: 3
     hull_max: 400
     colonist_capacity: 0
+    passenger_capacity: 0
     price: 0
     armament: [turret_array]        # all-round emplacement — no arc to slip (§10)
     defenses: [{ type: armour, value: 4 }, { type: screens, value: 3 }]

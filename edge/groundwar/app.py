@@ -29,7 +29,7 @@ from edge.groundwar.expedition import Site, generate_expedition
 from edge.groundwar.expedition_ui import ExpeditionScreen
 from edge.groundwar.mapgen import PLANET_TYPES, RUBBLE_ART, STRUCTURE_ART, generate_battle
 from edge.groundwar.model import Battle, Trooper
-from edge.groundwar.widgets import PlatoonComposer
+from edge.tui.composer import PlatoonComposer, options_from_suits
 
 
 @dataclass
@@ -863,10 +863,11 @@ The same seed always builds the same map, in either mode.\
                 yield Input(placeholder="seed (blank = random)", id="seed")
             # The drop table + DROP button, packaged for reuse in the main game.
             yield PlatoonComposer(
-                self.config.suits, budget=self.config.latinum_budget,
+                options_from_suits(self.config.suits, self._ROLE_BLURB),
+                budget=self.config.latinum_budget,
                 max_troopers=self.config.max_troopers,
                 initial={"marauder": 4, "scout": 3, "command": 1},
-                role_blurbs=self._ROLE_BLURB, id="composer")
+                id="composer")
             with Horizontal(classes="row", id="land-row"):
                 yield Button("LAND!", id="land", variant="success")
 

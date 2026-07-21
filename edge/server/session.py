@@ -143,6 +143,7 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.aliens import base_owner_hostile
+from edge.core.groundwar import force
 from edge.core.groundwar.access import Assault, Survey, ground_access
 from edge.core.groundwar.models import SurveyOperation
 from edge.core.groundwar import survey as ground_survey
@@ -238,6 +239,8 @@ def _ship_dto(state: UniverseState, ship: Ship, player: Player, sector: Sector) 
         gun="online", missiles=ship.missiles, kits=ship.repair_kits,
         latinum=player.latinum, band=sector.distance_band,
         colonists=ship.colonists, colonist_capacity=ship.colonist_capacity,
+        recruits=ship.recruits, suits_carried=force.suits_total(ship),
+        passenger_capacity=ship.passenger_capacity, ground_missiles=ship.ground_missiles,
     )
 
 
@@ -1228,6 +1231,73 @@ def stardock_view(state: UniverseState, player_id: int, config: GameConfig) -> d
         colonist_incentive=incentive, ship_colonists=ship.colonists,
         ship_colonist_capacity=ship.colonist_capacity,
         colonists_recruitable=min(free_berths, affordable_heads),
+        barracks=_barracks_catalog(player, ship, config),
+        ground_force=ground_force_view(player, ship, config),
+    )
+
+
+def _barracks_catalog(player: Player, ship: Ship, config: GameConfig) -> list[dto.BarracksItem]:
+    """The Stardock barracks catalog (GW-WP08, D3): recruits, suits, ground ordnance.
+
+    Every row's `max_affordable` is already clamped by the purse *and* by the physical
+    limit the reducer will enforce — free passenger berths for recruits and suits, the
+    owned suits' magazine ceiling for ordnance — so the tab offers nothing that would
+    bounce. Empty when the game ships without a `groundwar:` block.
+    """
+    if config.groundwar is None:
+        return []
+    gf = config.groundwar.ground_force
+    lat = player.latinum
+    free = force.berths_free(ship)
+
+    def _cap(price: int, room: int) -> int:
+        return min(room, lat // price if price > 0 else room)
+
+    out = [dto.BarracksItem(
+        id="recruit", label="Ground recruit", price=gf.recruit_price, carried=ship.recruits,
+        max_affordable=_cap(gf.recruit_price, free),
+        detail=f"{free} passenger berth(s) free", kind="recruit",
+    )]
+    for suit_id, suit in config.groundwar.suits.items():
+        blurb = force.ROLE_BLURBS.get(suit_id, "")
+        out.append(dto.BarracksItem(
+            id=suit_id, label=f"{suit.label} suit", price=suit.cost,
+            carried=ship.suits.get(suit_id, 0), max_affordable=_cap(suit.cost, free),
+            detail=blurb, kind="suit",
+        ))
+    room = max(0, force.missile_capacity(ship, config) - ship.ground_missiles)
+    out.append(dto.BarracksItem(
+        id="ordnance", label="Ground missile", price=gf.missile_price,
+        carried=ship.ground_missiles, max_affordable=_cap(gf.missile_price, room),
+        detail=f"magazine {ship.ground_missiles}/{force.missile_capacity(ship, config)}",
+        kind="ordnance",
+    ))
+    return out
+
+
+def ground_force_view(
+    player: Player, ship: Ship, config: GameConfig
+) -> dto.GroundForceDTO | None:
+    """The ground force aboard as the platoon composer sees it (GW-WP08, D3).
+
+    Projects the pure `force.loadout_options` caps, so a composer built from this can
+    only ever offer a drop the reducer would accept. None without a groundwar config.
+    """
+    if config.groundwar is None:
+        return None
+    return dto.GroundForceDTO(
+        recruits=ship.recruits, suits_carried=force.suits_total(ship),
+        berths_used=force.berths_used(ship), passenger_capacity=ship.passenger_capacity,
+        ground_missiles=ship.ground_missiles,
+        missile_capacity=force.missile_capacity(ship, config),
+        max_troopers=config.groundwar.max_troopers,
+        options=[
+            dto.LoadoutOptionDTO(
+                suit_id=o.suit_id, label=o.label, role=o.role, cost=o.cost,
+                owned=o.owned, deployable=o.deployable,
+            )
+            for o in force.loadout_options(ship, config)
+        ],
     )
 
 

@@ -1,4 +1,7 @@
-"""Reusable Textual widgets for the ground-war POC.
+"""Reusable count-selection widgets: the generic table and the platoon composer.
+
+Pioneered by the ground-war play-test app and promoted into the live TUI by GW-WP08,
+so the production assault composer and the standalone harness drive the *same* widget.
 
 `CountSelector` is a generic "pick a quantity of each of several things" table — a
 header, one 3-high row per item (arbitrary display columns + a Units count with
@@ -9,17 +12,23 @@ what is being counted; it just posts `Changed` when a count moves. Reuse it
 wherever a count-of-each selection is needed.
 
 `PlatoonComposer` is the ground-war-specific squad composer built *on top of*
-`CountSelector`: it feeds the selector the suit roster (Suit / Latinum / Role
-columns, per-suit latinum cost, the latinum budget, the trooper cap), adds a DROP
-button, and emits `Dropped(loadout)` when a valid squad is committed. That keeps
-it portable: the main game (edge) can later fund a raid from the player's own
-latinum by handing the same widget the player's suits and balance.
+`CountSelector`: it feeds the selector a roster of `SuitOption` rows (Suit / Latinum /
+Role columns), adds a DROP button, and emits `Dropped(loadout)` when a valid squad is
+committed.
+
+A row carries its own `available` ceiling, which is what makes the widget honest in
+the live game: the server projects `GroundForceDTO.options`, whose `deployable` is
+already capped by the suits owned, the recruits aboard to wear them, and the platoon
+ceiling (GW-WP08, D3), so the composer can only ever offer a drop the reducer would
+accept. The standalone harness passes the same rows built from config with a latinum
+`budget` instead — it buys its squad at drop time rather than owning one.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from rich.text import Text
 from textual import events
@@ -29,7 +38,7 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Button, Static
 
-from edge.groundwar.config import SuitClass
+from edge.core.config import GwSuit as SuitClass
 
 _COUNT_W = 6   # Units column width
 _BTNS_W = 12   # header spacer over the two − / + buttons (5 + margin, ×2)
@@ -61,12 +70,14 @@ class CountColumn:
 @dataclass(frozen=True)
 class CountItem:
     """One selectable row: a key, its display `cells` (one per `CountColumn`), an
-    optional per-unit `cost` charged against the budget, and a starting count."""
+    optional per-unit `cost` charged against the budget, a starting count, and an
+    optional `available` ceiling (how many of this row exist to be picked)."""
 
     key: str
     cells: Sequence[str]
     cost: int = 0
     initial: int = 0
+    available: int | None = None
 
 
 class CountSelector(Widget, can_focus=True):
@@ -135,6 +146,7 @@ class CountSelector(Widget, can_focus=True):
         self.items = list(items)
         self.keys = [it.key for it in self.items]
         self._cost = {it.key: it.cost for it in self.items}
+        self._available = {it.key: it.available for it in self.items}
         self.budget = budget
         self.max_total = max_total
         self.count_header = count_header
@@ -193,7 +205,10 @@ class CountSelector(Widget, can_focus=True):
         return {k: n for k, n in self.counts.items() if n > 0}
 
     def _can_add(self, key: str) -> bool:
-        """Whether one more of `key` fits both the budget and the total cap."""
+        """Whether one more of `key` fits the stock, the budget, and the total cap."""
+        available = self._available[key]
+        if available is not None and self.counts[key] >= available:
+            return False
         if self.budget is not None and self.spent + self._cost[key] > self.budget:
             return False
         if self.max_total is not None and self.total >= self.max_total:
@@ -249,6 +264,40 @@ class CountSelector(Widget, can_focus=True):
             event.stop()
 
 
+@dataclass(frozen=True)
+class SuitOption:
+    """One composer row. `available` None ⇒ unlimited (the harness's buy-at-drop mode).
+
+    Structurally the `dto.LoadoutOptionDTO` the server projects — `from_dto` adapts it,
+    so the live screen never reshapes an authoritative projection by hand.
+    """
+
+    suit_id: str
+    label: str
+    role: str
+    cost: int
+    available: int | None = None
+
+    @classmethod
+    def from_dto(cls, option: Any) -> "SuitOption":
+        """Adapt a `dto.LoadoutOptionDTO`, whose `deployable` is the honest ceiling."""
+        return cls(suit_id=option.suit_id, label=option.label, role=option.role,
+                   cost=option.cost, available=option.deployable)
+
+
+def options_from_suits(
+    suits: Mapping[str, SuitClass], role_blurbs: Mapping[str, str] | None = None
+) -> list[SuitOption]:
+    """Composer rows straight from a config suit roster (the standalone harness path).
+
+    No `available` ceiling: the harness buys its squad at drop time against a latinum
+    budget rather than deploying suits it already owns.
+    """
+    blurbs = role_blurbs or {}
+    return [SuitOption(suit_id=k, label=s.label, role=blurbs.get(k, ""), cost=s.cost)
+            for k, s in suits.items()]
+
+
 class PlatoonComposer(Widget):
     """Squad composer over a `CountSelector` + a DROP button. Emits `Dropped`."""
 
@@ -266,20 +315,18 @@ class PlatoonComposer(Widget):
 
     def __init__(
         self,
-        suits: dict[str, SuitClass],
+        options: Sequence[SuitOption],
         *,
-        budget: int,
+        budget: int | None = None,
         max_troopers: int,
         initial: dict[str, int] | None = None,
-        role_blurbs: dict[str, str] | None = None,
         drop_label: str = "DROP!",
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
-        self.suits = suits
+        self.options = list(options)
         self.budget = budget
         self.max_troopers = max_troopers
-        self.role_blurbs = role_blurbs or {}
         self.drop_label = drop_label
         self.initial = initial or {}
 
@@ -288,12 +335,14 @@ class PlatoonComposer(Widget):
                      id="composer-head")
         items = [
             CountItem(
-                key=k,
-                cells=(s.label, str(s.cost), self.role_blurbs.get(k, "")),
-                cost=s.cost,
-                initial=self.initial.get(k, 0),
+                key=o.suit_id,
+                cells=(o.label, str(o.cost), o.role),
+                cost=o.cost,
+                initial=min(self.initial.get(o.suit_id, 0),
+                            o.available if o.available is not None else 10 ** 9),
+                available=o.available,
             )
-            for k, s in self.suits.items()
+            for o in self.options
         ]
         columns = [CountColumn("Suit", 12), CountColumn("Latinum", 10),
                    CountColumn("Role", 18)]

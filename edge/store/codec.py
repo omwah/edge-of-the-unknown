@@ -31,6 +31,11 @@ from edge.core.events import (
     CitadelGunSilenced,
     Colonized,
     ColonistsRecruited,
+    GroundOrdnanceBought,
+    RecruitsDismissed,
+    RecruitsHired,
+    SuitsPurchased,
+    SuitsSold,
     ColonistsSettled,
     ColonyGrew,
     ContractAccepted,
@@ -170,7 +175,12 @@ from edge.core.rules import (
     PetitionCoreSeizure,
     PlanetDeposit,
     PlanetWithdraw,
+    BuyGroundOrdnance,
+    BuySuits,
+    DismissRecruits,
+    HireRecruits,
     RecruitColonists,
+    SellSuits,
     RemoveLimpets,
     ResignAlliance,
     RepairAtDock,
@@ -227,6 +237,16 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             }
         case RecruitColonists():
             return "RecruitColonists", {"count": command.count, "from_planet": command.from_planet}
+        case HireRecruits():
+            return "HireRecruits", {"count": command.count}
+        case DismissRecruits():
+            return "DismissRecruits", {"count": command.count}
+        case BuySuits():
+            return "BuySuits", {"suit_id": command.suit_id, "count": command.count}
+        case SellSuits():
+            return "SellSuits", {"suit_id": command.suit_id, "count": command.count}
+        case BuyGroundOrdnance():
+            return "BuyGroundOrdnance", {"count": command.count}
         case Colonize():
             return "Colonize", {"planet_id": command.planet_id, "colonists": command.colonists}
         case SettleColonists():
@@ -448,6 +468,16 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             )
         case "RecruitColonists":
             return RecruitColonists(count=payload["count"], from_planet=payload["from_planet"])
+        case "HireRecruits":
+            return HireRecruits(count=payload["count"])
+        case "DismissRecruits":
+            return DismissRecruits(count=payload["count"])
+        case "BuySuits":
+            return BuySuits(suit_id=payload["suit_id"], count=payload["count"])
+        case "SellSuits":
+            return SellSuits(suit_id=payload["suit_id"], count=payload["count"])
+        case "BuyGroundOrdnance":
+            return BuyGroundOrdnance(count=payload["count"])
         case "Colonize":
             return Colonize(planet_id=payload["planet_id"], colonists=payload["colonists"])
         case "SettleColonists":
@@ -769,6 +799,29 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "discovery_id": event.discovery_id,
                 "kind": event.kind, "rarity": event.rarity, "payload": event.payload,
                 "reward": event.reward,
+            }
+        case RecruitsHired():
+            return "RecruitsHired", {
+                "player_id": event.player_id, "count": event.count, "cost": event.cost,
+            }
+        case RecruitsDismissed():
+            return "RecruitsDismissed", {
+                "player_id": event.player_id, "count": event.count, "severance": event.severance,
+            }
+        case SuitsPurchased():
+            return "SuitsPurchased", {
+                "player_id": event.player_id, "suit_id": event.suit_id,
+                "count": event.count, "cost": event.cost,
+            }
+        case SuitsSold():
+            return "SuitsSold", {
+                "player_id": event.player_id, "suit_id": event.suit_id,
+                "count": event.count, "refund": event.refund,
+                "missiles_spilled": event.missiles_spilled,
+            }
+        case GroundOrdnanceBought():
+            return "GroundOrdnanceBought", {
+                "player_id": event.player_id, "count": event.count, "cost": event.cost,
             }
         case ColonistsRecruited():
             return "ColonistsRecruited", {
@@ -1129,6 +1182,18 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return DiscoveryCollected(payload["player_id"], payload["discovery_id"],
                                       payload["kind"], payload["rarity"], payload["payload"],
                                       payload.get("reward", ""))
+        case "RecruitsHired":
+            return RecruitsHired(payload["player_id"], payload["count"], payload["cost"])
+        case "RecruitsDismissed":
+            return RecruitsDismissed(payload["player_id"], payload["count"], payload["severance"])
+        case "SuitsPurchased":
+            return SuitsPurchased(payload["player_id"], payload["suit_id"],
+                                  payload["count"], payload["cost"])
+        case "SuitsSold":
+            return SuitsSold(payload["player_id"], payload["suit_id"], payload["count"],
+                             payload["refund"], payload["missiles_spilled"])
+        case "GroundOrdnanceBought":
+            return GroundOrdnanceBought(payload["player_id"], payload["count"], payload["cost"])
         case "ColonistsRecruited":
             return ColonistsRecruited(payload["player_id"], payload["source"],
                                       payload["count"], payload["cost"])

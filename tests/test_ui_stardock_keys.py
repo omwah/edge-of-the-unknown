@@ -74,7 +74,7 @@ def test_tab_accelerators_are_legible_and_unique() -> None:
     """Each accelerator is a letter of its own tab title, so it can be underlined there."""
     labels = {"trade": "Commodities", "shipyard": "Shipyard", "hardware": "Hardware",
               "devices": "Devices & Armaments", "colonists": "Colonists",
-              "bank": "Bank", "tavern": "Tavern"}
+              "barracks": "Marines", "bank": "Bank", "tavern": "Tavern"}
     accels = StardockScreen._TAB_ACCEL
     assert len(set(accels.values())) == len(accels)
     for tab, letter in accels.items():

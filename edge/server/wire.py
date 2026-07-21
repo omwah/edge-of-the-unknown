@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 28  # GW-WP07-FU2: player-chosen survey drop site
+WIRE_VERSION = 29  # GW-WP08: ground force (recruits/suits/ordnance, barracks, loadouts)
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected

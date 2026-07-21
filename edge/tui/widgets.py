@@ -704,6 +704,13 @@ class StatusSidebar(Vertical):
             lines.append(f" {h.label:<5}[yellow]{_scaled_bar(h.qty, h.capacity)}[/] {h.qty:>3}")
         lines += [
             f"Colonists {s.colonists:,}/{s.colonist_capacity:,}",
+        ]
+        # The ground force only takes a line once there is one to report (GW-WP08) —
+        # an empty barracks is not news on every sector view.
+        if s.recruits or s.suits_carried:
+            lines.append(f"Marines   {s.recruits:,} in {s.suits_carried:,} suits"
+                         f" · {s.ground_missiles:,} msl")
+        lines += [
             f"Latinum  [b yellow]{s.latinum:,}[/] slips",
             rule,
         ]

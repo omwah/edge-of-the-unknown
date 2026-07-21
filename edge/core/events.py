@@ -268,6 +268,54 @@ class SurveyTalked(Event):
 
 
 @dataclass(frozen=True)
+class RecruitsHired(Event):
+    """Ground recruits enlisted at a Stardock for a per-head incentive (GW-WP08, D3)."""
+
+    player_id: int
+    count: int
+    cost: int  # total latinum incentive paid
+
+
+@dataclass(frozen=True)
+class RecruitsDismissed(Event):
+    """Ground recruits released back to the dock, freeing their berths (GW-WP08, D3)."""
+
+    player_id: int
+    count: int
+    severance: int  # total latinum paid out
+
+
+@dataclass(frozen=True)
+class SuitsPurchased(Event):
+    """Powered-armour suits bought at a Stardock (GW-WP08, D3)."""
+
+    player_id: int
+    suit_id: str
+    count: int
+    cost: int
+
+
+@dataclass(frozen=True)
+class SuitsSold(Event):
+    """Powered-armour suits sold back to a Stardock at the resale fraction (GW-WP08)."""
+
+    player_id: int
+    suit_id: str
+    count: int
+    refund: int
+    missiles_spilled: int  # ordnance the remaining suits can no longer chamber (G8)
+
+
+@dataclass(frozen=True)
+class GroundOrdnanceBought(Event):
+    """Ground missiles loaded into the platoon's magazine (GW-WP08, D3)."""
+
+    player_id: int
+    count: int
+    cost: int
+
+
+@dataclass(frozen=True)
 class DiscoveryCollected(Event):
     """A discovery logged into the codex, its payload taken aboard (§7, WP5)."""
 

@@ -117,13 +117,15 @@ def test_stardock_concourse_sizes(snap_compare, size: tuple[int, int]) -> None:
                         run_before=_open_stardock("colonists"))
 
 
-@pytest.mark.parametrize("tab", ["trade", "shipyard", "hardware", "devices", "bank", "tavern"])
+@pytest.mark.parametrize("tab", ["trade", "shipyard", "hardware", "devices", "barracks",
+                                 "bank", "tavern"])
 def test_stardock_service_art_standard(snap_compare, tab: str) -> None:
     assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["standard"],
                         run_before=_open_stardock(tab))
 
 
-@pytest.mark.parametrize("tab", ["trade", "shipyard", "hardware", "devices", "bank", "tavern"])
+@pytest.mark.parametrize("tab", ["trade", "shipyard", "hardware", "devices", "barracks",
+                                 "bank", "tavern"])
 def test_stardock_service_art_wide(snap_compare, tab: str) -> None:
     assert snap_compare(EdgeApp(plain=True), terminal_size=SIZES["wide"],
                         run_before=_open_stardock(tab))

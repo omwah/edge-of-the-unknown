@@ -265,6 +265,16 @@ class Ship:
     turns_per_warp: int = 1
     colonist_capacity: int = 0  # life-support berths (separate occupancy limit, §4.2)
     colonists: int = 0  # recruited colonists aboard (≤ colonist_capacity); not cargo
+    # The ground force (GW plan D3) — a *third* occupancy limit, distinct from cargo
+    # holds and colonist berths, so a platoon never competes with trade goods or with
+    # peopling a colony. `recruits` are the people hired at Stardock; `suits` counts
+    # the powered armour bought there by suit-class id; both draw on `passenger_capacity`.
+    # `ground_missiles` is the shared heavy-ordnance magazine, capped by what the
+    # owned suits can chamber (`edge.core.groundwar.force.missile_capacity`).
+    passenger_capacity: int = 0
+    recruits: int = 0
+    suits: Mapping[str, int] = field(default_factory=dict)
+    ground_missiles: int = 0
     subsystems: Mapping[Subsystem, SubsystemState] | None = None
     components: Mapping[tuple[Component, ComponentTier], int] = field(default_factory=dict)
     # Counted special devices keyed by device id (e.g. "genesis_torpedo"); bought at

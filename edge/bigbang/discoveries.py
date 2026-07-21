@@ -23,7 +23,6 @@ from edge.core.enums import Component, ComponentTier, DiscoveryKind, PayloadKind
 from edge.core.models import Discovery, DiscoveryPayload, UniverseState
 from edge.core.movement import one_way_exits
 from edge.core.planets import is_landable
-from edge.core.surface_finds import surface_find_name
 from edge.bigbang.naming import DiscoveryNamer
 
 _PHENOMENA = (DiscoveryKind.NEBULA, DiscoveryKind.BLACK_HOLE, DiscoveryKind.WORMHOLE)

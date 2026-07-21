@@ -93,6 +93,19 @@ suits:
     command_acc_bonus: 0.10
     broadcast_range: 14     # from a cowed city's center, to dictate terms
 
+# The player's persistent ground force (GW plan D3). Recruits are *hired* at
+# Stardock for a per-head incentive — people, never merchandise — and wear suits
+# *bought* there at the `cost` above. Both ride a hull's passenger berths
+# (ship_classes → passenger_capacity), a limit of their own: a platoon never eats
+# cargo holds or colonist berths. Scale reference: a Marauder suit is 1800 slips,
+# a Tier-I ship component 2000, so a full platoon is a real expedition-sized
+# investment rather than pocket change.
+ground_force:
+  recruit_price: 250        # latinum incentive per head hired at the dock
+  recruit_severance: 50     # paid out when a recruit is released back to the dock
+  suit_resale_frac: 0.5     # fraction of `cost` refunded when a suit is sold back
+  missile_price: 400        # latinum per ground missile (magazine capped by owned suits)
+
 defenses:
   wall:    {hp: 80}
   gate:    {hp: 60}
