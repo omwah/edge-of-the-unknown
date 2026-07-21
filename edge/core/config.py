@@ -491,6 +491,52 @@ class OwnershipWeights(BaseModel):
     none: int
 
 
+class InhabitantsConfig(BaseModel):
+    """Who already lives in the universe when it is generated (GW-WP09-PRE, §4.2).
+
+    The big bang seeds **native polities**: an inhabited world carries
+    `inhabited_by_species_id`, a population, and — sometimes — the citadel/treasury
+    holdings that make it worth taking. Three populations, because their politics
+    differ: the governor's **Core** worlds, a bloc's **home-cluster** worlds, and the
+    **unaligned** worlds beyond them, which keep `owner=none` while holding a people
+    (the D2 protectorate's subject, and the only worlds a fresh player may assault).
+
+    `band_chance` is keyed by distance band, so the inhabited frontier thins with
+    depth. Population is a fraction of the world's *capacity* (habitability, or a
+    Cloud City's berths), never an absolute — a small world holds a small people.
+    The `min_*` floors are generation **invariants**: a seed that cannot field them
+    is regenerated, so the ground game always has targets to find (GW-WP09-PRE).
+    """
+
+    model_config = _FROZEN
+
+    band_chance: dict[str, float] = Field(default_factory=dict)  # band → P(unaligned world peopled)
+    home_cluster_chance: float = Field(default=0.7, ge=0.0, le=1.0)  # a bloc peoples its cluster
+    core_chance: float = Field(default=0.85, ge=0.0, le=1.0)  # the governor peoples the Core
+    population_min_frac: float = Field(default=0.05, gt=0.0, le=1.0)  # of colonist capacity
+    population_max_frac: float = Field(default=0.55, gt=0.0, le=1.0)
+    # Beyond the blocs a wary people is likelier — the friendly ones live under a flag.
+    # Probability an unaligned world draws from the below-amity cast when one is available.
+    unaligned_wary_bias: float = Field(default=0.7, ge=0.0, le=1.0)
+    citadel_chance: float = Field(default=0.35, ge=0.0, le=1.0)  # an inhabited world has fortified
+    citadel_max_level: int = Field(default=3, ge=0)
+    treasury_per_1k: int = Field(default=40, ge=0)  # latinum banked per 1000 inhabitants
+    stores_per_1k: int = Field(default=30, ge=0)  # goods held per 1000 inhabitants
+    # Generation invariants: the minimum ground-target set a universe must field for a
+    # *fresh* player (no attitude, no grudges, governing-alliance membership).
+    min_assaultable: int = Field(default=6, ge=0)  # below-amity inhabited worlds outside the Core
+    min_friendly_inhabited: int = Field(default=4, ge=0)  # worlds whose survey has settlements
+
+    @model_validator(mode="after")
+    def _check(self) -> InhabitantsConfig:
+        if self.population_max_frac < self.population_min_frac:
+            raise ValueError("planets.inhabitants population_max_frac must be ≥ population_min_frac")
+        for band, chance in self.band_chance.items():
+            if not 0.0 <= chance <= 1.0:
+                raise ValueError(f"planets.inhabitants band_chance[{band}] must be in 0..1")
+        return self
+
+
 class PlanetsConfig(BaseModel):
     """Planetary production constants + the per-type table (DESIGN §4.2, §8/§A.3)."""
 
@@ -522,6 +568,8 @@ class PlanetsConfig(BaseModel):
     cloud_city_npc_size: int = 2      # the city an alliance-owned gas giant is generated with
     # Band-weighted ownership at generation (unowned fraction non-decreasing, §4.2).
     ownership: dict[str, OwnershipWeights] = Field(default_factory=dict)
+    # Who already lives here when the universe is generated (GW-WP09-PRE).
+    inhabitants: InhabitantsConfig = InhabitantsConfig()
 
 
 class BaseServicesConfig(BaseModel):

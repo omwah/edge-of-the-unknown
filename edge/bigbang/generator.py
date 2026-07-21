@@ -21,6 +21,7 @@ from edge.bigbang import populate as _populate
 from edge.bigbang import validate as _validate
 from edge.bigbang.aliens import HomeClusterError, populate_species
 from edge.bigbang.discoveries import salt_discoveries, salt_raid_caches
+from edge.bigbang.inhabitants import ground_target_counts, seed_inhabitants
 from edge.bigbang.embedding import compute_embedding
 from edge.bigbang.naming import NameGenerator
 from edge.bigbang.numbering import assign_spatial_ids, assign_spiral_spatial_ids
@@ -957,6 +958,10 @@ def generate(
             )  # §6 aliens + home clusters on an independent sub-RNG
             from edge.bigbang.station_archetypes import assign_station_archetypes
             assign_station_archetypes(state, config)  # fixed roster-driven builders (§5)
+            # The inhabited universe (GW-WP09-PRE): native peoples, populations, and
+            # citadel holdings. After the cast and its home clusters exist (it reads
+            # both), before the raid caches that key off hostile homeworlds.
+            seed_inhabitants(state, config)
             salt_raid_caches(
                 state, config
             )  # §7/§10 legendary caches on hostile homeworlds (WP44)
@@ -1270,9 +1275,21 @@ def summarize(state: UniverseState) -> str:
     ]
 
     stardock_val = f"Sector {dock.sector_id}" if dock else "Missing"
+    # Who lives here, and what the ground game has to work with (GW-WP09-PRE): the
+    # inhabited count, and the target set a *fresh* player would find — worlds that
+    # route to assault, and inhabited friendly worlds whose survey has settlements.
+    # (Aliased: `load_default_config` is imported further down this function, which
+    # would make the bare name local for the whole body and unbound up here.)
+    from edge.config import load_default_config as _default_config
+
+    inhabited = sum(1 for p in state.planets.values() if p.inhabited_by_species_id is not None)
+    population = sum(p.colonists for p in state.planets.values())
+    assaultable, friendly_inhabited = ground_target_counts(state, _default_config())
     economic_rows = [
         ("  Ports", str(len(state.ports))),
         ("  Planets", str(len(state.planets))),
+        ("  Inhabited Worlds", f"{inhabited} ({population:,} people)"),
+        ("  Assaultable / Friendly", f"{assaultable} / {friendly_inhabited}"),
         ("  Stardock", stardock_val),
     ]
 

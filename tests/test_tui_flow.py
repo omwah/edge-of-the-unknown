@@ -1893,9 +1893,14 @@ async def test_planet_citadel_panel_builds_via_button() -> None:
         svc = app.service
         assert svc is not None
         planet = next(iter(svc.state.planets.values()))
+        # A player colony that has *not* fortified yet — stated explicitly, because the
+        # big bang now seeds native holdings (GW-WP09-PRE) and a generated world may
+        # already carry a citadel, which would skip the build flow this test exercises.
         svc.state.planets[planet.id] = _replace(
             planet, owner=Ownership("player", 1), colonists=1_000,
-            stores={Commodity.EQUIPMENT: 10_000})
+            stores={Commodity.EQUIPMENT: 10_000},
+            inhabited_by_species_id=None, citadel_level=0, citadel_progress=-1,
+            gun_integrity=0)
         svc.state.players[1] = _replace(svc.state.players[1], latinum=200_000)
         ship = svc.state.ships[svc.state.players[1].ship_id]
         svc.state.ships[ship.id] = _replace(ship, sector_id=planet.sector_id)

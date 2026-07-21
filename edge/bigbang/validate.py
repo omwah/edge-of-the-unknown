@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections import deque
 
+from edge.bigbang.inhabitants import ground_target_counts, target_floors
 from edge.bigbang.topology import bfs_distances
 from edge.core.aliens import is_friendly, species_relation
 from edge.core.config import GameConfig
@@ -34,6 +35,7 @@ def validate(state: UniverseState, config: GameConfig) -> None:
     _check_starbases(state)
     _check_discovery_gradient(state, config)
     _check_species(state, config)
+    _check_ground_targets(state, config)
     _check_home_clusters(state, config)
     _check_relations(state, config)
     if config.bigbang.topology_mode == "expansive":
@@ -164,6 +166,36 @@ def _check_starbases(state: UniverseState) -> None:
         # *is* the sector's trading post (minted by `populate._host_markets`).
         if not any(p.sector_id == base.sector_id for p in state.ports.values()):
             raise ValidationError(f"starbase {base.id} sector {base.sector_id} hosts no market port")
+
+
+def _check_ground_targets(state: UniverseState, config: GameConfig) -> None:
+    """The ground game has somewhere to go (§4.2, GW-WP09-PRE).
+
+    A generated universe must field a minimum set of **assaultable** worlds (inhabited,
+    below the amity threshold for a fresh player, outside the Core, not a Cloud City)
+    and of **friendly inhabited** worlds (whose survey finds settlements to visit). A
+    seed that cannot is regenerated rather than shipped: before this invariant existed
+    the big bang seeded no inhabitants at all, so *no* world could route to assault and
+    the whole tactical path was reachable only from hand-built state.
+
+    Skipped when the universe has no roster (no species to inhabit anything) or when
+    the floors are configured to zero.
+    """
+    cfg = config.planets.inhabitants
+    if not state.species or not (cfg.min_assaultable or cfg.min_friendly_inhabited):
+        return
+    assaultable, friendly = ground_target_counts(state, config)
+    assault_floor, friendly_floor = target_floors(state, config)
+    if assaultable < assault_floor:
+        raise ValidationError(
+            f"only {assaultable} assaultable worlds (need {assault_floor}): "
+            "the universe fields no ground targets"
+        )
+    if friendly < friendly_floor:
+        raise ValidationError(
+            f"only {friendly} friendly inhabited worlds (need {friendly_floor}): "
+            "surveys would find no settlements"
+        )
 
 
 def _check_discovery_gradient(state: UniverseState, config: GameConfig) -> None:
