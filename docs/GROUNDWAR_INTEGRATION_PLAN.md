@@ -7,7 +7,7 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–07 shipped; interview decisions resolved (July 2026).**
+> **Status: implementation underway — GW-WP01–08 shipped; interview decisions resolved (July 2026).**
 
 ## Context
 
@@ -842,7 +842,60 @@ Tests: drop zone excludes unsafe terrain and keeps every contact reachable from 
 extremes; survey begins inbound with actions refused and extraction legal; landing
 validates the cell and happens once.
 
-### GW-WP08 — Ground-force economy and assault composer (XL)
+### GW-WP08 — Ground-force economy and assault composer (XL) — SHIPPED
+
+**Status:** shipped July 2026. The D3 force model is live as persistent ship-carried
+assets: `Ship.recruits` (people *hired* at a Stardock for a per-head incentive, the same
+posture as colonists — never merchandise), `Ship.suits` (powered armour *bought* there,
+counted by suit-class id), and `Ship.ground_missiles` (the heavy-ordnance magazine). All
+three ride the new per-hull `passenger_capacity` — a **third** occupancy limit beside
+cargo holds and colonist berths, so a platoon never displaces trade goods or peopling a
+colony. Commands `HireRecruits` / `DismissRecruits` / `BuySuits` / `SellSuits` /
+`BuyGroundOrdnance` are Stardock-gated and clamp to berths, stock, and purse; dismissal
+pays severance and resale refunds `ground_force.suit_resale_frac`, so churning a platoon
+is a sink rather than a free undo. A hull swap refuses a force the new hull cannot berth,
+and the escape pod loses the force with the hull.
+
+**Two conservation rules landed beyond the plan's letter, both recorded in DESIGN §4.2.**
+(1) A *suit* takes a passenger berth of its own, not just its wearer — otherwise a hull
+could stockpile armour it could never crew — so a hull fields at most half its passenger
+capacity as armoured troopers. (2) Ordnance is capped by what the carried suits can
+chamber (`missile_capacity`), and surplus **spills** when suits are sold or lost, so
+ammunition can never outlive the armour that held it (G8).
+
+Loadout validation and casualty settlement are the pure `edge/core/groundwar/force.py`
+seam: `validate_loadout` accepts only owned suits worn by aboard recruits within
+`platoon.max_troopers`, and `apply_casualties` removes the recruit *and* their suit
+atomically (D8) before re-clamping the magazine. The composer is promoted rather than
+rewritten: the POC's `CountSelector` / `PlatoonComposer` moved from `edge/groundwar/`
+into `edge/tui/composer.py` and now take `SuitOption` rows with a per-row `available`
+ceiling; `GroundForceDTO.options` projects exactly that ceiling (suits owned ∧ recruits
+aboard ∧ platoon cap), so a composer built from the projection cannot offer a drop the
+reducer would refuse — and the standalone harness drives the *same* widget through
+`options_from_suits` with its buy-at-drop latinum budget. The live drop screen itself
+lands with the assault UI in GW-WP12; WP08 ships the economy, the seam, and the
+projection it consumes.
+
+The Stardock gains a **Marines** tab (`M`, `P` purchases with a quantity prompt) whose
+catalog rows carry a `max_affordable` already folded from purse, free berths, and
+magazine ceiling, so the tab offers nothing that would bounce.
+
+Epoch: config_version 11→12 (`passenger_capacity` on every hull +
+`groundwar.ground_force`), wire v28→v29 (the five commands, their five events,
+`ShipDTO` force fields, `BarracksItem` / `LoadoutOptionDTO` / `GroundForceDTO`).
+Files (as shipped): `edge/core/config.py`, `edge/core/models.py`,
+`edge/core/groundwar/force.py` (new), `edge/core/rules.py`, `edge/core/events.py`,
+`edge/core/dto.py`, `edge/store/codec.py`, `edge/server/session.py`,
+`edge/server/wire.py`, `edge/tui/composer.py` (moved from `edge/groundwar/widgets.py`),
+`edge/tui/screens/stardock.py`, `edge/tui/widgets.py`, `edge/groundwar/app.py`,
+`config/default.yaml`, `config/groundwar_default.yaml`, `docs/DESIGN.md`.
+Tests: `tests/test_groundwar_force.py` (21) — berth/cargo/colonist separation, purse and
+berth clamps, severance and resale conservation, magazine ceiling and spill, loadout
+validation, casualty atomicity, hull-swap refusal, catalog/composer projection, codec
+round trips, and a Pilot flow hiring through the Marines tab.
+
+*Deferred (recorded per the plan's change rule):* the D15 reinforcement command (which
+needs the persistent ground garrison of GW-WP09) and the drop screen itself (GW-WP12).
 
 Implement the D3 force model: persistent recruits hired at Stardock, persistent
 powered suits purchased there, a new per-hull passenger capacity separate from

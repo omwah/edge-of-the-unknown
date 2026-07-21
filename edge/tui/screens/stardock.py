@@ -33,8 +33,9 @@ from edge.core.economy import EconomyError
 from edge.core.engine_room import EngineRoomError
 from edge.core.enums import Component, ComponentTier
 from edge.core.rules import (
-    BuyComponent, BuyDevice, BuyFighters, BuyGenesis, BuyMines, BuyMissiles, BuyRumor,
-    BuyShip, Deposit, PostNotice, RecruitColonists, Withdraw,
+    BuyComponent, BuyDevice, BuyFighters, BuyGenesis, BuyGroundOrdnance, BuyMines,
+    BuyMissiles, BuyRumor, BuyShip, BuySuits, Deposit, HireRecruits, PostNotice,
+    RecruitColonists, Withdraw,
 )
 from edge.art.concourse import render_stardock_art
 from edge.server.service import GameService
@@ -138,6 +139,7 @@ class StardockScreen(EdgeScreen):
         Binding("h", "focus_tab('hardware')", "Hardware", show=False),
         Binding("d", "focus_tab('devices')", "Devices & Armaments", show=False),
         Binding("l", "focus_tab('colonists')", "Colonists", show=False),
+        Binding("m", "focus_tab('barracks')", "Marines", show=False),
         Binding("b", "focus_tab('bank')", "Bank", show=False),
         Binding("v", "focus_tab('tavern')", "Tavern", show=False),
     ]
@@ -162,6 +164,7 @@ class StardockScreen(EdgeScreen):
         "colonists": (("k", "recruit", "Recruit"),
                       ("plus", "step_recruit(1)", "More"),
                       ("minus", "step_recruit(-1)", "Fewer")),
+        "barracks": (("p", "buy", "Purchase"),),
         "bank": (("a", "deposit", "Deposit"), ("w", "withdraw", "Withdraw")),
         "tavern": (("r", "buy_rumor", "Rumor"), ("n", "post_notice", "Notice")),
     }
@@ -178,19 +181,19 @@ class StardockScreen(EdgeScreen):
 
     # tab id -> the letter underlined in its tab title (WP-PR2-01 / PT-32).
     _TAB_ACCEL = {"trade": "c", "shipyard": "s", "hardware": "h", "devices": "d",
-                  "colonists": "l", "bank": "b", "tavern": "v"}
+                  "colonists": "l", "barracks": "m", "bank": "b", "tavern": "v"}
 
     HELP_TITLE = "Stardock"
     HELP = """\
 Jump to a service and focus its contents in one step with the [b]underlined letter[/] in
 its tab title ([b]C[/]ommodities · [b]S[/]hipyard · [b]H[/]ardware · [b]D[/]evices &
-Armaments · Co[b]l[/]onists · [b]B[/]ank · Ta[b]v[/]ern); Enter on the tab rail does the
-same for the active tab.
+Armaments · Co[b]l[/]onists · [b]M[/]arines · [b]B[/]ank · Ta[b]v[/]ern); Enter on the
+tab rail does the same for the active tab.
 
 Every action key [b]belongs to its tab[/], so the footer only offers what the tab you are
 looking at can do. [b]T[/] trades and [b]G[/] haggles the highlighted commodity;
-[b]P[/] purchases the highlighted row on Hardware, Shipyard and Devices & Armaments
-(munitions there prompt for a quantity); on Colonists, typing a [b]number[/] starts an
+[b]P[/] purchases the highlighted row on Hardware, Shipyard, Devices & Armaments and
+Marines (munitions and marines prompt for a quantity); on Colonists, typing a [b]number[/] starts an
 amount and [b]+[/]/[b]−[/] step it ([b]K[/] edits it, [b]Enter[/] recruits); [b]A[/] deposits and
 [b]W[/] withdraws at the Bank, which pays daily interest; [b]R[/] buys a rumour and
 [b]N[/] posts a notice at the Tavern.
@@ -227,7 +230,7 @@ footer."""
 
     # Buy tabs whose table cursor we preserve across a screen rebuild.
     _BUY_TABLES = {"hardware": "#hardware-table", "shipyard": "#shipyard-table",
-                   "devices": "#devices-table"}
+                   "devices": "#devices-table", "barracks": "#barracks-table"}
 
     def __init__(self, service: GameService, player_id: int, initial_tab: str = "trade",
                  initial_key: str | None = None) -> None:
@@ -272,6 +275,7 @@ footer."""
                        "mines) prompt for a quantity; devices and the Genesis torpedo buy one. "
                        "Deploy them from the game screen's Deploy (D).[/]", classes="note"))
         colonists = Vertical(*list(self._colonist_panels(dock, port)))
+        barracks = Vertical(*list(self._barracks_panels(dock, port)))
         rate = dock.interest_per_day * 100
         bank = Vertical(
                 self._service_art_header("bank", port),
@@ -290,6 +294,7 @@ footer."""
             ("Hardware", "hardware", hardware, None),
             ("Devices & Armaments", "devices", devices, None),
             ("Colonists", "colonists", colonists, None),
+            ("Marines", "barracks", barracks, self._barracks_blocker(dock)),
             ("Bank", "bank", bank, None),
             ("Tavern", "tavern", tavern, None),
         ]
@@ -418,6 +423,80 @@ footer."""
             classes="recruit-row",
         )
 
+    def _barracks_blocker(self, dock: object) -> str | None:
+        """Why the barracks cannot serve this hull — or None when it can (GW-WP08)."""
+        if not dock.barracks:  # type: ignore[attr-defined]
+            return "This universe runs without ground operations."
+        if not dock.ground_force or dock.ground_force.passenger_capacity <= 0:  # type: ignore[attr-defined]
+            return ("This hull has no passenger berths. Ground recruits and their suits "
+                    "ride berths of their own — buy a hull that carries them.")
+        return None
+
+    def _barracks_panels(self, dock: object, port: object) -> ComposeResult:
+        """The barracks (GW-WP08, D3): hire recruits, buy suits and ground ordnance.
+
+        Recruits are *hired* and suits are *bought* — the copy keeps that distinction,
+        because troops are people. Both take passenger berths, so the readout leads with
+        berth occupancy: it is the limit that actually bites.
+        """
+        d = dock
+        gf = d.ground_force  # type: ignore[attr-defined]
+        yield self._service_art_header("concourse", port)
+        if gf is None:
+            yield Static("[b]BARRACKS[/]  — this universe runs without ground operations.")
+            return
+        free = max(0, gf.passenger_capacity - gf.berths_used)
+        yield Static(
+            f"[b]BARRACKS[/]        Latinum [b yellow]{d.latinum:,}[/] slips\n\n"  # type: ignore[attr-defined]
+            f"Berths    [b]{gf.berths_used:,}[/] / {gf.passenger_capacity:,}  "
+            f"([green]{free:,}[/] free) — [b]{gf.recruits:,}[/] recruit(s), "
+            f"[b]{gf.suits_carried:,}[/] suit(s)\n"
+            f"Magazine  [b]{gf.ground_missiles:,}[/] / {gf.missile_capacity:,} ground missiles"
+            f"  ·  at most [b]{gf.max_troopers:,}[/] troopers drop at once")
+        yield self._barracks_table(dock)
+        yield Static("[dim]Recruits are hired, not bought — a recruit and a suit each take a "
+                     "passenger berth, never a cargo hold. A trooper who dies takes their "
+                     "suit with them; ordnance rides the suits that chamber it.[/]",
+                     classes="note")
+        yield Static("[dim]P purchases the highlighted row and prompts for a quantity.[/]",
+                     classes="note")
+
+    def _barracks_table(self, dock: object) -> DataTable[Any]:
+        table: DataTable[Any] = DataTable(id="barracks-table", cursor_type="row")
+        table.add_columns("Item", "Carried", "Price", "Up to", "Notes")
+        for item in dock.barracks:  # type: ignore[attr-defined]
+            cap = f"{item.max_affordable:,}" if item.max_affordable else "[red]✗[/]"
+            table.add_row(item.label, f"{item.carried:,}", f"{item.price:,} ea", cap,
+                          item.detail, key=item.id)
+        return table
+
+    def _buy_barracks(self) -> None:
+        """Hire/buy the highlighted barracks row, prompting for a quantity (GW-WP08)."""
+        table = self.query_one("#barracks-table", DataTable)
+        row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+        if row_key.value is None:
+            return
+        item = next((b for b in self._service.stardock_view(self._pid).barracks
+                     if b.id == row_key.value), None)
+        if item is None:
+            return
+        if item.max_affordable <= 0:
+            notify_warning(self, f"No room or not enough latinum for a {item.label.lower()}.")
+            return
+
+        def _go(count: int | None) -> None:
+            if not count:
+                return
+            if item.kind == "recruit":
+                self._issue(HireRecruits(count=count), f"Hired {count:,} recruit(s)")
+            elif item.kind == "ordnance":
+                self._issue(BuyGroundOrdnance(count=count), f"Loaded {count:,} ground missile(s)")
+            else:
+                self._issue(BuySuits(suit_id=item.id, count=count),
+                            f"Bought {count:,} {item.label.lower()}(s)")
+        verb = "Hire" if item.kind == "recruit" else "Buy"
+        self.app.push_screen(_AmountInput(f"{verb} how many {item.label.lower()}?"), _go)
+
     def _shipyard_table(self, dock: object) -> DataTable[Any]:
         table: DataTable[Any] = DataTable(id="shipyard-table", cursor_type="row")
         table.add_columns("Hull", "Role", "Holds", "Shld", "Wrp", "Cbt", "Net", "")
@@ -456,6 +535,8 @@ footer."""
             self._buy_ship()
         elif active == "devices":
             self._buy_armament()
+        elif active == "barracks":
+            self._buy_barracks()
 
     def _active_tab(self) -> str:
         """The visible service tab's id (the unit every action keys on)."""

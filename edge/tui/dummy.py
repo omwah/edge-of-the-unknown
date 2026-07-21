@@ -127,6 +127,10 @@ def sample_state() -> GameState:
         band="0 - Core",
         colonists=25,
         colonist_capacity=100,
+        recruits=4,
+        suits_carried=4,  # a recruit and a suit each take a berth: 8 of 8 used
+        passenger_capacity=8,
+        ground_missiles=4,
     )
     sector = SectorDTO(
         region="CORE SPACE",

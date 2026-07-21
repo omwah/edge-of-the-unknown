@@ -120,6 +120,11 @@ from edge.core.events import (
     PlayerAttacked,
     BountyPosted,
     ColonistsRecruited,
+    GroundOrdnanceBought,
+    RecruitsDismissed,
+    RecruitsHired,
+    SuitsPurchased,
+    SuitsSold,
     InterdictorToggled,
     InvasionRepulsed,
     LimpetsRemoved,
@@ -209,6 +214,7 @@ from edge.core.models import (
 )
 from edge.core.groundwar.access import Survey, ground_access
 from edge.core.groundwar.models import ArtifactRecord, SurveyOperation, SurveyProgress
+from edge.core.groundwar import force as gw_force
 from edge.core.groundwar import survey as gw_survey
 from edge.core.groundwar.survey import eligible_surface_site_ids
 from edge.core.market import PortOrder
@@ -314,6 +320,62 @@ class RecruitColonists:
 
     count: int
     from_planet: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class HireRecruits:
+    """Enlist ground recruits at a Stardock for a per-head incentive (GW-WP08, D3).
+
+    People, never merchandise — the same recruitment posture as colonists (§4.2) — but
+    they occupy the hull's *passenger* berths (`Ship.passenger_capacity`), a limit of their
+    own. Clamped to free berths and to what the purse can afford.
+    """
+
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class DismissRecruits:
+    """Release ground recruits back to the dock, freeing their berths (GW-WP08, D3).
+
+    Pays `groundwar.ground_force.recruit_severance` per head — a sink, so churning a
+    platoon costs something rather than being a free undo.
+    """
+
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class BuySuits:
+    """Buy powered-armour suits at a Stardock (GW-WP08, D3).
+
+    Equipment, not people: a suit takes a passenger berth of its own, so a hull carries
+    at most `passenger_capacity` recruits *and* suits together.
+    """
+
+    suit_id: str
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class SellSuits:
+    """Sell suits back to a Stardock at `ground_force.suit_resale_frac` (GW-WP08).
+
+    Ordnance the remaining suits can no longer chamber is spilled, never banked (G8).
+    """
+
+    suit_id: str
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class BuyGroundOrdnance:
+    """Load ground missiles into the platoon magazine at a Stardock (GW-WP08, D3).
+
+    Capped by what the owned suits can chamber — ammunition follows the armour.
+    """
+
+    count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -1078,6 +1140,7 @@ Command = (
     | Warp | TravelTo | Dock | Trade | HaggleOffer | Deposit | Withdraw
     | BuyComponent | BuyShip | RepairAtDock
     | RecruitColonists | Colonize | SettleColonists | SetAllocation
+    | HireRecruits | DismissRecruits | BuySuits | SellSuits | BuyGroundOrdnance
     | BuildStagingArea
     | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
     | TransferCargo | BatchTransferCargo
@@ -1206,6 +1269,16 @@ def reduce(
             return _repair_at_dock(state, player_id, command, config)
         case RecruitColonists():
             return _recruit_colonists(state, player_id, command, config)
+        case HireRecruits():
+            return _hire_recruits(state, player_id, command, config)
+        case DismissRecruits():
+            return _dismiss_recruits(state, player_id, command, config)
+        case BuySuits():
+            return _buy_suits(state, player_id, command, config)
+        case SellSuits():
+            return _sell_suits(state, player_id, command, config)
+        case BuyGroundOrdnance():
+            return _buy_ground_ordnance(state, player_id, command, config)
         case Colonize():
             return _colonize(state, player_id, command, config)
         case SettleColonists():
@@ -1420,6 +1493,7 @@ def _join_game(
             cloak_rating=sc.cloak_rating, sensor_rating=sc.sensor_rating,
             missiles=sc.missiles,
             turns_per_warp=sc.turns_per_warp, colonist_capacity=sc.colonist_capacity,
+            passenger_capacity=sc.passenger_capacity,
             subsystems=build_subsystems(sc),
         ),
         config,
@@ -2025,6 +2099,11 @@ def _buy_ship(
         raise EconomyError("insufficient latinum for the hull, even after trade-in")
     if ship.colonists > new_class.colonist_capacity:
         raise EconomyError("the new hull has too few berths for your colonists — settle them first")
+    if gw_force.berths_used(ship) > new_class.passenger_capacity:
+        raise EconomyError(
+            "the new hull has too few passenger berths for your ground force — "
+            "dismiss recruits or sell suits first"
+        )
 
     # The old hull's installed components return to loose inventory; the new hull
     # arrives with its own fresh base slots. Cargo and existing loose parts carry over.
@@ -2039,6 +2118,7 @@ def _buy_ship(
         shields=new_class.shields_max, warp_speed=new_class.warp_speed,
         combat_speed=new_class.combat_speed, turns_per_warp=new_class.turns_per_warp,
         colonist_capacity=new_class.colonist_capacity,
+        passenger_capacity=new_class.passenger_capacity,  # the ground force rides along (GW-WP08)
         missiles=ship.missiles + new_class.missiles,  # ammo carries over + hull loadout
         subsystems=build_subsystems(new_class), components=merged,
     ), config)
@@ -2142,6 +2222,137 @@ def _recruit_colonists(
     new_ship = replace(ship, colonists=ship.colonists + count)
     return ReduceResult(
         events=(ColonistsRecruited(player_id, "emigration", count, 0),), ships=(new_ship,),
+    )
+
+
+# --- the ground force: recruits / suits / ordnance (GW-WP08, D3) -----------
+
+
+def _hire_recruits(
+    state: UniverseState, player_id: int, cmd: HireRecruits, config: GameConfig
+) -> ReduceResult:
+    """Enlist ground troops at the Stardock barracks — people, hired (D3)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    if cmd.count <= 0:
+        raise EconomyError("hire count must be positive")
+    free = gw_force.berths_free(ship)
+    if free <= 0:
+        raise EconomyError("no passenger berths free — a recruit needs a berth of their own")
+    price = gw_force.groundwar_config(config).ground_force.recruit_price
+    count = min(cmd.count, free)
+    if price:  # clamp to the purse, so "hire all" moves what it can afford atomically
+        count = min(count, player.latinum // price)
+    if count <= 0:
+        raise EconomyError(f"need {price} latinum for a recruit's incentive")
+    cost = count * price
+    new_player = replace(player, latinum=player.latinum - cost)
+    new_ship = replace(ship, recruits=ship.recruits + count)
+    return ReduceResult(
+        events=(RecruitsHired(player_id, count, cost),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _dismiss_recruits(
+    state: UniverseState, player_id: int, cmd: DismissRecruits, config: GameConfig
+) -> ReduceResult:
+    """Release recruits back to the dock, paying severance (a §8 sink)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    if cmd.count <= 0:
+        raise EconomyError("dismiss count must be positive")
+    count = min(cmd.count, ship.recruits)
+    if count <= 0:
+        raise EconomyError("no recruits aboard")
+    severance = count * gw_force.groundwar_config(config).ground_force.recruit_severance
+    if player.latinum < severance:
+        raise EconomyError(f"need {severance} latinum to pay their severance")
+    new_player = replace(player, latinum=player.latinum - severance)
+    new_ship = replace(ship, recruits=ship.recruits - count)
+    return ReduceResult(
+        events=(RecruitsDismissed(player_id, count, severance),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _buy_suits(
+    state: UniverseState, player_id: int, cmd: BuySuits, config: GameConfig
+) -> ReduceResult:
+    """Buy powered armour at the Stardock — equipment, purchased (D3)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    if cmd.count <= 0:
+        raise EconomyError("suit count must be positive")
+    suit = gw_force.suit_spec(config, cmd.suit_id)
+    free = gw_force.berths_free(ship)
+    if free <= 0:
+        raise EconomyError("no passenger berths free — a suit takes a berth of its own")
+    count = min(cmd.count, free)
+    if suit.cost:
+        count = min(count, player.latinum // suit.cost)
+    if count <= 0:
+        raise EconomyError(f"need {suit.cost} latinum for a {suit.label} suit")
+    cost = count * suit.cost
+    new_player = replace(player, latinum=player.latinum - cost)
+    new_ship = replace(ship, suits=gw_force.with_suits(ship, cmd.suit_id, count))
+    return ReduceResult(
+        events=(SuitsPurchased(player_id, cmd.suit_id, count, cost),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _sell_suits(
+    state: UniverseState, player_id: int, cmd: SellSuits, config: GameConfig
+) -> ReduceResult:
+    """Sell suits back at the resale fraction; spill ordnance they carried (G8)."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    if cmd.count <= 0:
+        raise EconomyError("suit count must be positive")
+    suit = gw_force.suit_spec(config, cmd.suit_id)
+    count = min(cmd.count, ship.suits.get(cmd.suit_id, 0))
+    if count <= 0:
+        raise EconomyError(f"no {suit.label} suits aboard")
+    refund = count * gw_force.resale_price(suit, config)
+    stripped = replace(ship, suits=gw_force.with_suits(ship, cmd.suit_id, -count))
+    new_ship = gw_force.clamp_magazine(stripped, config)
+    spilled = stripped.ground_missiles - new_ship.ground_missiles
+    new_player = replace(player, latinum=player.latinum + refund)
+    return ReduceResult(
+        events=(SuitsSold(player_id, cmd.suit_id, count, refund, spilled),),
+        players=(new_player,), ships=(new_ship,),
+    )
+
+
+def _buy_ground_ordnance(
+    state: UniverseState, player_id: int, cmd: BuyGroundOrdnance, config: GameConfig
+) -> ReduceResult:
+    """Load ground missiles, capped by what the owned suits can chamber."""
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    _stardock(state, ship)
+    if cmd.count <= 0:
+        raise EconomyError("ordnance count must be positive")
+    room = gw_force.missile_capacity(ship, config) - ship.ground_missiles
+    if room <= 0:
+        raise EconomyError("the platoon's magazines are full — buy more suits to carry more")
+    price = gw_force.groundwar_config(config).ground_force.missile_price
+    count = min(cmd.count, room)
+    if price:
+        count = min(count, player.latinum // price)
+    if count <= 0:
+        raise EconomyError(f"need {price} latinum for a ground missile")
+    cost = count * price
+    new_player = replace(player, latinum=player.latinum - cost)
+    new_ship = replace(ship, ground_missiles=ship.ground_missiles + count)
+    return ReduceResult(
+        events=(GroundOrdnanceBought(player_id, count, cost),),
+        players=(new_player,), ships=(new_ship,),
     )
 
 
@@ -3182,8 +3393,10 @@ def _escape_pod(wreck: Ship, config: GameConfig) -> Ship:
     """Replace a destroyed hull with the configured escape pod (§10, WP26).
 
     Cargo, loose components, devices, missiles, kits, and any colonists aboard go
-    down with the ship; the pod keeps the hull's id and sector so the player limps
-    home from where the fight ended. Latinum and the bank live on the player.
+    down with the ship; so does the ground force — recruits, their suits, and the
+    magazine (GW-WP08, D3): a pod holds one pilot, and troops are people who were
+    aboard. The pod keeps the hull's id and sector so the player limps home from
+    where the fight ended. Latinum and the bank live on the player.
     """
     pod = config.ship_class(config.combat.escape_pod_class)
     return apply_derived(replace(
@@ -3193,6 +3406,7 @@ def _escape_pod(wreck: Ship, config: GameConfig) -> Ship:
         shields=pod.shields_max, warp_speed=pod.warp_speed,
         combat_speed=pod.combat_speed, turns_per_warp=pod.turns_per_warp,
         colonist_capacity=pod.colonist_capacity, colonists=0,
+        passenger_capacity=pod.passenger_capacity, recruits=0, suits={}, ground_missiles=0,
         cargo={}, components={}, devices={}, missiles=0, repair_kits=0,
         subsystems=build_subsystems(pod),
     ), config)

@@ -447,6 +447,12 @@ class ShipDTO:
     band: str
     colonists: int
     colonist_capacity: int
+    # The ground force aboard (GW-WP08, D3) — passenger berths, distinct from holds
+    # and colonist berths. `suits_carried` is the total across every suit class.
+    recruits: int = 0
+    suits_carried: int = 0
+    passenger_capacity: int = 0
+    ground_missiles: int = 0
 
 
 @dataclass(frozen=True)
@@ -945,6 +951,57 @@ class ArmamentItem:
 
 
 @dataclass(frozen=True)
+class BarracksItem:
+    """One row of the Stardock barracks catalog (GW-WP08, D3).
+
+    Recruits are *hired* (a per-head incentive), suits and ordnance are *bought* — the
+    row's `kind` says which, and the label copy keeps the distinction visible. `carried`
+    is what the ship already has; `max_affordable` folds the purse, the free passenger
+    berths, and (for ordnance) the magazine ceiling into the one number the shopper
+    needs, so the catalog only offers what can actually be taken aboard.
+    """
+
+    id: str  # stable row key: "recruit" | "ordnance" | a suit-class id
+    label: str
+    price: int  # per unit
+    carried: int
+    max_affordable: int
+    detail: str  # role blurb / berth or magazine note
+    kind: str  # "recruit" | "suit" | "ordnance"
+
+
+@dataclass(frozen=True)
+class LoadoutOptionDTO:
+    """One platoon-composer row — an affordance the player can actually deploy (GW-WP08).
+
+    `deployable` is already capped by the suits owned, the recruits aboard to wear them,
+    and the configured platoon ceiling, so a composer built from these rows can never
+    offer a drop the reducer would refuse.
+    """
+
+    suit_id: str
+    label: str
+    role: str
+    cost: int
+    owned: int
+    deployable: int
+
+
+@dataclass(frozen=True)
+class GroundForceDTO:
+    """The ground force aboard, as the platoon composer sees it (GW-WP08, D3)."""
+
+    recruits: int
+    suits_carried: int
+    berths_used: int
+    passenger_capacity: int
+    ground_missiles: int
+    missile_capacity: int
+    max_troopers: int  # the configured platoon ceiling
+    options: list[LoadoutOptionDTO]
+
+
+@dataclass(frozen=True)
 class StardockDTO:
     """The Stardock services catalog (hardware + shipyard), fog-of-war scoped (§3)."""
 
@@ -962,6 +1019,9 @@ class StardockDTO:
     ship_colonists: int = 0  # aboard now
     ship_colonist_capacity: int = 0  # berth ceiling
     colonists_recruitable: int = 0  # min(free berths, what the purse can afford)
+    # Barracks tab (GW-WP08 / D3): hire recruits, buy suits and ground ordnance.
+    barracks: list[BarracksItem] = field(default_factory=list)
+    ground_force: GroundForceDTO | None = None  # the force aboard, or None without a groundwar config
 
 
 @dataclass(frozen=True)
