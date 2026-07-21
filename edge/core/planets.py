@@ -10,6 +10,7 @@ engine `planet_growth` cron schedules this; the math lives here (CLAUDE.md layer
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 
 from edge.core.config import GameConfig
@@ -107,6 +108,58 @@ def colonist_blocker(planet: Planet, config: GameConfig) -> str:
     if is_cloud_city_world(planet.planet_type, config):
         return "a gas giant has no ground — build a staging area before landing anyone"
     return f"a {pretty_planet_type(planet.planet_type).lower()} cannot hold colonists"
+
+
+_NO_HOME_SPECIES = "__player__"  # never a real roster_id; the no-roster/no-home-species fallback
+
+
+def player_species_key(config: GameConfig) -> str:
+    """The roster_id the player's own recruited colonists are tagged with (§4.2).
+
+    The roster's `player_species_id` when the roster names one (the common case —
+    Stardock recruits and any world the player colonizes are peopled by them); a
+    stable sentinel otherwise, since a hand-built config with no roster still needs
+    *some* key for Stardock recruits and it must never collide with a real roster_id.
+    """
+    roster = config.roster
+    if roster is not None and roster.player_species_id is not None:
+        return roster.player_species_id
+    return _NO_HOME_SPECIES
+
+
+def native_population_key(planet: Planet, config: GameConfig) -> str | None:
+    """The native people occupying `planet`, or None (§4.2, GW-WP09-PRE follow-up).
+
+    `population` may hold the player's own recruited people alongside — or instead of
+    — a native polity's; this names the native one, for the hostility/access checks
+    that only ever cared about "who lives here" in the singular. A Core/governor world
+    whose only people happen to share the player's own species has nothing left to
+    distinguish — but those worlds are friendly by ownership/alliance regardless, so
+    hostility callers never need this for them.
+    """
+    home = player_species_key(config)
+    for key in sorted(planet.population):
+        if planet.population[key] > 0 and key != home:
+            return key
+    return None
+
+
+def any_population_key(planet: Planet, config: GameConfig) -> str | None:
+    """Some people occupying `planet`, preferring a native one, or None (§4.2).
+
+    Unlike `native_population_key`, this does not give up on a world whose only
+    people happen to share the player's own species — a Terran-peopled Core capital
+    genuinely has settlements to describe, it just isn't a *hostility* subject (no
+    unowned world is ever peopled by the player's own kind — see
+    `native_population_key`). Generation-time "who lives here" metrics
+    (`bigbang.inhabitants.is_friendly_inhabited`) want this; live hostility
+    resolution (`groundwar.access._inhabiting_species`) wants the native-only view.
+    """
+    native = native_population_key(planet, config)
+    if native is not None:
+        return native
+    home = player_species_key(config)
+    return home if planet.population.get(home, 0) > 0 else None
 
 
 def store_blocker(planet: Planet, config: GameConfig) -> str:
@@ -230,7 +283,7 @@ def normalize_belt(planet: Planet, config: GameConfig) -> Planet:
     if reserve_max <= 0:
         reserve = reserve_max = config.planets.belt_reserve_base
     clean = replace(
-        planet, owner=UNOWNED, inhabited_by_species_id=None, colonists=0,
+        planet, owner=UNOWNED, population={},
         allocation={}, stores={}, citadel_level=0, citadel_progress=-1, treasury=0,
         fighters=0, gun_integrity=0, fighter_allocation=0.0, starbase_id=None,
         ore_reserve=reserve, ore_reserve_max=reserve_max,
@@ -262,13 +315,33 @@ def _add(stores: dict[Commodity, int], commodity: Commodity, amount: int) -> Non
         stores[commodity] = max(0, stores.get(commodity, 0) + amount)
 
 
+def scale_population(population: Mapping[str, int], old_total: int, new_total: int) -> dict[str, int]:
+    """Grow or shrink every people on a world by the same ratio, to exactly `new_total`.
+
+    Largest-remainder rounding (deterministic — ties break on key) keeps a mixed
+    colony's proportions stable tick over tick instead of letting round-off silently
+    drain one people to feed another (§4.2, GW-WP09-PRE follow-up).
+    """
+    if old_total <= 0 or new_total == old_total:
+        return dict(population)
+    shares = {k: v * new_total / old_total for k, v in population.items()}
+    floors = {k: int(s) for k, s in shares.items()}
+    remainder = new_total - sum(floors.values())
+    order = sorted(population, key=lambda k: (-(shares[k] - floors[k]), k))
+    for k in order[:remainder]:
+        floors[k] += 1
+    return {k: v for k, v in floors.items() if v > 0}
+
+
 def produce(planet: Planet, config: GameConfig) -> Planet:
     """Run one production tick for `planet`, returning the updated world (§8).
 
     A no-op for an unowned planet (only the owner collects, §8) and for a type with
     no profile. Goods only ever accumulate into `stores` (never negative); colonists
     stay within the world's colonist capacity — the habitability cap on a colonizable
-    world, the Cloud City's berths on a staged gas giant (§4.2, PT-54).
+    world, the Cloud City's berths on a staged gas giant (§4.2, PT-54). A world may hold
+    several peoples at once (`population`, GW-WP09-PRE follow-up); growth/starvation
+    scales every one of them by the same ratio, so the mix doesn't drift.
     """
     if not planet.owner.is_owned:
         return planet
@@ -278,6 +351,7 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
         return planet
 
     stores = dict(planet.stores)
+    population = dict(planet.population)
     colonists = planet.colonists
     fighters = planet.fighters
     ore_reserve = planet.ore_reserve
@@ -301,10 +375,14 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
         have = stores.get(Commodity.ORGANICS, 0)
         if have >= need:
             stores[Commodity.ORGANICS] = have - need
-            colonists = min(capacity, colonists + round(colonists * cfg.growth_rate))
+            new_colonists = min(capacity, colonists + round(colonists * cfg.growth_rate))
+            population = scale_population(population, colonists, new_colonists)
+            colonists = new_colonists
         elif colonists > 0:
             stores[Commodity.ORGANICS] = 0
-            colonists = max(0, colonists - round(colonists * cfg.starvation_rate))
+            new_colonists = max(0, colonists - round(colonists * cfg.starvation_rate))
+            population = scale_population(population, colonists, new_colonists)
+            colonists = new_colonists
 
     if planet.planet_type == "jovian":
         # The scoop runs city or no city — it is the gas giant itself paying out. A Cloud
@@ -322,8 +400,8 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
             ore_reserve -= haul[1]
     # barren (and any other uncolonizable type) produces nothing.
 
-    if (colonists == planet.colonists and fighters == planet.fighters
+    if (population == dict(planet.population) and fighters == planet.fighters
             and ore_reserve == planet.ore_reserve and stores == dict(planet.stores)):
         return planet  # nothing changed (e.g. an empty colony) — skip the rewrite
-    return replace(planet, stores=stores, colonists=colonists, fighters=fighters,
+    return replace(planet, stores=stores, population=population, fighters=fighters,
                    ore_reserve=ore_reserve)

@@ -29,11 +29,13 @@ def _state(*, owner: Ownership, ptype: str = "terrestrial_warm", colonists: int 
     state.sectors[1] = Sector(id=1, region_id=1, warps_out=(), distance_band="Frontier")
     state.rebuild_adjacency()
     state.planets[1] = Planet(id=1, sector_id=1, name="Eden", planet_type=ptype,
-                              owner=owner, colonists=colonists, habitability_cap=cap)
+                              owner=owner, population={"terran": colonists} if colonists else {},
+                              habitability_cap=cap)
     state.ships[1] = Ship(id=1, type_id="trailblazer", name="T", owner_player_id=1,
                           sector_id=1, holds_total=20, hull_current=200, hull_max=200,
                           shields=50, warp_speed=3, combat_speed=3, turns_per_warp=1,
-                          colonists=aboard, colonist_capacity=1000)
+                          population={"terran": aboard} if aboard else {},
+                          colonist_capacity=1000)
     state.players[1] = Player(id=1, name="T", ship_id=1, latinum=5000, turns_remaining=100)
     return state
 

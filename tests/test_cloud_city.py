@@ -65,7 +65,8 @@ def _state(*, size: int = 0, equipment: int = 500, colonists: int = 0) -> Univer
     state.ships[1] = Ship(id=1, type_id="trailblazer", name="T", owner_player_id=1,
                           sector_id=1, holds_total=500, hull_current=200, hull_max=200,
                           shields=50, warp_speed=3, combat_speed=3, turns_per_warp=1,
-                          cargo={Commodity.EQUIPMENT: equipment}, colonists=colonists,
+                          cargo={Commodity.EQUIPMENT: equipment},
+                          population={"terran": colonists} if colonists else {},
                           colonist_capacity=100_000)
     state.players[1] = Player(id=1, name="T", ship_id=1, latinum=5000, turns_remaining=100)
     return state
@@ -192,7 +193,7 @@ def test_the_scoop_runs_with_or_without_a_city_and_people_produce_on_top() -> No
     bare = replace(_state().planets[1], owner=Ownership("player", 1))
     assert produce(bare, CFG).stores[Commodity.FUEL_ORE] == CFG.planets.jovian_scoop
 
-    peopled = replace(_state(size=2).planets[1], colonists=4_000,
+    peopled = replace(_state(size=2).planets[1], population={"terran": 4_000},
                       allocation={Commodity.FUEL_ORE: 1.0},
                       stores={Commodity.ORGANICS: 10_000})
     after = produce(peopled, CFG)
@@ -202,7 +203,7 @@ def test_the_scoop_runs_with_or_without_a_city_and_people_produce_on_top() -> No
 
 def test_a_city_starves_without_imported_food() -> None:
     """The jovian yield profile has no Organics — a sky city eats what it is brought (§4.2)."""
-    hungry = replace(_state(size=1).planets[1], colonists=4_000,
+    hungry = replace(_state(size=1).planets[1], population={"terran": 4_000},
                      allocation={Commodity.FUEL_ORE: 1.0})
     assert produce(hungry, CFG).colonists < 4_000
 

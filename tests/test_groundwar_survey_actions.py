@@ -41,7 +41,7 @@ def _world(*, inhabited: bool = False, sites: int = 1, seed: int = 3) -> Univers
     # assault) — model it as the player's own colony so settlements generate (D1/D5).
     st.planets = {1: Planet(1, 1, "World", "terrestrial_warm", habitability_cap=1000,
                             owner=Ownership("player", 1) if inhabited else Ownership("none"),
-                            colonists=500 if inhabited else 0)}
+                            population={"terran": 500} if inhabited else {})}
     st.ships = {1: Ship(id=1, type_id="trailblazer", name="S", owner_player_id=1,
                         sector_id=1, holds_total=60, turns_per_warp=1, sensor_rating=9)}
     st.players = {1: Player(id=1, name="you", ship_id=1, latinum=100, turns_remaining=250)}

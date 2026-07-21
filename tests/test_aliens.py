@@ -312,8 +312,8 @@ def test_species_placement_does_not_perturb_ports_or_planets() -> None:
     # The planet *generation* itself (positions, types, habitability, yields) is what
     # must be unperturbed, so compare with those two overlays stripped.
     def strip(ps):  # type: ignore[no-untyped-def]
-        return {pid: replace(p, owner=Ownership(), inhabited_by_species_id=None,
-                             colonists=0, stores={}, allocation={}, citadel_level=0,
+        return {pid: replace(p, owner=Ownership(), population={},
+                             stores={}, allocation={}, citadel_level=0,
                              gun_integrity=0, treasury=0)
                 for pid, p in ps.items()}
     assert strip(a.planets) == strip(b.planets)

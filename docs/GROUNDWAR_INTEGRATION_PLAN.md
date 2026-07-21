@@ -132,7 +132,11 @@ consequence-bearing action whose gates and effects are specified by GW-WP01.
 
 Alliance-, corp-, and player-owned enemy worlds still follow their applicable
 conquest settlement, while an unaligned world's new protectorate state records
-control without misusing `owner=none` or erasing `inhabited_by_species_id`.
+control without misusing `owner=none` or erasing the native people's
+`Planet.population` entry (the per-species-count ledger the GW-WP09-PRE follow-up
+replaced the single `inhabited_by_species_id` field with, so a colonized or
+protectorate-claimed world can carry the player's own people *alongside* the
+native one instead of overwriting them).
 
 ### D3 — What is the player's ground force? **RESOLVED**
 
@@ -326,8 +330,8 @@ same result. The reducer always recomputes it; the DTO is advisory.
 
 The classifier distinguishes:
 
-- **inhabited**: live colonists, `inhabited_by_species_id`, or an inhabited
-  Cloud City under D9;
+- **inhabited**: a non-empty `Planet.population` (live colonists and/or a native
+  people — GW-WP09-PRE follow-up), or an inhabited Cloud City under D9;
 - **friendly**: player/corp ownership, same alliance, or effective disposition
   in the configured friendly band;
 - **hostile**: declared corp war, rival/negative alliance standing, or an

@@ -23,6 +23,7 @@ from dataclasses import dataclass, replace
 from edge.core.config import CitadelConfig, CitadelLevelConfig, GameConfig
 from edge.core.enums import Commodity
 from edge.core.models import EncounterFoe, Ownership, Planet
+from edge.core.planets import scale_population
 
 CITADEL_MAX = 3
 
@@ -197,10 +198,11 @@ def conquer(planet: Planet, player_id: int, survivors: int, config: GameConfig) 
     """
     cfg = _levels(config)
     captured = planet.treasury
+    survivor_total = round(planet.colonists * cfg.civilian_survival_frac)
     new_planet = replace(
         planet, owner=Ownership("player", player_id),
         citadel_level=max(0, planet.citadel_level - 1),
         fighters=survivors, gun_integrity=0, treasury=0,
-        colonists=round(planet.colonists * cfg.civilian_survival_frac),
+        population=scale_population(planet.population, planet.colonists, survivor_total),
     )
     return new_planet, captured

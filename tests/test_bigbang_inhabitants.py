@@ -1,11 +1,11 @@
 """GW-WP09-PRE — the inhabited universe: native peoples, populations, holdings.
 
-Before this pass, nothing in the tree ever set `Planet.inhabited_by_species_id`, so a
+Before this pass, nothing in the tree ever set a native `Planet.population`, so a
 generated universe held no inhabitants — and because the ground-access classifier keys
-"inhabited" off exactly that (plus colonists and Cloud Cities), **no generated world
-could route to assault at all**. These tests pin the seeding contract and, most
-importantly, the end-to-end fact that a real generated world now reaches `Assault`
-through the production classifier rather than through hand-built state.
+"inhabited" off exactly that (plus Cloud Cities), **no generated world could route to
+assault at all**. These tests pin the seeding contract and, most importantly, the
+end-to-end fact that a real generated world now reaches `Assault` through the
+production classifier rather than through hand-built state.
 """
 
 from __future__ import annotations
@@ -21,9 +21,10 @@ from edge.bigbang.inhabitants import (
 )
 from edge.bigbang.validate import ValidationError, validate
 from edge.config import load_default_config
+from edge.core.aliens import resolve_species_by_kind
 from edge.core.groundwar.access import Assault, Survey, ground_access
 from edge.core.models import UniverseState
-from edge.core.planets import colonist_capacity
+from edge.core.planets import colonist_capacity, native_population_key
 from edge.core.starbases import is_operational
 from helpers import generate_with_player
 
@@ -37,7 +38,7 @@ def world() -> UniverseState:
 
 
 def _inhabited(state: UniverseState) -> list[object]:
-    return [p for p in state.planets.values() if p.inhabited_by_species_id is not None]
+    return [p for p in state.planets.values() if p.population]
 
 
 # --- the gap this work package closes ----------------------------------------
@@ -99,7 +100,7 @@ def test_no_derelict_base_sits_on_an_inhabited_world(world: UniverseState) -> No
 def test_the_core_is_lived_in_and_still_sanctuary(world: UniverseState) -> None:
     core = [p for p in world.planets.values()
             if world.sectors[p.sector_id].is_galactic_core]
-    assert any(p.inhabited_by_species_id is not None for p in core), "an empty capital"
+    assert any(p.population for p in core), "an empty capital"
     # G13 holds regardless of who lives there.
     assert not any(is_assaultable_for_a_fresh_player(world, p, CFG) for p in core)
 
@@ -122,18 +123,16 @@ def test_citadel_holdings_are_coherent(world: UniverseState) -> None:
 
 def test_seeding_is_deterministic_for_a_seed() -> None:
     a, b = generate(CFG, 7), generate(CFG, 7)
-    assert {p.id: (p.inhabited_by_species_id, p.colonists, p.citadel_level)
-            for p in a.planets.values()} == \
-           {p.id: (p.inhabited_by_species_id, p.colonists, p.citadel_level)
-            for p in b.planets.values()}
+    assert {p.id: (p.population, p.citadel_level) for p in a.planets.values()} == \
+           {p.id: (p.population, p.citadel_level) for p in b.planets.values()}
 
 
 def test_re_seeding_an_already_seeded_state_changes_nothing(world: UniverseState) -> None:
     """The pass is a function of (seed, world), so running it twice is a no-op — it
     only ever settles worlds that have no people yet."""
-    before = {p.id: p.inhabited_by_species_id for p in world.planets.values()}
+    before = {p.id: p.population for p in world.planets.values()}
     seed_inhabitants(world, CFG)
-    assert {p.id: p.inhabited_by_species_id for p in world.planets.values()} == before
+    assert {p.id: p.population for p in world.planets.values()} == before
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -176,7 +175,7 @@ def test_the_invariant_rejects_a_universe_that_could_field_targets_but_does_not(
 
     stripped = generate(CFG, 1986)
     for pid, planet in list(stripped.planets.items()):
-        stripped.planets[pid] = replace(planet, inhabited_by_species_id=None, colonists=0)
+        stripped.planets[pid] = replace(planet, population={})
     with pytest.raises(ValidationError, match="assaultable"):
         validate(stripped, CFG)
 
@@ -189,10 +188,13 @@ def test_the_orbit_view_names_a_worlds_people() -> None:
     from edge.server import session
 
     state = generate_with_player(CFG, 1986)
-    inhabited = next(p for p in state.planets.values()
-                     if p.inhabited_by_species_id is not None)
+    inhabited = next(p for p in state.planets.values() if p.population)
     view = session.planet_view(state, 1, inhabited.id, CFG)
-    assert view.species == state.species[inhabited.inhabited_by_species_id].name
+    key = native_population_key(inhabited, CFG)
+    assert key is not None
+    species = resolve_species_by_kind(state, key, CFG.roster)
+    assert species is not None
+    assert view.species == species.name
 
 
 def test_a_world_the_player_settles_is_peopled_by_their_own_kind() -> None:
@@ -206,8 +208,9 @@ def test_a_world_the_player_settles_is_peopled_by_their_own_kind() -> None:
 
     state = generate_with_player(CFG, 1986)
     target = next(p for p in state.planets.values()
-                  if p.inhabited_by_species_id is None and colonist_capacity(p, CFG) > 0)
-    state.planets[target.id] = replace(target, owner=Ownership("player", 1), colonists=500)
+                  if not p.population and colonist_capacity(p, CFG) > 0)
+    state.planets[target.id] = replace(
+        target, owner=Ownership("player", 1), population={"terran": 500})
     view = session.planet_view(state, 1, target.id, CFG)
     assert CFG.roster is not None and CFG.roster.player_species_id == "terran"
     assert view.species == "Terrans"
@@ -217,6 +220,5 @@ def test_an_empty_world_names_nobody() -> None:
     from edge.server import session
 
     state = generate_with_player(CFG, 1986)
-    empty = next(p for p in state.planets.values()
-                 if p.inhabited_by_species_id is None and p.colonists == 0)
+    empty = next(p for p in state.planets.values() if not p.population)
     assert session.planet_view(state, 1, empty.id, CFG).species == ""

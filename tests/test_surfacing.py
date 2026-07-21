@@ -243,7 +243,8 @@ def test_cargo_transfer_breaks_the_citadel_bootstrap_deadlock() -> None:
     state = _linear_world()
     lc = CFG.citadels.levels[0]
     state.planets[1] = Planet(id=1, sector_id=1, name="Home", planet_type="terrestrial_warm",
-                              owner=Ownership("player", 1), colonists=lc.min_colonists)
+                              owner=Ownership("player", 1),
+                              population={"terran": lc.min_colonists})
     state.ships[1] = replace(state.ships[1], holds_total=120,
                              cargo={Commodity.EQUIPMENT: 120})
     state.players[1] = replace(state.players[1], latinum=lc.cost_latinum)

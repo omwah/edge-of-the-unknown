@@ -164,6 +164,11 @@ def populate_species(state: UniverseState, config: GameConfig) -> None:
     # separated from the Core and from rival clusters by neutral lanes (§5 step 6, §6.3).
     state.home_clusters = _carve_home_clusters(state, config, roster, rng, placed, bases, reserved)
     _seed_grudges(state, roster)
+    # A durable copy, keyed by roster_id (§6): population entries (`Planet.population`,
+    # GW-WP09-PRE follow-up) resolve a native people's disposition through this rather than
+    # a live `state.species` instance, so a world's people don't go unresolvable once every
+    # roaming ship of their kind is destroyed.
+    state.species_home_disposition = dict(bases)
 
 
 def _seed_grudges(state: UniverseState, roster: RosterConfig) -> None:

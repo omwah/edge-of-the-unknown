@@ -138,9 +138,18 @@ class Planet:
 
     `planet_type` fixes colonizability, the `yield_profile` over the trio, and the
     `habitability_cap` (max colonists). `owner` is three-way (§4.2): Core worlds are
-    governor-owned, the unowned fraction rises with band. `colonists` settle an owned
-    colony and produce into `stores` per `allocation` × `yield_profile` (the §8 cron);
-    `inhabited_by_species_id` marks an unaligned-species holding (set in WP7).
+    governor-owned, the unowned fraction rises with band. `population` settles an owned
+    colony and produces into `stores` per `allocation` × `yield_profile` (the §8 cron);
+    an unowned world can still carry a native people (an unaligned holding, set in WP7).
+
+    `population` is a **roster_id → count** ledger, not a single count: a world may
+    hold a native polity, the player's own recruited people, or both side by side once
+    a player settles atop a native world (§4.2, GW-WP09-PRE follow-up). Colonists keep
+    the species identity of wherever they were recruited — the player's home people
+    from Stardock, or a world's native people via emigration — so landing them never
+    relabels an existing population as someone else's. `colonists` is the derived
+    total; ownership alone (not which peoples are present) decides friendliness
+    (`core.groundwar.access._friendly` checks owner before species).
     """
 
     id: int
@@ -148,8 +157,7 @@ class Planet:
     name: str
     planet_type: str
     owner: Ownership = UNOWNED
-    inhabited_by_species_id: int | None = None
-    colonists: int = 0
+    population: Mapping[str, int] = field(default_factory=dict)
     habitability_cap: int = 0
     yield_profile: Mapping[Commodity, float] = field(default_factory=dict)
     allocation: Mapping[Commodity, float] = field(default_factory=dict)
@@ -172,6 +180,11 @@ class Planet:
     # A jovian has no ground — until a staging area is built it can hold no stores and no
     # colonists; once built, the city berths `size × planets.cloud_city_berths` people.
     cloud_city_size: int = 0
+
+    @property
+    def colonists(self) -> int:
+        """Total colonists on this world, summed across every people settled here."""
+        return sum(self.population.values())
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,7 +277,11 @@ class Ship:
     mines: int = 0     # carried space-mine stock (deployed to a sector, §10 WP41)
     turns_per_warp: int = 1
     colonist_capacity: int = 0  # life-support berths (separate occupancy limit, §4.2)
-    colonists: int = 0  # recruited colonists aboard (≤ colonist_capacity); not cargo
+    # Colonists aboard (≤ colonist_capacity; not cargo), by roster_id — they keep the
+    # species identity of wherever they were recruited (the player's own people from
+    # Stardock, or a world's native people via emigration), so landing them on a world
+    # never relabels an existing population as someone else's (§4.2, GW-WP09-PRE follow-up).
+    population: Mapping[str, int] = field(default_factory=dict)
     # The ground force (GW plan D3) — a *third* occupancy limit, distinct from cargo
     # holds and colonist berths, so a platoon never competes with trade goods or with
     # peopling a colony. `recruits` are the people hired at Stardock; `suits` counts
@@ -302,6 +319,11 @@ class Ship:
     @property
     def holds_free(self) -> int:
         return self.holds_total - self.holds_used
+
+    @property
+    def colonists(self) -> int:
+        """Colonists aboard, summed across every people the ship carries."""
+        return sum(self.population.values())
 
 
 @dataclass(frozen=True, slots=True)
@@ -859,6 +881,13 @@ class UniverseState:
     # time cache rebuilt by the big bang (like `core_hops`/`spatial_ids`), excluded from
     # `state_hash`; empty for hand-built (test) states until populated.
     species_knowledge: dict[str, tuple[LocationRef, ...]] = field(default_factory=dict)
+    # Per species **kind** (roster_id), its per-generation `base_disposition` draw (DESIGN
+    # §6) — memoised once in `bigbang.aliens._base_for` and mirrored here so a kind's
+    # disposition survives every roaming instance of it being destroyed (`removed_species_ids`
+    # pops `state.species` entries; a native world's `Planet.population` key must still
+    # resolve). A generation-time cache like `species_knowledge`, excluded from `state_hash`;
+    # empty for hand-built (test) states until populated.
+    species_home_disposition: dict[str, float] = field(default_factory=dict)
     # Alliance id -> its home-cluster sectors (DESIGN §5 step 6, §6.3). A generation-time
     # cache rebuilt by the big bang (like `core_hops`/`species_knowledge`), excluded from
     # `state_hash` — the cluster's *effects* (alliance-owned planets, stamped region

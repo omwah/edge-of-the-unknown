@@ -32,10 +32,11 @@ def _own_colony_here(svc: object) -> int:
     pid = (max(state.planets) + 1) if state.planets else 1
     state.planets[pid] = Planet(
         id=pid, sector_id=ship.sector_id, name="Homestead", planet_type="terrestrial_warm",
-        owner=Ownership("player", 1), colonists=100, habitability_cap=prof.habitability,
-        stores={Commodity.EQUIPMENT: 40})
+        owner=Ownership("player", 1), population={"terran": 100},
+        habitability_cap=prof.habitability, stores={Commodity.EQUIPMENT: 40})
     state.ships[ship.id] = replace(
-        ship, cargo={Commodity.FUEL_ORE: 30}, colonists=200, colonist_capacity=1000)
+        ship, cargo={Commodity.FUEL_ORE: 30}, population={"terran": 200},
+        colonist_capacity=1000)
     return pid
 
 

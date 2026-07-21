@@ -134,17 +134,22 @@ def _species_label(species: AlienSpecies) -> str:
 
 
 def _inhabitants(state: UniverseState, planet: Planet) -> str:
-    """The species living on a world, or the empty marker for an uninhabited one.
+    """The peoples living on a world, or the empty marker for an uninhabited one.
 
-    A world can carry `inhabited_by_species_id` while `owner` stays "none" (an unaligned
-    holding, §4.2) — which is exactly the case this column exists to make visible.
+    A world can carry a native `population` while `owner` stays "none" (an unaligned
+    holding, §4.2) — which is exactly the case this column exists to make visible. A
+    colonized world may show more than one people once a player settles atop natives
+    (GW-WP09-PRE follow-up); each roster_id resolves against the placed cast, falling
+    back to the bare id (rather than hiding a generation fault) for a kind with no
+    live instance left.
     """
-    if planet.inhabited_by_species_id is None:
-        return _NONE
-    species = state.species.get(planet.inhabited_by_species_id)
-    if species is None:  # dangling id: show it rather than hiding a generation fault
-        return f"?{planet.inhabited_by_species_id}"
-    return _species_label(species)
+    names = []
+    for roster_id in sorted(planet.population):
+        if planet.population[roster_id] <= 0:
+            continue
+        species = next((s for s in state.species.values() if s.roster_id == roster_id), None)
+        names.append(_species_label(species) if species is not None else f"?{roster_id}")
+    return ", ".join(names) if names else _NONE
 
 
 def _special(planet: Planet) -> str:

@@ -26,6 +26,7 @@ from edge.core.config import GameConfig
 from edge.core.enums import Commodity, Component, ComponentTier
 from edge.core.events import DevApplied
 from edge.core.models import Ownership, Planet, Player, Ship, UniverseState
+from edge.core.planets import player_species_key
 
 if TYPE_CHECKING:  # avoid a runtime cycle: rules imports this module for the union
     from edge.core.rules import ReduceResult
@@ -122,6 +123,12 @@ def apply_dev_patch(
         if field not in _SHIP_INT_FIELDS:
             raise DevPatchError(f"unknown ship field {field!r}")
         new = _clamp_ship_field(ship, field, _resolve(op, getattr(ship, field), cmd.value))
+        if field == "colonists":
+            # `colonists` is a derived total over `population` (§4.2, GW-WP09-PRE
+            # follow-up) — a blunt cheat-tool set collapses the ship to one people
+            # (the player's own) rather than trying to guess a per-species split.
+            new_ship = replace(ship, population={player_species_key(config): new} if new else {})
+            return done(f"{op} ship.colonists={new}", ship_=new_ship)
         change = {field: new}
         return done(f"{op} ship.{field}={new}", ship_=replace(ship, **change))
 

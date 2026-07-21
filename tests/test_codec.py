@@ -212,13 +212,16 @@ COMMANDS: list[Command] = [
     RepairAtDock(Subsystem.THRUSTERS, 1),
     RecruitColonists(count=40, from_planet=None),
     RecruitColonists(count=10, from_planet=7),
+    RecruitColonists(count=10, from_planet=7, species_id="vesk"),  # multi-species world
     HireRecruits(count=6),
     DismissRecruits(count=2),
     BuySuits(suit_id="marauder", count=3),
     SellSuits(suit_id="scout", count=1),
     BuyGroundOrdnance(count=4),
     Colonize(planet_id=5, colonists=25),
+    Colonize(planet_id=5, colonists=25, species_id="terran"),  # explicit multi-species pick
     SettleColonists(planet_id=5, colonists=25),        # WP-PR07 top up an owned colony
+    SettleColonists(planet_id=5, colonists=25, species_id="terran"),
     SetAllocation(planet_id=5, allocation={"fuel_ore": 0.5, "organics": 0.5}),
     BuildCitadel(planet_id=5),                       # WP54 open a timed citadel build
     PlanetDeposit(planet_id=5, amount=1_000),        # WP54 treasury deposit
