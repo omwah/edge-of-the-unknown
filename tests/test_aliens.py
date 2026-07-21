@@ -306,10 +306,16 @@ def test_species_placement_does_not_perturb_ports_or_planets() -> None:
     def strip_port_archetype(ports):  # type: ignore[no-untyped-def]
         return {pid: replace(port, archetype_id="") for pid, port in ports.items()}
     assert strip_port_archetype(a.ports) == strip_port_archetype(b.ports)
-    # Home-cluster carving overlays alliance ownership on some planets (WP23), but the
-    # planet *generation* (positions/types/stores) is unperturbed — compare ignoring owner.
+    # Home-cluster carving overlays alliance ownership on some planets (WP23), and the
+    # inhabited-universe pass overlays peoples, populations and their holdings on top
+    # (GW-WP09-PRE) — both run *after* the planet draw and only where a roster exists.
+    # The planet *generation* itself (positions, types, habitability, yields) is what
+    # must be unperturbed, so compare with those two overlays stripped.
     def strip(ps):  # type: ignore[no-untyped-def]
-        return {pid: replace(p, owner=Ownership()) for pid, p in ps.items()}
+        return {pid: replace(p, owner=Ownership(), inhabited_by_species_id=None,
+                             colonists=0, stores={}, allocation={}, citadel_level=0,
+                             gun_integrity=0, treasury=0)
+                for pid, p in ps.items()}
     assert strip(a.planets) == strip(b.planets)
     assert not a.species and b.species  # only the alien layer differs
 

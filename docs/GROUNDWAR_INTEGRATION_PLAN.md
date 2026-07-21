@@ -7,9 +7,9 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–08 shipped; interview decisions resolved (July 2026).
-> Next: GW-WP09-PRE (NPC-inhabited worlds at big bang), a prerequisite for GW-WP09 —
-> no generated world can route to `Assault` until it lands.**
+> **Status: implementation underway — GW-WP01–08 and GW-WP09-PRE shipped; interview
+> decisions resolved (July 2026). Next: GW-WP09 (persistent ground defense + assault
+> generation), which now has real inhabited worlds to derive difficulty from.**
 
 ## Context
 
@@ -951,7 +951,56 @@ Tests: capacity and cost conservation; no negative balances/ammo; loadout
 round-trip; casualty persistence; service availability; property tests.
 Commit `ground: GW-WP08 ground force + assault composer`.
 
-### GW-WP09-PRE — NPC-inhabited worlds at big bang (L) — NEXT
+### GW-WP09-PRE — NPC-inhabited worlds at big bang (L) — SHIPPED
+
+**Status:** shipped July 2026. New `edge/bigbang/inhabitants.py` runs after
+`populate_species` (it needs the placed cast *and* the carved home clusters) on its own
+salted sub-RNG, so it shifts neither the §7 discovery draw nor species placement. It
+seeds the three populations D2/§6.3 imply — the governor's **Core** worlds, a bloc's
+**home-cluster** worlds, and **unaligned** worlds that keep `owner=none` beside a
+species id — with population drawn as a fraction of each world's own capacity, plus
+citadel level / gun integrity / treasury / stores. A fresh seed now reports through the
+inspector: *195 planets, 70 inhabited, 1.4M people, 18 assaultable / 51 friendly*.
+
+**The floor is enforced by construction, not by retrying.** The first cut checked a
+minimum in the validator and regenerated on failure — and seed 7 then failed all 16
+attempts. The shortage is in the **species draw**, not the planet draw: that cast held
+61 species of which *zero* were below the amity threshold, and redrawing kept producing
+the same friendly skew (the roster skews friendly by design, §6). Two corrections
+followed, and both are load-bearing:
+
+1. **The wary pool spans the whole cast, not just unaligned species.** An unaligned
+   people is preferred for an unowned world (the cleanest protectorate subject), but a
+   bloc's kind living beyond its cluster on nobody's world is equally coherent — and
+   necessary, since a cast can hold no wary *unaligned* species at all.
+2. **A constructive top-up** settles wary peoples onto free frontier worlds, deepest
+   band first, until the floor is met — the same "enforced per seed rather than in
+   expectation" approach `_finalize_planets` already uses for the monotone unowned
+   fraction.
+
+**The floor is capped by supply** (`target_floors`, read by both the top-up and the
+validator so they cannot disagree). A configured floor is a target for a full-size
+universe, not a law of nature: a 60-sector test universe has 14 planets, 2 free
+unowned worlds and a wholly peaceable cast, and demanding six targets of it made
+generation impossible (469 test failures). The invariant now reads "field as many
+targets as you can, up to the configured floor", and a peaceable universe is valid
+rather than rejected.
+
+**Epoch:** hashed `Planet` state changes, but `config_version` stays 12 — the
+per-milestone epoch policy defers the single bump to GW-WP11.
+
+Files (as shipped): `edge/bigbang/inhabitants.py` (new), `edge/bigbang/generator.py`
+(pipeline step + `--stats` counts), `edge/bigbang/validate.py`
+(`_check_ground_targets`), `edge/core/config.py` (`InhabitantsConfig`),
+`config/default.yaml`.
+Tests: `tests/test_bigbang_inhabitants.py` (15) — including
+`test_a_real_generated_world_routes_to_assault`, which drives the production
+`ground_access` classifier against a generated universe and is **the case that could
+not be written before this WP** without hand-building state.
+
+*Deviation from the WP's own file list:* `edge/core/planets.py` needed no change (the
+belt normalizer already clears inhabitants, and belts are skipped by the capacity
+gate), and no golden/wire fixtures moved (no command, event, or DTO changed).
 
 **Why this exists.** Found while extending the bigbang inspector (July 2026):
 **nothing in the codebase ever sets `Planet.inhabited_by_species_id`.** The only
