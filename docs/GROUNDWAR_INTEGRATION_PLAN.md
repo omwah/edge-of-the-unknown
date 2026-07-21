@@ -480,6 +480,39 @@ Cloud Cities retain a separate `groundwar.cloud_city_assault_enabled` gate. It
 stays off through GW-M4 and turns on only when GW-M5's specialized interior art,
 rules, DTO, and tests are complete.
 
+### Config epochs are batched per milestone, not per work package
+
+**Decision (July 2026).** An individual WP does **not** bump `config_version`.
+Hashed-state and config changes accumulate across the WPs of a milestone and the
+version bumps **once**, when the milestone closes. GW-WP03 stated this intent
+("Golden replay regeneration happens in this WP, once") and practice drifted:
+WP06, WP07 (twice) and WP08 each took their own epoch, and every bump costs a
+`config/default.yaml` edit, a `tests/test_config.py` assertion, and golden/snapshot
+churn that reviews have to read past. GW-WP09-PRE through GW-WP11 will each change
+hashed `Planet` state; one bump at the end of GW-M3 is the whole cost instead of
+three.
+
+This is cheap because **nothing enforces `config_version` at load.** It is stored
+on `Game`, in the SQLite `meta` row and in the portable bundle, and shown by the
+sysop console, but `GameService.load_game` gates only on the *dialogue
+fingerprint*. It is provenance, not a compatibility check.
+
+Two consequences to hold:
+
+- **Mid-milestone saves are not portable across a WP boundary**, and nothing will
+  say so. Between bumps, a save's recorded version still matches the build while the
+  regenerated universe has moved underneath it, so the log replays onto a different
+  world and fails as an arbitrary rules error deep in the replay. The
+  `--save` guard in `python -m edge.bigbang` compares the two versions and cannot
+  see drift that was never versioned. Discard saves across a WP boundary; do not
+  file the resulting replay error as a bug.
+- **The closing WP of a milestone owns the epoch**: the bump, the
+  `tests/test_config.py` assertion, golden replay regeneration, and the snapshot
+  pass, for everything the milestone accumulated.
+
+`WIRE_VERSION` is unaffected and still bumps per change — the wire fingerprint test
+forces it, and it is a genuine client/server compatibility gate rather than a record.
+
 ## Work packages
 
 ### GW-WP01 — Interview decisions and authoritative spec delta (M) — SHIPPED
@@ -971,9 +1004,11 @@ before it can read it.
 population, citadel, owner/species and band; without this, every derivation reads
 zero and the tuning work in GW-WP13 would be measuring an empty universe.
 
-**Epoch.** Generation-visible hashed `Planet` fields change, so this is a
-`config_version` bump with golden-replay/state-hash regeneration and a snapshot
-pass — batched into this one WP, as GW-WP03 established.
+**Epoch.** Generation-visible hashed `Planet` fields change, but this WP does **not**
+bump `config_version` — under the per-milestone epoch policy above, GW-M3's closing
+WP (GW-WP11) carries the single bump, the `test_config.py` assertion, golden replay
+regeneration, and the snapshot pass for everything WP09-PRE through WP11 accumulated.
+Saves do not survive this WP; that is expected and unsignalled.
 
 **Acceptance readout.** `python -m edge.bigbang --list planets` shows populated
 `species` / `pop` / `cit` / `gun` / `treasury` columns on a fresh seed (they are
