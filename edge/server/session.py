@@ -695,6 +695,29 @@ def _owner_label(state: UniverseState, planet: Planet, player_id: int) -> str:
     return alliance.name if alliance is not None else "alliance"
 
 
+def _inhabitants_label(state: UniverseState, planet: Planet, config: GameConfig) -> str:
+    """Who lives on this world, for the orbit view's World & colony panel.
+
+    A native polity names its own species (GW-WP09-PRE). A world the **player** settled
+    has no `inhabited_by_species_id` — its people were recruited at Stardock — so it
+    names the roster's `player_species_id`, the player's own people, rather than reading
+    as an unpeopled world with a population. Empty when nobody lives here.
+    """
+    if planet.inhabited_by_species_id is not None:
+        species = state.species.get(planet.inhabited_by_species_id)
+        if species is not None:
+            return species.name
+    if planet.colonists <= 0:
+        return ""
+    roster = config.roster
+    home = roster.player_species_id if roster is not None else None
+    if home is not None and roster is not None:
+        named = next((s for s in roster.species if s.id == home), None)
+        if named is not None:
+            return named.name
+    return "your colonists"
+
+
 def planet_view(state: UniverseState, player_id: int, planet_id: int, config: GameConfig) -> dto.PlanetDTO:
     """The orbit view of a planet for `player_id` (§4.2): type, owner, colony, stores."""
     planet = state.planets[planet_id]
@@ -772,6 +795,7 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         colonists=planet.colonists, habitability_cap=capacity,
         stores=stores, allocation=allocation, ship_colonists=ship.colonists,
         ship_colonist_capacity=ship.colonist_capacity,
+        species=_inhabitants_label(state, planet, config),
         ship_genesis=ship_genesis, genesis_eligible=genesis_eligible,
         genesis_has_device=genesis_has_device, genesis_blocker=genesis_blocker_text,
         starbase=starbase_status, starbase_id=planet.starbase_id,

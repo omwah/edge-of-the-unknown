@@ -1326,6 +1326,11 @@ class RosterConfig(BaseModel):
     core_governing_alliance_id: int
     alliances: list[AllianceConfig]
     species: list[SpeciesConfig]
+    # The player's **own people** — the species id whose citizens the Stardock
+    # recruitment office enlists. A world the player colonizes is peopled by them, so
+    # its orbit view names them rather than reading as nobody in particular. None ⇒ the
+    # game has no named home species and such a colony is simply "your colonists".
+    player_species_id: str | None = None
     subset_min: int = 6
     subset_max: int = 12
     # High-traffic Core hub: at least this many distinct Core-welcome species (governing
