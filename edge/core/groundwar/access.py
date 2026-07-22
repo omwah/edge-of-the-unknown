@@ -90,7 +90,7 @@ class Assault:
 GroundAccess = OrbitalOnly | Survey | Assault
 
 
-def _inhabiting_species(
+def inhabiting_species(
     state: UniverseState, planet: Planet, config: GameConfig,
 ) -> AlienSpecies | None:
     """The native species inhabiting `planet` (D2 holdings), or None (§4.2).
@@ -99,7 +99,9 @@ def _inhabiting_species(
     world may now hold the player's own colonists alongside a native polity
     (GW-WP09-PRE follow-up); ownership alone (checked first in `_friendly`) already
     decides friendliness for a player-owned world, so this is only ever asked about an
-    unowned holding.
+    unowned holding. Public (GW-WP09): `rules._begin_assault` reuses this one seam
+    rather than duplicating the `native_population_key` + `resolve_species_by_kind`
+    pair a second time.
     """
     key = native_population_key(planet, config)
     if key is None:
@@ -148,7 +150,7 @@ def _friendly(state: UniverseState, player: Player, planet: Planet, config: Game
         return True
     if owner.kind == "alliance" and owner.ref is not None and owner.ref == player.alliance_id:
         return True
-    species = _inhabiting_species(state, planet, config)
+    species = inhabiting_species(state, planet, config)
     if species is not None and config.aliens is not None:
         return aliens.is_friendly(
             species_effective_standing(species, player, config), config.aliens)

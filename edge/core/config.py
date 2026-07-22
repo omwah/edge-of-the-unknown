@@ -1902,6 +1902,75 @@ class GwGroundForce(BaseModel):
     missile_price: int = Field(default=400, ge=0)  # latinum per ground missile
 
 
+class GwGarrisonEconomy(BaseModel):
+    """Persistent planetary ground-garrison economy (GW plan D11, GW-WP09).
+
+    Three independent rails feed `Planet.garrison_infantry`/`garrison_armor`:
+    big-bang seeding (once, at generation), automatic militia recovery (every
+    production tick, ownership-independent), and colonist-allocation training
+    (every tick, owner-only, equipment-gated). `ReinforceGarrison` (GW-WP09/D15)
+    is the fourth, ship-side, rail — its 1:1 recruit+suit → infantry conversion
+    needs no config knob here.
+    """
+
+    model_config = _FROZEN
+
+    # --- colonist-allocation training (produce(), owner-only) ---
+    train_yield: float = Field(default=0.4, ge=0.0)  # infantry minted per (output × garrison_allocation)
+    train_equipment_cost: int = Field(default=3, ge=0)  # equipment consumed per infantry unit trained
+
+    # --- automatic militia baseline recovery (cron, ownership-independent) ---
+    militia_recovery_frac: float = Field(default=0.01, ge=0.0, le=1.0)  # infantry: population-fraction/day
+    militia_armor_recovery_frac: float = Field(default=0.003, ge=0.0, le=1.0)  # armor: same shape, slower
+    armor_recovery_min_citadel_level: int = Field(default=2, ge=0)  # an unfortified world fields/regrows none
+
+    # --- shared ceiling ---
+    cap_frac: float = Field(default=0.35, gt=0.0, le=1.0)  # garrison_infantry ceiling, as a fraction of colonist_capacity
+
+    # --- big-bang seeding (edge/bigbang/inhabitants.py) ---
+    seed_infantry_frac_min: float = Field(default=0.02, ge=0.0)
+    seed_infantry_frac_max: float = Field(default=0.12, ge=0.0)
+    seed_hostility_mult: float = Field(default=1.6, ge=1.0)  # a below-amity species defends harder
+    seed_alliance_mult: float = Field(default=1.3, ge=1.0)  # a bloc-held world defends harder than unaligned
+    seed_band_mult: dict[str, float] = Field(default_factory=dict)  # distance band → seeding multiplier
+    seed_armor_min_citadel_level: int = Field(default=2, ge=0)  # matches citadels.gun_min_level by convention
+    seed_armor_frac: float = Field(default=0.25, ge=0.0, le=1.0)  # armor seeded as this fraction of seeded infantry
+
+    @model_validator(mode="after")
+    def _check(self) -> GwGarrisonEconomy:
+        if self.seed_infantry_frac_max < self.seed_infantry_frac_min:
+            raise ValueError("groundwar.garrison_economy seed_infantry_frac_max must be ≥ _min")
+        for band, mult in self.seed_band_mult.items():
+            if mult <= 0.0:
+                raise ValueError(f"groundwar.garrison_economy seed_band_mult[{band}] must be > 0")
+        return self
+
+
+class GwAssaultDifficulty(BaseModel):
+    """Live-state assault difficulty derivation (GW-WP09), superseding `GwDifficulty`
+    for production. `GwDifficulty` stays as-is for the standalone `edge.groundwar` app;
+    this block is read only by `edge.core.groundwar.assault.derive_difficulty`.
+    """
+
+    model_config = _FROZEN
+
+    min_cities: int = Field(default=1, gt=0)
+    max_cities: int = Field(default=4, ge=1)
+    population_per_extra_city: int = Field(default=4000, gt=0)  # scaled capacity per city beyond min_cities
+    surrender_threshold_base: int = Field(default=30, gt=0)
+    surrender_threshold_per_citadel_level: int = Field(default=8, ge=0)
+    hostility_mult: float = Field(default=1.4, ge=1.0)  # below-amity species → larger battlefield
+    band_mult: dict[str, float] = Field(default_factory=dict)  # distance band → capacity-score multiplier
+    alliance_owned_mult: float = Field(default=1.2, ge=1.0)  # a bloc-held world reads slightly harder
+    had_gun_mult: float = Field(default=1.15, ge=1.0)  # a world that built+lost a gun fights harder (GW plan D11)
+
+    @model_validator(mode="after")
+    def _check(self) -> GwAssaultDifficulty:
+        if self.max_cities < self.min_cities:
+            raise ValueError("groundwar.assault_difficulty max_cities must be ≥ min_cities")
+        return self
+
+
 class GwDifficulty(BaseModel):
     """A standalone setup-screen difficulty preset (superseded by live state in production)."""
 
@@ -1955,6 +2024,8 @@ class GroundwarConfig(BaseModel):
     expedition: GwExpedition
     ground_force: GwGroundForce = GwGroundForce()
     difficulties: dict[str, GwDifficulty] = Field(default_factory=dict)
+    garrison_economy: GwGarrisonEconomy = GwGarrisonEconomy()
+    assault_difficulty: GwAssaultDifficulty = GwAssaultDifficulty()
 
     @property
     def width(self) -> int:

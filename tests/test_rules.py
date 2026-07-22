@@ -528,6 +528,56 @@ def test_set_allocation_normalizes_and_requires_ownership() -> None:
         _do(state, SetAllocation(planet_id=1, allocation={"fuel_ore": 1.0}))
 
 
+def test_set_allocation_normalizes_trio_fighter_and_garrison_together() -> None:
+    """GW-WP09/D11: SetAllocation's `garrison` share joins the trio + `fighter` in the
+    same sum-to-1.0 normalization — `garrison=0.0` is back-compat with every caller
+    that never passes it (every fixture above this test)."""
+    from dataclasses import replace
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, population={"terran": 50})
+    _with_colony_world(state)
+    _do(state, Colonize(planet_id=1, colonists=30))
+    _do(state, SetAllocation(
+        planet_id=1, allocation={"fuel_ore": 1.0, "organics": 1.0}, fighter=1.0, garrison=2.0))
+    planet = state.planets[1]
+    total = sum(planet.allocation.values()) + planet.fighter_allocation + planet.garrison_allocation
+    assert abs(total - 1.0) < 1e-9
+    assert planet.garrison_allocation == 0.4  # 2.0 / (1+1+1+2)
+    # garrison=0.0 (the default) never touches garrison_allocation.
+    _do(state, SetAllocation(planet_id=1, allocation={"fuel_ore": 1.0}))
+    assert state.planets[1].garrison_allocation == 0.0
+
+
+def test_transfer_fighters_moves_conserved_amounts_both_ways() -> None:
+    from dataclasses import replace
+
+    from edge.core.rules import TransferFighters
+
+    state = _universe()
+    state.ships[1] = replace(state.ships[1], colonist_capacity=100, population={"terran": 50})
+    _with_colony_world(state)
+    _do(state, Colonize(planet_id=1, colonists=30))
+    state.ships[1] = replace(state.ships[1], fighters=40)
+    state.planets[1] = replace(state.planets[1], fighters=10)
+
+    _do(state, TransferFighters(planet_id=1, count=15))  # ship -> planet (default to_planet=True)
+    assert state.ships[1].fighters == 25 and state.planets[1].fighters == 25
+
+    _do(state, TransferFighters(planet_id=1, count=100, to_planet=False))  # "load all"
+    assert state.ships[1].fighters == 25 + 25 and state.planets[1].fighters == 0
+
+    with pytest.raises(EconomyError):
+        _do(state, TransferFighters(planet_id=1, count=0))
+    with pytest.raises(EconomyError):
+        _do(state, TransferFighters(planet_id=1, count=5, to_planet=False))  # nothing left in storage
+
+    # a world the player does not own is rejected
+    state.planets[1] = replace(state.planets[1], owner=Ownership("alliance", 1))
+    with pytest.raises(EconomyError):
+        _do(state, TransferFighters(planet_id=1, count=1))
+
+
 def test_bank_deposit_then_withdraw() -> None:
     state = _universe()
     _do(state, Deposit(amount=1_000))

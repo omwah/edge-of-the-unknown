@@ -7,9 +7,10 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–08 and GW-WP09-PRE shipped; interview
-> decisions resolved (July 2026). Next: GW-WP09 (persistent ground defense + assault
-> generation), which now has real inhabited worlds to derive difficulty from.**
+> **Status: implementation underway — GW-WP01–08, GW-WP09-PRE, and GW-WP09 shipped;
+> interview decisions resolved (July 2026). Next: GW-WP10 (tactical assault actions
+> and planetary AI), which now has a persistent garrison and a live battlefield/
+> difficulty derivation to fight over.**
 
 ## Context
 

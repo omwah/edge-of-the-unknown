@@ -31,6 +31,8 @@ from edge.core.events import (
     CitadelGunSilenced,
     Colonized,
     ColonistsRecruited,
+    FightersTransferred,
+    GarrisonReinforced,
     GroundOrdnanceBought,
     RecruitsDismissed,
     RecruitsHired,
@@ -148,7 +150,8 @@ from edge.core.rules import (
     PostNotice,
     RemoveNote,
     ToggleAvoid,
-    BatchTransferCargo, TransferCargo,
+    BatchTransferCargo, TransferCargo, TransferFighters,
+    BeginAssault,
     DeployBeacon,
     DeployFighters,
     DeployGenesis,
@@ -180,6 +183,7 @@ from edge.core.rules import (
     DismissRecruits,
     HireRecruits,
     RecruitColonists,
+    ReinforceGarrison,
     SellSuits,
     RemoveLimpets,
     ResignAlliance,
@@ -265,12 +269,17 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
         case SetAllocation():
             return "SetAllocation", {
                 "planet_id": command.planet_id, "allocation": command.allocation,
-                "fighter": command.fighter,
+                "fighter": command.fighter, "garrison": command.garrison,
             }
         case TransferCargo():
             return "TransferCargo", {
                 "planet_id": command.planet_id, "commodity": command.commodity.value,
                 "units": command.units, "to_planet": command.to_planet,
+            }
+        case TransferFighters():
+            return "TransferFighters", {
+                "planet_id": command.planet_id, "count": command.count,
+                "to_planet": command.to_planet,
             }
         case BatchTransferCargo():
             return "BatchTransferCargo", {
@@ -285,6 +294,13 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "PlanetWithdraw", {"planet_id": command.planet_id, "amount": command.amount}
         case InvadePlanet():
             return "InvadePlanet", {"planet_id": command.planet_id, "fighters": command.fighters}
+        case ReinforceGarrison():
+            return "ReinforceGarrison", {
+                "planet_id": command.planet_id, "suit_id": command.suit_id,
+                "count": command.count,
+            }
+        case BeginAssault():
+            return "BeginAssault", {"planet_id": command.planet_id}
         case InstallComponent():
             return "InstallComponent", {
                 "subsystem": command.subsystem.value, "slot_index": command.slot_index,
@@ -504,11 +520,15 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return BuildStagingArea(planet_id=payload["planet_id"])
         case "SetAllocation":
             return SetAllocation(planet_id=payload["planet_id"], allocation=payload["allocation"],
-                                 fighter=payload.get("fighter", 0.0))
+                                 fighter=payload.get("fighter", 0.0),
+                                 garrison=payload.get("garrison", 0.0))
         case "TransferCargo":
             return TransferCargo(planet_id=payload["planet_id"],
                                  commodity=Commodity(payload["commodity"]),
                                  units=payload["units"], to_planet=payload["to_planet"])
+        case "TransferFighters":
+            return TransferFighters(planet_id=payload["planet_id"], count=payload["count"],
+                                    to_planet=payload["to_planet"])
         case "BatchTransferCargo":
             return BatchTransferCargo(planet_id=payload["planet_id"], units=payload["units"],
                                       to_planet=payload["to_planet"])
@@ -520,6 +540,12 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return PlanetWithdraw(planet_id=payload["planet_id"], amount=payload["amount"])
         case "InvadePlanet":
             return InvadePlanet(planet_id=payload["planet_id"], fighters=payload["fighters"])
+        case "ReinforceGarrison":
+            return ReinforceGarrison(
+                planet_id=payload["planet_id"], suit_id=payload["suit_id"],
+                count=payload["count"])
+        case "BeginAssault":
+            return BeginAssault(planet_id=payload["planet_id"])
         case "InstallComponent":
             return InstallComponent(
                 subsystem=Subsystem(payload["subsystem"]), slot_index=payload["slot_index"],
@@ -863,6 +889,16 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "planet_id": event.planet_id,
                 "commodity": event.commodity.value, "units": event.units,
                 "to_planet": event.to_planet,
+            }
+        case FightersTransferred():
+            return "FightersTransferred", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "count": event.count, "to_planet": event.to_planet,
+            }
+        case GarrisonReinforced():
+            return "GarrisonReinforced", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "suit_id": event.suit_id, "count": event.count,
             }
         case CitadelBuildStarted():
             return "CitadelBuildStarted", {
@@ -1227,6 +1263,12 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
             return CargoTransferred(payload["player_id"], payload["planet_id"],
                                     Commodity(payload["commodity"]), payload["units"],
                                     payload["to_planet"])
+        case "FightersTransferred":
+            return FightersTransferred(payload["player_id"], payload["planet_id"],
+                                       payload["count"], payload["to_planet"])
+        case "GarrisonReinforced":
+            return GarrisonReinforced(payload["player_id"], payload["planet_id"],
+                                      payload["suit_id"], payload["count"])
         case "CitadelBuildStarted":
             return CitadelBuildStarted(payload["player_id"], payload["planet_id"],
                                        payload["target_level"])

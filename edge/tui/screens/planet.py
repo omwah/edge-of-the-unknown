@@ -29,17 +29,19 @@ from edge.core.citadels import CitadelError
 from edge.core.combat import CombatError
 from edge.core.economy import EconomyError
 from edge.core.dto import PlanetDTO
+from edge.core.groundwar.force import GroundForceError
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import (
     BeginSurvey, BuildCitadel, BuildStagingArea, Colonize, DeployGenesis, InvadePlanet, MineBelt,
-    PlanetDeposit, PlanetWithdraw,
+    PlanetDeposit, PlanetWithdraw, ReinforceGarrison,
 )
 from edge.server.service import GameService
 from edge.tui.chrome import EdgeScreen, notify_warning
 from edge.tui import art_adapter
 from edge.tui.screens.amount import AmountPrompt
 from edge.tui.screens.confirm import ConfirmScreen
+from edge.tui.screens.picker import ListPicker
 from edge.tui.dummy import sample_surface
 from edge.tui.screens.surface import SurfaceScreen
 from edge.tui.widgets import ClickableEntry
@@ -113,6 +115,7 @@ class PlanetScreen(EdgeScreen):
         Binding("plus", "treasury_deposit", "Deposit"),
         Binding("minus", "treasury_withdraw", "Withdraw"),
         Binding("i", "invade", "Invade"),
+        Binding("r", "reinforce", "Reinforce garrison"),
         # `P` boards the base here too, as it does on the sector view — the verb keeps
         # one key everywhere (a base *is* the port where it orbits, §4.2/WP80).
         Binding("p", "enter_base", "Enter base"),
@@ -120,7 +123,7 @@ class PlanetScreen(EdgeScreen):
         Binding("l", "load_cargo", "Load cargo"),
     ]
     # WP-UI06: both irreversibly commit troops / re-form the world — confirmed.
-    ACTION_DANGER = {"invade": "destructive", "genesis": "destructive"}
+    ACTION_DANGER = {"invade": "destructive", "genesis": "destructive", "reinforce": "destructive"}
 
     HELP_TITLE = "Planet orbit"
     HELP = """\
@@ -136,6 +139,8 @@ from the citadel panel. Citadel builds draw equipment from [i]stores[/], so supp
 runs in trips are the intended loop; the citadel art grows with its level.
 [b]I[/] invades a hostile world once its defences are down, and asks how many of your
 fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard.
+[b]R[/] reinforces an owned world's persistent ground garrison, converting carried
+recruits and suits — irreversible, unlike fighters, they never come back as troops.
 A gas giant has no ground: it holds nothing and nobody until [b]S[/] builds a
 [i]Cloud City[/] staging area, paid in equipment [i]from your hold[/] (the first build
 claims the world). Building again grows the city, and a bigger city berths more people."""
@@ -197,7 +202,9 @@ claims the world). Building again grows the city, and a bigger city berths more 
                     if p.cloud_city_size > 0 or not p.cloud_city:
                         yield self._stores_panel(p)
                 if p.landable and p.owned_by_you and (p.citadel_level > 0 or p.can_build_citadel
-                                       or p.citadel_build_target > 0):
+                                       or p.citadel_build_target > 0
+                                       or p.can_reinforce_garrison
+                                       or p.garrison_infantry or p.garrison_armor):
                     yield self._citadel_panel(p)
                 if p.can_invade:
                     yield Static(f"[red]\\[I] Invade[/] — land some or all of your "
@@ -415,6 +422,16 @@ claims the world). Building again grows the city, and a bigger city berths more 
             f"Level [b]{p.citadel_level}[/]   treasury [yellow]{p.treasury:,}[/]   "
             f"garrison {p.fighters:,}", classes="section-tight")
         children: list[Static | Horizontal] = [art, status]
+        # Ground-defense garrison (GW-WP09, D11/D15): a distinct headcount from the
+        # space-fighter garrison above — infantry/armor troops, not a citadel gun crew.
+        # Shown only once there is something to report, so a freshly claimed world's
+        # citadel panel stays as compact as it always was.
+        if p.garrison_infantry or p.garrison_armor or p.garrison_allocation_pct:
+            children.append(Static(
+                f"Ground garrison  [b]{p.garrison_infantry:,}[/] infantry / "
+                f"{p.garrison_armor:,} armor" + (
+                    f"   training {p.garrison_allocation_pct}%" if p.garrison_allocation_pct else ""
+                ), classes="section-tight"))
         if p.citadel_build_target > 0:
             done = max(1, p.citadel_build_pct // 10)
             bar = "█" * done + "░" * (10 - done)
@@ -430,6 +447,8 @@ claims the world). Building again grows the city, and a bigger city berths more 
         if p.citadel_level >= 1:
             buttons.append(Button("Deposit 1k", id="btn-cit-dep"))
             buttons.append(Button("Withdraw 1k", id="btn-cit-wd"))
+        if p.can_reinforce_garrison:
+            buttons.append(Button("Reinforce garrison…", id="btn-reinforce"))
         if buttons:
             children.append(Horizontal(*buttons, classes="buttons"))
         panel = Vertical(*children, classes="orbit-panel")
@@ -446,6 +465,7 @@ claims the world). Building again grows the city, and a bigger city berths more 
             "btn-build": self.action_build_citadel,
             "btn-cit-dep": self.action_treasury_deposit,
             "btn-cit-wd": self.action_treasury_withdraw,
+            "btn-reinforce": self.action_reinforce,
         }
         handler = actions.get(event.button.id or "")
         if handler is not None:
@@ -538,6 +558,58 @@ claims the world). Building again grows the city, and a bigger city berths more 
             "How many do you land? Committed troops do not come back.",
             maximum=p.ship_fighters, step=_INVADE_STEP, commit_label="Invade",
             dangerous=True), _go)
+
+    def action_reinforce(self) -> None:
+        """Station carried recruits + suits as persistent ground defenders (D15, GW-WP09).
+
+        Irreversible — stationed troopers are folded into a typed headcount, not
+        returned as individuals. Picks a suit class first (when more than one is
+        aboard, via the shared `ListPicker`), then how many via `AmountPrompt` —
+        mirroring `action_invade`'s single-prompt shape, just preceded by a class
+        choice since a reinforcement names a suit id the invasion command does not.
+        """
+        if self._service is None:
+            self.action_noop()
+            return
+        service = self._service
+        p = self._planet
+        if not p.can_reinforce_garrison:
+            self.notify(p.reinforce_blocker or "Nothing to reinforce with here.", timeout=2)
+            return
+
+        def _go(suit_id: str, count: int | None) -> None:
+            if not count:
+                return
+            try:
+                service.apply(self._pid, ReinforceGarrison(p.planet_id, suit_id, count))
+            except (EconomyError, GroundForceError) as exc:
+                notify_warning(self, str(exc))
+                return
+            self.notify(f"{count:,} troopers stationed in the garrison.", timeout=2)
+            self._reopen()
+
+        def _amount_for(suit_id: str, owned: int) -> None:
+            self.app.push_screen(AmountPrompt(
+                f"Station troopers on {p.name}?\n"
+                f"Garrison {p.garrison_infantry:,} infantry · you carry {owned:,} in that suit.\n"
+                "Stationed troopers do not come back.",
+                maximum=owned, commit_label="Reinforce", dangerous=True),
+                lambda count: _go(suit_id, count))
+
+        if len(p.ship_suits) == 1:
+            suit_id, owned = p.ship_suits[0]
+            _amount_for(suit_id, owned)
+            return
+
+        options = [(f"{suit_id} ({owned:,} aboard)", suit_id) for suit_id, owned in p.ship_suits]
+
+        def _picked(suit_id: str | int | None) -> None:
+            if not isinstance(suit_id, str):
+                return
+            owned = dict(p.ship_suits).get(suit_id, 0)
+            _amount_for(suit_id, owned)
+
+        self.app.push_screen(ListPicker("Which suit class?", options), _picked)
 
     def action_colonize(self) -> None:
         if self._service is None:

@@ -118,6 +118,51 @@ def test_citadel_holdings_are_coherent(world: UniverseState) -> None:
             assert planet.treasury == 0
 
 
+# --- garrison seeding (GW-WP09, D11) ------------------------------------------
+
+
+def test_seeded_garrison_is_never_negative(world: UniverseState) -> None:
+    for planet in _inhabited(world):
+        assert planet.garrison_infantry >= 0
+        assert planet.garrison_armor >= 0
+
+
+def test_seeded_garrison_scales_with_hostility_citadel_and_band() -> None:
+    """A wary/unaligned, deeper-band world seeds a heavier garrison than a friendly,
+    alliance-held, shallow-band world at comparable capacity — the live-state scaling
+    acceptance item, exercised at generation time rather than as a unit test of the
+    formula in isolation (already covered by `test_groundwar_assault.py`)."""
+    state = generate(CFG, 1986)
+    inhabited = _inhabited(state)
+    wary_unaligned = []
+    friendly_aligned = []
+    for planet in inhabited:
+        key = native_population_key(planet, CFG)
+        if key is None:
+            continue
+        species = resolve_species_by_kind(state, key, CFG.roster)
+        if species is None:
+            continue
+        capacity = colonist_capacity(planet, CFG)
+        if capacity <= 0:
+            continue
+        frac = planet.garrison_infantry / capacity
+        if species.base_disposition < CFG.aliens.amity_threshold and not planet.owner.is_owned:  # type: ignore[union-attr]
+            wary_unaligned.append(frac)
+        elif species.base_disposition >= CFG.aliens.amity_threshold and planet.owner.kind == "alliance":  # type: ignore[union-attr]
+            friendly_aligned.append(frac)
+    if wary_unaligned and friendly_aligned:
+        # Compare the group averages — a per-world comparison would fight the seeded
+        # per-generation disposition spread and band-mult noise.
+        assert sum(wary_unaligned) / len(wary_unaligned) >= sum(friendly_aligned) / len(friendly_aligned)
+
+
+def test_seeded_garrison_is_deterministic_for_a_seed() -> None:
+    a, b = generate(CFG, 7), generate(CFG, 7)
+    assert {p.id: (p.garrison_infantry, p.garrison_armor) for p in a.planets.values()} == \
+           {p.id: (p.garrison_infantry, p.garrison_armor) for p in b.planets.values()}
+
+
 # --- determinism + the generation invariant ----------------------------------
 
 

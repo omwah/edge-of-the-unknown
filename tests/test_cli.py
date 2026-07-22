@@ -133,12 +133,18 @@ def test_species_listing_carries_the_archetype(
 
 
 def _small_config():
-    """A 60-sector config — the same object the CLI and the save builder must share."""
+    """A 90-sector config — the same object the CLI and the save builder must share.
+
+    90 rather than 60 (GW-WP09): `_demo_save` needs at least one unowned, colonizable,
+    *uninhabited* world for seed 2 under the test overrides' bigbang parameters — the
+    GW-WP09-PRE native-population seeding pass can otherwise leave every unowned
+    colonizable world in a 60-sector universe already peopled.
+    """
     from edge.config import load_default_config
 
     cfg = load_default_config()
     return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(
-        update={"sector_count": 60})})
+        update={"sector_count": 90})})
 
 
 def _demo_save(path: Path, config) -> int:
@@ -152,8 +158,12 @@ def _demo_save(path: Path, config) -> int:
     with SqliteRepository(path) as repo:
         service = GameService.new_game(config, seed=2, repo=repo)
         state = service.state
+        # Unowned, colonizable, and *uninhabited* (GW-WP09-PRE seeds native peoples onto
+        # some unowned worlds too) — this test asserts the exact "50" the player brings,
+        # which a native population sharing the world would fold into a larger total.
         target = next(p for p in state.planets.values()
-                      if not p.owner.is_owned and colonist_capacity(p, config) > 0)
+                      if not p.owner.is_owned and colonist_capacity(p, config) > 0
+                      and not p.population)
         service.apply(1, DevPatch(op="set", target="ship.colonists", value=50))
         service.apply(1, DevPatch(op="teleport", target="sector", value=target.sector_id))
         service.apply(1, Colonize(planet_id=target.id, colonists=50))

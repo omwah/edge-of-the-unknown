@@ -41,6 +41,7 @@ from dataclasses import dataclass, replace
 from edge.core.aliens import resolve_species_by_kind
 from edge.core.config import GameConfig, InhabitantsConfig
 from edge.core.enums import Commodity
+from edge.core.groundwar.assault import seed_garrison
 from edge.core.models import AlienSpecies, Planet, UniverseState
 from edge.core.planets import any_population_key, colonist_capacity, is_cloud_city_world, is_landable
 from edge.core.starbases import is_operational
@@ -240,6 +241,20 @@ def _settle(state: UniverseState, planet: Planet, species_id: int, config: GameC
         if level >= citadels.gun_min_level:
             gun = citadels.gun_hull
 
+    # Persistent ground-defense garrison (GW plan D11, GW-WP09): seeded once, here, off
+    # the same salted `rng` `_settle` already draws from (no new stream, so this cannot
+    # perturb the discovery/species draw order). A consequence of settlement, not an
+    # input to it — `_can_hold_a_people`/`_guarantee_targets`/`target_floors` are unaffected.
+    infantry, armor = 0, 0
+    if config.groundwar is not None:
+        species = state.species[species_id]
+        hostile = (config.aliens is not None
+                   and species.base_disposition < config.aliens.amity_threshold)
+        band = state.sectors[planet.sector_id].distance_band
+        infantry, armor = seed_garrison(
+            config, capacity=capacity, citadel_level=level, distance_band=band,
+            hostile=hostile, alliance_owned=planet.owner.kind == "alliance", rng=rng)
+
     return replace(
         planet,
         population={roster_id: colonists},
@@ -248,6 +263,8 @@ def _settle(state: UniverseState, planet: Planet, species_id: int, config: GameC
         citadel_level=level,
         gun_integrity=gun,
         treasury=int(thousands * cfg.treasury_per_1k) if level > 0 else 0,
+        garrison_infantry=infantry,
+        garrison_armor=armor,
     )
 
 

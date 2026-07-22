@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 30  # GW-WP09-PRE: PlanetDTO.species (who lives on a world)
+WIRE_VERSION = 31  # GW-WP09: PlanetDTO garrison fields + TransferFighters/ReinforceGarrison/BeginAssault
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected

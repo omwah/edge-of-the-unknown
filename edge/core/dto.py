@@ -1141,6 +1141,15 @@ class PlanetDTO:
     ground_mode: str = "orbital_only"
     ground_blocker: str = ""  # reason (orbital-only) / first standing siege rung (assault) / ""
     ground_settlements: bool = False  # survey only: friendly inhabitants are visitable (D5/D6)
+    # Persistent ground-defense garrison (GW-WP09, D11/D15): a readout plus the reinforce
+    # affordance, gated like the citadel block above (owner + landable + recruits/suits aboard).
+    garrison_infantry: int = 0
+    garrison_armor: int = 0
+    garrison_allocation_pct: int = 0  # ground-garrison training share, percent (D11)
+    can_reinforce_garrison: bool = False  # owner + landable + recruits/suits aboard (D15)
+    reinforce_blocker: str = ""  # why reinforcement is barred, "" when allowed
+    ship_recruits: int = 0  # recruits aboard, for the reinforce affordance
+    ship_suits: list[tuple[str, int]] = field(default_factory=list)  # (suit_id, count) aboard
 
 
 @dataclass(frozen=True)

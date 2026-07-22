@@ -194,6 +194,19 @@ class GroundOperationEnded(Event):
 
 
 @dataclass(frozen=True)
+class GarrisonReinforced(Event):
+    """Recruits + suits converted into a world's persistent garrison (GW-WP09, D15).
+
+    Irreversible — `count` becomes exactly that much `garrison_infantry`.
+    """
+
+    player_id: int
+    planet_id: int
+    suit_id: str
+    count: int
+
+
+@dataclass(frozen=True)
 class BeltMined(Event):
     """The player hand-mined an asteroid belt, taking raw goods aboard (§4.2, PT-30)."""
 
@@ -775,6 +788,21 @@ class CargoTransferred(Event):
     planet_id: int
     commodity: Commodity
     units: int
+    to_planet: bool
+
+
+@dataclass(frozen=True)
+class FightersTransferred(Event):
+    """Fighters moved between a ship's bays and a planet's stored stock (GW-WP09).
+
+    `to_planet` True is an unload (ship → stores); False a load (stores → ship).
+    Fighters are conserved — mirrors `CargoTransferred`, but for the space-fighter
+    reserve rather than trade goods.
+    """
+
+    player_id: int
+    planet_id: int
+    count: int
     to_planet: bool
 
 
