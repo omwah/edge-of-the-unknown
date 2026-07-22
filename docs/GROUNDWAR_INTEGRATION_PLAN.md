@@ -7,10 +7,11 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–08, GW-WP09-PRE, and GW-WP09 shipped;
-> interview decisions resolved (July 2026). Next: GW-WP10 (tactical assault actions
-> and planetary AI), which now has a persistent garrison and a live battlefield/
-> difficulty derivation to fight over.**
+> **Status: implementation underway — GW-WP01–08, GW-WP09-PRE, GW-WP09, and GW-WP10
+> shipped; interview decisions resolved (July 2026). Next: GW-WP11 (strategic
+> assault settlement and consequences), which reconciles the tactical outcome
+> GW-WP10 can now produce into persistent planet/owner/species state — closing
+> GW-M3.**
 
 ## Context
 
@@ -1081,58 +1082,108 @@ real generated world (the case that cannot be written today without hand-buildin
 state).
 Commit `ground: GW-WP09-PRE seed NPC-inhabited worlds`.
 
-### GW-WP09 — Persistent ground defense and assault generation (XL)
+### GW-WP09 — Persistent ground defense and assault generation (XL) — SHIPPED
 
-Implement the D11 persistent planetary ground-defense model, its big-bang
-seeding, reinforcement/replenishment rail, player/protectorate management, DTO
-surface, and migration away from `Planet.fighters` as invasion defense.
-Planet-produced/stored fighters remain space assets; add any missing transfer
-path needed to move them between a planet, ship, and sector deployment.
+**Status:** shipped July 2026. The D11 persistent planetary ground-defense model
+lands as a finite, casualty-reducible garrison — `Planet.garrison_infantry` /
+`garrison_armor` — fed by three sources: big-bang seeding (`edge/bigbang/
+inhabitants.py`), ownership-independent militia recovery, and dedicated
+colonist-allocation training, all in `edge/core/planets.py`. The irreversible
+D15 reinforcement rail is the new `ReinforceGarrison` command (recruits+suits
+aboard ship → local garrison, one-way as the plan specified), alongside a new
+`TransferFighters` command that moves `Planet.fighters` between planet, ship,
+and sector deployment — closing a gap the plan named explicitly, and kept
+strictly outside the ground-defense calculation under D7 (fighters have no
+effect on assault odds).
 
-Ground garrisons combine D11's automatic population baseline, dedicated
-colonist allocation, and stationed recruit+suit reinforcements. Define exact
-production inputs, caps, the irreversible D15 reinforcement command,
-owner/protectorate rights,
-and how typed infantry/armour equipment maps onto tactical units without
-creating or destroying resources implicitly. Mission survivors return to the
-ship; only an explicit transfer merges them into local defense.
+A new `BeginAssault` reducer opens an `AssaultOperation`: it derives difficulty
+from live state — planet type, population, band, the D11 garrison, citadel
+level, surviving gun, owner/species — via the new `GwAssaultDifficulty` config
+block, which supersedes the POC's menu-selected `GwDifficulty` for production
+(that type stays as-is, unused, for the standalone `edge.groundwar` app).
+Battlefield/city/structure generation is **ported** from the edge-groundwar POC
+into frozen pure models; the POC's garrison model itself is **not** ported,
+since its infinite-wave garrison is incompatible with D11's finite headcount —
+this WP replaces it rather than reusing it. `BeginAssault` enforces the orbital
+ladder (never stamps a razed base or silenced gun), applies the D9 terrestrial-
+versus-Cloud-City gate, and snapshots/reserves the committed garrison so a
+second concurrent `BeginAssault` cannot spend it twice — the operation only
+opens; nothing on the planet mutates until GW-WP11 settles the outcome.
 
-Port battlefield/city/structure/garrison generation to frozen pure models.
-Difficulty is derived from live state rather than selected from a setup menu:
-planet type, population, band, the D11 persistent ground garrison, citadel level,
-surviving gun, owner/species, and config scaling curves.
+The planet screen gains a garrison readout and a reinforce affordance.
 
-Enforce the orbital ladder at begin. Never stamp a razed base or silenced gun.
-Snapshot/reserve the ground defenders committed to the operation so another
-command cannot spend them twice. Keep `Planet.fighters` entirely outside this
-calculation under D7. Apply the D9 terrestrial-versus-Cloud-City gate.
+**Epoch:** `config_version` stays 12 (per-milestone batching defers the single
+bump to GW-WP11), `WIRE_VERSION` 30→31 for `PlanetDTO` garrison fields plus the
+`TransferFighters` / `ReinforceGarrison` / `BeginAssault` commands and events.
 
-Files: `edge/core/groundwar/assault.py`, `edge/core/groundwar/access.py`,
-`edge/core/models.py`, `edge/core/planets.py`, `edge/bigbang/populate.py`,
-`edge/core/citadels.py`, `edge/core/rules.py`, `edge/core/events.py`, planet DTO/UI.
-Tests: seeded maps; live-state scaling; city reachability; no duplicate gun;
-base/gun/shield/Core rejection; ground-defender reserve conservation; fighters
-have no effect on assault odds; concurrent start race.
-Commit `ground: GW-WP09 assault maps from live worlds`.
+Files (as shipped): `edge/bigbang/inhabitants.py`, `edge/core/config.py`,
+`edge/core/dto.py`, `edge/core/events.py`, `edge/core/groundwar/access.py`,
+`edge/core/groundwar/assault.py` (new), `edge/core/groundwar/force.py`,
+`edge/core/groundwar/models.py`, `edge/core/models.py`, `edge/core/planets.py`,
+`edge/core/rules.py`, `edge/engine/cron.py`, `edge/server/session.py`,
+`edge/server/wire.py`, `edge/store/codec.py`, `edge/tui/screens/planet.py`,
+`config/groundwar_default.yaml`.
+Tests: `tests/test_groundwar_assault.py` (new, 17) plus additions to
+`tests/test_groundwar_access.py`, `tests/test_planets.py`, `tests/test_rules.py`,
+`tests/test_bigbang_inhabitants.py`, `tests/test_groundwar_force.py`,
+`tests/test_codec.py`, `tests/test_aliens.py`, `tests/test_cli.py`,
+`tests/test_tui_flow.py`, and a snapshot refresh — seeded maps, live-state
+difficulty scaling, city reachability, no duplicate gun, base/gun/shield/Core
+rejection, garrison-reserve conservation, fighters excluded from assault odds.
+Full suite green: 3106 passed, 80 snapshots; lint and typecheck clean.
+Commit `ground: GW-WP09 assault maps from live worlds` (821bc0c).
 
-### GW-WP10 — Tactical assault actions and planetary AI (XL)
+### GW-WP10 — Tactical assault actions and planetary AI (XL) — SHIPPED
 
-Port drop placement and AA reaction, individual actions, movement/jump, cover,
-LOS, firing, missiles, Scout jamming/detection, Command aura/broadcast, city
-cowing, Resolve, defense phase, garrison movement/fire, escalating sorties,
-retrieval, casualty ceiling, surrender, and extraction. Each player/defense
-phase is a bounded logged command; animation events do not mutate state.
+**Status:** shipped July 2026. The edge-groundwar POC's tactical battle engine —
+drop, movement/jump, cover/LOS, firing, AA reactions, detection/jamming,
+emplacement fire, garrison AI, escalating sorties, Resolve, broadcast/surrender,
+retrieval clock, casualty ceiling — is ported into authoritative, replayable
+core rules over frozen `AssaultOperation` state, closing the gap GW-WP09's
+battlefield generation left open. `edge/core/groundwar/models.py` gains
+`AssaultTrooper` / `AssaultGarrisonUnit` and the live tactical fields on
+`AssaultOperation` (platoon, garrison units, a `structure_hp` overlay,
+broadcast/cowed city sets, the finite garrison reserve pool, `next_unit_id`,
+`initial_strength`).
 
-The POC rules are a behavioral reference, not code exempt from production
-standards: freeze state, remove event draining and embedded RNG/config, typecheck
-strictly, and separate presentation labels from rules facts.
+`edge/core/groundwar/assault.py` carries the ported engine over a transient,
+private scratch `_Battle` rebuilt fresh from frozen state on every call —
+never hashed, never crossing a function boundary — so the POC's function
+bodies carry over almost verbatim behind six pure entry points
+(`assault_drop`/`move`/`jump`/`fire`/`broadcast`/`end_turn`). Garrison
+deployment is **pre-placed + sortie remainder** (an interview decision this
+WP resolved): a `preplaced_frac` share of the world's finite garrison stations
+in cities at drop, and the rest feeds escalating sorties capped per-kind by
+the shrinking remaining pool — replacing the POC's infinite supply. Battle-time
+movement/cover use new scratch-aware cost functions distinct from the static
+generation-time ones, since a destroyed wall must become passable rubble.
 
-Files: `edge/core/groundwar/assault.py`, `edge/core/rules.py`,
-`edge/core/events.py`, codecs.
-Tests: geometry; action economy; jump/AA; detection/jamming; Resolve directions;
-civilian harm; broadcast gates; AI determinism; escalation; every outcome;
-Hypothesis termination and bounds; reload at multiple tactical turns.
-Commit `ground: GW-WP10 authoritative tactical assault`.
+New commands land in `edge/core/rules.py`: `GroundDrop`, `GroundJump`,
+`GroundFire`, `GroundBroadcast`, `EndGroundTurn`; `GroundMove` now branches on
+operation kind to cover the assault trooper's single-action move alongside the
+existing survey march. D4/D12 macro-turn quanta apply to assaults too —
+`EndGroundTurn` is the only turn-advancing action, keeping each player/defense
+phase a bounded logged command with no state mutation from animation events.
+The POC rules were treated as a behavioral reference, not code exempt from
+production standards: state is frozen, event draining and embedded RNG/config
+are gone, and typing is strict.
+
+**Epoch:** no `config_version`/`WIRE_VERSION` bump — GW-M3's single epoch stays
+deferred to GW-WP11, matching the GW-WP09-PRE and GW-WP09 precedent.
+
+Files (as shipped): `edge/core/groundwar/assault.py`,
+`edge/core/groundwar/models.py`, `edge/core/rules.py`, `edge/core/config.py`
+(`GwGarrison.preplaced_frac`, `GwPressure` macro-turn fields, `GwResolve.cap`),
+`edge/core/events.py` (five new structured events: `GroundAssaultDropped` /
+`Jumped` / `Fired` / `BroadcastMade` / `TurnEnded`), `edge/store/codec.py`,
+`config/groundwar_default.yaml`.
+Tests: `tests/test_groundwar_assault_actions.py` (new, 27) — destroyed-wall
+passability, action economy, jump/missile ammo, Resolve in both directions,
+civilian atrocity, broadcast gating, sortie-pool conservation, casualty
+ceiling/wipe/surrender/retrieval outcomes, a Hypothesis bounds property, plus
+reducer-level drop/move/fire/jump/extract/replay coverage — and additions to
+`tests/test_codec.py`.
+Commit `ground: GW-WP10 authoritative tactical assault` (fdb1eb9).
 
 ### GW-WP11 — Strategic assault settlement and consequences (XL)
 
