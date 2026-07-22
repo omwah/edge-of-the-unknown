@@ -16,9 +16,14 @@ pressure:
   escalation_every: 5       # a sortie wave + defense stiffening every N turns
   escalation_acc_bonus: 0.04  # turret/AA accuracy gained per escalation step
   escalation_acc_cap: 0.16    # ... up to this much bonus
+  # GW-WP10 macro-turn economy (D4/D12): ending a tactical turn burns main-game turns
+  # in quanta, mirroring expedition.local_turns_per_main_turn/main_turn_cost below.
+  local_turns_per_main_turn: 2
+  main_turn_cost: 1
 
 resolve:
   start: 100
+  cap: 120                  # hardening ceiling — headroom above start for atrocity/kills
   surrender_threshold: 25   # planet capitulates at or below this (difficulty shifts it)
   # Demonstrations of power (resolve LOST by the defenders):
   turret_destroyed: 6
@@ -131,6 +136,7 @@ garrison:
   sortie_growth: 1          # extra units per later wave
   armor_from_wave: 2        # waves before tanks join the sorties
   undetected_first_strike: 0.15   # accuracy bonus firing while undetected
+  preplaced_frac: 0.35      # GW-WP10: share of the reserved garrison stationed at drop
 
 # Terrain gameplay classes, keyed by edge.art.terrain feature names.
 # move_cost 0 = impassable on foot (jump jets clear it). cover soaks accuracy.

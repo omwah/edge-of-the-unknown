@@ -1755,6 +1755,13 @@ class GwPressure(BaseModel):
     escalation_every: int = Field(gt=0)  # a sortie wave + defense stiffening every N turns
     escalation_acc_bonus: float = Field(ge=0.0)  # accuracy gained per escalation step
     escalation_acc_cap: float = Field(ge=0.0)  # ... up to this much bonus
+    # Macro-turn economy (GW plan D4/D12, GW-WP10): tactical actions cost only local
+    # actions, but ending a tactical turn burns main-game turns in quanta — mirrors
+    # `GwExpedition.local_turns_per_main_turn`/`main_turn_cost` exactly, since D4's text
+    # names "local expedition/assault turns" as the same mechanism for both modes. One
+    # local turn here is one full IGOUGO round (`EndGroundTurn`), not one march step.
+    local_turns_per_main_turn: int = Field(gt=0)
+    main_turn_cost: int = Field(ge=0)
 
 
 class GwResolve(BaseModel):
@@ -1763,6 +1770,7 @@ class GwResolve(BaseModel):
     model_config = _FROZEN
 
     start: int
+    cap: int  # hardening ceiling — kept above `start` so atrocity/kill events retain headroom
     surrender_threshold: int
     turret_destroyed: int
     aa_destroyed: int
@@ -1775,6 +1783,12 @@ class GwResolve(BaseModel):
     broadcast: int
     civilian_building_destroyed: int
     trooper_killed: int
+
+    @model_validator(mode="after")
+    def _check(self) -> GwResolve:
+        if self.cap < self.start:
+            raise ValueError("groundwar.resolve.cap must be >= start")
+        return self
 
 
 class GwEmplacement(BaseModel):
@@ -1815,6 +1829,10 @@ class GwGarrison(BaseModel):
     sortie_base: int = Field(ge=0)  # units in the first sortie wave
     sortie_growth: int = Field(ge=0)  # extra units per later wave
     armor_from_wave: int = Field(ge=0)  # waves before tanks join the sorties
+    # GW-WP10: the fraction of `reserved_infantry`/`reserved_armor` stationed inside cities
+    # at `GroundDrop` (the interview-resolved "pre-placed + sortie remainder" garrison-
+    # deployment model); the rest stays held back to feed escalating sorties as before.
+    preplaced_frac: float = Field(default=0.35, ge=0.0, le=1.0)
     undetected_first_strike: float = Field(ge=0.0)  # accuracy bonus firing while undetected
 
 

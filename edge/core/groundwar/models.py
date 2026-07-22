@@ -19,7 +19,8 @@ it without a cycle.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Literal
 
 
@@ -101,6 +102,50 @@ class SurveyOperation:
 
 
 @dataclass(frozen=True, slots=True)
+class AssaultTrooper:
+    """One deployed platoon member — hashed core state (GW-WP10).
+
+    Rides `AssaultOperation.platoon`. Dead troopers (`hp <= 0`) are **kept**, not
+    pruned: GW-WP11 needs each casualty's `suit_id` to settle
+    `Ship.suits`/`Ship.recruits` losses (`gw_force.apply_casualties`), which only a
+    per-suit-class breakdown can drive, not a bare headcount. `suit_id` names the
+    config-keyed `GwSuit` rather than embedding suit stats, so a config edit
+    between saves still resolves consistently at replay.
+    """
+
+    id: int
+    suit_id: str
+    name: str
+    x: int
+    y: int
+    hp: int
+    missiles: int
+    jump_charges: int
+    mp: int = 0
+    actions: int = 0
+    fired: bool = False
+    detected: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class AssaultGarrisonUnit:
+    """One live tactical ground defender — hashed core state (GW-WP10).
+
+    Rides `AssaultOperation.garrison_units`, whether pre-placed in a city at drop
+    or spawned by an escalating sortie. Unlike `AssaultTrooper`, dead units are
+    **dropped** here — GW-WP11 only needs the surviving-defender headcount
+    (`infantry_remaining`/`armor_remaining`), never a specific unit's identity.
+    """
+
+    id: int
+    kind: Literal["infantry", "armor"]
+    x: int
+    y: int
+    hp: int
+    city_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class AssaultOperation:
     """A live tactical assault (GW plan D7-D11) — hashed core state.
 
@@ -136,6 +181,27 @@ class AssaultOperation:
     reserved_armor: int = 0  # planet.garrison_armor at begin
     outcome: str | None = None
     kind: Literal["assault"] = "assault"
+    # --- live tactical state (GW-WP10) ---
+    # `dropped` mirrors `SurveyOperation.landed`: False while the platoon has not yet
+    # touched down (only `GroundDrop`/`ExtractGroundOperation` are legal before it flips).
+    dropped: bool = False
+    platoon: tuple[AssaultTrooper, ...] = ()
+    garrison_units: tuple[AssaultGarrisonUnit, ...] = ()
+    # Sparse damage overlay on the regenerated, frozen `AssaultMap.structures` (G5) — a
+    # structure id absent here is at its generated `hp_max`, mirroring how
+    # `SurveyOperation.dug_cells`/`resolved_discovery_ids` overlay the frozen `SurveyMap`.
+    structure_hp: Mapping[int, int] = field(default_factory=dict)
+    broadcast_cities: frozenset[int] = frozenset()
+    cowed_cities: frozenset[int] = frozenset()
+    # The finite garrison pool remaining to feed sorties, after `GroundDrop` pre-places a
+    # config-fractional share of `reserved_infantry`/`reserved_armor` into the cities.
+    infantry_remaining: int = 0
+    armor_remaining: int = 0
+    # Id counter for units minted after map generation (troopers, pre-placed/sortied garrison);
+    # seeded above the regenerated map's structure id range at `GroundDrop` so dynamic ids never
+    # collide with static structure ids within one operation's lifetime.
+    next_unit_id: int = 1
+    initial_strength: int = 0  # platoon size at drop — the casualty-ceiling/wipe denominator
 
 
 # The active ground operation on `Player.ground_operation`, discriminated by type

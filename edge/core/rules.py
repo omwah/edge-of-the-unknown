@@ -150,9 +150,14 @@ from edge.core.events import (
     FightersTransferred,
     GarrisonReinforced,
     GenesisDeployed,
+    GroundAssaultDropped,
+    GroundBroadcastMade,
+    GroundFired,
+    GroundJumped,
     GroundMoved,
     GroundOperationBegan,
     GroundOperationEnded,
+    GroundTurnEnded,
     GrudgeFormed,
     Haggled,
     LeadAccepted,
@@ -217,8 +222,8 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.groundwar.access import Assault, Survey, ground_access, inhabiting_species
-from edge.core.groundwar.assault import derive_difficulty
 from edge.core.groundwar.models import ArtifactRecord, AssaultOperation, SurveyOperation, SurveyProgress
+from edge.core.groundwar import assault as gw_assault
 from edge.core.groundwar import force as gw_force
 from edge.core.groundwar import survey as gw_survey
 from edge.core.groundwar.force import GroundForceError
@@ -726,6 +731,60 @@ class SurveyTalk:
 
 
 @dataclass(frozen=True, slots=True)
+class GroundDrop:
+    """Land the platoon and open live tactical play on an assault (GW-WP10, D3).
+
+    `placements` is `(suit_id, x, y)` per trooper — validated against the ship's
+    loadout (`gw_force.validate_loadout`) and against battlefield legality
+    (`assault.assault_drop`). Runs AA reaction fire on the way down and stations the
+    interview-resolved pre-placed garrison share; legal exactly once per operation,
+    before which only `GroundMove`(survey n/a here)/`ExtractGroundOperation` apply.
+    """
+
+    operation_id: int
+    placements: tuple[tuple[str, int, int], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class GroundJump:
+    """One trooper's jump-jet hop — ignores terrain, draws AA reaction fire (GW-WP10)."""
+
+    operation_id: int
+    actor_id: int
+    x: int
+    y: int
+
+
+@dataclass(frozen=True, slots=True)
+class GroundFire:
+    """One trooper fires at a cell — a structure or garrison unit (GW-WP10)."""
+
+    operation_id: int
+    actor_id: int
+    x: int
+    y: int
+    missile: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class GroundBroadcast:
+    """A Command-suit trooper dictates terms over the nearest cowed city in range —
+    the big Resolve strike (GW-WP10)."""
+
+    operation_id: int
+    actor_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class EndGroundTurn:
+    """Close the player's tactical phase and run the planet's whole turn (GW-WP10):
+    detection, emplacement fire, garrison AI, escalating sorties, and the retrieval
+    clock. Charges the D4/D12 macro-turn quantum before advancing."""
+
+    operation_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class MineBelt:
     """Hand-mine an asteroid belt in the current sector for raw goods (§4.2, PT-30).
 
@@ -1226,6 +1285,7 @@ Command = (
     | Salvage | Descend | Explore | BeginSurvey | BeginAssault | ReinforceGarrison
     | ExtractGroundOperation
     | GroundMove | SurveyDig | SurveyLand | SurveyTalk
+    | GroundDrop | GroundJump | GroundFire | GroundBroadcast | EndGroundTurn
     | MineBelt | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
@@ -1412,6 +1472,16 @@ def reduce(
             return _survey_land(state, player_id, command, config)
         case SurveyTalk():
             return _survey_talk(state, player_id, command, config)
+        case GroundDrop():
+            return _ground_drop(state, player_id, command, config)
+        case GroundJump():
+            return _ground_jump(state, player_id, command, config)
+        case GroundFire():
+            return _ground_fire(state, player_id, command, config)
+        case GroundBroadcast():
+            return _ground_broadcast(state, player_id, command, config)
+        case EndGroundTurn():
+            return _end_ground_turn(state, player_id, command, config)
         case MineBelt():
             return _mine_belt(state, player_id, command, config)
         case BuyGenesis():
@@ -4150,7 +4220,7 @@ def _begin_assault(
         raise EconomyError("ground operations are not configured")
     sector = state.sectors[planet.sector_id]
     species = inhabiting_species(state, planet, config)
-    difficulty = derive_difficulty(
+    difficulty = gw_assault.derive_difficulty(
         planet, config, distance_band=sector.distance_band, species=species)
     seed = state.rng.getrandbits(63)
     operation_id = state.rng.getrandbits(63)
@@ -4263,12 +4333,42 @@ def _survey_op(
     return player, op
 
 
+def _assault_op(
+    state: UniverseState, player_id: int, operation_id: int
+) -> tuple[Player, AssaultOperation]:
+    """As `_active_assault`, minus the dropped check — for `GroundDrop` itself
+    (GW-WP10, mirrors `_survey_op`)."""
+    player = _player(state, player_id)
+    op = player.ground_operation
+    if not isinstance(op, AssaultOperation):
+        raise MovementError("you have no active assault")
+    if op.operation_id != operation_id:
+        raise MovementError("that is not your active assault operation")
+    return player, op
+
+
+def _active_assault(
+    state: UniverseState, player_id: int, operation_id: int
+) -> tuple[Player, AssaultOperation]:
+    """The player's live assault operation, validated against `operation_id` and
+    requiring the platoon to have dropped (GW-WP10, G9/G10) — mirrors `_active_survey`.
+    """
+    player, op = _assault_op(state, player_id, operation_id)
+    if not op.dropped:
+        raise MovementError("the platoon has not dropped yet — GroundDrop first")
+    return player, op
+
+
 def _ground_move(
     state: UniverseState, player_id: int, cmd: GroundMove, config: GameConfig
 ) -> ReduceResult:
-    """March the survey explorer, charging macro-turns in the D4/D12 quanta (GW-WP06)."""
+    """March the survey explorer (D4/D12), or move one assault trooper — `GroundMove`
+    covers both kinds of ground operation; `actor_id` selects the assault trooper and
+    is ignored by a survey (which has exactly one explorer)."""
     if config.groundwar is None:
         raise EconomyError("ground operations are not configured")
+    if isinstance(_player(state, player_id).ground_operation, AssaultOperation):
+        return _assault_move(state, player_id, cmd, config)
     player, op = _active_survey(state, player_id, cmd.operation_id)
     smap = gw_survey.survey_map_for(state, op, config)
     result = gw_survey.survey_move(op, smap, config, player.turns_remaining, cmd.x, cmd.y)
@@ -4277,6 +4377,124 @@ def _ground_move(
     return ReduceResult(
         events=(GroundMoved(player_id, op.operation_id, result.operation.explorer_x,
                             result.operation.explorer_y, result.main_turns),),
+        players=(new_player,),
+    )
+
+
+def _assault_move(
+    state: UniverseState, player_id: int, cmd: GroundMove, config: GameConfig
+) -> ReduceResult:
+    """The assault-trooper branch of `GroundMove` (GW-WP10) — a single-action ranged
+    move, unlike the survey explorer's multi-cell supply march. Reuses `GroundMoved`
+    (`main_turns=0`: tactical moves burn only actions, never main-game turns)."""
+    player, op = _active_assault(state, player_id, cmd.operation_id)
+    amap = gw_assault.assault_map_for(state, op, config)
+    new_op = gw_assault.assault_move(op, amap, config, cmd.actor_id, cmd.x, cmd.y)
+    new_player = replace(player, ground_operation=new_op)
+    trooper = next(t for t in new_op.platoon if t.id == cmd.actor_id)
+    return ReduceResult(
+        events=(GroundMoved(player_id, op.operation_id, trooper.x, trooper.y, 0),),
+        players=(new_player,),
+    )
+
+
+def _ground_drop(
+    state: UniverseState, player_id: int, cmd: GroundDrop, config: GameConfig
+) -> ReduceResult:
+    """Land the platoon, validating it against the ship's owned loadout before
+    battlefield legality (GW-WP10, D3). `cmd.placements`' `(suit_id, x, y)` entries
+    imply the loadout: suit-class id -> deployed count."""
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _assault_op(state, player_id, cmd.operation_id)
+    if op.dropped:
+        raise EconomyError("the platoon has already dropped")
+    ship = _ship(state, player)
+    loadout: dict[str, int] = {}
+    for suit_id, _x, _y in cmd.placements:
+        loadout[suit_id] = loadout.get(suit_id, 0) + 1
+    try:
+        gw_force.validate_loadout(ship, loadout, config)
+    except GroundForceError as exc:
+        raise EconomyError(str(exc)) from exc
+    amap = gw_assault.assault_map_for(state, op, config)
+    new_op = gw_assault.assault_drop(op, amap, config, state.rng, cmd.placements)
+    new_player = replace(player, ground_operation=new_op)
+    return ReduceResult(
+        events=(GroundAssaultDropped(player_id, op.operation_id, len(new_op.platoon),
+                                     new_op.casualties),),
+        players=(new_player,),
+    )
+
+
+def _ground_jump(
+    state: UniverseState, player_id: int, cmd: GroundJump, config: GameConfig
+) -> ReduceResult:
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _active_assault(state, player_id, cmd.operation_id)
+    amap = gw_assault.assault_map_for(state, op, config)
+    new_op, hit = gw_assault.assault_jump(op, amap, config, state.rng, cmd.actor_id, cmd.x, cmd.y)
+    new_player = replace(player, ground_operation=new_op)
+    return ReduceResult(
+        events=(GroundJumped(player_id, op.operation_id, cmd.actor_id, cmd.x, cmd.y, hit),),
+        players=(new_player,),
+    )
+
+
+def _ground_fire(
+    state: UniverseState, player_id: int, cmd: GroundFire, config: GameConfig
+) -> ReduceResult:
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _active_assault(state, player_id, cmd.operation_id)
+    amap = gw_assault.assault_map_for(state, op, config)
+    new_op, hit, destroyed, target_kind = gw_assault.assault_fire(
+        op, amap, config, state.rng, cmd.actor_id, cmd.x, cmd.y, cmd.missile)
+    new_player = replace(player, ground_operation=new_op)
+    return ReduceResult(
+        events=(GroundFired(player_id, op.operation_id, cmd.actor_id, cmd.x, cmd.y,
+                            cmd.missile, hit, target_kind, destroyed),),
+        players=(new_player,),
+    )
+
+
+def _ground_broadcast(
+    state: UniverseState, player_id: int, cmd: GroundBroadcast, config: GameConfig
+) -> ReduceResult:
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _active_assault(state, player_id, cmd.operation_id)
+    amap = gw_assault.assault_map_for(state, op, config)
+    new_op = gw_assault.assault_broadcast(op, amap, config, cmd.actor_id)
+    new_player = replace(player, ground_operation=new_op)
+    city_id = next(iter(new_op.broadcast_cities - op.broadcast_cities), -1)
+    return ReduceResult(
+        events=(GroundBroadcastMade(player_id, op.operation_id, cmd.actor_id, city_id),),
+        players=(new_player,),
+    )
+
+
+def _end_ground_turn(
+    state: UniverseState, player_id: int, cmd: EndGroundTurn, config: GameConfig
+) -> ReduceResult:
+    """Close the tactical phase and run the planet's whole turn (GW-WP10). Charges the
+    D4/D12 macro-turn quantum before advancing; `EndGroundTurn` is the only assault
+    action that spends main-game turns, refusing when the player can't afford it
+    (extraction always remains legal regardless)."""
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _active_assault(state, player_id, cmd.operation_id)
+    cost = gw_assault.assault_turn_cost(config, op.local_turn)
+    if cost > player.turns_remaining:
+        raise EconomyError("not enough turns to end this round — extract to orbit")
+    amap = gw_assault.assault_map_for(state, op, config)
+    new_op = gw_assault.assault_end_turn(op, amap, config, state.rng)
+    new_player = replace(player, ground_operation=new_op,
+                         turns_remaining=player.turns_remaining - cost)
+    return ReduceResult(
+        events=(GroundTurnEnded(player_id, op.operation_id, new_op.local_turn, new_op.resolve,
+                                cost, new_op.outcome or ""),),
         players=(new_player,),
     )
 
