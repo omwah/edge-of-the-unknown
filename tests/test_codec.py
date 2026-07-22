@@ -37,6 +37,8 @@ from edge.core.events import (
     BeltMined,
     CargoTransferred,
     CloudCityBuilt,
+    FightersTransferred,
+    GarrisonReinforced,
     CitadelBuildStarted,
     CitadelCompleted,
     CitadelGunSilenced,
@@ -136,6 +138,7 @@ from edge.core.rules import (
     BuyMines,
     Cannibalize,
     ClaimStarbase,
+    BeginAssault,
     Colonize,
     CombatAction,
     Command,
@@ -143,6 +146,8 @@ from edge.core.rules import (
     DeployBeacon,
     DeployFighters,
     BeginSurvey,
+    ReinforceGarrison,
+    TransferFighters,
     DeployGenesis,
     DeployMines,
     Deposit,
@@ -227,10 +232,14 @@ COMMANDS: list[Command] = [
     PlanetDeposit(planet_id=5, amount=1_000),        # WP54 treasury deposit
     PlanetWithdraw(planet_id=5, amount=500),         # WP54 treasury withdraw
     SetAllocation(planet_id=5, allocation={"equipment": 0.6}, fighter=0.4),  # WP55 garrison share
+    SetAllocation(planet_id=5, allocation={"equipment": 0.5}, garrison=0.5),  # GW-WP09 ground garrison share
     InvadePlanet(planet_id=5, fighters=200),         # WP55 ground assault
     TransferCargo(planet_id=5, commodity=Commodity.EQUIPMENT, units=120),  # §4.2 supply haul
     TransferCargo(planet_id=5, commodity=Commodity.ORGANICS, units=30, to_planet=False),
+    TransferFighters(planet_id=5, count=15),  # GW-WP09 unload ship fighters onto a world
+    TransferFighters(planet_id=5, count=8, to_planet=False),  # GW-WP09 load stored fighters aboard
     BatchTransferCargo(planet_id=5, units={"fuel_ore": 40, "equipment": 90}),
+    ReinforceGarrison(planet_id=5, suit_id="marauder", count=6),  # GW-WP09/D15 station a garrison
     InstallComponent(Subsystem.SPINDRIVE, 3, Component.TURBINE, ComponentTier.II),
     SwapComponent(Subsystem.SCREENS, 1, Component.RADIATOR, ComponentTier.III),
     Cannibalize(Subsystem.MAIN_GUN, 2),
@@ -240,6 +249,7 @@ COMMANDS: list[Command] = [
     Descend(planet_id=5),         # WP6 descend to a planet surface
     Explore(planet_id=5),         # WP6 survey the next surface site
     BeginSurvey(planet_id=5),     # GW-WP03 open a surface-survey expedition
+    BeginAssault(planet_id=5),    # GW-WP09 open a tactical ground assault
     ExtractGroundOperation(operation_id=123),  # GW-WP03 settle/clear a ground op
     GroundMove(operation_id=123, x=40, y=20, actor_id=0),  # GW-WP06 march the explorer
     SurveyDig(operation_id=123),  # GW-WP06 open a trench
@@ -327,6 +337,8 @@ EVENTS: list[Event] = [
     PlanetProduced(5, 1),
     ColonyGrew(5, 1_050),
     CargoTransferred(1, 5, Commodity.EQUIPMENT, 120, True),  # §4.2 colony-supply haul
+    FightersTransferred(1, 5, 15, True),               # GW-WP09 ship -> planet fighter haul
+    GarrisonReinforced(1, 5, "marauder", 6),            # GW-WP09/D15 station a garrison
     CitadelBuildStarted(1, 5, 1),                      # WP54 citadel build opened
     CitadelCompleted(5, 1),                            # WP54 citadel level reached
     PlanetBanked(1, 5, "deposit", 1_000, 1_000),       # WP54 treasury move

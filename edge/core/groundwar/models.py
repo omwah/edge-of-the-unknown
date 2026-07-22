@@ -106,10 +106,17 @@ class AssaultOperation:
 
     Set on `Player.ground_operation`. Like `SurveyOperation`, the battlefield/city
     layout regenerates from `seed` + `planet_type` (G5); only dynamic state lives
-    here. The full platoon/structure/garrison/city dynamic state and the tactical
-    action commands land in GW-WP08-11 — this skeleton establishes the state epoch
-    and the shared begin/extract lifetime, carrying the retrieval clock and Resolve
-    an assault settles against.
+    here. The full platoon/structure/city dynamic state and the tactical action
+    commands land in GW-WP10-11 — this skeleton establishes the state epoch and the
+    shared begin/extract lifetime, carrying the retrieval clock and Resolve an
+    assault settles against, plus (GW-WP09) the live-derived difficulty and the
+    ground-defender reserve `BeginAssault` snapshots at open: `cities`/
+    `citadel_level`/`surrender_threshold` feed `generate_assault_map`/Resolve, and
+    `reserved_infantry`/`reserved_armor` are the planet's garrison headcount at the
+    moment of opening — frozen so a later build/downgrade can't retroactively
+    reshape an already-open battlefield, and so WP11 has an immutable number to
+    settle against. `Planet.garrison_infantry`/`garrison_armor` are themselves
+    untouched by `BeginAssault` — nothing is spent until WP11 ships.
     """
 
     operation_id: int
@@ -122,6 +129,11 @@ class AssaultOperation:
     retrieval_turn: int
     local_turn: int = 0
     casualties: int = 0
+    cities: int = 0  # snapshotted city count fed to generate_assault_map at begin (GW-WP09)
+    citadel_level: int = 0  # snapshotted planet.citadel_level at begin (GW-WP09)
+    surrender_threshold: int = 0  # snapshotted derived difficulty (GW-WP09)
+    reserved_infantry: int = 0  # planet.garrison_infantry at begin — WP11 settles against this
+    reserved_armor: int = 0  # planet.garrison_armor at begin
     outcome: str | None = None
     kind: Literal["assault"] = "assault"
 

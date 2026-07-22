@@ -202,6 +202,34 @@ def test_a_casualty_costs_the_recruit_and_the_suit_together() -> None:
         force.apply_casualties(ship, {"marauder": 9}, CFG)
 
 
+# --- reinforcement: ship troopers become a planetary garrison (D15, GW-WP09) --
+
+
+def test_reinforcement_removes_exact_recruits_and_suits() -> None:
+    st = _world()
+    _do(st, HireRecruits(count=4))
+    _do(st, BuySuits(suit_id="marauder", count=4))
+    _do(st, BuyGroundOrdnance(count=99))
+    ship = _ship(st)
+    reinforced = force.apply_reinforcement(ship, "marauder", 3, CFG)
+    assert reinforced.recruits == 1 and reinforced.suits == {"marauder": 1}
+    # Same "ammunition follows the armour" invariant as a casualty (G8).
+    assert reinforced.ground_missiles == force.missile_capacity(reinforced, CFG)
+
+
+def test_reinforcement_raises_on_recruit_or_suit_shortfall() -> None:
+    st = _world()
+    _do(st, HireRecruits(count=2))
+    _do(st, BuySuits(suit_id="marauder", count=2))
+    ship = _ship(st)
+    with pytest.raises(force.GroundForceError):
+        force.apply_reinforcement(ship, "marauder", 3, CFG)  # only 2 recruits/suits aboard
+    with pytest.raises(force.GroundForceError):
+        force.apply_reinforcement(ship, "scout", 1, CFG)  # no scout suits aboard at all
+    with pytest.raises(force.GroundForceError):
+        force.apply_reinforcement(ship, "marauder", 0, CFG)
+
+
 # --- hulls: the force cannot ride a berth it does not have -------------------
 
 

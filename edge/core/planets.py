@@ -286,6 +286,7 @@ def normalize_belt(planet: Planet, config: GameConfig) -> Planet:
         planet, owner=UNOWNED, population={},
         allocation={}, stores={}, citadel_level=0, citadel_progress=-1, treasury=0,
         fighters=0, gun_integrity=0, fighter_allocation=0.0, starbase_id=None,
+        garrison_infantry=0, garrison_armor=0, garrison_allocation=0.0,
         ore_reserve=reserve, ore_reserve_max=reserve_max,
     )
     return planet if clean == planet else clean
@@ -333,6 +334,32 @@ def scale_population(population: Mapping[str, int], old_total: int, new_total: i
     return {k: v for k, v in floors.items() if v > 0}
 
 
+def garrison_training(
+    config: GameConfig, *, output: float, allocation: float,
+    equipment_available: int, current_infantry: int, cap: int,
+) -> tuple[int, int]:
+    """Infantry minted this tick from a colonist-allocation training share (GW plan D11).
+
+    `raw = output × allocation × train_yield`, clamped to what
+    `equipment_available // train_equipment_cost` affords and to the headroom under
+    `cap`. Returns `(infantry_gained, equipment_consumed)`; equipment spent is exactly
+    `infantry_gained × train_equipment_cost` — conserved, never debt. The canonical
+    copy: `produce()` below calls this directly rather than duplicating the formula
+    (this module already owns `colonist_capacity`, so putting the function in
+    `edge.core.groundwar.assault` instead would risk a `planets.py` ↔ `assault.py`
+    import cycle for no benefit). `edge.core.groundwar.assault` and `session.py`
+    import it from here for a projected "training X/day" readout.
+    """
+    assert config.groundwar is not None
+    gcfg = config.groundwar.garrison_economy
+    headroom = max(0, cap - current_infantry)
+    raw = int(output * allocation * gcfg.train_yield)
+    if gcfg.train_equipment_cost > 0:
+        raw = min(raw, equipment_available // gcfg.train_equipment_cost)
+    gained = max(0, min(raw, headroom))
+    return gained, gained * gcfg.train_equipment_cost
+
+
 def produce(planet: Planet, config: GameConfig) -> Planet:
     """Run one production tick for `planet`, returning the updated world (§8).
 
@@ -354,6 +381,7 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
     population = dict(planet.population)
     colonists = planet.colonists
     fighters = planet.fighters
+    garrison_infantry = planet.garrison_infantry
     ore_reserve = planet.ore_reserve
     # The one capacity seam (§4.2): >0 means people can live here — on the ground, or in a
     # built Cloud City. A gas giant with no city has none, so it only scoops.
@@ -370,6 +398,21 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
         # instead of trade goods — the colony trades output for its own protection.
         if planet.fighter_allocation > 0.0 and config.citadels is not None:
             fighters += round(output * planet.fighter_allocation * config.citadels.fighter_yield)
+        # Ground-garrison training (GW plan D11, GW-WP09): a separate colonist-output
+        # share mints persistent infantry defenders instead, gated by equipment stores
+        # and a population-fraction ceiling. `garrison_armor` is never touched here —
+        # no player rail creates armor (only big-bang seeding and its own militia-
+        # recovery rail do).
+        if planet.garrison_allocation > 0.0 and config.groundwar is not None:
+            gcfg = config.groundwar.garrison_economy
+            cap = round(capacity * gcfg.cap_frac)
+            gained, spent = garrison_training(
+                config, output=output, allocation=planet.garrison_allocation,
+                equipment_available=stores.get(Commodity.EQUIPMENT, 0),
+                current_infantry=garrison_infantry, cap=cap)
+            if gained:
+                garrison_infantry += gained
+                _add(stores, Commodity.EQUIPMENT, -spent)
         # Food: eat organics; grow when fed (capped), else starve.
         need = round(colonists * cfg.food_per_colonist)
         have = stores.get(Commodity.ORGANICS, 0)
@@ -401,7 +444,8 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
     # barren (and any other uncolonizable type) produces nothing.
 
     if (population == dict(planet.population) and fighters == planet.fighters
+            and garrison_infantry == planet.garrison_infantry
             and ore_reserve == planet.ore_reserve and stores == dict(planet.stores)):
         return planet  # nothing changed (e.g. an empty colony) — skip the rewrite
     return replace(planet, stores=stores, population=population, fighters=fighters,
-                   ore_reserve=ore_reserve)
+                   garrison_infantry=garrison_infantry, ore_reserve=ore_reserve)

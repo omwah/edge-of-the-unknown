@@ -199,3 +199,19 @@ def apply_casualties(ship: Ship, losses: Mapping[str, int], config: GameConfig) 
         raise GroundForceError("more casualties than recruits aboard")
     new_ship = replace(new_ship, recruits=new_ship.recruits - dead)
     return clamp_magazine(new_ship, config)
+
+
+def apply_reinforcement(ship: Ship, suit_id: str, count: int, config: GameConfig) -> Ship:
+    """Convert `count` recruits + suits of `suit_id` into a planetary garrison (D15, GW-WP09).
+
+    Irreversible — the caller (`ReinforceGarrison`'s reducer) credits the planet's
+    `garrison_infantry`; this function only debits the ship. Atomic with
+    `apply_casualties`'s shape: the recruits and the suits they wore leave together,
+    raising `GroundForceError` on a shortfall of either.
+    """
+    if count <= 0:
+        raise GroundForceError("reinforce a positive number of troopers")
+    if count > ship.recruits:
+        raise GroundForceError(f"only {ship.recruits} recruit(s) aboard to station {count}")
+    new_ship = replace(ship, suits=with_suits(ship, suit_id, -count), recruits=ship.recruits - count)
+    return clamp_magazine(new_ship, config)

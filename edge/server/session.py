@@ -782,6 +782,20 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
             invade_blocker = "no fighters aboard to commit"
         else:
             can_invade = True
+    # Garrison (§4.2, GW-WP09, D11/D15): a straight readout plus the reinforce affordance,
+    # gated the same way the citadel/invasion blocks above gate on ownership.
+    ship_suits = [(sid, n) for sid, n in ship.suits.items() if n > 0]
+    can_reinforce = False
+    reinforce_blocker_text = ""
+    if owned_by_you:
+        if not is_landable(planet.planet_type, config) or city_world:
+            reinforce_blocker_text = "this world has no ground to station a garrison on"
+        elif ship.recruits <= 0 or not ship_suits:
+            reinforce_blocker_text = "no recruits/suits aboard to station"
+        else:
+            can_reinforce = True
+    elif planet.owner.is_owned:
+        reinforce_blocker_text = "you do not own that world"
     # The one ground-access contract projected (GW-WP04): the tagged mode + exact blocker,
     # recomputed here from the same pure seam the begin reducer enforces (H4 lockstep). The
     # blocker is the orbital-only/assault-disabled reason, or the first standing siege rung.
@@ -825,6 +839,10 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         ship_equipment=ship_equipment,
         ground_mode=ground_mode, ground_blocker=ground_blocker,
         ground_settlements=ground_settlements,
+        garrison_infantry=planet.garrison_infantry, garrison_armor=planet.garrison_armor,
+        garrison_allocation_pct=round(planet.garrison_allocation * 100),
+        can_reinforce_garrison=can_reinforce, reinforce_blocker=reinforce_blocker_text,
+        ship_recruits=ship.recruits, ship_suits=ship_suits,
     )
 
 

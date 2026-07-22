@@ -1892,10 +1892,17 @@ async def test_planet_citadel_panel_builds_via_button() -> None:
         await pilot.pause()
         svc = app.service
         assert svc is not None
-        planet = next(iter(svc.state.planets.values()))
+        from edge.core.planets import is_cloud_city_world, is_colonizable
+        planet = next(p for p in svc.state.planets.values()
+                     if is_colonizable(p.planet_type, svc.config)
+                     and not is_cloud_city_world(p.planet_type, svc.config))
         # A player colony that has *not* fortified yet — stated explicitly, because the
         # big bang now seeds native holdings (GW-WP09-PRE) and a generated world may
         # already carry a citadel, which would skip the build flow this test exercises.
+        # Also pinned to a landable, non-Cloud-City type (GW-WP09), since the garrison
+        # seeding pass's extra RNG draw shifts which world iteration happens to reach
+        # first for a given seed — this test cares about the citadel build flow, not
+        # about which specific generated world it lands on.
         svc.state.planets[planet.id] = _replace(
             planet, owner=Ownership("player", 1), population={"terran": 1_000},
             stores={Commodity.EQUIPMENT: 10_000},

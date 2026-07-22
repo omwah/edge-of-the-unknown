@@ -309,12 +309,15 @@ def test_species_placement_does_not_perturb_ports_or_planets() -> None:
     # Home-cluster carving overlays alliance ownership on some planets (WP23), and the
     # inhabited-universe pass overlays peoples, populations and their holdings on top
     # (GW-WP09-PRE) — both run *after* the planet draw and only where a roster exists.
+    # GW-WP09 adds a persistent ground garrison, seeded off the same rng _settle already
+    # draws from — another roster-only overlay, not a Phase-1 planet-generation draw.
     # The planet *generation* itself (positions, types, habitability, yields) is what
-    # must be unperturbed, so compare with those two overlays stripped.
+    # must be unperturbed, so compare with those overlays stripped.
     def strip(ps):  # type: ignore[no-untyped-def]
         return {pid: replace(p, owner=Ownership(), population={},
                              stores={}, allocation={}, citadel_level=0,
-                             gun_integrity=0, treasury=0)
+                             gun_integrity=0, treasury=0,
+                             garrison_infantry=0, garrison_armor=0)
                 for pid, p in ps.items()}
     assert strip(a.planets) == strip(b.planets)
     assert not a.species and b.species  # only the alien layer differs

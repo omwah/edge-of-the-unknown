@@ -30,8 +30,10 @@ from edge.core.models import (
     Ship,
     UniverseState,
 )
-from edge.core.rules import BeginSurvey, reduce
+from edge.core.rules import BeginAssault, BeginSurvey, ReinforceGarrison, apply_result, reduce
+from edge.store.snapshots import state_hash
 from edge.core.economy import EconomyError
+from edge.core.groundwar.force import GroundForceError
 from edge.server import session
 
 CFG = load_default_config()
@@ -223,6 +225,138 @@ def test_planet_dto_mode_matches_classifier(build) -> None:
     assert view.ground_mode == access.mode
 
 
+# --- BeginAssault (GW-WP09, D7-D11) -------------------------------------------
+
+
+def test_begin_assault_opens_operation_on_a_droppable_hostile_world() -> None:
+    planet = _planet(population={"vesk": 500}, habitability_cap=100_000,
+                     garrison_infantry=400, garrison_armor=20)
+    state = _state(planet)
+    state.species = {7: _species(0.1)}
+    result = reduce(state, 1, BeginAssault(planet.id), CFG)
+    assert result.players
+    op = result.players[0].ground_operation
+    assert op is not None and op.kind == "assault"
+    assert op.planet_id == planet.id
+    assert op.reserved_infantry == 400 and op.reserved_armor == 20
+    assert op.cities >= CFG.groundwar.assault_difficulty.min_cities  # type: ignore[union-attr]
+
+
+def test_begin_assault_does_not_mutate_the_planet() -> None:
+    planet = _planet(population={"vesk": 500}, garrison_infantry=100, garrison_armor=5)
+    state = _state(planet)
+    state.species = {7: _species(0.1)}
+    reduce(state, 1, BeginAssault(planet.id), CFG)
+    assert state.planets[planet.id] == planet  # decision #1: nothing is spent at begin
+
+
+def test_begin_assault_rejects_orbital_only_and_survey_worlds() -> None:
+    for build_planet in (
+        lambda: _planet(planet_type="asteroid_belt"),
+        lambda: _planet(),  # uninhabited — surveys
+        lambda: _planet(population={"vesk": 500}),  # friendly species (default disposition)
+    ):
+        planet = build_planet()
+        state = _state(planet)
+        state.species = {7: _species(CFG.aliens.amity_threshold + 0.2)}  # type: ignore[union-attr]
+        access = ground_access(state, state.players[1], planet, CFG)
+        with pytest.raises(EconomyError) as excinfo:
+            reduce(state, 1, BeginAssault(planet.id), CFG)
+        assert str(excinfo.value) == access.reason
+        assert state.players[1].ground_operation is None
+
+
+def test_begin_assault_rejects_when_the_citadel_gun_still_stands() -> None:
+    planet = _planet(population={"vesk": 500}, citadel_level=GUN_MIN, gun_integrity=50)
+    state = _state(planet)
+    state.species = {7: _species(0.1)}
+    with pytest.raises(EconomyError, match="silence the citadel gun first"):
+        reduce(state, 1, BeginAssault(planet.id), CFG)
+    assert state.players[1].ground_operation is None
+
+
+def test_begin_assault_second_call_is_rejected_while_one_is_open() -> None:
+    from edge.core.movement import MovementError
+
+    planet = _planet(population={"vesk": 500})
+    state = _state(planet)
+    state.species = {7: _species(0.1)}
+    result = reduce(state, 1, BeginAssault(planet.id), CFG)
+    state.players[1] = result.players[0]
+    with pytest.raises(MovementError):
+        reduce(state, 1, BeginAssault(planet.id), CFG)
+
+
+@pytest.mark.parametrize("fighters", [0, 1, 500, 9999])
+def test_begin_assault_ignores_the_player_ships_fighters(fighters: int) -> None:
+    """Fighters are a space asset (D7) — assault difficulty/reservation never reads them."""
+    planet = _planet(population={"vesk": 500}, garrison_infantry=250)
+    state = _state(planet)
+    state.species = {7: _species(0.1)}
+    state.ships[1] = replace(state.ships[1], fighters=fighters)
+    result = reduce(state, 1, BeginAssault(planet.id), CFG)
+    op = result.players[0].ground_operation
+    assert op is not None and op.reserved_infantry == 250
+
+
+# --- ReinforceGarrison (GW-WP09, D15) -----------------------------------------
+
+
+def _owned_reinforceable_state(*, recruits: int = 10, suits: dict[str, int] | None = None,
+                               garrison_infantry: int = 0) -> tuple[UniverseState, Planet]:
+    planet = _planet(owner=Ownership("player", 1), population={"terran": 5_000},
+                     garrison_infantry=garrison_infantry)
+    state = _state(planet)
+    state.ships[1] = replace(state.ships[1], recruits=recruits,
+                             suits=dict(suits if suits is not None else {"marauder": 6}))
+    return state, planet
+
+
+def test_reinforce_garrison_transfers_atomically() -> None:
+    state, planet = _owned_reinforceable_state(recruits=10, suits={"marauder": 6})
+    result = reduce(state, 1, ReinforceGarrison(planet.id, "marauder", 4), CFG)
+    assert len(result.ships) == 1 and len(result.planets) == 1
+    new_ship, new_planet = result.ships[0], result.planets[0]
+    assert new_ship.recruits == 6
+    assert new_ship.suits.get("marauder", 0) == 2
+    assert new_planet.garrison_infantry == 4
+
+
+def test_reinforce_garrison_rejects_insufficient_recruits_or_suits() -> None:
+    state, planet = _owned_reinforceable_state(recruits=2, suits={"marauder": 6})
+    with pytest.raises((EconomyError, GroundForceError)):
+        reduce(state, 1, ReinforceGarrison(planet.id, "marauder", 5), CFG)  # only 2 recruits
+    state2, planet2 = _owned_reinforceable_state(recruits=10, suits={"marauder": 1})
+    with pytest.raises((EconomyError, GroundForceError)):
+        reduce(state2, 1, ReinforceGarrison(planet2.id, "marauder", 5), CFG)  # only 1 suit
+
+
+def test_reinforce_garrison_rejects_non_owner() -> None:
+    planet = _planet(owner=Ownership("alliance", 9), population={"vesk": 500})
+    state = _state(planet)
+    state.ships[1] = replace(state.ships[1], recruits=10, suits={"marauder": 6})
+    with pytest.raises(EconomyError):
+        reduce(state, 1, ReinforceGarrison(planet.id, "marauder", 2), CFG)
+
+
+def test_reinforce_garrison_rejects_cloud_city_and_non_landable() -> None:
+    for ptype in ("jovian", "asteroid_belt"):
+        planet = _planet(owner=Ownership("player", 1), planet_type=ptype)
+        state = _state(planet)
+        state.ships[1] = replace(state.ships[1], recruits=10, suits={"marauder": 6})
+        with pytest.raises(EconomyError):
+            reduce(state, 1, ReinforceGarrison(planet.id, "marauder", 2), CFG)
+
+
+def test_reinforce_garrison_never_creates_armor() -> None:
+    """Only big-bang seeding and militia recovery ever touch `garrison_armor` — a
+    reinforcement, regardless of suit class, adds infantry only (decisions #5/#9)."""
+    state, planet = _owned_reinforceable_state(recruits=10, suits={"marauder": 6, "scout": 4})
+    for suit_id in ("marauder", "scout"):
+        result = reduce(state, 1, ReinforceGarrison(planet.id, suit_id, 2), CFG)
+        assert result.planets[0].garrison_armor == 0
+
+
 def test_begin_survey_rejects_assault_world_with_classifier_reason() -> None:
     planet = _planet(population={"vesk": 500})
     state = _state(planet)
@@ -240,3 +374,19 @@ def test_begin_survey_opens_on_a_friendly_world() -> None:
     state.species = {7: _species(AMITY + 0.2)}
     result = reduce(state, 1, BeginSurvey(planet.id), CFG)
     assert result.players and result.players[0].ground_operation is not None
+
+
+def test_begin_assault_replay_is_deterministic() -> None:
+    """A short command log ending in BeginAssault, replayed twice from the same seed,
+    reaches a bit-identical `state_hash` and an identical `AssaultOperation`."""
+    def run() -> tuple[str, object]:
+        planet = _planet(population={"vesk": 500}, garrison_infantry=300, garrison_armor=15)
+        state = _state(planet)
+        state.species = {7: _species(0.1)}
+        apply_result(state, reduce(state, 1, BeginAssault(planet.id), CFG))
+        return state_hash(state), state.players[1].ground_operation
+
+    hash_a, op_a = run()
+    hash_b, op_b = run()
+    assert hash_a == hash_b
+    assert op_a == op_b

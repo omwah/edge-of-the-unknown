@@ -147,6 +147,8 @@ from edge.core.events import (
     EncounterEvaded,
     EncounterStarted,
     Event,
+    FightersTransferred,
+    GarrisonReinforced,
     GenesisDeployed,
     GroundMoved,
     GroundOperationBegan,
@@ -180,6 +182,7 @@ from edge.core.planets import (
     colonist_blocker,
     colonist_capacity,
     genesis_blocker,
+    is_cloud_city_world,
     is_landable,
     player_species_key,
     pretty_planet_type,
@@ -213,10 +216,12 @@ from edge.core.models import (
     UNOWNED,
     UniverseState,
 )
-from edge.core.groundwar.access import Survey, ground_access
-from edge.core.groundwar.models import ArtifactRecord, SurveyOperation, SurveyProgress
+from edge.core.groundwar.access import Assault, Survey, ground_access, inhabiting_species
+from edge.core.groundwar.assault import derive_difficulty
+from edge.core.groundwar.models import ArtifactRecord, AssaultOperation, SurveyOperation, SurveyProgress
 from edge.core.groundwar import force as gw_force
 from edge.core.groundwar import survey as gw_survey
+from edge.core.groundwar.force import GroundForceError
 from edge.core.groundwar.survey import eligible_surface_site_ids
 from edge.core.market import PortOrder
 from edge.core.movement import MovementError, can_warp, shortest_path
@@ -430,17 +435,39 @@ class BuildStagingArea:
 
 @dataclass(frozen=True, slots=True)
 class SetAllocation:
-    """Set a player-owned colony's production split over the trio + garrison (§8, §4.2).
+    """Set a player-owned colony's production split over the trio + fighter + garrison
+    (§8, §4.2, GW plan D11).
 
-    `allocation` maps Commodity value → share; `fighter` is the optional garrison share
-    (§4.2, WP55). The reducer normalizes the trio shares **plus** `fighter` to sum 1.0, so
-    `sum(commodity shares) + fighter_allocation == 1.0` holds (the §4 invariant — the trio
-    stays sacred, fighters ride their own share rather than a fourth commodity).
+    `allocation` maps Commodity value → share; `fighter` is the space-fighter garrison
+    share (§4.2, WP55) and `garrison` the ground-defense training share (GW-WP09, D11).
+    The reducer normalizes the trio shares **plus** `fighter` **plus** `garrison` to sum
+    1.0, so `sum(commodity shares) + fighter_allocation + garrison_allocation == 1.0`
+    holds (the §4 invariant — the trio stays sacred, both garrisons ride their own
+    share rather than a fourth commodity).
     """
 
     planet_id: int
     allocation: dict[str, float]  # Commodity value -> share
-    fighter: float = 0.0  # garrison production share (WP55)
+    fighter: float = 0.0  # space-fighter garrison production share (WP55)
+    garrison: float = 0.0  # ground-garrison training share (GW-WP09, D11)
+
+
+@dataclass(frozen=True, slots=True)
+class ReinforceGarrison:
+    """Transfer recruits + suits from the ship into a world's persistent garrison
+    (GW-WP09, GW plan D15).
+
+    Irreversible — the converted defenders are no longer individually tracked or
+    retrievable; they become a typed headcount, not troopers. Owner (player or corp)
+    only, in-sector, landable non-Cloud-City world (D9). `suit_id` names the suit
+    class worn; every transferred trooper becomes one `garrison_infantry` (armor is
+    never player-created — only big-bang seeding and its own militia-recovery rail
+    ever touch `garrison_armor`).
+    """
+
+    planet_id: int
+    suit_id: str
+    count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -481,6 +508,25 @@ class TransferCargo:
     planet_id: int
     commodity: Commodity
     units: int
+    to_planet: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class TransferFighters:
+    """Move fighters between the ship's bays and an owned world's stored defense stock
+    (§4.2, GW-WP09).
+
+    `to_planet` True unloads (ship → planet stores); False loads (planet stores →
+    ship) — mirrors :class:`TransferCargo` exactly. Owner-only (player or corp),
+    in-sector; fighters are conserved. `count` is clamped to what is aboard/stored, so
+    "transfer all" is a large number. Closes the gap the GW plan names explicitly:
+    `DeployFighters` already moves ship → sector, `BuyFighters` latinum → ship, and
+    `InvadePlanet` ship → committed-to-invasion, but nothing previously moved fighters
+    between a planet's stored stock and the ship outside combat.
+    """
+
+    planet_id: int
+    count: int
     to_planet: bool = True
 
 
@@ -590,6 +636,23 @@ class BeginSurvey:
     from `state.rng` (G3), resumes the surveyor's saved position/hints for this world
     (D5), and refills supplies. The site generation and walk/dig/talk action commands
     land in GW-WP05/06; extraction is `ExtractGroundOperation`.
+    """
+
+    planet_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class BeginAssault:
+    """Open a tactical ground assault on a hostile world once its orbital defences
+    fall (GW-WP09, GW plan D7-D11).
+
+    Mirrors `BeginSurvey`'s shape (`Player.ground_operation`, replayable). The begin
+    reducer recomputes `ground_access` (never trusts a cached DTO), derives
+    battlefield difficulty from live world state, and snapshots the world's current
+    garrison headcount onto the operation — the planet itself is not touched (D11:
+    nothing is spent until GW-WP11 ships). Extraction is the existing
+    `ExtractGroundOperation`; tactical actions and strategic settlement land in
+    GW-WP10/WP11.
     """
 
     planet_id: int
@@ -1158,9 +1221,10 @@ Command = (
     | HireRecruits | DismissRecruits | BuySuits | SellSuits | BuyGroundOrdnance
     | BuildStagingArea
     | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
-    | TransferCargo | BatchTransferCargo
+    | TransferCargo | TransferFighters | BatchTransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
-    | Salvage | Descend | Explore | BeginSurvey | ExtractGroundOperation
+    | Salvage | Descend | Explore | BeginSurvey | BeginAssault | ReinforceGarrison
+    | ExtractGroundOperation
     | GroundMove | SurveyDig | SurveyLand | SurveyTalk
     | MineBelt | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
@@ -1306,6 +1370,8 @@ def reduce(
             return _build_citadel(state, player_id, command, config)
         case TransferCargo():
             return _transfer_cargo(state, player_id, command, config)
+        case TransferFighters():
+            return _transfer_fighters(state, player_id, command, config)
         case BatchTransferCargo():
             return _batch_transfer_cargo(state, player_id, command, config)
         case PlanetDeposit():
@@ -1332,6 +1398,10 @@ def reduce(
             return _explore(state, player_id, command, config)
         case BeginSurvey():
             return _begin_survey(state, player_id, command, config)
+        case BeginAssault():
+            return _begin_assault(state, player_id, command, config)
+        case ReinforceGarrison():
+            return _reinforce_garrison(state, player_id, command, config)
         case ExtractGroundOperation():
             return _extract_ground_operation(state, player_id, command, config)
         case GroundMove():
@@ -2536,13 +2606,16 @@ def _set_allocation(
         raise EconomyError("you do not own that world")
     alloc = {c: float(cmd.allocation.get(c.value, 0.0)) for c in Commodity}
     fighter = max(0.0, float(cmd.fighter))
-    total = sum(alloc.values()) + fighter
+    garrison = max(0.0, float(cmd.garrison))
+    total = sum(alloc.values()) + fighter + garrison
     if total <= 0:
         raise EconomyError("allocation must be positive")
-    # Normalize the trio + fighter share together so they sum to 1.0 (§4.2 invariant, WP55).
+    # Normalize the trio + fighter + garrison shares together so they sum to 1.0
+    # (§4.2 invariant, WP55/GW-WP09 D11).
     normalized = {c: v / total for c, v in alloc.items()}
     return ReduceResult(planets=(replace(
-        planet, allocation=normalized, fighter_allocation=fighter / total),))
+        planet, allocation=normalized, fighter_allocation=fighter / total,
+        garrison_allocation=garrison / total),))
 
 
 # --- citadels: build ladder + treasury (§4.2, WP54) -------------------------
@@ -2598,6 +2671,39 @@ def _transfer_cargo(
             **planet.stores, cmd.commodity: available - moved})
     return ReduceResult(
         events=(CargoTransferred(player_id, planet.id, cmd.commodity, moved, cmd.to_planet),),
+        ships=(new_ship,), planets=(new_planet,),
+    )
+
+
+def _transfer_fighters(
+    state: UniverseState, player_id: int, cmd: TransferFighters, config: GameConfig,
+) -> ReduceResult:
+    """Move fighters between the ship's bays and an owned world's stored stock (GW-WP09).
+
+    Conserves fighters exactly, mirroring `_transfer_cargo`'s shape: one side debits
+    what the other credits. No holds/capacity clamp is needed on either side — neither
+    `Ship.fighters` nor `Planet.fighters` is capacity-limited (unlike cargo, which
+    clamps to `ship.holds_free`).
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    if cmd.count <= 0:
+        raise EconomyError("transfer a positive number of fighters")
+    if cmd.to_planet:
+        moved = min(cmd.count, ship.fighters)
+        if moved <= 0:
+            raise EconomyError("no fighters aboard to unload")
+        new_ship = replace(ship, fighters=ship.fighters - moved)
+        new_planet = replace(planet, fighters=planet.fighters + moved)
+    else:
+        moved = min(cmd.count, planet.fighters)
+        if moved <= 0:
+            raise EconomyError("no fighters in storage to load")
+        new_ship = replace(ship, fighters=ship.fighters + moved)
+        new_planet = replace(planet, fighters=planet.fighters - moved)
+    return ReduceResult(
+        events=(FightersTransferred(player_id, planet.id, moved, cmd.to_planet),),
         ships=(new_ship,), planets=(new_planet,),
     )
 
@@ -4015,6 +4121,81 @@ def _begin_survey(
     return ReduceResult(
         events=(GroundOperationBegan(player_id, operation_id, "survey", cmd.planet_id),),
         players=(new_player,),
+    )
+
+
+def _begin_assault(
+    state: UniverseState, player_id: int, cmd: BeginAssault, config: GameConfig
+) -> ReduceResult:
+    """Open a tactical assault (GW-WP09, GW plan D7-D11).
+
+    Enforces the orbital ladder via the one `ground_access` contract (G12): a world
+    that isn't `Assault` at all, or is but still has a blocker standing (`droppable`
+    is False), is rejected with that contract's own reason — the reducer never
+    disagrees with `PlanetDTO.ground_blocker`. Draws the operation seed + id from
+    `state.rng` (G3, replay-exact). Difficulty and the reserved garrison are derived/
+    snapshotted from live state and frozen onto the operation; `Planet` itself is
+    unmodified (D11 decision #1) — nothing is spent here.
+    """
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    ship = _ship(state, player)
+    planet = _planet_in_sector(state, ship, cmd.planet_id)
+    access = ground_access(state, player, planet, config)
+    if not isinstance(access, Assault):
+        raise EconomyError(access.reason)
+    if not access.droppable:
+        raise EconomyError(access.blockers[0])
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    sector = state.sectors[planet.sector_id]
+    species = inhabiting_species(state, planet, config)
+    difficulty = derive_difficulty(
+        planet, config, distance_band=sector.distance_band, species=species)
+    seed = state.rng.getrandbits(63)
+    operation_id = state.rng.getrandbits(63)
+    operation = AssaultOperation(
+        operation_id=operation_id, planet_id=planet.id, sector_id=ship.sector_id,
+        planet_type=planet.planet_type, seed=seed, started_day=state.game.day_number,
+        resolve=config.groundwar.resolve.start,
+        retrieval_turn=config.groundwar.pressure.retrieval_turns,
+        cities=difficulty.cities, citadel_level=difficulty.citadel_level,
+        surrender_threshold=difficulty.surrender_threshold,
+        reserved_infantry=planet.garrison_infantry, reserved_armor=planet.garrison_armor,
+    )
+    new_player = replace(player, ground_operation=operation)
+    return ReduceResult(
+        events=(GroundOperationBegan(player_id, operation_id, "assault", cmd.planet_id),),
+        players=(new_player,),
+    )
+
+
+def _reinforce_garrison(
+    state: UniverseState, player_id: int, cmd: ReinforceGarrison, config: GameConfig,
+) -> ReduceResult:
+    """Convert ship-carried recruits + suits into persistent planetary defenders (GW-WP09, D15).
+
+    Validation order: owned world in this sector (`_owned_planet_here`) → landable,
+    non-Cloud-City (D9 — mirrors `ground_access`'s gate) → positive count →
+    `gw_force.apply_reinforcement` (owned-suit/recruit check, `GroundForceError` on
+    shortfall). The ship debit and the planet credit are the two halves of one atomic
+    transfer: `garrison_infantry` gains exactly what the ship gives up.
+    """
+    player = _player(state, player_id)
+    ship = _ship(state, player)
+    planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    if not is_landable(planet.planet_type, config) or is_cloud_city_world(planet.planet_type, config):
+        raise EconomyError("this world has no ground to station a garrison on")
+    if cmd.count <= 0:
+        raise EconomyError("reinforce a positive number of troopers")
+    try:
+        new_ship = gw_force.apply_reinforcement(ship, cmd.suit_id, cmd.count, config)
+    except GroundForceError as exc:
+        raise EconomyError(str(exc)) from exc
+    new_planet = replace(planet, garrison_infantry=planet.garrison_infantry + cmd.count)
+    return ReduceResult(
+        events=(GarrisonReinforced(player_id, planet.id, cmd.suit_id, cmd.count),),
+        ships=(new_ship,), planets=(new_planet,),
     )
 
 
