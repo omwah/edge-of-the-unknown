@@ -281,6 +281,74 @@ class SurveyTalked(Event):
 
 
 @dataclass(frozen=True)
+class GroundAssaultDropped(Event):
+    """The platoon landed, opening live tactical play (GW-WP10, D3).
+
+    `casualties_on_drop` counts troopers lost to AA reaction fire on the way down —
+    zero on a clean drop.
+    """
+
+    player_id: int
+    operation_id: int
+    trooper_count: int
+    casualties_on_drop: int
+
+
+@dataclass(frozen=True)
+class GroundJumped(Event):
+    """One trooper jump-jetted to a new cell, possibly drawing AA reaction fire
+    (GW-WP10). `hit` is whether that fire connected."""
+
+    player_id: int
+    operation_id: int
+    actor_id: int
+    x: int
+    y: int
+    hit: bool
+
+
+@dataclass(frozen=True)
+class GroundFired(Event):
+    """One trooper fired at a cell (GW-WP10). `target_kind` is "structure" or
+    "garrison"; `destroyed` is whether that hit finished the target."""
+
+    player_id: int
+    operation_id: int
+    actor_id: int
+    x: int
+    y: int
+    missile: bool
+    hit: bool
+    target_kind: str
+    destroyed: bool
+
+
+@dataclass(frozen=True)
+class GroundBroadcastMade(Event):
+    """A Command-suit trooper dictated terms over a cowed city — the big Resolve
+    strike (GW-WP10)."""
+
+    player_id: int
+    operation_id: int
+    actor_id: int
+    city_id: int
+
+
+@dataclass(frozen=True)
+class GroundTurnEnded(Event):
+    """The planet's whole turn ran: detection, emplacement fire, garrison AI,
+    escalating sorties, and the retrieval clock (GW-WP10). `outcome` is empty while
+    the assault remains live."""
+
+    player_id: int
+    operation_id: int
+    turn: int
+    resolve: int
+    main_turns: int
+    outcome: str
+
+
+@dataclass(frozen=True)
 class RecruitsHired(Event):
     """Ground recruits enlisted at a Stardock for a per-head incentive (GW-WP08, D3)."""
 

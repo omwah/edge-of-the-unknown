@@ -79,9 +79,14 @@ from edge.core.events import (
     EncounterStarted,
     Event,
     GenesisDeployed,
+    GroundAssaultDropped,
+    GroundBroadcastMade,
+    GroundFired,
+    GroundJumped,
     GroundMoved,
     GroundOperationBegan,
     GroundOperationEnded,
+    GroundTurnEnded,
     GrudgeFormed,
     Haggled,
     HazardDamage,
@@ -163,6 +168,11 @@ from edge.core.rules import (
     Explore,
     ExtractGroundOperation,
     FieldPatch,
+    EndGroundTurn,
+    GroundBroadcast,
+    GroundDrop,
+    GroundFire,
+    GroundJump,
     GroundMove,
     Hail,
     HaggleOffer,
@@ -348,6 +358,23 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
                                   "x": command.x, "y": command.y}
         case SurveyTalk():
             return "SurveyTalk", {"operation_id": command.operation_id}
+        case GroundDrop():
+            return "GroundDrop", {
+                "operation_id": command.operation_id,
+                "placements": [[suit_id, x, y] for suit_id, x, y in command.placements],
+            }
+        case GroundJump():
+            return "GroundJump", {"operation_id": command.operation_id,
+                                  "actor_id": command.actor_id, "x": command.x, "y": command.y}
+        case GroundFire():
+            return "GroundFire", {"operation_id": command.operation_id,
+                                  "actor_id": command.actor_id, "x": command.x, "y": command.y,
+                                  "missile": command.missile}
+        case GroundBroadcast():
+            return "GroundBroadcast", {"operation_id": command.operation_id,
+                                       "actor_id": command.actor_id}
+        case EndGroundTurn():
+            return "EndGroundTurn", {"operation_id": command.operation_id}
         case MineBelt():
             return "MineBelt", {"planet_id": command.planet_id}
         case BuyGenesis():
@@ -594,6 +621,22 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
                               x=payload["x"], y=payload["y"])
         case "SurveyTalk":
             return SurveyTalk(operation_id=payload["operation_id"])
+        case "GroundDrop":
+            return GroundDrop(
+                operation_id=payload["operation_id"],
+                placements=tuple((p[0], p[1], p[2]) for p in payload["placements"]),
+            )
+        case "GroundJump":
+            return GroundJump(operation_id=payload["operation_id"], actor_id=payload["actor_id"],
+                              x=payload["x"], y=payload["y"])
+        case "GroundFire":
+            return GroundFire(operation_id=payload["operation_id"], actor_id=payload["actor_id"],
+                              x=payload["x"], y=payload["y"], missile=payload["missile"])
+        case "GroundBroadcast":
+            return GroundBroadcast(operation_id=payload["operation_id"],
+                                   actor_id=payload["actor_id"])
+        case "EndGroundTurn":
+            return EndGroundTurn(operation_id=payload["operation_id"])
         case "MineBelt":
             return MineBelt(planet_id=payload["planet_id"])
         case "BuyGenesis":
@@ -817,6 +860,35 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "SurveyTalked", {
                 "player_id": event.player_id, "operation_id": event.operation_id,
                 "settlement_id": event.settlement_id, "hinted_id": event.hinted_id,
+            }
+        case GroundAssaultDropped():
+            return "GroundAssaultDropped", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "trooper_count": event.trooper_count,
+                "casualties_on_drop": event.casualties_on_drop,
+            }
+        case GroundJumped():
+            return "GroundJumped", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "actor_id": event.actor_id, "x": event.x, "y": event.y, "hit": event.hit,
+            }
+        case GroundFired():
+            return "GroundFired", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "actor_id": event.actor_id, "x": event.x, "y": event.y,
+                "missile": event.missile, "hit": event.hit,
+                "target_kind": event.target_kind, "destroyed": event.destroyed,
+            }
+        case GroundBroadcastMade():
+            return "GroundBroadcastMade", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "actor_id": event.actor_id, "city_id": event.city_id,
+            }
+        case GroundTurnEnded():
+            return "GroundTurnEnded", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "turn": event.turn, "resolve": event.resolve,
+                "main_turns": event.main_turns, "outcome": event.outcome,
             }
         case CloudCityBuilt():
             return "CloudCityBuilt", {
@@ -1220,6 +1292,22 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "SurveyTalked":
             return SurveyTalked(payload["player_id"], payload["operation_id"],
                                 payload["settlement_id"], payload["hinted_id"])
+        case "GroundAssaultDropped":
+            return GroundAssaultDropped(payload["player_id"], payload["operation_id"],
+                                        payload["trooper_count"], payload["casualties_on_drop"])
+        case "GroundJumped":
+            return GroundJumped(payload["player_id"], payload["operation_id"],
+                                payload["actor_id"], payload["x"], payload["y"], payload["hit"])
+        case "GroundFired":
+            return GroundFired(payload["player_id"], payload["operation_id"], payload["actor_id"],
+                               payload["x"], payload["y"], payload["missile"], payload["hit"],
+                               payload["target_kind"], payload["destroyed"])
+        case "GroundBroadcastMade":
+            return GroundBroadcastMade(payload["player_id"], payload["operation_id"],
+                                       payload["actor_id"], payload["city_id"])
+        case "GroundTurnEnded":
+            return GroundTurnEnded(payload["player_id"], payload["operation_id"], payload["turn"],
+                                   payload["resolve"], payload["main_turns"], payload["outcome"])
         case "BeltMined":
             return BeltMined(payload["player_id"], payload["planet_id"],
                              payload["commodity"], payload["amount"])
