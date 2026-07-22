@@ -260,8 +260,8 @@
     "semantic_hash": "c00b8be29092228886d192508fe097d7"
   },
   "edge/core/config.py": {
-    "mtime": 1784681559.1316986,
-    "ast_hash": "3f352e2bb6c02e586d535a46e2acbb0d",
+    "mtime": 1784694955.1382246,
+    "ast_hash": "71d4a90e99ddd4b4443c9f46f05f495a",
     "semantic_hash": ""
   },
   "edge/core/contracts.py": {
@@ -310,8 +310,8 @@
     "semantic_hash": "e68280de1e435811a5a00da2b94b8440"
   },
   "edge/core/events.py": {
-    "mtime": 1784682165.373806,
-    "ast_hash": "16184104312a139fddf9f9ee24c44d63",
+    "mtime": 1784695820.3931112,
+    "ast_hash": "6cfbb9bc07c81d16b71366b0b75cb351",
     "semantic_hash": ""
   },
   "edge/core/governance.py": {
@@ -350,8 +350,8 @@
     "semantic_hash": ""
   },
   "edge/core/rules.py": {
-    "mtime": 1784682180.1470523,
-    "ast_hash": "c43056f4886958cbe9519aef4db4dfdc",
+    "mtime": 1784695831.6234403,
+    "ast_hash": "14a26636355fdd710618198134fd5d34",
     "semantic_hash": ""
   },
   "edge/core/services.py": {
@@ -630,8 +630,8 @@
     "semantic_hash": "52c678d86d3ca9bc08ff4294898c335f"
   },
   "edge/store/codec.py": {
-    "mtime": 1784683093.963291,
-    "ast_hash": "d019a3a81535818d0183a5ee7c1f9564",
+    "mtime": 1784695913.9687445,
+    "ast_hash": "70d78afa1b78a42fca5f6c965277230f",
     "semantic_hash": ""
   },
   "edge/store/repo.py": {
@@ -995,8 +995,8 @@
     "semantic_hash": ""
   },
   "tests/test_codec.py": {
-    "mtime": 1784682557.6493473,
-    "ast_hash": "07174f10b2dfab20ca1ba9d7aad82977",
+    "mtime": 1784695960.2897384,
+    "ast_hash": "dc09598c3e83d19bcdd41cc59fa4e9db",
     "semantic_hash": ""
   },
   "tests/test_combat.py": {
@@ -1460,8 +1460,8 @@
     "semantic_hash": "2b425f757910dc0b9d8452a0cd8728ee"
   },
   "config/groundwar_default.yaml": {
-    "mtime": 1784681574.1239486,
-    "ast_hash": "920e52bfa925376e648afa6fd6e19d15",
+    "mtime": 1784694979.8372512,
+    "ast_hash": "233e630db9947d9ae7919ef0533a3429",
     "semantic_hash": ""
   },
   "config/names_default.yaml": {
@@ -3645,8 +3645,8 @@
     "semantic_hash": ""
   },
   "edge/core/groundwar/models.py": {
-    "mtime": 1784681633.6119401,
-    "ast_hash": "8d5160a7ccc1b2c623ce5734e4522990",
+    "mtime": 1784694931.7091932,
+    "ast_hash": "1d3beb945f78f7a4862f6f994f95388e",
     "semantic_hash": ""
   },
   "edge/core/groundwar/access.py": {
@@ -3720,13 +3720,43 @@
     "semantic_hash": ""
   },
   "edge/core/groundwar/assault.py": {
-    "mtime": 1784681840.5083892,
-    "ast_hash": "18ea6f89c5483ecd595dd2d43ac31031",
+    "mtime": 1784695781.4765866,
+    "ast_hash": "97c2681a2a29784b8718f34dbf7d5011",
     "semantic_hash": ""
   },
   "tests/test_groundwar_assault.py": {
     "mtime": 1784684213.001198,
     "ast_hash": "8d86422c9b084009bcd4ab82043ceba4",
+    "semantic_hash": ""
+  },
+  "tests/test_groundwar_assault_actions.py": {
+    "mtime": 1784698830.0597851,
+    "ast_hash": "6be2e3337a10e0935c76e0c0b9823e60",
+    "semantic_hash": ""
+  },
+  "docs/DIALOGUE_GAME_STATE.md": {
+    "mtime": 1784693734.2877777,
+    "ast_hash": "41f2dbb4ac8f52d8df4a42815c9e19cc",
+    "semantic_hash": ""
+  },
+  "docs/DIALOGUE_RUNTIME_SIMPLIFICATION_PLAN.md": {
+    "mtime": 1784696856.272833,
+    "ast_hash": "d6dfc62d3583443ce908363b7c2bdd1f",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20260722_044006_read_docs_dialogue_game_state_md_and_suggest_some.md": {
+    "mtime": 1784695206.918172,
+    "ast_hash": "aec00be288c30e502ceaa04a1a59790b",
+    "semantic_hash": ""
+  },
+  "docs/DIALOGUE_SYSTEM_REPLACEMENT_PLAN.md": {
+    "mtime": 1784696855.9828284,
+    "ast_hash": "d8589167f96fa103541f8be531b02094",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20260722_050115_write_the_dialogue_simplification_review_up_into_a.md": {
+    "mtime": 1784696475.2531066,
+    "ast_hash": "d2645ddb7cffdb8015fee3257b841f71",
     "semantic_hash": ""
   }
 }
