@@ -1337,6 +1337,32 @@ Tests: statistical bounds with fixed seed sets; performance budgets; bot golden
 logs; multiplayer contention/reconnect soak.
 Commit `ground: GW-WP13 ground-operations balance + soak`.
 
+**Status: infrastructure landed 2026-07-23; balance tuning deliberately deferred.**
+Shipped: deterministic `edge/bot/scripts/surveyor.py`/`assaulter.py` (drive a survey
+or tactical assault end to end over `ServiceProtocol`, reading trusted raw state like
+`edge.bot` already does elsewhere); `tests/test_groundwar_bots.py` (per-seed
+determinism replay for both bot kinds — the crown-jewel property, since a ground op
+draws from the shared `state.rng` and is exactly the class of bug that bit GW-WP09 —
+plus loose, non-degenerate aggregate outcome bounds, deliberately not a tight
+win-rate assertion a crude bot could never honor); `tests/test_groundwar_multiplayer.py`
+(extends the WP69 `BotSwarm` pattern: two survey bots never double-claim a discovery
+under real concurrent pressure — G8 stress-tested rather than single-player-only; two
+assault bots on the *same* world replay deterministically and never drive its garrison
+negative); `tests/test_groundwar_performance.py` (structural, not wall-clock, budgets:
+a live survey/assault operation checkpoints and reloads by replaying only the log tail,
+matching the `perf: bound save loading with state checkpoints` contract; `ground_operation_view`
+stays a viewport crop regardless of the underlying map's full size).
+
+**Not done, and not a silent gap**: actual numeric tuning (search time, supply
+pressure, victory rates, casualties, suit/ordnance costs, macro-turn costs, rewards,
+repeated-assault recovery) is a subjective balance call, not something the harness
+above can derive on its own — it needs a human read of what the bots' seed-matrix runs
+actually show. Also open: remote-latency profiling and a reconnect-specific soak (the
+in-process `BotSwarm` proves single-writer determinism under concurrent load, not
+socket reconnection); safe runtime caches, only if a future measurement pass finds one
+warranted (none did here). Revisit as a WP13 follow-up once there's a balance verdict
+to act on.
+
 ### GW-WP14 — Legacy retirement, documentation, and exit gate (M/L)
 
 Default the new paths on and remove or migrate:
