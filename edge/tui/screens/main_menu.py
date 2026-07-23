@@ -50,6 +50,19 @@ class MainMenuScreen(EdgeScreen):
     # via the shared ConfirmScreen (enforced by tests/test_ui_actions.py).
     ACTION_DANGER = {"new_game": "destructive"}
 
+    _loading = False
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        # A save load is in flight — block every menu action (including arrow-key
+        # focus movement) so the title screen can't be driven while it's busy.
+        if self._loading:
+            return False
+        return super().check_action(action, parameters)
+
+    def _set_menu_disabled(self, disabled: bool) -> None:
+        for button in self.query(Button):
+            button.disabled = disabled
+
     def compose(self) -> ComposeResult:
         saved = has_save()
         settings = getattr(self.app, "ui_settings", None)
@@ -122,8 +135,9 @@ class MainMenuScreen(EdgeScreen):
         if not has_save():
             self.notify("No save found — start a new game.", timeout=2)
             return
+        self._loading = True
+        self._set_menu_disabled(True)
         button = self.query_one("#continue", Button)
-        button.disabled = True
         button.label = "Loading saved game…"
 
         def progress(stage: str, done: int, total: int) -> None:
@@ -137,13 +151,17 @@ class MainMenuScreen(EdgeScreen):
             )
         except DialogueConfigMismatchError as exc:
             self.notify(str(exc), title="Error", severity="error", timeout=6)
-            button.disabled = False
+            self._loading = False
+            self._set_menu_disabled(False)
             button.label = "C  Continue"
             return
         if service is None:
-            button.disabled = False
+            self._loading = False
+            self._set_menu_disabled(False)
             button.label = "C  Continue"
             return  # error already shown via app.notify
+        self._loading = False
+        self._set_menu_disabled(False)
         self.app.attach_local_game(service)  # type: ignore[attr-defined]
         self.app.push_screen(GameScreen(service, self.app.player_id))  # type: ignore[attr-defined]
 
