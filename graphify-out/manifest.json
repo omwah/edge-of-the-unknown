@@ -900,8 +900,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/main_menu.py": {
-    "mtime": 1784784510.3291256,
-    "ast_hash": "94be76e8ed4d17a7d86d27a9cf4c3c6a",
+    "mtime": 1784816797.5095983,
+    "ast_hash": "ee647ee4e90ba56252247dc5be5d9dae",
     "semantic_hash": ""
   },
   "edge/tui/screens/options.py": {
@@ -1590,8 +1590,8 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1784443066.2245774,
-    "ast_hash": "b14ffbaff5f3a02bc85aca4942a59c54",
+    "mtime": 1784814476.282434,
+    "ast_hash": "aaf0e37f7acf3ccd7de1d448efd35b31",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -1670,8 +1670,8 @@
     "semantic_hash": ""
   },
   "docs/GROUNDWAR_INTEGRATION_PLAN.md": {
-    "mtime": 1784782292.9250216,
-    "ast_hash": "52d0f0606aea54ac5c634128df0f0523",
+    "mtime": 1784819947.2687812,
+    "ast_hash": "f26aa5a315c2dc75e7d8ddf876f63245",
     "semantic_hash": ""
   },
   "docs/GROUNDWAR_POC.md": {
@@ -3782,6 +3782,31 @@
   "images/ui/stardock/stardock_tavern_source_wide.png": {
     "mtime": 1783841573.7769296,
     "ast_hash": "14382e767b85cb55af48b41799f3e1d1",
+    "semantic_hash": ""
+  },
+  "edge/bot/scripts/assaulter.py": {
+    "mtime": 1784819907.085121,
+    "ast_hash": "51e6a862f135a1d817253a73c312a7f9",
+    "semantic_hash": ""
+  },
+  "edge/bot/scripts/surveyor.py": {
+    "mtime": 1784819764.8167832,
+    "ast_hash": "5c343e77ea31842de86e53e2f9094106",
+    "semantic_hash": ""
+  },
+  "tests/test_groundwar_bots.py": {
+    "mtime": 1784819336.1817358,
+    "ast_hash": "575a31b233fed4178ec2c3c36451f0f0",
+    "semantic_hash": ""
+  },
+  "tests/test_groundwar_multiplayer.py": {
+    "mtime": 1784819462.1508076,
+    "ast_hash": "f56d12f94bc28cf1be9d71f3473b787c",
+    "semantic_hash": ""
+  },
+  "tests/test_groundwar_performance.py": {
+    "mtime": 1784819699.9707174,
+    "ast_hash": "a188bcd0454663fbd0565f46dfa85a16",
     "semantic_hash": ""
   }
 }
