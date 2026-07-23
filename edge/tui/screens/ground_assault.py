@@ -17,12 +17,14 @@ from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
+from textual.screen import ModalScreen
 from textual.timer import Timer
 from textual.widgets import Footer, RichLog, Static
 
 from edge.core.dto import AssaultCellDTO, AssaultExpeditionDTO, AssaultTrooperDTO
 from edge.core.combat import CombatError
 from edge.core.economy import EconomyError
+from edge.core.events import GroundAssaultSettled
 from edge.core.movement import MovementError
 from edge.core.rules import (
     EndGroundTurn,
@@ -73,6 +75,67 @@ _LOG_EXPANDED_H = 12
 class _DropSlot:
     suit_id: str
     number: int
+
+
+_RESULT_TITLES: dict[str, tuple[str, str]] = {
+    "surrender": ("bold bright_green", "🏳 SURRENDER"),
+    "wiped": ("bold red", "☠ WIPED OUT"),
+    "casualties": ("bold red", "⚠ MISSION ABORTED"),
+    "retrieval": ("bold yellow", "⏱ RETRIEVAL"),
+}
+
+
+def _result_headline(planet: str, settled: GroundAssaultSettled) -> str:
+    if settled.control == "protectorate":
+        return f"{planet} yields — it is now your protectorate."
+    if settled.control == "conquest":
+        return f"{planet} is conquered and annexed to your holdings."
+    if settled.outcome == "wiped":
+        return f"The platoon is gone. {planet} remains unbowed."
+    if settled.outcome == "casualties":
+        return (f"Casualties passed the doctrine ceiling — survivors recalled. "
+                f"{planet}'s defenses remain intact.")
+    if settled.outcome == "retrieval":
+        return f"The retrieval boat lifted with {planet} unbowed."
+    return f"The assault on {planet} has ended ({settled.outcome})."
+
+
+class AssaultResultModal(ModalScreen[None]):
+    """The settled outcome of an assault that has already resolved (win or loss).
+
+    Replaces the "Abort and retrieve the survivors?" confirm framing once there is
+    nothing left to fight for — that confirm exists to protect mid-fight losses, which
+    no longer apply once `outcome` is set (GW-WP12-FU2)."""
+
+    BINDINGS = [Binding("escape", "close", "Close"), Binding("enter", "close", "Close")]
+    CSS = """
+    AssaultResultModal { align: center middle; background: $background 60%; }
+    AssaultResultModal #result-box {
+        width: 58; max-width: 100%; height: auto; padding: 1 2;
+        border: round $secondary; background: $surface;
+    }
+    AssaultResultModal #result-stats { color: $text-muted; margin-top: 1; }
+    """
+
+    def __init__(self, planet: str, settled: GroundAssaultSettled) -> None:
+        super().__init__()
+        self._planet = planet
+        self._settled = settled
+
+    def compose(self) -> ComposeResult:
+        style, title = _RESULT_TITLES.get(self._settled.outcome, ("bold", "OPERATION ENDED"))
+        stats = (f"{self._settled.attacker_losses} troopers lost · "
+                 f"{self._settled.defender_losses} defenders eliminated")
+        if self._settled.loot:
+            stats += f" · {self._settled.loot:,} slips looted"
+        with Vertical(id="result-box", classes="modal-box"):
+            yield Static(f"[{style}]{title}[/]")
+            yield Static(_result_headline(self._planet, self._settled))
+            yield Static(stats, id="result-stats")
+            yield Static("[dim]Esc or Enter to return to orbit[/]")
+
+    def action_close(self) -> None:
+        self.dismiss(None)
 
 
 class AssaultMapView(CroppedMapView):
@@ -186,7 +249,8 @@ Compose a platoon, then place each capsule with arrows or the mouse and [b]Enter
 After touchdown [b]Tab[/] selects a ready trooper; [b]M[/] moves, [b]G[/] jumps through
 terrain (drawing AA fire), [b]F[/] fires, [b]I[/] spends a missile, and [b]Space[/]
 runs the planet's turn. [b]Y[/] shows weapon ranges only for defenses you can see.
-Extraction always works, but it confirms because all tactical losses and damage settle."""
+Extraction always works; mid-fight it confirms because tactical losses and damage
+settle, and once the assault is decided it settles straight away with the result."""
     HELP_LEGEND_ROWS = [
         ("[black on green]M[/] [black on green]S[/] [black on green]C[/]", "your powered suits"),
         ("[white on dark_red]i[/] [white on dark_red]T[/]", "visible infantry / armor"),
@@ -644,6 +708,11 @@ Extraction always works, but it confirms because all tactical losses and damage 
         if self.view is None:
             self.app.pop_screen()
             return
+        if self.view.outcome is not None:
+            # The operation already resolved (win or loss) — nothing left to lose by
+            # extracting, so skip the destructive-abort confirm entirely.
+            self.run_worker(self._extract())
+            return
         message = ("Abort this assault and retrieve the survivors? All casualties, spent "
                    "ordnance, defender losses, and structural damage will settle.")
         self.app.push_screen(
@@ -656,9 +725,19 @@ Extraction always works, but it confirms because all tactical losses and damage 
             self.run_worker(self._extract())
 
     async def _extract(self) -> None:
-        if self.view is not None and await self._apply(
-            ExtractGroundOperation(self.view.operation_id)) is not None:
-            self.app.pop_screen()
+        if self.view is None:
+            return
+        planet, resolved = self.view.planet, self.view.outcome is not None
+        events_out = await self._apply(ExtractGroundOperation(self.view.operation_id))
+        if events_out is None:
+            return
+        if resolved:
+            settled = next((e for e in events_out if isinstance(e, GroundAssaultSettled)), None)
+            if settled is not None:
+                self.app.push_screen(
+                    AssaultResultModal(planet, settled), lambda _: self.app.pop_screen())
+                return
+        self.app.pop_screen()
 
     _OUTCOME_LINES: dict[str, tuple[str, str]] = {
         "surrender": ("bold bright_green", "🏳 SURRENDER — the planetary government yields."),

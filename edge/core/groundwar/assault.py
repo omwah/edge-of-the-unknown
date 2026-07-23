@@ -1555,13 +1555,18 @@ def assault_broadcast(
 
 def assault_end_turn(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig, rng: Random,
-) -> AssaultOperation:
+) -> tuple[AssaultOperation, tuple[tuple[str, str, int, int, bool], ...]]:
     """Run the planet's whole turn (`defense_phase`): detection, emplacement fire,
-    garrison AI, escalating sorties, the retrieval clock, and the next player phase."""
+    garrison AI, escalating sorties, the retrieval clock, and the next player phase.
+
+    Returns `(new_op, log)` — `log` is every `(kind, text, x, y, friendly)` line the
+    defense phase produced (emplacement/garrison fire, sorties), so the reducer can
+    surface each hit instead of only the round summary (a prior gap: trooper HP fell
+    during this phase with nothing explaining why)."""
     if op.outcome is not None:
         raise MovementError("the assault has ended — extract to orbit")
     if not op.dropped:
         raise MovementError("the platoon has not dropped yet")
     battle = _battle_for(op, amap, config, rng)
     defense_phase(battle)
-    return _freeze_battle(op, battle)
+    return _freeze_battle(op, battle), tuple(battle.events)

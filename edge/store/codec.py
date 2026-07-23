@@ -84,6 +84,7 @@ from edge.core.events import (
     GroundAssaultDropped,
     GroundAssaultSettled,
     GroundBroadcastMade,
+    GroundDefenseFireLogged,
     GroundFired,
     GroundJumped,
     GroundMoved,
@@ -907,6 +908,12 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "turn": event.turn, "resolve": event.resolve,
                 "main_turns": event.main_turns, "outcome": event.outcome,
             }
+        case GroundDefenseFireLogged():
+            return "GroundDefenseFireLogged", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "kind": event.kind, "text": event.text, "x": event.x, "y": event.y,
+                "friendly": event.friendly,
+            }
         case CloudCityBuilt():
             return "CloudCityBuilt", {
                 "player_id": event.player_id, "planet_id": event.planet_id,
@@ -1342,6 +1349,10 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "GroundTurnEnded":
             return GroundTurnEnded(payload["player_id"], payload["operation_id"], payload["turn"],
                                    payload["resolve"], payload["main_turns"], payload["outcome"])
+        case "GroundDefenseFireLogged":
+            return GroundDefenseFireLogged(
+                payload["player_id"], payload["operation_id"], payload["kind"],
+                payload["text"], payload["x"], payload["y"], payload["friendly"])
         case "BeltMined":
             return BeltMined(payload["player_id"], payload["planet_id"],
                              payload["commodity"], payload["amount"])

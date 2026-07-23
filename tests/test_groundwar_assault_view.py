@@ -17,7 +17,7 @@ from edge.server.client import LocalClient, RemoteClient
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
 from edge.tui.app import EdgeApp
-from edge.tui.screens.ground_assault import GroundAssaultScreen
+from edge.tui.screens.ground_assault import AssaultResultModal, GroundAssaultScreen
 from edge.tui.screens.game import GameScreen
 from test_groundwar_assault_actions import CFG, _dropped, _reducer_world
 
@@ -210,11 +210,17 @@ async def test_textual_outcome_and_settlement_flow(
         assert isinstance(screen, GroundAssaultScreen)
         assert screen.view is not None and screen.view.outcome == outcome
         assert outcome.upper() in screen._status().plain  # noqa: SLF001
+        # A settled operation (win or loss) extracts straight away — no "abort and lose
+        # everything?" confirm, since there is nothing left to lose — and reports the
+        # result in a modal instead of the ConfirmScreen used mid-fight.
         await pilot.press("escape")
         await pilot.pause()
-        await pilot.press("y")
-        await pilot.pause()
         assert state.players[1].ground_operation is None
+        assert isinstance(app.screen, AssaultResultModal)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert not isinstance(app.screen, AssaultResultModal)
+        assert not isinstance(app.screen, GroundAssaultScreen)
 
 
 @pytest.mark.parametrize("size", ((80, 24), (100, 34), (140, 42)))

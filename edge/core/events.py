@@ -335,6 +335,27 @@ class GroundBroadcastMade(Event):
 
 
 @dataclass(frozen=True)
+class GroundDefenseFireLogged(Event):
+    """One line from the planet's defense phase during `EndGroundTurn` — emplacement
+    fire, garrison fire, or a sortie — that would otherwise resolve silently.
+
+    `EndGroundTurn` used to report only the round summary (`GroundTurnEnded`), so
+    trooper HP dropped with no explanation in the log; this carries the individual
+    hit/miss/sortie line the core battle already computes. `kind` is one of "hit",
+    "killed", "miss", "resolve", "destroyed", "sortie". `friendly` mirrors the core
+    battle log's flag (whose meaning is kind-dependent, not simply "good news").
+    """
+
+    player_id: int
+    operation_id: int
+    kind: str
+    text: str
+    x: int
+    y: int
+    friendly: bool
+
+
+@dataclass(frozen=True)
 class GroundTurnEnded(Event):
     """The planet's whole turn ran: detection, emplacement fire, garrison AI,
     escalating sorties, and the retrieval clock (GW-WP10). `outcome` is empty while
