@@ -23,6 +23,7 @@ class OptionsScreen(ModalScreen[None]):
         Binding("d", "toggle_density", "Density"),
         Binding("o", "toggle_onboarding", "Onboarding"),
         Binding("g", "toggle_greyed", "Greyed replies"),
+        Binding("u", "toggle_auto_end", "Auto-end turn"),
     ]
 
     CSS = """
@@ -41,7 +42,8 @@ class OptionsScreen(ModalScreen[None]):
             yield ClickableEntry(self._density_line(), dest="opt", ref="density")
             yield ClickableEntry(self._onboarding_line(), dest="opt", ref="onboarding")
             yield ClickableEntry(self._greyed_line(), dest="opt", ref="greyed")
-            yield Static("[dim]T/R/A/D/O/G change · Esc closes · preferences are local[/]",
+            yield ClickableEntry(self._auto_end_line(), dest="opt", ref="auto_end")
+            yield Static("[dim]T/R/A/D/O/G/U change · Esc closes · preferences are local[/]",
                          id="options-footer")
 
     def _theme_line(self) -> str:
@@ -68,6 +70,11 @@ class OptionsScreen(ModalScreen[None]):
         value = self.app.ui_settings.show_onboarding  # type: ignore[attr-defined]
         return f"  [b]O[/] Captain's objectives: [cyan]{'shown' if value else 'hidden'}[/]"
 
+    def _auto_end_line(self) -> str:
+        value = self.app.ui_settings.auto_end_turn_solo  # type: ignore[attr-defined]
+        return (f"  [b]U[/] Auto-end assault turn (solo trooper): "
+                f"[cyan]{'on' if value else 'off'}[/]")
+
     def on_clickable_entry_picked(self, msg: object) -> None:
         ref = getattr(msg, "ref", "")
         if ref == "theme":
@@ -82,6 +89,8 @@ class OptionsScreen(ModalScreen[None]):
             self.action_toggle_onboarding()
         elif ref == "greyed":
             self.action_toggle_greyed()
+        elif ref == "auto_end":
+            self.action_toggle_auto_end()
 
     def action_toggle_theme(self) -> None:
         names = ["edge-ansi", "edge-high-contrast", "edge-monochrome"]
@@ -122,10 +131,17 @@ class OptionsScreen(ModalScreen[None]):
             self.app.ui_config = ui.model_copy(update={"show_disabled_options": value})  # type: ignore[attr-defined]
         self._redraw()
 
+    def action_toggle_auto_end(self) -> None:
+        settings = self.app.ui_settings  # type: ignore[attr-defined]
+        self.app.update_ui_settings(  # type: ignore[attr-defined]
+            auto_end_turn_solo=not settings.auto_end_turn_solo)
+        self._redraw()
+
     def _redraw(self) -> None:
         entries = list(self.query(ClickableEntry))
         lines = [self._theme_line(), self._motion_line(), self._art_line(),
-                 self._density_line(), self._onboarding_line(), self._greyed_line()]
+                 self._density_line(), self._onboarding_line(), self._greyed_line(),
+                 self._auto_end_line()]
         for entry, line in zip(entries, lines, strict=False):
             entry.update(line)
 

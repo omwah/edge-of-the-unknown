@@ -25,6 +25,10 @@ class UISettings:
     # Captain's-objectives progress (WP-UI11) — purely local presentation
     # state, never part of universe state, replays, or hashes.
     objectives_done: tuple[str, ...] = ()
+    # A lone remaining trooper has nothing left to choose once its actions run out —
+    # ending the round for them is a convenience, not a rules change, so it is opt-in
+    # local presentation state like everything else here, not a groundwar config knob.
+    auto_end_turn_solo: bool = False
 
 
 def settings_path() -> Path:

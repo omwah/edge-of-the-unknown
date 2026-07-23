@@ -54,12 +54,46 @@ def test_selected_actor_legality_and_fog_match_pure_projection() -> None:
     assert {cell for cell, value in by_cell.items() if value.jump_reachable} == projected.jumpable
     assert {cell for cell, value in by_cell.items() if value.fire_target} == projected.fireable
     assert {cell for cell, value in by_cell.items() if value.missile_target} == projected.missile_targets
+    # Passive geometry (walls/gates/buildings) projects unconditionally, like survey's
+    # settlements — only the active-defense kinds stay gated behind live trooper LOS.
     visible_structure_ids = {
         structure.id for structure in amap.structures
         if (structure.x, structure.y) in projected.visible
+        or structure.kind in ga.PASSIVE_STRUCTURE_KINDS
     }
     assert {cell.structure_id for cell in view.cells if cell.structure_id} == visible_structure_ids
     assert all((unit.x, unit.y) in projected.visible for unit in view.garrison)
+
+
+def test_city_geometry_visible_at_range_but_active_defenses_stay_fogged() -> None:
+    """A city out of every trooper's LOS must not render as empty ground.
+
+    Walls/gates/buildings are static footprint, not a hidden threat, so they project
+    unconditionally — the same way survey never fogs a settlement's `blocked`/`gate`
+    cells. Active defenses (turret/aa/sensor/citadel_gun) stay LOS-gated: scouting them
+    is still the point, and a remote client must not reverse-engineer their placement.
+    """
+    state = _reducer_world(reserved_infantry=0)
+    op = _dropped(state)
+    amap = ga.assault_map_for_state(op, CFG)
+    trooper = op.platoon[0]
+    city = amap.cities[0]
+    assert (trooper.x - city.cx) ** 2 + (trooper.y - city.cy) ** 2 > 30 ** 2, (
+        "fixture drifted: the trooper must land well outside every city's sight range")
+    far_structures = [s for s in amap.structures if s.city_id == city.id]
+    assert any(s.kind in ga.PASSIVE_STRUCTURE_KINDS for s in far_structures)
+    assert any(s.kind not in ga.PASSIVE_STRUCTURE_KINDS for s in far_structures)
+
+    view = session.ground_operation_view(
+        state, 1, CFG, viewport_x=0, viewport_y=0,
+        viewport_width=amap.width, viewport_height=amap.height,
+    )
+    assert isinstance(view, AssaultExpeditionDTO)
+    revealed_kinds = {cell.structure_kind for cell in view.cells if cell.structure_id}
+    assert revealed_kinds & ga.PASSIVE_STRUCTURE_KINDS, (
+        "a city far outside LOS must still show its walls/gates/buildings")
+    assert not (revealed_kinds - ga.PASSIVE_STRUCTURE_KINDS), (
+        "active defenses must stay hidden until a trooper actually sees them")
 
 
 def test_stale_actor_and_operation_commands_are_rejected() -> None:

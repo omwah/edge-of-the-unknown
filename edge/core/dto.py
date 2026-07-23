@@ -199,10 +199,13 @@ class SurveyExpeditionDTO:
 class AssaultCellDTO:
     """One fog-safe cell in the live tactical-assault viewport (GW-WP12).
 
-    Terrain and action affordances are public; enemy identities and structure state
-    are populated only when a surviving trooper currently sees the cell.  Threat
-    overlays likewise derive only from visible weapons, so a remote client cannot
-    reverse-engineer hidden defenses from an otherwise masked map.
+    Terrain, action affordances, and a city's passive geometry (walls, gates,
+    buildings — `PASSIVE_STRUCTURE_KINDS`) are always public, the same way survey
+    never fogs a settlement's `blocked`/`gate` cells. Enemy identities and *active*
+    defenses (turret/aa/sensor/citadel_gun) populate only when a surviving trooper
+    currently sees the cell, and threat overlays likewise derive only from visible
+    weapons, so a remote client cannot reverse-engineer a hidden gun emplacement
+    from an otherwise masked map.
     """
 
     x: int

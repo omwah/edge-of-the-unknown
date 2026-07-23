@@ -17,6 +17,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
+from textual.timer import Timer
 from textual.widgets import Footer, RichLog, Static
 
 from edge.core.dto import AssaultCellDTO, AssaultExpeditionDTO, AssaultTrooperDTO
@@ -41,10 +42,27 @@ from edge.groundwar.widgets import (
     STRUCTURE_ART,
 )
 from edge.server.client import GameClient
-from edge.tui.chrome import EdgeScreen, notify_warning
+from edge.tui.chrome import EdgeScreen
 from edge.tui.composer import PlatoonComposer, SuitOption
+from edge.tui.screens._ground_shared import (
+    CURSOR_MOVES,
+    FAST_MOVE_SCALE,
+    PAN_MOVES,
+    CroppedMapView,
+    FlashTrackerMixin,
+    LandingAnimationMixin,
+    LandingFrame,
+    feature_colors as _feature_colors,
+    feature_glyph as _feature_glyph,
+    follow_camera,
+    landing_frames,
+    pan_camera,
+    styled as _styled,
+    toggle_log_height,
+    viewport_size,
+    warn,
+)
 from edge.tui.screens.confirm import ConfirmScreen
-from edge.tui.screens.ground_expedition import _feature_colors, _feature_glyph, _styled
 
 _FLASH_SECONDS = 0.5
 _LOG_COLLAPSED_H = 3
@@ -57,33 +75,43 @@ class _DropSlot:
     number: int
 
 
-class AssaultMapView(Static, can_focus=True):
+class AssaultMapView(CroppedMapView):
     """Cropped DTO viewport with mouse cursor selection and transient command FX."""
 
     def __init__(self, host: GroundAssaultScreen) -> None:
-        super().__init__(id="assault-map")
-        self.host_screen = host
+        super().__init__(host, "assault-map", "Loading assault…")
+        self._cells: dict[tuple[int, int], AssaultCellDTO] = {}
+        self._troopers: dict[int, AssaultTrooperDTO] = {}
+        self._garrison: dict[int, Any] = {}
 
-    def render(self) -> Text:
-        host = self.host_screen
-        view = host.view
-        if view is None:
-            return Text("Loading assault…", style="dim")
-        cells = {(cell.x, cell.y): cell for cell in view.cells}
-        troopers = {trooper.trooper_id: trooper for trooper in view.troopers}
-        garrison = {unit.unit_id: unit for unit in view.garrison}
+    def _index_view(self, view: AssaultExpeditionDTO) -> None:
+        self._cells = {(cell.x, cell.y): cell for cell in view.cells}
+        self._troopers = {t.trooper_id: t for t in view.troopers}
+        self._garrison = {u.unit_id: u for u in view.garrison}
+
+    def _extra_frame_key(self, view: AssaultExpeditionDTO) -> tuple[Any, ...]:
+        # Placements are pure client-side state (no server round trip until the drop
+        # commits), so they must invalidate the cache themselves; show_threat likewise,
+        # since it repaints backgrounds the cached frame already baked in. The descent
+        # animation replaces glyphs, not just styles, so its step counter invalidates
+        # too — the DTO itself doesn't change mid-animation (`GroundDrop` already
+        # landed the troopers server-side before the capsules visually finish falling).
+        return (self.host_screen.show_threat, tuple(self.host_screen.placements),
+                self.host_screen.anim_step)
+
+    def _render_frame(self, view: AssaultExpeditionDTO) -> Text:
+        """Build the immutable viewport once; cursor moves only restyle a copied cell."""
+        placements = {position: slot for slot, position in self.host_screen.placements}
         out = Text(no_wrap=True)
-        flashes = host.live_flashes()
-        placements = {position: slot for slot, position in host.placements}
         for row in range(view.viewport_height):
             y = view.viewport_y + row
             for col in range(view.viewport_width):
                 x = view.viewport_x + col
-                cell = cells.get((x, y))
+                cell = self._cells.get((x, y))
                 if cell is None:
                     out.append(" ")
                     continue
-                char, style = self._cell(cell, view, troopers, garrison)
+                char, style = self._cell(cell, view)
                 slot = placements.get((x, y))
                 if slot is not None:
                     option = next(
@@ -92,27 +120,23 @@ class AssaultMapView(Static, can_focus=True):
                     ) if view.loadout is not None else None
                     char = option.label[:1].upper() if option is not None else "▼"
                     style = "black on bright_green"
-                if (x, y) in flashes:
-                    style = f"{style.split(' on ')[0]} {flashes[(x, y)][0]}"
-                if (x, y) == (host.cursor_x, host.cursor_y):
-                    style = "black on bright_white" if host.cursor_legal() else "bright_white on red3"
                 out.append(char, style)
             if row < view.viewport_height - 1:
                 out.append("\n")
         return out
 
-    def _cell(
-        self, cell: AssaultCellDTO, view: AssaultExpeditionDTO,
-        troopers: dict[int, AssaultTrooperDTO], garrison: dict[int, Any],
-    ) -> tuple[str, str]:
+    def _cell(self, cell: AssaultCellDTO, view: AssaultExpeditionDTO) -> tuple[str, str]:
+        animated = self.host_screen.anim_cells.get((cell.x, cell.y))
+        if animated is not None:
+            return animated
         if cell.trooper_id:
-            trooper = troopers[cell.trooper_id]
+            trooper = self._troopers[cell.trooper_id]
             selected = trooper.trooper_id == view.selected_actor_id
             return trooper.glyph, ("black on bright_green" if selected
                                    else "black on yellow" if trooper.detected
                                    else "black on green")
         if cell.garrison_id:
-            unit = garrison[cell.garrison_id]
+            unit = self._garrison[cell.garrison_id]
             return ("T" if unit.kind == "armor" else "i"), "white on dark_red"
         if cell.structure_id:
             if cell.structure_hp <= 0:
@@ -133,14 +157,8 @@ class AssaultMapView(Static, can_focus=True):
                 return char, f"{fg} {GROUND_THREAT_BG}"
         return char, _styled(fg, bg)
 
-    async def _on_click(self, event: events.Click) -> None:
-        view = self.host_screen.view
-        if view is not None:
-            await self.host_screen.set_cursor(
-                view.viewport_x + event.x, view.viewport_y + event.y)
 
-
-class GroundAssaultScreen(EdgeScreen):
+class GroundAssaultScreen(FlashTrackerMixin, LandingAnimationMixin, EdgeScreen):
     """Compose, deploy, command, and extract one authoritative planetary assault."""
 
     BINDINGS = [
@@ -209,6 +227,10 @@ Extraction always works, but it confirms because all tactical losses and damage 
         self.show_threat = False
         self.log_expanded = False
         self._flashes: dict[tuple[int, int], tuple[str, float]] = {}
+        self.anim_cells: dict[tuple[int, int], tuple[str, str]] = {}
+        self.anim_step = 0
+        self._anim_frames: list[LandingFrame] = []
+        self._anim_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
         if self.view is None:
@@ -219,8 +241,9 @@ Extraction always works, but it confirms because all tactical losses and damage 
             assert force is not None
             with Vertical(id="assault-compose"):
                 yield Static(f"[b]ASSAULT · {self.view.planet}[/]\n"
-                             "Choose carried suits for this drop. Casualties lose both "
-                             "the recruit and suit permanently.")
+                             "Choose which of your ship's owned suits ride this drop — buy "
+                             "more at Stardock's Marines tab. Casualties lose both the "
+                             "recruit and suit permanently.")
                 yield PlatoonComposer(
                     [SuitOption.from_dto(option) for option in force.options],
                     max_troopers=force.max_troopers, drop_label="PLACE CAPSULES",
@@ -259,8 +282,7 @@ Extraction always works, but it confirms because all tactical losses and damage 
         maps = self.query(AssaultMapView)
         if not maps:
             return 80, 30
-        widget = maps.first()
-        return max(20, widget.size.width), max(8, widget.size.height)
+        return viewport_size(maps.first())
 
     async def _load(self, *, center: bool = False) -> None:
         width, height = self._viewport_size()
@@ -272,7 +294,10 @@ Extraction always works, but it confirms because all tactical losses and damage 
         if view is None or not isinstance(view, AssaultExpeditionDTO):
             self.app.pop_screen()
             return
+        previous_outcome = self.view.outcome if self.view is not None else None
         self.view = view
+        if view.outcome is not None and previous_outcome is None:
+            self._announce_outcome(view.outcome)
         if view.dropped and self.selected_actor_id is None:
             living = next((trooper for trooper in view.troopers
                            if trooper.alive and trooper.actions > 0), None)
@@ -300,21 +325,24 @@ Extraction always works, but it confirms because all tactical losses and damage 
         view = self.view
         if view is None:
             return
-        mx, my = min(8, view.viewport_width // 3), min(3, view.viewport_height // 3)
-        nx, ny = self.camera_x, self.camera_y
-        if self.cursor_x < nx + mx:
-            nx = self.cursor_x - mx
-        elif self.cursor_x >= nx + view.viewport_width - mx:
-            nx = self.cursor_x - view.viewport_width + mx + 1
-        if self.cursor_y < ny + my:
-            ny = self.cursor_y - my
-        elif self.cursor_y >= ny + view.viewport_height - my:
-            ny = self.cursor_y - view.viewport_height + my + 1
-        nx = max(0, min(view.map_width - view.viewport_width, nx))
-        ny = max(0, min(view.map_height - view.viewport_height, ny))
+        nx, ny = follow_camera(
+            self.cursor_x, self.cursor_y, self.camera_x, self.camera_y,
+            view.viewport_width, view.viewport_height, view.map_width, view.map_height)
         if (nx, ny) != (self.camera_x, self.camera_y):
             self.camera_x, self.camera_y = nx, ny
             await self._load()
+
+    async def _pan(self, dx: int, dy: int) -> None:
+        view = self.view
+        if view is None:
+            return
+        moved = pan_camera(
+            self.camera_x, self.camera_y, self.cursor_x, self.cursor_y, dx, dy,
+            view.viewport_width, view.viewport_height, view.map_width, view.map_height)
+        if moved is None:
+            return
+        self.camera_x, self.camera_y, self.cursor_x, self.cursor_y = moved
+        await self._load()
 
     async def set_cursor(self, x: int, y: int) -> None:
         if self.view is None:
@@ -330,7 +358,9 @@ Extraction always works, but it confirms because all tactical losses and damage 
         return next((cell for cell in self.view.cells
                      if (cell.x, cell.y) == (self.cursor_x, self.cursor_y)), None)
 
-    def cursor_legal(self) -> bool:
+    def cursor_is_legal(self) -> bool:
+        """`CroppedMapView`'s cursor-highlight hook: landable pre-drop, else a legal
+        move/jump/fire/missile target for the selected trooper."""
         cell = self._cell_here()
         if cell is None:
             return False
@@ -350,14 +380,28 @@ Extraction always works, but it confirms because all tactical losses and damage 
         self._refresh_widgets()
 
     async def on_key(self, event: events.Key) -> None:
-        moves = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0),
-                 "k": (0, -1), "j": (0, 1), "h": (-1, 0), "l": (1, 0)}
-        if event.key in moves and self.view is not None:
-            dx, dy = moves[event.key]
+        if self._landing_playing:  # any key skips the descent
+            self._end_landing()
+            event.stop()
+            return
+        if self.view is None:
+            return
+        if event.key in CURSOR_MOVES:
+            dx, dy = CURSOR_MOVES[event.key]
             await self.set_cursor(self.cursor_x + dx, self.cursor_y + dy)
             event.stop()
             return
-        if event.key in ("tab", "shift+tab") and self.view is not None and self.view.dropped:
+        if event.key in ("H", "J", "K", "L"):
+            dx, dy = CURSOR_MOVES[event.key.lower()]
+            scale_x, scale_y = FAST_MOVE_SCALE
+            await self.set_cursor(self.cursor_x + dx * scale_x, self.cursor_y + dy * scale_y)
+            event.stop()
+            return
+        if event.key in PAN_MOVES:
+            await self._pan(*PAN_MOVES[event.key])
+            event.stop()
+            return
+        if event.key in ("tab", "shift+tab") and self.view.dropped:
             await self._select(1 if event.key == "tab" else -1)
             event.stop()
 
@@ -389,35 +433,52 @@ Extraction always works, but it confirms because all tactical losses and damage 
     async def _place_or_drop(self) -> None:
         if self.view is None or self._loadout is None or len(self.placements) >= len(self._slots):
             return
-        if not self.cursor_legal():
-            notify_warning(self, "That capsule cannot land there.")
+        if not self.cursor_is_legal():
+            warn(self, "#assault-log", "That capsule cannot land there.")
             return
         slot = self._slots[len(self.placements)]
         self.placements.append((slot, (self.cursor_x, self.cursor_y)))
         if len(self.placements) < len(self._slots):
             self._refresh_widgets()
             return
+        dropped_at = [pos for _, pos in self.placements]
         placements = tuple((s.suit_id, x, y) for s, (x, y) in self.placements)
         if await self._apply(GroundDrop(self.view.operation_id, placements)) is None:
             self.placements.pop()
             return
+        self.placements = []  # spent — the capsule markers give way to the real troopers
         await self._load()
         first = next((t for t in self.view.troopers if t.alive and t.actions > 0), None)
         if first is not None:
             self.selected_actor_id = first.trooper_id
             self.cursor_x, self.cursor_y = first.x, first.y
             await self._load()
+        if self.view is not None:
+            troopers_at = {(t.x, t.y): t for t in self.view.troopers}
+            touchdowns = [((x, y), troopers_at[(x, y)].glyph, "black on green")
+                         for (x, y) in dropped_at if (x, y) in troopers_at]
+            if touchdowns:
+                self._play_landing(landing_frames(touchdowns))
 
     def action_undo(self) -> None:
-        if self.view is not None and not self.view.dropped and self.placements:
-            self.placements.pop()
-            self._refresh_widgets()
+        if self.view is None or self.view.dropped:
+            return
+        if not self.placements:
+            warn(self, "#assault-log", "No capsule placements to undo yet.")
+            return
+        self.placements.pop()
+        self._refresh_widgets()
+
+    def _landing_log(self, text: str) -> None:
+        logs = self.query("#assault-log")
+        if logs:
+            logs.first().write(Text.from_markup(text))
 
     async def _apply(self, command: Any) -> tuple[Any, ...] | None:
         try:
             events_out = await self._client.apply(command)
         except (MovementError, CombatError, EconomyError) as exc:
-            notify_warning(self, str(exc))
+            warn(self, "#assault-log", str(exc))
             return None
         logs = self.query("#assault-log")
         log = logs.first() if logs else None
@@ -434,31 +495,81 @@ Extraction always works, but it confirms because all tactical losses and damage 
             self.set_timer(_FLASH_SECONDS + 0.05, self._refresh_widgets)
         return events_out
 
+    def _selected_trooper(self) -> AssaultTrooperDTO | None:
+        if self.view is None or self.selected_actor_id is None:
+            return None
+        return next((t for t in self.view.troopers if t.trooper_id == self.selected_actor_id), None)
+
+    def _ready_trooper_or_warn(self) -> AssaultTrooperDTO | None:
+        """The selected trooper if it can still act this round, else `None` after
+        logging exactly why — the operation already resolved, no trooper selected,
+        dead, or out of actions. Checking the resolved case first matters: once
+        `outcome` is set the server reports every cell unreachable/untargetable
+        (§ tactical_projection), so without this every action would otherwise warn
+        a misleading "out of range" instead of "the assault is over"."""
+        if self.view is not None and self.view.outcome is not None:
+            warn(self, "#assault-log",
+                f"This assault is over ({self.view.outcome}) — Esc settles to orbit.")
+            return None
+        trooper = self._selected_trooper()
+        if trooper is None:
+            warn(self, "#assault-log", "Select a ready trooper first (Tab).")
+            return None
+        if not trooper.alive:
+            warn(self, "#assault-log", f"{trooper.name} is down and cannot act.")
+            return None
+        if trooper.actions <= 0:
+            warn(self, "#assault-log", f"{trooper.name} has no actions left this round.")
+            return None
+        return trooper
+
     async def action_move(self) -> None:
+        trooper = self._ready_trooper_or_warn()
+        if trooper is None:
+            return
         cell = self._cell_here()
-        if self.view is None or cell is None or not cell.move_reachable or not self.selected_actor_id:
+        if cell is None or not cell.move_reachable:
+            warn(self, "#assault-log", "Not a legal move there — out of range, blocked, or no path.")
             return
         if await self._apply(GroundMove(
-            self.view.operation_id, cell.x, cell.y, self.selected_actor_id)) is not None:
+            self.view.operation_id, cell.x, cell.y, trooper.trooper_id)) is not None:  # type: ignore[union-attr]
             await self._load()
+            await self._maybe_auto_end_turn()
 
     async def action_jump(self) -> None:
+        trooper = self._ready_trooper_or_warn()
+        if trooper is None:
+            return
+        if trooper.jump_charges <= 0:
+            warn(self, "#assault-log", f"{trooper.name} has no jump charges left.")
+            return
         cell = self._cell_here()
-        if self.view is None or cell is None or not cell.jump_reachable or not self.selected_actor_id:
+        if cell is None or not cell.jump_reachable:
+            warn(self, "#assault-log", "Can't jump there — out of jump range or the spot is occupied.")
             return
         if await self._apply(GroundJump(
-            self.view.operation_id, self.selected_actor_id, cell.x, cell.y)) is not None:
+            self.view.operation_id, trooper.trooper_id, cell.x, cell.y)) is not None:  # type: ignore[union-attr]
             await self._load()
+            await self._maybe_auto_end_turn()
 
     async def _fire(self, missile: bool) -> None:
+        trooper = self._ready_trooper_or_warn()
+        if trooper is None:
+            return
+        if missile and trooper.missiles <= 0:
+            warn(self, "#assault-log", f"{trooper.name} is out of missiles.")
+            return
         cell = self._cell_here()
         legal = cell.missile_target if cell is not None and missile else (
             cell.fire_target if cell is not None else False)
-        if self.view is None or cell is None or not legal or not self.selected_actor_id:
+        if cell is None or not legal:
+            kind = "missile" if missile else "weapon"
+            warn(self, "#assault-log", f"No target there — out of {kind} range or no line of sight.")
             return
         if await self._apply(GroundFire(
-            self.view.operation_id, self.selected_actor_id, cell.x, cell.y, missile)) is not None:
+            self.view.operation_id, trooper.trooper_id, cell.x, cell.y, missile)) is not None:  # type: ignore[union-attr]
             await self._load()
+            await self._maybe_auto_end_turn()
 
     async def action_fire(self) -> None:
         await self._fire(False)
@@ -467,14 +578,52 @@ Extraction always works, but it confirms because all tactical losses and damage 
         await self._fire(True)
 
     async def action_broadcast(self) -> None:
-        if self.view is None or not self.view.can_broadcast or not self.selected_actor_id:
+        trooper = self._ready_trooper_or_warn()
+        if trooper is None:
+            return
+        if not self.view.can_broadcast:  # type: ignore[union-attr]
+            warn(self, "#assault-log",
+                "No cowed city is in range of a Command suit's broadcast yet.")
             return
         if await self._apply(GroundBroadcast(
-            self.view.operation_id, self.selected_actor_id)) is not None:
+            self.view.operation_id, trooper.trooper_id)) is not None:  # type: ignore[union-attr]
             await self._load()
+            await self._maybe_auto_end_turn()
+
+    async def _maybe_auto_end_turn(self) -> None:
+        """QoL for a one-trooper platoon: once its actions run out there is nothing
+        else to command this round, so an opted-in player can skip pressing Space.
+        Gated on `can_end_turn` so this never fires the "out of turns" warning on
+        its own — only a manual Space press does that."""
+        view = self.view
+        if view is None or not view.dropped or view.outcome is not None or not view.can_end_turn:
+            return
+        settings = getattr(self.app, "ui_settings", None)
+        if settings is None or not getattr(settings, "auto_end_turn_solo", False):
+            return
+        if len(view.troopers) != 1:
+            return
+        solo = view.troopers[0]
+        if solo.alive and solo.actions <= 0:
+            await self.action_end_turn()
 
     async def action_end_turn(self) -> None:
-        if self.view is None or not self.view.can_end_turn:
+        if self.view is None:
+            return
+        if self.view.outcome is not None:
+            warn(self, "#assault-log",
+                f"This assault is over ({self.view.outcome}) — Esc settles to orbit.")
+            return
+        if not self.view.dropped:
+            warn(self, "#assault-log", "Place your platoon before ending a round.")
+            return
+        if self.view.turns_remaining < self.view.next_turn_cost:
+            warn(self, "#assault-log",
+                "Out of main-game turns — you cannot end another round. Extract to "
+                "return to orbit (Esc).")
+            return
+        if not self.view.can_end_turn:
+            warn(self, "#assault-log", "Cannot end the round right now.")
             return
         if await self._apply(EndGroundTurn(self.view.operation_id)) is None:
             return
@@ -488,9 +637,8 @@ Extraction always works, but it confirms because all tactical losses and damage 
 
     def action_log_expand(self) -> None:
         self.log_expanded = not self.log_expanded
-        logs = self.query("#assault-log")
-        if logs:
-            logs.first().styles.height = _LOG_EXPANDED_H if self.log_expanded else _LOG_COLLAPSED_H
+        toggle_log_height(self, "#assault-log", expanded=self.log_expanded,
+                          collapsed_h=_LOG_COLLAPSED_H, expanded_h=_LOG_EXPANDED_H)
 
     def action_extract(self) -> None:
         if self.view is None:
@@ -512,10 +660,24 @@ Extraction always works, but it confirms because all tactical losses and damage 
             ExtractGroundOperation(self.view.operation_id)) is not None:
             self.app.pop_screen()
 
-    def live_flashes(self) -> dict[tuple[int, int], tuple[str, float]]:
-        now = time.monotonic()
-        self._flashes = {cell: flash for cell, flash in self._flashes.items() if flash[1] > now}
-        return self._flashes
+    _OUTCOME_LINES: dict[str, tuple[str, str]] = {
+        "surrender": ("bold bright_green", "🏳 SURRENDER — the planetary government yields."),
+        "wiped": ("bold red", "☠ WIPED OUT — the platoon is gone."),
+        "casualties": ("bold red",
+                       "⚠ MISSION ABORTED — casualties passed the doctrine ceiling."),
+        "retrieval": ("bold yellow",
+                      "⏱ RETRIEVAL — the boat lifts with the planet unbowed."),
+    }
+
+    def _announce_outcome(self, outcome: str) -> None:
+        """The operation just resolved — say so loudly in the log, once, the moment it
+        happens, instead of leaving it to the sidebar's passive status line (easy to
+        miss) while every further action quietly refuses with no explanation."""
+        style, text = self._OUTCOME_LINES.get(
+            outcome, ("bold", f"OPERATION ENDED — {outcome.upper()}"))
+        logs = self.query("#assault-log")
+        if logs:
+            logs.first().write(Text.from_markup(f"{text} Esc settles to orbit.", style=style))
 
     def _refresh_widgets(self) -> None:
         if self.view is None or not self.query(AssaultMapView):
@@ -544,7 +706,11 @@ Extraction always works, but it confirms because all tactical losses and damage 
         out.append(f"RESOLVE {'█' * fill}{'░' * (14 - fill)} {view.resolve}\n", "yellow")
         out.append(f"surrender at ≤ {view.surrender_threshold} · KIA "
                    f"{view.casualties}/{view.initial_strength}\n", "grey66")
-        out.append(f"main turns {view.turns_remaining} · next round costs {view.next_turn_cost}\n", "grey66")
+        out_of_turns = view.turns_remaining < view.next_turn_cost
+        out.append(f"main turns {view.turns_remaining} · next round costs {view.next_turn_cost}\n",
+                   "bold red" if out_of_turns else "grey66")
+        if out_of_turns and view.outcome is None:
+            out.append("⚠ OUT OF TURNS — extract to return to orbit (Esc)\n", "bold red")
         out.append("\nPLATOON\n", "bold")
         for trooper in view.troopers:
             if not trooper.alive:

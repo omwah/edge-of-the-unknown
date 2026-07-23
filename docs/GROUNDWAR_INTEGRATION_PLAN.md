@@ -1284,6 +1284,40 @@ strict mypy clean.
 
 Commit `758f764` — **GW-WP12 done.**
 
+### GW-WP12-FU1 — Post-playtest fixes and known gaps (M)
+
+**Status:** shipped July 2026 (not yet committed). A live playtest of the assault
+screen surfaced and fixed a chain of bugs — structures wrongly LOS-gated as a single
+class rather than split passive/active (a city outside line of sight rendered as bare
+terrain), zero log narration for tactical combat events, silent action rejection, no
+win/loss notification, and `AssaultMapView` rebuilding its whole grid every keystroke
+instead of caching like survey's map view does. `edge/tui/screens/_ground_shared.py`
+gained a `CroppedMapView` base widget (both map views now share one cache-and-restyle
+skeleton) and a `LandingAnimationMixin` (assault's capsule drop now plays the same
+descent animation as survey's touchdown, generalized to several simultaneous
+touchdown points). Full suite green throughout, `pixi run lint` clean.
+
+**Known gaps, surfaced but deliberately deferred:**
+
+- **No shared terrain identity between survey and assault.** The expectation is that
+  returning to a world in survey mode after winning an assault there would show the
+  same map with the battle's damage persisted. It doesn't: `GroundOperation`'s own
+  DESIGN.md entry says static terrain "is regenerated from identity," and
+  `generate_survey` (biome-based) and `generate_assault_map` (city/structure-based)
+  are structurally independent generators — neither knows about the other's output,
+  and `Planet` persists no rubble/city state beyond the life of the
+  `AssaultOperation` that created it. Fixing this needs a shared world-terrain-
+  identity model plus persisted structure/rubble state on `Planet` — sized like its
+  own work package, not a same-session fix.
+- **Protectorate/annexation has no TUI surface.** `AnnexProtectorate` exists in
+  `edge/core/rules.py` (GW-WP11) and `session._owner_label` already renders
+  `"protectorate (yours)"`/`"protectorate"` as plain text, but `PlanetDTO` carries no
+  protectorate/garrison-share/annex-eligibility fields and no screen offers an Annex
+  action, administers a production share, or manages a protectorate's garrison — the
+  rights DESIGN.md §4.2 describes ("The controller alone may administer production
+  share, manage and reinforce ground defense, and later seek annexation") are
+  implemented in core but never reach a player.
+
 ### GW-WP13 — Balance, bots, performance, and multiplayer contention (L)
 
 Build deterministic survey and assault bots over the public client/service

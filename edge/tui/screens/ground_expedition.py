@@ -7,14 +7,9 @@ authoritative command, and every rendered fact comes back in ``SurveyExpeditionD
 
 from __future__ import annotations
 
-import time
-from binascii import crc32
-from collections.abc import Iterable
-from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
-from rich.color import Color
 from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
@@ -24,7 +19,7 @@ from textual.screen import ModalScreen
 from textual.timer import Timer
 from textual.widgets import Footer, RichLog, Static
 
-from edge.art.terrain import BIOME_COLORS, FEATURES_REGISTRY, readable_fg
+from edge.art.terrain import readable_fg
 from edge.core.dto import GroundCellDTO, SurveyContactDTO, SurveyExpeditionDTO
 from edge.core.enums import DiscoveryKind
 from edge.core.events import (
@@ -34,7 +29,6 @@ from edge.core.events import (
     SurveySiteExcavated,
     SurveyTalked,
 )
-from edge.core.groundwar.terrain import BIOME_BANDS
 from edge.core.movement import MovementError
 from edge.core.rules import (
     ExtractGroundOperation,
@@ -47,7 +41,27 @@ from edge.core.surface_finds import FIND_KINDS, surface_find_kind
 from edge.groundwar.findart import generate_find_art
 from edge.server.client import GameClient
 from edge.tui import art_adapter
-from edge.tui.chrome import EdgeScreen, notify_warning
+from edge.tui.chrome import EdgeScreen
+from edge.tui.screens._ground_shared import (
+    CURSOR_MOVES,
+    FAST_MOVE_SCALE,
+    PAN_MOVES,
+    CroppedMapView,
+    FlashTrackerMixin,
+    LandingAnimationMixin,
+    LandingFrame,
+    dim_color as _dim,
+    feature_colors as _feature_colors,
+    feature_glyph as _feature_glyph,
+    follow_camera,
+    hex_color as _hex,
+    landing_frames,
+    pan_camera,
+    styled as _styled,
+    toggle_log_height,
+    viewport_size,
+    warn,
+)
 
 
 _HEAT = ("", "red3", "dark_orange3", "grey46", "grey30")
@@ -69,44 +83,9 @@ _EXPLORER = "Ѫ"
 _EXPLORER_STYLE = "black on bright_green"
 
 
-@dataclass(frozen=True)
-class _LandingFrame:
-    """One tick of the touchdown animation: glyph overrides plus an optional log beat."""
-
-    cells: dict[tuple[int, int], tuple[str, str]]
-    log: str = ""
-
-
-_LANDING_TICK = 0.17  # seconds per frame; the whole descent runs a bit over a second
-
-
-def _landing_frames(x: int, y: int) -> list[_LandingFrame]:
-    """The shuttle falling onto `(x, y)`: descent, plume, then the explorer standing there.
-
-    Coordinates above the target are clamped by the renderer (cells off the viewport simply
-    do not draw), so a drop site near the top edge just shows a shorter fall.
-    """
-    shuttle = "bold bright_white on grey15"
-    frames = [
-        _LandingFrame({(x, y - 4): ("╱▲╲"[1], shuttle)}, "[b]Shuttle away.[/]"),
-        _LandingFrame({(x, y - 3): ("▲", shuttle)}),
-        _LandingFrame({(x, y - 2): ("▲", shuttle)}, "Entering atmosphere…"),
-        _LandingFrame({(x, y - 1): ("▼", shuttle)}),
-    ]
-    plume = "bold wheat1 on dark_goldenrod"
-    ring = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
-    wide = [(x - 2, y), (x + 2, y), (x - 1, y - 1), (x + 1, y - 1),
-            (x - 1, y + 1), (x + 1, y + 1)]
-    frames.append(_LandingFrame(
-        {(x, y): ("▼", shuttle), **{c: ("░", plume) for c in ring}}))
-    frames.append(_LandingFrame(
-        {(x, y): (_EXPLORER, _EXPLORER_STYLE),
-         **{c: ("▒", plume) for c in ring},
-         **{c: ("░", plume) for c in wide}},
-        "[b]Touchdown[/] — survey deployed."))
-    frames.append(_LandingFrame(
-        {(x, y): (_EXPLORER, _EXPLORER_STYLE), **{c: ("░", plume) for c in ring}}))
-    return frames
+def _landing_frames(x: int, y: int) -> list[LandingFrame]:
+    """The shuttle falling onto `(x, y)`: descent, plume, then the explorer standing there."""
+    return landing_frames([((x, y), _EXPLORER, _EXPLORER_STYLE)])
 
 
 # Log emphasis by event type — a find must not read like a dry hole.
@@ -117,65 +96,6 @@ _EVENT_STYLES: dict[type, str] = {
     GroundMoved: "grey66",
     SurveyLanded: "bold bright_green",
 }
-
-
-@lru_cache(maxsize=None)
-def _feature_colors(ptype: str, feature: str) -> tuple[str, str]:
-    """The band's authored (fg, bg) for a feature name — deliberately *not* yet
-    contrast-corrected, because the background a cell finally renders on is not
-    always its own (see `_styled`)."""
-    layout = BIOME_BANDS.get(ptype)
-    colors = BIOME_COLORS.get(ptype, [])
-    if layout is not None:
-        for index, (_threshold, name) in enumerate(layout.bands):
-            if name == feature and index < len(colors):
-                return colors[index]
-    return "white", ""
-
-
-@lru_cache(maxsize=None)
-def _hex(color: str) -> str:
-    """Pin a colour to concrete truecolor, so the terminal cannot theme it away.
-
-    Named ANSI colours are *theme-dependent*: `readable_fg` measures contrast against
-    rich's nominal 4-bit palette, but the terminal paints its own. Where a band's fg and
-    bg are the same colour family — `terrestrial_cool` forest is `bright_green` on
-    `green`, and water_shallow/sand/dust/snow are alike — the nominal gap clears the
-    correction threshold while the *rendered* pair collapses into one colour, leaving
-    trees visible only when the cursor passes over them. Emitting hex makes what we
-    measured and what gets painted the same thing.
-    """
-    try:
-        rgb = Color.parse(color).get_truecolor()
-    except Exception:  # unknown name — leave it for the terminal to resolve
-        return color
-    return f"#{rgb.red:02x}{rgb.green:02x}{rgb.blue:02x}"
-
-
-@lru_cache(maxsize=None)
-def _styled(fg: str, bg: str) -> str:
-    """A rich style whose foreground is legible against the background it actually gets.
-
-    Two corrections happen here. First, overlays (search rings, scanner heat, walk range)
-    repaint the backdrop while keeping the terrain's foreground, so contrast is checked
-    against the *winning* background — correcting against the terrain's own and then
-    swapping the background out defeated it (`water_deep` on the `dark_orange3` heat band
-    measured a 0.002 luminance gap). Second, the result is pinned to hex (see `_hex`).
-    """
-    if not bg:
-        return _hex(fg)
-    return f"{_hex(readable_fg(fg, bg))} on {_hex(bg)}"
-
-
-@lru_cache(maxsize=None)
-def _dim(color: str, factor: float) -> str:
-    """Push a colour toward black, keeping its hue."""
-    try:
-        rgb = Color.parse(color).get_truecolor()
-    except Exception:
-        return color
-    return (f"#{round(rgb.red * factor):02x}"
-            f"{round(rgb.green * factor):02x}{round(rgb.blue * factor):02x}")
 
 
 @lru_cache(maxsize=None)
@@ -197,41 +117,6 @@ def _styled_excluded(fg: str, bg: str) -> str:
     front, back = lit.split(" on ")
     front, back = _dim(front, 0.62), _dim(back, 0.38)
     return f"{_hex(readable_fg(front, back))} on {back}"
-
-
-@lru_cache(maxsize=None)
-def _glyph_ramp(feature: str) -> tuple[tuple[str, ...], tuple[float, ...], float]:
-    """The feature's glyphs with cumulative weights (authored weights may be fractional)."""
-    choices = FEATURES_REGISTRY.get(feature, [("?", 1)])
-    chars: list[str] = []
-    cumulative: list[float] = []
-    running = 0.0
-    for char, weight in choices:
-        running += float(weight)
-        chars.append(char)
-        cumulative.append(running)
-    return tuple(chars), tuple(cumulative), running
-
-
-def _feature_glyph(planet_id: int, feature: str, x: int, y: int) -> str:
-    """Draw this cell's glyph against the authored weights, deterministically.
-
-    The POC drew per cell from the map RNG, which is what makes a forest read as
-    scattered trees over clearings (its blank entry carries 40 of 89 parts) instead of
-    a solid wall of one repeated glyph. The client has no operation seed and must never
-    receive one (G5), but a glyph only needs a *stable* key — and the feature name, the
-    cell's coordinates, and `planet_id` are all already public in the DTO, so texture
-    costs nothing in fog of war. CRC32 rather than `hash()`: string hashing is salted
-    per process, and snapshot tests need the same map to render identically every run.
-    """
-    chars, cumulative, total = _glyph_ramp(feature)
-    if total <= 0:
-        return chars[0]
-    roll = crc32(f"{planet_id}|{feature}|{x}|{y}".encode()) / 2**32 * total
-    for char, edge in zip(chars, cumulative):
-        if roll < edge:
-            return char
-    return chars[-1]
 
 
 class SurveyFindModal(ModalScreen[None]):
@@ -285,49 +170,20 @@ class SurveyFindModal(ModalScreen[None]):
         self.dismiss(None)
 
 
-class SurveyMapView(Static, can_focus=True):
+class SurveyMapView(CroppedMapView):
     """Scrolling server-projected viewport with mouse cursor selection."""
 
     def __init__(self, host: GroundExpeditionScreen) -> None:
-        super().__init__(id="survey-map")
-        self.host_screen = host
-        self._cells_view: SurveyExpeditionDTO | None = None
+        super().__init__(host, "survey-map", "Loading survey…")
         self._cells: dict[tuple[int, int], GroundCellDTO] = {}
-        self._frame_key: tuple[int, str] | None = None
-        self._frame: Text | None = None
 
-    def render(self) -> Text:
-        view = self.host_screen.view
-        if view is None:
-            return Text("Loading survey…", style="dim")
-        if view is not self._cells_view:
-            self._cells_view = view
-            self._cells = {(cell.x, cell.y): cell for cell in view.cells}
+    def _index_view(self, view: SurveyExpeditionDTO) -> None:
+        self._cells = {(cell.x, cell.y): cell for cell in view.cells}
+
+    def _extra_frame_key(self, view: SurveyExpeditionDTO) -> tuple[Any, ...]:
         # The landing animation replaces glyphs, not just styles, so it has to invalidate
-        # the cached frame — hence the step counter in the key.
-        frame_key = id(view), self.host_screen.overlay, self.host_screen.anim_step
-        if frame_key != self._frame_key:
-            self._frame_key = frame_key
-            self._frame = self._render_frame(view)
-        assert self._frame is not None
-        out = self._frame.copy()
-
-        def restyle(x: int, y: int, style: str) -> None:
-            col = x - view.viewport_x
-            row = y - view.viewport_y
-            if 0 <= col < view.viewport_width and 0 <= row < view.viewport_height:
-                offset = row * (view.viewport_width + 1) + col
-                out.stylize(style, offset, offset + 1)
-
-        for (fx, fy), (style, _until) in self.host_screen.live_flashes().items():
-            restyle(fx, fy, style)
-        # While inbound the cursor is a drop-site picker, so it has to say whether the cell
-        # under it is one — a white cursor over open water would read as a legal choice.
-        cursor = "black on bright_white"
-        if view.can_land and not self.host_screen.cursor_is_landable():
-            cursor = "bright_white on red3"
-        restyle(self.host_screen.cursor_x, self.host_screen.cursor_y, cursor)
-        return out
+        # the cached frame — hence the step counter.
+        return (self.host_screen.overlay, self.host_screen.anim_step)
 
     def _render_frame(self, view: SurveyExpeditionDTO) -> Text:
         """Build the immutable viewport once; cursor moves only restyle a copied cell."""
@@ -386,14 +242,8 @@ class SurveyMapView(Static, can_focus=True):
             bg = "grey27"
         return char, _styled(fg, bg)
 
-    async def _on_click(self, event: events.Click) -> None:
-        view = self.host_screen.view
-        if view is not None:
-            await self.host_screen.set_cursor(
-                view.viewport_x + event.x, view.viewport_y + event.y)
 
-
-class GroundExpeditionScreen(EdgeScreen):
+class GroundExpeditionScreen(FlashTrackerMixin, LandingAnimationMixin, EdgeScreen):
     """Walk, scan, excavate, and talk through authoritative survey commands."""
 
     BINDINGS = [
@@ -436,8 +286,8 @@ anywhere inside it pays off. A dry trench costs supplies and leaves spent ground
 
 [b]Marching[/] — put the cursor on any walkable cell and press [b]M[/] or Enter. Near \
 cells are a single local turn; distant ones are a multi-turn march that periodically \
-charges main-game turns. A march [b]halts itself[/] the moment unseen disturbed ground \
-comes into sight, so you will not tramp past the prize.
+charges main-game turns and goes the whole way in one command — disturbed ground stays \
+marked on the map the entire time it's in sight, so you can stop and dig whenever you spot it.
 
 [b]Supplies[/] — every turn of marching and every dig spends one. At zero the shuttle \
 recalls you, but anything found stays found: the planet remembers your position and \
@@ -501,7 +351,7 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         self._flashes: dict[tuple[int, int], tuple[str, float]] = {}
         self.anim_cells: dict[tuple[int, int], tuple[str, str]] = {}
         self.anim_step = 0
-        self._anim_frames: list[_LandingFrame] = []
+        self._anim_frames: list[LandingFrame] = []
         self._anim_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
@@ -529,8 +379,7 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
             await self._load()
 
     def _viewport_size(self) -> tuple[int, int]:
-        map_widget = self.query_one(SurveyMapView)
-        return max(20, map_widget.size.width), max(8, map_widget.size.height)
+        return viewport_size(self.query_one(SurveyMapView))
 
     async def _load(self, *, center: bool = False, cursor_to_explorer: bool = False) -> None:
         width, height = self._viewport_size()
@@ -566,18 +415,9 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         view = self.view
         if view is None:
             return
-        margin_x, margin_y = min(8, view.viewport_width // 3), min(3, view.viewport_height // 3)
-        nx, ny = self.camera_x, self.camera_y
-        if self.cursor_x < nx + margin_x:
-            nx = self.cursor_x - margin_x
-        if self.cursor_x > nx + view.viewport_width - margin_x:
-            nx = self.cursor_x - view.viewport_width + margin_x
-        if self.cursor_y < ny + margin_y:
-            ny = self.cursor_y - margin_y
-        if self.cursor_y > ny + view.viewport_height - margin_y:
-            ny = self.cursor_y - view.viewport_height + margin_y
-        nx = max(0, min(view.map_width - view.viewport_width, nx))
-        ny = max(0, min(view.map_height - view.viewport_height, ny))
+        nx, ny = follow_camera(
+            self.cursor_x, self.cursor_y, self.camera_x, self.camera_y,
+            view.viewport_width, view.viewport_height, view.map_width, view.map_height)
         if (nx, ny) != (self.camera_x, self.camera_y):
             self.camera_x, self.camera_y = nx, ny
             width, height = self._viewport_size()
@@ -597,18 +437,15 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
 
     async def _pan(self, dx: int, dy: int) -> None:
         """POC camera pan: the cursor rides with the viewport."""
-        if self.view is None:
+        view = self.view
+        if view is None:
             return
-        old_x, old_y = self.camera_x, self.camera_y
-        self.camera_x = max(
-            0, min(self.view.map_width - self.view.viewport_width, old_x + dx))
-        self.camera_y = max(
-            0, min(self.view.map_height - self.view.viewport_height, old_y + dy))
-        moved_x, moved_y = self.camera_x - old_x, self.camera_y - old_y
-        if not (moved_x or moved_y):
+        moved = pan_camera(
+            self.camera_x, self.camera_y, self.cursor_x, self.cursor_y, dx, dy,
+            view.viewport_width, view.viewport_height, view.map_width, view.map_height)
+        if moved is None:
             return
-        self.cursor_x = max(0, min(self.view.map_width - 1, self.cursor_x + moved_x))
-        self.cursor_y = max(0, min(self.view.map_height - 1, self.cursor_y + moved_y))
+        self.camera_x, self.camera_y, self.cursor_x, self.cursor_y = moved
         await self._load()
 
     def _refresh_widgets(self) -> None:
@@ -633,7 +470,9 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
                        "bright_green" if self.cursor_is_landable() else "red")
             out.append("\nEnter to set down · Esc aborts to orbit\n", "grey66")
             return out
-        out.append(f"local turn {v.local_turn} · main turns {v.turns_remaining}\n", "grey58")
+        out_of_turns = v.turns_remaining < v.main_turn_cost
+        out.append(f"local turn {v.local_turn} · main turns {v.turns_remaining}\n",
+                   "bold red" if out_of_turns else "grey58")
         frac = v.supplies / v.supplies_max if v.supplies_max else 0
         filled = round(14 * frac)
         color = "green" if frac > 0.5 else "yellow" if frac > 0.2 else "red"
@@ -645,6 +484,8 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         out.append(f"SCANNER  {v.scanner}\n", scanner_style)
         out.append(f"overlay {self.overlay} · next {v.main_turn_cost}-turn charge at local "
                    f"turn {v.next_main_turn_at}\n", "grey58")
+        if out_of_turns and v.outcome is None:
+            out.append("⚠ OUT OF TURNS — extract to return to orbit (Esc)\n", "bold red")
         out.append("\nCONTACTS\n", "bold")
         for contact in v.contacts:
             if contact.found:
@@ -688,30 +529,26 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
             self._end_landing()
             event.stop()
             return
-        moves = {
-            "up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0),
-            "k": (0, -1), "j": (0, 1), "h": (-1, 0), "l": (1, 0),
-        }
-        if event.key in moves:
-            dx, dy = moves[event.key]
+        if event.key in CURSOR_MOVES:
+            dx, dy = CURSOR_MOVES[event.key]
             await self.set_cursor(self.cursor_x + dx, self.cursor_y + dy)
             event.stop()
             return
         if event.key in ("H", "J", "K", "L"):
-            dx, dy = moves[event.key.lower()]
-            await self.set_cursor(self.cursor_x + dx * 8, self.cursor_y + dy * 4)
+            dx, dy = CURSOR_MOVES[event.key.lower()]
+            scale_x, scale_y = FAST_MOVE_SCALE
+            await self.set_cursor(self.cursor_x + dx * scale_x, self.cursor_y + dy * scale_y)
             event.stop()
             return
-        pans = {"w": (0, -4), "s": (0, 4), "a": (-8, 0), "d": (8, 0)}
-        if event.key in pans:
-            await self._pan(*pans[event.key])
+        if event.key in PAN_MOVES:
+            await self._pan(*PAN_MOVES[event.key])
             event.stop()
 
     async def _apply(self, command: Any) -> tuple[Any, ...] | None:
         try:
             events_out = await self._client.apply(command)
         except MovementError as exc:
-            notify_warning(self, str(exc))
+            warn(self, "#survey-log", str(exc))
             return None
         log = self.query_one("#survey-log", RichLog)
         for event in events_out:
@@ -730,8 +567,31 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
             return
         await self.action_march()
 
+    def _blocked_reason(self) -> str | None:
+        """Why the survey can't act right now, or `None` if it can — shared by march/
+        dig/talk so the log names the actual cause (recalled, not landed, out of
+        turns) instead of the keypress doing nothing."""
+        view = self.view
+        if view is None:
+            return "Not connected to the survey."
+        if view.outcome is not None:
+            return None  # the operation already ended; extraction is the only action
+        if not view.landed:
+            return "Land the shuttle before doing that."
+        if view.supplies <= 0:
+            return "Out of supplies — the shuttle is recalling you."
+        return None
+
     async def action_march(self) -> None:
-        if self.view is None or not self.view.can_move:
+        if self.view is None:
+            return
+        reason = self._blocked_reason()
+        if reason is not None:
+            warn(self, "#survey-log", reason)
+            return
+        if not self.view.can_move:
+            warn(self, "#survey-log",
+                "Not enough main-game turns left to march — extract to orbit.")
             return
         if await self._apply(
             GroundMove(self.view.operation_id, self.cursor_x, self.cursor_y)
@@ -740,7 +600,14 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         await self._load(cursor_to_explorer=True)
 
     async def action_dig(self) -> None:
-        if self.view is None or not self.view.can_dig:
+        if self.view is None:
+            return
+        reason = self._blocked_reason()
+        if reason is not None:
+            warn(self, "#survey-log", reason)
+            return
+        if not self.view.can_dig:
+            warn(self, "#survey-log", "Nothing to dig right now.")
             return
         before = {(c.x, c.y) for c in self.view.cells if c.dug}
         events_out = await self._apply(SurveyDig(self.view.operation_id))
@@ -752,10 +619,10 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         # turned over rather than re-deriving the shape from config.
         if self.view is not None:
             trench = {(c.x, c.y) for c in self.view.cells if c.dug} - before
-            self._flash(trench, "on orange3")
+            self.flash_cells(trench, "on orange3", _FLASH_SECONDS)
             found = {(c.x, c.y) for c in self.view.cells if c.found_contact_id}
             if excavated is not None:
-                self._flash(found, "on yellow")
+                self.flash_cells(found, "on yellow", _FLASH_SECONDS)
         if excavated is not None and self.view is not None:
             contact = next((c for c in self.view.contacts
                             if c.discovery_id == excavated.discovery_id), None)
@@ -763,7 +630,15 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
                 self.app.push_screen(SurveyFindModal(contact, first=True))
 
     async def action_talk(self) -> None:
-        if self.view is None or not self.view.can_talk:
+        if self.view is None:
+            return
+        reason = self._blocked_reason()
+        if reason is not None:
+            warn(self, "#survey-log", reason)
+            return
+        if not self.view.can_talk:
+            warn(self, "#survey-log",
+                "Walk inside a settlement first — there's no one to talk to here.")
             return
         events_out = await self._apply(SurveyTalk(self.view.operation_id))
         if events_out is None:
@@ -772,7 +647,7 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         # A narrowed circle is a quiet change on a busy map — mark where it was earned.
         hinted = any(isinstance(e, SurveyTalked) and e.hinted_id >= 0 for e in events_out)
         if hinted and self.view is not None:
-            self._flash({(self.view.explorer_x, self.view.explorer_y)}, "on yellow")
+            self.flash_cells({(self.view.explorer_x, self.view.explorer_y)}, "on yellow", _FLASH_SECONDS)
 
     def action_view_find(self) -> None:
         if self.view is None:
@@ -787,19 +662,6 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         if contact is not None:
             self.app.push_screen(SurveyFindModal(contact, first=False))
 
-    def live_flashes(self) -> dict[tuple[int, int], tuple[str, float]]:
-        """Drop expired flashes and return what is still lit."""
-        now = time.monotonic()
-        self._flashes = {k: v for k, v in self._flashes.items() if v[1] > now}
-        return self._flashes
-
-    def _flash(self, cells: Iterable[tuple[int, int]], style: str) -> None:
-        until = time.monotonic() + _FLASH_SECONDS
-        for cell in cells:
-            self._flashes[cell] = (style, until)
-        if self._flashes:
-            self.set_timer(_FLASH_SECONDS + 0.05, self._refresh_widgets)
-
     def cursor_is_landable(self) -> bool:
         """Whether the cell under the cursor is an advertised drop site."""
         if self.view is None:
@@ -808,11 +670,19 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
                      if (c.x, c.y) == (self.cursor_x, self.cursor_y)), None)
         return cell is not None and cell.landing_site
 
+    def cursor_is_legal(self) -> bool:
+        """`CroppedMapView`'s cursor-highlight hook. Only the land-picking phase marks
+        an illegal cell red; once landed, any walkable cell is a fine — if costly —
+        destination, so the cursor stays neutral rather than flagging it."""
+        if self.view is not None and self.view.can_land:
+            return self.cursor_is_landable()
+        return True
+
     async def action_land(self) -> None:
         if self.view is None or not self.view.can_land:
             return
         if not self.cursor_is_landable():
-            notify_warning(self, "The shuttle cannot set down there — pick open, level ground.")
+            warn(self, "#survey-log", "The shuttle cannot set down there — pick open, level ground.")
             return
         target = (self.cursor_x, self.cursor_y)
         if await self._apply(
@@ -820,44 +690,15 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         ) is None:
             return
         await self._load(cursor_to_explorer=True)
-        self._play_landing(*target)
+        self._play_landing(_landing_frames(*target))
 
-    def _play_landing(self, x: int, y: int) -> None:
-        self._anim_frames = _landing_frames(x, y)
-        self._advance_landing()
-
-    def _advance_landing(self) -> None:
-        if not self._anim_frames:
-            self._end_landing()
-            return
-        frame = self._anim_frames.pop(0)
-        self.anim_cells = frame.cells
-        self.anim_step += 1
-        if frame.log:
-            self.query_one("#survey-log", RichLog).write(Text.from_markup(frame.log))
-        self.query_one(SurveyMapView).refresh()
-        self._anim_timer = self.set_timer(_LANDING_TICK, self._advance_landing)
-
-    def _end_landing(self) -> None:
-        """Clear the overlay and stop the clock — also the skip path, so a keypress during
-        the descent lands you immediately rather than replaying the rest."""
-        if self._anim_timer is not None:
-            self._anim_timer.stop()
-            self._anim_timer = None
-        self._anim_frames = []
-        if self.anim_cells:
-            self.anim_cells = {}
-            self.anim_step += 1
-        self._refresh_widgets()
-
-    @property
-    def _landing_playing(self) -> bool:
-        return bool(self._anim_frames or self.anim_cells)
+    def _landing_log(self, text: str) -> None:
+        self.query_one("#survey-log", RichLog).write(Text.from_markup(text))
 
     def action_log_expand(self) -> None:
         self.log_expanded = not self.log_expanded
-        self.query_one("#survey-log", RichLog).styles.height = (
-            _LOG_EXPANDED_H if self.log_expanded else _LOG_COLLAPSED_H)
+        toggle_log_height(self, "#survey-log", expanded=self.log_expanded,
+                          collapsed_h=_LOG_COLLAPSED_H, expanded_h=_LOG_EXPANDED_H)
 
     def action_overlay(self) -> None:
         self.overlay = _OVERLAYS[(_OVERLAYS.index(self.overlay) + 1) % len(_OVERLAYS)]

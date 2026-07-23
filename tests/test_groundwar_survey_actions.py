@@ -110,6 +110,22 @@ def test_march_charges_macro_turns_in_quanta() -> None:
     assert spent == expected and spent >= 1
 
 
+def test_march_no_longer_halts_early_on_a_sighted_clue() -> None:
+    """A march used to stop the instant fresh disturbed ground came into sight — cheap
+    on a short hop, but it meant a march onto a site's own position (whose clues
+    necessarily surround it) never arrived in one `GroundMove` call; `_walk_onto`
+    above exists only because of that. The auto-halt was removed: with turns and
+    supplies to spare, one call now covers the whole path."""
+    st = _world(sites=1)
+    _begin(st)
+    op = _op(st)
+    smap = gw.survey_map_for(st, op, CFG)
+    site = smap.sites[0]
+    apply_result(st, reduce(st, 1, GroundMove(op.operation_id, site.x, site.y), CFG))
+    op2 = _op(st)
+    assert (op2.explorer_x, op2.explorer_y) == (site.x, site.y)
+
+
 def test_move_rejects_when_no_turns_left() -> None:
     st = _world()
     _begin(st)
