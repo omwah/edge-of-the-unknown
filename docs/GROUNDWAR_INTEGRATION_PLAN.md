@@ -1234,45 +1234,55 @@ open citadel builds, annex gates, daily Resolve recovery, and deterministic full
 siege settlement replay. Full suite green: 3176 passed, 80 snapshots; lint clean.
 Commit `ground: GW-WP11 assault settlement + consequence parity` — **GW-M3 done.**
 
-### GW-WP12 — Live assault DTO, remote client, and Textual battle (XL)
+### GW-WP12 — Live assault DTO, remote client, and Textual battle (XL) — **SHIPPED**
 
-Adapt the POC battle screen and platoon composer to DTO/client authority.
-Viewport projection exposes only visible enemy units/structures, legal selected
-actions, local stats, Resolve/retrieval/casualties, and event FX. The remote
-attacker drives commands through the game's single-writer queue; defenders need
-not be online.
+**Status:** shipped July 22, 2026 in commit `758f764`
+(`ground: GW-WP12 add fog-safe remote tactical assault UI`).
 
-Support keyboard and mouse drop placement, selection, move/jump/fire/missile,
-broadcast, end turn, extraction confirmation, reconnect/resume, responsive
-layouts, help, and accessibility copy. Orbit routes only assault-classified
-worlds to the composer and states every siege blocker.
+**Implementation (as shipped):**
 
-Files: DTO/session/client/wire layers, `edge/tui/screens/planet.py`, new/ported
-ground battle screen, `edge/groundwar/app.py`, `edge/groundwar/widgets.py`.
-Tests: fog and legal-action lockstep; local/remote parity; Pilot flows for win,
-loss, extract, and reconnect; responsive snapshots; stale-command rejection.
+- Added `AssaultExpeditionDTO` and its cell, trooper, garrison, and city DTOs.
+  The server regenerates the frozen battlefield and returns only the requested
+  viewport; no operation seed crosses the client boundary.
+- Added a pure tactical projection over the production assault rules. It computes
+  squad line-of-sight, visible enemy units and structures, visible-source threat
+  overlays, and the exact legal move, jump, fire, missile, and broadcast choices
+  for the selected trooper. The TUI does not reimplement action legality.
+- Extended `GameService`, `GameClient`, `LocalClient`, `RemoteClient`, and the
+  server protocol so embedded and hosted attackers consume the same assault view.
+  Mutations continue through the existing authoritative single-writer command
+  queue; planetary defenders remain server-controlled and need not be online.
+- Adapted the POC platoon composer and battle presentation into the production
+  `GroundAssaultScreen`. Shared structure art, rubble, threat colors, and event
+  flash styles now live in `edge/groundwar/widgets.py` and are reused by the POC.
+- Implemented keyboard and mouse capsule placement/cursor control, ready-trooper
+  selection, move/jump/fire/missile/broadcast/end-turn actions, radar overlays,
+  event log and combat flashes, confirmed extraction, surrender/wipe/retrieval
+  outcome display and settlement, help/accessibility copy, and compact/standard/
+  wide layouts.
+- Added operation resume to `GameScreen`: a loaded or reconnected session opens
+  the correct survey or assault screen and restores an actionable trooper
+  selection rather than stranding the player in orbit.
+- Completed the orbit route in `PlanetScreen`. Only a droppable
+  assault-classified world opens the composer; blocked worlds list every standing
+  orbital-base/citadel-gun/siege-shield rung from `PlanetDTO.ground_blockers`.
+- Bumped `WIRE_VERSION` 32→33 and refreshed the wire fingerprint and envelope
+  fixtures for the new DTO shapes and complete siege-blocker projection.
 
-**Shipped:** promoted the POC's platoon composer, tactical map vocabulary, threat
-overlays, event flashes, and structure art into shared presentation seams, while
-keeping the live screen strictly DTO/client-driven. Added a cropped assault DTO
-family and a pure selected-actor projection for earned visibility, exact
-move/jump/fire/missile/broadcast affordances, visible-only defenses and threat
-ranges, local counters, Resolve, retrieval, casualties, and settlement outcome.
-The local and remote clients share that read shape; commands still enter through
-the existing authoritative apply queue, and `WIRE_VERSION` moved 32→33 with
-refreshed golden fixtures.
+Files (as shipped): `edge/core/{dto.py,groundwar/assault.py}`,
+`edge/server/{client,protocol,service,session,wire}.py`,
+`edge/tui/screens/{game,ground_assault,planet}.py`,
+`edge/groundwar/{app,mapgen,widgets}.py`, wire fixtures, responsive SVG
+snapshots, and `tests/{test_groundwar_access,test_groundwar_assault_view}.py`.
 
-The production Textual screen now supports platoon composition, keyboard/mouse
-capsule placement and cursor control, selection, every tactical verb, radar,
-event logging/FX, confirmed extraction, outcome settlement, help/accessibility
-copy, compact/standard/wide layouts, and save/reconnect resume. Orbit shows every
-standing siege blocker and opens the composer only for a droppable
-assault-classified world. New tests cover DTO fog/legality lockstep, viewport and
-seed secrecy, stale actor/operation rejection, local/remote/wire parity, live
-move/extract, surrender/wipe, reconnect, all layout tiers, and three responsive
+Tests (as shipped): fog/visibility and legal-action lockstep; cropped viewport
+and seed secrecy; local/remote/wire parity; stale actor and operation rejection;
+complete siege-blocker projection; Textual Pilot move, surrender, wipe,
+confirmed extract, and reconnect flows; all layout tiers; and three responsive
 SVG snapshots. Full quality gate green: 3,191 tests and 83 snapshots; Ruff and
-strict mypy clean. Commit `ground: GW-WP12 authoritative tactical assault UI,
-remote projection, and reconnect flow`.
+strict mypy clean.
+
+Commit `758f764` — **GW-WP12 done.**
 
 ### GW-WP13 — Balance, bots, performance, and multiplayer contention (L)
 
