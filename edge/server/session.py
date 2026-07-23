@@ -88,6 +88,8 @@ from edge.core.events import (
     LimpetsRemoved,
     PlanetBanked,
     PlanetInvaded,
+    ProtectorateAnnexed,
+    ProtectorateEstablished,
     ProbeReport,
     DevicePurchased,
     DiscoveryCollected,
@@ -100,6 +102,7 @@ from edge.core.events import (
     GovernanceChanged,
     GrudgeFormed,
     GroundMoved,
+    GroundAssaultSettled,
     GroundOperationBegan,
     GroundOperationEnded,
     HazardDamage,
@@ -688,6 +691,11 @@ _COMMODITY_PCT = {Commodity.FUEL_ORE: "Fuel", Commodity.ORGANICS: "Org", Commodi
 
 
 def _owner_label(state: UniverseState, planet: Planet, player_id: int) -> str:
+    if planet.protectorate_controller.is_owned:
+        controller = planet.protectorate_controller
+        if corp.player_owns(state, controller, player_id):
+            return "protectorate (yours)"
+        return "protectorate"
     owner = planet.owner
     if owner.kind == "none":
         return "unowned"
@@ -733,7 +741,8 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     # the transfer workbench's clamps and the claim affordance read the reducer's own gate.
     capacity = colonist_capacity(planet, config)
     colonizable = capacity > 0
-    owned_by_you = planet.owner.kind == "player" and planet.owner.ref == player_id
+    sovereign_by_you = corp.player_owns(state, planet.owner, player_id)
+    owned_by_you = corp.player_controls_planet(state, planet, player_id)
     city_world = is_cloud_city_world(planet.planet_type, config)
     city_owner_ok = (not planet.owner.is_owned) or owned_by_you
     ship_equipment = ship.cargo.get(Commodity.EQUIPMENT, 0)
@@ -757,7 +766,7 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     citadel_pct = 0
     can_build = False
     next_cost: tuple[int, int] | None = None
-    if config.citadels is not None and owned_by_you:
+    if config.citadels is not None and sovereign_by_you:
         if citadels.building(planet):
             citadel_target = planet.citadel_level + 1
             lc = config.citadels.levels[citadel_target - 1]
@@ -811,7 +820,9 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     return dto.PlanetDTO(
         planet_id=planet.id, name=planet.name, ptype=planet.planet_type,
         owner=_owner_label(state, planet, player_id), colonizable=colonizable,
-        claimable=colonizable and not planet.owner.is_owned, owned_by_you=owned_by_you,
+        claimable=(colonizable and not planet.owner.is_owned
+                   and not planet.protectorate_controller.is_owned),
+        owned_by_you=owned_by_you,
         colonists=planet.colonists, habitability_cap=capacity,
         stores=stores, allocation=allocation, ship_colonists=ship.colonists,
         ship_colonist_capacity=ship.colonist_capacity,
@@ -1735,7 +1746,7 @@ def _planet_directory(
             colonists=planet.colonists,
             species=_inhabitants_label(state, planet, config) or "—",
             stores=stores, dist=dist.get(planet.sector_id, -1),
-            owned_by_you=corp.player_owns(state, planet.owner, player_id),
+            owned_by_you=corp.player_controls_planet(state, planet, player_id),
             citadel_level=planet.citadel_level, cloud_city_size=planet.cloud_city_size,
             starbase_status=base_status,
         ))
@@ -2559,6 +2570,14 @@ def format_event(event: Event) -> str:
         return f"[cyan]◇ Spoke with the settlement{hint}.[/]"
     if isinstance(event, GroundOperationEnded):
         return f"[magenta]▲ Ground operation {event.outcome}.[/]"
+    if isinstance(event, GroundAssaultSettled):
+        return (f"[{'green' if event.outcome == 'surrender' else 'yellow'}]"
+                f"⚔ Assault {event.outcome}: {event.attacker_losses} troopers and "
+                f"{event.defender_losses} defenders lost; {event.control}.[/]")
+    if isinstance(event, ProtectorateEstablished):
+        return "[green]⚑ The native polity accepts protectorate terms.[/]"
+    if isinstance(event, ProtectorateAnnexed):
+        return "[yellow]⚑ The protectorate is annexed into sovereign territory.[/]"
     if isinstance(event, BeltMined):
         return f"[green]⛏ Mined {event.amount} {event.commodity.replace('_', ' ')} from the belt.[/]"
     if isinstance(event, SiteExplored):
@@ -2732,7 +2751,10 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
             return None
         ship = state.ships.get(player.ship_id)
         return ship.sector_id if ship is not None else None
-    if isinstance(event, (CitadelGunSilenced, PlanetInvaded, InvasionRepulsed)):
+    if isinstance(event, (
+        CitadelGunSilenced, PlanetInvaded, InvasionRepulsed,
+        GroundAssaultSettled, ProtectorateEstablished, ProtectorateAnnexed,
+    )):
         planet = state.planets.get(event.planet_id)
         return planet.sector_id if planet is not None else None
     if isinstance(event, PortOrderFilled):
@@ -2757,7 +2779,8 @@ _SECTOR_PUBLIC_EVENTS: tuple[type[Event], ...] = (
     Warped, AlienMoved, AlienDestroyed, ShipDestroyed, StarbaseRazed, TerritoryDeployed, HazardDamage,
     EncounterStarted, EncounterEvaded, EncounterEnded, CombatRound, ComponentKnockedOut,
     SalvageCollected, GrudgeFormed, GenesisDeployed, CitadelGunSilenced, PlanetInvaded,
-    InvasionRepulsed, PortOrderFilled, PlayerAttacked,
+    InvasionRepulsed, GroundAssaultSettled, ProtectorateEstablished,
+    ProtectorateAnnexed, PortOrderFilled, PlayerAttacked,
 )
 
 

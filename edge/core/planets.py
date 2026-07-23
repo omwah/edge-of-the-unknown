@@ -370,7 +370,7 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
     several peoples at once (`population`, GW-WP09-PRE follow-up); growth/starvation
     scales every one of them by the same ratio, so the mix doesn't drift.
     """
-    if not planet.owner.is_owned:
+    if not planet.owner.is_owned and not planet.protectorate_controller.is_owned:
         return planet
     cfg = config.planets
     profile = cfg.types.get(planet.planet_type)
@@ -378,6 +378,8 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
         return planet
 
     stores = dict(planet.stores)
+    stores_before = dict(planet.stores)
+    protectorate_stores = dict(planet.protectorate_stores)
     population = dict(planet.population)
     colonists = planet.colonists
     fighters = planet.fighters
@@ -443,9 +445,23 @@ def produce(planet: Planet, config: GameConfig) -> Planet:
             ore_reserve -= haul[1]
     # barren (and any other uncolonizable type) produces nothing.
 
+    # A protectorate remains a native economy. Only the configured share of net
+    # positive production enters the controller's separate ledger; ordinary stores
+    # and the treasury remain the inhabitants' property (D13).
+    if planet.protectorate_controller.is_owned and config.groundwar is not None:
+        share = config.groundwar.settlement.protectorate_production_share
+        for commodity in Commodity:
+            gained = max(0, stores.get(commodity, 0) - stores_before.get(commodity, 0))
+            paid = min(gained, round(gained * share))
+            if paid:
+                stores[commodity] = stores.get(commodity, 0) - paid
+                protectorate_stores[commodity] = protectorate_stores.get(commodity, 0) + paid
+
     if (population == dict(planet.population) and fighters == planet.fighters
             and garrison_infantry == planet.garrison_infantry
-            and ore_reserve == planet.ore_reserve and stores == dict(planet.stores)):
+            and ore_reserve == planet.ore_reserve and stores == dict(planet.stores)
+            and protectorate_stores == dict(planet.protectorate_stores)):
         return planet  # nothing changed (e.g. an empty colony) — skip the rewrite
     return replace(planet, stores=stores, population=population, fighters=fighters,
-                   garrison_infantry=garrison_infantry, ore_reserve=ore_reserve)
+                   garrison_infantry=garrison_infantry, ore_reserve=ore_reserve,
+                   protectorate_stores=protectorate_stores)

@@ -349,6 +349,41 @@ class GroundTurnEnded(Event):
 
 
 @dataclass(frozen=True)
+class GroundAssaultSettled(Event):
+    """A tactical assault reconciled into persistent strategic state (GW-WP11)."""
+
+    player_id: int
+    planet_id: int
+    outcome: str
+    control: str
+    attacker_losses: int
+    defender_losses: int
+    civilian_losses: int
+    missiles_spent: int
+    loot: int
+
+
+@dataclass(frozen=True)
+class ProtectorateEstablished(Event):
+    """An unaligned native polity surrendered under limited player/corp control."""
+
+    player_id: int
+    planet_id: int
+    controller_kind: str
+    controller_ref: int
+
+
+@dataclass(frozen=True)
+class ProtectorateAnnexed(Event):
+    """A recovered protectorate was explicitly converted into ordinary ownership."""
+
+    player_id: int
+    planet_id: int
+    owner_kind: str
+    owner_ref: int
+
+
+@dataclass(frozen=True)
 class RecruitsHired(Event):
     """Ground recruits enlisted at a Stardock for a per-head incentive (GW-WP08, D3)."""
 

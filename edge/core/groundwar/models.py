@@ -202,6 +202,9 @@ class AssaultOperation:
     # collide with static structure ids within one operation's lifetime.
     next_unit_id: int = 1
     initial_strength: int = 0  # platoon size at drop — the casualty-ceiling/wipe denominator
+    # Actual shared-magazine rounds loaded into the dropped suits. Settlement debits
+    # this commitment and returns only unused rounds carried by surviving troopers.
+    ground_missiles_committed: int = 0
 
 
 # The active ground operation on `Player.ground_operation`, discriminated by type

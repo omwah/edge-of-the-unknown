@@ -5,7 +5,7 @@
 # game constant lives here, not in code (CLAUDE.md). Omitted fields fall back to
 # the schema defaults; the values below are spelled out so the balance is legible.
 
-config_version: 12  # GW-WP08: ground force (passenger_capacity, groundwar.ground_force)
+config_version: 13  # GW-M3: tactical assault state + strategic settlement/protectorates
 seed: 4             # universe seed for a new game; leave empty (seed:) for a random seed
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 

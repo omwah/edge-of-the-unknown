@@ -18,7 +18,9 @@ it) and the layer graph stays acyclic.
 
 from __future__ import annotations
 
-from edge.core.models import Corporation, Ownership, Player, UniverseState
+from dataclasses import replace
+
+from edge.core.models import Corporation, Ownership, Planet, Player, UniverseState
 
 
 def player_corp(state: UniverseState, player_id: int) -> Corporation | None:
@@ -43,6 +45,35 @@ def player_owns(state: UniverseState, owner: Ownership, player_id: int) -> bool:
         corp = state.corporations.get(owner.ref)
         return corp is not None and player_id in corp.member_player_ids
     return False
+
+
+def player_controls_planet(state: UniverseState, planet: Planet, player_id: int) -> bool:
+    """Whether the player owns a world or administers its protectorate (GW-WP11).
+
+    This is intentionally broader than :func:`player_owns`: D13 grants production
+    and ground-defense administration without pretending the retained native polity
+    is ordinary player/corp property.
+    """
+    return player_owns(state, planet.owner, player_id) or player_owns(
+        state, planet.protectorate_controller, player_id)
+
+
+def assault_war_delta(
+    state: UniverseState, attacker: Player, former_owner: Ownership,
+) -> Corporation | None:
+    """Declare the corp-war consequence of assaulting a rival corp holding.
+
+    A solo attacker has no corporation ledger to mutate. For two distinct corps,
+    the attacker's declaration is enough because corp hostility is mutual-by-
+    declaration throughout the rules.
+    """
+    if (former_owner.kind != "corp" or former_owner.ref is None
+            or attacker.corp_id is None or attacker.corp_id == former_owner.ref):
+        return None
+    attacking = state.corporations.get(attacker.corp_id)
+    if attacking is None or former_owner.ref in attacking.at_war_with:
+        return None
+    return replace(attacking, at_war_with=attacking.at_war_with | {former_owner.ref})
 
 
 def corps_at_war(state: UniverseState, corp_a: int | None, corp_b: int | None) -> bool:

@@ -1989,6 +1989,27 @@ class GwAssaultDifficulty(BaseModel):
         return self
 
 
+class GwSettlement(BaseModel):
+    """Strategic aftermath of a tactical assault (GW-WP11, D2/D8/D13/D14).
+
+    These values deliberately sit beside the tactical balance rather than in the
+    reducer: they govern how quickly a battered polity recovers, how long a
+    protectorate must exist before annexation, and how civilian harm feeds the
+    existing reputation/alignment rails.
+    """
+
+    model_config = _FROZEN
+
+    resolve_recovery_per_day: int = Field(default=8, ge=0)
+    protectorate_min_days: int = Field(default=5, ge=0)
+    annex_resolve_threshold: int = Field(default=80, ge=0)
+    protectorate_production_share: float = Field(default=0.1, ge=0.0, le=1.0)
+    civilian_loss_per_structure: float = Field(default=0.02, ge=0.0, le=1.0)
+    civilian_alignment_penalty: int = Field(default=3, ge=0)
+    annex_alignment_penalty: int = Field(default=15, ge=0)
+    defenders_per_consequence: int = Field(default=10, gt=0)
+
+
 class GwDifficulty(BaseModel):
     """A standalone setup-screen difficulty preset (superseded by live state in production)."""
 
@@ -2044,6 +2065,7 @@ class GroundwarConfig(BaseModel):
     difficulties: dict[str, GwDifficulty] = Field(default_factory=dict)
     garrison_economy: GwGarrisonEconomy = GwGarrisonEconomy()
     assault_difficulty: GwAssaultDifficulty = GwAssaultDifficulty()
+    settlement: GwSettlement = GwSettlement()
 
     @property
     def width(self) -> int:

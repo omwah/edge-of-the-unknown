@@ -249,3 +249,16 @@ assault_difficulty:
   band_mult: {}
   alliance_owned_mult: 1.2
   had_gun_mult: 1.15
+
+# GW-WP11 strategic reconciliation. Resolve recovers on the daily planet tick;
+# an unaligned people that surrenders remains sovereign under a limited
+# protectorate until both the time and Resolve gates permit explicit annexation.
+settlement:
+  resolve_recovery_per_day: 8
+  protectorate_min_days: 5
+  annex_resolve_threshold: 80
+  protectorate_production_share: 0.10
+  civilian_loss_per_structure: 0.02
+  civilian_alignment_penalty: 3
+  annex_alignment_penalty: 15
+  defenders_per_consequence: 10
