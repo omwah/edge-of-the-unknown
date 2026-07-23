@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 33  # GW-WP12: tactical assault DTOs, selected-actor legality, siege blockers
+WIRE_VERSION = 34  # GW-WP12-FU2: GroundDefenseFireLogged surfaces EndGroundTurn hits
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -100,6 +100,9 @@ v30 (GW-WP09-PRE): `PlanetDTO.species` — who lives on a world, now that the bi
 native peoples (a world the player settled names their own people).
 v33 (GW-WP12): live tactical assault DTOs and selected-actor legal-action projection;
 `PlanetDTO.ground_blockers` carries every still-standing orbital siege rung.
+v34 (GW-WP12-FU2): `GroundDefenseFireLogged` event — `EndGroundTurn`'s defense phase
+(emplacement/garrison fire, sorties) now surfaces each hit instead of only the round
+summary, so trooper HP loss during that phase is explained in the log.
 """
 
 

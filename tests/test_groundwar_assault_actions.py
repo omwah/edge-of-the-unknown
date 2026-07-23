@@ -98,10 +98,10 @@ def test_destroyed_wall_becomes_passable_rubble() -> None:
         if op.structure_hp.get(wall.id, wall.hp_max) <= 0:
             break
         if op.platoon[0].actions <= 0:
-            op = ga.assault_end_turn(op, amap, CFG, rng)
+            op, _ = ga.assault_end_turn(op, amap, CFG, rng)
     assert op.structure_hp.get(wall.id, wall.hp_max) <= 0
     if op.platoon[0].actions <= 0:
-        op = ga.assault_end_turn(op, amap, CFG, rng)
+        op, _ = ga.assault_end_turn(op, amap, CFG, rng)
 
     moved = ga.assault_move(op, amap, CFG, tid, wall.x, wall.y)
     trooper = next(t for t in moved.platoon if t.id == tid)
@@ -145,7 +145,7 @@ def test_actions_per_turn_enforced_and_reset_on_end_turn() -> None:
     assert next(t for t in op.platoon if t.id == tid).actions == 0
     with pytest.raises(MovementError):
         ga.assault_move(op, amap, CFG, tid, tx, ty)
-    op = ga.assault_end_turn(op, amap, CFG, rng)
+    op, _ = ga.assault_end_turn(op, amap, CFG, rng)
     assert next(t for t in op.platoon if t.id == tid).actions == GW.platoon.actions_per_turn
 
 
@@ -162,7 +162,7 @@ def test_jump_charges_deplete_and_reject_when_spent() -> None:
     for i in range(charges):
         target = b if i % 2 == 0 else a
         op, _hit = ga.assault_jump(op, amap, CFG, rng, tid, *target)
-        op = ga.assault_end_turn(op, amap, CFG, rng)  # refresh actions/charges-gate between jumps
+        op, _ = ga.assault_end_turn(op, amap, CFG, rng)  # refresh actions/charges-gate between jumps
     trooper = next(t for t in op.platoon if t.id == tid)
     assert trooper.jump_charges == 0
     other = a if trooper.x != a[0] or trooper.y != a[1] else b
@@ -237,7 +237,7 @@ def test_resolve_drains_on_structure_destroyed() -> None:
         if op.structure_hp.get(wall.id, wall.hp_max) <= 0:
             break
         if op.platoon[0].actions <= 0:
-            op = ga.assault_end_turn(op, amap, CFG, rng)
+            op, _ = ga.assault_end_turn(op, amap, CFG, rng)
     assert op.resolve < start_resolve
 
 
@@ -260,7 +260,7 @@ def test_resolve_hardens_on_civilian_building_destroyed() -> None:
         if op.outcome is not None:
             break
         if op.platoon[0].actions <= 0:
-            op = ga.assault_end_turn(op, amap, CFG, rng)
+            op, _ = ga.assault_end_turn(op, amap, CFG, rng)
     assert op.structure_hp.get(civ.id, civ.hp_max) <= 0
     assert op.resolve > start_resolve  # atrocity stiffens the defenders
 
@@ -316,7 +316,7 @@ def test_sorties_never_exceed_the_finite_remaining_pool() -> None:
     for _ in range(35):
         if op.outcome is not None:
             break
-        op = ga.assault_end_turn(op, amap, CFG, rng)
+        op, _ = ga.assault_end_turn(op, amap, CFG, rng)
     # Total ever fielded (still alive + already-dead) can never exceed the reserved pool.
     assert op.infantry_remaining >= 0
     total_fielded = 6 - op.infantry_remaining
@@ -380,7 +380,7 @@ def test_retrieval_clock_ends_the_mission_unbowed() -> None:
     for _ in range(5):
         if op.outcome is not None:
             break
-        op = ga.assault_end_turn(op, amap, CFG, rng)
+        op, _ = ga.assault_end_turn(op, amap, CFG, rng)
     assert op.outcome == "retrieval"
     assert op.local_turn == 3
 
@@ -390,7 +390,7 @@ def test_actions_reject_once_outcome_is_settled() -> None:
     op = _op(amap, reserved_infantry=0, retrieval_turn=1)
     rng = Random(2)
     op = _drop_at(amap, op, rng, amap.landing_x, amap.landing_y)
-    op = ga.assault_end_turn(op, amap, CFG, rng)
+    op, _ = ga.assault_end_turn(op, amap, CFG, rng)
     assert op.outcome == "retrieval"
     with pytest.raises(MovementError):
         ga.assault_end_turn(op, amap, CFG, rng)
@@ -408,7 +408,7 @@ def test_pure_battle_replay_is_deterministic() -> None:
         rng = Random(7)
         op = _drop_at(amap, _op(amap, retrieval_turn=6), rng, amap.landing_x, amap.landing_y)
         while op.outcome is None:
-            op = ga.assault_end_turn(op, amap, CFG, rng)
+            op, _ = ga.assault_end_turn(op, amap, CFG, rng)
         return op
 
     assert run() == run()
@@ -425,7 +425,7 @@ def test_resolve_and_casualties_stay_in_bounds(seed: int) -> None:
     op = _drop_at(amap, op, rng, amap.landing_x, amap.landing_y)
     turns = 0
     while op.outcome is None and turns < 15:
-        op = ga.assault_end_turn(op, amap, CFG, rng)
+        op, _ = ga.assault_end_turn(op, amap, CFG, rng)
         turns += 1
     assert 0 <= op.resolve <= GW.resolve.cap
     assert op.casualties <= op.initial_strength

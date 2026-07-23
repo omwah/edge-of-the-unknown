@@ -156,6 +156,7 @@ from edge.core.events import (
     GroundAssaultDropped,
     GroundAssaultSettled,
     GroundBroadcastMade,
+    GroundDefenseFireLogged,
     GroundFired,
     GroundJumped,
     GroundMoved,
@@ -4684,12 +4685,18 @@ def _end_ground_turn(
     if cost > player.turns_remaining:
         raise EconomyError("not enough turns to end this round — extract to orbit")
     amap = gw_assault.assault_map_for(state, op, config)
-    new_op = gw_assault.assault_end_turn(op, amap, config, state.rng)
+    new_op, log = gw_assault.assault_end_turn(op, amap, config, state.rng)
     new_player = replace(player, ground_operation=new_op,
                          turns_remaining=player.turns_remaining - cost)
+    events: list[Event] = [
+        GroundDefenseFireLogged(player_id, op.operation_id, kind, text, x, y, friendly)
+        for kind, text, x, y, friendly in log
+        if kind != "outcome"  # the outcome banner is announced separately, once
+    ]
+    events.append(GroundTurnEnded(player_id, op.operation_id, new_op.local_turn, new_op.resolve,
+                                  cost, new_op.outcome or ""))
     return ReduceResult(
-        events=(GroundTurnEnded(player_id, op.operation_id, new_op.local_turn, new_op.resolve,
-                                cost, new_op.outcome or ""),),
+        events=tuple(events),
         players=(new_player,),
     )
 

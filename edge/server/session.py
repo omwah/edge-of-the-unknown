@@ -103,6 +103,7 @@ from edge.core.events import (
     GrudgeFormed,
     GroundAssaultDropped,
     GroundBroadcastMade,
+    GroundDefenseFireLogged,
     GroundFired,
     GroundJumped,
     GroundMoved,
@@ -2726,6 +2727,11 @@ def format_event(event: Event) -> str:
         return f"[yellow]⚔ {weapon} hits the {event.target_kind} at {event.x},{event.y}{finish}[/]"
     if isinstance(event, GroundBroadcastMade):
         return "[bold bright_cyan]📣 Terms broadcast over the city — Resolve shaken.[/]"
+    if isinstance(event, GroundDefenseFireLogged):
+        style = {"hit": "red", "killed": "bold red", "miss": "grey62",
+                 "resolve": "yellow", "destroyed": "green",
+                 "sortie": "bold red"}.get(event.kind, "white")
+        return f"[{style}]{event.text}[/]"
     if isinstance(event, GroundTurnEnded):
         cost = f"  (-{event.main_turns} main turn)" if event.main_turns else ""
         outcome = f"  [bold]{event.outcome.upper()}[/]" if event.outcome else ""
