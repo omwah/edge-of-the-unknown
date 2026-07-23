@@ -275,12 +275,18 @@ list of everything in the sector (the sidebar's stand-in on a compact terminal).
             self.app.push_screen(EncounterScreen(self._service, self._pid))
 
     def _push_ground_operation(self) -> None:
-        """Resume one live survey screen, never stacking duplicates."""
+        """Resume the authoritative survey/assault screen without duplicates."""
+        from edge.core.dto import AssaultExpeditionDTO
+        from edge.tui.screens.ground_assault import GroundAssaultScreen
         from edge.tui.screens.ground_expedition import GroundExpeditionScreen
         client = getattr(self.app, "client", None)
-        if (client is not None
-                and not any(isinstance(s, GroundExpeditionScreen) for s in self.app.screen_stack)):
-            self.app.push_screen(GroundExpeditionScreen(client))
+        operation = self._service.ground_operation_view(self._pid)
+        ground_screens = (GroundExpeditionScreen, GroundAssaultScreen)
+        if client is None or any(isinstance(s, ground_screens) for s in self.app.screen_stack):
+            return
+        screen = GroundAssaultScreen(client) if isinstance(operation, AssaultExpeditionDTO) \
+            else GroundExpeditionScreen(client)
+        self.app.push_screen(screen)
 
     # --- commands ------------------------------------------------------------
 

@@ -28,19 +28,6 @@ CITY_NAMES = (
     "Fort Bannon", "Carr's Landing", "Hesperus", "Tango Urilla", "Sheol",
 )
 
-# How each structure kind draws (glyph, fg, bg) while alive; rubble is uniform.
-STRUCTURE_ART: dict[StructureKind, tuple[str, str, str]] = {
-    "wall": ("█", "grey66", "grey30"),
-    "gate": ("▒", "gold3", "grey30"),
-    "turret": ("╬", "bright_red", "grey30"),
-    "aa": ("⊕", "orange1", "grey23"),
-    "sensor": ("⍑", "bright_cyan", "grey23"),
-    "citadel_gun": ("✸", "bright_magenta", "grey30"),
-    "building_military": ("▪", "indian_red", "grey23"),
-    "building_civilian": ("⌂", "grey74", "grey23"),
-}
-RUBBLE_ART = ("▒", "grey42", "black")
-
 STREET_FEATURE = "dust"  # what city ground plays as (move 1, no cover)
 
 

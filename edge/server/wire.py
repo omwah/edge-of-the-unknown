@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 32  # GW-WP11: AnnexProtectorate + strategic settlement/protectorate events
+WIRE_VERSION = 33  # GW-WP12: tactical assault DTOs, selected-actor legality, siege blockers
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -98,6 +98,8 @@ berths/ordnance; new `BarracksItem`, `LoadoutOptionDTO` and `GroundForceDTO` (th
 barracks catalog and the platoon composer's honest affordances).
 v30 (GW-WP09-PRE): `PlanetDTO.species` — who lives on a world, now that the big bang seeds
 native peoples (a world the player settled names their own people).
+v33 (GW-WP12): live tactical assault DTOs and selected-actor legal-action projection;
+`PlanetDTO.ground_blockers` carries every still-standing orbital siege rung.
 """
 
 

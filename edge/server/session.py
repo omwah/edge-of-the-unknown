@@ -147,9 +147,10 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.aliens import base_owner_hostile
+from edge.core.groundwar import assault as ground_assault
 from edge.core.groundwar import force
 from edge.core.groundwar.access import Assault, Survey, ground_access
-from edge.core.groundwar.models import SurveyOperation
+from edge.core.groundwar.models import AssaultOperation, SurveyOperation
 from edge.core.groundwar import survey as ground_survey
 from edge.core.planets import (
     belt_mining_yield,
@@ -813,10 +814,13 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     ground_settlements = isinstance(access, Survey) and access.settlements
     if isinstance(access, Assault):
         ground_blocker = access.blockers[0] if access.blockers else ""
+        ground_blockers = list(access.blockers)
     elif isinstance(access, Survey):
         ground_blocker = ""
+        ground_blockers = []
     else:
         ground_blocker = access.reason
+        ground_blockers = [access.reason] if access.reason else []
     return dto.PlanetDTO(
         planet_id=planet.id, name=planet.name, ptype=planet.planet_type,
         owner=_owner_label(state, planet, player_id), colonizable=colonizable,
@@ -849,6 +853,7 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
                             if city_world else ""),
         ship_equipment=ship_equipment,
         ground_mode=ground_mode, ground_blocker=ground_blocker,
+        ground_blockers=ground_blockers,
         ground_settlements=ground_settlements,
         garrison_infantry=planet.garrison_infantry, garrison_armor=planet.garrison_armor,
         garrison_allocation_pct=round(planet.garrison_allocation * 100),
@@ -866,15 +871,22 @@ def ground_operation_view(
     viewport_y: int = 0,
     viewport_width: int | None = None,
     viewport_height: int | None = None,
-) -> dto.SurveyExpeditionDTO | None:
-    """Project the player's active survey without exposing its generation identity (GW-WP07).
+    selected_actor_id: int | None = None,
+) -> dto.SurveyExpeditionDTO | dto.AssaultExpeditionDTO | None:
+    """Project the player's active ground operation through one fog-safe seam.
 
-    The immutable map is regenerated server-side, then cropped.  Site positions influence only
-    the intended search-ring/scanner/clue overlays; an unresolved site's coordinates, real id,
-    name, kind, rarity, and the operation seed never enter the DTO (G1/G5/G7).
+    Survey and assault maps regenerate server-side and are cropped identically.  No operation
+    seed crosses the boundary; assault enemies and defenses appear only inside current
+    trooper visibility, and selected-actor legality is computed by core rather than the TUI.
     """
     player = state.players[player_id]
     op = player.ground_operation
+    if isinstance(op, AssaultOperation):
+        return _assault_operation_view(
+            state, player_id, op, config, viewport_x=viewport_x, viewport_y=viewport_y,
+            viewport_width=viewport_width, viewport_height=viewport_height,
+            selected_actor_id=selected_actor_id,
+        )
     if not isinstance(op, SurveyOperation):
         return None
     if config.groundwar is None:
@@ -1031,6 +1043,131 @@ def ground_operation_view(
         can_move=live and op.landed and op.supplies > 0 and can_afford_next,
         can_dig=live and op.landed and op.supplies > 0,
         can_talk=live and op.landed and town_here is not None,
+        can_extract=True,
+    )
+
+
+def _assault_operation_view(
+    state: UniverseState, player_id: int, op: AssaultOperation, config: GameConfig, *,
+    viewport_x: int, viewport_y: int, viewport_width: int | None,
+    viewport_height: int | None, selected_actor_id: int | None = None,
+) -> dto.AssaultExpeditionDTO | None:
+    """Crop one live assault and project only earned enemy information (GW-WP12)."""
+    if config.groundwar is None:
+        return None
+    player = state.players[player_id]
+    ship = state.ships[player.ship_id]
+    planet = state.planets[op.planet_id]
+    amap = ground_assault.assault_map_for_state(op, config)
+    vx = max(0, min(viewport_x, amap.width - 1))
+    vy = max(0, min(viewport_y, amap.height - 1))
+    requested_width = amap.width if viewport_width is None else max(1, viewport_width)
+    requested_height = amap.height if viewport_height is None else max(1, viewport_height)
+    vw = min(requested_width, amap.width - vx)
+    vh = min(requested_height, amap.height - vy)
+    projection = ground_assault.tactical_projection(op, amap, config, selected_actor_id)
+
+    structures = {structure.id: structure for structure in amap.structures}
+    structure_at = {(structure.x, structure.y): structure for structure in amap.structures}
+    live_troopers = {t.id: t for t in op.platoon if t.hp > 0}
+    trooper_at = {(t.x, t.y): t.id for t in live_troopers.values()}
+    visible_garrison = {
+        unit.id: unit for unit in op.garrison_units
+        if unit.hp > 0 and (unit.x, unit.y) in projection.visible
+    }
+    garrison_at = {(unit.x, unit.y): unit.id for unit in visible_garrison.values()}
+
+    cells: list[dto.AssaultCellDTO] = []
+    for y in range(vy, vy + vh):
+        for x in range(vx, vx + vw):
+            cell = (x, y)
+            structure = structure_at.get(cell)
+            structure_visible = structure is not None and cell in projection.visible
+            structure_hp = (
+                op.structure_hp.get(structure.id, structure.hp_max)
+                if structure_visible and structure is not None else 0)
+            terrain = config.groundwar.terrain.get(amap.feature[y][x])
+            terrain_blocked = terrain is not None and terrain.move_cost <= 0
+            structure_blocks = structure is not None and (
+                op.structure_hp.get(structure.id, structure.hp_max) > 0)
+            cells.append(dto.AssaultCellDTO(
+                x=x, y=y, feature=amap.feature[y][x],
+                blocked=terrain_blocked or structure_blocks,
+                landable=(not op.dropped and cell not in amap.blocked and not terrain_blocked),
+                move_reachable=cell in projection.reachable,
+                jump_reachable=cell in projection.jumpable,
+                fire_target=cell in projection.fireable,
+                missile_target=cell in projection.missile_targets,
+                aa_threat=cell in projection.aa_threat,
+                ground_threat=cell in projection.ground_threat,
+                trooper_id=trooper_at.get(cell, 0),
+                garrison_id=garrison_at.get(cell, 0),
+                structure_id=structure.id if structure_visible and structure is not None else 0,
+                structure_kind=structure.kind if structure_visible and structure is not None else "",
+                structure_hp=structure_hp,
+                structure_hp_max=(structure.hp_max
+                                  if structure_visible and structure is not None else 0),
+            ))
+
+    troopers = [
+        dto.AssaultTrooperDTO(
+            trooper_id=t.id, suit_id=t.suit_id,
+            suit_label=config.groundwar.suits[t.suit_id].label,
+            glyph=config.groundwar.suits[t.suit_id].glyph,
+            name=t.name, x=t.x, y=t.y, hp=max(0, t.hp),
+            hp_max=config.groundwar.suits[t.suit_id].hp,
+            actions=t.actions, actions_max=config.groundwar.platoon.actions_per_turn,
+            missiles=t.missiles, jump_charges=t.jump_charges,
+            detected=t.detected, alive=t.hp > 0,
+        )
+        for t in op.platoon
+    ]
+    garrison = [
+        dto.AssaultGarrisonDTO(
+            unit_id=unit.id, kind=unit.kind, x=unit.x, y=unit.y, hp=unit.hp,
+            hp_max=getattr(config.groundwar.garrison, unit.kind).hp,
+        )
+        for unit in visible_garrison.values()
+    ]
+    active_defense_kinds = {"turret", "aa", "citadel_gun"}
+    cities = []
+    for city in amap.cities:
+        armed = any(
+            structure.city_id == city.id and structure.kind in active_defense_kinds
+            and op.structure_hp.get(structure.id, structure.hp_max) > 0
+            for structure in structures.values()
+        )
+        occupied = any(unit.city_id == city.id for unit in op.garrison_units if unit.hp > 0)
+        cities.append(dto.AssaultCityDTO(
+            city_id=city.id, name=city.name, x=city.cx, y=city.cy,
+            cowed=not armed and not occupied,
+            broadcast_done=city.id in op.broadcast_cities,
+            is_citadel=city.is_citadel,
+        ))
+    selected = next((t for t in op.platoon if t.id == selected_actor_id and t.hp > 0), None)
+    next_cost = ground_assault.assault_turn_cost(config, op.local_turn)
+    live = op.outcome is None
+    loadout = ground_force_view(player, ship, config) if not op.dropped else None
+    return dto.AssaultExpeditionDTO(
+        operation_id=op.operation_id, planet_id=op.planet_id, planet=planet.name,
+        ptype=op.planet_type, map_width=amap.width, map_height=amap.height,
+        viewport_x=vx, viewport_y=vy, viewport_width=vw, viewport_height=vh,
+        cells=cells, troopers=troopers, garrison=garrison, cities=cities,
+        loadout=loadout,
+        local_turn=op.local_turn, retrieval_turn=op.retrieval_turn,
+        turns_remaining=player.turns_remaining, next_turn_cost=next_cost,
+        resolve=op.resolve, resolve_start=config.groundwar.resolve.start,
+        surrender_threshold=op.surrender_threshold, casualties=op.casualties,
+        initial_strength=op.initial_strength, selected_actor_id=selected_actor_id or 0,
+        outcome=op.outcome, dropped=op.dropped,
+        can_drop=(not op.dropped and live and loadout is not None
+                  and any(option.deployable > 0 for option in loadout.options)),
+        can_move=selected is not None and bool(projection.reachable),
+        can_jump=selected is not None and bool(projection.jumpable),
+        can_fire=selected is not None and bool(projection.fireable),
+        can_missile=selected is not None and bool(projection.missile_targets),
+        can_broadcast=projection.can_broadcast,
+        can_end_turn=op.dropped and live and player.turns_remaining >= next_cost,
         can_extract=True,
     )
 

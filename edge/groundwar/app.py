@@ -27,8 +27,9 @@ from edge.groundwar import rules
 from edge.groundwar.config import GroundwarConfig, load_config
 from edge.groundwar.expedition import Site, generate_expedition
 from edge.groundwar.expedition_ui import ExpeditionScreen
-from edge.groundwar.mapgen import PLANET_TYPES, RUBBLE_ART, STRUCTURE_ART, generate_battle
+from edge.groundwar.mapgen import PLANET_TYPES, generate_battle
 from edge.groundwar.model import Battle, Trooper
+from edge.groundwar.widgets import RUBBLE_ART, STRUCTURE_ART
 from edge.tui.composer import PlatoonComposer, options_from_suits
 
 

@@ -235,12 +235,14 @@ class GameService:
     def ground_operation_view(
         self, player_id: int, *, viewport_x: int = 0, viewport_y: int = 0,
         viewport_width: int | None = None, viewport_height: int | None = None,
-    ) -> dto.SurveyExpeditionDTO | None:
-        """The active survey's fog-safe viewport, or ``None`` while in orbit (GW-WP07)."""
+        selected_actor_id: int | None = None,
+    ) -> dto.SurveyExpeditionDTO | dto.AssaultExpeditionDTO | None:
+        """The active operation's fog-safe viewport, or ``None`` while in orbit."""
         return session.ground_operation_view(
             self._state, player_id, self._config,
             viewport_x=viewport_x, viewport_y=viewport_y,
             viewport_width=viewport_width, viewport_height=viewport_height,
+            selected_actor_id=selected_actor_id,
         )
 
     def surface_view(self, player_id: int, planet_id: int) -> dto.SurfaceDTO:

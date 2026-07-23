@@ -7,10 +7,10 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–11 shipped; interview decisions
-> resolved (July 2026), and GW-M3 is complete. Next: GW-WP12 (live assault DTO,
-> remote client, and Textual battle), which exposes the authoritative tactical
-> state through the client boundary and adapts the POC battle screen.**
+> **Status: implementation underway — GW-WP01–12 shipped; interview decisions
+> resolved (July 2026), and GW-M3 is complete. Next: GW-WP13 (balance, bots,
+> performance, and multiplayer contention), which tunes and soaks the now-live
+> survey and tactical-assault paths.**
 
 ## Context
 
@@ -1251,7 +1251,28 @@ Files: DTO/session/client/wire layers, `edge/tui/screens/planet.py`, new/ported
 ground battle screen, `edge/groundwar/app.py`, `edge/groundwar/widgets.py`.
 Tests: fog and legal-action lockstep; local/remote parity; Pilot flows for win,
 loss, extract, and reconnect; responsive snapshots; stale-command rejection.
-Commit `ground: GW-WP12 live tactical assault UI`.
+
+**Shipped:** promoted the POC's platoon composer, tactical map vocabulary, threat
+overlays, event flashes, and structure art into shared presentation seams, while
+keeping the live screen strictly DTO/client-driven. Added a cropped assault DTO
+family and a pure selected-actor projection for earned visibility, exact
+move/jump/fire/missile/broadcast affordances, visible-only defenses and threat
+ranges, local counters, Resolve, retrieval, casualties, and settlement outcome.
+The local and remote clients share that read shape; commands still enter through
+the existing authoritative apply queue, and `WIRE_VERSION` moved 32→33 with
+refreshed golden fixtures.
+
+The production Textual screen now supports platoon composition, keyboard/mouse
+capsule placement and cursor control, selection, every tactical verb, radar,
+event logging/FX, confirmed extraction, outcome settlement, help/accessibility
+copy, compact/standard/wide layouts, and save/reconnect resume. Orbit shows every
+standing siege blocker and opens the composer only for a droppable
+assault-classified world. New tests cover DTO fog/legality lockstep, viewport and
+seed secrecy, stale actor/operation rejection, local/remote/wire parity, live
+move/extract, surrender/wipe, reconnect, all layout tiers, and three responsive
+SVG snapshots. Full quality gate green: 3,191 tests and 83 snapshots; Ruff and
+strict mypy clean. Commit `ground: GW-WP12 authoritative tactical assault UI,
+remote projection, and reconnect flow`.
 
 ### GW-WP13 — Balance, bots, performance, and multiplayer contention (L)
 
