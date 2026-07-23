@@ -33,8 +33,8 @@ from edge.core.groundwar.force import GroundForceError
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import (
-    BeginSurvey, BuildCitadel, BuildStagingArea, Colonize, DeployGenesis, InvadePlanet, MineBelt,
-    PlanetDeposit, PlanetWithdraw, ReinforceGarrison,
+    BeginAssault, BeginSurvey, BuildCitadel, BuildStagingArea, Colonize, DeployGenesis,
+    InvadePlanet, MineBelt, PlanetDeposit, PlanetWithdraw, ReinforceGarrison,
 )
 from edge.server.service import GameService
 from edge.tui.chrome import EdgeScreen, notify_warning
@@ -296,8 +296,18 @@ claims the world). Building again grows the city, and a bigger city berths more 
             ])
             title = "Ground access — Survey"
         elif p.ground_mode == "assault":
-            reason = p.ground_blocker or "ground-force deployment is required"
-            children.append(Static(f"[red]Assault[/] — {reason}."))
+            blockers = p.ground_blockers or ([p.ground_blocker] if p.ground_blocker else [])
+            if blockers:
+                children.append(Static(
+                    "[red]Assault blocked[/] — clear every siege rung:\n" +
+                    "\n".join(f"  • {reason}" for reason in blockers)
+                ))
+            else:
+                children.extend([
+                    Static("[red]Assault[/] — orbital defences are down; compose a platoon."),
+                    Horizontal(Button("Deploy assault", id="btn-ground", variant="error"),
+                               classes="buttons"),
+                ])
             title = "Ground access — Assault"
         else:
             children.append(Static(f"[dim]Orbital only[/] — {p.ground_blocker or 'no landing route'}."))
@@ -707,20 +717,28 @@ claims the world). Building again grows the city, and a bigger city berths more 
         if p.ground_mode == "orbital_only":
             self.notify(p.ground_blocker or "This world is orbital-only.", timeout=3)
             return
-        if p.ground_mode == "assault":
-            self.notify(p.ground_blocker or "Ground assault deployment is not available yet.", timeout=3)
-            return
         client = getattr(self.app, "client", None)
         if client is None:
             self.notify("No game client is connected.", timeout=3)
             return
         try:
-            await client.apply(BeginSurvey(planet_id=p.planet_id))
+            if p.ground_mode == "assault":
+                blockers = p.ground_blockers or ([p.ground_blocker] if p.ground_blocker else [])
+                if blockers:
+                    self.notify("; ".join(blockers), timeout=3)
+                    return
+                await client.apply(BeginAssault(planet_id=p.planet_id))
+            else:
+                await client.apply(BeginSurvey(planet_id=p.planet_id))
         except (EconomyError, MovementError) as exc:
             notify_warning(self, str(exc))
             return
-        from edge.tui.screens.ground_expedition import GroundExpeditionScreen
-        self.app.push_screen(GroundExpeditionScreen(client))
+        if p.ground_mode == "assault":
+            from edge.tui.screens.ground_assault import GroundAssaultScreen
+            self.app.push_screen(GroundAssaultScreen(client))
+        else:
+            from edge.tui.screens.ground_expedition import GroundExpeditionScreen
+            self.app.push_screen(GroundExpeditionScreen(client))
 
     def action_mine(self) -> None:
         """Hand-mine an asteroid belt, taking raw goods aboard (§4.2, PT-30)."""

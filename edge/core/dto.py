@@ -196,6 +196,126 @@ class SurveyExpeditionDTO:
 
 
 @dataclass(frozen=True)
+class AssaultCellDTO:
+    """One fog-safe cell in the live tactical-assault viewport (GW-WP12).
+
+    Terrain and action affordances are public; enemy identities and structure state
+    are populated only when a surviving trooper currently sees the cell.  Threat
+    overlays likewise derive only from visible weapons, so a remote client cannot
+    reverse-engineer hidden defenses from an otherwise masked map.
+    """
+
+    x: int
+    y: int
+    feature: str
+    blocked: bool = False
+    landable: bool = False
+    move_reachable: bool = False
+    jump_reachable: bool = False
+    fire_target: bool = False
+    missile_target: bool = False
+    aa_threat: bool = False
+    ground_threat: bool = False
+    trooper_id: int = 0
+    garrison_id: int = 0
+    structure_id: int = 0
+    structure_kind: str = ""
+    structure_hp: int = 0
+    structure_hp_max: int = 0
+
+
+@dataclass(frozen=True)
+class AssaultTrooperDTO:
+    """One player-owned platoon member; casualties remain listed for the manifest."""
+
+    trooper_id: int
+    suit_id: str
+    suit_label: str
+    glyph: str
+    name: str
+    x: int
+    y: int
+    hp: int
+    hp_max: int
+    actions: int
+    actions_max: int
+    missiles: int
+    jump_charges: int
+    detected: bool
+    alive: bool
+
+
+@dataclass(frozen=True)
+class AssaultGarrisonDTO:
+    """A currently visible planetary defender; unseen units never cross the seam."""
+
+    unit_id: int
+    kind: str
+    x: int
+    y: int
+    hp: int
+    hp_max: int
+
+
+@dataclass(frozen=True)
+class AssaultCityDTO:
+    """Public city objective status for Resolve/broadcast planning."""
+
+    city_id: int
+    name: str
+    x: int
+    y: int
+    cowed: bool
+    broadcast_done: bool
+    is_citadel: bool
+
+
+@dataclass(frozen=True)
+class AssaultExpeditionDTO:
+    """Fog-safe, selected-actor-aware tactical assault view (GW-WP12).
+
+    The server projects exact legal cells for ``selected_actor_id``.  The TUI does
+    not reproduce movement, LOS, weapon, broadcast, or turn-cost rules locally.
+    """
+
+    operation_id: int
+    planet_id: int
+    planet: str
+    ptype: str
+    map_width: int
+    map_height: int
+    viewport_x: int
+    viewport_y: int
+    viewport_width: int
+    viewport_height: int
+    cells: list[AssaultCellDTO]
+    troopers: list[AssaultTrooperDTO]
+    garrison: list[AssaultGarrisonDTO]
+    cities: list[AssaultCityDTO]
+    loadout: GroundForceDTO | None
+    local_turn: int
+    retrieval_turn: int
+    turns_remaining: int
+    next_turn_cost: int
+    resolve: int
+    resolve_start: int
+    surrender_threshold: int
+    casualties: int
+    initial_strength: int
+    selected_actor_id: int = 0
+    outcome: str | None = None
+    dropped: bool = False
+    can_drop: bool = False
+    can_move: bool = False
+    can_jump: bool = False
+    can_fire: bool = False
+    can_missile: bool = False
+    can_broadcast: bool = False
+    can_end_turn: bool = False
+    can_extract: bool = True
+
+
+@dataclass(frozen=True)
 class HaggleQuote:
     """A read-only read on a counter-offer before the player commits it (§8).
 
@@ -1140,6 +1260,7 @@ class PlanetDTO:
     # Advisory only — the begin reducers recompute `ground_access` and stay authoritative.
     ground_mode: str = "orbital_only"
     ground_blocker: str = ""  # reason (orbital-only) / first standing siege rung (assault) / ""
+    ground_blockers: list[str] = field(default_factory=list)  # every standing assault rung
     ground_settlements: bool = False  # survey only: friendly inhabitants are visitable (D5/D6)
     # Persistent ground-defense garrison (GW-WP09, D11/D15): a readout plus the reinforce
     # affordance, gated like the citadel block above (owner + landable + recruits/suits aboard).

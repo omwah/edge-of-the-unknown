@@ -134,6 +134,25 @@ class AssaultMap:
 
 
 @dataclass(frozen=True, slots=True)
+class TacticalProjection:
+    """Pure selected-actor affordances and earned visibility for GW-WP12.
+
+    This is deliberately presentation-neutral.  ``server.session`` crops it into
+    DTOs; the standalone harness may consume the same facts without importing the
+    server or Textual layers.
+    """
+
+    visible: frozenset[Vec]
+    reachable: frozenset[Vec]
+    jumpable: frozenset[Vec]
+    fireable: frozenset[Vec]
+    missile_targets: frozenset[Vec]
+    aa_threat: frozenset[Vec]
+    ground_threat: frozenset[Vec]
+    can_broadcast: bool
+
+
+@dataclass(frozen=True, slots=True)
 class AssaultDifficulty:
     """Live-derived battlefield sizing (GW plan D11) — the frozen inputs
     `BeginAssault` snapshots onto `AssaultOperation` and `generate_assault_map`
@@ -427,6 +446,105 @@ def persistent_structure_hp(
         hp[structure.id] = 0
         remaining[structure.kind] -= 1
     return hp
+
+
+def tactical_projection(
+    op: AssaultOperation, amap: AssaultMap, config: GameConfig,
+    actor_id: int | None = None,
+) -> TacticalProjection:
+    """Project visibility and exact legal actions without mutating the battle.
+
+    Enemy units/structures contribute to the DTO only inside ``visible``.  Weapon
+    threat is painted only from those visible sources, preventing the old POC
+    radar from leaking an unseen battery's position through its range circle.
+    """
+    if config.groundwar is None or not op.dropped:
+        return TacticalProjection(
+            frozenset(), frozenset(), frozenset(), frozenset(), frozenset(),
+            frozenset(), frozenset(), False)
+    battle = _battle_for(op, amap, config)
+    visible: set[Vec] = set()
+    for trooper in battle.live_troopers():
+        sight = _suit(battle, trooper).sight
+        for y in range(max(0, trooper.y - sight), min(amap.height, trooper.y + sight + 1)):
+            for x in range(max(0, trooper.x - sight), min(amap.width, trooper.x + sight + 1)):
+                if (_dist(trooper.x, trooper.y, x, y) <= sight
+                        and _line_of_sight(battle, trooper.x, trooper.y, x, y)):
+                    visible.add((x, y))
+
+    actor = battle.troopers.get(actor_id) if actor_id is not None else None
+    live_action = actor is not None and actor.alive and op.outcome is None
+    reachable: set[Vec] = set()
+    jumpable: set[Vec] = set()
+    fireable: set[Vec] = set()
+    missile_targets: set[Vec] = set()
+    can_broadcast = False
+    if live_action and actor is not None:
+        reachable = set(_reachable(battle, actor))
+        suit = _suit(battle, actor)
+        if actor.actions > 0 and actor.jump_charges > 0:
+            for y in range(max(0, actor.y - suit.jump_range),
+                           min(amap.height, actor.y + suit.jump_range + 1)):
+                for x in range(max(0, actor.x - suit.jump_range),
+                               min(amap.width, actor.x + suit.jump_range + 1)):
+                    if (_dist(actor.x, actor.y, x, y) <= suit.jump_range
+                            and _battle_move_cost(battle, x, y) > 0
+                            and not _occupied(battle, x, y)):
+                        jumpable.add((x, y))
+
+        def targets(weapon_range: int) -> set[Vec]:
+            if actor.actions <= 0 or weapon_range <= 0:
+                return set()
+            out: set[Vec] = set()
+            for cell in visible:
+                x, y = cell
+                structure = battle.structure_at(x, y)
+                unit = battle.garrison_at(x, y)
+                if ((structure is None or not structure.alive) and unit is None):
+                    continue
+                if (_dist(actor.x, actor.y, x, y) <= weapon_range
+                        and _line_of_sight(battle, actor.x, actor.y, x, y)):
+                    out.add(cell)
+            return out
+
+        fireable = targets(suit.weapon.range)
+        if actor.missiles > 0:
+            missile_targets = targets(suit.missile.range)
+        can_broadcast = any(
+            city.id not in battle.broadcast_done
+            and battle.city_cowed(city)
+            and _dist(actor.x, actor.y, city.cx, city.cy) <= suit.broadcast_range
+            for city in amap.cities
+        )
+
+    aa_threat: set[Vec] = set()
+    ground_threat: set[Vec] = set()
+
+    def paint(cx: int, cy: int, radius: int, target: set[Vec]) -> None:
+        for y in range(max(0, cy - radius), min(amap.height, cy + radius + 1)):
+            for x in range(max(0, cx - radius), min(amap.width, cx + radius + 1)):
+                if _dist(cx, cy, x, y) <= radius:
+                    target.add((x, y))
+
+    for structure in battle.structures.values():
+        if not structure.alive or (structure.x, structure.y) not in visible:
+            continue
+        if structure.kind == "aa":
+            paint(structure.x, structure.y, battle.gw.defenses.aa.range, aa_threat)
+        elif structure.kind == "turret":
+            paint(structure.x, structure.y, battle.gw.defenses.turret.range, ground_threat)
+        elif structure.kind == "citadel_gun":
+            paint(structure.x, structure.y, battle.gw.defenses.citadel_gun.range, ground_threat)
+    for unit in battle.garrison.values():
+        if unit.alive and (unit.x, unit.y) in visible:
+            paint(unit.x, unit.y, getattr(battle.gw.garrison, unit.kind).weapon.range,
+                  ground_threat)
+    return TacticalProjection(
+        visible=frozenset(visible), reachable=frozenset(reachable),
+        jumpable=frozenset(jumpable), fireable=frozenset(fireable),
+        missile_targets=frozenset(missile_targets), aa_threat=frozenset(aa_threat),
+        ground_threat=frozenset(ground_threat), can_broadcast=can_broadcast,
+    )
 
 
 # --- garrison economy (pure; GW plan D11) --------------------------------------

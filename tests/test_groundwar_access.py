@@ -195,6 +195,22 @@ def test_live_citadel_gun_blocks_the_drop() -> None:
     assert access.blockers[0] == "silence the citadel gun first"
 
 
+def test_planet_dto_exposes_every_standing_siege_blocker() -> None:
+    planet = _planet(
+        population={"vesk": 500}, citadel_level=CFG.citadels.shield_min_level,
+        gun_integrity=CFG.citadels.gun_hull,
+    )
+    state = _state(planet)
+    state.species = {7: _species(0.1)}
+    access = ground_access(state, state.players[1], planet, CFG)
+    assert isinstance(access, Assault)
+    assert access.blockers == (
+        "silence the citadel gun first", "the siege shield holds",
+    )
+    view = session.planet_view(state, 1, planet.id, CFG)
+    assert view.ground_blockers == list(access.blockers)
+
+
 # --- assault disabled --------------------------------------------------------
 
 

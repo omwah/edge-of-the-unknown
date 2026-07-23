@@ -93,7 +93,8 @@ class GameClient(Protocol):
     async def ground_operation_view(
         self, *, viewport_x: int = ..., viewport_y: int = ...,
         viewport_width: int | None = ..., viewport_height: int | None = ...,
-    ) -> dto.SurveyExpeditionDTO | None: ...
+        selected_actor_id: int | None = ...,
+    ) -> dto.SurveyExpeditionDTO | dto.AssaultExpeditionDTO | None: ...
     async def surface_view(self, planet_id: int) -> dto.SurfaceDTO: ...
     async def contact_view(self, species_id: int, active_context: str = ...,
                            active_subject: int | None = ...) -> dto.ContactDTO: ...
@@ -237,10 +238,12 @@ class LocalClient:
     async def ground_operation_view(
         self, *, viewport_x: int = 0, viewport_y: int = 0,
         viewport_width: int | None = None, viewport_height: int | None = None,
-    ) -> dto.SurveyExpeditionDTO | None:
+        selected_actor_id: int | None = None,
+    ) -> dto.SurveyExpeditionDTO | dto.AssaultExpeditionDTO | None:
         return self._service.ground_operation_view(
             self.player_id, viewport_x=viewport_x, viewport_y=viewport_y,
             viewport_width=viewport_width, viewport_height=viewport_height,
+            selected_actor_id=selected_actor_id,
         )
 
     async def surface_view(self, planet_id: int) -> dto.SurfaceDTO:
@@ -574,11 +577,17 @@ class RemoteClient:
     async def ground_operation_view(
         self, *, viewport_x: int = 0, viewport_y: int = 0,
         viewport_width: int | None = None, viewport_height: int | None = None,
-    ) -> dto.SurveyExpeditionDTO | None:
-        return await self._read(
-            "ground_operation_view", viewport_x=viewport_x, viewport_y=viewport_y,
-            viewport_width=viewport_width, viewport_height=viewport_height,
-        )
+        selected_actor_id: int | None = None,
+    ) -> dto.SurveyExpeditionDTO | dto.AssaultExpeditionDTO | None:
+        params: dict[str, object] = {
+            "viewport_x": viewport_x, "viewport_y": viewport_y,
+            "viewport_width": viewport_width, "viewport_height": viewport_height,
+        }
+        # Preserve the pre-WP12 request shape for survey callers; an actor selection is
+        # meaningful only to the assault legality projection.
+        if selected_actor_id is not None:
+            params["selected_actor_id"] = selected_actor_id
+        return await self._read("ground_operation_view", **params)
 
     async def surface_view(self, planet_id: int) -> dto.SurfaceDTO:
         return await self._read("surface_view", planet_id=planet_id)
