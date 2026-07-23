@@ -511,6 +511,41 @@ def test_format_event_covers_kinds_and_filters_noise() -> None:
     assert session.format_event(StockRegenerated(3, Commodity.EQUIPMENT, 480)) == ""
 
 
+def test_format_event_covers_ground_assault_combat() -> None:
+    """GW-WP12's tactical actions must narrate — a silent log for jump/fire/broadcast/
+    end-turn was the actual bug behind "the assault game has no log messages"."""
+    from edge.core.events import (
+        GroundAssaultDropped,
+        GroundBroadcastMade,
+        GroundFired,
+        GroundJumped,
+        GroundTurnEnded,
+    )
+
+    assert "capsule" in session.format_event(GroundAssaultDropped(1, 5, 3, 0))
+    dropped_with_losses = session.format_event(GroundAssaultDropped(1, 5, 3, 1))
+    assert "flak" in dropped_with_losses
+
+    clean_jump = session.format_event(GroundJumped(1, 5, 9, 3, 4, False))
+    hit_jump = session.format_event(GroundJumped(1, 5, 9, 3, 4, True))
+    assert "3,4" in clean_jump and "AA fire" not in clean_jump
+    assert "AA fire" in hit_jump
+
+    miss = session.format_event(GroundFired(1, 5, 9, 3, 4, False, False, "structure", False))
+    hit = session.format_event(GroundFired(1, 5, 9, 3, 4, False, True, "garrison", False))
+    kill = session.format_event(GroundFired(1, 5, 9, 3, 4, True, True, "structure", True))
+    assert "misses" in miss
+    assert "hits the garrison" in hit and "destroyed" not in hit
+    assert "Missile" in kill and "destroyed" in kill
+
+    assert "Terms broadcast" in session.format_event(GroundBroadcastMade(1, 5, 9, 2))
+
+    ongoing = session.format_event(GroundTurnEnded(1, 5, 3, 80, 1, ""))
+    settled = session.format_event(GroundTurnEnded(1, 5, 3, 80, 1, "surrender"))
+    assert "Round 3 ends" in ongoing and "SURRENDER" not in ongoing
+    assert "SURRENDER" in settled
+
+
 def test_format_log_line_always_tags_the_sector() -> None:
     """Every surfaced log line carries a leading spatial-sector gutter (§11/§12)."""
     from edge.core.enums import PortMode

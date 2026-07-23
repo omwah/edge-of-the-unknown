@@ -12,16 +12,18 @@ what is being counted; it just posts `Changed` when a count moves. Reuse it
 wherever a count-of-each selection is needed.
 
 `PlatoonComposer` is the ground-war-specific squad composer built *on top of*
-`CountSelector`: it feeds the selector a roster of `SuitOption` rows (Suit / Latinum /
-Role columns), adds a DROP button, and emits `Dropped(loadout)` when a valid squad is
-committed.
+`CountSelector`: it feeds the selector a roster of `SuitOption` rows, adds a DROP
+button, and emits `Dropped(loadout)` when a valid squad is committed.
 
 A row carries its own `available` ceiling, which is what makes the widget honest in
 the live game: the server projects `GroundForceDTO.options`, whose `deployable` is
 already capped by the suits owned, the recruits aboard to wear them, and the platoon
 ceiling (GW-WP08, D3), so the composer can only ever offer a drop the reducer would
-accept. The standalone harness passes the same rows built from config with a latinum
-`budget` instead — it buys its squad at drop time rather than owning one.
+accept. Suits are bought only at Stardock — the live game passes no `budget`, so the
+selector drops its Latinum column and reads as "assign your roster to this drop," not
+a second shop. The standalone harness passes the same rows built from config *with* a
+latinum `budget` instead, since it buys its squad at drop time rather than owning one,
+and keeps the price column for that reason.
 """
 
 from __future__ import annotations
@@ -331,12 +333,19 @@ class PlatoonComposer(Widget):
         self.initial = initial or {}
 
     def compose(self) -> ComposeResult:
-        yield Static("SQUAD — ↑ ↓ select, − / + adjust (or click the row buttons)",
-                     id="composer-head")
+        # A latinum budget means this composer is buying a squad on the spot (the
+        # standalone harness) — show the price. The live game buys suits only at
+        # Stardock; here `budget` is None and the composer is just letting the player
+        # pick how many of their *already-owned* suits ride this drop, so a price
+        # column would misread as a second, duplicate purchase screen.
+        buying = self.budget is not None
+        head = ("SQUAD — ↑ ↓ select, − / + adjust (or click the row buttons)" if buying else
+                "ASSIGN OWNED SUITS — ↑ ↓ select, − / + adjust (or click the row buttons)")
+        yield Static(head, id="composer-head")
         items = [
             CountItem(
                 key=o.suit_id,
-                cells=(o.label, str(o.cost), o.role),
+                cells=(o.label, str(o.cost), o.role) if buying else (o.label, o.role),
                 cost=o.cost,
                 initial=min(self.initial.get(o.suit_id, 0),
                             o.available if o.available is not None else 10 ** 9),
@@ -344,8 +353,9 @@ class PlatoonComposer(Widget):
             )
             for o in self.options
         ]
-        columns = [CountColumn("Suit", 12), CountColumn("Latinum", 10),
-                   CountColumn("Role", 18)]
+        columns = ([CountColumn("Suit", 12), CountColumn("Latinum", 10), CountColumn("Role", 18)]
+                  if buying else
+                  [CountColumn("Suit", 14), CountColumn("Role", 24)])
         yield CountSelector(items, columns=columns, budget=self.budget,
                             max_total=self.max_troopers, units_label="troopers",
                             currency_label="latinum", id="composer-selector")

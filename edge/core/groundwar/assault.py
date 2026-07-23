@@ -56,6 +56,14 @@ StructureKind = Literal[
     "building_military", "building_civilian",
 ]
 
+# Passive geometry — a city's static footprint, not a hidden threat. Projected to the
+# client unconditionally (like survey's `blocked`/`gate`/`settlement_id`), unlike the
+# active-defense kinds (turret/aa/sensor/citadel_gun), which stay LOS-gated so a remote
+# client cannot reverse-engineer a world's defenses without a trooper actually seeing them.
+PASSIVE_STRUCTURE_KINDS: frozenset[StructureKind] = frozenset({
+    "wall", "gate", "building_military", "building_civilian",
+})
+
 _CITY_NAMES = (
     "Klendathu Down", "Port Joel", "Zegema Beach", "New Cyrene", "Uxmal",
     "Fort Bannon", "Carr's Landing", "Hesperus", "Tango Urilla", "Sheol",

@@ -618,11 +618,14 @@ def survey_move(op: SurveyOperation, smap: SurveyMap, config: GameConfig,
                 turns_remaining: int, x: int, y: int) -> SurveyActionResult:
     """March the explorer toward `(x, y)` (GW-WP06, D4/D12).
 
-    One supply per local turn, however many turns the march takes. The march halts early on
-    supply exhaustion, on newly-sighted disturbed ground (no walking blindly past the prize),
-    or when the next local turn would cross an **unaffordable** macro-turn threshold (D12:
-    the quantum is paid before the threshold is crossed; extraction stays free). Raises when
-    the target is unreachable or no progress at all can be paid for.
+    One supply per local turn, however many turns the march takes. The march halts early
+    on supply exhaustion, or when the next local turn would cross an **unaffordable**
+    macro-turn threshold (D12: the quantum is paid before the threshold is crossed;
+    extraction stays free). It no longer halts on newly-sighted disturbed ground — that
+    auto-stop (once meant to keep a multi-turn march from tramping past a clue) cost more
+    clicks than it saved, since `cell.clue` already marks the ground on the map the whole
+    time it's in sight; the player decides when to stop and dig. Raises when the target is
+    unreachable or no progress at all can be paid for.
     """
     if op.outcome is not None:
         raise MovementError("the expedition has ended — extract to orbit")
@@ -631,7 +634,6 @@ def survey_move(op: SurveyOperation, smap: SurveyMap, config: GameConfig,
     path = path_to(smap, config, op.explorer_x, op.explorer_y, x, y)
     if path is None:
         raise MovementError("no path to there")
-    seen = visible_clues(op, smap, config)
     ex, ey, supplies, local_turn = op.explorer_x, op.explorer_y, op.supplies, op.local_turn
     charged = 0
     turns = 0
@@ -661,10 +663,6 @@ def survey_move(op: SurveyOperation, smap: SurveyMap, config: GameConfig,
         if supplies <= 0:
             halt = "supplies"
             break
-        fresh = visible_clues(replace(op, explorer_x=ex, explorer_y=ey), smap, config) - seen
-        if fresh:
-            halt = "clue"
-            break
     if turns == 0:
         raise MovementError("not enough turns to advance the march — extract to orbit")
     logs: list[str] = []
@@ -672,8 +670,6 @@ def survey_move(op: SurveyOperation, smap: SurveyMap, config: GameConfig,
     if halt == "supplies":
         outcome = "exhausted"
         logs.append("Supplies spent — the shuttle recalls you to orbit. What you found stays found.")
-    elif halt == "clue":
-        logs.append("Disturbed ground catches your eye — you halt the march.")
     if turns > 1:
         logs.append(f"A march of {turns} turns.")
     op2 = replace(op, explorer_x=ex, explorer_y=ey, supplies=supplies,

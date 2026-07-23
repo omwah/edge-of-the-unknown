@@ -101,10 +101,15 @@ from edge.core.events import (
     GenesisDeployed,
     GovernanceChanged,
     GrudgeFormed,
+    GroundAssaultDropped,
+    GroundBroadcastMade,
+    GroundFired,
+    GroundJumped,
     GroundMoved,
     GroundAssaultSettled,
     GroundOperationBegan,
     GroundOperationEnded,
+    GroundTurnEnded,
     HazardDamage,
     SiteExplored,
     SurveyDug,
@@ -1082,7 +1087,8 @@ def _assault_operation_view(
         for x in range(vx, vx + vw):
             cell = (x, y)
             structure = structure_at.get(cell)
-            structure_visible = structure is not None and cell in projection.visible
+            structure_visible = structure is not None and (
+                cell in projection.visible or structure.kind in ground_assault.PASSIVE_STRUCTURE_KINDS)
             structure_hp = (
                 op.structure_hp.get(structure.id, structure.hp_max)
                 if structure_visible and structure is not None else 0)
@@ -2705,6 +2711,25 @@ def format_event(event: Event) -> str:
     if isinstance(event, SurveyTalked):
         hint = " — a search circle was narrowed" if event.hinted_id >= 0 else ""
         return f"[cyan]◇ Spoke with the settlement{hint}.[/]"
+    if isinstance(event, GroundAssaultDropped):
+        flak = (f"  [red]({event.casualties_on_drop} lost to flak on the way down)[/]"
+                if event.casualties_on_drop else "")
+        return f"[bold red]▼ {event.trooper_count} capsule(s) down.[/]{flak}"
+    if isinstance(event, GroundJumped):
+        return (f"[yellow]⇗ Jumped to {event.x},{event.y} — clipped by AA fire![/]" if event.hit
+                else f"[bright_green]⇗ Jumped to {event.x},{event.y}.[/]")
+    if isinstance(event, GroundFired):
+        weapon = "Missile" if event.missile else "Shot"
+        if not event.hit:
+            return f"[grey62]✗ {weapon} at {event.x},{event.y} misses.[/]"
+        finish = " — destroyed!" if event.destroyed else ""
+        return f"[yellow]⚔ {weapon} hits the {event.target_kind} at {event.x},{event.y}{finish}[/]"
+    if isinstance(event, GroundBroadcastMade):
+        return "[bold bright_cyan]📣 Terms broadcast over the city — Resolve shaken.[/]"
+    if isinstance(event, GroundTurnEnded):
+        cost = f"  (-{event.main_turns} main turn)" if event.main_turns else ""
+        outcome = f"  [bold]{event.outcome.upper()}[/]" if event.outcome else ""
+        return f"[bold bright_magenta]↻ Round {event.turn} ends.[/]{cost}{outcome}"
     if isinstance(event, GroundOperationEnded):
         return f"[magenta]▲ Ground operation {event.outcome}.[/]"
     if isinstance(event, GroundAssaultSettled):

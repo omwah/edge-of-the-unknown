@@ -718,8 +718,8 @@ footer."""
         # (fog-safe: read through leads_view, never core state).
         leads = self._service.leads_view(self._pid)
         summary = leads[-1].summary if leads else ""
-        self.notify("A rumour points the way — lead logged", timeout=2)
-        # Rebuild so the tavern's "rumour available" line refreshes (the tip is now spent),
+        # The reveal modal below says what the rumour bought — a toast here would just
+        # duplicate it. Rebuild so the tavern's "rumour available" line refreshes (the tip is now spent),
         # then reveal the lead over the fresh screen.
         active = self.query_one(TabbedContent).active
         self.app.pop_screen()
