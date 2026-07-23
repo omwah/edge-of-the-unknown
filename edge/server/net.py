@@ -339,6 +339,7 @@ class GameServer:
         for task in (self._worker_task, self._ticker_task):
             if task is not None:
                 task.cancel()
+        self._service.checkpoint()
 
 
 def _error(req_id: Any, code: int, message: str) -> dict[str, Any]:

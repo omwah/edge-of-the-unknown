@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+
+from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
@@ -14,6 +17,7 @@ from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.game import GameScreen
 from edge.tui.screens.sprites_gallery import SpriteGalleryScreen
 from edge.tui.widgets import Starfield
+from edge.server.service import DialogueConfigMismatchError
 
 _BANNER = r"""
  ___ ___   ___ ___    ___  ___   _____ _  _ ___
@@ -113,14 +117,42 @@ class MainMenuScreen(EdgeScreen):
         service = self.app.start_new_game()  # type: ignore[attr-defined]
         self.app.push_screen(GameScreen(service, self.app.player_id))  # type: ignore[attr-defined]
 
-    def action_continue_game(self) -> None:
+    @work(exclusive=True, group="continue-game")
+    async def action_continue_game(self) -> None:
         if not has_save():
             self.notify("No save found — start a new game.", timeout=2)
             return
-        service = self.app.continue_game()  # type: ignore[attr-defined]
+        button = self.query_one("#continue", Button)
+        button.disabled = True
+        button.label = "Loading saved game…"
+
+        def progress(stage: str, done: int, total: int) -> None:
+            self.app.call_from_thread(self._show_load_progress, stage, done, total)
+
+        try:
+            service = await asyncio.to_thread(
+                self.app.continue_game,  # type: ignore[attr-defined]
+                worker_thread=True,
+                progress=progress,
+            )
+        except DialogueConfigMismatchError as exc:
+            self.notify(str(exc), title="Error", severity="error", timeout=6)
+            button.disabled = False
+            button.label = "C  Continue"
+            return
         if service is None:
+            button.disabled = False
+            button.label = "C  Continue"
             return  # error already shown via app.notify
+        self.app.attach_local_game(service)  # type: ignore[attr-defined]
         self.app.push_screen(GameScreen(service, self.app.player_id))  # type: ignore[attr-defined]
+
+    def _show_load_progress(self, stage: str, done: int, total: int) -> None:
+        button = self.query_one("#continue", Button)
+        if total > 0:
+            button.label = f"{stage}  {min(100, done * 100 // total)}%"
+        else:
+            button.label = stage
 
     def action_gallery(self) -> None:
         self.app.push_screen(SpriteGalleryScreen())

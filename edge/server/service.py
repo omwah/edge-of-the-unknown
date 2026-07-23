@@ -13,7 +13,10 @@ universe, a loaded game reconstructs state by replaying the saved command log.
 
 from __future__ import annotations
 
+import hmac
+import logging
 from collections.abc import Callable, Sequence
+from datetime import datetime, timezone
 
 from edge.bigbang.generator import generate
 from edge.core import dto
@@ -27,8 +30,19 @@ from edge.core.rules import (
 from edge.dialogue import dialogue_fingerprint
 from edge.engine.cron import resolve_cron
 from edge.server import session
-from edge.store.repo import EngineState, Repository
-from edge.store.snapshots import rebuild
+from edge.store.repo import EngineState, Repository, StateCheckpoint
+from edge.store.snapshots import rebuild, replay_tail, state_hash
+from edge.store.state_codec import (
+    CHECKPOINT_CODEC_VERSION,
+    CheckpointCodecError,
+    encode_state,
+    payload_checksum,
+    restore_state,
+)
+
+_LOG = logging.getLogger(__name__)
+_CHECKPOINT_INTERVAL = 250
+LoadProgress = Callable[[str, int, int], None]
 
 
 class DialogueConfigMismatchError(RuntimeError):
@@ -42,13 +56,16 @@ class DialogueConfigMismatchError(RuntimeError):
 
 class GameService:
     def __init__(self, state: UniverseState, config: GameConfig, repo: Repository, *,
-                 last_command_seq: int = 0) -> None:
+                 last_command_seq: int = 0, last_maintenance_seq: int = 0,
+                 mutations_since_checkpoint: int = 0) -> None:
         self._state = state
         self._config = config
         self._repo = repo
         # The latest command_log seq applied — the `after_command_seq` stamped on a
         # maintenance firing so replay interleaves it correctly with commands (WP12).
         self._last_command_seq = last_command_seq
+        self._last_maintenance_seq = last_maintenance_seq
+        self._mutations_since_checkpoint = mutations_since_checkpoint
         # The broadcast seam (WP65): invoked with the (seq, event) pairs just persisted by
         # every `apply` *and* every `apply_maintenance`, so a subscriber (the LocalClient's
         # ticker stream, or the GameServer's fan-out) sees command- and time-driven events on
@@ -73,8 +90,14 @@ class GameService:
         return service
 
     @classmethod
-    def load_game(cls, config: GameConfig, repo: Repository) -> GameService:
-        """Reconstruct a saved game by replaying the merged command+maintenance log (§3, WP12).
+    def load_game(
+        cls,
+        config: GameConfig,
+        repo: Repository,
+        *,
+        progress: LoadProgress | None = None,
+    ) -> GameService:
+        """Restore a checkpoint and replay its bounded log tail (§3, §12).
 
         Raises `DialogueConfigMismatchError` if the save's dialogue fingerprint differs from
         the current config — catching this before replay avoids a mid-way crash in the
@@ -89,11 +112,111 @@ class GameService:
                     "This save used a different dialogue pack — start a new game "
                     "to use the current config."
                 )
-        commands = repo.load_commands()
-        state = rebuild(config, meta.seed, commands, created_at=meta.created_at,
-                        maintenance=repo.load_maintenance(), cron_resolver=resolve_cron)
-        last_seq = max((c.seq for c in commands), default=0)
-        return cls(state, config, repo, last_command_seq=last_seq)
+        command_head, maintenance_head = repo.log_positions()
+        total_records = command_head + maintenance_head
+        if progress is not None:
+            progress("Reading save", 0, total_records)
+        checkpoint = repo.load_checkpoint()
+        state: UniverseState | None = None
+        command_cursor = 0
+        maintenance_cursor = 0
+        if (
+            checkpoint is not None
+            and checkpoint.codec_version == CHECKPOINT_CODEC_VERSION
+            and checkpoint.config_version == config.config_version
+            and 0 <= checkpoint.command_seq <= command_head
+            and 0 <= checkpoint.maintenance_seq <= maintenance_head
+            and hmac.compare_digest(
+                checkpoint.payload_checksum, payload_checksum(checkpoint.payload)
+            )
+        ):
+            try:
+                base = generate(config, meta.seed, created_at=meta.created_at)
+                candidate = restore_state(base, checkpoint.payload)
+                if not hmac.compare_digest(state_hash(candidate), checkpoint.state_hash):
+                    raise CheckpointCodecError("checkpoint state hash does not match")
+                state = candidate
+                command_cursor = checkpoint.command_seq
+                maintenance_cursor = checkpoint.maintenance_seq
+                if progress is not None:
+                    progress(
+                        "Restored checkpoint",
+                        command_cursor + maintenance_cursor,
+                        total_records,
+                    )
+            except (CheckpointCodecError, TypeError, ValueError, KeyError, AttributeError):
+                _LOG.warning("Ignoring invalid state checkpoint; rebuilding from logs",
+                             exc_info=True)
+
+        commands = repo.load_commands_after(command_cursor)
+        maintenance = repo.load_maintenance_after(maintenance_cursor)
+        replay_offset = command_cursor + maintenance_cursor
+
+        def report_replay(done: int, _tail_total: int) -> None:
+            if progress is not None:
+                progress("Replaying recent history", replay_offset + done, total_records)
+
+        if state is None:
+            state = rebuild(
+                config,
+                meta.seed,
+                commands,
+                created_at=meta.created_at,
+                maintenance=maintenance,
+                cron_resolver=resolve_cron,
+                progress=report_replay,
+            )
+        else:
+            replay_tail(
+                state,
+                config,
+                commands,
+                maintenance=maintenance,
+                cron_resolver=resolve_cron,
+                after_command_seq=command_cursor,
+                progress=report_replay,
+            )
+        service = cls(
+            state,
+            config,
+            repo,
+            last_command_seq=command_head,
+            last_maintenance_seq=maintenance_head,
+            mutations_since_checkpoint=len(commands) + len(maintenance),
+        )
+        if checkpoint is None or commands or maintenance:
+            service.checkpoint()
+        if progress is not None:
+            progress("Ready", total_records, total_records)
+        return service
+
+    def checkpoint(self) -> None:
+        """Atomically replace the disposable load checkpoint at the current log cursors."""
+        try:
+            payload, checksum = encode_state(self._state)
+            self._repo.save_checkpoint(
+                StateCheckpoint(
+                    codec_version=CHECKPOINT_CODEC_VERSION,
+                    config_version=self._config.config_version,
+                    command_seq=self._last_command_seq,
+                    maintenance_seq=self._last_maintenance_seq,
+                    state_hash=state_hash(self._state),
+                    payload_checksum=checksum,
+                    payload=payload,
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                )
+            )
+        except Exception:
+            # Logs have already committed and remain the canonical save.  A
+            # checkpoint failure may slow the next load but must not reject play.
+            _LOG.exception("Could not write state checkpoint; durable logs are intact")
+        finally:
+            self._mutations_since_checkpoint = 0
+
+    def _maybe_checkpoint(self) -> None:
+        self._mutations_since_checkpoint += 1
+        if self._mutations_since_checkpoint >= _CHECKPOINT_INTERVAL:
+            self.checkpoint()
 
     def apply(self, player_id: int, command: Command) -> tuple[Event, ...]:
         """Validate, persist, and apply a command; return the events it produced.
@@ -106,6 +229,7 @@ class GameService:
         self._last_command_seq = self._repo.append_command(player_id, command)
         appended = [(self._repo.append_event(event), event) for event in result.events]
         apply_result(self._state, result)
+        self._maybe_checkpoint()
         if self.on_events is not None and appended:
             self.on_events(appended)
         return result.events
@@ -121,9 +245,13 @@ class GameService:
         events are always persisted to the event rail.
         """
         if cron_name is not None:
-            self._repo.append_maintenance(cron_name, tick, self._last_command_seq)
+            self._last_maintenance_seq = self._repo.append_maintenance(
+                cron_name, tick, self._last_command_seq
+            )
         apply_result(self._state, result)
         appended = [(self._repo.append_event(event), event) for event in result.events]
+        if cron_name is not None:
+            self._maybe_checkpoint()
         if self.on_events is not None and appended:
             self.on_events(appended)
 

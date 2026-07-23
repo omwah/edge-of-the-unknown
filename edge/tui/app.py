@@ -17,7 +17,7 @@ from textual.binding import Binding
 from textual.screen import Screen
 
 from edge.config import load_default_config
-from edge.server.service import DialogueConfigMismatchError
+from edge.server.service import DialogueConfigMismatchError, LoadProgress
 from edge.core.config import SceneArtConfig, UIConfig
 from edge.server.client import GameClient, LocalClient
 from edge.server.service import GameService
@@ -217,9 +217,12 @@ class EdgeApp(App[None]):
                 strip.show_progress(done) if not all_done(done) else strip.remove()
 
     def on_unmount(self) -> None:
-        """Tear down the remote loop/thread on exit (WP68)."""
+        """Tear down remote resources or checkpoint the embedded game on exit."""
         if self._remote_bridge is not None:
             self._remote_bridge.close()  # type: ignore[attr-defined]
+        if isinstance(self.client, LocalClient):
+            self.client.stop_ticker()
+            self.client.service.checkpoint()
 
     def start_new_game(self, seed: int | None = None) -> GameService:
         """Generate a fresh universe on disk and start the background ticker.
@@ -245,7 +248,12 @@ class EdgeApp(App[None]):
         self._start_ticker(self.client)
         return service
 
-    def continue_game(self) -> GameService | None:
+    def continue_game(
+        self,
+        *,
+        worker_thread: bool = False,
+        progress: LoadProgress | None = None,
+    ) -> GameService | None:
         """Reload the saved game by replaying its command log (DESIGN §12).
 
         Returns None when no save exists or when the save is incompatible with the current
@@ -257,13 +265,25 @@ class EdgeApp(App[None]):
         config = load_default_config()
         self._apply_art_config(config)
         try:
-            service = GameService.load_game(config, SqliteRepository(default_save()))
+            service = GameService.load_game(
+                config,
+                SqliteRepository(default_save(), check_same_thread=not worker_thread),
+                progress=progress,
+            )
         except DialogueConfigMismatchError as exc:
+            if worker_thread:
+                raise
             notify_error(self, str(exc))
             return None
+        if worker_thread:
+            return service
+        self.attach_local_game(service)
+        return service
+
+    def attach_local_game(self, service: GameService) -> None:
+        """Attach a fully loaded embedded service on the Textual event-loop thread."""
         self.client = LocalClient(service, player_id=self.player_id)
         self._start_ticker(self.client)
-        return service
 
     def _apply_art_config(self, config: object) -> None:
         """Validate art coverage and read scene-sprite sizes before a game starts.

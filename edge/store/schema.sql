@@ -3,8 +3,8 @@
 -- Phase 1 persists the reproducibility rail: the game meta (seed + config
 -- version) plus the durable command and event logs. Live entity state is
 -- reconstructed by regenerating the universe from the seed and replaying the
--- command log (the "(seed, command log)" integrity property, §3) — so the full
--- §4 entity tables are a later snapshot optimisation, not needed for Phase 1.
+-- command log (the "(seed, command log)" integrity property, §3).  A disposable
+-- state_checkpoint row now bounds replay time without replacing those logs.
 
 CREATE TABLE IF NOT EXISTS meta (
     id                          INTEGER PRIMARY KEY CHECK (id = 1),
@@ -55,4 +55,19 @@ CREATE TABLE IF NOT EXISTS engine_state (
 CREATE TABLE IF NOT EXISTS cron_schedule (
     name     TEXT PRIMARY KEY,
     next_due INTEGER NOT NULL
+);
+
+-- Disposable acceleration cache for long-running games.  The command and
+-- maintenance logs remain canonical; this row may be deleted at any time and a
+-- full replay will recreate it.  Separate cursors preserve the merged timeline.
+CREATE TABLE IF NOT EXISTS state_checkpoint (
+    id                   INTEGER PRIMARY KEY CHECK (id = 1),
+    codec_version        INTEGER NOT NULL,
+    config_version       INTEGER NOT NULL,
+    command_seq          INTEGER NOT NULL,
+    maintenance_seq      INTEGER NOT NULL,
+    state_hash           TEXT    NOT NULL,
+    payload_checksum     TEXT    NOT NULL,
+    payload              BLOB    NOT NULL,
+    created_at           TEXT    NOT NULL
 );

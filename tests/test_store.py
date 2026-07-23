@@ -7,6 +7,7 @@ both a reloaded repository and a gzipped portable save.
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -27,7 +28,7 @@ from edge.core.rules import (
     apply_result,
     reduce,
 )
-from edge.store.repo import SqliteRepository
+from edge.store.repo import RecordedCommand, RecordedMaintenance, SqliteRepository
 from edge.store.snapshots import (
     export_save,
     import_save,
@@ -35,6 +36,7 @@ from edge.store.snapshots import (
     rebuild_from_bundle,
     state_hash,
 )
+from edge.store.state_codec import encode_state, restore_state
 
 _CREATED = "2026-06-15T00:00:00Z"
 
@@ -88,6 +90,118 @@ def test_command_log_replay_reproduces_state(tmp_path: Path) -> None:
     assert bundle.seed == seed
     assert state_hash(rebuild_from_bundle(config, bundle)) == expected  # type: ignore[arg-type]
     repo.close()
+
+
+def test_checkpoint_codec_round_trips_state_and_rng() -> None:
+    config = _small_config()
+    state = generate(config, 42, created_at=_CREATED)  # type: ignore[arg-type]
+    apply_result(state, reduce(state, 1, JoinGame(), config))  # type: ignore[arg-type]
+    payload, _checksum = encode_state(state)
+    expected_hash = state_hash(state)
+    expected_draws = [state.rng.random() for _ in range(8)]
+
+    base = generate(config, 42, created_at=_CREATED)  # type: ignore[arg-type]
+    restored = restore_state(base, payload)
+
+    assert state_hash(restored) == expected_hash
+    assert [restored.rng.random() for _ in range(8)] == expected_draws
+
+
+def test_checkpoint_load_replays_only_the_log_tail(tmp_path: Path) -> None:
+    from edge.core.rules import SetPlayerName
+    from edge.server.service import GameService
+
+    class TrackingRepository(SqliteRepository):
+        command_cursors: list[int]
+        maintenance_cursors: list[int]
+
+        def __init__(self, path: Path) -> None:
+            super().__init__(path)
+            self.command_cursors = []
+            self.maintenance_cursors = []
+
+        def load_commands_after(self, seq: int) -> list[RecordedCommand]:
+            self.command_cursors.append(seq)
+            return super().load_commands_after(seq)
+
+        def load_maintenance_after(self, seq: int) -> list[RecordedMaintenance]:
+            self.maintenance_cursors.append(seq)
+            return super().load_maintenance_after(seq)
+
+    config = _small_config()
+    path = tmp_path / "tail.db"
+    svc = GameService.new_game(config, 42, SqliteRepository(path), created_at=_CREATED)  # type: ignore[arg-type]
+    target = svc.state.sectors[1].warps_out[0]
+    svc.apply(1, Warp(to_sector=target))
+    svc.checkpoint()
+    checkpoint_seq = svc._repo.load_checkpoint().command_seq  # type: ignore[attr-defined,union-attr]
+    svc.apply(1, SetPlayerName("Tail"))
+    expected = state_hash(svc.state)
+
+    tracking = TrackingRepository(path)
+    loaded = GameService.load_game(config, tracking)  # type: ignore[arg-type]
+
+    assert state_hash(loaded.state) == expected
+    assert tracking.command_cursors == [checkpoint_seq]
+    assert tracking.maintenance_cursors == [0]
+
+
+def test_corrupt_checkpoint_falls_back_to_full_replay(tmp_path: Path) -> None:
+    from edge.server.service import GameService
+
+    config = _small_config()
+    path = tmp_path / "corrupt.db"
+    svc = GameService.new_game(config, 42, SqliteRepository(path), created_at=_CREATED)  # type: ignore[arg-type]
+    target = svc.state.sectors[1].warps_out[0]
+    svc.apply(1, Warp(to_sector=target))
+    expected = state_hash(svc.state)
+    svc.checkpoint()
+
+    with sqlite3.connect(path) as conn:
+        conn.execute("UPDATE state_checkpoint SET payload = X'00' WHERE id = 1")
+
+    loaded = GameService.load_game(config, SqliteRepository(path))  # type: ignore[arg-type]
+
+    assert state_hash(loaded.state) == expected
+    refreshed = loaded._repo.load_checkpoint()  # type: ignore[attr-defined]
+    assert refreshed is not None and refreshed.payload != b"\x00"
+
+
+def test_checkpoint_tail_replays_maintenance_after_its_last_command(tmp_path: Path) -> None:
+    from edge.engine.ticker import EngineTicker
+    from edge.server.service import GameService
+
+    config = _small_config()
+    path = tmp_path / "maintenance-tail.db"
+    svc = GameService.new_game(config, 42, SqliteRepository(path), created_at=_CREATED)  # type: ignore[arg-type]
+    svc.checkpoint()
+    ticker = EngineTicker(svc, tick_seconds=0.0, ticks_per_hour=1, ticks_per_day=2)
+    ticker.step()
+    expected = state_hash(svc.state)
+
+    loaded = GameService.load_game(config, SqliteRepository(path))  # type: ignore[arg-type]
+
+    assert state_hash(loaded.state) == expected
+
+
+def test_service_writes_periodic_checkpoints(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from edge.core.rules import SetPlayerName
+    from edge.server import service as service_module
+
+    monkeypatch.setattr(service_module, "_CHECKPOINT_INTERVAL", 2)
+    repo = SqliteRepository(tmp_path / "periodic.db")
+    svc = service_module.GameService.new_game(
+        _small_config(), 42, repo, created_at=_CREATED  # type: ignore[arg-type]
+    )
+    assert repo.load_checkpoint() is None
+
+    svc.apply(1, SetPlayerName("Checkpoint"))
+
+    checkpoint = repo.load_checkpoint()
+    assert checkpoint is not None
+    assert checkpoint.command_seq == 2  # JoinGame plus SetPlayerName
 
 
 def test_ticked_game_export_round_trips(tmp_path: Path) -> None:
