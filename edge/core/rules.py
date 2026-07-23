@@ -32,6 +32,7 @@ from edge.core.aliens import (
     HOSTILE as HOSTILE_BAND,
     NEUTRAL as NEUTRAL_BAND,
     admission_met,
+    apply_ground_assault_consequences,
     apply_join_standing,
     apply_resign_standing,
     apply_spillover,
@@ -131,6 +132,8 @@ from edge.core.events import (
     NoticePosted,
     PlanetBanked,
     PlanetInvaded,
+    ProtectorateAnnexed,
+    ProtectorateEstablished,
     ProbeReport,
     RumorHeard,
     ComponentInstalled,
@@ -151,6 +154,7 @@ from edge.core.events import (
     GarrisonReinforced,
     GenesisDeployed,
     GroundAssaultDropped,
+    GroundAssaultSettled,
     GroundBroadcastMade,
     GroundFired,
     GroundJumped,
@@ -225,6 +229,7 @@ from edge.core.groundwar.access import Assault, Survey, ground_access, inhabitin
 from edge.core.groundwar.models import ArtifactRecord, AssaultOperation, SurveyOperation, SurveyProgress
 from edge.core.groundwar import assault as gw_assault
 from edge.core.groundwar import force as gw_force
+from edge.core.groundwar import settlement as gw_settlement
 from edge.core.groundwar import survey as gw_survey
 from edge.core.groundwar.force import GroundForceError
 from edge.core.groundwar.survey import eligible_surface_site_ids
@@ -498,6 +503,13 @@ class InvadePlanet:
 
     planet_id: int
     fighters: int
+
+
+@dataclass(frozen=True, slots=True)
+class AnnexProtectorate:
+    """Annex a recovered player/corp-controlled protectorate (GW-WP11, D14)."""
+
+    planet_id: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -1279,7 +1291,7 @@ Command = (
     | RecruitColonists | Colonize | SettleColonists | SetAllocation
     | HireRecruits | DismissRecruits | BuySuits | SellSuits | BuyGroundOrdnance
     | BuildStagingArea
-    | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet
+    | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet | AnnexProtectorate
     | TransferCargo | TransferFighters | BatchTransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | Descend | Explore | BeginSurvey | BeginAssault | ReinforceGarrison
@@ -1442,6 +1454,8 @@ def reduce(
                                 config, withdraw_=True)
         case InvadePlanet():
             return _invade_planet(state, player_id, command, config)
+        case AnnexProtectorate():
+            return _annex_protectorate(state, player_id, command, config)
         case InstallComponent():
             return _install_component(state, player_id, command, config)
         case SwapComponent():
@@ -2563,7 +2577,7 @@ def _colonize(
     planet = state.planets.get(cmd.planet_id)
     if planet is None or planet.sector_id != ship.sector_id:
         raise EconomyError("no such world in this sector")
-    if planet.owner.is_owned:
+    if planet.owner.is_owned or planet.protectorate_controller.is_owned:
         raise EconomyError("that world is already claimed")  # Core worlds are governor-owned
     # The capacity seam (§4.2, PT-54), not the raw type: a gas giant refuses people until its
     # Cloud City exists — and a staged one is already owned, so it comes through SettleColonists.
@@ -2602,8 +2616,8 @@ def _settle_colonists(
     planet = state.planets.get(cmd.planet_id)
     if planet is None or planet.sector_id != ship.sector_id:
         raise EconomyError("no such world in this sector")
-    if not corp.player_owns(state, planet.owner, player_id):
-        raise EconomyError("you do not own that world")  # claim an unowned world with Colonize
+    if not corp.player_controls_planet(state, planet, player_id):
+        raise EconomyError("you do not own or control that world")
     blocker = colonist_blocker(planet, config)  # the capacity seam (§4.2, PT-54)
     if blocker:
         raise EconomyError(blocker)
@@ -2672,8 +2686,8 @@ def _set_allocation(
     planet = state.planets.get(cmd.planet_id)
     if planet is None:
         raise EconomyError("no such world")
-    if not corp.player_owns(state, planet.owner, player_id):
-        raise EconomyError("you do not own that world")
+    if not corp.player_controls_planet(state, planet, player_id):
+        raise EconomyError("you do not own or control that world")
     alloc = {c: float(cmd.allocation.get(c.value, 0.0)) for c in Commodity}
     fighter = max(0.0, float(cmd.fighter))
     garrison = max(0.0, float(cmd.garrison))
@@ -2691,14 +2705,20 @@ def _set_allocation(
 # --- citadels: build ladder + treasury (§4.2, WP54) -------------------------
 
 
-def _owned_planet_here(state: UniverseState, player_id: int, planet_id: int) -> Planet:
-    """The player-owned planet in the ship's sector, or raise (citadel ops gate, WP54)."""
+def _owned_planet_here(
+    state: UniverseState, player_id: int, planet_id: int, *, controlled: bool = False,
+) -> Planet:
+    """An owned (or, when requested, controlled) in-sector world."""
     ship = _ship(state, _player(state, player_id))
     planet = state.planets.get(planet_id)
     if planet is None or planet.sector_id != ship.sector_id:
         raise EconomyError("no such world in this sector")
-    if not corp.player_owns(state, planet.owner, player_id):
-        raise EconomyError("you do not own that world")
+    permitted = (
+        corp.player_controls_planet(state, planet, player_id)
+        if controlled else corp.player_owns(state, planet.owner, player_id))
+    if not permitted:
+        raise EconomyError("you do not own or control that world" if controlled
+                           else "you do not own that world")
     return planet
 
 
@@ -2715,7 +2735,7 @@ def _transfer_cargo(
     """
     player = _player(state, player_id)
     ship = _ship(state, player)
-    planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    planet = _owned_planet_here(state, player_id, cmd.planet_id, controlled=True)
     blocked = store_blocker(planet, config)  # a gas giant stores nothing until it is staged
     if blocked:
         raise EconomyError(blocked)
@@ -2730,15 +2750,21 @@ def _transfer_cargo(
         new_planet = replace(planet, stores={
             **planet.stores, cmd.commodity: planet.stores.get(cmd.commodity, 0) + moved})
     else:
-        available = planet.stores.get(cmd.commodity, 0)
+        owns = corp.player_owns(state, planet.owner, player_id)
+        source = planet.stores if owns else planet.protectorate_stores
+        available = source.get(cmd.commodity, 0)
         moved = min(cmd.units, available, ship.holds_free)
         if moved <= 0:
             reason = "no free holds" if available > 0 else f"no {cmd.commodity.value} in stores"
             raise EconomyError(f"cannot load — {reason}")
         new_ship = replace(ship, cargo={
             **ship.cargo, cmd.commodity: ship.cargo.get(cmd.commodity, 0) + moved})
-        new_planet = replace(planet, stores={
-            **planet.stores, cmd.commodity: available - moved})
+        if owns:
+            new_planet = replace(planet, stores={
+                **planet.stores, cmd.commodity: available - moved})
+        else:
+            new_planet = replace(planet, protectorate_stores={
+                **planet.protectorate_stores, cmd.commodity: available - moved})
     return ReduceResult(
         events=(CargoTransferred(player_id, planet.id, cmd.commodity, moved, cmd.to_planet),),
         ships=(new_ship,), planets=(new_planet,),
@@ -2757,7 +2783,7 @@ def _transfer_fighters(
     """
     player = _player(state, player_id)
     ship = _ship(state, player)
-    planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    planet = _owned_planet_here(state, player_id, cmd.planet_id, controlled=True)
     if cmd.count <= 0:
         raise EconomyError("transfer a positive number of fighters")
     if cmd.to_planet:
@@ -2784,7 +2810,7 @@ def _batch_transfer_cargo(
     """Apply the transfer workbench's aggregate action as one all-or-nothing delta."""
     player = _player(state, player_id)
     ship = _ship(state, player)
-    planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    planet = _owned_planet_here(state, player_id, cmd.planet_id, controlled=True)
     blocked = store_blocker(planet, config)  # a gas giant stores nothing until it is staged
     if blocked:
         raise EconomyError(blocked)
@@ -2795,7 +2821,9 @@ def _batch_transfer_cargo(
         raise EconomyError("batch transfer amounts cannot be negative")
 
     cargo = dict(ship.cargo)
+    owns = corp.player_owns(state, planet.owner, player_id)
     stores = dict(planet.stores)
+    protected = dict(planet.protectorate_stores)
     events: list[Event] = []
     free_holds = ship.holds_free
     for commodity in Commodity:
@@ -2808,9 +2836,10 @@ def _batch_transfer_cargo(
                 cargo[commodity] = cargo.get(commodity, 0) - moved
                 stores[commodity] = stores.get(commodity, 0) + moved
         else:
-            moved = min(requested, stores.get(commodity, 0), free_holds)
+            source = stores if owns else protected
+            moved = min(requested, source.get(commodity, 0), free_holds)
             if moved:
-                stores[commodity] = stores.get(commodity, 0) - moved
+                source[commodity] = source.get(commodity, 0) - moved
                 cargo[commodity] = cargo.get(commodity, 0) + moved
                 free_holds -= moved
         if moved:
@@ -2821,7 +2850,8 @@ def _batch_transfer_cargo(
     return ReduceResult(
         events=tuple(events),
         ships=(replace(ship, cargo=cargo),),
-        planets=(replace(planet, stores=stores),),
+        planets=(replace(
+            planet, stores=stores, protectorate_stores=protected),),
     )
 
 
@@ -2942,6 +2972,56 @@ def _invade_planet(
         events=(InvasionRepulsed(player_id, planet.id, outcome.fighters_lost),),
         players=(new_player,), ships=(new_ship,), planets=(new_planet,),
     )
+
+
+def _annex_protectorate(
+    state: UniverseState, player_id: int, cmd: AnnexProtectorate, config: GameConfig,
+) -> ReduceResult:
+    """Apply the delayed, explicit D14 protectorate ownership transition."""
+    player = _player(state, player_id)
+    _require_no_encounter(player)
+    ship = _ship(state, player)
+    planet = state.planets.get(cmd.planet_id)
+    if planet is None or planet.sector_id != ship.sector_id:
+        raise EconomyError("no such protectorate in this sector")
+    blocker = gw_settlement.annex_ready(
+        planet, player_id, player.corp_id, state.game.day_number, config)
+    if blocker is not None:
+        raise EconomyError(blocker)
+    controller = planet.protectorate_controller
+    new_planet = gw_settlement.annex(planet)
+    new_player = player
+    events: list[Event] = []
+    species = inhabiting_species(state, planet, config)
+    if species is not None:
+        sc = _species_config(config, species)
+        before = player.species_attitudes.get(species.roster_id, 0.0)
+        new_player = apply_ground_assault_consequences(
+            player, species, sc, config.roster, config.aliens,
+            state.game.day_number, 2,
+            cause=f"annexed the {species.name} protectorate on {planet.name}")
+        after = new_player.species_attitudes.get(species.roster_id, before)
+        if new_player is not player and species.roster_id in new_player.grudges:
+            grudge = new_player.grudges[species.roster_id]
+            events.extend((
+                GrudgeFormed(
+                    player_id, species.roster_id, grudge.severity,
+                    grudge.duration_days < 0),
+                AttitudeChanged(
+                    player_id, species.id, round(after, 6),
+                    round(effective_disposition(species, new_player), 6)),
+            ))
+    if config.groundwar is not None:
+        new_player = replace(
+            new_player,
+            alignment=(new_player.alignment
+                       - config.groundwar.settlement.annex_alignment_penalty),
+        )
+    assert controller.ref is not None
+    events.append(ProtectorateAnnexed(
+        player_id, planet.id, controller.kind, controller.ref))
+    return ReduceResult(
+        events=tuple(events), players=(new_player,), planets=(new_planet,))
 
 
 # --- engine room: install / swap / cannibalize / field-patch (§4.1) ---------
@@ -4224,14 +4304,22 @@ def _begin_assault(
         planet, config, distance_band=sector.distance_band, species=species)
     seed = state.rng.getrandbits(63)
     operation_id = state.rng.getrandbits(63)
+    initial_resolve = (
+        planet.ground_resolve
+        if planet.ground_resolve is not None else config.groundwar.resolve.start)
     operation = AssaultOperation(
         operation_id=operation_id, planet_id=planet.id, sector_id=ship.sector_id,
         planet_type=planet.planet_type, seed=seed, started_day=state.game.day_number,
-        resolve=config.groundwar.resolve.start,
+        resolve=initial_resolve,
         retrieval_turn=config.groundwar.pressure.retrieval_turns,
         cities=difficulty.cities, citadel_level=difficulty.citadel_level,
         surrender_threshold=difficulty.surrender_threshold,
         reserved_infantry=planet.garrison_infantry, reserved_armor=planet.garrison_armor,
+    )
+    amap = gw_assault.assault_map_for_state(operation, config)
+    operation = replace(
+        operation,
+        structure_hp=gw_assault.persistent_structure_hp(amap, planet.ground_damage),
     )
     new_player = replace(player, ground_operation=operation)
     return ReduceResult(
@@ -4253,7 +4341,7 @@ def _reinforce_garrison(
     """
     player = _player(state, player_id)
     ship = _ship(state, player)
-    planet = _owned_planet_here(state, player_id, cmd.planet_id)
+    planet = _owned_planet_here(state, player_id, cmd.planet_id, controlled=True)
     if not is_landable(planet.planet_type, config) or is_cloud_city_world(planet.planet_type, config):
         raise EconomyError("this world has no ground to station a garrison on")
     if cmd.count <= 0:
@@ -4275,10 +4363,9 @@ def _extract_ground_operation(
     """Settle and clear the active ground operation (GW-WP03, GW plan D5/D8).
 
     Always legal while an operation is live (extraction is never barred — D4/D12), so
-    this deliberately does not call `_require_no_encounter`. Persists a survey's
-    surveyor position and hints into `Player.ground_survey_progress` (D5) while
-    trenches/supplies reset next descent; the assault win/loss reconciliation lands
-    with GW-WP11.
+    this deliberately does not call `_require_no_encounter`. Surveys persist D5
+    progress. Assaults route through the pure GW-WP11 reconciliation layer, then apply
+    the existing species/alliance/corp consequence rails in the same atomic result.
     """
     player = _player(state, player_id)
     operation = player.ground_operation
@@ -4286,19 +4373,125 @@ def _extract_ground_operation(
         raise MovementError("you have no ground operation to extract from")
     if operation.operation_id != cmd.operation_id:
         raise MovementError("that ground operation is not the active one")
-    progress = dict(player.ground_survey_progress)
     if isinstance(operation, SurveyOperation):
+        progress = dict(player.ground_survey_progress)
         progress[operation.planet_id] = SurveyProgress(
             last_x=operation.explorer_x, last_y=operation.explorer_y,
             hinted_discovery_ids=operation.hinted_discovery_ids,
             map_seed=operation.seed,
         )
-    new_player = replace(player, ground_operation=None, ground_survey_progress=progress)
+        new_player = replace(
+            player, ground_operation=None, ground_survey_progress=progress)
+        return ReduceResult(
+            events=(GroundOperationEnded(
+                player_id, operation.operation_id, operation.kind,
+                operation.outcome or "extracted"),),
+            players=(new_player,),
+        )
+
+    planet = state.planets.get(operation.planet_id)
+    if planet is None:
+        raise MovementError("the assaulted world no longer exists")
+    ship = _ship(state, player)
+    former_owner = planet.owner
+    species = inhabiting_species(state, planet, config)
+    try:
+        settled = gw_settlement.settle_assault(
+            planet, ship, operation, player_id=player_id, corp_id=player.corp_id,
+            day=state.game.day_number, config=config)
+    except gw_settlement.SettlementError as exc:
+        raise MovementError(str(exc)) from exc
+
+    events: list[Event] = [
+        GroundOperationEnded(
+            player_id, operation.operation_id, operation.kind, settled.outcome),
+        GroundAssaultSettled(
+            player_id, planet.id, settled.outcome, settled.control,
+            settled.attacker_losses, settled.defender_losses,
+            settled.civilian_losses, settled.missiles_spent, settled.loot),
+    ]
+    new_player = replace(
+        player, ground_operation=None, latinum=player.latinum + settled.loot)
+
+    if operation.dropped:
+        # Alliance/corp ownership consequences are keyed to the owner at extraction,
+        # before surrender changes it (G10). A corp attack is an explicit war act.
+        if former_owner.kind == "alliance" and former_owner.ref is not None:
+            new_player = replace(
+                new_player,
+                alliance_standing={
+                    **new_player.alliance_standing, former_owner.ref: -1.0},
+            )
+        corp_delta = corp.assault_war_delta(state, player, former_owner)
+        corporations = (corp_delta,) if corp_delta is not None else ()
+        if (corp_delta is not None and former_owner.ref is not None
+                and player.corp_id is not None):
+            events.append(CorpWarDeclared(
+                player_id, player.corp_id, former_owner.ref))
+
+        units = gw_settlement.consequence_units(settled.defender_losses, config)
+        if species is not None:
+            sc = _species_config(config, species)
+            band = disposition_band(effective_disposition(species, new_player), config.aliens)
+            severity = max(1, units) + settled.civilian_structures_destroyed
+            if settled.outcome == "surrender":
+                severity += 1
+            before_offset = new_player.species_attitudes.get(species.roster_id, 0.0)
+            soured = apply_ground_assault_consequences(
+                new_player, species, sc, config.roster, config.aliens,
+                state.game.day_number, severity,
+                cause=f"ground assault on {planet.name}")
+            after_offset = soured.species_attitudes.get(species.roster_id, before_offset)
+            if soured is not new_player and species.roster_id in soured.grudges:
+                grudge = soured.grudges[species.roster_id]
+                events.append(GrudgeFormed(
+                    player_id, species.roster_id, grudge.severity,
+                    grudge.duration_days < 0))
+                events.append(AttitudeChanged(
+                    player_id, species.id, round(after_offset, 6),
+                    round(effective_disposition(species, soured), 6)))
+            align_per_unit = {
+                HOSTILE_BAND: config.aliens.alignment_kill_hostile,
+                NEUTRAL_BAND: config.aliens.alignment_kill_neutral,
+                FRIENDLY_BAND: config.aliens.alignment_kill_friendly,
+            }[band]
+            xp = max(1, round(sc.threat_rating * config.aliens.experience_kill_scale)) * units
+            bounty = config.aliens.bounty_per_kill * units if band == HOSTILE_BAND else 0
+            new_player = replace(
+                soured,
+                alignment=soured.alignment + align_per_unit * units,
+                experience=soured.experience + xp,
+                latinum=soured.latinum + bounty,
+            )
+        else:
+            corporations = (corp_delta,) if corp_delta is not None else ()
+
+        penalty = (
+            0 if settled.outcome == "surrender"
+            else config.citadels.invasion_alignment_penalty
+            if config.citadels is not None else 0)
+        if config.groundwar is not None:
+            penalty += (
+                settled.civilian_structures_destroyed
+                * config.groundwar.settlement.civilian_alignment_penalty)
+        if penalty:
+            new_player = replace(new_player, alignment=new_player.alignment - penalty)
+    else:
+        corporations = ()
+
+    if settled.control == "protectorate":
+        controller = settled.planet.protectorate_controller
+        assert controller.ref is not None
+        events.append(ProtectorateEstablished(
+            player_id, planet.id, controller.kind, controller.ref))
+    elif settled.control == "conquest":
+        events.append(PlanetInvaded(
+            player_id, planet.id, settled.attacker_losses,
+            settled.planet.colonists, settled.loot))
+
     return ReduceResult(
-        events=(GroundOperationEnded(
-            player_id, operation.operation_id, operation.kind,
-            operation.outcome or "extracted"),),
-        players=(new_player,),
+        events=tuple(events), players=(new_player,), ships=(settled.ship,),
+        planets=(settled.planet,), corporations=corporations,
     )
 
 
@@ -4418,7 +4611,9 @@ def _ground_drop(
     except GroundForceError as exc:
         raise EconomyError(str(exc)) from exc
     amap = gw_assault.assault_map_for(state, op, config)
-    new_op = gw_assault.assault_drop(op, amap, config, state.rng, cmd.placements)
+    new_op = gw_assault.assault_drop(
+        op, amap, config, state.rng, cmd.placements,
+        missile_budget=ship.ground_missiles)
     new_player = replace(player, ground_operation=new_op)
     return ReduceResult(
         events=(GroundAssaultDropped(player_id, op.operation_id, len(new_op.platoon),

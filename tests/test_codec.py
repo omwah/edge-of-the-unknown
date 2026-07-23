@@ -74,6 +74,7 @@ from edge.core.events import (
     EncounterStarted,
     GenesisDeployed,
     GroundAssaultDropped,
+    GroundAssaultSettled,
     GroundBroadcastMade,
     GroundFired,
     GroundJumped,
@@ -81,6 +82,8 @@ from edge.core.events import (
     GroundOperationBegan,
     GroundOperationEnded,
     GroundTurnEnded,
+    ProtectorateAnnexed,
+    ProtectorateEstablished,
     GrudgeFormed,
     HazardDamage,
     SiteExplored,
@@ -144,6 +147,7 @@ from edge.core.rules import (
     Cannibalize,
     ClaimStarbase,
     BeginAssault,
+    AnnexProtectorate,
     Colonize,
     CombatAction,
     Command,
@@ -260,6 +264,7 @@ COMMANDS: list[Command] = [
     Explore(planet_id=5),         # WP6 survey the next surface site
     BeginSurvey(planet_id=5),     # GW-WP03 open a surface-survey expedition
     BeginAssault(planet_id=5),    # GW-WP09 open a tactical ground assault
+    AnnexProtectorate(planet_id=5),  # GW-WP11 convert a recovered protectorate
     ExtractGroundOperation(operation_id=123),  # GW-WP03 settle/clear a ground op
     GroundMove(operation_id=123, x=40, y=20, actor_id=0),  # GW-WP06 march the explorer
     SurveyDig(operation_id=123),  # GW-WP06 open a trench
@@ -378,6 +383,9 @@ EVENTS: list[Event] = [
     GroundFired(1, 123, 1, 10, 11, False, True, "structure", True),  # GW-WP10 shot destroyed a wall
     GroundBroadcastMade(1, 123, 1, 2),                  # GW-WP10 terms dictated over a cowed city
     GroundTurnEnded(1, 123, 3, 88, 1, ""),              # GW-WP10 tactical round settled
+    GroundAssaultSettled(1, 5, "surrender", "protectorate", 1, 7, 20, 2, 0),
+    ProtectorateEstablished(1, 5, "player", 1),
+    ProtectorateAnnexed(1, 5, "player", 1),
     GroundMoved(1, 123, 40, 20, 2),
     SurveyDug(1, 123, 40, 20, 9),
     SurveySiteExcavated(1, 123, 9, "ruins", "RARE"),

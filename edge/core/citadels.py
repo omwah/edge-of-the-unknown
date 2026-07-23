@@ -206,3 +206,34 @@ def conquer(planet: Planet, player_id: int, survivors: int, config: GameConfig) 
         population=scale_population(planet.population, planet.colonists, survivor_total),
     )
     return new_planet, captured
+
+
+def settle_tactical_conquest(
+    planet: Planet, controller: Ownership, defender_infantry: int,
+    defender_armor: int, config: GameConfig,
+) -> tuple[Planet, int]:
+    """Apply the sovereignty/citadel half of a GW-WP11 surrender.
+
+    This is the powered-suit successor to :func:`conquer`: attackers return to
+    their ship under D8/D15 instead of becoming planetary fighters, while the
+    surviving local defenders remain a finite garrison under the new sovereign.
+    The old conquest invariants are reused unchanged — treasury is captured,
+    the citadel drops one level, its gun is silenced, stores and an open build
+    stay with the world, and civilians survive at the configured conquest rate.
+    """
+    cfg = _levels(config)
+    captured = planet.treasury
+    survivor_total = round(planet.colonists * cfg.civilian_survival_frac)
+    return replace(
+        planet,
+        owner=controller,
+        population=scale_population(planet.population, planet.colonists, survivor_total),
+        citadel_level=max(0, planet.citadel_level - 1),
+        gun_integrity=0,
+        treasury=0,
+        garrison_infantry=max(0, defender_infantry),
+        garrison_armor=max(0, defender_armor),
+        protectorate_controller=Ownership("none"),
+        protectorate_since=None,
+        protectorate_stores={},
+    ), captured

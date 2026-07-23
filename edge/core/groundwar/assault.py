@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import heapq
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from random import Random
 from typing import Literal
@@ -399,9 +399,34 @@ def generate_assault_map(
 def assault_map_for(state: UniverseState, op: AssaultOperation, config: GameConfig) -> AssaultMap:
     """Regenerate the live battlefield for an active assault operation (G5) — the
     projection seam, mirroring `survey.survey_map_for`."""
+    return assault_map_for_state(op, config)
+
+
+def assault_map_for_state(op: AssaultOperation, config: GameConfig) -> AssaultMap:
+    """State-free battlefield regeneration for pure settlement/tests (G5)."""
     return generate_assault_map(
         config, seed=op.seed, planet_type=op.planet_type,
         cities=op.cities, citadel_level=op.citadel_level)
+
+
+def persistent_structure_hp(
+    amap: AssaultMap, damage: Mapping[str, int],
+) -> dict[int, int]:
+    """Project a world's aggregate destroyed defenses onto a regenerated map.
+
+    Operations intentionally do not persist a full terrain grid (G5), and a later
+    assault draws a new map seed. Persisting destruction by structure kind keeps the
+    strategic damage exact without pinning a stale tactical layout: the lowest stable
+    structure ids of each kind begin as rubble on the next map.
+    """
+    remaining = {str(kind): max(0, int(count)) for kind, count in damage.items()}
+    hp: dict[int, int] = {}
+    for structure in sorted(amap.structures, key=lambda item: item.id):
+        if remaining.get(structure.kind, 0) <= 0:
+            continue
+        hp[structure.id] = 0
+        remaining[structure.kind] -= 1
+    return hp
 
 
 # --- garrison economy (pure; GW plan D11) --------------------------------------
@@ -483,6 +508,27 @@ def apply_militia_recovery(planet: Planet, config: GameConfig) -> Planet:
     if infantry == planet.garrison_infantry and armor == planet.garrison_armor:
         return planet
     return replace(planet, garrison_infantry=infantry, garrison_armor=armor)
+
+
+def apply_ground_recovery(planet: Planet, config: GameConfig, day: int) -> Planet:
+    """Recover persisted planetary Resolve by one daily tick (GW-WP11, D8/D14).
+
+    The day marker makes a duplicate cron firing idempotent. Destruction itself does
+    not regenerate here: rubble remains strategic state until a later rebuilding
+    system explicitly repairs it.
+    """
+    if (config.groundwar is None or planet.ground_resolve is None
+            or planet.ground_last_assault_day is None
+            or day <= planet.ground_last_assault_day):
+        return planet
+    elapsed = day - planet.ground_last_assault_day
+    recovered = min(
+        config.groundwar.resolve.start,
+        planet.ground_resolve
+        + elapsed * config.groundwar.settlement.resolve_recovery_per_day,
+    )
+    return replace(
+        planet, ground_resolve=recovered, ground_last_assault_day=day)
 
 
 # --- tactical assault actions and planetary AI (GW-WP10) ---------------------
@@ -1253,7 +1299,7 @@ def _begin_action(
 
 def assault_drop(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig, rng: Random,
-    placements: Sequence[tuple[str, int, int]],
+    placements: Sequence[tuple[str, int, int]], *, missile_budget: int | None = None,
 ) -> AssaultOperation:
     """Land the platoon and populate the battlefield's live garrison (GW-WP10, D3).
 
@@ -1290,11 +1336,18 @@ def assault_drop(
     battle = _battle_for(op, amap, config, rng)
     battle.next_id = len(amap.structures) + 1  # dynamic ids start above the static map's range
     aa_cfg = battle.gw.defenses.aa
+    missiles_left = sum(config.groundwar.suits[s].missiles for s, _x, _y in placements)
+    if missile_budget is not None:
+        missiles_left = max(0, missile_budget)
+    committed = 0
     for i, (suit_id, x, y) in enumerate(placements):
         suit = battle.gw.suits[suit_id]
+        loaded = min(suit.missiles, missiles_left)
+        missiles_left -= loaded
+        committed += loaded
         tid = battle.next_unit_id()
         t = _Trooper(id=tid, suit_id=suit_id, name=TROOPER_NAMES[i % len(TROOPER_NAMES)],
-                    x=x, y=y, hp=suit.hp, missiles=suit.missiles, jump_charges=suit.jump_charges)
+                    x=x, y=y, hp=suit.hp, missiles=loaded, jump_charges=suit.jump_charges)
         battle.troopers[tid] = t
         battle.log("drop", f"{t.name} ({suit.label}) capsule down", x, y)
         for s in battle.structures.values():
@@ -1311,7 +1364,7 @@ def assault_drop(
     _place_preplaced_garrison(battle, op)
     _check_casualties(battle)
     start_player_phase(battle)
-    return _freeze_battle(op, battle)
+    return replace(_freeze_battle(op, battle), ground_missiles_committed=committed)
 
 
 def assault_move(

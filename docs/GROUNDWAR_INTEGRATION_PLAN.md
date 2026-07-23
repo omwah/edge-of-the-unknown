@@ -7,11 +7,10 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–08, GW-WP09-PRE, GW-WP09, and GW-WP10
-> shipped; interview decisions resolved (July 2026). Next: GW-WP11 (strategic
-> assault settlement and consequences), which reconciles the tactical outcome
-> GW-WP10 can now produce into persistent planet/owner/species state — closing
-> GW-M3.**
+> **Status: implementation underway — GW-WP01–11 shipped; interview decisions
+> resolved (July 2026), and GW-M3 is complete. Next: GW-WP12 (live assault DTO,
+> remote client, and Textual battle), which exposes the authoritative tactical
+> state through the client boundary and adapts the POC battle screen.**
 
 ## Context
 
@@ -1185,26 +1184,54 @@ reducer-level drop/move/fire/jump/extract/replay coverage — and additions to
 `tests/test_codec.py`.
 Commit `ground: GW-WP10 authoritative tactical assault` (fdb1eb9).
 
-### GW-WP11 — Strategic assault settlement and consequences (XL)
+### GW-WP11 — Strategic assault settlement and consequences (XL) — SHIPPED
 
-Settle surrender, retrieval, casualty abort, and wipe under D2/D3/D7/D8.
-Reconcile strategic defenders/attackers, persistent destroyed defenses, Resolve
-recovery, colonists/civilians, citadel downgrade/build progress, treasury,
-stores, ownership/protectorate/access, surviving ground defenders, and loot
-atomically.
+**Status:** shipped July 2026; GW-M3 complete. The new pure
+`edge/core/groundwar/settlement.py` reconciles all POC-derived tactical endings
+(pre-drop abort, retrieval, casualty abort, wipe, and surrender) into one atomic
+strategic result. It reuses the authoritative `AssaultOperation` overlay and
+existing `groundwar.force.apply_casualties`: surviving recruits, suits, and
+unspent committed missiles return to the ship, while dead troopers remove both
+their recruit and suit and defender casualties reduce the finite planetary
+garrison. Destroyed structures persist by kind as rubble, Resolve persists and
+recovers once per daily planet tick, and destroyed civilian buildings reduce
+the original species-keyed population without relabelling its inhabitants.
 
-Reuse and extend existing invasion consequences: alliance standing, species
-attitude and grudges, relation spillover, alignment, experience, corp war,
-bounty/outlawry, and civilian-atrocity penalties. An unaligned inhabited world
-must receive a real species consequence path; the old owner-only invasion did
-not cover it.
+Owned-world surrender reuses and extends the citadel conquest rail: ownership
+flips to the attacking player/corporation, treasury becomes loot, surviving
+ground defenders remain, the citadel downgrades and its gun is silenced, while
+stores and an open citadel build survive. Failed assaults persist casualties,
+damage, and Resolve but never flip control. An unaligned inhabited surrender
+instead retains `owner=none`, its native population/stores/treasury, and creates
+a controller-keyed protectorate. Protectorate administration grants access,
+garrison/supply management, and a config-driven share of daily production in a
+separate ledger; annexation is an explicit logged command gated by minimum age
+and recovered Resolve, then merges the controller share into sovereign stores.
 
-Files: `edge/core/groundwar/settlement.py`, `edge/core/citadels.py`,
-`edge/core/aliens.py`, `edge/core/corp.py`, `edge/core/rules.py`,
-`edge/core/events.py`.
-Tests: conservation and ownership properties; partial defender attrition;
-survivor return; every owner kind; unaligned species; betrayal/permanent grudge;
-civilian harm; failed assault; open citadel build; full siege replay golden.
+The reducer routes ground violence through the existing alliance-standing,
+species attitude/grudge, inter-species spillover, alignment/experience/bounty,
+and corp-war consequence rails. This gives unaligned inhabited worlds the same
+real species response as owned worlds; `never_forgets` / permanent-betrayal
+species form a permanent grudge. Civilian destruction adds an independent
+alignment penalty, while annexation carries a stronger species and alignment
+cost. New settlement/protectorate events and `AnnexProtectorate` round-trip
+through durable and remote codecs; session projections label and authorize
+limited protectorate control without presenting it as sovereign ownership.
+
+**Epoch:** GW-M3's batched `config_version` moves 12→13. The command/event wire
+moves `WIRE_VERSION` 31→32 and refreshes its fingerprint/envelope fixtures.
+
+Files (as shipped): `edge/core/groundwar/settlement.py`,
+`edge/core/groundwar/{assault,access,models}.py`, `edge/core/{models,config,
+citadels,aliens,corp,planets,rules,events}.py`, `edge/engine/cron.py`,
+`edge/server/{session,wire}.py`, `edge/store/codec.py`,
+`config/{default,groundwar_default}.yaml`, and wire fixtures.
+Tests: `tests/test_groundwar_settlement.py` (new, 10 tests including a Hypothesis
+conservation property) plus codec/config coverage — survivor and equipment
+return, partial defender attrition, every former owner kind, unaligned native
+protectorates, permanent grudges, civilian harm, failed assault persistence,
+open citadel builds, annex gates, daily Resolve recovery, and deterministic full
+siege settlement replay. Full suite green: 3176 passed, 80 snapshots; lint clean.
 Commit `ground: GW-WP11 assault settlement + consequence parity` — **GW-M3 done.**
 
 ### GW-WP12 — Live assault DTO, remote client, and Textual battle (XL)

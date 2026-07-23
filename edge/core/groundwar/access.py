@@ -146,8 +146,12 @@ def _friendly(state: UniverseState, player: Player, planet: Planet, config: Game
     unaligned species below amity — is *below friendly* and routes to assault.
     """
     owner = planet.owner
-    if corp.player_owns(state, owner, player.id):
+    if corp.player_controls_planet(state, planet, player.id):
         return True
+    if (planet.protectorate_controller.kind == "corp"
+            and corp.owner_at_war_with_player(
+                state, planet.protectorate_controller, player)):
+        return False
     if owner.kind == "alliance" and owner.ref is not None and owner.ref == player.alliance_id:
         return True
     species = inhabiting_species(state, planet, config)

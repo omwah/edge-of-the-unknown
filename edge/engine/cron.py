@@ -23,7 +23,7 @@ from edge.core.events import (
 )
 from edge.core.citadels import advance_build
 from edge.core.governance import apply_intrigue, flip_core_governor, npc_seizure_ready
-from edge.core.groundwar.assault import apply_militia_recovery
+from edge.core.groundwar.assault import apply_ground_recovery, apply_militia_recovery
 from edge.core.market import (
     clear_filled, desired_stock_frac, hinterland_drift, liquidity_drip, match_orders,
     orders_from_ports,
@@ -235,7 +235,8 @@ def planet_growth(state: UniverseState, config: GameConfig) -> ReduceResult:
         # Automatic ground-garrison militia recovery (GW plan D11, GW-WP09) — unconditional
         # on ownership (an unaligned/native inhabited world regrows its own defenders too),
         # so it runs outside produce()'s owned-only gate rather than inside it.
-        recovered = apply_militia_recovery(produced, config)
+        recovered = apply_ground_recovery(
+            apply_militia_recovery(produced, config), config, state.game.day_number)
         # Advance any open citadel build on the same tick — colonist-days accrue toward
         # completion in proportion to the (already-produced) colony size (§4.2, WP54).
         built, completed = advance_build(recovered, config)

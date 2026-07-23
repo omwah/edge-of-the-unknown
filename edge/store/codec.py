@@ -61,6 +61,8 @@ from edge.core.events import (
     LimpetsRemoved,
     PlanetBanked,
     PlanetInvaded,
+    ProtectorateAnnexed,
+    ProtectorateEstablished,
     ProbeReport,
     ComponentInstalled,
     ComponentKnockedOut,
@@ -80,6 +82,7 @@ from edge.core.events import (
     Event,
     GenesisDeployed,
     GroundAssaultDropped,
+    GroundAssaultSettled,
     GroundBroadcastMade,
     GroundFired,
     GroundJumped,
@@ -182,6 +185,7 @@ from edge.core.rules import (
     SurveyLand,
     SurveyTalk,
     InvadePlanet,
+    AnnexProtectorate,
     JoinAlliance,
     LaunchProbe,
     JoinGame,
@@ -304,6 +308,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
             return "PlanetWithdraw", {"planet_id": command.planet_id, "amount": command.amount}
         case InvadePlanet():
             return "InvadePlanet", {"planet_id": command.planet_id, "fighters": command.fighters}
+        case AnnexProtectorate():
+            return "AnnexProtectorate", {"planet_id": command.planet_id}
         case ReinforceGarrison():
             return "ReinforceGarrison", {
                 "planet_id": command.planet_id, "suit_id": command.suit_id,
@@ -567,6 +573,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
             return PlanetWithdraw(planet_id=payload["planet_id"], amount=payload["amount"])
         case "InvadePlanet":
             return InvadePlanet(planet_id=payload["planet_id"], fighters=payload["fighters"])
+        case "AnnexProtectorate":
+            return AnnexProtectorate(planet_id=payload["planet_id"])
         case "ReinforceGarrison":
             return ReinforceGarrison(
                 planet_id=payload["planet_id"], suit_id=payload["suit_id"],
@@ -867,6 +875,15 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "trooper_count": event.trooper_count,
                 "casualties_on_drop": event.casualties_on_drop,
             }
+        case GroundAssaultSettled():
+            return "GroundAssaultSettled", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "outcome": event.outcome, "control": event.control,
+                "attacker_losses": event.attacker_losses,
+                "defender_losses": event.defender_losses,
+                "civilian_losses": event.civilian_losses,
+                "missiles_spent": event.missiles_spent, "loot": event.loot,
+            }
         case GroundJumped():
             return "GroundJumped", {
                 "player_id": event.player_id, "operation_id": event.operation_id,
@@ -1003,6 +1020,17 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "InvasionRepulsed", {
                 "player_id": event.player_id, "planet_id": event.planet_id,
                 "fighters_lost": event.fighters_lost,
+            }
+        case ProtectorateEstablished():
+            return "ProtectorateEstablished", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "controller_kind": event.controller_kind,
+                "controller_ref": event.controller_ref,
+            }
+        case ProtectorateAnnexed():
+            return "ProtectorateAnnexed", {
+                "player_id": event.player_id, "planet_id": event.planet_id,
+                "owner_kind": event.owner_kind, "owner_ref": event.owner_ref,
             }
         case PlanetBanked():
             return "PlanetBanked", {
@@ -1295,6 +1323,12 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "GroundAssaultDropped":
             return GroundAssaultDropped(payload["player_id"], payload["operation_id"],
                                         payload["trooper_count"], payload["casualties_on_drop"])
+        case "GroundAssaultSettled":
+            return GroundAssaultSettled(
+                payload["player_id"], payload["planet_id"], payload["outcome"],
+                payload["control"], payload["attacker_losses"],
+                payload["defender_losses"], payload["civilian_losses"],
+                payload["missiles_spent"], payload["loot"])
         case "GroundJumped":
             return GroundJumped(payload["player_id"], payload["operation_id"],
                                 payload["actor_id"], payload["x"], payload["y"], payload["hit"])
@@ -1378,6 +1412,14 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "InvasionRepulsed":
             return InvasionRepulsed(payload["player_id"], payload["planet_id"],
                                     payload["fighters_lost"])
+        case "ProtectorateEstablished":
+            return ProtectorateEstablished(
+                payload["player_id"], payload["planet_id"],
+                payload["controller_kind"], payload["controller_ref"])
+        case "ProtectorateAnnexed":
+            return ProtectorateAnnexed(
+                payload["player_id"], payload["planet_id"],
+                payload["owner_kind"], payload["owner_ref"])
         case "PlanetBanked":
             return PlanetBanked(payload["player_id"], payload["planet_id"], payload["kind"],
                                 payload["amount"], payload["balance"])

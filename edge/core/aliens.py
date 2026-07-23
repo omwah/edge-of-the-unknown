@@ -201,6 +201,31 @@ def apply_spillover(
     return attitudes
 
 
+def apply_ground_assault_consequences(
+    player: Player, species: AlienSpecies, sc: SpeciesConfig,
+    roster: RosterConfig | None, config: AliensConfig, day: int,
+    severity: int, *, cause: str,
+) -> Player:
+    """Route planetary violence through the ordinary grudge/spillover rail (GW-WP11).
+
+    ``severity`` is expressed in the same consequence units as ship kills. This
+    deliberately reuses :func:`sour_attitude`, so memoryless peoples forget,
+    ``never_forgets``/permanent-betrayal peoples lock an undying grudge, and every
+    relation spillover uses the one existing matrix implementation.
+    """
+    prior = player.species_attitudes.get(species.roster_id, 0.0)
+    soured = sour_attitude(
+        player, species, sc, config, day, severity, cause=cause)
+    if soured is player or roster is None:
+        return soured
+    delta = soured.species_attitudes.get(species.roster_id, prior) - prior
+    return replace(
+        soured,
+        species_attitudes=apply_spillover(
+            soured, species.roster_id, delta, roster, config),
+    )
+
+
 def npc_stance(
     state: UniverseState, roster: RosterConfig, a_id: str, b_id: str, config: AliensConfig
 ) -> float:
@@ -491,6 +516,12 @@ def base_owner_hostile(state: UniverseState, base: Starbase, player: Player) -> 
     A base defends its planetary system against entrants hostile to its owner. Delegates
     to `owner_hostile` (the same rule the citadel gun uses, WP54).
     """
+    if base.planet_id is not None:
+        planet = state.planets.get(base.planet_id)
+        if (planet is not None and planet.protectorate_controller.is_owned
+                and owner_hostile(
+                    state, planet.protectorate_controller, player)):
+            return True
     return owner_hostile(state, base.owner, player)
 
 

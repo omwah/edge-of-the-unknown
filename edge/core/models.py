@@ -177,6 +177,18 @@ class Planet:
     garrison_infantry: int = 0
     garrison_armor: int = 0
     garrison_allocation: float = 0.0  # colonist-output share diverted to garrison training
+    # Strategic ground-war aftermath (GW-WP11). An unaligned inhabited world retains
+    # owner=none when it surrenders; control is recorded separately so its native polity
+    # and population are not erased. `protectorate_stores` is the controller's configured
+    # production share, distinct from the inhabitants' own stores/treasury.
+    protectorate_controller: Ownership = UNOWNED
+    protectorate_since: int | None = None
+    protectorate_stores: Mapping[Commodity, int] = field(default_factory=dict)
+    # Resolve/destroyed defenses survive extraction. Damage is aggregated by tactical
+    # structure kind because each operation regenerates a fresh deterministic layout.
+    ground_resolve: int | None = None
+    ground_damage: Mapping[str, int] = field(default_factory=dict)
+    ground_last_assault_day: int | None = None
     starbase_id: int | None = None  # WP4 orbital base
     # Asteroid belts only (§4.2, PT-52): the finite body of ore in the field. `ore_reserve` is
     # what is left, `ore_reserve_max` what it was seeded with (the art and the readout show the
