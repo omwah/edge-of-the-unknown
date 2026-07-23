@@ -60,6 +60,20 @@ class EngineState:
     schedule: dict[str, int]
 
 
+@dataclass(frozen=True)
+class StateCheckpoint:
+    """Latest materialized state plus its exact command/maintenance cursors."""
+
+    codec_version: int
+    config_version: int
+    command_seq: int
+    maintenance_seq: int
+    state_hash: str
+    payload_checksum: str
+    payload: bytes
+    created_at: str
+
+
 class Repository(ABC):
     """The persistence seam. A new game writes meta once, then appends commands."""
 
@@ -74,6 +88,9 @@ class Repository(ABC):
 
     @abstractmethod
     def load_commands(self) -> list[RecordedCommand]: ...
+
+    @abstractmethod
+    def load_commands_after(self, seq: int) -> list[RecordedCommand]: ...
 
     @abstractmethod
     def append_event(self, event: Event, tick: int = 0) -> int: ...
@@ -91,10 +108,22 @@ class Repository(ABC):
     def load_maintenance(self) -> list[RecordedMaintenance]: ...
 
     @abstractmethod
+    def load_maintenance_after(self, seq: int) -> list[RecordedMaintenance]: ...
+
+    @abstractmethod
     def save_engine_state(self, tick: int, schedule: dict[str, int]) -> None: ...
 
     @abstractmethod
     def load_engine_state(self) -> EngineState | None: ...
+
+    @abstractmethod
+    def load_checkpoint(self) -> StateCheckpoint | None: ...
+
+    @abstractmethod
+    def save_checkpoint(self, checkpoint: StateCheckpoint) -> None: ...
+
+    @abstractmethod
+    def log_positions(self) -> tuple[int, int]: ...
 
     @abstractmethod
     def close(self) -> None: ...
@@ -157,8 +186,13 @@ class SqliteRepository(Repository):
         return int(cur.lastrowid or 0)
 
     def load_commands(self) -> list[RecordedCommand]:
+        return self.load_commands_after(0)
+
+    def load_commands_after(self, seq: int) -> list[RecordedCommand]:
         rows = self._conn.execute(
-            "SELECT seq, player_id, type, payload FROM command_log ORDER BY seq"
+            "SELECT seq, player_id, type, payload"
+            " FROM command_log WHERE seq > ? ORDER BY seq",
+            (seq,),
         ).fetchall()
         return [
             RecordedCommand(seq=r[0], player_id=r[1], command=codec.decode_command(r[2], json.loads(r[3])))
@@ -201,8 +235,13 @@ class SqliteRepository(Repository):
         return int(cur.lastrowid or 0)
 
     def load_maintenance(self) -> list[RecordedMaintenance]:
+        return self.load_maintenance_after(0)
+
+    def load_maintenance_after(self, seq: int) -> list[RecordedMaintenance]:
         rows = self._conn.execute(
-            "SELECT seq, after_command_seq, cron_name, tick FROM maintenance_log ORDER BY seq"
+            "SELECT seq, after_command_seq, cron_name, tick"
+            " FROM maintenance_log WHERE seq > ? ORDER BY seq",
+            (seq,),
         ).fetchall()
         return [RecordedMaintenance(seq=r[0], after_command_seq=r[1], cron_name=r[2], tick=r[3])
                 for r in rows]
@@ -224,6 +263,53 @@ class SqliteRepository(Repository):
             for name, next_due in self._conn.execute("SELECT name, next_due FROM cron_schedule").fetchall()
         }
         return EngineState(tick=row[0], schedule=schedule)
+
+    def load_checkpoint(self) -> StateCheckpoint | None:
+        row = self._conn.execute(
+            "SELECT codec_version, config_version, command_seq, maintenance_seq,"
+            "       state_hash, payload_checksum, payload, created_at"
+            " FROM state_checkpoint WHERE id = 1"
+        ).fetchone()
+        if row is None:
+            return None
+        return StateCheckpoint(
+            codec_version=int(row[0]),
+            config_version=int(row[1]),
+            command_seq=int(row[2]),
+            maintenance_seq=int(row[3]),
+            state_hash=str(row[4]),
+            payload_checksum=str(row[5]),
+            payload=bytes(row[6]),
+            created_at=str(row[7]),
+        )
+
+    def save_checkpoint(self, checkpoint: StateCheckpoint) -> None:
+        self._conn.execute(
+            "INSERT OR REPLACE INTO state_checkpoint"
+            " (id, codec_version, config_version, command_seq, maintenance_seq,"
+            "  state_hash, payload_checksum, payload, created_at)"
+            " VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                checkpoint.codec_version,
+                checkpoint.config_version,
+                checkpoint.command_seq,
+                checkpoint.maintenance_seq,
+                checkpoint.state_hash,
+                checkpoint.payload_checksum,
+                checkpoint.payload,
+                checkpoint.created_at,
+            ),
+        )
+        self._conn.commit()
+
+    def log_positions(self) -> tuple[int, int]:
+        row = self._conn.execute(
+            "SELECT"
+            " COALESCE((SELECT MAX(seq) FROM command_log), 0),"
+            " COALESCE((SELECT MAX(seq) FROM maintenance_log), 0)"
+        ).fetchone()
+        assert row is not None
+        return int(row[0]), int(row[1])
 
     def close(self) -> None:
         self._conn.close()

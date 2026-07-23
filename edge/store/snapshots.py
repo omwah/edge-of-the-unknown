@@ -25,6 +25,7 @@ from edge.core.models import UniverseState
 from edge.core.rules import ReduceResult, apply_result, reduce
 from edge.store import codec
 from edge.store.repo import RecordedCommand, RecordedMaintenance, Repository
+from edge.store.state_codec import AUTHORITATIVE_STATE_FIELDS
 
 _SAVE_VERSION = 2  # v2 adds the maintenance timeline (WP12)
 
@@ -32,6 +33,7 @@ _SAVE_VERSION = 2  # v2 adds the maintenance timeline (WP12)
 # layer never imports the engine layer — `edge.engine.cron.resolve_cron` is the
 # production resolver passed in by the server's `load_game`.
 CronResolver = Callable[[str], Callable[[UniverseState, GameConfig], ReduceResult]]
+ReplayProgress = Callable[[int, int], None]
 
 
 @dataclass(frozen=True)
@@ -60,24 +62,7 @@ def _canonical(obj: Any) -> Any:
 
 def state_hash(state: UniverseState) -> str:
     """A deterministic fingerprint of the live entity state (RNG/adjacency excluded)."""
-    snapshot = {
-        "game": state.game,
-        "regions": state.regions,
-        "sectors": state.sectors,
-        "ports": state.ports,
-        "planets": state.planets,
-        "starbases": state.starbases,
-        "discoveries": state.discoveries,
-        "ships": state.ships,
-        "players": state.players,
-        "alliances": state.alliances,
-        "corporations": state.corporations,
-        "species": state.species,
-        "grudges": state.grudges,
-        "sector_forces": state.sector_forces,
-        "port_orders": state.port_orders,
-        "notices": state.notices,
-    }
+    snapshot = {name: getattr(state, name) for name in AUTHORITATIVE_STATE_FIELDS}
     blob = json.dumps(_canonical(snapshot), sort_keys=True).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()
 
@@ -85,7 +70,8 @@ def state_hash(state: UniverseState) -> str:
 def rebuild(config: GameConfig, seed: int, commands: list[RecordedCommand], *,
             created_at: str = "1970-01-01T00:00:00Z",
             maintenance: list[RecordedMaintenance] | None = None,
-            cron_resolver: CronResolver | None = None) -> UniverseState:
+            cron_resolver: CronResolver | None = None,
+            progress: ReplayProgress | None = None) -> UniverseState:
     """Regenerate the universe from the seed and replay the merged timeline (§3, WP12).
 
     Player commands and engine-cron firings (`maintenance`) form one total order:
@@ -95,22 +81,58 @@ def rebuild(config: GameConfig, seed: int, commands: list[RecordedCommand], *,
     keeps the `(seed, log)` determinism rail and `state_hash` honest.
     """
     state = generate(config, seed, created_at=created_at)
+    replay_tail(
+        state,
+        config,
+        commands,
+        maintenance=maintenance,
+        cron_resolver=cron_resolver,
+        progress=progress,
+    )
+    return state
+
+
+def replay_tail(
+    state: UniverseState,
+    config: GameConfig,
+    commands: list[RecordedCommand],
+    *,
+    maintenance: list[RecordedMaintenance] | None = None,
+    cron_resolver: CronResolver | None = None,
+    after_command_seq: int = 0,
+    progress: ReplayProgress | None = None,
+) -> None:
+    """Replay a log suffix onto existing state.
+
+    A checkpoint can be written after a command but before one or more cron
+    firings stamped with that command's sequence.  Those maintenance rows are
+    therefore applied before the first command in the suffix.
+    """
     by_after: dict[int, list[RecordedMaintenance]] = defaultdict(list)
     for m in maintenance or []:
         by_after[m.after_command_seq].append(m)
     if by_after and cron_resolver is None:
         raise ValueError("maintenance records require a cron_resolver to replay")
+    total = len(commands) + sum(len(records) for records in by_after.values())
+    completed = 0
 
     def run_maintenance(after_seq: int) -> None:
+        nonlocal completed
         for m in sorted(by_after.get(after_seq, ()), key=lambda r: r.seq):
             assert cron_resolver is not None  # guarded above when by_after is non-empty
             apply_result(state, cron_resolver(m.cron_name)(state, config))
+            completed += 1
+            if progress is not None:
+                progress(completed, total)
 
-    run_maintenance(0)
+    for prior_seq in sorted(seq for seq in by_after if seq <= after_command_seq):
+        run_maintenance(prior_seq)
     for record in commands:
         apply_result(state, reduce(state, record.player_id, record.command, config))
+        completed += 1
+        if progress is not None:
+            progress(completed, total)
         run_maintenance(record.seq)
-    return state
 
 
 def rebuild_from_bundle(config: GameConfig, bundle: SaveBundle, *,
