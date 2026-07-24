@@ -202,18 +202,6 @@ def test_planet_sizes(snap_compare, size: tuple[int, int]) -> None:
 
 
 @pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
-def test_surface_sizes(snap_compare, size: tuple[int, int]) -> None:
-    from edge.tui.dummy import sample_surface
-    from edge.tui.screens.surface import SurfaceScreen
-
-    async def open_surface(pilot: Pilot) -> None:
-        pilot.app.push_screen(SurfaceScreen(sample_surface()))
-        await pilot.pause()
-
-    assert snap_compare(EdgeApp(plain=True), terminal_size=size, run_before=open_surface)
-
-
-@pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
 def test_contact_sizes(snap_compare, size: tuple[int, int]) -> None:
     from dataclasses import replace
 
@@ -309,7 +297,7 @@ def test_dense_screen_themes(snap_compare, theme: str, surface: str) -> None:
 
 
 @pytest.mark.parametrize("theme", ["edge-high-contrast", "edge-monochrome"])
-@pytest.mark.parametrize("surface", ["port", "planet", "surface", "territory", "base"])
+@pytest.mark.parametrize("surface", ["port", "planet", "territory", "base"])
 def test_world_art_screen_themes(snap_compare, theme: str, surface: str) -> None:
     """WP-PR10: alternate-theme baselines for the remaining art-bearing families."""
     async def open_surface(pilot: Pilot) -> None:
@@ -326,10 +314,6 @@ def test_world_art_screen_themes(snap_compare, theme: str, surface: str) -> None
             from edge.tui.dummy import sample_planet
             from edge.tui.screens.planet import PlanetScreen
             screen = PlanetScreen(sample_planet())
-        elif surface == "surface":
-            from edge.tui.dummy import sample_surface
-            from edge.tui.screens.surface import SurfaceScreen
-            screen = SurfaceScreen(sample_surface())
         elif surface == "territory":
             from edge.tui.screens.territory import TerritoryScreen
             ship = service.state.ships[service.state.players[app.player_id].ship_id]

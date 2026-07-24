@@ -37,12 +37,16 @@ FIND_KINDS: dict[str, FindKind] = {
     "beacon": FindKind(
         "beacon", "Precursor Beacon",
         "A machine that has waited a long time. It is still warm.", "spring_green2"),
+    "hulk": FindKind(
+        "hulk", "Derelict Hulk",
+        "A hull split open on impact, its systems long since gone dark.", "grey62"),
 }
 
 _VARIANTS: dict[DiscoveryKind, tuple[str, ...]] = {
     DiscoveryKind.RUINS: ("colonnade", "obelisk", "leviathan"),
     DiscoveryKind.ARTIFACT: ("cache", "obelisk", "leviathan"),
     DiscoveryKind.ANCIENT_TECH: ("beacon",),
+    DiscoveryKind.CRASHED_SHIP: ("hulk",),
 }
 
 _ADJ = ("Sunken", "Silent", "Broken", "Painted", "First", "Sleeping", "Veiled",
@@ -53,6 +57,7 @@ _NOUN = {
     "obelisk": ("Obelisk", "Needle", "Standing Stone"),
     "leviathan": ("Leviathan", "Titan", "Great Bones"),
     "beacon": ("Beacon", "Signal", "Waking Engine"),
+    "hulk": ("Hulk", "Wreck", "Derelict"),
 }
 _SYL_A = ("Ves", "Kor", "Ana", "Thel", "Ur", "Mira", "Osh", "Cael", "Dun", "Ilo")
 _SYL_B = ("sara", "eth", "ione", "gart", "ume", "adin", "ka", "or", "eshi", "van")

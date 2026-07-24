@@ -53,7 +53,6 @@ ui:
   nav_core_anchor_side: left # which edge the nav rose's Core anchor pins to: left | right (fixed, never jumps sides)
   sidebar_width: 33          # status sidebar fixed character width (content is fixed-width)
   sidebar_min_screen_width: 90  # hide the sidebar when the terminal is narrower than this
-  surface_terrain_height: 15 # SurfaceScreen terrain-panel height (rows, incl. border)
   local_map_radius: 3        # Computer/Map ego-graph reach in warp hops from your sector
   portrait_dir: images/species       # species portrait dir (abs, or repo-root-relative); supports <id>_<n> variants
   portrait_symbols: vhalf+quad+geometric  # chafa --symbols selector for alien contact portraits
@@ -461,8 +460,6 @@ discovery:
   component_pool: [accelerator, converter, radiator, secondary, turbine, burner, linkage, navigator]  # parts a find may drop
   salvage_turn_cost: 2            # turns to salvage a wreck
   scan_turn_cost: 1              # turns to run a sensor scan of the current sector
-  descent_turn_cost: 3            # turns to land on a planet surface (WP6)
-  explore_turn_cost: 1            # turns to reveal one surface site (WP6)
   surface_hidden_min_rank: 3      # surface sites of this rarity rank and up need a sensor sweep to reveal
   black_hole_gravity_warp: false  # Phase-3 hazard seam (black holes fling you off-course); inert in Phase 2
   black_hole_warp_turn_cost: 5    # extra turns a black-hole gravity warp will cost once that hazard is live

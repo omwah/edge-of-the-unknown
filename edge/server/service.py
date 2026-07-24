@@ -373,10 +373,6 @@ class GameService:
             selected_actor_id=selected_actor_id,
         )
 
-    def surface_view(self, player_id: int, planet_id: int) -> dto.SurfaceDTO:
-        """The descended-planet surface view: terrain + sites (§7, WP6)."""
-        return session.surface_view(self._state, player_id, planet_id, self._config)
-
     def contact_view(self, player_id: int, species_id: int,
                      active_context: str = "greeting",
                      active_subject: int | None = None) -> dto.ContactDTO:

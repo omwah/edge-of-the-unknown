@@ -35,7 +35,7 @@ from edge.core.planets import (
     is_landable,
     normalize_belt,
 )
-from edge.core.rules import Descend, DeployGenesis, Explore, MineBelt, apply_result, reduce
+from edge.core.rules import DeployGenesis, MineBelt, apply_result, reduce
 from edge.server.session import planet_view
 
 CFG = load_default_config()
@@ -109,18 +109,6 @@ def _state_with_belt() -> UniverseState:
     return state
 
 
-def test_descend_rejected_on_belt() -> None:
-    state = _state_with_belt()
-    with pytest.raises(EconomyError, match="no surface"):
-        reduce(state, 1, Descend(planet_id=1), CFG)
-
-
-def test_explore_rejected_on_belt() -> None:
-    state = _state_with_belt()
-    with pytest.raises(EconomyError, match="no surface"):
-        reduce(state, 1, Explore(planet_id=1), CFG)
-
-
 def test_genesis_rejected_on_belt() -> None:
     state = _state_with_belt()
     genesis = CFG.genesis
@@ -129,14 +117,6 @@ def test_genesis_rejected_on_belt() -> None:
     state.ships[1] = replace(ship, devices={genesis.device_id: 1})  # torpedo aboard
     with pytest.raises(EconomyError, match="cannot be re-formed by genesis"):
         reduce(state, 1, DeployGenesis(planet_id=1), CFG)
-
-
-def test_descend_still_works_on_a_terrestrial() -> None:
-    state = _state_with_belt()
-    state.planets[1] = replace(state.planets[1], planet_type="terrestrial_warm")
-    result = reduce(state, 1, Descend(planet_id=1), CFG)  # no raise
-    apply_result(state, result)
-    assert state.players[1].turns_remaining < 100  # a turn was spent landing
 
 
 # --- projection capabilities --------------------------------------------------

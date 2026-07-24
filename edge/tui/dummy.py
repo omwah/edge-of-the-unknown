@@ -36,8 +36,6 @@ from edge.core.dto import (
     ShipDTO,
     Slot,
     Subsystem,
-    SurfaceDTO,
-    SurfaceSite,
     TradePair,
     TrailCrumb,
     WarpDTO,
@@ -48,10 +46,10 @@ __all__ = [
     "Aspect", "CommodityLine", "ComputerDTO", "EngineRoomDTO", "GameState",
     "Hold", "LocalMapDTO", "LogEntry", "MessagesDTO", "NavStripDTO",
     "PlanetDTO", "PortDTO", "SectorDTO", "SectorPlanetDTO", "SectorPortDTO",
-    "SectorShipDTO", "ShipDTO", "Slot", "Subsystem", "SurfaceDTO",
-    "SurfaceSite", "TradePair", "WarpDTO", "dto",
+    "SectorShipDTO", "ShipDTO", "Slot", "Subsystem",
+    "TradePair", "WarpDTO", "dto",
     "EnemyShip", "EncounterDTO",
-    "sample_planet", "sample_state", "sample_port", "sample_surface",
+    "sample_planet", "sample_state", "sample_port",
     "sample_map", "sample_engine_room", "sample_computer", "sample_contact",
     "sample_encounter", "sample_encounter_view", "sample_messages",
     "sample_stardock_port",
@@ -175,41 +173,6 @@ def sample_port() -> PortDTO:
             CommodityLine("Equipment", "BUY", 580, 1000, 14, 15, 8),
         ],
         display_id=3,
-    )
-
-
-def sample_surface() -> SurfaceDTO:
-    """The Terra Nova descent scene from UI_MOCKUPS.md §4.
-
-    Terrain is produced by the live `edge.server.terrain` generator so the
-    screenshot harness shows exactly the procedural art the service emits.
-    """
-    from edge.server import terrain as terrain_art
-
-    sites = [
-        SurfaceSite(
-            "[1]", "Ruined Spire", "Rare", "unexplored",
-            payload=["[red]ancient_tech ?[/]", "lore fragment"], discovery_id=1,
-        ),
-        SurfaceSite(
-            "[2]", "Crashed Ship", "Uncommon", "explored",
-            payload=["ancient drive", "salvage cache"], discovery_id=2,
-            salvageable=True, kind="shipwreck",
-        ),
-        SurfaceSite(
-            "[?]", "(hidden)", "?", "unexplored", discovery_id=3,
-        ),
-    ]
-    return SurfaceDTO(
-        planet="Terra Nova",
-        descent_fuel="n/a",
-        terrain=terrain_art.render_terrain(
-            "terrestrial_warm", sites, seed=1986, planet_id=1,
-        ),
-        sites=sites,
-        explorable=True,
-        terrain_blurb=terrain_art.blurb_for("terrestrial_warm"),
-        ptype="terrestrial_warm",
     )
 
 

@@ -95,7 +95,6 @@ class GameClient(Protocol):
         viewport_width: int | None = ..., viewport_height: int | None = ...,
         selected_actor_id: int | None = ...,
     ) -> dto.SurveyExpeditionDTO | dto.AssaultExpeditionDTO | None: ...
-    async def surface_view(self, planet_id: int) -> dto.SurfaceDTO: ...
     async def contact_view(self, species_id: int, active_context: str = ...,
                            active_subject: int | None = ...) -> dto.ContactDTO: ...
     async def species_in_sector(self) -> int | None: ...
@@ -245,9 +244,6 @@ class LocalClient:
             viewport_width=viewport_width, viewport_height=viewport_height,
             selected_actor_id=selected_actor_id,
         )
-
-    async def surface_view(self, planet_id: int) -> dto.SurfaceDTO:
-        return self._service.surface_view(self.player_id, planet_id)
 
     async def contact_view(self, species_id: int, active_context: str = "greeting",
                            active_subject: int | None = None) -> dto.ContactDTO:
@@ -588,9 +584,6 @@ class RemoteClient:
         if selected_actor_id is not None:
             params["selected_actor_id"] = selected_actor_id
         return await self._read("ground_operation_view", **params)
-
-    async def surface_view(self, planet_id: int) -> dto.SurfaceDTO:
-        return await self._read("surface_view", planet_id=planet_id)
 
     async def contact_view(self, species_id: int, active_context: str = "greeting",
                            active_subject: int | None = None) -> dto.ContactDTO:

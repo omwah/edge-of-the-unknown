@@ -25,9 +25,8 @@ from edge.core.models import (
     Ship,
     UniverseState,
 )
-from edge.core.combat import CombatError
 from edge.core.rules import (
-    BuildCitadel, InvadePlanet, PlanetDeposit, PlanetWithdraw, SetAllocation, apply_result, reduce,
+    BuildCitadel, PlanetDeposit, PlanetWithdraw, SetAllocation, apply_result, reduce,
 )
 from edge.engine.cron import planet_growth
 
@@ -157,65 +156,6 @@ def test_owner_only_gating() -> None:
     state.planets[1] = replace(state.planets[1], owner=Ownership("alliance", 2))
     with pytest.raises(EconomyError):
         reduce(state, 1, BuildCitadel(1), CFG)
-
-
-# --- WP55: planetary siege + conquest ----------------------------------------
-
-
-def _enemy_world(*, fighters: int = 100, level: int = 0, gun: int = 0) -> UniverseState:
-    """An alliance-owned world in the player's sector, ready to invade (no base)."""
-    state = UniverseState.new(Game(1, 1, CFG.config_version, "t"))
-    state.sectors = {1: Sector(1, 1, (), "Frontier")}
-    state.rebuild_adjacency()
-    state.alliances = {}
-    state.planets = {
-        1: Planet(1, 1, "Redoubt", "terrestrial_warm", owner=Ownership("alliance", 2),
-                  population={"terran": 1000}, habitability_cap=100_000, citadel_level=level,
-                  fighters=fighters, gun_integrity=gun),
-    }
-    state.ships = {1: Ship(id=1, type_id="trailblazer", name="S.S.", owner_player_id=1,
-                           sector_id=1, holds_total=60, turns_per_warp=1, fighters=500)}
-    state.players = {1: Player(id=1, name="you", ship_id=1, latinum=0, turns_remaining=250,
-                               alignment=0)}
-    return state
-
-
-def test_invasion_commits_fighters_and_flips_ownership_on_victory() -> None:
-    state = _enemy_world(fighters=10)  # a token garrison — the attacker should win
-    before = state.ships[1].fighters
-    apply_result(state, reduce(state, 1, InvadePlanet(1, 300), CFG))
-    planet = state.planets[1]
-    assert planet.owner == Ownership("player", 1)  # flipped
-    assert state.ships[1].fighters == before - 300  # committed fighters left the ship
-    assert planet.gun_integrity == 0
-    assert state.players[1].alliance_standing.get(2) == -1.0  # bloc soured
-
-
-def test_invasion_ladder_rejects_until_gun_is_down() -> None:
-    # A live citadel gun bars a ground assault.
-    state = _enemy_world(fighters=10, level=2, gun=CFG.citadels.gun_hull)  # type: ignore[union-attr]
-    with pytest.raises(CombatError):
-        reduce(state, 1, InvadePlanet(1, 300), CFG)
-    # With the gun silenced (integrity 0) the assault is legal.
-    state.planets[1] = replace(state.planets[1], gun_integrity=0)
-    reduce(state, 1, InvadePlanet(1, 300), CFG)  # no raise
-
-
-def test_invasion_fighters_never_minted_and_repulse_costs_them() -> None:
-    # An overwhelming garrison repulses a token assault; committed fighters die.
-    state = _enemy_world(fighters=100_000)
-    before_ship = state.ships[1].fighters
-    apply_result(state, reduce(state, 1, InvadePlanet(1, 5), CFG))
-    assert state.ships[1].fighters == before_ship - 5  # the 5 committed are gone
-    assert state.planets[1].owner == Ownership("alliance", 2)  # not taken
-    assert state.players[1].alignment < 0  # alignment hit on the failed assault
-
-
-def test_cannot_invade_a_core_world() -> None:
-    state = _enemy_world(fighters=10)
-    state.sectors = {1: replace(state.sectors[1], is_galactic_core=True)}
-    with pytest.raises(CombatError):
-        reduce(state, 1, InvadePlanet(1, 300), CFG)
 
 
 def test_set_allocation_with_fighter_share_normalizes_to_one() -> None:

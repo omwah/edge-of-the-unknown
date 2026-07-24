@@ -64,7 +64,7 @@ canonical **sector display** and **port (CIM)** text format right.
 - **Break Into Chat — TW2002** (screenshots): <https://breakintochat.com/wiki/TradeWars_2002>
   - Title screen — `https://breakintochat.com/w/images/7/72/Tradewars-2002-title-1.png` → **MainMenu**
   - Stardock docking — `https://breakintochat.com/w/images/5/50/Tradewars-2002-stardock.png` → **StardockScreen**
-  - Planet landing (Terra) — `https://breakintochat.com/w/images/6/6e/Tradewars-2002-terra.png` → **PlanetScreen / SurfaceScreen**
+  - Planet landing (Terra) — `https://breakintochat.com/w/images/6/6e/Tradewars-2002-terra.png` → **PlanetScreen / GroundExpeditionScreen**
   - Stardock in the TWTerm helper — `https://breakintochat.com/w/images/e/ef/Twterm-stardock.png` → **ComputerScreen** (the community helper overlays we're absorbing as first-class)
   - Alien derelict art — `https://breakintochat.com/w/images/c/c7/AlienDerelict1.gif` → discovery flavor
 - **MobyGames screenshots**: <https://www.mobygames.com/game/3340/trade-wars-2002/screenshots/>
@@ -146,7 +146,7 @@ What the `UI_UX_OVERHAUL_PLAN.md` work leans on beyond the original board:
 | MainMenu | TW2002 title (2); terminal-space MenuDialog + starfield (1) |
 | Game | terminal-space scene + StatFrame (1); TW2002 sector display (2); Dolphie bars, Toolong ticker (3) |
 | PortScreen | terminal-space port table (1); TW2002 port/CIM (2); Harlequin DataTable (3) |
-| PlanetScreen / SurfaceScreen | TW2002 Terra landing (2) |
+| PlanetScreen / GroundExpeditionScreen | TW2002 Terra landing (2) |
 | StardockScreen | TW2002 stardock (2); Posting tabs (3) |
 | AlienContactScreen | (new ground — §6.7; lean on Posting panels + dialogue layout) |
 | EncounterScreen | terminal-space battle scene `tspace/client/scene/battle.py` (1) |

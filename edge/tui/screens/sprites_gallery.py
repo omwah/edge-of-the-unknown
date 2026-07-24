@@ -3,9 +3,11 @@
 A dev/review screen (not part of the player flow) reachable by a hidden key on the
 Main Menu. It sweeps the standalone `edge.art` engine (via `edge.tui.art_adapter`)
 and lays out one card per subtype for each entity kind — planets, ports, ships,
-terrain — plus the hand-drawn engine-room subsystem icons (the one kind the art
-engine doesn't generate). Art cards render the engine's own colours verbatim;
-only the subsystem icons are tinted.
+discoveries, terrain — plus two kinds the `edge.art` engine doesn't generate: the
+hand-drawn engine-room subsystem icons, and the GroundWar expedition field-sketch
+art (`edge.groundwar.findart`) used for archaeological finds on a planet descent.
+Art cards render the engine's own colours verbatim; only the subsystem icons are
+tinted.
 
 These are static *presentation* assets, not game state, so this screen talks to the
 art layer directly; no service boundary is crossed.
@@ -22,6 +24,8 @@ from edge.tui.chrome import EdgeScreen
 from textual.widgets import Footer, Static, TabbedContent, TabPane
 
 from edge.art.generator import available_subtypes
+from edge.core.surface_finds import FIND_KINDS
+from edge.groundwar.findart import generate_find_art
 from edge.tui import art_adapter, sprites
 
 _GALLERY_SEED = 7  # fixed so the gallery is reproducible across runs
@@ -96,6 +100,13 @@ class SpriteGalleryScreen(EdgeScreen):
                             spr = art_adapter.sprite(
                                 entity, subtype, seed=_GALLERY_SEED, width=sw, height=sh)
                             yield _SpriteCard(spr, subtype)
+            with TabPane("Field Finds", id="field_finds"):
+                grid = Grid(classes="section-grid")
+                grid.styles.grid_size_columns = 2
+                with grid:
+                    for key in FIND_KINDS:
+                        art = generate_find_art(key, _GALLERY_SEED)
+                        yield _SpriteCard(art, key)
             with TabPane("Subsystems", id="subsystems"):
                 grid = Grid(classes="section-grid")
                 grid.styles.grid_size_columns = 4

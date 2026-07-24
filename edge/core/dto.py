@@ -60,39 +60,6 @@ class PortDTO:
 
 
 @dataclass(frozen=True)
-class SurfaceSite:
-    """A surface-exploration site on a descended planet (UI_MOCKUPS.md §4, §7).
-
-    `status` is "unexplored" / "explored" / "logged"; a still-hidden unexplored site
-    is masked ("[?]" / "(unsurveyed)") until a sensor sweep reveals it. `salvageable`
-    means it's revealed and uncollected, so `Salvage(discovery_id)` can log it.
-    """
-
-    marker: str  # "[1]" by slot, or "[?]" for an unsurveyed hidden site
-    name: str
-    rarity: str  # "Rare" … or "?" while masked
-    status: str  # "unexplored" | "explored" | "logged"
-    payload: list[str] = field(default_factory=list)  # detail lines (markup ok)
-    discovery_id: int = 0
-    salvageable: bool = False
-    kind: str = ""  # DiscoveryKind value for entity art; "" while masked (fog of war)
-
-
-@dataclass(frozen=True)
-class SurfaceDTO:
-    """The descended-planet view: terrain + the planet's surface sites (§7, WP6)."""
-
-    planet: str
-    descent_fuel: str  # "n/a" (movement costs turns, not fuel)
-    terrain: list[str]  # top-down ASCII map rows (markup ok)
-    sites: list[SurfaceSite] = field(default_factory=list)
-    planet_id: int = 0
-    explorable: bool = False  # at least one site can still be revealed (drives [E])
-    terrain_blurb: str = ""  # planet-type flavor caption for the terrain panel title
-    ptype: str = ""  # planet_type, so the TUI can render the art-engine terrain backdrop
-
-
-@dataclass(frozen=True)
 class GroundCellDTO:
     """One server-projected cell in a survey viewport (GW-WP07).
 
@@ -1234,9 +1201,6 @@ class PlanetDTO:
     can_build_citadel: bool = False  # owner + next level exists (the affordance shows)
     citadel_next_cost: tuple[int, int] | None = None  # (equipment, latinum) for the next level
     fighter_allocation_pct: int = 0  # garrison production share, percent (WP55)
-    can_invade: bool = False  # a hostile owned world with defences down + fighters aboard (WP55)
-    invade_blocker: str = ""  # why invasion is barred (base up / gun up / shield / no fighters)
-    ship_fighters: int = 0  # fighters aboard, for the invade affordance
     # Capabilities keyed by planet type (§4.2, WP-PR06): a belt is a spatial feature —
     # not `landable` (no descent/surface), `extractable` in orbit instead. `colonizable`
     # (above) also gates colony stores/citadel/banking/invasion, so the TUI never infers

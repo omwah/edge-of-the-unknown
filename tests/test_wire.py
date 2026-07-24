@@ -73,7 +73,6 @@ def _live_dtos() -> dict[str, Any]:
         _collect_dtos(view, seen)
     for planet in svc.state.planets.values():
         _collect_dtos(svc.planet_view(1, planet.id), seen)
-        _collect_dtos(svc.surface_view(1, planet.id), seen)
     for port in svc.state.ports.values():
         _collect_dtos(svc.port_view(1, port.id), seen)
     return seen

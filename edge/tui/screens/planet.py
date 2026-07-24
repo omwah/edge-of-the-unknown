@@ -26,7 +26,6 @@ from textual.message import Message
 from textual.widgets import Button, DataTable, Footer, Static
 
 from edge.core.citadels import CitadelError
-from edge.core.combat import CombatError
 from edge.core.economy import EconomyError
 from edge.core.dto import PlanetDTO
 from edge.core.groundwar.force import GroundForceError
@@ -34,7 +33,7 @@ from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import (
     BeginAssault, BeginSurvey, BuildCitadel, BuildStagingArea, Colonize, DeployGenesis,
-    InvadePlanet, MineBelt, PlanetDeposit, PlanetWithdraw, ReinforceGarrison,
+    MineBelt, PlanetDeposit, PlanetWithdraw, ReinforceGarrison,
 )
 from edge.server.service import GameService
 from edge.tui.chrome import EdgeScreen, notify_warning
@@ -42,14 +41,7 @@ from edge.tui import art_adapter
 from edge.tui.screens.amount import AmountPrompt
 from edge.tui.screens.confirm import ConfirmScreen
 from edge.tui.screens.picker import ListPicker
-from edge.tui.dummy import sample_surface
-from edge.tui.screens.surface import SurfaceScreen
 from edge.tui.widgets import ClickableEntry
-
-
-# How much one −/+ press moves the invasion wing. Wings run to the hundreds, so stepping by one
-# would be useless; the exact figure is still typeable, and `[A]` commits the lot.
-_INVADE_STEP = 10
 
 # Citadel art, one structure per development stage (§4.2, WP54): an unbuilt survey
 # site, construction scaffolding, the L1 treasury keep, the L2 keep + planetary gun,
@@ -114,7 +106,6 @@ class PlanetScreen(EdgeScreen):
         Binding("s", "build_city", "Build cloud city"),
         Binding("plus", "treasury_deposit", "Deposit"),
         Binding("minus", "treasury_withdraw", "Withdraw"),
-        Binding("i", "invade", "Invade"),
         Binding("r", "reinforce", "Reinforce garrison"),
         # `P` boards the base here too, as it does on the sector view — the verb keeps
         # one key everywhere (a base *is* the port where it orbits, §4.2/WP80).
@@ -123,7 +114,7 @@ class PlanetScreen(EdgeScreen):
         Binding("l", "load_cargo", "Load cargo"),
     ]
     # WP-UI06: both irreversibly commit troops / re-form the world — confirmed.
-    ACTION_DANGER = {"invade": "destructive", "genesis": "destructive", "reinforce": "destructive"}
+    ACTION_DANGER = {"genesis": "destructive", "reinforce": "destructive"}
 
     HELP_TITLE = "Planet orbit"
     HELP = """\
@@ -137,8 +128,6 @@ The Stores and Citadel panels are button-driven ([b]Tab[/] walks the buttons,
 stores and to settle colonists onto the colony; start builds and move the treasury
 from the citadel panel. Citadel builds draw equipment from [i]stores[/], so supply
 runs in trips are the intended loop; the citadel art grows with its level.
-[b]I[/] invades a hostile world once its defences are down, and asks how many of your
-fighters to land ([b]A[/] commits them all) — troops you hold back stay aboard.
 [b]R[/] reinforces an owned world's persistent ground garrison, converting carried
 recruits and suits — irreversible, unlike fighters, they never come back as troops.
 A gas giant has no ground: it holds nothing and nobody until [b]S[/] builds a
@@ -206,12 +195,6 @@ claims the world). Building again grows the city, and a bigger city berths more 
                                        or p.can_reinforce_garrison
                                        or p.garrison_infantry or p.garrison_armor):
                     yield self._citadel_panel(p)
-                if p.can_invade:
-                    yield Static(f"[red]\\[I] Invade[/] — land some or all of your "
-                                 f"{p.ship_fighters:,} fighters against the garrison "
-                                 f"({p.fighters:,}).", classes="section")
-                elif p.invade_blocker:
-                    yield Static(f"[dim]Invasion barred: {p.invade_blocker}.[/]", classes="section")
                 if p.starbase:
                     colour = "yellow" if p.starbase_derelict else "green"
                     yield ClickableEntry(
@@ -536,47 +519,14 @@ claims the world). Building again grows the city, and a bigger city berths more 
         self.app.push_screen(PlanetScreen(
             self._service.planet_view(self._pid, self._planet.planet_id), self._service, self._pid))
 
-    def action_invade(self) -> None:
-        """Land a chosen number of carried fighters in a ground assault (§4.2, WP55).
-
-        The reducer has always taken an amount; the screen used to commit the whole wing, so a
-        failed assault cost every fighter aboard (PT-53). The prompt defaults to all — the
-        common case — but you may hold a reserve back, clamped to `1..ship_fighters`.
-        """
-        if self._service is None:
-            self.action_noop()
-            return
-        service = self._service
-        p = self._planet
-        if not p.can_invade:
-            self.notify(p.invade_blocker or "Nothing to invade here.", timeout=2)
-            return
-
-        def _go(fighters: int | None) -> None:
-            if not fighters:
-                return
-            try:
-                service.apply(self._pid, InvadePlanet(p.planet_id, fighters))
-            except (EconomyError, CombatError, CitadelError) as exc:
-                notify_warning(self, str(exc))
-                return
-            self._reopen()
-
-        self.app.push_screen(AmountPrompt(
-            f"Invade {p.name}?\n"
-            f"Garrison {p.fighters:,} · you carry {p.ship_fighters:,} fighters.\n"
-            "How many do you land? Committed troops do not come back.",
-            maximum=p.ship_fighters, step=_INVADE_STEP, commit_label="Invade",
-            dangerous=True), _go)
-
     def action_reinforce(self) -> None:
         """Station carried recruits + suits as persistent ground defenders (D15, GW-WP09).
 
         Irreversible — stationed troopers are folded into a typed headcount, not
         returned as individuals. Picks a suit class first (when more than one is
         aboard, via the shared `ListPicker`), then how many via `AmountPrompt` —
-        mirroring `action_invade`'s single-prompt shape, just preceded by a class
-        choice since a reinforcement names a suit id the invasion command does not.
+        a single-prompt shape preceded by a class choice since a reinforcement
+        names a suit id.
         """
         if self._service is None:
             self.action_noop()
@@ -711,7 +661,7 @@ claims the world). Building again grows the city, and a bigger city berths more 
 
     async def action_descend(self) -> None:
         if self._service is None:
-            self.app.push_screen(SurfaceScreen(sample_surface()))  # screenshot harness
+            self.action_noop()  # screenshot harness
             return
         p = self._planet
         if p.ground_mode == "orbital_only":
