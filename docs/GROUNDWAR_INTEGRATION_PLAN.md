@@ -1461,10 +1461,43 @@ behavior and needed updating for the "hulk" mapping. `docs/ui/shots/surface.svg`
 and its five snapshot baselines deleted; `test_planet_sizes[wide]`'s baseline
 regenerated (the `[I] Invade` footer entry is gone from the wide-tier render).
 `test_options_modal` remains failing — confirmed pre-existing on a clean stash
-(unrelated to this WP, not chased). Full suite green otherwise. The
-`edge-groundwar` POC retarget (the "mutable duplicate production rules" bullet)
-lands as its own follow-up pass in the same session — see the commit that closes
-GW-M4.
+(unrelated to this WP, not chased). Full suite green otherwise.
+
+**POC retarget shipped in the same session** (`ground: GW-WP14 retarget groundwar
+POC onto production rules`, closing GW-M4). Deleted the standalone-only engine
+outright — `edge/groundwar/rules.py`, `model.py`, `mapgen.py`, `expedition.py`,
+`expedition_ui.py` — rather than porting it to a DTO-driven render layer as
+originally scoped: `GroundAssaultScreen`/`GroundExpeditionScreen` turned out to have
+no `EdgeApp`-specific dependencies (just `self.app.push_screen`/`pop_screen`/
+`notify`, which any Textual `App` provides), so `GroundwarApp` now **subclasses
+`EdgeApp`** directly (`edge/tui/app.py` gained one small seam for this,
+`_initial_screen()`, so a subclass can push a different first screen than
+`MainMenuScreen` without duplicating `on_mount`'s theme/ticker setup) and
+`SetupScreen` hands off to the *actual* production screens instead of reimplementing
+their rendering. New `edge/groundwar/harness.py` builds a throwaway single-sector,
+single-planet `UniverseState` (mirroring `tests/test_groundwar_access.py`'s
+`_state`/`_planet` pattern) — an assault builder that sizes a droppable below-
+friendly world via `edge.core.groundwar.assault.seed_garrison` and pre-loads the
+ship's `recruits`/`suits` from the composed loadout, and a survey builder that
+salts real `Discovery` records onto an owned/unowned world (survey sites must each
+name a real discovery id, G6 — a bare planet has nothing to find). `SetupScreen`
+builds a harness state, constructs a throwaway `GameService`/`SqliteRepository
+(":memory:")`/`LocalClient`, dispatches `BeginAssault`/`BeginSurvey`, and pushes
+`GroundAssaultScreen`/`GroundExpeditionScreen` — the identical screens
+`PlanetScreen.action_descend` pushes in the live game. The standalone-only
+`GwDifficulty`/`config.groundwar.difficulties` preset table (already documented as
+"superseded by live state in production") was retired alongside it — the setup
+screen's difficulty picker now feeds `habitability_cap`/`citadel_level` presets
+straight into the same live-state derivation
+(`edge.core.groundwar.assault.derive_difficulty`) production itself uses, rather
+than a parallel table nothing else read. Verified end-to-end via a Textual `Pilot`
+harness (drop a composed platoon → land on `GroundAssaultScreen`; land on a friendly
+world → arrive on `GroundExpeditionScreen`; `?` help and Esc-back-with-confirm both
+route correctly) plus the full `tests/test_groundwar_*.py` suite (200 passed,
+unaffected — it already exercised production rules directly, never the POC's own
+engine) and the full quality suite. `edge/groundwar/findart.py`/`widgets.py`
+untouched throughout (confirmed live production dependencies). `docs/
+GROUNDWAR_POC.md` rewritten to describe the retargeted shape.
 
 ### GW-WP15 — Cloud City station-interior terrain and art (L)
 

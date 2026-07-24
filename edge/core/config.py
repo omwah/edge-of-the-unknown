@@ -1962,9 +1962,10 @@ class GwGarrisonEconomy(BaseModel):
 
 
 class GwAssaultDifficulty(BaseModel):
-    """Live-state assault difficulty derivation (GW-WP09), superseding `GwDifficulty`
-    for production. `GwDifficulty` stays as-is for the standalone `edge.groundwar` app;
-    this block is read only by `edge.core.groundwar.assault.derive_difficulty`.
+    """Live-state assault difficulty derivation (GW-WP09). The standalone-only
+    `GwDifficulty` preset table it once existed alongside was retired in GW-WP14, when
+    the `edge.groundwar` app was retargeted onto this same live-state derivation; this
+    block is read only by `edge.core.groundwar.assault.derive_difficulty`.
     """
 
     model_config = _FROZEN
@@ -2007,18 +2008,6 @@ class GwSettlement(BaseModel):
     defenders_per_consequence: int = Field(default=10, gt=0)
 
 
-class GwDifficulty(BaseModel):
-    """A standalone setup-screen difficulty preset (superseded by live state in production)."""
-
-    model_config = _FROZEN
-
-    label: str
-    cities: int = Field(gt=0)
-    citadel_level: int = Field(ge=0)
-    surrender_threshold: int
-    garrison_mult: float = Field(gt=0.0)  # a conversion ratio — must be nonzero
-
-
 class GwBattlefield(BaseModel):
     """Assault battlefield dimensions."""
 
@@ -2059,7 +2048,6 @@ class GroundwarConfig(BaseModel):
     terrain: dict[str, GwTerrain]
     expedition: GwExpedition
     ground_force: GwGroundForce = GwGroundForce()
-    difficulties: dict[str, GwDifficulty] = Field(default_factory=dict)
     garrison_economy: GwGarrisonEconomy = GwGarrisonEconomy()
     assault_difficulty: GwAssaultDifficulty = GwAssaultDifficulty()
     settlement: GwSettlement = GwSettlement()

@@ -1,12 +1,20 @@
 # Ground-war prototype and production source (`edge-groundwar`)
 
 A standalone, Starship-Troopers-inspired turn-based tactical game built from Edge
-of the Unknown parts. The prototype has been **adopted** as the mechanical and
-visual source for the production ground-operation system specified in
-`DESIGN.md` §§3–4.2, 7, 10–11, 13–14 and
-`GROUNDWAR_INTEGRATION_PLAN.md`. It is not yet wired to live universe state: the
-existing entry point remains a deterministic playtest and balance harness while
-the GW work packages move its pure mechanics into `edge/core/groundwar/`.
+of the Unknown parts. The prototype's mechanics and look were **adopted** as the
+source for the production ground-operation system specified in `DESIGN.md`
+§§3–4.2, 7, 10–11, 13–14 and `GROUNDWAR_INTEGRATION_PLAN.md` (GW-WP01–13), reached
+in the live game from `PlanetScreen.action_descend` and rendered by
+`edge.tui.screens.ground_assault`/`ground_expedition`.
+
+**GW-WP14 retired the prototype's own duplicate engine and retargeted this app onto
+those same production rules and screens.** `edge-groundwar` is no longer a separate
+implementation to keep in sync — it is a lightweight playtest entry point: its
+`SetupScreen` builds a throwaway single-planet `GameService`
+(`edge.groundwar.harness`), dispatches `BeginAssault`/`BeginSurvey` into it, and
+hands off entirely to the production `GroundAssaultScreen`/`GroundExpeditionScreen`.
+`findart.py` and `widgets.py` remain live production dependencies despite living
+under this nominally-POC package.
 
 Run it: `edge-groundwar` (or `python -m edge.groundwar`).
 
@@ -41,19 +49,28 @@ hardens), as does losing troopers.
 - IGOUGO turns; seeded generator + setup menu (planet type / difficulty / seed);
   modest FX (cell flashes + combat log).
 
-## Current prototype layout
+## Current layout
 
-- `config/groundwar_default.yaml` — every balance constant.
-- `edge/groundwar/config.py` — typed loader.
-- `edge/groundwar/model.py` — battle-state dataclasses (UI reads, never writes).
-- `edge/groundwar/mapgen.py` — seeded battlefield: `edge.art.terrain` biome art +
-  a parallel gameplay feature grid; stamped walled cities.
-- `edge/groundwar/rules.py` — pure turn rules (movement, jump+AA reaction, LOS,
-  detection/jamming, fire, resolve, garrison AI, sorties, outcomes). Only mutator.
-- `edge/groundwar/app.py` — throwaway Textual shell (tui-tier exemption).
+- `config/groundwar_default.yaml` — every balance constant, read by both the live
+  game and this playtest app.
+- `edge/groundwar/config.py` — typed loader (a thin re-export over the production
+  `GameConfig.groundwar` block; no divergent balance).
+- `edge/groundwar/harness.py` — builds a throwaway single-sector, single-planet
+  `UniverseState` (assault: a below-friendly world sized for a droppable raid, plus
+  a loaded ship; expedition: an owned/unowned world with real `Discovery` records
+  salted onto it) so `SetupScreen` can start a real `GameService` without a full
+  big-bang universe.
+- `edge/groundwar/app.py` — `SetupScreen` (mode / planet / difficulty / world / seed
+  pickers, the platoon composer) plus `GroundwarApp` (an `edge.tui.app.EdgeApp`
+  subclass, so it gets the same chrome/theme/client wiring as the live game). Owns
+  no ground-operations rules of its own — `edge.core.groundwar` is the only
+  implementation, exercised through the identical production screens.
+- `edge/groundwar/findart.py` / `widgets.py` — production dependencies (Field Finds
+  art, assault map glyphs/colors) that happen to live in this package.
 
-Deterministic from `(seed, planet_type, difficulty)` plus the battle's own rng
-stream; all randomness flows through `Battle.rng`.
+Deterministic from `(seed, planet_type, difficulty preset)`: the harness state feeds
+the same `BeginAssault`/`BeginSurvey` reducers the live game uses, which draw their
+own operation seed from `state.rng`.
 
 ## Adopted production contract
 
@@ -102,19 +119,25 @@ Production deliberately changes the prototype's surrounding economy and state:
   seen it (GW-WP13-FU1, restoring *some* landing-danger read without reintroducing
   the leak GW-WP12 removed).
 
-## Balance snapshot
+## Balance snapshot (historical, pre-GW-WP14)
 
 A scripted competent bot (drop outside AA range, missile priority targets,
-advance/broadcast) wins ~2/10 raids at `raid` difficulty, in 12–18 of 24 turns
-when it wins — losses are clock/approach failures, not attrition. Humans should
-land somewhat higher; tune in the YAML (`pressure`, `resolve`, suit costs).
+advance/broadcast) won ~2/10 raids at the prototype's own `raid` difficulty
+preset, in 12–18 of 24 turns when it won — losses were clock/approach failures,
+not attrition. That preset table (`GwDifficulty`/`config.groundwar.difficulties`)
+no longer exists: production derives difficulty from live world state
+(`edge.core.groundwar.assault.derive_difficulty`), so this snapshot is a rough
+historical reference, not a live number. Tune balance in the YAML
+(`assault_difficulty`, `garrison_economy`, `pressure`, `resolve`, suit costs) and
+re-measure against `edge/bot/scripts/assaulter.py` for a current read.
 
 ## Productionization path
 
-`GROUNDWAR_INTEGRATION_PLAN.md` is the executable work plan. Its milestones move
-configuration and terrain into the production dependency graph, add frozen replay
-models and ground access, ship the survey loop, replace fighter invasion with the
-recruit/suit assault and persistent defense economy, then complete UI/migration/
-multiplayer parity and the separately gated Cloud City interior. Until the
-relevant work package lands, code under `edge/groundwar/` remains a prototype
-harness rather than an authority over live game state.
+`GROUNDWAR_INTEGRATION_PLAN.md` is the executable work plan (GW-WP01–14, GW-M1–M4).
+Its milestones moved configuration and terrain into the production dependency
+graph, added frozen replay models and ground access, shipped the survey loop,
+replaced fighter invasion with the recruit/suit assault and persistent defense
+economy, retired the superseded abstract surface/invasion paths, and — finally —
+retired this app's own duplicate engine so `edge.core.groundwar` is the sole
+authority over live game state (GW-M4). The separately gated Cloud City interior
+assault remains open follow-up work (GW-WP15/16).

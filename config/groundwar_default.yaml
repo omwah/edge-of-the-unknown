@@ -190,32 +190,6 @@ expedition:
     - mountain
     - ice
 
-difficulties:
-  patrol:
-    label: "Patrol Raid"
-    cities: 2
-    citadel_level: 0
-    surrender_threshold: 30
-    garrison_mult: 0.8
-  raid:
-    label: "Planetary Raid"
-    cities: 3
-    citadel_level: 1
-    surrender_threshold: 25
-    garrison_mult: 1.0
-  siege:
-    label: "Hardened World"
-    cities: 3
-    citadel_level: 2
-    surrender_threshold: 20
-    garrison_mult: 1.25
-  fortress:
-    label: "Fortress World"
-    cities: 4
-    citadel_level: 3
-    surrender_threshold: 15
-    garrison_mult: 1.5
-
 # Persistent planetary ground-garrison economy (GW plan D11, GW-WP09). Feeds
 # Planet.garrison_infantry/garrison_armor via three rails: big-bang seeding,
 # automatic militia recovery (ownership-independent), and colonist-allocation
@@ -236,9 +210,9 @@ garrison_economy:
   seed_armor_min_citadel_level: 2
   seed_armor_frac: 0.25
 
-# Live-state assault difficulty derivation (GW-WP09), superseding the
-# `difficulties:` presets above for production. Read only by
-# edge.core.groundwar.assault.derive_difficulty.
+# Live-state assault difficulty derivation (GW-WP09); the standalone-only
+# `difficulties:` preset table this once superseded was retired in GW-WP14. Read
+# only by edge.core.groundwar.assault.derive_difficulty.
 assault_difficulty:
   min_cities: 1
   max_cities: 4
