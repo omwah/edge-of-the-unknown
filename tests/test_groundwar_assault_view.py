@@ -230,6 +230,7 @@ async def test_textual_outcome_and_settlement_flow(
     app = EdgeApp(plain=True)
     async with app.run_test(size=(100, 34)) as pilot:
         app.client = client
+        base_screen, base_depth = app.screen, len(app.screen_stack)
         app.push_screen(GroundAssaultScreen(client))
         await pilot.pause()
         screen = app.screen
@@ -245,8 +246,58 @@ async def test_textual_outcome_and_settlement_flow(
         assert isinstance(app.screen, AssaultResultModal)
         await pilot.press("enter")
         await pilot.pause()
-        assert not isinstance(app.screen, AssaultResultModal)
-        assert not isinstance(app.screen, GroundAssaultScreen)
+        await pilot.pause()
+        # Exactly two pops here: the modal's own dismiss-pop, then _extract()'s
+        # explicit pop of this screen. GroundAssaultScreen suppresses its own
+        # on_screen_resume self-pop while _extracting (see test below) — without that
+        # guard, a resume triggered by the modal popping can race _extract()'s pop and
+        # remove an extra screen, landing one level too deep (GW regression).
+        assert app.screen is base_screen
+        assert len(app.screen_stack) == base_depth
+
+
+async def test_on_screen_resume_skips_self_pop_while_extracting(tmp_path: Path) -> None:
+    """The `_extracting` guard's actual contract, tested directly rather than by timing.
+
+    `on_screen_resume` -> `_load()` self-pops when the ground operation is gone (a
+    safety net for e.g. reconnect flows). But `_extract()` also pops this screen once
+    it finishes extracting, and popping a screen above this one (a result modal, the
+    abort ConfirmScreen) triggers a resume here too. Racing those two "operation's
+    gone, pop" paths against real async timing landed the fix on the wrong screen in
+    production (only reproducible by injecting a delay, per the GW incident) — headless
+    pilot timing never interleaves them, so a flow-level test can pass while this
+    exact regression is broken. Assert the guard's contract directly instead."""
+    state = _reducer_world(reserved_infantry=0)
+    op = _dropped(state)
+    state.players[1] = replace(
+        state.players[1], ground_operation=replace(op, outcome=None),
+    )
+    service = GameService(state, CFG, SqliteRepository(tmp_path / "guard.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.client = client
+        app.push_screen(GroundAssaultScreen(client))
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GroundAssaultScreen)
+        assert screen.view is not None
+        depth = len(app.screen_stack)
+
+        # Simulate the operation having just been extracted out from under this
+        # screen (as _extract() does) while a resume is in flight.
+        state.players[1] = replace(state.players[1], ground_operation=None)
+        screen._extracting = True  # noqa: SLF001
+        await screen.on_screen_resume()
+        assert app.screen is screen
+        assert len(app.screen_stack) == depth
+
+        # Un-set the guard: the same resume now self-pops as designed (the safety net
+        # for a legitimately vanished operation, e.g. reconnect flows).
+        screen._extracting = False  # noqa: SLF001
+        await screen.on_screen_resume()
+        assert app.screen is not screen
+        assert len(app.screen_stack) == depth - 1
 
 
 @pytest.mark.parametrize("size", ((80, 24), (100, 34), (140, 42)))

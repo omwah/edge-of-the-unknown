@@ -301,6 +301,7 @@ settle, and once the assault is decided it settles straight away with the result
         self.anim_step = 0
         self._anim_frames: list[LandingFrame] = []
         self._anim_timer: Timer | None = None
+        self._extracting = False
 
     def compose(self) -> ComposeResult:
         if self.view is None:
@@ -333,6 +334,12 @@ settle, and once the assault is decided it settles straight away with the result
         self._focus_map()
 
     async def on_screen_resume(self) -> None:
+        # Skip once extraction has started: _extract() owns returning to the screen
+        # beneath this one, and this resume-triggered _load() can otherwise race it
+        # (both see the operation gone and pop — the second pop lands one screen too
+        # deep, past wherever _extract()'s own pop already landed).
+        if self._extracting:
+            return
         if self.view is not None:
             await self._load()
 
@@ -717,8 +724,9 @@ settle, and once the assault is decided it settles straight away with the result
         if self.view.outcome is not None:
             # The operation already resolved (win or loss) — nothing left to lose by
             # extracting, so skip the destructive-abort confirm entirely.
-            self.run_worker(self._extract())
+            self._start_extract()
             return
+
         message = ("Abort this assault and retrieve the survivors? All casualties, spent "
                    "ordnance, defender losses, and structural damage will settle.")
         self.app.push_screen(
@@ -728,20 +736,31 @@ settle, and once the assault is decided it settles straight away with the result
 
     def _extract_confirmed(self, confirmed: bool | None) -> None:
         if confirmed:
-            self.run_worker(self._extract())
+            self._start_extract()
+
+    def _start_extract(self) -> None:
+        # Set synchronously, before scheduling the worker: on_screen_resume can fire
+        # (e.g. once ConfirmScreen or AssaultResultModal pops) before the worker below
+        # gets a turn on the event loop, and it must see this screen is already leaving
+        # to skip its own _load()-triggered self-pop (see on_screen_resume).
+        self._extracting = True
+        self.run_worker(self._extract())
 
     async def _extract(self) -> None:
         if self.view is None:
+            self._extracting = False
             return
         planet, resolved = self.view.planet, self.view.outcome is not None
         events_out = await self._apply(ExtractGroundOperation(self.view.operation_id))
         if events_out is None:
+            self._extracting = False
             return
         if resolved:
             settled = next((e for e in events_out if isinstance(e, GroundAssaultSettled)), None)
             if settled is not None:
-                self.app.push_screen(
-                    AssaultResultModal(planet, settled), lambda _: self.app.pop_screen())
+                await self.app.push_screen(
+                    AssaultResultModal(planet, settled), wait_for_dismiss=True)
+                self.app.pop_screen()
                 return
         self.app.pop_screen()
 
