@@ -15,6 +15,7 @@ from edge.groundwar.findart import ART_H, ART_W, generate_find_art
         (DiscoveryKind.RUINS, {"colonnade", "obelisk", "leviathan"}),
         (DiscoveryKind.ARTIFACT, {"cache", "obelisk", "leviathan"}),
         (DiscoveryKind.ANCIENT_TECH, {"beacon"}),
+        (DiscoveryKind.CRASHED_SHIP, {"hulk"}),
     ],
 )
 def test_production_surface_kinds_select_poc_identities(
@@ -23,11 +24,6 @@ def test_production_surface_kinds_select_poc_identities(
     selected = {surface_find_kind(kind, discovery_id) for discovery_id in range(12)}
     assert selected == allowed
     assert all(surface_find_name(kind, discovery_id) for discovery_id in range(12))
-
-
-def test_crashed_ship_keeps_existing_identity_and_art_path() -> None:
-    assert surface_find_kind(DiscoveryKind.CRASHED_SHIP, 7) is None
-    assert surface_find_name(DiscoveryKind.CRASHED_SHIP, 7) is None
 
 
 @pytest.mark.parametrize("kind", FIND_KINDS)

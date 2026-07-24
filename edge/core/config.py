@@ -666,8 +666,6 @@ class DiscoveryConfig(BaseModel):
     component_pool: list[str] = Field(default_factory=list)  # Component names for component payloads
     salvage_turn_cost: int = 2        # turns to collect a discovery (§7)
     scan_turn_cost: int = 1           # turns for an explicit sensor sweep
-    descent_turn_cost: int = 3        # turns to descend to a planet surface (§7, WP6)
-    explore_turn_cost: int = 1        # turns to reveal one surface site (§7, WP6)
     surface_hidden_min_rank: int = 3  # surface sites of this rarity rank+ need a sensor sweep
     black_hole_gravity_warp: bool = False  # Phase-3 seam; inert in Phase 2
     black_hole_warp_turn_cost: int = 5
@@ -1540,7 +1538,6 @@ class UIConfig(BaseModel):
     nav_core_anchor_side: Literal["left", "right"] = "left"
     sidebar_width: int = Field(default=33, gt=0)
     sidebar_min_screen_width: int = Field(default=90, gt=0)
-    surface_terrain_height: int = Field(default=12, gt=0)  # SurfaceScreen terrain panel height
     local_map_radius: int = Field(default=3, gt=0)  # Computer/Map ego-graph reach in warp hops
     # Directory of species portrait images (absolute, or relative to the repo root). Each
     # species uses `<roster_id>.<ext>` and/or `<roster_id>_<digits>.<ext>` variant files.

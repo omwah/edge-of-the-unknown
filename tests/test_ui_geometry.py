@@ -38,7 +38,7 @@ def _assert_controls_reachable(app: EdgeApp) -> None:
 @pytest.mark.parametrize(
     "surface",
     [
-        "sector", "computer", "lobby", "port", "stardock", "planet", "surface",
+        "sector", "computer", "lobby", "port", "stardock", "planet",
         "contact", "encounter", "territory", "base", "help", "detail-modal",
     ],
 )
@@ -67,10 +67,6 @@ async def test_compact_art_screen_controls_are_visible_or_scrollable(surface: st
             from edge.tui.dummy import sample_planet
             from edge.tui.screens.planet import PlanetScreen
             screen = PlanetScreen(sample_planet())
-        elif surface == "surface":
-            from edge.tui.dummy import sample_surface
-            from edge.tui.screens.surface import SurfaceScreen
-            screen = SurfaceScreen(sample_surface())
         elif surface == "contact":
             from edge.tui.dummy import sample_contact
             from edge.tui.screens.contact import AlienContactScreen

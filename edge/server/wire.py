@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 35  # GW-WP13-FU1: AssaultExpeditionDTO.casualty_ceiling
+WIRE_VERSION = 36  # GW-WP14: legacy surface/invasion paths retired
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -105,6 +105,11 @@ v34 (GW-WP12-FU2): `GroundDefenseFireLogged` event — `EndGroundTurn`'s defense
 summary, so trooper HP loss during that phase is explained in the log.
 v35 (GW-WP13-FU1): `AssaultExpeditionDTO.casualty_ceiling` — the doctrine-abort fraction,
 so the sidebar can show the abort threshold the POC always displayed.
+v36 (GW-WP14): the legacy abstract surface-descent path (`Descend`/`Explore` commands,
+`Descended`/`SiteExplored` events, `SurfaceDTO`/`SurfaceSite`, the `surface_view` read
+method) and the one-roll `InvadePlanet` invasion (`InvasionRepulsed` event; `PlanetDTO`
+loses `can_invade`/`invade_blocker`/`ship_fighters`) are retired — both fully superseded
+by the `edge.core.groundwar` survey/tactical-assault system.
 """
 
 

@@ -63,13 +63,14 @@ _COMPUTER_TABS = (
 
 # Sprite-gallery tabs to capture, each to its own SVG: (TabPane id, file stem).
 # Must match SpriteGalleryScreen's tabs (planets / ports / ships / discoveries /
-# terrain) plus the subsystems tab.
+# terrain) plus the field-finds and subsystems tabs.
 _GALLERY_TABS = [
     ("planets", "gallery-planets"),
     ("ports", "gallery-ports"),
     ("ships", "gallery-ships"),
     ("discoveries", "gallery-discoveries"),
     ("terrain", "gallery-terrain"),
+    ("field_finds", "gallery-field-finds"),
     ("subsystems", "gallery-subsystems"),
 ]
 
@@ -242,9 +243,6 @@ async def _capture() -> None:
         # Screens with stable sample presentation data.
         app.push_screen(PlanetScreen(sample_planet()))
         await _shot(app, pilot, "planet.svg")
-        await pilot.press("d")  # descend -> SurfaceScreen
-        await _shot(app, pilot, "surface.svg")
-        await pilot.press("escape")
         await pilot.press("escape")
         await pilot.pause()
 

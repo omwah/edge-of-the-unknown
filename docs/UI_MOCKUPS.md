@@ -318,7 +318,8 @@ docking reaches an identical trade experience — only the container differs.
   opens the discovery modal after the reducer has atomically recorded artifact+lore.
 - **Responsive layout**: compact stacks map/status while keyboard bindings remain available;
   standard places status beside the map; wide gives the map and contact list more room.
-  `SurfaceScreen` remains only as the legacy migration implementation until GW-M4.
+  `SurfaceScreen` was retired in GW-WP14 (GW-M4) — `GroundExpeditionScreen` is the only
+  planet-descent screen now.
 - DESIGN: §7 (discovery kinds/rarity/hidden), §4.2 (surface_sites).
 
 ---

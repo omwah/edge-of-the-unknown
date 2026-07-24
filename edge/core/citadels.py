@@ -1,14 +1,14 @@
 """Citadels — planetary defense levels, treasury, timed builds, and the gun (§4.2, §14).
 
-Pure core (no I/O, no RNG in the build/defense math; the invasion roll of WP55 draws
-from the reducer's `state.rng`). A citadel is raised in three cumulative levels on an
-owned colony, each **paid up front** (equipment from the planet's stores + latinum) and
-completed as a **timed build**: `Planet.citadel_progress` accrues the colony's headcount
-per planet-growth tick until it reaches the level's `build_colonist_days`, so bigger
-colonies build faster (the point of the colonist gate). Level 1 grants the treasury +
-a garrison bonus, level 2 the fixed **citadel gun** that joins sector defense exactly as
-an orbital base does, level 3 a **siege shield** (WP55). An in-progress build is neither
-lootable nor cancellable — conquest inherits it (interview decision 2).
+Pure core (no I/O, no RNG in the build/defense math). A citadel is raised in three
+cumulative levels on an owned colony, each **paid up front** (equipment from the planet's
+stores + latinum) and completed as a **timed build**: `Planet.citadel_progress` accrues
+the colony's headcount per planet-growth tick until it reaches the level's
+`build_colonist_days`, so bigger colonies build faster (the point of the colonist gate).
+Level 1 grants the treasury + a garrison bonus, level 2 the fixed **citadel gun** that
+joins sector defense exactly as an orbital base does, level 3 a **siege shield** (WP55).
+An in-progress build is neither lootable nor cancellable — a tactical-assault conquest
+(`edge.core.groundwar.settlement`) inherits it.
 
 Invariants owned here: costs conserve (equipment leaves stores, latinum burns — a §8
 sink); one build open per planet; a build completes exactly once; the gun foe's stats
@@ -17,8 +17,7 @@ derive from config, so a silenced/absent gun never defends.
 
 from __future__ import annotations
 
-import random
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 from edge.core.config import CitadelConfig, CitadelLevelConfig, GameConfig
 from edge.core.enums import Commodity
@@ -139,73 +138,6 @@ def siege_shielded(planet: Planet, config: GameConfig, base_operational: bool) -
     return base_operational or has_gun(planet, config)
 
 
-def citadel_defense_mult(planet: Planet, config: GameConfig) -> float:
-    """The garrison multiplier the citadel level grants in the invasion math (§4.2, WP55)."""
-    if config.citadels is None or planet.citadel_level < 1:
-        return 1.0
-    return config.citadels.levels[min(planet.citadel_level, CITADEL_MAX) - 1].garrison_mult
-
-
-@dataclass(frozen=True, slots=True)
-class InvasionOutcome:
-    """The result of a ground assault (§4.2, §14, WP55) — folded into the reducer.
-
-    `victory` flips the world; `attacker_survivors` become the new garrison on victory;
-    `fighters_lost` is the committed count that died. Pure over its inputs.
-    """
-
-    victory: bool
-    attacker_survivors: int
-    defender_survivors: int
-    fighters_lost: int
-
-
-def resolve_invasion(
-    planet: Planet, attacker_fighters: int, config: GameConfig, rng: random.Random,
-) -> InvasionOutcome:
-    """Resolve a ground assault: attacker fighters vs the citadel-scaled garrison (§4.2, WP55).
-
-    Per-round percentile exchange (BNT §A.3 shape): each round both sides lose a random
-    fraction — in `[invasion_round_lo, invasion_round_hi]` — of the *other's* current
-    strength (at least one each, so a fight always terminates), until one side breaks.
-    Victory is the attacker outlasting the defender. Draws (both wiped) count as a repulse
-    — you must *hold* the ground to take it. Draws from the passed rng (the reducer's
-    `state.rng`, H4), so a siege replays exactly.
-    """
-    cfg = _levels(config)
-    attacker = attacker_fighters
-    defender = round(planet.fighters * citadel_defense_mult(planet, config))
-    while attacker > 0 and defender > 0:
-        a_loss = max(1, round(defender * rng.uniform(cfg.invasion_round_lo, cfg.invasion_round_hi)))
-        d_loss = max(1, round(attacker * rng.uniform(cfg.invasion_round_lo, cfg.invasion_round_hi)))
-        attacker = max(0, attacker - a_loss)
-        defender = max(0, defender - d_loss)
-    victory = attacker > 0 and defender <= 0
-    return InvasionOutcome(
-        victory=victory, attacker_survivors=attacker, defender_survivors=defender,
-        fighters_lost=attacker_fighters - attacker,
-    )
-
-
-def conquer(planet: Planet, player_id: int, survivors: int, config: GameConfig) -> tuple[Planet, int]:
-    """The post-victory planet state + captured latinum (§4.2, WP55).
-
-    Owner flips to the invader; the citadel drops one level (its defences are spent); the
-    garrison becomes the surviving attacker fighters; colonists are spared at
-    `civilian_survival_frac`; the treasury is captured (returned as latinum, zeroed on the
-    planet — conserved). Stores stay with the now-player-owned world (its salvage is simply
-    the player's henceforth). Any open build is inherited (progress untouched).
-    """
-    cfg = _levels(config)
-    captured = planet.treasury
-    survivor_total = round(planet.colonists * cfg.civilian_survival_frac)
-    new_planet = replace(
-        planet, owner=Ownership("player", player_id),
-        citadel_level=max(0, planet.citadel_level - 1),
-        fighters=survivors, gun_integrity=0, treasury=0,
-        population=scale_population(planet.population, planet.colonists, survivor_total),
-    )
-    return new_planet, captured
 
 
 def settle_tactical_conquest(

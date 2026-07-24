@@ -40,7 +40,6 @@ from edge.core.rules import (
 from edge.core.surface_finds import FIND_KINDS, surface_find_kind
 from edge.groundwar.findart import generate_find_art
 from edge.server.client import GameClient
-from edge.tui import art_adapter
 from edge.tui.chrome import EdgeScreen
 from edge.tui.screens._ground_shared import (
     CURSOR_MOVES,
@@ -143,20 +142,14 @@ class SurveyFindModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         c = self._contact
         title = "A DISCOVERY — artifact and lore recorded" if self._first else "FIELD NOTES"
-        try:
-            find_kind = surface_find_kind(DiscoveryKind(c.kind), c.discovery_id)
-        except ValueError:
-            find_kind = None
-        if find_kind is None:
-            art = art_adapter.sprite(
-                "discovery", c.kind, seed=c.discovery_id, width=44, height=10)
-            label = c.kind.replace("_", " ")
-            blurb = ""
-        else:
-            identity = FIND_KINDS[find_kind]
-            art = generate_find_art(find_kind, c.discovery_id)
-            label = identity.label
-            blurb = identity.blurb
+        # Every surface DiscoveryKind maps to a Field Finds identity (GW-WP14) — a
+        # survey dig only ever contacts a planet-surface site, never a free-floating kind.
+        find_kind = surface_find_kind(DiscoveryKind(c.kind), c.discovery_id)
+        assert find_kind is not None
+        identity = FIND_KINDS[find_kind]
+        art = generate_find_art(find_kind, c.discovery_id)
+        label = identity.label
+        blurb = identity.blurb
         with VerticalScroll(id="find-box"):
             yield Static(title, id="find-title")
             yield Static(art, id="find-art")

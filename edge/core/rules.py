@@ -127,7 +127,6 @@ from edge.core.events import (
     SuitsPurchased,
     SuitsSold,
     InterdictorToggled,
-    InvasionRepulsed,
     LimpetsRemoved,
     NoticePosted,
     PlanetBanked,
@@ -141,7 +140,6 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     CoreLawNotice,
-    Descended,
     DevicePurchased,
     DiscoveryCollected,
     DiscoveryDetected,
@@ -170,7 +168,6 @@ from edge.core.events import (
     SalvageCollected,
     ShipDestroyed,
     ShipPurchased,
-    SiteExplored,
     SurveyDug,
     SurveySiteExcavated,
     SurveyLanded,
@@ -493,20 +490,6 @@ class BuildCitadel:
 
 
 @dataclass(frozen=True, slots=True)
-class InvadePlanet:
-    """Land carried fighters to take an owned world by ground assault (§4.2, §14, WP55).
-
-    Legal only when no operational base defends the sector and the citadel gun is down
-    (or was never built), and the L3 siege shield does not bar it. Commits `fighters`
-    from the ship; resolution is a per-round exchange against the citadel-scaled garrison.
-    Never in the Core (deployment-free, §10).
-    """
-
-    planet_id: int
-    fighters: int
-
-
-@dataclass(frozen=True, slots=True)
 class AnnexProtectorate:
     """Annex a recovered player/corp-controlled protectorate (GW-WP11, D14)."""
 
@@ -538,9 +521,9 @@ class TransferFighters:
     ship) — mirrors :class:`TransferCargo` exactly. Owner-only (player or corp),
     in-sector; fighters are conserved. `count` is clamped to what is aboard/stored, so
     "transfer all" is a large number. Closes the gap the GW plan names explicitly:
-    `DeployFighters` already moves ship → sector, `BuyFighters` latinum → ship, and
-    `InvadePlanet` ship → committed-to-invasion, but nothing previously moved fighters
-    between a planet's stored stock and the ship outside combat.
+    `DeployFighters` already moves ship → sector and `BuyFighters` latinum → ship, but
+    nothing previously moved fighters between a planet's stored stock and the ship
+    outside combat.
     """
 
     planet_id: int
@@ -627,33 +610,14 @@ class Salvage:
 
 
 @dataclass(frozen=True, slots=True)
-class Descend:
-    """Land on a planet's surface to explore its sites (§7, WP6). Costs turns."""
-
-    planet_id: int
-
-
-@dataclass(frozen=True, slots=True)
-class Explore:
-    """Reveal the next surface site of a planet (§7, WP6).
-
-    Surveys site-by-site: each call reveals the lowest-slot still-hidden site the
-    ship's sensors can resolve (obvious sites always; Rare+ sites need a sensor
-    sweep). Revealed sites enter `Player.detected` and can then be logged (`Salvage`).
-    """
-
-    planet_id: int
-
-
-@dataclass(frozen=True, slots=True)
 class BeginSurvey:
     """Open a surface-survey expedition on a landable planet (GW-WP03, GW plan D1/D4-D6).
 
-    Replaces the abstract `Descend`/`Explore` path with a persisted, replayable
-    operation (`Player.ground_operation`). The begin reducer draws the operation seed
-    from `state.rng` (G3), resumes the surveyor's saved position/hints for this world
-    (D5), and refills supplies. The site generation and walk/dig/talk action commands
-    land in GW-WP05/06; extraction is `ExtractGroundOperation`.
+    A persisted, replayable operation (`Player.ground_operation`). The begin reducer
+    draws the operation seed from `state.rng` (G3), resumes the surveyor's saved
+    position/hints for this world (D5), and refills supplies. The site generation and
+    walk/dig/talk action commands land in GW-WP05/06; extraction is
+    `ExtractGroundOperation`.
     """
 
     planet_id: int
@@ -1292,10 +1256,10 @@ Command = (
     | RecruitColonists | Colonize | SettleColonists | SetAllocation
     | HireRecruits | DismissRecruits | BuySuits | SellSuits | BuyGroundOrdnance
     | BuildStagingArea
-    | BuildCitadel | PlanetDeposit | PlanetWithdraw | InvadePlanet | AnnexProtectorate
+    | BuildCitadel | PlanetDeposit | PlanetWithdraw | AnnexProtectorate
     | TransferCargo | TransferFighters | BatchTransferCargo
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
-    | Salvage | Descend | Explore | BeginSurvey | BeginAssault | ReinforceGarrison
+    | Salvage | BeginSurvey | BeginAssault | ReinforceGarrison
     | ExtractGroundOperation
     | GroundMove | SurveyDig | SurveyLand | SurveyTalk
     | GroundDrop | GroundJump | GroundFire | GroundBroadcast | EndGroundTurn
@@ -1453,8 +1417,6 @@ def reduce(
         case PlanetWithdraw():
             return _planet_bank(state, player_id, command.planet_id, command.amount,
                                 config, withdraw_=True)
-        case InvadePlanet():
-            return _invade_planet(state, player_id, command, config)
         case AnnexProtectorate():
             return _annex_protectorate(state, player_id, command, config)
         case InstallComponent():
@@ -1467,10 +1429,6 @@ def reduce(
             return _field_patch(state, player_id, command, config)
         case Salvage():
             return _salvage(state, player_id, command, config)
-        case Descend():
-            return _descend(state, player_id, command, config)
-        case Explore():
-            return _explore(state, player_id, command, config)
         case BeginSurvey():
             return _begin_survey(state, player_id, command, config)
         case BeginAssault():
@@ -2911,70 +2869,6 @@ def _planet_bank(
     )
 
 
-def _invade_planet(
-    state: UniverseState, player_id: int, cmd: InvadePlanet, config: GameConfig
-) -> ReduceResult:
-    """Ground-assault an owned world once its defences have fallen (§4.2, §14, WP55).
-
-    Enforces the invasion ladder in order (no operational base, gun down, no siege shield),
-    commits carried fighters, and resolves the fight in `citadels.resolve_invasion` (drawing
-    from `state.rng`, H4). Victory flips ownership and captures the treasury; defeat costs
-    the committed fighters, drops alignment, and sours the owner bloc (the WP27 rail).
-    """
-    if config.citadels is None:
-        raise CombatError("planetary invasion is not enabled in this universe")
-    player = _player(state, player_id)
-    _require_no_encounter(player)
-    ship = _ship(state, player)
-    planet = state.planets.get(cmd.planet_id)
-    if planet is None or planet.sector_id != ship.sector_id:
-        raise CombatError("no such world in this sector")
-    if not planet.owner.is_owned or corp.player_owns(state, planet.owner, player_id):
-        raise CombatError("there is nothing to invade — it is unowned or already yours")
-    # Core worlds can never be invaded (deployment-free Core, §10 — assert, don't special-case).
-    if state.sectors[ship.sector_id].is_galactic_core:
-        raise CombatError("the Core's worlds cannot be invaded")
-    # The ladder, in order: an operational base must be razed, then the gun silenced, and
-    # the L3 siege shield must not stand — each rung rejects until the previous falls.
-    if any(b.sector_id == ship.sector_id and is_operational(b) for b in state.starbases.values()):
-        raise CombatError("raze the orbital base before a ground assault")
-    if citadels.has_gun(planet, config):
-        raise CombatError("silence the citadel gun before a ground assault")
-    if citadels.siege_shielded(planet, config, base_operational=False):
-        raise CombatError("the citadel's siege shield holds — nothing can land")
-    if cmd.fighters < 1 or ship.fighters < cmd.fighters:
-        raise CombatError("not enough fighters aboard to commit")
-
-    outcome = citadels.resolve_invasion(planet, cmd.fighters, config, state.rng)
-    new_ship = replace(ship, fighters=ship.fighters - cmd.fighters)
-    former = planet.owner
-
-    def _sour(p: Player) -> Player:
-        # Taking (or trying to take) a bloc's world is an act of war (the WP38 rail).
-        if former.kind == "alliance" and former.ref is not None:
-            return replace(p, alliance_standing={**p.alliance_standing, former.ref: -1.0})
-        return p
-
-    if outcome.victory:
-        new_planet, loot = citadels.conquer(planet, player_id, outcome.attacker_survivors, config)
-        new_player = _sour(replace(player, latinum=player.latinum + loot))
-        return ReduceResult(
-            events=(PlanetInvaded(player_id, planet.id, outcome.fighters_lost,
-                                  new_planet.colonists, loot),),
-            players=(new_player,), ships=(new_ship,), planets=(new_planet,),
-        )
-    # Repulsed: the committed fighters are gone, alignment drops, the garrison is attrited.
-    new_player = _sour(replace(
-        player, alignment=player.alignment - config.citadels.invasion_alignment_penalty))
-    mult = citadels.citadel_defense_mult(planet, config)
-    raw_survivors = min(planet.fighters, round(outcome.defender_survivors / mult)) if mult else 0
-    new_planet = replace(planet, fighters=raw_survivors)
-    return ReduceResult(
-        events=(InvasionRepulsed(player_id, planet.id, outcome.fighters_lost),),
-        players=(new_player,), ships=(new_ship,), planets=(new_planet,),
-    )
-
-
 def _annex_protectorate(
     state: UniverseState, player_id: int, cmd: AnnexProtectorate, config: GameConfig,
 ) -> ReduceResult:
@@ -4215,12 +4109,6 @@ def _planet_in_sector(state: UniverseState, ship: Ship, planet_id: int) -> Plane
     return planet
 
 
-def _surface_sites(state: UniverseState, planet_id: int) -> list[Discovery]:
-    """A planet's surface-site discoveries, in slot order (§7, WP6)."""
-    sites = [d for d in state.discoveries.values() if d.planet_id == planet_id]
-    return sorted(sites, key=lambda d: d.site_slot)
-
-
 def _begin_survey(
     state: UniverseState, player_id: int, cmd: BeginSurvey, config: GameConfig
 ) -> ReduceResult:
@@ -4811,61 +4699,6 @@ def _survey_talk(
         events=(SurveyTalked(player_id, op.operation_id,
                              town.id if town is not None else -1, hinted_id,
                              resupply=result.resupply),),
-        players=(new_player,),
-    )
-
-
-def _descend(
-    state: UniverseState, player_id: int, cmd: Descend, config: GameConfig
-) -> ReduceResult:
-    """Land on a planet surface (§7, WP6). A turn cost that opens site exploration."""
-    player = _player(state, player_id)
-    _require_no_encounter(player)
-    ship = _ship(state, player)
-    planet = _planet_in_sector(state, ship, cmd.planet_id)
-    if not is_landable(planet.planet_type, config):
-        raise EconomyError(
-            f"a {pretty_planet_type(planet.planet_type).lower()} has no surface to land on")
-    cost = config.discovery.descent_turn_cost if config.discovery is not None else 1
-    if player.turns_remaining < cost:
-        raise MovementError("out of turns")
-    new_player = replace(player, turns_remaining=player.turns_remaining - cost)
-    return ReduceResult(events=(Descended(player_id, cmd.planet_id),), players=(new_player,))
-
-
-def _explore(
-    state: UniverseState, player_id: int, cmd: Explore, config: GameConfig
-) -> ReduceResult:
-    """Reveal the next still-hidden surface site the ship's sensors can resolve (§7, WP6)."""
-    player = _player(state, player_id)
-    ship = _ship(state, player)
-    planet = _planet_in_sector(state, ship, cmd.planet_id)
-    if not is_landable(planet.planet_type, config):
-        raise EconomyError(
-            f"a {pretty_planet_type(planet.planet_type).lower()} has no surface to explore")
-    undetected = [d for d in _surface_sites(state, cmd.planet_id) if d.id not in player.detected]
-    if not undetected:
-        raise EconomyError("every site here is already surveyed")
-    target = next(
-        (d for d in undetected
-         if is_detectable(d, ship.sensor_rating, in_nebula=False, config=config)),
-        None,
-    )
-    if target is None:
-        raise EconomyError("sensors too weak to resolve the remaining sites — upgrade and retry")
-    cost = config.discovery.explore_turn_cost if config.discovery is not None else 1
-    if player.turns_remaining < cost:
-        raise MovementError("out of turns")
-    # Surveying both reveals the site and logs it to the codex; taking the payload
-    # aboard is a separate, optional act (Salvage). So a surveyed-but-untaken site stays
-    # `found_by=None` — the player can leave it for the next person.
-    new_player = replace(player, turns_remaining=player.turns_remaining - cost,
-                         detected=player.detected | frozenset({target.id}),
-                         codex=player.codex | frozenset({target.id}),
-                         experience=player.experience + config.aliens.experience_per_discovery)
-    return ReduceResult(
-        events=(SiteExplored(player_id, cmd.planet_id, target.id,
-                             target.kind.value, target.rarity_tier.name),),
         players=(new_player,),
     )
 

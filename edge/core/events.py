@@ -166,14 +166,6 @@ class GenesisDeployed(Event):
 
 
 @dataclass(frozen=True)
-class Descended(Event):
-    """The player landed on a planet surface to explore its sites (§7, WP6)."""
-
-    player_id: int
-    planet_id: int
-
-
-@dataclass(frozen=True)
 class GroundOperationBegan(Event):
     """A ground operation (survey/assault) opened on a planet (GW-WP03)."""
 
@@ -214,17 +206,6 @@ class BeltMined(Event):
     planet_id: int
     commodity: str  # Commodity value
     amount: int  # units taken into the cargo hold
-
-
-@dataclass(frozen=True)
-class SiteExplored(Event):
-    """A surface site revealed by exploration/sensor sweep on descent (§7, WP6)."""
-
-    player_id: int
-    planet_id: int
-    discovery_id: int
-    kind: str  # DiscoveryKind value
-    rarity: str  # RarityTier name
 
 
 @dataclass(frozen=True)
@@ -1010,11 +991,11 @@ class CitadelGunSilenced(Event):
 
 @dataclass(frozen=True)
 class PlanetInvaded(Event):
-    """A ground assault took an owned world (§4.2, §14, WP55).
+    """A ground assault took an owned world (§4.2, §14, GW-WP11 tactical settlement).
 
-    `fighters_lost` of the attacker's committed fighters died taking it; `colonists`
-    survived the conquest; `loot` latinum (captured treasury + looted stores value) was
-    seized. The planet's `owner` flips to the invader and its citadel drops one level.
+    `fighters_lost` attacker losses died taking it; `colonists` survived the conquest;
+    `loot` latinum (captured treasury + looted stores value) was seized. The planet's
+    `owner` flips to the invader and its citadel drops one level.
     """
 
     player_id: int
@@ -1022,19 +1003,6 @@ class PlanetInvaded(Event):
     fighters_lost: int
     colonists: int
     loot: int
-
-
-@dataclass(frozen=True)
-class InvasionRepulsed(Event):
-    """A ground assault failed — the garrison held (§4.2, §14, WP55).
-
-    All `fighters_lost` committed fighters died; the attacker takes an alignment hit and
-    the owner's consequence rail fires (grudge/spillover, §6.5).
-    """
-
-    player_id: int
-    planet_id: int
-    fighters_lost: int
 
 
 @dataclass(frozen=True)

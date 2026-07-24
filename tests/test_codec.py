@@ -53,7 +53,6 @@ from edge.core.events import (
     ColonyGrew,
     CombatRound,
     InterdictorToggled,
-    InvasionRepulsed,
     LimpetsRemoved,
     PlanetBanked,
     PlanetInvaded,
@@ -63,7 +62,6 @@ from edge.core.events import (
     ComponentPurchased,
     ComponentRemoved,
     CoreLawNotice,
-    Descended,
     DevApplied,
     DevicePurchased,
     DiscoveryCollected,
@@ -87,7 +85,6 @@ from edge.core.events import (
     ProtectorateEstablished,
     GrudgeFormed,
     HazardDamage,
-    SiteExplored,
     SurveyDug,
     SurveySiteExcavated,
     SurveyLanded,
@@ -161,9 +158,7 @@ from edge.core.rules import (
     DeployGenesis,
     DeployMines,
     Deposit,
-    Descend,
     Dock,
-    Explore,
     ExtractGroundOperation,
     FieldPatch,
     EndGroundTurn,
@@ -198,7 +193,6 @@ from edge.core.rules import (
     SwapComponent,
     BuildCitadel,
     BuyDevice,
-    InvadePlanet,
     LaunchProbe,
     PlanetDeposit,
     PlanetWithdraw,
@@ -248,7 +242,6 @@ COMMANDS: list[Command] = [
     PlanetWithdraw(planet_id=5, amount=500),         # WP54 treasury withdraw
     SetAllocation(planet_id=5, allocation={"equipment": 0.6}, fighter=0.4),  # WP55 garrison share
     SetAllocation(planet_id=5, allocation={"equipment": 0.5}, garrison=0.5),  # GW-WP09 ground garrison share
-    InvadePlanet(planet_id=5, fighters=200),         # WP55 ground assault
     TransferCargo(planet_id=5, commodity=Commodity.EQUIPMENT, units=120),  # §4.2 supply haul
     TransferCargo(planet_id=5, commodity=Commodity.ORGANICS, units=30, to_planet=False),
     TransferFighters(planet_id=5, count=15),  # GW-WP09 unload ship fighters onto a world
@@ -261,8 +254,6 @@ COMMANDS: list[Command] = [
     Cannibalize(Subsystem.FUSION_REACTOR, 0, starbase_id=4),  # WP4 starbase salvage
     FieldPatch(Subsystem.THRUSTERS, 0),
     Salvage(discovery_id=7),      # WP5 log a discovery to the codex
-    Descend(planet_id=5),         # WP6 descend to a planet surface
-    Explore(planet_id=5),         # WP6 survey the next surface site
     BeginSurvey(planet_id=5),     # GW-WP03 open a surface-survey expedition
     BeginAssault(planet_id=5),    # GW-WP09 open a tactical ground assault
     AnnexProtectorate(planet_id=5),  # GW-WP11 convert a recovered protectorate
@@ -366,7 +357,6 @@ EVENTS: list[Event] = [
     PlanetBanked(1, 5, "deposit", 1_000, 1_000),       # WP54 treasury move
     CitadelGunSilenced(1, 5),                          # WP55 gun knocked out
     PlanetInvaded(1, 5, 40, 500, 3_000),               # WP55 conquest
-    InvasionRepulsed(1, 5, 200),                       # WP55 failed assault
     ProbeReport(1, 42, 6, 2, 3, 1, False),             # WP56 probe recon
     InterdictorToggled(1, True),                       # WP56 interdictor engaged
     LimpetsRemoved(1, 4, 500),                         # WP56 limpets stripped
@@ -376,7 +366,6 @@ EVENTS: list[Event] = [
     StarbaseSalvaged(1, 4, "fusion_reactor", 0, "converter", "I"),
     DiscoveryDetected(1, 7, "wreck", "RARE"),
     DiscoveryCollected(1, 7, "wreck", "RARE", "artifact"),
-    Descended(1, 5),
     GroundOperationBegan(1, 123, "survey", 5),
     GroundOperationEnded(1, 123, "survey", "extracted"),
     GroundAssaultDropped(1, 123, 4, 0),                 # GW-WP10 platoon landed
@@ -396,7 +385,6 @@ EVENTS: list[Event] = [
     SurveyTalked(1, 123, 1, 9),
     BeltMined(1, 5, "equipment", 50),
     CloudCityBuilt(1, 5, 1, 50),
-    SiteExplored(1, 5, 9, "ruins", "RARE"),
     DevicePurchased(1, "genesis_torpedo", 15_000),
     GenesisDeployed(1, 5, "terrestrial_warm"),
     TurnsReset(1, 250),

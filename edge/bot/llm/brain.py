@@ -61,7 +61,7 @@ Practical rules:
    "commodity": "", "units": 0, "planet_id": 0, "species_id": 0,
    "discovery_id": 0, "starbase_id": 0, "offer_index": -1, "subsystem": "",
    "slot_index": -1, "count": 0}
-- You must dock before trading, and descend before exploring a surface.
+- You must dock before trading.
 - Markets, Stardock facilities, and orbital starbases are different destinations. Use
   `dock_trading_port` only to enter a port's commodities market and trade. At Stardock, use
   `dock_stardock`

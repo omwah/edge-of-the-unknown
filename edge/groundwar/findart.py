@@ -145,12 +145,44 @@ def _draw_beacon(canvas: Canvas, rng: random.Random, accent: str) -> None:
         _text(canvas, cx - 2, base + 1, "▔▔▔▔▔", "grey42")
 
 
+def _draw_hulk(canvas: Canvas, rng: random.Random, accent: str) -> None:
+    """A derelict ship's hull, buried nose-down and split open on impact: cracked
+    plating rising toward a jagged torn stern, a snapped antenna canted over the
+    wreck, and a scorched debris trail where it came down."""
+    base = ART_H - 4
+    cx = ART_W // 2
+    span = 9
+    heights: list[int] = []
+    for i in range(-span, span + 1):
+        h = max(1, 2 + (i + span) // 3)
+        if i > span - 3:  # the torn stern — ragged, not a clean break
+            h = max(1, h + rng.choice((-1, 0, 1)))
+        heights.append(h)
+        x = cx + i
+        for dy in range(h):
+            ch = rng.choice("▛▜") if dy == h - 1 and rng.random() < 0.3 else "█"
+            _put(canvas, x, base - dy, ch, "grey58" if (x + dy) % 3 else "grey42")
+    # A dark gash amidships, exposing the interior.
+    for dy in range(2):
+        _put(canvas, cx - 1, base - heights[span - 1] - dy, "╳", f"bold {accent}")
+    # The snapped antenna, canted over the torn stern.
+    ax, ay = cx + span - 2, base - heights[-3]
+    for dy in range(3):
+        _put(canvas, ax + dy, ay - 1 - dy, "╱", "grey66")
+    _put(canvas, ax + 3, ay - 4, "◆", f"bold {accent}")
+    # Scorched debris trail where it came down.
+    for _ in range(5):
+        sx = cx + rng.randint(-span, span)
+        _put(canvas, sx, base + 1, rng.choice("▒░"), "grey42")
+
+
 _DRAW = {
     "colonnade": _draw_colonnade,
     "cache": _draw_cache,
     "obelisk": _draw_obelisk,
     "leviathan": _draw_leviathan,
     "beacon": _draw_beacon,
+    "hulk": _draw_hulk,
 }
 
 _SKY = ["grey7", "grey11", "grey15", "dark_slate_gray1"]
@@ -160,6 +192,7 @@ _SKIES = {  # per-kind dawn palettes, darkest band first
     "obelisk": ["grey7", "grey15", "deep_sky_blue4", "steel_blue"],
     "leviathan": ["grey7", "grey15", "grey30", "tan"],
     "beacon": ["grey7", "grey11", "dark_green", "green4"],
+    "hulk": ["grey7", "grey15", "grey35", "dark_red"],
 }
 
 

@@ -22,8 +22,8 @@ from rich.text import Text
 from edge.bot.runner import BotRunner
 from edge.core.enums import Commodity, Component, ComponentTier, Subsystem
 from edge.core.rules import (
-    BuyAlienTech, BuyComponent, BuyRumor, Colonize, CombatAction, Deposit, Descend, Dock,
-    Explore, Hail, InstallComponent, MineBelt, RecruitColonists, Salvage, SwapComponent,
+    BuyAlienTech, BuyComponent, BuyRumor, Colonize, CombatAction, Deposit, Dock,
+    Hail, InstallComponent, MineBelt, RecruitColonists, Salvage, SwapComponent,
     Trade, TravelTo, Warp, Withdraw,
 )
 
@@ -48,8 +48,6 @@ _NORMAL_ACTIONS: list[tuple[str, str]] = [
     ("withdraw", "withdraw {count} — withdraw that many banked slips at a service point"),
     ("buy_rumor", "buy_rumor — buy one fresh lead from the Stardock tavern"),
     ("salvage", "salvage {discovery_id} — collect/log a salvageable discovery here"),
-    ("descend", "descend {planet_id} — land on a planet here to survey its surface"),
-    ("explore", "explore {planet_id} — reveal the next surface site of a planet you descended on"),
     ("mine_belt", "mine_belt {planet_id} — hand-mine an asteroid belt here for equipment"),
     ("hail", "hail {species_id} — open peaceful contact with an alien ship here"),
     ("buy_tech", "buy_tech {species_id, offer_index} — buy a hailed species' tech offer"),
@@ -396,12 +394,6 @@ class ActionCatalog:
 
     def _do_salvage(self, decision: dict[str, Any]) -> ActionOutcome:
         return self._apply(Salvage(discovery_id=self._int_arg(decision, "discovery_id")))
-
-    def _do_descend(self, decision: dict[str, Any]) -> ActionOutcome:
-        return self._apply(Descend(planet_id=self._int_arg(decision, "planet_id")))
-
-    def _do_explore(self, decision: dict[str, Any]) -> ActionOutcome:
-        return self._apply(Explore(planet_id=self._int_arg(decision, "planet_id")))
 
     def _do_mine_belt(self, decision: dict[str, Any]) -> ActionOutcome:
         return self._apply(MineBelt(planet_id=self._int_arg(decision, "planet_id")))

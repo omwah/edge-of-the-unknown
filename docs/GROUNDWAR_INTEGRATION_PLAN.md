@@ -1408,7 +1408,22 @@ Default the new paths on and remove or migrate:
   `SurfaceScreen`;
 - one-roll `InvadePlanet` and its direct TUI prompt;
 - separate POC config loading and mutable duplicate production rules;
-- feature flags and compatibility shims no longer needed.
+- feature flags and compatibility shims no longer needed;
+- the legacy planet-surface-site art `SurfaceScreen` alone rendered: all four
+  `ruins`/`artifact`/`ancient_tech`/`crashed_ship` generators in
+  `edge/art/discovery.py` (and their `DISCOVERY_GRAMMAR`/`available_subtypes`
+  entries, plus the surface-scene scaffold only they used), superseded by the
+  GroundWar expedition field-sketch art (`edge/groundwar/findart.py`,
+  `edge/core/surface_finds.py`). `crashed_ship` gets a sixth Field Finds
+  identity ("hulk," with new field-sketch art in `findart.py`) rather than
+  being kept as a fallback — the interview decision that closed the gap the
+  WP07 migration note flagged ("crashed ships retain their existing generator
+  because the POC has no equivalent"). `edge/tui/widgets.py`'s sector-scene
+  `_paint_discovery` only ever hits the five free-floating kinds
+  (`nebula`/`black_hole`/`wormhole`/`wreck`/`entity`) per DESIGN §7, since
+  surface-site kinds never appear as sector-space discoveries. The
+  `DiscoveryKind` enum values themselves stay — they remain the authoritative
+  mechanical category — only the old presentation layer goes.
 
 Keep reusable POC launcher/play-test support pointed at production rules. Update
 `DESIGN.md`, `GROUNDWAR_POC.md`, UI/keymap docs, scripting/service docs, wire
@@ -1419,6 +1434,37 @@ Files: repository-wide removal/update set.
 Tests: no references to retired commands/views; full `pixi run check`; portable
 save/rebuild; hosted-client smoke; manual exit-criterion record.
 Commit `ground: GW-WP14 retire abstract surface/invasion paths` — **GW-M4 done.**
+
+**Status: SHIPPED 2026-07-23.** Removed `Descend`/`Explore` (rules + `Descended`/
+`SiteExplored` events + `SurfaceDTO`/`SurfaceSite`/`surface_view` read method/RPC
+whitelist entry), one-roll `InvadePlanet` (rules + `citadels.resolve_invasion`/
+`citadel_defense_mult`/`InvasionOutcome`/`conquer` + `InvasionRepulsed` event +
+`PlanetDTO.can_invade`/`invade_blocker`/`ship_fighters` + the `[I]` PlanetScreen
+prompt), `edge/tui/screens/surface.py`, `edge/server/terrain.py`, and the dead
+`descent_turn_cost`/`explore_turn_cost`/`surface_terrain_height` config fields
+(kept `surface_site_chance`/`surface_sites_max`/`surface_kinds`/
+`surface_hidden_min_rank` — still read by `edge/bigbang/discoveries.py`
+generation, unrelated to the retired commands). `PlanetInvaded` (the conquest
+event) and `is_landable`/`has_gun`/`siege_shielded` stayed — confirmed shared
+with the GW-WP11 tactical-assault settlement path and `ground_access`. All four
+legacy surface-site art generators retired per the art-layer note above;
+`edge/core/surface_finds.py`'s find-modal fallback in `ground_expedition.py`
+collapsed to the single always-mapped path now that every surface `DiscoveryKind`
+has a Field Finds identity. `WIRE_VERSION` 35→36 (RPC method + codec surface
+changed); `config_version` unchanged (no `AUTHORITATIVE_STATE_FIELDS`-relevant
+shape touched by this WP). Two gaps found outside the plan's original file list
+during a repo-wide sweep and fixed in the same pass: `edge/bot/llm/actions.py`
+(the dev-only LLM pilot) still called `Descend`/`Explore` — its vocabulary
+entries and system-prompt line describing them were removed; `tests/test_discovery_art.py`
+and `tests/test_surface_finds.py` asserted the pre-redirect `crashed_ship → None`
+behavior and needed updating for the "hulk" mapping. `docs/ui/shots/surface.svg`
+and its five snapshot baselines deleted; `test_planet_sizes[wide]`'s baseline
+regenerated (the `[I] Invade` footer entry is gone from the wide-tier render).
+`test_options_modal` remains failing — confirmed pre-existing on a clean stash
+(unrelated to this WP, not chased). Full suite green otherwise. The
+`edge-groundwar` POC retarget (the "mutable duplicate production rules" bullet)
+lands as its own follow-up pass in the same session — see the commit that closes
+GW-M4.
 
 ### GW-WP15 — Cloud City station-interior terrain and art (L)
 

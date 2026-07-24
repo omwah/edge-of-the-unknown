@@ -170,10 +170,11 @@ class Planet:
     gun_integrity: int = 0  # the citadel gun's health (L2+); 0 ⇒ no gun or gun silenced (WP55)
     fighter_allocation: float = 0.0  # share of production minting garrison fighters (WP55)
     # Persistent ground-defense garrison (GW plan D11, GW-WP09): a finite, casualty-reducible
-    # headcount, distinct from `fighters` (a space asset committed via legacy InvadePlanet).
-    # Fed by big-bang seeding, ownership-independent militia recovery, and colonist-allocation
-    # training (`garrison_allocation`, owner-only); `garrison_armor` is native-seeded/auto-
-    # recovering only — no player rail ever creates it (ReinforceGarrison adds infantry only).
+    # headcount, distinct from `fighters` (a space asset for sector/orbital defense, moved
+    # via `TransferFighters`). Fed by big-bang seeding, ownership-independent militia
+    # recovery, and colonist-allocation training (`garrison_allocation`, owner-only);
+    # `garrison_armor` is native-seeded/auto-recovering only — no player rail ever creates
+    # it (ReinforceGarrison adds infantry only).
     garrison_infantry: int = 0
     garrison_armor: int = 0
     garrison_allocation: float = 0.0  # colonist-output share diverted to garrison training

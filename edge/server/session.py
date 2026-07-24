@@ -21,7 +21,6 @@ from edge.dialogue.intel import pick_intel_target, pick_rumor
 from edge.core import dto
 from edge.server import mapgraph
 from edge.server import navstrip
-from edge.server import terrain as terrain_art
 from edge.core import citadels
 from edge.core import combat
 from edge.core import contracts
@@ -39,7 +38,7 @@ from edge.core.aliens import (
     seizure_progress,
 )
 from edge.core.config import DialogueChoice, GameConfig
-from edge.core.discovery import entity_contactable, entity_species, is_detectable
+from edge.core.discovery import entity_contactable, entity_species
 from edge.core.economy import EconomyError, haggle_acceptance_probability, port_unit_price
 from edge.core.engine_room import EngineRoomError, build_subsystems, derive_aspects
 from edge.core.movement import RoutePlan, one_way_exits, plan_route, plan_route_legs
@@ -82,9 +81,7 @@ from edge.core.events import (
     ComponentRemoved,
     CoreLawNotice,
     BeltMined,
-    Descended,
     InterdictorToggled,
-    InvasionRepulsed,
     LimpetsRemoved,
     PlanetBanked,
     PlanetInvaded,
@@ -112,7 +109,6 @@ from edge.core.events import (
     GroundOperationEnded,
     GroundTurnEnded,
     HazardDamage,
-    SiteExplored,
     SurveyDug,
     SurveySiteExcavated,
     SurveyTalked,
@@ -782,22 +778,6 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
             nxt = config.citadels.levels[planet.citadel_level]  # next level's config
             can_build = True
             next_cost = (nxt.cost_equipment, nxt.cost_latinum)
-    # Invasion affordance (§4.2, WP55): a hostile owned world outside the Core, with its
-    # base razed, gun silenced, and no siege shield — the ladder the reducer enforces.
-    can_invade = False
-    invade_blocker = ""
-    if (config.citadels is not None and planet.owner.is_owned and not owned_by_you
-            and not state.sectors[planet.sector_id].is_galactic_core):
-        if any(b.sector_id == planet.sector_id and is_operational(b) for b in state.starbases.values()):
-            invade_blocker = "raze the orbital base first"
-        elif citadels.has_gun(planet, config):
-            invade_blocker = "silence the citadel gun first"
-        elif citadels.siege_shielded(planet, config, base_operational=False):
-            invade_blocker = "the siege shield holds"
-        elif ship.fighters < 1:
-            invade_blocker = "no fighters aboard to commit"
-        else:
-            can_invade = True
     # Garrison (§4.2, GW-WP09, D11/D15): a straight readout plus the reinforce affordance,
     # gated the same way the citadel/invasion blocks above gate on ownership.
     ship_suits = [(sid, n) for sid, n in ship.suits.items() if n > 0]
@@ -845,7 +825,6 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         citadel_build_target=citadel_target, citadel_build_pct=citadel_pct,
         can_build_citadel=can_build, citadel_next_cost=next_cost,
         fighter_allocation_pct=round(planet.fighter_allocation * 100),
-        can_invade=can_invade, invade_blocker=invade_blocker, ship_fighters=ship.fighters,
         landable=is_landable(planet.planet_type, config),
         extractable=is_extractable(planet.planet_type, config),
         mine_yield=(belt_mining_yield(planet, config) or (None, 0))[1],
@@ -1215,12 +1194,6 @@ def _cached_survey_map_for(
     return smap
 
 
-_SITE_NAME = {
-    "ruins": "Ruins", "artifact": "Artifact Cache", "ancient_tech": "Ancient Tech",
-    "crashed_ship": "Crashed Ship",
-}
-
-
 def _payload_lines(payload: object) -> list[str]:
     """Human-readable detail lines for a revealed site's payload (§7)."""
     from edge.core.enums import PayloadKind
@@ -1241,52 +1214,6 @@ def _payload_lines(payload: object) -> list[str]:
         )
         return lines
     return [payload.lore or "a fragment of lore"]
-
-
-def surface_view(state: UniverseState, player_id: int, planet_id: int, config: GameConfig) -> dto.SurfaceDTO:
-    """The descended-planet view: terrain + surface sites with explore/log state (§7, WP6)."""
-    planet = state.planets[planet_id]
-    ship = state.ships[state.players[player_id].ship_id]
-    detected = state.players[player_id].detected
-    sites_src = sorted(
-        (d for d in state.discoveries.values() if d.planet_id == planet_id),
-        key=lambda d: d.site_slot,
-    )
-    sites: list[dto.SurfaceSite] = []
-    explorable = False
-    for site in sites_src:
-        explored = site.id in detected
-        collected = site.found_by is not None
-        masked = site.hidden and not explored  # an unsurveyed hidden site stays unknown
-        if not (explored or collected) and is_detectable(site, ship.sensor_rating, in_nebula=False, config=config):
-            explorable = True
-        marker = "[?]" if masked else f"[{site.site_slot + 1}]"
-        status = "logged" if collected else ("explored" if explored else "unexplored")
-        if collected:
-            payload = ["[dim]logged to codex[/]"]
-        elif explored:
-            payload = _payload_lines(site.payload)
-        elif masked:
-            payload = ["[dim]needs a sensor sweep[/]"]
-        else:
-            payload = ["[dim]survey to reveal[/]"]
-        sites.append(dto.SurfaceSite(
-            marker=marker,
-            name="(unsurveyed)" if masked else _SITE_NAME.get(site.kind.value, site.kind.value),
-            rarity="?" if masked else site.rarity_tier.name.capitalize(),
-            status=status, payload=payload, discovery_id=site.id,
-            salvageable=explored and not collected,
-            kind="" if masked else site.kind.value,  # "" hides the kind (and its art) until surveyed
-        ))
-    terrain = terrain_art.render_terrain(
-        planet.planet_type, sites, seed=state.game.seed, planet_id=planet_id,
-    )
-    return dto.SurfaceDTO(
-        planet=planet.name, descent_fuel="n/a", terrain=terrain, sites=sites,
-        planet_id=planet_id, explorable=explorable,
-        terrain_blurb=terrain_art.blurb_for(planet.planet_type),
-        ptype=planet.planet_type,
-    )
 
 
 def corp_view(state: UniverseState, player_id: int, config: GameConfig) -> dto.CorpDTO | None:
@@ -2697,8 +2624,6 @@ def format_event(event: Event) -> str:
         return f"[green]Bought {event.device_id.replace('_', ' ')}[/]  (-{event.cost} slips)"
     if isinstance(event, GenesisDeployed):
         return f"[green]✦ Genesis: world re-formed to {event.new_type.replace('_', ' ')}[/]"
-    if isinstance(event, Descended):
-        return "[magenta]▼ Descended to the surface.[/]"
     if isinstance(event, GroundOperationBegan):
         return "[magenta]▼ Survey expedition deployed.[/]" if event.kind == "survey" \
             else "[red]▼ Ground assault deployed.[/]"
@@ -2755,8 +2680,6 @@ def format_event(event: Event) -> str:
         return "[yellow]⚑ The protectorate is annexed into sovereign territory.[/]"
     if isinstance(event, BeltMined):
         return f"[green]⛏ Mined {event.amount} {event.commodity.replace('_', ' ')} from the belt.[/]"
-    if isinstance(event, SiteExplored):
-        return f"[cyan]✦ Site surveyed: {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
     if isinstance(event, DiscoveryDetected):
         return f"[cyan]✦ Sensors: {event.kind.replace('_', ' ')} ({event.rarity.lower()})[/]"
     if isinstance(event, DiscoveryCollected):
@@ -2844,8 +2767,6 @@ def format_event(event: Event) -> str:
     if isinstance(event, PlanetInvaded):
         return (f"[green]⚑ The world is taken — {event.colonists:,} colonists spared, "
                 f"{event.loot:,} slips seized (lost {event.fighters_lost} fighters).[/]")
-    if isinstance(event, InvasionRepulsed):
-        return f"[red]✖ The ground assault is thrown back — {event.fighters_lost} fighters lost.[/]"
     if isinstance(event, ProbeReport):
         if event.destroyed:
             return f"[yellow]◈ Probe lost — charted {event.sectors_charted} new sectors before it fell.[/]"
@@ -2910,7 +2831,7 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
     if isinstance(event, (Traded, Haggled)):
         port = state.ports.get(event.port_id)
         return port.sector_id if port is not None else None
-    if isinstance(event, (GenesisDeployed, Descended, BeltMined, SiteExplored, Colonized, ColonistsSettled, ColonyGrew, PlanetProduced)):
+    if isinstance(event, (GenesisDeployed, BeltMined, Colonized, ColonistsSettled, ColonyGrew, PlanetProduced)):
         planet = state.planets.get(event.planet_id)
         return planet.sector_id if planet is not None else None
     if isinstance(event, (DiscoveryDetected, DiscoveryCollected)):
@@ -2927,7 +2848,7 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
         ship = state.ships.get(player.ship_id)
         return ship.sector_id if ship is not None else None
     if isinstance(event, (
-        CitadelGunSilenced, PlanetInvaded, InvasionRepulsed,
+        CitadelGunSilenced, PlanetInvaded,
         GroundAssaultSettled, ProtectorateEstablished, ProtectorateAnnexed,
     )):
         planet = state.planets.get(event.planet_id)
@@ -2954,7 +2875,7 @@ _SECTOR_PUBLIC_EVENTS: tuple[type[Event], ...] = (
     Warped, AlienMoved, AlienDestroyed, ShipDestroyed, StarbaseRazed, TerritoryDeployed, HazardDamage,
     EncounterStarted, EncounterEvaded, EncounterEnded, CombatRound, ComponentKnockedOut,
     SalvageCollected, GrudgeFormed, GenesisDeployed, CitadelGunSilenced, PlanetInvaded,
-    InvasionRepulsed, GroundAssaultSettled, ProtectorateEstablished,
+    GroundAssaultSettled, ProtectorateEstablished,
     ProtectorateAnnexed, PortOrderFilled, PlayerAttacked,
 )
 
@@ -3039,18 +2960,14 @@ def _event_turn_cost(event: Event, config: GameConfig) -> int:
     """Turns an event spent — used to reconstruct the day/turn each log line is stamped with.
 
     Mirrors the turn costs the reducers charge (§9): warps carry their own cost, docking is
-    one turn, and the descent/explore/salvage actions read the discovery config (defaulting
-    to 1 like the reducers do). Every other event is free, so it shares the running turn.
+    one turn, and salvage reads the discovery config (defaulting to 1 like the reducer
+    does). Every other event is free, so it shares the running turn.
     """
     if isinstance(event, Warped):
         return event.turn_cost
     if isinstance(event, Docked):
         return 1
     disc = config.discovery
-    if isinstance(event, Descended):
-        return disc.descent_turn_cost if disc is not None else 1
-    if isinstance(event, SiteExplored):
-        return disc.explore_turn_cost if disc is not None else 1
     if isinstance(event, DiscoveryCollected):
         return disc.salvage_turn_cost if disc is not None else 1
     if isinstance(event, BeltMined):
