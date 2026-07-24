@@ -31,6 +31,7 @@ from edge.core.models import UniverseState
 from edge.core.movement import MovementError
 from edge.core.rules import BeginAssault, BeginSurvey
 from edge.groundwar import harness
+from edge.groundwar.interior_preview import CloudCityPreviewScreen
 from edge.server.client import LocalClient
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
@@ -80,9 +81,17 @@ production derives the battlefield and garrison from.
 [b]Expedition[/] — pick inhabited (friendly, settlements resupply and hint) or \
 uninhabited (no help, sites anywhere).
 
+[b]Cloud City preview[/] — a read-only look at the GW-WP15 station-interior \
+generator and art: no reducer runs yet (the live gate stays off until GW-WP16), \
+so this just renders a generated layout. Pick a size and PREVIEW; the preview \
+screen's own [b]?[/]-adjacent hints show its size/reroll keys.
+
 Once you drop or land, you are on the exact screen the live game uses — see its \
 own [b]?[/] help for controls.\
 """
+
+    # Cycled by the Mode button, in this order.
+    _MODES = ("assault", "expedition", "cloud_city")
 
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen(self))
@@ -92,10 +101,11 @@ own [b]?[/] help for controls.\
         self.config = config
         self.gw = config.groundwar
         assert self.gw is not None
-        self.mode = "assault"  # or "expedition"
+        self.mode = "assault"  # one of _MODES
         self.inhabited = True
         self.planet_idx = 0
         self.difficulty_idx = 1  # default "Assault"
+        self.cloud_city_size = 1
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="setup"):
@@ -108,6 +118,7 @@ own [b]?[/] help for controls.\
                 yield Button("Planet type", id="planet")
                 yield Button("Difficulty", id="difficulty")
                 yield Button("World", id="world")
+                yield Button("City size", id="city-size")
             with Horizontal(classes="row"):
                 yield Input(placeholder="seed (blank = random)", id="seed")
             yield PlatoonComposer(
@@ -118,24 +129,31 @@ own [b]?[/] help for controls.\
                 id="composer")
             with Horizontal(classes="row", id="land-row"):
                 yield Button("LAND!", id="land", variant="success")
+            with Horizontal(classes="row", id="preview-row"):
+                yield Button("PREVIEW", id="preview", variant="success")
 
     def on_mount(self) -> None:
         self._update()
 
     def _update(self) -> None:
         expedition = self.mode == "expedition"
+        cloud_city = self.mode == "cloud_city"
+        assault = self.mode == "assault"
         planet = PLANET_TYPES[self.planet_idx]
         label, cap, citadel = _ASSAULT_PRESETS[self.difficulty_idx]
-        self.query_one("#mode", Button).label = \
-            f"Mode: {'Expedition' if expedition else 'Assault'}"
+        self.query_one("#mode", Button).label = f"Mode: {self.mode.replace('_', ' ').title()}"
         self.query_one("#planet", Button).label = f"Planet: {planet}"
         self.query_one("#difficulty", Button).label = f"Difficulty: {label}"
         self.query_one("#world", Button).label = \
             f"World: {'inhabited' if self.inhabited else 'uninhabited'}"
-        self.query_one("#difficulty", Button).display = not expedition
+        self.query_one("#city-size", Button).label = f"City size: {self.cloud_city_size}"
+        self.query_one("#planet", Button).display = not cloud_city
+        self.query_one("#difficulty", Button).display = assault
         self.query_one("#world", Button).display = expedition
-        self.query_one("#composer", PlatoonComposer).display = not expedition
+        self.query_one("#city-size", Button).display = cloud_city
+        self.query_one("#composer", PlatoonComposer).display = assault
         self.query_one("#land-row", Horizontal).display = expedition
+        self.query_one("#preview-row", Horizontal).display = cloud_city
         brief = Text()
         if expedition:
             e = self.gw.expedition
@@ -147,6 +165,10 @@ own [b]?[/] help for controls.\
                 f"  {e.sites_min}–{e.sites_max} real sites · "
                 f"{'friendly settlements resupply and hint' if self.inhabited else 'no help down there'}\n",
                 "grey70")
+        elif cloud_city:
+            brief.append(
+                "GW-WP15 read-only preview: the interior generator + art, no reducer "
+                "yet — the live assault gate stays off until GW-WP16.\n", "grey70")
         else:
             brief.append(
                 "A demonstration raid, not extermination: drop, break their defenses, "
@@ -162,15 +184,22 @@ own [b]?[/] help for controls.\
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
         if bid == "mode":
-            self.mode = "expedition" if self.mode == "assault" else "assault"
+            self.mode = self._MODES[(self._MODES.index(self.mode) + 1) % len(self._MODES)]
         elif bid == "world":
             self.inhabited = not self.inhabited
         elif bid == "planet":
             self.planet_idx = (self.planet_idx + 1) % len(PLANET_TYPES)
         elif bid == "difficulty":
             self.difficulty_idx = (self.difficulty_idx + 1) % len(_ASSAULT_PRESETS)
+        elif bid == "city-size":
+            max_size = self.config.planets.cloud_city_max_size
+            self.cloud_city_size = self.cloud_city_size % max_size + 1
         elif bid == "land":
             self._launch_expedition(self._seed(), PLANET_TYPES[self.planet_idx])
+            return
+        elif bid == "preview":
+            self.app.push_screen(
+                CloudCityPreviewScreen(self.config, self.cloud_city_size, self._seed()))
             return
         self._update()
 

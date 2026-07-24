@@ -7,10 +7,10 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–12 shipped; interview decisions
-> resolved (July 2026), and GW-M3 is complete. Next: GW-WP13 (balance, bots,
-> performance, and multiplayer contention), which tunes and soaks the now-live
-> survey and tactical-assault paths.**
+> **Status: implementation underway — GW-WP01–15 shipped (GW-WP13 balance
+> tuning deliberately deferred); GW-M3/GW-M4 complete. Next: GW-WP16 (gated
+> Cloud City assault integration), which wires the GW-WP15 station-interior
+> generator/art into a real tactical assault and flips the live gate.**
 
 ## Context
 
@@ -1499,24 +1499,53 @@ engine) and the full quality suite. `edge/groundwar/findart.py`/`widgets.py`
 untouched throughout (confirmed live production dependencies). `docs/
 GROUNDWAR_POC.md` rewritten to describe the retargeted shape.
 
-### GW-WP15 — Cloud City station-interior terrain and art (L)
+### GW-WP15 — Cloud City station-interior terrain and art (L) — SHIPPED
 
-Design and implement the D9 interior-map vocabulary without reusing planetary
-biomes: pressure hulls, bulkheads, corridors, lifts/shafts, plazas/habitation,
-engineering, security doors, cover, vacuum/fire/electrical hazards, defensive
-emplacements, and a command/citadel core. Define a pure gameplay-feature grid
-below core and a separate glyph/color/art resolver above it, preserving G5.
+**Status: shipped July 2026.** Interview decisions this session (recorded in
+DESIGN.md's Cloud City section): a **flat single-level** map (lifts are
+same-grid teleport links, no z-axis); a new **wall-aware** structural art
+renderer for walls/doors specifically (planet terrain's per-cell glyph-pool
+style is kept for every other feature); hazards (`vacuum`/`fire`/`electrical`)
+are **inert data tags** this WP, no effects wired; and — diverging deliberately
+from the planet `move_cost: 0 ⇒ jump clears it` precedent — **jump-jets never
+bypass a wall or door on a station**, while a **`security_door` is destructible**
+(breach cost is GW-WP16) and may legally be the sole connector between two
+areas, whereas a plain `bulkhead` never may.
 
-Generation derives scale and district count from `cloud_city_size`, population,
-citadel/defense state, and seed. Every deployment zone, objective, and defender
-must share a traversable component, accounting for locked doors and jump/vertical
-movement rules. The standalone groundwar harness gains a Cloud City scenario for
-art/rules iteration while the live feature gate remains off.
+New pure `edge/core/groundwar/interior.py`: `generate_interior` BSP-partitions
+the map into `districts_base + districts_per_size × (size − 1)` rooms
+(`groundwar.cloud_city` config), carves `corridor` connections through a
+`bulkhead` ring (a `locked_door_frac` becoming `security_door` instead),
+drops `lift_pairs` teleport links, and sprinkles hazard/`cover_strut` cells.
+The connectivity invariant (every deployment zone/objective/defender slot in
+one component, doors passable, bulkhead never the sole connector) is checked
+by BFS with bounded retries (mirrors `edge.bigbang.generator`'s idiom),
+raising `InteriorGenerationError` on repeated failure. District count derives
+from `cloud_city_size` and the operation seed only — population/citadel-state
+scaling (as the original text sketched) is deferred; nothing yet reads
+population into interior generation. New `edge/art/interior.py`: per-cell
+glyph pools for floor features (reusing `edge.art.terrain`'s style), a
+16-case wall-junction box-drawing table for `bulkhead`/`security_door`, and a
+shared `LEGEND`. New terrain classes slot into the existing
+`GroundwarConfig.terrain: dict[str, GwTerrain]` mapping unchanged — no schema
+growth beyond the new `GwCloudCity` model.
 
-Files: new groundwar interior generator and art modules, `edge/art` station
-interior assets, config, standalone harness.
-Tests: deterministic generation; connectivity/reachability; feature/art registry
-coverage; compact/standard/wide viewport snapshots; visual review sheet.
+The standalone `edge-groundwar` harness gained a **read-only preview mode**
+(`edge/groundwar/interior_preview.py`, `CloudCityPreviewScreen`) reachable from
+`SetupScreen`'s Mode cycle — it calls the generator/art directly with no
+command/DTO/`GameService` involved (there is nothing to drive yet). The live
+gate (`groundwar.cloud_city_assault_enabled`) stays off; `ground_access` still
+routes every Cloud City `OrbitalOnly`.
+
+Files: `edge/core/groundwar/interior.py`, `edge/art/interior.py`,
+`edge/groundwar/interior_preview.py`, `edge/groundwar/app.py`,
+`edge/core/config.py`, `config/groundwar_default.yaml`.
+Tests: `tests/test_groundwar_interior.py` — determinism; many-seed connectivity
+across every city size (1..`planets.cloud_city_max_size`); independent
+(non-reused) reachability re-check; config terrain-coverage validation
+(positive and negative); art/glyph registry coverage; the 16-case wall-junction
+table; compact/standard/wide `snap_compare` responsive snapshots of the preview
+screen (the "visual review sheet"); preview-screen reroll/resize key handling.
 Commit `ground: GW-WP15 Cloud City station-interior maps + art`.
 
 ### GW-WP16 — Gated Cloud City assault integration (L/XL)
