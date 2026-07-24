@@ -118,6 +118,15 @@ class EdgeApp(App[None]):
             return self._remote_service  # type: ignore[return-value]
         return self.client.service if isinstance(self.client, LocalClient) else None
 
+    def _initial_screen(self) -> Screen[None]:
+        """The screen `on_mount` pushes for local (non-remote-play) sessions.
+
+        A seam for a subclass that wants the same chrome/theme/client wiring but a
+        different entry point than the main menu (`edge.groundwar.app.GroundwarApp`,
+        GW-WP14).
+        """
+        return MainMenuScreen()
+
     def on_mount(self) -> None:
         for theme in EDGE_THEMES:
             self.register_theme(theme)
@@ -129,7 +138,7 @@ class EdgeApp(App[None]):
             from edge.tui.screens.lobby import LobbyScreen
             self.push_screen(LobbyScreen(self._connect_url))
         else:
-            self.push_screen(MainMenuScreen())
+            self.push_screen(self._initial_screen())
         self.call_after_refresh(self._apply_layout_class)
         if self._settings_warning:
             self.call_after_refresh(
