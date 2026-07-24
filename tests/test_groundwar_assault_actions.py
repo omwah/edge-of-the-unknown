@@ -161,7 +161,7 @@ def test_jump_charges_deplete_and_reject_when_spent() -> None:
     assert _passable(amap, *b)
     for i in range(charges):
         target = b if i % 2 == 0 else a
-        op, _hit = ga.assault_jump(op, amap, CFG, rng, tid, *target)
+        op, _hit, _log = ga.assault_jump(op, amap, CFG, rng, tid, *target)
         op, _ = ga.assault_end_turn(op, amap, CFG, rng)  # refresh actions/charges-gate between jumps
     trooper = next(t for t in op.platoon if t.id == tid)
     assert trooper.jump_charges == 0
@@ -298,7 +298,7 @@ def test_broadcast_succeeds_once_city_is_fully_silenced() -> None:
             s.hp = 0
     op = ga._freeze_battle(op, battle)  # noqa: SLF001
     tid = op.platoon[0].id
-    new_op = ga.assault_broadcast(op, amap, CFG, tid)
+    new_op, _log = ga.assault_broadcast(op, amap, CFG, tid)
     assert city.id in new_op.broadcast_cities
     assert new_op.resolve < op.resolve
 

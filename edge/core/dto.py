@@ -305,6 +305,7 @@ class AssaultExpeditionDTO:
     surrender_threshold: int
     casualties: int
     initial_strength: int
+    casualty_ceiling: float = 0.0  # fraction of initial_strength lost before doctrine abort
     selected_actor_id: int = 0
     outcome: str | None = None
     dropped: bool = False

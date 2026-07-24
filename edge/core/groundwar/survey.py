@@ -589,15 +589,16 @@ class SurveyActionResult:
 
     `operation` is the new (frozen) `SurveyOperation`; `main_turns` are main-game turns to
     charge (movement only, D4/D12); `excavated_id` is the discovery a dig uncovered (the
-    reducer settles its artifact/codex reward, D6); `resupply` and `logs` are for the event
-    log / UI.
+    reducer settles its artifact/codex reward, D6); `resupply` is a supply gain to surface in
+    the event log; `already_dug` distinguishes a free re-dig of fully-spent ground from a
+    fresh dry hole (both leave `excavated_id` None).
     """
 
     operation: SurveyOperation
     main_turns: int = 0
     excavated_id: int | None = None
     resupply: int = 0
-    logs: tuple[str, ...] = ()
+    already_dug: bool = False
 
 
 def _threshold_cost(local_from: int, local_to: int, config: GameConfig) -> int:
@@ -665,16 +666,12 @@ def survey_move(op: SurveyOperation, smap: SurveyMap, config: GameConfig,
             break
     if turns == 0:
         raise MovementError("not enough turns to advance the march — extract to orbit")
-    logs: list[str] = []
     outcome = op.outcome
     if halt == "supplies":
         outcome = "exhausted"
-        logs.append("Supplies spent — the shuttle recalls you to orbit. What you found stays found.")
-    if turns > 1:
-        logs.append(f"A march of {turns} turns.")
     op2 = replace(op, explorer_x=ex, explorer_y=ey, supplies=supplies,
                   local_turn=local_turn, outcome=outcome)
-    return SurveyActionResult(operation=op2, main_turns=charged, logs=tuple(logs))
+    return SurveyActionResult(operation=op2, main_turns=charged)
 
 
 def survey_dig(op: SurveyOperation, smap: SurveyMap, config: GameConfig) -> SurveyActionResult:
@@ -692,8 +689,7 @@ def survey_dig(op: SurveyOperation, smap: SurveyMap, config: GameConfig) -> Surv
     trench = dig_trench(smap, config, op.explorer_x, op.explorer_y)
     trench_set = set(trench)
     if trench_set <= op.dug_cells:
-        return SurveyActionResult(
-            operation=op, logs=("You already turned this ground over — nothing here.",))
+        return SurveyActionResult(operation=op, already_dug=True)
     dug = op.dug_cells | frozenset(trench)
     hits = [s for s in smap.sites if not s.found and (s.x, s.y) in trench_set]
     if hits:
@@ -706,24 +702,24 @@ def survey_dig(op: SurveyOperation, smap: SurveyMap, config: GameConfig) -> Surv
         op2 = replace(op, dug_cells=dug, supplies=op.supplies + gained,
                       resolved_discovery_ids=resolved, outcome=outcome)
         return SurveyActionResult(
-            operation=op2, excavated_id=site.discovery_id, resupply=gained,
-            logs=(f"Your spade rings on worked stone — {site.name}!",))
+            operation=op2, excavated_id=site.discovery_id, resupply=gained)
     supplies = max(0, op.supplies - exp.dig_cost)
     outcome = op.outcome
-    logs = ["You open a trench: nothing but soil and stones."]
     if supplies <= 0 and outcome is None:
         outcome = "exhausted"
-        logs.append("Supplies spent — the shuttle recalls you to orbit.")
     op2 = replace(op, dug_cells=dug, supplies=supplies, outcome=outcome)
-    return SurveyActionResult(operation=op2, logs=tuple(logs))
+    return SurveyActionResult(operation=op2)
 
 
 def survey_talk(op: SurveyOperation, smap: SurveyMap, config: GameConfig) -> SurveyActionResult:
-    """Talk to a settlement the explorer stands in (GW-WP06, D5).
+    """Talk to a settlement the explorer stands in (GW-WP06, D5, GW-WP13-FU1).
 
-    Resupplies (capped at the start amount) and, if any unhinted unfound site remains, narrows
-    the nearest one's search circle — recorded in `hinted_discovery_ids`, which persists across
-    descents (D5). A site is hinted at most once. Costs no main-game turns.
+    Resupplies (capped at the start amount) and, if this settlement hasn't already
+    given its hint and any unhinted unfound site remains, narrows the nearest one's
+    search circle — recorded in `hinted_discovery_ids`, which persists across descents
+    (D5). Each *settlement* gives at most one hint ever (`hinted_settlement_ids`,
+    ported from the POC's per-town cap), so working a survey means visiting several
+    towns rather than talking to one repeatedly. Costs no main-game turns.
     """
     if op.outcome is not None:
         raise MovementError("the expedition has ended — extract to orbit")
@@ -733,17 +729,15 @@ def survey_talk(op: SurveyOperation, smap: SurveyMap, config: GameConfig) -> Sur
     if town is None:
         raise MovementError("no settlement here to talk to")
     gained = max(0, min(exp.supplies_start, op.supplies + exp.settlement_resupply) - op.supplies)
-    logs: list[str] = []
-    if gained > 0:
-        logs.append(f"The people of {town.name} refill your packs: +{gained} supplies.")
-    candidates = [s for s in smap.sites
-                  if not s.found and s.discovery_id not in op.hinted_discovery_ids]
     hinted = op.hinted_discovery_ids
-    if candidates:
-        site = min(candidates, key=lambda s: _dist(town.cx, town.cy, s.x, s.y))
-        hinted = op.hinted_discovery_ids | {site.discovery_id}
-        logs.append(f"An elder of {town.name} recalls old stones nearby — your chart circle tightens.")
-    else:
-        logs.append(f"{town.name} wishes you fair digging.")
-    op2 = replace(op, supplies=op.supplies + gained, hinted_discovery_ids=hinted)
-    return SurveyActionResult(operation=op2, resupply=gained, logs=tuple(logs))
+    hinted_towns = op.hinted_settlement_ids
+    if town.id not in hinted_towns:
+        candidates = [s for s in smap.sites
+                      if not s.found and s.discovery_id not in op.hinted_discovery_ids]
+        if candidates:
+            site = min(candidates, key=lambda s: _dist(town.cx, town.cy, s.x, s.y))
+            hinted = op.hinted_discovery_ids | {site.discovery_id}
+            hinted_towns = op.hinted_settlement_ids | {town.id}
+    op2 = replace(op, supplies=op.supplies + gained, hinted_discovery_ids=hinted,
+                  hinted_settlement_ids=hinted_towns)
+    return SurveyActionResult(operation=op2, resupply=gained)

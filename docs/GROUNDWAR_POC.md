@@ -89,7 +89,18 @@ Production deliberately changes the prototype's surrounding economy and state:
   annexation requires elapsed time, recovered Resolve, and explicit political
   consequences; and
 - mission survivors return to the ship, while a separate confirmed reinforcement
-  action irreversibly converts recruits+suits into typed local defenders.
+  action irreversibly converts recruits+suits into typed local defenders;
+- a survey march no longer auto-halts the instant fresh disturbed ground comes into
+  sight — a clue stays visible on the map for the whole march anyway, so the
+  auto-stop cost more clicks than it saved (GW-WP13-FU1 parity audit);
+- the scanner heat-map overlay defaults **off** rather than on, toggled with the
+  same key as before (GW-WP13-FU1 parity audit); and
+- pre-drop, the assault screen paints a coarse, fixed-radius AA hazard zone around
+  each city's center rather than the POC's exact-battery-position radar — doctrine
+  knowledge of a city's footprint, not sensor telemetry, so a remote client still
+  cannot reverse-engineer interior defense placement before a trooper has actually
+  seen it (GW-WP13-FU1, restoring *some* landing-danger read without reintroducing
+  the leak GW-WP12 removed).
 
 ## Balance snapshot
 

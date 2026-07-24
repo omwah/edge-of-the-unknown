@@ -28,6 +28,7 @@ from edge.core.rules import (
 )
 from edge.core.surface_finds import surface_find_name
 from edge.store.snapshots import state_hash
+from edge.store.state_codec import encode_state, restore_state
 
 CFG = load_default_config()
 EXP = CFG.groundwar.expedition  # type: ignore[union-attr]
@@ -223,6 +224,25 @@ def test_talk_resupplies_and_hints_once() -> None:
     assert hinted <= set(_op(st).hinted_discovery_ids)
 
 
+def test_talk_caps_hints_per_settlement_not_per_survey() -> None:
+    """GW-WP13-FU1: a settlement gives its one hint and no more, even if unhinted sites
+    remain elsewhere — restores the POC's per-town cap (a survey-wide cap let one town
+    dispense every remaining hint if talked to repeatedly)."""
+    st = _world(inhabited=True, sites=3)
+    _begin(st)
+    smap = gw.survey_map_for(st, _op(st), CFG)
+    town = smap.settlements[0]  # repeated talk to *this same* town, regardless of how many exist
+    st.players[1] = replace(  # type: ignore[index]
+        st.players[1], ground_operation=replace(_op(st), explorer_x=town.cx, explorer_y=town.cy))
+    apply_result(st, reduce(st, 1, SurveyTalk(_op(st).operation_id), CFG))
+    op = _op(st)
+    assert len(op.hinted_discovery_ids) == 1
+    assert op.hinted_settlement_ids == frozenset({town.id})
+    # Two unhinted sites remain, but this town has already given its one hint.
+    apply_result(st, reduce(st, 1, SurveyTalk(op.operation_id), CFG))
+    assert _op(st).hinted_discovery_ids == op.hinted_discovery_ids  # unchanged
+
+
 def test_talk_off_settlement_rejected() -> None:
     st = _world(inhabited=True, sites=1)
     _begin(st)
@@ -249,6 +269,8 @@ def test_position_and_hints_persist_while_trenches_and_supplies_reset() -> None:
     before_map = gw.survey_map_for(st, before, CFG)
     saved_pos = (before.explorer_x, before.explorer_y)
     saved_hints = before.hinted_discovery_ids
+    saved_towns = before.hinted_settlement_ids
+    assert saved_towns, "the talked-to town should have used its hint"
     assert before.dug_cells  # a trench was laid
     apply_result(st, reduce(st, 1, ExtractGroundOperation(before.operation_id), CFG))
     apply_result(st, reduce(st, 1, BeginSurvey(1), CFG))
@@ -261,8 +283,30 @@ def test_position_and_hints_persist_while_trenches_and_supplies_reset() -> None:
     ]
     assert (after.explorer_x, after.explorer_y) == saved_pos  # position persists (D5)
     assert after.hinted_discovery_ids == saved_hints          # hints persist (D5)
+    assert after.hinted_settlement_ids == saved_towns         # per-town cap persists (GW-WP13-FU1)
     assert after.dug_cells == frozenset()                     # trenches reset
     assert after.supplies == EXP.supplies_start               # supplies reset
+
+
+def test_hinted_settlements_survive_a_checkpoint_round_trip() -> None:
+    """A silently-dropped `SurveyOperation`/`SurveyProgress` field resets to its default
+    on load with no error (the checkpoint contract's documented failure mode) — prove
+    `hinted_settlement_ids` actually survives `encode_state`/`restore_state`, not just
+    the in-process extract/begin round trip above."""
+    st = _world(inhabited=True, sites=2)
+    _begin(st)
+    smap = gw.survey_map_for(st, _op(st), CFG)
+    town = smap.settlements[0]
+    st.players[1] = replace(  # type: ignore[index]
+        st.players[1], ground_operation=replace(_op(st), explorer_x=town.cx, explorer_y=town.cy))
+    apply_result(st, reduce(st, 1, SurveyTalk(_op(st).operation_id), CFG))
+    apply_result(st, reduce(st, 1, ExtractGroundOperation(_op(st).operation_id), CFG))
+    saved_towns = st.players[1].ground_survey_progress[1].hinted_settlement_ids
+    assert saved_towns == frozenset({town.id})
+
+    payload, _checksum = encode_state(st)
+    restored = restore_state(st, payload)
+    assert restored.players[1].ground_survey_progress[1].hinted_settlement_ids == saved_towns
 
 
 # --- replay determinism ------------------------------------------------------

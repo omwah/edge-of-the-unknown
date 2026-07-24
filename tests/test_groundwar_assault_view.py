@@ -65,6 +65,32 @@ def test_selected_actor_legality_and_fog_match_pure_projection() -> None:
     assert all((unit.x, unit.y) in projected.visible for unit in view.garrison)
 
 
+def test_pre_drop_projection_paints_a_coarse_city_hazard_not_exact_batteries() -> None:
+    """GW-WP13-FU1: the drop-placement screen gets *some* danger read (a fixed AA-range
+    radius around each city center — doctrine knowledge, not sensor telemetry), but
+    never leaks which cells inside a city actually hold a live battery."""
+    state = _reducer_world()
+    apply_result(state, reduce(state, 1, BeginAssault(1), CFG))
+    op = state.players[1].ground_operation
+    amap = ga.assault_map_for(state, op, CFG)
+    projected = ga.tactical_projection(op, amap, CFG)
+    assert not op.dropped
+    assert projected.visible == projected.reachable == projected.fireable == frozenset()
+    assert projected.aa_threat, "the pre-drop screen should show some landing hazard"
+    aa_range = CFG.groundwar.defenses.aa.range  # type: ignore[union-attr]
+    expected = set()
+    for city in amap.cities:
+        for y in range(max(0, city.cy - aa_range), min(amap.height, city.cy + aa_range + 1)):
+            for x in range(max(0, city.cx - aa_range), min(amap.width, city.cx + aa_range + 1)):
+                if (x - city.cx) ** 2 + (y - city.cy) ** 2 <= aa_range ** 2:
+                    expected.add((x, y))
+    # A plain filled disc around each city center, matching the coarse formula exactly —
+    # proof this is doctrine geometry, not derived from any individual battery's position.
+    assert projected.aa_threat == frozenset(expected)
+    aa_batteries = {(s.x, s.y) for s in amap.structures if s.kind == "aa"}
+    assert aa_batteries, "fixture drifted: expected at least one AA battery on the map"
+
+
 def test_city_geometry_visible_at_range_but_active_defenses_stay_fogged() -> None:
     """A city out of every trooper's LOS must not render as empty ground.
 

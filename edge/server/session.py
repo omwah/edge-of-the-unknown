@@ -1165,7 +1165,9 @@ def _assault_operation_view(
         turns_remaining=player.turns_remaining, next_turn_cost=next_cost,
         resolve=op.resolve, resolve_start=config.groundwar.resolve.start,
         surrender_threshold=op.surrender_threshold, casualties=op.casualties,
-        initial_strength=op.initial_strength, selected_actor_id=selected_actor_id or 0,
+        initial_strength=op.initial_strength,
+        casualty_ceiling=config.groundwar.pressure.casualty_ceiling,
+        selected_actor_id=selected_actor_id or 0,
         outcome=op.outcome, dropped=op.dropped,
         can_drop=(not op.dropped and live and loadout is not None
                   and any(option.deployable > 0 for option in loadout.options)),
@@ -2704,14 +2706,19 @@ def format_event(event: Event) -> str:
         cost = f"  (-{event.main_turns} main turn)" if event.main_turns else ""
         return f"[cyan]↝ Marched to {event.x},{event.y}.[/]{cost}"
     if isinstance(event, SurveyDug):
-        return ("[green]✦ Excavation struck a buried site.[/]" if event.discovery_id >= 0
-                else "[yellow]⛏ Opened a dry trench.[/]")
+        gain = f"  (+{event.resupply} supplies)" if event.resupply else ""
+        if event.discovery_id >= 0:
+            return f"[green]✦ Excavation struck a buried site.[/]{gain}"
+        if event.already_dug:
+            return "[grey62]⛏ Already turned over — nothing here.[/]"
+        return "[yellow]⛏ Opened a dry trench.[/]"
     if isinstance(event, SurveySiteExcavated):
         return (f"[green]✦ Excavated {event.kind.replace('_', ' ')} "
                 f"({event.rarity.lower()}); artifact and lore recorded.[/]")
     if isinstance(event, SurveyTalked):
         hint = " — a search circle was narrowed" if event.hinted_id >= 0 else ""
-        return f"[cyan]◇ Spoke with the settlement{hint}.[/]"
+        gain = f"  (+{event.resupply} supplies)" if event.resupply else ""
+        return f"[cyan]◇ Spoke with the settlement{hint}.[/]{gain}"
     if isinstance(event, GroundAssaultDropped):
         flak = (f"  [red]({event.casualties_on_drop} lost to flak on the way down)[/]"
                 if event.casualties_on_drop else "")
