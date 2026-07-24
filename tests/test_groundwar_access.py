@@ -89,11 +89,94 @@ def test_bare_jovian_is_orbital_only() -> None:
     assert isinstance(access, OrbitalOnly)
 
 
-def test_inhabited_cloud_city_is_orbital_only_until_gate() -> None:
+# --- GW-WP16: the Cloud City assault gate ------------------------------------
+#
+# The gate is **on** in the production default (`config/groundwar_default.yaml`,
+# GW-M5) — `CFG` here already has it enabled, so `_GATE_ON` is just a readable
+# alias for the tests below; `_GATE_OFF` constructs the pre-WP16 config
+# explicitly for the two regression tests that need it.
+
+_GATE_ON = CFG
+_GATE_OFF = CFG.model_copy(update={
+    "groundwar": CFG.groundwar.model_copy(update={"cloud_city_assault_enabled": False})})  # type: ignore[union-attr]
+
+
+def test_inhabited_cloud_city_is_orbital_only_with_gate_off() -> None:
     state, planet = _pair(_planet(planet_type="jovian", cloud_city_size=2))
-    access = ground_access(state, state.players[1], planet, CFG)
+    access = ground_access(state, state.players[1], planet, _GATE_OFF)
     assert isinstance(access, OrbitalOnly)
     assert "Cloud City" in access.reason
+
+
+def test_unowned_cloud_city_with_no_species_assaults_by_default() -> None:
+    """The production default (gate on): an unowned Cloud City with nothing
+    inhabiting it resolvable is below-friendly by the same fallthrough every
+    other ownerless, species-less world uses."""
+    state, planet = _pair(_planet(planet_type="jovian", cloud_city_size=2))
+    access = ground_access(state, state.players[1], planet, CFG)
+    assert isinstance(access, Assault)
+
+
+def test_gate_on_below_friendly_cloud_city_routes_to_assault() -> None:
+    """A below-friendly (unaligned, below-amity) Cloud City assaults once the
+    migration flag is on — the same below-friendly routing every other
+    inhabited world already gets (D1)."""
+    planet = _planet(planet_type="jovian", cloud_city_size=2,
+                     population={"vesk": 5_000})
+    state = _state(planet)
+    state.species = {7: _species(AMITY - 0.1)}
+    access = ground_access(state, state.players[1], planet, _GATE_ON)
+    assert isinstance(access, Assault)
+
+
+def test_gate_on_friendly_cloud_city_stays_orbital_only() -> None:
+    """Even with the gate on, a friendly/owned Cloud City never assaults (D9)."""
+    planet = _planet(planet_type="jovian", cloud_city_size=2,
+                     owner=Ownership("player", 1))
+    state, _ = _pair(planet)
+    access = ground_access(state, state.players[1], planet, _GATE_ON)
+    assert isinstance(access, OrbitalOnly)
+
+
+def test_gate_on_bare_gas_giant_stays_orbital_only() -> None:
+    """The gate only ever applies to a *built* Cloud City (`cloud_city_size > 0`)."""
+    state, planet = _pair(_planet(planet_type="jovian"))
+    access = ground_access(state, state.players[1], planet, _GATE_ON)
+    assert isinstance(access, OrbitalOnly)
+    assert "gas giant" in access.reason
+
+
+def test_gate_on_core_cloud_city_stays_orbital_only() -> None:
+    """G13 Core sanctuary holds for a Cloud City exactly like any other world."""
+    planet = _planet(planet_type="jovian", cloud_city_size=2,
+                     population={"vesk": 5_000})
+    state = _state(planet, core=True)
+    state.species = {7: _species(AMITY - 0.1)}
+    access = ground_access(state, state.players[1], planet, _GATE_ON)
+    assert isinstance(access, OrbitalOnly)
+    assert "Core" in access.reason
+
+
+def test_gate_on_below_friendly_cloud_city_without_citadels_stays_orbital_only() -> None:
+    cfg = _GATE_ON.model_copy(update={"citadels": None})
+    planet = _planet(planet_type="jovian", cloud_city_size=2,
+                     population={"vesk": 5_000})
+    state = _state(planet)
+    state.species = {7: _species(AMITY - 0.1)}
+    access = ground_access(state, state.players[1], planet, cfg)
+    assert isinstance(access, OrbitalOnly)
+    assert "not enabled" in access.reason
+
+
+def test_gate_off_is_unaffected_by_below_friendly_standing() -> None:
+    """Regression guard: the same below-friendly Cloud City stays `OrbitalOnly`
+    when the flag is explicitly off (the pre-WP16 / migration-rollback state)."""
+    planet = _planet(planet_type="jovian", cloud_city_size=2,
+                     population={"vesk": 5_000})
+    state = _state(planet)
+    state.species = {7: _species(AMITY - 0.1)}
+    access = ground_access(state, state.players[1], planet, _GATE_OFF)
+    assert isinstance(access, OrbitalOnly)
 
 
 # --- survey routing (D1: uninhabited / friendly) -----------------------------

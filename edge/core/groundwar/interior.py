@@ -62,14 +62,41 @@ _EDGE_MARGIN = 3  # deployment zones must be within this of the map border
 
 
 @dataclass(frozen=True, slots=True)
+class District:
+    """One generated room — a district of the station (GW-WP16 consumer).
+
+    `x0/y0/x1/y1` is the room's full leaf rect (the `bulkhead` margin ring
+    included, so it matches what `_carve_rooms` partitioned); `floor` is the
+    interior cells only (margin excluded), matching `_Room.floor`. Exactly one
+    district per layout has `role == "command_core"` — the assault objective.
+    """
+
+    id: int
+    role: str
+    x0: int
+    y0: int
+    x1: int
+    y1: int
+    cx: int
+    cy: int
+    floor: tuple[Vec, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class InteriorLayout:
     """A generated, replay-stable Cloud City interior (GW plan D9).
 
     `feature_grid` is row-major (`feature_grid[y][x]`), matching
     `edge.core.groundwar.terrain.generate_feature_grid`. `lift_links` pairs
-    teleport cells that the connectivity graph (and, later, movement) must treat
-    as directly adjacent even though they need not be 4-adjacent on the grid.
-    `defender_slots` are positions only — GW-WP16 gives them occupants.
+    teleport cells that a future movement mechanic could treat as directly
+    adjacent even though they need not be 4-adjacent on the grid — GW-WP16
+    proved they are never *required* for connectivity (every room is already
+    spanned by corridors/doors before lifts are placed, see
+    `test_connectivity_holds_without_lift_links`), so they are treated as inert
+    bonus shortcuts, not a tactical teleport action. `defender_slots` are
+    positions only — GW-WP16 gives them occupants. `districts` exposes the
+    per-room records (`GW-WP16`'s assault-map adapter stamps emplacements from
+    these) that WP15 only used internally.
     """
 
     width: int
@@ -79,6 +106,7 @@ class InteriorLayout:
     deployment_zones: tuple[Vec, ...]
     objective: Vec
     defender_slots: tuple[Vec, ...]
+    districts: tuple[District, ...]
 
 
 class InteriorGenerationError(Exception):
@@ -328,11 +356,22 @@ def generate_interior(
             defender_slots = _defender_slots(rooms, rng)
             command_room = next(r for r in rooms if r.role == "command_core")
             objective = rng.choice(command_room.floor)
+            districts = tuple(
+                District(
+                    id=i, role=room.role,
+                    x0=room.rect.x, y0=room.rect.y,
+                    x1=room.rect.x + room.rect.w - 1, y1=room.rect.y + room.rect.h - 1,
+                    cx=room.rect.cx, cy=room.rect.cy,
+                    floor=tuple(room.floor),
+                )
+                for i, room in enumerate(rooms)
+            )
             layout = InteriorLayout(
                 width=config.width, height=config.height,
                 feature_grid=tuple(tuple(row) for row in grid),
                 lift_links=lift_links, deployment_zones=deployment_zones,
                 objective=objective, defender_slots=defender_slots,
+                districts=districts,
             )
             if _connectivity_ok(grid, layout):
                 return layout

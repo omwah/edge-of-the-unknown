@@ -2073,6 +2073,11 @@ class GroundwarConfig(BaseModel):
     assault_difficulty: GwAssaultDifficulty = GwAssaultDifficulty()
     settlement: GwSettlement = GwSettlement()
     cloud_city: GwCloudCity = GwCloudCity()
+    # GW-WP16 migration gate (GW plan "Cloud Cities retain a separate gate"):
+    # stays False until the station-interior assault path (generation, tactics,
+    # settlement, remote/UI parity) is proven — ground_access keeps routing every
+    # Cloud City OrbitalOnly while it is off, regardless of standing.
+    cloud_city_assault_enabled: bool = False
 
     @property
     def width(self) -> int:

@@ -220,6 +220,13 @@ cloud_city:
   hazard_frac: 0.03        # fraction of non-objective floor cells tagged vacuum/fire/electrical
   cover_frac: 0.08         # fraction tagged cover_strut
 
+# GW-WP16 migration gate: on. Generation/tactics/settlement/TUI parity proven
+# (tests/test_groundwar_cloud_city_assault*.py); balance (garrison counts, defense
+# density per district, emplacement geometry) is not tuned yet — a WP13-style
+# follow-up, not a blocker for correctness. Below-friendly Cloud Cities now route
+# to Assault via edge.core.groundwar.access.ground_access.
+cloud_city_assault_enabled: true
+
 # Persistent planetary ground-garrison economy (GW plan D11, GW-WP09). Feeds
 # Planet.garrison_infantry/garrison_armor via three rails: big-bang seeding,
 # automatic militia recovery (ownership-independent), and colonist-allocation
