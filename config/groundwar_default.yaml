@@ -155,6 +155,24 @@ terrain:
   rock:          {move_cost: 2, cover: 0.15, blocks_los: false}
   debris:        {move_cost: 2, cover: 0.15, blocks_los: false}
   void:          {move_cost: 1, cover: 0.0,  blocks_los: false}
+  # Cloud City station-interior features (GW-WP15). `bulkhead` and `security_door`
+  # are both move_cost: 0 (impassable on foot), but unlike planet terrain jump-jets
+  # never bypass either here — a bulkhead must never be the only route anywhere
+  # (edge.core.groundwar.interior's connectivity invariant), while a security_door
+  # may legally be a sole connector since it is always destructible (breach cost is
+  # GW-WP16). vacuum/fire/electrical are inert hazard tags this WP — no effect yet.
+  corridor:      {move_cost: 1, cover: 0.0,  blocks_los: false}
+  plaza:         {move_cost: 1, cover: 0.0,  blocks_los: false}
+  habitation:    {move_cost: 1, cover: 0.05, blocks_los: false}
+  engineering:   {move_cost: 2, cover: 0.15, blocks_los: false}
+  command_core:  {move_cost: 1, cover: 0.05, blocks_los: false}
+  cover_strut:   {move_cost: 1, cover: 0.30, blocks_los: false}
+  bulkhead:      {move_cost: 0, cover: 0.0,  blocks_los: true}
+  security_door: {move_cost: 0, cover: 0.0,  blocks_los: true}
+  lift:          {move_cost: 1, cover: 0.0,  blocks_los: false}
+  vacuum:        {move_cost: 1, cover: 0.0,  blocks_los: false}
+  fire:          {move_cost: 2, cover: 0.0,  blocks_los: false}
+  electrical:    {move_cost: 1, cover: 0.0,  blocks_los: false}
 
 # The peaceful branch (Expedition mode): a lone surveyor on a friendly world
 # chasing ship-sensor archaeology leads. Smaller map than the battlefield —
@@ -189,6 +207,18 @@ expedition:
     - water_shallow
     - mountain
     - ice
+
+# Cloud City station-interior generation (GW-WP15; edge.core.groundwar.interior).
+# The assault gate stays off until GW-WP16 — this tunes generation/art review only.
+cloud_city:
+  width: 60
+  height: 32
+  districts_base: 3        # room count at cloud_city_size 1
+  districts_per_size: 2    # ... plus this many per size step above 1 (max size 4 -> 9 rooms)
+  locked_door_frac: 0.35   # fraction of inter-room connections stamped as a security_door
+  lift_pairs: 2            # extra long-range teleport-link shortcuts
+  hazard_frac: 0.03        # fraction of non-objective floor cells tagged vacuum/fire/electrical
+  cover_frac: 0.08         # fraction tagged cover_strut
 
 # Persistent planetary ground-garrison economy (GW plan D11, GW-WP09). Feeds
 # Planet.garrison_infantry/garrison_armor via three rails: big-bang seeding,

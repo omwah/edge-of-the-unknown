@@ -2017,6 +2017,27 @@ class GwBattlefield(BaseModel):
     height: int = Field(ge=2)
 
 
+class GwCloudCity(BaseModel):
+    """Station-interior generation tuning (GW-WP15; the assault gate stays off
+    until GW-WP16). `districts_base`/`districts_per_size` size the room count
+    against `Planet.cloud_city_size` (1..`planets.cloud_city_max_size`);
+    `locked_door_frac` and `lift_pairs` shape the connectivity graph
+    (`edge.core.groundwar.interior`); `hazard_frac`/`cover_frac` sprinkle inert
+    `vacuum`/`fire`/`electrical`/`cover_strut` cells onto room floors.
+    """
+
+    model_config = _FROZEN
+
+    width: int = Field(default=60, ge=2)
+    height: int = Field(default=32, ge=2)
+    districts_base: int = Field(default=3, ge=1)
+    districts_per_size: int = Field(default=2, ge=0)
+    locked_door_frac: float = Field(default=0.35, ge=0.0, le=1.0)
+    lift_pairs: int = Field(default=2, ge=0)
+    hazard_frac: float = Field(default=0.03, ge=0.0, le=1.0)
+    cover_frac: float = Field(default=0.08, ge=0.0, le=1.0)
+
+
 class GwPlatoon(BaseModel):
     """Drop-squad budget and size caps."""
 
@@ -2051,6 +2072,7 @@ class GroundwarConfig(BaseModel):
     garrison_economy: GwGarrisonEconomy = GwGarrisonEconomy()
     assault_difficulty: GwAssaultDifficulty = GwAssaultDifficulty()
     settlement: GwSettlement = GwSettlement()
+    cloud_city: GwCloudCity = GwCloudCity()
 
     @property
     def width(self) -> int:
@@ -2080,6 +2102,7 @@ class GroundwarConfig(BaseModel):
             raise ValueError("groundwar.terrain must define at least one terrain class")
         # Every feature a landable biome can emit must have a terrain class, or a
         # generated cell would silently read as impassable (no move cost lookup).
+        from edge.core.groundwar.interior import INTERIOR_FEATURES
         from edge.core.groundwar.terrain import BIOME_BANDS, LANDABLE_BIOMES
 
         needed = {name for pt in LANDABLE_BIOMES for _, name in BIOME_BANDS[pt].bands}
@@ -2088,6 +2111,12 @@ class GroundwarConfig(BaseModel):
             raise ValueError(
                 "groundwar.terrain missing classes for landable biome features: "
                 f"{', '.join(sorted(missing))}"
+            )
+        missing_interior = set(INTERIOR_FEATURES) - set(self.terrain)
+        if missing_interior:
+            raise ValueError(
+                "groundwar.terrain missing classes for Cloud City interior features: "
+                f"{', '.join(sorted(missing_interior))}"
             )
         return self
 
