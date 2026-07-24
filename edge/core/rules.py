@@ -4253,6 +4253,7 @@ def _begin_survey(
     start_x = prior.last_x if prior is not None else exp.width // 2
     start_y = prior.last_y if prior is not None else exp.height // 2
     hinted = prior.hinted_discovery_ids if prior is not None else frozenset()
+    hinted_towns = prior.hinted_settlement_ids if prior is not None else frozenset()
     # Snapshot the sensor/detection window now (G7): only these surface sites are ever
     # placed on the map, so a hidden out-of-reach site leaks nothing — and a later descent
     # after a sensor upgrade widens the set (GW-WP05). Already-collected sites show `found`.
@@ -4265,8 +4266,8 @@ def _begin_survey(
         operation_id=operation_id, planet_id=cmd.planet_id, sector_id=ship.sector_id,
         planet_type=planet.planet_type, seed=seed, started_day=state.game.day_number,
         explorer_x=start_x, explorer_y=start_y, supplies=exp.supplies_start,
-        hinted_discovery_ids=hinted, visible_discovery_ids=visible,
-        resolved_discovery_ids=resolved,
+        hinted_discovery_ids=hinted, hinted_settlement_ids=hinted_towns,
+        visible_discovery_ids=visible, resolved_discovery_ids=resolved,
     )
     new_player = replace(player, ground_operation=operation)
     return ReduceResult(
@@ -4379,6 +4380,7 @@ def _extract_ground_operation(
         progress[operation.planet_id] = SurveyProgress(
             last_x=operation.explorer_x, last_y=operation.explorer_y,
             hinted_discovery_ids=operation.hinted_discovery_ids,
+            hinted_settlement_ids=operation.hinted_settlement_ids,
             map_seed=operation.seed,
         )
         new_player = replace(
@@ -4623,6 +4625,22 @@ def _ground_drop(
     )
 
 
+def _ground_battle_narration(
+    player_id: int, operation_id: int,
+    log: tuple[tuple[str, str, int, int, bool], ...], *, exclude: frozenset[str],
+) -> tuple[Event, ...]:
+    """Secondary battle-log lines (Resolve deltas, cowing, KIA) that a player-caused
+    ground action's own summary event doesn't narrate (GW-WP13-FU1). `exclude` filters
+    out the kinds the caller's summary event already covers; "outcome" is always
+    dropped here too — it stays announced once via the existing DTO-diff path in the
+    TUI, matching `_end_ground_turn`'s convention below."""
+    return tuple(
+        GroundDefenseFireLogged(player_id, operation_id, kind, text, x, y, friendly)
+        for kind, text, x, y, friendly in log
+        if kind != "outcome" and kind not in exclude
+    )
+
+
 def _ground_jump(
     state: UniverseState, player_id: int, cmd: GroundJump, config: GameConfig
 ) -> ReduceResult:
@@ -4630,12 +4648,14 @@ def _ground_jump(
         raise EconomyError("ground operations are not configured")
     player, op = _active_assault(state, player_id, cmd.operation_id)
     amap = gw_assault.assault_map_for(state, op, config)
-    new_op, hit = gw_assault.assault_jump(op, amap, config, state.rng, cmd.actor_id, cmd.x, cmd.y)
+    new_op, hit, log = gw_assault.assault_jump(
+        op, amap, config, state.rng, cmd.actor_id, cmd.x, cmd.y)
     new_player = replace(player, ground_operation=new_op)
-    return ReduceResult(
-        events=(GroundJumped(player_id, op.operation_id, cmd.actor_id, cmd.x, cmd.y, hit),),
-        players=(new_player,),
-    )
+    events: list[Event] = [
+        GroundJumped(player_id, op.operation_id, cmd.actor_id, cmd.x, cmd.y, hit)]
+    events.extend(_ground_battle_narration(
+        player_id, op.operation_id, log, exclude=frozenset({"jump", "miss", "info"})))
+    return ReduceResult(events=tuple(events), players=(new_player,))
 
 
 def _ground_fire(
@@ -4645,14 +4665,16 @@ def _ground_fire(
         raise EconomyError("ground operations are not configured")
     player, op = _active_assault(state, player_id, cmd.operation_id)
     amap = gw_assault.assault_map_for(state, op, config)
-    new_op, hit, destroyed, target_kind = gw_assault.assault_fire(
+    new_op, hit, destroyed, target_kind, log = gw_assault.assault_fire(
         op, amap, config, state.rng, cmd.actor_id, cmd.x, cmd.y, cmd.missile)
     new_player = replace(player, ground_operation=new_op)
-    return ReduceResult(
-        events=(GroundFired(player_id, op.operation_id, cmd.actor_id, cmd.x, cmd.y,
-                            cmd.missile, hit, target_kind, destroyed),),
-        players=(new_player,),
-    )
+    events: list[Event] = [
+        GroundFired(player_id, op.operation_id, cmd.actor_id, cmd.x, cmd.y,
+                   cmd.missile, hit, target_kind, destroyed)]
+    events.extend(_ground_battle_narration(
+        player_id, op.operation_id, log,
+        exclude=frozenset({"shot", "missile", "miss", "info", "destroyed"})))
+    return ReduceResult(events=tuple(events), players=(new_player,))
 
 
 def _ground_broadcast(
@@ -4662,13 +4684,14 @@ def _ground_broadcast(
         raise EconomyError("ground operations are not configured")
     player, op = _active_assault(state, player_id, cmd.operation_id)
     amap = gw_assault.assault_map_for(state, op, config)
-    new_op = gw_assault.assault_broadcast(op, amap, config, cmd.actor_id)
+    new_op, log = gw_assault.assault_broadcast(op, amap, config, cmd.actor_id)
     new_player = replace(player, ground_operation=new_op)
     city_id = next(iter(new_op.broadcast_cities - op.broadcast_cities), -1)
-    return ReduceResult(
-        events=(GroundBroadcastMade(player_id, op.operation_id, cmd.actor_id, city_id),),
-        players=(new_player,),
-    )
+    events: list[Event] = [
+        GroundBroadcastMade(player_id, op.operation_id, cmd.actor_id, city_id)]
+    events.extend(_ground_battle_narration(
+        player_id, op.operation_id, log, exclude=frozenset({"broadcast", "info"})))
+    return ReduceResult(events=tuple(events), players=(new_player,))
 
 
 def _end_ground_turn(
@@ -4719,12 +4742,14 @@ def _survey_dig(
     new_player = replace(player, ground_operation=result.operation)
     if result.excavated_id is None:
         return ReduceResult(
-            events=(SurveyDug(player_id, op.operation_id, op.explorer_x, op.explorer_y, -1),),
+            events=(SurveyDug(player_id, op.operation_id, op.explorer_x, op.explorer_y, -1,
+                              already_dug=result.already_dug),),
             players=(new_player,),
         )
     disc = state.discoveries.get(result.excavated_id)
     events: list[Event] = [
-        SurveyDug(player_id, op.operation_id, op.explorer_x, op.explorer_y, result.excavated_id)]
+        SurveyDug(player_id, op.operation_id, op.explorer_x, op.explorer_y, result.excavated_id,
+                 resupply=result.resupply)]
     if disc is None:  # defensive: the site named a discovery that no longer exists
         return ReduceResult(events=tuple(events), players=(new_player,))
     if disc.found_by is not None:
@@ -4784,7 +4809,8 @@ def _survey_talk(
     hinted_id = next(iter(result.operation.hinted_discovery_ids - op.hinted_discovery_ids), -1)
     return ReduceResult(
         events=(SurveyTalked(player_id, op.operation_id,
-                             town.id if town is not None else -1, hinted_id),),
+                             town.id if town is not None else -1, hinted_id,
+                             resupply=result.resupply),),
         players=(new_player,),
     )
 

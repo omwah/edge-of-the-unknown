@@ -249,6 +249,12 @@ Compose a platoon, then place each capsule with arrows or the mouse and [b]Enter
 After touchdown [b]Tab[/] selects a ready trooper; [b]M[/] moves, [b]G[/] jumps through
 terrain (drawing AA fire), [b]F[/] fires, [b]I[/] spends a missile, and [b]Space[/]
 runs the planet's turn. [b]Y[/] shows weapon ranges only for defenses you can see.
+
+A Scout's sensor jamming keeps your platoon undetected — an undetected trooper's first
+shot lands with a bonus, and firing reveals you. The clock runs both ways: sorties
+launch and defender accuracy escalates the longer a fight drags on, so don't dawdle.
+Losses past the sidebar's abort threshold force a doctrine recall, survivors only.
+
 Extraction always works; mid-fight it confirms because tactical losses and damage
 settle, and once the assault is decided it settles straight away with the result."""
     HELP_LEGEND_ROWS = [
@@ -784,7 +790,8 @@ settle, and once the assault is decided it settles straight away with the result
         fill = round(14 * frac)
         out.append(f"RESOLVE {'█' * fill}{'░' * (14 - fill)} {view.resolve}\n", "yellow")
         out.append(f"surrender at ≤ {view.surrender_threshold} · KIA "
-                   f"{view.casualties}/{view.initial_strength}\n", "grey66")
+                   f"{view.casualties}/{view.initial_strength} "
+                   f"(abort past {view.casualty_ceiling:.0%})\n", "grey66")
         out_of_turns = view.turns_remaining < view.next_turn_cost
         out.append(f"main turns {view.turns_remaining} · next round costs {view.next_turn_cost}\n",
                    "bold red" if out_of_turns else "grey66")

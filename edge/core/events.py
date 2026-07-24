@@ -240,13 +240,20 @@ class GroundMoved(Event):
 
 @dataclass(frozen=True)
 class SurveyDug(Event):
-    """A dig at `(x, y)` opened a trench (GW-WP06). `discovery_id` is -1 for a dry hole."""
+    """A dig at `(x, y)` opened a trench (GW-WP06). `discovery_id` is -1 for a dry hole.
+
+    `resupply` is the supply gain on a successful excavation (0 otherwise); `already_dug`
+    marks a free re-dig of ground already fully turned over, distinct from a fresh dry hole
+    (both leave `discovery_id` -1). Defaulted so older persisted logs decode unchanged.
+    """
 
     player_id: int
     operation_id: int
     x: int
     y: int
     discovery_id: int
+    resupply: int = 0
+    already_dug: bool = False
 
 
 @dataclass(frozen=True)
@@ -272,12 +279,17 @@ class SurveyLanded(Event):
 
 @dataclass(frozen=True)
 class SurveyTalked(Event):
-    """The explorer spoke with a settlement (GW-WP06, D5). `hinted_id` -1 when no hint given."""
+    """The explorer spoke with a settlement (GW-WP06, D5). `hinted_id` -1 when no hint given.
+
+    `resupply` is the supply gain from this visit (0 when already topped up). Defaulted so
+    older persisted logs decode unchanged.
+    """
 
     player_id: int
     operation_id: int
     settlement_id: int
     hinted_id: int
+    resupply: int = 0
 
 
 @dataclass(frozen=True)
@@ -336,14 +348,16 @@ class GroundBroadcastMade(Event):
 
 @dataclass(frozen=True)
 class GroundDefenseFireLogged(Event):
-    """One line from the planet's defense phase during `EndGroundTurn` — emplacement
-    fire, garrison fire, or a sortie — that would otherwise resolve silently.
+    """One battle-log line that would otherwise resolve silently (GW-WP10/WP13-FU1).
 
+    Originally scoped to the planet's defense phase during `EndGroundTurn` —
     `EndGroundTurn` used to report only the round summary (`GroundTurnEnded`), so
-    trooper HP dropped with no explanation in the log; this carries the individual
-    hit/miss/sortie line the core battle already computes. `kind` is one of "hit",
-    "killed", "miss", "resolve", "destroyed", "sortie". `friendly` mirrors the core
-    battle log's flag (whose meaning is kind-dependent, not simply "good news").
+    trooper HP dropped with no explanation in the log. Now also carries the
+    secondary consequence lines (Resolve deltas, city cowing, trooper KIA) that a
+    player-caused `GroundFire`/`GroundJump`/`GroundBroadcast` action computes but
+    whose own summary event doesn't narrate. `kind` is one of "hit", "killed",
+    "miss", "resolve", "destroyed", "sortie". `friendly` mirrors the core battle
+    log's flag (whose meaning is kind-dependent, not simply "good news").
     """
 
     player_id: int

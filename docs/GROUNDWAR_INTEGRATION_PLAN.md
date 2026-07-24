@@ -1363,6 +1363,43 @@ socket reconnection); safe runtime caches, only if a future measurement pass fin
 warranted (none did here). Revisit as a WP13 follow-up once there's a balance verdict
 to act on.
 
+### GW-WP13-FU1 — POC parity fixes: narration, settlement hints, drop hazard (M) — SHIPPED
+
+A pre-WP14 feature-parity audit of survey/assault against the `edge-groundwar` POC
+(mechanics, help text, logging) found production a faithful, mostly-superset port,
+with four gaps a human interview resolved:
+
+- **Narration**: `SurveyActionResult`'s computed-but-discarded `logs` field is
+  retired; `SurveyDug`/`SurveyTalked` gained typed `resupply`/`already_dug` fields
+  so the log distinguishes a hit, a dry hole, and a free re-dig, and shows resupply
+  amounts. `assault_fire`/`assault_jump`/`assault_broadcast` now also return their
+  full battle-event tuple (mirroring `assault_end_turn`'s existing `(new_op, log)`
+  shape); the reducers forward the Resolve-delta/KIA lines their own summary events
+  don't narrate as `GroundDefenseFireLogged`, generalized beyond its original
+  `EndGroundTurn`-only scope.
+- **Per-town settlement hint cap restored** (`hinted_settlement_ids` on
+  `SurveyOperation`/`SurveyProgress`, persisting across descents like site hints
+  already did) — a survey-wide-only cap had let one town dispense every remaining
+  hint if talked to repeatedly.
+- **Limited drop-zone hazard visualization**: `tactical_projection` pre-drop paints
+  a coarse, fixed-radius AA hazard zone around each city's center (from
+  `defenses.aa.range`, not any actual battery's position) — some landing-danger
+  read, without reintroducing the exact-position leak GW-WP12 removed.
+- **Bundled polish**: `AssaultExpeditionDTO.casualty_ceiling` (wire v35, sidebar
+  shows the abort threshold), help text covers jamming/sortie-escalation/doctrine-
+  abort, and `GROUNDWAR_POC.md` documents the two previously-undocumented behavior
+  changes (march no longer auto-halts on a sighted clue; scanner overlay defaults
+  off) plus the new hazard-visualization design.
+
+Files: `edge/core/groundwar/{survey,assault,models}.py`, `edge/core/events.py`,
+`edge/core/rules.py`, `edge/core/dto.py`, `edge/server/{session,wire}.py`,
+`edge/tui/screens/ground_assault.py`, `docs/GROUNDWAR_POC.md`.
+Tests: per-town hint cap (single-descent + checkpoint round-trip), pre-drop hazard
+radius (exact-shape assertion vs. real battery positions), narration coverage per
+fixed reducer; full `pixi run check` green (3137 passed, one pre-existing unrelated
+snapshot failure confirmed present on `main` beforehand).
+Commit `ground: GW-WP13-FU1 POC parity fixes before legacy retirement`.
+
 ### GW-WP14 — Legacy retirement, documentation, and exit gate (M/L)
 
 Default the new paths on and remove or migrate:

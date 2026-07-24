@@ -53,14 +53,17 @@ class SurveyProgress:
     returning to a planet cannot redraw its terrain or move known sites.
     `last_x`/`last_y` persist so a later descent resumes where the surveyor stood;
     `hinted_discovery_ids` persist so settlement hints keep narrowing the same
-    sites. Trenches and supplies do **not** live here — they reset each descent and
-    stay on the active operation. Hashed, because it changes future search
-    information.
+    sites. `hinted_settlement_ids` persists which towns have already given their one
+    hint (GW-WP13-FU1) — a town's cap survives a return descent the same way the
+    hinted sites themselves do. Trenches and supplies do **not** live here — they
+    reset each descent and stay on the active operation. Hashed, because it changes
+    future search information.
     """
 
     last_x: int
     last_y: int
     hinted_discovery_ids: frozenset[int] = frozenset()
+    hinted_settlement_ids: frozenset[int] = frozenset()
     map_seed: int = 0
 
 
@@ -91,6 +94,7 @@ class SurveyOperation:
     visible_discovery_ids: frozenset[int] = frozenset()
     resolved_discovery_ids: frozenset[int] = frozenset()
     hinted_discovery_ids: frozenset[int] = frozenset()
+    hinted_settlement_ids: frozenset[int] = frozenset()
     dug_cells: frozenset[tuple[int, int]] = frozenset()
     # The shuttle holds in the upper atmosphere until the player picks a drop site: while
     # `landed` is False, `explorer_*` is only the *suggested* cursor rest, not a position,

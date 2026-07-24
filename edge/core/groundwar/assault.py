@@ -456,6 +456,13 @@ def persistent_structure_hp(
     return hp
 
 
+def _paint_radius(amap: AssaultMap, cx: int, cy: int, radius: int, target: set[Vec]) -> None:
+    for y in range(max(0, cy - radius), min(amap.height, cy + radius + 1)):
+        for x in range(max(0, cx - radius), min(amap.width, cx + radius + 1)):
+            if _dist(cx, cy, x, y) <= radius:
+                target.add((x, y))
+
+
 def tactical_projection(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig,
     actor_id: int | None = None,
@@ -465,11 +472,27 @@ def tactical_projection(
     Enemy units/structures contribute to the DTO only inside ``visible``.  Weapon
     threat is painted only from those visible sources, preventing the old POC
     radar from leaking an unseen battery's position through its range circle.
+
+    Pre-drop (``not op.dropped``), no trooper has earned any visibility yet, but the
+    player still needs some read on where to land (GW-WP13-FU1). Every city's
+    footprint/name/citadel-tier already reaches the client unconditionally
+    (``AssaultCityDTO`` in `server.session`), so painting a coarse, fixed-radius AA
+    hazard zone around each city's center — not derived from any actual battery's
+    position — reveals nothing about interior defense placement or count. This is
+    deliberately *not* the POC's exact-position radar, which this module's
+    LOS-gating exists to prevent.
     """
-    if config.groundwar is None or not op.dropped:
+    if config.groundwar is None:
         return TacticalProjection(
             frozenset(), frozenset(), frozenset(), frozenset(), frozenset(),
             frozenset(), frozenset(), False)
+    if not op.dropped:
+        pre_drop_aa: set[Vec] = set()
+        for city in amap.cities:
+            _paint_radius(amap, city.cx, city.cy, config.groundwar.defenses.aa.range, pre_drop_aa)
+        return TacticalProjection(
+            frozenset(), frozenset(), frozenset(), frozenset(), frozenset(),
+            frozenset(pre_drop_aa), frozenset(), False)
     battle = _battle_for(op, amap, config)
     visible: set[Vec] = set()
     for trooper in battle.live_troopers():
@@ -528,25 +551,21 @@ def tactical_projection(
     aa_threat: set[Vec] = set()
     ground_threat: set[Vec] = set()
 
-    def paint(cx: int, cy: int, radius: int, target: set[Vec]) -> None:
-        for y in range(max(0, cy - radius), min(amap.height, cy + radius + 1)):
-            for x in range(max(0, cx - radius), min(amap.width, cx + radius + 1)):
-                if _dist(cx, cy, x, y) <= radius:
-                    target.add((x, y))
-
     for structure in battle.structures.values():
         if not structure.alive or (structure.x, structure.y) not in visible:
             continue
         if structure.kind == "aa":
-            paint(structure.x, structure.y, battle.gw.defenses.aa.range, aa_threat)
+            _paint_radius(amap, structure.x, structure.y, battle.gw.defenses.aa.range, aa_threat)
         elif structure.kind == "turret":
-            paint(structure.x, structure.y, battle.gw.defenses.turret.range, ground_threat)
+            _paint_radius(amap, structure.x, structure.y, battle.gw.defenses.turret.range,
+                          ground_threat)
         elif structure.kind == "citadel_gun":
-            paint(structure.x, structure.y, battle.gw.defenses.citadel_gun.range, ground_threat)
+            _paint_radius(amap, structure.x, structure.y, battle.gw.defenses.citadel_gun.range,
+                          ground_threat)
     for unit in battle.garrison.values():
         if unit.alive and (unit.x, unit.y) in visible:
-            paint(unit.x, unit.y, getattr(battle.gw.garrison, unit.kind).weapon.range,
-                  ground_threat)
+            _paint_radius(amap, unit.x, unit.y, getattr(battle.gw.garrison, unit.kind).weapon.range,
+                          ground_threat)
     return TacticalProjection(
         visible=frozenset(visible), reachable=frozenset(reachable),
         jumpable=frozenset(jumpable), fireable=frozenset(fireable),
@@ -1508,30 +1527,35 @@ def assault_move(
 def assault_jump(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig, rng: Random,
     actor_id: int, x: int, y: int,
-) -> tuple[AssaultOperation, bool]:
-    """Returns `(new_op, hit)` — `hit` read directly off `do_jump`'s own log entries
-    (an AA reaction landed) rather than diffed from before/after state at the reducer,
-    since the trooper who jumped is trivially identified but a diff-based "was there
-    an AA hit" would need to inspect the same log anyway."""
+) -> tuple[AssaultOperation, bool, tuple[tuple[str, str, int, int, bool], ...]]:
+    """Returns `(new_op, hit, events)` — `hit` read directly off `do_jump`'s own log
+    entries (an AA reaction landed) rather than diffed from before/after state at the
+    reducer, since the trooper who jumped is trivially identified but a diff-based "was
+    there an AA hit" would need to inspect the same log anyway. `events` is the full
+    battle log for this action (GW-WP13-FU1) — the reducer surfaces the lines its own
+    `GroundJumped` summary doesn't already narrate (KIA, Resolve deltas)."""
     battle, trooper = _begin_action(op, amap, config, rng, actor_id)
     if not do_jump(battle, trooper, x, y):
         raise MovementError("that jump is not legal")
     hit = any(kind == "hit" for kind, *_ in battle.events)
-    return _freeze_battle(op, battle), hit
+    return _freeze_battle(op, battle), hit, tuple(battle.events)
 
 
 def assault_fire(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig, rng: Random,
     actor_id: int, x: int, y: int, missile: bool = False,
-) -> tuple[AssaultOperation, bool, bool, str]:
-    """Returns `(new_op, hit, destroyed, target_kind)`.
+) -> tuple[AssaultOperation, bool, bool, str, tuple[tuple[str, str, int, int, bool], ...]]:
+    """Returns `(new_op, hit, destroyed, target_kind, events)`.
 
-    Read directly off what `fire_at` actually targeted and logged, rather than
-    diffed from before/after frozen state at the reducer: a garrison unit standing
-    on a destroyed structure's rubble is a legal, occupiable cell, and `fire_at`
-    always prefers the garrison unit there over the dead structure beneath it — a
-    reducer-side diff keyed only on the map's static structure list at `(x, y)`
-    could misattribute that shot to the structure instead.
+    `hit`/`destroyed`/`target_kind` are read directly off what `fire_at` actually
+    targeted and logged, rather than diffed from before/after frozen state at the
+    reducer: a garrison unit standing on a destroyed structure's rubble is a legal,
+    occupiable cell, and `fire_at` always prefers the garrison unit there over the
+    dead structure beneath it — a reducer-side diff keyed only on the map's static
+    structure list at `(x, y)` could misattribute that shot to the structure instead.
+    `events` is the full battle log for this action (GW-WP13-FU1) — the reducer
+    surfaces the lines its own `GroundFired` summary doesn't already narrate (Resolve
+    deltas from a destroyed structure or a newly cowed city).
     """
     battle, trooper = _begin_action(op, amap, config, rng, actor_id)
     target_kind = "garrison" if battle.garrison_at(x, y) is not None else "structure"
@@ -1540,17 +1564,20 @@ def assault_fire(
     kinds = {kind for kind, *_ in battle.events}
     hit = bool(kinds & {"shot", "missile"})
     destroyed = "destroyed" in kinds
-    return _freeze_battle(op, battle), hit, destroyed, target_kind
+    return _freeze_battle(op, battle), hit, destroyed, target_kind, tuple(battle.events)
 
 
 def assault_broadcast(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig, actor_id: int,
-) -> AssaultOperation:
-    """No rng — `broadcast_terms` is a deterministic range/cowed check, not a roll."""
+) -> tuple[AssaultOperation, tuple[tuple[str, str, int, int, bool], ...]]:
+    """Returns `(new_op, events)` — no rng, `broadcast_terms` is a deterministic
+    range/cowed check, not a roll. `events` is the full battle log for this action
+    (GW-WP13-FU1), surfacing the Resolve strike `GroundBroadcastMade`'s summary
+    doesn't narrate."""
     battle, trooper = _begin_action(op, amap, config, None, actor_id)
     if not broadcast_terms(battle, trooper):
         raise CombatError("no cowed city in broadcast range")
-    return _freeze_battle(op, battle)
+    return _freeze_battle(op, battle), tuple(battle.events)
 
 
 def assault_end_turn(
