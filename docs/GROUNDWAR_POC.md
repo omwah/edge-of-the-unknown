@@ -83,8 +83,9 @@ The prototype establishes the tactical vocabulary we are retaining:
   civilian harm backfiring, retrieval pressure, and Resolve-based surrender;
 - the survey sibling's movement, scanner bands, hints, trenches, supplies, and
   automatic dig resolution; and
-- its procedural terrain and tactical art as the reference look, with a separate
-  station-interior map and new art reserved for the later Cloud City gate.
+- its procedural terrain and tactical art as the reference look; the station's
+  interior map and art (GW-WP15) are a separate discrete generator, not a reuse
+  of this terrain, and now feed a live Cloud City assault (GW-WP16).
 
 Production deliberately changes the prototype's surrounding economy and state:
 
@@ -133,11 +134,16 @@ re-measure against `edge/bot/scripts/assaulter.py` for a current read.
 
 ## Productionization path
 
-`GROUNDWAR_INTEGRATION_PLAN.md` is the executable work plan (GW-WP01–14, GW-M1–M4).
-Its milestones moved configuration and terrain into the production dependency
-graph, added frozen replay models and ground access, shipped the survey loop,
-replaced fighter invasion with the recruit/suit assault and persistent defense
-economy, retired the superseded abstract surface/invasion paths, and — finally —
-retired this app's own duplicate engine so `edge.core.groundwar` is the sole
-authority over live game state (GW-M4). The separately gated Cloud City interior
-assault remains open follow-up work (GW-WP15/16).
+`GROUNDWAR_INTEGRATION_PLAN.md` is the executable work plan (GW-WP01–16,
+GW-M1–M5 — all shipped). Its milestones moved configuration and terrain into
+the production dependency graph, added frozen replay models and ground access,
+shipped the survey loop, replaced fighter invasion with the recruit/suit
+assault and persistent defense economy, retired the superseded abstract
+surface/invasion paths, retired this app's own duplicate engine so
+`edge.core.groundwar` is the sole authority over live game state (GW-M4), and
+— finally — built the station-interior generator/art and adapted tactical
+assault to it, so a below-friendly Cloud City now assaults through the same
+production `GroundAssaultScreen` a terrestrial world does (GW-M5). Balance
+tuning (garrison counts, defense density, emplacement geometry, for both
+terrestrial and Cloud City assaults) is the one deliberately deferred
+follow-up, flagged in GW-WP13's status note.

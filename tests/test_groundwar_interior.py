@@ -5,8 +5,14 @@ many-seed connectivity across every city size, and the config coverage the
 `GroundwarConfig` validator enforces; the art module (`edge.art.interior`) —
 glyph/colour registry coverage and the wall-junction table; and the read-only
 harness preview screen (`edge.groundwar.interior_preview`) — responsive
-snapshots, the "visual review sheet" GW-WP15 calls for. The gate stays off
-(`groundwar.cloud_city_assault_enabled`) — nothing here touches rules/DTO/wire.
+snapshots, the "visual review sheet" GW-WP15 calls for. This file only
+exercises generation/art — nothing here touches rules/DTO/wire.
+
+Also covers a GW-WP16 prerequisite proved here rather than in the assault
+layer: `test_connectivity_holds_without_lift_links` shows `lift_links` are
+never load-bearing (every room is already corridor/door-connected before
+lifts are placed), which is what lets WP16 treat `lift` cells as inert floor
+instead of building a teleport tactical mechanic.
 """
 
 from __future__ import annotations
@@ -58,18 +64,25 @@ def test_many_seeds_generate_and_connect(size: int) -> None:
         assert layout.height == CC.height
         assert layout.deployment_zones
         assert layout.defender_slots or size == 1  # a 1-district city may have none left over
+        assert layout.districts
+        assert sum(1 for d in layout.districts if d.role == "command_core") == 1
+        command_district = next(d for d in layout.districts if d.role == "command_core")
+        assert layout.objective in command_district.floor
 
 
-def _independent_reachability(layout: object) -> set[tuple[int, int]]:
-    """Recomputes reachability from scratch (walk edges + lift links, doors
-    passable, bulkhead never) without reusing the generator's own check —
+def _independent_reachability(
+    layout: object, *, use_lifts: bool = True,
+) -> set[tuple[int, int]]:
+    """Recomputes reachability from scratch (walk edges + optional lift links,
+    doors passable, bulkhead never) without reusing the generator's own check —
     a true test of the connectivity invariant, not a restatement of it."""
     grid = layout.feature_grid  # type: ignore[attr-defined]
     width, height = layout.width, layout.height  # type: ignore[attr-defined]
     link_map: dict[tuple[int, int], tuple[int, int]] = {}
-    for a, b in layout.lift_links:  # type: ignore[attr-defined]
-        link_map[a] = b
-        link_map[b] = a
+    if use_lifts:
+        for a, b in layout.lift_links:  # type: ignore[attr-defined]
+            link_map[a] = b
+            link_map[b] = a
     start = layout.deployment_zones[0]  # type: ignore[attr-defined]
     seen = {start}
     stack = [start]
@@ -95,6 +108,22 @@ def test_connectivity_invariant_independently(seed: int) -> None:
     assert layout.objective in reachable
     assert all(z in reachable for z in layout.deployment_zones)
     assert all(s in reachable for s in layout.defender_slots)
+
+
+@pytest.mark.parametrize("size", _SIZES)
+def test_connectivity_holds_without_lift_links(size: int) -> None:
+    """GW-WP16 prerequisite: `lift_links` must never be *required* for
+    connectivity, or a tactical engine with no teleport action (WP16 treats
+    lifts as inert floor) could face an unreachable objective/defender slot.
+    `_connect_rooms` already spans every room via corridors/doors before
+    `_place_lifts` runs, so this should hold for every seed/size with lift
+    edges excluded entirely from the reachability graph."""
+    for seed in range(30):
+        layout = generate_interior(seed, size, CC)
+        reachable = _independent_reachability(layout, use_lifts=False)
+        assert layout.objective in reachable
+        assert all(z in reachable for z in layout.deployment_zones)
+        assert all(s in reachable for s in layout.defender_slots)
 
 
 def test_bulkhead_never_sole_connector() -> None:

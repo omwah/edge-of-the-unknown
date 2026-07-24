@@ -15,9 +15,10 @@ planet query surface. Encodes the interview decisions:
   is no separate neutral/wary permission branch. Friendly (yours/your corp/your bloc,
   or an inhabiting species in the friendly band) and uninhabited landable worlds route
   to survey.
-- **D9** bare jovians / Cloud Cities stay **orbital-only** until the dedicated Cloud
-  City assault gate opens (GW-WP15/16); the seam is explicit, never reusing terrestrial
-  terrain.
+- **D9** a bare gas giant stays **orbital-only** always; a below-friendly Cloud City
+  routes to `Assault` (station-interior tactical map, GW-WP15/16) once
+  `groundwar.cloud_city_assault_enabled` is on — friendly/owned Cloud Cities stay
+  orbital-only either way. The seam is explicit, never reusing terrestrial terrain.
 - **G13** a Core world can **never** enter assault — the sanctuary holds regardless of
   crafted commands or stale DTOs.
 
@@ -202,10 +203,27 @@ def ground_access(
     # explicit and never reuses terrestrial terrain. Checked before landability because a
     # jovian is nominally landable (the legacy `Descend` path descends to its Cloud City).
     if is_cloud_city_world(planet.planet_type, config):
-        if planet.cloud_city_size > 0:
-            return OrbitalOnly(
-                "a Cloud City is engaged from orbit until station-interior assault opens")
-        return OrbitalOnly("a gas giant has no surface to land on")
+        if planet.cloud_city_size == 0:
+            return OrbitalOnly("a gas giant has no surface to land on")
+        gw = config.groundwar
+        below_friendly = gw is not None and gw.cloud_city_assault_enabled \
+            and not _friendly(state, player, planet, config)
+        if below_friendly:
+            # GW-WP16: the same below-friendly → assault routing every other inhabited
+            # world gets, gated on the migration flag — friendly/owned Cloud Cities and a
+            # bare gas giant stay OrbitalOnly above regardless of it. The Core sanctuary
+            # (G13) and "assault not enabled" checks mirror the generic path below exactly.
+            if state.sectors[planet.sector_id].is_galactic_core:
+                return OrbitalOnly("the Core's worlds cannot be assaulted")  # G13 sanctuary
+            if config.citadels is None:
+                return OrbitalOnly("ground assault is not enabled in this universe")
+            return Assault(
+                owner=planet.owner, inhabited=True,
+                blockers=assault_blockers(state, planet, config),
+                reason="a hostile Cloud City — assault once its orbital defences fall",
+            )
+        return OrbitalOnly(
+            "a Cloud City is engaged from orbit until station-interior assault opens")
     if not is_landable(planet.planet_type, config):
         return OrbitalOnly(
             f"a {pretty_planet_type(planet.planet_type).lower()} has no surface to land on")

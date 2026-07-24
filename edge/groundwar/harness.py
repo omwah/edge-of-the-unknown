@@ -6,7 +6,7 @@ duplicate engine. It needs a live `GameService`, not a full big-bang universe �
 mirrors `tests/test_groundwar_access.py`'s `_state`/`_planet` pattern: a one-sector Hub
 holding one planet and the player's ship.
 
-Two builders, one per mode:
+Three builders, one per mode:
 
 - `assault_state` seeds a below-friendly-species world with a garrison sized by
   `edge.core.groundwar.assault.seed_garrison` (the same call the big bang makes) and
@@ -16,6 +16,12 @@ Two builders, one per mode:
 - `expedition_state` seeds an owned (friendly, "inhabited") or unowned ("uninhabited")
   world and salts a handful of real `Discovery` records onto it — survey sites must
   each name a real discovery id (GW plan G6), so a bare planet has nothing to find.
+- `cloud_city_assault_state` (GW-WP16) is `assault_state`'s Cloud City sibling: a
+  below-friendly jovian world with `cloud_city_size` set, otherwise identical
+  shape (same garrison seeding, same loadout wiring). Only meaningful once the
+  caller's config has `groundwar.cloud_city_assault_enabled` on — `BeginAssault`
+  recomputes `ground_access` itself and rejects the drop while the gate is off,
+  exactly as it does for every other caller.
 """
 
 from __future__ import annotations
@@ -88,6 +94,41 @@ def assault_state(
     planet = Planet(
         id=PLANET_ID, sector_id=SECTOR_ID, name="Target World", planet_type=planet_type,
         habitability_cap=habitability_cap, population={_HOSTILE_SPECIES_KIND: habitability_cap},
+        citadel_level=citadel_level, gun_integrity=0,
+        garrison_infantry=infantry, garrison_armor=armor)
+    suits_total = sum(loadout.values())
+    ship = Ship(
+        id=SHIP_ID, type_id="trailblazer", name="S.S. Harness", owner_player_id=PLAYER_ID,
+        sector_id=SECTOR_ID, holds_total=60, turns_per_warp=1,
+        passenger_capacity=suits_total * 2, recruits=suits_total, suits=dict(loadout))
+    ship = replace(ship, ground_missiles=missile_capacity(ship, config))
+    return _base_state(config, seed, planet, ship)
+
+
+def cloud_city_assault_state(
+    config: GameConfig, *, seed: int, cloud_city_size: int, citadel_level: int,
+    loadout: dict[str, int],
+) -> UniverseState:
+    """A below-friendly Cloud City sized for a droppable station-interior assault
+    (GW-WP16), plus a loaded ship — `assault_state`'s Cloud City sibling.
+
+    Garrison is sized the same way (`seed_garrison`, reading a jovian's
+    `size × berths` capacity in place of a terrestrial `habitability_cap`);
+    `gun_integrity` stays 0 for the same reason (a droppable assault requires
+    the orbital gun already silenced). No explicit owner — an unowned world
+    with an unresolvable inhabiting species reads as below-friendly exactly
+    like `assault_state`'s terrestrial worlds already do, without needing a
+    fake alliance fixture.
+    """
+    assert config.groundwar is not None
+    rng = Random(seed)
+    capacity = cloud_city_size * config.planets.cloud_city_berths
+    infantry, armor = seed_garrison(
+        config, capacity=capacity, citadel_level=citadel_level,
+        distance_band="Frontier", hostile=True, alliance_owned=False, rng=rng)
+    planet = Planet(
+        id=PLANET_ID, sector_id=SECTOR_ID, name="Skyhold", planet_type="jovian",
+        cloud_city_size=cloud_city_size, population={_HOSTILE_SPECIES_KIND: capacity},
         citadel_level=citadel_level, gun_integrity=0,
         garrison_infantry=infantry, garrison_armor=armor)
     suits_total = sum(loadout.values())

@@ -7,10 +7,11 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: implementation underway — GW-WP01–15 shipped (GW-WP13 balance
-> tuning deliberately deferred); GW-M3/GW-M4 complete. Next: GW-WP16 (gated
-> Cloud City assault integration), which wires the GW-WP15 station-interior
-> generator/art into a real tactical assault and flips the live gate.**
+> **Status: COMPLETE — all of GW-WP01–16 shipped, GW-M1 through GW-M5 all
+> closed (July 2026). `groundwar.cloud_city_assault_enabled` is on in the
+> production default. GW-WP13's balance tuning (garrison counts, defense
+> density, emplacement geometry for both terrestrial and Cloud City assaults)
+> remains the one deliberately deferred follow-up, flagged not silent.**
 
 ## Context
 
@@ -1548,24 +1549,99 @@ table; compact/standard/wide `snap_compare` responsive snapshots of the preview
 screen (the "visual review sheet"); preview-screen reroll/resize key handling.
 Commit `ground: GW-WP15 Cloud City station-interior maps + art`.
 
-### GW-WP16 — Gated Cloud City assault integration (L/XL)
+### GW-WP16 — Gated Cloud City assault integration (L/XL) — SHIPPED
 
-Adapt assault generation and tactics to the station interior: boarding/drop
-entry, doors and corridors, interior hazards, Cloud City defensive structures,
-Resolve objectives, retrieval/extraction, persistent damage, and D8 settlement.
-Reuse recruits/suits, ground defenders, diplomacy, protectorate, conquest, wire,
-DTO, and command rails; specialize only topology/art and rules that truly differ.
+**Status: shipped July 2026 — GW-M5 done, all of GW-WP01–16 shipped.** Interview
+decisions this session: **bulkhead stays permanently indestructible** (only
+`security_door` is destructible — the "Recommended" option, bounding structure
+count to actual doorways instead of ~400+ wall cells per station); **surrender/
+Resolve is whole-station**, not per-district (the user chose this over the
+per-district recommendation).
 
-When parity, balance, remote play, and persistence tests pass, enable
-`groundwar.cloud_city_assault_enabled`. Below-friendly inhabited Cloud Cities
-then route to assault; bare jovians and friendly/owned Cloud Cities remain
-orbital-only under D9.
+Research before implementation (an advisor pass, before committing to the
+shape) found the tactical engine already almost entirely **topology-agnostic**:
+`_battle_move_cost`/`_line_of_sight`/`_battle_cover_at`/`_reachable` read
+terrain by feature name and live `AssaultStructure`s, not planet type;
+`_check_cowed`/`broadcast_terms`/`_apply_resolve` key purely on `city_id`;
+`settle_assault` (D8) reads structure-kind counters and headcounts only;
+`session._assault_operation_view`/`AssaultCityDTO` project whatever
+`AssaultMap` they're given with no hardcoded assumptions. So this WP turned out
+to be almost entirely a **generation-adapter + gating** problem:
 
-Files: core groundwar access/assault/settlement, DTO/session/client/wire, planet
-and battle TUI, config and docs.
-Tests: gate-off orbital behavior; gate-on access; assault win/fail/extract;
-persistent interior damage; protectorate/conquest; reload and remote-client
-goldens; fighter non-involvement.
+- New `edge/core/groundwar/interior.py::District`/`InteriorLayout.districts`
+  exposes the per-room records WP15's generator already built internally but
+  never surfaced. A new defensive test
+  (`test_connectivity_holds_without_lift_links`) proves `lift_links` are never
+  load-bearing (`_connect_rooms` already spans every room via corridors/doors
+  *before* `_place_lifts` runs) — so `lift` cells are inert floor tactically,
+  no teleport mechanic needed; `lift`'s existing `GwTerrain` entry already
+  reads as ordinary floor.
+- New `edge/core/groundwar/assault.py::generate_cloud_city_assault_map` builds
+  an `AssaultMap` from `generate_interior`: **one shared `AssaultCity`** seated
+  at the command-core district (every structure across every physical room
+  reports to it — this alone makes surrender whole-station with **zero
+  changes** to `_check_cowed`/`broadcast_terms`/`_apply_resolve`'s own
+  `city_id`-keyed code), AA/sensor per district (extra AA + a `citadel_gun` at
+  `citadel_level >= 2`/`>= 3` capital-only, mirroring `_stamp_city`'s own
+  thresholds), `building_civilian`/`building_military` stamped in
+  `habitation`/`engineering` districts (WP15's vocabulary had none — this is
+  what gives civilian-harm consequences a real target on a station), every
+  `security_door` → a `gate` structure, **no `wall`-kind structure ever
+  emitted** (`city_cowed` never references walls/gates, so this has zero
+  effect on the win condition). New `AssaultMap.spawn_anchors` carries the
+  layout's `defender_slots` so `_place_units` has somewhere to spawn garrison
+  even on a station with zero doors (found via a real generated-seed
+  distribution during testing — some seeds have zero `security_door` cells).
+  A real bug caught by the test suite, not assumed safe: a WP15 deployment
+  zone could land on a cell a district's emplacement stamp later claimed,
+  making `assault_drop` reject it — fixed by reserving `deployment_zones`
+  cells from `_stamp_district`'s candidate floor before this WP shipped, not
+  after a report.
+- `derive_difficulty` branches: for a jovian world, `cities` carries
+  `planet.cloud_city_size` directly (WP15's own district-count formula
+  controls room count, not the population-derived terrestrial one) —
+  `citadel_level`/`surrender_threshold` are untouched, already
+  planet-type-agnostic. `AssaultOperation.cities` therefore doubles as
+  `cloud_city_size` for a jovian operation, reusing the existing field rather
+  than adding a new hashed one. `assault_map_for_state` dispatches on
+  `is_cloud_city_world(op.planet_type, config)`.
+- `edge/core/groundwar/access.py::ground_access` gates the below-friendly →
+  `Assault` path **inside** the existing Cloud City branch on
+  `groundwar.cloud_city_assault_enabled` — friendly/owned Cloud Cities and a
+  bare gas giant stay `OrbitalOnly` regardless; the Core sanctuary (G13) and
+  "citadels not configured" checks apply exactly as they do everywhere else.
+- **Confirmed zero-touch by actually exercising the code, not just reading
+  it**: `edge/server/session.py`/`edge/core/dto.py` (generic DTO projection),
+  `edge/core/groundwar/settlement.py` (D8, planet-type-agnostic), the
+  unmodified `edge/tui/screens/ground_assault.py` (a Pilot smoke test pushes
+  it against a live Cloud City operation and it renders/accepts input with no
+  code changes — the CITIES panel just shows one row). Wire/DTO shape is
+  unchanged, so `WIRE_VERSION` did not bump; `config_version` 13→14 closes the
+  GW-M5 epoch batching both this WP's `cloud_city_assault_enabled` flag and
+  WP15's deferred `GwCloudCity`/terrain-class additions in one bump, per
+  "config epochs batch per milestone."
+- `edge/groundwar/harness.py` gained `cloud_city_assault_state` (mirrors
+  `assault_state`'s shape: `seed_garrison`-sized garrison, loaded ship, gun
+  already silenced) for the Pilot smoke test; no new interactive
+  `edge-groundwar` setup-screen mode was added (flagged as a follow-up, not
+  required to prove the topology adapter's correctness).
+- **Not tuned this WP, flagged not silent** (a WP13-style follow-up): garrison
+  counts, defense density per district, emplacement placement geometry,
+  multi-drop-zone landing (only `deployment_zones[0]` is used), a dedicated
+  Cloud-City bot/multiplayer contention scenario (the existing groundwar
+  bot/multiplayer tests already stress the shared tactical engine), and TUI
+  wording polish ("planetfall"/city terminology reading oddly for a station).
+
+Files: `edge/core/groundwar/interior.py`, `edge/core/groundwar/assault.py`,
+`edge/core/groundwar/access.py`, `edge/core/config.py`,
+`config/groundwar_default.yaml`, `edge/groundwar/harness.py`,
+`config/default.yaml`, `tests/test_config.py`.
+Tests: `tests/test_groundwar_interior.py` (District/no-lift-links proof),
+`tests/test_groundwar_cloud_city_assault.py` (pure generation), `tests/
+test_groundwar_cloud_city_assault_tactics.py` (drop/fight/broadcast/settle
+end-to-end), `tests/test_groundwar_cloud_city_assault_view.py` (Textual
+Pilot), `tests/test_groundwar_access.py` (gate-off/gate-on table). Full
+`-k groundwar` suite green, no regressions in the terrestrial assault path.
 Commit `ground: GW-WP16 Cloud City interior assaults` — **GW-M5 done.**
 
 ## Verification matrix

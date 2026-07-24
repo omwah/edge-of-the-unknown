@@ -38,11 +38,12 @@ from typing import Literal
 
 from edge.core.combat import CombatError
 from edge.core.config import GameConfig, GroundwarConfig, GwEmplacement, GwSuit
+from edge.core.groundwar import interior as gw_interior
 from edge.core.groundwar.models import AssaultGarrisonUnit, AssaultOperation, AssaultTrooper
 from edge.core.groundwar.terrain import generate_feature_grid
 from edge.core.models import AlienSpecies, Planet, UniverseState
 from edge.core.movement import MovementError
-from edge.core.planets import colonist_capacity
+from edge.core.planets import colonist_capacity, is_cloud_city_world
 
 Vec = tuple[int, int]
 
@@ -67,6 +68,14 @@ PASSIVE_STRUCTURE_KINDS: frozenset[StructureKind] = frozenset({
 _CITY_NAMES = (
     "Klendathu Down", "Port Joel", "Zegema Beach", "New Cyrene", "Uxmal",
     "Fort Bannon", "Carr's Landing", "Hesperus", "Tango Urilla", "Sheol",
+)
+
+# GW-WP16: a Cloud City assault has exactly one `AssaultCity` (the whole
+# station — interview decision: surrender is whole-station, not per-district),
+# named from this pool instead of `_CITY_NAMES`.
+_STATION_NAMES = (
+    "Aurora Spar", "Halcyon Reach", "Meridian Vault", "Thresher's Rest",
+    "Windward Dock", "Lantern Spire", "Coriolis Bell", "Farview Anchor",
 )
 
 _STREET_FEATURE = "dust"  # what city ground plays as (move 1, no cover)
@@ -135,6 +144,12 @@ class AssaultMap:
     structures: tuple[AssaultStructure, ...]
     landing_x: int
     landing_y: int
+    # GW-WP16: a Cloud City map's WP15 `defender_slots`, so `_place_units` has
+    # somewhere to spawn garrison even with zero `security_door`/`gate` structures
+    # to derive a ring-search origin from (a terrestrial `bulkhead`-equivalent has
+    # no structure to fall back to the way a terrestrial wall does). Empty/unused
+    # for terrestrial maps, which keep deriving origins from gates/walls.
+    spawn_anchors: tuple[Vec, ...] = ()
 
     def structures_in(self, city_id: int, *kinds: StructureKind) -> tuple[AssaultStructure, ...]:
         return tuple(s for s in self.structures
@@ -193,6 +208,15 @@ def derive_difficulty(
     world with `citadel_level >= gun_min_level` — one that built and lost a gun
     in the siege — scores a `had_gun_mult` harder than one that never invested
     in one, even though the literal weapon is down either way (decision #7).
+
+    **GW-WP16 Cloud City branch**: `cities` carries `planet.cloud_city_size`
+    directly rather than the population-derived city count below — WP15's own
+    `districts_base`/`districts_per_size` formula (`GwCloudCity`, read inside
+    `generate_cloud_city_assault_map`) controls room count for a station, not
+    this one. `citadel_level`/`surrender_threshold` are untouched: already
+    planet-type-agnostic (`colonist_capacity` already returns the
+    cloud-city-appropriate `size × berths` figure, so every multiplier above
+    already reads correctly for a station).
     """
     assert config.groundwar is not None
     cfg = config.groundwar.assault_difficulty
@@ -206,7 +230,10 @@ def derive_difficulty(
     score *= cfg.band_mult.get(distance_band, 1.0)
     if config.citadels is not None and planet.citadel_level >= config.citadels.gun_min_level:
         score *= cfg.had_gun_mult
-    cities = min(cfg.max_cities, cfg.min_cities + int(score // cfg.population_per_extra_city))
+    if is_cloud_city_world(planet.planet_type, config):
+        cities = planet.cloud_city_size
+    else:
+        cities = min(cfg.max_cities, cfg.min_cities + int(score // cfg.population_per_extra_city))
     citadel_level = min(planet.citadel_level, _CITADEL_MAX)
     surrender_threshold = max(
         1, cfg.surrender_threshold_base + citadel_level * cfg.surrender_threshold_per_citadel_level)
@@ -423,6 +450,150 @@ def generate_assault_map(
     )
 
 
+# --- Cloud City station-interior battlefield generation (GW-WP16, GW plan D9) --
+
+
+def _stamp_district(
+    structures: list[AssaultStructure], struct_at: dict[Vec, int], next_id: list[int],
+    config: GameConfig, district: gw_interior.District, city_id: int, reserved: set[Vec], *,
+    is_citadel: bool, citadel_level: int,
+) -> None:
+    """Emplacements + building stamps for one district, keyed off its own floor
+    cell list (index-based selection, not geometric offsets — robust regardless
+    of the room's actual shape). Every non-command-core district gets AA +
+    sensor, mirroring `_stamp_city`'s baseline; only the command-core district
+    (the station's objective) can carry a `citadel_gun`, at the same
+    `citadel_level >= 2` threshold terrestrial capitals use. `habitation`/
+    `engineering` districts stamp a fraction of their floor as
+    `building_civilian`/`building_military` — WP15's interior vocabulary had
+    none, so this is what gives civilian-harm consequences (`_structure_destroyed`,
+    `settlement.civilian_loss_per_structure`) real targets on a station.
+
+    `reserved` (the layout's `deployment_zones`) is excluded from every
+    candidate cell — a district role can be `plaza`, which *is* eligible
+    floor for a landing zone, so without this a drop point could otherwise
+    land on a cell a structure just claimed (found via a failing
+    `assault_drop` in this WP's own test suite, not assumed safe).
+    """
+    assert config.groundwar is not None
+    d = config.groundwar.defenses
+    floor = [p for p in district.floor if p not in reserved]
+    if not floor:
+        return
+    used: set[Vec] = set()
+
+    def _take(start_idx: int) -> Vec | None:
+        for step in range(len(floor)):
+            pos = floor[(start_idx + step) % len(floor)]
+            if pos not in used and pos not in struct_at:
+                used.add(pos)
+                return pos
+        return None
+
+    aa_pos = _take(0)
+    if aa_pos is not None:
+        _add_structure(structures, struct_at, next_id, "aa", *aa_pos, city_id, d.aa.hp)
+    sensor_pos = _take(len(floor) // 3)
+    if sensor_pos is not None:
+        _add_structure(structures, struct_at, next_id, "sensor", *sensor_pos, city_id, d.sensor.hp)
+    if citadel_level >= 3:
+        extra_aa = _take(2 * len(floor) // 3)
+        if extra_aa is not None:
+            _add_structure(structures, struct_at, next_id, "aa", *extra_aa, city_id, d.aa.hp)
+    if is_citadel and citadel_level >= 2:
+        gun_pos = _take(len(floor) - 1)
+        if gun_pos is not None:
+            _add_structure(
+                structures, struct_at, next_id, "citadel_gun", *gun_pos, city_id, d.citadel_gun.hp)
+
+    if district.role == "habitation":
+        building_kind: StructureKind = "building_civilian"
+        building_hp = d.building_civilian_hp
+    elif district.role == "engineering":
+        building_kind = "building_military"
+        building_hp = d.building_military_hp
+    else:
+        return  # plaza / command_core get no building stamps
+    for i, pos in enumerate(floor):
+        if i % 3 == 0 and pos not in used and pos not in struct_at:
+            _add_structure(structures, struct_at, next_id, building_kind, *pos, city_id, building_hp)
+            used.add(pos)
+
+
+def generate_cloud_city_assault_map(
+    config: GameConfig, *, seed: int, cloud_city_size: int, citadel_level: int,
+) -> AssaultMap:
+    """Lay out a Cloud City's tactical battlefield from its GW-WP15 interior
+    layout (`edge.core.groundwar.interior.generate_interior`).
+
+    Unlike `generate_assault_map`'s several discrete walled cities, the whole
+    station reports to **one shared `AssaultCity`** seated at the command-core
+    district (interview decision: surrender is whole-station, not
+    per-district) — every stamped structure across every physical room carries
+    that one `city_id`, so `_check_cowed`/`broadcast_terms`/`_apply_resolve`
+    are whole-station with **no changes to their own code** (they already key
+    purely on `city_id`).
+
+    `bulkhead` stays permanent, impassable terrain — no live structure, no
+    breach mechanic (interview decision: only `security_door` is destructible).
+    Every generated `security_door` cell becomes a destructible `gate`
+    structure; no `wall`-kind structure is ever emitted (`city_cowed`'s own
+    definition never references walls/gates, so this has no effect on the win
+    condition). `blocked` covers every stamped structure's cell (gates
+    excluded, mirroring how terrestrial gates are excluded) plus every
+    `bulkhead` cell, in parity with `_stamp_city`'s redundant wall-blocked
+    bookkeeping even though the terrain `move_cost` check alone already
+    covers bulkhead. `spawn_anchors` carries the layout's `defender_slots`.
+    """
+    assert config.groundwar is not None
+    layout = gw_interior.generate_interior(seed, cloud_city_size, config.groundwar.cloud_city)
+    structures: list[AssaultStructure] = []
+    struct_at: dict[Vec, int] = {}
+    next_id = [1]
+    rng = Random(f"{seed}|cloud_city_assault|{cloud_city_size}|{citadel_level}")
+
+    command_district = next(dd for dd in layout.districts if dd.role == "command_core")
+    city = AssaultCity(
+        id=1, name=rng.choice(_STATION_NAMES),
+        cx=command_district.cx, cy=command_district.cy,
+        x0=command_district.x0, y0=command_district.y0,
+        x1=command_district.x1, y1=command_district.y1,
+        is_citadel=True, citadel_level=citadel_level,
+    )
+
+    reserved_cells = set(layout.deployment_zones)
+    for district in layout.districts:
+        is_capital = district.role == "command_core"
+        _stamp_district(
+            structures, struct_at, next_id, config, district, city.id, reserved_cells,
+            # Mirrors `generate_assault_map`'s own call to `_stamp_city`: the
+            # citadel_level>=3 extra-AA/hardening bonus is capital-only, so a
+            # non-capital district is stamped as if citadel_level were 0.
+            is_citadel=is_capital, citadel_level=citadel_level if is_capital else 0,
+        )
+
+    for y, row in enumerate(layout.feature_grid):
+        for x, feature_name in enumerate(row):
+            if feature_name == "security_door":
+                _add_structure(
+                    structures, struct_at, next_id, "gate", x, y, city.id,
+                    config.groundwar.defenses.gate.hp)
+
+    kind_by_id = {s.id: s.kind for s in structures}
+    blocked: set[Vec] = {pos for pos, sid in struct_at.items() if kind_by_id[sid] != "gate"}
+    for y, row in enumerate(layout.feature_grid):
+        for x, feature_name in enumerate(row):
+            if feature_name == "bulkhead":
+                blocked.add((x, y))
+
+    landing_x, landing_y = layout.deployment_zones[0]
+    return AssaultMap(
+        width=layout.width, height=layout.height, feature=layout.feature_grid,
+        blocked=frozenset(blocked), cities=(city,), structures=tuple(structures),
+        landing_x=landing_x, landing_y=landing_y, spawn_anchors=layout.defender_slots,
+    )
+
+
 def assault_map_for(state: UniverseState, op: AssaultOperation, config: GameConfig) -> AssaultMap:
     """Regenerate the live battlefield for an active assault operation (G5) — the
     projection seam, mirroring `survey.survey_map_for`."""
@@ -430,7 +601,17 @@ def assault_map_for(state: UniverseState, op: AssaultOperation, config: GameConf
 
 
 def assault_map_for_state(op: AssaultOperation, config: GameConfig) -> AssaultMap:
-    """State-free battlefield regeneration for pure settlement/tests (G5)."""
+    """State-free battlefield regeneration for pure settlement/tests (G5).
+
+    `AssaultOperation.cities` doubles as `cloud_city_size` for a Cloud City
+    operation (GW-WP16 — `derive_difficulty` sets it that way instead of the
+    population-derived city count), so the dispatch below is the one place
+    that distinction matters; every downstream consumer (session, TUI,
+    settlement) reads the same `AssaultMap` shape either way.
+    """
+    if is_cloud_city_world(op.planet_type, config):
+        return generate_cloud_city_assault_map(
+            config, seed=op.seed, cloud_city_size=op.cities, citadel_level=op.citadel_level)
     return generate_assault_map(
         config, seed=op.seed, planet_type=op.planet_type,
         cities=op.cities, citadel_level=op.citadel_level)
@@ -1214,23 +1395,33 @@ def do_jump(battle: _Battle, trooper: _Trooper, x: int, y: int) -> bool:
 def _place_units(
     battle: _Battle, city: AssaultCity, kind: Literal["infantry", "armor"], count: int,
 ) -> int:
-    """Place up to `count` garrison units of `kind` in a ring outward from `city`'s
-    gates (or a wall stub when gateless) — ported from the POC's `_spawn_sortie`
-    placement loop, factored out so both pre-placement (`GroundDrop`) and escalating
-    sorties (`_spawn_sortie`) share it. Draws no rng (placement is a deterministic
+    """Place up to `count` garrison units of `kind` in a ring outward from a set
+    of origin cells — ported from the POC's `_spawn_sortie` placement loop,
+    factored out so both pre-placement (`GroundDrop`) and escalating sorties
+    (`_spawn_sortie`) share it. Draws no rng (placement is a deterministic
     geometric search); returns how many were actually placed, which may be fewer
-    than `count` if the city runs out of legal cells nearby."""
+    than `count` if the city runs out of legal cells nearby.
+
+    Origins are `city`'s gates (or a wall stub when gateless) for a terrestrial
+    map; a Cloud City map has no wall structures to fall back to (`bulkhead` is
+    permanent, non-structural terrain — GW-WP16), so it instead supplies
+    `AssaultMap.spawn_anchors` (WP15's `defender_slots`) directly, which take
+    priority whenever the map provides them.
+    """
     if count <= 0:
         return 0
-    gates = [s for s in battle.structures.values() if s.city_id == city.id and s.kind == "gate"]
-    spawn_from = gates or [s for s in battle.structures.values()
-                           if s.city_id == city.id and s.kind == "wall"][:2]
+    if battle.amap.spawn_anchors:
+        origins: list[Vec] = list(battle.amap.spawn_anchors)
+    else:
+        gates = [(s.x, s.y) for s in battle.structures.values()
+                 if s.city_id == city.id and s.kind == "gate"]
+        origins = gates or [(s.x, s.y) for s in battle.structures.values()
+                            if s.city_id == city.id and s.kind == "wall"][:2]
     gcls = getattr(battle.gw.garrison, kind)
     placed = 0
-    for gate in spawn_from:
+    for ox, oy in origins:
         for r in range(1, 5):
-            for nx, ny in ((gate.x - r, gate.y), (gate.x + r, gate.y),
-                           (gate.x, gate.y - r), (gate.x, gate.y + r)):
+            for nx, ny in ((ox - r, oy), (ox + r, oy), (ox, oy - r), (ox, oy + r)):
                 if placed >= count:
                     return placed
                 if battle.in_bounds(nx, ny) and _battle_move_cost(battle, nx, ny) > 0 \
