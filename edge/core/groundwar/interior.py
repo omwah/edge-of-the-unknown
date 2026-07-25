@@ -8,6 +8,16 @@ gameplay feature grid here, glyphs/colours in `edge.art.interior`), different
 algorithm, because a station's rooms and corridors are architecture, not organic
 noise bands.
 
+The layout is **hub-and-spoke, not a spanning tree over rooms** (interview note:
+a random room-to-room spanning tree reads as a maze — you have to cut through
+other rooms' doorways to get anywhere). One horizontal corridor **spine** runs the
+width of the station; every room sits either north or south of it and connects to
+it with exactly one straight stub and one door — never to another room directly.
+`_spine_band` reserves the spine's rows before any room is placed, so a room can
+never span across it, and `_bsp_leaves` partitions the north/south halves
+independently (`_generate_leaves`). See `_connect_to_spine` for the stub/door pass
+that replaces the old room-to-room `_connect_rooms`.
+
 Two interview decisions (July 2026) shape the connectivity model:
 
 - **Jump-jets never bypass a wall or a locked door here** (unlike the planet
@@ -71,6 +81,7 @@ WALL_LIKE_FEATURES: tuple[str, ...] = ("bulkhead", "security_door")
 _MIN_LEAF = 8  # a leaf below this on its split axis is never split further
 _ROOM_MARGIN = 1  # bulkhead ring left around every carved room
 _EDGE_MARGIN = 3  # deployment zones must be within this of the map border
+_SPINE_THICKNESS = 4  # rows reserved for the main corridor spine
 
 
 def wall_neighbor_mask(
@@ -192,16 +203,14 @@ def _cut_rect(r: _Rect, rng: Random) -> tuple[_Rect, _Rect] | None:
     return None
 
 
-def _split(rect: _Rect, target_leaves: int, rng: Random) -> list[_Rect]:
+def _bsp_leaves(rect: _Rect, target_leaves: int, rng: Random) -> list[_Rect]:
     """BSP-partition `rect` toward `target_leaves` leaves (a soft target — a leaf
     is never split below `_MIN_LEAF` on its shorter usable axis, so a small map or
-    a large target may yield fewer leaves than requested), then a forced pass
-    that keeps bisecting any leaf still spanning more than a third of the full
-    map on either axis — the largest-area-first loop above can reach
-    `target_leaves` while leaving one oversized leaf untouched (a low
-    `districts_base` on a big map), which used to show up as a single room
-    spanning almost the whole station height. That pass ignores `target_leaves`
-    entirely, so the final room count is a floor, not an exact count."""
+    a large target may yield fewer leaves than requested). Used per spine half
+    (`_generate_leaves`): the reserved spine band already bounds how tall a room
+    can get, so — unlike the pre-spine layout — there is no further "oversized
+    leaf" pass here; a room is free to span its whole half, which is what makes
+    it read as a bay off the corridor rather than one cell in a grid of rooms."""
     leaves = [rect]
     while len(leaves) < target_leaves:
         # Split the largest-area leaf that can still be split.
@@ -214,29 +223,37 @@ def _split(rect: _Rect, target_leaves: int, rng: Random) -> list[_Rect]:
         cut = _cut_rect(r, rng)
         assert cut is not None  # split_idx was only chosen when _cut_rect succeeds
         leaves.extend(cut)
-    return _split_oversized(leaves, rect.w, rect.h, rng)
-
-
-def _split_oversized(leaves: list[_Rect], map_w: int, map_h: int, rng: Random) -> list[_Rect]:
-    """Keep bisecting any leaf whose width or height still exceeds a third of
-    the full map on that axis, regardless of leaf count — the "at least
-    thirds" guarantee `_split`'s docstring promises. A leaf too small to clear
-    `_MIN_LEAF * 2` on either axis is left oversized rather than forced below
-    the minimum room size."""
-    max_w, max_h = -(-map_w // 3), -(-map_h // 3)  # ceil
-    changed = True
-    while changed:
-        changed = False
-        next_leaves: list[_Rect] = []
-        for r in leaves:
-            cut = _cut_rect(r, rng) if (r.w > max_w or r.h > max_h) else None
-            if cut is None:
-                next_leaves.append(r)
-            else:
-                next_leaves.extend(cut)
-                changed = True
-        leaves = next_leaves
     return leaves
+
+
+def _spine_band(width: int, height: int) -> tuple[int, int]:
+    """The `[y0, y1)` row range reserved for the main corridor spine, vertically
+    centred. Raises `InteriorGenerationError` immediately — rather than burning the
+    bounded-retry budget on a map shape that can never work regardless of seed —
+    when the remaining north/south halves can't each hold at least one
+    `_MIN_LEAF`-tall room."""
+    y0 = height // 2 - _SPINE_THICKNESS // 2
+    y1 = y0 + _SPINE_THICKNESS
+    if y0 < _MIN_LEAF or (height - y1) < _MIN_LEAF:
+        raise InteriorGenerationError(
+            f"Cloud City map too short for a corridor spine (height={height}, "
+            f"needs >= {2 * _MIN_LEAF + _SPINE_THICKNESS})")
+    return y0, y1
+
+
+def _generate_leaves(
+    width: int, height: int, target_leaves: int, rng: Random,
+) -> tuple[list[_Rect], int, int]:
+    """Room rects split into a north band and a south band around a reserved
+    horizontal corridor spine — hub-and-spoke, not a spanning tree over rooms (the
+    "should not look like a maze" interview note): every room gets exactly one stub
+    connecting it to the spine (`_connect_to_spine`), never to another room."""
+    y0, y1 = _spine_band(width, height)
+    north_n = -(-target_leaves // 2)  # ceil — north gets the extra room on an odd split
+    south_n = target_leaves - north_n
+    north = _bsp_leaves(_Rect(0, 0, width, y0), north_n, rng) if north_n > 0 else []
+    south = _bsp_leaves(_Rect(0, y1, width, height - y1), south_n, rng) if south_n > 0 else []
+    return north + south, y0, y1
 
 
 def _carve_rooms(
@@ -257,50 +274,36 @@ def _carve_rooms(
     return rooms
 
 
-def _carve_corridor(grid: list[list[str]], a: Vec, b: Vec) -> None:
-    (ax, ay), (bx, by) = a, b
-    x, y = ax, ay
-    while x != bx:
-        x += 1 if bx > x else -1
-        if grid[y][x] == "bulkhead":
-            grid[y][x] = "corridor"
-    while y != by:
-        y += 1 if by > y else -1
-        if grid[y][x] == "bulkhead":
-            grid[y][x] = "corridor"
-
-
-def _connect_rooms(
+def _connect_to_spine(
     grid: list[list[str]], rooms: list[_Room], rng: Random, locked_door_frac: float,
+    spine_y0: int, spine_y1: int,
 ) -> None:
-    """Join every room into one spanning tree via straight corridor carves,
-    turning a `locked_door_frac` fraction of connections into a `security_door`
-    at one endpoint instead of a plain open corridor mouth."""
-    order = list(range(len(rooms)))
-    rng.shuffle(order)
-    connected = [order[0]] if order else []
-    remaining = order[1:]
-    while remaining:
-        # Connect a random remaining room to a random already-connected one —
-        # simple random spanning tree, not a minimum-distance MST (art/rules
-        # iteration doesn't need optimal corridors, just guaranteed connectivity).
-        b = remaining.pop(rng.randrange(len(remaining)))
-        a = rng.choice(connected)
-        pa, pb = rooms[a].rect, rooms[b].rect
-        _carve_corridor(grid, (pa.cx, pa.cy), (pb.cx, pb.cy))
-        if rng.random() < locked_door_frac:
-            # Stamp the door at the point the corridor first leaves room b's rect.
-            bx, by = pb.cx, pb.cy
-            ax, ay = pa.cx, pa.cy
-            x, y = bx, by
-            while pb.x <= x < pb.x + pb.w and pb.y <= y < pb.y + pb.h:
-                x += 1 if ax > x else (-1 if ax < x else 0)
-                y += 1 if ay > y else (-1 if ay < y else 0)
-                if x == bx and y == by:
-                    break
-            if grid[y][x] == "corridor":
-                grid[y][x] = "security_door"
-        connected.append(b)
+    """Stamp the spine band as corridor, then give every room exactly one straight
+    stub connecting it to the spine — hub-and-spoke, not room-to-room: a room never
+    reaches another room except by walking the spine between their two doors.
+
+    `locked_door_frac` still turns a room's own doorway (where its stub meets its
+    outer wall) into a `security_door` instead of an open mouth, same knob as
+    before — it just always lands on the stub-to-room breach now, not an arbitrary
+    room-to-room connection.
+    """
+    width = len(grid[0])
+    for y in range(spine_y0, spine_y1):
+        for x in range(1, width - 1):
+            grid[y][x] = "corridor"
+    for room in rooms:
+        r = room.rect
+        cx = r.cx
+        if r.y >= spine_y1:  # south room: stub runs up, breach at its own top wall
+            for y in range(spine_y1, r.y):
+                grid[y][cx] = "corridor"
+            door_y = r.y
+        else:  # north room: stub runs down, breach at its own bottom wall
+            for y in range(r.y + r.h, spine_y0):
+                grid[y][cx] = "corridor"
+            door_y = r.y + r.h - 1
+        grid[door_y][cx] = (
+            "security_door" if rng.random() < locked_door_frac else "corridor")
 
 
 def _grow_patch(floor: set[Vec], start: Vec, budget: int, rng: Random) -> list[Vec]:
@@ -538,19 +541,23 @@ def generate_interior(
 ) -> InteriorLayout:
     """A deterministic Cloud City interior layout; raises on repeated failure.
 
-    Draws no game RNG — reproducible from `(noise_seed, cloud_city_size, config)`
-    alone, exactly like `edge.bigbang.generator.generate` is reproducible from
+    One corridor spine down the middle, rooms hanging off it north and south —
+    see the module docstring and `_generate_leaves`/`_connect_to_spine`. Draws no
+    game RNG — reproducible from `(noise_seed, cloud_city_size, config)` alone,
+    exactly like `edge.bigbang.generator.generate` is reproducible from
     `(seed, config)` (G2/G5).
     """
     target_leaves = _district_count(cloud_city_size, config)
+    _spine_band(config.width, config.height)  # raises immediately if this map shape can't work
     last_error: Exception | None = None
     for attempt in range(_MAX_ATTEMPTS):
         rng = Random(f"{noise_seed}-{attempt}")
         try:
             grid = [["bulkhead"] * config.width for _ in range(config.height)]
-            leaves = _split(_Rect(0, 0, config.width, config.height), target_leaves, rng)
+            leaves, spine_y0, spine_y1 = _generate_leaves(
+                config.width, config.height, target_leaves, rng)
             rooms = _carve_rooms(grid, leaves, rng)
-            _connect_rooms(grid, rooms, rng, config.locked_door_frac)
+            _connect_to_spine(grid, rooms, rng, config.locked_door_frac, spine_y0, spine_y1)
             _sprinkle(grid, rooms, rng, config.hazard_frac, config.cover_frac)
             lift_links = _place_lifts(grid, rooms, rng, config.lift_pairs)
             _place_landmarks(grid, rooms)
