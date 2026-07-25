@@ -100,6 +100,7 @@ from edge.core.events import (
     SalvageCollected,
     ShipDestroyed,
     ShipPurchased,
+    CrateOpened,
     SurveyDug,
     SurveySiteExcavated,
     SurveyLanded,
@@ -177,6 +178,7 @@ from edge.core.rules import (
     HaggleOffer,
     MineBelt,
     InstallComponent,
+    OpenCrate,
     SurveyDig,
     SurveyLand,
     SurveyTalk,
@@ -348,6 +350,8 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
                                   "y": command.y, "actor_id": command.actor_id}
         case SurveyDig():
             return "SurveyDig", {"operation_id": command.operation_id}
+        case OpenCrate():
+            return "OpenCrate", {"operation_id": command.operation_id}
         case SurveyLand():
             return "SurveyLand", {"operation_id": command.operation_id,
                                   "x": command.x, "y": command.y}
@@ -607,6 +611,8 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
                               y=payload["y"], actor_id=payload.get("actor_id", 0))
         case "SurveyDig":
             return SurveyDig(operation_id=payload["operation_id"])
+        case "OpenCrate":
+            return OpenCrate(operation_id=payload["operation_id"])
         case "SurveyLand":
             return SurveyLand(operation_id=payload["operation_id"],
                               x=payload["x"], y=payload["y"])
@@ -829,6 +835,12 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
             return "GroundMoved", {
                 "player_id": event.player_id, "operation_id": event.operation_id,
                 "x": event.x, "y": event.y, "main_turns": event.main_turns,
+            }
+        case CrateOpened():
+            return "CrateOpened", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+                "x": event.x, "y": event.y, "crate_id": event.crate_id,
+                "component_kind": event.component_kind, "component_tier": event.component_tier,
             }
         case SurveyDug():
             return "SurveyDug", {
@@ -1283,6 +1295,10 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "GroundMoved":
             return GroundMoved(payload["player_id"], payload["operation_id"],
                                payload["x"], payload["y"], payload["main_turns"])
+        case "CrateOpened":
+            return CrateOpened(payload["player_id"], payload["operation_id"],
+                               payload["x"], payload["y"], payload["crate_id"],
+                               payload["component_kind"], payload["component_tier"])
         case "SurveyDug":
             return SurveyDug(payload["player_id"], payload["operation_id"],
                              payload["x"], payload["y"], payload["discovery_id"])

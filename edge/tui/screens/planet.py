@@ -271,11 +271,11 @@ claims the world). Building again grows the city, and a bigger city berths more 
         children: list[Static | Horizontal] = []
         if p.ground_mode == "survey":
             if p.cloud_city:
-                # A Cloud City tour (GW-WP17): a built station, not an archaeology find —
-                # walkable, but with nothing to dig up.
+                # A Cloud City tour (GW-WP17/18): a built station, not an archaeology
+                # find — no dig sites, but salvage crates are worth opening.
                 children.extend([
                     Static("[green]Tour[/] — walk the city's halls from the inside.  "
-                           "[dim]Nothing to dig up — it's a built station, not a ruin.[/]"),
+                           "[dim]No ruins to dig up, but salvage crates are worth opening.[/]"),
                     Horizontal(Button("Tour the city", id="btn-ground", variant="primary"),
                                classes="buttons"),
                 ])

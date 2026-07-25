@@ -96,13 +96,27 @@ class SurveySettlement:
 
 
 @dataclass(frozen=True, slots=True)
+class CrateSite:
+    """One salvage crate inside a Cloud City tour (GW-WP18) — a station's payoff, not
+    an archaeology find. Never tied to a `Discovery`: opening one pulls a Tier-I
+    component the same way `Cannibalize` pulls one out of a derelict base, not the
+    artifact+codex rail every real surface `Discovery` uses (G6 stays untouched)."""
+
+    id: int
+    x: int
+    y: int
+    opened: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class SurveyMap:
     """The regenerated, non-hashed survey layout for one expedition (G5).
 
     Reconstructed from the operation seed + the visible discoveries + config; safely
     discardable and excluded from `state_hash`. `feature` is the gameplay terrain grid
     (feature names, glyph/colour styling stays in `edge.art`/`edge.tui`); `blocked` are
-    the settlement masonry cells foot travel cannot cross.
+    the settlement masonry cells foot travel cannot cross. `crates` is always empty
+    outside a Cloud City tour.
     """
 
     width: int
@@ -113,9 +127,13 @@ class SurveyMap:
     sites: tuple[SurveySite, ...]
     landing_x: int
     landing_y: int
+    crates: tuple[CrateSite, ...] = ()
 
     def site_by_discovery(self, discovery_id: int) -> SurveySite | None:
         return next((s for s in self.sites if s.discovery_id == discovery_id), None)
+
+    def crate_at(self, x: int, y: int) -> CrateSite | None:
+        return next((c for c in self.crates if (c.x, c.y) == (x, y)), None)
 
 
 # --- terrain / passability (pure, ported from the POC into frozen inputs) -----
@@ -314,19 +332,30 @@ def eligible_surface_site_ids(
     return frozenset(ids)
 
 
-def _generate_cloud_city_survey(config: GameConfig, *, seed: int, cloud_city_size: int) -> SurveyMap:
+def _generate_cloud_city_survey(
+    config: GameConfig, *, seed: int, cloud_city_size: int,
+    opened_crate_ids: frozenset[int] = frozenset(),
+) -> SurveyMap:
     """A friendly/owned Cloud City's tour map (GW-WP17): the same room/corridor interior a
     hostile assault uses (`edge.core.groundwar.interior`), with no dig sites or settlements —
     it's a built station, not an archaeology find, and it's already one friendly place, not
-    a planet with towns scattered over it.
+    a planet with towns scattered over it. Its only payoff is a handful of salvage crates
+    (GW-WP18, `layout.crate_slots`), numbered in generation order (1-based, matching every
+    other GroundCellDTO id-marker field — `found_contact_id` reserves 0 for "nothing here"
+    the same way) so the id is stable across regenerations regardless of which have opened.
     """
     assert config.groundwar is not None
     layout = generate_interior(seed, cloud_city_size, config.groundwar.cloud_city)
     lx, ly = (layout.deployment_zones[0] if layout.deployment_zones
               else (layout.width // 2, layout.height // 2))
+    crates = tuple(
+        CrateSite(id=i, x=x, y=y, opened=i in opened_crate_ids)
+        for i, (x, y) in enumerate(layout.crate_slots, 1)
+    )
     return SurveyMap(
         width=layout.width, height=layout.height, feature=layout.feature_grid,
         blocked=frozenset(), settlements=(), sites=(), landing_x=lx, landing_y=ly,
+        crates=crates,
     )
 
 
@@ -334,6 +363,7 @@ def generate_survey(
     config: GameConfig, *, seed: int, planet_type: str, inhabited: bool,
     sites: Sequence[Discovery], resolved_ids: frozenset[int] = frozenset(),
     hinted_ids: frozenset[int] = frozenset(), cloud_city_size: int = 0,
+    opened_crate_ids: frozenset[int] = frozenset(),
 ) -> SurveyMap:
     """Lay out a survey map for the given *visible* surface discoveries (pure, G5/G6/G7).
 
@@ -347,7 +377,9 @@ def generate_survey(
     the station-interior generator instead — see `_generate_cloud_city_survey`.
     """
     if is_cloud_city_world(planet_type, config):
-        return _generate_cloud_city_survey(config, seed=seed, cloud_city_size=cloud_city_size)
+        return _generate_cloud_city_survey(
+            config, seed=seed, cloud_city_size=cloud_city_size,
+            opened_crate_ids=opened_crate_ids)
     assert config.groundwar is not None
     exp = config.groundwar.expedition
     width, height = exp.width, exp.height
@@ -409,7 +441,7 @@ def survey_map_for(state: UniverseState, op: SurveyOperation, config: GameConfig
     return generate_survey(
         config, seed=op.seed, planet_type=op.planet_type, inhabited=inhabited, sites=sites,
         resolved_ids=op.resolved_discovery_ids, hinted_ids=op.hinted_discovery_ids,
-        cloud_city_size=op.cloud_city_size)
+        cloud_city_size=op.cloud_city_size, opened_crate_ids=op.opened_crate_ids)
 
 
 # --- live queries (pure, projection- and reducer-shared) ---------------------

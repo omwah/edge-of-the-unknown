@@ -24,6 +24,7 @@ from edge.core.events import (
     CorpJoined,
     CorpWarDeclared,
     CorpWarEnded,
+    CrateOpened,
     PlanetTransferred,
     PlayerAttacked,
     BountyPosted,
@@ -187,6 +188,7 @@ from edge.core.rules import (
     SetAllocation,
     SetPlayerName,
     SettleColonists,
+    OpenCrate,
     SurveyDig,
     SurveyLand,
     SurveyTalk,
@@ -260,6 +262,7 @@ COMMANDS: list[Command] = [
     ExtractGroundOperation(operation_id=123),  # GW-WP03 settle/clear a ground op
     GroundMove(operation_id=123, x=40, y=20, actor_id=0),  # GW-WP06 march the explorer
     SurveyDig(operation_id=123),  # GW-WP06 open a trench
+    OpenCrate(operation_id=123),  # GW-WP18 open a Cloud City salvage crate
     SurveyLand(operation_id=123, x=17, y=9),  # GW-WP07-FU2 player-chosen drop site
     SurveyTalk(operation_id=123),  # GW-WP06 settlement resupply/hint
     GroundDrop(operation_id=123, placements=(("marauder", 4, 29), ("scout", 5, 29))),  # GW-WP10
@@ -381,6 +384,7 @@ EVENTS: list[Event] = [
     GroundMoved(1, 123, 40, 20, 2),
     SurveyDug(1, 123, 40, 20, 9),
     SurveySiteExcavated(1, 123, 9, "ruins", "RARE"),
+    CrateOpened(1, 123, 40, 20, 2, "accelerator", "I"),
     SurveyLanded(1, 123, 17, 9),
     SurveyTalked(1, 123, 1, 9),
     BeltMined(1, 5, "equipment", 50),

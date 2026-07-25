@@ -88,6 +88,7 @@ class GroundCellDTO:
     # server-side against the *full* interior grid (`wall_neighbor_mask`), never a cropped
     # viewport, so the client's box-drawing glyph is correct even at the viewport's edge.
     wall_mask: int = 0
+    crate_id: int = 0  # GW-WP18: a salvage crate sits here (0 elsewhere)
 
 
 @dataclass(frozen=True)
@@ -122,6 +123,16 @@ class SurveySettlementDTO:
 
 
 @dataclass(frozen=True)
+class CrateDTO:
+    """One salvage crate inside a Cloud City tour (GW-WP18) — never a `Discovery`."""
+
+    crate_id: int
+    x: int
+    y: int
+    opened: bool = False
+
+
+@dataclass(frozen=True)
 class SurveyExpeditionDTO:
     """Fog-safe live survey view consumed by local and remote clients (GW-WP07).
 
@@ -152,6 +163,9 @@ class SurveyExpeditionDTO:
     scanner_band: int = 0  # 1 = saturated/hottest, 0 = nothing to read (see scanner_band_index)
     contacts: list[SurveyContactDTO] = field(default_factory=list)
     settlements: list[SurveySettlementDTO] = field(default_factory=list)
+    # A Cloud City tour (GW-WP17/18): no dig sites/settlements, salvage crates instead.
+    is_cloud_city: bool = False
+    crates: list[CrateDTO] = field(default_factory=list)
     outcome: str | None = None
     # Until the player picks a drop site the shuttle is still inbound: `explorer_x/y` is
     # only where the cursor should rest, and marching/digging/talking are refused. Aborting

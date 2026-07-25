@@ -2024,6 +2024,9 @@ class GwCloudCity(BaseModel):
     `locked_door_frac` and `lift_pairs` shape the connectivity graph
     (`edge.core.groundwar.interior`); `hazard_frac`/`cover_frac` sprinkle inert
     `vacuum`/`fire`/`electrical`/`cover_strut` cells onto room floors.
+    `crate_chance` is the per-district odds of a salvage crate (GW-WP18) — the
+    friendly tour's only payoff, a Tier-I component pulled the same way
+    `Cannibalize` pulls one out of a derelict base, never a `Discovery`/artifact.
     """
 
     model_config = _FROZEN
@@ -2036,6 +2039,7 @@ class GwCloudCity(BaseModel):
     lift_pairs: int = Field(default=2, ge=0)
     hazard_frac: float = Field(default=0.03, ge=0.0, le=1.0)
     cover_frac: float = Field(default=0.08, ge=0.0, le=1.0)
+    crate_chance: float = Field(default=0.4, ge=0.0, le=1.0)
 
 
 class GwPlatoon(BaseModel):

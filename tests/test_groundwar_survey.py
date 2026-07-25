@@ -140,6 +140,26 @@ def test_cloud_city_survey_is_deterministic() -> None:
     assert a.feature == b.feature and (a.landing_x, a.landing_y) == (b.landing_x, b.landing_y)
 
 
+def test_cloud_city_survey_places_crates_matching_the_interior_layout() -> None:
+    """GW-WP18: crate ids/positions come straight from `layout.crate_slots`, and
+    `opened_crate_ids` marks the matching ones `opened` — nothing recomputed."""
+    from edge.core.groundwar.interior import generate_interior
+
+    cc = CFG.groundwar.cloud_city.model_copy(update={"crate_chance": 1.0})  # type: ignore[union-attr]
+    cfg = CFG.model_copy(update={
+        "groundwar": CFG.groundwar.model_copy(update={"cloud_city": cc})})  # type: ignore[union-attr]
+    layout = generate_interior(42, 3, cc)
+    assert layout.crate_slots  # crate_chance 1.0 guarantees at least one
+    m = generate_survey(cfg, seed=42, planet_type="jovian", inhabited=True, sites=[],
+                        cloud_city_size=3, opened_crate_ids=frozenset({1}))
+    assert len(m.crates) == len(layout.crate_slots)
+    for i, (x, y) in enumerate(layout.crate_slots, 1):  # 1-based: 0 means "no crate"
+        crate = next(c for c in m.crates if c.id == i)
+        assert (crate.x, crate.y) == (x, y)
+        assert crate.opened == (i == 1)
+    assert m.crate_at(*layout.crate_slots[0]) is not None
+
+
 def test_eligible_surface_site_ids_excludes_every_cloud_city() -> None:
     """A Cloud City never surfaces a dig site, regardless of what big bang rolled
     for the underlying jovian before it was staged (GW-WP17)."""

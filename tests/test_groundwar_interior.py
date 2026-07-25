@@ -71,6 +71,42 @@ def test_many_seeds_generate_and_connect(size: int) -> None:
         assert layout.objective in command_district.floor
 
 
+def test_crate_chance_zero_gives_no_crates() -> None:
+    cc = CC.model_copy(update={"crate_chance": 0.0})
+    layout = generate_interior(1234, 3, cc)
+    assert layout.crate_slots == ()
+
+
+def test_crate_chance_one_gives_one_per_non_command_core_district() -> None:
+    cc = CC.model_copy(update={"crate_chance": 1.0})
+    layout = generate_interior(1234, 3, cc)
+    non_core = [d for d in layout.districts if d.role != "command_core"]
+    assert len(layout.crate_slots) == len(non_core)
+
+
+def test_crates_sit_on_a_non_command_core_room_floor() -> None:
+    cc = CC.model_copy(update={"crate_chance": 1.0})
+    layout = generate_interior(7, 4, cc)
+    command_district = next(d for d in layout.districts if d.role == "command_core")
+    for crate in layout.crate_slots:
+        assert crate not in command_district.floor
+        assert any(crate in d.floor for d in layout.districts)
+
+
+def test_crate_slots_do_not_perturb_the_existing_layout() -> None:
+    """Regression guard (GW-WP18): crate placement draws from the tail of the same
+    `rng` stream, after every earlier field — it must never change an already-shipped
+    layout's rooms/corridors/hazards/lifts/objective."""
+    with_crates = generate_interior(555, 2, CC)
+    no_crates = generate_interior(555, 2, CC.model_copy(update={"crate_chance": 0.0}))
+    assert with_crates.feature_grid == no_crates.feature_grid
+    assert with_crates.lift_links == no_crates.lift_links
+    assert with_crates.deployment_zones == no_crates.deployment_zones
+    assert with_crates.objective == no_crates.objective
+    assert with_crates.defender_slots == no_crates.defender_slots
+    assert with_crates.districts == no_crates.districts
+
+
 def _independent_reachability(
     layout: object, *, use_lifts: bool = True,
 ) -> set[tuple[int, int]]:

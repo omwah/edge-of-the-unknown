@@ -130,7 +130,11 @@ class InteriorLayout:
     bonus shortcuts, not a tactical teleport action. `defender_slots` are
     positions only — GW-WP16 gives them occupants. `districts` exposes the
     per-room records (`GW-WP16`'s assault-map adapter stamps emplacements from
-    these) that WP15 only used internally.
+    these) that WP15 only used internally. `crate_slots` (GW-WP18) are also
+    positions only — the friendly tour's salvage reward, drawn from `rng` after
+    every earlier field so appending them here never perturbs an existing
+    layout's rooms/corridors/hazards/lifts/objective (same tail-append
+    reasoning `_defender_slots` already relies on).
     """
 
     width: int
@@ -141,6 +145,7 @@ class InteriorLayout:
     objective: Vec
     defender_slots: tuple[Vec, ...]
     districts: tuple[District, ...]
+    crate_slots: tuple[Vec, ...] = ()
 
 
 class InteriorGenerationError(Exception):
@@ -324,6 +329,19 @@ def _defender_slots(rooms: list[_Room], rng: Random) -> tuple[Vec, ...]:
     return tuple(slots)
 
 
+def _crate_slots(rooms: list[_Room], rng: Random, crate_chance: float) -> tuple[Vec, ...]:
+    """Up to one salvage crate per non-command_core district (GW-WP18), each district
+    an independent `crate_chance` roll. Position-only, exactly like `_defender_slots` —
+    a crate is an overlay entity, not a terrain feature, so it never touches `grid`."""
+    slots: list[Vec] = []
+    for room in rooms:
+        if room.role == "command_core" or not room.floor:
+            continue
+        if rng.random() < crate_chance:
+            slots.append(rng.choice(room.floor))
+    return tuple(slots)
+
+
 def _passable(feature: str) -> bool:
     return feature != "bulkhead"
 
@@ -390,6 +408,7 @@ def generate_interior(
             defender_slots = _defender_slots(rooms, rng)
             command_room = next(r for r in rooms if r.role == "command_core")
             objective = rng.choice(command_room.floor)
+            crate_slots = _crate_slots(rooms, rng, config.crate_chance)
             districts = tuple(
                 District(
                     id=i, role=room.role,
@@ -405,7 +424,7 @@ def generate_interior(
                 feature_grid=tuple(tuple(row) for row in grid),
                 lift_links=lift_links, deployment_zones=deployment_zones,
                 objective=objective, defender_slots=defender_slots,
-                districts=districts,
+                districts=districts, crate_slots=crate_slots,
             )
             if _connectivity_ok(grid, layout):
                 return layout

@@ -249,6 +249,19 @@ class SurveySiteExcavated(Event):
 
 
 @dataclass(frozen=True)
+class CrateOpened(Event):
+    """A salvage crate at `(x, y)` yielded a component (GW-WP18, Cloud City tour only)."""
+
+    player_id: int
+    operation_id: int
+    x: int
+    y: int
+    crate_id: int
+    component_kind: str  # Component value
+    component_tier: str  # ComponentTier name
+
+
+@dataclass(frozen=True)
 class SurveyLanded(Event):
     """The shuttle set down on the player's chosen drop site, opening the survey."""
 

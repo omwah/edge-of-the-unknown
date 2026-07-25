@@ -494,6 +494,76 @@ def test_begin_survey_on_a_cloud_city_snapshots_its_size_and_finds_nothing() -> 
     assert op.visible_discovery_ids == frozenset()
 
 
+_CRATE_CFG = CFG.model_copy(update={"groundwar": CFG.groundwar.model_copy(  # type: ignore[union-attr]
+    update={"cloud_city": CFG.groundwar.cloud_city.model_copy(  # type: ignore[union-attr]
+        update={"crate_chance": 1.0})})})
+
+
+def _cloud_city_tour_at_a_crate(equipment: int = 0) -> tuple[UniverseState, SurveyOperation, object]:
+    """A landed Cloud City tour with the explorer standing on an unopened crate
+    (GW-WP18) — `crate_chance` forced to 1.0 so a crate is guaranteed."""
+    from edge.core.groundwar import survey as gw_survey
+
+    from edge.core.enums import Commodity
+
+    planet = _planet(planet_type="jovian", cloud_city_size=3, owner=Ownership("player", 1))
+    state = _state(planet)
+    state.ships[1] = replace(
+        state.ships[1], cargo={Commodity.EQUIPMENT: equipment} if equipment else {})
+    result = reduce(state, 1, BeginSurvey(planet.id), _CRATE_CFG)
+    apply_result(state, result)
+    op = state.players[1].ground_operation
+    assert isinstance(op, SurveyOperation)
+    smap = gw_survey.survey_map_for(state, op, _CRATE_CFG)
+    assert smap.crates  # crate_chance 1.0 guarantees at least one
+    crate = smap.crates[0]
+    op = replace(op, landed=True, explorer_x=crate.x, explorer_y=crate.y)
+    state.players[1] = replace(state.players[1], ground_operation=op)
+    return state, op, crate
+
+
+def test_open_crate_grants_a_tier_i_component() -> None:
+    from edge.core.rules import OpenCrate
+
+    state, op, crate = _cloud_city_tour_at_a_crate()
+    result = reduce(state, 1, OpenCrate(op.operation_id), _CRATE_CFG)
+    ship = result.ships[0]
+    assert sum(n for (_, tier), n in ship.components.items() if tier.name == "I") == 1
+    new_op = result.players[0].ground_operation
+    assert crate.id in new_op.opened_crate_ids
+
+
+def test_open_crate_rejects_an_already_opened_crate() -> None:
+    from edge.core.economy import EconomyError as _EconomyError
+    from edge.core.rules import OpenCrate
+
+    state, op, crate = _cloud_city_tour_at_a_crate()
+    apply_result(state, reduce(state, 1, OpenCrate(op.operation_id), _CRATE_CFG))
+    with pytest.raises((_EconomyError, Exception)):  # MovementError: "already opened"
+        reduce(state, 1, OpenCrate(op.operation_id), _CRATE_CFG)
+
+
+def test_open_crate_refuses_and_leaves_it_unopened_when_hold_is_full() -> None:
+    from edge.core.rules import OpenCrate
+
+    state, op, crate = _cloud_city_tour_at_a_crate(equipment=60)  # fills the 60-hold ship
+    with pytest.raises(EconomyError, match="no free hold"):
+        reduce(state, 1, OpenCrate(op.operation_id), _CRATE_CFG)
+    # Unopened — a later sale that frees hold space still lets it be opened.
+    live_op = state.players[1].ground_operation
+    assert crate.id not in live_op.opened_crate_ids
+
+
+def test_open_crate_rejects_when_no_crate_underfoot() -> None:
+    from edge.core.rules import OpenCrate
+
+    state, op, crate = _cloud_city_tour_at_a_crate()
+    off_crate = replace(op, explorer_x=0, explorer_y=0)
+    state.players[1] = replace(state.players[1], ground_operation=off_crate)
+    with pytest.raises(Exception, match="no crate here"):
+        reduce(state, 1, OpenCrate(off_crate.operation_id), _CRATE_CFG)
+
+
 def test_begin_assault_replay_is_deterministic() -> None:
     """A short command log ending in BeginAssault, replayed twice from the same seed,
     reaches a bit-identical `state_hash` and an identical `AssaultOperation`."""
