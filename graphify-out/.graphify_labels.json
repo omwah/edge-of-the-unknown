@@ -217,7 +217,6 @@
   "215": "graphify.md",
   "216": "__init__.py",
   "217": "__init__.py",
-  "218": "sprite",
   "221": "__init__.py",
   "222": "__init__.py",
   "223": "__init__.py",
@@ -237,8 +236,5 @@
   "237": "__init__.py",
   "238": "__init__.py",
   "239": "edge-of-the-unknown",
-  "240": "note",
-  "241": "sprites.py",
-  "245": "CommodityPricing",
   "246": "test_ground_render_glyph_widths.py"
 }

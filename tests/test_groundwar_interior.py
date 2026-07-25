@@ -152,8 +152,8 @@ def test_connectivity_holds_without_lift_links(size: int) -> None:
     """GW-WP16 prerequisite: `lift_links` must never be *required* for
     connectivity, or a tactical engine with no teleport action (WP16 treats
     lifts as inert floor) could face an unreachable objective/defender slot.
-    `_connect_rooms` already spans every room via corridors/doors before
-    `_place_lifts` runs, so this should hold for every seed/size with lift
+    `_connect_to_spine` already spans every room via its own corridor/door stub
+    before `_place_lifts` runs, so this should hold for every seed/size with lift
     edges excluded entirely from the reachability graph."""
     for seed in range(30):
         layout = generate_interior(seed, size, CC)
