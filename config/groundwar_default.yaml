@@ -166,10 +166,27 @@ terrain:
   habitation:    {move_cost: 1, cover: 0.05, blocks_los: false}
   engineering:   {move_cost: 2, cover: 0.15, blocks_los: false}
   command_core:  {move_cost: 1, cover: 0.05, blocks_los: false}
+  # Amenity districts (interview note: "too busy" — fewer, larger set pieces instead
+  # of dense per-cell texture). bar/store carry a fixed-glyph landmark of their own
+  # (bar_counter/shelf, below); promenade never does — a big open concourse is itself
+  # the large-scale relief from clutter.
+  bar:           {move_cost: 1, cover: 0.05, blocks_los: false}
+  store:         {move_cost: 1, cover: 0.05, blocks_los: false}
+  promenade:     {move_cost: 1, cover: 0.0,  blocks_los: false}
   cover_strut:   {move_cost: 1, cover: 0.30, blocks_los: false}
   bulkhead:      {move_cost: 0, cover: 0.0,  blocks_los: true}
   security_door: {move_cost: 0, cover: 0.0,  blocks_los: true}
   lift:          {move_cost: 1, cover: 0.0,  blocks_los: false}
+  # Fixed-glyph landmarks (edge.core.groundwar.interior._place_landmarks) — a plain
+  # feature_grid value like lift, never texture, so cover/move_cost live here same as
+  # any other interior feature. Each landmark is two feature names (a centre/body vs.
+  # its ring/end caps) so it draws as a small object, not one solid-glyph block.
+  fountain_jet:    {move_cost: 1, cover: 0.20, blocks_los: false}
+  fountain_basin:  {move_cost: 1, cover: 0.15, blocks_los: false}
+  bar_counter:     {move_cost: 1, cover: 0.25, blocks_los: false}
+  bar_counter_end: {move_cost: 1, cover: 0.25, blocks_los: false}
+  shelf:           {move_cost: 1, cover: 0.25, blocks_los: false}
+  shelf_end:       {move_cost: 1, cover: 0.25, blocks_los: false}
   vacuum:        {move_cost: 1, cover: 0.0,  blocks_los: false}
   fire:          {move_cost: 2, cover: 0.0,  blocks_los: false}
   electrical:    {move_cost: 1, cover: 0.0,  blocks_los: false}

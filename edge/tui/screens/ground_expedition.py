@@ -349,6 +349,7 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         self.anim_step = 0
         self._anim_frames: list[LandingFrame] = []
         self._anim_timer: Timer | None = None
+        self._dig_label: str | None = None
 
     def compose(self) -> ComposeResult:
         with Container(id="survey-main"):
@@ -404,8 +405,21 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         self.camera_x, self.camera_y = view.viewport_x, view.viewport_y
         if cursor_to_explorer:
             self.cursor_x, self.cursor_y = view.explorer_x, view.explorer_y
+        self._sync_dig_label(view.is_cloud_city)
         await self._follow_cursor()
         self._refresh_widgets()
+
+    def _sync_dig_label(self, is_cloud_city: bool) -> None:
+        """`x` opens a crate on a Cloud City tour instead of digging (`action_dig`
+        already branches on this) — the footer should say so. `bind()` only appends,
+        it never replaces, so the existing "x" entry is swapped out in place rather
+        than rebound."""
+        label = "Open" if is_cloud_city else "Dig"
+        if label == self._dig_label:
+            return
+        self._dig_label = label
+        self._bindings.key_to_bindings["x"] = [Binding("x", "dig", label)]
+        self.refresh_bindings()
 
     async def _follow_cursor(self) -> None:
         view = self.view

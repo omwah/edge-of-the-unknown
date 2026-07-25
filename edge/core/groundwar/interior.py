@@ -44,7 +44,8 @@ _MAX_ATTEMPTS = 16
 # The room/corridor floor roles a district can be assigned. Exactly one district
 # per city is `command_core` (the assault objective); the rest are drawn from
 # this pool.
-_DISTRICT_ROLES: tuple[str, ...] = ("plaza", "habitation", "engineering")
+_DISTRICT_ROLES: tuple[str, ...] = (
+    "plaza", "habitation", "engineering", "bar", "store", "promenade")
 
 _HAZARDS: tuple[str, ...] = ("vacuum", "fire", "electrical")
 
@@ -53,7 +54,10 @@ _HAZARDS: tuple[str, ...] = ("vacuum", "fire", "electrical")
 # `edge.core.groundwar.terrain.LANDABLE_BIOMES` is validated against `BIOME_BANDS`.
 INTERIOR_FEATURES: tuple[str, ...] = (
     "corridor", "plaza", "habitation", "engineering", "command_core",
+    "bar", "store", "promenade",
     "cover_strut", "bulkhead", "security_door", "lift",
+    "fountain_jet", "fountain_basin", "bar_counter", "bar_counter_end",
+    "shelf", "shelf_end",
     *_HAZARDS,
 )
 
@@ -299,18 +303,50 @@ def _connect_rooms(
         connected.append(b)
 
 
+def _grow_patch(floor: set[Vec], start: Vec, budget: int, rng: Random) -> list[Vec]:
+    """Randomized flood-fill from `start` over `floor`, collecting up to `budget`
+    4-connected cells — one contiguous patch instead of independent per-cell rolls,
+    so a hazard or a run of cover reads as a single deliberate zone (a scorched
+    corner, a bank of struts) rather than scattered dots (the "chaotic" note)."""
+    if budget <= 0:
+        return []
+    seen = {start}
+    patch = [start]
+    frontier = [start]
+    while frontier and len(patch) < budget:
+        cx, cy = frontier.pop(rng.randrange(len(frontier)))
+        neighbors = [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
+        rng.shuffle(neighbors)
+        for n in neighbors:
+            if n in floor and n not in seen:
+                seen.add(n)
+                patch.append(n)
+                frontier.append(n)
+                if len(patch) >= budget:
+                    break
+    return patch
+
+
 def _sprinkle(
     grid: list[list[str]], rooms: list[_Room], rng: Random,
     hazard_frac: float, cover_frac: float,
 ) -> None:
+    """One hazard patch and one cover-strut patch per non-command-core room, each
+    sized to its room's own `hazard_frac`/`cover_frac` share of the floor — see
+    `_grow_patch` for why a patch, not a per-cell roll."""
     for room in rooms:
-        if room.role == "command_core":
+        if room.role == "command_core" or not room.floor:
             continue  # keep the objective legible — no hazards/cover clutter
-        for x, y in room.floor:
-            roll = rng.random()
-            if roll < hazard_frac:
-                grid[y][x] = rng.choice(_HAZARDS)
-            elif roll < hazard_frac + cover_frac:
+        floor = set(room.floor)
+        hazard_budget = round(len(room.floor) * hazard_frac)
+        if hazard_budget > 0:
+            kind = rng.choice(_HAZARDS)
+            for x, y in _grow_patch(floor, rng.choice(room.floor), hazard_budget, rng):
+                grid[y][x] = kind
+                floor.discard((x, y))
+        cover_budget = round(len(room.floor) * cover_frac)
+        if cover_budget > 0 and floor:
+            for x, y in _grow_patch(floor, rng.choice(list(floor)), cover_budget, rng):
                 grid[y][x] = "cover_strut"
 
 
@@ -329,6 +365,57 @@ def _place_lifts(
         grid[pb[1]][pb[0]] = "lift"
         links.append((pa, pb))
     return tuple(links)
+
+
+def _landmark_fits(grid: list[list[str]], floor: set[Vec], role: str, cells: list[Vec]) -> bool:
+    return all(p in floor and grid[p[1]][p[0]] == role for p in cells)
+
+
+def _place_landmarks(grid: list[list[str]], rooms: list[_Room]) -> None:
+    """Stamp one recognisable centrepiece per amenity room instead of covering it in
+    dense per-cell texture — a fountain anchors a plaza, a counter a bar, two shelf
+    runs a store (the "too busy" interview note: fewer, larger objects read as a real
+    place where a wall of scattered glyphs did not). Each shape is composed of two
+    distinct feature names — a jet vs. a basin ring, a counter body vs. its end caps,
+    a shelf run vs. its end posts — rather than one glyph repeated across every cell,
+    so a landmark reads as a small drawn object instead of a solid colour block.
+
+    Purely geometric off each room's own rect/floor, so it draws no `rng` and is safe
+    to run last among the grid-mutating passes: it only claims cells still holding the
+    room's own unclaimed floor value, so a hazard, cover strut, or lift that got there
+    first is left alone, and a room too small for the shape silently gets no landmark
+    at all (matching `_defender_slots`'s own tolerance for a room with nothing to give).
+    A landmark is a plain `feature_grid` value like `lift` — cover/move_cost come from
+    its own `GwTerrain` entry, not the room it sits in — so it needs no special-casing
+    anywhere else (DTO projection, movement, the connectivity check) beyond that entry.
+    """
+    for room in rooms:
+        floor = set(room.floor)
+        r = room.rect
+        if room.role == "plaza":
+            cx, cy = r.cx, r.cy
+            basin = [(cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)]
+            shape = [(cx, cy), *basin]
+            if _landmark_fits(grid, floor, "plaza", shape):
+                grid[cy][cx] = "fountain_jet"
+                for x, y in basin:
+                    grid[y][x] = "fountain_basin"
+        elif room.role == "bar":
+            xs = list(range(r.x + 2, r.x + r.w - 2))
+            y = r.y + 2
+            shape = [(x, y) for x in xs]
+            if len(shape) >= 3 and _landmark_fits(grid, floor, "bar", shape):
+                grid[y][xs[0]] = grid[y][xs[-1]] = "bar_counter_end"
+                for x in xs[1:-1]:
+                    grid[y][x] = "bar_counter"
+        elif room.role == "store":
+            xs = list(range(r.x + 2, r.x + r.w - 2))
+            for row_y in (r.y + 2, r.y + r.h - 3):
+                shape = [(x, row_y) for x in xs]
+                if len(shape) >= 3 and _landmark_fits(grid, floor, "store", shape):
+                    grid[row_y][xs[0]] = grid[row_y][xs[-1]] = "shelf_end"
+                    for x in xs[1:-1]:
+                        grid[row_y][x] = "shelf"
 
 
 def _deployment_zones(grid: list[list[str]], width: int, height: int) -> tuple[Vec, ...]:
@@ -431,6 +518,7 @@ def generate_interior(
             _connect_rooms(grid, rooms, rng, config.locked_door_frac)
             _sprinkle(grid, rooms, rng, config.hazard_frac, config.cover_frac)
             lift_links = _place_lifts(grid, rooms, rng, config.lift_pairs)
+            _place_landmarks(grid, rooms)
             deployment_zones = _deployment_zones(grid, config.width, config.height)
             defender_slots = _defender_slots(rooms, rng)
             command_room = next(r for r in rooms if r.role == "command_core")

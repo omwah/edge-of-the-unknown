@@ -7,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from textual.widgets._footer import FooterKey
 
 from edge.config import load_default_config
 from edge.core.enums import DiscoveryKind, PayloadKind, RarityTier
@@ -258,6 +259,9 @@ async def test_excavation_keeps_the_same_map_and_viewport(tmp_path: Path) -> Non
         app.push_screen(screen)
         await pilot.pause()
         assert screen.view is not None
+        assert not screen.view.is_cloud_city
+        x_key = next(k for k in screen.query(FooterKey) if k.key == "x")
+        assert x_key.description == "Dig"
         before = screen.view
         before_size = screen.query_one(SurveyMapView).size
         before_render = screen.query_one(SurveyMapView).render().plain.splitlines()
@@ -656,6 +660,9 @@ async def test_cloud_city_tour_open_crate_via_pilot(tmp_path: Path) -> None:
         await pilot.pause()
         assert screen.view is not None
         assert screen.view.is_cloud_city
+        # A Cloud City tour opens crates, not trenches — the footer should say so.
+        x_key = next(k for k in screen.query(FooterKey) if k.key == "x")
+        assert x_key.description == "Open"
         before_components = sum(state.ships[1].components.values())
 
         await pilot.press("x")

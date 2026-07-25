@@ -250,7 +250,8 @@ def test_wall_neighbor_mask_agrees_with_wall_glyph_lookup() -> None:
 
 def test_legend_covers_every_feature_family() -> None:
     labels = " ".join(row[1] for row in LEGEND)
-    for name in ("bulkhead", "door", "corridor", "plaza", "habitation", "engineering",
+    for name in ("bulkhead", "door", "corridor", "plaza", "fountain", "habitation",
+                 "engineering", "bar", "shelving", "store", "promenade",
                  "command core", "cover strut", "lift", "vacuum", "fire", "electrical"):
         assert name in labels
 

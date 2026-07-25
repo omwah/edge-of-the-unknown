@@ -3,14 +3,19 @@
 Styling for `edge.core.groundwar.interior.InteriorLayout` — the same core/art
 split as `edge.art.terrain` (core owns feature names, this module owns
 glyphs/colours; `edge.core` never imports this module). Floor features
-(corridor/plaza/habitation/engineering/command_core/hazards/cover) reuse
-`edge.art.terrain`'s per-cell weighted-glyph-pool pattern via
-`resolve_feature_char` — that texture-only style already reads fine for flat
-floors. `bulkhead`/`security_door` do not: an interior's rooms and corridors
-only read as connected structure with **wall-aware** rendering, so those two
-get a neighbor-bitmask box-drawing junction lookup instead (the interview
-decision distinguishing this module from the planet-terrain style it borrows
-everything else from).
+(corridor/plaza/habitation/engineering/command_core/bar/store/promenade/
+hazards/cover) reuse `edge.art.terrain`'s per-cell weighted-glyph-pool pattern
+via `resolve_feature_char`, kept deliberately sparse (interview note: "too
+busy") so a room reads as a clean, real space rather than a wall of texture.
+`bulkhead`/`security_door` do not: an interior's rooms and corridors only read
+as connected structure with **wall-aware** rendering, so those two get a
+neighbor-bitmask box-drawing junction lookup instead (the interview decision
+distinguishing this module from the planet-terrain style it borrows everything
+else from). `fountain_jet`/`fountain_basin`/`bar_counter`/`bar_counter_end`/
+`shelf`/`shelf_end` are landmarks (`edge.core.groundwar.interior._place_landmarks`)
+— each a fixed glyph, not texture, composed two-to-an-object (a centre/body vs.
+its ring/end caps) so an amenity room gets one small drawn object instead of
+many small repeated glyphs.
 """
 
 from __future__ import annotations
@@ -29,15 +34,36 @@ Cell = tuple[str, str, str]  # (char, fg, bg)
 # then cascades through the rest of that row and misaligns whatever sits to its right
 # (the sidebar's own border, in the live screens).
 FEATURES_REGISTRY: dict[str, list[tuple[str, float]]] = {
-    "corridor": [(" ", 6), (".", 1), ("·", 1)],
-    "plaza": [(" ", 8), ("·", 1), ("˙", 1)],
-    "habitation": [(" ", 5), ("≡", 1), ("⊟", 1)],
-    "engineering": [(" ", 4), ("╬", 1), ("╫", 1), ("¤", 0.5)],
-    "command_core": [(" ", 6), ("◈", 1), ("✦", 0.3)],
-    "cover_strut": [("◘", 1), ("▤", 1), (" ", 2)],
-    "vacuum": [("░", 2), ("·", 1), (" ", 3)],
-    "fire": [("▓", 1), ("≈", 1), (" ", 2)],
-    "electrical": [("⌁", 0.5), ("∴", 1), (" ", 4)],
+    # Blank floors — no per-cell texture roll at all. A room's own bg colour,
+    # `_place_landmarks`'s one bold centrepiece, and `_sprinkle`'s clustered hazard/
+    # cover patch (edge.core.groundwar.interior) now carry all the visual interest;
+    # per-cell random glyphs, however sparse, still read as scattered noise with no
+    # pattern to it (the "still chaotic" interview note) — order comes from *removing*
+    # randomness from the ambient floor, not merely thinning it out.
+    "corridor": [(" ", 1)],
+    "plaza": [(" ", 1)],
+    "habitation": [(" ", 1)],
+    "engineering": [(" ", 1)],
+    "command_core": [(" ", 1)],
+    "bar": [(" ", 1)],
+    "store": [(" ", 1)],
+    "promenade": [(" ", 1)],
+    # Hazard/cover cells are placed as one contiguous patch per room (`_sprinkle`),
+    # not independent per-cell rolls, so a single glyph each stays a solid, legible
+    # shape instead of gaining holes from a mixed-in blank option.
+    "cover_strut": [("▤", 1)],
+    "vacuum": [("░", 1)],
+    "fire": [("▓", 1)],
+    "electrical": [("⌁", 1)],
+    # Landmarks (edge.core.groundwar.interior._place_landmarks): each a fixed glyph,
+    # not texture, like `lift` — two per object (a centre/body vs. its ring/end caps)
+    # so it draws as a small composed object rather than one repeated glyph.
+    "fountain_jet": [("◉", 1)],
+    "fountain_basin": [("○", 1)],
+    "bar_counter": [("─", 1)],
+    "bar_counter_end": [("●", 1)],
+    "shelf": [("▦", 1)],
+    "shelf_end": [("│", 1)],
 }
 
 # (fg, bg) per floor feature name — a light, blueprint-on-white hull rather than
@@ -50,10 +76,19 @@ FEATURE_COLORS: dict[str, tuple[str, str]] = {
     "habitation": ("orange4", "grey89"),
     "engineering": ("steel_blue", "grey85"),
     "command_core": ("dark_goldenrod", "grey89"),
+    "bar": ("dark_red", "grey89"),
+    "store": ("green4", "grey89"),
+    "promenade": ("cadet_blue", "grey100"),
     "cover_strut": ("grey42", "grey85"),
     "vacuum": ("dark_cyan", "#eaf6f6"),
     "fire": ("red3", "#fbe9e9"),
     "electrical": ("dark_goldenrod", "#fdf6d9"),
+    "fountain_jet": ("deep_sky_blue4", "grey93"),
+    "fountain_basin": ("steel_blue3", "grey93"),
+    "bar_counter": ("orange4", "grey89"),
+    "bar_counter_end": ("dark_red", "grey89"),
+    "shelf": ("green4", "grey89"),
+    "shelf_end": ("dark_green", "grey89"),
 }
 
 WALL_COLOR = ("grey19", "grey82")
@@ -80,8 +115,14 @@ LEGEND: tuple[tuple[str, str, str, str], ...] = (
     (DOOR_GLYPH, "security door (breachable)", *DOOR_COLOR),
     (" ", "corridor", *FEATURE_COLORS["corridor"]),
     (" ", "plaza (open space)", *FEATURE_COLORS["plaza"]),
-    ("≡", "habitation", *FEATURE_COLORS["habitation"]),
-    ("╬", "engineering", *FEATURE_COLORS["engineering"]),
+    ("◉/○", "fountain", *FEATURE_COLORS["fountain_jet"]),
+    ("≡", "habitation (sleeping quarters)", *FEATURE_COLORS["habitation"]),
+    ("╬", "engineering (maintenance)", *FEATURE_COLORS["engineering"]),
+    ("─/●", "bar counter", *FEATURE_COLORS["bar_counter"]),
+    (" ", "bar / restaurant", *FEATURE_COLORS["bar"]),
+    ("▦/│", "shelving", *FEATURE_COLORS["shelf"]),
+    (" ", "store", *FEATURE_COLORS["store"]),
+    (" ", "promenade (open concourse)", *FEATURE_COLORS["promenade"]),
     (OBJECTIVE_GLYPH, "command core (objective)", *OBJECTIVE_COLOR),
     ("◘", "cover strut", *FEATURE_COLORS["cover_strut"]),
     (LIFT_GLYPH, "lift (teleport link)", *LIFT_COLOR),
