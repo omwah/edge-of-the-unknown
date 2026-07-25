@@ -680,3 +680,41 @@ async def test_cloud_city_tour_open_crate_via_pilot(tmp_path: Path) -> None:
         await pilot.press("x")
         await pilot.pause()
         assert sum(state.ships[1].components.values()) == before_components + 1
+
+
+def _landed_adjacent_to_a_crate(state: UniverseState) -> object:
+    """Land the tour one cell east of its (guaranteed) first crate; returns that crate."""
+    op = state.players[1].ground_operation
+    assert op is not None
+    crate = gw.survey_map_for(state, op, _CRATE_CFG).crates[0]
+    state.players[1] = replace(
+        state.players[1],
+        ground_operation=replace(
+            op, landed=True, explorer_x=crate.x + 1, explorer_y=crate.y),
+    )
+    return crate
+
+
+async def test_cloud_city_tour_open_crate_from_adjacent_cell_via_pilot(tmp_path: Path) -> None:
+    """`X` reaches a crate one step away, not just one stood directly on."""
+    state = _cloud_city_world()
+    crate = _landed_adjacent_to_a_crate(state)
+    service = GameService(state, _CRATE_CFG, SqliteRepository(tmp_path / "crate_adjacent.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.client = client
+        screen = GroundExpeditionScreen(client)
+        app.push_screen(screen)
+        await pilot.pause()
+        assert screen.view is not None
+        before_components = sum(state.ships[1].components.values())
+
+        await pilot.press("x")
+        await pilot.pause()
+
+        assert screen.view is not None
+        opened = next(c for c in screen.view.crates if c.crate_id == crate.id)
+        assert opened.opened
+        assert sum(state.ships[1].components.values()) == before_components + 1

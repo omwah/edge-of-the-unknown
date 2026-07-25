@@ -135,6 +135,18 @@ class SurveyMap:
     def crate_at(self, x: int, y: int) -> CrateSite | None:
         return next((c for c in self.crates if (c.x, c.y) == (x, y)), None)
 
+    def crate_near(self, x: int, y: int) -> CrateSite | None:
+        """The crate at `(x, y)` or one of its 4 orthogonal neighbours — opening a
+        crate no longer requires standing exactly on it, matching the 4-directional
+        walk `path_to` already uses. An unopened crate takes priority when both an
+        opened and an unopened one are in reach, so standing between two never
+        reports the wrong one as "already opened"."""
+        reach = ((x, y), (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
+        candidates = [c for c in self.crates if (c.x, c.y) in reach]
+        if not candidates:
+            return None
+        return next((c for c in candidates if not c.opened), candidates[0])
+
 
 # --- terrain / passability (pure, ported from the POC into frozen inputs) -----
 

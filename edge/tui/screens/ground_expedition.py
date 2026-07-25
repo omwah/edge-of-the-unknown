@@ -658,14 +658,15 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
                 self.app.push_screen(SurveyFindModal(contact, first=True))
 
     async def _open_crate(self) -> None:
-        """Open the crate underfoot (GW-WP18) — the Cloud City tour's `X` verb."""
+        """Open the crate underfoot or in an adjacent cell (GW-WP18) — the Cloud City
+        tour's `X` verb. Mirrors `SurveyMap.crate_near`'s 4-directional reach."""
         assert self.view is not None
+        ex, ey = self.view.explorer_x, self.view.explorer_y
+        reach = ((ex, ey), (ex + 1, ey), (ex - 1, ey), (ex, ey + 1), (ex, ey - 1))
         crate_here = next(
-            (c for c in self.view.crates
-             if not c.opened and (c.x, c.y) == (self.view.explorer_x, self.view.explorer_y)),
-            None)
+            (c for c in self.view.crates if not c.opened and (c.x, c.y) in reach), None)
         if crate_here is None:
-            warn(self, "#survey-log", "No crate here to open.")
+            warn(self, "#survey-log", "No crate nearby to open.")
             return
         events_out = await self._apply(OpenCrate(self.view.operation_id))
         if events_out is None:
