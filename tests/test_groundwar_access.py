@@ -34,6 +34,7 @@ from edge.core.rules import BeginAssault, BeginSurvey, ReinforceGarrison, apply_
 from edge.store.snapshots import state_hash
 from edge.core.economy import EconomyError
 from edge.core.groundwar.force import GroundForceError
+from edge.core.groundwar.models import SurveyOperation
 from edge.server import session
 
 CFG = load_default_config()
@@ -101,11 +102,13 @@ _GATE_OFF = CFG.model_copy(update={
     "groundwar": CFG.groundwar.model_copy(update={"cloud_city_assault_enabled": False})})  # type: ignore[union-attr]
 
 
-def test_inhabited_cloud_city_is_orbital_only_with_gate_off() -> None:
+def test_inhabited_cloud_city_surveys_with_gate_off() -> None:
+    """With the assault gate off, a Cloud City never assaults — it routes to the
+    GW-WP17 walking tour instead of the pre-WP17 permanent `OrbitalOnly`."""
     state, planet = _pair(_planet(planet_type="jovian", cloud_city_size=2))
     access = ground_access(state, state.players[1], planet, _GATE_OFF)
-    assert isinstance(access, OrbitalOnly)
-    assert "Cloud City" in access.reason
+    assert isinstance(access, Survey)
+    assert access.settlements is False
 
 
 def test_unowned_cloud_city_with_no_species_assaults_by_default() -> None:
@@ -129,13 +132,15 @@ def test_gate_on_below_friendly_cloud_city_routes_to_assault() -> None:
     assert isinstance(access, Assault)
 
 
-def test_gate_on_friendly_cloud_city_stays_orbital_only() -> None:
-    """Even with the gate on, a friendly/owned Cloud City never assaults (D9)."""
+def test_gate_on_friendly_cloud_city_surveys() -> None:
+    """Even with the gate on, a friendly/owned Cloud City never assaults (D9) — it
+    routes to `Survey` (GW-WP17), the walking tour of its own interior."""
     planet = _planet(planet_type="jovian", cloud_city_size=2,
                      owner=Ownership("player", 1))
     state, _ = _pair(planet)
     access = ground_access(state, state.players[1], planet, _GATE_ON)
-    assert isinstance(access, OrbitalOnly)
+    assert isinstance(access, Survey)
+    assert access.settlements is False
 
 
 def test_gate_on_bare_gas_giant_stays_orbital_only() -> None:
@@ -169,14 +174,15 @@ def test_gate_on_below_friendly_cloud_city_without_citadels_stays_orbital_only()
 
 
 def test_gate_off_is_unaffected_by_below_friendly_standing() -> None:
-    """Regression guard: the same below-friendly Cloud City stays `OrbitalOnly`
-    when the flag is explicitly off (the pre-WP16 / migration-rollback state)."""
+    """Regression guard: the same below-friendly Cloud City never assaults when the
+    flag is explicitly off (the pre-WP16 / migration-rollback state) — it surveys
+    (GW-WP17) rather than assaults, exactly as a gate-on friendly one does."""
     planet = _planet(planet_type="jovian", cloud_city_size=2,
                      population={"vesk": 5_000})
     state = _state(planet)
     state.species = {7: _species(AMITY - 0.1)}
     access = ground_access(state, state.players[1], planet, _GATE_OFF)
-    assert isinstance(access, OrbitalOnly)
+    assert isinstance(access, Survey)
 
 
 # --- survey routing (D1: uninhabited / friendly) -----------------------------
@@ -473,6 +479,19 @@ def test_begin_survey_opens_on_a_friendly_world() -> None:
     state.species = {7: _species(AMITY + 0.2)}
     result = reduce(state, 1, BeginSurvey(planet.id), CFG)
     assert result.players and result.players[0].ground_operation is not None
+
+
+def test_begin_survey_on_a_cloud_city_snapshots_its_size_and_finds_nothing() -> None:
+    """GW-WP17: an owned Cloud City opens a tour, not an assault; the operation
+    snapshots `cloud_city_size` (so a city that grows mid-tour can't reshuffle rooms
+    underfoot) and never carries any visible surface site."""
+    planet = _planet(planet_type="jovian", cloud_city_size=3, owner=Ownership("player", 1))
+    state = _state(planet)
+    result = reduce(state, 1, BeginSurvey(planet.id), CFG)
+    op = result.players[0].ground_operation
+    assert isinstance(op, SurveyOperation)
+    assert op.cloud_city_size == 3
+    assert op.visible_discovery_ids == frozenset()
 
 
 def test_begin_assault_replay_is_deterministic() -> None:

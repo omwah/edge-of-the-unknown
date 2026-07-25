@@ -217,7 +217,7 @@ class SurveyMapView(CroppedMapView):
             return ("◉", "bright_cyan on grey15") if self.host_screen.is_settlement_plaza(cell) \
                 else ("⌂", "navajo_white3 on grey23")
         fg, bg = _feature_colors(view.ptype, cell.feature)
-        char = _feature_glyph(view.planet_id, cell.feature, cell.x, cell.y)
+        char = _feature_glyph(view.planet_id, cell.feature, cell.x, cell.y, cell.wall_mask)
         # Overlays keep the terrain's foreground and repaint the backdrop; `_styled` then
         # re-checks legibility against that new backdrop rather than the terrain's own.
         if view.can_land:

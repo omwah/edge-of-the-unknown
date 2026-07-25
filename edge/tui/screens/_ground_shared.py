@@ -33,6 +33,9 @@ from textual import events
 from textual.timer import Timer
 from textual.widgets import Static
 
+from edge.art.interior import DOOR_COLOR, DOOR_GLYPH, LIFT_COLOR, LIFT_GLYPH, WALL_COLOR, WALL_GLYPHS
+from edge.art.interior import FEATURE_COLORS as _INTERIOR_FEATURE_COLORS
+from edge.art.interior import FEATURES_REGISTRY as _INTERIOR_FEATURES_REGISTRY
 from edge.art.terrain import BIOME_COLORS, FEATURES_REGISTRY, readable_fg
 from edge.core.groundwar.terrain import BIOME_BANDS
 
@@ -113,7 +116,20 @@ def pan_camera(
 def feature_colors(ptype: str, feature: str) -> tuple[str, str]:
     """The band's authored (fg, bg) for a feature name — deliberately *not* yet
     contrast-corrected, because the background a cell finally renders on is not
-    always its own (see `styled`)."""
+    always its own (see `styled`).
+
+    Station-interior feature names (GW-WP15/16) are a disjoint namespace from any
+    planet biome's, so they're checked first and never consult `ptype` — one
+    Cloud City interior looks the same regardless of which jovian it floats over.
+    """
+    if feature == "bulkhead":
+        return WALL_COLOR
+    if feature == "security_door":
+        return DOOR_COLOR
+    if feature == "lift":
+        return LIFT_COLOR
+    if feature in _INTERIOR_FEATURE_COLORS:
+        return _INTERIOR_FEATURE_COLORS[feature]
     layout = BIOME_BANDS.get(ptype)
     colors = BIOME_COLORS.get(ptype, [])
     if layout is not None:
@@ -171,8 +187,13 @@ def dim_color(color: str, factor: float) -> str:
 
 @lru_cache(maxsize=None)
 def glyph_ramp(feature: str) -> tuple[tuple[str, ...], tuple[float, ...], float]:
-    """The feature's glyphs with cumulative weights (authored weights may be fractional)."""
-    choices = FEATURES_REGISTRY.get(feature, [("?", 1)])
+    """The feature's glyphs with cumulative weights (authored weights may be fractional).
+
+    Checks the interior registry (GW-WP15/16) before the biome one — the two feature-name
+    sets are disjoint (validated by `GroundwarConfig`), so this never shadows a planet
+    texture, and a Cloud City's rooms/corridors get their own weighted pool the same way.
+    """
+    choices = _INTERIOR_FEATURES_REGISTRY.get(feature) or FEATURES_REGISTRY.get(feature, [("?", 1)])
     chars: list[str] = []
     cumulative: list[float] = []
     running = 0.0
@@ -183,7 +204,7 @@ def glyph_ramp(feature: str) -> tuple[tuple[str, ...], tuple[float, ...], float]
     return tuple(chars), tuple(cumulative), running
 
 
-def feature_glyph(planet_id: int, feature: str, x: int, y: int) -> str:
+def feature_glyph(planet_id: int, feature: str, x: int, y: int, wall_mask: int = 0) -> str:
     """Draw this cell's glyph against the authored weights, deterministically.
 
     A per-cell random draw is what makes a forest read as scattered trees over clearings
@@ -193,7 +214,20 @@ def feature_glyph(planet_id: int, feature: str, x: int, y: int) -> str:
     `planet_id` are all already public in the DTO, so texture costs nothing in fog of war.
     CRC32 rather than `hash()`: string hashing is salted per process, and snapshot tests
     need the same map to render identically every run.
+
+    `bulkhead`/`security_door`/`lift` are station-interior landmarks, not texture (GW-WP15/16):
+    a wall reads as connected structure only via its neighbor-junction glyph, keyed off the
+    server-computed `wall_mask` (`AssaultCellDTO`/`GroundCellDTO.wall_mask`) since a client
+    holding only a cropped viewport cannot always see a wall cell's true neighbours itself
+    (`edge.core.groundwar.interior.wall_neighbor_mask`); a door or lift is a fixed landmark,
+    never randomized texture.
     """
+    if feature == "bulkhead":
+        return WALL_GLYPHS[wall_mask]
+    if feature == "security_door":
+        return DOOR_GLYPH
+    if feature == "lift":
+        return LIFT_GLYPH
     chars, cumulative, total = glyph_ramp(feature)
     if total <= 0:
         return chars[0]

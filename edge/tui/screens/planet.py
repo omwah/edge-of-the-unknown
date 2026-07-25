@@ -219,7 +219,8 @@ claims the world). Building again grows the city, and a bigger city berths more 
                 id="orbit-art",
             )
             art.tooltip = {
-                "survey": "Click to deploy a survey expedition",
+                "survey": ("Click to tour the city's interior" if p.cloud_city
+                           else "Click to deploy a survey expedition"),
                 "assault": "Ground access requires an assault",
             }.get(p.ground_mode, "Orbital only — no ground route")
             yield art
@@ -269,15 +270,26 @@ claims the world). Building again grows the city, and a bigger city berths more 
         """The classifier's one truthful orbit route: survey, assault, or orbital-only."""
         children: list[Static | Horizontal] = []
         if p.ground_mode == "survey":
-            detail = "Friendly settlements are open to visitors." if p.ground_settlements \
-                else "No inhabited settlement is expected on the surface."
-            children.extend([
-                Static(f"[green]Survey[/] — deploy a walking archaeological expedition.  "
-                       f"[dim]{detail}[/]"),
-                Horizontal(Button("Survey surface", id="btn-ground", variant="primary"),
-                           classes="buttons"),
-            ])
-            title = "Ground access — Survey"
+            if p.cloud_city:
+                # A Cloud City tour (GW-WP17): a built station, not an archaeology find —
+                # walkable, but with nothing to dig up.
+                children.extend([
+                    Static("[green]Tour[/] — walk the city's halls from the inside.  "
+                           "[dim]Nothing to dig up — it's a built station, not a ruin.[/]"),
+                    Horizontal(Button("Tour the city", id="btn-ground", variant="primary"),
+                               classes="buttons"),
+                ])
+                title = "Ground access — Tour"
+            else:
+                detail = "Friendly settlements are open to visitors." if p.ground_settlements \
+                    else "No inhabited settlement is expected on the surface."
+                children.extend([
+                    Static(f"[green]Survey[/] — deploy a walking archaeological expedition.  "
+                           f"[dim]{detail}[/]"),
+                    Horizontal(Button("Survey surface", id="btn-ground", variant="primary"),
+                               classes="buttons"),
+                ])
+                title = "Ground access — Survey"
         elif p.ground_mode == "assault":
             blockers = p.ground_blockers or ([p.ground_blocker] if p.ground_blocker else [])
             if blockers:

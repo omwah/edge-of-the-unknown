@@ -22,7 +22,7 @@ from dataclasses import replace
 from edge.core.config import CitadelConfig, CitadelLevelConfig, GameConfig
 from edge.core.enums import Commodity
 from edge.core.models import EncounterFoe, Ownership, Planet
-from edge.core.planets import scale_population
+from edge.core.planets import is_cloud_city_world, scale_population
 
 CITADEL_MAX = 3
 
@@ -58,7 +58,13 @@ def open_build(planet: Planet, config: GameConfig) -> tuple[Planet, int]:
     leaves `stores` and the latinum is charged to the *caller* (the reducer debits the
     player), so this returns the planet with equipment removed and progress opened at 0.
     Returns `(planet, target_level)`.
+
+    A Cloud City has no ground to fortify — a player may never *build* one here, though a
+    station captured with a citadel already raised (bigbang NPC seeding, or a conquered
+    hostile Cloud City) keeps the level it had (§4.2).
     """
+    if is_cloud_city_world(planet.planet_type, config):
+        raise CitadelError("a Cloud City has no ground to fortify")
     if building(planet):
         raise CitadelError("a citadel build is already in progress here")
     target = planet.citadel_level + 1

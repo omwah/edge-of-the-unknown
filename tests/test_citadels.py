@@ -158,6 +158,17 @@ def test_owner_only_gating() -> None:
         reduce(state, 1, BuildCitadel(1), CFG)
 
 
+def test_cloud_city_has_no_ground_to_fortify() -> None:
+    """A staged Cloud City can meet the colonist/equipment gate but is still barred —
+    a jovian has no ground, even once it carries people and stores (DESIGN.md §4.2)."""
+    state = _world()
+    state.planets[1] = replace(
+        state.planets[1], planet_type="jovian", cloud_city_size=2,
+        population={"terran": 5000}, habitability_cap=0)
+    with pytest.raises(CitadelError, match="no ground to fortify"):
+        reduce(state, 1, BuildCitadel(1), CFG)
+
+
 def test_set_allocation_with_fighter_share_normalizes_to_one() -> None:
     state = _world(level=1)
     apply_result(state, reduce(state, 1, SetAllocation(

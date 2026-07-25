@@ -210,7 +210,7 @@ class AssaultMapView(CroppedMapView):
                     fg = "orange1"
             return char, f"{fg} on {bg}"
         fg, bg = _feature_colors(view.ptype, cell.feature)
-        char = _feature_glyph(view.planet_id, cell.feature, cell.x, cell.y)
+        char = _feature_glyph(view.planet_id, cell.feature, cell.x, cell.y, cell.wall_mask)
         if cell.move_reachable:
             bg = "grey27"
         if self.host_screen.show_threat:

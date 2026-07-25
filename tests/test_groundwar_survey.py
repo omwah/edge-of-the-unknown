@@ -112,10 +112,54 @@ def test_friendly_world_gets_settlements_uninhabited_does_not() -> None:
     assert _survey(sites, inhabited=False).settlements == ()
 
 
+# --- Cloud City tour (GW-WP17) -------------------------------------------------
+
+
+def test_cloud_city_survey_uses_the_interior_layout_with_no_sites_or_settlements() -> None:
+    """A Cloud City tour ignores any passed-in `sites` entirely — it's a built
+    station, not an archaeology find (GW-WP17) — and its dimensions come from
+    `groundwar.cloud_city`, not the planet expedition map."""
+    m = generate_survey(
+        CFG, seed=42, planet_type="jovian", inhabited=True, sites=[_disc(1)],
+        cloud_city_size=2)
+    assert m.sites == ()
+    assert m.settlements == ()
+    cc = CFG.groundwar.cloud_city  # type: ignore[union-attr]
+    assert (m.width, m.height) == (cc.width, cc.height)
+    feature_names = {name for row in m.feature for name in row}
+    assert "bulkhead" in feature_names  # the room/corridor layout, not biome noise
+    assert _move_cost([list(r) for r in m.feature], set(m.blocked), CFG,
+                      m.landing_x, m.landing_y) > 0
+
+
+def test_cloud_city_survey_is_deterministic() -> None:
+    a = generate_survey(CFG, seed=99, planet_type="jovian", inhabited=True,
+                        sites=[], cloud_city_size=3)
+    b = generate_survey(CFG, seed=99, planet_type="jovian", inhabited=True,
+                        sites=[], cloud_city_size=3)
+    assert a.feature == b.feature and (a.landing_x, a.landing_y) == (b.landing_x, b.landing_y)
+
+
+def test_eligible_surface_site_ids_excludes_every_cloud_city() -> None:
+    """A Cloud City never surfaces a dig site, regardless of what big bang rolled
+    for the underlying jovian before it was staged (GW-WP17)."""
+    from edge.core.models import Game, Planet, Sector, UniverseState
+
+    state = UniverseState.new(Game(1, 1, CFG.config_version, "t"))
+    state.sectors = {1: Sector(1, 1, (), "Frontier")}
+    state.planets = {1: Planet(id=1, sector_id=1, name="Sky City",
+                               planet_type="jovian", cloud_city_size=2)}
+    state.discoveries = {1: _disc(1)}
+    assert eligible_surface_site_ids(state, 1, 9999, frozenset(), CFG) == frozenset()
+
+
 # --- eligibility snapshot on a real universe ---------------------------------
 
 
 def _planet_with_hidden_and_obvious():
+    """A world with both a hidden and an obvious surface site — excluding jovians:
+    a Cloud City never surfaces a site regardless (GW-WP17, `eligible_surface_site_ids`),
+    so a seed that happens to land this fixture on one would test the wrong predicate."""
     for seed in range(80):
         st = generate(CFG, seed)
         by_planet: dict[int, list[Discovery]] = {}
@@ -123,6 +167,8 @@ def _planet_with_hidden_and_obvious():
             if d.planet_id is not None:
                 by_planet.setdefault(d.planet_id, []).append(d)
         for pid, ds in by_planet.items():
+            if st.planets[pid].planet_type == "jovian":
+                continue
             if any(d.hidden for d in ds) and any(not d.hidden for d in ds):
                 return st, pid
     raise AssertionError("no planet with both hidden and obvious sites found")

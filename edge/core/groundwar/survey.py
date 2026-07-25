@@ -33,10 +33,12 @@ from random import Random
 
 from edge.core.config import GameConfig
 from edge.core.discovery import is_detectable, sector_has_nebula
+from edge.core.groundwar.interior import generate_interior
 from edge.core.groundwar.models import SurveyOperation
 from edge.core.groundwar.terrain import generate_feature_grid
 from edge.core.models import Discovery, UniverseState
 from edge.core.movement import MovementError
+from edge.core.planets import is_cloud_city_world
 from edge.core.surface_finds import surface_find_name
 
 Vec = tuple[int, int]
@@ -293,9 +295,14 @@ def eligible_surface_site_ids(
     detection set). The begin reducer snapshots this so a later descent after a sensor
     upgrade widens the set; only these ids are ever placed, so a hidden, out-of-reach site
     leaks nothing. Already-*collected* sites are a subset and stay visible (shown `found`).
+
+    A Cloud City is a **built** station, not an archaeology find (GW-WP17): it never
+    surfaces a site regardless of what big bang happened to roll for the underlying jovian
+    (`is_landable` gates that roll, not `is_cloud_city_world`, so a bare/staged gas giant can
+    already hold now-reachable `Discovery` records this predicate deliberately excludes).
     """
     planet = state.planets.get(planet_id)
-    if planet is None:
+    if planet is None or is_cloud_city_world(planet.planet_type, config):
         return frozenset()
     in_nebula = sector_has_nebula(state, planet.sector_id)
     ids = {
@@ -307,10 +314,26 @@ def eligible_surface_site_ids(
     return frozenset(ids)
 
 
+def _generate_cloud_city_survey(config: GameConfig, *, seed: int, cloud_city_size: int) -> SurveyMap:
+    """A friendly/owned Cloud City's tour map (GW-WP17): the same room/corridor interior a
+    hostile assault uses (`edge.core.groundwar.interior`), with no dig sites or settlements —
+    it's a built station, not an archaeology find, and it's already one friendly place, not
+    a planet with towns scattered over it.
+    """
+    assert config.groundwar is not None
+    layout = generate_interior(seed, cloud_city_size, config.groundwar.cloud_city)
+    lx, ly = (layout.deployment_zones[0] if layout.deployment_zones
+              else (layout.width // 2, layout.height // 2))
+    return SurveyMap(
+        width=layout.width, height=layout.height, feature=layout.feature_grid,
+        blocked=frozenset(), settlements=(), sites=(), landing_x=lx, landing_y=ly,
+    )
+
+
 def generate_survey(
     config: GameConfig, *, seed: int, planet_type: str, inhabited: bool,
     sites: Sequence[Discovery], resolved_ids: frozenset[int] = frozenset(),
-    hinted_ids: frozenset[int] = frozenset(),
+    hinted_ids: frozenset[int] = frozenset(), cloud_city_size: int = 0,
 ) -> SurveyMap:
     """Lay out a survey map for the given *visible* surface discoveries (pure, G5/G6/G7).
 
@@ -319,7 +342,12 @@ def generate_survey(
     the operation-seed RNG (stable per world); each site's position/circle/clues draw from
     its own `{seed}|site|{id}` salt, so the layout of known sites is invariant to which
     other sites are visible. `resolved_ids` marks already-collected sites `found`.
+
+    A Cloud City (`cloud_city_size` snapshotted at descent, GW-WP17) skips all of that for
+    the station-interior generator instead — see `_generate_cloud_city_survey`.
     """
+    if is_cloud_city_world(planet_type, config):
+        return _generate_cloud_city_survey(config, seed=seed, cloud_city_size=cloud_city_size)
     assert config.groundwar is not None
     exp = config.groundwar.expedition
     width, height = exp.width, exp.height
@@ -380,7 +408,8 @@ def survey_map_for(state: UniverseState, op: SurveyOperation, config: GameConfig
     inhabited = planet is not None and bool(planet.population)
     return generate_survey(
         config, seed=op.seed, planet_type=op.planet_type, inhabited=inhabited, sites=sites,
-        resolved_ids=op.resolved_discovery_ids, hinted_ids=op.hinted_discovery_ids)
+        resolved_ids=op.resolved_discovery_ids, hinted_ids=op.hinted_discovery_ids,
+        cloud_city_size=op.cloud_city_size)
 
 
 # --- live queries (pure, projection- and reducer-shared) ---------------------

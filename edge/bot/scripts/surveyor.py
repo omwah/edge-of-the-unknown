@@ -18,6 +18,7 @@ from edge.core.groundwar.access import Survey, ground_access
 from edge.core.groundwar.models import SurveyOperation
 from edge.core.groundwar.survey import landing_sites, settlement_at, survey_map_for
 from edge.core.models import Planet, UniverseState
+from edge.core.planets import is_cloud_city_world
 from edge.core.rules import (
     BeginSurvey, CombatAction, ExtractGroundOperation, GroundMove, SurveyDig, SurveyLand,
     SurveyTalk, TravelTo, Warp,
@@ -32,7 +33,11 @@ def _pick_planet(state: UniverseState, player_id: int, config: GameConfig) -> Pl
     `TravelTo` is route-locked to charted space (checked here before the more expensive
     `ground_access` call), and a world every discovery of which has already been logged
     is excluded — otherwise the bot would re-land on a fully excavated world forever
-    (nothing about `ground_access` itself tracks exhaustion, only real state does).
+    (nothing about `ground_access` itself tracks exhaustion, only real state does). A
+    Cloud City is excluded outright even when it happens to hold an unclaimed `Discovery`
+    row (a bare/staged jovian can from the general `is_landable` surface-site roll,
+    GW-WP17): `eligible_surface_site_ids` never surfaces one there regardless, so the
+    world would otherwise look "has something to find" and never actually yield it.
     """
     player = state.players[player_id]
     ship = state.ships[player.ship_id]
@@ -44,6 +49,7 @@ def _pick_planet(state: UniverseState, player_id: int, config: GameConfig) -> Pl
     candidates = [
         planet for planet in state.planets.values()
         if planet.sector_id in known and planet.id in open_planet_ids
+        and not is_cloud_city_world(planet.planet_type, config)
         and isinstance(ground_access(state, player, planet, config), Survey)
     ]
     return min(candidates, key=lambda p: p.id) if candidates else None

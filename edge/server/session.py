@@ -151,6 +151,7 @@ from edge.core.models import (
 from edge.core.aliens import base_owner_hostile
 from edge.core.groundwar import assault as ground_assault
 from edge.core.groundwar import force
+from edge.core.groundwar import interior as gw_interior
 from edge.core.groundwar.access import Assault, Survey, ground_access
 from edge.core.groundwar.models import AssaultOperation, SurveyOperation
 from edge.core.groundwar import survey as ground_survey
@@ -765,11 +766,13 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         starbase_derelict = not operational
         starbase_status = "operational" if operational else "derelict — salvageable"
     # Citadel affordance (§4.2, WP54): the next-level cost + build progress, owner-only.
+    # A Cloud City has no ground to fortify — `city_world` bars the *build* affordance
+    # only; a level raised by bigbang seeding or a conquered station still displays/banks.
     citadel_target = 0
     citadel_pct = 0
     can_build = False
     next_cost: tuple[int, int] | None = None
-    if config.citadels is not None and sovereign_by_you:
+    if config.citadels is not None and sovereign_by_you and not city_world:
         if citadels.building(planet):
             citadel_target = planet.citadel_level + 1
             lc = config.citadels.levels[citadel_target - 1]
@@ -940,10 +943,18 @@ def ground_operation_view(
                     if nearest <= band.within:
                         heat = index
                         break
+            feature = smap.feature[y][x]
+            wall_mask = (
+                gw_interior.wall_neighbor_mask(
+                    lambda nx, ny: smap.feature[ny][nx], x, y, smap.width, smap.height)
+                if feature == "bulkhead" else 0)
             cells.append(dto.GroundCellDTO(
                 x=x,
                 y=y,
-                feature=smap.feature[y][x],
+                feature=feature,
+                # A Cloud City's bulkhead (GW-WP17) renders via its own wall-junction glyph
+                # below, not the flat masonry block `blocked` triggers in the client — so,
+                # unlike a settlement wall, it is deliberately *not* folded into `blocked`.
                 blocked=(x, y) in smap.blocked,
                 gate=(x, y) in gates and (x, y) not in smap.blocked,
                 dug=(x, y) in op.dug_cells,
@@ -954,6 +965,7 @@ def ground_operation_view(
                 settlement_id=settlement.id if settlement is not None else 0,
                 found_contact_id=contact_ids[found.discovery_id] if found is not None else 0,
                 landing_site=(x, y) in landing,
+                wall_mask=wall_mask,
             ))
 
     contacts = [
@@ -1076,9 +1088,14 @@ def _assault_operation_view(
             terrain_blocked = terrain is not None and terrain.move_cost <= 0
             structure_blocks = structure is not None and (
                 op.structure_hp.get(structure.id, structure.hp_max) > 0)
+            wall_mask = (
+                gw_interior.wall_neighbor_mask(
+                    lambda nx, ny: amap.feature[ny][nx], x, y, amap.width, amap.height)
+                if amap.feature[y][x] == "bulkhead" else 0)
             cells.append(dto.AssaultCellDTO(
                 x=x, y=y, feature=amap.feature[y][x],
                 blocked=terrain_blocked or structure_blocks,
+                wall_mask=wall_mask,
                 landable=(not op.dropped and cell not in amap.blocked and not terrain_blocked),
                 move_reachable=cell in projection.reachable,
                 jump_reachable=cell in projection.jumpable,
