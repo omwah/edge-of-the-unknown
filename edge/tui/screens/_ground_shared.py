@@ -304,8 +304,14 @@ class CroppedMapView(Static, can_focus=True):
         # cached foreground shows through untouched — no need to re-derive it here.
         for (fx, fy), (style, _until) in self.host_screen.live_flashes().items():
             restyle(fx, fy, style)
-        cursor_style = ("black on bright_white" if self.host_screen.cursor_is_legal()
-                        else "bright_white on red3")
+        # A fixed "black on bright_white" legal-cursor swatch reads fine against dark
+        # planet terrain but disappears into a light Cloud City floor (GW-WP15/17 station
+        # interiors, edge.art.interior, moved to a near-white palette) — "reverse" instead
+        # inverts whatever fg/bg the cell already has, so it stays high-contrast against
+        # any tile without needing to know the underlying theme (verified against
+        # Textual's SVG snapshot export, which resolves `reverse` into swapped fill
+        # colours rather than leaving it as an unswapped terminal attribute).
+        cursor_style = "reverse" if self.host_screen.cursor_is_legal() else "bright_white on red3"
         restyle(self.host_screen.cursor_x, self.host_screen.cursor_y, cursor_style)
         return out
 

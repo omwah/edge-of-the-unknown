@@ -2031,8 +2031,8 @@ class GwCloudCity(BaseModel):
 
     model_config = _FROZEN
 
-    width: int = Field(default=60, ge=2)
-    height: int = Field(default=32, ge=2)
+    width: int = Field(default=120, ge=2)
+    height: int = Field(default=64, ge=2)
     districts_base: int = Field(default=3, ge=1)
     districts_per_size: int = Field(default=2, ge=0)
     locked_door_frac: float = Field(default=0.35, ge=0.0, le=1.0)

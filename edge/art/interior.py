@@ -40,26 +40,29 @@ FEATURES_REGISTRY: dict[str, list[tuple[str, float]]] = {
     "electrical": [("⌁", 0.5), ("∴", 1), (" ", 4)],
 }
 
-# (fg, bg) per floor feature name.
+# (fg, bg) per floor feature name — a light, blueprint-on-white hull rather than
+# a dark one: every bg sits in the grey82-grey100 band, with fg colours darkened
+# to match (a straight light/dark swap of the old dark-hull palette would have
+# left former dark-on-dark accents unreadable against paper-white floors).
 FEATURE_COLORS: dict[str, tuple[str, str]] = {
-    "corridor": ("grey62", "grey11"),
-    "plaza": ("grey70", "grey15"),
-    "habitation": ("wheat4", "grey15"),
-    "engineering": ("grey58", "grey19"),
-    "command_core": ("gold3", "grey19"),
-    "cover_strut": ("grey54", "grey15"),
-    "vacuum": ("bright_cyan", "grey7"),
-    "fire": ("bright_red", "grey11"),
-    "electrical": ("bright_yellow", "grey11"),
+    "corridor": ("grey54", "grey100"),
+    "plaza": ("grey58", "grey93"),
+    "habitation": ("orange4", "grey89"),
+    "engineering": ("steel_blue", "grey85"),
+    "command_core": ("dark_goldenrod", "grey89"),
+    "cover_strut": ("grey42", "grey85"),
+    "vacuum": ("dark_cyan", "#eaf6f6"),
+    "fire": ("red3", "#fbe9e9"),
+    "electrical": ("dark_goldenrod", "#fdf6d9"),
 }
 
-WALL_COLOR = ("grey78", "grey7")
+WALL_COLOR = ("grey19", "grey82")
 DOOR_GLYPH = "◫"
-DOOR_COLOR = ("bright_yellow", "grey7")
+DOOR_COLOR = ("dark_orange3", "grey85")
 LIFT_GLYPH = "▲"
-LIFT_COLOR = ("bright_magenta", "grey15")
+LIFT_COLOR = ("purple4", "grey89")
 OBJECTIVE_GLYPH = "✪"
-OBJECTIVE_COLOR = ("bold gold3", "grey19")
+OBJECTIVE_COLOR = ("bold dark_goldenrod", "grey89")
 
 # The standard 16-case wall-junction table, indexed by a 4-bit mask
 # (N=1, S=2, E=4, W=8) of which orthogonal neighbours are themselves wall-like
@@ -122,7 +125,7 @@ def style_interior(rng: random.Random, layout: InteriorLayout) -> list[list[Cell
             elif (x, y) in lift_cells:
                 row.append((LIFT_GLYPH, *LIFT_COLOR))
             else:
-                fg, bg = FEATURE_COLORS.get(feature, ("grey50", "grey11"))
+                fg, bg = FEATURE_COLORS.get(feature, ("grey50", "grey93"))
                 ch = resolve_feature_char(rng, feature, FEATURES_REGISTRY)
                 row.append((ch, fg, bg))
         out.append(row)
