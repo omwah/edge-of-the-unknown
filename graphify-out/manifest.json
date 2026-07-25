@@ -1585,8 +1585,8 @@
     "semantic_hash": ""
   },
   "config/groundwar_default.yaml": {
-    "mtime": 1784965153.8064625,
-    "ast_hash": "5364d040f25e5479011d3a90c5ef729c",
+    "mtime": 1784969123.3044093,
+    "ast_hash": "7cbe9c68ed3620a61274afc23fa51402",
     "semantic_hash": ""
   },
   "config/names_default.yaml": {
@@ -3765,13 +3765,13 @@
     "semantic_hash": ""
   },
   "edge/art/interior.py": {
-    "mtime": 1784965214.5933928,
-    "ast_hash": "5fc0ab3027e70f8cf815824302b4b8b7",
+    "mtime": 1784969187.043516,
+    "ast_hash": "d56e44498a4d96b37884481cf951a927",
     "semantic_hash": ""
   },
   "edge/core/groundwar/interior.py": {
-    "mtime": 1784966271.8657458,
-    "ast_hash": "9ded9fa0c7b188272e0b08b4f16000a0",
+    "mtime": 1784969163.5571084,
+    "ast_hash": "8099a376d8b52bdd1b5baed9c71b946e",
     "semantic_hash": ""
   },
   "edge/groundwar/harness.py": {

@@ -192,6 +192,7 @@ terrain:
   bed:             {move_cost: 1, cover: 0.15, blocks_los: false}
   console:         {move_cost: 1, cover: 0.20, blocks_los: false}
   table:           {move_cost: 1, cover: 0.20, blocks_los: false}
+  stool:           {move_cost: 1, cover: 0.10, blocks_los: false}
   vacuum:        {move_cost: 1, cover: 0.0,  blocks_los: false}
   fire:          {move_cost: 2, cover: 0.0,  blocks_los: false}
   electrical:    {move_cost: 1, cover: 0.0,  blocks_los: false}
@@ -235,8 +236,8 @@ expedition:
 cloud_city:
   width: 120
   height: 64
-  districts_base: 3        # room count at cloud_city_size 1
-  districts_per_size: 2    # ... plus this many per size step above 1 (max size 4 -> 9 rooms)
+  districts_base: 8        # room count at cloud_city_size 1
+  districts_per_size: 4    # ... plus this many per size step above 1 (max size 4 -> 20 rooms)
   locked_door_frac: 0.35   # fraction of inter-room connections stamped as a security_door
   lift_pairs: 2            # extra long-range teleport-link shortcuts
   hazard_frac: 0.03        # fraction of non-objective floor cells tagged vacuum/fire/electrical
