@@ -100,6 +100,7 @@ from edge.core.events import (
     BeltMined,
     CloudCityBuilt,
     Colonized,
+    CrateOpened,
     ColonistsSettled,
     AdmissionAdvanced,
     AllianceJoined,
@@ -677,6 +678,19 @@ class SurveyDig:
     A site inside the trench is uncovered and its artifact + codex reward settled atomically
     (no second collect step, no hold gate). A dry dig spends supplies; re-digging spent ground
     is free. Costs no main-game turns.
+    """
+
+    operation_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class OpenCrate:
+    """Open the salvage crate where the explorer stands, inside a Cloud City tour (GW-WP18).
+
+    Never a `Discovery`/artifact reward (that rail is G6-invariant to real surface finds) —
+    this pulls a Tier-I component into the ship's loose inventory exactly like `Cannibalize`
+    pulls one out of a derelict base. Refused outright (crate stays unopened) when the hold
+    has no free slot for it. Costs no main-game turns, no supplies.
     """
 
     operation_id: int
@@ -1261,7 +1275,7 @@ Command = (
     | InstallComponent | SwapComponent | Cannibalize | FieldPatch
     | Salvage | BeginSurvey | BeginAssault | ReinforceGarrison
     | ExtractGroundOperation
-    | GroundMove | SurveyDig | SurveyLand | SurveyTalk
+    | GroundMove | SurveyDig | OpenCrate | SurveyLand | SurveyTalk
     | GroundDrop | GroundJump | GroundFire | GroundBroadcast | EndGroundTurn
     | MineBelt | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
@@ -1441,6 +1455,8 @@ def reduce(
             return _ground_move(state, player_id, command, config)
         case SurveyDig():
             return _survey_dig(state, player_id, command, config)
+        case OpenCrate():
+            return _open_crate(state, player_id, command, config)
         case SurveyLand():
             return _survey_land(state, player_id, command, config)
         case SurveyTalk():
@@ -4148,6 +4164,7 @@ def _begin_survey(
     start_y = prior.last_y if prior is not None else def_h // 2
     hinted = prior.hinted_discovery_ids if prior is not None else frozenset()
     hinted_towns = prior.hinted_settlement_ids if prior is not None else frozenset()
+    opened_crates = prior.opened_crate_ids if prior is not None else frozenset()
     # Snapshot the sensor/detection window now (G7): only these surface sites are ever
     # placed on the map, so a hidden out-of-reach site leaks nothing — and a later descent
     # after a sensor upgrade widens the set (GW-WP05). Already-collected sites show `found`.
@@ -4164,6 +4181,7 @@ def _begin_survey(
         hinted_discovery_ids=hinted, hinted_settlement_ids=hinted_towns,
         visible_discovery_ids=visible, resolved_discovery_ids=resolved,
         cloud_city_size=planet.cloud_city_size if city_world else 0,
+        opened_crate_ids=opened_crates if city_world else frozenset(),
     )
     new_player = replace(player, ground_operation=operation)
     return ReduceResult(
@@ -4278,6 +4296,7 @@ def _extract_ground_operation(
             hinted_discovery_ids=operation.hinted_discovery_ids,
             hinted_settlement_ids=operation.hinted_settlement_ids,
             map_seed=operation.seed,
+            opened_crate_ids=operation.opened_crate_ids,
         )
         new_player = replace(
             player, ground_operation=None, ground_survey_progress=progress)
@@ -4668,6 +4687,42 @@ def _survey_dig(
                                       disc.kind.value, disc.rarity_tier.name))
     return ReduceResult(events=tuple(events), players=(new_player,),
                         discoveries=(replace(disc, found_by=player_id),))
+
+
+def _open_crate(
+    state: UniverseState, player_id: int, cmd: OpenCrate, config: GameConfig
+) -> ReduceResult:
+    """Open the salvage crate underfoot inside a Cloud City tour (GW-WP18).
+
+    Pulls a Tier-I component into the ship's loose inventory — the same reward
+    `Cannibalize` gives for stripping a derelict base, never a `Discovery`/artifact
+    (G6 stays scoped to real surface finds; a crate is never one). Refuses outright
+    when the hold has no free slot, leaving the crate unopened rather than consuming
+    it for nothing.
+    """
+    if config.groundwar is None:
+        raise EconomyError("ground operations are not configured")
+    player, op = _active_survey(state, player_id, cmd.operation_id)
+    if op.outcome is not None:
+        raise MovementError("the expedition has ended — extract to orbit")
+    smap = gw_survey.survey_map_for(state, op, config)
+    crate = smap.crate_at(op.explorer_x, op.explorer_y)
+    if crate is None:
+        raise MovementError("no crate here to open")
+    if crate.opened:
+        raise MovementError("already opened — nothing left inside")
+    ship = _ship(state, player)
+    if ship.holds_free < 1:
+        raise EconomyError("no free hold for the salvage — sell cargo first")
+    kind = state.rng.choice(list(Component))
+    new_ship = replace(ship, components=_inv_add(ship.components, (kind, ComponentTier.I)))
+    new_op = replace(op, opened_crate_ids=op.opened_crate_ids | {crate.id})
+    new_player = replace(player, ground_operation=new_op)
+    return ReduceResult(
+        events=(CrateOpened(player_id, op.operation_id, crate.x, crate.y, crate.id,
+                            kind.value, ComponentTier.I.name),),
+        players=(new_player,), ships=(new_ship,),
+    )
 
 
 def _survey_land(

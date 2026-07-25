@@ -1723,6 +1723,79 @@ Tests: `tests/test_citadels.py` (Cloud City citadel-build rejection),
 `tests/test_wire.py` (regenerated golden fingerprint/envelopes for v37).
 Commit `ground: GW-WP17 Cloud City survey tour + interior render fix`.
 
+### GW-WP18 — Cloud City salvage crates + two shipped-with-WP17 bugs (M) — SHIPPED
+
+A follow-up request ("I should be able to visit... even with no finds" reversed to
+"I should be able to dig!" once the tour existed) — clarified to *crates*, not
+literal digging through a metal floor: standing over one and opening it. Landed
+alongside two bugs the tour work exposed:
+
+- **Double-width glyphs broke the sidebar.** The interior `engineering`/`electrical`
+  glyph pools (`edge/art/interior.py`, shipped in GW-WP17) picked `⚌`/`⚡`, both
+  `rich.cells.cell_len` == 2 — a double-width glyph desyncs the fixed per-cell grid
+  one column per occurrence, cascading through the row and misaligning the sidebar's
+  border. Swept the *entire* shared render path (biome terrain, hardcoded screen
+  markers, `STRUCTURE_ART`/`RUBBLE_ART`) and confirmed those two were the only
+  offenders; replaced with `╫`/`⌁` (both width 1) and added
+  `tests/test_ground_render_glyph_widths.py` as a permanent guard — two registries
+  swept automatically, the hardcoded markers inventoried once.
+- **A crate's `opened` flag never reached the live view.** `_cached_survey_map_for`'s
+  cache key omitted `op.opened_crate_ids` (and `op.cloud_city_size`), so a crate
+  opened server-side (confirmed via the event log) kept rendering `opened=False`
+  forever — caught by a Textual Pilot test that actually pressed `X` and checked the
+  *next* rendered view, not just that the reducer accepted the command.
+
+The crate mechanic itself:
+
+- `citadels`'s salvage precedent, not a `Discovery`: opening a crate pulls a Tier-I
+  `Component` into the ship's loose inventory the same way `Cannibalize` pulls one
+  out of a derelict base — never routed through the artifact/codex/experience rail
+  the G6 invariant reserves for real surface finds (property-tested, untouched here).
+  Refuses outright (`ship.holds_free < 1`) rather than mutate when the hold is full,
+  leaving the crate unopened — matching `Cannibalize`'s own defensive pattern.
+- `edge.core.groundwar.interior.generate_interior` gained `_crate_slots` (up to one
+  per non-command_core district, `groundwar.cloud_city.crate_chance` per-district
+  odds) and `InteriorLayout.crate_slots`, drawn from the *tail* of the same `rng`
+  stream — after every earlier field, so appending it never perturbs an
+  already-generated layout's rooms/corridors/hazards/lifts/objective (verified by
+  hashing `feature_grid` across 80 `(seed, size)` pairs before/after, not just
+  reasoned about — `test_crate_slots_do_not_perturb_the_existing_layout`).
+- `groundwar.survey.CrateSite`/`SurveyMap.crates` project `layout.crate_slots` into
+  numbered crates — **1-based** ids (`enumerate(..., 1)`), matching `found_contact_id`'s
+  own "0 means nothing here" convention; a first-crate id of 0 would have been
+  indistinguishable from "no crate" on `GroundCellDTO.crate_id`.
+  `SurveyOperation.opened_crate_ids` snapshots which have been opened — a crate has
+  no durable backing entity the way a `Discovery` does, so this is its only record,
+  persisted into `SurveyProgress` on extraction exactly like `hinted_discovery_ids`.
+- New `OpenCrate` command / `CrateOpened` event, a `_open_crate` reducer beside
+  `_survey_dig` (not folded into it — the G6 reward rail must stay untouched), and
+  `Player`/`GameCommand`/codec/wire wiring identical in shape to `SurveyDig`'s.
+- `SurveyExpeditionDTO.is_cloud_city`/`crates` (`CrateDTO`) and
+  `GroundCellDTO.crate_id` project the above; `GroundExpeditionScreen`'s `X` key
+  (`action_dig`) branches on `is_cloud_city` to send `OpenCrate` instead of
+  `SurveyDig` — same key, same screen, different verb — with its own sidebar
+  CRATES section (replacing CONTACTS/SETTLEMENTS, which are always empty for a
+  Cloud City) and a `▣` crate glyph on the map. `can_dig`'s server-side legality
+  gained `or is_cloud_city` since opening a crate costs no supplies, unlike a dig.
+  `WIRE_VERSION` stayed 37 — folded into the not-yet-committed GW-WP17 bump rather
+  than a second version, one golden regeneration for both.
+
+Files (added to GW-WP17's list, same commit boundary target): `edge/core/config.py`
+(`GwCloudCity.crate_chance`), `config/groundwar_default.yaml`,
+`edge/core/groundwar/interior.py`, `edge/core/groundwar/survey.py`,
+`edge/core/groundwar/models.py`, `edge/core/rules.py`, `edge/core/events.py`,
+`edge/core/dto.py`, `edge/store/codec.py`, `edge/server/session.py`,
+`edge/server/wire.py`, `edge/art/interior.py`, `edge/tui/screens/_ground_shared.py`,
+`edge/tui/screens/ground_expedition.py`, `edge/tui/screens/planet.py`, `docs/DESIGN.md`.
+Tests: `tests/test_ground_render_glyph_widths.py` (new — width guard),
+`tests/test_groundwar_interior.py` (crate-slot placement + no-perturbation),
+`tests/test_groundwar_survey.py` (crate projection/ids),
+`tests/test_groundwar_access.py` (`OpenCrate` reducer: grant/refuse/already-opened/
+no-crate-here), `tests/test_groundwar_expedition_view.py` (DTO projection + a
+Textual Pilot round-trip that caught the cache-key bug), `tests/test_codec.py`,
+`tests/test_wire.py` (regenerated goldens).
+Commit (pending, same boundary as GW-WP17 unless split at the user's request).
+
 ## Verification matrix
 
 | Concern | Required evidence |

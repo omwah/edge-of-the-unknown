@@ -588,3 +588,88 @@ def test_inbound_view_keeps_terrain_colour_and_dims_only_refused_ground() -> Non
             front, back = excluded.split(" on ")
             assert luminance(front) != pytest.approx(luminance(back), abs=0.15), (
                 f"{ptype}/{feature} is unreadable when dimmed")
+
+
+# --- GW-WP18: Cloud City tour crates, end to end -----------------------------
+
+_CRATE_CFG = CFG.model_copy(update={"groundwar": CFG.groundwar.model_copy(  # type: ignore[union-attr]
+    update={"cloud_city": CFG.groundwar.cloud_city.model_copy(  # type: ignore[union-attr]
+        update={"crate_chance": 1.0})})})
+
+
+def _cloud_city_world() -> UniverseState:
+    """A player-owned, staged Cloud City with the tour already open — `crate_chance`
+    forced to 1.0 so a crate is guaranteed, mirroring `_world`'s terrestrial setup."""
+    state = UniverseState.new(Game(1, 91, CFG.config_version, "t"))
+    state.sectors = {1: Sector(1, 1, (), "Frontier")}
+    state.regions = {1: Region(1, "Frontier")}
+    state.rebuild_adjacency()
+    state.planets = {
+        1: Planet(1, 1, "Sky Reach", "jovian", cloud_city_size=3,
+                  owner=Ownership("player", 1)),
+    }
+    state.ships = {
+        1: Ship(id=1, type_id="trailblazer", name="S", owner_player_id=1,
+               sector_id=1, holds_total=60, turns_per_warp=1),
+    }
+    state.players = {1: Player(id=1, name="you", ship_id=1, latinum=100, turns_remaining=250)}
+    apply_result(state, reduce(state, 1, BeginSurvey(1), _CRATE_CFG))
+    return state
+
+
+def _landed_on_a_crate(state: UniverseState) -> object:
+    """Land the tour directly on its (guaranteed) first crate; returns that crate."""
+    op = state.players[1].ground_operation
+    assert op is not None
+    crate = gw.survey_map_for(state, op, _CRATE_CFG).crates[0]
+    state.players[1] = replace(
+        state.players[1],
+        ground_operation=replace(op, landed=True, explorer_x=crate.x, explorer_y=crate.y),
+    )
+    return crate
+
+
+def test_cloud_city_view_projects_crates_and_is_cloud_city_flag() -> None:
+    state = _cloud_city_world()
+    crate = _landed_on_a_crate(state)
+    view = session.ground_operation_view(state, 1, _CRATE_CFG)
+    assert view is not None
+    assert view.is_cloud_city is True
+    assert any(c.crate_id == crate.id and not c.opened for c in view.crates)
+    marker = next(cell for cell in view.cells if cell.crate_id == crate.id)
+    assert (marker.x, marker.y) == (crate.x, crate.y)
+
+
+async def test_cloud_city_tour_open_crate_via_pilot(tmp_path: Path) -> None:
+    """`X` opens the crate underfoot instead of digging, no modal pushed (unlike a
+    real excavation), and the sidebar/DTO reflect the reward in place."""
+    state = _cloud_city_world()
+    crate = _landed_on_a_crate(state)
+    service = GameService(state, _CRATE_CFG, SqliteRepository(tmp_path / "crate.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.client = client
+        screen = GroundExpeditionScreen(client)
+        app.push_screen(screen)
+        await pilot.pause()
+        assert screen.view is not None
+        assert screen.view.is_cloud_city
+        before_components = sum(state.ships[1].components.values())
+
+        await pilot.press("x")
+        await pilot.pause()
+
+        assert isinstance(app.screen, GroundExpeditionScreen)  # no find modal for a crate
+        assert screen.view is not None
+        opened = next(c for c in screen.view.crates if c.crate_id == crate.id)
+        assert opened.opened
+        assert sum(state.ships[1].components.values()) == before_components + 1
+        op = state.players[1].ground_operation
+        assert op is not None and crate.id in op.opened_crate_ids  # type: ignore[union-attr]
+
+        # Re-pressing X on the now-empty crate is a no-op refusal, not a second reward.
+        await pilot.press("x")
+        await pilot.pause()
+        assert sum(state.ships[1].components.values()) == before_components + 1

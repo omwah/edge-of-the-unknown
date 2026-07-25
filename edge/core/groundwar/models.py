@@ -55,9 +55,11 @@ class SurveyProgress:
     `hinted_discovery_ids` persist so settlement hints keep narrowing the same
     sites. `hinted_settlement_ids` persists which towns have already given their one
     hint (GW-WP13-FU1) — a town's cap survives a return descent the same way the
-    hinted sites themselves do. Trenches and supplies do **not** live here — they
-    reset each descent and stay on the active operation. Hashed, because it changes
-    future search information.
+    hinted sites themselves do. `opened_crate_ids` (GW-WP18) is the Cloud City tour's
+    equivalent — a crate has no durable backing entity the way a real `Discovery` does,
+    so this is its only record of having been opened. Trenches and supplies do **not**
+    live here — they reset each descent and stay on the active operation. Hashed,
+    because it changes future search information.
     """
 
     last_x: int
@@ -65,6 +67,7 @@ class SurveyProgress:
     hinted_discovery_ids: frozenset[int] = frozenset()
     hinted_settlement_ids: frozenset[int] = frozenset()
     map_seed: int = 0
+    opened_crate_ids: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +111,12 @@ class SurveyOperation:
     # of `(seed, cloud_city_size)`, and regenerating against a station that grew mid-survey
     # would shift every room underfoot. 0 for an ordinary planet survey (never consulted).
     cloud_city_size: int = 0
+    # Salvage crates already opened this tour (GW-WP18). Unlike `resolved_discovery_ids`
+    # (re-derived live from `Discovery.found_by`, a durable top-level record), a crate has
+    # no such backing entity — this is the only record it was opened, so the extract
+    # reducer persists it into `SurveyProgress` the same way it persists
+    # `hinted_discovery_ids`. Empty and never consulted outside a Cloud City.
+    opened_crate_ids: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)

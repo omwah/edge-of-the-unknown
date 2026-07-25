@@ -73,6 +73,7 @@ from edge.core.events import (
     ContractAccepted,
     ContractCompleted,
     ContractFailed,
+    CrateOpened,
     NoticePosted,
     RumorHeard,
     CitadelGunSilenced,
@@ -882,6 +883,7 @@ def ground_operation_view(
     expedition = config.groundwar.expedition
     smap = _cached_survey_map_for(state, op, config)
     planet = state.planets[op.planet_id]
+    is_cloud_city = is_cloud_city_world(op.planet_type, config)
 
     vx = max(0, min(viewport_x, smap.width - 1))
     vy = max(0, min(viewport_y, smap.height - 1))
@@ -892,6 +894,8 @@ def ground_operation_view(
 
     ordered_sites = sorted(smap.sites, key=lambda site: site.discovery_id)
     contact_ids = {site.discovery_id: index for index, site in enumerate(ordered_sites, 1)}
+    # GW-WP18: an opened crate reverts to plain floor — only unopened ones mark their cell.
+    crate_at_cell = {(c.x, c.y): c.id for c in smap.crates if not c.opened}
     clues = ground_survey.visible_clues(op, smap, config)
     # Excavation adds a marker; it must not visually erase the chart patch that led
     # there. These resolved clues were already earned, while core movement stopping
@@ -966,6 +970,7 @@ def ground_operation_view(
                 found_contact_id=contact_ids[found.discovery_id] if found is not None else 0,
                 landing_site=(x, y) in landing,
                 wall_mask=wall_mask,
+                crate_id=crate_at_cell.get((x, y), 0),
             ))
 
     contacts = [
@@ -1032,13 +1037,19 @@ def ground_operation_view(
             )
             for town in smap.settlements
         ],
+        is_cloud_city=is_cloud_city,
+        crates=[
+            dto.CrateDTO(crate_id=crate.id, x=crate.x, y=crate.y, opened=crate.opened)
+            for crate in smap.crates
+        ],
         outcome=op.outcome,
         landed=op.landed,
         can_land=live and not op.landed,
         suggested_landing_x=suggested_x,
         suggested_landing_y=suggested_y,
         can_move=live and op.landed and op.supplies > 0 and can_afford_next,
-        can_dig=live and op.landed and op.supplies > 0,
+        # A crate costs no supplies to open (GW-WP18), unlike an ordinary dig.
+        can_dig=live and op.landed and (op.supplies > 0 or is_cloud_city),
         can_talk=live and op.landed and town_here is not None,
         can_extract=True,
     )
@@ -1197,7 +1208,7 @@ def _cached_survey_map_for(
     key: tuple[object, ...] = (
         id(config), state.game.seed, op.seed, op.planet_id, op.planet_type, inhabited,
         discoveries, op.visible_discovery_ids, op.resolved_discovery_ids,
-        op.hinted_discovery_ids,
+        op.hinted_discovery_ids, op.cloud_city_size, op.opened_crate_ids,
     )
     cached = _SURVEY_MAP_CACHE.get(key)
     if cached is not None:
@@ -2657,6 +2668,9 @@ def format_event(event: Event) -> str:
     if isinstance(event, SurveySiteExcavated):
         return (f"[green]✦ Excavated {event.kind.replace('_', ' ')} "
                 f"({event.rarity.lower()}); artifact and lore recorded.[/]")
+    if isinstance(event, CrateOpened):
+        return (f"[green]▣ Salvage crate opened — a Tier {event.component_tier} "
+                f"{event.component_kind.replace('_', ' ')} taken aboard.[/]")
     if isinstance(event, SurveyTalked):
         hint = " — a search circle was narrowed" if event.hinted_id >= 0 else ""
         gain = f"  (+{event.resupply} supplies)" if event.resupply else ""
@@ -2858,7 +2872,7 @@ def _event_sector(event: Event, state: UniverseState) -> int | None:
                           Repaired, DevicePurchased, StarbaseSalvaged, ColonistsRecruited,
                           LeadAccepted, Banked, TurnsReset, GroundOperationBegan,
                           GroundOperationEnded, GroundMoved, SurveyDug,
-                          SurveySiteExcavated, SurveyTalked)):
+                          SurveySiteExcavated, SurveyTalked, CrateOpened)):
         player = state.players.get(event.player_id)
         if player is None:
             return None

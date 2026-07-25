@@ -219,6 +219,7 @@ cloud_city:
   lift_pairs: 2            # extra long-range teleport-link shortcuts
   hazard_frac: 0.03        # fraction of non-objective floor cells tagged vacuum/fire/electrical
   cover_frac: 0.08         # fraction tagged cover_strut
+  crate_chance: 0.4        # per-district odds of a salvage crate (GW-WP18 friendly tour)
 
 # GW-WP16 migration gate: on. Generation/tactics/settlement/TUI parity proven
 # (tests/test_groundwar_cloud_city_assault*.py); balance (garrison counts, defense

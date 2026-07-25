@@ -33,6 +33,7 @@ from edge.core.movement import MovementError
 from edge.core.rules import (
     ExtractGroundOperation,
     GroundMove,
+    OpenCrate,
     SurveyDig,
     SurveyLand,
     SurveyTalk,
@@ -205,6 +206,8 @@ class SurveyMapView(CroppedMapView):
             return _EXPLORER, _EXPLORER_STYLE
         if cell.found_contact_id:
             return "✦", "bold gold1 on grey19"
+        if cell.crate_id:
+            return "▣", "black on gold3"
         if cell.dug:
             return "◌", "black on dark_goldenrod"
         if cell.clue:
@@ -479,30 +482,45 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
                    f"turn {v.next_main_turn_at}\n", "grey58")
         if out_of_turns and v.outcome is None:
             out.append("⚠ OUT OF TURNS — extract to return to orbit (Esc)\n", "bold red")
-        out.append("\nCONTACTS\n", "bold")
-        for contact in v.contacts:
-            if contact.found:
-                out.append(f" ✦ {contact.name[:25]}\n", "gold1")
-            else:
-                suffix = " — narrowed" if contact.hinted else " — area marked"
-                out.append(f" ? contact {contact.contact_id}{suffix}\n",
-                           "bright_cyan" if contact.hinted else "grey70")
-        if v.settlements:
-            out.append("\nSETTLEMENTS\n", "bold")
-            for town in v.settlements:
-                tag = "will share" if town.hint_available else "nothing left to tell"
-                out.append(f" ◇ {town.name[:16]:<16} {tag}\n",
-                           "white" if town.hint_available else "grey42")
+        if v.is_cloud_city:
+            out.append("\nCRATES\n", "bold")
+            for crate in v.crates:
+                if crate.opened:
+                    out.append(f" ▣ crate {crate.crate_id} — opened\n", "grey42")
+                else:
+                    out.append(f" ▣ crate {crate.crate_id} — sealed\n", "gold1")
+        else:
+            out.append("\nCONTACTS\n", "bold")
+            for contact in v.contacts:
+                if contact.found:
+                    out.append(f" ✦ {contact.name[:25]}\n", "gold1")
+                else:
+                    suffix = " — narrowed" if contact.hinted else " — area marked"
+                    out.append(f" ? contact {contact.contact_id}{suffix}\n",
+                               "bright_cyan" if contact.hinted else "grey70")
+            if v.settlements:
+                out.append("\nSETTLEMENTS\n", "bold")
+                for town in v.settlements:
+                    tag = "will share" if town.hint_available else "nothing left to tell"
+                    out.append(f" ◇ {town.name[:16]:<16} {tag}\n",
+                               "white" if town.hint_available else "grey42")
         out.append("\n")
         if v.outcome is not None:
             done = v.outcome == "complete"
-            resolved = sum(1 for c in v.contacts if c.found)
             out.append("═" * 26 + "\n", "bold")
             out.append("SURVEY COMPLETE\n" if done else "RECALLED — SUPPLIES SPENT\n",
                        "bold bright_green" if done else "bold yellow")
-            out.append(f"{resolved}/{len(v.contacts)} contacts resolved\n", "grey70")
-            out.append("V on a ✦ revisits it\n", "grey66")
+            if v.is_cloud_city:
+                opened = sum(1 for c in v.crates if c.opened)
+                out.append(f"{opened}/{len(v.crates)} crates opened\n", "grey70")
+            else:
+                resolved = sum(1 for c in v.contacts if c.found)
+                out.append(f"{resolved}/{len(v.contacts)} contacts resolved\n", "grey70")
+                out.append("V on a ✦ revisits it\n", "grey66")
             out.append("Esc extracts to orbit\n", "grey66")
+        elif v.is_cloud_city:
+            out.append("M march · X open crate\n", "grey66")
+            out.append("Z log · ? help\n", "grey66")
         else:
             out.append("M march · X dig · T talk\n", "grey66")
             out.append("V view find · Z log · ? help\n", "grey66")
@@ -602,6 +620,9 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
         if not self.view.can_dig:
             warn(self, "#survey-log", "Nothing to dig right now.")
             return
+        if self.view.is_cloud_city:
+            await self._open_crate()
+            return
         before = {(c.x, c.y) for c in self.view.cells if c.dug}
         events_out = await self._apply(SurveyDig(self.view.operation_id))
         if events_out is None:
@@ -621,6 +642,22 @@ overlay and [b]Z[/] expands the log when you want the full narration."""
                             if c.discovery_id == excavated.discovery_id), None)
             if contact is not None:
                 self.app.push_screen(SurveyFindModal(contact, first=True))
+
+    async def _open_crate(self) -> None:
+        """Open the crate underfoot (GW-WP18) — the Cloud City tour's `X` verb."""
+        assert self.view is not None
+        crate_here = next(
+            (c for c in self.view.crates
+             if not c.opened and (c.x, c.y) == (self.view.explorer_x, self.view.explorer_y)),
+            None)
+        if crate_here is None:
+            warn(self, "#survey-log", "No crate here to open.")
+            return
+        events_out = await self._apply(OpenCrate(self.view.operation_id))
+        if events_out is None:
+            return
+        await self._load()
+        self.flash_cells({(crate_here.x, crate_here.y)}, "on yellow", _FLASH_SECONDS)
 
     async def action_talk(self) -> None:
         if self.view is None:
