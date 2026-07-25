@@ -10,13 +10,20 @@ noise bands.
 
 The layout is **hub-and-spoke, not a spanning tree over rooms** (interview note:
 a random room-to-room spanning tree reads as a maze — you have to cut through
-other rooms' doorways to get anywhere). One horizontal corridor **spine** runs the
-width of the station; every room sits either north or south of it and connects to
-it with exactly one straight stub and one door — never to another room directly.
-`_spine_band` reserves the spine's rows before any room is placed, so a room can
-never span across it, and `_bsp_leaves` partitions the north/south halves
-independently (`_generate_leaves`). See `_connect_to_spine` for the stub/door pass
-that replaces the old room-to-room `_connect_rooms`.
+other rooms' doorways to get anywhere), and it is **two levels of branching, not
+one long hallway** (follow-up interview note: a single spine with a whole half's
+rooms hanging directly off it makes each room span the entire half — too big, and
+only one corridor). One horizontal corridor **spine** runs the width of the
+station; each spine half (north/south) is divided along its width into several
+**branch corridors** (`_half_leaves`), and rooms are stacked in pairs flanking
+each branch, not the spine itself. So the hierarchy is spine ->
+branch -> room, three hops deep, and a room only ever needs to be as tall as its
+stack slot, not the whole half. `_spine_band` reserves the spine's rows before
+anything else is placed, so nothing can span across it; `_cut_x`/`_cut_y` are the
+two explicit single-axis BSP cuts (`_half_leaves` picks the right one at each
+level — a column split for branches, a stack split for the rooms flanking one).
+See `_connect_to_spine` for the stub/door pass that stamps the spine, every branch
+column, and one door per room on the wall facing its own branch.
 
 Two interview decisions (July 2026) shape the connectivity model:
 
@@ -67,7 +74,7 @@ INTERIOR_FEATURES: tuple[str, ...] = (
     "bar", "store", "promenade",
     "cover_strut", "bulkhead", "security_door", "lift",
     "fountain_jet", "fountain_basin", "bar_counter", "bar_counter_end",
-    "shelf", "shelf_end", "bed", "console", "table",
+    "shelf", "shelf_end", "bed", "console", "table", "stool",
     *_HAZARDS,
 )
 
@@ -82,6 +89,10 @@ _MIN_LEAF = 8  # a leaf below this on its split axis is never split further
 _ROOM_MARGIN = 1  # bulkhead ring left around every carved room
 _EDGE_MARGIN = 3  # deployment zones must be within this of the map border
 _SPINE_THICKNESS = 4  # rows reserved for the main corridor spine
+_BRANCH_WIDTH = 3  # columns reserved for each branch corridor stem
+_ROOMS_PER_BRANCH = 2  # soft target: how many rooms a branch is sized to serve —
+# low on purpose so a half gets several branches rather than one or two wide ones
+# (follow-up interview note: "we need multiple branching corridors")
 
 
 def wall_neighbor_mask(
@@ -190,40 +201,97 @@ class _Room:
     floor: list[Vec]  # interior cells, margin excluded
 
 
-def _cut_rect(r: _Rect, rng: Random) -> tuple[_Rect, _Rect] | None:
-    """Bisect `r` along its longer axis; `None` if neither axis clears
-    `_MIN_LEAF * 2` (nothing left worth splitting)."""
-    vertical = r.w >= r.h  # cut the longer axis
-    if vertical and r.w >= _MIN_LEAF * 2:
-        cut = rng.randint(_MIN_LEAF, r.w - _MIN_LEAF)
-        return _Rect(r.x, r.y, cut, r.h), _Rect(r.x + cut, r.y, r.w - cut, r.h)
-    if r.h >= _MIN_LEAF * 2:
-        cut = rng.randint(_MIN_LEAF, r.h - _MIN_LEAF)
-        return _Rect(r.x, r.y, r.w, cut), _Rect(r.x, r.y + cut, r.w, r.h - cut)
-    return None
+_Cut = Callable[[_Rect, Random], "tuple[_Rect, _Rect] | None"]
+
+# A branch segment must fit a branch column plus two _MIN_LEAF flanking rooms —
+# a plain `_MIN_LEAF * 2` (enough for two flanks alone) let `_cut_x` cut segments
+# too thin for their branch column, yielding sliver rooms a few cells wide.
+_MIN_SEGMENT_W = _BRANCH_WIDTH + 2 * _MIN_LEAF
 
 
-def _bsp_leaves(rect: _Rect, target_leaves: int, rng: Random) -> list[_Rect]:
-    """BSP-partition `rect` toward `target_leaves` leaves (a soft target — a leaf
-    is never split below `_MIN_LEAF` on its shorter usable axis, so a small map or
-    a large target may yield fewer leaves than requested). Used per spine half
-    (`_generate_leaves`): the reserved spine band already bounds how tall a room
-    can get, so — unlike the pre-spine layout — there is no further "oversized
-    leaf" pass here; a room is free to span its whole half, which is what makes
-    it read as a bay off the corridor rather than one cell in a grid of rooms."""
+def _cut_x(r: _Rect, rng: Random) -> tuple[_Rect, _Rect] | None:
+    """Bisect `r` on the x axis (left/right); `None` if `r.w` can't clear
+    `_MIN_SEGMENT_W * 2`. Used only to divide a spine half into branch-corridor
+    segments, so the threshold accounts for the branch column each child still
+    needs to reserve, not just its two flanking rooms."""
+    if r.w < _MIN_SEGMENT_W * 2:
+        return None
+    cut = rng.randint(_MIN_SEGMENT_W, r.w - _MIN_SEGMENT_W)
+    return _Rect(r.x, r.y, cut, r.h), _Rect(r.x + cut, r.y, r.w - cut, r.h)
+
+
+def _cut_y(r: _Rect, rng: Random) -> tuple[_Rect, _Rect] | None:
+    """Bisect `r` on the y axis (top/bottom); `None` if `r.h` can't clear
+    `_MIN_LEAF * 2`. Used to stack rooms flanking one branch corridor."""
+    if r.h < _MIN_LEAF * 2:
+        return None
+    cut = rng.randint(_MIN_LEAF, r.h - _MIN_LEAF)
+    return _Rect(r.x, r.y, r.w, cut), _Rect(r.x, r.y + cut, r.w, r.h - cut)
+
+
+def _bsp_leaves(rect: _Rect, target_leaves: int, rng: Random, cut: _Cut) -> list[_Rect]:
+    """BSP-partition `rect` toward `target_leaves` leaves along a single axis,
+    picked by the caller via `cut` (`_cut_x` or `_cut_y` — never chosen by aspect
+    ratio here, that was the pre-spine bug: an aspect-ratio pick silently changes
+    axis mid-tree). A soft target — a leaf is never split below `_MIN_LEAF` on its
+    split axis, so a small map or a large target may yield fewer leaves than
+    requested."""
     leaves = [rect]
     while len(leaves) < target_leaves:
         # Split the largest-area leaf that can still be split.
         candidates = sorted(
             range(len(leaves)), key=lambda i: leaves[i].w * leaves[i].h, reverse=True)
-        split_idx = next((i for i in candidates if _cut_rect(leaves[i], rng)), None)
+        split_idx = next((i for i in candidates if cut(leaves[i], rng)), None)
         if split_idx is None:
             break  # nothing left worth splitting
         r = leaves.pop(split_idx)
-        cut = _cut_rect(r, rng)
-        assert cut is not None  # split_idx was only chosen when _cut_rect succeeds
-        leaves.extend(cut)
+        pieces = cut(r, rng)
+        assert pieces is not None  # split_idx was only chosen when cut succeeds
+        leaves.extend(pieces)
     return leaves
+
+
+def _distribute(total: int, parts: int) -> list[int]:
+    """`total` split as evenly as possible across `parts` buckets, remainder going
+    to the first buckets — how many rooms each branch in a half is asked for."""
+    base, extra = divmod(total, parts)
+    return [base + 1 if i < extra else base for i in range(parts)]
+
+
+def _half_leaves(half: _Rect, target: int, rng: Random) -> tuple[list[_Rect], list[_Rect]]:
+    """Rooms and branch-corridor columns for one spine half — the "multiple
+    branching corridors" follow-up: `half`'s width is first cut (`_cut_x`) into
+    roughly `target / _ROOMS_PER_BRANCH` segments, one branch per segment; each
+    branch reserves a `_BRANCH_WIDTH`-wide column spanning the segment's *full*
+    height (reserved before any room is carved, same discipline `_spine_band`
+    uses for the main corridor, so a branch always reaches unobstructed from the
+    half's outer edge to the spine). The segment's two flanking strips are then
+    each stacked (`_cut_y`) into rooms facing the branch — smaller and more
+    numerous than one room spanning the whole half."""
+    if target <= 0:
+        return [], []
+    n_branches = max(1, -(-target // _ROOMS_PER_BRANCH))
+    segments = _bsp_leaves(half, n_branches, rng, _cut_x)
+    counts = _distribute(target, len(segments))
+    rooms: list[_Rect] = []
+    branches: list[_Rect] = []
+    for seg, count in zip(segments, counts):
+        half_bw = _BRANCH_WIDTH // 2
+        bx0 = max(seg.x + 1, seg.cx - half_bw)
+        bx1 = min(seg.x + seg.w - 1, bx0 + _BRANCH_WIDTH)
+        if bx1 <= bx0:
+            continue  # segment too narrow for a branch column at all — no rooms either
+        branch = _Rect(bx0, seg.y, bx1 - bx0, seg.h)
+        branches.append(branch)
+        left = _Rect(seg.x, seg.y, bx0 - seg.x, seg.h)
+        right = _Rect(bx1, seg.y, seg.x + seg.w - bx1, seg.h)
+        left_n = count // 2
+        right_n = count - left_n
+        if left_n > 0:
+            rooms.extend(_bsp_leaves(left, left_n, rng, _cut_y))
+        if right_n > 0:
+            rooms.extend(_bsp_leaves(right, right_n, rng, _cut_y))
+    return rooms, branches
 
 
 def _spine_band(width: int, height: int) -> tuple[int, int]:
@@ -243,17 +311,19 @@ def _spine_band(width: int, height: int) -> tuple[int, int]:
 
 def _generate_leaves(
     width: int, height: int, target_leaves: int, rng: Random,
-) -> tuple[list[_Rect], int, int]:
-    """Room rects split into a north band and a south band around a reserved
-    horizontal corridor spine — hub-and-spoke, not a spanning tree over rooms (the
-    "should not look like a maze" interview note): every room gets exactly one stub
-    connecting it to the spine (`_connect_to_spine`), never to another room."""
+) -> tuple[list[_Rect], list[_Rect], int, int]:
+    """Room and branch-corridor rects split into a north band and a south band
+    around a reserved horizontal corridor spine — hub-and-spoke, not a spanning
+    tree over rooms (the "should not look like a maze" interview note), and two
+    levels of branching, not one long hallway (the "rooms are too big, multiple
+    branching corridors" follow-up): every room gets exactly one door onto its own
+    branch (`_connect_to_spine`), never onto the spine or another room directly."""
     y0, y1 = _spine_band(width, height)
     north_n = -(-target_leaves // 2)  # ceil — north gets the extra room on an odd split
     south_n = target_leaves - north_n
-    north = _bsp_leaves(_Rect(0, 0, width, y0), north_n, rng) if north_n > 0 else []
-    south = _bsp_leaves(_Rect(0, y1, width, height - y1), south_n, rng) if south_n > 0 else []
-    return north + south, y0, y1
+    north_rooms, north_branches = _half_leaves(_Rect(0, 0, width, y0), north_n, rng)
+    south_rooms, south_branches = _half_leaves(_Rect(0, y1, width, height - y1), south_n, rng)
+    return north_rooms + south_rooms, north_branches + south_branches, y0, y1
 
 
 def _carve_rooms(
@@ -275,34 +345,40 @@ def _carve_rooms(
 
 
 def _connect_to_spine(
-    grid: list[list[str]], rooms: list[_Room], rng: Random, locked_door_frac: float,
-    spine_y0: int, spine_y1: int,
+    grid: list[list[str]], rooms: list[_Room], branches: list[_Rect],
+    rng: Random, locked_door_frac: float, spine_y0: int, spine_y1: int,
 ) -> None:
-    """Stamp the spine band as corridor, then give every room exactly one straight
-    stub connecting it to the spine — hub-and-spoke, not room-to-room: a room never
-    reaches another room except by walking the spine between their two doors.
+    """Stamp the spine band and every branch column as corridor, then give each
+    room exactly one door on the wall facing its own branch — three-hop
+    hub-and-spoke (spine -> branch -> room), never room-to-room and never
+    room-to-spine directly. A branch column spans its segment's full height
+    (`_half_leaves` reserved it before any room was carved), so its far edge is
+    already flush against the spine band stamped just above — no separate stub
+    needed to join the two, exactly like a room used to sit flush on the spine
+    before branches existed.
 
-    `locked_door_frac` still turns a room's own doorway (where its stub meets its
-    outer wall) into a `security_door` instead of an open mouth, same knob as
-    before — it just always lands on the stub-to-room breach now, not an arbitrary
-    room-to-room connection.
+    `locked_door_frac` still turns a room's own doorway (where it meets its
+    branch) into a `security_door` instead of an open mouth, same knob as before.
     """
     width = len(grid[0])
     for y in range(spine_y0, spine_y1):
         for x in range(1, width - 1):
             grid[y][x] = "corridor"
+    for b in branches:
+        for y in range(b.y, b.y + b.h):
+            for x in range(b.x, b.x + b.w):
+                grid[y][x] = "corridor"
     for room in rooms:
         r = room.rect
-        cx = r.cx
-        if r.y >= spine_y1:  # south room: stub runs up, breach at its own top wall
-            for y in range(spine_y1, r.y):
-                grid[y][cx] = "corridor"
-            door_y = r.y
-        else:  # north room: stub runs down, breach at its own bottom wall
-            for y in range(r.y + r.h, spine_y0):
-                grid[y][cx] = "corridor"
-            door_y = r.y + r.h - 1
-        grid[door_y][cx] = (
+        branch = next(
+            (b for b in branches
+             if b.y <= r.y and r.y + r.h <= b.y + b.h
+             and (b.x == r.x + r.w or r.x == b.x + b.w)),
+            None)
+        if branch is None:
+            continue  # degenerate leaf with no matching branch — left unreachable, caught by _connectivity_ok
+        door_x = r.x + r.w - 1 if branch.x == r.x + r.w else r.x  # own wall facing the branch
+        grid[r.cy][door_x] = (
             "security_door" if rng.random() < locked_door_frac else "corridor")
 
 
@@ -401,8 +477,10 @@ def _place_landmarks(grid: list[list[str]], rooms: list[_Room]) -> None:
     """Stamp recognisable, regularly-arranged furniture into each amenity room instead
     of covering it in dense per-cell texture (interview notes: "too busy", then "still
     looks chaotic" once texture alone was thinned) — a fountain anchors a plaza, a
-    counter and a few tables a bar, shelf runs a store, a row of consoles engineering, a
-    row of bunks habitation, a grid of tables a promenade. Order comes from *regularity*
+    counter with stool seating and a few tables a bar, shelf runs a store, a row of
+    consoles engineering, a row of bunks habitation, a grid of tables a promenade, and a
+    console ring around the objective in command_core (the reference deck-plan's
+    bridge/cockpit nook). Order comes from *regularity*
     — a lattice at a fixed stride, like a real deck plan's repeated cabins and dining
     tables — not merely from fewer objects. Every shape composed of two-plus distinct
     feature names (a jet vs. a basin ring, a counter body vs. its end caps, a shelf run
@@ -437,8 +515,21 @@ def _place_landmarks(grid: list[list[str]], rooms: list[_Room]) -> None:
                 grid[y][xs[0]] = grid[y][xs[-1]] = "bar_counter_end"
                 for x in xs[1:-1]:
                     grid[y][x] = "bar_counter"
+                stool_y = y + 1  # patrons' side of the counter, à la the reference deck plan
+                for x in xs[1:-1:2]:
+                    if (x, stool_y) in floor and grid[stool_y][x] == "bar":
+                        grid[stool_y][x] = "stool"
             _place_grid(grid, floor, "bar", r.x + 2, r.x + r.w - 2, r.y + 4, r.y + r.h - 2,
                         5, 3, "table")
+        elif room.role == "command_core":
+            # A console ring around the objective — the reference deck-plan's circular
+            # bridge/cockpit consultation pit — reusing the `console` feature engineering
+            # already has rather than adding a lookalike glyph for one landmark.
+            cx, cy = r.cx, r.cy
+            ring = [(cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)]
+            if _landmark_fits(grid, floor, "command_core", ring):
+                for x, y in ring:
+                    grid[y][x] = "console"
         elif room.role == "store":
             xs = list(range(r.x + 2, r.x + r.w - 2))
             for row_y in range(r.y + 2, r.y + r.h - 2, 3):
@@ -554,10 +645,11 @@ def generate_interior(
         rng = Random(f"{noise_seed}-{attempt}")
         try:
             grid = [["bulkhead"] * config.width for _ in range(config.height)]
-            leaves, spine_y0, spine_y1 = _generate_leaves(
+            leaves, branches, spine_y0, spine_y1 = _generate_leaves(
                 config.width, config.height, target_leaves, rng)
             rooms = _carve_rooms(grid, leaves, rng)
-            _connect_to_spine(grid, rooms, rng, config.locked_door_frac, spine_y0, spine_y1)
+            _connect_to_spine(
+                grid, rooms, branches, rng, config.locked_door_frac, spine_y0, spine_y1)
             _sprinkle(grid, rooms, rng, config.hazard_frac, config.cover_frac)
             lift_links = _place_lifts(grid, rooms, rng, config.lift_pairs)
             _place_landmarks(grid, rooms)

@@ -74,6 +74,7 @@ FEATURES_REGISTRY: dict[str, list[tuple[str, float]]] = {
     "bed": [("⊟", 1)],
     "console": [("▧", 1)],
     "table": [("□", 1)],
+    "stool": [("o", 1)],
 }
 
 # (fg, bg) per floor feature name — a light, blueprint-on-white hull rather than
@@ -102,6 +103,7 @@ FEATURE_COLORS: dict[str, tuple[str, str]] = {
     "bed": ("slate_blue3", "grey89"),
     "console": ("dodger_blue3", "grey85"),
     "table": ("dark_sea_green4", "grey93"),
+    "stool": ("dark_red", "grey89"),
 }
 
 WALL_COLOR = ("grey19", "grey82")
@@ -132,11 +134,13 @@ LEGEND: tuple[tuple[str, str, str, str], ...] = (
     ("⊟", "habitation (sleeping quarters, bunk row)", *FEATURE_COLORS["bed"]),
     ("▧", "engineering (maintenance, console row)", *FEATURE_COLORS["console"]),
     ("─/●", "bar counter", *FEATURE_COLORS["bar_counter"]),
+    ("o", "bar stool", *FEATURE_COLORS["stool"]),
     ("□", "bar / restaurant (tables)", *FEATURE_COLORS["table"]),
     ("▦/│", "shelving", *FEATURE_COLORS["shelf"]),
     (" ", "store", *FEATURE_COLORS["store"]),
     ("□", "promenade (dining tables)", *FEATURE_COLORS["table"]),
     (OBJECTIVE_GLYPH, "command core (objective)", *OBJECTIVE_COLOR),
+    ("▧", "command core (bridge console ring)", *FEATURE_COLORS["console"]),
     ("◘", "cover strut", *FEATURE_COLORS["cover_strut"]),
     (LIFT_GLYPH, "lift (teleport link)", *LIFT_COLOR),
     ("░", "vacuum hazard", *FEATURE_COLORS["vacuum"]),
