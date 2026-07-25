@@ -175,36 +175,63 @@ class _Room:
     floor: list[Vec]  # interior cells, margin excluded
 
 
+def _cut_rect(r: _Rect, rng: Random) -> tuple[_Rect, _Rect] | None:
+    """Bisect `r` along its longer axis; `None` if neither axis clears
+    `_MIN_LEAF * 2` (nothing left worth splitting)."""
+    vertical = r.w >= r.h  # cut the longer axis
+    if vertical and r.w >= _MIN_LEAF * 2:
+        cut = rng.randint(_MIN_LEAF, r.w - _MIN_LEAF)
+        return _Rect(r.x, r.y, cut, r.h), _Rect(r.x + cut, r.y, r.w - cut, r.h)
+    if r.h >= _MIN_LEAF * 2:
+        cut = rng.randint(_MIN_LEAF, r.h - _MIN_LEAF)
+        return _Rect(r.x, r.y, r.w, cut), _Rect(r.x, r.y + cut, r.w, r.h - cut)
+    return None
+
+
 def _split(rect: _Rect, target_leaves: int, rng: Random) -> list[_Rect]:
     """BSP-partition `rect` toward `target_leaves` leaves (a soft target — a leaf
     is never split below `_MIN_LEAF` on its shorter usable axis, so a small map or
-    a large target may yield fewer leaves than requested)."""
+    a large target may yield fewer leaves than requested), then a forced pass
+    that keeps bisecting any leaf still spanning more than a third of the full
+    map on either axis — the largest-area-first loop above can reach
+    `target_leaves` while leaving one oversized leaf untouched (a low
+    `districts_base` on a big map), which used to show up as a single room
+    spanning almost the whole station height. That pass ignores `target_leaves`
+    entirely, so the final room count is a floor, not an exact count."""
     leaves = [rect]
     while len(leaves) < target_leaves:
         # Split the largest-area leaf that can still be split.
         candidates = sorted(
             range(len(leaves)), key=lambda i: leaves[i].w * leaves[i].h, reverse=True)
-        split_idx = None
-        for i in candidates:
-            r = leaves[i]
-            if r.w >= _MIN_LEAF * 2 or r.h >= _MIN_LEAF * 2:
-                split_idx = i
-                break
+        split_idx = next((i for i in candidates if _cut_rect(leaves[i], rng)), None)
         if split_idx is None:
             break  # nothing left worth splitting
         r = leaves.pop(split_idx)
-        vertical = r.w >= r.h  # cut the longer axis
-        if vertical and r.w >= _MIN_LEAF * 2:
-            cut = rng.randint(_MIN_LEAF, r.w - _MIN_LEAF)
-            leaves.append(_Rect(r.x, r.y, cut, r.h))
-            leaves.append(_Rect(r.x + cut, r.y, r.w - cut, r.h))
-        elif r.h >= _MIN_LEAF * 2:
-            cut = rng.randint(_MIN_LEAF, r.h - _MIN_LEAF)
-            leaves.append(_Rect(r.x, r.y, r.w, cut))
-            leaves.append(_Rect(r.x, r.y + cut, r.w, r.h - cut))
-        else:
-            leaves.append(r)  # can't split this axis either — put it back untouched
-            break
+        cut = _cut_rect(r, rng)
+        assert cut is not None  # split_idx was only chosen when _cut_rect succeeds
+        leaves.extend(cut)
+    return _split_oversized(leaves, rect.w, rect.h, rng)
+
+
+def _split_oversized(leaves: list[_Rect], map_w: int, map_h: int, rng: Random) -> list[_Rect]:
+    """Keep bisecting any leaf whose width or height still exceeds a third of
+    the full map on that axis, regardless of leaf count — the "at least
+    thirds" guarantee `_split`'s docstring promises. A leaf too small to clear
+    `_MIN_LEAF * 2` on either axis is left oversized rather than forced below
+    the minimum room size."""
+    max_w, max_h = -(-map_w // 3), -(-map_h // 3)  # ceil
+    changed = True
+    while changed:
+        changed = False
+        next_leaves: list[_Rect] = []
+        for r in leaves:
+            cut = _cut_rect(r, rng) if (r.w > max_w or r.h > max_h) else None
+            if cut is None:
+                next_leaves.append(r)
+            else:
+                next_leaves.extend(cut)
+                changed = True
+        leaves = next_leaves
     return leaves
 
 

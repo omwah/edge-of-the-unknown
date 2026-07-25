@@ -211,8 +211,8 @@ expedition:
 # Cloud City station-interior generation (GW-WP15; edge.core.groundwar.interior).
 # The assault gate stays off until GW-WP16 — this tunes generation/art review only.
 cloud_city:
-  width: 60
-  height: 32
+  width: 120
+  height: 64
   districts_base: 3        # room count at cloud_city_size 1
   districts_per_size: 2    # ... plus this many per size step above 1 (max size 4 -> 9 rooms)
   locked_door_frac: 0.35   # fraction of inter-room connections stamped as a security_door
