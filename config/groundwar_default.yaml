@@ -187,6 +187,11 @@ terrain:
   bar_counter_end: {move_cost: 1, cover: 0.25, blocks_los: false}
   shelf:           {move_cost: 1, cover: 0.25, blocks_los: false}
   shelf_end:       {move_cost: 1, cover: 0.25, blocks_los: false}
+  # Lattice furniture (`_place_row`/`_place_grid`) — a repeated single-cell object at a
+  # fixed stride, not an atomic shape: a bunk row, a console bank, a grid of tables.
+  bed:             {move_cost: 1, cover: 0.15, blocks_los: false}
+  console:         {move_cost: 1, cover: 0.20, blocks_los: false}
+  table:           {move_cost: 1, cover: 0.20, blocks_los: false}
   vacuum:        {move_cost: 1, cover: 0.0,  blocks_los: false}
   fire:          {move_cost: 2, cover: 0.0,  blocks_los: false}
   electrical:    {move_cost: 1, cover: 0.0,  blocks_los: false}
