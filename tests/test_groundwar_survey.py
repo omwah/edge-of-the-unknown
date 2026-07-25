@@ -160,6 +160,26 @@ def test_cloud_city_survey_places_crates_matching_the_interior_layout() -> None:
     assert m.crate_at(*layout.crate_slots[0]) is not None
 
 
+def test_crate_near_reaches_orthogonal_neighbours_and_prefers_unopened() -> None:
+    """Opening a crate no longer requires standing exactly on it — one step in any
+    of the 4 orthogonal directions reaches it too, matching `path_to`'s own
+    4-directional walk. A diagonal step does not. Standing on an opened crate that
+    is itself adjacent to an unopened one reports the unopened one, not "already
+    opened", so the player is never told the wrong crate is spent."""
+    from edge.core.groundwar.survey import CrateSite, SurveyMap
+
+    smap = SurveyMap(
+        width=5, height=5, feature=(("corridor",) * 5,) * 5, blocked=frozenset(),
+        settlements=(), sites=(), landing_x=0, landing_y=0,
+        crates=(CrateSite(id=1, x=2, y=2), CrateSite(id=2, x=2, y=3, opened=True)),
+    )
+    assert smap.crate_near(2, 2) is smap.crates[0]
+    for nx, ny in ((3, 2), (1, 2), (2, 1)):
+        assert smap.crate_near(nx, ny) is smap.crates[0]
+    assert smap.crate_near(1, 1) is None
+    assert smap.crate_near(2, 3) is smap.crates[0]  # underfoot-opened but adjacent-unopened
+
+
 def test_eligible_surface_site_ids_excludes_every_cloud_city() -> None:
     """A Cloud City never surfaces a dig site, regardless of what big bang rolled
     for the underlying jovian before it was staged (GW-WP17)."""

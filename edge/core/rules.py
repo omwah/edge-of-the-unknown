@@ -4692,7 +4692,7 @@ def _survey_dig(
 def _open_crate(
     state: UniverseState, player_id: int, cmd: OpenCrate, config: GameConfig
 ) -> ReduceResult:
-    """Open the salvage crate underfoot inside a Cloud City tour (GW-WP18).
+    """Open the salvage crate underfoot or adjacent inside a Cloud City tour (GW-WP18).
 
     Pulls a Tier-I component into the ship's loose inventory — the same reward
     `Cannibalize` gives for stripping a derelict base, never a `Discovery`/artifact
@@ -4706,7 +4706,7 @@ def _open_crate(
     if op.outcome is not None:
         raise MovementError("the expedition has ended — extract to orbit")
     smap = gw_survey.survey_map_for(state, op, config)
-    crate = smap.crate_at(op.explorer_x, op.explorer_y)
+    crate = smap.crate_near(op.explorer_x, op.explorer_y)
     if crate is None:
         raise MovementError("no crate here to open")
     if crate.opened:

@@ -554,6 +554,19 @@ def test_open_crate_refuses_and_leaves_it_unopened_when_hold_is_full() -> None:
     assert crate.id not in live_op.opened_crate_ids
 
 
+def test_open_crate_from_an_adjacent_cell() -> None:
+    """Opening no longer requires standing exactly on the crate — one step in any
+    orthogonal direction reaches it too (`SurveyMap.crate_near`)."""
+    from edge.core.rules import OpenCrate
+
+    state, op, crate = _cloud_city_tour_at_a_crate()
+    adjacent = replace(op, explorer_x=crate.x + 1, explorer_y=crate.y)
+    state.players[1] = replace(state.players[1], ground_operation=adjacent)
+    result = reduce(state, 1, OpenCrate(adjacent.operation_id), _CRATE_CFG)
+    new_op = result.players[0].ground_operation
+    assert crate.id in new_op.opened_crate_ids
+
+
 def test_open_crate_rejects_when_no_crate_underfoot() -> None:
     from edge.core.rules import OpenCrate
 
