@@ -207,6 +207,7 @@
   "205": "WP-PR2-01 — Tabbed-screen keyboard model — landed (with deferrals)",
   "206": "WP-PR2-15 — Cloud City on jovian worlds (split a/b/c)",
   "207": "CommodityPricing",
+  "208": "trader_step",
   "209": "render.py",
   "210": "opencode.json",
   "211": "Scope",
@@ -216,7 +217,9 @@
   "215": "graphify.md",
   "216": "__init__.py",
   "217": "__init__.py",
+  "218": "sprite",
   "219": "surveyor.py",
+  "220": "GameState",
   "221": "__init__.py",
   "222": "__init__.py",
   "223": "__init__.py",
@@ -238,5 +241,9 @@
   "239": "edge-of-the-unknown",
   "240": "note",
   "241": "sprites.py",
+  "242": "MessagesDTO",
+  "243": "Debris",
+  "244": ".__exit__",
+  "245": "CommodityPricing",
   "246": "test_ground_render_glyph_widths.py"
 }

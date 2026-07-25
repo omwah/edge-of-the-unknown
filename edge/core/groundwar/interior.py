@@ -57,7 +57,7 @@ INTERIOR_FEATURES: tuple[str, ...] = (
     "bar", "store", "promenade",
     "cover_strut", "bulkhead", "security_door", "lift",
     "fountain_jet", "fountain_basin", "bar_counter", "bar_counter_end",
-    "shelf", "shelf_end",
+    "shelf", "shelf_end", "bed", "console", "table",
     *_HAZARDS,
 )
 
@@ -371,23 +371,49 @@ def _landmark_fits(grid: list[list[str]], floor: set[Vec], role: str, cells: lis
     return all(p in floor and grid[p[1]][p[0]] == role for p in cells)
 
 
+def _place_row(
+    grid: list[list[str]], floor: set[Vec], role: str,
+    x0: int, x1: int, y: int, stride: int, kind: str,
+) -> None:
+    """One `kind` cell every `stride` columns along row `y` — a repeated bunk, console,
+    or table run, à la a reference deck-plan's row of identical cabins/consoles. Each
+    point is independent (unlike the atomic shapes above): a hazard already sitting on
+    one slot just skips that slot rather than cancelling the whole row."""
+    for x in range(x0, x1, stride):
+        if (x, y) in floor and grid[y][x] == role:
+            grid[y][x] = kind
+
+
+def _place_grid(
+    grid: list[list[str]], floor: set[Vec], role: str,
+    x0: int, x1: int, y0: int, y1: int, stride_x: int, stride_y: int, kind: str,
+) -> None:
+    """A regular lattice of `kind` cells — a mess hall's grid of dining tables, not one
+    scattered per room. Same independent-point tolerance as `_place_row`."""
+    for y in range(y0, y1, stride_y):
+        _place_row(grid, floor, role, x0, x1, y, stride_x, kind)
+
+
 def _place_landmarks(grid: list[list[str]], rooms: list[_Room]) -> None:
-    """Stamp one recognisable centrepiece per amenity room instead of covering it in
-    dense per-cell texture — a fountain anchors a plaza, a counter a bar, two shelf
-    runs a store (the "too busy" interview note: fewer, larger objects read as a real
-    place where a wall of scattered glyphs did not). Each shape is composed of two
-    distinct feature names — a jet vs. a basin ring, a counter body vs. its end caps,
-    a shelf run vs. its end posts — rather than one glyph repeated across every cell,
-    so a landmark reads as a small drawn object instead of a solid colour block.
+    """Stamp recognisable, regularly-arranged furniture into each amenity room instead
+    of covering it in dense per-cell texture (interview notes: "too busy", then "still
+    looks chaotic" once texture alone was thinned) — a fountain anchors a plaza, a
+    counter and a few tables a bar, shelf runs a store, a row of consoles engineering, a
+    row of bunks habitation, a grid of tables a promenade. Order comes from *regularity*
+    — a lattice at a fixed stride, like a real deck plan's repeated cabins and dining
+    tables — not merely from fewer objects. Every shape composed of two-plus distinct
+    feature names (a jet vs. a basin ring, a counter body vs. its end caps, a shelf run
+    vs. its end posts) so a landmark reads as a small drawn object, not a solid colour
+    block or, for the row/grid placements, a single repeated glyph.
 
     Purely geometric off each room's own rect/floor, so it draws no `rng` and is safe
-    to run last among the grid-mutating passes: it only claims cells still holding the
-    room's own unclaimed floor value, so a hazard, cover strut, or lift that got there
-    first is left alone, and a room too small for the shape silently gets no landmark
-    at all (matching `_defender_slots`'s own tolerance for a room with nothing to give).
-    A landmark is a plain `feature_grid` value like `lift` — cover/move_cost come from
-    its own `GwTerrain` entry, not the room it sits in — so it needs no special-casing
-    anywhere else (DTO projection, movement, the connectivity check) beyond that entry.
+    to run last among the grid-mutating passes: every placement only claims cells still
+    holding the room's own unclaimed floor value, so a hazard, cover strut, or lift that
+    got there first is left alone, and a room too small for a shape silently gets less
+    or none of it (matching `_defender_slots`'s own tolerance for a room with nothing to
+    give). A landmark is a plain `feature_grid` value like `lift` — cover/move_cost come
+    from its own `GwTerrain` entry, not the room it sits in — so it needs no special-
+    casing anywhere else (DTO projection, movement, the connectivity check) beyond that.
     """
     for room in rooms:
         floor = set(room.floor)
@@ -408,14 +434,23 @@ def _place_landmarks(grid: list[list[str]], rooms: list[_Room]) -> None:
                 grid[y][xs[0]] = grid[y][xs[-1]] = "bar_counter_end"
                 for x in xs[1:-1]:
                     grid[y][x] = "bar_counter"
+            _place_grid(grid, floor, "bar", r.x + 2, r.x + r.w - 2, r.y + 4, r.y + r.h - 2,
+                        5, 3, "table")
         elif room.role == "store":
             xs = list(range(r.x + 2, r.x + r.w - 2))
-            for row_y in (r.y + 2, r.y + r.h - 3):
+            for row_y in range(r.y + 2, r.y + r.h - 2, 3):
                 shape = [(x, row_y) for x in xs]
                 if len(shape) >= 3 and _landmark_fits(grid, floor, "store", shape):
                     grid[row_y][xs[0]] = grid[row_y][xs[-1]] = "shelf_end"
                     for x in xs[1:-1]:
                         grid[row_y][x] = "shelf"
+        elif room.role == "habitation":
+            _place_row(grid, floor, "habitation", r.x + 2, r.x + r.w - 2, r.cy, 3, "bed")
+        elif room.role == "engineering":
+            _place_row(grid, floor, "engineering", r.x + 2, r.x + r.w - 2, r.y + 2, 3, "console")
+        elif room.role == "promenade":
+            _place_grid(grid, floor, "promenade", r.x + 2, r.x + r.w - 2, r.y + 2, r.y + r.h - 2,
+                        5, 4, "table")
 
 
 def _deployment_zones(grid: list[list[str]], width: int, height: int) -> tuple[Vec, ...]:
