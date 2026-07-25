@@ -1644,6 +1644,85 @@ Pilot), `tests/test_groundwar_access.py` (gate-off/gate-on table). Full
 `-k groundwar` suite green, no regressions in the terrestrial assault path.
 Commit `ground: GW-WP16 Cloud City interior assaults` — **GW-M5 done.**
 
+### GW-WP17 — Cloud City survey tour + the interior render fix it exposed (M) — SHIPPED
+
+Two findings drove this WP, both surfaced while scoping a user request to visit an
+owned Cloud City rather than leave it permanently `OrbitalOnly`:
+
+- **A player-buildable citadel on a jovian was never excluded.** `citadels.open_build`
+  only checked colonist/equipment minimums, both of which a staged Cloud City can
+  satisfy (`cloud_city_size × berths` colonists, stores once staged) — so a player
+  could build/upgrade a citadel on their own gas giant, which has no ground to fortify.
+  Fixed by excluding every `is_cloud_city_world` planet in `citadels.open_build`
+  (raises `CitadelError`) and the `session.py` `can_build_citadel` projection
+  (`sovereign_by_you and not city_world`). A citadel level already standing on one
+  (bigbang NPC seeding on an alliance-owned jovian, or one inherited by conquering a
+  hostile station) is untouched — only the player's own *build* path is barred, so
+  WP16's command-core `citadel_gun` structure is unaffected.
+- **GW-WP15/16 shipped without live rendering.** `edge.art.interior.style_interior`
+  (wall-aware junction glyphs, door/lift landmarks) was complete but wired only into
+  the offline `interior_preview` harness. The live `GroundAssaultScreen` dispatched
+  every cell through `_ground_shared.feature_colors`/`feature_glyph`, keyed on
+  `(ptype, feature)` — `BIOME_BANDS["jovian"]` only has the pre-Cloud-City
+  `gas_thick`/`gas_thin` bands, and `FEATURES_REGISTRY` had no interior feature
+  entries at all, so a live Cloud City assault rendered every room/wall as a plain
+  `?`. `test_groundwar_cloud_city_assault_view.py` never caught it because it only
+  asserts DTO shape (`view.cities`, `is_citadel`), never glyph/color content —
+  confirmed empirically before reporting it, not assumed from reading code.
+
+Fix and feature landed together:
+
+- `edge/core/groundwar/interior.py` gained `WALL_LIKE_FEATURES` and
+  `wall_neighbor_mask()` — the pure 4-bit N/S/E/W junction-mask math extracted from
+  `edge.art.interior._wall_glyph` so a server can compute it once against the *full*
+  grid (a client holding only a cropped viewport can't always see a wall cell's true
+  neighbours at the viewport's edge). `edge/art/interior.py._wall_glyph` now calls it
+  instead of duplicating the math; `_WALL_GLYPHS` renamed public `WALL_GLYPHS` since
+  the live-screen resolver indexes it directly.
+- `AssaultCellDTO`/`GroundCellDTO` gain `wall_mask: int = 0`, populated in
+  `session.py` only for a `"bulkhead"` cell (0 elsewhere, harmless). `WIRE_VERSION`
+  37 (v36→v37; DTO shape changed, unlike WP16).
+- `_ground_shared.feature_colors`/`glyph_ramp`/`feature_glyph` check
+  `edge.art.interior`'s `FEATURE_COLORS`/`FEATURES_REGISTRY` before the biome tables
+  (the two feature-name sets are disjoint — validated by `GroundwarConfig` — so this
+  never shadows a planet texture); `bulkhead` resolves via `WALL_GLYPHS[wall_mask]`,
+  `security_door`/`lift` to their own fixed landmark glyph rather than randomized
+  texture. Both `GroundAssaultScreen` and the new tour screen consume the same path.
+- `ground_access` routes a friendly/owned, staged Cloud City to `Survey` (previously
+  permanently `OrbitalOnly`) — `settlements=False` (the whole station is already one
+  friendly place, no separate "town" structure), reason "a Cloud City — tour its halls
+  from the inside." A bare (unstaged) jovian and a below-friendly Cloud City are
+  unchanged.
+- `SurveyOperation.cloud_city_size` snapshots the station's size at descent —
+  mirroring the existing `planet_type` snapshot — since the interior layout is a pure
+  function of `(seed, cloud_city_size)` and a city that grows mid-tour must not
+  reshuffle rooms underfoot. `_begin_survey` (`rules.py`) sets it and picks the
+  default rest position from `groundwar.cloud_city` dimensions, not the (much larger)
+  planet expedition map, for a Cloud City.
+- `groundwar.survey.generate_survey` branches on `is_cloud_city_world` to
+  `_generate_cloud_city_survey`, which calls `generate_interior` directly and returns
+  a `SurveyMap` with `settlements=()`/`sites=()`/`blocked=frozenset()` (bulkhead
+  impassability already comes from `GwTerrain.move_cost`, validated for every
+  `INTERIOR_FEATURES` name — no core movement/pathing/LOS changes were needed, only
+  the terrain-grid source and the art). `eligible_surface_site_ids` now excludes every
+  Cloud City outright — a built station never surfaces a dig site regardless of what
+  big bang happened to roll for the underlying jovian type before it was staged.
+- `planet.py`'s ground panel and orbit-art tooltip read `p.cloud_city` to swap in
+  "Tour"/"Tour the city" copy over "Survey"/"Survey surface" — the reducer path
+  (`BeginSurvey` → `GroundExpeditionScreen`) is identical either way.
+
+Files: `edge/core/citadels.py`, `edge/core/planets.py`,
+`edge/core/groundwar/interior.py`, `edge/core/groundwar/access.py`,
+`edge/core/groundwar/models.py`, `edge/core/groundwar/survey.py`, `edge/core/rules.py`,
+`edge/core/dto.py`, `edge/art/interior.py`, `edge/tui/screens/_ground_shared.py`,
+`edge/tui/screens/ground_assault.py`, `edge/tui/screens/ground_expedition.py`,
+`edge/tui/screens/planet.py`, `edge/server/session.py`, `edge/server/wire.py`,
+`docs/DESIGN.md`.
+Tests: `tests/test_citadels.py` (Cloud City citadel-build rejection),
+`tests/test_groundwar_interior.py` (renamed `WALL_GLYPHS` import),
+`tests/test_wire.py` (regenerated golden fingerprint/envelopes for v37).
+Commit `ground: GW-WP17 Cloud City survey tour + interior render fix`.
+
 ## Verification matrix
 
 | Concern | Required evidence |

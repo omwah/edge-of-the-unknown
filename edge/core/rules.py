@@ -4135,16 +4135,23 @@ def _begin_survey(
     if config.groundwar is None:
         raise EconomyError("ground operations are not configured")
     exp = config.groundwar.expedition
+    city_world = is_cloud_city_world(planet.planet_type, config)
+    # A Cloud City's interior (GW-WP17) is scaled to `groundwar.cloud_city`, not the planet
+    # expedition map — the default rest position must fit whichever grid this world uses.
+    def_w, def_h = (
+        (config.groundwar.cloud_city.width, config.groundwar.cloud_city.height) if city_world
+        else (exp.width, exp.height))
     prior = player.ground_survey_progress.get(cmd.planet_id)
     seed = prior.map_seed if prior is not None and prior.map_seed else state.rng.getrandbits(63)
     operation_id = state.rng.getrandbits(63)
-    start_x = prior.last_x if prior is not None else exp.width // 2
-    start_y = prior.last_y if prior is not None else exp.height // 2
+    start_x = prior.last_x if prior is not None else def_w // 2
+    start_y = prior.last_y if prior is not None else def_h // 2
     hinted = prior.hinted_discovery_ids if prior is not None else frozenset()
     hinted_towns = prior.hinted_settlement_ids if prior is not None else frozenset()
     # Snapshot the sensor/detection window now (G7): only these surface sites are ever
     # placed on the map, so a hidden out-of-reach site leaks nothing — and a later descent
     # after a sensor upgrade widens the set (GW-WP05). Already-collected sites show `found`.
+    # Always empty for a Cloud City (GW-WP17) — a built station has no surface sites.
     visible = eligible_surface_site_ids(
         state, cmd.planet_id, ship.sensor_rating, player.detected, config)
     resolved = frozenset(
@@ -4156,6 +4163,7 @@ def _begin_survey(
         explorer_x=start_x, explorer_y=start_y, supplies=exp.supplies_start,
         hinted_discovery_ids=hinted, hinted_settlement_ids=hinted_towns,
         visible_discovery_ids=visible, resolved_discovery_ids=resolved,
+        cloud_city_size=planet.cloud_city_size if city_world else 0,
     )
     new_player = replace(player, ground_operation=operation)
     return ReduceResult(

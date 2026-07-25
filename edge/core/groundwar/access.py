@@ -17,8 +17,10 @@ planet query surface. Encodes the interview decisions:
   to survey.
 - **D9** a bare gas giant stays **orbital-only** always; a below-friendly Cloud City
   routes to `Assault` (station-interior tactical map, GW-WP15/16) once
-  `groundwar.cloud_city_assault_enabled` is on — friendly/owned Cloud Cities stay
-  orbital-only either way. The seam is explicit, never reusing terrestrial terrain.
+  `groundwar.cloud_city_assault_enabled` is on. A friendly/owned Cloud City routes to
+  `Survey` instead (GW-WP17) — the same interior layout, toured rather than assaulted,
+  with no dig sites (`settlements=False`, no separate "friendly town" structure since the
+  whole station already is one). The seam is explicit, never reusing terrestrial terrain.
 - **G13** a Core world can **never** enter assault — the sanctuary holds regardless of
   crafted commands or stale DTOs.
 
@@ -222,8 +224,10 @@ def ground_access(
                 blockers=assault_blockers(state, planet, config),
                 reason="a hostile Cloud City — assault once its orbital defences fall",
             )
-        return OrbitalOnly(
-            "a Cloud City is engaged from orbit until station-interior assault opens")
+        # GW-WP17: a friendly/owned Cloud City is walkable, not orbital-only — the same
+        # interior layout a hostile assault uses (edge.core.groundwar.interior), toured with
+        # no defenders and no dig sites (it's a built station, not an archaeology find).
+        return Survey(settlements=False, reason="a Cloud City — tour its halls from the inside")
     if not is_landable(planet.planet_type, config):
         return OrbitalOnly(
             f"a {pretty_planet_type(planet.planet_type).lower()} has no surface to land on")

@@ -103,6 +103,11 @@ class SurveyOperation:
     landed: bool = False
     outcome: str | None = None
     kind: Literal["survey"] = "survey"
+    # A Cloud City tour (GW-WP17) snapshots the station's size at descent, exactly like
+    # `planet_type` is snapshotted rather than read live — the interior layout is a function
+    # of `(seed, cloud_city_size)`, and regenerating against a station that grew mid-survey
+    # would shift every room underfoot. 0 for an ordinary planet survey (never consulted).
+    cloud_city_size: int = 0
 
 
 @dataclass(frozen=True, slots=True)

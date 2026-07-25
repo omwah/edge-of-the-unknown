@@ -21,12 +21,13 @@ import pytest
 from pydantic import ValidationError
 
 from edge.config import load_default_config
-from edge.art.interior import FEATURE_COLORS, FEATURES_REGISTRY, LEGEND, _WALL_GLYPHS, _wall_glyph
+from edge.art.interior import FEATURE_COLORS, FEATURES_REGISTRY, LEGEND, WALL_GLYPHS as _WALL_GLYPHS, _wall_glyph
 from edge.core.config import GwCloudCity
 from edge.core.groundwar.interior import (
     INTERIOR_FEATURES,
     InteriorGenerationError,
     generate_interior,
+    wall_neighbor_mask,
 )
 from edge.groundwar.interior_preview import CloudCityPreviewScreen
 from edge.tui.app import EdgeApp
@@ -192,6 +193,23 @@ def test_wall_glyph_selects_by_neighbor_mask() -> None:
     grid2 = [["corridor"] * 3 for _ in range(3)]
     grid2[1][1] = "bulkhead"
     assert _wall_glyph(grid2, 1, 1, 3, 3) == "■"
+
+
+def test_wall_neighbor_mask_agrees_with_wall_glyph_lookup() -> None:
+    """GW-WP17: the server-side mask (`wall_neighbor_mask`) and `_wall_glyph`'s own
+    junction lookup must derive from the same bits, or the live screen and the
+    offline preview would draw different glyphs for the same layout."""
+    grid = [["bulkhead"] * 3 for _ in range(3)]
+    assert wall_neighbor_mask(lambda x, y: grid[y][x], 1, 1, 3, 3) == 0b1111
+    assert _WALL_GLYPHS[wall_neighbor_mask(lambda x, y: grid[y][x], 1, 1, 3, 3)] == "┼"
+    grid2 = [["corridor"] * 3 for _ in range(3)]
+    grid2[1][1] = "bulkhead"
+    assert wall_neighbor_mask(lambda x, y: grid2[y][x], 1, 1, 3, 3) == 0
+    # security_door counts as wall-like for a neighbouring bulkhead's own junction read.
+    grid3 = [["bulkhead", "security_door"]]
+    assert wall_neighbor_mask(lambda x, y: grid3[y][x], 0, 0, 2, 1) & 0b0100  # east bit set
+    # The map edge reads as wall too, so a border cell caps instead of dangling open.
+    assert wall_neighbor_mask(lambda x, y: grid[y][x], 0, 0, 3, 3) == 0b1111
 
 
 def test_legend_covers_every_feature_family() -> None:

@@ -39,8 +39,12 @@ def pretty_planet_type(planet_type: str) -> str:
 def is_colonizable(planet_type: str, config: GameConfig) -> bool:
     """Whether a world of this type can be claimed and settled (§4.2).
 
-    Colonizable worlds are the only ones that hold colonists, colony stores, and
-    citadels — so this predicate also gates transfer/citadel/banking/invasion.
+    Ordinary colonizable worlds are the only *type-based* route to colonists, stores,
+    and a citadel — but a staged Cloud City (`is_cloud_city_world`) is a second,
+    orthogonal route to colonists/stores on an otherwise-uncolonizable jovian (see
+    `colonist_capacity`/`store_blocker`), and citadel eligibility is its own explicit
+    `is_cloud_city_world` exclusion in `citadels.open_build`, not this predicate. Do not
+    read this as gating transfer/banking/invasion — check the specific seam instead.
     """
     profile = config.planets.types.get(planet_type)
     return bool(profile and profile.colonizable)

@@ -31,6 +31,7 @@ reproduce the identical layout on every replay).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from random import Random
 
@@ -56,9 +57,42 @@ INTERIOR_FEATURES: tuple[str, ...] = (
     *_HAZARDS,
 )
 
+# Wall-like for the neighbor-mask junction reading only (a security_door reads as
+# continuous wall from an adjacent bulkhead's perspective — it gets its own fixed
+# glyph rather than a junction, see `edge.art.interior`). Distinct from
+# `_connectivity_ok`'s own `_passable` — that one treats `security_door` as
+# passable (a door is always eventually breachable), this one does not.
+WALL_LIKE_FEATURES: tuple[str, ...] = ("bulkhead", "security_door")
+
 _MIN_LEAF = 8  # a leaf below this on its split axis is never split further
 _ROOM_MARGIN = 1  # bulkhead ring left around every carved room
 _EDGE_MARGIN = 3  # deployment zones must be within this of the map border
+
+
+def wall_neighbor_mask(
+    feature_at: Callable[[int, int], str], x: int, y: int, width: int, height: int,
+) -> int:
+    """The 4-bit N/S/E/W mask of which orthogonal neighbours of `(x, y)` are
+    wall-like (GW-WP15/16 art seam), treating the map edge as wall too so a
+    border bulkhead caps cleanly instead of dangling open.
+
+    Pure and core-side so the server can compute it once against the *full* grid
+    (`edge.server.session`, `AssaultCellDTO`/`GroundCellDTO.wall_mask`) — a client
+    holding only a cropped viewport cannot always see a wall cell's true neighbours
+    at the viewport's edge. `edge.art.interior` turns the mask into a box-drawing
+    glyph; this module only ever hands out the structural fact.
+    """
+    def wall_like(nx: int, ny: int) -> bool:
+        if not (0 <= nx < width and 0 <= ny < height):
+            return True
+        return feature_at(nx, ny) in WALL_LIKE_FEATURES
+
+    return (
+        (1 if wall_like(x, y - 1) else 0)
+        | (2 if wall_like(x, y + 1) else 0)
+        | (4 if wall_like(x + 1, y) else 0)
+        | (8 if wall_like(x - 1, y) else 0)
+    )
 
 
 @dataclass(frozen=True, slots=True)

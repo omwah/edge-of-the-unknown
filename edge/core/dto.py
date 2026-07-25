@@ -84,6 +84,10 @@ class GroundCellDTO:
     settlement_id: int = 0
     found_contact_id: int = 0
     landing_site: bool = False  # the shuttle may set down here (pre-landing drop-zone paint)
+    # A Cloud City tour's wall-junction mask (GW-WP15/16 art, 0 elsewhere): computed
+    # server-side against the *full* interior grid (`wall_neighbor_mask`), never a cropped
+    # viewport, so the client's box-drawing glyph is correct even at the viewport's edge.
+    wall_mask: int = 0
 
 
 @dataclass(frozen=True)
@@ -192,6 +196,9 @@ class AssaultCellDTO:
     structure_kind: str = ""
     structure_hp: int = 0
     structure_hp_max: int = 0
+    # A Cloud City assault's wall-junction mask (GW-WP15/16 art, 0 elsewhere) — see
+    # `GroundCellDTO.wall_mask`.
+    wall_mask: int = 0
 
 
 @dataclass(frozen=True)

@@ -18,24 +18,26 @@ from __future__ import annotations
 import random
 
 from edge.art.terrain import resolve_feature_char
-from edge.core.groundwar.interior import InteriorLayout
+from edge.core.groundwar.interior import InteriorLayout, wall_neighbor_mask
 
 Cell = tuple[str, str, str]  # (char, fg, bg)
 
-_WALL_LIKE = ("bulkhead", "security_door")
-
 # Per-feature weighted glyph pools (texture only — no neighbor awareness), same
-# shape/convention as edge.art.terrain.FEATURES_REGISTRY.
+# shape/convention as edge.art.terrain.FEATURES_REGISTRY. Every glyph here must be
+# single-width per `rich.cells.cell_len` — a double-width pick (⚡/⌘-style symbols are
+# common offenders) desyncs the fixed per-cell grid one column per occurrence, which
+# then cascades through the rest of that row and misaligns whatever sits to its right
+# (the sidebar's own border, in the live screens).
 FEATURES_REGISTRY: dict[str, list[tuple[str, float]]] = {
     "corridor": [(" ", 6), (".", 1), ("·", 1)],
     "plaza": [(" ", 8), ("·", 1), ("˙", 1)],
     "habitation": [(" ", 5), ("≡", 1), ("⊟", 1)],
-    "engineering": [(" ", 4), ("╬", 1), ("⚌", 1), ("¤", 0.5)],
+    "engineering": [(" ", 4), ("╬", 1), ("╫", 1), ("¤", 0.5)],
     "command_core": [(" ", 6), ("◈", 1), ("✦", 0.3)],
     "cover_strut": [("◘", 1), ("▤", 1), (" ", 2)],
     "vacuum": [("░", 2), ("·", 1), (" ", 3)],
     "fire": [("▓", 1), ("≈", 1), (" ", 2)],
-    "electrical": [("⚡", 0.5), ("∴", 1), (" ", 4)],
+    "electrical": [("⌁", 0.5), ("∴", 1), (" ", 4)],
 }
 
 # (fg, bg) per floor feature name.
@@ -60,8 +62,10 @@ OBJECTIVE_GLYPH = "✪"
 OBJECTIVE_COLOR = ("bold gold3", "grey19")
 
 # The standard 16-case wall-junction table, indexed by a 4-bit mask
-# (N=1, S=2, E=4, W=8) of which orthogonal neighbours are themselves wall-like.
-_WALL_GLYPHS = (
+# (N=1, S=2, E=4, W=8) of which orthogonal neighbours are themselves wall-like
+# (`edge.core.groundwar.interior.wall_neighbor_mask`) — public so the live-screen
+# per-cell resolver (a server-computed mask, not a whole-layout pass) can index it too.
+WALL_GLYPHS = (
     "■", "╵", "╷", "│", "╶", "└", "┌", "├",
     "╴", "┘", "┐", "┤", "─", "┴", "┬", "┼",
 )
@@ -80,26 +84,16 @@ LEGEND: tuple[tuple[str, str, str, str], ...] = (
     (LIFT_GLYPH, "lift (teleport link)", *LIFT_COLOR),
     ("░", "vacuum hazard", *FEATURE_COLORS["vacuum"]),
     ("▓", "fire hazard", *FEATURE_COLORS["fire"]),
-    ("⚡", "electrical hazard", *FEATURE_COLORS["electrical"]),
+    ("⌁", "electrical hazard", *FEATURE_COLORS["electrical"]),
 )
 
 
 def _wall_glyph(grid: list[list[str]], x: int, y: int, width: int, height: int) -> str:
-    """The junction glyph for a wall-like cell, treating the map edge as wall too
-    (so bulkhead cells on the border cap cleanly instead of dangling open)."""
-
-    def wall_like(nx: int, ny: int) -> bool:
-        if not (0 <= nx < width and 0 <= ny < height):
-            return True
-        return grid[ny][nx] in _WALL_LIKE
-
-    mask = (
-        (1 if wall_like(x, y - 1) else 0)
-        | (2 if wall_like(x, y + 1) else 0)
-        | (4 if wall_like(x + 1, y) else 0)
-        | (8 if wall_like(x - 1, y) else 0)
-    )
-    return _WALL_GLYPHS[mask]
+    """The junction glyph for a wall-like cell (shares its mask math with the
+    live-screen per-cell resolver via `wall_neighbor_mask`, so a whole-layout bake
+    here and a server-computed mask there always agree)."""
+    mask = wall_neighbor_mask(lambda nx, ny: grid[ny][nx], x, y, width, height)
+    return WALL_GLYPHS[mask]
 
 
 def style_interior(rng: random.Random, layout: InteriorLayout) -> list[list[Cell]]:
