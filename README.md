@@ -158,3 +158,8 @@ scripts/      helper scripts (build the design PDF, clone references)
 The analyzed TradeWars clones aren't committed; recreate them locally with
 `scripts/clone_references.sh` to read alongside DESIGN.md. They carry assorted
 licenses, so they are inspiration, never code to copy.
+
+## License
+
+Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-or-later)
+— see [`LICENSE`](LICENSE).

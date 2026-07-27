@@ -3,6 +3,8 @@ name = "edge-of-the-unknown"
 version = "0.1.0"
 description = "Edge of the Unknown — an exploration-first descendant of TradeWars 2002"
 authors = [{name = "James McDuffie", email = "mcduffie@pitfall.org"}]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
 requires-python = ">= 3.12"
 dependencies = ["opensimplex>=0.4.5.1,<0.5", "tracery>=0.1.1"]
 
