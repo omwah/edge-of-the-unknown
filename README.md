@@ -22,12 +22,14 @@ forfeits its rivals'. The Federation merely governs the Core at the start;
 control of that home region can change hands through your deeds or the galaxy's
 own upheavals — and with it, whether the Core stays a safe harbor.
 
-Deterministic and seedable, test-covered, single-player first, with the data
-model laid out so multiplayer can follow later.
+Deterministic and seedable, test-covered — playable single-player or hosted for
+multiplayer, from the same core.
 
 ## Status
 
-**Phases 1–3 are complete and playable.**
+**All five design phases are complete and playable, including multiplayer** — the
+full roadmap in `docs/DESIGN.md` §14 has shipped, followed by two post-launch
+correction/depth arcs.
 
 - **Phase 1 (the walking skeleton).** Generate a universe, explore it under fog of
   war with turn costs, find profitable routes with the ship computer, trade on live
@@ -40,26 +42,65 @@ model laid out so multiplayer can follow later.
   colonization and derelict-starbase salvage; friendly alien species with config-driven,
   standing-keyed dialogue and tech barter; and the Computer suite (pair-trade finder,
   route planner, codex, alien dossier).
-- **Phase 3 (danger) — complete.** The frontier bites back. Selectable **universe
-  topologies** (`trunk` chokepoints vs. the new default `expansive` band-lattice) with
-  band-graded disposition so **hostiles populate the outer bands**, and **alliance home
-  clusters** near the Core separated by neutral lanes. A live **encounter system**
-  (interrupt roll, detection, greeting-vs-violence) and **firing-arc combat** with a
-  floored escape chance, localized engine-room damage, field-kit repair, escape pods,
-  and salvage. **Conversation depth** — per-visit sessions, situational facts, cross-visit
-  callbacks, per-instance phrasing, and live combat dialogue. **Signature mechanics** (the
-  morality judge, trojan gifts, brokers, and more) and the singular roaming **Entity**,
-  hunted by stale leads and a sensor-gated contact. **Joinable alliances** with admission
-  prices, rival fallout, and Core law keyed to the governor; inter-species relations and
-  reputation spillover; **starbase set-pieces** (assault, planetary defense, repair-and-claim);
-  sector **fighters, mines, beacons, and black-hole hazards**; goal-directed NPC movement,
-  **NPC merchants trading real goods**, and homeworld raids with legendary tech caches and
-  bounties.
+- **Phase 3 (danger).** The frontier bites back. Selectable **universe topologies**
+  (`trunk`, `expansive`, `planar`, `mesh`, `spiral`) with band-graded disposition so
+  **hostiles populate the outer bands**, and **alliance home clusters** near the Core
+  separated by neutral lanes. A live **encounter system** (interrupt roll, detection,
+  greeting-vs-violence) and **firing-arc combat** with a floored escape chance,
+  localized engine-room damage, field-kit repair, escape pods, and salvage.
+  **Conversation depth** — per-visit sessions, situational facts, cross-visit
+  callbacks, per-instance phrasing, and live combat dialogue. **Signature mechanics**
+  (the morality judge, trojan gifts, brokers, and more, now voiced for every carrier
+  species) and the singular roaming **Entity**, hunted by stale leads and a
+  sensor-gated contact. **Joinable alliances** with admission prices, rival fallout,
+  and Core law keyed to the governor; inter-species relations and reputation
+  spillover; **starbase set-pieces** (assault, planetary defense, repair-and-claim);
+  sector **fighters, mines, beacons, and black-hole hazards**; goal-directed NPC
+  movement, **NPC merchants trading real goods**, and homeworld raids with legendary
+  tech caches and bounties.
+- **Phase 5 (depth) — built before Phase 4 by design.** An **order-book economy**
+  with hard port purses replacing the old blind price drift; **dynamic governance of
+  Core Space** — a rival `covets_core` bloc can seize the Core (by the player's deeds
+  or NPC events), re-keying who is welcome there; **forward-base services** at
+  player-owned orbital starbases; **citadels and planetary siege combat**; contracts,
+  a tavern/noticeboard, an admin **sysop console**, and scripting hooks for
+  autonomous play.
+- **Phase 4 (multiplayer).** A versioned JSON-RPC-over-websockets wire, lobby and
+  accounts, broadcast to connected clients, **corporations with corp war**, full
+  attacker-driven **PvP**, and a browser-hosted client via `textual serve` — see
+  `docs/HOSTING.md` to run a dedicated server and connect remotely.
 
-Phases 4–5 (multiplayer, corporations, the order-book economy, dynamic Core governance)
-are designed in `docs/DESIGN.md` but not yet built. The per-phase work-package
-breakdowns live in `docs/PHASE1_PLAN.md`, `docs/PHASE2_PLAN.md`, and
-`docs/PHASE3_PLAN.md`.
+Two arcs followed the Phase 1–5/4 roadmap itself:
+
+- **Seams & gaps correction (WP70–WP77).** An audit found that core had shipped well
+  ahead of the TUI — whole systems (alliance membership, starbase assault/repair,
+  contracts, territory, corp war) had reducers and tests but no player-reachable
+  screen. The correction arc gave them entry points: in-sector **Engage** and a live
+  contact-screen attack choice, a **Territory** screen (fighters/mines/beacons/probes/
+  interdictor), a Computer **Alliances** tab, a real Stardock **Bank** tab, a
+  normalized keymap with a discoverable numbered action menu, destructive-action
+  confirmations, and a complete **Corp** screen (invites, wars, world transfer).
+- **Ground operations integration.** The abstract "descend and press a button"
+  surface exploration and one-roll planetary invasion were replaced by embodied,
+  tactical play adopted from the standalone `edge-groundwar` prototype: a surveyor
+  walking seeded terrain toward sensor contacts, and a powered-armor squad assaulting
+  a defended world — including **Cloud City**-style station-interior assaults —
+  reached in the live game from the Planet screen.
+- **Game-wide UI/UX overhaul (WP-UI01–23).** A full modernization of the Textual
+  frontend: a responsive shell down to 80×24, a shared `ComponentWorkbench` widget
+  reused by the ship engine room and starbase stations, unified action discovery
+  (command palette, help, numbered action menu), consistent feedback/focus/forms,
+  and a visual-regression snapshot matrix — while keeping the TW2002 ANSI identity,
+  hotkeys, and command feel intact.
+
+Two experimental, **not yet integrated** subsystems live alongside the game as
+standalone Textual apps for playtesting: `edge-spacebattle` (a positioning-driven
+fleet-combat mini-game, a candidate replacement for the current stats-based ship
+combat) and `edge-llm-bot` (an Ollama-piloted autonomous player, `docs/SCRIPTING.md`).
+
+The per-phase and per-arc work-package breakdowns live in `docs/PHASE1_PLAN.md`
+through `docs/PHASE3_PLAN.md`, `docs/PHASE5_4_PLAN.md`, `docs/SEAMS_PLAN.md`,
+`docs/GROUNDWAR_INTEGRATION_PLAN.md`, and `docs/UI_UX_OVERHAUL_PLAN.md`.
 
 ## Inspiration
 
@@ -86,7 +127,16 @@ From the main menu, press **N** for a new game, then explore: click a warp in
 the grid (or a neighbour in the sidebar) to move one hop, **W** to travel a known
 multi-hop route, **P** to dock at a port and trade (**T** trades the highlighted
 commodity; at a Stardock, **U** buys an upgrade), **C** for the ship computer
-(pair-trade finder), **M** for its galactic map, **G** for its event log.
+(pair-trade finder), **G** for its event log, and **.** at any time for a numbered
+menu of every action the current screen supports.
+
+To play with someone else, host a dedicated multiplayer server and connect a
+browser-served client to it (`docs/HOSTING.md`):
+
+```bash
+pixi run host          # edge-server: lobby + accounts over websocket JSON-RPC
+pixi run serve-remote   # a second terminal: browser client -> ws://localhost:8765
+```
 
 ## Development
 
@@ -117,32 +167,43 @@ Strict, downward-only layered dependencies (DESIGN §3):
 
 ```
 edge/core     pure rules engine — models, economy, movement, command→event
-              reducers. No I/O, no async, no Textual imports.
+              reducers (incl. edge/core/groundwar). No I/O, no async, no
+              Textual imports.
 edge/dialogue pure salience-scored alien dialogue (standing-keyed line pools,
               persona voice, recency ring). Imports core; below core.rules.
 edge/bigbang  deterministic universe generation (cluster + bridge + bands +
-              home clusters; selectable trunk / expansive topology).
+              home clusters; selectable trunk/expansive/planar/mesh/spiral
+              topology).
 edge/engine   the asyncio tick loop (turn reset / stock regen / interest / drift).
 edge/store    SQLite persistence behind a repository interface.
-edge/server   the in-process GameService; fog of war enforced at to_public().
-edge/tui      the Textual application — reads only the public DTOs.
+edge/server   the GameService — embedded in-process for single-player, or
+              exposed over a versioned JSON-RPC/websocket wire (edge/server/net.py)
+              for multiplayer; fog of war enforced at to_public() either way.
+edge/tui      the Textual application — reads only the public DTOs, whether
+              talking to a local or remote GameService.
 ```
 
 Two invariants make the whole thing trustworthy: **all randomness flows through a
 single seeded `random.Random`** owned by game state, so a game is fully
 reproducible from `(seed, command log)`; and **the TUI never reaches into core
-state** — it only sees the read-only projections the server emits.
+state** — it only sees the read-only projections the server emits, over the
+same DTO boundary whether the service is local or remote.
 
-`mypy --strict` and `ruff` run on every real layer; the Textual skeleton is the
-one exemption.
+`mypy --strict` and `ruff` run on every real layer (core, dialogue, bigbang,
+store, server, engine); the Textual `tui/` and the standalone/dev packages
+(`groundwar`, `spacebattle`, `bot`, `devtool`, `art`, `dialogue/authoring`) are
+exempt.
 
 ## Repository layout
 
 ```
-edge/         the game (the layers above)
-config/       default.yaml — all tunable game constants (economy, generation, ship)
+edge/         the game: core/bigbang/dialogue/engine/store/server/tui (above),
+              plus groundwar (tactical survey/assault app), spacebattle and bot
+              (experimental/dev Textual apps), devtool/art (dev tooling)
+config/       default.yaml — tunable game constants, plus per-system configs
+              (alien_roster/alien_dialogue, groundwar, spacebattle, names)
 tests/        pytest + hypothesis suites
-docs/         DESIGN.md (authoritative spec), UI_MOCKUPS.md, PHASE{1,2,3}_PLAN.md
+docs/         DESIGN.md (authoritative spec) and its companion plans/notes
 scripts/      helper scripts (build the design PDF, clone references)
 ```
 
@@ -151,9 +212,17 @@ scripts/      helper scripts (build the design PDF, clone references)
 - **`docs/DESIGN.md`** — the authoritative design document (data model, big bang,
   economy, combat, alien species, roadmap). Read it before any architectural
   change.
-- **`docs/UI_MOCKUPS.md`** — TUI wireframes and the region→widget mapping.
-- **`docs/PHASE1_PLAN.md`**, **`docs/PHASE2_PLAN.md`**, **`docs/PHASE3_PLAN.md`** — the
-  per-phase work-package breakdowns and status.
+- **`docs/UI_MOCKUPS.md`** — TUI wireframes, the region→widget mapping, and the
+  keymap conventions.
+- **`docs/PHASE1_PLAN.md`**, **`docs/PHASE2_PLAN.md`**, **`docs/PHASE3_PLAN.md`**,
+  **`docs/PHASE5_4_PLAN.md`** — the per-phase work-package breakdowns and status.
+- **`docs/SEAMS_PLAN.md`**, **`docs/GROUNDWAR_INTEGRATION_PLAN.md`**,
+  **`docs/UI_UX_OVERHAUL_PLAN.md`** — the post-roadmap correction and depth arcs
+  (surfacing shipped-but-hidden systems, ground operations, the full UI/UX pass).
+- **`docs/HOSTING.md`** — running a dedicated multiplayer server and connecting a
+  remote/browser client.
+- **`docs/SCRIPTING.md`** — the service protocol and the Ollama-piloted
+  `edge-llm-bot` autonomous player.
 
 The analyzed TradeWars clones aren't committed; recreate them locally with
 `scripts/clone_references.sh` to read alongside DESIGN.md. They carry assorted
