@@ -7,11 +7,13 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: COMPLETE — all of GW-WP01–16 shipped, GW-M1 through GW-M5 all
+> **Status: COMPLETE — all of GW-WP01–19 shipped, GW-M1 through GW-M5 all
 > closed (July 2026). `groundwar.cloud_city_assault_enabled` is on in the
-> production default. GW-WP13's balance tuning (garrison counts, defense
-> density, emplacement geometry for both terrestrial and Cloud City assaults)
-> remains the one deliberately deferred follow-up, flagged not silent.**
+> production default. Two deliberately deferred follow-ups remain, flagged not
+> silent: GW-WP13's/GW-WP16's balance tuning (garrison counts, defense density,
+> emplacement geometry for both terrestrial and Cloud City assaults), and the
+> protectorate/annexation TUI surface recorded under GW-WP12-FU1 — the rights
+> DESIGN §4.2 describes are implemented in core but never reach a player.**
 
 ## Context
 
@@ -1300,7 +1302,8 @@ touchdown points). Full suite green throughout, `pixi run lint` clean.
 
 **Known gaps, surfaced but deliberately deferred:**
 
-- **No shared terrain identity between survey and assault.** The expectation is that
+- ~~**No shared terrain identity between survey and assault.**~~ **Closed by GW-WP19**
+  (below). The original note read: The expectation is that
   returning to a world in survey mode after winning an assault there would show the
   same map with the battle's damage persisted. It doesn't: `GroundOperation`'s own
   DESIGN.md entry says static terrain "is regenerated from identity," and
@@ -1795,6 +1798,106 @@ no-crate-here), `tests/test_groundwar_expedition_view.py` (DTO projection + a
 Textual Pilot round-trip that caught the cache-key bug), `tests/test_codec.py`,
 `tests/test_wire.py` (regenerated goldens).
 Commit (pending, same boundary as GW-WP17 unless split at the user's request).
+
+### GW-WP19 — One world, one ground: shared survey/assault layout (XL) — SHIPPED
+
+Closes the first of the two **known gaps GW-WP12-FU1 recorded** ("No shared terrain
+identity between survey and assault", explicitly sized there as "its own work
+package"). The user's framing when reopening it: *after making a world a protectorate
+with a successful ground assault we can then survey the same world, which still
+includes the damage from the assault.*
+
+**The premise checked out; the payoff did not.** A protectorate world does route to
+`Survey` — `access._friendly` calls `corp.player_controls_planet`, which counts
+`protectorate_controller` — but what it showed you was a different planet. Three
+independent breaks, not one:
+
+1. **Different noise seed.** `generate_survey` passed its operation seed straight into
+   `generate_feature_grid`; `generate_assault_map` passed
+   `Random(f"{seed}|assault|…").randint(...)`. And the two operation seeds came from
+   different places: survey's was per-*player* per-world (`SurveyProgress.map_seed`),
+   assault's freshly drawn per operation. Nothing tied either to the planet.
+2. **Towns and cities were unrelated.** Survey scattered 18×9 `SurveySettlement`s from a
+   peaceable name pool; assault stamped walled `AssaultCity`s in per-city lanes from a
+   military pool. The place you fought over did not exist on the survey map.
+3. **Damage was not positional.** `Planet.ground_damage` was a per-kind `Counter`, and
+   `models.py` said why in as many words: *"Damage is aggregated by tactical structure
+   kind because each operation regenerates a fresh deterministic layout."* So a survey
+   had nothing to paint — and **a second assault on the same world also got a brand-new
+   battlefield**, a consistency hole wider than the survey mismatch that prompted the WP.
+
+**One piece of luck made the fix tractable:** `battlefield` and `expedition` were already
+both 220×56, so no cropping or rescaling was needed (the config comment calling expedition
+"smaller than the battlefield" was stale and is corrected). And `Game.seed` meant the
+shared identity could be **derived** rather than stored.
+
+**Implementation.** New pure `edge/core/groundwar/world.py` owns the one identity:
+`world_ground_seed(Game.seed, planet_id)` (derived — **no new hashed field** for the seam
+itself), `place_count`, `generate_world_ground` → a `WorldGround` of biome grid +
+one `PlaceStamp` per place (footprint, perimeter, gates, military/civilian building
+blocks, reserved emplacement slots). `survey.generate_survey` renders each stamp as a
+walkable town; `assault._stamp_city` fortifies the identical geometry, adding only hit
+points, turrets on the corner/mid-wall slots, and the live `citadel_level`'s
+emplacements. The generation-time terrain/passability helpers (`move_cost`,
+`passable_components`, `landing_in_component`, `footprint_passable_frac`) had been
+byte-identical private copies in both modules and are now one copy in `world.py`; the
+*battle-time* cost/cover functions stay separate on purpose (rubble mid-fight).
+
+- **`Planet.ground_rubble: tuple[GroundRubble, ...]` replaces `ground_damage`** —
+  positional, monotone, and the single truth (`world.rubble_counts` derives the aggregate
+  the counter used to store). `persistent_structure_hp` now zeroes *the structure that
+  stood there* instead of spending a per-kind count against "the lowest stable ids of
+  each kind". Rubble is walkable in both modes (`survey._cell_cost` checks it ahead of
+  the terrain class, since a station's `security_door`/`bulkhead` is impassable by
+  *feature*, not by `blocked`).
+- **`SurveyOperation.world_seed`/`places` and `AssaultOperation.world_seed`** snapshot the
+  identity at begin (mirroring `cloud_city_size`/`cities`), so a mid-operation change
+  cannot reshuffle the ground and the pure regeneration seams stay state-free.
+  `SurveyProgress.map_seed` is **retired**: generation identity was never one player's
+  memory of a place. Position, hints, and opened crates still persist per player (D5).
+- **Cloud Cities get the same treatment** (the user chose this): the tour and the
+  interior assault now generate from the same `world_seed`, so a station taken by force
+  is toured room for room as the one fought through, with blown doors showing as rubble.
+- **A projection bug fixed on the way**: `session.py` re-derived town gates from the town
+  box as "mid-edge on all four sides", which the shared layout makes wrong (top/bottom
+  mid cells are turret slots). `SurveyMap.gates` now carries them and the projection
+  reads it — the same class of guess GW-WP07-FU1 removed for settlement plazas.
+- **Cache-key discipline** (the GW-WP18 lesson): `_cached_survey_map_for`'s key gains
+  `world_seed`, `places`, and `ground_rubble`, or a wall levelled by an assault would keep
+  rendering intact for the life of the process.
+
+**Deliberate scope calls, recorded per the plan's change rule.**
+`assault_difficulty.hostility_mult`/`alliance_owned_mult`/`had_gun_mult` no longer size
+the battlefield. Each of them *changes* over a world's life — ownership and citadel level
+flip on conquest, and the inhabiting species vanishes if its people are wiped out — so
+each was a path by which a layout could re-roll, which is the bug being removed.
+`place_count` is now capacity × band only, and the three multipliers lower
+`surrender_threshold` instead (a hostile people, a bloc holding, or a world that built and
+lost a gun holds out to a lower Resolve). The species path was caught by asking what
+happens to a world whose last native dies, not by a test failure. `expedition.settlements_min`/
+`settlements_max` are **retired**: town count is `world.place_count`, and a separate knob
+could only ever have disagreed with the assault it must match. Place footprints adopt the
+assault's sizes (24×11, capital 30×14) and the lane layout, and the two name pools merge
+into one `PLACE_NAMES` — a place has one name whichever way you arrive.
+
+**Epoch:** `config_version` 14→15 (hashed `Planet`/operation shape + the two retired
+expedition fields), `WIRE_VERSION` 37→38 (`GroundCellDTO.rubble`).
+
+Files: `edge/core/groundwar/world.py` (new), `edge/core/groundwar/{survey,assault,
+settlement,models}.py`, `edge/core/{models,config,dto,rules}.py`,
+`edge/server/{session,wire}.py`, `edge/tui/screens/ground_expedition.py`,
+`config/{default,groundwar_default}.yaml`, `docs/DESIGN.md`.
+Tests: `tests/test_groundwar_world.py` (new, 10) — the two assertions that could not be
+written before (`test_survey_and_assault_of_one_world_share_terrain_and_places`,
+`test_surveying_a_conquered_world_shows_the_assaults_rubble`), plus derived-seed
+stability, generation determinism, an uninhabited world keeping its terrain without
+towns, the conquest-does-not-re-roll guard, the shared-grid config rejection, positional
+settlement, repeat-assault breach reuse, and two players getting one world. Existing
+suites updated for the new contract (`test_groundwar_{survey,survey_actions,settlement,
+cloud_city_assault_tactics}.py`) and the ground snapshots regenerated.
+
+**Still open** (unchanged by this WP): the second GW-WP12-FU1 known gap — protectorate/
+annexation has no TUI surface — plus GW-WP13's and GW-WP16's deferred balance tuning.
 
 ## Verification matrix
 

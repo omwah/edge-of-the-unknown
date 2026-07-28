@@ -87,6 +87,15 @@ The prototype establishes the tactical vocabulary we are retaining:
   interior map and art (GW-WP15) are a separate discrete generator, not a reuse
   of this terrain, and now feed a live Cloud City assault (GW-WP16).
 
+One thing production no longer inherits is the prototype's *separation* of the two
+maps. The POC generated an expedition's terrain and an assault's battlefield from
+independent seeds with unrelated towns and cities, which was harmless in a standalone demo
+where a world existed only for the length of one scenario. In the live game a world
+persists and can be both surveyed and assaulted, so GW-WP19 gave every planet **one**
+ground layout (`edge/core/groundwar/world.py`) that both modes read, and made battle
+damage positional so an expedition walks the ruins an assault left. See DESIGN.md §4.2
+*One world, one ground*.
+
 Production deliberately changes the prototype's surrounding economy and state:
 
 - real `Planet`/`Player`/`Ship` state replaces the setup menu, and one active
@@ -134,7 +143,7 @@ re-measure against `edge/bot/scripts/assaulter.py` for a current read.
 
 ## Productionization path
 
-`GROUNDWAR_INTEGRATION_PLAN.md` is the executable work plan (GW-WP01–16,
+`GROUNDWAR_INTEGRATION_PLAN.md` is the executable work plan (GW-WP01–19,
 GW-M1–M5 — all shipped). Its milestones moved configuration and terrain into
 the production dependency graph, added frozen replay models and ground access,
 shipped the survey loop, replaced fighter invasion with the recruit/suit

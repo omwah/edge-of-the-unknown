@@ -1861,8 +1861,11 @@ class GwExpedition(BaseModel):
     area_radius: int = Field(gt=0)  # the ship-sensor "general area" circle
     clue_radius: int = Field(ge=0)  # disturbed-ground clues lie within this of the true spot
     clue_count: int = Field(ge=0)
-    settlements_min: int = Field(ge=0)  # inhabited worlds only
-    settlements_max: int = Field(ge=0)
+    # How many towns an inhabited world has is *not* tuned here (GW-WP19): a world's
+    # built-up places are one shared layout, counted by `groundwar.world.place_count`
+    # off `assault_difficulty`, so a survey walks into exactly the settlements an
+    # assault would besiege. The retired `settlements_min`/`settlements_max` pair could
+    # only ever have disagreed with it.
     city_hint_radius: int = Field(ge=0)  # a settlement's hint shrinks one search circle to this
     scanner: tuple[GwScannerBand, ...]  # nearest-first, non-overlapping
     # Macro-turn economy (GW plan D4/D12): tactical actions cost only local supplies, but
@@ -1881,8 +1884,6 @@ class GwExpedition(BaseModel):
     def _check(self) -> GwExpedition:
         if self.sites_max < self.sites_min:
             raise ValueError("expedition sites_max must be ≥ sites_min")
-        if self.settlements_max < self.settlements_min:
-            raise ValueError("expedition settlements_max must be ≥ settlements_min")
         if not self.scanner:
             raise ValueError("expedition scanner must define at least one band")
         withins = [b.within for b in self.scanner]
@@ -2126,6 +2127,18 @@ class GroundwarConfig(BaseModel):
             raise ValueError(
                 "groundwar.terrain missing classes for Cloud City interior features: "
                 f"{', '.join(sorted(missing_interior))}"
+            )
+        # GW-WP19: one world, one ground. A survey and an assault of the same world
+        # share a single terrain grid and a single set of built-up places, so the two
+        # blocks must agree on its size — differing dimensions would make the shared
+        # identity impossible to express rather than merely mis-tuned.
+        if (self.expedition.width, self.expedition.height) != (
+                self.battlefield.width, self.battlefield.height):
+            raise ValueError(
+                "groundwar.expedition and groundwar.battlefield must share one grid size "
+                f"(expedition {self.expedition.width}x{self.expedition.height} vs "
+                f"battlefield {self.battlefield.width}x{self.battlefield.height}) — "
+                "survey and assault read one shared world layout (GW-WP19)"
             )
         return self
 

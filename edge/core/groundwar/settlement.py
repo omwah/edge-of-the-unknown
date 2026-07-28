@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 
 from edge.core import citadels
 from edge.core.config import GameConfig
-from edge.core.groundwar import assault, force
+from edge.core.groundwar import assault, force, world
 from edge.core.groundwar.models import AssaultOperation
 from edge.core.models import Ownership, Planet, Ship
 from edge.core.planets import scale_population
@@ -44,11 +44,17 @@ class AssaultSettlement:
     control: str
 
 
-def _destroyed(op: AssaultOperation, amap: assault.AssaultMap) -> Counter[str]:
-    return Counter(
-        structure.kind for structure in amap.structures
+def _destroyed(op: AssaultOperation, amap: assault.AssaultMap) -> dict[tuple[int, int], str]:
+    """Every levelled structure as `position -> kind` (GW-WP19).
+
+    Positional, because a world's ground layout is now one stable identity shared with
+    its survey map: what fell can be recorded where it stood, so the next assault
+    reopens the same breach and an expedition paints the same ruin.
+    """
+    return {
+        (structure.x, structure.y): structure.kind for structure in amap.structures
         if op.structure_hp.get(structure.id, structure.hp_max) <= 0
-    )
+    }
 
 
 def _surviving_defenders(op: AssaultOperation) -> tuple[int, int]:
@@ -93,11 +99,11 @@ def settle_assault(
             planet.garrison_infantry, planet.garrison_armor, 0, 0, 0, "none")
 
     amap = assault.assault_map_for_state(op, config)
-    destroyed = _destroyed(op, amap)
-    old_damage = Counter({str(k): int(v) for k, v in planet.ground_damage.items()})
-    persistent = old_damage | destroyed
-    new_civilian_structures = max(
-        0, destroyed["building_civilian"] - old_damage["building_civilian"])
+    # Damage folds in by position (GW-WP19): a wall already rubble when the platoon
+    # dropped stays one entry, and only *newly* levelled civilian blocks charge civilian
+    # harm — the pre-GW-WP19 per-kind counters could only approximate that with a max().
+    persistent, fresh = world.merged_rubble(planet, _destroyed(op, amap))
+    new_civilian_structures = fresh["building_civilian"]
     population_before = planet.colonists
     survival = max(
         0.0,
@@ -108,7 +114,7 @@ def settle_assault(
     battered = replace(
         planet,
         population=scale_population(planet.population, population_before, population_after),
-        ground_damage=dict(persistent),
+        ground_rubble=persistent,
         ground_resolve=max(0, min(config.groundwar.resolve.cap, op.resolve)),
         ground_last_assault_day=day,
     )

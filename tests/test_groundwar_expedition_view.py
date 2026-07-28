@@ -352,10 +352,15 @@ def test_town_gates_project_as_walkable_breaks_in_the_wall() -> None:
     view = _inhabited_view()
     assert view is not None
     gates = [cell for cell in view.cells if cell.gate]
-    # `_stamp_settlement` leaves one mid-edge gate per side of every town.
-    assert len(gates) == 4 * len(view.settlements)
+    # Two gates per town, on the vertical sides (GW-WP19): the shared world layout puts
+    # an assault's turret slots on the top/bottom mid-wall cells, so the pre-WP19
+    # "mid-edge on all four sides" projection guess was wrong on two of them. The
+    # projection now reads `SurveyMap.gates` instead of re-deriving from the town box.
+    assert len(gates) == 2 * len(view.settlements)
     # A gate the client paints as a doorway must actually be enterable.
     assert not any(cell.blocked for cell in gates)
+    towns = {town.settlement_id: town for town in view.settlements}
+    assert all(cell.settlement_id in towns for cell in gates)
 
 
 def test_settlement_projects_its_real_plaza_and_hint_offer() -> None:

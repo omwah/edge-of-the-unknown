@@ -39,9 +39,13 @@ def _disc(i: int, *, hidden: bool = False, rarity: RarityTier = RarityTier.RARE)
         planet_id=1, site_slot=i, hidden=hidden, name=f"Site {i}")
 
 
-def _survey(sites, *, seed: int = 7, inhabited: bool = True, resolved=frozenset()):
+def _survey(sites, *, seed: int = 7, inhabited: bool = True, resolved=frozenset(),
+            places: int = 2, rubble=None):
+    # `places` is the world's built-up count (GW-WP19) — supplied by the caller now that
+    # the layout belongs to the world and is shared with its assault map.
     return generate_survey(CFG, seed=seed, planet_type="terrestrial_warm",
-                           inhabited=inhabited, sites=sites, resolved_ids=resolved)
+                           inhabited=inhabited, sites=sites, resolved_ids=resolved,
+                           places=places, rubble=rubble)
 
 
 # --- pure generation ---------------------------------------------------------

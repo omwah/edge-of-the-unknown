@@ -230,6 +230,7 @@ from edge.core.groundwar import assault as gw_assault
 from edge.core.groundwar import force as gw_force
 from edge.core.groundwar import settlement as gw_settlement
 from edge.core.groundwar import survey as gw_survey
+from edge.core.groundwar import world as gw_world
 from edge.core.groundwar.force import GroundForceError
 from edge.core.groundwar.survey import eligible_surface_site_ids
 from edge.core.market import PortOrder
@@ -4130,10 +4131,10 @@ def _begin_survey(
 ) -> ReduceResult:
     """Open a surface-survey expedition (GW-WP03, GW plan D1/D4-D6).
 
-    Draws the world's survey seed on its first descent and reuses that saved generation
-    identity thereafter; the operation id is always drawn from `state.rng` (G3). Both
-    replay identically from the command log, while returning to a planet cannot redraw
-    its terrain or move known sites. Resumes the surveyor's saved position/hints for
+    The map identity is the world's own (`world.world_ground_seed`, GW-WP19), so no seed
+    is drawn or remembered for it; the operation seed and id are drawn from `state.rng`
+    (G3). Both replay identically from the command log, while returning to a planet
+    cannot redraw its terrain or move known sites. Resumes the surveyor's saved position/hints for
     this world (D5) and refills supplies to the configured start. `_require_no_encounter`
     doubles as the G9 guard: it rejects opening a survey while an encounter or another
     ground operation is already live.
@@ -4158,7 +4159,14 @@ def _begin_survey(
         (config.groundwar.cloud_city.width, config.groundwar.cloud_city.height) if city_world
         else (exp.width, exp.height))
     prior = player.ground_survey_progress.get(cmd.planet_id)
-    seed = prior.map_seed if prior is not None and prior.map_seed else state.rng.getrandbits(63)
+    # The layout is the *world's*, not this descent's and not this player's (GW-WP19):
+    # derived from `(Game.seed, planet_id)`, so terrain, towns, and site positions are
+    # identical for every player and every return trip — and identical to the battlefield
+    # a tactical assault of this world fights over. Snapshotted onto the operation so
+    # nothing can reshuffle the ground mid-expedition.
+    world_seed = gw_world.world_ground_seed(state.game.seed, cmd.planet_id)
+    places = gw_world.place_count(
+        planet, config, distance_band=state.sectors[planet.sector_id].distance_band)
     operation_id = state.rng.getrandbits(63)
     start_x = prior.last_x if prior is not None else def_w // 2
     start_y = prior.last_y if prior is not None else def_h // 2
@@ -4176,7 +4184,8 @@ def _begin_survey(
         if d.planet_id == cmd.planet_id and d.found_by == player_id and d.id in visible)
     operation = SurveyOperation(
         operation_id=operation_id, planet_id=cmd.planet_id, sector_id=ship.sector_id,
-        planet_type=planet.planet_type, seed=seed, started_day=state.game.day_number,
+        planet_type=planet.planet_type, seed=state.rng.getrandbits(63),
+        started_day=state.game.day_number, world_seed=world_seed, places=places,
         explorer_x=start_x, explorer_y=start_y, supplies=exp.supplies_start,
         hinted_discovery_ids=hinted, hinted_settlement_ids=hinted_towns,
         visible_discovery_ids=visible, resolved_discovery_ids=resolved,
@@ -4228,6 +4237,10 @@ def _begin_assault(
         planet_type=planet.planet_type, seed=seed, started_day=state.game.day_number,
         resolve=initial_resolve,
         retrieval_turn=config.groundwar.pressure.retrieval_turns,
+        # The battlefield is the world's shared layout (GW-WP19) — the same ground a
+        # survey of this world walks, and the same one a previous assault left its rubble
+        # on, which `persistent_structure_hp` now restores by position.
+        world_seed=gw_world.world_ground_seed(state.game.seed, planet.id),
         cities=difficulty.cities, citadel_level=difficulty.citadel_level,
         surrender_threshold=difficulty.surrender_threshold,
         reserved_infantry=planet.garrison_infantry, reserved_armor=planet.garrison_armor,
@@ -4235,7 +4248,8 @@ def _begin_assault(
     amap = gw_assault.assault_map_for_state(operation, config)
     operation = replace(
         operation,
-        structure_hp=gw_assault.persistent_structure_hp(amap, planet.ground_damage),
+        structure_hp=gw_assault.persistent_structure_hp(
+            amap, gw_world.rubble_at(planet)),
     )
     new_player = replace(player, ground_operation=operation)
     return ReduceResult(
@@ -4295,7 +4309,6 @@ def _extract_ground_operation(
             last_x=operation.explorer_x, last_y=operation.explorer_y,
             hinted_discovery_ids=operation.hinted_discovery_ids,
             hinted_settlement_ids=operation.hinted_settlement_ids,
-            map_seed=operation.seed,
             opened_crate_ids=operation.opened_crate_ids,
         )
         new_player = replace(

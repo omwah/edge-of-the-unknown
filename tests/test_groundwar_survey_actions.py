@@ -276,7 +276,10 @@ def test_position_and_hints_persist_while_trenches_and_supplies_reset() -> None:
     apply_result(st, reduce(st, 1, BeginSurvey(1), CFG))
     after = _op(st)
     after_map = gw.survey_map_for(st, after, CFG)
-    assert after.seed == before.seed                              # terrain identity persists
+    # Terrain identity persists — and since GW-WP19 it is the *world's* (`world_seed`),
+    # not this descent's, so it holds without being remembered per player at all.
+    assert after.world_seed == before.world_seed
+    assert after.places == before.places
     assert after_map.feature == before_map.feature
     assert [(s.discovery_id, s.x, s.y) for s in after_map.sites] == [
         (s.discovery_id, s.x, s.y) for s in before_map.sites

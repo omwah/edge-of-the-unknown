@@ -26,6 +26,7 @@ from edge.core.groundwar.models import (
 from edge.core.models import (
     AlienSpecies,
     Game,
+    GroundRubble,
     Ownership,
     Planet,
     Player,
@@ -260,7 +261,9 @@ def test_failed_assault_persists_defender_and_structure_damage_without_control_f
         planet, _ship(), op, player_id=1, corp_id=None, day=5, config=CFG)
     assert settled.control == "none"
     assert settled.planet.owner == Ownership("alliance", 4)
-    assert settled.planet.ground_damage["wall"] == 1
+    # GW-WP19: damage persists by position, so the record names the wall that fell.
+    assert (wall.x, wall.y, "wall") in [
+        (entry.x, entry.y, entry.kind) for entry in settled.planet.ground_rubble]
     assert settled.planet.ground_resolve == 35
     assert settled.planet.ground_last_assault_day == 5
 
@@ -282,7 +285,8 @@ def test_civilian_destruction_persists_population_loss_without_erasing_species()
     assert settled.civilian_structures_destroyed == 1
     assert settled.civilian_losses > 0
     assert set(settled.planet.population) == {"vesk"}
-    assert settled.planet.ground_damage["building_civilian"] == 1
+    assert [(entry.x, entry.y) for entry in settled.planet.ground_rubble] == [
+        (civilian.x, civilian.y)]
 
 
 def test_unaligned_surrender_creates_native_protectorate_and_permanent_grudge() -> None:
@@ -334,11 +338,12 @@ def test_protectorate_annexation_has_time_and_resolve_gates_then_merges_share() 
 
 
 def test_daily_resolve_recovery_is_once_per_day_and_rubble_does_not_heal() -> None:
+    rubble = (GroundRubble(10, 10, "wall"), GroundRubble(11, 10, "wall"))
     planet = replace(
-        _planet(), ground_resolve=20, ground_damage={"wall": 2}, ground_last_assault_day=5)
+        _planet(), ground_resolve=20, ground_rubble=rubble, ground_last_assault_day=5)
     recovered = assault.apply_ground_recovery(planet, CFG, 6)
     assert recovered.ground_resolve == 20 + GW.settlement.resolve_recovery_per_day
-    assert recovered.ground_damage == {"wall": 2}
+    assert recovered.ground_rubble == rubble
     assert assault.apply_ground_recovery(recovered, CFG, 6) == recovered
 
 

@@ -89,6 +89,11 @@ class GroundCellDTO:
     # viewport, so the client's box-drawing glyph is correct even at the viewport's edge.
     wall_mask: int = 0
     crate_id: int = 0  # GW-WP18: a salvage crate sits here (0 elsewhere)
+    # GW-WP19: the destroyed-structure kind a previous tactical assault left standing here
+    # as ruin (`""` for undamaged ground). Survey and assault now share one world layout,
+    # so a wall levelled in the assault is wreckage on the very cell the expedition walks —
+    # and a walkable one, since rubble is passable.
+    rubble: str = ""
 
 
 @dataclass(frozen=True)

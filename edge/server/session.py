@@ -921,12 +921,10 @@ def ground_operation_view(
                     if rings.get(cell) != "hinted":
                         rings[cell] = label
 
-    # The gated breaks `_stamp_settlement` leaves in each wall, re-derived from the frozen
-    # town box (mid-edge on all four sides) so the client can paint an enterable doorway.
-    gates: set[tuple[int, int]] = set()
-    for town in smap.settlements:
-        gates |= {(town.x0, town.cy), (town.x1, town.cy),
-                  (town.cx, town.y0), (town.cx, town.y1)}
+    # The walkable breaks in each town wall, taken from the map itself (GW-WP19) rather
+    # than re-derived from the town box — that guess assumed mid-edge on all four sides
+    # and the shared layout puts turret slots on the top/bottom mid cells.
+    gates = smap.gates
 
     # The drop zone is only meaningful (and only worth flooding the map for) while inbound.
     landing = ground_survey.landing_sites(smap, config) if not op.landed else frozenset()
@@ -971,6 +969,10 @@ def ground_operation_view(
                 landing_site=(x, y) in landing,
                 wall_mask=wall_mask,
                 crate_id=crate_at_cell.get((x, y), 0),
+                # Battle damage a previous assault left on this world (GW-WP19). Public,
+                # like every other piece of a place's static geometry: it is visible
+                # ground truth to anyone standing on the planet, not a fogged defence.
+                rubble=smap.rubble.get((x, y), ""),
             ))
 
     contacts = [
@@ -1205,10 +1207,15 @@ def _cached_survey_map_for(
         for discovery_id in sorted(op.visible_discovery_ids)
         if (disc := state.discoveries.get(discovery_id)) is not None
     )
+    # Every input `survey_map_for` reads must appear here. `ground_rubble` and `places`
+    # join the key in GW-WP19 for the reason GW-WP18's missing `opened_crate_ids` did: an
+    # omitted input silently freezes the rendered map, so a wall levelled by an assault
+    # would keep drawing intact for the rest of the process's life.
     key: tuple[object, ...] = (
-        id(config), state.game.seed, op.seed, op.planet_id, op.planet_type, inhabited,
-        discoveries, op.visible_discovery_ids, op.resolved_discovery_ids,
-        op.hinted_discovery_ids, op.cloud_city_size, op.opened_crate_ids,
+        id(config), state.game.seed, op.world_seed, op.seed, op.planet_id, op.planet_type,
+        inhabited, discoveries, op.visible_discovery_ids, op.resolved_discovery_ids,
+        op.hinted_discovery_ids, op.cloud_city_size, op.opened_crate_ids, op.places,
+        planet.ground_rubble if planet is not None else (),
     )
     cached = _SURVEY_MAP_CACHE.get(key)
     if cached is not None:

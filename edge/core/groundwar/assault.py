@@ -39,8 +39,8 @@ from typing import Literal
 from edge.core.combat import CombatError
 from edge.core.config import GameConfig, GroundwarConfig, GwEmplacement, GwSuit
 from edge.core.groundwar import interior as gw_interior
+from edge.core.groundwar import world as gw_world
 from edge.core.groundwar.models import AssaultGarrisonUnit, AssaultOperation, AssaultTrooper
-from edge.core.groundwar.terrain import generate_feature_grid
 from edge.core.models import AlienSpecies, Planet, UniverseState
 from edge.core.movement import MovementError
 from edge.core.planets import colonist_capacity, is_cloud_city_world
@@ -65,23 +65,20 @@ PASSIVE_STRUCTURE_KINDS: frozenset[StructureKind] = frozenset({
     "wall", "gate", "building_military", "building_civilian",
 })
 
-_CITY_NAMES = (
-    "Klendathu Down", "Port Joel", "Zegema Beach", "New Cyrene", "Uxmal",
-    "Fort Bannon", "Carr's Landing", "Hesperus", "Tango Urilla", "Sheol",
-)
+# City names moved to `groundwar.world.PLACE_NAMES` in GW-WP19 — a place carries one
+# name whether a platoon drops on it or a surveyor walks into it.
 
 # GW-WP16: a Cloud City assault has exactly one `AssaultCity` (the whole
 # station — interview decision: surrender is whole-station, not per-district),
-# named from this pool instead of `_CITY_NAMES`.
+# named from this pool instead of the shared place names.
 _STATION_NAMES = (
     "Aurora Spar", "Halcyon Reach", "Meridian Vault", "Thresher's Rest",
     "Windward Dock", "Lantern Spire", "Coriolis Bell", "Farview Anchor",
 )
 
-_STREET_FEATURE = "dust"  # what city ground plays as (move 1, no cover)
-_CAPITAL_SIZE = (30, 14)  # (w, h) — cosmetic footprint dims, not balance (ported from the POC)
-_CITY_SIZE = (24, 11)
-_BUILDING_MILITARY_FRAC = 0.3  # the POC's military/civilian building-block split
+# Street paving, footprint dimensions, and the military/civilian building split moved to
+# `groundwar.world` in GW-WP19: they describe the world's built-up places, which a survey
+# and an assault now share rather than each inventing.
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,45 +214,43 @@ def derive_difficulty(
     planet-type-agnostic (`colonist_capacity` already returns the
     cloud-city-appropriate `size × berths` figure, so every multiplier above
     already reads correctly for a station).
+
+    **GW-WP19**: the city *count* is no longer derived here — it is
+    `world.place_count`, part of the world's stable shared layout, because a survey of
+    the same world must walk into the same towns and a conquest must not re-roll them.
+    What remains here is what may legitimately vary with the world's live condition:
+    the citadel level, and how stubbornly it holds (`surrender_threshold`).
     """
     assert config.groundwar is not None
     cfg = config.groundwar.assault_difficulty
-    capacity = colonist_capacity(planet, config)
-    score = float(capacity)
-    if (species is not None and config.aliens is not None
-            and species.base_disposition < config.aliens.amity_threshold):
-        score *= cfg.hostility_mult
-    if planet.owner.kind == "alliance":
-        score *= cfg.alliance_owned_mult
-    score *= cfg.band_mult.get(distance_band, 1.0)
-    if config.citadels is not None and planet.citadel_level >= config.citadels.gun_min_level:
-        score *= cfg.had_gun_mult
     if is_cloud_city_world(planet.planet_type, config):
         cities = planet.cloud_city_size
     else:
-        cities = min(cfg.max_cities, cfg.min_cities + int(score // cfg.population_per_extra_city))
+        cities = gw_world.place_count(planet, config, distance_band=distance_band)
     citadel_level = min(planet.citadel_level, _CITADEL_MAX)
-    surrender_threshold = max(
-        1, cfg.surrender_threshold_base + citadel_level * cfg.surrender_threshold_per_citadel_level)
+    # `hostility_mult`/`alliance_owned_mult`/`had_gun_mult` shift how hard the world
+    # *fights*, not how large it is (GW-WP19): every one of them can change over a
+    # world's life — ownership and citadel level flip on conquest, and an inhabiting
+    # species vanishes if its people do — while the battlefield's size is now part of
+    # the world's stable shared layout (`world.place_count`), which none of those events
+    # may re-roll. A hostile people, a bloc holding, and a world that built and lost a
+    # gun therefore hold out to a lower Resolve instead.
+    resist = 1.0
+    if (species is not None and config.aliens is not None
+            and species.base_disposition < config.aliens.amity_threshold):
+        resist *= cfg.hostility_mult
+    if planet.owner.kind == "alliance":
+        resist *= cfg.alliance_owned_mult
+    if config.citadels is not None and planet.citadel_level >= config.citadels.gun_min_level:
+        resist *= cfg.had_gun_mult
+    surrender_threshold = max(1, round(
+        (cfg.surrender_threshold_base
+         + citadel_level * cfg.surrender_threshold_per_citadel_level) / resist))
     return AssaultDifficulty(
         cities=cities, citadel_level=citadel_level, surrender_threshold=surrender_threshold)
 
 
 # --- battlefield generation (ported from edge.groundwar.mapgen, GW-WP09) ------
-
-
-def _footprint_passable_frac(
-    feature: list[list[str]], config: GameConfig, x0: int, y0: int, w: int, h: int,
-) -> float:
-    assert config.groundwar is not None
-    total = passable = 0
-    for y in range(y0, y0 + h):
-        for x in range(x0, x0 + w):
-            total += 1
-            tc = config.groundwar.terrain.get(feature[y][x])
-            if tc is not None and tc.move_cost > 0:
-                passable += 1
-    return passable / max(1, total)
 
 
 def _add_structure(
@@ -270,173 +265,111 @@ def _add_structure(
 
 def _stamp_city(
     feature: list[list[str]], blocked: set[Vec], structures: list[AssaultStructure],
-    struct_at: dict[Vec, int], next_id: list[int], config: GameConfig, rng: Random,
-    city_id: int, name: str, x0: int, y0: int, w: int, h: int, *,
-    is_citadel: bool, citadel_level: int,
+    struct_at: dict[Vec, int], next_id: list[int], config: GameConfig,
+    stamp: gw_world.PlaceStamp, *, citadel_level: int,
 ) -> AssaultCity:
+    """Fortify one of the world's built-up places into a defended city (GW-WP19).
+
+    The *geometry* — footprint, perimeter, gates, building blocks and their
+    military/civilian split — comes from the shared `groundwar.world` stamp a survey
+    of this world walks as a town, so the two modes cannot disagree about where a
+    wall is. This function adds only what a defence contributes: hit points, turrets
+    substituted at the corner/mid-wall slots, and the interior emplacements the live
+    `citadel_level` pays for (an extra AA at 3, exactly one `citadel_gun` on the
+    capital at 2).
+    """
     assert config.groundwar is not None
     d = config.groundwar.defenses
-    city = AssaultCity(id=city_id, name=name, cx=x0 + w // 2, cy=y0 + h // 2,
-                       x0=x0, y0=y0, x1=x0 + w - 1, y1=y0 + h - 1,
-                       is_citadel=is_citadel, citadel_level=citadel_level)
-
-    # Pave the footprint: city ground plays as street regardless of what's under it.
-    for y in range(y0, y0 + h):
-        for x in range(x0, x0 + w):
-            feature[y][x] = _STREET_FEATURE
+    place = stamp.place
+    city = AssaultCity(id=place.id, name=place.name, cx=place.cx, cy=place.cy,
+                       x0=place.x0, y0=place.y0, x1=place.x1, y1=place.y1,
+                       is_citadel=place.capital, citadel_level=citadel_level)
+    gw_world.pave(feature, stamp)
 
     wall_mult = 2.0 if citadel_level >= 3 else 1.0
     wall_hp = round(d.wall.hp * wall_mult)
 
-    # Perimeter walls, with a gate at the middle of each vertical side.
-    gates = {(x0, y0 + h // 2), (x0 + w - 1, y0 + h // 2)}
-    corners = {(x0, y0), (x0 + w - 1, y0), (x0, y0 + h - 1), (x0 + w - 1, y0 + h - 1)}
-    mids = {(x0 + w // 2, y0), (x0 + w // 2, y0 + h - 1)}  # mid top/bottom wall
-    for x in range(x0, x0 + w):
-        for y in (y0, y0 + h - 1):
-            pos = (x, y)
-            if pos in corners:
-                _add_structure(structures, struct_at, next_id, "turret", *pos, city.id, d.turret.hp)
-            elif pos in mids and citadel_level >= 1:
-                _add_structure(structures, struct_at, next_id, "turret", *pos, city.id, d.turret.hp)
-            else:
-                _add_structure(structures, struct_at, next_id, "wall", *pos, city.id, wall_hp)
-            blocked.add(pos)
-    for y in range(y0 + 1, y0 + h - 1):
-        for x in (x0, x0 + w - 1):
-            pos = (x, y)
-            if pos in gates:
-                _add_structure(structures, struct_at, next_id, "gate", *pos, city.id, d.gate.hp)
-            else:
-                _add_structure(structures, struct_at, next_id, "wall", *pos, city.id, wall_hp)
-                blocked.add(pos)
+    corners = {(place.x0, place.y0), (place.x1, place.y0),
+               (place.x0, place.y1), (place.x1, place.y1)}
+    mids = {(place.cx, place.y0), (place.cx, place.y1)}  # mid top/bottom wall
+    for pos in stamp.perimeter:
+        if pos in corners or (pos in mids and citadel_level >= 1):
+            _add_structure(structures, struct_at, next_id, "turret", *pos, city.id, d.turret.hp)
+        else:
+            _add_structure(structures, struct_at, next_id, "wall", *pos, city.id, wall_hp)
+        blocked.add(pos)
+    for pos in stamp.gates:
+        _add_structure(structures, struct_at, next_id, "gate", *pos, city.id, d.gate.hp)
 
-    # Interior emplacements: AA battery, sensor tower (an extra AA on a level-3 citadel),
-    # and — only on the capital at citadel_level >= 2 — exactly one citadel_gun.
-    _add_structure(structures, struct_at, next_id, "aa", city.cx - w // 4, city.cy - 1, city.id, d.aa.hp)
-    _add_structure(structures, struct_at, next_id, "sensor", city.cx + w // 4, city.cy + 1, city.id, d.sensor.hp)
+    # Interior emplacements, on the slots the shared stamp reserves for them.
+    aa_slot, sensor_slot, aa2_slot, gun_slot = stamp.reserved
+    _add_structure(structures, struct_at, next_id, "aa", *aa_slot, city.id, d.aa.hp)
+    _add_structure(structures, struct_at, next_id, "sensor", *sensor_slot, city.id, d.sensor.hp)
     if citadel_level >= 3:
-        _add_structure(structures, struct_at, next_id, "aa", city.cx + w // 4, city.cy - 1, city.id, d.aa.hp)
-    if is_citadel and citadel_level >= 2:
-        _add_structure(structures, struct_at, next_id, "citadel_gun", city.cx, city.cy, city.id, d.citadel_gun.hp)
+        _add_structure(structures, struct_at, next_id, "aa", *aa2_slot, city.id, d.aa.hp)
+    if place.capital and citadel_level >= 2:
+        _add_structure(
+            structures, struct_at, next_id, "citadel_gun", *gun_slot, city.id, d.citadel_gun.hp)
 
-    # Building blocks on a street grid: rows every other line, 2-cell blocks with gaps.
-    for y in range(y0 + 2, y0 + h - 2, 2):
-        for bx in range(x0 + 3, x0 + w - 4, 4):
-            for x in (bx, bx + 1):
-                if (x, y) in struct_at or abs(x - city.cx) + abs(y - city.cy) <= 1:
-                    continue
-                military = rng.random() < _BUILDING_MILITARY_FRAC
-                kind: StructureKind = "building_military" if military else "building_civilian"
-                hp = d.building_military_hp if military else d.building_civilian_hp
-                _add_structure(structures, struct_at, next_id, kind, x, y, city.id, hp)
-                blocked.add((x, y))
+    blocks: tuple[tuple[StructureKind, int, tuple[Vec, ...]], ...] = (
+        ("building_military", d.building_military_hp, stamp.military),
+        ("building_civilian", d.building_civilian_hp, stamp.civilian),
+    )
+    for kind, hp, cells in blocks:
+        for x, y in cells:
+            _add_structure(structures, struct_at, next_id, kind, x, y, city.id, hp)
+            blocked.add((x, y))
     return city
 
 
-def _move_cost(feature: list[list[str]], blocked: set[Vec], config: GameConfig, x: int, y: int) -> int:
-    if (x, y) in blocked:
-        return 0
-    assert config.groundwar is not None
-    tc = config.groundwar.terrain.get(feature[y][x])
-    return tc.move_cost if tc else 1
-
-
-def _in_bounds(width: int, height: int, x: int, y: int) -> bool:
-    return 0 <= x < width and 0 <= y < height
-
-
-def _passable_components(
-    feature: list[list[str]], blocked: set[Vec], config: GameConfig, width: int, height: int
-) -> tuple[list[list[int]], dict[int, int]]:
-    """Label the 4-connected passable regions; return (labels, sizes) — ported from
-    `survey.py::_passable_components` (GW-WP09 decision #3: a new invariant the POC
-    never needed, since its troopers can jump)."""
-    labels = [[-1] * width for _ in range(height)]
-    sizes: dict[int, int] = {}
-    label = 0
-    for sy in range(height):
-        for sx in range(width):
-            if labels[sy][sx] != -1 or _move_cost(feature, blocked, config, sx, sy) <= 0:
-                continue
-            stack = [(sx, sy)]
-            labels[sy][sx] = label
-            n = 0
-            while stack:
-                x, y = stack.pop()
-                n += 1
-                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                    if (_in_bounds(width, height, nx, ny) and labels[ny][nx] == -1
-                            and _move_cost(feature, blocked, config, nx, ny) > 0):
-                        labels[ny][nx] = label
-                        stack.append((nx, ny))
-            sizes[label] = n
-            label += 1
-    return labels, sizes
-
-
-def _landing(labels: list[list[int]], comp: int, width: int, height: int) -> Vec:
-    """Land near the map's left-middle, but only inside the cities' component
-    (ported from `survey.py::_landing`)."""
-    mid = height // 2
-    for x in range(4, width):
-        for dy in range(mid):
-            for y in (mid - dy, mid + dy):
-                if 0 <= y < height and labels[y][x] == comp:
-                    return x, y
-    return 4, mid
+# Generation-time terrain/passability helpers live in `groundwar.world` since GW-WP19 —
+# `assault.py` and `survey.py` each carried a byte-identical private copy before the two
+# modes shared one layout. (The *battle-time* cost/cover functions further down stay
+# separate on purpose: a wall reduced to rubble mid-fight must become passable, which the
+# static generation-time view knows nothing about.)
+_move_cost = gw_world.move_cost
+_in_bounds = gw_world.in_bounds
+_passable_components = gw_world.passable_components
+_landing = gw_world.landing_in_component
 
 
 def generate_assault_map(
     config: GameConfig, *, seed: int, planet_type: str, cities: int, citadel_level: int,
 ) -> AssaultMap:
-    """Lay out a defended battlefield: terrain + `cities` walled cities, the last one
-    the citadel capital at `citadel_level` (pure, deterministic, GW-WP09/G5).
+    """Fortify the world's shared ground into a battlefield (pure, deterministic, G5).
 
-    Ports `edge.groundwar.mapgen.generate_battle`/`_stamp_city` near-verbatim (walls
-    with gates, corner turrets, mid-wall turrets at `citadel_level >= 1`, AA + sensor,
-    an extra AA + hardened walls at `citadel_level >= 3`, exactly one `citadel_gun` on
-    the capital at `citadel_level >= 2`, building blocks), with one addition the POC
-    never needed (its troopers can jump, so it never checked foot-reachability): after
-    every city is stamped, the largest 4-connected passable component is computed and
-    the landing point confined to it — never re-rolled, so the same seed always
-    produces the same map (determinism over retry, matching survey's own "confine,
-    don't redraw" contract, decision #3). Places **zero** garrison units (module
-    docstring).
+    `seed` is the **world's** layout identity (`world.world_ground_seed`), not this
+    operation's: since GW-WP19 the terrain grid and the footprints of the world's
+    `cities` built-up places come from `groundwar.world`, the same layout a survey of
+    this world walks, so taking a world and then surveying it shows the ground you
+    fought over — and a second assault reopens the same battlefield rather than a
+    freshly rolled one. This function adds the fortification: walls with gates, corner
+    turrets, mid-wall turrets at `citadel_level >= 1`, AA + sensor, an extra AA +
+    hardened walls at `citadel_level >= 3`, exactly one `citadel_gun` on the capital at
+    `citadel_level >= 2`, building blocks.
+
+    The POC never needed foot-reachability (its troopers can jump), so as in GW-WP09 the
+    largest 4-connected passable component is computed after fortification and the
+    landing point confined to it — never re-rolled, so the same seed always produces
+    the same map (determinism over retry, decision #3). Places **zero** garrison units
+    (module docstring).
     """
     assert config.groundwar is not None
-    width, height = config.groundwar.battlefield.width, config.groundwar.battlefield.height
-    rng = Random(f"{seed}|assault|{planet_type}|{cities}|{citadel_level}")
-    feature = generate_feature_grid(rng.randint(0, 2**31 - 1), planet_type, width, height)
+    ground = gw_world.generate_world_ground(
+        config, seed=seed, planet_type=planet_type, places=cities)
+    width, height = ground.width, ground.height
+    feature = [list(row) for row in ground.feature]
     blocked: set[Vec] = set()
     structures: list[AssaultStructure] = []
     struct_at: dict[Vec, int] = {}
     next_id = [1]
 
-    names = list(_CITY_NAMES)
-    rng.shuffle(names)
-    n = cities
-    built: list[AssaultCity] = []
-    for i in range(n):
-        is_citadel = i == n - 1
-        w, h = _CAPITAL_SIZE if is_citadel else _CITY_SIZE
-        lane_x0 = width * (i + 1) // (n + 1)
-        lane_x1 = width * (i + 2) // (n + 1) - w - 2
-        best: tuple[float, int, int] | None = None
-        for _ in range(24):
-            x0 = rng.randint(max(2, lane_x0), max(max(2, lane_x0), lane_x1))
-            y0 = rng.randint(3, height - h - 3)
-            frac = _footprint_passable_frac(feature, config, x0, y0, w, h)
-            if best is None or frac > best[0]:
-                best = (frac, x0, y0)
-            if frac >= 0.7:
-                break
-        assert best is not None
-        city = _stamp_city(
-            feature, blocked, structures, struct_at, next_id, config, rng,
-            len(built) + 1, names[i % len(names)], best[1], best[2], w, h,
-            is_citadel=is_citadel, citadel_level=citadel_level if is_citadel else 0)
-        built.append(city)
+    built = [
+        _stamp_city(
+            feature, blocked, structures, struct_at, next_id, config, stamp,
+            citadel_level=citadel_level if stamp.place.capital else 0)
+        for stamp in ground.stamps
+    ]
 
     labels, sizes = _passable_components(feature, blocked, config, width, height)
     comp = max(sizes, key=lambda k: sizes[k]) if sizes else 0
@@ -603,6 +536,10 @@ def assault_map_for(state: UniverseState, op: AssaultOperation, config: GameConf
 def assault_map_for_state(op: AssaultOperation, config: GameConfig) -> AssaultMap:
     """State-free battlefield regeneration for pure settlement/tests (G5).
 
+    Generates from `op.world_seed` — the world's shared layout identity, not the
+    operation's own seed (GW-WP19) — so the battlefield is the same ground a survey
+    of this world walks and a repeat assault fights.
+
     `AssaultOperation.cities` doubles as `cloud_city_size` for a Cloud City
     operation (GW-WP16 — `derive_difficulty` sets it that way instead of the
     population-derived city count), so the dispatch below is the one place
@@ -611,30 +548,30 @@ def assault_map_for_state(op: AssaultOperation, config: GameConfig) -> AssaultMa
     """
     if is_cloud_city_world(op.planet_type, config):
         return generate_cloud_city_assault_map(
-            config, seed=op.seed, cloud_city_size=op.cities, citadel_level=op.citadel_level)
+            config, seed=op.world_seed, cloud_city_size=op.cities,
+            citadel_level=op.citadel_level)
     return generate_assault_map(
-        config, seed=op.seed, planet_type=op.planet_type,
+        config, seed=op.world_seed, planet_type=op.planet_type,
         cities=op.cities, citadel_level=op.citadel_level)
 
 
 def persistent_structure_hp(
-    amap: AssaultMap, damage: Mapping[str, int],
+    amap: AssaultMap, rubble: Mapping[Vec, str],
 ) -> dict[int, int]:
-    """Project a world's aggregate destroyed defenses onto a regenerated map.
+    """Project a world's persisted battle damage onto a regenerated map (GW-WP19).
 
-    Operations intentionally do not persist a full terrain grid (G5), and a later
-    assault draws a new map seed. Persisting destruction by structure kind keeps the
-    strategic damage exact without pinning a stale tactical layout: the lowest stable
-    structure ids of each kind begin as rubble on the next map.
+    Operations still do not persist a terrain grid (G5) — but they no longer need to
+    guess *which* structures were lost. A world has one stable layout shared with its
+    survey map, so `Planet.ground_rubble` records damage by position and this simply
+    starts the structure standing there at zero: the breach a previous assault opened is
+    the breach the next one drops into. The pre-GW-WP19 version could only spend a
+    per-kind count against "the lowest stable structure ids of each kind", which moved
+    the damage around whenever the map was re-rolled.
     """
-    remaining = {str(kind): max(0, int(count)) for kind, count in damage.items()}
-    hp: dict[int, int] = {}
-    for structure in sorted(amap.structures, key=lambda item: item.id):
-        if remaining.get(structure.kind, 0) <= 0:
-            continue
-        hp[structure.id] = 0
-        remaining[structure.kind] -= 1
-    return hp
+    return {
+        structure.id: 0 for structure in amap.structures
+        if rubble.get((structure.x, structure.y)) is not None
+    }
 
 
 def _paint_radius(amap: AssaultMap, cx: int, cy: int, radius: int, target: set[Vec]) -> None:
