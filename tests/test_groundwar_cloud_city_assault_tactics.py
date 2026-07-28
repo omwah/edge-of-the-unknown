@@ -38,6 +38,9 @@ def _op(amap: ga.AssaultMap, *, reserved_infantry: int = 4, reserved_armor: int 
         retrieval_turn: int = 20, citadel_level: int = 2) -> AssaultOperation:
     return AssaultOperation(
         operation_id=1, planet_id=1, sector_id=1, planet_type="jovian", seed=7,
+        # GW-WP19: the map identity is the world's `world_seed`, so it must match the
+        # seed `_map` generated from or `settle_assault` regenerates a different station.
+        world_seed=7,
         started_day=1, resolve=GW.resolve.start, retrieval_turn=retrieval_turn,
         cities=3, citadel_level=citadel_level,
         surrender_threshold=GW.resolve.surrender_threshold,

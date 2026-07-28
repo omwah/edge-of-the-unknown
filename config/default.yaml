@@ -5,7 +5,7 @@
 # game constant lives here, not in code (CLAUDE.md). Omitted fields fall back to
 # the schema defaults; the values below are spelled out so the balance is legible.
 
-config_version: 14  # GW-M5: Cloud City station-interior assaults (GW-WP15-16)
+config_version: 15  # GW-WP19: one shared survey/assault world ground layout
 seed: 4             # universe seed for a new game; leave empty (seed:) for a random seed
 turns_per_day: 250  # TWINSTR.DOC default (§9)
 

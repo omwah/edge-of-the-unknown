@@ -12,7 +12,7 @@ from edge.core.config import GameConfig, SceneArtConfig
 def test_default_config_loads() -> None:
     cfg = load_default_config()
     assert isinstance(cfg, GameConfig)
-    assert cfg.config_version == 14  # GW-M5: Cloud City station-interior assaults
+    assert cfg.config_version == 15  # GW-WP19: one shared survey/assault world layout
     assert cfg.turns_per_day == 250
     assert cfg.seed == 4  # default.yaml pins a curated seed; empty ⇒ random at start
     assert cfg.bigbang.start_sector == "stardock"  # the player starts at the Stardock

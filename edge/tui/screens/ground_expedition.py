@@ -40,6 +40,7 @@ from edge.core.rules import (
 )
 from edge.core.surface_finds import FIND_KINDS, surface_find_kind
 from edge.groundwar.findart import generate_find_art
+from edge.groundwar.widgets import RUBBLE_ART
 from edge.server.client import GameClient
 from edge.tui.chrome import EdgeScreen
 from edge.tui.screens._ground_shared import (
@@ -212,6 +213,12 @@ class SurveyMapView(CroppedMapView):
             return "◌", "black on dark_goldenrod"
         if cell.clue:
             return "∴", "black on dark_goldenrod"
+        if cell.rubble:
+            # What a tactical assault levelled here, still lying where it fell (GW-WP19).
+            # Drawn ahead of `gate`/`blocked` because a ruined wall is walkable ground: the
+            # breach reads as a way through, not as masonry.
+            char, fg, bg = RUBBLE_ART
+            return char, f"{fg} on {bg}"
         if cell.gate:
             return "▒", "gold3 on grey30"
         if cell.blocked:

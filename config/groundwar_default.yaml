@@ -198,8 +198,10 @@ terrain:
   electrical:    {move_cost: 1, cover: 0.0,  blocks_los: false}
 
 # The peaceful branch (Expedition mode): a lone surveyor on a friendly world
-# chasing ship-sensor archaeology leads. Smaller map than the battlefield —
-# the pacing is walking and searching, not a platoon assault.
+# chasing ship-sensor archaeology leads. The pacing is walking and searching, not a
+# platoon assault — but the *ground* is the same ground: GW-WP19 makes survey and
+# assault share one terrain grid and one set of built-up places per world, so these
+# dimensions must match `battlefield` above (the config validator enforces it).
 expedition:
   width: 220
   height: 56
@@ -215,8 +217,6 @@ expedition:
   area_radius: 14           # the ship-sensor "general area" circle
   clue_radius: 3            # disturbed-ground clues lie within this of the true spot
   clue_count: 4
-  settlements_min: 2        # inhabited worlds only
-  settlements_max: 3
   city_hint_radius: 6       # a settlement's hint shrinks one search circle to this
   scanner:                  # handheld reading vs. distance to the nearest unfound site
     - {within: 8,  label: "SATURATED — it is close; look for disturbed ground"}

@@ -48,9 +48,6 @@ class ArtifactRecord:
 class SurveyProgress:
     """Per-player, per-world survey memory that outlives an expedition (GW plan D5).
 
-    `map_seed` is the per-player/per-world generation identity: the first descent
-    draws it from the authoritative game RNG and every later descent reuses it, so
-    returning to a planet cannot redraw its terrain or move known sites.
     `last_x`/`last_y` persist so a later descent resumes where the surveyor stood;
     `hinted_discovery_ids` persist so settlement hints keep narrowing the same
     sites. `hinted_settlement_ids` persists which towns have already given their one
@@ -60,13 +57,17 @@ class SurveyProgress:
     so this is its only record of having been opened. Trenches and supplies do **not**
     live here — they reset each descent and stay on the active operation. Hashed,
     because it changes future search information.
+
+    The per-player `map_seed` this once carried is gone (GW-WP19): a world's terrain
+    and site positions are now its *own* identity — derived from `(Game.seed,
+    planet_id)` by `world.world_ground_seed` and shared with the assault map — so
+    generation identity no longer belongs to one player's memory of the place.
     """
 
     last_x: int
     last_y: int
     hinted_discovery_ids: frozenset[int] = frozenset()
     hinted_settlement_ids: frozenset[int] = frozenset()
-    map_seed: int = 0
     opened_crate_ids: frozenset[int] = frozenset()
 
 
@@ -74,8 +75,9 @@ class SurveyProgress:
 class SurveyOperation:
     """A live surface-survey expedition (GW plan D4-D6) — hashed core state.
 
-    Set on `Player.ground_operation`. The immutable terrain and site layout
-    regenerate from `seed` + `planet_type` (G5), so only dynamic state lives here.
+    Set on `Player.ground_operation`. The immutable terrain, place, and site layout
+    regenerate from `world_seed` + `planet_type` + `places` (G5), so only dynamic
+    state lives here.
     `outcome` is `None` while live and set when the operation settles. Movement,
     docking, hailing, combat, and a second ground operation are all rejected while
     it is set (G9); the extract reducer clears it, persisting `explorer_*` and
@@ -88,11 +90,19 @@ class SurveyOperation:
     planet_id: int
     sector_id: int
     planet_type: str
-    seed: int  # drawn from state.rng in the begin reducer (G3)
+    seed: int  # this descent's own operation identity, drawn from state.rng (G3)
     started_day: int
     explorer_x: int
     explorer_y: int
     supplies: int
+    # The world's shared ground identity (GW-WP19), snapshotted at descent: the terrain
+    # grid, its built-up places, and every site position derive from this, and the assault
+    # map of the same world derives from the identical value — which is what makes a
+    # protectorate you took walkable as the world you fought over. Snapshotted rather than
+    # re-derived so nothing can reshuffle the ground mid-operation; `places` likewise
+    # freezes the built-up count (`world.place_count`) the same way assault freezes `cities`.
+    world_seed: int = 0
+    places: int = 0
     local_turn: int = 0
     visible_discovery_ids: frozenset[int] = frozenset()
     resolved_discovery_ids: frozenset[int] = frozenset()
@@ -186,10 +196,15 @@ class AssaultOperation:
     planet_id: int
     sector_id: int
     planet_type: str
-    seed: int  # drawn from state.rng in the begin reducer (G3)
+    seed: int  # this operation's own identity (unit placement), drawn from state.rng (G3)
     started_day: int
     resolve: int
     retrieval_turn: int
+    # The world's shared ground identity (GW-WP19) — the same value a survey of this world
+    # snapshots, so terrain and the walls/gates/buildings of every city are cell-for-cell
+    # what a later expedition walks. Repeat assaults on one world therefore fight the same
+    # battlefield, with the previous assault's rubble (`Planet.ground_rubble`) still down.
+    world_seed: int = 0
     local_turn: int = 0
     casualties: int = 0
     cities: int = 0  # snapshotted city count fed to generate_assault_map at begin (GW-WP09)

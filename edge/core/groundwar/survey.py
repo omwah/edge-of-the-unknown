@@ -19,23 +19,29 @@ Two invariants shape the design:
   newly resolvable site **without moving** the ones already known (the upgrade-and-return
   property).
 
-Pure `edge.core`: imports the terrain seam and stdlib only — no `edge.art`, no Textual,
-no RNG owned by anyone but the local `Random` seeded from the operation seed here.
+Since GW-WP19 the terrain and the built-up places are **not** this module's to invent:
+both come from `groundwar.world`, the one layout a world has, shared with the tactical
+assault map. A town a surveyor walks into is the same footprint, with the same walls,
+gates, and buildings, that an assault of that world besieges — and `Planet.ground_rubble`
+lets this generator paint the ruins a previous assault left, with breached walls walkable.
+
+Pure `edge.core`: imports the world/terrain seams and stdlib only — no `edge.art`, no
+Textual, no RNG owned by anyone but the local `Random` seeded from the layout seed here.
 """
 
 from __future__ import annotations
 
 import heapq
 import math
-from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from random import Random
 
 from edge.core.config import GameConfig
 from edge.core.discovery import is_detectable, sector_has_nebula
+from edge.core.groundwar import world as gw_world
 from edge.core.groundwar.interior import generate_interior
 from edge.core.groundwar.models import SurveyOperation
-from edge.core.groundwar.terrain import generate_feature_grid
 from edge.core.models import Discovery, UniverseState
 from edge.core.movement import MovementError
 from edge.core.planets import is_cloud_city_world
@@ -47,11 +53,9 @@ _EDGE_MARGIN = 6
 _SETTLEMENT_KEEPOUT = 8  # sites never spawn this close to a settlement footprint
 _LANDING_KEEPOUT = 22    # ... nor this close to the shuttle's left-middle landing zone
 
-# A closed, seeded pool of peaceable town names (ported from the POC, order-stable).
-SETTLEMENT_NAMES = (
-    "Wayrest", "Karsholm", "Lantern Flats", "Umber's Ford", "Tessene",
-    "Quiet Harbor", "Millbrace", "Old Anchorage",
-)
+# Town names moved to `groundwar.world.PLACE_NAMES` in GW-WP19: a place has one name
+# whether a surveyor walks into it or a platoon drops on it, so the peaceable pool that
+# lived here and the military pool that lived in `assault.py` are now one list.
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,11 +116,13 @@ class CrateSite:
 class SurveyMap:
     """The regenerated, non-hashed survey layout for one expedition (G5).
 
-    Reconstructed from the operation seed + the visible discoveries + config; safely
+    Reconstructed from the world layout seed + the visible discoveries + config; safely
     discardable and excluded from `state_hash`. `feature` is the gameplay terrain grid
     (feature names, glyph/colour styling stays in `edge.art`/`edge.tui`); `blocked` are
     the settlement masonry cells foot travel cannot cross. `crates` is always empty
-    outside a Cloud City tour.
+    outside a Cloud City tour. `rubble` (GW-WP19) is `position -> destroyed structure
+    kind` from `Planet.ground_rubble`: a wall or building an assault levelled here. A
+    rubble cell is *never* in `blocked` — a breach an assault opened stays walkable.
     """
 
     width: int
@@ -128,6 +134,11 @@ class SurveyMap:
     landing_x: int
     landing_y: int
     crates: tuple[CrateSite, ...] = ()
+    rubble: Mapping[Vec, str] = field(default_factory=dict)
+    # The walkable breaks in the towns' walls (GW-WP19). Carried rather than re-derived by
+    # the projection from the town box, which guessed mid-edge on all four sides and was
+    # wrong the moment the shared layout put turret slots on the top/bottom mid cells.
+    gates: frozenset[Vec] = frozenset()
 
     def site_by_discovery(self, discovery_id: int) -> SurveySite | None:
         return next((s for s in self.sites if s.discovery_id == discovery_id), None)
@@ -151,85 +162,43 @@ class SurveyMap:
 # --- terrain / passability (pure, ported from the POC into frozen inputs) -----
 
 
-def _move_cost(feature: list[list[str]], blocked: set[Vec],
-               config: GameConfig, x: int, y: int) -> int:
-    """Entry cost on foot; 0 == impassable (hard terrain or settlement masonry)."""
-    if (x, y) in blocked:
-        return 0
-    assert config.groundwar is not None
-    tc = config.groundwar.terrain.get(feature[y][x])
-    return tc.move_cost if tc else 1
-
-
-def _in_bounds(width: int, height: int, x: int, y: int) -> bool:
-    return 0 <= x < width and 0 <= y < height
+# Generation-time terrain/passability helpers live in `groundwar.world` since GW-WP19 —
+# `survey.py` and `assault.py` each carried a byte-identical private copy before the two
+# modes shared one layout, and a survey's walkability must be the assault's by construction.
+_move_cost = gw_world.move_cost
+_in_bounds = gw_world.in_bounds
+_passable_components = gw_world.passable_components
+_landing = gw_world.landing_in_component
 
 
 def _dist(ax: int, ay: int, bx: int, by: int) -> float:
     return math.hypot(ax - bx, ay - by)
 
 
-def _passable_components(
-    feature: list[list[str]], blocked: set[Vec], config: GameConfig, width: int, height: int
-) -> tuple[list[list[int]], dict[int, int]]:
-    """Label the 4-connected passable regions; return (labels, sizes).
-
-    Sites and the landing must share one region, or the survey is unwinnable — the
-    caller keeps the largest component and confines everything to it.
-    """
-    labels = [[-1] * width for _ in range(height)]
-    sizes: dict[int, int] = {}
-    label = 0
-    for sy in range(height):
-        for sx in range(width):
-            if labels[sy][sx] != -1 or _move_cost(feature, blocked, config, sx, sy) <= 0:
-                continue
-            stack = [(sx, sy)]
-            labels[sy][sx] = label
-            n = 0
-            while stack:
-                x, y = stack.pop()
-                n += 1
-                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                    if (_in_bounds(width, height, nx, ny) and labels[ny][nx] == -1
-                            and _move_cost(feature, blocked, config, nx, ny) > 0):
-                        labels[ny][nx] = label
-                        stack.append((nx, ny))
-            sizes[label] = n
-            label += 1
-    return labels, sizes
-
-
 def _stamp_settlement(
-    feature: list[list[str]], blocked: set[Vec], rng: Random, next_id: int, name: str,
-    x0: int, y0: int, w: int, h: int,
+    feature: list[list[str]], blocked: set[Vec], stamp: gw_world.PlaceStamp,
+    rubble: Mapping[Vec, str],
 ) -> SurveySettlement:
-    """A peaceable walled town: gated walls + homes carve masonry into `blocked`.
+    """Render one of the world's built-up places as a peaceable walkable town (GW-WP19).
+
+    The geometry is *not* invented here: `stamp` is the shared `groundwar.world`
+    description an assault of this world stamps its walls, gates, and buildings from,
+    so the town a surveyor walks into is the city an assault besieges. This function
+    only decides what that geometry means in peacetime — paving underfoot, masonry in
+    `blocked`, gates left open — and honours `rubble`: a levelled wall or building is
+    walkable ground, so a breach an assault opened is still a way in.
 
     Mutates `feature`/`blocked` in place (the caller owns them during generation) and
-    returns the frozen settlement. Glyph/colour art is *not* set here — that is the
-    TUI's job in GW-WP07; core owns only which cells are dust vs. impassable masonry.
+    returns the frozen settlement. Glyph/colour art stays in `edge.art`/`edge.tui`;
+    core owns only which cells are street vs. impassable masonry.
     """
-    s = SurveySettlement(id=next_id, name=name, cx=x0 + w // 2, cy=y0 + h // 2,
-                         x0=x0, y0=y0, x1=x0 + w - 1, y1=y0 + h - 1)
-    for y in range(y0, y0 + h):
-        for x in range(x0, x0 + w):
-            feature[y][x] = "dust"
-    gates = {(x0, s.cy), (x0 + w - 1, s.cy), (s.cx, y0), (s.cx, y0 + h - 1)}
-    for x in range(x0, x0 + w):
-        for y in (y0, y0 + h - 1):
-            if (x, y) not in gates:
-                blocked.add((x, y))
-    for y in range(y0 + 1, y0 + h - 1):
-        for x in (x0, x0 + w - 1):
-            if (x, y) not in gates:
-                blocked.add((x, y))
-    for y in range(y0 + 2, y0 + h - 2, 2):  # homes on a street grid
-        for bx in range(x0 + 3, x0 + w - 4, 4):
-            for x in (bx, bx + 1):
-                if abs(x - s.cx) + abs(y - s.cy) <= 2:
-                    continue  # keep the plaza open
-                blocked.add((x, y))
+    place = stamp.place
+    s = SurveySettlement(id=place.id, name=place.name, cx=place.cx, cy=place.cy,
+                         x0=place.x0, y0=place.y0, x1=place.x1, y1=place.y1)
+    gw_world.pave(feature, stamp)
+    for pos in stamp.perimeter + stamp.buildings:
+        if pos not in rubble:
+            blocked.add(pos)
     return s
 
 
@@ -303,17 +272,6 @@ def _build_site(
     )
 
 
-def _landing(labels: list[list[int]], comp: int, width: int, height: int) -> Vec:
-    """Land near the map's left-middle, but only inside the sites' component."""
-    mid = height // 2
-    for x in range(4, width):
-        for dy in range(mid):
-            for y in (mid - dy, mid + dy):
-                if 0 <= y < height and labels[y][x] == comp:
-                    return x, y
-    return 4, mid
-
-
 def eligible_surface_site_ids(
     state: UniverseState, planet_id: int, sensor_rating: int,
     detected: frozenset[int], config: GameConfig,
@@ -347,6 +305,7 @@ def eligible_surface_site_ids(
 def _generate_cloud_city_survey(
     config: GameConfig, *, seed: int, cloud_city_size: int,
     opened_crate_ids: frozenset[int] = frozenset(),
+    rubble: Mapping[Vec, str] | None = None,
 ) -> SurveyMap:
     """A friendly/owned Cloud City's tour map (GW-WP17): the same room/corridor interior a
     hostile assault uses (`edge.core.groundwar.interior`), with no dig sites or settlements —
@@ -355,6 +314,10 @@ def _generate_cloud_city_survey(
     (GW-WP18, `layout.crate_slots`), numbered in generation order (1-based, matching every
     other GroundCellDTO id-marker field — `found_contact_id` reserves 0 for "nothing here"
     the same way) so the id is stable across regenerations regardless of which have opened.
+
+    `seed` is the station's shared world identity (GW-WP19) — the same value a hostile
+    assault's interior generates from, so a station taken by force is toured room for room
+    as the one fought through, with `rubble` marking the doors and fittings that were blown.
     """
     assert config.groundwar is not None
     layout = generate_interior(seed, cloud_city_size, config.groundwar.cloud_city)
@@ -364,10 +327,14 @@ def _generate_cloud_city_survey(
         CrateSite(id=i, x=x, y=y, opened=i in opened_crate_ids)
         for i, (x, y) in enumerate(layout.crate_slots, 1)
     )
+    wrecked = {
+        pos: kind for pos, kind in (rubble or {}).items()
+        if _in_bounds(layout.width, layout.height, *pos)
+    }
     return SurveyMap(
         width=layout.width, height=layout.height, feature=layout.feature_grid,
         blocked=frozenset(), settlements=(), sites=(), landing_x=lx, landing_y=ly,
-        crates=crates,
+        crates=crates, rubble=wrecked,
     )
 
 
@@ -375,47 +342,41 @@ def generate_survey(
     config: GameConfig, *, seed: int, planet_type: str, inhabited: bool,
     sites: Sequence[Discovery], resolved_ids: frozenset[int] = frozenset(),
     hinted_ids: frozenset[int] = frozenset(), cloud_city_size: int = 0,
-    opened_crate_ids: frozenset[int] = frozenset(),
+    opened_crate_ids: frozenset[int] = frozenset(), places: int = 0,
+    rubble: Mapping[Vec, str] | None = None,
 ) -> SurveyMap:
     """Lay out a survey map for the given *visible* surface discoveries (pure, G5/G6/G7).
 
     `sites` are exactly the discoveries the sensor/detection snapshot resolved — nothing
-    hidden and out of reach is passed, so nothing leaks. Terrain and settlements draw from
-    the operation-seed RNG (stable per world); each site's position/circle/clues draw from
-    its own `{seed}|site|{id}` salt, so the layout of known sites is invariant to which
-    other sites are visible. `resolved_ids` marks already-collected sites `found`.
+    hidden and out of reach is passed, so nothing leaks. `seed` is the **world's** shared
+    ground identity (`world.world_ground_seed`, snapshotted on the operation), so the
+    terrain and the `places` built-up towns here are the same grid and the same footprints
+    a tactical assault of this world fights over (GW-WP19); each site's position/circle/
+    clues draw from its own `{seed}|site|{id}` salt, so the layout of known sites is
+    invariant to which other sites are visible. `resolved_ids` marks already-collected
+    sites `found`, and `rubble` paints what a previous assault levelled — a rubble cell is
+    walkable, so an assault's breach is still a way through a town wall.
+
+    Towns are stamped only when `inhabited`: an emptied world keeps its footprints in the
+    layout (they are the world's, not the population's) but shows no living settlement.
 
     A Cloud City (`cloud_city_size` snapshotted at descent, GW-WP17) skips all of that for
     the station-interior generator instead — see `_generate_cloud_city_survey`.
     """
+    rubble = rubble or {}
     if is_cloud_city_world(planet_type, config):
         return _generate_cloud_city_survey(
             config, seed=seed, cloud_city_size=cloud_city_size,
-            opened_crate_ids=opened_crate_ids)
+            opened_crate_ids=opened_crate_ids, rubble=rubble)
     assert config.groundwar is not None
-    exp = config.groundwar.expedition
-    width, height = exp.width, exp.height
-    rng = Random(f"{seed}|survey|{planet_type}|{int(inhabited)}")
-    feature = generate_feature_grid(seed, planet_type, width, height)
+    ground = gw_world.generate_world_ground(
+        config, seed=seed, planet_type=planet_type, places=places if inhabited else 0)
+    width, height = ground.width, ground.height
+    feature = [list(row) for row in ground.feature]
     blocked: set[Vec] = set()
-    settlements: list[SurveySettlement] = []
-    next_id = 1
-    if inhabited:
-        names = list(SETTLEMENT_NAMES)
-        rng.shuffle(names)
-        n = rng.randint(exp.settlements_min, exp.settlements_max)
-        for i in range(n):
-            w, h = 18, 9
-            for _ in range(40):
-                x0 = rng.randint(3, width - w - 3)
-                y0 = rng.randint(3, height - h - 3)
-                if not any(abs(x0 - st.x0) < w + 10 and abs(y0 - st.y0) < h + 6
-                           for st in settlements):
-                    settlements.append(
-                        _stamp_settlement(feature, blocked, rng, next_id,
-                                          names[i % len(names)], x0, y0, w, h))
-                    next_id += 1
-                    break
+    settlements = [
+        _stamp_settlement(feature, blocked, stamp, rubble) for stamp in ground.stamps
+    ]
     # Settlements shape passability, so components come after they are stamped.
     labels, sizes = _passable_components(feature, blocked, config, width, height)
     comp = max(sizes, key=lambda k: sizes[k]) if sizes else 0
@@ -431,36 +392,52 @@ def generate_survey(
                            hinted=disc.id in hinted_ids)
         placed.append(site)
     lx, ly = _landing(labels, comp, width, height)
+    in_bounds_rubble = {
+        pos: kind for pos, kind in rubble.items()
+        if _in_bounds(width, height, *pos)
+    }
     return SurveyMap(
         width=width, height=height,
         feature=tuple(tuple(row) for row in feature), blocked=frozenset(blocked),
         settlements=tuple(settlements), sites=tuple(placed), landing_x=lx, landing_y=ly,
+        rubble=in_bounds_rubble,
+        gates=frozenset(gate for stamp in ground.stamps for gate in stamp.gates),
     )
 
 
 def survey_map_for(state: UniverseState, op: SurveyOperation, config: GameConfig) -> SurveyMap:
     """Regenerate the live map for an active survey operation (G5) — the projection seam.
 
-    Turns the operation's stored seed + visible/resolved/hinted id sets back into positions;
-    the begin/dig/talk reducers and the DTO all read the same layout. `inhabited` (settlement
-    presence) is recomputed from the world's live population, so a survey of a peopled world
-    gets its towns.
+    Turns the operation's stored world identity + visible/resolved/hinted id sets back into
+    positions; the begin/dig/talk reducers and the DTO all read the same layout.
+    `inhabited` (settlement presence) is recomputed from the world's live population, so a
+    survey of a peopled world gets its towns, and `rubble` from the world's live
+    `ground_rubble`, so damage an assault did shows up the moment you walk it (GW-WP19).
     """
     sites = [state.discoveries[i] for i in sorted(op.visible_discovery_ids)
              if i in state.discoveries]
     planet = state.planets.get(op.planet_id)
     inhabited = planet is not None and bool(planet.population)
     return generate_survey(
-        config, seed=op.seed, planet_type=op.planet_type, inhabited=inhabited, sites=sites,
-        resolved_ids=op.resolved_discovery_ids, hinted_ids=op.hinted_discovery_ids,
-        cloud_city_size=op.cloud_city_size, opened_crate_ids=op.opened_crate_ids)
+        config, seed=op.world_seed, planet_type=op.planet_type, inhabited=inhabited,
+        sites=sites, resolved_ids=op.resolved_discovery_ids,
+        hinted_ids=op.hinted_discovery_ids, cloud_city_size=op.cloud_city_size,
+        opened_crate_ids=op.opened_crate_ids, places=op.places,
+        rubble=gw_world.rubble_at(planet) if planet is not None else {})
 
 
 # --- live queries (pure, projection- and reducer-shared) ---------------------
 
 
 def _cell_cost(smap: SurveyMap, config: GameConfig, x: int, y: int) -> int:
-    """Foot-entry cost on the live map; 0 == impassable. Reads the frozen `SurveyMap`."""
+    """Foot-entry cost on the live map; 0 == impassable. Reads the frozen `SurveyMap`.
+
+    Rubble is walkable ground (GW-WP19): a wall an assault breached or a station door it
+    blew stays open afterwards. Checked ahead of the terrain class because a station's
+    `security_door`/`bulkhead` cells are impassable by *feature*, not by `blocked`.
+    """
+    if (x, y) in smap.rubble:
+        return 1
     if (x, y) in smap.blocked:
         return 0
     assert config.groundwar is not None

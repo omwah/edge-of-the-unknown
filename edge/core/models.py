@@ -133,6 +133,23 @@ UNOWNED = Ownership("none")
 
 
 @dataclass(frozen=True, slots=True)
+class GroundRubble:
+    """One tactical structure destroyed on a world, left standing as ruin (GW-WP19).
+
+    Rides `Planet.ground_rubble`. Positional rather than counted: because a world's
+    ground layout is now one stable identity shared by survey and assault
+    (`core.groundwar.world`), the wall that fell can be named, so a later assault
+    starts it already breached and a survey of the world paints the wreckage where it
+    actually lies. `kind` is the tactical structure kind
+    (`wall`/`gate`/`turret`/`aa`/`sensor`/`citadel_gun`/`building_*`).
+    """
+
+    x: int
+    y: int
+    kind: str
+
+
+@dataclass(frozen=True, slots=True)
 class Planet:
     """A planet (DESIGN §4.2): a typed, ownable, producing world.
 
@@ -185,10 +202,13 @@ class Planet:
     protectorate_controller: Ownership = UNOWNED
     protectorate_since: int | None = None
     protectorate_stores: Mapping[Commodity, int] = field(default_factory=dict)
-    # Resolve/destroyed defenses survive extraction. Damage is aggregated by tactical
-    # structure kind because each operation regenerates a fresh deterministic layout.
+    # Resolve/destroyed defenses survive extraction. Damage is recorded by **position**
+    # (GW-WP19): a world now has one stable ground layout shared by survey and assault
+    # (`core.groundwar.world`), so a fallen wall can be named rather than merely counted.
+    # A later assault reopens exactly that breach and a survey of the world paints the
+    # ruin. `world.rubble_counts` derives the per-kind aggregate this replaced.
     ground_resolve: int | None = None
-    ground_damage: Mapping[str, int] = field(default_factory=dict)
+    ground_rubble: tuple[GroundRubble, ...] = ()
     ground_last_assault_day: int | None = None
     starbase_id: int | None = None  # WP4 orbital base
     # Asteroid belts only (§4.2, PT-52): the finite body of ore in the field. `ore_reserve` is

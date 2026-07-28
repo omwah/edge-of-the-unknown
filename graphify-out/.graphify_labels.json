@@ -248,5 +248,18 @@
   "246": "test_ground_render_glyph_widths.py",
   "247": "test_groundwar_cloud_city_assault_view.py",
   "248": "_load",
-  "249": ".__init__"
+  "249": ".__init__",
+  "250": "_seizure_world",
+  "251": "EngineRoomDTO",
+  "252": "test_groundwar_bots.py",
+  "253": "render_station_art",
+  "254": "LocalMapDTO",
+  "255": "LiveSysopService",
+  "256": "_entity_world",
+  "257": ".compose",
+  "258": "sprites.py",
+  "259": ".boarded_starbase_id",
+  "260": ".docked_port_sector_id",
+  "261": ".stardock_facilities_sector_id",
+  "262": "assault_turn_cost"
 }
