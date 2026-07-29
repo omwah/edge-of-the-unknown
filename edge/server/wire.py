@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 38  # GW-WP19: GroundCellDTO.rubble (shared survey/assault world layout)
+WIRE_VERSION = 39  # GW-WP20: PlanetDTO protectorate administration + annex-gate fields
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected

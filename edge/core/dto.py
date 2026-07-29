@@ -1265,6 +1265,25 @@ class PlanetDTO:
     reinforce_blocker: str = ""  # why reinforcement is barred, "" when allowed
     ship_recruits: int = 0  # recruits aboard, for the reinforce affordance
     ship_suits: list[tuple[str, int]] = field(default_factory=list)  # (suit_id, count) aboard
+    # Protectorate control (D2/D13/D14, GW-WP20). A surrendered *unaligned* inhabited world
+    # keeps `owner=none` and its native polity, recording the winner as its controller — so
+    # `protectorate` and sovereign ownership are mutually exclusive, never both. The rights
+    # D13 grants are administration, not property: the controller draws a configured share
+    # of production into a **separate ledger** (`protectorate_stores` — what a load actually
+    # draws from, unlike `stores`, which stays the inhabitants'), manages ground defense, and
+    # may later annex. `owned_by_you` above is already the broader "owns or controls" test.
+    protectorate: bool = False  # this world is under protectorate control (by anyone)
+    protectorate_yours: bool = False  # …and you are its controller
+    protectorate_days: int = 0  # days elapsed under that control (the D14 age gate's input)
+    protectorate_share_pct: int = 0  # controller's configured share of daily production
+    protectorate_stores: list[tuple[str, int]] = field(default_factory=list)  # your share ledger
+    # The D14 annexation gate, projected with the reducer's own words so a greyed button and
+    # a refusal never disagree. `ground_resolve`/`annex_resolve_threshold` show the progress
+    # the age gate cannot: Resolve recovers daily and is the half a player can watch.
+    ground_resolve: int = 0
+    annex_resolve_threshold: int = 0
+    can_annex: bool = False
+    annex_blocker: str = ""  # why annexation is barred, "" when allowed
 
 
 @dataclass(frozen=True)

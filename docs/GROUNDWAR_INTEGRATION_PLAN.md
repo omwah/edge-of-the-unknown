@@ -7,13 +7,13 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: COMPLETE — all of GW-WP01–19 shipped, GW-M1 through GW-M5 all
+> **Status: COMPLETE — all of GW-WP01–20 shipped, GW-M1 through GW-M5 all
 > closed (July 2026). `groundwar.cloud_city_assault_enabled` is on in the
-> production default. Two deliberately deferred follow-ups remain, flagged not
-> silent: GW-WP13's/GW-WP16's balance tuning (garrison counts, defense density,
-> emplacement geometry for both terrestrial and Cloud City assaults), and the
-> protectorate/annexation TUI surface recorded under GW-WP12-FU1 — the rights
-> DESIGN §4.2 describes are implemented in core but never reach a player.**
+> production default. GW-WP20 closed the protectorate/annexation TUI gap, so
+> one deliberately deferred follow-up remains, flagged not silent: GW-WP13's /
+> GW-WP16's balance tuning (garrison counts, defense density, emplacement
+> geometry for both terrestrial and Cloud City assaults), which needs a human
+> read of the bot seed-matrix runs rather than more harness.**
 
 ## Context
 
@@ -1313,7 +1313,8 @@ touchdown points). Full suite green throughout, `pixi run lint` clean.
   `AssaultOperation` that created it. Fixing this needs a shared world-terrain-
   identity model plus persisted structure/rubble state on `Planet` — sized like its
   own work package, not a same-session fix.
-- **Protectorate/annexation has no TUI surface.** `AnnexProtectorate` exists in
+- ~~**Protectorate/annexation has no TUI surface.**~~ **Closed by GW-WP20** (below).
+  The original note read: `AnnexProtectorate` exists in
   `edge/core/rules.py` (GW-WP11) and `session._owner_label` already renders
   `"protectorate (yours)"`/`"protectorate"` as plain text, but `PlanetDTO` carries no
   protectorate/garrison-share/annex-eligibility fields and no screen offers an Annex
@@ -1898,6 +1899,81 @@ cloud_city_assault_tactics}.py`) and the ground snapshots regenerated.
 
 **Still open** (unchanged by this WP): the second GW-WP12-FU1 known gap — protectorate/
 annexation has no TUI surface — plus GW-WP13's and GW-WP16's deferred balance tuning.
+*(The protectorate gap is closed by GW-WP20 below.)*
+
+### GW-WP20 — Protectorate administration and annexation UI (M) — SHIPPED
+
+Closes the **second** of the two known gaps GW-WP12-FU1 recorded: "the rights DESIGN.md
+§4.2 describes are implemented in core but never reach a player." Everything D13/D14
+grants had been in core since GW-WP11 — `AnnexProtectorate`, `annex_ready`'s two gates,
+`player_controls_planet` widening allocation/transfer/fighters/reinforce to a controller,
+`_planet_bank` deliberately *not* widened, and `planets.py`'s per-day share accrual into
+`Planet.protectorate_stores`. Nothing projected or offered any of it.
+
+**The gap was not only a missing button.** Two shipped screens were written under a
+sovereign-ownership assumption that a protectorate quietly violates, and both were
+already wrong before this WP added anything:
+
+1. **The transfer workbench offered cargo the reducer would refuse.** `_transfer_cargo`
+   and `_batch_transfer_cargo` branch on `corp.player_owns`: a *controller* loads from
+   `protectorate_stores`, not `planet.stores`. The workbench read `PlanetDTO.stores` for
+   both its readout and its stepper ceiling, so a world with 9,000 Fuel in native stores
+   and 30 in the controller's share offered a 60-unit load (holds-clamped) that the
+   reducer would cut to 30. Fixed by projecting the share and clamping to it, with the
+   row relabelled "your share"; unloading still credits the inhabitants either way.
+2. **The citadel panel offered banking on a protectorate.** Its gate is `owned_by_you`,
+   which is the broader owns-*or-controls* test, while `_planet_bank` uses
+   `_owned_planet_here` **without** `controlled=True` — D13 keeps the treasury with its
+   people. Deposit/Withdraw were reachable and could only ever refuse.
+
+**Implementation.** `PlanetDTO` gains ten fields — `protectorate` / `protectorate_yours` /
+`protectorate_days` / `protectorate_share_pct` / `protectorate_stores`, and the D14 gate as
+`ground_resolve` / `annex_resolve_threshold` / `can_annex` / `annex_blocker`. `planet_view`
+fills them from `gw_settlement.annex_ready` itself, so the greyed line and the refusal are
+one sentence rather than two paraphrases (the projection adds only the reducer's in-sector
+check, which `annex_ready` does not cover because it takes no ship). The share ledger
+projects **only to its controller** — an outsider sees `protectorate=True` and nothing of
+another player's books.
+
+`PlanetScreen` gains a Protectorate panel (age held, the share ledger, and a Resolve bar
+against the annex threshold — the half of the D14 gate a player can watch recover) and an
+`A` / `Annex — take ownership` action behind `ConfirmScreen`, listed in `ACTION_DANGER`
+beside genesis/reinforce since it dissolves a polity and carries the stronger species,
+grudge, spillover, and alignment consequences. `check_action` hides the key entirely on a
+world that is not your protectorate, but keeps it live when it is merely *barred*, so
+pressing it explains rather than doing nothing (the shipped `build_city` precedent). The
+stores table splits into "Their stores" / "Your share" columns on a protectorate, and the
+citadel line reads "their treasury".
+
+No hashed state or config changed — `config_version` stays 15. `WIRE_VERSION` 38→39 for
+the `PlanetDTO` shape, with the fingerprint and envelope goldens regenerated.
+
+Files: `edge/core/dto.py`, `edge/server/session.py`, `edge/server/wire.py`,
+`edge/tui/screens/planet.py`, `edge/tui/screens/transfer.py`, wire fixtures.
+Tests: `tests/test_groundwar_protectorate_ui.py` (new, 15) — control age/share
+projection, the no-leak case for another power's protectorate, both D14 blockers asserted
+**equal to the reducer's own `EconomyError` string**, annex merging the share into stores
+without minting or dropping (G8), the out-of-sector gate barred in both places, the panel
+at all three layout tiers, the greyed-with-reason case, the hidden-key case, the split
+stores table, banking hidden, and the workbench load drawing the share while the natives'
+9,000 stays untouched.
+
+Full suite: 3,270 passed, 80 snapshots, lint and strict mypy clean. **Two pre-existing
+failures**, both confirmed present on a clean stash *before* this WP and deliberately not
+chased (they are core/engine and chrome, outside a projection-and-screens WP):
+`tests/test_ui_snapshots.py::test_options_modal`, already recorded as pre-existing under
+GW-WP14; and — newly observed here, not previously recorded —
+`tests/test_groundwar_cloud_city_assault_tactics.py::test_settle_assault_extraction_leaves_ownership_untouched`,
+where the drop now leaves `AssaultOperation.outcome` already set (the op reaches
+`assault_end_turn` at `resolve=101`), so the next `assault_end_turn` raises "the assault
+has ended — extract to orbit" instead of running a defense phase. Worth a look as its own
+item: either the fixture's starting Resolve/retrieval clock drifted from the engine, or a
+Cloud City drop is ending the operation earlier than the terrestrial path it shares.
+
+**Still open after this WP:** GW-WP13's and GW-WP16's deferred balance tuning
+(garrison counts, defense density, emplacement geometry, victory/casualty rates), which
+the plan records as needing a human read of the bot seed-matrix runs rather than more
+harness — plus the two pre-existing failures above.
 
 ## Verification matrix
 
@@ -1950,7 +2026,7 @@ annexation has no TUI surface — plus GW-WP13's and GW-WP16's deferred balance 
 ## Definition of done
 
 - D1–D15 are resolved and recorded in both this plan and authoritative DESIGN.
-- GW-WP01–16 (with GW-WP09-PRE) acceptance tests pass.
+- GW-WP01–20 (with GW-WP09-PRE) acceptance tests pass.
 - A **generated** universe contains inhabited worlds that route to survey and to
   assault; neither path is reachable only through hand-built state.
 - `ruff`, strict `mypy` production layers, pytest/property tests, codec fixtures,

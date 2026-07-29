@@ -155,6 +155,7 @@ from edge.core.groundwar import force
 from edge.core.groundwar import interior as gw_interior
 from edge.core.groundwar.access import Assault, Survey, ground_access
 from edge.core.groundwar.models import AssaultOperation, SurveyOperation
+from edge.core.groundwar import settlement as gw_settlement
 from edge.core.groundwar import survey as ground_survey
 from edge.core.planets import (
     belt_mining_yield,
@@ -799,6 +800,38 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
     # The one ground-access contract projected (GW-WP04): the tagged mode + exact blocker,
     # recomputed here from the same pure seam the begin reducer enforces (H4 lockstep). The
     # blocker is the orbital-only/assault-disabled reason, or the first standing siege rung.
+    # Protectorate administration + the D14 annex gate (GW-WP20). `annex_ready` is the same
+    # pure seam `_annex_protectorate` recomputes, so the greyed action and the refusal share
+    # one sentence. The share ledger is projected only to its controller — an outsider learns
+    # nothing about what another player draws off this world.
+    protectorate = planet.protectorate_controller.is_owned
+    protectorate_yours = protectorate and corp.player_owns(
+        state, planet.protectorate_controller, player_id)
+    protectorate_days = 0
+    protectorate_share_pct = 0
+    protectorate_stores: list[tuple[str, int]] = []
+    annex_blocker_text = ""
+    can_annex = False
+    resolve = 0
+    annex_threshold = 0
+    if config.groundwar is not None:
+        resolve = (planet.ground_resolve if planet.ground_resolve is not None
+                   else config.groundwar.resolve.start)
+        annex_threshold = config.groundwar.settlement.annex_resolve_threshold
+    if protectorate_yours:
+        if planet.protectorate_since is not None:
+            protectorate_days = max(0, state.game.day_number - planet.protectorate_since)
+        if config.groundwar is not None:
+            protectorate_share_pct = round(
+                config.groundwar.settlement.protectorate_production_share * 100)
+        protectorate_stores = [
+            (_FULL[c], planet.protectorate_stores.get(c, 0)) for c in Commodity]
+        annex_blocker_text = gw_settlement.annex_ready(
+            planet, player_id, state.players[player_id].corp_id,
+            state.game.day_number, config) or ""
+        if not annex_blocker_text and planet.sector_id != ship.sector_id:
+            annex_blocker_text = "you must be in orbit to annex"  # the reducer's own gate
+        can_annex = not annex_blocker_text
     access = ground_access(state, state.players[player_id], planet, config)
     ground_mode = access.mode
     ground_settlements = isinstance(access, Survey) and access.settlements
@@ -848,6 +881,12 @@ def planet_view(state: UniverseState, player_id: int, planet_id: int, config: Ga
         garrison_allocation_pct=round(planet.garrison_allocation * 100),
         can_reinforce_garrison=can_reinforce, reinforce_blocker=reinforce_blocker_text,
         ship_recruits=ship.recruits, ship_suits=ship_suits,
+        protectorate=protectorate, protectorate_yours=protectorate_yours,
+        protectorate_days=protectorate_days,
+        protectorate_share_pct=protectorate_share_pct,
+        protectorate_stores=protectorate_stores,
+        ground_resolve=resolve, annex_resolve_threshold=annex_threshold,
+        can_annex=can_annex, annex_blocker=annex_blocker_text,
     )
 
 

@@ -78,12 +78,21 @@ class TransferWorkbenchScreen(ModalScreen[None]):
         aboard = {c: h.qty for c, h in zip(Commodity, ship.holds)}
         free_holds = max(0, ship.holds_total - ship.holds_used)
         stores = dict(p.stores)
+        # On a protectorate the load side draws the *controller's* share, not the colony's
+        # own stores (rules._transfer_cargo, D13/GW-WP20) — so the ledger this screen clamps
+        # and labels has to be that one, or a full-looking colony would offer cargo the
+        # reducer refuses. Unloading still credits the inhabitants' stores either way.
+        share = dict(p.protectorate_stores) if p.protectorate_yours else stores
+        source_word = "your share" if p.protectorate_yours else "stores"
         with VerticalScroll(id="panel"):
             yield Static(f"[b]Transfer · {p.name}[/]", id="title")
-            yield Static("[dim]Aboard ↔ colony stores. Steps of 10, or type an exact amount.[/]")
+            yield Static(
+                "[dim]Aboard ↔ their stores. You load from your production share; "
+                "anything you unload is theirs.[/]" if p.protectorate_yours else
+                "[dim]Aboard ↔ colony stores. Steps of 10, or type an exact amount.[/]")
             for c in Commodity:
                 label = c.value.replace("_", " ").title()  # matches session `_FULL`, the stores key
-                a, s = aboard.get(c, 0), stores.get(label, 0)
+                a, s = aboard.get(c, 0), share.get(label, 0)
                 # Mirror the reducer's clamp (rules._transfer_cargo) so a greyed button and a
                 # rejected command never disagree: loading stops at free holds *and* stores,
                 # unloading at what is aboard (colony stores are unbounded). The shared field
@@ -91,7 +100,8 @@ class TransferWorkbenchScreen(ModalScreen[None]):
                 load_cap = min(s, free_holds)
                 unload_cap = a
                 yield Horizontal(
-                    Static(f"[b]{label}[/]\n[dim]aboard {a:,} · stores {s:,}[/]", classes="row-head"),
+                    Static(f"[b]{label}[/]\n[dim]aboard {a:,} · {source_word} {s:,}[/]",
+                           classes="row-head"),
                     AmountStepper(c.value, step=_STEP, maximum=max(load_cap, unload_cap)),
                     Button("Load", id=f"load-{c.value}", classes="act", disabled=load_cap == 0),
                     Button("Unload", id=f"unload-{c.value}", classes="act", disabled=unload_cap == 0),
