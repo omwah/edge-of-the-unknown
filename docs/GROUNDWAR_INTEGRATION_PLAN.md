@@ -10,14 +10,13 @@
 > **Status: COMPLETE — all of GW-WP01–21 shipped, GW-M1 through GW-M5 all
 > closed (July 2026). `groundwar.cloud_city_assault_enabled` is on in the
 > production default. GW-WP20 closed the protectorate/annexation TUI gap and
-> GW-WP21 the terrain band-colour gap, so one deliberately deferred follow-up
-> remains, flagged not silent: GW-WP13's / GW-WP16's balance tuning (garrison
-> counts, defense density, emplacement geometry for both terrestrial and Cloud
-> City assaults), which needs a human read of the bot seed-matrix runs rather
-> than more harness. GW-WP21 also cleared the last two red tests, so **the suite
-> is fully green**; the one remaining deferred *polish* item is
-> `_CONTRAST_TRIGGER` (GW-WP07-FU1), measured under GW-WP21 and awaiting an
-> aesthetic verdict.**
+> GW-WP21 the terrain band-colour gap; GW-WP21-FU1 then settled
+> `_CONTRAST_TRIGGER` at 0.26 on a human read of the rendered comparison,
+> closing GW-WP07-FU1's last polish item. **The suite is fully green.** One
+> deliberately deferred follow-up remains, flagged not silent: GW-WP13's /
+> GW-WP16's balance tuning (garrison counts, defense density, emplacement
+> geometry for both terrestrial and Cloud City assaults), which needs a human
+> read of the bot seed-matrix runs rather than more harness.**
 
 ## Context
 
@@ -850,8 +849,9 @@ given feature name, so where a biome repeats one (`terrestrial_cold` ice, jovian
 asteroid_belt) the later band's colours are unreachable — fixing it needs a band index on
 `GroundCellDTO`.~~ **Closed by GW-WP21** (below), which also corrects this note on two
 counts: only `terrestrial_cold` was actually affected, and the fix is unique band names
-rather than a band index. And `_CONTRAST_TRIGGER` (0.20, `edge/art/terrain.py`) leaves
-mountain/dust/snow honestly dim at ~0.25; raising it is shared with the world-art screens.
+rather than a band index. ~~And `_CONTRAST_TRIGGER` (0.20, `edge/art/terrain.py`) leaves
+mountain/dust/snow honestly dim at ~0.25; raising it is shared with the world-art
+screens.~~ **Closed by GW-WP21-FU1** — the trigger is 0.26.
 
 ### GW-WP07-FU2 — Player-chosen survey drop site (M) — SHIPPED
 
@@ -2050,7 +2050,7 @@ added the option and touched no snapshot file. The modal is rendering its new op
 correctly, so the baseline is simply out of date — refreshed, and the whole snapshot
 matrix (72) is green.
 
-**Deliberately not taken here:** GW-WP07-FU1's other deferred gap, `_CONTRAST_TRIGGER`
+**Not taken here, deferred to a human:** GW-WP07-FU1's other gap, `_CONTRAST_TRIGGER`
 (0.20). Measured, and the note is accurate: six landable bands sit between 0.20 and 0.26 —
 `terrestrial_cold` ice, `terrestrial_cool` dust/snow/mountain, `terrestrial_warm` mountain,
 `terrestrial_hot` mountain — so a 0.26 trigger corrects exactly the cluster the note names
@@ -2059,7 +2059,8 @@ and nothing else. But the correction is not obviously an improvement: `readable_
 `bright_white` to `#666666` grey on white, which reads better and looks dirtier. Since
 `BIOME_COLORS` is shared with the orbital planet-art screens, the change restyles every
 world in the game. That is an aesthetic verdict for a human at a terminal, not a
-luminance-threshold argument, so it stays open with the measurements recorded.
+luminance-threshold argument, so it went to one with the measurements attached —
+see GW-WP21-FU1.
 
 Files: `edge/core/groundwar/terrain.py`, `edge/art/terrain.py`,
 `config/groundwar_default.yaml`.
@@ -2071,6 +2072,36 @@ and `glacier` still barred as a survey drop site;
 `tests/__snapshots__/test_ui_snapshots/test_options_modal.svg` (baseline refresh).
 
 **The whole suite is now green** — 3,289 passed, 80 snapshots, no known failures.
+
+### GW-WP21-FU1 — `_CONTRAST_TRIGGER` raised to 0.26 (S) — SHIPPED
+
+**Status:** shipped July 2026. Closes the last item GW-WP07-FU1 deferred, and the only one
+GW-WP21 left open.
+
+GW-WP21 measured the three candidates but declined to pick, because the choice is aesthetic
+and `BIOME_COLORS` is shared with the orbital planet-art screens — the threshold restyles
+every world in the game, not just the ground maps. The candidates were rendered to an image
+(all five landable biomes at 0.20 / 0.26 / 0.35, one noise seed and one glyph seed
+throughout, so the correction is the only variable) and read by a human, who chose 0.26 for
+every biome.
+
+**Confirmed against the rendering, not just the arithmetic.** The visible effect is
+narrower than the luminance table implies: on the pale biomes the corrected bands are
+sparse punctuation glyphs (`_ - * +`), so darkening their foreground moves very few pixels.
+The band that actually changes is mountain rock — `#777777` → `#909090` against its grey —
+which is also the one a player reads most, since relief drives every march decision. 0.35
+was rejected as buying almost nothing over 0.26 while reaching bands that were already fine.
+
+**Blast radius, measured rather than assumed.** Three expedition snapshots moved; diffing
+their `<text>` content shows **zero** character differences, and diffing their style blocks
+shows exactly **one** changed rule — the `#777777` → `#909090` above. Baselines refreshed.
+The rest of the 80-snapshot matrix is untouched, which is the evidence that the restyle
+stayed inside the terrain art.
+
+Files: `edge/art/terrain.py` (the constant, plus the rationale recorded at the constant so
+the next person to reach for it knows what it costs).
+Tests: `tests/__snapshots__/test_groundwar_expedition_view/*.svg` (3 baselines refreshed);
+full snapshot matrix and `tests/test_terrain_bands.py` re-run green.
 
 ## Verification matrix
 

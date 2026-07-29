@@ -105,8 +105,8 @@
     "semantic_hash": ""
   },
   "edge/art/terrain.py": {
-    "mtime": 1785287369.6060898,
-    "ast_hash": "6fbec6d35170040a822b3131743dad5b",
+    "mtime": 1785297611.819636,
+    "ast_hash": "3faaaee0bb473a3938334a67cdab6e57",
     "semantic_hash": ""
   },
   "edge/bigbang/__init__.py": {
@@ -1630,8 +1630,8 @@
     "semantic_hash": ""
   },
   "docs/GROUNDWAR_INTEGRATION_PLAN.md": {
-    "mtime": 1785287633.672293,
-    "ast_hash": "532cbe9106634486df844f7daf702b6d",
+    "mtime": 1785297819.330264,
+    "ast_hash": "a79c8f6b0f448224e7bf801cf360d993",
     "semantic_hash": ""
   },
   "docs/GROUNDWAR_POC.md": {

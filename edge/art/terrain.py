@@ -156,7 +156,15 @@ BIOMES_REGISTRY = {
 # nudges the foreground to a hue-preserving lighter/darker variant just past
 # `_CONTRAST_TARGET`. Enforcing the "fg must read against bg" convention in code
 # keeps every biome and roster legible without per-band colour tables.
-_CONTRAST_TRIGGER = 0.20  # correct a band only when its fg/bg gap is below this
+#
+# The trigger was 0.20 through GW-WP20, which left six landable bands sitting in the
+# 0.20-0.26 gap — legible enough to pass the threshold, still muddy to read. GW-WP21
+# measured the alternatives (0.20 / 0.26 / 0.35) side by side against the same noise
+# seed and settled on 0.26: it catches those six (mountain rock reads noticeably
+# harder against its grey) without 0.35's habit of restyling bands that were fine.
+# Raising it further is not free — `BIOME_COLORS` is shared with the orbital
+# planet-art screens, so every world in the game restyles with it.
+_CONTRAST_TRIGGER = 0.26  # correct a band only when its fg/bg gap is below this
 _CONTRAST_TARGET = 0.35   # push the adjusted fg at least this far from the bg
 
 
