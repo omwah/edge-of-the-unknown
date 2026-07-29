@@ -105,8 +105,8 @@
     "semantic_hash": ""
   },
   "edge/art/terrain.py": {
-    "mtime": 1784444889.7865,
-    "ast_hash": "0658ab0bf26a099085f3cc6dd8a5b37a",
+    "mtime": 1785287369.6060898,
+    "ast_hash": "6fbec6d35170040a822b3131743dad5b",
     "semantic_hash": ""
   },
   "edge/bigbang/__init__.py": {
@@ -380,8 +380,8 @@
     "semantic_hash": ""
   },
   "edge/core/groundwar/terrain.py": {
-    "mtime": 1784444307.7519705,
-    "ast_hash": "02e2a51c43f15099dcfebf490999434e",
+    "mtime": 1785287336.9847236,
+    "ast_hash": "12f045cccac5bf471e443786a9920665",
     "semantic_hash": ""
   },
   "edge/core/market.py": {
@@ -1585,8 +1585,8 @@
     "semantic_hash": ""
   },
   "config/groundwar_default.yaml": {
-    "mtime": 1785216055.9136496,
-    "ast_hash": "fe4046f00d6da67dae19326d2fff6e86",
+    "mtime": 1785287361.1009936,
+    "ast_hash": "917d51638a73e6d29e38815de101e667",
     "semantic_hash": ""
   },
   "config/names_default.yaml": {
@@ -1630,8 +1630,8 @@
     "semantic_hash": ""
   },
   "docs/GROUNDWAR_INTEGRATION_PLAN.md": {
-    "mtime": 1785280533.773609,
-    "ast_hash": "cd95e02242a30fa70ef7df49e95964f3",
+    "mtime": 1785287633.672293,
+    "ast_hash": "532cbe9106634486df844f7daf702b6d",
     "semantic_hash": ""
   },
   "docs/GROUNDWAR_POC.md": {
@@ -3790,8 +3790,8 @@
     "semantic_hash": ""
   },
   "tests/test_groundwar_cloud_city_assault_tactics.py": {
-    "mtime": 1785217087.030163,
-    "ast_hash": "24574685ef2a6bae1057a507f6757b5f",
+    "mtime": 1785287292.8322403,
+    "ast_hash": "395f9b540084207c7ecbc73e74ff689e",
     "semantic_hash": ""
   },
   "tests/test_groundwar_cloud_city_assault_view.py": {
@@ -3822,6 +3822,11 @@
   "tests/test_groundwar_protectorate_ui.py": {
     "mtime": 1785280512.8842685,
     "ast_hash": "e1b6efdd1bbe660286c2be1595051a07",
+    "semantic_hash": ""
+  },
+  "tests/test_terrain_bands.py": {
+    "mtime": 1785287411.9265761,
+    "ast_hash": "f742284fb9372c303f7a59db789c47e1",
     "semantic_hash": ""
   }
 }

@@ -7,13 +7,15 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: COMPLETE — all of GW-WP01–20 shipped, GW-M1 through GW-M5 all
+> **Status: COMPLETE — all of GW-WP01–21 shipped, GW-M1 through GW-M5 all
 > closed (July 2026). `groundwar.cloud_city_assault_enabled` is on in the
-> production default. GW-WP20 closed the protectorate/annexation TUI gap, so
-> one deliberately deferred follow-up remains, flagged not silent: GW-WP13's /
-> GW-WP16's balance tuning (garrison counts, defense density, emplacement
-> geometry for both terrestrial and Cloud City assaults), which needs a human
-> read of the bot seed-matrix runs rather than more harness.**
+> production default. GW-WP20 closed the protectorate/annexation TUI gap and
+> GW-WP21 the terrain band-colour gap, so one deliberately deferred follow-up
+> remains, flagged not silent: GW-WP13's / GW-WP16's balance tuning (garrison
+> counts, defense density, emplacement geometry for both terrestrial and Cloud
+> City assaults), which needs a human read of the bot seed-matrix runs rather
+> than more harness. One unrelated red test also remains:
+> `tests/test_ui_snapshots.py::test_options_modal`, pre-existing since GW-WP14.**
 
 ## Context
 
@@ -841,10 +843,12 @@ plaza guess) and `.hint_available`, `SurveyExpeditionDTO.scanner_band`.
 `HELP_LEGEND_ROWS` hook on the shared `HelpScreen`; `z` log expand; log lines coloured by
 event type; trench/find/hint cell flashes; outcome summary and key cheatsheet.
 
-**Known gaps, deliberately deferred:** `_feature_colors` matches the *first* band with a
+**Known gaps, deliberately deferred:** ~~`_feature_colors` matches the *first* band with a
 given feature name, so where a biome repeats one (`terrestrial_cold` ice, jovian,
 asteroid_belt) the later band's colours are unreachable — fixing it needs a band index on
-`GroundCellDTO`. And `_CONTRAST_TRIGGER` (0.20, `edge/art/terrain.py`) leaves
+`GroundCellDTO`.~~ **Closed by GW-WP21** (below), which also corrects this note on two
+counts: only `terrestrial_cold` was actually affected, and the fix is unique band names
+rather than a band index. And `_CONTRAST_TRIGGER` (0.20, `edge/art/terrain.py`) leaves
 mountain/dust/snow honestly dim at ~0.25; raising it is shared with the world-art screens.
 
 ### GW-WP07-FU2 — Player-chosen survey drop site (M) — SHIPPED
@@ -1969,11 +1973,78 @@ where the drop now leaves `AssaultOperation.outcome` already set (the op reaches
 has ended — extract to orbit" instead of running a defense phase. Worth a look as its own
 item: either the fixture's starting Resolve/retrieval clock drifted from the engine, or a
 Cloud City drop is ending the operation earlier than the terrestrial path it shares.
+**Diagnosed and fixed in GW-WP21 (below) — it was neither: the fixture drops a lone
+trooper onto a fully-armed station, and the station shoots it down.**
 
 **Still open after this WP:** GW-WP13's and GW-WP16's deferred balance tuning
 (garrison counts, defense density, emplacement geometry, victory/casualty rates), which
 the plan records as needing a human read of the bot seed-matrix runs rather than more
 harness — plus the two pre-existing failures above.
+
+### GW-WP21 — Unique band names per landable biome, and a misdiagnosed red test (S) — SHIPPED
+
+Two small items, both surfaced by GW-WP20's full-suite run.
+
+**1. Closes GW-WP07-FU1's deferred colour gap.** That note read: "`_feature_colors`
+matches the *first* band with a given feature name, so where a biome repeats one
+(`terrestrial_cold` ice, jovian, asteroid_belt) the later band's colours are unreachable —
+fixing it needs a band index on `GroundCellDTO`."
+
+Two corrections to that note, from tracing it rather than re-reading it:
+
+- **The scope is narrower than recorded.** Of the three biomes named, only
+  `terrestrial_cold` is affected. Jovian ground maps are Cloud City *interiors*, whose
+  feature names are a disjoint namespace `feature_colors` resolves before it ever consults
+  `ptype`; asteroid belts are not landable at all (`LANDABLE_BIOMES`, D9). Both are still
+  reached by *planet art*, which calls `get_biome_feature` and indexes bands positionally —
+  correct already. So the live defect was exactly one: `terrestrial_cold`'s high ice band
+  (authored `bright_cyan` on `blue`) rendering in the shallow band's `bright_white` on
+  `white`. Rare enough to hide — about 0.4% of cells on a sample cold world — but two
+  terrains authored to look different drew identically.
+- **A band index on `GroundCellDTO` is the wrong fix.** It would grow every projected cell,
+  need a wire bump, and require the band index to survive from generation through the
+  frozen map models — all to work *around* the root cause. The root cause is that a band's
+  name is its only identity in the colour lookup **and** its gameplay key, so two bands
+  sharing a name are indistinguishable in every respect except the colours one of them can
+  never reach. The fix is to stop sharing: `terrestrial_cold`'s top band is now `glacier`.
+
+`glacier` gets its own terrain class (deliberately *identical* to `ice` — the split is a
+rendering fix, and changing movement or cover in the same commit would smuggle a balance
+edit in behind a cosmetic one; it is now free to diverge when that is an intended tuning
+decision), its own heavier glyphs so the two ice bands separate by weight as well as
+colour, and a place in `landing_blocked_features`, which it had implicitly as `ice` and
+must not silently lose. No DTO, wire, or hashed-state change; `config_version` stays 15.
+
+The invariant is now stated where the bands are authored and **guarded by tests**, scoped
+to `LANDABLE_BIOMES` because that is where it bites.
+
+**2. `test_settle_assault_extraction_leaves_ownership_untouched` — a fixture, not a
+regression.** The GW-WP20 note above guessed at a drifted retrieval clock or a Cloud City
+drop path diverging from the terrestrial one. It is neither. The fixture drops **one**
+trooper onto the `_map()`/`_op()` defaults — a size-3 station at citadel level 2 — and the
+station's AA and citadel guns shoot the capsule down during `assault_drop` on 4 of 6 seeds,
+including the seed the test pins. The operation is `wiped` before the test's
+`assault_end_turn` is reached, and that call correctly refuses to run a defense phase for a
+finished operation. The engine is right; the scenario simply became unreachable.
+
+Fixed the way the sibling `test_retrieval_clock_ends_the_mission_unbowed` already solves
+it — drop on an undefended station (`cloud_city_size=1`, `citadel_level=0`), where the
+drop survives on 6 of 6 seeds — plus an explicit `assert op.outcome is None` so the test
+fails loudly at the *setup* step if this ever recurs, instead of failing later somewhere
+that invites the same misdiagnosis. The test's actual subject, that a `retrieval` outcome
+leaves ownership untouched, was never broken.
+
+Whether a lone capsule surviving a fully-armed station only a third of the time is
+correctly *tuned* is a separate question, and belongs to GW-WP13/WP16's deferred balance
+pass — recorded there, not decided here.
+
+Files: `edge/core/groundwar/terrain.py`, `edge/art/terrain.py`,
+`config/groundwar_default.yaml`.
+Tests: `tests/test_terrain_bands.py` (new, 17) — band-name uniqueness per landable biome,
+every band resolving to the colour pair authored at *its own* index, the concrete
+shelf-ice/glacier regression, terrain-class and glyph coverage for every landable band,
+and `glacier` still barred as a survey drop site;
+`tests/test_groundwar_cloud_city_assault_tactics.py` (fixture fix).
 
 ## Verification matrix
 
@@ -2026,7 +2097,7 @@ harness — plus the two pre-existing failures above.
 ## Definition of done
 
 - D1–D15 are resolved and recorded in both this plan and authoritative DESIGN.
-- GW-WP01–20 (with GW-WP09-PRE) acceptance tests pass.
+- GW-WP01–21 (with GW-WP09-PRE) acceptance tests pass.
 - A **generated** universe contains inhabited worlds that route to survey and to
   assault; neither path is reachable only through hand-built state.
 - `ruff`, strict `mypy` production layers, pytest/property tests, codec fixtures,
