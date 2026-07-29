@@ -9,6 +9,7 @@ legal-action set comes from ``AssaultExpeditionDTO`` and every mutation is a log
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -546,10 +547,19 @@ settle, and once the assault is decided it settles straight away with the result
         self.placements.pop()
         self._refresh_widgets()
 
-    def _landing_log(self, text: str) -> None:
+    def note(self, text: str) -> None:
+        """Write one markup line into the battle log.
+
+        Public because the spectator (`edge.groundwar.spectate`) narrates the bot's
+        *decisions* alongside the events they produce — the log is the only place on
+        this screen that carries prose.
+        """
         logs = self.query("#assault-log")
         if logs:
             logs.first().write(Text.from_markup(text))
+
+    def _landing_log(self, text: str) -> None:
+        self.note(text)
 
     async def _apply(self, command: Any) -> tuple[Any, ...] | None:
         try:
@@ -557,6 +567,11 @@ settle, and once the assault is decided it settles straight away with the result
         except (MovementError, CombatError, EconomyError) as exc:
             warn(self, "#assault-log", str(exc))
             return None
+        await self._narrate(events_out)
+        return events_out
+
+    async def _narrate(self, events_out: Sequence[Any]) -> None:
+        """Write `events_out` to the battle log and flash the cells they name."""
         logs = self.query("#assault-log")
         log = logs.first() if logs else None
         until = time.monotonic() + _FLASH_SECONDS
@@ -570,7 +585,29 @@ settle, and once the assault is decided it settles straight away with the result
                 self._flashes[(x, y)] = (EVENT_FLASH[name], until)
         if self._flashes:
             self.set_timer(_FLASH_SECONDS + 0.05, self._refresh_widgets)
-        return events_out
+
+    async def observe(self, events_out: Sequence[Any], *, follow: bool = False) -> None:
+        """Narrate events applied to the service by *someone else*, then re-pull the view.
+
+        `_apply` is the player's path — submit a command, narrate what comes back. A bot
+        (`edge.groundwar.spectate`) drives the same `GameService` directly, so its events
+        never pass through this screen and neither the log nor the map would ever move.
+        This is that same narrate-and-reload tail with the submit removed, which is what
+        lets an unmodified assault screen act as a spectator view.
+
+        Recomposes when the platoon lands, because `compose` serves a completely
+        different tree before the drop (the squad chooser) than after it (the map), and
+        a bot's `GroundDrop` crosses that boundary without the screen's own placement
+        flow ever running.
+        """
+        if self._extracting or self.view is None:
+            return
+        was_dropped = self.view.dropped
+        await self._narrate(events_out)
+        await self._load(center=follow)
+        if self.view is not None and self.view.dropped and not was_dropped:
+            await self.recompose()
+            self._focus_map()
 
     def _selected_trooper(self) -> AssaultTrooperDTO | None:
         if self.view is None or self.selected_actor_id is None:
