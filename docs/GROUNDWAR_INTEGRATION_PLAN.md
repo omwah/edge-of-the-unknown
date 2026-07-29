@@ -14,8 +14,10 @@
 > remains, flagged not silent: GW-WP13's / GW-WP16's balance tuning (garrison
 > counts, defense density, emplacement geometry for both terrestrial and Cloud
 > City assaults), which needs a human read of the bot seed-matrix runs rather
-> than more harness. One unrelated red test also remains:
-> `tests/test_ui_snapshots.py::test_options_modal`, pre-existing since GW-WP14.**
+> than more harness. GW-WP21 also cleared the last two red tests, so **the suite
+> is fully green**; the one remaining deferred *polish* item is
+> `_CONTRAST_TRIGGER` (GW-WP07-FU1), measured under GW-WP21 and awaiting an
+> aesthetic verdict.**
 
 ## Context
 
@@ -1981,9 +1983,9 @@ trooper onto a fully-armed station, and the station shoots it down.**
 the plan records as needing a human read of the bot seed-matrix runs rather than more
 harness — plus the two pre-existing failures above.
 
-### GW-WP21 — Unique band names per landable biome, and a misdiagnosed red test (S) — SHIPPED
+### GW-WP21 — Unique band names per landable biome, and two red tests (S) — SHIPPED
 
-Two small items, both surfaced by GW-WP20's full-suite run.
+Three small items, all surfaced by GW-WP20's full-suite run.
 
 **1. Closes GW-WP07-FU1's deferred colour gap.** That note read: "`_feature_colors`
 matches the *first* band with a given feature name, so where a biome repeats one
@@ -2038,13 +2040,37 @@ Whether a lone capsule surviving a fully-armed station only a third of the time 
 correctly *tuned* is a separate question, and belongs to GW-WP13/WP16's deferred balance
 pass — recorded there, not decided here.
 
+**3. `test_options_modal` — a stale baseline, not a regression.** Carried as a known
+pre-existing failure since GW-WP14 without anyone establishing *why*. Diffing the text of
+the committed SVG against a fresh capture shows exactly two differences: a new
+`U — Auto-end assault turn (solo trooper)` row, and the footer key hint growing from
+`T/R/A/D/O/G change` to `T/R/A/D/O/G/U change`. Everything else is identical content in a
+different element order. `git log -S` puts the cause at `5f3c764` (GW-WP12-FU1), which
+added the option and touched no snapshot file. The modal is rendering its new option
+correctly, so the baseline is simply out of date — refreshed, and the whole snapshot
+matrix (72) is green.
+
+**Deliberately not taken here:** GW-WP07-FU1's other deferred gap, `_CONTRAST_TRIGGER`
+(0.20). Measured, and the note is accurate: six landable bands sit between 0.20 and 0.26 —
+`terrestrial_cold` ice, `terrestrial_cool` dust/snow/mountain, `terrestrial_warm` mountain,
+`terrestrial_hot` mountain — so a 0.26 trigger corrects exactly the cluster the note names
+and nothing else. But the correction is not obviously an improvement: `readable_fg` moves
+*away* from the background, so on the pale biomes it darkens ice/snow/dust from
+`bright_white` to `#666666` grey on white, which reads better and looks dirtier. Since
+`BIOME_COLORS` is shared with the orbital planet-art screens, the change restyles every
+world in the game. That is an aesthetic verdict for a human at a terminal, not a
+luminance-threshold argument, so it stays open with the measurements recorded.
+
 Files: `edge/core/groundwar/terrain.py`, `edge/art/terrain.py`,
 `config/groundwar_default.yaml`.
 Tests: `tests/test_terrain_bands.py` (new, 17) — band-name uniqueness per landable biome,
 every band resolving to the colour pair authored at *its own* index, the concrete
 shelf-ice/glacier regression, terrain-class and glyph coverage for every landable band,
 and `glacier` still barred as a survey drop site;
-`tests/test_groundwar_cloud_city_assault_tactics.py` (fixture fix).
+`tests/test_groundwar_cloud_city_assault_tactics.py` (fixture fix);
+`tests/__snapshots__/test_ui_snapshots/test_options_modal.svg` (baseline refresh).
+
+**The whole suite is now green** — 3,289 passed, 80 snapshots, no known failures.
 
 ## Verification matrix
 
