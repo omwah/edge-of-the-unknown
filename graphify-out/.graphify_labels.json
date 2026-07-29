@@ -259,7 +259,5 @@
   "257": ".compose",
   "258": "sprites.py",
   "259": ".boarded_starbase_id",
-  "260": ".docked_port_sector_id",
-  "261": ".stardock_facilities_sector_id",
   "262": "assault_turn_cost"
 }

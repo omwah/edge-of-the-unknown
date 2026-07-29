@@ -41,6 +41,13 @@ class BiomeBands:
 # band. Groundwar gameplay uses only the terrestrial_* and barren entries
 # (jovian/asteroid_belt are orbital-only, DESIGN §4.2 / GW plan D9); the full set
 # is shared here so planet art has one authority for the band layout.
+#
+# **A landable biome's band names must be unique** (GW-WP21, guarded by
+# `tests/test_terrain_bands.py`): the ground map views colour a cell by looking its
+# feature *name* up in this list, so two bands sharing a name collapse to whichever
+# comes first and the later band's authored colours can never render. Non-landable
+# biomes may repeat a name — planet art indexes bands positionally
+# (`edge.art.terrain.get_biome_feature`) and so is unaffected.
 BIOME_BANDS: dict[str, BiomeBands] = {
     "terrestrial_warm": BiomeBands(
         scale_x=15.0,
@@ -88,7 +95,11 @@ BIOME_BANDS: dict[str, BiomeBands] = {
             (0.1, "ice"),
             (0.4, "snow"),
             (0.7, "mountain"),
-            (1.0, "ice"),
+            # The top band was a second "ice" until GW-WP21. A band's *name* is the only
+            # key `edge.tui.screens._ground_shared.feature_colors` has, so a repeated name
+            # made this band's authored cyan-on-blue unreachable — high glacial ice drew
+            # in the shallow band's white-on-white. Distinct bands need distinct names.
+            (1.0, "glacier"),
         ),
     ),
     "jovian": BiomeBands(

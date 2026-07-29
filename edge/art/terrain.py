@@ -53,6 +53,11 @@ FEATURES_REGISTRY = {
     "ice": [
         ("_", 1), ("-", 1),
     ],
+    # terrestrial_cold's top band (GW-WP21) — heavier glyphs than flat shelf `ice`, so
+    # the two ice bands now separate by weight as well as by their authored colours.
+    "glacier": [
+        ("=", 2), ("≡", 1),
+    ],
     "ash": [
         ("_", 1), ("-", 1), (".", 1),
     ],

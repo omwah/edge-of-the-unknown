@@ -149,6 +149,12 @@ terrain:
   mountain:      {move_cost: 0, cover: 0.10, blocks_los: true}
   snow:          {move_cost: 2, cover: 0.0,  blocks_los: false}
   ice:           {move_cost: 1, cover: 0.0,  blocks_los: false}
+  # High glacial ice, terrestrial_cold's top band (GW-WP21). Split out of `ice` so that
+  # band has a name of its own and can reach its own colours. Deliberately identical to
+  # `ice` here: the split is a rendering fix, and giving it different movement or cover
+  # in the same change would smuggle a balance edit in behind a cosmetic one. It is now
+  # free to diverge whenever that is an intended tuning decision.
+  glacier:       {move_cost: 1, cover: 0.0,  blocks_los: false}
   ash:           {move_cost: 1, cover: 0.05, blocks_los: false}
   crater:        {move_cost: 2, cover: 0.15, blocks_los: false}
   dust:          {move_cost: 1, cover: 0.0,  blocks_los: false}
@@ -230,6 +236,7 @@ expedition:
     - water_shallow
     - mountain
     - ice
+    - glacier    # GW-WP21: was covered by `ice` before that band was split out
 
 # Cloud City station-interior generation (GW-WP15; edge.core.groundwar.interior).
 # The assault gate stays off until GW-WP16 — this tunes generation/art review only.

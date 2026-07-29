@@ -171,12 +171,20 @@ def test_settle_assault_surrender_conquers_a_cloud_city() -> None:
 
 
 def test_settle_assault_extraction_leaves_ownership_untouched() -> None:
-    planet = _planet()
+    # citadel_level=0 / size=1 for the same reason the retrieval-clock test above gives:
+    # this asserts what *settlement* does with a `retrieval` outcome, so the drop must
+    # survive to reach one. A fully-armed station (the `_map()`/`_op()` defaults, size 3
+    # and citadel 2) shoots a lone capsule down during `assault_drop` on most seeds — the
+    # op is already `wiped` before the end-turn below, and `assault_end_turn` rightly
+    # refuses to run a defense phase for a finished operation. That is the guns working,
+    # not a settlement bug, so the fixture drops somewhere undefended instead.
+    planet = _planet(cloud_city_size=1, citadel_level=0)
     ship = _ship()
-    amap = _map()
+    amap = _map(cloud_city_size=1, citadel_level=0)
     rng = Random(5)
-    op = _drop_at(amap, _op(amap, reserved_infantry=0, retrieval_turn=1), rng,
+    op = _drop_at(amap, _op(amap, reserved_infantry=0, retrieval_turn=1, citadel_level=0), rng,
                   amap.landing_x, amap.landing_y)
+    assert op.outcome is None, "the drop must survive for the retrieval clock to be the cause"
     op, _ = ga.assault_end_turn(op, amap, CFG, rng)
     assert op.outcome == "retrieval"
 
