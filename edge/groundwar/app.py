@@ -14,12 +14,14 @@ a full universe.
 from __future__ import annotations
 
 import random as _random
+from dataclasses import replace as _replace
 from pathlib import Path
 
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
+from textual.timer import Timer
 from textual.widgets import Button, Input, Static
 from rich.text import Text
 
@@ -32,6 +34,7 @@ from edge.core.movement import MovementError
 from edge.core.rules import BeginAssault, BeginSurvey
 from edge.groundwar import harness
 from edge.groundwar.interior_preview import CloudCityPreviewScreen
+from edge.groundwar.spectate import BotDriver
 from edge.server.client import LocalClient
 from edge.server.service import GameService
 from edge.store.repo import SqliteRepository
@@ -106,6 +109,9 @@ own [b]?[/] help for controls.\
         self.planet_idx = 0
         self.difficulty_idx = 1  # default "Assault"
         self.cloud_city_size = 1
+        # GW-WP22: who fights the drop. "bot" hands the same operation to the assault
+        # bot and watches it on the same screen — the balance-tuning instrument.
+        self.bot_pilot = False
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="setup"):
@@ -119,6 +125,7 @@ own [b]?[/] help for controls.\
                 yield Button("Difficulty", id="difficulty")
                 yield Button("World", id="world")
                 yield Button("City size", id="city-size")
+                yield Button("Pilot", id="pilot")
             with Horizontal(classes="row"):
                 yield Input(placeholder="seed (blank = random)", id="seed")
             yield PlatoonComposer(
@@ -147,11 +154,17 @@ own [b]?[/] help for controls.\
         self.query_one("#world", Button).label = \
             f"World: {'inhabited' if self.inhabited else 'uninhabited'}"
         self.query_one("#city-size", Button).label = f"City size: {self.cloud_city_size}"
+        self.query_one("#pilot", Button).label = \
+            f"Pilot: {'bot' if self.bot_pilot else 'you'}"
         self.query_one("#planet", Button).display = not cloud_city
         self.query_one("#difficulty", Button).display = assault
         self.query_one("#world", Button).display = expedition
         self.query_one("#city-size", Button).display = cloud_city
-        self.query_one("#composer", PlatoonComposer).display = assault
+        # The composer now serves both fighting modes: GW-WP16 shipped the Cloud City
+        # assault but left this shell preview-only, so a station could not be played or
+        # watched here at all. Its balance is the least-tuned of the two.
+        self.query_one("#composer", PlatoonComposer).display = assault or cloud_city
+        self.query_one("#pilot", Button).display = assault or cloud_city
         self.query_one("#land-row", Horizontal).display = expedition
         self.query_one("#preview-row", Horizontal).display = cloud_city
         brief = Text()
@@ -191,6 +204,8 @@ own [b]?[/] help for controls.\
             self.planet_idx = (self.planet_idx + 1) % len(PLANET_TYPES)
         elif bid == "difficulty":
             self.difficulty_idx = (self.difficulty_idx + 1) % len(_ASSAULT_PRESETS)
+        elif bid == "pilot":
+            self.bot_pilot = not self.bot_pilot
         elif bid == "city-size":
             max_size = self.config.planets.cloud_city_max_size
             self.cloud_city_size = self.cloud_city_size % max_size + 1
@@ -203,31 +218,53 @@ own [b]?[/] help for controls.\
             return
         self._update()
 
-    def _new_client(self, state: UniverseState) -> LocalClient:
+    def _new_client(self, state: UniverseState, *, ticker: bool = True) -> LocalClient:
         app = self.app
         assert isinstance(app, EdgeApp)
         service = GameService(state, self.config, SqliteRepository(":memory:"))
         client = LocalClient(service, player_id=harness.PLAYER_ID)
         app.client = client
-        app._start_ticker(client)
+        if ticker:
+            # Skipped for a bot pilot: the background day-tick would keep advancing the
+            # calendar while the run is paused for inspection, which is the one thing a
+            # spectator must not do. A tactical operation resolves without it.
+            app._start_ticker(client)
         return client
 
     async def on_platoon_composer_dropped(self, event: PlatoonComposer.Dropped) -> None:
-        """The reusable composer committed a squad — build the world and drop in."""
+        """The reusable composer committed a squad — build the world and drop in.
+
+        Serves both fighting modes and both pilots. The world is built the same way
+        regardless: a bot-flown drop must be the same operation the human would have
+        got, or watching it would prove nothing about the balance.
+        """
         from edge.tui.screens.ground_assault import GroundAssaultScreen
 
-        planet = PLANET_TYPES[self.planet_idx]
-        _, cap, citadel = _ASSAULT_PRESETS[self.difficulty_idx]
-        state = harness.assault_state(
-            self.config, seed=self._seed(), planet_type=planet,
-            habitability_cap=cap, citadel_level=citadel, loadout=dict(event.loadout))
-        client = self._new_client(state)
+        loadout = dict(event.loadout)
+        seed = self._seed()
+        if self.mode == "cloud_city":
+            state = harness.cloud_city_assault_state(
+                self.config, seed=seed, cloud_city_size=self.cloud_city_size,
+                citadel_level=_ASSAULT_PRESETS[self.difficulty_idx][2], loadout=loadout)
+            label = f"seed {seed} · Cloud City size {self.cloud_city_size}"
+        else:
+            planet = PLANET_TYPES[self.planet_idx]
+            _, cap, citadel = _ASSAULT_PRESETS[self.difficulty_idx]
+            state = harness.assault_state(
+                self.config, seed=seed, planet_type=planet,
+                habitability_cap=cap, citadel_level=citadel, loadout=loadout)
+            label = f"seed {seed} · {planet} cap {cap:,} · citadel {citadel}"
+        client = self._new_client(state, ticker=not self.bot_pilot)
         try:
             await client.apply(BeginAssault(planet_id=harness.PLANET_ID))
         except (EconomyError, MovementError) as exc:
             notify_warning(self, str(exc))
             return
         self.app.push_screen(GroundAssaultScreen(client))
+        if self.bot_pilot:
+            app = self.app
+            assert isinstance(app, GroundwarApp)
+            app.start_bot_pilot(client, label)
 
     def _launch_expedition(self, seed: int, planet: str) -> None:
         from edge.tui.screens.ground_expedition import GroundExpeditionScreen
@@ -253,6 +290,16 @@ own [b]?[/] help for controls.\
 class GroundwarApp(EdgeApp):
     TITLE = "edge-groundwar"
 
+    # All `ctrl+…`, and only live while a bot is flying: the assault screen owns every
+    # plain letter it binds (`m` move, `f` fire, `space` end turn, …), and a spectator
+    # key that shadowed one would change what is being observed.
+    BINDINGS = [
+        Binding("ctrl+s", "toggle_bot", "Run bot", priority=True),
+        Binding("ctrl+n", "step_bot", "Step", priority=True),
+        Binding("ctrl+d", "bot_slower", "Slower", priority=True),
+        Binding("ctrl+u", "bot_faster", "Faster", priority=True),
+    ]
+
     # `EdgeApp.CSS_PATH` is a bare filename Textual resolves against the *subclass's*
     # module file, not the declaring class's — inheriting it unchanged would look for
     # a stylesheet next to this file instead of `edge/tui/app.tcss`. Point it at the
@@ -270,9 +317,90 @@ class GroundwarApp(EdgeApp):
     def __init__(self, config: GameConfig | None = None) -> None:
         super().__init__()
         self.config_data = config or load_default_config()
+        self.bot: BotDriver | None = None
+        self._bot_timer: Timer | None = None
 
     def _initial_screen(self) -> Screen[None]:
         return SetupScreen(self.config_data)
+
+    # --- bot pilot (GW-WP22) --------------------------------------------------
+
+    def start_bot_pilot(self, client: LocalClient, label: str) -> None:
+        """Attach the assault bot to the operation the pushed screen is showing."""
+        self.bot = BotDriver(client, self.config_data, label=label)
+        self.bot.running = True
+        self._reset_bot_timer()
+        self._sync_bot_labels()
+
+    def _reset_bot_timer(self) -> None:
+        """Textual timers hold a fixed interval, so a pace change means a new timer."""
+        if self._bot_timer is not None:
+            self._bot_timer.stop()
+        self._bot_timer = None
+        if self.bot is not None:
+            self._bot_timer = self.set_interval(self.bot.pace, self._bot_tick)
+
+    async def _bot_tick(self) -> None:
+        if self.bot is not None and self.bot.running:
+            await self.advance_bot()
+
+    async def advance_bot(self) -> None:
+        """One bot action, narrated onto the live assault screen."""
+        from edge.tui.screens.ground_assault import GroundAssaultScreen
+
+        bot = self.bot
+        if bot is None or bot.finished:
+            return
+        screen = self.screen if self.is_running else None
+        if not isinstance(screen, GroundAssaultScreen):
+            return  # a modal is up (outcome, help) — let the human read it first
+        await bot.advance(screen)
+        self._sync_bot_labels()
+
+    def action_toggle_bot(self) -> None:
+        if self.bot is None:
+            return
+        if self.bot.finished:
+            self.bot.running = False
+        else:
+            self.bot.running = not self.bot.running
+        self._sync_bot_labels()
+
+    async def action_step_bot(self) -> None:
+        if self.bot is None or self.bot.finished:
+            return
+        self.bot.running = False
+        await self.advance_bot()
+
+    def action_bot_slower(self) -> None:
+        if self.bot is None:
+            return
+        self.bot.slower()
+        self._reset_bot_timer()
+        self._sync_bot_labels()
+
+    def action_bot_faster(self) -> None:
+        if self.bot is None:
+            return
+        self.bot.faster()
+        self._reset_bot_timer()
+        self._sync_bot_labels()
+
+    def _sync_bot_labels(self) -> None:
+        """Keep the Footer and subtitle telling the truth about the run right now."""
+        bot = self.bot
+        if bot is None:
+            return
+        self._set_binding_description("ctrl+s", "Pause" if bot.running else "Run bot")
+        self._set_binding_description("ctrl+d", f"Slower ({bot.pace:.2f}s)")
+        self.sub_title = bot.status_line()
+        self.refresh_bindings()
+
+    def _set_binding_description(self, key: str, description: str) -> None:
+        bindings = self._bindings.key_to_bindings.get(key, [])
+        self._bindings.key_to_bindings[key] = [
+            _replace(binding, description=description) for binding in bindings
+        ]
 
 
 def main() -> None:

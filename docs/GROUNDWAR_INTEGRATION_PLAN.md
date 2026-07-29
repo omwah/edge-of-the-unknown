@@ -7,7 +7,7 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: COMPLETE — all of GW-WP01–21 shipped, GW-M1 through GW-M5 all
+> **Status: COMPLETE — all of GW-WP01–22 shipped, GW-M1 through GW-M5 all
 > closed (July 2026). `groundwar.cloud_city_assault_enabled` is on in the
 > production default. GW-WP20 closed the protectorate/annexation TUI gap and
 > GW-WP21 the terrain band-colour gap; GW-WP21-FU1 then settled
@@ -15,8 +15,11 @@
 > closing GW-WP07-FU1's last polish item. **The suite is fully green.** One
 > deliberately deferred follow-up remains, flagged not silent: GW-WP13's /
 > GW-WP16's balance tuning (garrison counts, defense density, emplacement
-> geometry for both terrestrial and Cloud City assaults), which needs a human
-> read of the bot seed-matrix runs rather than more harness.**
+> geometry for both terrestrial and Cloud City assaults). GW-WP22 built the
+> instrument it was waiting on — a bot pilot inside `edge-groundwar` that fights
+> a scenario on the production screen while you watch — after measurement showed
+> a batch seed matrix would have graded the *bot*, not the balance. The verdict
+> itself is still a human's.**
 
 ## Context
 
@@ -2103,6 +2106,75 @@ the next person to reach for it knows what it costs).
 Tests: `tests/__snapshots__/test_groundwar_expedition_view/*.svg` (3 baselines refreshed);
 full snapshot matrix and `tests/test_terrain_bands.py` re-run green.
 
+### GW-WP22 — Bot pilot: watch the assault, to judge its balance (M) — SHIPPED
+
+**Status:** shipped July 2026. Builds the instrument GW-WP13's deferral was waiting on.
+Does **not** close that deferral — the tuning verdict is still a human's.
+
+**Why an instrument and not a seed matrix.** WP13 left the numeric tuning open pending
+"a human read of what the bots' seed-matrix runs actually show," so the obvious next
+step was a batch runner tabulating win rates. Measuring first killed that idea: across
+four seeds × citadel 0/2 on `terrestrial_warm`, **every run ended `retrieval` at turn 24
+with 0–2 casualties of 7**, citadel level making no difference whatever. A table of
+identical rows cannot distinguish "the world is too hard" from "the bot never closed
+with it", so it would have measured the bot and been read as balance. Tracing one run
+turn by turn shows all three causes at once:
+
+| turn | resolve | distance to nearest city |
+|---:|---:|---:|
+| 0 | 100 | 93 |
+| 9 | 100 | 16 |
+| 16 | 94 | 16 |
+| 24 (retrieval) | 78 | 14 |
+
+The platoon lands at the map's west edge with cities 95/130/203 cells away, spends **ten
+of twenty-four turns marching**, then **stalls at range 14–16 and never enters the
+city** — the bot has no assault-the-objective behaviour, only "shoot what is fireable" —
+plinking Resolve down ~1.6/turn against the ~70 it needs. Only the middle fault is the
+bot's. Watching separates them; a win-rate column cannot.
+
+**One service, no simulation.** `BotDriver` (`edge/groundwar/spectate.py`) holds the
+`RecordingRunner` and drives `edge.bot.scripts.assaulter` one action per `step()`; the
+**unmodified** `GroundAssaultScreen` renders the same `GameService` the bot commands.
+There is no replay and no second copy of state that could drift from what the rules ran
+against — which is the whole reason to trust what you watch. The screen gained one
+public seam, `observe(events, follow=)`: `_apply`'s narrate-and-reload tail with the
+submit removed, since bot-applied events never pass through the screen's own command
+path. It recomposes when the platoon lands, because `compose` serves a squad chooser
+before the drop and the map after it, and a bot's `GroundDrop` crosses that boundary
+without the placement flow ever running.
+
+**A mode of `edge-groundwar`, not a second program.** The first cut shipped a separate
+`edge-groundwar-watch` entry point with an argparse scenario; the setup screen already
+picks seed, world, difficulty, and squad, so that duplicated a working UI for no gain.
+It is now a **`Pilot: you / bot`** toggle beside the other knobs, and both pilots build
+the world through the identical path — a bot-flown drop must be the same operation the
+human would have got, opened by the same logged command, or watching it proves nothing.
+Controls are all `ctrl+…` (`ctrl+s` run/pause, `ctrl+n` step, `ctrl+d`/`ctrl+u` pace)
+and inert without a pilot: the assault screen owns every plain letter it binds, and a
+spectator key shadowing one would change what is being observed. The day-tick ticker is
+skipped for a bot run — the calendar must not advance while a run is paused for
+inspection.
+
+**Also closes a GW-WP16 follow-up**: that WP shipped the Cloud City assault but left this
+shell preview-only, so a station could be neither played nor watched here. The composer
+now serves both fighting modes, and the pilot is parametrized over both — the station
+branch being the less tuned of the two.
+
+**Still open, and unchanged by this WP:** the tuning itself, plus two findings for
+whoever takes it — a per-action `assault_map_for` regeneration costs ~0.1s and dominates
+a run's ~79s wall clock (WP13 found no measurement warranting a runtime cache; this is
+one), and at citadel level 2 a citadel gun with range 16 did not touch a platoon sitting
+at range 14. Whether that is geometry or a defect is exactly what watching is for.
+
+Files: `edge/groundwar/spectate.py` (new), `edge/groundwar/app.py`,
+`edge/tui/screens/ground_assault.py` (`observe`/`_narrate`/`note` seams).
+Tests: `tests/test_groundwar_spectate.py` (new, 15) — the operation opens live, bot
+actions move the *screen's own projection*, the drop recomposes chooser→map, a decided
+operation freezes on the board instead of being extracted out from under the viewer,
+pace bounds, both topologies, the setup-screen toggle, bot keys inert without a pilot,
+and the whole launch path end to end for terrestrial and Cloud City.
+
 ## Verification matrix
 
 | Concern | Required evidence |
@@ -2154,7 +2226,7 @@ full snapshot matrix and `tests/test_terrain_bands.py` re-run green.
 ## Definition of done
 
 - D1–D15 are resolved and recorded in both this plan and authoritative DESIGN.
-- GW-WP01–21 (with GW-WP09-PRE) acceptance tests pass.
+- GW-WP01–22 (with GW-WP09-PRE) acceptance tests pass.
 - A **generated** universe contains inhabited worlds that route to survey and to
   assault; neither path is reachable only through hand-built state.
 - `ruff`, strict `mypy` production layers, pytest/property tests, codec fixtures,
