@@ -32,8 +32,8 @@ from edge.core.groundwar.force import GroundForceError
 from edge.core.movement import MovementError
 from edge.core.planets import pretty_planet_type
 from edge.core.rules import (
-    BeginAssault, BeginSurvey, BuildCitadel, BuildStagingArea, Colonize, DeployGenesis,
-    MineBelt, PlanetDeposit, PlanetWithdraw, ReinforceGarrison,
+    AnnexProtectorate, BeginAssault, BeginSurvey, BuildCitadel, BuildStagingArea, Colonize,
+    DeployGenesis, MineBelt, PlanetDeposit, PlanetWithdraw, ReinforceGarrison,
 )
 from edge.server.service import GameService
 from edge.tui.chrome import EdgeScreen, notify_warning
@@ -107,14 +107,17 @@ class PlanetScreen(EdgeScreen):
         Binding("plus", "treasury_deposit", "Deposit"),
         Binding("minus", "treasury_withdraw", "Withdraw"),
         Binding("r", "reinforce", "Reinforce garrison"),
+        Binding("a", "annex", "Annex protectorate"),
         # `P` boards the base here too, as it does on the sector view — the verb keeps
         # one key everywhere (a base *is* the port where it orbits, §4.2/WP80).
         Binding("p", "enter_base", "Enter base"),
         Binding("t", "unload_cargo", "Unload cargo"),
         Binding("l", "load_cargo", "Load cargo"),
     ]
-    # WP-UI06: both irreversibly commit troops / re-form the world — confirmed.
-    ACTION_DANGER = {"genesis": "destructive", "reinforce": "destructive"}
+    # WP-UI06: all three irreversibly commit troops / re-form the world / dissolve a
+    # people's polity — confirmed.
+    ACTION_DANGER = {
+        "genesis": "destructive", "reinforce": "destructive", "annex": "destructive"}
 
     HELP_TITLE = "Planet orbit"
     HELP = """\
@@ -130,6 +133,11 @@ from the citadel panel. Citadel builds draw equipment from [i]stores[/], so supp
 runs in trips are the intended loop; the citadel art grows with its level.
 [b]R[/] reinforces an owned world's persistent ground garrison, converting carried
 recruits and suits — irreversible, unlike fighters, they never come back as troops.
+A world you took by force but did not own is a [i]protectorate[/]: its people keep their
+polity, stores, and treasury, and you administer it — production share, allocation,
+and its garrison. You draw the share, not the colony's stores. [b]A[/] annexes it into
+your own territory once it has stood long enough and its Resolve has recovered; that
+dissolves the polity and its people will remember it.
 A gas giant has no ground: it holds nothing and nobody until [b]S[/] builds a
 [i]Cloud City[/] staging area, paid in equipment [i]from your hold[/] (the first build
 claims the world). Building again grows the city, and a bigger city berths more people."""
@@ -179,6 +187,8 @@ claims the world). Building again grows the city, and a bigger city berths more 
                 yield self._identity_panel(p)
                 if self._service is not None:
                     yield self._ground_panel(p)
+                if p.protectorate:
+                    yield self._protectorate_panel(p)
                 # A belt is a spatial feature, not a colony: no descent, no colony stores
                 # or citadel — only its orbital scan/mining note (§4.2, WP-PR06).
                 if not p.landable:
@@ -235,6 +245,10 @@ claims the world). Building again grows the city, and a bigger city berths more 
             return False
         # Staging is a gas giant's verb alone, and only while the city can still grow (PT-54).
         if action == "build_city" and self._planet.cloud_city_next_cost <= 0:
+            return False
+        # Annexation is a controller's verb (D14): hide it entirely on a world that is not
+        # your protectorate, rather than offering a key that can only ever refuse.
+        if action == "annex" and not self._planet.protectorate_yours:
             return False
         return True
 
@@ -311,6 +325,53 @@ claims the world). Building again grows the city, and a bigger city berths more 
         panel.border_title = title
         return panel
 
+    def _protectorate_panel(self, p: PlanetDTO) -> Vertical:
+        """Limited planetary control, and the road to owning it outright (D13/D14, GW-WP20).
+
+        The rights D13 grants are administration, not property, so this panel says what
+        the controller actually holds — a production *share* in a ledger of its own, the
+        world's defense, and nothing of the natives' stores or treasury — and then shows
+        both halves of the D14 annex gate: the time served and the Resolve recovered.
+        """
+        children: list[Static | Horizontal] = []
+        if not p.protectorate_yours:
+            children.append(Static(
+                "[yellow]Under protectorate[/] — another power administers this world. "
+                "Its people keep their own polity."))
+            panel = Vertical(*children, classes="orbit-panel")
+            panel.border_title = "Protectorate"
+            return panel
+        children.append(Static(
+            f"[green]Yours to administer[/] — held [b]{p.protectorate_days:,}[/] "
+            f"{'day' if p.protectorate_days == 1 else 'days'}.  "
+            f"[dim]Their polity, stores and treasury remain theirs; you take "
+            f"{p.protectorate_share_pct}% of production and manage the defense.[/]"))
+        share = "   ".join(f"{label} {qty:,}" for label, qty in p.protectorate_stores)
+        if share:
+            children.append(Static(f"Your share  [cyan]{share}[/]  "
+                                   "[dim](what Transfer… loads from)[/]"))
+        # Resolve is the half of the D14 gate a player can watch recover, so bar it.
+        if p.annex_resolve_threshold > 0:
+            pct = max(0, min(100, round(100 * p.ground_resolve / p.annex_resolve_threshold)))
+            done = round(pct / 10)
+            bar = "█" * done + "░" * (10 - done)
+            colour = "green" if pct >= 100 else ("yellow" if pct >= 50 else "red")
+            children.append(Static(
+                f"Resolve  [{colour}]{bar}[/]  {p.ground_resolve} of "
+                f"{p.annex_resolve_threshold} needed to annex"))
+        if p.can_annex:
+            children.append(Horizontal(
+                Button("Annex — take ownership", id="btn-annex", variant="error"),
+                classes="buttons"))
+            children.append(Static(
+                "[dim]Annexation dissolves the local polity into your territory. Its "
+                "people — and their kind elsewhere — will hold it against you.[/]"))
+        else:
+            children.append(Static(f"[dim]\\[A] Annex — [/][yellow]{p.annex_blocker}[/]"))
+        panel = Vertical(*children, classes="orbit-panel")
+        panel.border_title = "Protectorate"
+        return panel
+
     async def on_planet_sprite_descend(self, msg: PlanetSprite.Descend) -> None:
         if not self._planet.landable:
             self.notify("No surface to land on — scan for finds in orbit instead.", timeout=3)
@@ -382,6 +443,8 @@ claims the world). Building again grows the city, and a bigger city berths more 
 
     def _claim_hint(self) -> str:
         p = self._planet
+        if p.protectorate:
+            return ""  # the protectorate panel is the hint on a world you hold but don't own
         if p.owned_by_you:
             return "[dim]Your colony.[/]"
         if not p.landable:
@@ -397,23 +460,42 @@ claims the world). Building again grows the city, and a bigger city berths more 
         return f"[green]\\[C] Colonize[/] — land {p.ship_colonists} colonists aboard."
 
     def _stores_panel(self, p: PlanetDTO) -> Vertical:
-        """Colony stores vs. the ship's hold, tabular, with haul buttons (§4.2)."""
+        """Colony stores vs. the ship's hold, tabular, with haul buttons (§4.2).
+
+        On a protectorate the two ledgers are not one (D13, GW-WP20): the inhabitants'
+        stores stay theirs and a load draws from the controller's production share, so
+        the share gets a column of its own rather than being folded into "In stores" —
+        the table would otherwise promise cargo the reducer would refuse to hand over.
+        """
         aboard: dict[str, int] = {}
         if self._service is not None:
             ship = self._service.game_view(self._pid).ship
             aboard = {h.label: h.qty for h in ship.holds}
+        share = dict(p.protectorate_stores)
         table: DataTable[Any] = DataTable(id="stores-table", zebra_stripes=True, cursor_type="row")
-        table.add_columns("Commodity", "In stores", "Aboard")
+        if p.protectorate_yours:
+            table.add_columns("Commodity", "Their stores", "Your share", "Aboard")
+        else:
+            table.add_columns("Commodity", "In stores", "Aboard")
         for label, qty in p.stores:
-            table.add_row(label, f"{qty:,}", f"{aboard.get(label, 0):,}")
+            row = [label, f"{qty:,}"]
+            if p.protectorate_yours:
+                row.append(f"{share.get(label, 0):,}")
+            row.append(f"{aboard.get(label, 0):,}")
+            table.add_row(*row)
         children: list[Static | DataTable[Any] | Horizontal] = [table]
         if p.owned_by_you:
             children.append(Horizontal(
                 Button("Transfer…", id="btn-transfer", variant="primary"),
                 classes="buttons"))
-            hint = ("[dim]Open the transfer editor to haul goods and settle colonists.[/]"
-                    if p.colonizable else
-                    "[dim]Citadel builds draw equipment from stores — supply runs in trips are the loop.[/]")
+            if p.protectorate_yours:
+                hint = ("[dim]You unload into their stores, but load only from your own "
+                        "share — the colony's goods are not yours to take.[/]")
+            elif p.colonizable:
+                hint = "[dim]Open the transfer editor to haul goods and settle colonists.[/]"
+            else:
+                hint = ("[dim]Citadel builds draw equipment from stores — supply runs in "
+                        "trips are the loop.[/]")
             children.append(Static(hint))
         panel = Vertical(*children, classes="orbit-panel")
         panel.border_title = "Stores"
@@ -423,8 +505,9 @@ claims the world). Building again grows the city, and a bigger city berths more 
         """The citadel: staged art, status, and its build/treasury buttons (§4.2, WP54)."""
         stage = _citadel_stage(p)
         art = Static(Text.from_markup(_CITADEL_ART[stage]), classes="citadel-art")
+        treasury = "their treasury" if p.protectorate else "treasury"
         status = Static(
-            f"Level [b]{p.citadel_level}[/]   treasury [yellow]{p.treasury:,}[/]   "
+            f"Level [b]{p.citadel_level}[/]   {treasury} [yellow]{p.treasury:,}[/]   "
             f"garrison {p.fighters:,}", classes="section-tight")
         children: list[Static | Horizontal] = [art, status]
         # Ground-defense garrison (GW-WP09, D11/D15): a distinct headcount from the
@@ -449,7 +532,10 @@ claims the world). Building again grows the city, and a bigger city berths more 
             buttons.append(Button(
                 f"Build level {p.citadel_level + 1} — {eq} equ + {lat:,} latinum",
                 id="btn-build", variant="primary"))
-        if p.citadel_level >= 1:
+        # Banking is sovereign-only: D13 keeps a protectorate's treasury with its people,
+        # and `_planet_bank` enforces that, so the buttons must not appear on one (this
+        # panel's own gate, `owned_by_you`, is the broader owns-or-controls test).
+        if p.citadel_level >= 1 and not p.protectorate:
             buttons.append(Button("Deposit 1k", id="btn-cit-dep"))
             buttons.append(Button("Withdraw 1k", id="btn-cit-wd"))
         if p.can_reinforce_garrison:
@@ -471,6 +557,7 @@ claims the world). Building again grows the city, and a bigger city berths more 
             "btn-cit-dep": self.action_treasury_deposit,
             "btn-cit-wd": self.action_treasury_withdraw,
             "btn-reinforce": self.action_reinforce,
+            "btn-annex": self.action_annex,
         }
         handler = actions.get(event.button.id or "")
         if handler is not None:
@@ -582,6 +669,42 @@ claims the world). Building again grows the city, and a bigger city berths more 
             _amount_for(suit_id, owned)
 
         self.app.push_screen(ListPicker("Which suit class?", options), _picked)
+
+    def action_annex(self) -> None:
+        """Convert a recovered protectorate into ordinary ownership (D14, GW-WP20).
+
+        Confirmed, because it is the one protectorate action that cannot be walked
+        back: the local polity is dissolved and the reducer applies the stronger
+        species-attitude, grudge, spillover, and alignment consequences of doing it.
+        The blocker shown is `annex_ready`'s own sentence, so a refusal here and the
+        greyed line in the panel say the same thing.
+        """
+        if self._service is None:
+            self.action_noop()
+            return
+        service = self._service
+        p = self._planet
+        if not p.can_annex:
+            self.notify(p.annex_blocker or "There is no protectorate of yours here.",
+                        timeout=3)
+            return
+
+        def _go(ok: bool | None) -> None:
+            if not ok:
+                return
+            try:
+                service.apply(self._pid, AnnexProtectorate(planet_id=p.planet_id))
+            except (EconomyError, MovementError) as exc:
+                notify_warning(self, str(exc))
+                return
+            self.notify(f"{p.name} is annexed — it is your territory now.", timeout=3)
+            self._reopen()
+
+        self.app.push_screen(ConfirmScreen(
+            f"Annex {p.name}?\n"
+            "The protectorate's polity is dissolved into your own territory and its "
+            "stores merge with yours.\n"
+            "Its people, and their kind elsewhere, will not forget it."), _go)
 
     def action_colonize(self) -> None:
         if self._service is None:
