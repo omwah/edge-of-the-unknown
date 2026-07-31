@@ -193,75 +193,10 @@ reading only. Never copy code from them verbatim** — they are inspiration
 and a source of constants/algorithms, and they carry assorted licenses
 (GPL-era code among them). Reimplement ideas cleanly.
 
-What each is for:
-- `references/twclone` — architecture reference: server/engine process split,
-  durable event log + cron-task scheduling, market-driven port economy
-  (docs/GALACTIC_ECONOMY.md, docs/ENGINE.md), tunnel/FedSpace universe gen,
-  full TW command catalog in docs/PROTOCOL.v3/.
-- `references/terminal-space` — closest Python cousin: clean domain model,
-  PortClass enum (8 buy/sell triples), port type distribution
-  (20/20/20/10/10/10/5/5), stock-ratio pricing, `to_public(context)`
-  fog-of-war DTO pattern, embedded-server single-player.
-- `references/blacknovatraders` — tuned economy constants (config.php),
-  linear pricing `base ± delta * stock/limit`, planet/colonist production
-  math (sched_planets.php), combat baseline (attack.php).
-- `references/tradewars/tw2bas/` — the original 1986 BASIC source +
-  TWINSTR.DOC rulebook: turn costs, sector-fighter rules, retreat costs one
-  fighter, Cabal NPCs, 500-sector scale. Authenticity reference.
-- `references/SectorWars` — contains "TW Sector Algorithm.txt": the
-  cluster-and-bridge universe generation algorithm we use.
-- `references/ExchangeConflict2016` — networkx generation motifs (deadends,
-  rings), uniview-style map inspector idea, config-driven ship data.
-- `references/aatraders` — sysop/admin feature catalog only (Phase 5).
+`docs/REFERENCES.md` catalogs what each clone is for — read it before mining
+`references/` for an algorithm or constant.
 
 ## Work completed so far
-
-1. Researched and identified all notable open-source TW2002 clones.
-2. Cloned and analyzed their source directly (architecture, economy
-   formulas, universe-gen algorithms, original game rules).
-3. Wrote `docs/DESIGN.md`: full design — layered architecture
-   (core / bigbang / engine / store / server / tui), data model, big bang
-   pipeline, economy formulas, turn/tick engine, combat, Textual UI design,
-   persistence, testing strategy, 5-phase roadmap.
-4. Revised the design (v0.2, June 2026) to the exploration-first focus
-   described above: alien species, discoveries, distance bands, latinum, ship
-   aspects, encounter/flee rules (DESIGN.md §§6, 8, 11).
-5. Added the *Lightspeed*-inspired engine-room subsystem/component ship model
-   (DESIGN.md §4.1): slotted subsystems, shared component vocabulary, localized
-   combat damage, hybrid repair, global engine bonus, homing missiles.
-6. Added the planetary system (DESIGN.md §4.2, *Lightspeed* §1.4.6-inspired):
-   `planet_type` taxonomy with yield profiles + habitability, three-way ownership
-   (none / alliance_id / player_id) with Core-owned-by-governor and band-rising
-   unowned density, and orbital starbases (engine-room model minus thrusters/spindrive
-   plus a fusion reactor) that the big bang can make derelict by stripping/damaging
-   components on unowned worlds (so repair is routine, not special-cased), are
-   scavengeable for components, and defend owned planetary systems via alliance-keyed
-   hostility.
-7. Added alliance **home clusters** to universe generation (DESIGN.md §5 step 6,
-   §6.3): each non-governing alliance gets a compact, alliance-owned cluster of worlds
-   just outside the Core — smaller than the Core, never adjacent to it — with **neutral
-   navigable lanes** of empty space between clusters so the player can always reach the
-   outer bands without transiting a bloc's territory. Clusters are friendly-band by
-   disposition, so the Hub stays peaceable until the player aligns against a bloc.
-8. Reviewed and tightened the economy spec (DESIGN.md §8): made the §8 pricing
-   formula **normative** over the §A.2 reference (whose buy-side sign is inverted —
-   selling into a port must *lower* its price), defined `stock_ratio`/`capacity`/
-   `elasticity` and a positive-price **clamp** invariant, and added an **Economy
-   constants** block (starting capital, Tier-I/II/III component prices and barter
-   equivalence, ship/repair costs, and an explicit latinum faucet/sink model) so the
-   `trade → fund first upgrade` loop has a tunable, testable balance ratio.
-9. Added the **alien dialogue system** (DESIGN.md §6.7), stress-tested against the
-   Lightspeed per-species dialogue corpus (`lightspeed-analysis/Lightspeed_Alien_Dialogue_Reference.md`):
-   a config-driven `dialogue_pack` of context keys → conditional (`when`) line entries
-   keyed to standing band / treaty / grudge / mechanic stage, with **variant pools + a
-   recency ring** for non-repeating variability, templated placeholders, and a
-   species → `persona` → generic fallback chain. The contact-screen conversation **verb
-   menu is derived** from species parameters, not authored. The dialogue corpus lives in
-   its **own config file** (`config/alien_dialogue_default.yaml`, separate from
-   `config/alien_roster_default.yaml`), merged onto the roster at the config I/O seam so a
-   roster and its voice corpus vary independently. Wired into §4 data model
-   (`dialogue_pack`, `Player.dialogue_recency`), §10/§11 (encounter & contact screens),
-   §13 (dialogue-integrity validation), and Appendix B.
 
 **Phases 1, 1.5, 2 (incl. the route follow-up WP14–WP18), and 3
 (`docs/PHASE3_PLAN.md`, WP19–WP44 / M10–M15) are implemented and shipped.**
@@ -294,55 +229,12 @@ spec-delta commit landing that plan; implementation starts at WP46.
 - Single-player embeds the server in-process; never let the TUI reach
   around the service API into core state directly.
 
-## Roadmap (from DESIGN.md §14)
+## Roadmap
 
-- **Phase 1 (shipped):** core models, big bang (cluster+bridge+distance
-  bands+validate, Core Space sectors 1-10, Stardock), movement with turn
-  costs, port docking + trading with live pricing and haggling in latinum,
-  SQLite persistence, Textual game screen (sector view, clickable warp
-  list, status sidebar, port screen). Exit criterion: pair-trading loop is
-  fun for 30 minutes and funds a first ship upgrade.
-- **Phase 2 (the pivot phase; shipped incl. WP14–WP18):** discovery system with distance-banded
-  rarity, planet descent + surface sites, sensor detection, discovery
-  codex, friendly-disposition alien species with tech barter/latinum sales of aspect upgrades,
-  the engine-room subsystem/component model (§4.1: slotted upgrades, component
-  tiers, derived aspects, repair), Stardock services, multiple ship types,
-  **typed planets with band-weighted types/ownership and BNT-style production
-  shaped by `planet_type`/habitability, player colonization of unowned worlds,
-  derelict orbital starbases as scavengeable component caches** (DESIGN.md §4.2),
-  Genesis torpedoes, Computer screen (pair-trade finder, route planner).
-- **Phase 3 (shipped; see `docs/PHASE3_PLAN.md`, WP19–WP44 / M10–M15):**
-  **big bang topology modes** (config-selectable `trunk` / `expansive` band-lattice
-  bridge pass, per-mode band retune — DESIGN.md §5), **alliance home clusters +
-  neutral lanes generated for real** (§5 step 6), low-disposition (hostile-band)
-  alien species (threat/interception,
-  threat tiers, rarity inverse to threat, escape-chance floor), encounter system
-  (disposition roll for greeting vs. violence, escort/pack spawns, firing-arc
-  combat, localized component damage + field-kit repair, homing missiles),
-  **conversation depth** (§6.7: per-contact dialogue sessions, situational facts,
-  cross-visit arcs/callbacks, per-instance recency, expanded corpus, combat
-  dialogue live), **the Entity** (§7: the singular roaming dialogue-only discovery
-  replacing the salted `entity` kind — stale last-known leads, always-on sensor
-  hint, sensor-gated contact, Legendary codex stamp),
-  signature-mechanic hooks, alliances (join one bloc, admission-price
-  tasks, rival fallout) and inter-species relations/grudges, ship combat with
-  salvage and escape pods, NPC starbases as destructible set-pieces,
-  **orbital/planetary starbases with ownership-keyed planetary-system defense and
-  player repair/claim of derelict bases into forward footholds** (DESIGN.md §4.2),
-  sector fighters/mines/beacons, alignment/experience, Core Space law keyed to the
-  governing alliance (static Federation governor this phase; Core safety driven by
-  the player's standing with the governor), goal-directed NPC movement,
-  friendly-disposition NPC traders, hostile homeworld raids with bounties.
-- **Phase 5 (next — executed *before* Phase 4; `docs/PHASE5_4_PLAN.md`
-  WP45–WP60 / M16–M19):** order-book economy with hard port purses, dynamic
-  governance of Core Space (a `covets_core` bloc seizing control, flipping the
-  governing alliance), forward-base services at player-owned orbital starbases,
-  citadels + planetary combat, Armid/limpet mine split, probes/interdictor,
-  favor/escort contracts, tavern/noticeboard, sysop console, scripting hooks.
-- **Phase 4 (executed after Phase 5; `docs/PHASE5_4_PLAN.md` WP61–WP69 /
-  M20–M21):** multiplayer — the wire (JSON-RPC over websockets, a versioned
-  dataclass-DTO codec), lobby/auth, broadcast pipeline, corporations + corp
-  war, full attacker-driven PvP, hosted client via `textual serve`.
+Per-phase scope lives in `docs/DESIGN.md` §14, with the per-work-package
+breakdowns in `docs/PHASE3_PLAN.md` (WP19–WP44 / M10–M15) and
+`docs/PHASE5_4_PLAN.md` (WP45–WP69 / M16–M21). Read those rather than a copy
+here.
 
 ## Conventions
 
@@ -351,16 +243,13 @@ spec-delta commit landing that plan; implementation starts at WP46.
 - Tests: pytest + hypothesis. Property tests for economy invariants;
   golden-master replays of command logs against fixed seeds; bigbang
   validation across many seeds; Textual Pilot for UI flows.
-- Dependencies (Phase 1): textual, rich, networkx, pydantic v2, pyyaml,
-  matplotlib + scipy (dev-only bigbang --render); stdlib sqlite3. Add nothing
-  else without updating DESIGN.md §15.
+- Dependencies: see `pyproject.toml`. Add nothing else without updating
+  DESIGN.md §15.
 - Commit style: small, phase-tagged (e.g. `p1: bigbang cluster pass`).
 
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
 
 Rules:
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
