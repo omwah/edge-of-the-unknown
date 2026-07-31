@@ -25,14 +25,20 @@ resolve:
   start: 100
   cap: 120                  # hardening ceiling — headroom above start for atrocity/kills
   surrender_threshold: 25   # planet capitulates at or below this (difficulty shifts it)
-  # Demonstrations of power (resolve LOST by the defenders):
-  turret_destroyed: 6
-  aa_destroyed: 8
-  sensor_destroyed: 5
-  wall_breached: 3          # per wall segment reduced to rubble
-  garrison_killed: 2
-  military_building_destroyed: 5
-  citadel_gun_destroyed: 15
+  # Demonstrations of power (resolve LOST by the defenders).
+  #
+  # GW-WP24 (D33) cut these ~35%. They set how *much work* a surrender costs, and with a
+  # fixed 24-turn clock the work a platoon can do is proportional to how many guns it
+  # brought — so the size of these numbers is what makes force the dominant variable.
+  # At the old values two marauders won half their seeds and any squad of four won every
+  # one of them, which is not a curve at all.
+  turret_destroyed: 4
+  aa_destroyed: 6
+  sensor_destroyed: 3
+  wall_breached: 2          # per wall segment reduced to rubble
+  garrison_killed: 1
+  military_building_destroyed: 3
+  citadel_gun_destroyed: 10
   city_cowed: 10            # a city's every active defense silenced
   broadcast: 14             # a Command suit dictating terms over a cowed city
   # Backfire (resolve GAINED by the defenders — hardened by atrocity/success):
@@ -80,6 +86,15 @@ suits:
     missiles: 0
     missile: {range: 0, damage: 0, accuracy: 0.0, structure_mult: 1.0}
     jam_radius: 9           # city sensors inside this radius are suppressed
+    # GW-WP24 (D30/D34): the scout's two real jobs. `recon_radius` uncovers enemy
+    # infantry and emplacements through fog without line of sight — it is how the
+    # platoon finds the AA it has to silence. `spot_radius`/`spot_missile_bonus` then
+    # make the missile that kills that AA hit harder when the scout is near the target.
+    # Both feed the D27 tactic directly, which is what makes a mixed platoon better than
+    # a marauder stack without capping marauders by rule.
+    recon_radius: 16
+    spot_radius: 10
+    spot_missile_bonus: 0.15
   command:
     label: Command
     glyph: "C"
@@ -96,6 +111,10 @@ suits:
     missile: {range: 12, damage: 45, accuracy: 0.85, structure_mult: 2.0}
     command_radius: 8       # friendly accuracy aura
     command_acc_bonus: 0.10
+    # GW-WP24 (D31): extra move points per turn for allies inside `command_radius`.
+    # Movement is the scarce resource on a 24-turn clock, so this is the command suit's
+    # primary reason to exist — dictating terms (below) is a bonus finish, not the draw.
+    command_move_bonus: 2
     broadcast_range: 14     # from a cowed city's center, to dictate terms
 
 # The player's persistent ground force (GW plan D3). Recruits are *hired* at
@@ -112,31 +131,58 @@ ground_force:
   missile_price: 400        # latinum per ground missile (magazine capped by owned suits)
 
 defenses:
-  wall:    {hp: 80}
-  gate:    {hp: 60}
+  # GW-WP24 (D27): walls are the *slow* way in. A marauder's rifle does 28 x2.0 = 56 to
+  # structures, so 80hp was two shots — blasting a hole was strictly better than jumping
+  # and the jump jets were dead weight. At 200 a breach is four shots of a scarce
+  # 24-turn clock — the price of refusing to deal with the AA first, but still a real
+  # fallback for a platoon that has spent its missiles.
+  wall:    {hp: 200}
+  gate:    {hp: 200}
   # Turrets are the ground gauntlet: the on-foot approach past them should cost
   # blood but stay survivable behind cover and by silencing them one at a time.
-  turret:  {hp: 60, range: 12, damage: 24, accuracy: 0.72}
-  # AA is the aerial defense. Dropping or jumping into its umbrella is meant to be
-  # punishing, worse the deeper you land — `point_blank_bonus` ramps accuracy from
-  # the base value at the edge of `range` up to (accuracy + bonus) at the muzzle,
-  # so a capsule landing in the heart of a city (usually under several overlapping
-  # AA) is near-certain death. The intended play is to land clear of the umbrella
-  # and march in, taking the risk only for the jumps you truly need.
-  aa:      {hp: 50, range: 15, damage: 48, accuracy: 0.60, point_blank_bonus: 0.35}
+  # GW-WP24 (D29/D33): lethality raised so a win costs roughly a third of the platoon —
+  # and, just as important, so casualties *steepen the force curve*. Losing one trooper
+  # costs a two-man raid half its firepower and an eight-man platoon an eighth, so
+  # attrition punishes small squads convexly. That is the mechanism making a couple of
+  # marauders a slim chance rather than a slow certainty.
+  turret:  {hp: 60, range: 12, damage: 32, accuracy: 0.72}
+  # AA is the aerial defense, and since GW-WP24 (D27) it is the *gate on jumping* rather
+  # than a flat prohibition on it. Dropping or jumping into a live umbrella is still
+  # punishing — `point_blank_bonus` ramps accuracy from the base value at the edge of
+  # `range` up to (accuracy + bonus) at the muzzle, so a capsule landing in the heart of
+  # a city is near-certain death.
+  #
+  # `range` must stay **below the marauder/command missile range** (13/12): that gap is
+  # the whole tactic. At the old 15 the AA outranged every weapon that could reach it, so
+  # it could only be silenced by walking into it — by which point the jump it was
+  # blocking was pointless, and jump jets had no use in the game at all. At 12 a marauder
+  # can stand off at 13 and missile it, and the jump window opens the turn it dies.
+  # `hp` sits just under one missile (60 x2.0 = 120) so a single missile silences a
+  # battery outright. Two-missile batteries were measured and rejected: a platoon carries
+  # twelve missiles against two or three AA per city, and when the maths went against it
+  # the jump window never opened at all — half of sixteen runs never got inside. The
+  # missile is meant to be the key that opens the door, not an attrition race.
+  aa:      {hp: 110, range: 12, damage: 48, accuracy: 0.60, point_blank_bonus: 0.35}
   sensor:  {hp: 40, radius: 16}
   citadel_gun: {hp: 120, range: 16, damage: 40, accuracy: 0.70}
   building_military_hp: 50
   building_civilian_hp: 30
+  # Cells of open ground between the drop and the capital's **footprint edge** (GW-WP24
+  # re-anchored this from the city centre — see `assault_landing`). Read it as "how long
+  # is the walk in": 12 is roughly two turns of marching under fire before the wall, plus
+  # room to stand at missile range (13) while outside AA range (12), which is where D27's
+  # silence-then-jump line is played. Raising this lengthens the approach on every world
+  # equally now, instead of doing nothing on worlds with big cities.
+  drop_standoff: 12
 
 garrison:
-  infantry: {hp: 40, armor: 1, move: 3, sight: 8, weapon: {range: 6, damage: 10, accuracy: 0.60, structure_mult: 1.0}}
-  armor:    {hp: 90, armor: 4, move: 4, sight: 9, weapon: {range: 8, damage: 22, accuracy: 0.65, structure_mult: 1.0}}
+  infantry: {hp: 40, armor: 1, move: 3, sight: 8, weapon: {range: 6, damage: 14, accuracy: 0.60, structure_mult: 1.0}}
+  armor:    {hp: 90, armor: 4, move: 4, sight: 9, weapon: {range: 8, damage: 28, accuracy: 0.65, structure_mult: 1.0}}
   sortie_base: 2            # units in the first sortie wave
   sortie_growth: 1          # extra units per later wave
   armor_from_wave: 2        # waves before tanks join the sorties
   undetected_first_strike: 0.15   # accuracy bonus firing while undetected
-  preplaced_frac: 0.35      # GW-WP10: share of the reserved garrison stationed at drop
+  preplaced_frac: 0.50      # GW-WP24: more defenders already in place at the drop (D29)
 
 # Terrain gameplay classes, keyed by edge.art.terrain feature names.
 # move_cost 0 = impassable on foot (jump jets clear it). cover soaks accuracy.
@@ -285,8 +331,19 @@ assault_difficulty:
   min_cities: 1
   max_cities: 4
   population_per_extra_city: 4000
-  surrender_threshold_base: 30
-  surrender_threshold_per_citadel_level: 8
+  # GW-WP24 (D33): raised from 30 so a full platoon wins ~90% rather than ~67% — the
+  # single lever that lifts the whole force curve without flattening it, since it changes
+  # how much work a surrender costs and not how fast any given squad can do that work.
+  surrender_threshold_base: 35
+  # GW-WP24: **negative on purpose.** Surrender fires at `resolve <= threshold`, so a
+  # stubborn world wants a *lower* threshold — which is how `resist` below already works
+  # ("hold out to a lower Resolve"). This term had the opposite sign, so every citadel
+  # level made a world capitulate at a higher Resolve, i.e. sooner. Worse, its extra
+  # emplacements (citadel gun 15 + second AA 8) are themselves Resolve to strip, so
+  # fortifying a world made it easier *twice over*: measured at citadel 2 it surrendered
+  # in 3-6 turns against 5-12 at citadel 0. Investment in defense must not accelerate
+  # your own capitulation.
+  surrender_threshold_per_citadel_level: -6
   hostility_mult: 1.4
   band_mult: {}
   alliance_owned_mult: 1.2
@@ -304,3 +361,10 @@ settlement:
   civilian_alignment_penalty: 3
   annex_alignment_penalty: 15
   defenders_per_consequence: 10
+
+# GW-WP23 (D23): read only by the example assault bot (`edge/bot/scripts/assaulter.py`),
+# including when it flies the spectator pilot. Mirrors the setup screen's own starting
+# suggestion, so a watched run shows the mix most players actually field — and can be
+# slid between runs, since class mixture is itself one of the levers being judged.
+bot:
+  squad: {marauder: 4, scout: 3, command: 1}

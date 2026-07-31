@@ -116,9 +116,17 @@ def test_derive_difficulty_scales_with_population() -> None:
 
 
 def test_derive_difficulty_scales_with_citadel_level_only_via_surrender_threshold() -> None:
+    """A fortified world holds out to a **lower** Resolve, so a higher citadel level must
+    *lower* the threshold (surrender fires at `resolve <= threshold`).
+
+    This asserted the opposite direction until GW-WP24. The old sign made every citadel
+    level capitulate at a higher Resolve — sooner — while its extra emplacements were
+    themselves Resolve to strip, so fortifying a world made it easier twice over:
+    measured at citadel 2 it surrendered in 3-6 turns against 5-12 at citadel 0.
+    """
     low = derive_difficulty(_planet(citadel_level=0), CFG, distance_band="Hub", species=None)
     high = derive_difficulty(_planet(citadel_level=3), CFG, distance_band="Hub", species=None)
-    assert high.surrender_threshold > low.surrender_threshold
+    assert high.surrender_threshold < low.surrender_threshold
     assert high.cities == low.cities  # citadel level alone never sizes the city count
 
 
@@ -146,7 +154,10 @@ def test_derive_difficulty_had_gun_scores_higher_than_never_had_one() -> None:
     big_had = derive_difficulty(
         _planet(citadel_level=GUN_MIN, habitability_cap=15_000), CFG, distance_band="Hub", species=None)
     assert big_had.cities >= big_never.cities
-    assert had.surrender_threshold > never_had.surrender_threshold  # citadel_level itself still bites
+    # Both terms now push the same way: `had_gun_mult` divides the threshold down, and
+    # since GW-WP24 the citadel term subtracts rather than adds. A world that built and
+    # lost a gun holds out to a lower Resolve than one that never invested.
+    assert had.surrender_threshold < never_had.surrender_threshold
 
 
 @given(fighters=st.integers(min_value=0, max_value=10_000))
