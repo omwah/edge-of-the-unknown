@@ -66,6 +66,28 @@ def _drop_at(amap: ga.AssaultMap, op: AssaultOperation, rng: Random, x: int, y: 
     return ga.assault_drop(op, amap, CFG, rng, [(suit, x, y)])
 
 
+def _quiet_pair(amap: ga.AssaultMap) -> tuple[tuple[int, int], tuple[int, int]]:
+    """Two adjacent passable cells as far from every city as the map allows.
+
+    Since GW-WP23 the generated landing point sits deliberately just outside the
+    capital's AA umbrella (`ga.assault_landing`) rather than at the map's west edge.
+    That is the right place to begin a raid and the wrong place to test a mechanic: a
+    lone trooper parked there draws emplacement and garrison fire, and an operation that
+    ends mid-test makes the next `assault_end_turn` raise instead of exercising whatever
+    was under test. Tests that just need somewhere to stand ask for quiet ground.
+    """
+    best: tuple[float, int, int] | None = None
+    for y in range(amap.height):
+        for x in range(amap.width):
+            if not _passable(amap, x, y) or not _passable(amap, x + 1, y):
+                continue
+            d = min((math.hypot(c.cx - x, c.cy - y) for c in amap.cities), default=0.0)
+            if best is None or d > best[0]:
+                best = (d, x, y)
+    assert best is not None
+    return (best[1], best[2]), (best[1] + 1, best[2])
+
+
 # --- geometry: destroyed structures become passable rubble -------------------
 
 
@@ -152,12 +174,12 @@ def test_actions_per_turn_enforced_and_reset_on_end_turn() -> None:
 def test_jump_charges_deplete_and_reject_when_spent() -> None:
     amap = _map()
     rng = Random(9)
-    op = _drop_at(amap, _op(amap), rng, amap.landing_x, amap.landing_y, suit="scout")
+    a, b = _quiet_pair(amap)  # away from the objective: this tests charges, not survival
+    op = _drop_at(amap, _op(amap), rng, *a, suit="scout")
     tid = op.platoon[0].id
     suit = GW.suits["scout"]
     charges = suit.jump_charges
     assert charges > 0
-    a, b = (amap.landing_x, amap.landing_y), (amap.landing_x + 1, amap.landing_y)
     assert _passable(amap, *b)
     for i in range(charges):
         target = b if i % 2 == 0 else a

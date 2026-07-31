@@ -30,13 +30,34 @@ from edge.store.snapshots import rebuild, state_hash
 
 _CREATED = "2026-07-23T00:00:00Z"
 _SEEDS = (7, 11, 23)
-_TICKS = 160  # bounded so a stuck bot can't stall the suite; well past one op's lifecycle
+# Bounded so a stuck bot can't stall the suite, but it must still comfortably outlast one
+# operation. A step is a single trooper action, so an op costs roughly
+# `troopers x actions_per_turn x turns` — about 380 for a full platoon fighting the clock
+# out. GW-WP24 made battles longer (a surrender now lands around turn 12-18 instead of 6)
+# and the platoon larger, and at the old 160 the bot simply ran out of budget mid-fight:
+# every seed ended with no outcome at all, which reads as a broken bot rather than a
+# tick ceiling.
+_TICKS = 700
 
 
 def _config() -> GameConfig:
+    """A small universe, but with berths for a **real** platoon.
+
+    The starter hull carries 8 passengers and a suit takes a berth of its own (GW-WP08),
+    so the default put two armed troopers on the ground — and the aggregate assertion
+    below then measured a two-man raid rather than the bot. That was survivable while
+    walls fell in two shots; after GW-WP24 raised them to 200hp a two-man platoon can
+    only ever time out, so every outcome came back `retrieval` and the non-degeneracy
+    check failed on balance rather than on anything the bot did. Berths are not what this
+    test is about, so it buys enough of them to ask its real question.
+    """
     cfg = load_default_config()
-    return cfg.model_copy(update={"bigbang": cfg.bigbang.model_copy(
-        update={"sector_count": 400, "start_sector": 1})})
+    return cfg.model_copy(update={
+        "bigbang": cfg.bigbang.model_copy(
+            update={"sector_count": 400, "start_sector": 1}),
+        "starter_ship": cfg.starter_ship.model_copy(
+            update={"passenger_capacity": 20}),
+    })
 
 
 def _service(tmp_path: Path, seed: int, name: str) -> GameService:

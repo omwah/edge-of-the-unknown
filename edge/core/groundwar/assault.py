@@ -332,6 +332,160 @@ _in_bounds = gw_world.in_bounds
 _passable_components = gw_world.passable_components
 _landing = gw_world.landing_in_component
 
+# How far off the exact standoff radius still counts as "on the ring" (GW-WP23). Wide
+# enough that a ring almost always has candidates to choose between on exposure grounds,
+# narrow enough that "just outside AA range" stays true.
+_RING_BAND = 1.5
+
+
+def assault_landing(
+    labels: list[list[int]], sizes: Mapping[int, int], width: int, height: int,
+    cities: Sequence[AssaultCity], config: GameConfig,
+) -> Vec:
+    """Set down on a ring just outside the capital's AA umbrella (GW-WP23, D16/D17).
+
+    Assault-only, deliberately **not** shared with survey (D18): a survey faces no AA
+    and since GW-WP07-FU2 picks its own drop site, so `landing_in_component`'s
+    west-edge default is a suggestion there rather than a forced march. An assault
+    had no such escape — it inherited the same west-edge point, computed with no
+    reference whatsoever to where the cities are, which is why a GW-WP22 watched run
+    spent ten of its twenty-four turns walking (cities at 95/130/203 cells) and the
+    `defenses.aa` config comment's stated intent — "land clear of the umbrella and
+    march in" — was never actually achievable.
+
+    Anchored on the **capital** (D16), not the nearest city: the capital is the
+    objective and the only city that ever carries a `citadel_gun`, so anchoring here
+    is what makes `citadel_level` legible in where you come down. Cells covered by
+    *another* town's AA are accepted only when nothing clear exists, so a short march
+    is never bought with a landing under someone else's guns.
+
+    Degrades rather than failing: with no ring cell at the exact radius (a small map,
+    or a capital boxed against an edge) it takes the component cell closest to the
+    ring. Pure and deterministic — same labels/cities in, same cell out, no re-rolling
+    (decision #3).
+
+    **Lands in the capital's own passable component, not the map's largest one.** These
+    are not always the same, and the difference is fatal: on `terrestrial_warm` seed 2 the
+    capital sits on a 1149-cell landmass while the largest component is a 2173-cell one
+    108 cells away, with no foot route between them. Confining the drop to the largest
+    component — as this did through GW-WP22, and as survey still does — puts the platoon
+    somewhere it can never walk to the objective from, on a clock, with jump charges
+    covering at most ~32 of those cells. The old west-edge landing hid this behind a long
+    march that failed for the ordinary reason instead of the impossible one.
+    """
+    assert config.groundwar is not None
+    d = config.groundwar.defenses
+    if not cities:
+        return _landing(labels, max(sizes, key=lambda k: sizes[k]) if sizes else 0,
+                        width, height)
+    capital = next((c for c in cities if c.is_citadel), cities[0])
+    # Cells of open ground to cross, measured from the capital's *footprint* (GW-WP24) —
+    # not `aa.range + standoff` from its centre, which made the approach a function of how
+    # big the city happened to be. Clearing the AA umbrella is still required, but as a
+    # separate condition below rather than as arithmetic folded into the radius.
+    radius = float(d.drop_standoff)
+
+    # Open ground *inside* a city's footprint is passable and often its own component, so
+    # neither the component choice nor the ring may consider it: a capital wider than
+    # `aa.range + drop_standoff` would otherwise put the drop boat down in the middle of
+    # the objective, past every wall, which is not a landing — it is skipping the assault.
+    def outside_cities(x: int, y: int) -> bool:
+        return not any(c.inside(x, y) for c in cities)
+
+    # The component a foot assault can actually reach the capital across: the one holding
+    # the passable cell nearest the capital, breaking ties toward the larger landmass.
+    comp: int | None = None
+    anchor: tuple[float, int, int] | None = None
+    for y in range(height):
+        for x in range(width):
+            label = labels[y][x]
+            if label not in sizes or not outside_cities(x, y):
+                continue
+            key = (_dist(capital.cx, capital.cy, x, y), -sizes[label], label)
+            if anchor is None or key < anchor:
+                anchor, comp = key, label
+    if comp is None:
+        return _landing(labels, 0, width, height)
+
+    # Being *on the ring* outranks being clear of another town's guns, and the ordering
+    # matters more than it looks: ranking exposure first lets a seed whose whole ring
+    # happens to sit under a neighbouring town's umbrella escape to some empty corner of
+    # the map instead — one test seed landed 108 cells from the capital that way, which
+    # is the very failure this function exists to remove. So: gather a band around the
+    # ring, prefer an unexposed cell *within it*, and only widen if the band is empty.
+    # Clearance from the capital's *footprint*, not its centre. Cities are wide rectangles
+    # (30x14 in the shipped battlefield) while the ring is a circle, so the same 17-cell
+    # radius leaves ~11 cells of open ground off a long face and barely 2 off a corner —
+    # measured on shipped seeds. Landing on the ring is the decision (D16/D17); *where* on
+    # the ring is free, so spend it on the bearing that actually gives an approach.
+    half_w, half_h = (capital.x1 - capital.x0) / 2, (capital.y1 - capital.y0) / 2
+
+    def clearance(x: int, y: int) -> float:
+        """Open ground between this cell and the capital's edge — the honest approach
+        length, and since GW-WP24 the quantity the ring is actually built on.
+
+        Measuring the ring from the *centre* (D16/D17 as originally decided) couples the
+        approach to the city's size, and shipped cities are ~30x14 against a circular
+        ring: a 20-cell radius leaves ~6 cells of open ground off a long face and none at
+        all off a corner. Tuning the standoff then moved the drop without lengthening the
+        approach, which is the thing the standoff exists to create. Anchoring on the
+        footprint makes `drop_standoff` mean one size-independent thing — cells of open
+        ground you must cross — on every world.
+        """
+        return max(abs(x - capital.cx) - half_w, abs(y - capital.cy) - half_h)
+
+    # Ranked in one pass, safety first. A capital pinned against a map edge can leave the
+    # ring with no cells at all in its component — three shipped `terrestrial_hot` seeds
+    # do exactly that, their capitals sitting within ~11 cells of the top edge — and a
+    # fallback of "nearest to the ring" then reaches *inward*, setting the platoon down
+    # 10-15 cells out, under the very umbrella the standoff exists to clear. So a cell
+    # outside every AA envelope always outranks a closer one, and only a capital with no
+    # safe ground anywhere in reach falls back to the farthest cell available.
+    safe: list[tuple[float, float, int, int]] = []
+    exposed_best: tuple[float, int, int] | None = None
+    for y in range(height):
+        for x in range(width):
+            if labels[y][x] != comp or not outside_cities(x, y):
+                continue
+            here = _dist(capital.cx, capital.cy, x, y)
+            if any(_dist(c.cx, c.cy, x, y) <= d.aa.range for c in cities):
+                if exposed_best is None or (-here, y, x) < exposed_best:
+                    exposed_best = (-here, y, x)
+                continue
+            off = abs(clearance(x, y) - radius)
+            safe.append((off, here, y, x))
+    if safe:
+        _, _, by, bx = min(safe)
+        return bx, by
+    if exposed_best is None:  # nothing walkable at all — the shared default still applies
+        return _landing(labels, comp, width, height)
+    return exposed_best[2], exposed_best[1]
+
+
+def station_landing(
+    zones: Sequence[Vec], city: AssaultCity, config: GameConfig,
+) -> Vec:
+    """Pick the station deployment zone that best honours the drop standoff (D19).
+
+    Closes the GW-WP16 deferral that only ever used `deployment_zones[0]`: every zone
+    the interior layout offers is now a candidate, ranked by the same rule
+    `assault_landing` applies outdoors — outside the command core's AA envelope first,
+    then nearest the standoff ring.
+
+    A station is far smaller than a battlefield, so the ring usually does not fit at
+    all and every zone is inside the envelope. That is the intended degenerate case,
+    not a failure: with all candidates exposed, ranking by distance-to-ring picks the
+    zone *farthest* from the command core, which is the D19 fallback stated exactly.
+    Interior AA is therefore a real cost of the approach rather than something a drop
+    can sidestep — the opposite of the terrestrial case, and deliberately so.
+    """
+    assert config.groundwar is not None
+    d = config.groundwar.defenses
+    radius = float(d.aa.range + d.drop_standoff)
+    return min(zones, key=lambda z: (
+        1 if _dist(city.cx, city.cy, *z) <= d.aa.range else 0,
+        abs(_dist(city.cx, city.cy, *z) - radius), z[1], z[0]))
+
 
 def generate_assault_map(
     config: GameConfig, *, seed: int, planet_type: str, cities: int, citadel_level: int,
@@ -351,7 +505,9 @@ def generate_assault_map(
     The POC never needed foot-reachability (its troopers can jump), so as in GW-WP09 the
     largest 4-connected passable component is computed after fortification and the
     landing point confined to it — never re-rolled, so the same seed always produces
-    the same map (determinism over retry, decision #3). Places **zero** garrison units
+    the same map (determinism over retry, decision #3). Since GW-WP23 that point is
+    also placed *relative to the capital*, on a ring just outside AA range
+    (`assault_landing`), instead of at the map's west edge irrespective of the cities. Places **zero** garrison units
     (module docstring).
     """
     assert config.groundwar is not None
@@ -372,8 +528,7 @@ def generate_assault_map(
     ]
 
     labels, sizes = _passable_components(feature, blocked, config, width, height)
-    comp = max(sizes, key=lambda k: sizes[k]) if sizes else 0
-    landing_x, landing_y = _landing(labels, comp, width, height)
+    landing_x, landing_y = assault_landing(labels, sizes, width, height, built, config)
 
     return AssaultMap(
         width=width, height=height,
@@ -519,7 +674,7 @@ def generate_cloud_city_assault_map(
             if feature_name == "bulkhead":
                 blocked.add((x, y))
 
-    landing_x, landing_y = layout.deployment_zones[0]
+    landing_x, landing_y = station_landing(layout.deployment_zones, city, config)
     return AssaultMap(
         width=layout.width, height=layout.height, feature=layout.feature_grid,
         blocked=frozenset(blocked), cities=(city,), structures=tuple(structures),
@@ -531,6 +686,31 @@ def assault_map_for(state: UniverseState, op: AssaultOperation, config: GameConf
     """Regenerate the live battlefield for an active assault operation (G5) — the
     projection seam, mirroring `survey.survey_map_for`."""
     return assault_map_for_state(op, config)
+
+
+_MAP_CACHE_MAX = 64
+# GW-WP23 (D24): the runtime cache GW-WP13 said to add only where measurement warrants
+# one. GW-WP22's watched run supplied the warrant — regenerating the battlefield once
+# per bot action costs ~0.1s and dominated a ~79s run, because every projection, every
+# legality check and every narration line re-derives the same map from the same inputs.
+#
+# Sound because generation is pure: `generate_assault_map`/`generate_cloud_city_assault_map`
+# are total functions of (seed, planet_type, cities, citadel_level) and the config, and
+# `AssaultMap` is frozen throughout (tuples/frozensets), so a shared instance cannot be
+# mutated by one holder under another. Determinism is therefore untouched — a cache hit
+# returns exactly what a recompute would have built. Live battle damage is *not* cached
+# here: it is applied downstream by `persistent_structure_hp`/`_battle_for` against this
+# immutable layout, which is what makes the layout cacheable in the first place.
+#
+# `id(config)` is part of the key and the config is held alive by the cached entry, so an
+# id cannot be recycled onto a different config while its map is still reachable — tests
+# routinely build many configs that differ without any version field changing.
+_map_cache: dict[tuple[object, ...], tuple[GameConfig, AssaultMap]] = {}
+
+
+def clear_assault_map_cache() -> None:
+    """Drop every memoized battlefield (GW-WP23). For tests that mutate config in place."""
+    _map_cache.clear()
 
 
 def assault_map_for_state(op: AssaultOperation, config: GameConfig) -> AssaultMap:
@@ -546,13 +726,23 @@ def assault_map_for_state(op: AssaultOperation, config: GameConfig) -> AssaultMa
     that distinction matters; every downstream consumer (session, TUI,
     settlement) reads the same `AssaultMap` shape either way.
     """
-    if is_cloud_city_world(op.planet_type, config):
-        return generate_cloud_city_assault_map(
+    station = is_cloud_city_world(op.planet_type, config)
+    key = (id(config), station, op.world_seed, op.planet_type, op.cities, op.citadel_level)
+    hit = _map_cache.get(key)
+    if hit is not None and hit[0] is config:
+        return hit[1]
+    if station:
+        amap = generate_cloud_city_assault_map(
             config, seed=op.world_seed, cloud_city_size=op.cities,
             citadel_level=op.citadel_level)
-    return generate_assault_map(
-        config, seed=op.world_seed, planet_type=op.planet_type,
-        cities=op.cities, citadel_level=op.citadel_level)
+    else:
+        amap = generate_assault_map(
+            config, seed=op.world_seed, planet_type=op.planet_type,
+            cities=op.cities, citadel_level=op.citadel_level)
+    if len(_map_cache) >= _MAP_CACHE_MAX:
+        _map_cache.clear()
+    _map_cache[key] = (config, amap)
+    return amap
 
 
 def persistent_structure_hp(
@@ -620,6 +810,25 @@ def tactical_projection(
                 if (_dist(trooper.x, trooper.y, x, y) <= sight
                         and _line_of_sight(battle, trooper.x, trooper.y, x, y)):
                     visible.add((x, y))
+
+    # GW-WP24 (D30): a scout uncovers enemy *units and emplacements* at `recon_radius`
+    # without needing line of sight — reading heat and movement rather than seeing it.
+    # Deliberately narrow: only occupied cells are revealed, never open ground or passive
+    # geometry, so this finds the AA the platoon must silence (D27) without turning the
+    # scout into a map-wide x-ray. This is the scout's reason to exist, replacing
+    # `jam_radius`, whose sensor suppression only touched detection and first-strike
+    # bonuses that nothing in the fight meaningfully exploited.
+    for trooper in battle.live_troopers():
+        recon = _suit(battle, trooper).recon_radius
+        if recon <= 0:
+            continue
+        for unit in battle.garrison.values():
+            if unit.alive and _dist(trooper.x, trooper.y, unit.x, unit.y) <= recon:
+                visible.add((unit.x, unit.y))
+        for s in battle.structures.values():
+            if (s.alive and s.kind not in PASSIVE_STRUCTURE_KINDS
+                    and _dist(trooper.x, trooper.y, s.x, s.y) <= recon):
+                visible.add((s.x, s.y))
 
     actor = battle.troopers.get(actor_id) if actor_id is not None else None
     live_action = actor is not None and actor.alive and op.outcome is None
@@ -1150,6 +1359,35 @@ def _structure_destroyed(battle: _Battle, s: _Structure) -> None:
 # --- attacks ---------------------------------------------------------------
 
 
+def _spotter_bonus(battle: _Battle, tx: int, ty: int) -> float:
+    """Accuracy a scout lends a missile fired at `(tx, ty)` (GW-WP24, D34).
+
+    Keyed on the *target*, not the firer: the scout has to be forward, near what is being
+    shot at, which is what makes bringing one a positioning decision rather than a passive
+    stat. Pairs with `recon_radius` (D30) — the same trooper finds the AA and then makes
+    the missile that silences it land.
+    """
+    best = 0.0
+    for ally in battle.live_troopers():
+        asuit = _suit(battle, ally)
+        if asuit.spot_radius > 0 and _dist(ally.x, ally.y, tx, ty) <= asuit.spot_radius:
+            best = max(best, asuit.spot_missile_bonus)
+    return best
+
+
+def _command_move_bonus(battle: _Battle, trooper: _Trooper) -> int:
+    """Extra move points a nearby Command suit lends this trooper (GW-WP24, D31)."""
+    best = 0
+    for ally in battle.live_troopers():
+        if ally is trooper:
+            continue
+        asuit = _suit(battle, ally)
+        if (asuit.command_move_bonus > 0
+                and _dist(ally.x, ally.y, trooper.x, trooper.y) <= asuit.command_radius):
+            best = max(best, asuit.command_move_bonus)
+    return best
+
+
 def _command_bonus(battle: _Battle, trooper: _Trooper) -> float:
     for ally in battle.live_troopers():
         if ally is trooper:
@@ -1213,6 +1451,8 @@ def fire_at(
     if missile:
         trooper.missiles -= 1
     acc = weapon.accuracy + _command_bonus(battle, trooper)
+    if missile:
+        acc += _spotter_bonus(battle, tx, ty)  # D34
     if not trooper.detected:
         acc += battle.gw.garrison.undetected_first_strike
     trooper.detected = True  # firing reveals you
@@ -1516,7 +1756,7 @@ def _spawn_sortie(battle: _Battle) -> None:
 def start_player_phase(battle: _Battle) -> None:
     for t in battle.live_troopers():
         suit = _suit(battle, t)
-        t.mp = suit.move
+        t.mp = suit.move + _command_move_bonus(battle, t)  # D31
         t.actions = battle.gw.platoon.actions_per_turn
         t.fired = False
     update_detection(battle)

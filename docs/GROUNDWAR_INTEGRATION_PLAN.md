@@ -7,7 +7,7 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: COMPLETE — all of GW-WP01–22 shipped, GW-M1 through GW-M5 all
+> **Status: COMPLETE — all of GW-WP01–24 shipped, GW-M1 through GW-M5 all
 > closed (July 2026). `groundwar.cloud_city_assault_enabled` is on in the
 > production default. GW-WP20 closed the protectorate/annexation TUI gap and
 > GW-WP21 the terrain band-colour gap; GW-WP21-FU1 then settled
@@ -18,8 +18,12 @@
 > geometry for both terrestrial and Cloud City assaults). GW-WP22 built the
 > instrument it was waiting on — a bot pilot inside `edge-groundwar` that fights
 > a scenario on the production screen while you watch — after measurement showed
-> a batch seed matrix would have graded the *bot*, not the balance. The verdict
-> itself is still a human's.**
+> a batch seed matrix would have graded the *bot*, not the balance. **GW-WP23 then
+> fixed the two things that made the verdict unreachable: the drop was placed at the
+> map's west edge with no reference to the objective, and the bot never assaulted it.
+> With both fixed the seed matrix returns (reporting breach/contact/Resolve-rate
+> diagnostics, not bare outcomes) and the tuning is finally a judgement about the
+> balance.** The verdict itself is still a human's.**
 
 ## Context
 
@@ -320,6 +324,90 @@ from the ship into a player world/protectorate. On transfer they become
 persistent typed local defenders and are no longer individually tracked or
 retrievable. The action conserves passenger/suit inventory atomically and makes
 the irreversible conversion explicit before confirmation.
+
+### D16–D26 — Drop placement and bot competence (GW-WP23) **RESOLVED**
+
+Interview of July 30, 2026, opened by a playtest observation ("the bots drop way too
+far from the objectives; they should drop just out of AA range") and the GW-WP22
+finding that the bot never assaults its objective. All resolved and implemented in
+GW-WP23.
+
+- **D16 — The drop ring is measured from the capital.** Not the nearest city (which
+  may be a trivial town while the objective is 200 cells away) and not the union of
+  every AA envelope (which merges on dense maps and pushes the drop back to the edge).
+  The capital is the objective and the only city that ever carries a `citadel_gun`, so
+  anchoring there is what makes `citadel_level` legible in where you come down. Derived
+  rule: a ring cell covered by another town's AA is accepted only when no clear ring
+  cell exists.
+- **D17 — Standoff is a config knob, default +2.** `groundwar.defenses.drop_standoff`,
+  added to `aa.range` for a ring radius of 17. A knob rather than a constant because
+  "just out of range" is a balance feel to be slid while watching a run, not a fact.
+- **D18 — Assault only.** Survey keeps `world.landing_in_component`: it faces no AA and
+  has picked its own drop site since GW-WP07-FU2, so the west-edge default is a
+  suggestion there rather than a forced march.
+- **D19 — Cloud City included, over all deployment zones.** Closes GW-WP16's deferred
+  "only `deployment_zones[0]` is used". A station is far smaller than a battlefield, so
+  the ring usually cannot fit and every zone is exposed; ranking by distance-to-ring
+  then picks the zone farthest from the command core, which is the intended fallback.
+- **D20 — The bot plays role-differentiated.** Marauders close and breach, scouts
+  screen, command holds at broadcast range. The bot is the instrument the balance
+  verdict is read through, so a bot that plays badly makes every world read "too hard";
+  its skill level *is* a measurement decision.
+- **D21 — Out of position, fire only at blocking or threatening targets.** Gate, wall,
+  approach-covering emplacement, or anything shooting back. Free-fire on everything only
+  once inside the objective.
+- **D22 — Breach by blasting a wall segment.** Marauder guns break walls; the platoon
+  makes its own hole. Accepted consequence: gate placement becomes decorative and this
+  pass cannot tell whether gate geometry matters.
+- **D23 — The bot's squad mix is config** (`groundwar.bot.squad`), because composition
+  is itself one of the levers being judged.
+- **D24 — `assault_map_for` is memoized.** GW-WP13 said to add caches only where
+  measurement warrants; GW-WP22's ~0.1s-per-action finding is that warrant.
+- **D25 — Lands as GW-WP23 with no `config_version` bump**, as mid-milestone work in a
+  tuning arc that will bump once the numbers settle. Saves are therefore not portable
+  across it (see the epoch section's standing warning) — the generated battlefield moves
+  while the recorded version does not.
+- **D26 — Done means watched, plus a diagnostic seed matrix.** Tests assert determinism
+  and non-degeneracy only, per GW-WP13. The batch runner GW-WP22 rejected returns, but
+  reports *how the fight went* (contact turn, breach turn, Resolve delta per turn,
+  casualties at breach) rather than outcomes alone — a table of outcomes is precisely
+  the artefact that misled before.
+
+### D27–D33 — Assault balance and class differentiation (GW-WP24) **RESOLVED**
+
+Interview of July 30, 2026, from playtest tuning notes: the battle is too easy, there is
+no incentive to jump (AA makes it a pure disincentive), win rate should scale with force
+size, and the suit classes are not differentiated enough to field anything but marauders.
+D27–D29 are implemented; D30–D33 are decided and **not yet implemented**.
+
+- **D27 — Jumping is gated on silencing AA, not forbidden by it.** `aa.range` must stay
+  *below* the marauder/command missile range (13/12) — at the shipped 15 the AA outranged
+  every weapon that could reach it, so it could only be silenced on foot, by which point
+  the jump was pointless and the jump jets were dead weight. AA is now range 12 with HP
+  just under one missile, and walls rose 80 → 200 so blasting is the slow fallback. The
+  line is: stand off at 13, missile the battery, jump the wall the turn it dies.
+- **D28 — A competent assault should win just before the clock runs out**, ~18–23 of 24
+  turns, with a real minority of seeds failing.
+- **D29 — Winning should cost roughly a third of the platoon.**
+- **D30 — Scouts are the recon class.** They extend how far enemy infantry, artillery and
+  AA are uncovered through fog of war. This replaces `jam_radius` as the scout's reason to
+  exist: sensor jamming only affected detection and first-strike bonuses that nothing in
+  the fight meaningfully exploited.
+- **D31 — A Command suit in range increases effective movement distance** for nearby
+  troopers, replacing its accuracy aura as the primary reason to bring one. Movement is
+  the scarce resource on a 24-turn clock, so this makes command a tempo asset.
+- **D32 — Broadcast/term-dictation is kept.** *Reversed the same session.* The first call
+  was to delete it as unused flavour; on reflection there is no harm in keeping it, and
+  the removal's blast radius (command + reducer, event, codec, `WIRE_VERSION`,
+  `broadcast_cities`/`can_broadcast`, config, TUI action, bot branch) bought nothing. It
+  stays as an optional faster finish rather than a required one.
+- **D33 — The force curve is steep**: roughly 5% for a two-marauder raid, ~90% for a full
+  platoon. Force size is the dominant variable.
+- **D34 — Scouts spot for missiles.** A marauder's missile is more effective with a live
+  scout in range of the target. Together with D30 this gives the scout two jobs that both
+  serve the D27 tactic — it finds the AA, and it makes the missile that silences it hit
+  harder — which is what makes a mixed platoon better than a marauder stack without
+  capping marauders by rule.
 
 ## Ground-access contract
 
@@ -2175,6 +2263,146 @@ operation freezes on the board instead of being extracted out from under the vie
 pace bounds, both topologies, the setup-screen toggle, bot keys inert without a pilot,
 and the whole launch path end to end for terrestrial and Cloud City.
 
+### GW-WP23 — Drop standoff, a bot that assaults, and three bugs it uncovered (L) — SHIPPED
+
+**Status:** shipped July 30, 2026. Implements D16–D26. Does **not** close the GW-WP13/16
+tuning deferral — it removes the two reasons the verdict could not be reached, and hands
+the numbers back to a human with instruments that now work.
+
+**The drop was never placed relative to the objective.** `generate_assault_map` took its
+landing point from `world.landing_in_component`, whose docstring reads "set down near the
+map's left-middle" — a scan from x=4 with no reference to city positions at all. Every
+terrestrial assault, every seed, began at the west edge; GW-WP22's watched run had cities
+at 95/130/203 cells and spent ten of twenty-four turns marching. The shipped `defenses.aa`
+comment already stated the intended play — "land clear of the umbrella and march in" — so
+this was a bug against written design, not a tuning gap. New `assault.assault_landing`
+places the drop on a ring at `aa.range + drop_standoff` from the capital, preferring cells
+clear of every AA envelope and, among equivalent ring cells, the bearing with the most
+clearance from the capital's *footprint* — cities are 30×14 rectangles against a circular
+ring, so the same 17-cell radius gives ~11 cells of approach off a long face and barely 2
+off a corner. Measured over 48 generated maps (4 planet types × 12 seeds), every drop now
+lands on the ring with the capital foot-reachable.
+
+**Three bugs the work uncovered, none of them the drop:**
+
+1. **Capitals could be foot-unreachable.** Confining the landing to the map's *largest*
+   passable component is wrong for an assault: on `terrestrial_warm` seed 2 the capital
+   sits on a 1149-cell landmass while the largest is a 2173-cell one 108 cells away, with
+   no route between them and jump charges covering ~32 cells. That assault could not be
+   completed by any play. The landing now picks the component that reaches the capital.
+   The old west-edge behaviour hid this behind a march that failed for the ordinary reason
+   instead of the impossible one.
+2. **Nothing stopped a drop *inside* a city.** Open ground within the walls is passable
+   and often its own component, so a capital wider than the ring radius could put the drop
+   boat down past every wall. Excluded explicitly.
+3. **Some worlds have no safe drop at all.** On `terrestrial_hot` seeds 2, 4 and 11 the
+   capital sits ~11 cells from the map's top edge and every walkable cell that can reach
+   it lies under an umbrella. The generator takes the farthest available cell and does not
+   pretend otherwise; whether such worlds should exist is a balance question, flagged not
+   silent.
+
+**The bot now reaches and enters the objective.** Its predecessor's priority order fired
+whenever anything was fireable, so it advanced only while nothing was in range and froze
+on contact; `min(proj.fireable)` then spread damage across every wall cell so no segment
+ever fell. Rewritten for D20–D23: roles diverge, out-of-position fire is restricted to
+blocking/threatening targets, the platoon concentrates on **one** breach, movement takes
+the turn's first action so a trooper in contact still closes, and the squad mix comes from
+config. Two further stalls were found and fixed by tracing: a trooper already inside the
+walls still walked toward the perimeter breach (marching back out of the objective), and
+`_breach` kept selecting the *next* nearest wall after each one fell — nine segments over
+twenty-four turns, several destroyed, the objective never entered. A seed-11 trace now
+runs 17 cells out to 3.6 from the capital centre by turn 11.
+
+**Also fixed:** `_ensure_loadout` treated the configured squad as a precondition rather
+than a goal, so a universe that cannot supply it (recruit capacity below squad size)
+oscillated forever — a run burned all 160 ticks on 80 warps and 80 travels without opening
+an operation.
+
+**Still open, and unchanged by this WP:** the numeric tuning itself. Also new for whoever
+takes it — `terrestrial_hot` worlds with no safe drop; the citadel gun's silence at range
+14 is now explained (`_line_of_sight` blocks on any live structure, and the gun sits behind
+its own wall, so it cannot fire on anything outside the city it defends — geometry, not a
+defect, but arguably the wrong geometry for a `citadel_level >= 2` centrepiece); and the
+first matrix run shows breach turns clustering at 2–10 with Resolve falling 0.0–1.2/turn
+against the ~70 needed, i.e. the raid still cannot finish inside the retrieval clock.
+
+Files: `edge/core/groundwar/assault.py` (`assault_landing`, `station_landing`, map cache),
+`edge/core/config.py` (`drop_standoff`, `GwBot`), `config/groundwar_default.yaml`,
+`edge/bot/scripts/assaulter.py` (rewritten), `edge/groundwar/matrix.py` (new).
+Tests: `tests/test_groundwar_drop_standoff.py` (new, 153 cases — ring placement, AA
+clearance conditional on safe ground existing, never inside a footprint, capital
+foot-reachability, determinism, the knob actually moving the drop, Cloud City zone
+selection, and cache identity/keying/config isolation); `tests/test_groundwar_assault_actions.py`
+gains `_quiet_pair` (mechanics tests must stand somewhere quiet now that the drop is
+deliberately near the objective); assault-view snapshots refreshed for the moved drop.
+Commit `ground: GW-WP23 drop standoff + an assaulting bot`.
+
+### GW-WP24 — Assault balance: the jump tactic, class roles, and a force curve (L) — SHIPPED
+
+**Status:** shipped July 30, 2026. Implements D27–D31, D33, D34 (D32 was reversed the same
+session — broadcast is kept). Full suite 3457 green. The tuning verdict is **partly** met;
+the shortfalls are enumerated below rather than rounded off.
+
+**Jumping is now a tactic instead of a trap (D27).** `aa.range` was 15 while the longest
+missile reaches 13, so AA outranged every weapon that could silence it: the only way to
+clear an umbrella was to walk into it, by which point the jump it blocked was pointless.
+Jump jets were unused equipment. AA is now range 12 with HP just under one missile, so a
+marauder stands off at 13, spends a missile, and the window opens the turn the battery
+dies. Walls went 80 → 200 so blasting is the deliberate slow fallback.
+
+**A wrong sign made fortification a gift.** `surrender_threshold = base + citadel_level ×
+per_level`, with surrender firing at `resolve <= threshold`, so every citadel level made a
+world capitulate at a *higher* Resolve — sooner — while its extra emplacements were
+themselves 23 more Resolve to strip. Measured, citadel 2 surrendered in 3–6 turns against
+5–12 at citadel 0. The term is now negative and the `ge=0` bound that had enforced the
+wrong direction is gone.
+
+**The standoff was anchored on the wrong thing.** Measuring the ring from the capital's
+*centre* couples the approach to city size; against a ~30×14 footprint a 20-cell radius
+leaves ~11 cells off a long face and ~2 off a corner, and when `aa.range` dropped the ring
+came with it *inside* the footprint — every seed breached on turn 0. Re-anchored to the
+footprint edge (a revision to D16/D17), so `drop_standoff` means one size-independent
+thing: cells of open ground to cross.
+
+**Classes now have distinct jobs (D30/D31/D34).** Scouts uncover enemy infantry and
+emplacements through fog without line of sight (`recon_radius`, revealing only *occupied*
+cells so it finds the AA without becoming a map-wide x-ray) and spot for missiles
+(`spot_radius`/`spot_missile_bonus`); a Command suit grants move points to allies in range
+(`command_move_bonus`), movement being the scarce resource against the clock. Measured: a
+mixed 4/3/1 platoon breaches on turn 0 where an equal-sized 8-marauder stack takes turn 4.
+
+**The force curve exists (D33).** Six seeds at citadel 0: two marauders 0/6 (one wiped),
+four marauders 2/6, a full 4/3/1 platoon 4/6 winning on turns 12/17/17/18 — inside D28's
+"just before the boat". Before the pass it was 50%/100%/100%, i.e. no curve. Resolve
+drains were cut ~35% (a surrender costs more *work*, and work per turn scales with how
+many guns landed) and lethality raised (turret 24→32, garrison 10→14 and 22→28,
+`preplaced_frac` 0.35→0.50) — the lethality half is what makes the curve convex, since one
+casualty costs a two-man raid half its firepower and a full platoon an eighth.
+
+**Not met, and not rounded off:**
+
+- **Full platoon wins 67%, not D33's ~90%.** Both losses are seeds 4 and 5, which never
+  breach under *any* configuration tried, and on seed 4 the bot never even makes contact.
+  That is a bot or geometry defect, not balance — chase it before tuning further, or the
+  numbers will be compensating for a bug.
+- **A win costs 0–2 of 8, short of D29's "about a third".** The lethality raise moved
+  small squads sharply and full platoons barely.
+- **Two marauders win 0%, not a slim ~5%.** At six seeds those are indistinguishable;
+  needs a wider sample before touching.
+
+Files: `config/groundwar_default.yaml`, `edge/core/config.py` (`recon_radius`,
+`spot_radius`, `spot_missile_bonus`, `command_move_bonus`, signed
+`surrender_threshold_per_citadel_level`), `edge/core/groundwar/assault.py`
+(`_spotter_bonus`, `_command_move_bonus`, recon visibility, footprint-anchored ring),
+`edge/bot/scripts/assaulter.py` (missile-then-jump line, civilian exclusion, value-ranked
+targeting), `edge/groundwar/matrix.py` (`--squad`).
+Tests: existing groundwar suite retuned — `test_derive_difficulty_*` now assert the
+corrected sign, the drop-standoff tests measure footprint clearance, and the bots test's
+`_TICKS` went 160 → 700 because longer battles and a bigger platoon exhausted the old
+budget mid-fight (every seed returned no outcome, which reads as a broken bot rather than
+a ceiling).
+Commit `ground: GW-WP24 assault balance + class roles`.
+
 ## Verification matrix
 
 | Concern | Required evidence |
@@ -2225,8 +2453,8 @@ and the whole launch path end to end for terrestrial and Cloud City.
 
 ## Definition of done
 
-- D1–D15 are resolved and recorded in both this plan and authoritative DESIGN.
-- GW-WP01–22 (with GW-WP09-PRE) acceptance tests pass.
+- D1–D34 are resolved and recorded in both this plan and authoritative DESIGN.
+- GW-WP01–24 (with GW-WP09-PRE) acceptance tests pass.
 - A **generated** universe contains inhabited worlds that route to survey and to
   assault; neither path is reachable only through hand-built state.
 - `ruff`, strict `mypy` production layers, pytest/property tests, codec fixtures,

@@ -1718,6 +1718,22 @@ class GwSuit(BaseModel):
     command_radius: int = Field(default=0, ge=0)
     command_acc_bonus: float = Field(default=0.0, ge=0.0)
     broadcast_range: int = Field(default=0, ge=0)
+    # GW-WP24 class differentiation (D30/D31/D34). Before these, a marauder was the best
+    # fighter, the only class that breaks structures (`structure_mult` 2.0) *and* the
+    # carrier of the missiles that silence AA — so a platoon of nothing but marauders was
+    # strictly correct and the other two classes were baggage.
+    #
+    # D30: enemy infantry/emplacements within this radius of a scout are uncovered
+    # through fog of war without needing line of sight — the scout finds the AA.
+    recon_radius: int = Field(default=0, ge=0)
+    # D34: a missile fired at a target within this radius of the scout hits harder — the
+    # scout also *spots* for the missile that silences what it found.
+    spot_radius: int = Field(default=0, ge=0)
+    spot_missile_bonus: float = Field(default=0.0, ge=0.0)
+    # D31: allies within `command_radius` get this many extra move points per turn.
+    # Movement is the scarce resource against a 24-turn clock, so this makes a command
+    # suit a tempo asset rather than a formality.
+    command_move_bonus: int = Field(default=0, ge=0)
 
 
 class GwGarrisonClass(BaseModel):
@@ -1814,6 +1830,13 @@ class GwDefenses(BaseModel):
     citadel_gun: GwEmplacement
     building_military_hp: int = Field(gt=0)
     building_civilian_hp: int = Field(gt=0)
+    # GW-WP23 (D17): cells *beyond* `aa.range` at which an assault sets down. The
+    # landing ring is `aa.range + drop_standoff` from the capital, so a drop lands
+    # deliberately outside the AA envelope `tactical_projection` already paints
+    # pre-drop — rather than at the map's west edge regardless of where the cities
+    # are, which is what shipped through GW-WP22 and cost ten of twenty-four turns
+    # marching. Tunable because "just out of range" is a balance feel, not a fact.
+    drop_standoff: int = Field(default=2, ge=0)
 
 
 class GwGarrison(BaseModel):
@@ -1975,7 +1998,10 @@ class GwAssaultDifficulty(BaseModel):
     max_cities: int = Field(default=4, ge=1)
     population_per_extra_city: int = Field(default=4000, gt=0)  # scaled capacity per city beyond min_cities
     surrender_threshold_base: int = Field(default=30, gt=0)
-    surrender_threshold_per_citadel_level: int = Field(default=8, ge=0)
+    # Signed (GW-WP24): surrender fires at `resolve <= threshold`, so a *negative* value
+    # is what makes a fortified world hold out longer. The old `ge=0` bound enforced the
+    # wrong direction — it permitted only settings that made citadels easier to break.
+    surrender_threshold_per_citadel_level: int = Field(default=-6)
     hostility_mult: float = Field(default=1.4, ge=1.0)  # below-amity species → larger battlefield
     band_mult: dict[str, float] = Field(default_factory=dict)  # distance band → capacity-score multiplier
     alliance_owned_mult: float = Field(default=1.2, ge=1.0)  # a bloc-held world reads slightly harder
@@ -2053,6 +2079,22 @@ class GwPlatoon(BaseModel):
     actions_per_turn: int = Field(default=2, gt=0)
 
 
+class GwBot(BaseModel):
+    """Knobs only the example assault bot reads (GW-WP23, D23).
+
+    The squad mix is itself one of the balance levers the setup screen calls "the
+    puzzle", so judging a watched run means being able to slide composition between
+    runs without editing the script. Before this the bot bought
+    `next(iter(config.groundwar.suits))` six times — six of whatever suit sorted
+    first — which made role-differentiated play impossible to express at all.
+    """
+
+    model_config = _FROZEN
+
+    squad: dict[str, int] = Field(
+        default_factory=lambda: {"marauder": 4, "scout": 3, "command": 1})
+
+
 class GroundwarConfig(BaseModel):
     """Ground-operations balance (survey + assault), one YAML source of truth.
 
@@ -2078,6 +2120,7 @@ class GroundwarConfig(BaseModel):
     assault_difficulty: GwAssaultDifficulty = GwAssaultDifficulty()
     settlement: GwSettlement = GwSettlement()
     cloud_city: GwCloudCity = GwCloudCity()
+    bot: GwBot = GwBot()
     # GW-WP16 migration gate (GW plan "Cloud Cities retain a separate gate"):
     # stays False until the station-interior assault path (generation, tactics,
     # settlement, remote/UI parity) is proven — ground_access keeps routing every
@@ -2139,6 +2182,22 @@ class GroundwarConfig(BaseModel):
                 f"(expedition {self.expedition.width}x{self.expedition.height} vs "
                 f"battlefield {self.battlefield.width}x{self.battlefield.height}) — "
                 "survey and assault read one shared world layout (GW-WP19)"
+            )
+        # GW-WP23 (D23): the bot's mix is config, so a typo in a suit id would
+        # otherwise surface as a bot that silently drops a smaller squad.
+        unknown = set(self.bot.squad) - set(self.suits)
+        if unknown:
+            raise ValueError(
+                "groundwar.bot.squad names suits that do not exist: "
+                f"{', '.join(sorted(unknown))}"
+            )
+        if any(n < 0 for n in self.bot.squad.values()):
+            raise ValueError("groundwar.bot.squad counts must be non-negative")
+        total = sum(self.bot.squad.values())
+        if total > self.platoon.max_troopers:
+            raise ValueError(
+                f"groundwar.bot.squad totals {total} troopers, over "
+                f"platoon.max_troopers ({self.platoon.max_troopers})"
             )
         return self
 
