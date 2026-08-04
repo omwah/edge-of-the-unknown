@@ -69,6 +69,11 @@ _NEVER_TARGET = frozenset({"building_civilian"})
 # Structures a breach can be forced through. Gates are cheaper (60hp vs 80) but the wall
 # is reachable anywhere along the perimeter; both are tried, nearest-first.
 _BREACHABLE = frozenset({"wall", "gate"})
+# What a trooper *inside* the objective is there to kill. A city interior is mostly wall
+# and house, so this is the set that makes the difference between working the objective
+# and demolishing scenery.
+_PAYLOAD_TARGETS = frozenset({
+    "citadel_gun", "aa", "turret", "sensor", "building_military"})
 
 
 def _role(suit: GwSuit) -> str:
@@ -266,14 +271,28 @@ def _breach(
 
 def _target_value(
     amap: AssaultMap, op: AssaultOperation, config: GameConfig, cell: Vec, actor: Vec,
+    *, inside: bool = False,
 ) -> float | None:
     """How much this cell is worth shooting, or None if it must not be shot.
 
-    Ranked by the Resolve each kill actually drains, straight off `groundwar.resolve` —
-    a citadel gun is worth 15 and a wall segment 3, so "nearest target" was never the
-    right rule even setting the civilian problem aside. Garrison units are only worth 2
-    but get a proximity bump: a shooter three cells away is doing damage now, and a
-    platoon that walks past live infantry to plink a distant sensor gets wiped.
+    Ranked by the Resolve each kill actually drains **per shot it takes to get there**,
+    not per kill. Per-kill ranking already put walls last, but not nearly far enough
+    down: a wall segment pays 2 Resolve for 200hp, which at a marauder's 56 damage
+    against structures is four actions for half a point apiece, against three points a
+    shot for a sensor or a military block. Dividing by the shots a kill costs is what
+    makes that six-to-one gap visible to the chooser, and it is why lowering
+    `resolve.wall_breached` cannot fix wall-plinking: walls are already bottom of the
+    order, and demoting last place changes no decision.
+
+    Garrison units get a proximity bump on top: a shooter three cells away is doing
+    damage now, and a platoon that walks past live infantry to plink a distant sensor
+    gets wiped.
+
+    `inside` refuses walls outright. Within the objective they are never worth an action
+    — the perimeter is already breached, interior segments block line of sight rather
+    than the advance, and a trooper that shoots the wall in front of it instead of
+    walking around it burns the retrieval clock at 0.5 Resolve a turn. Refusing the
+    shot leaves the trooper `adrift` and it closes on something that matters instead.
     """
     assert config.groundwar is not None
     r = config.groundwar.resolve
@@ -284,15 +303,31 @@ def _target_value(
     for s in amap.structures:
         if (s.x, s.y) != cell or not _alive(op, s):
             continue
-        if s.kind in _NEVER_TARGET:
+        if s.kind in _NEVER_TARGET or (inside and s.kind in _BREACHABLE):
             return None
-        return {
+        value = {
             "citadel_gun": r.citadel_gun_destroyed, "aa": r.aa_destroyed,
             "turret": r.turret_destroyed, "sensor": r.sensor_destroyed,
             "building_military": r.military_building_destroyed,
             "wall": r.wall_breached, "gate": r.wall_breached,
         }.get(s.kind, 0.0)
+        return value / _shots_to_kill(config, s)
     return None
+
+
+def _shots_to_kill(config: GameConfig, s: AssaultStructure) -> float:
+    """Roughly how many actions this structure costs, in marauder rifle shots.
+
+    A nominal shooter, not the actual one: the point is the *ratio* between target kinds,
+    and that ratio barely moves with who is holding the trigger. Keeping it nominal also
+    keeps the ordering stable across a mixed platoon, so two troopers looking at the same
+    two targets agree on which to shoot.
+    """
+    assert config.groundwar is not None
+    suits = config.groundwar.suits
+    ref = suits.get("marauder") or next(iter(suits.values()))
+    per_shot = max(1.0, ref.weapon.damage * ref.weapon.structure_mult)
+    return max(1.0, s.hp_max / per_shot)
 
 
 def _worth_firing(
@@ -310,9 +345,37 @@ def _worth_firing(
     return False
 
 
+def _hunt_goal(
+    amap: AssaultMap, op: AssaultOperation, city: AssaultCity, trooper: AssaultTrooper,
+) -> Vec | None:
+    """The nearest thing inside the objective actually worth walking to.
+
+    "Head for the city centre" was the old inside-goal, and it is the other half of the
+    wall-plinking problem: a trooper standing on the centre is not `adrift`, so it stops
+    moving and shoots whatever is in line of sight — in a built-up interior, a wall.
+    Aiming at live emplacements and garrison instead keeps it closing on Resolve until
+    there is none left to take.
+    """
+    best: tuple[int, int, int] | None = None
+    goal: Vec | None = None
+    for u in op.garrison_units:
+        if u.hp <= 0 or not city.inside(u.x, u.y):
+            continue
+        key = (abs(u.x - trooper.x) + abs(u.y - trooper.y), u.y, u.x)
+        if best is None or key < best:
+            best, goal = key, (u.x, u.y)
+    for s in amap.structures:
+        if s.city_id != city.id or s.kind not in _PAYLOAD_TARGETS or not _alive(op, s):
+            continue
+        key = (abs(s.x - trooper.x) + abs(s.y - trooper.y), s.y, s.x)
+        if best is None or key < best:
+            best, goal = key, (s.x, s.y)
+    return goal
+
+
 def _move_goal(
     city: AssaultCity, breach: AssaultStructure | None, suit: GwSuit, role: str,
-    *, inside: bool,
+    *, inside: bool, hunt: Vec | None = None,
 ) -> tuple[Vec, int]:
     """Where this role wants to be, and how close is close enough.
 
@@ -328,7 +391,7 @@ def _move_goal(
     just entered, which is precisely what an early GW-WP23 trace showed it doing.
     """
     if inside:
-        return (city.cx, city.cy), 0
+        return (hunt or (city.cx, city.cy)), 0
     if role == "command":
         return (city.cx, city.cy), max(1, suit.broadcast_range - 1)
     if breach is not None:
@@ -497,7 +560,8 @@ def setup(bot: BotRunner) -> None:
                     b.apply(GroundJump(op.operation_id, trooper.id, *leap))
                     return
 
-            (gx, gy), hold = _move_goal(city, breach, suit, role, inside=inside)
+            hunt = _hunt_goal(amap, op, city, trooper) if inside else None
+            (gx, gy), hold = _move_goal(city, breach, suit, role, inside=inside, hunt=hunt)
             adrift = abs(trooper.x - gx) + abs(trooper.y - gy) > hold
 
             # Spend the turn's *first* action closing, then shoot with the rest. Without
@@ -515,14 +579,15 @@ def setup(bot: BotRunner) -> None:
             if proj.fireable:
                 if inside:
                     # In the objective: shoot what actually breaks their will, best value
-                    # first. *Not* "everything standing" — civilian blocks are excluded
-                    # outright (see `_NEVER_TARGET`), and among the rest a citadel gun is
-                    # worth five wall segments.
+                    # first. *Not* "everything standing" — civilian blocks and interior
+                    # walls are both excluded outright, and among what is left a citadel
+                    # gun pays about seven times a turret per action spent.
                     scored = [
                         (-value, abs(c[0] - trooper.x) + abs(c[1] - trooper.y), c)
                         for c in sorted(proj.fireable)
                         if (value := _target_value(
-                            amap, op, config, c, (trooper.x, trooper.y))) is not None]
+                            amap, op, config, c, (trooper.x, trooper.y),
+                            inside=True)) is not None]
                     if scored:
                         _, _, (tx, ty) = min(scored)
                         b.apply(GroundFire(op.operation_id, trooper.id, tx, ty))
