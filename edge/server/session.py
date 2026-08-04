@@ -1127,6 +1127,7 @@ def _assault_operation_view(
         if unit.hp > 0 and (unit.x, unit.y) in projection.visible
     }
     garrison_at = {(unit.x, unit.y): unit.id for unit in visible_garrison.values()}
+    marker_cells = amap.marker_cells
 
     cells: list[dto.AssaultCellDTO] = []
     for y in range(vy, vy + vh):
@@ -1146,10 +1147,21 @@ def _assault_operation_view(
                 gw_interior.wall_neighbor_mask(
                     lambda nx, ny: amap.feature[ny][nx], x, y, amap.width, amap.height)
                 if amap.feature[y][x] == "bulkhead" else 0)
+            # GW-WP27: only meaningful (and only sent) when the structure standing here
+            # is itself visible — an unfogged mask would leak a hidden emplacement's
+            # footprint shape to a client that hasn't earned sight of it.
+            building_mask = (
+                ground_assault.structure_neighbor_mask(amap, x, y)
+                if structure_visible and structure is not None and (structure.w > 1
+                                                                     or structure.h > 1)
+                else 0)
             cells.append(dto.AssaultCellDTO(
                 x=x, y=y, feature=amap.feature[y][x],
                 blocked=terrain_blocked or structure_blocks,
                 wall_mask=wall_mask,
+                building_mask=building_mask,
+                structure_marker=(structure_visible and structure is not None
+                                  and marker_cells.get(cell) == structure.id),
                 landable=(not op.dropped and cell not in amap.blocked and not terrain_blocked),
                 move_reachable=cell in projection.reachable,
                 jump_reachable=cell in projection.jumpable,

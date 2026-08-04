@@ -27,7 +27,7 @@ from edge.art.interior import (
     WALL_GLYPHS,
 )
 from edge.art.terrain import FEATURES_REGISTRY as BIOME_FEATURES_REGISTRY
-from edge.groundwar.widgets import RUBBLE_ART, STRUCTURE_ART
+from edge.groundwar.widgets import BUILDING_GLYPHS, RUBBLE_ART, STRUCTURE_ART
 
 # The hardcoded per-cell/sidebar markers in ground_expedition.py, ground_assault.py, and
 # _ground_shared.py that aren't drawn from either glyph-pool registry above.
@@ -58,6 +58,14 @@ def test_structure_art_glyphs_are_single_width() -> None:
     for kind, (glyph, _fg, _bg) in STRUCTURE_ART.items():
         assert cell_len(glyph) == 1, f"structure {kind!r} glyph {glyph!r} is not single-width"
     assert cell_len(RUBBLE_ART[0]) == 1
+
+
+def test_building_outline_glyphs_are_single_width() -> None:
+    # GW-WP27: the multi-cell-building outline ramp, indexed by the same 4-bit mask
+    # convention as the interior WALL_GLYPHS it deliberately mirrors.
+    assert len(BUILDING_GLYPHS) == 16
+    for glyph in BUILDING_GLYPHS:
+        assert cell_len(glyph) == 1, f"building outline glyph {glyph!r} is not single-width"
 
 
 def test_hardcoded_marker_glyphs_are_single_width() -> None:

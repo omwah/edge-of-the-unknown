@@ -47,6 +47,10 @@ from edge.core.models import GroundRubble, Planet
 from edge.core.planets import colonist_capacity
 
 Vec = tuple[int, int]
+# GW-WP27: a building as `(x, y, w, h)` with `x, y` the north-west anchor. Rectangles
+# only — every building the street grid places is one, and keeping it four ints rather
+# than a cell tuple keeps `PlaceStamp` small and comparable.
+Footprint = tuple[int, int, int, int]
 
 # One pool for both modes: a place has a single name whether you walk into it or
 # drop on it. Merges the peaceable town names survey used with the military city
@@ -62,10 +66,32 @@ PLACE_NAMES: tuple[str, ...] = (
 # What a paved footprint plays as underfoot (move 1, no cover) regardless of biome.
 STREET_FEATURE = "dust"
 
-CAPITAL_SIZE = (30, 14)  # (w, h) — cosmetic footprint dims, not balance (ported from the POC)
-PLACE_SIZE = (24, 11)
+# GW-WP27 (D35/D38): grown to hold multi-cell buildings. A trooper and an apartment
+# block used to be the same size; at these dimensions a city holds roughly 20 (town) to
+# 35 (capital) real buildings on a street grid, and one trooper action crosses about one
+# block, which is the readable unit at this scale.
+CAPITAL_SIZE = (46, 26)  # (w, h)
+PLACE_SIZE = (34, 20)
 
 _BUILDING_MILITARY_FRAC = 0.3  # the POC's military/civilian building-block split
+
+# Street grid. Pitch exceeds the widest/tallest building so every block keeps at least one
+# cell of street around it — buildings that touch would read as one shapeless mass.
+_BLOCK_PITCH_X = 6
+_BLOCK_PITCH_Y = 4
+# Buildings the grid may place, as `(w, h, weight)`. Rolled **once per building** rather
+# than per cell: the pre-GW-WP27 loop rolled military/civilian independently for each of a
+# block's two cells, so a single visual "building" could come out half depot, half housing.
+_BUILDING_SIZES: tuple[tuple[int, int, float], ...] = (
+    (2, 2, 0.30),   # row house
+    (3, 2, 0.28),   # shop row
+    (4, 2, 0.20),   # tenement
+    (3, 3, 0.12),   # workshop
+    (5, 3, 0.10),   # hall / depot
+)
+# Cells of clear ground held inside the wall. Without it buildings abut the perimeter and
+# a breach opens into a wall of masonry rather than into the city.
+_SERVICE_ROAD = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,23 +137,32 @@ class PlaceStamp:
     `perimeter` is the wall line minus `gates`; a survey renders every perimeter
     cell as masonry, while an assault renders the same cells as `wall` structures
     with turrets substituted at the corner/mid slots. `military`/`civilian` are the
-    interior building blocks, split here (off the world seed) rather than per
-    assault, so the *kind* standing at a position is as stable as the position.
-    `reserved` are the interior emplacement slots and the plaza: cells no building
-    may take, held regardless of citadel level so the building layout does not
-    drift when a citadel is built or lost.
+    interior buildings as **footprints** since GW-WP27, split here (off the world
+    seed) rather than per assault, so the *kind* standing at a position is as stable
+    as the position. `reserved` are the interior emplacement anchors and the plaza:
+    cells no building may take, held regardless of citadel level so the building
+    layout does not drift when a citadel is built or lost.
     """
 
     place: GroundPlace
     perimeter: tuple[Vec, ...]
     gates: tuple[Vec, ...]
-    military: tuple[Vec, ...]
-    civilian: tuple[Vec, ...]
+    military: tuple[Footprint, ...]
+    civilian: tuple[Footprint, ...]
     reserved: tuple[Vec, ...]
 
     @property
-    def buildings(self) -> tuple[Vec, ...]:
+    def buildings(self) -> tuple[Footprint, ...]:
         return self.military + self.civilian
+
+    @property
+    def building_cells(self) -> tuple[Vec, ...]:
+        """Every cell every building covers — what a survey blocks and paves."""
+        return tuple(
+            (x + dx, y + dy)
+            for x, y, w, h in self.buildings
+            for dy in range(h) for dx in range(w)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,17 +302,47 @@ def footprint_passable_frac(
 def _emplacement_slots(place: GroundPlace) -> tuple[Vec, ...]:
     """Interior cells an assault may put an emplacement on (and a survey leaves open).
 
-    Held *unconditionally*, including the level-3 second AA and the level-2 citadel
-    gun: reserving only what the current citadel level would build would move the
-    building blocks every time a citadel is raised or lost.
+    Held *unconditionally*, including the second AA and the level-2 citadel gun:
+    reserving only what the current citadel level would build would move the building
+    blocks every time a citadel is raised or lost.
+
+    These are **anchors**. Since GW-WP27 the AA batteries and the citadel gun are 2x2,
+    so `_reserved_cells` expands each of these into the area a building may not take.
     """
     w = place.width
     return (
         (place.cx - w // 4, place.cy - 1),  # AA battery
         (place.cx + w // 4, place.cy + 1),  # sensor tower
-        (place.cx + w // 4, place.cy - 1),  # second AA (citadel level 3)
+        (place.cx + w // 4, place.cy - 1),  # second AA
         (place.cx, place.cy),               # citadel gun (capital, level 2) / plaza
     )
+
+
+def _reserved_cells(place: GroundPlace) -> set[Vec]:
+    """Every cell the emplacement slots and the central plaza consume.
+
+    The plaza is a small open square rather than the old one-cell cross: at these
+    dimensions a city centre that is solid building right up to the citadel gun reads
+    as a maze, and the gun itself now needs 2x2 of its own.
+    """
+    cells: set[Vec] = set()
+    for ax, ay in _emplacement_slots(place):
+        for dy in range(2):
+            for dx in range(2):
+                cells.add((ax + dx, ay + dy))
+    for dy in range(-2, 3):
+        for dx in range(-3, 4):
+            cells.add((place.cx + dx, place.cy + dy))
+    return cells
+
+
+def _pick_size(rng: Random) -> tuple[int, int]:
+    roll = rng.random() * sum(weight for _, _, weight in _BUILDING_SIZES)
+    for w, h, weight in _BUILDING_SIZES:
+        roll -= weight
+        if roll <= 0:
+            return w, h
+    return _BUILDING_SIZES[-1][0], _BUILDING_SIZES[-1][1]
 
 
 def stamp_place(place: GroundPlace, rng: Random) -> PlaceStamp:
@@ -300,15 +365,31 @@ def stamp_place(place: GroundPlace, rng: Random) -> PlaceStamp:
         for x in (x0, x1):
             if (x, y) not in gates:
                 perimeter.append((x, y))
-    military: list[Vec] = []
-    civilian: list[Vec] = []
-    taken = set(reserved)
-    for y in range(y0 + 2, y1 - 1, 2):
-        for bx in range(x0 + 3, x1 - 3, 4):
-            for x in (bx, bx + 1):
-                if (x, y) in taken or abs(x - place.cx) + abs(y - place.cy) <= 1:
-                    continue
-                (military if rng.random() < _BUILDING_MILITARY_FRAC else civilian).append((x, y))
+
+    # Buildings, on a street grid inset by the wall plus a service road.
+    blocked = _reserved_cells(place)
+    lo_x, lo_y = x0 + 1 + _SERVICE_ROAD, y0 + 1 + _SERVICE_ROAD
+    hi_x, hi_y = x1 - 1 - _SERVICE_ROAD, y1 - 1 - _SERVICE_ROAD
+    military: list[Footprint] = []
+    civilian: list[Footprint] = []
+    taken: set[Vec] = set()
+    for by in range(lo_y, hi_y + 1, _BLOCK_PITCH_Y):
+        for bx in range(lo_x, hi_x + 1, _BLOCK_PITCH_X):
+            w, h = _pick_size(rng)
+            # Shrink to whatever the slot and the interior actually allow, rather than
+            # skipping: a clamped building still fills its block, where skipping would
+            # leave the city's east and south edges conspicuously empty.
+            w = min(w, _BLOCK_PITCH_X - 1, hi_x - bx + 1)
+            h = min(h, _BLOCK_PITCH_Y - 1, hi_y - by + 1)
+            if w < 2 or h < 2:
+                continue
+            cells = [(bx + dx, by + dy) for dy in range(h) for dx in range(w)]
+            if any(c in blocked or c in taken for c in cells):
+                continue
+            taken.update(cells)
+            # One roll for the whole building, so a depot is a depot all the way through.
+            target = military if rng.random() < _BUILDING_MILITARY_FRAC else civilian
+            target.append((bx, by, w, h))
     return PlaceStamp(
         place=place, perimeter=tuple(perimeter), gates=gates,
         military=tuple(military), civilian=tuple(civilian), reserved=reserved,

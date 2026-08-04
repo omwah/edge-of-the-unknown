@@ -63,6 +63,30 @@ def _destroyed(op: AssaultOperation, amap: assault.AssaultMap) -> dict[tuple[int
     }
 
 
+def _newly_destroyed_by_kind(
+    op: AssaultOperation, amap: assault.AssaultMap, existing: dict[tuple[int, int], str],
+) -> Counter[str]:
+    """Newly destroyed **structures** this settlement, one count per object, by kind.
+
+    `world.merged_rubble`'s own `fresh` counter counts *positions*, which was the right
+    unit while every structure was exactly one cell — GW-WP27 broke that equivalence.
+    Counting cells there would charge a 5x3 civilian hall's population/consequence hit
+    fifteen times over for "one building destroyed", so this counts structures directly
+    instead. A structure counts as newly destroyed if it is down and its anchor cell was
+    not already rubble before this operation — damage is written atomically across a
+    structure's whole footprint (`_destroyed` above), so checking one cell is enough to
+    know whether the rest were already there too.
+    """
+    counts: Counter[str] = Counter()
+    for structure in amap.structures:
+        if op.structure_hp.get(structure.id, structure.hp_max) > 0:
+            continue
+        if (structure.x, structure.y) in existing:
+            continue
+        counts[structure.kind] += 1
+    return counts
+
+
 def _surviving_defenders(op: AssaultOperation) -> tuple[int, int]:
     infantry = op.infantry_remaining + sum(
         unit.kind == "infantry" for unit in op.garrison_units)
@@ -105,11 +129,16 @@ def settle_assault(
             planet.garrison_infantry, planet.garrison_armor, 0, 0, 0, "none")
 
     amap = assault.assault_map_for_state(op, config)
+    destroyed = _destroyed(op, amap)
     # Damage folds in by position (GW-WP19): a wall already rubble when the platoon
     # dropped stays one entry, and only *newly* levelled civilian blocks charge civilian
     # harm — the pre-GW-WP19 per-kind counters could only approximate that with a max().
-    persistent, fresh = world.merged_rubble(planet, _destroyed(op, amap))
-    new_civilian_structures = fresh["building_civilian"]
+    # GW-WP27: civilian harm scales by newly destroyed *structures*, not cells — see
+    # `_newly_destroyed_by_kind`. `merged_rubble` still folds `destroyed` by position;
+    # only the count consequences draw from is computed differently now.
+    persistent, _fresh_cells = world.merged_rubble(planet, destroyed)
+    new_civilian_structures = _newly_destroyed_by_kind(
+        op, amap, world.rubble_at(planet))["building_civilian"]
     population_before = planet.colonists
     survival = max(
         0.0,

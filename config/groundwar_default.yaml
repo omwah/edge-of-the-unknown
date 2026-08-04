@@ -46,7 +46,11 @@ resolve:
   sensor_destroyed: 3
   wall_breached: 2          # per wall segment reduced to rubble
   garrison_killed: 1
-  military_building_destroyed: 3
+  # GW-WP27: doubled with the footprint. A "building" used to be two independent 1-cell
+  # structures paying 3 each; it is now one object, so the drain per building has to rise
+  # or a city's total drainable Resolve halves and the surrender threshold moves out of
+  # reach. Object count roughly halved, so the per-object value roughly doubles.
+  military_building_destroyed: 6
   citadel_gun_destroyed: 10
   city_cowed: 10            # a city's every active defense silenced
   broadcast: 14             # a Command suit dictating terms over a cowed city
@@ -174,8 +178,14 @@ defenses:
   aa:      {hp: 110, range: 12, damage: 48, accuracy: 0.60, point_blank_bonus: 0.35}
   sensor:  {hp: 40, radius: 16}
   citadel_gun: {hp: 120, range: 16, damage: 40, accuracy: 0.70}
-  building_military_hp: 50
-  building_civilian_hp: 30
+  # GW-WP27 (D36): a building is one object with one HP pool over its whole footprint,
+  # so these roughly doubled — about two marauder shots, still finishable inside a turn.
+  # Deliberately **not** scaled by area: a half-demolished building pays no Resolve at
+  # all, so 6x HP would let a platoon spend four turns on one block and score nothing
+  # against the retrieval clock. ~2x keeps Resolve-per-shot near the ratio the bot's
+  # `_target_value` ranks on and GW-WP24's force curve was tuned against.
+  building_military_hp: 110
+  building_civilian_hp: 70
   # Cells of open ground between the drop and the capital's **footprint edge** (GW-WP24
   # re-anchored this from the city centre — see `assault_landing`). Read it as "how long
   # is the walk in": 12 is roughly two turns of marching under fire before the wall, plus
