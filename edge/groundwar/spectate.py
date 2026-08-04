@@ -56,7 +56,7 @@ class Scenario:
     habitability_cap: int = 8_000
     citadel_level: int = 0
     cloud_city_size: int = 0  # > 0 selects the Cloud City (jovian station) branch
-    loadout: tuple[tuple[str, int], ...] = (("marauder", 4), ("scout", 2), ("command", 1))
+    loadout: tuple[tuple[str, int], ...] = (("marauder", 4), ("scout", 3), ("command", 1))
 
     @property
     def is_cloud_city(self) -> bool:
