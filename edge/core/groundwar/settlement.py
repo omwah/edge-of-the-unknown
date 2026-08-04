@@ -50,10 +50,16 @@ def _destroyed(op: AssaultOperation, amap: assault.AssaultMap) -> dict[tuple[int
     Positional, because a world's ground layout is now one stable identity shared with
     its survey map: what fell can be recorded where it stood, so the next assault
     reopens the same breach and an expedition paints the same ruin.
+
+    GW-WP25: **every cell** of a levelled structure is recorded, not just its anchor.
+    A structure has one HP pool over its whole footprint, so a razed depot must leave
+    a depot-shaped ruin — writing the anchor alone would have a survey walk through
+    the rest of the rubble as if the building were still standing there.
     """
     return {
-        (structure.x, structure.y): structure.kind for structure in amap.structures
+        cell: structure.kind for structure in amap.structures
         if op.structure_hp.get(structure.id, structure.hp_max) <= 0
+        for cell in structure.cells
     }
 
 

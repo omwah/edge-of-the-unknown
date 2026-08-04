@@ -1117,7 +1117,9 @@ def _assault_operation_view(
     projection = ground_assault.tactical_projection(op, amap, config, selected_actor_id)
 
     structures = {structure.id: structure for structure in amap.structures}
-    structure_at = {(structure.x, structure.y): structure for structure in amap.structures}
+    # GW-WP25: the map's own footprint-complete index, not a rebuild off `(s.x, s.y)`.
+    # This was the third and last place that assumed a structure occupied one cell.
+    structure_at = amap.struct_at
     live_troopers = {t.id: t for t in op.platoon if t.hp > 0}
     trooper_at = {(t.x, t.y): t.id for t in live_troopers.values()}
     visible_garrison = {

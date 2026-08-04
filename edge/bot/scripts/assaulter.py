@@ -300,9 +300,12 @@ def _target_value(
         if (u.x, u.y) == cell and u.hp > 0:
             near = abs(u.x - actor[0]) + abs(u.y - actor[1]) <= 3
             return r.garrison_killed + (4.0 if near else 0.0)
-    for s in amap.structures:
-        if (s.x, s.y) != cell or not _alive(op, s):
-            continue
+    # GW-WP25: ask the map what stands on the cell rather than scanning for an exact
+    # anchor match. An anchor comparison silently returns None for every cell of a
+    # footprint except its north-west corner — and None here means "must not shoot",
+    # so the bot would refuse to fire at most of any building it could see.
+    s = amap.structure_at(*cell)
+    if s is not None and _alive(op, s):
         if s.kind in _NEVER_TARGET or (inside and s.kind in _BREACHABLE):
             return None
         value = {
@@ -334,14 +337,14 @@ def _worth_firing(
     amap: AssaultMap, op: AssaultOperation, cell: Vec, breach: AssaultStructure | None,
 ) -> bool:
     """D21: while out of position, shoot only what blocks or threatens the approach."""
-    if breach is not None and (breach.x, breach.y) == cell:
+    if breach is not None and breach.covers(*cell):
         return True
     for u in op.garrison_units:
         if (u.x, u.y) == cell and u.hp > 0:
             return True  # it is shooting back — answering it is never a waste
-    for s in amap.structures:
-        if (s.x, s.y) == cell and _alive(op, s):
-            return s.kind in _APPROACH_TARGETS and s.kind not in _BREACHABLE
+    s = amap.structure_at(*cell)
+    if s is not None and _alive(op, s):
+        return s.kind in _APPROACH_TARGETS and s.kind not in _BREACHABLE
     return False
 
 
@@ -367,9 +370,12 @@ def _hunt_goal(
     for s in amap.structures:
         if s.city_id != city.id or s.kind not in _PAYLOAD_TARGETS or not _alive(op, s):
             continue
-        key = (abs(s.x - trooper.x) + abs(s.y - trooper.y), s.y, s.x)
-        if best is None or key < best:
-            best, goal = key, (s.x, s.y)
+        # Walk to the *nearest* cell of the footprint, not its anchor: heading for the
+        # far corner of a depot walks past the near face you could already be shooting.
+        for cx, cy in s.cells:
+            key = (abs(cx - trooper.x) + abs(cy - trooper.y), cy, cx)
+            if best is None or key < best:
+                best, goal = key, (cx, cy)
     return goal
 
 
@@ -413,10 +419,15 @@ def _aa_covers(aa: list[AssaultStructure], config: GameConfig, x: int, y: int) -
     covers read as safe and the bot jumped into a hot umbrella on turn 0 — taking exactly
     the casualties D27's tactic exists to avoid, on the turn it was least necessary.
     A safety check must never be looser than the rule it is protecting against.
+
+    GW-WP25: measured from the battery's **firing cell** (`ox/oy`), which is the cell
+    `assault._dist` measures from. Using the anchor of a 2x2 battery would put this
+    check up to a cell and a half off — in whichever direction the footprint happens
+    to extend — and the same rule applies: err toward calling a cell dangerous.
     """
     assert config.groundwar is not None
     reach = config.groundwar.defenses.aa.range
-    return any(math.hypot(s.x - x, s.y - y) <= reach for s in aa)
+    return any(math.hypot(s.ox - x, s.oy - y) <= reach for s in aa)
 
 
 def _jump_into_city(
@@ -458,8 +469,12 @@ def _missile_target(
     if trooper.missiles <= 0:
         return None
     for s in _live_aa(amap, op, city):
-        if (s.x, s.y) in missile_targets:
-            return (s.x, s.y)
+        # Any cell of the battery is a legal aim point — a missile that hits its south
+        # face kills it exactly as dead, and insisting on the anchor would pass up shots
+        # the projection is offering.
+        for cell in s.cells:
+            if cell in missile_targets:
+                return cell
     return None
 
 

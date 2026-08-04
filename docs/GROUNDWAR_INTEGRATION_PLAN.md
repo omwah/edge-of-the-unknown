@@ -24,6 +24,14 @@
 > With both fixed the seed matrix returns (reporting breach/contact/Resolve-rate
 > diagnostics, not bare outcomes) and the tuning is finally a judgement about the
 > balance.** The verdict itself is still a human's.**
+>
+> **GW-M22 (August 2026) is in progress: scale.** A watched run made two things
+> plain — the platoon was spending a third of its shots on walls it was already
+> standing behind (fixed in GW-WP24-FU1), and a trooper and an apartment block
+> were the same size. GW-WP25–29 give buildings real footprints (D35/D36), grow
+> the board to 320x84 (D38), and replace rectangular cities with four silhouettes
+> (D37). GW-WP25 shipped as a deliberate no-op refactor so the rest lands on a
+> checked foundation.
 
 ## Context
 
@@ -408,6 +416,34 @@ D27–D29 are implemented; D30–D33 are decided and **not yet implemented**.
   serve the D27 tactic — it finds the AA, and it makes the missile that silences it hit
   harder — which is what makes a mixed platoon better than a marauder stack without
   capping marauders by rule.
+- **D35 — Buildings occupy 2x2 to 5x3 cells**, size rolled per building. A trooper and an
+  apartment block being the same size was simply the wrong scale, and the map read as a
+  grid of dots rather than a place. The pitch is chosen so one action crosses roughly one
+  block, which is the readable unit at this size.
+- **D36 — A building is one object: one HP pool, one Resolve drain, one ruin.** The
+  alternative (N independent cells that merely *look* joined, via the neighbour-mask trick
+  walls already use) is far cheaper and was rejected on the economy: a 4x2 block would pay
+  8x `military_building_destroyed` for "one building", swamping a ~30-Resolve city budget,
+  and would show eight HP bars and half-demolish into a mottled mess. One pool also makes
+  footprint splash expressible later with no splash code at all.
+- **D37 — Four city silhouettes: rect, octagon, round, L**, weighted so rectangles stay
+  common, capitals biased fortified and towns organic. Cross/star was declined: ~12 corners
+  makes turret placement and the interior street grid fiddly for a shape that reads more
+  fortress than city.
+- **D38 — The board grows to 320x84**, `max_cities` held at 4. Forced by the lane math in
+  `generate_world_ground`: a lane is `width/(places+1)` wide and must exceed a 46-wide
+  capital, so 220 puts adjacent cities on top of each other and 320 leaves 17 columns of
+  jitter. Survey shares the grid, so its supply budget scales with it or a surveyor starves
+  crossing the map.
+- **D39 — Walls, gates, turrets and sensors stay 1x1.** Not an exception for convenience:
+  D22's breach loop picks one *individually killable* segment and the whole concentrate-fire
+  behaviour rests on that, `resolve.wall_breached` is tuned per segment, and walls already
+  read as connected masonry through `wall_mask`. Only buildings and the big emplacements
+  (`aa`, `citadel_gun`) grow.
+- **D40 — `retrieval_turns` holds at 24 through the scale-up**, and is re-decided by
+  measurement in GW-WP29. Wins currently land turn 9-13 against that clock; a 2.8x objective
+  is expected to consume exactly the slack the standing tuning note asks to remove. Raising
+  the clock pre-emptively would hand that slack straight back.
 
 ## Ground-access contract
 
@@ -2403,6 +2439,106 @@ budget mid-fight (every seed returned no outcome, which reads as a broken bot ra
 a ceiling).
 Commit `ground: GW-WP24 assault balance + class roles`.
 
+### GW-WP24-FU1 — The platoon stops plinking walls (S) — SHIPPED
+
+**Status:** shipped August 3, 2026. A watched bot run showed the platoon "just shooting the
+walls"; a shot audit over 16 seeds put **35.6% of every shot into a wall the platoon was
+already standing behind**, against 25.5% into military blocks.
+
+The obvious lever — lowering `resolve.wall_breached` — would have changed nothing, and that
+is the useful finding. Walls were *already* last in `_target_value`'s ordering. But `min()`
+over the fireable set returns something whenever the set is non-empty, so last place is
+still first when nothing else is in line of sight, and inside a built-up city that is the
+common case. **Demoting last place changes no decision.**
+
+Two real causes, both fixed:
+
+1. **Ranking was per kill, not per action.** A wall pays 2 Resolve for 200hp — four marauder
+   actions at half a point each — against 3.0 a shot for a 50hp military block. Per-kill
+   ranking showed that six-to-one gap as 2-vs-3, because the cost was hidden in hit points.
+   `_target_value` now divides by shots-to-kill.
+2. **The inside move-goal was the city centre.** A trooper that arrives stops being
+   `adrift`, stops moving, and freezes its line of sight wherever it happens to be —
+   reliably on a wall. `_hunt_goal` replaces it with the nearest live emplacement or
+   garrison unit.
+
+Ranking alone was not enough: interior walls are now *refused* inside the objective (None,
+not a low score), because refusing is what leaves the trooper `adrift` and walking.
+
+Measured, 16 seeds, terrestrial_warm, citadel 0, 4/3/1 platoon: wall shots inside
+598 (35.6%) → 11 (0.9%); wins 12/16 (75%) → 13/16 (81%); total shots 1681 → 1174. Seeds 10
+and 13 flipped from timeout to surrender, both having been chipping ~100 wall cells apiece;
+seed 6 went the other way (turn-22 surrender → wipe at 20), since the hunt goal pushes
+harder into garrison fire.
+
+`resolve.wall_breached` deliberately left at 2: with the bot no longer farming walls it
+decides little, and cutting it only shrinks the drainable pool.
+
+Files: `edge/bot/scripts/assaulter.py`.
+Tests: `tests/test_groundwar_bot_targeting.py` (new, 3 cases) pins both halves — the old
+behaviour was a silent failure, nothing crashed and no test went red, the platoon just spent
+its clock on masonry.
+Commit `ground: stop the platoon plinking walls inside the objective`.
+
+## GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes
+
+Implements D35–D40. A trooper and an apartment block were the same size; cities were
+30x14 rectangles with rectangular walls. Sequenced riskiest-first, with the load-bearing
+refactor staged as a provable no-op so the rest lands on a checked foundation.
+
+### GW-WP25 — Structure footprints, all still 1x1 (L) — SHIPPED
+
+**Status:** shipped August 3, 2026. Implements the D36 model with **zero behaviour change**.
+
+`AssaultStructure` and its battle-time twin `_Structure` gained `w`/`h`/`origin_dx`/
+`origin_dy`, with `cells`, `ox`/`oy` and `covers()` derived. Two ints rather than an explicit
+cell tuple: buildings are rectangles, `cells` stays derived, and every field is defaulted so
+a 1x1 structure constructs exactly as it did before.
+
+**Two of the three cell→structure index builders were deleted rather than patched.**
+`generate_assault_map` already built `struct_at` during generation and threw it away; it now
+lives on `AssaultMap`, and both `_battle_for` and `session.py` read it instead of rebuilding
+from `(s.x, s.y)`. That is *less* code than before, and it is why passability, cover,
+reachability, targeting, `structure_hp`, `_freeze_battle` and `city_cowed` needed no change
+at all — they already ask a cell what is on it.
+
+Four semantic breaks fixed here rather than discovered in GW-WP27:
+
+- **LOS self-blocking.** `_line_of_sight` excluded only the two endpoint cells, which was
+  correct while a structure *was* one cell. Give it a body and a shot at its far face
+  crosses its near face — neither endpoint — so the target blocks the shot at itself and is
+  unkillable from that side. Now both endpoints' structure **ids** are exempted along the
+  whole line, which also lets a trooper shoot out of the rubble it stands in.
+- **Firing origin.** Range and LOS *sources* read `ox`/`oy`; *targets* became cell-set
+  membership. Deliberately a designated cell, not "nearest cell of the footprint":
+  nearest-cell silently extends AA reach by about a cell on the diagonal, and the 12-vs-13
+  gap between `aa.range` and a marauder's missile is the single fact D27's tactic rests on.
+- **Rubble round trip.** `settlement._destroyed` writes every cell of a levelled structure;
+  `persistent_structure_hp` recognises it from any one of them. Rubble stays per cell
+  because that is the granularity a survey walks, but a structure has one HP pool.
+- **Threat-paint visibility gate.** Now "any cell visible", not the anchor — otherwise an
+  emplacement whose north-west corner happens to be fogged vanishes entirely, and the anchor
+  is the one cell a player has no reason to think is special.
+
+Bot: the three exact-cell equalities (`_target_value`, `_worth_firing`, `_hunt_goal`) go
+through the new `AssaultMap.structure_at`; `_aa_covers` measures from `ox`/`oy` — a safety
+check must never be looser than the rule it guards, which is that function's own
+documented lesson.
+
+**The acceptance criterion was the point:** full suite green — 3468 passed, 81 snapshots —
+**without a single test expectation or snapshot being touched**. Anything moving would have
+meant the "no-op" refactor was not one.
+
+Files: `edge/core/groundwar/assault.py`, `edge/core/groundwar/settlement.py`,
+`edge/server/session.py`, `edge/bot/scripts/assaulter.py`.
+Tests: `tests/test_groundwar_structure_footprint.py` (new, 8 cases). It builds multi-cell
+structures **by hand**, because nothing the shipped generator produces is bigger than 1x1
+yet — without synthetic fixtures the whole footprint machinery would ship dark and first
+fail in GW-WP27, where it would look like a generation bug rather than a plumbing one. The
+LOS exemption was verified to have teeth by reverting just that clause: both LOS tests fail
+without it.
+Commit `ground: GW-WP25 structure footprints (no-op refactor)`.
+
 ## Verification matrix
 
 | Concern | Required evidence |
@@ -2453,8 +2589,8 @@ Commit `ground: GW-WP24 assault balance + class roles`.
 
 ## Definition of done
 
-- D1–D34 are resolved and recorded in both this plan and authoritative DESIGN.
-- GW-WP01–24 (with GW-WP09-PRE) acceptance tests pass.
+- D1–D40 are resolved and recorded in both this plan and authoritative DESIGN.
+- GW-WP01–29 (with GW-WP09-PRE) acceptance tests pass.
 - A **generated** universe contains inhabited worlds that route to survey and to
   assault; neither path is reachable only through hand-built state.
 - `ruff`, strict `mypy` production layers, pytest/property tests, codec fixtures,
