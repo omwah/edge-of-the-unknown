@@ -2765,6 +2765,89 @@ rewrite above. Three assault-view snapshots refreshed and re-verified by greppin
 both outline and marker glyphs.
 Commit `ground: GW-WP28 city silhouettes`.
 
+### GW-WP29 — Force-curve re-run, a scout-escort fix, and a stale platoon-size bug (M) — SHIPPED
+
+**Status:** shipped August 4, 2026. Resolves D40 (hold `retrieval_turns` at 24) and closes
+the WP24 leftover ("full platoon wins 67%, not 90%; seeds 4/5 never breach").
+
+**A real bug surfaced before any balance measurement meant anything: the "full platoon"
+matrix runs weren't landing a full platoon.** `Scenario.loadout`
+(`edge/groundwar/spectate.py`) defaulted to `marauder=4,scout=2,command=1` — seven
+troopers — while every other definition of the full platoon (`GwBot.squad`'s config
+default, `GameConfig`'s field default, the TUI's initial squad picker) is `4/3/1`, eight.
+Every "full platoon" number recorded for GW-WP24 through WP28 was measuring a
+seven-trooper force one scout short of the documented one. Fixed by correcting the stray
+default to match; no other caller hardcoded a trooper count, so nothing else moved.
+
+**The actual regression this WP chased: at the (now-correct) 320×84 board, scouts ran
+ahead of their marauder escort and died alone.** Traced via a turn-by-turn casualty log:
+scout deaths clustered turn 2–12, well before any marauder made contact. Cause is
+arithmetic, not tactics — a scout's `move: 6` / `jump_range: 10` comfortably outpaces a
+marauder's `move: 3` / `jump_range: 8`, and a scout's whole value (`recon_radius: 16`
+ignoring line of sight, `spot_missile_bonus`) needs no proximity to anything, so nothing
+in its own tactics was what sent it ahead. It was simply running the same "close on the
+goal" logic as every other role, on a board large enough that the gap this opens is now
+lethal before support arrives — a scale side-effect of GW-WP26, not something either WP26
+or WP27 broke on its own.
+
+**Fix: an escort leash, gated off role, not latched.** New `_scout_should_hold` (bot,
+`edge/bot/scripts/assaulter.py`) returns true once the nearest **live** marauder is more
+than `_SCOUT_LEASH = 6` cells (Manhattan) away; re-evaluated fresh every turn rather than
+latched, so a scout that holds while the pack closes resumes on its own the moment it is
+back in leash. Distance is deliberately Manhattan, not the Euclidean `_dist` used for
+range checks elsewhere in the module — it over-reports how far the scout has run ahead,
+so the leash trips a little early rather than a little late; tightening it to Euclidean
+would be wrong in the unsafe direction. If every marauder is dead there is no pack left to
+wait for, so a scout goes on alone rather than freezing forever. The drive loop's existing
+`inside`/`escorted` gate (missile aim, jump-in) is extended with `escorted = role !=
+"scout" or not _scout_should_hold(...)`, and `_jump_into_city` is further restricted to
+`role != "scout"` outright — a single jump clears the whole leash distance in one action,
+so "escorted" alone does not stop a scout from jumping past its cover. New
+`tests/test_groundwar_bot_targeting.py::test_scout_holds_only_once_it_has_outrun_its_marauder_escort`
+pins the threshold and the "no living escort → go on alone" fallback directly against
+`_scout_should_hold`, using a real dropped platoon with synthetic positions rather than a
+hand-built one, since the values under test are read off the live suit config.
+
+**The force curve, re-measured with the corrected 8-trooper platoon and both fixes
+applied** (`python -m edge.groundwar.matrix --seeds 1-8`):
+
+| Citadel | Outcome mix | Win rate | Breach | Casualties (loss seeds) |
+|---|---|---|---|---|
+| 0 | surrender×7, retrieval×1 | 7/8 (87.5%) | 8/8, median turn 0 | 0–3 of 8 |
+| 2 | surrender×2, retrieval×2, casualties×4 | 2/8 (25%) | 8/8, median turn 0 | 4–5 of 8 in loss seeds |
+
+Citadel 0 is close to D33's ~90% (up from WP24's 67%) and **every seed now breaches** —
+seeds 4 and 5, WP24's specific leftover, no longer stall out; that was very likely the
+stale seven-trooper platoon rather than a geometry defect, since nothing in WP25–28
+targeted breach behavior directly. Wins land turn 10–24 of the 24-turn clock, inside D28's
+"just before the boat" — **D40 is decided: hold `retrieval_turns` at 24.**
+
+Citadel 2 looked like a regression at first (2/8, casualty-heavy, scouts dying turn 2–12
+even with the leash applied) and drew two rounds of bot changes before the discriminating
+test: **does a bigger force fix it?** `--squad marauder=8,scout=3,command=1` (12 troopers,
+legal under `max_troopers: 14`) against the same eight citadel-2 seeds wins **8/8, all
+surrender, 0–2 casualties.** That settles it — citadel 2 is not a bot or balance defect,
+it is a fortified world that legitimately demands more than the eight-trooper platoon
+D33's curve was calibrated against at citadel 0 (six turret slots instead of four, an
+extra live AA, a lower surrender threshold). No citadel-2-specific target was ever stated
+in D33, and the force curve — "a couple of marauders should take a world only on a slim
+chance; a full platoon should be favoured" — says nothing about a fixed platoon size
+clearing every citadel level. This is left as a documented finding, not chased further:
+the identical fixes that took citadel 0 from 50%→87.5% are proven correct by the citadel-0
+number, and a third round of bot tuning aimed at a citadel-2 target nobody set would be
+guessing at a curve rather than measuring one.
+
+**Not chased, and why:** median breach turn is 0 at both citadel levels, meaning many runs
+breach on the very first contact turn — the WP26 "blind corner" finding from the jump
+tactic is not closed, only one path into it (scout jumping) was removed. Out of scope
+here; the marauder path into the same finding is unaffected by anything in this WP.
+
+Files: `edge/groundwar/spectate.py` (`Scenario.loadout` default fix),
+`edge/bot/scripts/assaulter.py` (`_SCOUT_LEASH`, `_scout_should_hold`, `escorted` gate
+extension, `_jump_into_city` scout restriction).
+Tests: `tests/test_groundwar_bot_targeting.py` (new case, above).
+Commit `ground: GW-WP29 force-curve re-run and scout escort leash`.
+
 ## Verification matrix
 
 | Concern | Required evidence |

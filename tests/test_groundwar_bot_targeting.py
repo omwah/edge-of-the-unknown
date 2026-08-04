@@ -17,9 +17,12 @@ from __future__ import annotations
 
 import pytest
 
+from dataclasses import replace
+
 from edge.bot.runner import BotRunner
 from edge.bot.scripts import assaulter
-from edge.bot.scripts.assaulter import _alive, _hunt_goal, _target_value
+from edge.bot.scripts.assaulter import _SCOUT_LEASH, _alive, _hunt_goal, _role, \
+    _scout_should_hold, _target_value
 from edge.config import load_default_config
 from edge.core.config import GameConfig
 from edge.core.groundwar.assault import assault_map_for
@@ -123,3 +126,36 @@ def test_hunt_goal_picks_a_live_target_over_the_city_centre(dropped) -> None:
     assert hit or garrison, "hunt goal must be an actual target, not empty ground"
     if hit:
         assert hit[0].kind not in {"wall", "gate", "building_civilian"}
+
+
+def test_scout_holds_only_once_it_has_outrun_its_marauder_escort(dropped) -> None:  # type: ignore[no-untyped-def]
+    """GW-WP29: a scout's move (6) and jump_range (10) let it outpace the marauder
+    pack (move 3) it needs for cover — traced losses showed scouts dying alone, turns
+    before any marauder made contact. `_scout_should_hold` is what stops that.
+    """
+    config, op, _amap = dropped
+    scout = next(t for t in op.platoon if _role(config.groundwar.suits[t.suit_id]) == "scout")
+    anchor = next(
+        t for t in op.platoon if _role(config.groundwar.suits[t.suit_id]) == "marauder")
+    # Pin every marauder to one point so `min()` over the pack has a single, known answer.
+    platoon = tuple(
+        replace(t, x=anchor.x, y=anchor.y)
+        if _role(config.groundwar.suits[t.suit_id]) == "marauder" else t
+        for t in op.platoon)
+
+    near = replace(scout, x=anchor.x, y=anchor.y + _SCOUT_LEASH)
+    op_near = replace(op, platoon=tuple(
+        near if t.id == scout.id else t for t in platoon))
+    assert not _scout_should_hold(near, op_near, config)
+
+    far = replace(scout, x=anchor.x, y=anchor.y + _SCOUT_LEASH + 1)
+    op_far = replace(op, platoon=tuple(
+        far if t.id == scout.id else t for t in platoon))
+    assert _scout_should_hold(far, op_far, config)
+
+    dead_marauders = tuple(
+        replace(t, hp=0) if _role(config.groundwar.suits[t.suit_id]) == "marauder" else t
+        for t in op.platoon)
+    op_no_escort = replace(op, platoon=dead_marauders)
+    assert not _scout_should_hold(far, op_no_escort, config), \
+        "a scout with no living marauder to wait for must go on alone"

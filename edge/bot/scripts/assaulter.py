@@ -74,6 +74,16 @@ _BREACHABLE = frozenset({"wall", "gate"})
 # and demolishing scenery.
 _PAYLOAD_TARGETS = frozenset({
     "citadel_gun", "aa", "turret", "sensor", "building_military"})
+# GW-WP29 (D40 measurement pass): how far a scout may range ahead of the nearest live
+# marauder before it stops closing and waits. Found by tracing full-platoon losses on
+# the GW-WP26/27 board — a scout was the first casualty in every one, consistently
+# dying turns before any marauder made contact. A scout's move (6) and jump_range (10)
+# comfortably outpace a marauder's (3/8), and its whole value — `recon_radius: 16`
+# ignoring line of sight, `spot_missile_bonus` — needs no proximity to anything at all,
+# so nothing in its own tactics is what sent it ahead alone. It was simply running the
+# same "close on the goal" logic as every other role on a board large enough that the
+# gap this opens is now lethal before marauder support ever arrives.
+_SCOUT_LEASH = 6
 
 
 def _role(suit: GwSuit) -> str:
@@ -88,6 +98,31 @@ def _role(suit: GwSuit) -> str:
     if suit.jam_radius > 0:
         return "scout"
     return "marauder"
+
+
+def _scout_should_hold(
+    trooper: AssaultTrooper, op: AssaultOperation, config: GameConfig,
+) -> bool:
+    """Whether this scout has already outrun its marauder escort and must wait.
+
+    True once the nearest **live** marauder is farther than `_SCOUT_LEASH` away.
+    Evaluated fresh every turn rather than latched, so a scout that holds while the
+    pack closes the gap resumes moving on its own the moment it is back in leash —
+    no separate "resume" state to get wrong. If every marauder is dead there is no
+    pack left to wait for, so the scout goes on alone rather than freezing forever.
+
+    Distance is Manhattan, not the Euclidean `_dist` used for range checks elsewhere
+    in this module — deliberately: it over-reports how far the scout has run ahead,
+    so the leash trips a little early rather than a little late. Tightening it to
+    Euclidean would let the scout drift slightly farther before holding, which is
+    the wrong direction to be wrong in.
+    """
+    marauders = [t for t in op.platoon if t.hp > 0
+                and _role(config.groundwar.suits[t.suit_id]) == "marauder"]
+    if not marauders:
+        return False
+    nearest = min(abs(trooper.x - m.x) + abs(trooper.y - m.y) for m in marauders)
+    return nearest > _SCOUT_LEASH
 
 
 def _pick_planet(state: UniverseState, player_id: int, config: GameConfig) -> Planet | None:
@@ -571,25 +606,37 @@ def setup(bot: BotRunner) -> None:
                 return
 
             inside = city.inside(trooper.x, trooper.y)
+            # GW-WP29: a scout that has already outrun its marauder escort stops closing
+            # (and stops jumping — a jump can open that gap in one action, faster than
+            # walking ever could) until the pack catches up. See `_scout_should_hold`.
+            escorted = role != "scout" or not _scout_should_hold(trooper, op, config)
 
             # D27's line, in order: silence the battery, then jump the wall it was
             # guarding. Both outrank closing on foot — a marauder that walks toward the
             # wall instead of spending a missile is choosing the five-shot breach over
             # the one-turn entry, which is the choice this tuning exists to make wrong.
-            if not inside:
+            if not inside and escorted:
                 aim = _missile_target(amap, op, city, trooper, proj.missile_targets)
                 if aim is not None:
                     b.apply(GroundFire(op.operation_id, trooper.id, *aim, missile=True))
                     return
-                leap = _jump_into_city(amap, op, city, config, trooper, proj.jumpable)
-                if leap is not None:
-                    b.apply(GroundJump(op.operation_id, trooper.id, *leap))
-                    return
+                # GW-WP29: the D27 silence-then-jump breach stays a marauder's tactic
+                # (command already avoids it by holding at range). A scout's own escort
+                # leash only throttles *walking* speed — one jump's `jump_range: 10`
+                # clears the whole leash in a single action, so an "escorted" scout
+                # could still leap alone into a city interior an escort was supposed to
+                # keep it out of. Nothing about a scout's job needs it inside first: its
+                # recon and missile-spotting both work from the approach.
+                if role != "scout":
+                    leap = _jump_into_city(amap, op, city, config, trooper, proj.jumpable)
+                    if leap is not None:
+                        b.apply(GroundJump(op.operation_id, trooper.id, *leap))
+                        return
 
             hunt = _hunt_goal(amap, op, city, trooper) if inside else None
             (gx, gy), hold = _move_goal(city, breach, suit, role, at=(trooper.x, trooper.y),
                                         inside=inside, hunt=hunt)
-            adrift = abs(trooper.x - gx) + abs(trooper.y - gy) > hold
+            adrift = escorted and abs(trooper.x - gx) + abs(trooper.y - gy) > hold
 
             # Spend the turn's *first* action closing, then shoot with the rest. Without
             # this a trooper with any target in range simply never moves again: a
