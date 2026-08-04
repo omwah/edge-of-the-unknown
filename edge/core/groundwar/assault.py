@@ -32,7 +32,7 @@ from __future__ import annotations
 import heapq
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from random import Random
 from typing import Literal
 
@@ -89,6 +89,24 @@ class AssaultStructure:
     like `SurveyMap`. Live damage tracking is WP10's id-keyed overlay on
     `AssaultOperation`, the same way `SurveyOperation.resolved_discovery_ids`
     overlays `SurveySite.found` without `SurveySite` itself being mutable.
+
+    GW-WP25 (D35/D36) gave a structure a **footprint**. `x, y` is the anchor — the
+    north-west cell — and `w, h` its extent, so a 4x2 depot is *one* object with one
+    HP pool and one Resolve drain rather than eight independent cells. Two ints
+    beat an explicit cell tuple here: buildings are rectangles, `cells` stays
+    derived, and every field is defaulted so a 1x1 structure constructs exactly as
+    it did before.
+
+    `origin_dx/dy` names the **firing cell** — where an emplacement's range and
+    line of sight are measured from. It is a designated cell rather than "whichever
+    of my cells is nearest the target" on purpose: nearest-cell silently extends an
+    AA battery's reach by about a cell on the diagonal, and the 12-vs-13 gap
+    between `aa.range` and a marauder's missile is the single fact D27's
+    silence-then-jump tactic is built on.
+
+    Per D39 only buildings and the big emplacements (`aa`, `citadel_gun`) ever grow.
+    Walls and gates stay 1x1 because D22's breach loop picks one individually
+    killable segment, and `resolve.wall_breached` is tuned per segment.
     """
 
     id: int
@@ -97,6 +115,29 @@ class AssaultStructure:
     y: int
     city_id: int
     hp_max: int
+    w: int = 1
+    h: int = 1
+    origin_dx: int = 0
+    origin_dy: int = 0
+
+    @property
+    def cells(self) -> tuple[Vec, ...]:
+        """Every cell this structure occupies, row-major from the anchor."""
+        if self.w == 1 and self.h == 1:
+            return ((self.x, self.y),)
+        return tuple((self.x + dx, self.y + dy)
+                     for dy in range(self.h) for dx in range(self.w))
+
+    @property
+    def ox(self) -> int:
+        return self.x + self.origin_dx
+
+    @property
+    def oy(self) -> int:
+        return self.y + self.origin_dy
+
+    def covers(self, x: int, y: int) -> bool:
+        return self.x <= x < self.x + self.w and self.y <= y < self.y + self.h
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,10 +188,19 @@ class AssaultMap:
     # no structure to fall back to the way a terrestrial wall does). Empty/unused
     # for terrestrial maps, which keep deriving origins from gates/walls.
     spawn_anchors: tuple[Vec, ...] = ()
+    # GW-WP25: cell -> structure id, covering **every** cell of every footprint.
+    # Generation already built this index and threw it away; keeping it deletes the two
+    # other places that rebuilt one from `(s.x, s.y)` (`_battle_for` and the server's
+    # DTO projection), which were the only readers that had to know a structure was a
+    # single cell. Everything downstream — passability, cover, LOS, targeting — asks a
+    # cell what is on it and needs no footprint awareness at all.
+    # cell keys the structure itself rather than its id: every consumer that asks
+    # "what is on this cell" wants the object, and the one place that wants an id
+    # (`_battle_for`, keying its mutable twins) just reads `.id` off it.
+    struct_at: Mapping[Vec, AssaultStructure] = field(default_factory=dict)
 
-    def structures_in(self, city_id: int, *kinds: StructureKind) -> tuple[AssaultStructure, ...]:
-        return tuple(s for s in self.structures
-                     if s.city_id == city_id and (not kinds or s.kind in kinds))
+    def structure_at(self, x: int, y: int) -> AssaultStructure | None:
+        return self.struct_at.get((x, y))
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,18 +304,29 @@ def derive_difficulty(
 
 
 def _add_structure(
-    structures: list[AssaultStructure], struct_at: dict[Vec, int], next_id: list[int],
-    kind: StructureKind, x: int, y: int, city_id: int, hp: int,
-) -> None:
-    s = AssaultStructure(id=next_id[0], kind=kind, x=x, y=y, city_id=city_id, hp_max=hp)
+    structures: list[AssaultStructure], struct_at: dict[Vec, AssaultStructure],
+    next_id: list[int], kind: StructureKind, x: int, y: int, city_id: int, hp: int,
+    *, w: int = 1, h: int = 1, origin: Vec = (0, 0),
+) -> AssaultStructure:
+    """Stamp one structure and index **every cell of its footprint** (GW-WP25).
+
+    Indexing the whole footprint here is what lets the rest of the system stay
+    footprint-blind: passability, cover, line of sight and targeting all ask
+    `struct_at` what is on a cell, and get the same answer for the far corner of a
+    depot as for its anchor.
+    """
+    s = AssaultStructure(id=next_id[0], kind=kind, x=x, y=y, city_id=city_id, hp_max=hp,
+                         w=w, h=h, origin_dx=origin[0], origin_dy=origin[1])
     structures.append(s)
-    struct_at[(x, y)] = s.id
+    for cell in s.cells:
+        struct_at[cell] = s
     next_id[0] += 1
+    return s
 
 
 def _stamp_city(
     feature: list[list[str]], blocked: set[Vec], structures: list[AssaultStructure],
-    struct_at: dict[Vec, int], next_id: list[int], config: GameConfig,
+    struct_at: dict[Vec, AssaultStructure], next_id: list[int], config: GameConfig,
     stamp: gw_world.PlaceStamp, *, citadel_level: int,
 ) -> AssaultCity:
     """Fortify one of the world's built-up places into a defended city (GW-WP19).
@@ -517,7 +578,7 @@ def generate_assault_map(
     feature = [list(row) for row in ground.feature]
     blocked: set[Vec] = set()
     structures: list[AssaultStructure] = []
-    struct_at: dict[Vec, int] = {}
+    struct_at: dict[Vec, AssaultStructure] = {}
     next_id = [1]
 
     built = [
@@ -534,7 +595,7 @@ def generate_assault_map(
         width=width, height=height,
         feature=tuple(tuple(row) for row in feature), blocked=frozenset(blocked),
         cities=tuple(built), structures=tuple(structures),
-        landing_x=landing_x, landing_y=landing_y,
+        landing_x=landing_x, landing_y=landing_y, struct_at=struct_at,
     )
 
 
@@ -542,8 +603,8 @@ def generate_assault_map(
 
 
 def _stamp_district(
-    structures: list[AssaultStructure], struct_at: dict[Vec, int], next_id: list[int],
-    config: GameConfig, district: gw_interior.District, city_id: int, reserved: set[Vec], *,
+    structures: list[AssaultStructure], struct_at: dict[Vec, AssaultStructure],
+    next_id: list[int], config: GameConfig, district: gw_interior.District, city_id: int, reserved: set[Vec], *,
     is_citadel: bool, citadel_level: int,
 ) -> None:
     """Emplacements + building stamps for one district, keyed off its own floor
@@ -636,7 +697,7 @@ def generate_cloud_city_assault_map(
     assert config.groundwar is not None
     layout = gw_interior.generate_interior(seed, cloud_city_size, config.groundwar.cloud_city)
     structures: list[AssaultStructure] = []
-    struct_at: dict[Vec, int] = {}
+    struct_at: dict[Vec, AssaultStructure] = {}
     next_id = [1]
     rng = Random(f"{seed}|cloud_city_assault|{cloud_city_size}|{citadel_level}")
 
@@ -667,8 +728,7 @@ def generate_cloud_city_assault_map(
                     structures, struct_at, next_id, "gate", x, y, city.id,
                     config.groundwar.defenses.gate.hp)
 
-    kind_by_id = {s.id: s.kind for s in structures}
-    blocked: set[Vec] = {pos for pos, sid in struct_at.items() if kind_by_id[sid] != "gate"}
+    blocked: set[Vec] = {pos for pos, s in struct_at.items() if s.kind != "gate"}
     for y, row in enumerate(layout.feature_grid):
         for x, feature_name in enumerate(row):
             if feature_name == "bulkhead":
@@ -679,6 +739,7 @@ def generate_cloud_city_assault_map(
         width=layout.width, height=layout.height, feature=layout.feature_grid,
         blocked=frozenset(blocked), cities=(city,), structures=tuple(structures),
         landing_x=landing_x, landing_y=landing_y, spawn_anchors=layout.defender_slots,
+        struct_at=struct_at,
     )
 
 
@@ -758,9 +819,13 @@ def persistent_structure_hp(
     per-kind count against "the lowest stable structure ids of each kind", which moved
     the damage around whenever the map was re-rolled.
     """
+    # GW-WP25: any cell of the footprint being rubble means the whole structure is
+    # down. Rubble is recorded per cell (`Planet.ground_rubble`) because that is the
+    # granularity a survey walks and a repeat assault re-enters, but a structure has
+    # one HP pool, so recognising it from any one of its cells is the correct read.
     return {
         structure.id: 0 for structure in amap.structures
-        if rubble.get((structure.x, structure.y)) is not None
+        if any(rubble.get(cell) is not None for cell in structure.cells)
     }
 
 
@@ -826,9 +891,12 @@ def tactical_projection(
             if unit.alive and _dist(trooper.x, trooper.y, unit.x, unit.y) <= recon:
                 visible.add((unit.x, unit.y))
         for s in battle.structures.values():
-            if (s.alive and s.kind not in PASSIVE_STRUCTURE_KINDS
-                    and _dist(trooper.x, trooper.y, s.x, s.y) <= recon):
-                visible.add((s.x, s.y))
+            if s.alive and s.kind not in PASSIVE_STRUCTURE_KINDS and any(
+                    _dist(trooper.x, trooper.y, cx, cy) <= recon for cx, cy in s.cells):
+                # Reveal the whole footprint: a scout that has spotted one corner of a
+                # battery has spotted the battery, and revealing a partial silhouette
+                # would render as a fragment of a building.
+                visible.update(s.cells)
 
     actor = battle.troopers.get(actor_id) if actor_id is not None else None
     live_action = actor is not None and actor.alive and op.outcome is None
@@ -879,15 +947,20 @@ def tactical_projection(
     ground_threat: set[Vec] = set()
 
     for structure in battle.structures.values():
-        if not structure.alive or (structure.x, structure.y) not in visible:
+        # Seeing *any* cell of a battery is seeing the battery: gating on the anchor
+        # alone would hide a whole emplacement whose north-west corner happens to be
+        # fogged, which is the one cell a player has no reason to think is special.
+        if not structure.alive or not any(cell in visible for cell in structure.cells):
             continue
+        # Painted from the firing cell, matching where the gun actually shoots from.
         if structure.kind == "aa":
-            _paint_radius(amap, structure.x, structure.y, battle.gw.defenses.aa.range, aa_threat)
+            _paint_radius(amap, structure.ox, structure.oy, battle.gw.defenses.aa.range,
+                          aa_threat)
         elif structure.kind == "turret":
-            _paint_radius(amap, structure.x, structure.y, battle.gw.defenses.turret.range,
+            _paint_radius(amap, structure.ox, structure.oy, battle.gw.defenses.turret.range,
                           ground_threat)
         elif structure.kind == "citadel_gun":
-            _paint_radius(amap, structure.x, structure.y, battle.gw.defenses.citadel_gun.range,
+            _paint_radius(amap, structure.ox, structure.oy, battle.gw.defenses.citadel_gun.range,
                           ground_threat)
     for unit in battle.garrison.values():
         if unit.alive and (unit.x, unit.y) in visible:
@@ -1031,6 +1104,14 @@ _RUBBLE_COST = 2  # moving through a destroyed structure cell
 
 @dataclass(slots=True)
 class _Structure:
+    """The battle-time mutable twin of `AssaultStructure`, footprint and all.
+
+    Carries `w/h/origin_*` for the same reason the frozen record does: one HP pool
+    over N cells, and a single designated cell that range and line of sight are
+    measured from (see `AssaultStructure` for why that is a fixed cell rather than
+    the nearest one).
+    """
+
     id: int
     kind: StructureKind
     x: int
@@ -1038,10 +1119,29 @@ class _Structure:
     city_id: int
     hp: int
     hp_max: int
+    w: int = 1
+    h: int = 1
+    origin_dx: int = 0
+    origin_dy: int = 0
 
     @property
     def alive(self) -> bool:
         return self.hp > 0
+
+    @property
+    def cells(self) -> tuple[Vec, ...]:
+        if self.w == 1 and self.h == 1:
+            return ((self.x, self.y),)
+        return tuple((self.x + dx, self.y + dy)
+                     for dy in range(self.h) for dx in range(self.w))
+
+    @property
+    def ox(self) -> int:
+        return self.x + self.origin_dx
+
+    @property
+    def oy(self) -> int:
+        return self.y + self.origin_dy
 
 
 @dataclass(slots=True)
@@ -1173,10 +1273,14 @@ def _battle_for(
     assert config.groundwar is not None
     structures = {
         s.id: _Structure(id=s.id, kind=s.kind, x=s.x, y=s.y, city_id=s.city_id,
-                         hp=op.structure_hp.get(s.id, s.hp_max), hp_max=s.hp_max)
+                         hp=op.structure_hp.get(s.id, s.hp_max), hp_max=s.hp_max,
+                         w=s.w, h=s.h, origin_dx=s.origin_dx, origin_dy=s.origin_dy)
         for s in amap.structures
     }
-    struct_at = {(s.x, s.y): s.id for s in structures.values()}
+    # GW-WP25: reuse the map's own index instead of rebuilding one from `(s.x, s.y)`.
+    # The old comprehension was one of exactly three places that assumed a structure
+    # was a single cell; the map already knows every cell of every footprint.
+    struct_at = {cell: s.id for cell, s in amap.struct_at.items()}
     troopers = {
         t.id: _Trooper(id=t.id, suit_id=t.suit_id, name=t.name, x=t.x, y=t.y, hp=t.hp,
                        missiles=t.missiles, jump_charges=t.jump_charges, mp=t.mp,
@@ -1259,7 +1363,18 @@ def _dist(ax: int, ay: int, bx: int, by: int) -> float:
 
 
 def _line_of_sight(battle: _Battle, ax: int, ay: int, bx: int, by: int) -> bool:
-    """Bresenham; blocked by LOS-blocking terrain or a live structure between endpoints."""
+    """Bresenham; blocked by LOS-blocking terrain or a live structure between endpoints.
+
+    GW-WP25: a structure occupying **either endpoint** is exempted along the whole
+    line, not just on the endpoint cell. Excluding only the two endpoint cells was
+    correct while every structure was one cell — the target's only cell *was* the
+    endpoint — but a shot at the far corner of a 4x2 depot crosses the depot's own
+    other cells, which are neither endpoint, so the target would block the shot at
+    itself and become unkillable. The same exemption covers a trooper standing in
+    the rubble of a big building shooting out of it.
+    """
+    ignore = {s.id for s in (battle.structure_at(ax, ay), battle.structure_at(bx, by))
+              if s is not None}
     dx, dy = abs(bx - ax), abs(by - ay)
     sx, sy = (1 if ax < bx else -1), (1 if ay < by else -1)
     err = dx - dy
@@ -1267,7 +1382,7 @@ def _line_of_sight(battle: _Battle, ax: int, ay: int, bx: int, by: int) -> bool:
     while True:
         if (x, y) != (ax, ay) and (x, y) != (bx, by):
             s = battle.structure_at(x, y)
-            if s is not None and s.alive:
+            if s is not None and s.alive and s.id not in ignore:
                 return False
             tc = battle.gw.terrain.get(battle.amap.feature[y][x])
             if tc is not None and tc.blocks_los:
@@ -1347,7 +1462,10 @@ def _structure_destroyed(battle: _Battle, s: _Structure) -> None:
         "building_military": r.military_building_destroyed,
     }
     label = s.kind.replace("_", " ")
-    battle.log("destroyed", f"{label} destroyed", s.x, s.y, friendly=True)
+    # Logged at the footprint's centre so a destruction marker sits *on* the building
+    # rather than on its north-west corner.
+    battle.log("destroyed", f"{label} destroyed",
+               s.x + (s.w - 1) // 2, s.y + (s.h - 1) // 2, friendly=True)
     if s.kind == "building_civilian":
         _apply_resolve(battle, r.civilian_building_destroyed,
                        "civilian block leveled — atrocity stiffens them")
@@ -1556,7 +1674,7 @@ def do_jump(battle: _Battle, trooper: _Trooper, x: int, y: int) -> bool:
     for s in battle.structures.values():
         if s.kind != "aa" or not s.alive or trooper.hp <= 0:
             continue
-        d = _dist(s.x, s.y, x, y)
+        d = _dist(s.ox, s.oy, x, y)
         if d <= aa_cfg.range:
             if rng.random() < _aa_reaction_acc(aa_cfg, d, _escalation_bonus(battle)):
                 _trooper_hit(battle, trooper, aa_cfg.damage, "AA fire mid-air")
@@ -1590,9 +1708,9 @@ def _place_units(
     if battle.amap.spawn_anchors:
         origins: list[Vec] = list(battle.amap.spawn_anchors)
     else:
-        gates = [(s.x, s.y) for s in battle.structures.values()
+        gates = [(s.ox, s.oy) for s in battle.structures.values()
                  if s.city_id == city.id and s.kind == "gate"]
-        origins = gates or [(s.x, s.y) for s in battle.structures.values()
+        origins = gates or [(s.ox, s.oy) for s in battle.structures.values()
                             if s.city_id == city.id and s.kind == "wall"][:2]
     gcls = getattr(battle.gw.garrison, kind)
     placed = 0
@@ -1639,7 +1757,7 @@ def _place_preplaced_garrison(battle: _Battle, op: AssaultOperation) -> None:
 def _sensor_jammed(battle: _Battle, sensor: _Structure) -> bool:
     return any(
         _suit(battle, t).jam_radius > 0
-        and _dist(t.x, t.y, sensor.x, sensor.y) <= _suit(battle, t).jam_radius
+        and _dist(t.x, t.y, sensor.ox, sensor.oy) <= _suit(battle, t).jam_radius
         for t in battle.live_troopers()
     )
 
@@ -1651,7 +1769,7 @@ def update_detection(battle: _Battle) -> None:
         for s in sensors:
             if _sensor_jammed(battle, s):
                 continue
-            if _dist(s.x, s.y, t.x, t.y) <= battle.gw.defenses.sensor.radius * _suit(battle, t).signature:
+            if _dist(s.ox, s.oy, t.x, t.y) <= battle.gw.defenses.sensor.radius * _suit(battle, t).signature:
                 seen = True
                 break
         if not seen:
@@ -1676,11 +1794,11 @@ def _emplacement_fire(battle: _Battle) -> None:
             continue
         w = stats[s.kind]
         targets = [t for t in battle.live_troopers()
-                   if t.detected and _dist(s.x, s.y, t.x, t.y) <= w.range
-                   and _line_of_sight(battle, s.x, s.y, t.x, t.y)]
+                   if t.detected and _dist(s.ox, s.oy, t.x, t.y) <= w.range
+                   and _line_of_sight(battle, s.ox, s.oy, t.x, t.y)]
         if not targets:
             continue
-        target = min(targets, key=lambda t: _dist(s.x, s.y, t.x, t.y))
+        target = min(targets, key=lambda t: _dist(s.ox, s.oy, t.x, t.y))
         acc = w.accuracy + bonus - _battle_cover_at(battle, target.x, target.y)
         if rng.random() < acc:
             _trooper_hit(battle, target, w.damage, s.kind.replace("_", " "))
@@ -1866,7 +1984,7 @@ def assault_drop(
         for s in battle.structures.values():
             if s.kind != "aa" or not s.alive:
                 continue
-            d = _dist(s.x, s.y, x, y)
+            d = _dist(s.ox, s.oy, x, y)
             if d <= aa_cfg.range:
                 if rng.random() < _aa_reaction_acc(aa_cfg, d):
                     _trooper_hit(battle, t, aa_cfg.damage, "anti-drop fire")
