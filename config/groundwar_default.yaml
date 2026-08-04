@@ -7,8 +7,17 @@
 # (edge/groundwar/rules.py) reads only these numbers.
 
 battlefield:
-  width: 220        # cells; ~2-3 terminal screens wide
-  height: 56
+  # GW-WP26 (D38) grew this from 220x56. The lane math in `generate_world_ground`
+  # forces it: place `i` is jittered inside a lane `width/(places+1)` wide, and that
+  # lane must exceed the place's own width or adjacent cities land on top of each
+  # other. At `max_cities: 4` and a 46-wide capital (GW-WP27) a 220-wide map gives
+  # 44-cell lanes — too narrow. 320 gives 64, leaving 17 columns of jitter.
+  #
+  # Cost is paid once per `_map_cache` key at generation (~0.1s -> ~0.25s); the
+  # per-action projection cost is unchanged, because visibility is bounded by sight
+  # radius and the DTO is viewport-cropped, not by map area.
+  width: 320        # cells; ~4 terminal screens wide
+  height: 84
 
 pressure:
   retrieval_turns: 24       # boat pickup — surrender must land before this turn ends
@@ -255,15 +264,19 @@ terrain:
 # assault share one terrain grid and one set of built-up places per world, so these
 # dimensions must match `battlefield` above (the config validator enforces it).
 expedition:
-  width: 220
-  height: 56
+  width: 320
+  height: 84
   sites_min: 3              # sensor contacts per descent
   sites_max: 6
-  supplies_start: 55        # every move or dig spends 1; settlements refill it
+  # GW-WP26: raised with the map (D38). A surveyor spends one supply per cell moved,
+  # so this number *is* how far it can walk — 55 was a bit over a quarter of a 220-wide
+  # map and would have been a sixth of a 320-wide one, starving the expedition before
+  # it reached the first town. Scaled with the width, not re-derived.
+  supplies_start: 80        # every move or dig spends 1; settlements refill it
   dig_cost: 1
   dig_radius: 2             # a dig opens a trench this wide — the site pays off anywhere inside
   find_resupply: 6          # supplies regained at each successful find (capped at supplies_start)
-  settlement_resupply: 12   # supplies regained per settlement visit (capped at supplies_start)
+  settlement_resupply: 18   # supplies regained per settlement visit (capped at supplies_start)
   move: 7                   # move points per turn (terrain costs apply)
   sight: 11                 # you must be this close to *notice* disturbed ground
   area_radius: 14           # the ship-sensor "general area" circle
