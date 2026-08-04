@@ -379,9 +379,14 @@ def _hunt_goal(
     return goal
 
 
+def _nearest_city_cell(city: AssaultCity, at: Vec) -> Vec:
+    """The cell of the city's footprint closest to `at` — its near face, in effect."""
+    return (min(max(at[0], city.x0), city.x1), min(max(at[1], city.y0), city.y1))
+
+
 def _move_goal(
     city: AssaultCity, breach: AssaultStructure | None, suit: GwSuit, role: str,
-    *, inside: bool, hunt: Vec | None = None,
+    *, at: Vec, inside: bool, hunt: Vec | None = None,
 ) -> tuple[Vec, int]:
     """Where this role wants to be, and how close is close enough.
 
@@ -392,6 +397,12 @@ def _move_goal(
     against a Euclidean `broadcast_range`, which errs toward closing too far rather than
     stopping short — a command trooper that halts just out of range would strand the run.
 
+    GW-WP26: Command aims at the city's **near face**, not its centre. Against a 46-wide
+    capital a centre-anchored hold of `broadcast_range - 1` sits well inside the walls —
+    so the suit whose job is to survive would march into the middle of the objective to
+    do it. Now it stops short of the wall, which is both what D31 describes and what the
+    matching `assault.city_range` change makes legal.
+
     `inside` overrides the breach goal, and must: a trooper already past the wall that
     still walked toward the perimeter breach would march back *out* of the objective it
     just entered, which is precisely what an early GW-WP23 trace showed it doing.
@@ -399,7 +410,7 @@ def _move_goal(
     if inside:
         return (hunt or (city.cx, city.cy)), 0
     if role == "command":
-        return (city.cx, city.cy), max(1, suit.broadcast_range - 1)
+        return _nearest_city_cell(city, at), max(1, suit.broadcast_range - 1)
     if breach is not None:
         return (breach.x, breach.y), 1
     return (city.cx, city.cy), 0
@@ -576,7 +587,8 @@ def setup(bot: BotRunner) -> None:
                     return
 
             hunt = _hunt_goal(amap, op, city, trooper) if inside else None
-            (gx, gy), hold = _move_goal(city, breach, suit, role, inside=inside, hunt=hunt)
+            (gx, gy), hold = _move_goal(city, breach, suit, role, at=(trooper.x, trooper.y),
+                                        inside=inside, hunt=hunt)
             adrift = abs(trooper.x - gx) + abs(trooper.y - gy) > hold
 
             # Spend the turn's *first* action closing, then shoot with the rest. Without

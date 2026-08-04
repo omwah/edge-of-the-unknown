@@ -2539,6 +2539,54 @@ LOS exemption was verified to have teeth by reverting just that clause: both LOS
 without it.
 Commit `ground: GW-WP25 structure footprints (no-op refactor)`.
 
+### GW-WP26 — A bigger board, and the broadcast anchor it breaks (M) — SHIPPED
+
+**Status:** shipped August 3, 2026. Implements D38. Scale only — cities keep today's
+dimensions, so exactly one variable moves and GW-WP27's effect stays measurable.
+
+`battlefield` and `expedition` both go to **320x84** (the config validator rejects
+disagreement). Survey shares the grid, so `supplies_start` 55 → 80 and
+`settlement_resupply` 12 → 18: a surveyor spends one supply per cell moved, so that number
+*is* how far it can walk, and 55 would have been a sixth of the new width — starving the
+expedition before it reached the first town.
+
+**`broadcast_range` had to move with it.** It was measured to `city.cx, city.cy`, which is
+harmless at 30 cells wide and wrong at 46: a centre-anchored range means Command must stand
+*deeper inside a bigger objective* to dictate terms — the range shrinks in practice exactly
+as the city grows — inverting D31's point that Command wins by surviving rather than by
+joining the firefight. New `assault.city_range()` measures to the nearest cell of the
+footprint (bounding box, since it is a player affordance and generous is the safe
+direction), and the bot's Command hold aims at the city's near face instead of its centre.
+
+**Measured:** the survey keepout worry did not materialise — 375 generations across five
+planet types x 25 seeds x 3 settlement counts placed **every** site (`_site_position` drops
+a site silently after 400 tries, so this was worth checking rather than assuming). Balance
+moved the right way: seeds 1-6 at citadel 0 went from 3 wins to **5 wins**, and — notably —
+**all six now breach**, clearing the GW-WP24 leftover where seeds 4 and 5 never breached
+under any configuration and seed 4 never made contact. The re-rolled geometry did it; there
+was no bot defect to find.
+
+**Finding, not fixed here: a scout can enter the capital on turn 0 without breaching.**
+Traced on seed 1 — drop at (279,38), scout `GroundJump`s to (284,51), one cell inside the
+capital's north wall. It works because the single AA sits at `(cx - w//4, cy - 1)` and
+`aa.range: 12` does not reach the far corners of even a 30-wide city (12.6 cells to that
+landing cell). So D27's silence-then-jump line is bypassed by jumping into the umbrella's
+blind corner, skipping the approach *and* the breach. This predates GW-WP26 — turn-0 and
+turn-1 breaches are visible in the GW-WP24-FU1 16-seed audit — and it gets worse at a 46-wide
+capital. Deferred to GW-WP27, which adds the second capital AA independent of citadel level
+(**not** a larger `aa.range`: the 12-vs-13 gap against a marauder's missile is what makes
+the tactic exist at all), and to GW-WP29 to re-measure.
+
+Files: `config/groundwar_default.yaml`, `edge/core/groundwar/assault.py` (`city_range`),
+`edge/bot/scripts/assaulter.py` (`_nearest_city_cell`, Command hold).
+Tests: `tests/test_groundwar_assault_actions.py` gains `_sight_clear`/`_firing_spot` and a
+`city_range` test. The four mechanics tests that broke did **not** break on mechanics —
+they picked a firing spot with `_passable`, which tests `move_cost` only, and forest is
+walkable *and* opaque. The re-rolled map put forest between shooter and wall, so a
+legal-looking spot had no line of sight. One helper now checks the whole line, replacing
+three copies of the same naive scan. Six ground-war snapshots refreshed for the moved map.
+Commit `ground: GW-WP26 a bigger board + the broadcast anchor`.
+
 ## Verification matrix
 
 | Concern | Required evidence |

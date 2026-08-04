@@ -66,6 +66,35 @@ def _drop_at(amap: ga.AssaultMap, op: AssaultOperation, rng: Random, x: int, y: 
     return ga.assault_drop(op, amap, CFG, rng, [(suit, x, y)])
 
 
+def _sight_clear(amap: ga.AssaultMap, x: int, y: int) -> bool:
+    """Passable *and* transparent — `_passable` alone is not enough to shoot across.
+
+    `move_cost` and `blocks_los` are independent terrain properties: forest is walkable
+    and opaque. GW-WP26 grew the map, which re-rolled every generated layout, and the
+    first wall these tests happened to pick came up with forest between the shooter and
+    the target — so a legal-looking firing spot had no line of sight and every shot was
+    rejected. The mechanic was fine; the fixture was picking its ground on half the
+    criteria.
+    """
+    if not _passable(amap, x, y):
+        return False
+    tc = GW.terrain.get(amap.feature[y][x])
+    return tc is None or not tc.blocks_los
+
+
+def _firing_spot(amap: ga.AssaultMap, s: ga.AssaultStructure, *, gap: int = 2) -> tuple[int, int]:
+    """A cell `gap` away from `s` that can actually see it, in any cardinal direction.
+
+    Checks the whole line, not just the destination, so the caller gets somewhere a shot
+    genuinely connects from rather than somewhere merely stand-on-able.
+    """
+    for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+        cells = [(s.x + dx * step, s.y + dy * step) for step in range(1, gap + 1)]
+        if all(_sight_clear(amap, cx, cy) for cx, cy in cells):
+            return cells[-1]
+    raise AssertionError(f"no clear firing spot {gap} cells from {s.kind} {s.id}")
+
+
 def _quiet_pair(amap: ga.AssaultMap) -> tuple[tuple[int, int], tuple[int, int]]:
     """Two adjacent passable cells as far from every city as the map allows.
 
@@ -94,21 +123,15 @@ def _quiet_pair(amap: ga.AssaultMap) -> tuple[tuple[int, int], tuple[int, int]]:
 def test_destroyed_wall_becomes_passable_rubble() -> None:
     amap = _map()
 
-    def passable_and_clear(x: int, y: int, mid: tuple[int, int] | None) -> bool:
-        return _passable(amap, x, y) and (mid is None or _passable(amap, *mid))
-
     target: tuple | None = None
     for s in amap.structures:
         if s.kind != "wall":
             continue
-        for dx, dy in ((0, -2), (0, 2), (-2, 0), (2, 0)):
-            tx, ty = s.x + dx, s.y + dy
-            mid = (s.x + dx // 2, s.y + dy // 2) if dx == 0 or dy == 0 else None
-            if passable_and_clear(tx, ty, mid):
-                target = (s, tx, ty)
-                break
-        if target:
-            break
+        try:
+            target = (s, *_firing_spot(amap, s))
+        except AssertionError:
+            continue
+        break
     assert target is not None
     wall, tx, ty = target
 
@@ -198,10 +221,7 @@ def test_missile_ammo_depletes_and_rejects_when_spent() -> None:
     set the trooper's magazine to zero directly and check the reducer refuses."""
     amap = _map()
     wall = next(s for s in amap.structures if s.kind == "wall")
-    for dx, dy in ((0, -2), (0, 2), (-2, 0), (2, 0)):
-        tx, ty = wall.x + dx, wall.y + dy
-        if _passable(amap, tx, ty):
-            break
+    tx, ty = _firing_spot(amap, wall)
     rng = Random(11)
     op = _drop_at(amap, _op(amap), rng, tx, ty)
     tid = op.platoon[0].id
@@ -224,10 +244,7 @@ def test_firing_always_reveals_the_shooter() -> None:
     always reveals you, regardless of prior detection state."""
     amap = _map()
     wall = next(s for s in amap.structures if s.kind == "wall")
-    for dx, dy in ((0, -2), (0, 2), (-2, 0), (2, 0)):
-        tx, ty = wall.x + dx, wall.y + dy
-        if _passable(amap, tx, ty):
-            break
+    tx, ty = _firing_spot(amap, wall)
     op = _op(amap, reserved_infantry=0)
     battle = ga._battle_for(op, amap, CFG, Random(4))  # noqa: SLF001
     tid = 9_999
@@ -246,10 +263,7 @@ def test_firing_always_reveals_the_shooter() -> None:
 def test_resolve_drains_on_structure_destroyed() -> None:
     amap = _map()
     wall = next(s for s in amap.structures if s.kind == "wall")
-    for dx, dy in ((0, -2), (0, 2), (-2, 0), (2, 0)):
-        tx, ty = wall.x + dx, wall.y + dy
-        if _passable(amap, tx, ty):
-            break
+    tx, ty = _firing_spot(amap, wall)
     rng = Random(3)
     op = _drop_at(amap, _op(amap), rng, tx, ty)
     tid = op.platoon[0].id
@@ -323,6 +337,31 @@ def test_broadcast_succeeds_once_city_is_fully_silenced() -> None:
     new_op, _log = ga.assault_broadcast(op, amap, CFG, tid)
     assert city.id in new_op.broadcast_cities
     assert new_op.resolve < op.resolve
+
+
+def test_broadcast_range_is_measured_to_the_city_edge_not_its_centre() -> None:
+    """GW-WP26: `broadcast_range` must not shrink as the objective grows.
+
+    Anchoring on `city.cx, city.cy` meant a wider city pushed Command deeper inside to
+    say the words — the range in *practice* shrank by half the added width. That is the
+    opposite of D31, where Command wins by surviving to dictate terms rather than by
+    joining the firefight. Asserted against a deliberately oversized footprint so the
+    property is pinned now, before GW-WP27 makes capitals 46 wide and the bug would have
+    become a silent balance change rather than a visible one.
+    """
+    narrow = ga.AssaultCity(id=1, name="Narrow", cx=100, cy=40,
+                            x0=90, y0=35, x1=110, y1=45)
+    wide = ga.AssaultCity(id=2, name="Wide", cx=100, cy=40,
+                          x0=70, y0=30, x1=130, y1=50)
+    # One cell west of each city's wall: the same tactical position in both cases.
+    assert ga.city_range(narrow, 89, 40) == pytest.approx(1.0)
+    assert ga.city_range(wide, 69, 40) == pytest.approx(1.0)
+    # ...and inside is zero, not "distance to the middle".
+    assert ga.city_range(wide, 100, 40) == 0.0
+    assert ga.city_range(wide, 71, 31) == 0.0
+    # The centre-anchored measure it replaced would have called the wide city's
+    # near wall 30 cells away — twice a command suit's whole broadcast range.
+    assert ga._dist(69, 40, wide.cx, wide.cy) > GW.suits["command"].broadcast_range  # noqa: SLF001
 
 
 # --- sortie pool capping (garrison-deployment decision) ------------------------

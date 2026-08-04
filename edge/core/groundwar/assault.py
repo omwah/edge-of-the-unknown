@@ -939,7 +939,7 @@ def tactical_projection(
         can_broadcast = any(
             city.id not in battle.broadcast_done
             and battle.city_cowed(city)
-            and _dist(actor.x, actor.y, city.cx, city.cy) <= suit.broadcast_range
+            and city_range(city, actor.x, actor.y) <= suit.broadcast_range
             for city in amap.cities
         )
 
@@ -1362,6 +1362,26 @@ def _dist(ax: int, ay: int, bx: int, by: int) -> float:
     return math.hypot(ax - bx, ay - by)
 
 
+def city_range(city: AssaultCity, x: int, y: int) -> float:
+    """Distance from a cell to the **nearest cell of a city**, zero inside it.
+
+    GW-WP26: `broadcast_range` used to be measured to `city.cx, city.cy`, which was
+    harmless while a capital was 30 cells wide and wrong the moment it became 46. A
+    centre-anchored range means Command has to stand *deeper inside a bigger objective*
+    to dictate terms — the range shrinks, in effect, exactly as the city grows — which
+    inverts D31's whole point that Command wins by surviving to say the words rather
+    than by joining the firefight.
+
+    Measured against the bounding box rather than the silhouette on purpose: it is a
+    player affordance, so erring generous is the safe direction, and it keeps meaning
+    one size-independent thing when GW-WP28 makes cities non-rectangular. Same reasoning
+    that anchored the GW-WP24 drop ring on the footprint edge.
+    """
+    dx = max(city.x0 - x, 0, x - city.x1)
+    dy = max(city.y0 - y, 0, y - city.y1)
+    return math.hypot(dx, dy)
+
+
 def _line_of_sight(battle: _Battle, ax: int, ay: int, bx: int, by: int) -> bool:
     """Bresenham; blocked by LOS-blocking terrain or a live structure between endpoints.
 
@@ -1612,7 +1632,7 @@ def broadcast_terms(battle: _Battle, trooper: _Trooper) -> bool:
     for city in battle.amap.cities:
         if city.id in battle.broadcast_done:
             continue
-        if _dist(trooper.x, trooper.y, city.cx, city.cy) > suit.broadcast_range:
+        if city_range(city, trooper.x, trooper.y) > suit.broadcast_range:
             continue
         if not battle.city_cowed(city):
             battle.log("info", f"{city.name} still resists — silence its defenses first.")
