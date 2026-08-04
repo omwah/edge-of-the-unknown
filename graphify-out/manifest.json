@@ -3740,8 +3740,8 @@
     "semantic_hash": ""
   },
   "edge/bot/scripts/assaulter.py": {
-    "mtime": 1785468797.0930502,
-    "ast_hash": "ae3bab9e0230e5e1e699d514db47f9f0",
+    "mtime": 1785807124.1335857,
+    "ast_hash": "84b42e1880d6777908757334086b97c9",
     "semantic_hash": ""
   },
   "edge/bot/scripts/surveyor.py": {
@@ -3852,6 +3852,11 @@
   "docs/REFERENCES.md": {
     "mtime": 1785394674.7442586,
     "ast_hash": "933bde1708e03561dbac552fd98ebb3c",
+    "semantic_hash": ""
+  },
+  "tests/test_groundwar_bot_targeting.py": {
+    "mtime": 1785807278.0534134,
+    "ast_hash": "13907b4cb84e5bcac4e386f8f471a957",
     "semantic_hash": ""
   }
 }
