@@ -2676,6 +2676,95 @@ verified by grepping the regenerated SVGs for both box-drawing outline character
 marker glyphs, confirming the new rendering path actually fired rather than silently no-op'd.
 Commit `ground: GW-WP27 multi-cell buildings`.
 
+### GW-WP28 — City silhouettes (M) — SHIPPED
+
+**Status:** shipped August 4, 2026. Implements D37. Rectangles remain the common case
+(D37: rect weighted highest in both tables) — this adds three more.
+
+**The one predicate.** New `edge/core/groundwar/shapes.py`: `shape_contains(shape,
+param, x0, y0, x1, y1, x, y)` for `rect`/`chamfered`/`ellipse`/`stepped`, closed-form
+and O(1) — no cell set, no allocation, which matters because `inside()` runs inside
+`assault_landing`'s full-grid sweeps. `GroundPlace.inside`, `AssaultCity.inside`, and
+`SurveySettlement.inside` all delegate to it — **one function, three callers** is the
+lockstep guarantee the shared survey/assault layout needs, proven directly by
+`tests/test_groundwar_city_shapes.py::test_ground_place_and_assault_city_agree_on_every_cell`.
+`strictly_inside` generalizes `SurveySettlement`'s pre-existing "excludes the wall
+ring" rule (`x0 < x < x1`) to any shape: inside, and every neighbour is too — which
+reduces to the exact old inequality for a rectangle.
+
+**Every family is star-shaped around its own centre**, by construction — a real
+constraint stated in `shapes.py`'s docstring, not incidental: it is what lets
+`world._boundary_ring` derive an ordered perimeter by sorting boundary cells on angle
+around the centre rather than tracing a walk. A traced boundary walk would need to
+handle cul-de-sacs and multiple disconnected components for a general shape; angle
+sort always terminates and is exact for any shape where a ray from centre crosses the
+boundary exactly once, which is true of all four families here and is the reason
+cross/star was declined at the design stage — a cross is not star-shaped from a
+generic interior point, only from its own middle.
+
+**Turret slots and gates generalize the same way.** `_ring_turret_slots` samples 6
+evenly spaced ring positions (rotated to start near the north-west corner, so early
+slots land roughly where the old bbox corners did); `_stamp_city` takes the first 4 at
+citadel 0 and all 6 from citadel 1 up — a simplification from two independent K=4/K=6
+samplings to one K=6 sampling sliced two ways, traded for real code, since visual
+turret coverage doesn't need the first-4 subset to be a mathematically special one.
+`_ring_gates` picks the extreme-west/east ring cells nearest the mid-height, which
+reproduces `(x0, cy)`/`(x1, cy)` exactly for a rect.
+
+**Emplacement slots by farthest-point search.** The old `(cx ± w//4, cy ∓ 1)`
+arithmetic assumed a rectangle wide enough that those four points were themselves
+inside it — exactly the corner a chamfered or stepped place can cut away.
+`_emplacement_slots` instead takes the deepest remaining interior cell (by Chebyshev
+distance to the boundary ring) whose own 2x2 fits and is far enough from every slot
+already chosen, four times. The deepest pick — the most central point — is returned
+**last**, preserving what `_stamp_city`'s `aa_slot, sensor_slot, aa2_slot, gun_slot =
+stamp.reserved` unpacking has always meant.
+
+**`pave()` paints the shape, not the bbox** (`stamp.cells`, a property on
+`PlaceStamp`) — painting the bbox would leave a cut corner as a paved square poking
+out past the city's own wall, pristine wilderness underneath nothing.
+
+**A real bug the lockstep test's own supporting checks caught, not the lockstep test
+itself:** buildings could land on top of a wall. The service-road inset that has
+always kept buildings clear of the perimeter was computed relative to the *bounding
+box* — which was exactly the wall's own position for a rectangle, so the inset
+implicitly cleared it without any code saying so. A chamfered corner's cut creates a
+*diagonal* ring line running several cells deep into the interior (the cut scales
+with footprint size), which the bbox-relative inset knows nothing about; a building
+landed squarely on a wall segment inside that cut. Found by
+`tests/test_groundwar_structure_footprint.py::test_map_index_covers_every_cell_of_every_structure_exactly_once`
+(a WP25 test, still doing its job three WPs later), confirmed with a 60-seed overlap
+sweep at citadel level 2. Fixed by folding the boundary ring itself into the
+building-placement exclusion set, not just the emplacement/plaza cells.
+
+**Two more test fixtures hit the same class of staleness GW-WP26/27 already
+diagnosed** — code assuming a shape as simple as the ground it used to stand on. A
+wall picked by `next(...)` with no fallback can now sit hard against a building (no
+service-road gap on a diagonal cut) or, over several turns of live combat, end up
+with a wandering garrison unit standing in the one path to it — neither is a defect,
+both are what a real silhouette and a real defender actually do. Fixed with a
+`_wall_with_firing_spot` helper that tries each wall in turn (generalizing the
+inline retry `test_destroyed_wall_becomes_passable_rubble` already had), and by
+isolating that test's actual claim — rubble is walkable — from the firing loop that
+used to also, incidentally, risk exposing it to nine turns of enemy movement.
+
+Files: `edge/core/groundwar/shapes.py` (new), `edge/core/groundwar/world.py`
+(`GroundPlace.shape`/`shape_param`, `PlaceStamp.turret_slots`/`cells`,
+`_shape_cells`, `_boundary_ring`, `_ring_gates`, `_ring_turret_slots`,
+`_emplacement_slots`, `_reserved_cells`, `_pick_shape`, `pave`),
+`edge/core/groundwar/assault.py` (`AssaultCity.shape`/`shape_param`, `_stamp_city`
+turret-slot lookup), `edge/core/groundwar/survey.py`
+(`SurveySettlement.shape`/`shape_param`/`inside`).
+Tests: `tests/test_groundwar_city_shapes.py` (new, 7 cases) — the lockstep test;
+strict-interior subset property; every family reachable across a seed sweep; every
+gate on the ring and every perimeter cell genuinely boundary-facing; every reserved
+slot's full 2x2 inside; no building crosses the silhouette; survey/assault agreement
+re-checked specifically on a shaped (non-rect) world. `tests/test_groundwar_assault_actions.py`
+gains `_wall_with_firing_spot` and the `test_destroyed_wall_becomes_passable_rubble`
+rewrite above. Three assault-view snapshots refreshed and re-verified by grepping for
+both outline and marker glyphs.
+Commit `ground: GW-WP28 city silhouettes`.
+
 ## Verification matrix
 
 | Concern | Required evidence |

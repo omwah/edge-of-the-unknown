@@ -95,6 +95,26 @@ def _firing_spot(amap: ga.AssaultMap, s: ga.AssaultStructure, *, gap: int = 2) -
     raise AssertionError(f"no clear firing spot {gap} cells from {s.kind} {s.id}")
 
 
+def _wall_with_firing_spot(amap: ga.AssaultMap) -> tuple[ga.AssaultStructure, int, int]:
+    """The first wall segment with a clear firing spot, not just the first wall.
+
+    GW-WP28 gave a city a real silhouette: a wall can now sit hard against a building
+    (a chamfered/stepped corner's diagonal ring has no `_SERVICE_ROAD` gap the way the
+    old bbox-edge ring always did), so the map's very first wall segment is no longer
+    guaranteed to have open ground on any side. Trying each in turn is the same fix as
+    `test_destroyed_wall_becomes_passable_rubble` already applies, generalized for the
+    other call sites that only ever wanted "some wall, somewhere reachable".
+    """
+    for s in amap.structures:
+        if s.kind != "wall":
+            continue
+        try:
+            return s, *_firing_spot(amap, s)
+        except AssertionError:
+            continue
+    raise AssertionError("no wall on this map has a clear firing spot")
+
+
 def _quiet_pair(amap: ga.AssaultMap) -> tuple[tuple[int, int], tuple[int, int]]:
     """Two adjacent passable cells as far from every city as the map allows.
 
@@ -121,32 +141,24 @@ def _quiet_pair(amap: ga.AssaultMap) -> tuple[tuple[int, int], tuple[int, int]]:
 
 
 def test_destroyed_wall_becomes_passable_rubble() -> None:
-    amap = _map()
+    """Rubble is walkable — isolated from the firing mechanic that would put it there.
 
-    target: tuple | None = None
-    for s in amap.structures:
-        if s.kind != "wall":
-            continue
-        try:
-            target = (s, *_firing_spot(amap, s))
-        except AssertionError:
-            continue
-        break
-    assert target is not None
-    wall, tx, ty = target
+    GW-WP28 gave a city a real garrison AI running loose over however many turns
+    combat takes, and repeatedly firing until a wall falls (the old approach here)
+    could — and once seed 42 did — let a defender wander into the very path the
+    test then tried to walk, failing on enemy movement rather than on anything this
+    test is actually about. Destroying the wall by direct state surgery removes that
+    incidental risk the same way `test_missile_ammo_depletes_and_rejects_when_spent`
+    already isolates ammo depletion from combat; that firing genuinely destroys a
+    structure over time is exercised elsewhere (`test_resolve_drains_on_structure_destroyed`).
+    """
+    amap = _map()
+    wall, tx, ty = _wall_with_firing_spot(amap)
 
     rng = Random(3)
     op = _drop_at(amap, _op(amap), rng, tx, ty)
     tid = op.platoon[0].id
-    for _ in range(300):
-        op, *_ = ga.assault_fire(op, amap, CFG, rng, tid, wall.x, wall.y)
-        if op.structure_hp.get(wall.id, wall.hp_max) <= 0:
-            break
-        if op.platoon[0].actions <= 0:
-            op, _ = ga.assault_end_turn(op, amap, CFG, rng)
-    assert op.structure_hp.get(wall.id, wall.hp_max) <= 0
-    if op.platoon[0].actions <= 0:
-        op, _ = ga.assault_end_turn(op, amap, CFG, rng)
+    op = replace(op, structure_hp={wall.id: 0})
 
     moved = ga.assault_move(op, amap, CFG, tid, wall.x, wall.y)
     trooper = next(t for t in moved.platoon if t.id == tid)
@@ -220,8 +232,7 @@ def test_missile_ammo_depletes_and_rejects_when_spent() -> None:
     depletion by repeated fire is fragile (the target dies before ammo runs out) —
     set the trooper's magazine to zero directly and check the reducer refuses."""
     amap = _map()
-    wall = next(s for s in amap.structures if s.kind == "wall")
-    tx, ty = _firing_spot(amap, wall)
+    wall, tx, ty = _wall_with_firing_spot(amap)
     rng = Random(11)
     op = _drop_at(amap, _op(amap), rng, tx, ty)
     tid = op.platoon[0].id
@@ -243,8 +254,7 @@ def test_firing_always_reveals_the_shooter() -> None:
     directly on the scratch battle instead, isolating the one reliable invariant: firing
     always reveals you, regardless of prior detection state."""
     amap = _map()
-    wall = next(s for s in amap.structures if s.kind == "wall")
-    tx, ty = _firing_spot(amap, wall)
+    wall, tx, ty = _wall_with_firing_spot(amap)
     op = _op(amap, reserved_infantry=0)
     battle = ga._battle_for(op, amap, CFG, Random(4))  # noqa: SLF001
     tid = 9_999
@@ -262,8 +272,7 @@ def test_firing_always_reveals_the_shooter() -> None:
 
 def test_resolve_drains_on_structure_destroyed() -> None:
     amap = _map()
-    wall = next(s for s in amap.structures if s.kind == "wall")
-    tx, ty = _firing_spot(amap, wall)
+    wall, tx, ty = _wall_with_firing_spot(amap)
     rng = Random(3)
     op = _drop_at(amap, _op(amap), rng, tx, ty)
     tid = op.platoon[0].id

@@ -39,6 +39,7 @@ from random import Random
 
 from edge.core.config import GameConfig
 from edge.core.discovery import is_detectable, sector_has_nebula
+from edge.core.groundwar import shapes as gw_shapes
 from edge.core.groundwar import world as gw_world
 from edge.core.groundwar.interior import generate_interior
 from edge.core.groundwar.models import SurveyOperation
@@ -94,9 +95,22 @@ class SurveySettlement:
     y0: int
     x1: int
     y1: int
+    # GW-WP28 (D37): mirrors `world.GroundPlace.shape/shape_param` — see that class's
+    # docstring and `AssaultCity`'s matching fields. The third of the three `inside()`
+    # delegates the lockstep guarantee depends on.
+    shape: gw_shapes.PlaceShape = "rect"
+    shape_param: int = 0
 
     def inside(self, x: int, y: int) -> bool:
-        return self.x0 < x < self.x1 and self.y0 < y < self.y1
+        """Strictly inside the town — never the wall ring itself.
+
+        `x0 < x < x1` was always excluding the boundary row/column of a rectangle;
+        `shapes.strictly_inside` is the general statement of that same rule ("inside,
+        and every neighbour is too"), which reduces to exactly this inequality for
+        `"rect"` and extends correctly to a cut corner or notch.
+        """
+        return gw_shapes.strictly_inside(
+            self.shape, self.shape_param, self.x0, self.y0, self.x1, self.y1, x, y)
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,7 +208,8 @@ def _stamp_settlement(
     """
     place = stamp.place
     s = SurveySettlement(id=place.id, name=place.name, cx=place.cx, cy=place.cy,
-                         x0=place.x0, y0=place.y0, x1=place.x1, y1=place.y1)
+                         x0=place.x0, y0=place.y0, x1=place.x1, y1=place.y1,
+                         shape=place.shape, shape_param=place.shape_param)
     gw_world.pave(feature, stamp)
     for pos in stamp.perimeter + stamp.building_cells:
         if pos not in rubble:

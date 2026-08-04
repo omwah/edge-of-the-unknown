@@ -39,6 +39,7 @@ from typing import Literal
 from edge.core.combat import CombatError
 from edge.core.config import GameConfig, GroundwarConfig, GwEmplacement, GwSuit
 from edge.core.groundwar import interior as gw_interior
+from edge.core.groundwar import shapes as gw_shapes
 from edge.core.groundwar import world as gw_world
 from edge.core.groundwar.models import AssaultGarrisonUnit, AssaultOperation, AssaultTrooper
 from edge.core.models import AlienSpecies, Planet, UniverseState
@@ -152,9 +153,16 @@ class AssaultCity:
     y1: int
     is_citadel: bool = False
     citadel_level: int = 0
+    # GW-WP28 (D37): mirrors `groundwar.world.GroundPlace.shape/shape_param` — see that
+    # class's docstring. `"rect"` (the default) is the whole bounding box, so a Cloud
+    # City's single station-wide city (never shaped) and every pre-WP28 map behave
+    # exactly as before.
+    shape: gw_shapes.PlaceShape = "rect"
+    shape_param: int = 0
 
     def inside(self, x: int, y: int) -> bool:
-        return self.x0 <= x <= self.x1 and self.y0 <= y <= self.y1
+        return gw_shapes.shape_contains(
+            self.shape, self.shape_param, self.x0, self.y0, self.x1, self.y1, x, y)
 
 
 @dataclass(frozen=True, slots=True)
@@ -374,7 +382,7 @@ def _stamp_city(
     military/civilian split — comes from the shared `groundwar.world` stamp a survey
     of this world walks as a town, so the two modes cannot disagree about where a
     wall is. This function adds only what a defence contributes: hit points, turrets
-    substituted at the corner/mid-wall slots, and the interior emplacements the live
+    substituted at the ring's turret slots, and the interior emplacements the live
     `citadel_level` pays for (an extra AA at 3, exactly one `citadel_gun` on the
     capital at 2).
     """
@@ -383,17 +391,21 @@ def _stamp_city(
     place = stamp.place
     city = AssaultCity(id=place.id, name=place.name, cx=place.cx, cy=place.cy,
                        x0=place.x0, y0=place.y0, x1=place.x1, y1=place.y1,
-                       is_citadel=place.capital, citadel_level=citadel_level)
+                       is_citadel=place.capital, citadel_level=citadel_level,
+                       shape=place.shape, shape_param=place.shape_param)
     gw_world.pave(feature, stamp)
 
     wall_mult = 2.0 if citadel_level >= 3 else 1.0
     wall_hp = round(d.wall.hp * wall_mult)
 
-    corners = {(place.x0, place.y0), (place.x1, place.y0),
-               (place.x0, place.y1), (place.x1, place.y1)}
-    mids = {(place.cx, place.y0), (place.cx, place.y1)}  # mid top/bottom wall
+    # GW-WP28: turrets seat at the shared stamp's evenly spaced ring slots — 4 of them
+    # at citadel 0, all 6 from citadel 1 up — rather than the old bbox corners/mids,
+    # which assumed a rectangle and have no meaning against a chamfered or stepped
+    # silhouette.
+    turret_cells = frozenset(stamp.turret_slots[:4] if citadel_level < 1
+                             else stamp.turret_slots)
     for pos in stamp.perimeter:
-        if pos in corners or (pos in mids and citadel_level >= 1):
+        if pos in turret_cells:
             _add_structure(structures, struct_at, next_id, "turret", *pos, city.id, d.turret.hp)
         else:
             _add_structure(structures, struct_at, next_id, "wall", *pos, city.id, wall_hp)

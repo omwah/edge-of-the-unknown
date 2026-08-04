@@ -37,11 +37,14 @@ deterministic in its arguments and draws no game RNG (G2/G5).
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 from dataclasses import dataclass
 from random import Random
 
 from edge.core.config import GameConfig
+from edge.core.groundwar import shapes as gw_shapes
+from edge.core.groundwar.shapes import PlaceShape
 from edge.core.groundwar.terrain import generate_feature_grid
 from edge.core.models import GroundRubble, Planet
 from edge.core.planets import colonist_capacity
@@ -100,6 +103,13 @@ class GroundPlace:
 
     Footprint corners are inclusive. `capital` marks the seat a citadel fortifies
     (the last place, matching the POC's `is_citadel = i == n - 1`).
+
+    GW-WP28 (D37): `shape`/`shape_param` cut the place's silhouette out of its
+    bounding box — see `groundwar.shapes`. `"rect"` (the default) uses the whole
+    box, so every pre-WP28 place is unaffected. `inside()` is the delegation
+    point every consumer already calls; `AssaultCity.inside` and the survey
+    `SurveySettlement.inside` mirror it exactly so the three never disagree about
+    which cell belongs to a place.
     """
 
     id: int
@@ -109,6 +119,8 @@ class GroundPlace:
     x1: int
     y1: int
     capital: bool = False
+    shape: PlaceShape = "rect"
+    shape_param: int = 0
 
     @property
     def cx(self) -> int:
@@ -127,7 +139,8 @@ class GroundPlace:
         return self.y1 - self.y0 + 1
 
     def inside(self, x: int, y: int) -> bool:
-        return self.x0 <= x <= self.x1 and self.y0 <= y <= self.y1
+        return gw_shapes.shape_contains(
+            self.shape, self.shape_param, self.x0, self.y0, self.x1, self.y1, x, y)
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,6 +163,12 @@ class PlaceStamp:
     military: tuple[Footprint, ...]
     civilian: tuple[Footprint, ...]
     reserved: tuple[Vec, ...]
+    # GW-WP28: evenly spaced ring positions a defended city seats turrets at, sampled by
+    # angle around the place's own centre (`_ring_turret_slots`) rather than the old
+    # bbox corners/mid-walls — the general replacement, since a chamfered or stepped
+    # silhouette has no "corner" in the bbox sense. `_stamp_city` takes the first 4 at
+    # citadel 0 and all of them (6) from citadel 1 up.
+    turret_slots: tuple[Vec, ...]
 
     @property
     def buildings(self) -> tuple[Footprint, ...]:
@@ -162,6 +181,22 @@ class PlaceStamp:
             (x + dx, y + dy)
             for x, y, w, h in self.buildings
             for dy in range(h) for dx in range(w)
+        )
+
+    @property
+    def cells(self) -> tuple[Vec, ...]:
+        """Every cell of the place's own silhouette — what `pave()` paints.
+
+        For `"rect"` this is the whole bounding box, matching every pre-WP28 place
+        exactly. For a cut shape it excludes the corners/notch `shape_contains`
+        removed, which is the whole point: painting the bbox instead would leave a
+        cut-off corner as pristine wilderness terrain with nothing standing on it,
+        one biome patch sitting inside the city's own bounding box.
+        """
+        p = self.place
+        return tuple(
+            (x, y) for y in range(p.y0, p.y1 + 1) for x in range(p.x0, p.x1 + 1)
+            if p.inside(x, y)
         )
 
 
@@ -299,41 +334,132 @@ def footprint_passable_frac(
     return passable / max(1, total)
 
 
-def _emplacement_slots(place: GroundPlace) -> tuple[Vec, ...]:
-    """Interior cells an assault may put an emplacement on (and a survey leaves open).
+def _shape_cells(place: GroundPlace) -> set[Vec]:
+    """Every cell of the place's own silhouette (GW-WP28) — one O(W*H) sweep, called
+    once per place at stamp time and never again; nothing downstream re-derives it."""
+    return {
+        (x, y) for y in range(place.y0, place.y1 + 1) for x in range(place.x0, place.x1 + 1)
+        if place.inside(x, y)
+    }
 
-    Held *unconditionally*, including the second AA and the level-2 citadel gun:
-    reserving only what the current citadel level would build would move the building
-    blocks every time a citadel is raised or lost.
 
-    These are **anchors**. Since GW-WP27 the AA batteries and the citadel gun are 2x2,
-    so `_reserved_cells` expands each of these into the area a building may not take.
+def _boundary_ring(place: GroundPlace, cells: set[Vec]) -> list[Vec]:
+    """Every shape cell touching the outside, ordered by angle around the place's own
+    centre (GW-WP28) — a wall-line replacement for the old bbox-edge scan.
+
+    Angle sort rather than a traced walk: every shape family in `groundwar.shapes` is
+    star-shaped around its own centre by construction (see that module's docstring), so
+    a single ray from the centre crosses the boundary exactly once and angle order *is*
+    ring order — no walk, no cul-de-sac risk, always terminates. For `"rect"` the
+    resulting set is identical to the old top/bottom-then-sides scan; only the order
+    changes, and order was never a contract anything downstream depended on.
     """
-    w = place.width
-    return (
-        (place.cx - w // 4, place.cy - 1),  # AA battery
-        (place.cx + w // 4, place.cy + 1),  # sensor tower
-        (place.cx + w // 4, place.cy - 1),  # second AA
-        (place.cx, place.cy),               # citadel gun (capital, level 2) / plaza
-    )
+    boundary = [
+        (x, y) for x, y in cells
+        if any((nx, ny) not in cells
+              for nx, ny in ((x, y - 1), (x, y + 1), (x + 1, y), (x - 1, y)))
+    ]
+    cx, cy = place.cx, place.cy
+    boundary.sort(key=lambda c: math.atan2(c[1] - cy, c[0] - cx))
+    return boundary
 
 
-def _reserved_cells(place: GroundPlace) -> set[Vec]:
+def _ring_gates(place: GroundPlace, ring: list[Vec]) -> tuple[Vec, Vec]:
+    """The extreme-west and extreme-east ring cells, nearest the place's own mid-height.
+
+    For a rect this reproduces `(x0, cy)`/`(x1, cy)` exactly. For any other silhouette
+    it is still well-defined — "furthest in this direction, break ties toward the
+    middle" needs no notion of corners or edges to make sense.
+    """
+    if not ring:
+        return (place.x0, place.cy), (place.x1, place.cy)
+    west = min(ring, key=lambda c: (c[0], abs(c[1] - place.cy)))
+    east = max(ring, key=lambda c: (c[0], -abs(c[1] - place.cy)))
+    return west, east
+
+
+def _ring_turret_slots(ring: list[Vec], place: GroundPlace, count: int = 6) -> tuple[Vec, ...]:
+    """`count` evenly spaced positions around the boundary ring (GW-WP28), rotated to
+    start near the place's own north-west corner so the first few slots land roughly
+    where the old bbox corners did.
+
+    Replaces the bbox `corners`/`mids` sets `_stamp_city` used to derive inline: a
+    chamfered or stepped silhouette has no "corner" in the bounding-box sense, but
+    "evenly spaced around the wall" is meaningful for any shape.
+    """
+    if not ring:
+        return ()
+    start = min(range(len(ring)),
+               key=lambda i: abs(ring[i][0] - place.x0) + abs(ring[i][1] - place.y0))
+    rotated = ring[start:] + ring[:start]
+    n = len(rotated)
+    k = min(count, n)
+    return tuple(rotated[(i * n) // k] for i in range(k))
+
+
+def _emplacement_slots(place: GroundPlace, cells: set[Vec], boundary: set[Vec]) -> tuple[Vec, ...]:
+    """Four well-separated interior anchors an assault may seat an emplacement on
+    (and a survey leaves open) — GW-WP28's general replacement for the old
+    `(cx ± w//4, cy ∓ 1)` arithmetic, which assumed a rectangle wide enough that those
+    four points were themselves inside it. A chamfered or stepped place can cut exactly
+    that corner away.
+
+    Greedy farthest-point selection by Chebyshev depth from the boundary ring: take the
+    deepest remaining interior cell whose own 2x2 (every emplacement anchor needs one,
+    GW-WP27) is fully inside the shape and at least `min(width, height) // 4` from every
+    slot already chosen, repeat four times. The deepest pick — the most central point,
+    almost always inside any of these four families — becomes the **last** slot
+    returned, preserving what `_stamp_city`'s `aa_slot, sensor_slot, aa2_slot, gun_slot
+    = stamp.reserved` unpacking has always meant: the fourth slot is the plaza/gun spot.
+
+    Held *unconditionally* regardless of citadel level, same as before GW-WP28:
+    reserving only what the current level would build would move the building layout
+    every time a citadel is raised or lost.
+    """
+    interior = cells - boundary or cells
+    if boundary:
+        def depth(c: Vec) -> int:
+            return min(max(abs(c[0] - bx), abs(c[1] - by)) for bx, by in boundary)
+    else:
+        def depth(c: Vec) -> int:
+            return 0
+    ordered = sorted(interior, key=lambda c: (-depth(c), c[1], c[0]))
+    min_sep = max(2, min(place.width, place.height) // 4)
+    chosen: list[Vec] = []
+    for cx, cy in ordered:
+        if len(chosen) >= 4:
+            break
+        if not all((cx + dx, cy + dy) in cells for dx in (0, 1) for dy in (0, 1)):
+            continue
+        if all(max(abs(cx - ox), abs(cy - oy)) >= min_sep for ox, oy in chosen):
+            chosen.append((cx, cy))
+    while len(chosen) < 4:  # only reachable on an implausibly tiny/degenerate footprint
+        chosen.append(chosen[0] if chosen else (place.cx, place.cy))
+    return (chosen[1], chosen[2], chosen[3], chosen[0])
+
+
+def _reserved_cells(place: GroundPlace, cells: set[Vec], slots: tuple[Vec, ...]) -> set[Vec]:
     """Every cell the emplacement slots and the central plaza consume.
 
-    The plaza is a small open square rather than the old one-cell cross: at these
-    dimensions a city centre that is solid building right up to the citadel gun reads
-    as a maze, and the gun itself now needs 2x2 of its own.
+    The plaza is a small open square anchored on the fourth slot (the deepest pick,
+    `_emplacement_slots`'s gun/plaza position) rather than the bare geometric centre —
+    the two coincide for a rect but not necessarily for a cut shape — and is clipped to
+    `cells` so it can never reserve ground outside the place's own silhouette.
     """
-    cells: set[Vec] = set()
-    for ax, ay in _emplacement_slots(place):
+    reserved: set[Vec] = set()
+    for ax, ay in slots:
         for dy in range(2):
             for dx in range(2):
-                cells.add((ax + dx, ay + dy))
+                cell = (ax + dx, ay + dy)
+                if cell in cells:
+                    reserved.add(cell)
+    plaza_x, plaza_y = slots[3] if len(slots) >= 4 else (place.cx, place.cy)
     for dy in range(-2, 3):
         for dx in range(-3, 4):
-            cells.add((place.cx + dx, place.cy + dy))
-    return cells
+            cell = (plaza_x + dx, plaza_y + dy)
+            if cell in cells:
+                reserved.add(cell)
+    return reserved
 
 
 def _pick_size(rng: Random) -> tuple[int, int]:
@@ -350,24 +476,39 @@ def stamp_place(place: GroundPlace, rng: Random) -> PlaceStamp:
 
     Ports the POC's city/town stamping — perimeter wall with a gate mid each
     vertical side, building blocks on a street grid every other row — into one
-    description both modes consume. `rng` decides only the military/civilian split,
-    drawn here off the world seed so the kind at a position is stable across
-    operations (and so positional rubble can name what was destroyed).
+    description both modes consume. `rng` decides only the military/civilian split
+    and each building's size, drawn here off the world seed so the kind and shape
+    standing at a position are as stable as the position (and so positional rubble
+    can name what was destroyed).
+
+    GW-WP28 (D37): `place.shape` cuts the silhouette this is all derived from; the
+    wall ring, gates, turret slots, and emplacement anchors are computed generally
+    (`_boundary_ring`/`_ring_gates`/`_ring_turret_slots`/`_emplacement_slots`) rather
+    than off the bounding box, and reduce to exactly the old bbox-corner behaviour
+    when `place.shape == "rect"`.
     """
     x0, y0, x1, y1 = place.x0, place.y0, place.x1, place.y1
-    gates = ((x0, place.cy), (x1, place.cy))
-    reserved = _emplacement_slots(place)
-    perimeter: list[Vec] = []
-    for x in range(x0, x1 + 1):
-        for y in (y0, y1):
-            perimeter.append((x, y))
-    for y in range(y0 + 1, y1):
-        for x in (x0, x1):
-            if (x, y) not in gates:
-                perimeter.append((x, y))
+    cells = _shape_cells(place)
+    ring = _boundary_ring(place, cells)
+    boundary = set(ring)
+    gates = _ring_gates(place, ring)
+    turret_slots = _ring_turret_slots(ring, place)
+    reserved = _emplacement_slots(place, cells, boundary)
+    # GW-WP28: the wall ring itself must be excluded too, not just the emplacement/plaza
+    # cells. For a rectangle this was implicit — the ring is exactly the outer 1-cell bbox
+    # edge, and the building grid's own inset from the bbox (`_SERVICE_ROAD`) always
+    # cleared it without anyone having to say so. A chamfered or stepped corner's cut
+    # creates a *diagonal* ring line running several cells deep into the interior
+    # (`chamfer_param`/`stepped_param` scale with the footprint), which the bbox-relative
+    # inset knows nothing about — a building could and did land squarely on top of it.
+    blocked = _reserved_cells(place, cells, reserved) | boundary
+    perimeter = [c for c in ring if c not in gates]
 
-    # Buildings, on a street grid inset by the wall plus a service road.
-    blocked = _reserved_cells(place)
+    # Buildings, on a street grid inset by the wall plus a service road. The grid's own
+    # bounds are still the bbox inset (a cheap, safe superset for any shape); it is the
+    # per-cell `c not in cells` check below that does the real work of excluding a cut
+    # corner or notch — a candidate block straddling one is dropped rather than shrunk,
+    # which reads as a small open lot next to the wall rather than a clipped building.
     lo_x, lo_y = x0 + 1 + _SERVICE_ROAD, y0 + 1 + _SERVICE_ROAD
     hi_x, hi_y = x1 - 1 - _SERVICE_ROAD, y1 - 1 - _SERVICE_ROAD
     military: list[Footprint] = []
@@ -383,17 +524,43 @@ def stamp_place(place: GroundPlace, rng: Random) -> PlaceStamp:
             h = min(h, _BLOCK_PITCH_Y - 1, hi_y - by + 1)
             if w < 2 or h < 2:
                 continue
-            cells = [(bx + dx, by + dy) for dy in range(h) for dx in range(w)]
-            if any(c in blocked or c in taken for c in cells):
+            footprint_cells = [(bx + dx, by + dy) for dy in range(h) for dx in range(w)]
+            if any(c in blocked or c in taken or c not in cells for c in footprint_cells):
                 continue
-            taken.update(cells)
+            taken.update(footprint_cells)
             # One roll for the whole building, so a depot is a depot all the way through.
             target = military if rng.random() < _BUILDING_MILITARY_FRAC else civilian
             target.append((bx, by, w, h))
     return PlaceStamp(
         place=place, perimeter=tuple(perimeter), gates=gates,
         military=tuple(military), civilian=tuple(civilian), reserved=reserved,
+        turret_slots=turret_slots,
     )
+
+
+def _pick_shape(rng: Random, *, capital: bool, w: int, h: int) -> tuple[PlaceShape, int]:
+    """Roll a silhouette family (D37) and derive its one size-dependent parameter.
+
+    Capitals weight toward `chamfered` (reads as planned/fortified); towns weight
+    toward `ellipse`/`stepped` (reads as grown organically) — `groundwar.shapes`'
+    two weight tables. `stepped`'s notch corner is the only value that genuinely
+    needs a second roll; `chamfered`'s cut and `stepped`'s notch depth are both
+    derived from the footprint's own size rather than rolled, so one shape-family
+    draw (plus, for `stepped` only, one corner draw) is all the entropy this spends.
+    """
+    weights = gw_shapes.CAPITAL_SHAPE_WEIGHTS if capital else gw_shapes.TOWN_SHAPE_WEIGHTS
+    roll = rng.random() * sum(weight for _, weight in weights)
+    shape: PlaceShape = "rect"
+    for candidate, weight in weights:
+        roll -= weight
+        if roll <= 0:
+            shape = candidate
+            break
+    if shape == "chamfered":
+        return shape, gw_shapes.chamfer_param(w, h)
+    if shape == "stepped":
+        return shape, gw_shapes.stepped_param(rng.randint(0, 3), w, h)
+    return shape, 0
 
 
 def generate_world_ground(
@@ -428,9 +595,17 @@ def generate_world_ground(
             if frac >= 0.7:
                 break
         assert best is not None
+        # A shape-only salted rng, deliberately separate from `rng` above: the
+        # placement loop and `stamp_place`'s per-building rolls draw a variable,
+        # order-sensitive number of times from `rng`, and folding the shape roll into
+        # that stream would make it perturb every building/placement draw downstream
+        # for no reason connected to the shape itself.
+        shape_rng = Random(f"{seed}|shape|{planet_type}|{i + 1}")
+        shape, shape_param = _pick_shape(shape_rng, capital=capital, w=w, h=h)
         place = GroundPlace(
             id=i + 1, name=names[i % len(names)], x0=best[1], y0=best[2],
             x1=best[1] + w - 1, y1=best[2] + h - 1, capital=capital,
+            shape=shape, shape_param=shape_param,
         )
         stamps.append(stamp_place(place, rng))
     return WorldGround(
@@ -440,10 +615,16 @@ def generate_world_ground(
 
 
 def pave(feature: list[list[str]], stamp: PlaceStamp) -> None:
-    """Pave a place's footprint: built-up ground plays as street whatever lies under it."""
-    for y in range(stamp.place.y0, stamp.place.y1 + 1):
-        for x in range(stamp.place.x0, stamp.place.x1 + 1):
-            feature[y][x] = STREET_FEATURE
+    """Pave a place's footprint: built-up ground plays as street whatever lies under it.
+
+    GW-WP28: paints `stamp.cells` — the place's own silhouette — not its bounding box.
+    A chamfered or stepped place cuts real cells out of its bbox, and those cut corners
+    are ordinary wilderness a foot patrol may cross; paving the whole box would plant a
+    street-paved patch of nothing there, visible as a paved square poking out past the
+    city's own wall.
+    """
+    for x, y in stamp.cells:
+        feature[y][x] = STREET_FEATURE
 
 
 def rubble_at(planet: Planet) -> dict[Vec, str]:
