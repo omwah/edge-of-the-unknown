@@ -2587,6 +2587,95 @@ legal-looking spot had no line of sight. One helper now checks the whole line, r
 three copies of the same naive scan. Six ground-war snapshots refreshed for the moved map.
 Commit `ground: GW-WP26 a bigger board + the broadcast anchor`.
 
+### GW-WP27 — Multi-cell buildings, the visible payoff (L) — SHIPPED
+
+**Status:** shipped August 4, 2026. Implements D35/D36. A trooper and an apartment block
+were the same size; this is the change that fixes it.
+
+**Generation.** `world.stamp_place` now places footprints on a 6x4 street grid instead of
+1x1 cells on a 4x2 one: size and **military/civilian kind are rolled once per building**,
+not per cell — the old loop rolled independently for each of a two-wide block's two cells,
+so a single visual "building" could come out half depot, half housing. `_BUILDING_SIZES`
+weights five shapes (2x2 row house through 5x3 hall/depot). `CAPITAL_SIZE` → (46, 26),
+`PLACE_SIZE` → (34, 20). `_reserved_cells` grew the plaza from a one-cell cross to a small
+open square, and expanded the AA/citadel_gun anchors to the 2x2 area those now cover — a
+building placed on top of an emplacement slot was the obvious failure mode a naive port of
+the old reservation would have hit.
+
+**Fortification.** `_stamp_city` places `aa`/`citadel_gun` as 2x2 structures and each
+building as **one structure over its whole footprint** — one `_add_structure` call, not
+one per cell. The capital now gets its second AA battery **unconditionally**, not just at
+`citadel_level >= 3` — the GW-WP26 finding (a scout jumping into the single battery's blind
+corner on turn 0) needed more coverage regardless of fortification level, and `aa.range`
+itself must not move or the 12-vs-13 gap against a marauder's missile stops existing.
+
+**One HP pool, one Resolve drain (D36).** `building_military_hp`/`building_civilian_hp`
+roughly doubled (110/70) rather than scaling by area — a half-demolished building must
+still pay zero Resolve, so 6x HP would let a platoon spend four turns on one block and
+score nothing. `military_building_destroyed`/`civilian_building_destroyed` doubled to
+match: object count roughly halved, so per-object value roughly doubles to hold a city's
+total drainable Resolve steady.
+
+**Rendering.** `AssaultCellDTO` gained `building_mask`/`structure_marker`, computed
+server-side by a new `assault.structure_neighbor_mask` — **the `wall_mask` pattern
+verbatim**, because the reason is identical: a cropped viewport cannot see a footprint's
+true neighbours at its own edge. `structure_marker` picks the footprint's *centre* cell
+(not its anchor) to carry the kind glyph, server-computed so every client agrees on which
+cell that is. New `BUILDING_GLYPHS` in `edge/groundwar/widgets.py` reuses the exact
+box-drawing ramp and bit order `WALL_GLYPHS` already uses, so a building reads as a
+connected floorplan outline rather than a field of repeated glyphs.
+
+**A real bug, caught by the model rather than by observation.** `settlement._destroyed`
+records rubble at every footprint cell (GW-WP25), so `world.merged_rubble`'s *positional*
+"freshly destroyed" counter started counting **cells**, not structures — a 5x3 civilian
+hall would have charged civilian-harm consequences (population loss, diplomatic severity)
+fifteen times over for "one building destroyed", where a 2x2 row house charged four. New
+`settlement._newly_destroyed_by_kind` counts structures directly; `merged_rubble` keeps its
+existing job of folding the rubble tuple. Caught by
+`test_civilian_destruction_persists_population_loss_without_erasing_species`, which every
+prior WP's tests couldn't have caught — no building was ever more than one cell before.
+
+**Four test fixtures assumed a structure's anchor was its only cell** — the same class of
+staleness GW-WP26 hit with `_passable`-only firing spots, now hitting `(s.x, s.y)`
+equality checks: the bot-targeting hunt-goal test, the shared-geometry `blocked <= struct_at`
+assertion, and both directions of the world/settlement rubble round-trip. Fixed by checking
+cell membership (`goal in s.cells`) or expanding the expected set (`{cell for s in ...
+for cell in s.cells}`) instead of comparing to `(s.x, s.y)`.
+
+**Two drop-standoff tests needed a different seed, not a different assertion.** At the new
+capital size, seed 3 (`cities=3, citadel_level=2`, the fixture both tests shared) backs
+onto an 88-cell pocket pinned against the map edge with achievable clearance topping out
+around 6.5 — below every radius the tests try, so every radius picks the same boundary cell
+regardless of the knob. A seed sweep found seed 1 gives clearance up to the 50s in the same
+scenario; swapped in with the reasoning recorded in both tests so a future map-size change
+doesn't reintroduce the same trap silently.
+
+**Balance, measured not assumed:** seeds 1-6 at citadel 0 still all breach and all surrender
+— the second capital AA did not close the GW-WP26 turn-0 scout-jump finding on these seeds;
+it remains open for GW-WP29. Deliberately not chased further here: GW-WP27's job was scale
+and rendering, and re-tuning against balance numbers that GW-WP28's city shapes haven't
+landed yet would mean doing it twice.
+
+Files: `edge/core/groundwar/world.py` (`Footprint`, `_BUILDING_SIZES`, `_reserved_cells`,
+`stamp_place`, `CAPITAL_SIZE`/`PLACE_SIZE`), `edge/core/groundwar/assault.py`
+(`_stamp_city`, `structure_neighbor_mask`, `AssaultMap.marker_cells`),
+`edge/core/groundwar/settlement.py` (`_newly_destroyed_by_kind`), `edge/core/dto.py`
+(`AssaultCellDTO.building_mask`/`structure_marker`), `edge/server/session.py`,
+`edge/groundwar/widgets.py` (`BUILDING_GLYPHS`), `edge/tui/screens/ground_assault.py`,
+`config/groundwar_default.yaml`, `edge/server/wire.py` (`WIRE_VERSION` 39 → 40 for the two
+new `AssaultCellDTO` fields — `tests/fixtures/wire/fingerprint.txt` and `envelopes.json`
+regenerated to match, per the project's WIRE_VERSION-is-exempt-from-batching convention).
+Tests: `tests/test_groundwar_world.py` gains `test_buildings_are_whole_footprints_with_one_kind_each`
+(overlap, containment, and size-variety across an 11-seed sweep) and updates the two rubble
+tests to whole-footprint expectations; `tests/test_groundwar_settlement.py` updates the
+civilian-destruction test to assert per-structure counting and whole-footprint rubble;
+`tests/test_groundwar_bot_targeting.py` and `tests/test_groundwar_drop_standoff.py` get the
+anchor-only and cramped-seed fixes above; `tests/test_ground_render_glyph_widths.py` gains
+`test_building_outline_glyphs_are_single_width`. Three assault-view snapshots refreshed;
+verified by grepping the regenerated SVGs for both box-drawing outline characters and kind
+marker glyphs, confirming the new rendering path actually fired rather than silently no-op'd.
+Commit `ground: GW-WP27 multi-cell buildings`.
+
 ## Verification matrix
 
 | Concern | Required evidence |

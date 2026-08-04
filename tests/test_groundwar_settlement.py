@@ -282,11 +282,15 @@ def test_civilian_destruction_persists_population_loss_without_erasing_species()
         day=5,
         config=CFG,
     )
+    # GW-WP27: one civilian STRUCTURE destroyed, whatever its footprint — civilian harm
+    # must not scale with cell count, or a large hall would cost fifteen times what a
+    # small one does for "one building destroyed".
     assert settled.civilian_structures_destroyed == 1
     assert settled.civilian_losses > 0
     assert set(settled.planet.population) == {"vesk"}
-    assert [(entry.x, entry.y) for entry in settled.planet.ground_rubble] == [
-        (civilian.x, civilian.y)]
+    # ...but the rubble itself is still recorded at every cell of the footprint, so a
+    # repeat visit sees the building's whole shape, not just its anchor.
+    assert {(entry.x, entry.y) for entry in settled.planet.ground_rubble} == set(civilian.cells)
 
 
 def test_unaligned_surrender_creates_native_protectorate_and_permanent_grudge() -> None:

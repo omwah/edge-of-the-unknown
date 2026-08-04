@@ -160,13 +160,20 @@ def test_landing_is_deterministic_for_one_seed() -> None:
 
 def test_standoff_knob_moves_the_ring() -> None:
     """`drop_standoff` is a knob so the balance can be slid while watching a run (D17);
-    a knob that does not move the drop would be a lie in the config file."""
+    a knob that does not move the drop would be a lie in the config file.
+
+    Seed 1, not 3: at GW-WP27's capital footprint (46x26) seed 3's capital backs onto an
+    88-cell pocket pinned against the map edge, whose achievable clearance tops out around
+    6.5 — below every radius this test tries, so every radius picks the same boundary
+    cell and the knob would look broken when the map is simply cramped there. Seed 1's
+    open ground has clearance up to the 50s, comfortably wider than the tested spread.
+    """
     assert GW is not None
     wider = CFG.model_copy(update={"groundwar": GW.model_copy(update={
         "defenses": GW.defenses.model_copy(update={"drop_standoff": 24})})})
-    base = _map(3)
+    base = _map(1)
     far = ga.generate_assault_map(
-        wider, seed=3, planet_type="terrestrial_warm", cities=3, citadel_level=2)
+        wider, seed=1, planet_type="terrestrial_warm", cities=3, citadel_level=2)
     assert (_clearance(far, far.landing_x, far.landing_y)
             > _clearance(base, base.landing_x, base.landing_y) + 5)
 
@@ -232,11 +239,16 @@ def test_map_cache_keys_on_the_inputs_that_change_the_map() -> None:
 def test_map_cache_does_not_leak_across_configs() -> None:
     """Configs are rebuilt constantly in tests and differ without any version field
     changing, so the cache key carries `id(config)` *and* holds the config alive — an id
-    recycled onto a different config would otherwise serve a map built from the old one."""
+    recycled onto a different config would otherwise serve a map built from the old one.
+
+    Seed 1 (see `test_standoff_knob_moves_the_ring`): the property under test is that a
+    changed `drop_standoff` actually reaches a *different* landing, which seed 3's cramped
+    edge pocket cannot demonstrate at GW-WP27's capital size regardless of caching.
+    """
     assert GW is not None
     ga.clear_assault_map_cache()
-    base = ga.assault_map_for_state(_op(3), CFG)
+    base = ga.assault_map_for_state(_op(1), CFG)
     other = CFG.model_copy(update={"groundwar": GW.model_copy(update={
         "defenses": GW.defenses.model_copy(update={"drop_standoff": 9})})})
-    shifted = ga.assault_map_for_state(_op(3), other)
+    shifted = ga.assault_map_for_state(_op(1), other)
     assert (shifted.landing_x, shifted.landing_y) != (base.landing_x, base.landing_y)

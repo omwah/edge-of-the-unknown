@@ -18,6 +18,18 @@ STRUCTURE_ART: dict[str, tuple[str, str, str]] = {
     "building_civilian": ("⌂", "grey74", "grey23"),
 }
 
+# GW-WP27: outline glyphs for a multi-cell building, indexed by the 4-bit N/S/E/W
+# "joined to the same structure" mask (`assault.structure_neighbor_mask`) — the same
+# box-drawing ramp and bit order as `edge.art.interior.WALL_GLYPHS`
+# (`edge.core.groundwar.interior.wall_neighbor_mask`), so a building reads as one
+# connected floorplan rather than a field of repeated glyphs. Index 0 (a lone,
+# unjoined cell — a 1x1 structure, or a footprint's isolated corner) falls back to
+# the kind's own glyph in `STRUCTURE_ART`, not a box-drawing character.
+BUILDING_GLYPHS = (
+    "■", "╵", "╷", "│", "╶", "└", "┌", "├",
+    "╴", "┘", "┐", "┤", "─", "┴", "┬", "┼",
+)
+
 RUBBLE_ART = ("▒", "grey42", "black")
 AA_THREAT_BG = "on #3a2708"
 GROUND_THREAT_BG = "on #3a1414"

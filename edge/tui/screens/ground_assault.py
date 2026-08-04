@@ -38,6 +38,7 @@ from edge.core.rules import (
 )
 from edge.groundwar.widgets import (
     AA_THREAT_BG,
+    BUILDING_GLYPHS,
     EVENT_FLASH,
     EVENT_STYLES,
     GROUND_THREAT_BG,
@@ -207,6 +208,14 @@ class AssaultMapView(CroppedMapView):
                 char, fg, bg = RUBBLE_ART
             else:
                 char, fg, bg = STRUCTURE_ART.get(cell.structure_kind, ("?", "white", "black"))
+                # GW-WP27: a multi-cell footprint draws as a connected floorplan outline
+                # — the kind glyph (▪/⌂/⊕/✸) marks only its one visual-centre cell, chosen
+                # server-side (`AssaultMap.marker_cells`) so every client agrees on which
+                # cell that is even at a viewport's edge. `building_mask == 0` covers both
+                # an ordinary 1x1 structure and a footprint's isolated corner, and both
+                # fall back to the kind glyph correctly.
+                if cell.building_mask and not cell.structure_marker:
+                    char = BUILDING_GLYPHS[cell.building_mask]
                 if cell.structure_hp < cell.structure_hp_max:
                     fg = "orange1"
             return char, f"{fg} on {bg}"

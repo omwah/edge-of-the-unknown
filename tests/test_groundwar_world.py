@@ -99,6 +99,40 @@ def test_generate_world_ground_is_deterministic() -> None:
     assert [stamp.place.capital for stamp in a.stamps] == [False, False, True]
 
 
+def test_buildings_are_whole_footprints_with_one_kind_each() -> None:
+    """GW-WP27: a building is one rolled object, not a strip of independently-kinded cells.
+
+    The pre-WP27 loop rolled military/civilian per *cell*, so a two-wide block could —
+    and, over enough seeds, did — come out half depot, half housing. Rolling once per
+    building and placing its whole footprint atomically is the fix; this asserts both
+    halves of it hold across a seed sweep: every footprint is internally one kind, no
+    two footprints share a cell, and every footprint sits entirely inside its place
+    (never straddling the wall or a reserved emplacement slot).
+    """
+    for seed in range(1, 12):
+        ground = gw_world.generate_world_ground(
+            CFG, seed=seed, planet_type="terrestrial_warm", places=3)
+        for stamp in ground.stamps:
+            place = stamp.place
+            seen: set[tuple[int, int]] = set()
+            sizes_seen: set[tuple[int, int]] = set()
+            for x, y, w, h in stamp.buildings:
+                cells = {(x + dx, y + dy) for dy in range(h) for dx in range(w)}
+                assert cells.isdisjoint(seen), f"seed {seed}: overlapping building footprints"
+                seen |= cells
+                assert cells.isdisjoint(set(stamp.reserved)), (
+                    f"seed {seed}: building overlaps a reserved emplacement slot")
+                assert all(place.x0 < cx < place.x1 and place.y0 < cy < place.y1
+                          for cx, cy in cells), f"seed {seed}: building crosses the wall line"
+                sizes_seen.add((w, h))
+            # Each footprint is one atomic (x, y, w, h) tuple in `military` XOR `civilian`
+            # — there is no per-cell kind to disagree with itself, so "one kind each" is
+            # true by construction. What's worth checking is that sizes actually vary
+            # (the whole point of D35), not just 2x2 everywhere.
+            if len(stamp.buildings) >= 4:
+                assert len(sizes_seen) > 1, f"seed {seed}: every building came out the same size"
+
+
 def test_survey_and_assault_of_one_world_share_terrain_and_places() -> None:
     """The whole point of the WP: one world, one ground.
 
@@ -124,8 +158,9 @@ def test_survey_and_assault_of_one_world_share_terrain_and_places() -> None:
     # Every gate the surveyor can walk through is a `gate` structure on the battlefield.
     assert smap.gates == frozenset(
         (s.x, s.y) for s in amap.structures if s.kind == "gate")
-    # Every masonry cell a surveyor cannot cross carries a structure in the assault.
-    struct_at = {(s.x, s.y) for s in amap.structures}
+    # Every masonry cell a surveyor cannot cross carries a structure in the assault —
+    # every cell of every footprint since GW-WP27, not just each structure's anchor.
+    struct_at = {cell for s in amap.structures for cell in s.cells}
     assert smap.blocked <= struct_at
 
 
@@ -288,7 +323,11 @@ def test_taking_a_world_then_surveying_it_shows_the_battle_through_the_reducers(
     assert settled.protectorate_controller == Ownership("player", 1)
     assert settled.owner == Ownership("none")  # D2: the native polity is retained
     ruined = {(entry.x, entry.y): entry.kind for entry in settled.ground_rubble}
-    assert ruined == {(wall.x, wall.y): "wall", (civilian.x, civilian.y): "building_civilian"}
+    # GW-WP27: a razed building leaves rubble at *every* cell of its footprint, not just
+    # its anchor — one HP pool, one ruin, the whole shape of it.
+    expected = {(wall.x, wall.y): "wall"}
+    expected.update({cell: "building_civilian" for cell in civilian.cells})
+    assert ruined == expected
 
     # Now walk it. The survey must be the same world, carrying that damage.
     apply_result(state, reduce(state, 1, BeginSurvey(planet.id), CFG))

@@ -115,8 +115,10 @@ def test_hunt_goal_picks_a_live_target_over_the_city_centre(dropped) -> None:
         pytest.skip("objective already stripped of live targets at drop time")
     assert goal != (city.cx, city.cy) or any(
         (u.x, u.y) == goal and u.hp > 0 for u in op.garrison_units)
+    # GW-WP27: `goal` may be any cell of a footprint, not just its anchor — `_hunt_goal`
+    # walks to the nearest face of a multi-cell building, not necessarily its (x, y).
     hit = [s for s in amap.structures
-           if (s.x, s.y) == goal and s.city_id == city.id]
+           if goal in s.cells and s.city_id == city.id]
     garrison = [u for u in op.garrison_units if (u.x, u.y) == goal and u.hp > 0]
     assert hit or garrison, "hunt goal must be an actual target, not empty ground"
     if hit:

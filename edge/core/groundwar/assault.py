@@ -202,6 +202,45 @@ class AssaultMap:
     def structure_at(self, x: int, y: int) -> AssaultStructure | None:
         return self.struct_at.get((x, y))
 
+    @property
+    def marker_cells(self) -> Mapping[Vec, int]:
+        """The one cell per structure that carries its kind glyph, keyed to its id.
+
+        GW-WP27: the centre cell of the footprint, not the anchor — a 5x3 hall's
+        glyph belongs in its middle, not tucked in a corner. For a 1x1 structure this
+        is its only cell, so nothing about today's single-cell kinds changes.
+        """
+        return {(s.x + (s.w - 1) // 2, s.y + (s.h - 1) // 2): s.id for s in self.structures}
+
+
+def structure_neighbor_mask(amap: AssaultMap, x: int, y: int) -> int:
+    """The 4-bit N/S/E/W mask of which orthogonal neighbours of `(x, y)` belong to
+    the **same structure** (GW-WP27 art seam, mirroring `wall_neighbor_mask`).
+
+    Server-side and against the *full* map for the same reason as the wall-junction
+    mask it mirrors: a client holding only a cropped viewport cannot always see a
+    footprint's true neighbours at the viewport's edge. Unlike a wall (which treats
+    the map edge as "wall-like" so a border segment caps cleanly), the map edge here
+    is simply not part of the building — there is nothing beyond it to join with.
+
+    A cell with no structure, or whose neighbour belongs to a *different* structure
+    (adjacent buildings sharing a wall line), reads as an outside face on that side.
+    """
+    s = amap.structure_at(x, y)
+    if s is None:
+        return 0
+
+    def joined(nx: int, ny: int) -> bool:
+        other = amap.structure_at(nx, ny)
+        return other is not None and other.id == s.id
+
+    return (
+        (1 if joined(x, y - 1) else 0)
+        | (2 if joined(x, y + 1) else 0)
+        | (4 if joined(x + 1, y) else 0)
+        | (8 if joined(x - 1, y) else 0)
+    )
+
 
 @dataclass(frozen=True, slots=True)
 class TacticalProjection:
@@ -362,24 +401,34 @@ def _stamp_city(
     for pos in stamp.gates:
         _add_structure(structures, struct_at, next_id, "gate", *pos, city.id, d.gate.hp)
 
-    # Interior emplacements, on the slots the shared stamp reserves for them.
+    # Interior emplacements, on the slots the shared stamp reserves for them. The
+    # batteries and the gun are 2x2 since GW-WP27 — they are installations, not masts —
+    # and measure range from their north-west cell (`origin` defaults to it).
     aa_slot, sensor_slot, aa2_slot, gun_slot = stamp.reserved
-    _add_structure(structures, struct_at, next_id, "aa", *aa_slot, city.id, d.aa.hp)
+    _add_structure(structures, struct_at, next_id, "aa", *aa_slot, city.id, d.aa.hp, w=2, h=2)
     _add_structure(structures, struct_at, next_id, "sensor", *sensor_slot, city.id, d.sensor.hp)
-    if citadel_level >= 3:
-        _add_structure(structures, struct_at, next_id, "aa", *aa2_slot, city.id, d.aa.hp)
+    # GW-WP27: a capital gets its second battery **regardless of citadel level**. One AA at
+    # `cx - w//4` with `range: 12` leaves the far corners of the city uncovered, and a
+    # GW-WP26 trace caught a scout jumping straight into that blind corner on turn 0 —
+    # skipping the approach and the breach both. Two batteries shrink the gap without
+    # touching `aa.range`, which must stay under the marauder missile's 13 or D27's
+    # silence-then-jump line stops existing.
+    if citadel_level >= 3 or place.capital:
+        _add_structure(structures, struct_at, next_id, "aa", *aa2_slot, city.id, d.aa.hp,
+                       w=2, h=2)
     if place.capital and citadel_level >= 2:
-        _add_structure(
-            structures, struct_at, next_id, "citadel_gun", *gun_slot, city.id, d.citadel_gun.hp)
+        _add_structure(structures, struct_at, next_id, "citadel_gun", *gun_slot, city.id,
+                       d.citadel_gun.hp, w=2, h=2)
 
-    blocks: tuple[tuple[StructureKind, int, tuple[Vec, ...]], ...] = (
+    blocks: tuple[tuple[StructureKind, int, tuple[gw_world.Footprint, ...]], ...] = (
         ("building_military", d.building_military_hp, stamp.military),
         ("building_civilian", d.building_civilian_hp, stamp.civilian),
     )
-    for kind, hp, cells in blocks:
-        for x, y in cells:
-            _add_structure(structures, struct_at, next_id, kind, x, y, city.id, hp)
-            blocked.add((x, y))
+    for kind, hp, footprints in blocks:
+        for x, y, w, h in footprints:
+            s = _add_structure(structures, struct_at, next_id, kind, x, y, city.id, hp,
+                               w=w, h=h)
+            blocked.update(s.cells)
     return city
 
 

@@ -196,7 +196,7 @@ def _stamp_settlement(
     s = SurveySettlement(id=place.id, name=place.name, cx=place.cx, cy=place.cy,
                          x0=place.x0, y0=place.y0, x1=place.x1, y1=place.y1)
     gw_world.pave(feature, stamp)
-    for pos in stamp.perimeter + stamp.buildings:
+    for pos in stamp.perimeter + stamp.building_cells:
         if pos not in rubble:
             blocked.add(pos)
     return s

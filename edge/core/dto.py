@@ -218,6 +218,16 @@ class AssaultCellDTO:
     # A Cloud City assault's wall-junction mask (GW-WP15/16 art, 0 elsewhere) — see
     # `GroundCellDTO.wall_mask`.
     wall_mask: int = 0
+    # GW-WP27: the same neighbour-mask trick, applied to a structure's own footprint
+    # rather than to wall-like terrain — the 4-bit N/S/E/W mask of which neighbours
+    # belong to *this same structure* (`assault.structure_neighbor_mask`), computed
+    # server-side against the full map for the reason `wall_mask` is: a cropped
+    # viewport cannot always see a footprint's true neighbours at its own edge.
+    # `structure_marker` is set on exactly one cell of the footprint — its visual
+    # centre — the cell that carries the kind glyph; every other cell of a multi-cell
+    # structure draws outline only.
+    building_mask: int = 0
+    structure_marker: bool = False
 
 
 @dataclass(frozen=True)
