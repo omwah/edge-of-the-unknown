@@ -317,6 +317,43 @@ async def test_assault_screen_uses_responsive_layout(size: tuple[int, int], tmp_
         assert screen.has_class("wide") == (size[0] >= 130)
 
 
+@pytest.mark.parametrize("size", ((80, 24), (100, 34), (140, 42)))
+async def test_first_frame_viewport_matches_the_mounted_map_widget_size(
+    size: tuple[int, int], tmp_path: Path,
+) -> None:
+    """The DTO fetched for the very first rendered frame must cover the whole map
+    widget, not a stand-in guess made before that widget existed.
+
+    Before `_settle_viewport`, `on_mount`'s only `_load` ran while `AssaultMapView`
+    didn't exist yet (`compose` shows nothing/the squad chooser until the first load
+    completes), so `_viewport_size`'s no-widget fallback stood in for the real size.
+    On a wide terminal that fallback under-covers the widget, and `_render_frame`
+    only ever paints exactly `view.viewport_width`x`view.viewport_height` cells — the
+    rest of the widget renders as blank background until an incidental resize event
+    corrects it. This is what `test_assault_responsive_snapshots[wide-*]` caught.
+    """
+    from edge.tui.screens.ground_assault import AssaultMapView
+
+    state = _reducer_world()
+    _dropped(state)
+    service = GameService(state, CFG, SqliteRepository(tmp_path / f"first-frame-{size[0]}.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+    async with app.run_test(size=size) as pilot:
+        app.client = client
+        app.push_screen(GroundAssaultScreen(client))
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GroundAssaultScreen)
+        assert screen.view is not None
+        maps = screen.query(AssaultMapView)
+        assert maps
+        widget = maps.first()
+        assert (screen.view.viewport_width, screen.view.viewport_height) == (
+            widget.size.width, widget.size.height,
+        )
+
+
 @pytest.mark.parametrize(
     ("label", "size"),
     (("compact", (80, 24)), ("standard", (100, 34)), ("wide", (140, 42))),
