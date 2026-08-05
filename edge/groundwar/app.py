@@ -221,6 +221,17 @@ own [b]?[/] help for controls.\
     def _new_client(self, state: UniverseState, *, ticker: bool = True) -> LocalClient:
         app = self.app
         assert isinstance(app, EdgeApp)
+        if isinstance(app, GroundwarApp):
+            # A bot left attached across runs is not just idle: `action_extract` (Escape)
+            # on the assault screen clears its operation straight through the shared
+            # client, without ever going through `BotDriver._check_finished` — so a bot
+            # escaped-out-of mid-run survives with `running=True` and no operation. The
+            # next `GroundAssaultScreen` (even a human-flown one) still passes
+            # `advance_bot`'s screen-type check, so the orphaned bot resumes ticking
+            # against it: `drive()` sees `op is None`, tries to start a fresh assault, and
+            # calls `b.game()`, which crashes — the harness's throwaway single-sector
+            # state never populates `state.regions`. Starting any new run must detach it.
+            app.stop_bot_pilot()
         service = GameService(state, self.config, SqliteRepository(":memory:"))
         client = LocalClient(service, player_id=harness.PLAYER_ID)
         app.client = client
@@ -339,6 +350,13 @@ class GroundwarApp(EdgeApp):
         self._bot_timer = None
         if self.bot is not None:
             self._bot_timer = self.set_interval(self.bot.pace, self._bot_tick)
+
+    def stop_bot_pilot(self) -> None:
+        """Detach any bot left over from a previous run before a new one starts."""
+        if self._bot_timer is not None:
+            self._bot_timer.stop()
+        self._bot_timer = None
+        self.bot = None
 
     async def _bot_tick(self) -> None:
         if self.bot is not None and self.bot.running:
