@@ -85,12 +85,17 @@ class HelpScreen(ModalScreen[None]):
         legend = False
         legend_rows: list[tuple[str, str]] = []
         if host is not None:
-            name = getattr(type(host), "HELP_TITLE", None) or type(host).__name__
+            # Instance lookup (not `type(host)`): most screens declare these as plain
+            # class constants, which resolve identically either way, but it also lets a
+            # screen expose one as an `@property` to answer with state-dependent text
+            # (e.g. the assault screen's bot-piloting note) without every other screen
+            # having to care.
+            name = getattr(host, "HELP_TITLE", None) or type(host).__name__
             title = f"Help — {name}"
             rows = _binding_rows(host)
-            prose = getattr(type(host), "HELP", "")
-            legend = bool(getattr(type(host), "HELP_LEGEND", False))
-            legend_rows = list(getattr(type(host), "HELP_LEGEND_ROWS", ()))
+            prose = getattr(host, "HELP", "")
+            legend = bool(getattr(host, "HELP_LEGEND", False))
+            legend_rows = list(getattr(host, "HELP_LEGEND_ROWS", ()))
 
         with VerticalScroll(id="help-box"):
             yield Static(title, id="help-title")

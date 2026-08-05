@@ -266,3 +266,60 @@ async def test_start_bot_pilot_attaches_and_advances() -> None:
         assert app.bot.steps == 1
         app.action_toggle_bot()
         assert not app.bot.running
+
+
+async def test_help_mentions_bot_controls_only_while_a_bot_is_flying() -> None:
+    """`GroundAssaultScreen.HELP` is an `@property`, not a plain constant, precisely so
+    it can answer differently once a bot is attached — the Ctrl+S/N/D/U keys it
+    documents are `GroundwarApp` bindings, invisible to `.`/`?`'s usual bindings-table
+    derivation (which only reflects the *screen's* own `BINDINGS`)."""
+    bot_world = _driver()
+    app = GroundwarApp(CFG)
+    async with app.run_test(size=(120, 40)) as pilot:
+        app.client = bot_world.client
+        screen = GroundAssaultScreen(bot_world.client)
+        app.push_screen(screen)
+        await pilot.pause()
+        assert app.bot is None
+        assert "Ctrl+S" not in screen.HELP
+
+        app.start_bot_pilot(bot_world.client, "test scenario")
+        assert "Ctrl+S" in screen.HELP and "Ctrl+N" in screen.HELP
+
+        app.bot = None  # detaching again (e.g. a stale-bot cleanup) reverts the text
+        assert "Ctrl+S" not in screen.HELP
+
+
+async def test_manual_pan_suspends_bot_auto_follow_until_recenter() -> None:
+    """The bug this guards: `observe(..., follow=True)` used to hard-recentre the
+    camera on the active trooper every bot step, so a manual pan while spectating was
+    immediately overwritten on the next tick. A pan must now stick until `R`
+    (`action_recenter`) explicitly resumes auto-follow.
+    """
+    bot = _driver()
+    app = GroundwarApp(CFG)
+    async with app.run_test(size=(120, 40)) as pilot:
+        app.client = bot.client
+        app.push_screen(GroundAssaultScreen(bot.client))
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GroundAssaultScreen)
+        # Land the platoon first — pre-drop camera math takes a different path.
+        for _ in range(40):
+            await bot.advance(screen)
+            if screen.view is not None and screen.view.dropped:
+                break
+        assert screen.view is not None and screen.view.dropped
+        assert not screen._auto_follow_suspended
+
+        await pilot.press("d")  # a PAN_MOVES key
+        assert screen._auto_follow_suspended
+        panned_camera = (screen.camera_x, screen.camera_y)
+
+        await bot.advance(screen)  # a bot step that would otherwise recentre
+        assert (screen.camera_x, screen.camera_y) == panned_camera, (
+            "a suspended bot must not drag the camera back on its own step")
+        assert screen._auto_follow_suspended
+
+        await screen.action_recenter()
+        assert not screen._auto_follow_suspended

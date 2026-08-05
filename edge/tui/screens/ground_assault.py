@@ -56,6 +56,7 @@ from edge.tui.screens._ground_shared import (
     FlashTrackerMixin,
     LandingAnimationMixin,
     LandingFrame,
+    clamp_camera,
     feature_colors as _feature_colors,
     feature_glyph as _feature_glyph,
     follow_camera,
@@ -244,16 +245,22 @@ class GroundAssaultScreen(FlashTrackerMixin, LandingAnimationMixin, EdgeScreen):
         Binding("b", "broadcast", "Terms"),
         Binding("space", "end_turn", "End turn"),
         Binding("y", "radar", "Radar"),
+        Binding("r", "recenter", "Recenter"),
         Binding("u", "undo", "Undo drop"),
         Binding("z", "log_expand", "Expand log"),
     ]
     ACTION_DANGER = {"extract": "destructive"}
     HELP_TITLE = "Planetary assault"
-    HELP = """\
+    _HELP = """\
 The objective is [b]surrender[/], not extermination. Military targets, cowed cities,
 and a Command suit's [b]B[/]roadcast drain Resolve; civilian destruction and your own
 casualties harden it. The server highlights only legal actions for the selected trooper
 and reveals enemies only when your surviving suits see them.
+
+A city's buildings can span several cells — a kind glyph ([indian_red]▪[/]/[grey74]⌂[/]/…)
+marks only its footprint's one visual-centre cell; the rest of that same building draws
+as a connected outline in the same colour, so treat the whole coloured cluster as one
+structure, not several.
 
 Compose a platoon, then place each capsule with arrows or the mouse and [b]Enter[/].
 After touchdown [b]Tab[/] selects a ready trooper; [b]M[/] moves, [b]G[/] jumps through
@@ -267,14 +274,30 @@ Losses past the sidebar's abort threshold force a doctrine recall, survivors onl
 
 Extraction always works; mid-fight it confirms because tactical losses and damage
 settle, and once the assault is decided it settles straight away with the result."""
+    _HELP_BOT_ADDENDUM = """
+
+Watching a bot: [b]Ctrl+S[/] runs or pauses it, [b]Ctrl+N[/] steps one action at a time,
+[b]Ctrl+D[/]/[b]Ctrl+U[/] slow it down or speed it up. Your own cursor and pan keys
+still work; using them suspends the camera's auto-follow so the bot stops dragging the
+view back, until [b]R[/] recentres and resumes it."""
     HELP_LEGEND_ROWS = [
         ("[black on green]M[/] [black on green]S[/] [black on green]C[/]", "your powered suits"),
         ("[white on dark_red]i[/] [white on dark_red]T[/]", "visible infantry / armor"),
         ("[bright_red on grey30]╬[/] [orange1 on grey23]⊕[/]", "turret / anti-air battery"),
         ("[bright_cyan on grey23]⍑[/] [bright_magenta on grey30]✸[/]", "sensor / citadel gun"),
-        ("[indian_red on grey23]▪[/] [grey74 on grey23]⌂[/]", "military / civilian block"),
+        ("[indian_red on grey23]▪[/] [grey74 on grey23]⌂[/]",
+         "[indian_red]military[/] / [grey74]civilian[/] block"),
         ("[white on grey27] [/]", "legal walking destination for the selected trooper"),
     ]
+
+    @property
+    def HELP(self) -> str:  # noqa: N802 — HelpScreen reads this like the class constant it replaces
+        """Bot-piloting controls only belong here while a bot is actually flying this
+        operation (`GroundwarApp.bot`, duck-typed to avoid an upward import into
+        `edge.groundwar` — see AGENTS.md's layering rule)."""
+        if getattr(self.app, "bot", None) is not None:
+            return self._HELP + self._HELP_BOT_ADDENDUM
+        return self._HELP
 
     CSS = """
     GroundAssaultScreen #assault-main { height: 1fr; layout: horizontal; }
@@ -312,6 +335,11 @@ settle, and once the assault is decided it settles straight away with the result
         self._anim_frames: list[LandingFrame] = []
         self._anim_timer: Timer | None = None
         self._extracting = False
+        # GW bot-pilot spectating: a bot's `observe(..., follow=True)` hard-recentres the
+        # camera on the active trooper every step, which fights any manual pan/cursor move
+        # you make while watching. One of those keys sets this, which `observe` then reads
+        # to skip its own recentre until `action_recenter` (R) explicitly resumes it.
+        self._auto_follow_suspended = False
 
     def compose(self) -> ComposeResult:
         if self.view is None:
@@ -341,7 +369,27 @@ settle, and once the assault is decided it settles straight away with the result
     async def on_mount(self) -> None:
         await self._load(center=True)
         await self.recompose()
+        self.call_after_refresh(self._settle_viewport, center=True)
         self._focus_map()
+
+    async def _settle_viewport(self, *, center: bool) -> None:
+        """Refetch once the compositor has actually laid out `AssaultMapView`.
+
+        The very first `_load` of a run is always fetched before the map widget has
+        been mounted (`compose` shows the squad chooser, or nothing, until then), so
+        `_viewport_size`'s no-widget fallback stands in for it. If the widget's actual
+        size differs, that first frame renders fewer/more cells than the widget is wide
+        or tall, leaving blank space at its bottom/right edge until an incidental resize
+        happens to correct it. Scheduled via `call_after_refresh` rather than run
+        straight after `recompose` — immediately after mounting, `AssaultMapView.size`
+        is still its pre-layout `(0, 0)` (Textual only resolves it during the next
+        compositor pass), so an inline refetch would just settle on a *different* wrong
+        size instead of the real one. `center=True` also re-centres using that now-correct
+        size — the prior centering pass ran against the same too-small guess, so it can
+        leave the camera short of the map's edge even once the size itself is fixed.
+        """
+        if self.query(AssaultMapView):
+            await self._load(center=center)
 
     async def on_screen_resume(self) -> None:
         # Skip once extraction has started: _extract() owns returning to the screen
@@ -400,8 +448,14 @@ settle, and once the assault is decided it settles straight away with the result
             else:
                 first = next((c for c in view.cells if c.landable), view.cells[0])
                 self.cursor_x, self.cursor_y = first.x, first.y
-            self.camera_x = max(0, self.cursor_x - width // 2)
-            self.camera_y = max(0, self.cursor_y - height // 2)
+            # Clamped against the map's far edges too (not just 0 on the near ones): a
+            # drop point near the right/bottom of a map otherwise leaves the camera
+            # pointed partway off it, and the server can only return however much of
+            # the requested viewport is still on the map — the rest of the widget
+            # renders blank even though real terrain sits just to the left/above.
+            self.camera_x, self.camera_y = clamp_camera(
+                self.cursor_x - width // 2, self.cursor_y - height // 2,
+                width, height, view.map_width, view.map_height)
             if (self.camera_x, self.camera_y) != (view.viewport_x, view.viewport_y):
                 await self._load()
                 return
@@ -463,6 +517,7 @@ settle, and once the assault is decided it settles straight away with the result
             for suit_id, count in event.loadout.items() for number in range(1, count + 1)
         ]
         await self.recompose()
+        self.call_after_refresh(self._settle_viewport, center=True)
         self._focus_map()
         self._refresh_widgets()
 
@@ -475,16 +530,19 @@ settle, and once the assault is decided it settles straight away with the result
             return
         if event.key in CURSOR_MOVES:
             dx, dy = CURSOR_MOVES[event.key]
+            self._auto_follow_suspended = True
             await self.set_cursor(self.cursor_x + dx, self.cursor_y + dy)
             event.stop()
             return
         if event.key in ("H", "J", "K", "L"):
             dx, dy = CURSOR_MOVES[event.key.lower()]
             scale_x, scale_y = FAST_MOVE_SCALE
+            self._auto_follow_suspended = True
             await self.set_cursor(self.cursor_x + dx * scale_x, self.cursor_y + dy * scale_y)
             event.stop()
             return
         if event.key in PAN_MOVES:
+            self._auto_follow_suspended = True
             await self._pan(*PAN_MOVES[event.key])
             event.stop()
             return
@@ -608,14 +666,20 @@ settle, and once the assault is decided it settles straight away with the result
         different tree before the drop (the squad chooser) than after it (the map), and
         a bot's `GroundDrop` crosses that boundary without the screen's own placement
         flow ever running.
+
+        `follow` asks to recentre the camera on the action, but a manual pan/cursor move
+        (`on_key`) suspends that until `action_recenter` (R) turns it back on — otherwise
+        every bot step would drag your view straight back to where it wants to look.
         """
         if self._extracting or self.view is None:
             return
         was_dropped = self.view.dropped
+        should_center = follow and not self._auto_follow_suspended
         await self._narrate(events_out)
-        await self._load(center=follow)
+        await self._load(center=should_center)
         if self.view is not None and self.view.dropped and not was_dropped:
             await self.recompose()
+            self.call_after_refresh(self._settle_viewport, center=should_center)
             self._focus_map()
 
     def _selected_trooper(self) -> AssaultTrooperDTO | None:
@@ -757,6 +821,11 @@ settle, and once the assault is decided it settles straight away with the result
     def action_radar(self) -> None:
         self.show_threat = not self.show_threat
         self._refresh_widgets()
+
+    async def action_recenter(self) -> None:
+        """Resume auto-follow (if a bot suspended it) and jump the camera back now."""
+        self._auto_follow_suspended = False
+        await self._load(center=True)
 
     def action_log_expand(self) -> None:
         self.log_expanded = not self.log_expanded
