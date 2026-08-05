@@ -202,6 +202,56 @@ async def test_launching_with_the_bot_pilot_starts_a_watched_run(mode: str) -> N
         assert app.bot.operation() is not None
 
 
+async def test_a_stale_bot_does_not_survive_into_a_new_run() -> None:
+    """Escaping a bot-piloted run early must not leave a live bot behind to crash the
+    next one.
+
+    `action_extract` (Escape) clears the operation straight through the shared client,
+    never touching `BotDriver` — so a bot backed out of mid-run is left `running=True`,
+    `finished=False`, with no operation of its own. Before this fix, starting a *second*,
+    human-piloted run left that orphaned bot attached: its timer kept ticking against the
+    new screen (any `GroundAssaultScreen` passes `advance_bot`'s check), `drive()` saw its
+    own `op is None`, tried to open a fresh assault, and called `b.game()` — which crashes
+    because the harness's throwaway single-sector state never populates `state.regions`.
+    """
+    from edge.core.rules import ExtractGroundOperation
+
+    app = GroundwarApp(CFG)
+    async with app.run_test(size=(120, 40)) as pilot:
+        setup = app.screen
+        assert isinstance(setup, SetupScreen)
+        setup.bot_pilot = True
+        setup._update()
+        setup.post_message(PlatoonComposer.Dropped({"marauder": 2, "command": 1}))
+        await pilot.pause()
+        assert isinstance(app.screen, GroundAssaultScreen)
+        bot = app.bot
+        assert bot is not None and bot.running and not bot.finished
+
+        # Escape out mid-run, exactly as `action_extract` does: clear the operation
+        # through the shared client, then pop back to setup — without telling the bot.
+        operation = bot.operation()
+        assert operation is not None
+        await bot.client.apply(ExtractGroundOperation(operation.operation_id))
+        app.pop_screen()
+        assert app.bot is bot and bot.running and not bot.finished
+        assert bot.operation() is None
+
+        # Now play a second, human-piloted run.
+        setup2 = app.screen
+        assert isinstance(setup2, SetupScreen)
+        setup2.bot_pilot = False
+        setup2._update()
+        setup2.post_message(PlatoonComposer.Dropped({"marauder": 2, "command": 1}))
+        await pilot.pause()
+        assert isinstance(app.screen, GroundAssaultScreen)
+        assert app.bot is None, "the orphaned bot must be detached before a new run starts"
+
+        # The orphaned bot's timer (if it survived) would have crashed on its next tick —
+        # advancing here is what a background tick would have done.
+        await app.advance_bot()
+
+
 async def test_start_bot_pilot_attaches_and_advances() -> None:
     """`start_bot_pilot` is what the setup screen calls after pushing the screen."""
     bot_world = _driver()
