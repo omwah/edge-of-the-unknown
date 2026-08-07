@@ -17,7 +17,7 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Vertical
+from textual.containers import Container, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.timer import Timer
 from textual.widgets import Footer, RichLog, Static
@@ -64,6 +64,7 @@ from edge.tui.screens._ground_shared import (
     pan_camera,
     styled as _styled,
     toggle_log_height,
+    tracer_cells,
     viewport_size,
     warn,
 )
@@ -114,16 +115,20 @@ class AssaultResultModal(ModalScreen[None]):
     CSS = """
     AssaultResultModal { align: center middle; background: $background 60%; }
     AssaultResultModal #result-box {
-        width: 58; max-width: 100%; height: auto; padding: 1 2;
-        border: round $secondary; background: $surface;
+        width: 58; max-width: 100%; max-height: 90%; height: auto; overflow-y: auto;
+        padding: 1 2; border: round $secondary; background: $surface;
     }
     AssaultResultModal #result-stats { color: $text-muted; margin-top: 1; }
+    AssaultResultModal #result-kia-title { margin-top: 1; }
+    AssaultResultModal #result-kia { color: $text-muted; }
     """
 
-    def __init__(self, planet: str, settled: GroundAssaultSettled) -> None:
+    def __init__(self, planet: str, settled: GroundAssaultSettled,
+                kia_lines: Sequence[str] = ()) -> None:
         super().__init__()
         self._planet = planet
         self._settled = settled
+        self._kia_lines = list(kia_lines)
 
     def compose(self) -> ComposeResult:
         style, title = _RESULT_TITLES.get(self._settled.outcome, ("bold", "OPERATION ENDED"))
@@ -131,11 +136,15 @@ class AssaultResultModal(ModalScreen[None]):
                  f"{self._settled.defender_losses} defenders eliminated")
         if self._settled.loot:
             stats += f" · {self._settled.loot:,} slips looted"
-        with Vertical(id="result-box", classes="modal-box"):
+        with VerticalScroll(id="result-box", classes="modal-box"):
             yield Static(f"[{style}]{title}[/]")
             yield Static(_result_headline(self._planet, self._settled))
             yield Static(stats, id="result-stats")
-            yield Static("[dim]Esc or Enter to return to orbit[/]")
+            if self._kia_lines:
+                yield Static("[b]Casualties[/]", id="result-kia-title")
+                yield Static("\n".join(f"· {line}" for line in self._kia_lines),
+                             id="result-kia")
+            yield Static("[dim]Esc or Enter to return to orbit[/]", id="result-footer")
 
     def action_close(self) -> None:
         self.dismiss(None)
@@ -231,6 +240,15 @@ class AssaultMapView(CroppedMapView):
                 return char, f"{fg} {GROUND_THREAT_BG}"
         return char, _styled(fg, bg)
 
+    async def _on_click(self, event: events.Click) -> None:
+        view = self.host_screen.view
+        if view is not None and view.dropped:
+            cell = self._cells.get((view.viewport_x + event.x, view.viewport_y + event.y))
+            if cell is not None and cell.trooper_id:
+                await self.host_screen.select_trooper(cell.trooper_id)
+                return
+        await super()._on_click(event)
+
 
 class GroundAssaultScreen(FlashTrackerMixin, LandingAnimationMixin, EdgeScreen):
     """Compose, deploy, command, and extract one authoritative planetary assault."""
@@ -243,7 +261,8 @@ class GroundAssaultScreen(FlashTrackerMixin, LandingAnimationMixin, EdgeScreen):
         Binding("f", "fire", "Fire"),
         Binding("i", "missile", "Missile"),
         Binding("b", "broadcast", "Terms"),
-        Binding("space", "end_turn", "End turn"),
+        Binding("e", "end_turn", "End turn"),
+        Binding("space", "next_trooper", "Next trooper"),
         Binding("y", "radar", "Radar"),
         Binding("r", "recenter", "Recenter"),
         Binding("u", "undo", "Undo drop"),
@@ -257,15 +276,16 @@ and a Command suit's [b]B[/]roadcast drain Resolve; civilian destruction and you
 casualties harden it. The server highlights only legal actions for the selected trooper
 and reveals enemies only when your surviving suits see them.
 
-A city's buildings can span several cells — a kind glyph ([indian_red]▪[/]/[grey74]⌂[/]/…)
+A city's buildings can span several cells — a kind glyph ([#d75f5f]▪[/]/[#bcbcbc]⌂[/]/…)
 marks only its footprint's one visual-centre cell; the rest of that same building draws
 as a connected outline in the same colour, so treat the whole coloured cluster as one
 structure, not several.
 
 Compose a platoon, then place each capsule with arrows or the mouse and [b]Enter[/].
-After touchdown [b]Tab[/] selects a ready trooper; [b]M[/] moves, [b]G[/] jumps through
-terrain (drawing AA fire), [b]F[/] fires, [b]I[/] spends a missile, and [b]Space[/]
-runs the planet's turn. [b]Y[/] shows weapon ranges only for defenses you can see.
+After touchdown [b]Space[/] (or [b]Tab[/]) cycles to the next ready trooper — clicking
+one also selects it directly; [b]M[/] moves, [b]G[/] jumps through terrain (drawing AA
+fire), [b]F[/] fires, [b]I[/] spends a missile, and [b]E[/] runs the planet's turn.
+[b]Y[/] shows weapon ranges only for defenses you can see.
 
 A Scout's sensor jamming keeps your platoon undetected — an undetected trooper's first
 shot lands with a bonus, and firing reveals you. The clock runs both ways: sorties
@@ -280,14 +300,17 @@ Watching a bot: [b]Ctrl+S[/] runs or pauses it, [b]Ctrl+N[/] steps one action at
 [b]Ctrl+D[/]/[b]Ctrl+U[/] slow it down or speed it up. Your own cursor and pan keys
 still work; using them suspends the camera's auto-follow so the bot stops dragging the
 view back, until [b]R[/] recentres and resumes it."""
+    # Hex, not Rich names (grey23/dark_red/bright_cyan/…): Textual's Content markup
+    # parser rejects those, silently dropping the style for that span and everything
+    # after it on the line. Values match STRUCTURE_ART in edge/groundwar/widgets.py.
     HELP_LEGEND_ROWS = [
         ("[black on green]M[/] [black on green]S[/] [black on green]C[/]", "your powered suits"),
-        ("[white on dark_red]i[/] [white on dark_red]T[/]", "visible infantry / armor"),
-        ("[bright_red on grey30]╬[/] [orange1 on grey23]⊕[/]", "turret / anti-air battery"),
-        ("[bright_cyan on grey23]⍑[/] [bright_magenta on grey30]✸[/]", "sensor / citadel gun"),
-        ("[indian_red on grey23]▪[/] [grey74 on grey23]⌂[/]",
-         "[indian_red]military[/] / [grey74]civilian[/] block"),
-        ("[white on grey27] [/]", "legal walking destination for the selected trooper"),
+        ("[white on #870000]i[/] [white on #870000]T[/]", "visible infantry / armor"),
+        ("[#ff0000 on #4e4e4e]╬[/] [#ffaf00 on #3a3a3a]⊕[/]", "turret / anti-air battery"),
+        ("[#00ffff on #3a3a3a]⍑[/] [#ff00ff on #4e4e4e]✸[/]", "sensor / citadel gun"),
+        ("[#d75f5f on #3a3a3a]▪[/] [#bcbcbc on #3a3a3a]⌂[/]",
+         "[#d75f5f]military[/] / [#bcbcbc]civilian[/] block"),
+        ("[white on #444444] [/]", "legal walking destination for the selected trooper"),
     ]
 
     @property
@@ -335,6 +358,9 @@ view back, until [b]R[/] recentres and resumes it."""
         self._anim_frames: list[LandingFrame] = []
         self._anim_timer: Timer | None = None
         self._extracting = False
+        # Post-mortem (GW help follow-up): every "killed" line this operation has
+        # narrated, oldest first, for the win/loss modal's causes-of-death summary.
+        self._kia_lines: list[str] = []
         # GW bot-pilot spectating: a bot's `observe(..., follow=True)` hard-recentres the
         # camera on the active trooper every step, which fights any manual pan/cursor move
         # you make while watching. One of those keys sets this, which `observe` then reads
@@ -547,8 +573,28 @@ view back, until [b]R[/] recentres and resumes it."""
             event.stop()
             return
         if event.key in ("tab", "shift+tab") and self.view.dropped:
+            # Tab/Shift+Tab remain a working alias for Space/next_trooper — the
+            # bindings-table cycle key from before Space took over that role.
             await self._select(1 if event.key == "tab" else -1)
             event.stop()
+
+    async def action_next_trooper(self) -> None:
+        if self.view is None or not self.view.dropped:
+            return
+        await self._select(1)
+
+    async def select_trooper(self, trooper_id: int) -> None:
+        """Select a trooper the map's own cursor already sits on (a click), the same
+        target `_select` and Space/Tab cycle through — just chosen directly."""
+        if self.view is None or not self.view.dropped:
+            return
+        trooper = next((t for t in self.view.troopers if t.trooper_id == trooper_id), None)
+        if trooper is None or trooper.trooper_id == self.selected_actor_id:
+            return
+        self.selected_actor_id = trooper.trooper_id
+        self.cursor_x, self.cursor_y = trooper.x, trooper.y
+        await self._load()
+        await self._follow_cursor()
 
     async def _select(self, step: int) -> None:
         if self.view is None:
@@ -638,10 +684,12 @@ view back, until [b]R[/] recentres and resumes it."""
         return events_out
 
     async def _narrate(self, events_out: Sequence[Any]) -> None:
-        """Write `events_out` to the battle log and flash the cells they name."""
+        """Write `events_out` to the battle log, flash the cells they name, and draw
+        a tracer for every shot this batch fired (player and defender alike)."""
         logs = self.query("#assault-log")
         log = logs.first() if logs else None
         until = time.monotonic() + _FLASH_SECONDS
+        tracers: dict[tuple[int, int], tuple[str, str]] = {}
         for event in events_out:
             name = type(event).__name__
             line = await self._client.describe_event(event)
@@ -650,8 +698,35 @@ view back, until [b]R[/] recentres and resumes it."""
             x, y = getattr(event, "x", -1), getattr(event, "y", -1)
             if x >= 0 and name in EVENT_FLASH:
                 self._flashes[(x, y)] = (EVENT_FLASH[name], until)
+            if name == "GroundDefenseFireLogged" and event.kind == "killed":
+                self._kia_lines.append(event.text)
+            tracers.update(self._tracer_for(event, name))
         if self._flashes:
             self.set_timer(_FLASH_SECONDS + 0.05, self._refresh_widgets)
+        if tracers and not self._landing_playing:
+            self._play_landing([LandingFrame(tracers)])
+
+    def _tracer_for(self, event: Any, name: str) -> dict[tuple[int, int], tuple[str, str]]:
+        """A shot's flight path, if this event names one.
+
+        `GroundFired` carries the shooter's `actor_id` but not its position — `self.view`
+        is still last round's DTO here (the caller reloads only after `_narrate`
+        returns), and firing never relocates a trooper, so its pre-action position is
+        still exactly where the shot left from. `GroundDefenseFireLogged` (a defender's
+        emplacement/garrison/AA fire) carries the shooter's cell directly as
+        `source_x`/`source_y` (-1, -1 for lines with no shooter, e.g. Resolve deltas)."""
+        if name == "GroundFired":
+            if self.view is None:
+                return {}
+            shooter = next((t for t in self.view.troopers if t.trooper_id == event.actor_id), None)
+            if shooter is None:
+                return {}
+            style = "bold bright_red" if event.missile else "bold bright_yellow"
+            return tracer_cells(shooter.x, shooter.y, event.x, event.y, style)
+        if name == "GroundDefenseFireLogged" and event.kind in ("hit", "killed", "miss") \
+                and event.source_x >= 0:
+            return tracer_cells(event.source_x, event.source_y, event.x, event.y, "bold red")
+        return {}
 
     async def observe(self, events_out: Sequence[Any], *, follow: bool = False) -> None:
         """Narrate events applied to the service by *someone else*, then re-pull the view.
@@ -700,7 +775,7 @@ view back, until [b]R[/] recentres and resumes it."""
             return None
         trooper = self._selected_trooper()
         if trooper is None:
-            warn(self, "#assault-log", "Select a ready trooper first (Tab).")
+            warn(self, "#assault-log", "Select a ready trooper first (Space).")
             return None
         if not trooper.alive:
             warn(self, "#assault-log", f"{trooper.name} is down and cannot act.")
@@ -874,7 +949,7 @@ view back, until [b]R[/] recentres and resumes it."""
             settled = next((e for e in events_out if isinstance(e, GroundAssaultSettled)), None)
             if settled is not None:
                 await self.app.push_screen(
-                    AssaultResultModal(planet, settled), wait_for_dismiss=True)
+                    AssaultResultModal(planet, settled, self._kia_lines), wait_for_dismiss=True)
                 self.app.pop_screen()
                 return
         self.app.pop_screen()
@@ -954,7 +1029,7 @@ view back, until [b]R[/] recentres and resumes it."""
             out.append(f"\n{view.outcome.upper()} — Esc settles to orbit\n",
                        "bold bright_green" if view.outcome == "surrender" else "bold red")
         else:
-            out.append(f"\nY radar {'ON' if self.show_threat else 'off'} · Tab select\n", "grey66")
+            out.append(f"\nY radar {'ON' if self.show_threat else 'off'} · Space select\n", "grey66")
             out.append("M move · G jump · F/I fire · B terms\n", "grey66")
-            out.append("Space planet turn · Esc extract\n", "grey66")
+            out.append("E planet turn · Esc extract\n", "grey66")
         return out

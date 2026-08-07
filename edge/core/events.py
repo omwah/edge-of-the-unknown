@@ -352,6 +352,10 @@ class GroundDefenseFireLogged(Event):
     whose own summary event doesn't narrate. `kind` is one of "hit", "killed",
     "miss", "resolve", "destroyed", "sortie". `friendly` mirrors the core battle
     log's flag (whose meaning is kind-dependent, not simply "good news").
+
+    `source_x`/`source_y` are the shooter's cell for a "hit"/"killed"/"miss" line
+    (-1, -1 when the line has no shooter — Resolve deltas, cowing). Defaulted so
+    older persisted logs decode unchanged.
     """
 
     player_id: int
@@ -361,6 +365,8 @@ class GroundDefenseFireLogged(Event):
     x: int
     y: int
     friendly: bool
+    source_x: int = -1
+    source_y: int = -1
 
 
 @dataclass(frozen=True)

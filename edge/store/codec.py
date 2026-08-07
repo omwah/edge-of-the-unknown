@@ -905,6 +905,7 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "operation_id": event.operation_id,
                 "kind": event.kind, "text": event.text, "x": event.x, "y": event.y,
                 "friendly": event.friendly,
+                "source_x": event.source_x, "source_y": event.source_y,
             }
         case CloudCityBuilt():
             return "CloudCityBuilt", {
@@ -1336,7 +1337,8 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "GroundDefenseFireLogged":
             return GroundDefenseFireLogged(
                 payload["player_id"], payload["operation_id"], payload["kind"],
-                payload["text"], payload["x"], payload["y"], payload["friendly"])
+                payload["text"], payload["x"], payload["y"], payload["friendly"],
+                payload.get("source_x", -1), payload.get("source_y", -1))
         case "BeltMined":
             return BeltMined(payload["player_id"], payload["planet_id"],
                              payload["commodity"], payload["amount"])

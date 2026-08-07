@@ -81,7 +81,9 @@ _FLASH_SECONDS = 0.5
 # (⛑, ♟, ☺ in some fonts) and East-Asian-ambiguous ones (Ω, ∩ under a CJK width setting)
 # render double-width and would shear the map grid.
 _EXPLORER = "Ѫ"
-_EXPLORER_STYLE = "black on bright_green"
+# Hex, not "bright_green": this string is also spliced into HELP_LEGEND_ROWS markup,
+# and Textual's Content markup parser rejects Rich-only color names outright.
+_EXPLORER_STYLE = "black on #00ff00"
 
 
 def _landing_frames(x: int, y: int) -> list[LandingFrame]:
@@ -272,7 +274,7 @@ you do is pick a drop site. Terrain reads in its normal colours; ground the shut
 [b]not[/] take is [b]darkened[/]. What is left is open, level terrain inside the region \
 that holds every contact, so a landing can never strand you across water from your own \
 sites. Open water, mountain peaks and ice are refused, and the cursor turns \
-[bright_white on red3] red [/] over anything it cannot take. \
+[#ffffff on #d70000] red [/] over anything it cannot take. \
 Put the cursor on your chosen spot and press [b]Enter[/]. You choose afresh on every \
 descent — a returning survey starts the cursor where you left off, but nothing stops \
 you setting down on the far side of the map instead.
@@ -281,11 +283,11 @@ you setting down on the far side of the map instead.
 reads hotter as you close on the nearest unfound site. As you close in, the \
 [b]scanner glow[/] tints the ground inside your sweep — warmer means nearer. Once the \
 readout saturates the scanner can do no more; now read the ground itself. \
-[b]Disturbed earth[/] [black on dark_goldenrod]∴[/] only appears once you are close \
+[b]Disturbed earth[/] [black on #af8700]∴[/] only appears once you are close \
 enough to notice it, and clusters within a few cells of the truth. Stand on your best \
 guess and [b]X[/] to dig: that opens a trench a couple of cells wide, and a site \
 anywhere inside it pays off. A dry trench costs supplies and leaves spent ground \
-[black on dark_goldenrod]◌[/], so you never dig the same hole twice.
+[black on #af8700]◌[/], so you never dig the same hole twice.
 
 [b]Marching[/] — put the cursor on any walkable cell and press [b]M[/] or Enter. Near \
 cells are a single local turn; distant ones are a multi-turn march that periodically \
@@ -300,26 +302,29 @@ your narrowed circles across descents, while trenches and supplies reset.
 the townsfolk refill your packs, and while any circle is still wide an elder's memory \
 [green]tightens one of them[/].
 
-[b]The payoff[/] — a found site is marked [gold1]✦[/] on the chart. Put the cursor on it \
+[b]The payoff[/] — a found site is marked [#ffd700]✦[/] on the chart. Put the cursor on it \
 and press [b]V[/] any time to revisit the find and its notes. [b]O[/] cycles the map \
 overlay and [b]Z[/] expands the log when you want the full narration."""
 
+    # Hex, not Rich names (grey35/dark_green/gold1/…): Textual's Content markup
+    # parser rejects those, silently dropping the style for that span and everything
+    # after it on the line.
     HELP_LEGEND_ROWS = [
         ("[#4a4a4a on #1a1a1a]░[/]",
          "darkened ground — the shuttle will not set down (inbound view only)"),
         (f"[{_EXPLORER_STYLE}]{_EXPLORER}[/]", "you, the surveyor"),
-        ("[white on grey35] [/]", "sensor search circle — a site lies somewhere inside"),
-        ("[white on dark_green] [/]", "narrowed circle (an elder's hint tightened it)"),
-        ("[black on dark_goldenrod]∴[/]",
+        ("[white on #585858] [/]", "sensor search circle — a site lies somewhere inside"),
+        ("[white on #005f00] [/]", "narrowed circle (an elder's hint tightened it)"),
+        ("[black on #af8700]∴[/]",
          "disturbed ground — the dig spot is within a few cells"),
-        ("[black on dark_goldenrod]◌[/]", "ground you already dug (nothing there)"),
-        ("[bold gold1 on grey19]✦[/]", "found site (press V on it to revisit the find)"),
-        ("[white on grey46] [/][white on dark_orange3] [/][white on red3] [/]",
+        ("[black on #af8700]◌[/]", "ground you already dug (nothing there)"),
+        ("[bold #ffd700 on #303030]✦[/]", "found site (press V on it to revisit the find)"),
+        ("[white on #767676] [/][white on #d75f00] [/][white on #d70000] [/]",
          "scanner glow — ground in your sweep, warmer = nearer a buried site"),
-        ("[white on grey27] [/]", "one turn's walking range (O cycles the overlays)"),
-        ("[grey62 on grey30]█[/] [gold3 on grey30]▒[/]",
+        ("[white on #444444] [/]", "one turn's walking range (O cycles the overlays)"),
+        ("[#9e9e9e on #4e4e4e]█[/] [#d7af00 on #4e4e4e]▒[/]",
          "settlement wall / gate — walk in through a gate"),
-        ("[navajo_white3 on grey23]⌂[/] [bright_cyan on grey15]◉[/]",
+        ("[#afaf87 on #3a3a3a]⌂[/] [#00ffff on #262626]◉[/]",
          "homes / the plaza well — talk (T) anywhere inside a town"),
     ]
 

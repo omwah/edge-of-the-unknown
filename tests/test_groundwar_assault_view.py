@@ -6,12 +6,14 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from textual.widgets import Static
 
 from edge.core.dto import AssaultExpeditionDTO
+from edge.core.events import GroundAssaultSettled
 from edge.core.groundwar import assault as ga
 from edge.core.models import Region
 from edge.core.movement import MovementError
-from edge.core.rules import BeginAssault, EndGroundTurn, apply_result, reduce
+from edge.core.rules import BeginAssault, EndGroundTurn, GroundDrop, apply_result, reduce
 from edge.server import session, wire
 from edge.server.client import LocalClient, RemoteClient
 from edge.server.service import GameService
@@ -19,7 +21,7 @@ from edge.store.repo import SqliteRepository
 from edge.tui.app import EdgeApp
 from edge.tui.screens.ground_assault import AssaultResultModal, GroundAssaultScreen
 from edge.tui.screens.game import GameScreen
-from test_groundwar_assault_actions import CFG, _dropped, _reducer_world
+from test_groundwar_assault_actions import CFG, _dropped, _passable, _reducer_world
 
 
 def test_pre_drop_view_is_cropped_seedless_and_loadout_authoritative() -> None:
@@ -193,6 +195,114 @@ async def test_textual_move_and_confirmed_extract(tmp_path: Path) -> None:
         await pilot.pause()
         assert state.players[1].ground_operation is None
         assert not isinstance(app.screen, GroundAssaultScreen)
+
+
+async def test_textual_space_selects_next_trooper_and_e_ends_turn(tmp_path: Path) -> None:
+    """GW help-text rebind: Space now cycles troopers (Tab's old job) and E ends the
+    round (Space's old job) — regression guard that the swapped bindings actually
+    reach the screen's actions rather than being swallowed by the focused map."""
+    state = _reducer_world(reserved_infantry=0)
+    apply_result(state, reduce(state, 1, BeginAssault(1), CFG))
+    op = state.players[1].ground_operation
+    amap = ga.assault_map_for(state, op, CFG)
+    lx, ly = amap.landing_x, amap.landing_y
+    ox, oy = next(
+        (x, y)
+        for dx in range(-3, 4) for dy in range(-3, 4)
+        for x, y in ((lx + dx, ly + dy),)
+        if (x, y) != (lx, ly) and _passable(amap, x, y)
+    )
+    apply_result(state, reduce(state, 1, GroundDrop(
+        op.operation_id, (("marauder", lx, ly), ("marauder", ox, oy))), CFG))
+    service = GameService(state, CFG, SqliteRepository(tmp_path / "keys.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.client = client
+        app.push_screen(GroundAssaultScreen(client))
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GroundAssaultScreen)
+        first_selected = screen.selected_actor_id
+        assert first_selected is not None
+
+        await pilot.press("space")
+        await pilot.pause()
+        assert screen.selected_actor_id is not None
+        assert screen.selected_actor_id != first_selected
+
+        turn_before = state.players[1].ground_operation.local_turn  # type: ignore[union-attr]
+        await pilot.press("e")
+        await pilot.pause()
+        assert state.players[1].ground_operation.local_turn == turn_before + 1  # type: ignore[union-attr]
+
+
+def test_tracer_cells_draws_the_path_between_shooter_and_target() -> None:
+    from edge.tui.screens._ground_shared import tracer_cells
+
+    assert tracer_cells(0, 0, 0, 0, "red") == {}
+    assert tracer_cells(0, 0, 1, 0, "red") == {}, "adjacent cells have no interior to trace"
+    assert tracer_cells(0, 0, 3, 0, "red") == {(1, 0): ("─", "red"), (2, 0): ("─", "red")}
+    assert tracer_cells(0, 0, 0, 3, "red") == {(0, 1): ("│", "red"), (0, 2): ("│", "red")}
+    assert tracer_cells(0, 0, 3, 3, "red") == {(1, 1): ("╲", "red"), (2, 2): ("╲", "red")}
+    assert tracer_cells(3, 0, 0, 3, "red") == {(2, 1): ("╱", "red"), (1, 2): ("╱", "red")}
+
+
+async def test_narrate_draws_a_tracer_and_collects_a_kia_line(tmp_path: Path) -> None:
+    """GW help follow-up: a shot narrated through `_narrate` leaves a tracer overlay
+    on the map, and a defender's "killed" line is remembered for the post-mortem
+    (whether the trooper who fired or the defender who killed someone)."""
+    from edge.core.events import GroundDefenseFireLogged, GroundFired
+
+    state = _reducer_world(reserved_infantry=0)
+    op = _dropped(state)
+    shooter = op.platoon[0]
+    service = GameService(state, CFG, SqliteRepository(tmp_path / "narrate.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.client = client
+        app.push_screen(GroundAssaultScreen(client))
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GroundAssaultScreen)
+        assert screen.view is not None
+
+        fired = GroundFired(1, op.operation_id, shooter.id, shooter.x + 3, shooter.y,
+                            False, True, "structure", False)
+        killed = GroundDefenseFireLogged(
+            1, op.operation_id, "killed", f"{shooter.name} is KIA — cut down by turret.",
+            shooter.x, shooter.y, False, shooter.x - 2, shooter.y)
+        await screen._narrate([fired, killed])
+
+        assert screen.anim_cells, "a fired shot should leave a tracer overlay"
+        assert screen._kia_lines == [f"{shooter.name} is KIA — cut down by turret."]
+
+        modal = AssaultResultModal("World", GroundAssaultSettled(
+            1, op.planet_id, "wiped", "", 1, 0, 0, 0, 0), screen._kia_lines)
+        app.push_screen(modal)
+        await pilot.pause()
+        kia = app.screen.query_one("#result-kia", Static)
+        assert f"{shooter.name} is KIA" in str(kia.content)
+
+
+async def test_result_modal_footer_stays_reachable_with_a_full_platoon_wiped() -> None:
+    """A 14-trooper wipe (max_troopers) adds 14 causes-of-death lines to the box —
+    on a short terminal that must scroll, not push the "Esc or Enter" footer off
+    screen with no way back (GW help follow-up)."""
+    kia_lines = [f"Trooper{i} is KIA — cut down by turret." for i in range(14)]
+    settled = GroundAssaultSettled(1, 1, "wiped", "", 14, 3, 0, 2, 0)
+    app = EdgeApp(plain=True)
+    async with app.run_test(size=(80, 24)) as pilot:  # 80x24: the app's own supported floor
+        app.push_screen(AssaultResultModal("World", settled, kia_lines))
+        await pilot.pause()
+        footer = app.screen.query_one("#result-footer", Static)
+        footer.scroll_visible(animate=False)
+        await pilot.pause()
+        region = footer.region
+        assert 0 <= region.y < 24, "the footer must be scrollable into view, not stranded"
 
 
 async def test_game_screen_reconnect_resumes_active_assault(tmp_path: Path) -> None:

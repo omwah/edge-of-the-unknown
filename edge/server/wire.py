@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 40  # GW-WP27: AssaultCellDTO.building_mask/structure_marker
+WIRE_VERSION = 41  # GroundDefenseFireLogged.source_x/source_y (shooter-to-target tracers)
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -113,6 +113,9 @@ v36 (GW-WP14): the legacy abstract surface-descent path (`Descend`/`Explore` com
 method) and the one-roll `InvadePlanet` invasion (`InvasionRepulsed` event; `PlanetDTO`
 loses `can_invade`/`invade_blocker`/`ship_fighters`) are retired — both fully superseded
 by the `edge.core.groundwar` survey/tactical-assault system.
+v41: `GroundDefenseFireLogged.source_x`/`source_y` — the shooter's cell for a
+"hit"/"killed"/"miss" line, so the TUI can draw a tracer back to whichever turret,
+garrison unit, or AA battery actually fired (previously only the target cell was known).
 """
 
 
