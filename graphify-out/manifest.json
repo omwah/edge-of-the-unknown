@@ -285,7 +285,7 @@
     "semantic_hash": ""
   },
   "edge/core/config.py": {
-    "mtime": 1785469944.8744755,
+    "mtime": 1785904123.0636735,
     "ast_hash": "57ce411bf39db1b122b07a528ced4b41",
     "semantic_hash": ""
   },
@@ -310,7 +310,7 @@
     "semantic_hash": ""
   },
   "edge/core/dto.py": {
-    "mtime": 1785844390.6798778,
+    "mtime": 1785904123.0636735,
     "ast_hash": "034b89395fc3b6ec3261121a7380d641",
     "semantic_hash": ""
   },
@@ -355,7 +355,7 @@
     "semantic_hash": ""
   },
   "edge/core/groundwar/assault.py": {
-    "mtime": 1785848959.2445157,
+    "mtime": 1785904123.0636735,
     "ast_hash": "e7dbd8958ec275a7bb3a7e79a84b2ae4",
     "semantic_hash": ""
   },
@@ -370,12 +370,12 @@
     "semantic_hash": ""
   },
   "edge/core/groundwar/settlement.py": {
-    "mtime": 1785845163.3697,
+    "mtime": 1785904123.0646734,
     "ast_hash": "fc55185062930037fe40f2784e4f32d2",
     "semantic_hash": ""
   },
   "edge/core/groundwar/survey.py": {
-    "mtime": 1785849009.933391,
+    "mtime": 1785904123.0646734,
     "ast_hash": "43b9e149c626e4144dde1093c5efda37",
     "semantic_hash": ""
   },
@@ -555,7 +555,7 @@
     "semantic_hash": ""
   },
   "edge/groundwar/app.py": {
-    "mtime": 1785892904.4486694,
+    "mtime": 1785904123.0646734,
     "ast_hash": "fdb70e69f94d5082c34b70f75da723bb",
     "semantic_hash": ""
   },
@@ -570,7 +570,7 @@
     "semantic_hash": ""
   },
   "edge/groundwar/widgets.py": {
-    "mtime": 1785844425.4104476,
+    "mtime": 1785904123.0646734,
     "ast_hash": "80c3eac2ca3a82bc4536a1729ea1a9b9",
     "semantic_hash": ""
   },
@@ -625,12 +625,12 @@
     "semantic_hash": ""
   },
   "edge/server/session.py": {
-    "mtime": 1785844410.1721976,
+    "mtime": 1785904123.0656734,
     "ast_hash": "ccfd97477f655b452619f3afea3b34fe",
     "semantic_hash": ""
   },
   "edge/server/wire.py": {
-    "mtime": 1785847292.0002577,
+    "mtime": 1785904123.0656734,
     "ast_hash": "9b0f84b9460fb9e82cd696c54ef0cfd0",
     "semantic_hash": ""
   },
@@ -845,8 +845,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/ground_assault.py": {
-    "mtime": 1785844451.779881,
-    "ast_hash": "7417fe30409de43df09b781ab803f368",
+    "mtime": 1785904123.0656734,
+    "ast_hash": "1b96ae213f0dd344b86c9b34ece8d477",
     "semantic_hash": ""
   },
   "edge/tui/screens/ground_expedition.py": {
@@ -860,8 +860,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/help.py": {
-    "mtime": 1784519357.536642,
-    "ast_hash": "720c14db822394f366d3b73c3ab3d34f",
+    "mtime": 1785904123.0656734,
+    "ast_hash": "a29aa991709abfba97d58d57d397b493",
     "semantic_hash": ""
   },
   "edge/tui/screens/lobby.py": {
@@ -980,7 +980,7 @@
     "semantic_hash": ""
   },
   "tests/fixtures/wire/envelopes.json": {
-    "mtime": 1785847340.6846805,
+    "mtime": 1785904123.090674,
     "ast_hash": "413edf934ca32b616ef4c0a97b36de77",
     "semantic_hash": ""
   },
@@ -1200,18 +1200,18 @@
     "semantic_hash": ""
   },
   "tests/test_groundwar_assault.py": {
-    "mtime": 1785469164.8448493,
+    "mtime": 1785904123.090674,
     "ast_hash": "a34e6b2cb95f21bf729d6d37409e1d2b",
     "semantic_hash": ""
   },
   "tests/test_groundwar_assault_actions.py": {
-    "mtime": 1785849925.6800132,
+    "mtime": 1785904123.0916739,
     "ast_hash": "76fd49aca8614c2c5d2b7d54a29866e5",
     "semantic_hash": ""
   },
   "tests/test_groundwar_assault_view.py": {
-    "mtime": 1784913413.1512558,
-    "ast_hash": "dff6628e7395851759920b29bc10fa64",
+    "mtime": 1785904123.0916739,
+    "ast_hash": "4ab7e4bad92cbcf2f0fa7fd87524f667",
     "semantic_hash": ""
   },
   "tests/test_groundwar_expedition_view.py": {
@@ -1225,7 +1225,7 @@
     "semantic_hash": ""
   },
   "tests/test_groundwar_settlement.py": {
-    "mtime": 1785845188.669123,
+    "mtime": 1785904123.0916739,
     "ast_hash": "a8f4de97957cde8b4c9a79929202215e",
     "semantic_hash": ""
   },
@@ -1585,7 +1585,7 @@
     "semantic_hash": ""
   },
   "config/groundwar_default.yaml": {
-    "mtime": 1785813962.4593058,
+    "mtime": 1785904123.0616734,
     "ast_hash": "a326e965fc96d3d2a11f213946d9f171",
     "semantic_hash": ""
   },
@@ -1630,7 +1630,7 @@
     "semantic_hash": ""
   },
   "docs/GROUNDWAR_INTEGRATION_PLAN.md": {
-    "mtime": 1785853933.4664104,
+    "mtime": 1785904123.0626733,
     "ast_hash": "b65a00d1a0f02c5d64dfaa0cda1f24bc",
     "semantic_hash": ""
   },
@@ -1780,7 +1780,7 @@
     "semantic_hash": ""
   },
   "tests/fixtures/wire/fingerprint.txt": {
-    "mtime": 1785847313.7069178,
+    "mtime": 1785904123.090674,
     "ast_hash": "d2cd65c58cb9ed83ff1c2987c31df312",
     "semantic_hash": ""
   },
@@ -3740,8 +3740,8 @@
     "semantic_hash": ""
   },
   "edge/bot/scripts/assaulter.py": {
-    "mtime": 1785853933.4674103,
-    "ast_hash": "0752cf7fe57ca60ba3d4a74d08d56579",
+    "mtime": 1786131891.9637249,
+    "ast_hash": "84d36ceee8635b54dc4e476050693fce",
     "semantic_hash": ""
   },
   "edge/bot/scripts/surveyor.py": {
@@ -3750,7 +3750,7 @@
     "semantic_hash": ""
   },
   "tests/test_groundwar_bots.py": {
-    "mtime": 1785471482.1526046,
+    "mtime": 1785904123.0916739,
     "ast_hash": "e1ac6d3c1db95ff902ed4b92ac9aa7ff",
     "semantic_hash": ""
   },
@@ -3805,17 +3805,17 @@
     "semantic_hash": ""
   },
   "tests/test_ground_render_glyph_widths.py": {
-    "mtime": 1785844467.8761458,
+    "mtime": 1785904123.090674,
     "ast_hash": "93138bf75239e4814a61ac183f489dc0",
     "semantic_hash": ""
   },
   "edge/core/groundwar/world.py": {
-    "mtime": 1785849630.696006,
+    "mtime": 1785904123.0646734,
     "ast_hash": "c602617dc067770795e87a12898e457e",
     "semantic_hash": ""
   },
   "tests/test_groundwar_world.py": {
-    "mtime": 1785846253.4894397,
+    "mtime": 1785904123.0926738,
     "ast_hash": "433054ba63382107088c797c2c5cd598",
     "semantic_hash": ""
   },
@@ -3830,22 +3830,22 @@
     "semantic_hash": ""
   },
   "edge/groundwar/spectate.py": {
-    "mtime": 1785853933.4674103,
+    "mtime": 1785904123.0646734,
     "ast_hash": "79d170bc9890e2e821a7aa8af4e568d3",
     "semantic_hash": ""
   },
   "tests/test_groundwar_spectate.py": {
-    "mtime": 1785892874.67028,
-    "ast_hash": "c00171c6f422137576c6804e691ef8ef",
+    "mtime": 1785904123.0916739,
+    "ast_hash": "85a449c6b7d2e10cabd3e31abadbb6e9",
     "semantic_hash": ""
   },
   "edge/groundwar/matrix.py": {
-    "mtime": 1785469433.0699089,
+    "mtime": 1785904123.0646734,
     "ast_hash": "75c873d42b1e0676a364752d804d32c8",
     "semantic_hash": ""
   },
   "tests/test_groundwar_drop_standoff.py": {
-    "mtime": 1785845042.1196747,
+    "mtime": 1785904123.0916739,
     "ast_hash": "d011cbd223fddb1344dc0bdecc843779",
     "semantic_hash": ""
   },
@@ -3855,23 +3855,138 @@
     "semantic_hash": ""
   },
   "tests/test_groundwar_bot_targeting.py": {
-    "mtime": 1785853933.4674103,
-    "ast_hash": "5714a04bad26924664bf7c983325305d",
+    "mtime": 1786131922.8352358,
+    "ast_hash": "5a9adc5b3d246c60eff7273c631e2d74",
     "semantic_hash": ""
   },
   "edge/core/groundwar/shapes.py": {
-    "mtime": 1785848596.436178,
+    "mtime": 1785904123.0646734,
     "ast_hash": "c456df44dad1e99203f699a32d4523a0",
     "semantic_hash": ""
   },
   "tests/test_groundwar_city_shapes.py": {
-    "mtime": 1785849070.22343,
+    "mtime": 1785904123.0916739,
     "ast_hash": "022f1228810da3c24ddde1119a506ebf",
     "semantic_hash": ""
   },
   "tests/test_groundwar_structure_footprint.py": {
-    "mtime": 1785811354.069185,
+    "mtime": 1785904123.0916739,
     "ast_hash": "40f621170b3af0627e0bf3ca02a88a58",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/scripts/__init__.py": {
+    "mtime": 1786131587.7199929,
+    "ast_hash": "4bfea67395a7ba04f363df51355d1ef8",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/scripts/__main__.py": {
+    "mtime": 1786131587.7199929,
+    "ast_hash": "746aff14c3a098a28fe9d01d54f174a9",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/scripts/benchmark.py": {
+    "mtime": 1786131587.7200284,
+    "ast_hash": "a84586774a335e7dd894f45f5fc2aaf5",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/scripts/cli.py": {
+    "mtime": 1786131587.7200189,
+    "ast_hash": "993604200cad4bb12bdb2efcdb45fcf5",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/scripts/compress.py": {
+    "mtime": 1786131587.7200284,
+    "ast_hash": "91d277d3b9de1f3daf20b87269cc03f9",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/scripts/detect.py": {
+    "mtime": 1786131587.7200553,
+    "ast_hash": "2bf8e79c0ae7ee3bc4c3817a19a49f89",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/scripts/validate.py": {
+    "mtime": 1786131587.7200418,
+    "ast_hash": "555b8323eb519d25e46e8b05bdb62c6d",
+    "semantic_hash": ""
+  },
+  "skills-lock.json": {
+    "mtime": 1786131587.7297153,
+    "ast_hash": "8694115aeb7907f6bef16b3a30020b6f",
+    "semantic_hash": ""
+  },
+  ".agents/skills/cavecrew/README.md": {
+    "mtime": 1786131587.7157881,
+    "ast_hash": "31826d02cff90536871a308040ec4eb7",
+    "semantic_hash": ""
+  },
+  ".agents/skills/cavecrew/SKILL.md": {
+    "mtime": 1786131587.715874,
+    "ast_hash": "f184873cd9c507fa872cc86fd36722e3",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-commit/README.md": {
+    "mtime": 1786131587.7181034,
+    "ast_hash": "15f57347c5b5449b79fdf24fdab21f31",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-commit/SKILL.md": {
+    "mtime": 1786131587.7181034,
+    "ast_hash": "1262c2156cd81379fc011d538728079d",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/README.md": {
+    "mtime": 1786131587.7197127,
+    "ast_hash": "fc1a6957f7c111a5044c1ceb1cca3c8c",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/SECURITY.md": {
+    "mtime": 1786131587.7197952,
+    "ast_hash": "debca8209e185a1fa93455e51c43dd5d",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-compress/SKILL.md": {
+    "mtime": 1786131587.719777,
+    "ast_hash": "580399f83a2e4eb331cd425bfec4d398",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-help/README.md": {
+    "mtime": 1786131587.720745,
+    "ast_hash": "9c9cf8de78df2a8831c57d6bc88d942b",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-help/SKILL.md": {
+    "mtime": 1786131587.720745,
+    "ast_hash": "b26af86985ada3feb8b327360415ff6a",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-review/README.md": {
+    "mtime": 1786131587.721226,
+    "ast_hash": "ae3bdc81125037690fc50504e2917c83",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-review/SKILL.md": {
+    "mtime": 1786131587.721226,
+    "ast_hash": "fbb47ffb83198a1ed37a453417e691e2",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-stats/README.md": {
+    "mtime": 1786131587.7216167,
+    "ast_hash": "c2f26cde34791836bea794ff5e0dbaa4",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman-stats/SKILL.md": {
+    "mtime": 1786131587.7216377,
+    "ast_hash": "6b6603d1be02f48c1151c7a708dc640f",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman/README.md": {
+    "mtime": 1786131587.716921,
+    "ast_hash": "273a25110a7bb5681f488c17417986ce",
+    "semantic_hash": ""
+  },
+  ".agents/skills/caveman/SKILL.md": {
+    "mtime": 1786131587.716921,
+    "ast_hash": "8c3ec0ce859210de95578d3e1c7f6e2a",
     "semantic_hash": ""
   }
 }

@@ -27,3 +27,6 @@ graphify-out/cache/
 
 # Graphify dated backup snapshots
 graphify-out/????-??-??/
+
+# Agent skills
+.agents
