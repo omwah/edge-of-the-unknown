@@ -4555,7 +4555,7 @@ def _ground_drop(
 
 def _ground_battle_narration(
     player_id: int, operation_id: int,
-    log: tuple[tuple[str, str, int, int, bool], ...], *, exclude: frozenset[str],
+    log: tuple[tuple[str, str, int, int, bool, int, int], ...], *, exclude: frozenset[str],
 ) -> tuple[Event, ...]:
     """Secondary battle-log lines (Resolve deltas, cowing, KIA) that a player-caused
     ground action's own summary event doesn't narrate (GW-WP13-FU1). `exclude` filters
@@ -4563,8 +4563,8 @@ def _ground_battle_narration(
     dropped here too — it stays announced once via the existing DTO-diff path in the
     TUI, matching `_end_ground_turn`'s convention below."""
     return tuple(
-        GroundDefenseFireLogged(player_id, operation_id, kind, text, x, y, friendly)
-        for kind, text, x, y, friendly in log
+        GroundDefenseFireLogged(player_id, operation_id, kind, text, x, y, friendly, sx, sy)
+        for kind, text, x, y, friendly, sx, sy in log
         if kind != "outcome" and kind not in exclude
     )
 
@@ -4640,8 +4640,8 @@ def _end_ground_turn(
     new_player = replace(player, ground_operation=new_op,
                          turns_remaining=player.turns_remaining - cost)
     events: list[Event] = [
-        GroundDefenseFireLogged(player_id, op.operation_id, kind, text, x, y, friendly)
-        for kind, text, x, y, friendly in log
+        GroundDefenseFireLogged(player_id, op.operation_id, kind, text, x, y, friendly, sx, sy)
+        for kind, text, x, y, friendly, sx, sy in log
         if kind != "outcome"  # the outcome banner is announced separately, once
     ]
     events.append(GroundTurnEnded(player_id, op.operation_id, new_op.local_turn, new_op.resolve,

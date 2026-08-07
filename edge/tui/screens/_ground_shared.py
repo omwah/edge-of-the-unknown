@@ -482,3 +482,43 @@ def landing_frames(
            **{(x, y): (glyph, style) for (x, y), glyph, style in points}}
     frames.append(LandingFrame(tail))
     return frames
+
+
+def _line_cells(ax: int, ay: int, bx: int, by: int) -> list[tuple[int, int]]:
+    """Bresenham, endpoints included — same stepping as `assault._line_of_sight`,
+    duplicated rather than imported: that one is private and tied to `_Battle`."""
+    dx, dy = abs(bx - ax), abs(by - ay)
+    sx, sy = (1 if ax < bx else -1), (1 if ay < by else -1)
+    err = dx - dy
+    x, y = ax, ay
+    cells = []
+    while True:
+        cells.append((x, y))
+        if (x, y) == (bx, by):
+            return cells
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x += sx
+        if e2 < dx:
+            err += dx
+            y += sy
+
+
+def tracer_cells(sx: int, sy: int, tx: int, ty: int, style: str) -> dict[tuple[int, int], tuple[str, str]]:
+    """A shot's flight path as a one-shot `anim_cells` overlay: a line of glyphs from
+    shooter to target, endpoints excluded (those cells already show the trooper/
+    defender/target glyph — the tracer only needs to mark what's in between)."""
+    path = _line_cells(sx, sy, tx, ty)[1:-1]
+    if not path:
+        return {}
+    dx, dy = tx - sx, ty - sy
+    if dx == 0:
+        glyph = "│"
+    elif dy == 0:
+        glyph = "─"
+    elif dx * dy > 0:
+        glyph = "╲"
+    else:
+        glyph = "╱"
+    return {cell: (glyph, style) for cell in path}

@@ -1270,7 +1270,9 @@ class _Battle:
     armor_remaining: int
     next_id: int
     initial_strength: int
-    events: list[tuple[str, str, int, int, bool]]  # (kind, text, x, y, friendly)
+    # (kind, text, x, y, friendly, source_x, source_y) — source is -1,-1 when the
+    # line has no shooter to point back to (resolve deltas, cowing, outcome banners).
+    events: list[tuple[str, str, int, int, bool, int, int]]
 
     def next_unit_id(self) -> int:
         self.next_id += 1
@@ -1313,8 +1315,9 @@ class _Battle:
     def casualties(self) -> int:
         return sum(1 for t in self.troopers.values() if not t.alive)
 
-    def log(self, kind: str, text: str, x: int = -1, y: int = -1, friendly: bool = True) -> None:
-        self.events.append((kind, text, x, y, friendly))
+    def log(self, kind: str, text: str, x: int = -1, y: int = -1, friendly: bool = True,
+            source_x: int = -1, source_y: int = -1) -> None:
+        self.events.append((kind, text, x, y, friendly, source_x, source_y))
 
     def rand(self) -> Random:
         assert self.rng is not None, "this action needs rng but none was supplied"
@@ -1610,13 +1613,16 @@ def _check_casualties(battle: _Battle) -> None:
                               "survivors recalled to the boat.", friendly=False)
 
 
-def _trooper_hit(battle: _Battle, trooper: _Trooper, damage: int, source: str) -> None:
+def _trooper_hit(battle: _Battle, trooper: _Trooper, damage: int, source: str,
+                 sx: int = -1, sy: int = -1) -> None:
     dmg = max(1, damage - _suit(battle, trooper).armor)
     trooper.hp -= dmg
     battle.log("hit", f"{trooper.name} takes {dmg} from {source}"
-                      f" ({max(0, trooper.hp)} hp)", trooper.x, trooper.y, friendly=False)
+                      f" ({max(0, trooper.hp)} hp)", trooper.x, trooper.y, friendly=False,
+              source_x=sx, source_y=sy)
     if not trooper.alive:
-        battle.log("killed", f"{trooper.name} is KIA.", trooper.x, trooper.y, friendly=False)
+        battle.log("killed", f"{trooper.name} is KIA — cut down by {source}.",
+                  trooper.x, trooper.y, friendly=False, source_x=sx, source_y=sy)
         _apply_resolve(battle, battle.gw.resolve.trooper_killed,
                        f"{trooper.name} down — the defenders take heart")
         _check_casualties(battle)
@@ -1758,10 +1764,10 @@ def do_jump(battle: _Battle, trooper: _Trooper, x: int, y: int) -> bool:
         d = _dist(s.ox, s.oy, x, y)
         if d <= aa_cfg.range:
             if rng.random() < _aa_reaction_acc(aa_cfg, d, _escalation_bonus(battle)):
-                _trooper_hit(battle, trooper, aa_cfg.damage, "AA fire mid-air")
+                _trooper_hit(battle, trooper, aa_cfg.damage, "AA fire mid-air", s.ox, s.oy)
             else:
                 battle.log("miss", "AA fire bursts wide of the jump arc", x, y,
-                           friendly=False)
+                           friendly=False, source_x=s.ox, source_y=s.oy)
     return True
 
 
@@ -1882,10 +1888,10 @@ def _emplacement_fire(battle: _Battle) -> None:
         target = min(targets, key=lambda t: _dist(s.ox, s.oy, t.x, t.y))
         acc = w.accuracy + bonus - _battle_cover_at(battle, target.x, target.y)
         if rng.random() < acc:
-            _trooper_hit(battle, target, w.damage, s.kind.replace("_", " "))
+            _trooper_hit(battle, target, w.damage, s.kind.replace("_", " "), s.ox, s.oy)
         else:
             battle.log("miss", f"{s.kind.replace('_', ' ')} fire misses {target.name}",
-                       target.x, target.y, friendly=False)
+                       target.x, target.y, friendly=False, source_x=s.ox, source_y=s.oy)
 
 
 def _garrison_step(battle: _Battle, g: _GarrisonUnit) -> None:
@@ -1900,10 +1906,10 @@ def _garrison_step(battle: _Battle, g: _GarrisonUnit) -> None:
         rng = battle.rand()
         acc = gcls.weapon.accuracy - _battle_cover_at(battle, target.x, target.y)
         if rng.random() < acc:
-            _trooper_hit(battle, target, gcls.weapon.damage, f"garrison {g.kind}")
+            _trooper_hit(battle, target, gcls.weapon.damage, f"garrison {g.kind}", g.x, g.y)
         else:
             battle.log("miss", f"garrison {g.kind} misses {target.name}",
-                       target.x, target.y, friendly=False)
+                       target.x, target.y, friendly=False, source_x=g.x, source_y=g.y)
         return
     # close the distance: greedy steps toward the target
     for _ in range(gcls.move):
@@ -2068,10 +2074,10 @@ def assault_drop(
             d = _dist(s.ox, s.oy, x, y)
             if d <= aa_cfg.range:
                 if rng.random() < _aa_reaction_acc(aa_cfg, d):
-                    _trooper_hit(battle, t, aa_cfg.damage, "anti-drop fire")
+                    _trooper_hit(battle, t, aa_cfg.damage, "anti-drop fire", s.ox, s.oy)
                 else:
                     battle.log("miss", f"flak brackets {t.name}'s capsule", x, y,
-                               friendly=False)
+                               friendly=False, source_x=s.ox, source_y=s.oy)
     battle.initial_strength = len(battle.troopers)
     _place_preplaced_garrison(battle, op)
     _check_casualties(battle)
@@ -2094,7 +2100,7 @@ def assault_move(
 def assault_jump(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig, rng: Random,
     actor_id: int, x: int, y: int,
-) -> tuple[AssaultOperation, bool, tuple[tuple[str, str, int, int, bool], ...]]:
+) -> tuple[AssaultOperation, bool, tuple[tuple[str, str, int, int, bool, int, int], ...]]:
     """Returns `(new_op, hit, events)` — `hit` read directly off `do_jump`'s own log
     entries (an AA reaction landed) rather than diffed from before/after state at the
     reducer, since the trooper who jumped is trivially identified but a diff-based "was
@@ -2111,7 +2117,7 @@ def assault_jump(
 def assault_fire(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig, rng: Random,
     actor_id: int, x: int, y: int, missile: bool = False,
-) -> tuple[AssaultOperation, bool, bool, str, tuple[tuple[str, str, int, int, bool], ...]]:
+) -> tuple[AssaultOperation, bool, bool, str, tuple[tuple[str, str, int, int, bool, int, int], ...]]:
     """Returns `(new_op, hit, destroyed, target_kind, events)`.
 
     `hit`/`destroyed`/`target_kind` are read directly off what `fire_at` actually
@@ -2136,7 +2142,7 @@ def assault_fire(
 
 def assault_broadcast(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig, actor_id: int,
-) -> tuple[AssaultOperation, tuple[tuple[str, str, int, int, bool], ...]]:
+) -> tuple[AssaultOperation, tuple[tuple[str, str, int, int, bool, int, int], ...]]:
     """Returns `(new_op, events)` — no rng, `broadcast_terms` is a deterministic
     range/cowed check, not a roll. `events` is the full battle log for this action
     (GW-WP13-FU1), surfacing the Resolve strike `GroundBroadcastMade`'s summary
@@ -2149,12 +2155,13 @@ def assault_broadcast(
 
 def assault_end_turn(
     op: AssaultOperation, amap: AssaultMap, config: GameConfig, rng: Random,
-) -> tuple[AssaultOperation, tuple[tuple[str, str, int, int, bool], ...]]:
+) -> tuple[AssaultOperation, tuple[tuple[str, str, int, int, bool, int, int], ...]]:
     """Run the planet's whole turn (`defense_phase`): detection, emplacement fire,
     garrison AI, escalating sorties, the retrieval clock, and the next player phase.
 
-    Returns `(new_op, log)` — `log` is every `(kind, text, x, y, friendly)` line the
-    defense phase produced (emplacement/garrison fire, sorties), so the reducer can
+    Returns `(new_op, log)` — `log` is every `(kind, text, x, y, friendly, source_x,
+    source_y)` line the defense phase produced (emplacement/garrison fire, sorties),
+    so the reducer can
     surface each hit instead of only the round summary (a prior gap: trooper HP fell
     during this phase with nothing explaining why)."""
     if op.outcome is not None:

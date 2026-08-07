@@ -377,7 +377,8 @@ EVENTS: list[Event] = [
     GroundBroadcastMade(1, 123, 1, 2),                  # GW-WP10 terms dictated over a cowed city
     GroundTurnEnded(1, 123, 3, 88, 1, ""),              # GW-WP10 tactical round settled
     GroundDefenseFireLogged(1, 123, "hit", "Doc takes 6 from garrison infantry (14 hp)",
-                            10, 11, False),              # a defender-phase hit, now surfaced
+                            10, 11, False, 8, 9),        # a defender-phase hit, now surfaced,
+                                                          # with the shooter's cell for a tracer
     GroundAssaultSettled(1, 5, "surrender", "protectorate", 1, 7, 20, 2, 0),
     ProtectorateEstablished(1, 5, "player", 1),
     ProtectorateAnnexed(1, 5, "player", 1),
