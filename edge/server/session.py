@@ -99,6 +99,8 @@ from edge.core.events import (
     GenesisDeployed,
     GovernanceChanged,
     GrudgeFormed,
+    GroundActionRedone,
+    GroundActionUndone,
     GroundAssaultDropped,
     GroundBroadcastMade,
     GroundDefenseFireLogged,
@@ -1240,6 +1242,8 @@ def _assault_operation_view(
         can_broadcast=projection.can_broadcast,
         can_end_turn=op.dropped and live and player.turns_remaining >= next_cost,
         can_extract=True,
+        can_undo=op.dropped and live and bool(op.undo_stack),
+        can_redo=op.dropped and live and bool(op.redo_stack),
     )
 
 
@@ -2759,6 +2763,10 @@ def format_event(event: Event) -> str:
         cost = f"  (-{event.main_turns} main turn)" if event.main_turns else ""
         outcome = f"  [bold]{event.outcome.upper()}[/]" if event.outcome else ""
         return f"[bold bright_magenta]↻ Round {event.turn} ends.[/]{cost}{outcome}"
+    if isinstance(event, GroundActionUndone):
+        return "[grey62]↶ Action undone.[/]"
+    if isinstance(event, GroundActionRedone):
+        return "[grey62]↷ Action redone.[/]"
     if isinstance(event, GroundOperationEnded):
         return f"[magenta]▲ Ground operation {event.outcome}.[/]"
     if isinstance(event, GroundAssaultSettled):

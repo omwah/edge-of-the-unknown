@@ -21,6 +21,7 @@ expedition, say) whose glyphs the warp legend cannot describe: a list of
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from textual.app import ComposeResult
@@ -37,6 +38,24 @@ _CONVENTIONS = """\
 · [b]?[/] this help
 destructive acts always confirm first · pickers: [b]↑/↓[/] select, [b]Enter[/] choose\
 """
+
+
+_MARKUP_TAG = re.compile(r"\[/?[^\[\]]*\]")
+
+
+def _visible_width(markup: str) -> int:
+    """A markup string's rendered width, `[...]`/`[/...]` tags stripped — a symbol's
+    raw string length is a poor proxy for its column width, since two glyphs of the
+    same on-screen width can carry very different amounts of colour markup."""
+    return len(_MARKUP_TAG.sub("", markup))
+
+
+def _legend_rows(rows: list[tuple[str, str]]) -> str:
+    """The Legend section's two columns: symbols right-padded to the widest one in
+    this list, so every row's description starts at the same column."""
+    col = max((_visible_width(sym) for sym, _ in rows), default=0)
+    return "\n".join(
+        f"  {sym}{' ' * (col - _visible_width(sym))}  {meaning}" for sym, meaning in rows)
 
 
 def _binding_rows(host: Screen[Any]) -> list[str]:
@@ -104,7 +123,7 @@ class HelpScreen(ModalScreen[None]):
                 yield Static("\n".join(rows))
             if legend_rows:
                 yield Static("Legend", classes="help-section")
-                yield Static("\n".join(f"  {sym}  {meaning}" for sym, meaning in legend_rows))
+                yield Static(_legend_rows(legend_rows))
             if prose:
                 yield Static("Notes", classes="help-section")
                 yield Static(prose)

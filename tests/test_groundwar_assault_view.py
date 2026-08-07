@@ -238,6 +238,47 @@ async def test_textual_space_selects_next_trooper_and_e_ends_turn(tmp_path: Path
         assert state.players[1].ground_operation.local_turn == turn_before + 1  # type: ignore[union-attr]
 
 
+async def test_textual_u_undoes_and_shift_u_redoes_a_move(tmp_path: Path) -> None:
+    """GW help follow-up: U steps a completed in-round action back, Shift+U steps it
+    forward again — a live regression guard (not just the core reducer test) that
+    both keys actually reach the screen and round-trip the server's undo stack."""
+    state = _reducer_world(reserved_infantry=0)
+    _dropped(state)
+    service = GameService(state, CFG, SqliteRepository(tmp_path / "undo.db"))
+    client = LocalClient(service)
+    app = EdgeApp(plain=True)
+
+    async with app.run_test(size=(100, 34)) as pilot:
+        app.client = client
+        app.push_screen(GroundAssaultScreen(client))
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, GroundAssaultScreen)
+        assert screen.view is not None and not screen.view.can_undo
+        before = (screen.view.troopers[0].x, screen.view.troopers[0].y)
+        reachable = next(cell for cell in screen.view.cells if cell.move_reachable)
+        await screen.set_cursor(reachable.x, reachable.y)
+
+        await pilot.press("m")
+        await pilot.pause()
+        assert screen.view is not None
+        moved = (screen.view.troopers[0].x, screen.view.troopers[0].y)
+        assert moved == (reachable.x, reachable.y) and moved != before
+        assert screen.view.can_undo and not screen.view.can_redo
+
+        await pilot.press("u")
+        await pilot.pause()
+        assert screen.view is not None
+        assert (screen.view.troopers[0].x, screen.view.troopers[0].y) == before
+        assert not screen.view.can_undo and screen.view.can_redo
+
+        await pilot.press("U")
+        await pilot.pause()
+        assert screen.view is not None
+        assert (screen.view.troopers[0].x, screen.view.troopers[0].y) == moved
+        assert screen.view.can_undo and not screen.view.can_redo
+
+
 def test_tracer_cells_draws_the_path_between_shooter_and_target() -> None:
     from edge.tui.screens._ground_shared import tracer_cells
 

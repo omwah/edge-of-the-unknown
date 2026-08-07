@@ -152,6 +152,8 @@ from edge.core.events import (
     FightersTransferred,
     GarrisonReinforced,
     GenesisDeployed,
+    GroundActionRedone,
+    GroundActionUndone,
     GroundAssaultDropped,
     GroundAssaultSettled,
     GroundBroadcastMade,
@@ -225,7 +227,14 @@ from edge.core.models import (
     UniverseState,
 )
 from edge.core.groundwar.access import Assault, Survey, ground_access, inhabiting_species
-from edge.core.groundwar.models import ArtifactRecord, AssaultOperation, SurveyOperation, SurveyProgress
+from edge.core.groundwar.models import (
+    ArtifactRecord,
+    AssaultOperation,
+    ResolvedFire,
+    ResolvedJump,
+    SurveyOperation,
+    SurveyProgress,
+)
 from edge.core.groundwar import assault as gw_assault
 from edge.core.groundwar import force as gw_force
 from edge.core.groundwar import settlement as gw_settlement
@@ -777,6 +786,24 @@ class EndGroundTurn:
 
 
 @dataclass(frozen=True, slots=True)
+class UndoGroundAction:
+    """Step one assault action back this round (GW help follow-up) — move, jump,
+    fire, or broadcast. Only legal before `EndGroundTurn` (undo never crosses a round
+    boundary); refused with nothing left to undo."""
+
+    operation_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class RedoGroundAction:
+    """Step one undone assault action forward again (GW help follow-up) — the
+    inverse of `UndoGroundAction`. Refused with nothing left to redo, and any fresh
+    action clears whatever was available to redo."""
+
+    operation_id: int
+
+
+@dataclass(frozen=True, slots=True)
 class MineBelt:
     """Hand-mine an asteroid belt in the current sector for raw goods (§4.2, PT-30).
 
@@ -1278,6 +1305,7 @@ Command = (
     | ExtractGroundOperation
     | GroundMove | SurveyDig | OpenCrate | SurveyLand | SurveyTalk
     | GroundDrop | GroundJump | GroundFire | GroundBroadcast | EndGroundTurn
+    | UndoGroundAction | RedoGroundAction
     | MineBelt | BuyGenesis | DeployGenesis
     | CombatAction | BuyMissiles | AttackPlayer | AttackSpecies
     | Hail | Converse | BuyAlienTech | BarterArtifact | AcceptLead
@@ -1472,6 +1500,10 @@ def reduce(
             return _ground_broadcast(state, player_id, command, config)
         case EndGroundTurn():
             return _end_ground_turn(state, player_id, command, config)
+        case UndoGroundAction():
+            return _undo_ground_action(state, player_id, command, config)
+        case RedoGroundAction():
+            return _redo_ground_action(state, player_id, command, config)
         case MineBelt():
             return _mine_belt(state, player_id, command, config)
         case BuyGenesis():
@@ -4505,15 +4537,42 @@ def _ground_move(
     )
 
 
+def _gw_snapshot(op: AssaultOperation) -> AssaultOperation:
+    """A bare undo/redo/memo entry: pure battle state, no nested history — keeps
+    `undo_stack`/`redo_stack`/`resolved_actions` from recursively nesting (GW help
+    follow-up)."""
+    return replace(op, undo_stack=(), redo_stack=(), resolved_actions={})
+
+
+def _gw_commit(
+    new_op: AssaultOperation, prior: AssaultOperation, *,
+    memo_key: tuple[int, int, int, int, str] | None = None,
+    memo_value: ResolvedFire | ResolvedJump | None = None,
+) -> AssaultOperation:
+    """Finalize an in-round assault action's resulting op: push `prior`'s snapshot
+    onto the undo stack, clear the redo stack (a fresh action invalidates whatever
+    was available to redo), and — for fire/jump — record the RNG-replay memo entry
+    so a later redo, or simply re-issuing the same shot after an undo, replays the
+    same outcome instead of drawing a fresh roll."""
+    resolved = prior.resolved_actions
+    if memo_key is not None and memo_value is not None:
+        resolved = {**resolved, memo_key: memo_value}
+    return replace(new_op, undo_stack=prior.undo_stack + (_gw_snapshot(prior),),
+                  redo_stack=(), resolved_actions=resolved)
+
+
 def _assault_move(
     state: UniverseState, player_id: int, cmd: GroundMove, config: GameConfig
 ) -> ReduceResult:
     """The assault-trooper branch of `GroundMove` (GW-WP10) — a single-action ranged
     move, unlike the survey explorer's multi-cell supply march. Reuses `GroundMoved`
-    (`main_turns=0`: tactical moves burn only actions, never main-game turns)."""
+    (`main_turns=0`: tactical moves burn only actions, never main-game turns).
+    Deterministic (no `rng`), so — unlike fire/jump — it never needs the RNG-replay
+    memo, only the plain undo/redo push."""
     player, op = _active_assault(state, player_id, cmd.operation_id)
     amap = gw_assault.assault_map_for(state, op, config)
-    new_op = gw_assault.assault_move(op, amap, config, cmd.actor_id, cmd.x, cmd.y)
+    new_op = _gw_commit(
+        gw_assault.assault_move(op, amap, config, cmd.actor_id, cmd.x, cmd.y), op)
     new_player = replace(player, ground_operation=new_op)
     trooper = next(t for t in new_op.platoon if t.id == cmd.actor_id)
     return ReduceResult(
@@ -4576,8 +4635,15 @@ def _ground_jump(
         raise EconomyError("ground operations are not configured")
     player, op = _active_assault(state, player_id, cmd.operation_id)
     amap = gw_assault.assault_map_for(state, op, config)
-    new_op, hit, log = gw_assault.assault_jump(
-        op, amap, config, state.rng, cmd.actor_id, cmd.x, cmd.y)
+    key = (len(op.undo_stack), cmd.actor_id, cmd.x, cmd.y, "jump")
+    memo = op.resolved_actions.get(key)
+    if isinstance(memo, ResolvedJump):
+        raw_op, hit, log = memo.op, memo.hit, memo.log
+    else:
+        raw_op, hit, log = gw_assault.assault_jump(
+            op, amap, config, state.rng, cmd.actor_id, cmd.x, cmd.y)
+    new_op = _gw_commit(raw_op, op, memo_key=key,
+                        memo_value=ResolvedJump(_gw_snapshot(raw_op), hit, log))
     new_player = replace(player, ground_operation=new_op)
     events: list[Event] = [
         GroundJumped(player_id, op.operation_id, cmd.actor_id, cmd.x, cmd.y, hit)]
@@ -4593,8 +4659,16 @@ def _ground_fire(
         raise EconomyError("ground operations are not configured")
     player, op = _active_assault(state, player_id, cmd.operation_id)
     amap = gw_assault.assault_map_for(state, op, config)
-    new_op, hit, destroyed, target_kind, log = gw_assault.assault_fire(
-        op, amap, config, state.rng, cmd.actor_id, cmd.x, cmd.y, cmd.missile)
+    key = (len(op.undo_stack), cmd.actor_id, cmd.x, cmd.y, "missile" if cmd.missile else "fire")
+    memo = op.resolved_actions.get(key)
+    if isinstance(memo, ResolvedFire):
+        raw_op, hit, destroyed, target_kind, log = (
+            memo.op, memo.hit, memo.destroyed, memo.target_kind, memo.log)
+    else:
+        raw_op, hit, destroyed, target_kind, log = gw_assault.assault_fire(
+            op, amap, config, state.rng, cmd.actor_id, cmd.x, cmd.y, cmd.missile)
+    new_op = _gw_commit(raw_op, op, memo_key=key, memo_value=ResolvedFire(
+        _gw_snapshot(raw_op), hit, destroyed, target_kind, log))
     new_player = replace(player, ground_operation=new_op)
     events: list[Event] = [
         GroundFired(player_id, op.operation_id, cmd.actor_id, cmd.x, cmd.y,
@@ -4612,7 +4686,8 @@ def _ground_broadcast(
         raise EconomyError("ground operations are not configured")
     player, op = _active_assault(state, player_id, cmd.operation_id)
     amap = gw_assault.assault_map_for(state, op, config)
-    new_op, log = gw_assault.assault_broadcast(op, amap, config, cmd.actor_id)
+    raw_op, log = gw_assault.assault_broadcast(op, amap, config, cmd.actor_id)
+    new_op = _gw_commit(raw_op, op)
     new_player = replace(player, ground_operation=new_op)
     city_id = next(iter(new_op.broadcast_cities - op.broadcast_cities), -1)
     events: list[Event] = [
@@ -4628,7 +4703,8 @@ def _end_ground_turn(
     """Close the tactical phase and run the planet's whole turn (GW-WP10). Charges the
     D4/D12 macro-turn quantum before advancing; `EndGroundTurn` is the only assault
     action that spends main-game turns, refusing when the player can't afford it
-    (extraction always remains legal regardless)."""
+    (extraction always remains legal regardless). Clears the in-round undo/redo
+    stacks and RNG-replay memo — undo never crosses a round boundary."""
     if config.groundwar is None:
         raise EconomyError("ground operations are not configured")
     player, op = _active_assault(state, player_id, cmd.operation_id)
@@ -4637,6 +4713,7 @@ def _end_ground_turn(
         raise EconomyError("not enough turns to end this round — extract to orbit")
     amap = gw_assault.assault_map_for(state, op, config)
     new_op, log = gw_assault.assault_end_turn(op, amap, config, state.rng)
+    new_op = replace(new_op, undo_stack=(), redo_stack=(), resolved_actions={})
     new_player = replace(player, ground_operation=new_op,
                          turns_remaining=player.turns_remaining - cost)
     events: list[Event] = [
@@ -4648,6 +4725,55 @@ def _end_ground_turn(
                                   cost, new_op.outcome or ""))
     return ReduceResult(
         events=tuple(events),
+        players=(new_player,),
+    )
+
+
+def _undo_ground_action(
+    state: UniverseState, player_id: int, cmd: UndoGroundAction, config: GameConfig
+) -> ReduceResult:
+    """Step one in-round assault action back (GW help follow-up). Restores the
+    operation to its state right before the most recent move/jump/fire/broadcast,
+    and pushes the current (pre-undo) state onto the redo stack. The RNG-replay
+    memo is untouched — it lives outside the undo/redo snapshots on purpose (see
+    `AssaultOperation.resolved_actions`), so undoing a shot never rewinds the dice,
+    only the state."""
+    player, op = _active_assault(state, player_id, cmd.operation_id)
+    if op.outcome is not None:
+        # Every fire_at/do_jump already refuses once `outcome` is set, so this can
+        # only be reached by undoing the settling action itself — which would
+        # un-surrender or un-wipe an assault the reducer has already resolved.
+        raise MovementError("the assault is already settled — nothing left to undo")
+    if not op.undo_stack:
+        raise MovementError("nothing to undo this round")
+    prior = op.undo_stack[-1]
+    new_op = replace(prior, undo_stack=op.undo_stack[:-1],
+                     redo_stack=op.redo_stack + (_gw_snapshot(op),),
+                     resolved_actions=op.resolved_actions)
+    new_player = replace(player, ground_operation=new_op)
+    return ReduceResult(
+        events=(GroundActionUndone(player_id, op.operation_id),),
+        players=(new_player,),
+    )
+
+
+def _redo_ground_action(
+    state: UniverseState, player_id: int, cmd: RedoGroundAction, config: GameConfig
+) -> ReduceResult:
+    """Step one undone assault action forward again — the inverse of
+    `_undo_ground_action` (GW help follow-up)."""
+    player, op = _active_assault(state, player_id, cmd.operation_id)
+    if op.outcome is not None:
+        raise MovementError("the assault is already settled — nothing left to redo")
+    if not op.redo_stack:
+        raise MovementError("nothing to redo this round")
+    ahead = op.redo_stack[-1]
+    new_op = replace(ahead, redo_stack=op.redo_stack[:-1],
+                     undo_stack=op.undo_stack + (_gw_snapshot(op),),
+                     resolved_actions=op.resolved_actions)
+    new_player = replace(player, ground_operation=new_op)
+    return ReduceResult(
+        events=(GroundActionRedone(player_id, op.operation_id),),
         players=(new_player,),
     )
 

@@ -384,6 +384,24 @@ class GroundTurnEnded(Event):
 
 
 @dataclass(frozen=True)
+class GroundActionUndone(Event):
+    """One in-round assault action (move/jump/fire/broadcast) was stepped back
+    (GW help follow-up). Never crosses a round boundary."""
+
+    player_id: int
+    operation_id: int
+
+
+@dataclass(frozen=True)
+class GroundActionRedone(Event):
+    """One undone assault action was stepped forward again — the inverse of
+    `GroundActionUndone` (GW help follow-up)."""
+
+    player_id: int
+    operation_id: int
+
+
+@dataclass(frozen=True)
 class GroundAssaultSettled(Event):
     """A tactical assault reconciled into persistent strategic state (GW-WP11)."""
 

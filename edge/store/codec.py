@@ -79,6 +79,8 @@ from edge.core.events import (
     EncounterStarted,
     Event,
     GenesisDeployed,
+    GroundActionRedone,
+    GroundActionUndone,
     GroundAssaultDropped,
     GroundAssaultSettled,
     GroundBroadcastMade,
@@ -174,6 +176,8 @@ from edge.core.rules import (
     GroundFire,
     GroundJump,
     GroundMove,
+    RedoGroundAction,
+    UndoGroundAction,
     Hail,
     HaggleOffer,
     MineBelt,
@@ -374,6 +378,10 @@ def encode_command(command: Command) -> tuple[str, dict[str, Any]]:
                                        "actor_id": command.actor_id}
         case EndGroundTurn():
             return "EndGroundTurn", {"operation_id": command.operation_id}
+        case UndoGroundAction():
+            return "UndoGroundAction", {"operation_id": command.operation_id}
+        case RedoGroundAction():
+            return "RedoGroundAction", {"operation_id": command.operation_id}
         case MineBelt():
             return "MineBelt", {"planet_id": command.planet_id}
         case BuyGenesis():
@@ -634,6 +642,10 @@ def decode_command(type_: str, payload: dict[str, Any]) -> Command:
                                    actor_id=payload["actor_id"])
         case "EndGroundTurn":
             return EndGroundTurn(operation_id=payload["operation_id"])
+        case "UndoGroundAction":
+            return UndoGroundAction(operation_id=payload["operation_id"])
+        case "RedoGroundAction":
+            return RedoGroundAction(operation_id=payload["operation_id"])
         case "MineBelt":
             return MineBelt(planet_id=payload["planet_id"])
         case "BuyGenesis":
@@ -899,6 +911,14 @@ def encode_event(event: Event) -> tuple[str, dict[str, Any]]:
                 "player_id": event.player_id, "operation_id": event.operation_id,
                 "turn": event.turn, "resolve": event.resolve,
                 "main_turns": event.main_turns, "outcome": event.outcome,
+            }
+        case GroundActionUndone():
+            return "GroundActionUndone", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
+            }
+        case GroundActionRedone():
+            return "GroundActionRedone", {
+                "player_id": event.player_id, "operation_id": event.operation_id,
             }
         case GroundDefenseFireLogged():
             return "GroundDefenseFireLogged", {
@@ -1334,6 +1354,10 @@ def decode_event(type_: str, payload: dict[str, Any]) -> Event:
         case "GroundTurnEnded":
             return GroundTurnEnded(payload["player_id"], payload["operation_id"], payload["turn"],
                                    payload["resolve"], payload["main_turns"], payload["outcome"])
+        case "GroundActionUndone":
+            return GroundActionUndone(payload["player_id"], payload["operation_id"])
+        case "GroundActionRedone":
+            return GroundActionRedone(payload["player_id"], payload["operation_id"])
         case "GroundDefenseFireLogged":
             return GroundDefenseFireLogged(
                 payload["player_id"], payload["operation_id"], payload["kind"],
