@@ -31,6 +31,25 @@ four identical rows. Three faults caused that, all fixed here:
 
 The squad mix is config (`groundwar.bot.squad`, D23) rather than hard-coded, because
 composition is itself one of the levers being judged.
+
+**GW-WP30: three of eight troopers were not playing.** Tallying actions per trooper
+across seeds showed the default `4 marauder / 3 scout / 1 command` squad spending ~180
+actions on marauders, 1-20 on all three scouts together, and **zero** on Command in
+every seed measured. So every balance number since GW-WP24 was read off an instrument
+fielding half its platoon — without the scout recon and missile-spotting the D27 line
+depends on, and without the Command aura. Three coupled faults, all fixed here:
+
+1. **Command was born inside its own hold ring.** It held at `broadcast_range - 1` (13)
+   from the objective's near face, and the drop ring starts ~12 cells out, so it was
+   never `adrift` and never took a step. It now keeps station on the marauder pack
+   (`_move_goal`), with the no-entry rule it actually needs moved to `_advance_cell`.
+2. **The scout leash was a freeze.** Over-leash a scout issued no move at all and waited
+   for a pack that, being on the attack, only ever got farther away. It now closes back
+   on its escort (`_scout_regroup`).
+3. **Turn order made fault 2 certain.** The driver acts once and returns, so id-ordering
+   let each marauder spend its whole turn before the next trooper was considered and the
+   scouts were reached only after the full pack advance — sampling the leash at its
+   widest, every turn. Ordering now round-robins on actions remaining.
 """
 
 from __future__ import annotations
@@ -100,29 +119,57 @@ def _role(suit: GwSuit) -> str:
     return "marauder"
 
 
-def _scout_should_hold(
+def _scout_regroup(
     trooper: AssaultTrooper, op: AssaultOperation, config: GameConfig,
-) -> bool:
-    """Whether this scout has already outrun its marauder escort and must wait.
+) -> Vec | None:
+    """Where a scout that has outrun its escort should head to rejoin it, or None.
 
-    True once the nearest **live** marauder is farther than `_SCOUT_LEASH` away.
-    Evaluated fresh every turn rather than latched, so a scout that holds while the
-    pack closes the gap resumes moving on its own the moment it is back in leash —
-    no separate "resume" state to get wrong. If every marauder is dead there is no
-    pack left to wait for, so the scout goes on alone rather than freezing forever.
+    Returns the nearest **live** marauder's cell once that marauder is farther than
+    `_SCOUT_LEASH` away; None while the scout is inside the leash (go about your
+    business) or when no marauder survives (no pack left to rejoin, so it goes on alone).
+
+    GW-WP30: this replaces `_scout_should_hold`, which was a *freeze* rather than a
+    leash. Over-leash it returned True, which cleared `adrift`, which meant the scout
+    issued no move at all — and its docstring's assumption that a held scout "resumes
+    moving on its own the moment it is back in leash" never came true, because the pack
+    it was waiting for is advancing on a fixed objective and only ever gets farther away.
+    A trace of the GW-WP26/27 board showed every scout tripping the leash on turn 1 and
+    standing still for the remaining twenty-three, so the platoon fought the whole
+    operation without the `recon_radius`/`spot_missile_bonus` the D27 silence-the-AA line
+    is built on. Closing on the escort keeps the original intent — a scout is never out
+    alone — while leaving it a way back into formation.
 
     Distance is Manhattan, not the Euclidean `_dist` used for range checks elsewhere
     in this module — deliberately: it over-reports how far the scout has run ahead,
     so the leash trips a little early rather than a little late. Tightening it to
-    Euclidean would let the scout drift slightly farther before holding, which is
+    Euclidean would let the scout drift slightly farther before regrouping, which is
     the wrong direction to be wrong in.
     """
-    marauders = [t for t in op.platoon if t.hp > 0
-                and _role(config.groundwar.suits[t.suit_id]) == "marauder"]
-    if not marauders:
-        return False
-    nearest = min(abs(trooper.x - m.x) + abs(trooper.y - m.y) for m in marauders)
-    return nearest > _SCOUT_LEASH
+    nearest: Vec | None = None
+    best: int | None = None
+    for m in op.platoon:
+        if m.hp <= 0 or _role(config.groundwar.suits[m.suit_id]) != "marauder":
+            continue
+        gap = abs(trooper.x - m.x) + abs(trooper.y - m.y)
+        if best is None or gap < best:
+            best, nearest = gap, (m.x, m.y)
+    if best is None or best <= _SCOUT_LEASH:
+        return None
+    return nearest
+
+
+def _pack_centroid(op: AssaultOperation, config: GameConfig) -> Vec | None:
+    """The live marauder pack's centre of mass — what the command suit keeps station on.
+
+    Centroid rather than nearest marauder, because what Command projects is an *area*
+    (`command_radius`): standing on the middle of the pack covers the most of it. None
+    when no marauder is left, which drops Command back to its own broadcast-range goal.
+    """
+    pack = [t for t in op.platoon if t.hp > 0
+            and _role(config.groundwar.suits[t.suit_id]) == "marauder"]
+    if not pack:
+        return None
+    return (sum(t.x for t in pack) // len(pack), sum(t.y for t in pack) // len(pack))
 
 
 def _pick_planet(state: UniverseState, player_id: int, config: GameConfig) -> Planet | None:
@@ -422,21 +469,34 @@ def _nearest_city_cell(city: AssaultCity, at: Vec) -> Vec:
 def _move_goal(
     city: AssaultCity, breach: AssaultStructure | None, suit: GwSuit, role: str,
     *, at: Vec, inside: bool, hunt: Vec | None = None,
+    pack: Vec | None = None, regroup: Vec | None = None,
 ) -> tuple[Vec, int]:
     """Where this role wants to be, and how close is close enough.
 
-    Marauders and scouts head for the breach, then the city centre once through.
-    Command closes only to **broadcast range of the objective** and holds there: it wins
-    the fight by surviving to dictate terms, so walking it into the firefight trades the
-    win condition for one more gun. The hold distance is measured in Manhattan steps
-    against a Euclidean `broadcast_range`, which errs toward closing too far rather than
-    stopping short — a command trooper that halts just out of range would strand the run.
+    Marauders and scouts head for the breach, then the city centre once through. A scout
+    that has outrun its escort (`regroup`, GW-WP30) drops everything and closes back on
+    it first — stopping a cell *inside* the leash rather than exactly on it, so it settles
+    into formation instead of oscillating across the boundary every turn.
 
-    GW-WP26: Command aims at the city's **near face**, not its centre. Against a 46-wide
-    capital a centre-anchored hold of `broadcast_range - 1` sits well inside the walls —
-    so the suit whose job is to survive would march into the middle of the objective to
-    do it. Now it stops short of the wall, which is both what D31 describes and what the
-    matching `assault.city_range` change makes legal.
+    Command keeps station on the **marauder pack** (`pack`), at `command_radius - 1`.
+    GW-WP30: it used to hold at `broadcast_range - 1` from the city's near face, and that
+    number is larger than the distance the drop ring starts at — measured across seeds,
+    the landing zone sits ~12 cells off the objective against a hold of 13. So Command
+    was *born* inside its own hold ring, was never `adrift`, and took zero actions in an
+    entire operation. That is not merely one idle trooper: `command_move_bonus`,
+    `command_acc_bonus` and `command_radius` are what the config calls the suit's primary
+    reason to exist (D31), and the marauders walked out of that aura on turn 1 and never
+    came back. Following the pack is what keeps the aura on the platoon it is for.
+
+    Broadcasting still works from there — better, in fact. Following the pack only ever
+    moves Command *toward* the objective, so `city_range <= broadcast_range` is satisfied
+    more readily than at the old standoff, and `can_broadcast` is checked before movement
+    every step regardless of where it happens to be standing.
+
+    What D31 and GW-WP26 actually forbid — Command entering the objective — is enforced
+    where it belongs, as a keep-out filter on the cells it may step to (`_advance_cell`),
+    not by parking it out of usefulness. With no marauder left there is no pack to follow,
+    so it falls back to the near-face standoff and waits to say the words.
 
     `inside` overrides the breach goal, and must: a trooper already past the wall that
     still walked toward the perimeter breach would march back *out* of the objective it
@@ -444,11 +504,39 @@ def _move_goal(
     """
     if inside:
         return (hunt or (city.cx, city.cy)), 0
+    if regroup is not None:
+        return regroup, max(1, _SCOUT_LEASH - 1)
     if role == "command":
+        if pack is not None:
+            return pack, max(1, suit.command_radius - 1)
         return _nearest_city_cell(city, at), max(1, suit.broadcast_range - 1)
     if breach is not None:
         return (breach.x, breach.y), 1
     return (city.cx, city.cy), 0
+
+
+def _advance_cell(
+    reachable: frozenset[Vec], goal: Vec, *, keep_out: AssaultCity | None,
+) -> Vec | None:
+    """The reachable cell closest to `goal`, or None if there is nowhere to go.
+
+    `keep_out` excludes the objective's interior — Command's hard rule (D31): it wins by
+    surviving to dictate terms, so it may shadow the platoon right up to the wall but
+    never through it. Applied as a filter on the *candidate cells* rather than as a check
+    on the chosen one, because the goal it closes on is the marauder pack and the pack is
+    very often inside the city: a post-hoc rejection would cancel the move and freeze the
+    suit exactly the way GW-WP30 exists to stop. If every reachable cell is inside the
+    objective the filter yields, since standing still in a city is worse than moving
+    through it.
+    """
+    cells = reachable
+    if keep_out is not None:
+        outside = frozenset(c for c in cells if not keep_out.inside(*c))
+        if outside:
+            cells = outside
+    if not cells:
+        return None
+    return min(cells, key=lambda c: (abs(c[0] - goal[0]) + abs(c[1] - goal[1]), c))
 
 
 def _live_aa(
@@ -590,9 +678,19 @@ def setup(bot: BotRunner) -> None:
 
         # Command acts first: a live broadcast ends the fight outright, and spending it a
         # turn late is the most expensive mistake available.
+        #
+        # GW-WP30: everyone else goes round-robin — most actions remaining first — rather
+        # than strictly by id. This driver returns after every single action and is
+        # re-entered from the top, so an id-ordered list let the first marauder spend its
+        # *whole* turn before the second was even considered, and the scouts (sorting
+        # last) were only ever reached once all four marauders had made their full
+        # advance. That is the worst possible moment to ask "has this scout outrun its
+        # escort?", and the answer was yes on every turn from the first. Interleaving
+        # samples the formation mid-advance, which is what it actually looks like.
         ordered = sorted(
             op.platoon,
-            key=lambda t: (0 if _role(config.groundwar.suits[t.suit_id]) == "command" else 1, t.id))
+            key=lambda t: (0 if _role(config.groundwar.suits[t.suit_id]) == "command" else 1,
+                           -t.actions, t.id))
 
         for trooper in ordered:
             if trooper.hp <= 0 or trooper.actions <= 0:
@@ -606,16 +704,20 @@ def setup(bot: BotRunner) -> None:
                 return
 
             inside = city.inside(trooper.x, trooper.y)
-            # GW-WP29: a scout that has already outrun its marauder escort stops closing
-            # (and stops jumping — a jump can open that gap in one action, faster than
-            # walking ever could) until the pack catches up. See `_scout_should_hold`.
-            escorted = role != "scout" or not _scout_should_hold(trooper, op, config)
+            # GW-WP29/WP30: a scout that has outrun its marauder escort closes back on it
+            # before doing anything else. It still never jumps (a jump can reopen that gap
+            # in one action, faster than walking ever could) — that stays gated on role
+            # below, not on the leash, so an escorted scout cannot leap into a city either.
+            regroup = (_scout_regroup(trooper, op, config)
+                       if role == "scout" and not inside else None)
 
             # D27's line, in order: silence the battery, then jump the wall it was
             # guarding. Both outrank closing on foot — a marauder that walks toward the
             # wall instead of spending a missile is choosing the five-shot breach over
             # the one-turn entry, which is the choice this tuning exists to make wrong.
-            if not inside and escorted:
+            # Firing is not gated on the leash: a missile does not break formation, so a
+            # regrouping scout that somehow carries one should still take the shot.
+            if not inside:
                 aim = _missile_target(amap, op, city, trooper, proj.missile_targets)
                 if aim is not None:
                     b.apply(GroundFire(op.operation_id, trooper.id, *aim, missile=True))
@@ -634,9 +736,12 @@ def setup(bot: BotRunner) -> None:
                         return
 
             hunt = _hunt_goal(amap, op, city, trooper) if inside else None
+            pack = _pack_centroid(op, config) if role == "command" else None
             (gx, gy), hold = _move_goal(city, breach, suit, role, at=(trooper.x, trooper.y),
-                                        inside=inside, hunt=hunt)
-            adrift = escorted and abs(trooper.x - gx) + abs(trooper.y - gy) > hold
+                                        inside=inside, hunt=hunt, pack=pack, regroup=regroup)
+            adrift = abs(trooper.x - gx) + abs(trooper.y - gy) > hold
+            # Command shadows the pack but never follows it through the wall (D31).
+            keep_out = city if role == "command" and not inside else None
 
             # Spend the turn's *first* action closing, then shoot with the rest. Without
             # this a trooper with any target in range simply never moves again: a
@@ -645,8 +750,8 @@ def setup(bot: BotRunner) -> None:
             # Trading one of two actions keeps the advance honest without giving up the
             # firefight.
             if adrift and proj.reachable and trooper.actions >= config.groundwar.actions_per_turn:
-                cell = min(proj.reachable, key=lambda c: (abs(c[0] - gx) + abs(c[1] - gy), c))
-                if cell != (trooper.x, trooper.y):
+                cell = _advance_cell(proj.reachable, (gx, gy), keep_out=keep_out)
+                if cell is not None and cell != (trooper.x, trooper.y):
                     b.apply(GroundMove(op.operation_id, *cell, actor_id=trooper.id))
                     return
 
@@ -683,8 +788,8 @@ def setup(bot: BotRunner) -> None:
                     return
 
             if adrift and proj.reachable:
-                cell = min(proj.reachable, key=lambda c: (abs(c[0] - gx) + abs(c[1] - gy), c))
-                if cell != (trooper.x, trooper.y):
+                cell = _advance_cell(proj.reachable, (gx, gy), keep_out=keep_out)
+                if cell is not None and cell != (trooper.x, trooper.y):
                     b.apply(GroundMove(op.operation_id, *cell, actor_id=trooper.id))
                     return
         b.apply(EndGroundTurn(op.operation_id))
