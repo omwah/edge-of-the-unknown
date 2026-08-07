@@ -320,6 +320,8 @@ class AssaultExpeditionDTO:
     can_broadcast: bool = False
     can_end_turn: bool = False
     can_extract: bool = True
+    can_undo: bool = False
+    can_redo: bool = False
 
 
 @dataclass(frozen=True)

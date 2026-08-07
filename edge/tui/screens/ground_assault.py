@@ -35,6 +35,8 @@ from edge.core.rules import (
     GroundFire,
     GroundJump,
     GroundMove,
+    RedoGroundAction,
+    UndoGroundAction,
 )
 from edge.groundwar.widgets import (
     AA_THREAT_BG,
@@ -265,7 +267,8 @@ class GroundAssaultScreen(FlashTrackerMixin, LandingAnimationMixin, EdgeScreen):
         Binding("space", "next_trooper", "Next trooper"),
         Binding("y", "radar", "Radar"),
         Binding("r", "recenter", "Recenter"),
-        Binding("u", "undo", "Undo drop"),
+        Binding("u", "undo", "Undo"),
+        Binding("U", "redo", "Redo"),
         Binding("z", "log_expand", "Expand log"),
     ]
     ACTION_DANGER = {"extract": "destructive"}
@@ -291,6 +294,11 @@ A Scout's sensor jamming keeps your platoon undetected — an undetected trooper
 shot lands with a bonus, and firing reveals you. The clock runs both ways: sorties
 launch and defender accuracy escalates the longer a fight drags on, so don't dawdle.
 Losses past the sidebar's abort threshold force a doctrine recall, survivors only.
+
+[b]U[/] undoes your last move/jump/fire/broadcast this round, [b]Shift+U[/] redoes it —
+undo never rewinds the dice a shot already rolled, so redoing (or just re-aiming the
+same shot again) replays the exact same hit or miss rather than a fresh gamble. Both
+clear the moment you [b]E[/]nd the round.
 
 Extraction always works; mid-fight it confirms because tactical losses and damage
 settle, and once the assault is decided it settles straight away with the result."""
@@ -651,14 +659,35 @@ view back, until [b]R[/] recentres and resumes it."""
             if touchdowns:
                 self._play_landing(landing_frames(touchdowns))
 
-    def action_undo(self) -> None:
-        if self.view is None or self.view.dropped:
+    async def action_undo(self) -> None:
+        """Pre-drop: pop the last unconfirmed capsule placement. Post-drop (GW help
+        follow-up): step the last move/jump/fire/broadcast back — a server-side
+        `UndoGroundAction`, since only the server holds the round's undo stack."""
+        if self.view is None:
             return
-        if not self.placements:
-            warn(self, "#assault-log", "No capsule placements to undo yet.")
+        if not self.view.dropped:
+            if not self.placements:
+                warn(self, "#assault-log", "No capsule placements to undo yet.")
+                return
+            self.placements.pop()
+            self._refresh_widgets()
             return
-        self.placements.pop()
-        self._refresh_widgets()
+        if not self.view.can_undo:
+            warn(self, "#assault-log", "Nothing to undo this round.")
+            return
+        if await self._apply(UndoGroundAction(self.view.operation_id)) is not None:
+            await self._load()
+
+    async def action_redo(self) -> None:
+        """Step one undone action forward again (GW help follow-up) — post-drop only,
+        the inverse of the second half of `action_undo`."""
+        if self.view is None or not self.view.dropped:
+            return
+        if not self.view.can_redo:
+            warn(self, "#assault-log", "Nothing to redo this round.")
+            return
+        if await self._apply(RedoGroundAction(self.view.operation_id)) is not None:
+            await self._load()
 
     def note(self, text: str) -> None:
         """Write one markup line into the battle log.
@@ -1031,5 +1060,5 @@ view back, until [b]R[/] recentres and resumes it."""
         else:
             out.append(f"\nY radar {'ON' if self.show_threat else 'off'} · Space select\n", "grey66")
             out.append("M move · G jump · F/I fire · B terms\n", "grey66")
-            out.append("E planet turn · Esc extract\n", "grey66")
+            out.append("E planet turn · U undo · shift+U redo · Esc extract\n", "grey66")
         return out

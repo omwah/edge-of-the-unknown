@@ -26,7 +26,8 @@ from edge.core.models import AlienSpecies, Game, Planet, Player, Sector, Ship, U
 from edge.core.movement import MovementError
 from edge.core.rules import (
     BeginAssault, EndGroundTurn, ExtractGroundOperation, GroundDrop,
-    GroundFire, GroundJump, GroundMove, apply_result, reduce,
+    GroundFire, GroundJump, GroundMove, RedoGroundAction, UndoGroundAction,
+    apply_result, reduce,
 )
 from edge.store.snapshots import state_hash
 
@@ -608,6 +609,131 @@ def test_ground_fire_and_ground_jump_events_reach_the_log() -> None:
     )
     result2 = reduce(st, 1, GroundJump(op.operation_id, tid, *jump_target), CFG)
     assert any(isinstance(e, GroundJumped) for e in result2.events)
+
+
+def _fire_setup() -> tuple:
+    """A dropped platoon adjacent to a wall with clear LOS to it — GW help follow-up
+    undo/redo tests need a legal, repeatable fire target (mirrors the setup in
+    `test_ground_fire_and_ground_jump_events_reach_the_log` above)."""
+    st = _reducer_world(reserved_infantry=0)
+    apply_result(st, reduce(st, 1, BeginAssault(1), CFG))
+    op = st.players[1].ground_operation
+    amap = ga.assault_map_for(st, op, CFG)
+    los_battle = ga._battle_for(op, amap, CFG, None)  # noqa: SLF001
+    wall, tx, ty = next(
+        (s, s.x + dx, s.y + dy)
+        for s in amap.structures if s.kind == "wall"
+        for dx, dy in ((0, -2), (0, 2), (-2, 0), (2, 0))
+        if _passable(amap, s.x + dx, s.y + dy)
+        and ga._line_of_sight(los_battle, s.x + dx, s.y + dy, s.x, s.y)  # noqa: SLF001
+    )
+    apply_result(st, reduce(st, 1, GroundDrop(op.operation_id, (("marauder", tx, ty),)), CFG))
+    op = st.players[1].ground_operation
+    return st, op, op.platoon[0].id, wall
+
+
+def test_undo_then_move_restores_state_and_redo_reapplies_it() -> None:
+    st = _reducer_world(reserved_infantry=0)
+    op = _dropped(st)
+    tid = op.platoon[0].id
+    amap = ga.assault_map_for(st, op, CFG)
+    trooper = op.platoon[0]
+    before = (trooper.x, trooper.y)
+    target = next(
+        (trooper.x + dx, trooper.y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+        if _passable(amap, trooper.x + dx, trooper.y + dy)
+    )
+    apply_result(st, reduce(st, 1, GroundMove(op.operation_id, *target, actor_id=tid), CFG))
+    op = st.players[1].ground_operation
+    assert (op.platoon[0].x, op.platoon[0].y) == target
+    assert len(op.undo_stack) == 1 and not op.redo_stack
+
+    apply_result(st, reduce(st, 1, UndoGroundAction(op.operation_id), CFG))
+    op = st.players[1].ground_operation
+    assert (op.platoon[0].x, op.platoon[0].y) == before
+    assert not op.undo_stack and len(op.redo_stack) == 1
+    assert op.platoon[0].actions == 2  # the move's action point is restored too
+
+    apply_result(st, reduce(st, 1, RedoGroundAction(op.operation_id), CFG))
+    op = st.players[1].ground_operation
+    assert (op.platoon[0].x, op.platoon[0].y) == target
+    assert len(op.undo_stack) == 1 and not op.redo_stack
+
+
+def test_undo_undo_redo_and_move_are_rejected_with_nothing_pending() -> None:
+    st = _reducer_world(reserved_infantry=0)
+    op = _dropped(st)
+    with pytest.raises(Exception):
+        reduce(st, 1, UndoGroundAction(op.operation_id), CFG)
+    with pytest.raises(Exception):
+        reduce(st, 1, RedoGroundAction(op.operation_id), CFG)
+
+
+def test_undo_then_reissued_fire_replays_the_same_roll_without_drawing_rng() -> None:
+    """GW help follow-up's whole point: undo must not let a shot be re-rolled for a
+    better outcome. Proven two ways — the replayed shot's `hit`/`destroyed` exactly
+    match the original, and the shared RNG stream draws nothing on the replay, so a
+    different result is not merely unlikely but structurally impossible."""
+    st, op, tid, wall = _fire_setup()
+
+    result1 = reduce(st, 1, GroundFire(op.operation_id, tid, wall.x, wall.y), CFG)
+    apply_result(st, result1)
+    fired1 = next(e for e in result1.events if type(e).__name__ == "GroundFired")
+    op1 = st.players[1].ground_operation
+    assert len(op1.undo_stack) == 1 and len(op1.resolved_actions) == 1
+
+    apply_result(st, reduce(st, 1, UndoGroundAction(op1.operation_id), CFG))
+    op2 = st.players[1].ground_operation
+    assert op2.platoon[0].hp == op.platoon[0].hp
+    assert op2.platoon[0].actions == op.platoon[0].actions
+    # the memo survives the undo — it is not part of what a snapshot restores
+    assert len(op2.resolved_actions) == 1
+
+    rng_before = st.rng.getstate()
+    result2 = reduce(st, 1, GroundFire(op2.operation_id, tid, wall.x, wall.y), CFG)
+    apply_result(st, result2)
+    rng_after = st.rng.getstate()
+    fired2 = next(e for e in result2.events if type(e).__name__ == "GroundFired")
+
+    assert rng_before == rng_after, "a memoized replay must not draw from the RNG stream"
+    assert (fired1.hit, fired1.destroyed) == (fired2.hit, fired2.destroyed)
+    op3 = st.players[1].ground_operation
+    assert op3.platoon[0].hp == op1.platoon[0].hp
+
+
+def test_end_ground_turn_clears_undo_redo_and_the_replay_memo() -> None:
+    st, op, tid, wall = _fire_setup()
+    apply_result(st, reduce(st, 1, GroundFire(op.operation_id, tid, wall.x, wall.y), CFG))
+    op = st.players[1].ground_operation
+    assert op.undo_stack and op.resolved_actions
+
+    apply_result(st, reduce(st, 1, EndGroundTurn(op.operation_id), CFG))
+    op = st.players[1].ground_operation
+    assert op.undo_stack == () and op.redo_stack == () and op.resolved_actions == {}
+    with pytest.raises(Exception):  # undo never crosses a round boundary
+        reduce(st, 1, UndoGroundAction(op.operation_id), CFG)
+
+
+def test_undo_redo_refused_once_the_assault_has_settled() -> None:
+    """Every `fire_at`/`do_jump` already refuses once `battle.outcome` is set, but
+    undo/redo don't call either — they swap whole-operation snapshots directly. Without
+    an explicit outcome check, undoing the settling shot would un-surrender or
+    un-wipe an assault the reducer has already resolved (caught before shipping: a
+    hand-built settled op with a populated undo/redo stack round-tripped cleanly
+    through `reduce()`, silently clearing `outcome`)."""
+    st = _reducer_world(reserved_infantry=0)
+    op = _dropped(st)
+    bare = replace(op, undo_stack=(), redo_stack=(), resolved_actions={})
+
+    settled_with_undo = replace(op, outcome="surrender", undo_stack=(bare,))
+    st.players[1] = replace(st.players[1], ground_operation=settled_with_undo)  # type: ignore[index]
+    with pytest.raises(Exception):
+        reduce(st, 1, UndoGroundAction(settled_with_undo.operation_id), CFG)
+
+    settled_with_redo = replace(op, outcome="wiped", redo_stack=(bare,))
+    st.players[1] = replace(st.players[1], ground_operation=settled_with_redo)  # type: ignore[index]
+    with pytest.raises(Exception):
+        reduce(st, 1, RedoGroundAction(settled_with_redo.operation_id), CFG)
 
 
 def test_extract_ground_operation_clears_a_live_assault() -> None:

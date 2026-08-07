@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 41  # GroundDefenseFireLogged.source_x/source_y (shooter-to-target tracers)
+WIRE_VERSION = 42  # UndoGroundAction/RedoGroundAction + AssaultExpeditionDTO.can_undo/can_redo
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -116,6 +116,9 @@ by the `edge.core.groundwar` survey/tactical-assault system.
 v41: `GroundDefenseFireLogged.source_x`/`source_y` — the shooter's cell for a
 "hit"/"killed"/"miss" line, so the TUI can draw a tracer back to whichever turret,
 garrison unit, or AA battery actually fired (previously only the target cell was known).
+v42: `UndoGroundAction`/`RedoGroundAction` commands + `GroundActionUndone`/
+`GroundActionRedone` events — in-round assault undo/redo; `AssaultExpeditionDTO`
+gains `can_undo`/`can_redo` so the screen can show an honest affordance.
 """
 
 

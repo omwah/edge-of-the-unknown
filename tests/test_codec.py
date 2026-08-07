@@ -72,6 +72,8 @@ from edge.core.events import (
     EncounterEvaded,
     EncounterStarted,
     GenesisDeployed,
+    GroundActionRedone,
+    GroundActionUndone,
     GroundAssaultDropped,
     GroundAssaultSettled,
     GroundBroadcastMade,
@@ -168,6 +170,8 @@ from edge.core.rules import (
     GroundFire,
     GroundJump,
     GroundMove,
+    RedoGroundAction,
+    UndoGroundAction,
     Hail,
     HaggleOffer,
     MineBelt,
@@ -271,6 +275,8 @@ COMMANDS: list[Command] = [
     GroundFire(operation_id=123, actor_id=1, x=10, y=11, missile=True),  # GW-WP10 missile shot
     GroundBroadcast(operation_id=123, actor_id=1),  # GW-WP10 dictate terms over a cowed city
     EndGroundTurn(operation_id=123),  # GW-WP10 close the tactical phase
+    UndoGroundAction(operation_id=123),  # GW help follow-up step an action back
+    RedoGroundAction(operation_id=123),  # GW help follow-up step it forward again
     MineBelt(planet_id=5),        # PT-30 hand-mine an asteroid belt
     BuildStagingArea(planet_id=5),  # PT-54 stage a Cloud City on a gas giant
     BuyGenesis(),                 # WP10 buy a genesis torpedo
@@ -376,6 +382,8 @@ EVENTS: list[Event] = [
     GroundFired(1, 123, 1, 10, 11, False, True, "structure", True),  # GW-WP10 shot destroyed a wall
     GroundBroadcastMade(1, 123, 1, 2),                  # GW-WP10 terms dictated over a cowed city
     GroundTurnEnded(1, 123, 3, 88, 1, ""),              # GW-WP10 tactical round settled
+    GroundActionUndone(1, 123),         # GW help follow-up an in-round action stepped back
+    GroundActionRedone(1, 123),         # GW help follow-up stepped forward again
     GroundDefenseFireLogged(1, 123, "hit", "Doc takes 6 from garrison infantry (14 hp)",
                             10, 11, False, 8, 9),        # a defender-phase hit, now surfaced,
                                                           # with the shooter's cell for a tracer

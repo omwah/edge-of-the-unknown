@@ -238,6 +238,48 @@ class AssaultOperation:
     # Actual shared-magazine rounds loaded into the dropped suits. Settlement debits
     # this commitment and returns only unused rounds carried by surviving troopers.
     ground_missiles_committed: int = 0
+    # --- in-round undo/redo (GW help follow-up) ---
+    # `undo_stack`/`redo_stack` hold prior/subsequent whole-operation snapshots, oldest
+    # first — every entry has its own `undo_stack`/`redo_stack`/`resolved_actions`
+    # stripped to `()`/`{}` before being pushed, so nesting stays O(actions this round)
+    # instead of recursive. Both clear at `EndGroundTurn` — undo never crosses a round
+    # boundary, since `turns_remaining`/the defense phase are not part of what a
+    # snapshot restores. `resolved_actions` is the RNG-replay memo keyed by
+    # `(len(undo_stack) before the action, actor_id, x, y, kind)` — `kind` is
+    # "fire"/"missile"/"jump" (the two actions that roll dice; move and broadcast are
+    # deterministic and never memoized here). The undo-stack depth in the key is what
+    # keeps a *second, independent* shot at the same cell (same actor/x/y/kind, but
+    # taken from a later, already-changed state) from colliding with an earlier one:
+    # it only replays when re-issued from the *exact* prior state it was first rolled
+    # against — i.e. after an undo — not from a state that has since moved on. That
+    # means redoing, or simply re-issuing, an action already resolved this round
+    # replays the same outcome instead of drawing a fresh roll (no undo-to-reroll).
+    undo_stack: tuple[AssaultOperation, ...] = ()
+    redo_stack: tuple[AssaultOperation, ...] = ()
+    resolved_actions: Mapping[tuple[int, int, int, int, str], "ResolvedFire | ResolvedJump"] = field(
+        default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedFire:
+    """A memoized `assault_fire` outcome, keyed on `AssaultOperation.resolved_actions`
+    by `(undo_depth, actor_id, x, y, "fire"/"missile")` — see that field's docstring."""
+
+    op: AssaultOperation
+    hit: bool
+    destroyed: bool
+    target_kind: str
+    log: tuple[tuple[str, str, int, int, bool, int, int], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedJump:
+    """A memoized `assault_jump` outcome, keyed on `AssaultOperation.resolved_actions`
+    by `(undo_depth, actor_id, x, y, "jump")` — see that field's docstring."""
+
+    op: AssaultOperation
+    hit: bool
+    log: tuple[tuple[str, str, int, int, bool, int, int], ...]
 
 
 # The active ground operation on `Player.ground_operation`, discriminated by type
