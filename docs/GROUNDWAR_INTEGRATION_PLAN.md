@@ -7,31 +7,46 @@
 > Where implementation reality requires a design change, update `DESIGN.md` in
 > the same work package and record the reason here.
 >
-> **Status: COMPLETE — all of GW-WP01–24 shipped, GW-M1 through GW-M5 all
-> closed (July 2026). `groundwar.cloud_city_assault_enabled` is on in the
-> production default. GW-WP20 closed the protectorate/annexation TUI gap and
-> GW-WP21 the terrain band-colour gap; GW-WP21-FU1 then settled
+> **Status: COMPLETE — all of GW-WP01–30 shipped, GW-M1 through GW-M5 and
+> GW-M22 all closed (through August 8, 2026). `groundwar.cloud_city_assault_enabled`
+> is on in the production default. GW-WP20 closed the protectorate/annexation TUI gap
+> and GW-WP21 the terrain band-colour gap; GW-WP21-FU1 then settled
 > `_CONTRAST_TRIGGER` at 0.26 on a human read of the rendered comparison,
-> closing GW-WP07-FU1's last polish item. **The suite is fully green.** One
-> deliberately deferred follow-up remains, flagged not silent: GW-WP13's /
-> GW-WP16's balance tuning (garrison counts, defense density, emplacement
-> geometry for both terrestrial and Cloud City assaults). GW-WP22 built the
-> instrument it was waiting on — a bot pilot inside `edge-groundwar` that fights
-> a scenario on the production screen while you watch — after measurement showed
-> a batch seed matrix would have graded the *bot*, not the balance. **GW-WP23 then
-> fixed the two things that made the verdict unreachable: the drop was placed at the
-> map's west edge with no reference to the objective, and the bot never assaulted it.
-> With both fixed the seed matrix returns (reporting breach/contact/Resolve-rate
-> diagnostics, not bare outcomes) and the tuning is finally a judgement about the
-> balance.** The verdict itself is still a human's.**
+> closing GW-WP07-FU1's last polish item. **The suite is fully green.**
 >
-> **GW-M22 (August 2026) is in progress: scale.** A watched run made two things
-> plain — the platoon was spending a third of its shots on walls it was already
-> standing behind (fixed in GW-WP24-FU1), and a trooper and an apartment block
-> were the same size. GW-WP25–29 give buildings real footprints (D35/D36), grow
-> the board to 320x84 (D38), and replace rectangular cities with four silhouettes
-> (D37). GW-WP25 shipped as a deliberate no-op refactor so the rest lands on a
-> checked foundation.
+> **GW-M22 (August 2026, scale) closed with GW-WP25–29.** Buildings gained real
+> footprints (D35/D36), the board grew to 320x84 (D38), and rectangular cities gave
+> way to four silhouettes (D37). GW-WP29's force-curve re-run also caught a stray
+> seven-trooper default that had been quietly under-measuring every "full platoon"
+> number since GW-WP24, and fixed a scout-escort death spiral on the larger board —
+> citadel-0 win rate 67% → 87.5%, every seed breaching.
+>
+> **GW-WP30 (August 7, 2026, unnumbered-milestone fix) closed the balance verdict's
+> last confound: the bot itself.** A per-actor action tally (not a win-rate table)
+> showed scouts and the command suit taking almost no actions across every seed —
+> three independent bugs (a command hold-radius that never triggered "adrift", a
+> scout leash that froze instead of regrouping, and a turn-order bug that let
+> marauders finish their whole turn before scouts were ever evaluated) meant every
+> balance number recorded since GW-WP24, including GW-WP29's own 87.5%/25%, was read
+> off an instrument fielding roughly half its platoon. Fixing the bot — with **no
+> tuning value touched** — raised citadel-0 to 91% and citadel-1 to 83%. A same-day
+> ad hoc playtest follow-up session (legend colors, key rebinds, shot tracers,
+> post-mortem summary, in-round undo/redo, a marauder move buff, and a landing-
+> animation glyph-bleed fix; commits `8e4079c`/`1154a8a`/`1a9f592`) closed out the
+> remaining screen-level playtest feedback. Both are recorded in memory
+> (`project_groundwar_integration.md`, `project_groundwar_help_followup.md`); this
+> plan does not renumber them as WP30/WP31 since neither touched hashed state,
+> config, or the wire contract.
+>
+> **Two items remain open, both deliberately deferred rather than chased:** the
+> citadel-2 world class only clears at 25% with the standard 8-trooper platoon
+> (a 12-trooper platoon clears it 8/8 — GW-WP29 recorded this as a genuinely
+> harder objective, not a defect, since D33 never set a citadel-2-specific target);
+> and the non-bot-competence half of GW-WP13's original tuning backlog — search-time/
+> supply-pressure pacing, suit/ordnance costs, macro-turn costs, repeated-assault
+> recovery, remote-latency profiling, and a reconnect-specific soak test — was never
+> revisited once the GW-WP22–30 arc absorbed the win-rate/bot-competence half of that
+> list. Neither blocks the Definition of Done below.
 
 ## Context
 
@@ -2899,7 +2914,8 @@ Commit `ground: GW-WP29 force-curve re-run and scout escort leash`.
 ## Definition of done
 
 - D1–D40 are resolved and recorded in both this plan and authoritative DESIGN.
-- GW-WP01–29 (with GW-WP09-PRE) acceptance tests pass.
+- GW-WP01–29 (with GW-WP09-PRE), plus the unnumbered GW-WP30 bot-competence fix
+  and its same-day playtest follow-up, all pass their acceptance tests.
 - A **generated** universe contains inhabited worlds that route to survey and to
   assault; neither path is reachable only through hand-built state.
 - `ruff`, strict `mypy` production layers, pytest/property tests, codec fixtures,
