@@ -310,8 +310,8 @@
     "semantic_hash": ""
   },
   "edge/core/dto.py": {
-    "mtime": 1785904123.0636735,
-    "ast_hash": "034b89395fc3b6ec3261121a7380d641",
+    "mtime": 1786136526.081715,
+    "ast_hash": "35295169e0c1e33325a8ec9fc1968281",
     "semantic_hash": ""
   },
   "edge/core/economy.py": {
@@ -335,8 +335,8 @@
     "semantic_hash": ""
   },
   "edge/core/events.py": {
-    "mtime": 1784942232.4738786,
-    "ast_hash": "26fe4290b03690f1b9e38eb4873eac7e",
+    "mtime": 1786136162.0096488,
+    "ast_hash": "2bb3e942592ef30c90ae94e292c7cf58",
     "semantic_hash": ""
   },
   "edge/core/governance.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "edge/core/groundwar/assault.py": {
-    "mtime": 1785904123.0636735,
-    "ast_hash": "e7dbd8958ec275a7bb3a7e79a84b2ae4",
+    "mtime": 1786134809.1190515,
+    "ast_hash": "780f16737202d1e31a0c8d973c64061c",
     "semantic_hash": ""
   },
   "edge/core/groundwar/force.py": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "edge/core/groundwar/models.py": {
-    "mtime": 1785216005.6545765,
-    "ast_hash": "02e6c6a87a4fc004828b57d863d88d3e",
+    "mtime": 1786136048.8195686,
+    "ast_hash": "7607ae6f349c6daa78d4beb5c1e61aa7",
     "semantic_hash": ""
   },
   "edge/core/groundwar/settlement.py": {
@@ -415,8 +415,8 @@
     "semantic_hash": ""
   },
   "edge/core/rules.py": {
-    "mtime": 1785217695.830564,
-    "ast_hash": "5648878b8cc8174f13752f703ce27036",
+    "mtime": 1786137650.9340446,
+    "ast_hash": "d4d020d24c61cf5b9dfb56f8e5bfc053",
     "semantic_hash": ""
   },
   "edge/core/services.py": {
@@ -625,13 +625,13 @@
     "semantic_hash": ""
   },
   "edge/server/session.py": {
-    "mtime": 1785904123.0656734,
-    "ast_hash": "ccfd97477f655b452619f3afea3b34fe",
+    "mtime": 1786136537.1998894,
+    "ast_hash": "398f61e3a5c51a222c83bb17af073e49",
     "semantic_hash": ""
   },
   "edge/server/wire.py": {
-    "mtime": 1785904123.0656734,
-    "ast_hash": "9b0f84b9460fb9e82cd696c54ef0cfd0",
+    "mtime": 1786136793.049786,
+    "ast_hash": "2df546923463a9ddd56237858f4ff78d",
     "semantic_hash": ""
   },
   "edge/spacebattle/__init__.py": {
@@ -675,8 +675,8 @@
     "semantic_hash": ""
   },
   "edge/store/codec.py": {
-    "mtime": 1784942328.2645333,
-    "ast_hash": "85c621825713f0eee308f22fdf47be5e",
+    "mtime": 1786136414.8479404,
+    "ast_hash": "bd83119ea9e28f5022b930bee5305ec7",
     "semantic_hash": ""
   },
   "edge/store/repo.py": {
@@ -790,8 +790,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/_ground_shared.py": {
-    "mtime": 1784960040.5057216,
-    "ast_hash": "3aaf9442833ae4fac4c3fec7d7dbfbc1",
+    "mtime": 1786138746.8390875,
+    "ast_hash": "d4365d9854b26b246c2374f76007a5c1",
     "semantic_hash": ""
   },
   "edge/tui/screens/action_menu.py": {
@@ -845,13 +845,13 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/ground_assault.py": {
-    "mtime": 1785904123.0656734,
-    "ast_hash": "1b96ae213f0dd344b86c9b34ece8d477",
+    "mtime": 1786138706.4494655,
+    "ast_hash": "68b29745cecc53c97e81d98a8f53abd1",
     "semantic_hash": ""
   },
   "edge/tui/screens/ground_expedition.py": {
-    "mtime": 1785216700.8614664,
-    "ast_hash": "0b5b5b9dc8a26b9b9ca46b6497f70f8c",
+    "mtime": 1786133655.2107258,
+    "ast_hash": "cb3f9c2107fdd234d396218f9cd66e07",
     "semantic_hash": ""
   },
   "edge/tui/screens/haggle.py": {
@@ -860,8 +860,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/help.py": {
-    "mtime": 1785904123.0656734,
-    "ast_hash": "a29aa991709abfba97d58d57d397b493",
+    "mtime": 1786137791.5765986,
+    "ast_hash": "65d35c4773cb51e9fcef23f3c0b766d3",
     "semantic_hash": ""
   },
   "edge/tui/screens/lobby.py": {
@@ -980,8 +980,8 @@
     "semantic_hash": ""
   },
   "tests/fixtures/wire/envelopes.json": {
-    "mtime": 1785904123.090674,
-    "ast_hash": "413edf934ca32b616ef4c0a97b36de77",
+    "mtime": 1786136808.2535017,
+    "ast_hash": "97931f693f55f1bb1f134a1a4187558f",
     "semantic_hash": ""
   },
   "tests/helpers.py": {
@@ -1065,8 +1065,8 @@
     "semantic_hash": ""
   },
   "tests/test_codec.py": {
-    "mtime": 1784942742.5826004,
-    "ast_hash": "e67e6816f22e23d63e96873c70b7b1bf",
+    "mtime": 1786136844.2375438,
+    "ast_hash": "1610937e771ab85157fc6ecb02b3127e",
     "semantic_hash": ""
   },
   "tests/test_combat.py": {
@@ -1205,13 +1205,13 @@
     "semantic_hash": ""
   },
   "tests/test_groundwar_assault_actions.py": {
-    "mtime": 1785904123.0916739,
-    "ast_hash": "76fd49aca8614c2c5d2b7d54a29866e5",
+    "mtime": 1786137722.5103598,
+    "ast_hash": "f7a7481a8c44952528661d4650ea0fc3",
     "semantic_hash": ""
   },
   "tests/test_groundwar_assault_view.py": {
-    "mtime": 1785904123.0916739,
-    "ast_hash": "4ab7e4bad92cbcf2f0fa7fd87524f667",
+    "mtime": 1786138847.4096308,
+    "ast_hash": "b667414d2ad4ee8a42b32020f3442fbc",
     "semantic_hash": ""
   },
   "tests/test_groundwar_expedition_view.py": {
@@ -1539,16 +1539,6 @@
     "ast_hash": "a690c19b1a8cfe1fcca1561349f3674a",
     "semantic_hash": ""
   },
-  ".agents/rules/graphify.md": {
-    "mtime": 1784443076.2355888,
-    "ast_hash": "f1e53ecc9194573d3c28fc116c743a2e",
-    "semantic_hash": ""
-  },
-  ".agents/workflows/graphify.md": {
-    "mtime": 1784443076.2356784,
-    "ast_hash": "0bc020d491fca99550c1ea3de0a5f862",
-    "semantic_hash": ""
-  },
   "AGENTS.md": {
     "mtime": 1785394684.2964299,
     "ast_hash": "90d5b5dfa3b5b38eeb9238ad268b7828",
@@ -1585,8 +1575,8 @@
     "semantic_hash": ""
   },
   "config/groundwar_default.yaml": {
-    "mtime": 1785904123.0616734,
-    "ast_hash": "a326e965fc96d3d2a11f213946d9f171",
+    "mtime": 1786138384.5684435,
+    "ast_hash": "70b92579ffa928f03de3495cad7dfd87",
     "semantic_hash": ""
   },
   "config/names_default.yaml": {
@@ -1780,8 +1770,8 @@
     "semantic_hash": ""
   },
   "tests/fixtures/wire/fingerprint.txt": {
-    "mtime": 1785904123.090674,
-    "ast_hash": "d2cd65c58cb9ed83ff1c2987c31df312",
+    "mtime": 1786136803.1889367,
+    "ast_hash": "10ad7cfa8477cbba93de58420d7c86bb",
     "semantic_hash": ""
   },
   "docs/ui/shots/action-menu.svg": {
@@ -3872,121 +3862,6 @@
   "tests/test_groundwar_structure_footprint.py": {
     "mtime": 1785904123.0916739,
     "ast_hash": "40f621170b3af0627e0bf3ca02a88a58",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/scripts/__init__.py": {
-    "mtime": 1786131587.7199929,
-    "ast_hash": "4bfea67395a7ba04f363df51355d1ef8",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/scripts/__main__.py": {
-    "mtime": 1786131587.7199929,
-    "ast_hash": "746aff14c3a098a28fe9d01d54f174a9",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/scripts/benchmark.py": {
-    "mtime": 1786131587.7200284,
-    "ast_hash": "a84586774a335e7dd894f45f5fc2aaf5",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/scripts/cli.py": {
-    "mtime": 1786131587.7200189,
-    "ast_hash": "993604200cad4bb12bdb2efcdb45fcf5",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/scripts/compress.py": {
-    "mtime": 1786131587.7200284,
-    "ast_hash": "91d277d3b9de1f3daf20b87269cc03f9",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/scripts/detect.py": {
-    "mtime": 1786131587.7200553,
-    "ast_hash": "2bf8e79c0ae7ee3bc4c3817a19a49f89",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/scripts/validate.py": {
-    "mtime": 1786131587.7200418,
-    "ast_hash": "555b8323eb519d25e46e8b05bdb62c6d",
-    "semantic_hash": ""
-  },
-  "skills-lock.json": {
-    "mtime": 1786131587.7297153,
-    "ast_hash": "8694115aeb7907f6bef16b3a30020b6f",
-    "semantic_hash": ""
-  },
-  ".agents/skills/cavecrew/README.md": {
-    "mtime": 1786131587.7157881,
-    "ast_hash": "31826d02cff90536871a308040ec4eb7",
-    "semantic_hash": ""
-  },
-  ".agents/skills/cavecrew/SKILL.md": {
-    "mtime": 1786131587.715874,
-    "ast_hash": "f184873cd9c507fa872cc86fd36722e3",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-commit/README.md": {
-    "mtime": 1786131587.7181034,
-    "ast_hash": "15f57347c5b5449b79fdf24fdab21f31",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-commit/SKILL.md": {
-    "mtime": 1786131587.7181034,
-    "ast_hash": "1262c2156cd81379fc011d538728079d",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/README.md": {
-    "mtime": 1786131587.7197127,
-    "ast_hash": "fc1a6957f7c111a5044c1ceb1cca3c8c",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/SECURITY.md": {
-    "mtime": 1786131587.7197952,
-    "ast_hash": "debca8209e185a1fa93455e51c43dd5d",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-compress/SKILL.md": {
-    "mtime": 1786131587.719777,
-    "ast_hash": "580399f83a2e4eb331cd425bfec4d398",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-help/README.md": {
-    "mtime": 1786131587.720745,
-    "ast_hash": "9c9cf8de78df2a8831c57d6bc88d942b",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-help/SKILL.md": {
-    "mtime": 1786131587.720745,
-    "ast_hash": "b26af86985ada3feb8b327360415ff6a",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-review/README.md": {
-    "mtime": 1786131587.721226,
-    "ast_hash": "ae3bdc81125037690fc50504e2917c83",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-review/SKILL.md": {
-    "mtime": 1786131587.721226,
-    "ast_hash": "fbb47ffb83198a1ed37a453417e691e2",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-stats/README.md": {
-    "mtime": 1786131587.7216167,
-    "ast_hash": "c2f26cde34791836bea794ff5e0dbaa4",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman-stats/SKILL.md": {
-    "mtime": 1786131587.7216377,
-    "ast_hash": "6b6603d1be02f48c1151c7a708dc640f",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman/README.md": {
-    "mtime": 1786131587.716921,
-    "ast_hash": "273a25110a7bb5681f488c17417986ce",
-    "semantic_hash": ""
-  },
-  ".agents/skills/caveman/SKILL.md": {
-    "mtime": 1786131587.716921,
-    "ast_hash": "8c3ec0ce859210de95578d3e1c7f6e2a",
     "semantic_hash": ""
   }
 }
