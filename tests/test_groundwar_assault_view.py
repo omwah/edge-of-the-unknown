@@ -290,6 +290,27 @@ def test_tracer_cells_draws_the_path_between_shooter_and_target() -> None:
     assert tracer_cells(3, 0, 0, 3, "red") == {(2, 1): ("╱", "red"), (1, 2): ("╱", "red")}
 
 
+def test_landing_frames_masks_the_touchdown_cell_until_impact() -> None:
+    """`GroundDrop`/`SurveyLand` already land the unit server-side before the descent
+    animation plays, so the DTO's real glyph sits at the touchdown cell from frame
+    one — every pre-impact frame must explicitly override that cell too (not just
+    the falling capsule above it), or the trooper/explorer glyph shows through
+    underneath the still-descending rocket."""
+    from edge.tui.screens._ground_shared import landing_frames
+
+    frames = landing_frames([((10, 10), "M", "black on green")])
+    # Frames 0-3 are the sky descent (rocket at y-4..y-1) — the ground cell must
+    # read as "inbound", never the real glyph, on every one of them.
+    for frame in frames[:4]:
+        assert frame.cells[(10, 10)] == ("▼", "black on bright_green")
+    # Frame 4 is impact (rocket now at the ground cell) — still not the real glyph.
+    assert frames[4].cells[(10, 10)][0] == "▼"
+    assert frames[4].cells[(10, 10)] != ("M", "black on green")
+    # Only from the settle frame onward does the real glyph appear.
+    assert frames[5].cells[(10, 10)] == ("M", "black on green")
+    assert frames[6].cells[(10, 10)] == ("M", "black on green")
+
+
 async def test_narrate_draws_a_tracer_and_collects_a_kia_line(tmp_path: Path) -> None:
     """GW help follow-up: a shot narrated through `_narrate` leaves a tracer overlay
     on the map, and a defender's "killed" line is remembered for the post-mortem

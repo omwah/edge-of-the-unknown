@@ -454,13 +454,20 @@ def landing_frames(
     shuttle = "bold bright_white on grey15"
     plume = "bold wheat1 on dark_goldenrod"
     plural = len(points) > 1
+    # `GroundDrop` already lands the troopers server-side (the DTO's own glyph is
+    # sitting at each touchdown cell from the very first frame), so every frame
+    # before impact must explicitly mask that cell too — not just the falling capsule
+    # above it — or the real glyph shows through underneath the still-descending
+    # rocket. Reuses the placement screen's own marker style, so a capsule reads as
+    # "still inbound" continuously from the moment it was placed through to impact.
+    inbound = {(x, y): ("▼", "black on bright_green") for (x, y), _, _ in points}
     frames = [
-        LandingFrame({(x, y - 4): ("╱▲╲"[1], shuttle) for (x, y), _, _ in points},
+        LandingFrame({**inbound, **{(x, y - 4): ("╱▲╲"[1], shuttle) for (x, y), _, _ in points}},
                     "[b]Capsules away.[/]" if plural else "[b]Shuttle away.[/]"),
-        LandingFrame({(x, y - 3): ("▲", shuttle) for (x, y), _, _ in points}),
-        LandingFrame({(x, y - 2): ("▲", shuttle) for (x, y), _, _ in points},
+        LandingFrame({**inbound, **{(x, y - 3): ("▲", shuttle) for (x, y), _, _ in points}}),
+        LandingFrame({**inbound, **{(x, y - 2): ("▲", shuttle) for (x, y), _, _ in points}},
                     "Entering atmosphere…"),
-        LandingFrame({(x, y - 1): ("▼", shuttle) for (x, y), _, _ in points}),
+        LandingFrame({**inbound, **{(x, y - 1): ("▼", shuttle) for (x, y), _, _ in points}}),
     ]
 
     def ring(x: int, y: int) -> list[tuple[int, int]]:
