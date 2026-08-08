@@ -76,7 +76,7 @@ suits:
     cost: 1800              # latinum
     hp: 120
     armor: 8                # flat damage soak per hit
-    move: 3                 # move points per turn (terrain costs apply)
+    move: 4                 # move points per turn (terrain costs apply)
     jump_range: 8           # cells per jump, ignoring terrain
     jump_charges: 4
     sight: 8
