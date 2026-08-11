@@ -115,6 +115,8 @@ record what each taught us.
 
 ## Quick start
 
+Install [Git LFS](https://git-lfs.com/) before cloning so the artwork downloads correctly.
+
 This project uses [pixi](https://pixi.sh/) to manage its environment.
 
 ```bash
