@@ -1,0 +1,786 @@
+schema_version: 4
+id: pearl_shell
+name: Pearl Shell
+kind: ship
+role: pearl_shell
+description: An alien troop shell with offset carapace plates and a ring of recessed weapon ports.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: ciliary_drive
+        name: Ciliary Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: fronds
+          weight: 1
+          cells:
+          - '▄╾╮  '
+          - '▄╾▓▖ '
+          - ▄╾█░▓
+          - ▄╾█▓▓
+          - '▄╾▓▘ '
+          - '▄╾╯  '
+          - '     '
+          color_mask:
+          - ESSSS
+          - ESSSS
+          - ESSES
+          - ESSSS
+          - ESSSS
+          - ESSSS
+          - SSSSS
+        - id: barbed_cilia
+          weight: 1
+          cells:
+          - ' ▄▖  '
+          - '╾▄▟▓ '
+          - ▄▟█░▓
+          - ▄▜█▓▓
+          - '╾▄▓▓ '
+          - ' ▄▓  '
+          - '     '
+          color_mask:
+          - SESSS
+          - SESSS
+          - ESSES
+          - ESSSS
+          - SESSS
+          - SESSS
+          - SSSSS
+      - id: rear_carapace
+        name: Rear Carapace
+        primary_property: armor
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: pearl_plates
+          weight: 1
+          cells:
+          - '  ╭─╮'
+          - ' ╭██╯'
+          - ╭█▒██
+          - █▒◇▒█
+          - ╰█▒██
+          - ' ╰██╮'
+          - '  ╰─╯'
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: scarred_carapace
+          weight: 1
+          cells:
+          - '  ▗▄▖'
+          - ' ▗█▒▙'
+          - ▗▄█◇█
+          - █▒▒◆█
+          - ▝▀█▒█
+          - ' ▝█▒▛'
+          - '  ▝▀▘'
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: weapon_ring
+        name: Weapon Ring
+        primary_property: weapons
+        secondary_properties:
+        - hangar
+        - hull
+        repeat: 4
+        variants:
+        - id: open_pores
+          weight: 1
+          cells:
+          - '      '
+          - ╭────╮
+          - █▒◆▒▒█
+          - █▀▒▀▒█
+          - █▒☼▒▒█
+          - ╰────╯
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SASASS
+          - SSBSSS
+          - SSSSSS
+          - SSSSSS
+        - id: sealed_ring
+          weight: 1
+          cells:
+          - '      '
+          - ' ▗▄▄▖ '
+          - ▗▄██▄▖
+          - █▒▀▒▒█
+          - ▝▀██▀▘
+          - ' ▝▀▀▘ '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSASSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+      - id: troop_lobe
+        name: Troop Lobe
+        primary_property: hangar
+        secondary_properties:
+        - habitat
+        repeat: 1
+        variants:
+        - id: open_lobe
+          weight: 1
+          cells:
+          - ' ╭█╮ '
+          - ╭█○█╮
+          - █○▒○█
+          - █▒☼▒█
+          - █○▒○█
+          - ╰█○█╯
+          - ' ╰█╯ '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSBSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: armored_lobe
+          weight: 1
+          cells:
+          - '  ▗▄▖'
+          - ' ▗███'
+          - ▗█▒▒█
+          - █▒☼▒█
+          - ▝█▒▒█
+          - ' ▝███'
+          - '  ▝▀▘'
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSBSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: beak
+        name: Carapace Beak
+        primary_property: screens
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: hooked_beak
+          weight: 1
+          cells:
+          - '     '
+          - ' ◇█◇ '
+          - ◇███▙
+          - ◇█☼▓►
+          - ◇███▛
+          - '  ◇█ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SDSDS
+          - DSSSS
+          - DSBSS
+          - DSSSS
+          - SSDSS
+          - SSSSS
+        - id: armored_beak
+          weight: 1
+          cells:
+          - '     '
+          - '  ◇█◇'
+          - ◇███◇
+          - ◇█▒▓►
+          - ◇███◇
+          - '  ◇█◇'
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSDSD
+          - DSSSD
+          - DSSSS
+          - DSSSD
+          - SSDSD
+          - SSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: ciliary_drive
+        name: Ciliary Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: fronds
+          weight: 1
+          cells:
+          - '▄╾▓ '
+          - ▄╾█▓
+          - ▄╾█▓
+          - '▄╾▓ '
+          - '    '
+          color_mask:
+          - ESSS
+          - ESSS
+          - ESSS
+          - ESSS
+          - SSSS
+        - id: barbed_cilia
+          weight: 1
+          cells:
+          - '╾▄▟ '
+          - ▄▟█▓
+          - ▄▜█▓
+          - '╾▄▓ '
+          - '    '
+          color_mask:
+          - SESS
+          - ESSS
+          - ESSS
+          - SESS
+          - SSSS
+      - id: rear_carapace
+        name: Rear Carapace
+        primary_property: armor
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: pearl_plates
+          weight: 1
+          cells:
+          - ' ╭█╯'
+          - ╭█▒█
+          - █▒◇█
+          - ╰█▒█
+          - ' ╰█╮'
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: scarred_carapace
+          weight: 1
+          cells:
+          - ' ▗█▙'
+          - ▗▄██
+          - █▒▒█
+          - ▝▀██
+          - ' ▝█▛'
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: weapon_ring
+        name: Weapon Ring
+        primary_property: weapons
+        secondary_properties:
+        - hangar
+        - hull
+        repeat: 4
+        variants:
+        - id: open_pores
+          weight: 1
+          cells:
+          - ╭───╮
+          - █▒◆▒█
+          - █▀▒▀█
+          - █▒☼▒█
+          - ╰───╯
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SASAS
+          - SSBSS
+          - SSSSS
+        - id: sealed_ring
+          weight: 1
+          cells:
+          - ' ▗▄▄ '
+          - ▗▄██▖
+          - █▒▀▒█
+          - ▝▀██▘
+          - ' ▝▀▀ '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSASS
+          - SSSSS
+          - SSSSS
+      - id: troop_lobe
+        name: Troop Lobe
+        primary_property: hangar
+        secondary_properties:
+        - habitat
+        repeat: 1
+        variants:
+        - id: open_lobe
+          weight: 1
+          cells:
+          - ╭█○╮
+          - █○▒█
+          - █▒☼█
+          - █○▒█
+          - ╰█○╯
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSBS
+          - SSSS
+          - SSSS
+        - id: armored_lobe
+          weight: 1
+          cells:
+          - ' ▗██'
+          - ▗█▒█
+          - █▒☼█
+          - ▝█▒█
+          - ' ▝██'
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSBS
+          - SSSS
+          - SSSS
+      - id: beak
+        name: Carapace Beak
+        primary_property: screens
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: hooked_beak
+          weight: 1
+          cells:
+          - ' ◇█ '
+          - ◇██▙
+          - ◇█☼►
+          - ◇██▛
+          - '  ◇ '
+          color_mask:
+          - SDSS
+          - DSSS
+          - DSBS
+          - DSSS
+          - SSDS
+        - id: armored_beak
+          weight: 1
+          cells:
+          - '  ◇◇'
+          - ◇██◇
+          - ◇█▒►
+          - ◇██◇
+          - '  ◇◇'
+          color_mask:
+          - SSDD
+          - DSSD
+          - DSSS
+          - DSSD
+          - SSDD
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ' █'
+          - ▄╬
+          - ' ╽'
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: shell
+          weight: 1
+          cells:
+          - ◢█
+          - █◇
+          - ◥█
+          color_mask:
+          - SS
+          - SS
+          - SS
+        - id: pores
+          weight: 1
+          cells:
+          - ▀█
+          - █☼
+          - ▄█
+          color_mask:
+          - AS
+          - SB
+          - AS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: beak
+          weight: 1
+          cells:
+          - ' ◇ '
+          - ◇█►
+          - ' ◇ '
+          color_mask:
+          - SDS
+          - DSS
+          - SDS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: ciliary_drive
+        name: Ciliary Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: fronds
+          weight: 1
+          cells:
+          - '    ▓▓▓▓      '
+          - '  ▓▓████▓▓    '
+          - '▐▐▐▐▐▐▐▐▐▐▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - EEEEEEEEEEEESS
+        - id: barbed_cilia
+          weight: 1
+          cells:
+          - '    ▓▓▓▓      '
+          - '▗▗▜▜████▛▛▖▖  '
+          - '  ╽╽▐▐▐▐╽╽    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSEEEESSSSSS
+      - id: rear_carapace
+        name: Rear Carapace
+        primary_property: armor
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: pearl_plates
+          weight: 1
+          cells:
+          - ╭╭╮╮██████╭╭╮╮
+          - ╰╰██▒▒◇◇▒▒██╯╯
+          - '    ╰╰██╯╯    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: scarred_carapace
+          weight: 1
+          cells:
+          - ▗▗▟▟██████▙▙▖▖
+          - ▝▝████▒▒████▘▘
+          - '    ▝▝██▘▘    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: weapon_ring
+        name: Weapon Ring
+        primary_property: weapons
+        secondary_properties:
+        - hangar
+        - hull
+        repeat: 4
+        variants:
+        - id: open_pores
+          weight: 1
+          cells:
+          - '  ╭╭██████╮╮  '
+          - '  ││▒▒▌▌▒▒││  '
+          - '  ││▒▒▌▌▒▒││  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSAASSSSSS
+          - SSSSSSAASSSSSS
+        - id: sealed_ring
+          weight: 1
+          cells:
+          - '    ▗▗██▖▖    '
+          - '  ▐▐██▒▒██▌▌  '
+          - '  ▝▝▐▐▒▒▌▌▘▘  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: troop_lobe
+        name: Troop Lobe
+        primary_property: hangar
+        secondary_properties:
+        - habitat
+        repeat: 1
+        variants:
+        - id: open_lobe
+          weight: 1
+          cells:
+          - '  ╭╭██████╮╮  '
+          - ██○○▒▒☼☼▒▒○○██
+          - '  ╰╰██████╯╯  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSBBSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: armored_lobe
+          weight: 1
+          cells:
+          - ▗▗██████████▖▖
+          - ▝▝██▒▒☼☼▒▒██▘▘
+          - '    ▝▝██▘▘    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSBBSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: beak
+        name: Carapace Beak
+        primary_property: screens
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: hooked_beak
+          weight: 1
+          cells:
+          - '    ▟▟▲▲▙▙    '
+          - '  ████☼☼██◇◇  '
+          - '    ◇◇◇◇◇◇    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSBBSSDDSS
+          - SSSSDDDDDDSSSS
+        - id: armored_beak
+          weight: 1
+          cells:
+          - '  ◇◇◇◇▲▲◇◇◇◇  '
+          - '  ◇◇██▒▒██◇◇  '
+          - '    ◇◇◇◇◇◇    '
+          color_mask:
+          - SSDDDDSSDDDDSS
+          - SSDDSSSSSSDDSS
+          - SSSSDDDDDDSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: ciliary_drive
+        name: Ciliary Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: fronds
+          weight: 1
+          cells:
+          - '  ▓▓▓▓    '
+          - ╽╽╽╽╽╽╽╽╽╽
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: barbed_cilia
+          weight: 1
+          cells:
+          - '  ▓▓▓▓    '
+          - ▐▐▜▜▛▛▐▐▐▐
+          color_mask:
+          - SSSSSSSSSS
+          - EESSSSEEEE
+      - id: rear_carapace
+        name: Rear Carapace
+        primary_property: armor
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: pearl_plates
+          weight: 1
+          cells:
+          - ╮╮██████╭╭
+          - ╰╰██▒▒██╯╯
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: scarred_carapace
+          weight: 1
+          cells:
+          - ▟▟██████▙▙
+          - ▝▝▐▐▒▒▌▌▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: weapon_ring
+        name: Weapon Ring
+        primary_property: weapons
+        secondary_properties:
+        - hangar
+        - hull
+        repeat: 4
+        variants:
+        - id: open_pores
+          weight: 1
+          cells:
+          - ╭╭██████╮╮
+          - ││◆◆▒▒☼☼││
+          - ╰╰██████╯╯
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSBBSS
+          - SSSSSSSSSS
+        - id: sealed_ring
+          weight: 1
+          cells:
+          - '  ▗▗██▖▖  '
+          - ▐▐██▌▌██▌▌
+          - '  ▝▝██▘▘  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSAASSSS
+          - SSSSSSSSSS
+      - id: troop_lobe
+        name: Troop Lobe
+        primary_property: hangar
+        secondary_properties:
+        - habitat
+        repeat: 1
+        variants:
+        - id: open_lobe
+          weight: 1
+          cells:
+          - ╭╭██████╮╮
+          - ██○○▒▒○○██
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: armored_lobe
+          weight: 1
+          cells:
+          - ██████████
+          - ▝▝██▒▒██▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: beak
+        name: Carapace Beak
+        primary_property: screens
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: hooked_beak
+          weight: 1
+          cells:
+          - '  ▟▟▲▲▙▙  '
+          - '◇◇██████  '
+          color_mask:
+          - SSSSSSSSSS
+          - DDSSSSSSSS
+        - id: armored_beak
+          weight: 1
+          cells:
+          - ◇◇◇◇▲▲◇◇◇◇
+          - '  ██████  '
+          color_mask:
+          - DDDDSSDDDD
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ██╽╽▶▶
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: shell
+          weight: 1
+          cells:
+          - ██◇◇██
+          color_mask:
+          - SSSSSS
+        - id: pores
+          weight: 1
+          cells:
+          - ██☼☼██
+          color_mask:
+          - SSBBSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: beak
+          weight: 1
+          cells:
+          - '  ▲▲  '
+          - '  ◇◇  '
+          color_mask:
+          - SSSSSS
+          - SSDDSS

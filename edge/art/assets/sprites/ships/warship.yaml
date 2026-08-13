@@ -1,0 +1,794 @@
+schema_version: 4
+id: warship
+name: Warship
+kind: ship
+role: warship
+description: A dense line combatant organized around armor, a defensive collar, and one weapon axis.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Armored Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        - armor
+        repeat: 1
+        variants:
+        - id: armored_bells
+          weight: 1
+          cells:
+          - '     '
+          - '▓▄▓▖ '
+          - ▓▄█▓╾
+          - ▓▄█░█
+          - ▓▄█▓╾
+          - '▓▄▓▘ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SESSS
+          - SESSS
+          - SESES
+          - SESSS
+          - SESSS
+          - SSSSS
+        - id: open_bells
+          weight: 1
+          cells:
+          - '     '
+          - '▄▄▓▖ '
+          - ▄█░▓╾
+          - ▄███▓
+          - ▄█░▓╾
+          - '▄▀▓▘ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - SSSSS
+      - id: spindrive
+        name: Armored Drive
+        primary_property: spindrive
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: armored_core
+          weight: 1
+          cells:
+          - '     '
+          - ▗▄█▄▖
+          - ▟█▤█▙
+          - █▤░▤█
+          - ▜█▤█▛
+          - ▝▀█▀▘
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSESS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: reactor_bulge
+          weight: 1
+          cells:
+          - '     '
+          - ' ▄▓▄ '
+          - ◢█☼█◣
+          - █▒░▒█
+          - ◥█▓█◤
+          - ' ▀▓▀ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSBSS
+          - SSESS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: hull
+        name: Armored Spine
+        primary_property: armor
+        secondary_properties:
+        - hull
+        - weapons
+        repeat: 5
+        variants:
+        - id: plate_band
+          weight: 1
+          cells:
+          - '     '
+          - ▓▀▓▓╾
+          - █▤██▓
+          - ██▒██
+          - █▤██▓
+          - ▓▄▓▓╾
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: turret_band
+          weight: 1
+          cells:
+          - '     '
+          - '▟▀▙  '
+          - █▓▓▓╾
+          - ██▒██
+          - █▤██▓
+          - ▓▄▓▓╾
+          - '     '
+          color_mask:
+          - SSSSS
+          - SASSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: screens
+        name: Screen Collar
+        primary_property: screens
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: deflector_collar
+          weight: 1
+          cells:
+          - '    '
+          - ' ◇  '
+          - ◢▓█▙
+          - ◇█▓╾
+          - ◥▓█▛
+          - ' ◇  '
+          - '    '
+          color_mask:
+          - SSSS
+          - SDSS
+          - SSSS
+          - DSSS
+          - SSSS
+          - SDSS
+          - SSSS
+        - id: cic_collar
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ◇▟▓▙
+          - ◇█◆█
+          - ◇▜▓▛
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - DSSS
+          - DSWS
+          - DSSS
+          - SSSS
+          - SSSS
+      - id: main_gun
+        name: Spinal Gun
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: heavy_spinal
+          weight: 1
+          cells:
+          - '       '
+          - '  ▄▄   '
+          - ' ╾═▓▓▙ '
+          - ╾══█▓▓►
+          - ' ╾═▓▓▛ '
+          - '  ▀▀   '
+          - '       '
+          color_mask:
+          - SSSSSSS
+          - SSSSSSS
+          - SSSSSSS
+          - SSASSSA
+          - SSSSSSS
+          - SSSSSSS
+          - SSSSSSS
+        - id: siege_barrel
+          weight: 1
+          cells:
+          - '       '
+          - ' ╾▀▙   '
+          - '╾═█▓▙  '
+          - ╾═█▓▓▀►
+          - '╾═█▓▛  '
+          - ' ╾▄▛   '
+          - '       '
+          color_mask:
+          - SSSSSSS
+          - SSASSSS
+          - SSSSSSS
+          - SASSSAA
+          - SSSSSSS
+          - SSASSSS
+          - SSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Armored Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        - armor
+        repeat: 1
+        variants:
+        - id: armored_bells
+          weight: 1
+          cells:
+          - '▓▄▓ '
+          - ▓▄█╾
+          - ▓▄██
+          - ▓▄█╾
+          - '▓▄▓ '
+          color_mask:
+          - SESS
+          - SESS
+          - SESS
+          - SESS
+          - SESS
+        - id: open_bells
+          weight: 1
+          cells:
+          - '▄▄▓ '
+          - ▄█░╾
+          - ▄██▓
+          - ▄█░╾
+          - '▄▀▓ '
+          color_mask:
+          - ESSS
+          - ESES
+          - ESSS
+          - ESES
+          - ESSS
+      - id: spindrive
+        name: Armored Drive
+        primary_property: spindrive
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: armored_core
+          weight: 1
+          cells:
+          - ▗▄█▖
+          - ▟█▤▙
+          - █▤░█
+          - ▜█▤▛
+          - ▝▀█▘
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSES
+          - SSSS
+          - SSSS
+        - id: reactor_bulge
+          weight: 1
+          cells:
+          - ' ▄▓ '
+          - ◢█☼◣
+          - █▒░█
+          - ◥█▓◤
+          - ' ▀▓ '
+          color_mask:
+          - SSSS
+          - SSBS
+          - SSES
+          - SSSS
+          - SSSS
+      - id: hull
+        name: Armored Spine
+        primary_property: armor
+        secondary_properties:
+        - hull
+        - weapons
+        repeat: 5
+        variants:
+        - id: plate_band
+          weight: 1
+          cells:
+          - ▓▀▓╾
+          - █▤█▓
+          - ██▒█
+          - █▤█▓
+          - ▓▄▓╾
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: turret_band
+          weight: 1
+          cells:
+          - '▟▀▙ '
+          - █▓▓╾
+          - ██▒█
+          - █▤█▓
+          - ▓▄▓╾
+          color_mask:
+          - SASS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: screens
+        name: Screen Collar
+        primary_property: screens
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: deflector_collar
+          weight: 1
+          cells:
+          - ' ◇ '
+          - ◢▓▙
+          - ◇█╾
+          - ◥▓▛
+          - ' ◇ '
+          color_mask:
+          - SDS
+          - SSS
+          - DSS
+          - SSS
+          - SDS
+        - id: cic_collar
+          weight: 1
+          cells:
+          - '   '
+          - ◇▟▙
+          - ◇██
+          - ◇▜▛
+          - '   '
+          color_mask:
+          - SSS
+          - DSS
+          - DSS
+          - DSS
+          - SSS
+      - id: main_gun
+        name: Spinal Gun
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: heavy_spinal
+          weight: 1
+          cells:
+          - '  ▄  '
+          - ' ╾▓▓ '
+          - ╾═█▓►
+          - ' ╾▓▓ '
+          - '  ▀  '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSA
+          - SSSSS
+          - SSSSS
+        - id: siege_barrel
+          weight: 1
+          cells:
+          - ' ╾▙  '
+          - '╾═▓▙ '
+          - ╾═▓▓►
+          - '╾═▓▛ '
+          - ' ╾▛  '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SASSA
+          - SSSSS
+          - SSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - '▓ '
+          - ▄█
+          - '▓ '
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: armor
+          weight: 1
+          cells:
+          - ▗▄
+          - █▤
+          - ▝▀
+          color_mask:
+          - SS
+          - SS
+          - SS
+        - id: turret
+          weight: 1
+          cells:
+          - ▀▓
+          - ██
+          - ▀▀
+          color_mask:
+          - AS
+          - SS
+          - SS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: gun
+          weight: 1
+          cells:
+          - '   '
+          - ══►
+          - '   '
+          color_mask:
+          - SSS
+          - AAA
+          - SSS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Armored Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        - armor
+        repeat: 1
+        variants:
+        - id: armored_bells
+          weight: 1
+          cells:
+          - '    ╽╽██╽╽    '
+          - '  ▓▓██████▓▓  '
+          - '  ▓▓▓▓▓▓▓▓▓▓  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: open_bells
+          weight: 1
+          cells:
+          - '    ╽╽▓▓╽╽    '
+          - '  ▓▓░░██░░▓▓  '
+          - '  ▐▐▐▐▐▐▐▐▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSEESSEESSSS
+          - SSEEEEEEEEEESS
+      - id: spindrive
+        name: Armored Drive
+        primary_property: spindrive
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: armored_core
+          weight: 1
+          cells:
+          - '  ▗▗▟▟██▙▙▖▖  '
+          - '  ██▤▤░░▤▤██  '
+          - '  ▝▝▜▜██▛▛▘▘  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSEESSSSSS
+          - SSSSSSSSSSSSSS
+        - id: reactor_bulge
+          weight: 1
+          cells:
+          - '    ◢◢██◣◣    '
+          - '  ▓▓☼☼░░▓▓▓▓  '
+          - '    ◥◥██◤◤    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSBBEESSSSSS
+          - SSSSSSSSSSSSSS
+      - id: hull
+        name: Armored Spine
+        primary_property: armor
+        secondary_properties:
+        - hull
+        - weapons
+        repeat: 5
+        variants:
+        - id: plate_band
+          weight: 1
+          cells:
+          - '  ╽╽▓▓██▓▓╽╽  '
+          - '  ▓▓██▒▒██▓▓  '
+          - '  ▓▓██████▓▓  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: turret_band
+          weight: 1
+          cells:
+          - '    ╽╽██▓▓╽╽  '
+          - '  ▟▟▓▓▒▒██▓▓  '
+          - '  ▜▜██████▓▓  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: screens
+        name: Screen Collar
+        primary_property: screens
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: deflector_collar
+          weight: 1
+          cells:
+          - '    ▟▟╽╽▙▙    '
+          - '  ◇◇▓▓██▓▓◇◇  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSDDSSSSSSDDSS
+        - id: cic_collar
+          weight: 1
+          cells:
+          - '    ▟▟██▙▙    '
+          - '    ▜▜██▛▛    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: main_gun
+        name: Spinal Gun
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: heavy_spinal
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ▓▓▓▓▓▓    '
+          - '  ▐▐║║║║║║▌▌  '
+          - '      ╽╽      '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+        - id: siege_barrel
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ▟▟▓▓▙▙    '
+          - '  ▌▌██████▐▐  '
+          - '    ╽╽╽╽╽╽    '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSAASSSSSSAASS
+          - SSSSSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Armored Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        - armor
+        repeat: 1
+        variants:
+        - id: armored_bells
+          weight: 1
+          cells:
+          - '  ╽╽██╽╽  '
+          - ▐▐▐▐▐▐▐▐▐▐
+          color_mask:
+          - SSSSSSSSSS
+          - EEEEEEEEEE
+        - id: open_bells
+          weight: 1
+          cells:
+          - '  ╽╽▓▓╽╽  '
+          - ▐▐██████▌▌
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: spindrive
+        name: Armored Drive
+        primary_property: spindrive
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: armored_core
+          weight: 1
+          cells:
+          - ▗▗▟▟██▙▙▖▖
+          - ▐▐██▤▤██▌▌
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: reactor_bulge
+          weight: 1
+          cells:
+          - '  ◢◢██◣◣  '
+          - ▐▐██▒▒██▌▌
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: hull
+        name: Armored Spine
+        primary_property: armor
+        secondary_properties:
+        - hull
+        - weapons
+        repeat: 5
+        variants:
+        - id: plate_band
+          weight: 1
+          cells:
+          - ╽╽▓▓██▓▓╽╽
+          - ▌▌▤▤██▤▤▐▐
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: turret_band
+          weight: 1
+          cells:
+          - '  ╽╽██▓▓╽╽'
+          - ▌▌▓▓██▤▤▐▐
+          color_mask:
+          - SSSSSSSSSS
+          - AASSSSSSSS
+      - id: screens
+        name: Screen Collar
+        primary_property: screens
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: deflector_collar
+          weight: 1
+          cells:
+          - '  ▟▟╽╽▙▙  '
+          - '  ◥◥◇◇◤◤  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSDDSSSS
+        - id: cic_collar
+          weight: 1
+          cells:
+          - '  ▟▟██▙▙  '
+          - '  ◇◇◇◇◇◇  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSDDDDDDSS
+      - id: main_gun
+        name: Spinal Gun
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: heavy_spinal
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - ▐▐▓▓██▓▓▌▌
+          - '    ╽╽    '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: siege_barrel
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - ▟▟▓▓▓▓▓▓▙▙
+          - '  ╽╽╽╽╽╽  '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - '  ██  '
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: armor
+          weight: 1
+          cells:
+          - ▐▐▤▤▌▌
+          color_mask:
+          - SSSSSS
+        - id: turret
+          weight: 1
+          cells:
+          - ▓▓██▓▓
+          color_mask:
+          - SSSSSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: gun
+          weight: 1
+          cells:
+          - '  ▲▲  '
+          - '  ║║  '
+          color_mask:
+          - SSAASS
+          - SSAASS

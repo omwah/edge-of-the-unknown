@@ -1,0 +1,30 @@
+{
+  "upstream_commit": "08192b9eab3928d31f8e9ed37d6644095652a768",
+  "synced": "2026-08-13",
+  "files": {
+    "edge/art/sprite_art/__init__.py": "9946eb01eb57dbf9e5e72658a6d9aa1483ad41dc00de35ebaf8f9ec20963bbd3",
+    "edge/art/sprite_art/glyphs.py": "35e3af5e4b08b3c294cec5a6ca89e3046152b2047ccb481ae2c0b91d504231b1",
+    "edge/art/sprite_art/io.py": "0c7d3e47de49aa7c63a40dd0fb147c37b9e642df7384d50f5fe536d0abbe17c7",
+    "edge/art/sprite_art/library.py": "86828b9e6f78c58e419595fc4cbdc6b22f8f774f7c22163a8310db3735114b68",
+    "edge/art/sprite_art/model.py": "3c4252139073686c24f0efab0885b143648663b453ba4f78445d04bdd0e75f2b",
+    "edge/art/sprite_art/render.py": "55165a1dd0b835822e45b07e2bef77074148c5128eba1d75aba629b5c87653be",
+    "edge/art/assets/palettes.yaml": "eeff75b03f228ead46fc4ef8295fd38ffd37c5ea65646b83fbf8ff1150720040",
+    "edge/art/assets/sprites/ports/stardock.yaml": "c8953f0a8f0ad4f4cca7475611058525f5fa45a389e41d318d9b8d9b67f7f683",
+    "edge/art/assets/sprites/ports/trading_port.yaml": "7acc8f4dda81c3493b51fdf763936f0286d58dfff8b700525612a0ae1e5745b5",
+    "edge/art/assets/sprites/ports/starbase.yaml": "fc79615cf43fcc5f181e8c08eb28ce310ef691837b6713154536e00ad6d4c367",
+    "edge/art/assets/sprites/ships/junction_pinnace.yaml": "cf790ecb9b2af372bc18e79516364b3aaad100b54e73fc02176d175e93469840",
+    "edge/art/assets/sprites/ships/capital_warship.yaml": "b8d225725b5de4c2ae4ef732a9ce790b5cbfcbaf51818aaabb2e709f404e64ed",
+    "edge/art/assets/sprites/ships/broadside_citadel.yaml": "59701f2728ed0ccf7adf6890fa96b7205d3fa35110398511afa8fd5e802ab9a8",
+    "edge/art/assets/sprites/ships/fighter.yaml": "f583516627d554953cd39ec5f138b118a321bb84d64766d8104f18bb265e6ef6",
+    "edge/art/assets/sprites/ships/needle_picket.yaml": "67238b0444a36649b971ba561254675277a8634d381444cfc7a3cdbacb566822",
+    "edge/art/assets/sprites/ships/transport.yaml": "5445332173f273849e2d887c7879c1f538b1e9fe242e30c74c2eec472b4944dc",
+    "edge/art/assets/sprites/ships/pearl_shell.yaml": "5f39954aedcfb54780cb76702ab54ccdce7344b87ecf317c6951278b4dd1ec8e",
+    "edge/art/assets/sprites/ships/marrow_dart.yaml": "3f5e303ecb10119d3c5cd24a1841cb795fe86fac32010fa386dfc4f4031b1226",
+    "edge/art/assets/sprites/ships/warship.yaml": "f231e4570d893c47ed4d79cfec4e95aef1715e83dfc8ac44e38a5489fe75dffe",
+    "edge/art/assets/sprites/ships/falsehold_raider.yaml": "eb62ce1e57f7239c94276bf320e8f2f2af33c1dbb5c86ac391176ce29b4ab691",
+    "edge/art/assets/sprites/ships/radiant_lance.yaml": "0519367c220804a8bfbd40ed2b4ed64337d2ae20f010da7cf1c710bd85ebbef1",
+    "edge/art/assets/sprites/ships/hearth_freighter.yaml": "d84a98abc6132e63f71614510eab2b6cfc583805dd13c2cdad8ca32781a3e765",
+    "tests/test_vendored_sprite_art.py": "8a9bd52b11ac3ec1541734aad8ad673c5f93137a7d12f9bff0df9da5665d3365",
+    "tests/fixtures/tier_renders.json": "f971167497c08fe8be1acf81e1bdd2104316cb18eea367709f365636faeef87e"
+  }
+}

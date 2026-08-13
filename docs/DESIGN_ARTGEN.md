@@ -33,9 +33,12 @@ The art generation logic will live in a new `edge.art` library to separate it fr
 We will use a hybrid algorithmic approach based on the entity type:
 - **Surface Terrain**: Rasterization via Noise (e.g., Simplex, Perlin, or cellular automata) to generate organic, continuous fields.
 - **Planets**: A combination of Compositional (assembling predefined parts like atmospheres or rings) and Rasterization (for surface textures).
-- **Ships, Ports, and Starbases**: Compositional — hand-authored ASCII parts (hulls, docking arms, thrusters, beacons) composed into a silhouette and recolored at render time (see §4.2). Ports/starbases **mirror and stack** left/right-symmetric *vertical* bands; ships compose **asymmetric *horizontal* sections** (tail → nose) and flip the whole hull to face either way. These sprites are small (a port may be as little as 3 cells tall, a ship 3 rows high), and at that resolution Signed Distance Fields (SDFs) have too few samples to read as recognizable structure — the traced boundary degrades into a blob and per-cell noise greebling becomes speckle. Hand-drawn silhouettes stay crisp at small sizes and preserve the BBS/ANSI heritage, so SDFs are reserved for the large circular planet masks of §4.1 where the cell count justifies them.
-
-  The machinery these two share — the part/slot band-grammar types, the glyph-flip table, the closed hull glyph alphabet, the per-`archetype_id` palettes, and the painter that centers a glyph grid in the requested box and colors hull shading / beacon / glow / windows / facets — lives in a common module, `edge/art/hull.py`. `edge/art/port.py` and `edge/art/ship.py` each own only their grammar and their composition axis (and ports own their mirror-symmetry, which ships do not have).
+- **Ships, Ports, and Starbases**: Compositional YAML documents from the vendored
+  schema-v4 `sprite_art` library. Ordered sections, archetype-aware variants, and
+  discrete tiers produce small hand-authored silhouettes while the library centres
+  every result in the requested rectangle. Ships expose a left/right facing view;
+  stations use vertical compositions. Discovery art remains algorithmic and keeps
+  its own painter, while its palette is resolved from the same catalog.
 
 ### 2.1 TUI Integration
 
@@ -73,17 +76,40 @@ This ensures that a `terrestrial_warm` world always looks habitable and dynamica
 
 ### 4.2 Ships and Ports
 
-Ship and Port generation maps core data (`ship_class` `role` and port type) to visual output via a **compositional** path. Neither is stored as whole fixed-size silhouettes: each subtype owns a **band grammar** of **recombinable parts** and the renderer composes a sprite to fit the requested bounds. This unlocks arbitrary sizes (not a few discrete tiers) and genuine per-entity variety, while the canonical part selection still reproduces the original hand-drawn silhouette exactly ("decompose what we had", not "redraw"). The two differ in their **composition axis and symmetry**:
+Ship and station art is now authored as schema-v4 YAML in the vendored `sprite_art`
+library. The game copies the runtime package and its `assets/` tree; it does not
+import the designer project. Each document contains ordered sections, variants,
+colour masks, and a discrete tier ladder. The library selects a tier that fits the
+requested box, resolves archetype-specific variants and repeats, then centres the
+result in an exact rectangle. Its per-instance cache is complemented by the
+outer generator cache.
 
-- **Ports/starbases** read as a left/right-symmetric *vertical stack of bands* (beacon, tower, platform, tapering body, engine glow, …) and compose along the **height** axis.
-- **Ships** read as an asymmetric *horizontal sequence of sections* (tail → nose) and compose along the **width** axis, with **no symmetry** in either direction.
-
-- **Role / Port Type Defines the Grammar**: The `role` (for ships: `fighter`, `transport`, `warship`, `capital_warship`) or the port type (`trading_port`, `starbase`, `stardock`) selects the band grammar. A freighter always has a recognizable cargo backbone; a port reads as a stationary orbital structure. The flagship `stardock` deliberately evokes the classic TradeWars 2002 Federation Stardock: a vertical, left/right-symmetric station with a red beacon, control tower, a wide platform trailing thin docking arms, a tapering chevron body, and a yellow engine glow.
-- **Port Symmetry by Mirroring**: Every port part is authored as a **left half including the centre column** and mirrored to full width at render time. A shared glyph-flip table (`hull.GLYPH_FLIP`) swaps the asymmetric box/quadrant/triangle glyphs when reflecting (`▟↔▙`, `▜↔▛`, `╾↔╼`, `◢↔◣`, `┌↔┐`, `▶↔◀`, `╱↔╲`, …); self-symmetric glyphs (full/shade blocks, rules, beacon/glow markers, facets) and the part's centre-column glyph pass through unchanged. This halves authoring and guarantees perfect symmetry.
-- **Ships are Horizontal, Asymmetric, and Flippable**: Ships have no symmetry, so their parts are authored as **full rows** (not mirrored half-rows) and verticality — a dorsal bridge/sensor mast rising above the hull line, an offset nacelle — is drawn straight into the row grid. Ships are authored facing **nose-right** (canonical); requesting `facing="left"` flips the finished grid with the same glyph-flip table (reverse each row and swap asymmetric glyphs), so one authored ship points either way. The flip is a deterministic post-transform that consumes no rng, so the two facings are the identical ship. The five section slots map to the four player-tweakable engine-room subsystems plus the hull backbone, so a glance reads the loadout: **THRUSTERS** (exhaust/glow at the tail) → **SPINDRIVE** (warp block) → **HULL** (repeatable cargo/structure backbone, grows the ship's length) → **SCREENS** (deflector facets near the bow) → **MAIN_GUN** (spinal barrel to a muzzle at the nose).
-- **Band Grammar & Composition**: A grammar is an ordered run of **slots** (a CAP and BASE bracketing one or more **repeatable** middle slots). Each slot offers several interchangeable **parts**; the composer picks one per slot (seeded) and grows the repeatable slot(s) to fill the target size (height for ports, width for ships). A subtype actually maps to an ordered list of grammar **tiers** (full-detail, then compact); the composer selects the richest tier that fits the box — for ports the richest tier whose minimum stack fits the **height**, for ships the tallest tier whose authored **row-height** fits — so large boxes get docking arms / octagon belts / superstructure towers while tiny boxes (3 rows) get a dedicated legible compact silhouette (beacon / band / glow, or glow / hull / muzzle) rather than a cropped detailed one. Sprites larger than the box are cropped symmetrically so the iconic extremities survive.
-- **Archetype Defines Style**: Just like ships, all three types of ports accept an `archetype_id` argument (the owner species' `archetype_id`, e.g. `humanoid_diplomat`, `brain_dome_automaton`). It is keyed on the **archetype rather than the species id/name** deliberately: a roster can rename or reskin a species, but its archetype is the stable visual identity, so the hull look stays put across roster edits. The `archetype_id` selects the color palette — three hull shading levels plus navigation-beacon and lit-window hues, and a **facet** colour for surface-feature glyphs (drawn over a bright-hull patch so the detail reads as etched into the plating). The `humanoid_diplomat` (Federation) palette reads as the grey Stardock hull; other archetypes supply their own (cold chrome automata, rusted-bronze salvagers, royal-purple mind-mages, ...). Shading is carried by the authored glyphs themselves (solid blocks read bright, half/box-drawing chars read mid, light-shade blocks read dark), so a single grammar recolors cleanly across archetypes without per-archetype geometry. Unknown archetypes fall back to the Federation grey.
-- **Seed Adds Variation**: The local seed resolves steady per-station choices — which part fills each slot, which beacon hue is lit, which hull cells light up as windows — on top of the selected grammar tier and archetype palette, so repeat entities differ without losing their iconic shape. The number of part-selection draws is fixed per grammar (one per slot, independent of height), keeping the seed stream stable across sizes. Determinism is preserved because the seed drives every choice.
+- **Roles and subtypes**: ship roles and the three station ids (`trading_port`,
+  `starbase`, `stardock`) select authored documents. The catalog also contains
+  eight ship documents reserved for future config-only routing through
+  `ShipClassConfig.art_subtype`; they are not gameplay classes yet.
+- **Sections and variants**: a sprite is an ordered composition of named sections,
+  with weighted or archetype-specific variants. The seed selects variants and
+  render details from the stable recipe `seed|kind|role|archetype_id`.
+- **Tiers and sizing**: each document supplies a discrete size ladder. The richest
+  tier that fits is selected and repeats are applied according to the authored
+  archetype rules; the result is centred in the requested width and height. This
+  intentionally replaces continuous band tiling. The library budgets that choice
+  on the requested **height** alone and centre-crops a wider tier, so
+  `edge.art.sprites.fit_box` resolves the requested box to the richest rung that
+  fits it on *both* axes before rendering, and `generate_sprite` pads that render
+  back into the caller's box. Asking for a box that clears no rung does not yield
+  a smaller sprite — it yields the middle of a cropped one, which is why the
+  `scene:` caps are constrained by the ladders (see
+  `docs/SECTOR_SCENE_COMPOSITION.md` §2 and `docs/SPRITE_ART_SYNC.md` §4).
+- **Facing and palettes**: ships provide horizontal views and are mirrored for
+  `facing="left"`; stations are vertical-only. The vendored palette catalog is
+  the single palette source for ship, station, and discovery art, with
+  `humanoid_diplomat` as its validated fallback.
+- **Integration**: generation remains synchronous and cached. `edge.art.generator`
+  routes ship and station requests through one loaded `SpriteLibrary`, while
+  terrain, planets, starfields, and discovery generators retain their existing
+  local RNG paths.
 
 ### 4.3 Engine Room Subsystems
 

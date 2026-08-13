@@ -416,6 +416,7 @@ class ShipClassConfig(BaseModel):
     id: str
     name: str
     role: str
+    art_subtype: str | None = None  # art sprite id; None routes on ``role``
     holds_total: int
     turns_per_warp: int
     shields_max: int
@@ -1474,18 +1475,23 @@ class SceneArtConfig(BaseModel):
     planet_detail: PlanetSpriteSize = PlanetSpriteSize(max_height=14)  # PlanetScreen orbit view
     # Station max_height must stay ≥ round(scale × planet.max_height) — a lower cap
     # saturates while the planet is still growing, freezing the station at one size
-    # across most viewports (the responsiveness bug this guards against). max_width
-    # covers the 2.4 primary-branch aspect at max_height.
-    port: SpriteSize = SpriteSize(max_width=16, max_height=6)
+    # across most viewports (the responsiveness bug this guards against). The caps
+    # must also clear a whole *tier* of the sprite art (`edge.art.sprites.fit_box`)
+    # or the art steps down a rung: a port capped at 6 rows selects trading_port's
+    # 7-wide mast rung rather than its 11×7 silhouette, and a ship capped at 16
+    # columns clears no rung at all (the narrowest is 17×3, then ~34×5).
+    port: SpriteSize = SpriteSize(max_width=19, max_height=8)
     stardock: SpriteSize = SpriteSize(max_width=38, max_height=16)
     starbase: SpriteSize = SpriteSize(max_width=22, max_height=9)
-    ship: SpriteSize = SpriteSize(max_width=16, max_height=5)
+    ship: SpriteSize = SpriteSize(max_width=36, max_height=5)
     max_ships_shown: int = Field(default=3, gt=0)  # sprites; extras list as text
     ship_face_inward_chance: float = Field(default=0.5, ge=0.0, le=1.0)
     # Arrival-view scale hierarchy (PT-36): a station beside a rendered primary
     # body scales from that body's actual height; a lone station scales from the
     # scene body. The docked header reuses the Sector composer's resolved dimensions.
-    port_scale: float = Field(default=0.25, gt=0.0, le=1.0)
+    # Floor set by the art: below ~0.27 the scaled box never clears 7 rows, and
+    # trading_port's 6-row rung is a bare mast rather than its 11-wide silhouette.
+    port_scale: float = Field(default=0.3, gt=0.0, le=1.0)
     stardock_scale: float = Field(default=0.6, gt=0.0, le=1.0)
     starbase_scale: float = Field(default=0.35, gt=0.0, le=1.0)
     # Below port_scale so traffic never outsizes the port it visits (§ scale hierarchy).

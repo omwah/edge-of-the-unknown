@@ -358,6 +358,19 @@ def _sector_discoveries(state: UniverseState, player: Player, sector_id: int) ->
     return out
 
 
+def _species_ship_class_id(species: AlienSpecies, config: GameConfig) -> str:
+    """Resolve the lead configured hull id for a species vessel."""
+    roster = config.roster
+    sc = roster.species_by_id(species.roster_id) if roster is not None else None
+    if sc is not None and sc.fleet:
+        try:
+            config.ship_class(sc.fleet[0])
+            return sc.fleet[0]
+        except KeyError:
+            pass
+    return config.starter_ship.id
+
+
 def _species_ship_role(species: AlienSpecies, config: GameConfig) -> str:
     """The art ship role for a species' vessel, from its fleet's lead hull (§6.1).
 
@@ -443,6 +456,7 @@ def _sector_dto(
         dto.SectorShipDTO(
             name=f"{sp.name} vessel", role=_species_ship_role(sp, config),
             archetype_id=sp.archetype_id, contact_id=sp.id,
+            art_subtype=config.ship_class(_species_ship_class_id(sp, config)).art_subtype,
         )
         for sp in here_species
     ]
@@ -459,9 +473,10 @@ def _sector_dto(
         label = other.name + (f" [{corp.tag}]" if corp is not None else "")
         if other.bounty > 0:
             label += " ☠"
+        other_class = config.ship_class(other_ship.type_id)
         ships.append(dto.SectorShipDTO(
-            name=label, role=config.ship_class(other_ship.type_id).role,
-            player_id=pid,
+            name=label, role=other_class.role,
+            player_id=pid, art_subtype=other_class.art_subtype,
         ))
     here = core_hops.get(sector.id, 0)
     came_from = player.entered_from.get(sector.id)

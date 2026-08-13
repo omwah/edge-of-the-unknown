@@ -44,7 +44,7 @@ only a cap on the rendered planet, never the station's direct scaling reference.
 | ordinary port | `scene.port_scale` × rendered primary height, clamped by `scene.port` | independently tunable port footprint |
 | Stardock | `scene.stardock_scale` × rendered primary height, clamped by `scene.stardock` | independently tunable flagship silhouette, never ordinary-port art |
 | starbase | `scene.starbase_scale` × rendered primary height, clamped by `scene.starbase` | independently tunable orbital-base silhouette |
-| ship | `scene.ship_scale` (0.2) × primary height, slimmed further if the open sky is narrow | traffic — must stay below `port_scale` so a visiting ship never outsizes the port |
+| ship | height from `scene.ship_scale` (0.2) × primary height; width is the open sky, clamped by `scene.ship`, and the art then steps down its tier ladder to fit | traffic — must stay below `port_scale` so a visiting ship never outsizes the port. No fixed aspect: see the tier note below |
 | fighters / mines | single glyphs (`▴` / `✺`) | presence, not objects |
 
 `SceneArtConfig.station_dimensions(kind, primary_height, body_height)` is the one
@@ -66,23 +66,56 @@ aspect at that height — otherwise the clamp pins the station at one size while
 planet is still growing across normal viewports, and the responsiveness the resolver
 exists to provide is silently erased (this shipped once: `starbase.max_height: 9`
 against `0.5 × 26` froze every starbase at 8 inked rows). The shipped values are
-`port 16×6`, `stardock 38×16`, `starbase 22×9` for scales 0.25 / 0.6 / 0.35 against
-`planet.max_height: 26`. Those values realise the §1 tier ordering **planet ≫
-Stardock > starbase > port > ship** at every viewport — at a full-size planet the
-chain is 26 ≫ 16 > 8–9 > 6 > 5 rows — and any retune must preserve that strict
+`port 19×8`, `stardock 38×16`, `starbase 22×9` for scales 0.3 / 0.6 / 0.35 against
+`planet.max_height: 26`, with `ship 36×5` at 0.2. Those values realise the §1 tier
+ordering **planet ≫ Stardock > starbase > port > ship** at every viewport — at a
+full-size planet the chain is 26 ≫ 16 > 9 > 8 > 5 rows — and any retune must
+preserve that strict
 ordering on both the scales and the caps, or two kinds collapse into reading as
 peers. The port and starbase scales are deliberately small —
 playtest feedback of 2026-07-17: at 0.35–0.4 an ordinary port read as a rival body
-beside the planet, and at 0.5 a starbase (12 inked rows) did the same. Note that a
+beside the planet, and at 0.5 a starbase (12 inked rows) did the same.
+`port_scale` is nonetheless floored by the art at ~0.27: below that the scaled box
+never clears 7 rows beside a planet, and `trading_port`'s 6-row rung is a bare
+7-wide mast rather than its 11-wide silhouette. 0.3 is the compromise — the
+silhouette at the larger primaries, still under the 0.35 playtest ceiling. At small
+primaries the port legitimately steps down to that mast; that is the ladder doing
+its job, not the bug described below. Note that a
 starbase hosts the sector's market and takes the port's slot in the scene, so "the
 port is too big" reports usually mean *this* sprite.
 Because a small port scale would otherwise let ships outsize the port at mid
 viewports, `ship_scale` (0.2, cap 5) must stay *below* `port_scale` on both scale
 and cap; `test_default_scene_art_values` asserts the cap inequality and the
 ship-below-port ordering.
-A second, minor quantiser exists downstream: archetype station grammars stack 2-row
-repeat blocks, so odd requested heights ink one row short (centred in the box by
-`render_grid`) — acceptable slack, not worth perturbing the deterministic silhouettes.
+A second, intentional quantiser exists in the sprite library: ships and stations
+select from an authored discrete tier ladder and apply archetype-specific section
+repeats rather than continuously tiling a band to the requested height. The selected
+art is centred in the exact box, so a tier can leave a small amount of blank slack.
+This is accepted by the scene layout; do not reintroduce continuous grammar tiling in
+Edge.
+
+**The scene must ask for a box that clears a whole tier.** The library selects a tier
+by the requested *height* alone and then centre-crops that tier's natural width down
+to the requested width. A box narrower than the selected tier therefore returns the
+*middle* of the art — for a ship, the repeating hull band with the prow and drive cut
+off, which reads as a one-row band; for an ordinary port, a bare mast. Edge resolves
+this at the seam: `edge/art/sprites.py` → `fit_box` walks the ladder richest-first for
+the top rung that fits the box on **both** axes and returns that rung's natural size,
+and `generate_sprite` renders there and pads the result back into the requested box.
+Two consequences for anyone tuning `scene:`:
+
+- The tier ladder *is* the responsiveness mechanism on the width axis. A narrow sky
+  must step a ship down a rung (`medium` → `compact`), never shave columns off the
+  rung above. `_paint_ships` accordingly passes the sky it actually has as the width
+  bound; it must not impose an aspect ratio of its own — ship art composes at roughly
+  6:1 (`7×46`, `5×34`, `3×17`), so the old `height × 3` bound selected a tier three
+  times wider than the box it was drawn into.
+- A cap that clears no rung is a silent breakage, not a smaller sprite. `port` capped
+  at 6 rows selected `trading_port`'s 3-wide mast tower instead of its 11×7
+  silhouette, and `ship` capped at 16 columns cleared nothing at all (17 is the
+  narrowest rung). `tests/test_sprite_seam.py` asserts every vendored subtype clears a
+  whole tier at its configured cap, so a future cap change — or a synced asset whose
+  ladder moved — fails there rather than in the eye.
 
 The Sector composer records the two rendered inputs `(primary_height, body_height)` on
 `SectorScene`, which publishes them as the app's current `sector_station_reference`

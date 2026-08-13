@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 42  # UndoGroundAction/RedoGroundAction + AssaultExpeditionDTO.can_undo/can_redo
+WIRE_VERSION = 43  # SectorShipDTO.art_subtype (sprite-art migration)
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected

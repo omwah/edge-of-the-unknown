@@ -1,0 +1,766 @@
+schema_version: 4
+id: marrow_dart
+name: Marrow Dart
+kind: ship
+role: marrow_dart
+description: A reckless organic assault craft grown as bound spars, muscle bands, and a hardened beak.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: sinew_drive
+        name: Sinew Drive
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: tendons
+          weight: 1
+          cells:
+          - '     '
+          - '▄▀╲▓ '
+          - ▄▒██▓
+          - ▄█░▒▓
+          - '▄▀╱▓ '
+          - ' ▀   '
+          - '     '
+          color_mask:
+          - SSSSS
+          - EESSS
+          - ESSSS
+          - ESESS
+          - EESSS
+          - SESSS
+          - SSSSS
+        - id: spasm
+          weight: 1
+          cells:
+          - '▄    '
+          - '▄╲▒▓ '
+          - ▄███▓
+          - ▄█░█▓
+          - '▄╱▒▓ '
+          - '  ▀  '
+          - '     '
+          color_mask:
+          - ESSSS
+          - ESSSS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - SSESS
+          - SSSSS
+      - id: marrow_knot
+        name: Marrow Knot
+        primary_property: spindrive
+        secondary_properties:
+        - hull
+        repeat: 1
+        variants:
+        - id: joint
+          weight: 1
+          cells:
+          - '    '
+          - ' ▗▒▖'
+          - ╱███
+          - █☼▒█
+          - ╲███
+          - ' ▝▒▘'
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SBSS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: scar_knot
+          weight: 1
+          cells:
+          - '    '
+          - '  ▴ '
+          - ◢█▒◣
+          - ██◊█
+          - ◥█▒◤
+          - '  ▾ '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: bound_spars
+        name: Bound Spars
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 7
+        variants:
+        - id: spar
+          weight: 1
+          cells:
+          - '    '
+          - ╲  ╱
+          - ▓██▓
+          - █▒▒█
+          - ▓██▓
+          - ╱  ╲
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: muscle_band
+          weight: 1
+          cells:
+          - '    '
+          - ▗▒▒▖
+          - █▓▓█
+          - █∞▒█
+          - █▓▓█
+          - ▝▒▒▘
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: nerve_cluster
+        name: Nerve Cluster
+        primary_property: sensors
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: eye_cluster
+          weight: 1
+          cells:
+          - '     '
+          - ' ☼█☼ '
+          - █☼███
+          - █▒█▒█
+          - █☼▒██
+          - ' ◥█◤ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SBSBS
+          - SBSSS
+          - SSSSS
+          - SBSSS
+          - SSSSS
+          - SSSSS
+        - id: many_eyes
+          weight: 1
+          cells:
+          - '     '
+          - '     '
+          - ◢☼█☼◣
+          - █████
+          - ◥█☼█◤
+          - '  ▾  '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SBSBS
+          - SSSSS
+          - SSBSS
+          - SSSSS
+          - SSSSS
+      - id: hardened_beak
+        name: Hardened Beak
+        primary_property: main_gun
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: fang
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - '◢▒▙ '
+          - ██▀►
+          - '◥▒▛ '
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSAA
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: barbed_beak
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - '╲█▙ '
+          - █▒▀►
+          - '╱█▛ '
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSAA
+          - SSSS
+          - SSSS
+          - SSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: sinew_drive
+        name: Sinew Drive
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: tendons
+          weight: 1
+          cells:
+          - '▄▀╲ '
+          - ▄▒█▓
+          - ▄█░▓
+          - '▄▀╱ '
+          - ' ▀  '
+          color_mask:
+          - EESS
+          - ESSS
+          - ESES
+          - EESS
+          - SESS
+        - id: spasm
+          weight: 1
+          cells:
+          - '▄   '
+          - ▄██▓
+          - ▄█░▓
+          - '▄╱▒ '
+          - '  ▀ '
+          color_mask:
+          - ESSS
+          - ESSS
+          - ESES
+          - ESSS
+          - SSES
+      - id: marrow_knot
+        name: Marrow Knot
+        primary_property: spindrive
+        secondary_properties:
+        - hull
+        repeat: 1
+        variants:
+        - id: joint
+          weight: 1
+          cells:
+          - ' ▗▖'
+          - ╱██
+          - █☼█
+          - ╲██
+          - ' ▝▘'
+          color_mask:
+          - SSS
+          - SSS
+          - SBS
+          - SSS
+          - SSS
+        - id: scar_knot
+          weight: 1
+          cells:
+          - '   '
+          - ◢█◣
+          - ███
+          - ◥█◤
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+      - id: bound_spars
+        name: Bound Spars
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 7
+        variants:
+        - id: spar
+          weight: 1
+          cells:
+          - ╲ ╱
+          - ▓█▓
+          - █▒█
+          - ▓█▓
+          - ╱ ╲
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+        - id: muscle_band
+          weight: 1
+          cells:
+          - ▗▒▖
+          - █▓█
+          - █∞█
+          - █▓█
+          - ▝▒▘
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+      - id: nerve_cluster
+        name: Nerve Cluster
+        primary_property: sensors
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: eye_cluster
+          weight: 1
+          cells:
+          - ' ☼█ '
+          - █☼██
+          - █▒██
+          - █☼▒█
+          - ' ◥█ '
+          color_mask:
+          - SBSS
+          - SBSS
+          - SSSS
+          - SBSS
+          - SSSS
+        - id: many_eyes
+          weight: 1
+          cells:
+          - '    '
+          - ◢☼█◣
+          - ████
+          - ◥█☼◤
+          - '  ▾ '
+          color_mask:
+          - SSSS
+          - SBSS
+          - SSSS
+          - SSBS
+          - SSSS
+      - id: hardened_beak
+        name: Hardened Beak
+        primary_property: main_gun
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: fang
+          weight: 1
+          cells:
+          - '   '
+          - '◢▒ '
+          - ██►
+          - '◥▒ '
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSA
+          - SSS
+          - SSS
+        - id: barbed_beak
+          weight: 1
+          cells:
+          - '   '
+          - '╲█ '
+          - █▒►
+          - '╱█ '
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSA
+          - SSS
+          - SSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ' ▴'
+          - ▄▒
+          - ' ▾'
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: spar
+          weight: 1
+          cells:
+          - ╲█
+          - █▒
+          - ╱█
+          color_mask:
+          - SS
+          - SS
+          - SS
+        - id: muscle
+          weight: 1
+          cells:
+          - ◢▒
+          - █◊
+          - ◥▒
+          color_mask:
+          - SS
+          - SS
+          - SS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: fang
+          weight: 1
+          cells:
+          - ' ◢ '
+          - █▀►
+          - ' ◥ '
+          color_mask:
+          - SSS
+          - SAA
+          - SSS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: sinew_drive
+        name: Sinew Drive
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: tendons
+          weight: 1
+          cells:
+          - '    ▓▓▓▓      '
+          - '  ╱╱██░░╲╲    '
+          - '  ▐▐▐▐▐▐▐▐    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSEESSSSSS
+          - SSEEEEEEEESSSS
+        - id: spasm
+          weight: 1
+          cells:
+          - '    ▓▓▓▓      '
+          - '▌▌▒▒██░░▒▒▌▌  '
+          - '  ▐▐▐▐▐▐▐▐    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - EESSSSEESSEESS
+          - SSEEEEEEEESSSS
+      - id: marrow_knot
+        name: Marrow Knot
+        primary_property: spindrive
+        secondary_properties:
+        - hull
+        repeat: 1
+        variants:
+        - id: joint
+          weight: 1
+          cells:
+          - '  ▗▗██████▖▖  '
+          - '  ▝▝██☼☼██▘▘  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSBBSSSSSS
+        - id: scar_knot
+          weight: 1
+          cells:
+          - '    ◢◢██◣◣    '
+          - '    ██████    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: bound_spars
+        name: Bound Spars
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 7
+        variants:
+        - id: spar
+          weight: 1
+          cells:
+          - '  ╲╲▓▓██▓▓╱╱  '
+          - '    ██▒▒██    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: muscle_band
+          weight: 1
+          cells:
+          - '  ▗▗██████▖▖  '
+          - '  ▒▒▓▓∞∞▓▓▒▒  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: nerve_cluster
+        name: Nerve Cluster
+        primary_property: sensors
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: eye_cluster
+          weight: 1
+          cells:
+          - '    ██████    '
+          - '  ██████▒▒██  '
+          - '    ██████    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: many_eyes
+          weight: 1
+          cells:
+          - '    ◢◢██◣◣    '
+          - '    ████☼☼▶▶  '
+          - '    ◥◥██◤◤    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSBBSSSS
+          - SSSSSSSSSSSSSS
+      - id: hardened_beak
+        name: Hardened Beak
+        primary_property: main_gun
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: fang
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ▒▒██▒▒    '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+        - id: barbed_beak
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ██▒▒██    '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: sinew_drive
+        name: Sinew Drive
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: tendons
+          weight: 1
+          cells:
+          - '  ▓▓▓▓    '
+          - ▌▌▒▒██▌▌▌▌
+          color_mask:
+          - SSSSSSSSSS
+          - EESSSSEEEE
+        - id: spasm
+          weight: 1
+          cells:
+          - '  ▓▓▓▓    '
+          - '╱╱████╲╲  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: marrow_knot
+        name: Marrow Knot
+        primary_property: spindrive
+        secondary_properties:
+        - hull
+        repeat: 1
+        variants:
+        - id: joint
+          weight: 1
+          cells:
+          - ▗▗██████▖▖
+          - '  ╲╲██╱╱  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: scar_knot
+          weight: 1
+          cells:
+          - '  ◢◢██◣◣  '
+          - '  ◥◥██◤◤  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: bound_spars
+        name: Bound Spars
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 7
+        variants:
+        - id: spar
+          weight: 1
+          cells:
+          - ╲╲▓▓██▓▓╱╱
+          - ╱╱▓▓██▓▓╲╲
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: muscle_band
+          weight: 1
+          cells:
+          - ▗▗██████▖▖
+          - ▝▝██████▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: nerve_cluster
+        name: Nerve Cluster
+        primary_property: sensors
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: eye_cluster
+          weight: 1
+          cells:
+          - '  ██████  '
+          - ☼☼☼☼▒▒☼☼◤◤
+          color_mask:
+          - SSSSSSSSSS
+          - BBBBSSBBSS
+        - id: many_eyes
+          weight: 1
+          cells:
+          - '  ◢◢██◣◣  '
+          - '▌▌☼☼████  '
+          color_mask:
+          - SSSSSSSSSS
+          - BBBBSSSSSS
+      - id: hardened_beak
+        name: Hardened Beak
+        primary_property: main_gun
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: fang
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - '  ◥◥██◤◤  '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+        - id: barbed_beak
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - '  ╱╱██╲╲  '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ◀◀▒▒▶▶
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: spar
+          weight: 1
+          cells:
+          - ██▒▒██
+          color_mask:
+          - SSSSSS
+        - id: muscle
+          weight: 1
+          cells:
+          - ▒▒◊◊▒▒
+          color_mask:
+          - SSSSSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: fang
+          weight: 1
+          cells:
+          - '  ▲▲  '
+          - '  ██  '
+          color_mask:
+          - SSAASS
+          - SSSSSS

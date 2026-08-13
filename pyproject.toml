@@ -6,7 +6,7 @@ authors = [{name = "James McDuffie", email = "mcduffie@pitfall.org"}]
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">= 3.12"
-dependencies = ["opensimplex>=0.4.5.1,<0.5", "tracery>=0.1.1"]
+dependencies = ["opensimplex>=0.4.5.1,<0.5", "tracery>=0.1.1", "pyyaml", "rich"]
 
 [project.scripts]
 edge = "edge.tui.app:main"
@@ -85,6 +85,7 @@ check = { depends-on = ["lint", "typecheck", "test"] }
 # tui skeleton is intentionally exempt until Phase 1 wiring lands.
 [tool.ruff]
 target-version = "py312"
+extend-exclude = ["edge/art/sprite_art"]
 
 [tool.mypy]
 python_version = "3.12"

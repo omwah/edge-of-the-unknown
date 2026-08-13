@@ -159,6 +159,28 @@ of those, update the doc's rules *and* shipped numbers in the same change —
 its §2 cap rule exists because a stale cap once silently froze station
 responsiveness.
 
+**Keep the vendored sprite art in sync.** `edge/art/sprite_art/` and
+`edge/art/assets/` are **copies** of code and data authored in the separate
+`sprite-art-designer` repository — ship and station art is data-driven YAML, not
+code, and Edge is not where it is edited. `docs/SPRITE_ART_SYNC.md` is the
+authoritative record: what is copied, the `scripts/sync_sprite_art.py` runbook,
+and the contracts that break *silently* on an upstream change — above all the
+render seed recipe (`f"{seed}|{kind}|{role}"`, which must keep matching Edge's
+`entity_type`/`subtype`) and the fact that `assets/palettes.yaml` styles
+**discovery art as well as** ships and stations, so retuning a hull colour
+upstream restyles that archetype's nebulae here. Never sync the library without
+the assets or the assets without the library — their `schema_version`s move
+together. Never hand-edit a vendored file; ruff is configured to skip that tree
+and a `--check` test asserts it is byte-identical to the manifest. The third
+silent contract is the **tier ladder**: the library picks a tier by the requested
+*height* alone and centre-crops a wider one, so a `scene:` cap that clears no rung
+returns the middle of a cropped sprite rather than a smaller one — Edge absorbs
+this in `edge/art/sprites.py` → `fit_box`, and
+`tests/test_sprite_seam.py::test_every_subtype_renders_a_whole_tier_at_its_scene_box`
+is the guard to run after every sync and after any `scene:` change.
+`docs/SPRITE_ART_MIGRATION.md` records how the vendored code replaced the old
+in-code band grammar.
+
 **Keep the checkpoint field set in sync.** `AUTHORITATIVE_STATE_FIELDS` in
 `edge/store/state_codec.py` is the single, shared list of the `UniverseState`
 containers that both the load checkpoint (DESIGN.md §12) and `state_hash`

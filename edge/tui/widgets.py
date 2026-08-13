@@ -1118,14 +1118,17 @@ class _SceneComposer:
             return
         ref_h = (primary[3] - primary[1]) if primary is not None else cfg.ship.max_height * 3
         sh = max(cfg.ship.min_height, min(cfg.ship.max_height, round(ref_h * cfg.ship_scale)))
-        sw = max(cfg.ship.min_width, min(cfg.ship.max_width, sh * 3))
         sky_r = (primary[0] - 2) if primary is not None else w - 2
-        # A centred primary leaves a narrower sky: slim the ships to what it can
-        # hold rather than deferring them all to text rows.
-        sw = max(cfg.ship.min_width, min(sw, sky_r - 4))
+        # The height comes off the scale hierarchy; the *width* is whatever sky is
+        # left, not a fixed aspect. Ship art composes along its length at roughly
+        # 6:1, so imposing an aspect here picked a tier far wider than the box and
+        # the library cropped the prow and drive off it. `generate_sprite` resolves
+        # this box down to the richest tier that fits inside it — a narrow sky steps
+        # a ship down a rung instead of shaving columns off the one above.
+        sw = max(cfg.ship.min_width, min(cfg.ship.max_width, sky_r - 4))
         rng = random.Random(sec.sector_id)
         for i, vessel in enumerate(shown):
-            entity, sub = art_adapter.ship_entity(vessel.role)
+            entity, sub = art_adapter.ship_entity(vessel.role, vessel.art_subtype)
             facing = "right"
             if primary is None and i == 1 and rng.random() < cfg.ship_face_inward_chance:
                 facing = "left"

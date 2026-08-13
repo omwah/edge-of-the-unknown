@@ -1,0 +1,1285 @@
+schema_version: 4
+id: trading_port
+name: Trading Port
+kind: port
+role: trading_port
+description: 'A small commercial dock: a signal mast above a panelled core hung with berthing arms.'
+views:
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: null
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: mast
+        name: Mast
+        primary_property: tower
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '           '
+          - '     ▴     '
+          - '     │     '
+          - '   ┌───┐   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '           '
+          - '           '
+          - '     ▴     '
+          - '   ┌───┐   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - '     ▴     '
+          - '     │     '
+          - '     │     '
+          - '   ┌───┐   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: humanoid_diplomat
+          weight: 1
+          archetypes:
+          - humanoid_diplomat
+          cells:
+          - '           '
+          - '           '
+          - '     ▀     '
+          - '    ▟█▙    '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSBSSSSS
+          - SSSSSSSSSSS
+        - id: canid_technologist
+          weight: 1
+          archetypes:
+          - canid_technologist
+          cells:
+          - '           '
+          - '           '
+          - '   ▴ ▴ ▴   '
+          - '   ▟███▙   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: tentacled_envoy
+          weight: 1
+          archetypes:
+          - tentacled_envoy
+          cells:
+          - '           '
+          - '           '
+          - '     ◆     '
+          - '   ▟███▙   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: brain_dome_automaton
+          weight: 1
+          archetypes:
+          - brain_dome_automaton
+          cells:
+          - '           '
+          - '           '
+          - '     ▀     '
+          - '   ▟███▙   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSBSSSSS
+          - SSSSSSSSSSS
+        - id: ribbon_salvager
+          weight: 1
+          archetypes:
+          - ribbon_salvager
+          cells:
+          - '           '
+          - '           '
+          - ╭─╮  ▴  ╮─╭
+          - '  ╰─▟█▙─╰  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: temporal_broker
+          weight: 1
+          archetypes:
+          - temporal_broker
+          cells:
+          - '           '
+          - '           '
+          - '     ◊     '
+          - '    ▟█▙    '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: cosmic_arbiter
+          weight: 1
+          archetypes:
+          - cosmic_arbiter
+          cells:
+          - '           '
+          - '           '
+          - '   ╭─╮─╭   '
+          - '   │◆│◆│   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: telepath_aristocrat
+          weight: 1
+          archetypes:
+          - telepath_aristocrat
+          cells:
+          - '           '
+          - '           '
+          - '     ◇     '
+          - '    ◢█◣    '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: engineered_aesthete
+          weight: 1
+          archetypes:
+          - engineered_aesthete
+          cells:
+          - '           '
+          - '           '
+          - '     ▴     '
+          - '   ▟███▙   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: amorous_imp
+          weight: 1
+          archetypes:
+          - amorous_imp
+          cells:
+          - '           '
+          - '           '
+          - '     ♥     '
+          - '   ◢███◣   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: horned_grudgekeeper
+          weight: 1
+          archetypes:
+          - horned_grudgekeeper
+          cells:
+          - '           '
+          - '           '
+          - ◢    ◆    ◣
+          - '  ◢█████◣  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: psionic_overlord
+          weight: 1
+          archetypes:
+          - psionic_overlord
+          cells:
+          - '           '
+          - '           '
+          - '  ╭──╮──╭  '
+          - '     ◆     '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: colonial_broodmaster
+          weight: 1
+          archetypes:
+          - colonial_broodmaster
+          cells:
+          - '           '
+          - '           '
+          - '   ◢◆█◆◣   '
+          - ' ◢███████◣ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: winged_schemer
+          weight: 1
+          archetypes:
+          - winged_schemer
+          cells:
+          - '           '
+          - '           '
+          - '   ▴███▴   '
+          - ' ◢███████◣ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+      - id: core
+        name: Core
+        primary_property: docking
+        secondary_properties: []
+        repeat: 2
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - ▤──┤███├──▤
+          - '   │███│   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '   │███│   '
+          - '   │███│   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - ▦──┤███├──▦
+          - '   │███│   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: humanoid_diplomat
+          weight: 1
+          archetypes:
+          - humanoid_diplomat
+          cells:
+          - ╾─▟█████▙─╼
+          - '  ▟█████▙  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: canid_technologist
+          weight: 1
+          archetypes:
+          - canid_technologist
+          cells:
+          - ╾─┤█████├─╼
+          - '  █◇███◇█  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: tentacled_envoy
+          weight: 1
+          archetypes:
+          - tentacled_envoy
+          cells:
+          - ╾▟█◇███◇█▙╼
+          - ' ▟███████▙ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: brain_dome_automaton
+          weight: 1
+          archetypes:
+          - brain_dome_automaton
+          cells:
+          - ╾█████████╼
+          - ▒█≡█████≡█▒
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: ribbon_salvager
+          weight: 1
+          archetypes:
+          - ribbon_salvager
+          cells:
+          - ╾─▒█████▒─╼
+          - ' ╭┤█████├╭ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: temporal_broker
+          weight: 1
+          archetypes:
+          - temporal_broker
+          cells:
+          - '  ▟█◊█◊█▙  '
+          - ╾─▒█████▒─╼
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: cosmic_arbiter
+          weight: 1
+          archetypes:
+          - cosmic_arbiter
+          cells:
+          - ╾─┤◇███◇├─╼
+          - '  │█████│  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: telepath_aristocrat
+          weight: 1
+          archetypes:
+          - telepath_aristocrat
+          cells:
+          - '  ◢█◆█◆█◣  '
+          - ╾─███████─╼
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: engineered_aesthete
+          weight: 1
+          archetypes:
+          - engineered_aesthete
+          cells:
+          - ▦─┤█████├─▦
+          - ▒█◊█████◊█▒
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: amorous_imp
+          weight: 1
+          archetypes:
+          - amorous_imp
+          cells:
+          - ╾◢█♥███♥█◣╼
+          - ' ▜███████▛ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: horned_grudgekeeper
+          weight: 1
+          archetypes:
+          - horned_grudgekeeper
+          cells:
+          - ╾█████████╼
+          - ▒█≡█████≡█▒
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: psionic_overlord
+          weight: 1
+          archetypes:
+          - psionic_overlord
+          cells:
+          - '  ▟█◇█◇█▙  '
+          - ╾─███████─╼
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: colonial_broodmaster
+          weight: 1
+          archetypes:
+          - colonial_broodmaster
+          cells:
+          - ◢█◆█████◆█◣
+          - ██◇█████◇██
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: winged_schemer
+          weight: 1
+          archetypes:
+          - winged_schemer
+          cells:
+          - ╾◢█◊███◊█◣╼
+          - ╾─███████─╼
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+      - id: base
+        name: Base
+        primary_property: platform
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - ▤──┤███├──▤
+          - '   └───┘   '
+          - '     │     '
+          - '     ▾     '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '   └───┘   '
+          - '     │     '
+          - '     ▾     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - ▤──┤███├──▤
+          - '   └───┘   '
+          - '     ▾     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: humanoid_diplomat
+          weight: 1
+          archetypes:
+          - humanoid_diplomat
+          cells:
+          - '  ▜█████▛  '
+          - '     ▄     '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSESSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: canid_technologist
+          weight: 1
+          archetypes:
+          - canid_technologist
+          cells:
+          - '  ▜█████▛  '
+          - '     ▾     '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: tentacled_envoy
+          weight: 1
+          archetypes:
+          - tentacled_envoy
+          cells:
+          - '  ▜█████▛  '
+          - '     ◇     '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: brain_dome_automaton
+          weight: 1
+          archetypes:
+          - brain_dome_automaton
+          cells:
+          - ' ▜███████▛ '
+          - '     ▄     '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSESSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: ribbon_salvager
+          weight: 1
+          archetypes:
+          - ribbon_salvager
+          cells:
+          - ' ╰─▜███▛─╰ '
+          - ╰─╯  ▾  ╯─╰
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: temporal_broker
+          weight: 1
+          archetypes:
+          - temporal_broker
+          cells:
+          - '   ▜███▛   '
+          - '     ▄     '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSESSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: cosmic_arbiter
+          weight: 1
+          archetypes:
+          - cosmic_arbiter
+          cells:
+          - '   │◆│◆│   '
+          - '   ╰─╯─╰   '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: telepath_aristocrat
+          weight: 1
+          archetypes:
+          - telepath_aristocrat
+          cells:
+          - '  ◥█◇█◇█◤  '
+          - '     ◇     '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: engineered_aesthete
+          weight: 1
+          archetypes:
+          - engineered_aesthete
+          cells:
+          - ╾─▜█████▛─╼
+          - '     ▾     '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: amorous_imp
+          weight: 1
+          archetypes:
+          - amorous_imp
+          cells:
+          - '  ◥█████◤  '
+          - '     ♦     '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: horned_grudgekeeper
+          weight: 1
+          archetypes:
+          - horned_grudgekeeper
+          cells:
+          - ' ◥███████◤ '
+          - ◥    ◆    ◤
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: psionic_overlord
+          weight: 1
+          archetypes:
+          - psionic_overlord
+          cells:
+          - '   ▜███▛   '
+          - '  ╰──╯──╰  '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: colonial_broodmaster
+          weight: 1
+          archetypes:
+          - colonial_broodmaster
+          cells:
+          - ◥█████████◤
+          - '   ◥◆█◆◤   '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: winged_schemer
+          weight: 1
+          archetypes:
+          - winged_schemer
+          cells:
+          - ' ◥███████◤ '
+          - '   ▾███▾   '
+          - '           '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: mast
+        name: Mast
+        primary_property: tower
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_2
+          weight: 1
+          cells:
+          - '     ▴     '
+          - '   ┌───┐   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: humanoid_diplomat
+          weight: 1
+          archetypes:
+          - humanoid_diplomat
+          cells:
+          - '     ▀     '
+          - '    ▟█▙    '
+          color_mask:
+          - SSSSSBSSSSS
+          - SSSSSSSSSSS
+        - id: canid_technologist
+          weight: 1
+          archetypes:
+          - canid_technologist
+          cells:
+          - '   ▴ ▴ ▴   '
+          - '   ▟███▙   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: tentacled_envoy
+          weight: 1
+          archetypes:
+          - tentacled_envoy
+          cells:
+          - '     ◆     '
+          - '   ▟███▙   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: brain_dome_automaton
+          weight: 1
+          archetypes:
+          - brain_dome_automaton
+          cells:
+          - '     ▀     '
+          - '   ▟███▙   '
+          color_mask:
+          - SSSSSBSSSSS
+          - SSSSSSSSSSS
+        - id: ribbon_salvager
+          weight: 1
+          archetypes:
+          - ribbon_salvager
+          cells:
+          - ╭─╮  ▴  ╮─╭
+          - '  ╰─▟█▙─╰  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: temporal_broker
+          weight: 1
+          archetypes:
+          - temporal_broker
+          cells:
+          - '     ◊     '
+          - '    ▟█▙    '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: cosmic_arbiter
+          weight: 1
+          archetypes:
+          - cosmic_arbiter
+          cells:
+          - '   ╭─╮─╭   '
+          - '   │◆│◆│   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: telepath_aristocrat
+          weight: 1
+          archetypes:
+          - telepath_aristocrat
+          cells:
+          - '     ◇     '
+          - '    ◢█◣    '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: engineered_aesthete
+          weight: 1
+          archetypes:
+          - engineered_aesthete
+          cells:
+          - '     ▴     '
+          - '   ▟███▙   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: amorous_imp
+          weight: 1
+          archetypes:
+          - amorous_imp
+          cells:
+          - '     ♥     '
+          - '   ◢███◣   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: horned_grudgekeeper
+          weight: 1
+          archetypes:
+          - horned_grudgekeeper
+          cells:
+          - ◢    ◆    ◣
+          - '  ◢█████◣  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: psionic_overlord
+          weight: 1
+          archetypes:
+          - psionic_overlord
+          cells:
+          - '  ╭──╮──╭  '
+          - '     ◆     '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: colonial_broodmaster
+          weight: 1
+          archetypes:
+          - colonial_broodmaster
+          cells:
+          - '   ◢◆█◆◣   '
+          - ' ◢███████◣ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: winged_schemer
+          weight: 1
+          archetypes:
+          - winged_schemer
+          cells:
+          - '   ▴███▴   '
+          - ' ◢███████◣ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+      - id: core
+        name: Core
+        primary_property: docking
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - ▤──┤███├──▤
+          - '   │███│   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '   │███│   '
+          - '   │███│   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - ▦──┤███├──▦
+          - '   │███│   '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: humanoid_diplomat
+          weight: 1
+          archetypes:
+          - humanoid_diplomat
+          cells:
+          - ╾─▟█████▙─╼
+          - '  ▟█████▙  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: canid_technologist
+          weight: 1
+          archetypes:
+          - canid_technologist
+          cells:
+          - ╾─┤█████├─╼
+          - '  █◇███◇█  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: tentacled_envoy
+          weight: 1
+          archetypes:
+          - tentacled_envoy
+          cells:
+          - ╾▟█◇███◇█▙╼
+          - ' ▟███████▙ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: brain_dome_automaton
+          weight: 1
+          archetypes:
+          - brain_dome_automaton
+          cells:
+          - ╾█████████╼
+          - ▒█≡█████≡█▒
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: ribbon_salvager
+          weight: 1
+          archetypes:
+          - ribbon_salvager
+          cells:
+          - ╾─▒█████▒─╼
+          - ' ╭┤█████├╭ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: temporal_broker
+          weight: 1
+          archetypes:
+          - temporal_broker
+          cells:
+          - '  ▟█◊█◊█▙  '
+          - ╾─▒█████▒─╼
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: cosmic_arbiter
+          weight: 1
+          archetypes:
+          - cosmic_arbiter
+          cells:
+          - ╾─┤◇███◇├─╼
+          - '  │█████│  '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: telepath_aristocrat
+          weight: 1
+          archetypes:
+          - telepath_aristocrat
+          cells:
+          - '  ◢█◆█◆█◣  '
+          - ╾─███████─╼
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: engineered_aesthete
+          weight: 1
+          archetypes:
+          - engineered_aesthete
+          cells:
+          - ▦─┤█████├─▦
+          - ▒█◊█████◊█▒
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: amorous_imp
+          weight: 1
+          archetypes:
+          - amorous_imp
+          cells:
+          - ╾◢█♥███♥█◣╼
+          - ' ▜███████▛ '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: horned_grudgekeeper
+          weight: 1
+          archetypes:
+          - horned_grudgekeeper
+          cells:
+          - ╾█████████╼
+          - ▒█≡█████≡█▒
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: psionic_overlord
+          weight: 1
+          archetypes:
+          - psionic_overlord
+          cells:
+          - '  ▟█◇█◇█▙  '
+          - ╾─███████─╼
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: colonial_broodmaster
+          weight: 1
+          archetypes:
+          - colonial_broodmaster
+          cells:
+          - ◢█◆█████◆█◣
+          - ██◇█████◇██
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: winged_schemer
+          weight: 1
+          archetypes:
+          - winged_schemer
+          cells:
+          - ╾◢█◊███◊█◣╼
+          - ╾─███████─╼
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+      - id: base
+        name: Base
+        primary_property: platform
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_2
+          weight: 1
+          cells:
+          - '   └───┘   '
+          - '     │     '
+          - '     ▾     '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - ▤──┤███├──▤
+          - '   └───┘   '
+          - '     ▾     '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: humanoid_diplomat
+          weight: 1
+          archetypes:
+          - humanoid_diplomat
+          cells:
+          - '  ▜█████▛  '
+          - '     ▄     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSESSSSS
+          - SSSSSSSSSSS
+        - id: canid_technologist
+          weight: 1
+          archetypes:
+          - canid_technologist
+          cells:
+          - '  ▜█████▛  '
+          - '     ▾     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: tentacled_envoy
+          weight: 1
+          archetypes:
+          - tentacled_envoy
+          cells:
+          - '  ▜█████▛  '
+          - '     ◇     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: brain_dome_automaton
+          weight: 1
+          archetypes:
+          - brain_dome_automaton
+          cells:
+          - ' ▜███████▛ '
+          - '     ▄     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSESSSSS
+          - SSSSSSSSSSS
+        - id: ribbon_salvager
+          weight: 1
+          archetypes:
+          - ribbon_salvager
+          cells:
+          - ' ╰─▜███▛─╰ '
+          - ╰─╯  ▾  ╯─╰
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: temporal_broker
+          weight: 1
+          archetypes:
+          - temporal_broker
+          cells:
+          - '   ▜███▛   '
+          - '     ▄     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSESSSSS
+          - SSSSSSSSSSS
+        - id: cosmic_arbiter
+          weight: 1
+          archetypes:
+          - cosmic_arbiter
+          cells:
+          - '   │◆│◆│   '
+          - '   ╰─╯─╰   '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: telepath_aristocrat
+          weight: 1
+          archetypes:
+          - telepath_aristocrat
+          cells:
+          - '  ◥█◇█◇█◤  '
+          - '     ◇     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: engineered_aesthete
+          weight: 1
+          archetypes:
+          - engineered_aesthete
+          cells:
+          - ╾─▜█████▛─╼
+          - '     ▾     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: amorous_imp
+          weight: 1
+          archetypes:
+          - amorous_imp
+          cells:
+          - '  ◥█████◤  '
+          - '     ♦     '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: horned_grudgekeeper
+          weight: 1
+          archetypes:
+          - horned_grudgekeeper
+          cells:
+          - ' ◥███████◤ '
+          - ◥    ◆    ◤
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: psionic_overlord
+          weight: 1
+          archetypes:
+          - psionic_overlord
+          cells:
+          - '   ▜███▛   '
+          - '  ╰──╯──╰  '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: colonial_broodmaster
+          weight: 1
+          archetypes:
+          - colonial_broodmaster
+          cells:
+          - ◥█████████◤
+          - '   ◥◆█◆◤   '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+        - id: winged_schemer
+          weight: 1
+          archetypes:
+          - winged_schemer
+          cells:
+          - ' ◥███████◤ '
+          - '   ▾███▾   '
+          - '           '
+          color_mask:
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+          - SSSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: mast
+        name: Mast
+        primary_property: tower
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '  ┌─┐  '
+          color_mask:
+          - SSSSSSS
+      - id: core
+        name: Core
+        primary_property: docking
+        secondary_properties: []
+        repeat: 4
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - ' ▦│█│▦ '
+          color_mask:
+          - SSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '  │█│  '
+          color_mask:
+          - SSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - ' ▤─█─▤ '
+          color_mask:
+          - SSSSSSS
+      - id: base
+        name: Base
+        primary_property: platform
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '  └─┘  '
+          color_mask:
+          - SSSSSSS
+    - id: minimal
+      name: Minimal
+      sections:
+      - id: mast
+        name: Mast
+        primary_property: tower
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '  ┌─┐  '
+          color_mask:
+          - SSSSSSS
+      - id: core
+        name: Core
+        primary_property: docking
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - ' ▦│█│▦ '
+          color_mask:
+          - SSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '  │█│  '
+          color_mask:
+          - SSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - ' ▤─█─▤ '
+          color_mask:
+          - SSSSSSS
+      - id: base
+        name: Base
+        primary_property: platform
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '  └─┘  '
+          color_mask:
+          - SSSSSSS

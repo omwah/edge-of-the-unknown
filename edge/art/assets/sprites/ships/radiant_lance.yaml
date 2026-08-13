@@ -1,0 +1,790 @@
+schema_version: 4
+id: radiant_lance
+name: Radiant Lance
+kind: ship
+role: radiant_lance
+description: A glittering military spine with folding diamond radiators and petal habitats.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: fusion_bell
+        name: Fusion Bell
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: focused_bell
+          weight: 1
+          cells:
+          - '  ▄  '
+          - ' ▀▓  '
+          - '▄◢█▓ '
+          - ▄█░█▓
+          - '▄◥█▓ '
+          - ' ▀▓  '
+          - '  ▀  '
+          color_mask:
+          - SSESS
+          - SESSS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - SESSS
+          - SSESS
+        - id: luminous_plume
+          weight: 1
+          cells:
+          - '     '
+          - ' ◀▄▖ '
+          - ◀▄▟▓╾
+          - ◀▄█░█
+          - ◀▄▜▓╾
+          - ' ◀▄▘ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSESS
+          - SESSS
+          - SESES
+          - SESSS
+          - SSESS
+          - SSSSS
+      - id: engine_swell
+        name: Engine Swell
+        primary_property: spindrive
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: swell
+          weight: 1
+          cells:
+          - '  ▴  '
+          - '◢██◣ '
+          - ▓█☼█▓
+          - █▒░▒█
+          - ▓███▓
+          - '◥██◤ '
+          - '  ▾  '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSBSS
+          - SSESS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: veined_swell
+          weight: 1
+          cells:
+          - '  ☼  '
+          - '◢█▓◣ '
+          - ▓░█░▓
+          - █▓☼▓█
+          - ▓░█░▓
+          - '◥█▓◤ '
+          - '  ☼  '
+          color_mask:
+          - SSBSS
+          - SSSSS
+          - SESES
+          - SSBSS
+          - SESES
+          - SSSSS
+          - SSBSS
+      - id: diamond_radiators
+        name: Diamond Radiators
+        primary_property: radiator
+        secondary_properties:
+        - hull
+        repeat: 5
+        variants:
+        - id: panel_vanes
+          weight: 1
+          cells:
+          - ' ▗▓▖ '
+          - ' ▐▓▌ '
+          - ' ▐▓▌ '
+          - ╬═╬═╬
+          - ' ▐▓▌ '
+          - ' ▐▓▌ '
+          - ' ▝▓▘ '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: diamond_chain
+          weight: 1
+          cells:
+          - ' ◥◤  '
+          - ' ◢◣  '
+          - '  █  '
+          - ╾═█═╼
+          - '  █  '
+          - ' ◥◤  '
+          - ' ◢◣  '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: habitat_petals
+        name: Habitat Petals
+        primary_property: habitat
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: spread_petals
+          weight: 1
+          cells:
+          - '◢██◣ '
+          - ' ╲╱  '
+          - █◆░◆█
+          - █☼███
+          - █◆░◆█
+          - ' ╱╲  '
+          - '◥██◤ '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SWSWS
+          - SBSSS
+          - SWSWS
+          - SSSSS
+          - SSSSS
+        - id: folded_petals
+          weight: 1
+          cells:
+          - ' ▄▄  '
+          - '╭██╮ '
+          - █◆◆▓╾
+          - █☼▓██
+          - █◆▓▓╾
+          - '╰██╯ '
+          - ' ▀▀  '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SWWSS
+          - SBSSS
+          - SWSSS
+          - SSSSS
+          - SSSSS
+      - id: lance
+        name: Lance
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: long_lance
+          weight: 1
+          cells:
+          - '       '
+          - '       '
+          - '  ╾──▙ '
+          - ╾──══▓►
+          - '  ╾──▛ '
+          - '       '
+          - '       '
+          color_mask:
+          - SSSSSSS
+          - SSSSSSS
+          - SSSSSSS
+          - SSSASSA
+          - SSSSSSS
+          - SSSSSSS
+          - SSSSSSS
+        - id: lensed_lance
+          weight: 1
+          cells:
+          - '       '
+          - '   ╾▀▙ '
+          - '  ╾═▓▙ '
+          - ╾─═█☼▓►
+          - '  ╾═▓▛ '
+          - '   ╾▀▛ '
+          - '       '
+          color_mask:
+          - SSSSSSS
+          - SSSSASS
+          - SSSSSSS
+          - SSSSBSA
+          - SSSSSSS
+          - SSSSASS
+          - SSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: fusion_bell
+        name: Fusion Bell
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: focused_bell
+          weight: 1
+          cells:
+          - ' ▀▌ '
+          - '▄◢█ '
+          - ▄█░▓
+          - '▄◥█ '
+          - ' ▀▘ '
+          color_mask:
+          - SESS
+          - ESSS
+          - ESES
+          - ESSS
+          - SESS
+        - id: luminous_plume
+          weight: 1
+          cells:
+          - ' ◀▄ '
+          - ◀▄▟╾
+          - ◀▄██
+          - ◀▄▜╾
+          - ' ◀▄ '
+          color_mask:
+          - SSES
+          - SESS
+          - SESS
+          - SESS
+          - SSES
+      - id: engine_swell
+        name: Engine Swell
+        primary_property: spindrive
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: swell
+          weight: 1
+          cells:
+          - '◢██ '
+          - ▓█☼▓
+          - █▒░█
+          - ▓██▓
+          - '◥██ '
+          color_mask:
+          - SSSS
+          - SSBS
+          - SSES
+          - SSSS
+          - SSSS
+        - id: veined_swell
+          weight: 1
+          cells:
+          - '◢█▓ '
+          - ▓░█▓
+          - █▓☼█
+          - ▓░█▓
+          - '◥█▓ '
+          color_mask:
+          - SSSS
+          - SESS
+          - SSBS
+          - SESS
+          - SSSS
+      - id: diamond_radiators
+        name: Diamond Radiators
+        primary_property: radiator
+        secondary_properties:
+        - hull
+        repeat: 4
+        variants:
+        - id: panel_vanes
+          weight: 1
+          cells:
+          - ' ▐▓ '
+          - ' ▐▓ '
+          - ╬═╬╬
+          - ' ▐▓ '
+          - ' ▐▓ '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: diamond_chain
+          weight: 1
+          cells:
+          - ' ◢◣ '
+          - '  █ '
+          - ╾═█╼
+          - '  █ '
+          - ' ◥◤ '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: habitat_petals
+        name: Habitat Petals
+        primary_property: habitat
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: spread_petals
+          weight: 1
+          cells:
+          - ' ╲╱ '
+          - █◆░█
+          - █☼██
+          - █◆░█
+          - ' ╱╲ '
+          color_mask:
+          - SSSS
+          - SWSS
+          - SBSS
+          - SWSS
+          - SSSS
+        - id: folded_petals
+          weight: 1
+          cells:
+          - '╭██ '
+          - █◆◆╾
+          - █☼▓█
+          - █◆▓╾
+          - '╰██ '
+          color_mask:
+          - SSSS
+          - SWWS
+          - SBSS
+          - SWSS
+          - SSSS
+      - id: lance
+        name: Lance
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: long_lance
+          weight: 1
+          cells:
+          - '     '
+          - '  ─╗ '
+          - ╾─═╬►
+          - '  ─╝ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSASA
+          - SSSSS
+          - SSSSS
+        - id: lensed_lance
+          weight: 1
+          cells:
+          - '  ╾▄ '
+          - '  ═▓ '
+          - ╾─█☼►
+          - '  ═▓ '
+          - '  ╾▀ '
+          color_mask:
+          - SSSAS
+          - SSSSS
+          - SSSBA
+          - SSSSS
+          - SSSAS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ' ▴'
+          - ▄█
+          - ' ▾'
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: diamond
+          weight: 1
+          cells:
+          - ◤◥
+          - █♦
+          - ◣◢
+          color_mask:
+          - SS
+          - SS
+          - SS
+        - id: petal
+          weight: 1
+          cells:
+          - ▀◆
+          - █☼
+          - ▄◆
+          color_mask:
+          - SW
+          - SB
+          - SW
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: lance
+          weight: 1
+          cells:
+          - '   '
+          - ╾═►
+          - '   '
+          color_mask:
+          - SSS
+          - SAA
+          - SSS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: fusion_bell
+        name: Fusion Bell
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: focused_bell
+          weight: 1
+          cells:
+          - '      ▓▓      '
+          - ▌▌▗▗██░░██▖▖▌▌
+          - '    ▐▐▐▐▐▐    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - EESSSSEESSSSEE
+          - SSSSEEEEEESSSS
+        - id: luminous_plume
+          weight: 1
+          cells:
+          - '    ╽╽██╽╽    '
+          - '  ▐▐▜▜██▛▛▐▐  '
+          - '    ▾▾▾▾▾▾    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSEESSSSSSEESS
+          - SSSSSSSSSSSSSS
+      - id: engine_swell
+        name: Engine Swell
+        primary_property: spindrive
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: swell
+          weight: 1
+          cells:
+          - '    ▓▓██▓▓    '
+          - ◀◀██☼☼░░████▶▶
+          - '  ◥◥▓▓██▓▓◤◤  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSBBEESSSSSS
+          - SSSSSSSSSSSSSS
+        - id: veined_swell
+          weight: 1
+          cells:
+          - '    ▓▓██▓▓    '
+          - ☼☼▓▓██☼☼██▓▓☼☼
+          - '  ◥◥▓▓██▓▓◤◤  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - BBSSSSBBSSSSBB
+          - SSSSSSSSSSSSSS
+      - id: diamond_radiators
+        name: Diamond Radiators
+        primary_property: radiator
+        secondary_properties:
+        - hull
+        repeat: 5
+        variants:
+        - id: panel_vanes
+          weight: 1
+          cells:
+          - '      ╦╦      '
+          - ▓▓▓▓▓▓╬╬▓▓▓▓▓▓
+          - '      ╩╩      '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: diamond_chain
+          weight: 1
+          cells:
+          - '      ╿╿      '
+          - ◤◤◢◢██████◣◣◥◥
+          - '      ╽╽      '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: habitat_petals
+        name: Habitat Petals
+        primary_property: habitat
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: spread_petals
+          weight: 1
+          cells:
+          - '    ██████    '
+          - ██╲╲░░██░░╱╱██
+          - ◥◥  ██████  ◤◤
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: folded_petals
+          weight: 1
+          cells:
+          - '    ╽╽██╽╽    '
+          - ▐▐██◆◆▓▓▓▓██▌▌
+          - '  ╰╰██████╯╯  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSWWSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: lance
+        name: Lance
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: long_lance
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ││║║││    '
+          - '    ╽╽││╽╽    '
+          - '      ╽╽      '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: lensed_lance
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '  ▌▌▓▓☼☼▓▓▌▌  '
+          - '    ╽╽║║╽╽    '
+          - '      ╽╽      '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSAASSBBSSAASS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: fusion_bell
+        name: Fusion Bell
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: focused_bell
+          weight: 1
+          cells:
+          - '    ▓▓    '
+          - ▌▌◥◥██◤◤▌▌
+          color_mask:
+          - SSSSSSSSSS
+          - EESSSSSSEE
+        - id: luminous_plume
+          weight: 1
+          cells:
+          - '  ╽╽██╽╽  '
+          - ▾▾▐▐▐▐▐▐▾▾
+          color_mask:
+          - SSSSSSSSSS
+          - SSEEEEEESS
+      - id: engine_swell
+        name: Engine Swell
+        primary_property: spindrive
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: swell
+          weight: 1
+          cells:
+          - '  ▓▓██▓▓  '
+          - ████▒▒████
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: veined_swell
+          weight: 1
+          cells:
+          - '  ▓▓██▓▓  '
+          - ██░░▓▓░░██
+          color_mask:
+          - SSSSSSSSSS
+          - SSEESSEESS
+      - id: diamond_radiators
+        name: Diamond Radiators
+        primary_property: radiator
+        secondary_properties:
+        - hull
+        repeat: 4
+        variants:
+        - id: panel_vanes
+          weight: 1
+          cells:
+          - '    ╦╦    '
+          - ▀▀▀▀║║▀▀▀▀
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: diamond_chain
+          weight: 1
+          cells:
+          - '    ╿╿    '
+          - ◥◥  ║║  ◤◤
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: habitat_petals
+        name: Habitat Petals
+        primary_property: habitat
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: spread_petals
+          weight: 1
+          cells:
+          - '  ██████  '
+          - ╱╱◆◆☼☼◆◆╲╲
+          color_mask:
+          - SSSSSSSSSS
+          - SSWWBBWWSS
+        - id: folded_petals
+          weight: 1
+          cells:
+          - '  ╽╽██╽╽  '
+          - ██◆◆☼☼◆◆██
+          color_mask:
+          - SSSSSSSSSS
+          - SSWWBBWWSS
+      - id: lance
+        name: Lance
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: long_lance
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - '  ││║║││  '
+          - '    ╽╽    '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSAASSSS
+          - SSSSSSSSSS
+        - id: lensed_lance
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - ╽╽║║██║║╽╽
+          - '    ╽╽    '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ◀◀██▶▶
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: diamond
+          weight: 1
+          cells:
+          - ◤◤♦♦◥◥
+          color_mask:
+          - SSSSSS
+        - id: petal
+          weight: 1
+          cells:
+          - ◆◆☼☼◆◆
+          color_mask:
+          - WWBBWW
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: lance
+          weight: 1
+          cells:
+          - '  ▲▲  '
+          - '  ╽╽  '
+          color_mask:
+          - SSAASS
+          - SSSSSS

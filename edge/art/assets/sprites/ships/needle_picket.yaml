@@ -1,0 +1,770 @@
+schema_version: 4
+id: needle_picket
+name: Needle Picket
+kind: ship
+role: needle_picket
+description: A lean independent patrol hull with exposed drive nodes and an oversized sensor prow.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Thruster Fork
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: forked_nacelles
+          weight: 1
+          cells:
+          - '     '
+          - '▄▟▓  '
+          - ▄╾█▓╾
+          - ' ▓▒▓ '
+          - ▄╾█▓╾
+          - '▄▜▓  '
+          - '     '
+          color_mask:
+          - SSSSS
+          - ESSSS
+          - ESSSS
+          - SSSSS
+          - ESSSS
+          - ESSSS
+          - SSSSS
+        - id: ring_nacelle
+          weight: 1
+          cells:
+          - '     '
+          - '▄▗▄▖ '
+          - ▄▐█░▓
+          - ' ▓▒▓╾'
+          - ▄▐█░▓
+          - '▄▝▀▘ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - ESSSS
+          - ESSES
+          - SSSSS
+          - ESSES
+          - ESSSS
+          - SSSSS
+      - id: drive_nodes
+        name: Drive Nodes
+        primary_property: spindrive
+        secondary_properties:
+        - radiator
+        repeat: 1
+        variants:
+        - id: exposed_nodes
+          weight: 1
+          cells:
+          - '    '
+          - ' ☼  '
+          - ▓██╾
+          - █░▓█
+          - ▓██╾
+          - ' ▀  '
+          - '    '
+          color_mask:
+          - SSSS
+          - SBSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SBSS
+          - SSSS
+        - id: veiled_nodes
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ╭██╮
+          - █▒☼█
+          - ╰██╯
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSBS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: patrol_spine
+        name: Patrol Spine
+        primary_property: hull
+        secondary_properties:
+        - sensors
+        repeat: 7
+        variants:
+        - id: truss_rib
+          weight: 1
+          cells:
+          - '    '
+          - ▗▄▄▖
+          - █░▒█
+          - █▒░█
+          - ▝▀▀▘
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: sensor_rib
+          weight: 1
+          cells:
+          - '    '
+          - ▗▄▄▖
+          - █░◇█
+          - █▒░█
+          - ▝▀▀▘
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSWS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: sensor_crown
+        name: Sensor Crown
+        primary_property: sensors
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: crown
+          weight: 1
+          cells:
+          - '     '
+          - ' ☼█☼ '
+          - ◇███◇
+          - ☼█◆◆█
+          - ' ◥██◤'
+          - '     '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SBSBS
+          - SSSSS
+          - BSWWS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: dish_array
+          weight: 1
+          cells:
+          - '     '
+          - '     '
+          - ' ◢◣  '
+          - ◢█◆█◣
+          - ☼███☼
+          - '     '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSWSS
+          - BSSSB
+          - SSSSS
+          - SSSSS
+      - id: needle
+        name: Needle Prow
+        primary_property: main_gun
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: long_needle
+          weight: 1
+          cells:
+          - '      '
+          - '      '
+          - '  ╾─▙ '
+          - ╾──╼▓►
+          - '  ╾─▛ '
+          - '      '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSA
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: probe_spike
+          weight: 1
+          cells:
+          - '      '
+          - '      '
+          - '  ╾▓▙ '
+          - ╾─╼▓▓►
+          - '  ╾▓▛ '
+          - '      '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSA
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Thruster Fork
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: forked_nacelles
+          weight: 1
+          cells:
+          - '▄▟▓ '
+          - ▄╾█╾
+          - ' ▓▒ '
+          - ▄╾█╾
+          - '▄▜▓ '
+          color_mask:
+          - ESSS
+          - ESSS
+          - SSSS
+          - ESSS
+          - ESSS
+        - id: ring_nacelle
+          weight: 1
+          cells:
+          - '▄▗▄ '
+          - ▄▐█▓
+          - ' ▓▒╾'
+          - ▄▐█▓
+          - '▄▝▀ '
+          color_mask:
+          - ESSS
+          - ESSS
+          - SSSS
+          - ESSS
+          - ESSS
+      - id: drive_nodes
+        name: Drive Nodes
+        primary_property: spindrive
+        secondary_properties:
+        - radiator
+        repeat: 1
+        variants:
+        - id: exposed_nodes
+          weight: 1
+          cells:
+          - ' ☼ '
+          - ▓█╾
+          - █░█
+          - ▓█╾
+          - ' ▀ '
+          color_mask:
+          - SBS
+          - SSS
+          - SSS
+          - SSS
+          - SBS
+        - id: veiled_nodes
+          weight: 1
+          cells:
+          - '   '
+          - ╭█╮
+          - █▒█
+          - ╰█╯
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+      - id: patrol_spine
+        name: Patrol Spine
+        primary_property: hull
+        secondary_properties:
+        - sensors
+        repeat: 6
+        variants:
+        - id: truss_rib
+          weight: 1
+          cells:
+          - ▗▄▖
+          - █░█
+          - █▒█
+          - ▝▀▘
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+        - id: sensor_rib
+          weight: 1
+          cells:
+          - ▗▄▖
+          - █░█
+          - █▒█
+          - ▝▀▘
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+      - id: sensor_crown
+        name: Sensor Crown
+        primary_property: sensors
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: crown
+          weight: 1
+          cells:
+          - ' ☼█ '
+          - ◇██◇
+          - ☼█◆█
+          - ' ◥█◤'
+          - '    '
+          color_mask:
+          - SBSS
+          - SSSS
+          - BSWS
+          - SSSS
+          - SSSS
+        - id: dish_array
+          weight: 1
+          cells:
+          - '    '
+          - ' ◢◣ '
+          - ◢█◆◣
+          - ☼██☼
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSWS
+          - BSSB
+          - SSSS
+      - id: needle
+        name: Needle Prow
+        primary_property: main_gun
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: long_needle
+          weight: 1
+          cells:
+          - '     '
+          - '  ╾─╮'
+          - ╾──╼►
+          - '  ╾─╯'
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSA
+          - SSSSS
+          - SSSSS
+        - id: probe_spike
+          weight: 1
+          cells:
+          - '     '
+          - '  ╾▓ '
+          - ╾─╼▓►
+          - '  ╾▓ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSA
+          - SSSSS
+          - SSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - '  '
+          - ▄▓
+          - '  '
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: truss
+          weight: 1
+          cells:
+          - ▗▖
+          - █░
+          - ▝▘
+          color_mask:
+          - SS
+          - SS
+          - SS
+        - id: sensor
+          weight: 1
+          cells:
+          - '  '
+          - █☼
+          - '  '
+          color_mask:
+          - SS
+          - SB
+          - SS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: needle
+          weight: 1
+          cells:
+          - '   '
+          - ╾╼►
+          - '   '
+          color_mask:
+          - SSS
+          - SSA
+          - SSS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Thruster Fork
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: forked_nacelles
+          weight: 1
+          cells:
+          - '    ╽╽  ╽╽    '
+          - '  ▓▓██▒▒██▓▓  '
+          - '  ▐▐▐▐  ▐▐▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSEEEESSEEEESS
+        - id: ring_nacelle
+          weight: 1
+          cells:
+          - '    ▓▓╽╽▓▓    '
+          - '  ▐▐██▒▒██▌▌  '
+          - '  ▐▐▐▐  ▐▐▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSEEEESSEEEESS
+      - id: drive_nodes
+        name: Drive Nodes
+        primary_property: spindrive
+        secondary_properties:
+        - radiator
+        repeat: 1
+        variants:
+        - id: exposed_nodes
+          weight: 1
+          cells:
+          - '    ╽╽██╽╽    '
+          - '  ☼☼██░░██▌▌  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSBBSSSSSSBBSS
+        - id: veiled_nodes
+          weight: 1
+          cells:
+          - '    ╭╭██╮╮    '
+          - '    ██▒▒██    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: patrol_spine
+        name: Patrol Spine
+        primary_property: hull
+        secondary_properties:
+        - sensors
+        repeat: 7
+        variants:
+        - id: truss_rib
+          weight: 1
+          cells:
+          - '  ▗▗████▖▖    '
+          - '  ▐▐░░▒▒▌▌    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: sensor_rib
+          weight: 1
+          cells:
+          - '  ▗▗████▖▖    '
+          - '▌▌▐▐░░▒▒▌▌    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - BBSSSSSSSSSSSS
+      - id: sensor_crown
+        name: Sensor Crown
+        primary_property: sensors
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: crown
+          weight: 1
+          cells:
+          - '    ◇◇██◣◣    '
+          - '  ████◆◆██    '
+          - '    ◇◇☼☼      '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSWWSSSSSS
+          - SSSSSSBBSSSSSS
+        - id: dish_array
+          weight: 1
+          cells:
+          - '      ◢◢☼☼    '
+          - '  ▌▌◢◢◆◆██    '
+          - '      ◥◥☼☼    '
+          color_mask:
+          - SSSSSSSSBBSSSS
+          - SSBBSSWWSSSSSS
+          - SSSSSSSSBBSSSS
+      - id: needle
+        name: Needle Prow
+        primary_property: main_gun
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: long_needle
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ││╿╿││    '
+          - '      ││      '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: probe_spike
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ▓▓▓▓▓▓    '
+          - '      ││      '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Thruster Fork
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: forked_nacelles
+          weight: 1
+          cells:
+          - '  ╽╽  ╽╽  '
+          - ▜▜╽╽▓▓╽╽▛▛
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: ring_nacelle
+          weight: 1
+          cells:
+          - '  ▓▓╽╽▓▓  '
+          - ▝▝▀▀▓▓▀▀▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: drive_nodes
+        name: Drive Nodes
+        primary_property: spindrive
+        secondary_properties:
+        - radiator
+        repeat: 1
+        variants:
+        - id: exposed_nodes
+          weight: 1
+          cells:
+          - '  ╽╽██╽╽  '
+          - '  ▓▓██▓▓  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: veiled_nodes
+          weight: 1
+          cells:
+          - '  ╭╭██╮╮  '
+          - '  ╰╰██╯╯  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: patrol_spine
+        name: Patrol Spine
+        primary_property: hull
+        secondary_properties:
+        - sensors
+        repeat: 6
+        variants:
+        - id: truss_rib
+          weight: 1
+          cells:
+          - '▗▗████▖▖  '
+          - '▝▝████▘▘  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: sensor_rib
+          weight: 1
+          cells:
+          - '▗▗████▖▖  '
+          - '▝▝████▘▘  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: sensor_crown
+        name: Sensor Crown
+        primary_property: sensors
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: crown
+          weight: 1
+          cells:
+          - '  ◇◇██◣◣  '
+          - '☼☼████◤◤  '
+          color_mask:
+          - SSSSSSSSSS
+          - BBSSSSSSSS
+        - id: dish_array
+          weight: 1
+          cells:
+          - '    ◢◢☼☼  '
+          - '  ◥◥████  '
+          color_mask:
+          - SSSSSSBBSS
+          - SSSSSSSSSS
+      - id: needle
+        name: Needle Prow
+        primary_property: main_gun
+        secondary_properties:
+        - sensors
+        repeat: 1
+        variants:
+        - id: long_needle
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - '  ╽╽││╽╽  '
+          - '    ╽╽    '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: probe_spike
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - '  ╽╽╿╿╽╽  '
+          - '    ╽╽    '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - '  ▓▓  '
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: truss
+          weight: 1
+          cells:
+          - ▗▗░░▖▖
+          color_mask:
+          - SSSSSS
+        - id: sensor
+          weight: 1
+          cells:
+          - '▌▌☼☼  '
+          color_mask:
+          - BBBBSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: needle
+          weight: 1
+          cells:
+          - '  ▲▲  '
+          - '  ╽╽  '
+          color_mask:
+          - SSAASS
+          - SSSSSS

@@ -1,0 +1,846 @@
+schema_version: 4
+id: transport
+name: Transport
+kind: ship
+role: transport
+description: A dependable modular carrier whose countable container bays determine its capacity.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Cargo Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: twin_bell
+          weight: 1
+          cells:
+          - '     '
+          - ' ▀▓  '
+          - ▄▟░▓╾
+          - ▄███▓
+          - ▄▟░▓╾
+          - ' ▀▀  '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SESSS
+          - ESESS
+          - ESSSS
+          - ESESS
+          - SESSS
+          - SSSSS
+        - id: cluster_tug
+          weight: 1
+          cells:
+          - '     '
+          - '▄▄▓  '
+          - ▄▓█▓╾
+          - '▄█░▓ '
+          - ▄▓█▓╾
+          - '▄▟▓  '
+          - '     '
+          color_mask:
+          - SSSSS
+          - ESSSS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - ESSSS
+          - SSSSS
+      - id: spindrive
+        name: Drive Frame
+        primary_property: spindrive
+        secondary_properties:
+        - utility
+        repeat: 1
+        variants:
+        - id: drive_cradle
+          weight: 1
+          cells:
+          - '     '
+          - ╔═╦═╗
+          - ╢▓█▓║
+          - ╠═╬═╟
+          - ╢▓█▓║
+          - ╚═╩═╝
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: service_module
+          weight: 1
+          cells:
+          - '     '
+          - ╭───╮
+          - ┤▓░▓│
+          - ┤░☼░├
+          - ┤▓░▓│
+          - ╰───╯
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSBSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: hull
+        name: Container Bays
+        primary_property: cargo
+        secondary_properties:
+        - hull
+        - utility
+        repeat: 5
+        variants:
+        - id: boxcar
+          weight: 1
+          cells:
+          - '      '
+          - ╭─┬──╮
+          - │▒│▒▒│
+          - ┤░┼░▒├
+          - │▒│▒▒│
+          - ╰─┴──╯
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: tank_farm
+          weight: 1
+          cells:
+          - '      '
+          - ▗▄▄▄▄▖
+          - ▟█▒▒█▙
+          - █▒◆▒█╺
+          - ▜█▒▒█▛
+          - ▝▀▀▀▀▘
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: open_rack
+          weight: 1
+          cells:
+          - '      '
+          - ╔════╗
+          - ║▤▤▤▤║
+          - ╬═╬══╬
+          - ║▦▦▦▦║
+          - ╚════╝
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+      - id: screens
+        name: Control Collar
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        - sensors
+        repeat: 1
+        variants:
+        - id: bridge_collar
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ◢██▙
+          - ◇◆◆█
+          - ◥██▛
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - DWWS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: sensor_collar
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ◇◢█▙
+          - ◇◆◆█
+          - ◇◥█▛
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - DSSS
+          - DWSS
+          - DSSS
+          - SSSS
+          - SSSS
+      - id: main_gun
+        name: Utility Prow
+        primary_property: main_gun
+        secondary_properties:
+        - utility
+        - weapons
+        repeat: 1
+        variants:
+        - id: docking_prow
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ◢██▙
+          - █▓▀►
+          - ◥██▛
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSAA
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: clamp_prow
+          weight: 1
+          cells:
+          - '    '
+          - ' ▄  '
+          - ▟██▙
+          - █╬═►
+          - ▜██▛
+          - ' ▀  '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSA
+          - SSSS
+          - SSSS
+          - SSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Cargo Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: twin_bell
+          weight: 1
+          cells:
+          - ' ▀▓ '
+          - ▄▟░╾
+          - ▄██▓
+          - ▄▓░╾
+          - ' ▀▀ '
+          color_mask:
+          - SESS
+          - ESES
+          - ESSS
+          - ESES
+          - SESS
+        - id: cluster_tug
+          weight: 1
+          cells:
+          - '▄▗▓ '
+          - ▄▐█╾
+          - '▄█░ '
+          - ▄▐█╾
+          - '▄▝▓ '
+          color_mask:
+          - ESSS
+          - ESSS
+          - ESES
+          - ESSS
+          - ESSS
+      - id: spindrive
+        name: Drive Frame
+        primary_property: spindrive
+        secondary_properties:
+        - utility
+        repeat: 1
+        variants:
+        - id: drive_cradle
+          weight: 1
+          cells:
+          - ╔═╦╗
+          - ╢▓█║
+          - ╠═╬╬
+          - ╢▓█║
+          - ╚═╩╝
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: service_module
+          weight: 1
+          cells:
+          - ╭──╮
+          - ┤▓░│
+          - ┤░☼├
+          - ┤▓░│
+          - ╰──╯
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSBS
+          - SSSS
+          - SSSS
+      - id: hull
+        name: Container Bays
+        primary_property: cargo
+        secondary_properties:
+        - hull
+        - utility
+        repeat: 4
+        variants:
+        - id: boxcar
+          weight: 1
+          cells:
+          - ╭─┬─╮
+          - │▒│▒│
+          - ┤░┼░├
+          - │▒│▒│
+          - ╰─┴─╯
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: tank_farm
+          weight: 1
+          cells:
+          - ▗▄▄▄▖
+          - ▟█▒▒▙
+          - █▒◆▒╺
+          - ▜█▒▒▛
+          - ▝▀▀▀▘
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: open_rack
+          weight: 1
+          cells:
+          - ╔═══╗
+          - ║▤▤▤║
+          - ╬═╬═╬
+          - ║▦▦▦║
+          - ╚═══╝
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: screens
+        name: Control Collar
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        - sensors
+        repeat: 1
+        variants:
+        - id: bridge_collar
+          weight: 1
+          cells:
+          - '   '
+          - ◢█▙
+          - ◇◆█
+          - ◥█▛
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - DWS
+          - SSS
+          - SSS
+        - id: sensor_collar
+          weight: 1
+          cells:
+          - '   '
+          - ◇◢▙
+          - ◇◆█
+          - ◇◥▛
+          - '   '
+          color_mask:
+          - SSS
+          - DSS
+          - DWS
+          - DSS
+          - SSS
+      - id: main_gun
+        name: Utility Prow
+        primary_property: main_gun
+        secondary_properties:
+        - utility
+        - weapons
+        repeat: 1
+        variants:
+        - id: docking_prow
+          weight: 1
+          cells:
+          - '   '
+          - ◢█▙
+          - █▓►
+          - ◥█▛
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSA
+          - SSS
+          - SSS
+        - id: clamp_prow
+          weight: 1
+          cells:
+          - ' ▄ '
+          - ▟█▙
+          - █╬►
+          - ▜█▛
+          - ' ▀ '
+          color_mask:
+          - SSS
+          - SSS
+          - SSA
+          - SSS
+          - SSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - '  '
+          - ▄█
+          - '  '
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 4
+        variants:
+        - id: box
+          weight: 1
+          cells:
+          - ╭─╮
+          - ┤▒├
+          - ╰─╯
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+        - id: tank
+          weight: 1
+          cells:
+          - ▗▄▖
+          - █▒█
+          - ▝▀▘
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: cab
+          weight: 1
+          cells:
+          - ' ▀ '
+          - ◇◆◆
+          - ' ▄ '
+          color_mask:
+          - SBS
+          - DWW
+          - SSS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Cargo Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: twin_bell
+          weight: 1
+          cells:
+          - '    ╽╽▓▓╽╽    '
+          - '  ▐▐░░██░░▌▌  '
+          - '    ▐▐▐▐▐▐    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSEESSEESSSS
+          - SSSSEEEEEESSSS
+        - id: cluster_tug
+          weight: 1
+          cells:
+          - '    ╽╽  ╽╽    '
+          - '  ▓▓██░░██▓▓  '
+          - '  ▐▐▐▐▐▐▐▐▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSEESSSSSS
+          - SSEEEEEEEEEESS
+      - id: spindrive
+        name: Drive Frame
+        primary_property: spindrive
+        secondary_properties:
+        - utility
+        repeat: 1
+        variants:
+        - id: drive_cradle
+          weight: 1
+          cells:
+          - '  ╔╔══╦╦══╗╗  '
+          - '  ╠╠██╬╬██╣╣  '
+          - '  ╚╚══╩╩══╝╝  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: service_module
+          weight: 1
+          cells:
+          - '  ╭╭──┴┴──╮╮  '
+          - '  ││░░☼☼░░││  '
+          - '  ╰╰──┬┬──╯╯  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSBBSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: hull
+        name: Container Bays
+        primary_property: cargo
+        secondary_properties:
+        - hull
+        - utility
+        repeat: 5
+        variants:
+        - id: boxcar
+          weight: 1
+          cells:
+          - '  ╭╭──┴┴──╮╮  '
+          - '  ││▒▒░░▒▒││  '
+          - '  ││▒▒░░▒▒││  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: tank_farm
+          weight: 1
+          cells:
+          - '  ▗▗▟▟╹╹▙▙▖▖  '
+          - '  ▐▐▒▒▒▒▒▒▌▌  '
+          - '  ▐▐██▒▒██▌▌  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: open_rack
+          weight: 1
+          cells:
+          - '  ╔╔══╦╦══╗╗  '
+          - '  ║║▤▤║║▦▦║║  '
+          - '  ║║▤▤║║▦▦║║  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: screens
+        name: Control Collar
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        - sensors
+        repeat: 1
+        variants:
+        - id: bridge_collar
+          weight: 1
+          cells:
+          - '    ▟▟██▙▙    '
+          - '  ▌▌██◆◆██    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSBBSSWWSSSSSS
+        - id: sensor_collar
+          weight: 1
+          cells:
+          - '    ▟▟██▙▙    '
+          - '    ◥◥◆◆◤◤    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSWWSSSSSS
+      - id: main_gun
+        name: Utility Prow
+        primary_property: main_gun
+        secondary_properties:
+        - utility
+        - weapons
+        repeat: 1
+        variants:
+        - id: docking_prow
+          weight: 1
+          cells:
+          - '    ▟▟▲▲▙▙    '
+          - '    ██▓▓██    '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+        - id: clamp_prow
+          weight: 1
+          cells:
+          - '    ▟▟▲▲▙▙    '
+          - '  ▐▐██╬╬██▌▌  '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Cargo Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: twin_bell
+          weight: 1
+          cells:
+          - '  ╽╽▓▓╽╽  '
+          - ▌▌▜▜██▛▛▌▌
+          color_mask:
+          - SSSSSSSSSS
+          - EESSSSSSEE
+        - id: cluster_tug
+          weight: 1
+          cells:
+          - '  ╽╽  ╽╽  '
+          - ▝▝▀▀██▀▀▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: spindrive
+        name: Drive Frame
+        primary_property: spindrive
+        secondary_properties:
+        - utility
+        repeat: 1
+        variants:
+        - id: drive_cradle
+          weight: 1
+          cells:
+          - ╔╔══╦╦══╗╗
+          - ║║▓▓║║▓▓║║
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: service_module
+          weight: 1
+          cells:
+          - ╭╭──┴┴──╮╮
+          - ││▓▓░░▓▓││
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: hull
+        name: Container Bays
+        primary_property: cargo
+        secondary_properties:
+        - hull
+        - utility
+        repeat: 4
+        variants:
+        - id: boxcar
+          weight: 1
+          cells:
+          - ╭╭──┴┴──╮╮
+          - ├├──┼┼──┤┤
+          - ╰╰──┬┬──╯╯
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: tank_farm
+          weight: 1
+          cells:
+          - ▗▗▟▟╹╹▙▙▖▖
+          - ▐▐▒▒◆◆▒▒▌▌
+          - ▝▝▜▜██▛▛▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: open_rack
+          weight: 1
+          cells:
+          - ╔╔══╦╦══╗╗
+          - ║║▤▤╬╬▦▦║║
+          - ╚╚══╩╩══╝╝
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: screens
+        name: Control Collar
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        - sensors
+        repeat: 1
+        variants:
+        - id: bridge_collar
+          weight: 1
+          cells:
+          - '  ▟▟██▙▙  '
+          - '  ◥◥◇◇◤◤  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSDDSSSS
+        - id: sensor_collar
+          weight: 1
+          cells:
+          - '  ▟▟██▙▙  '
+          - '  ◇◇◇◇◇◇  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSDDDDDDSS
+      - id: main_gun
+        name: Utility Prow
+        primary_property: main_gun
+        secondary_properties:
+        - utility
+        - weapons
+        repeat: 1
+        variants:
+        - id: docking_prow
+          weight: 1
+          cells:
+          - '  ▟▟▲▲▙▙  '
+          - '  ◥◥██◤◤  '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+        - id: clamp_prow
+          weight: 1
+          cells:
+          - '  ▟▟▲▲▙▙  '
+          - '  ▜▜██▛▛  '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - '  ██  '
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 4
+        variants:
+        - id: box
+          weight: 1
+          cells:
+          - ╭╭──╮╮
+          - ╰╰──╯╯
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+        - id: tank
+          weight: 1
+          cells:
+          - ▗▗██▖▖
+          - ▝▝██▘▘
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: cab
+          weight: 1
+          cells:
+          - '  ◆◆  '
+          - '  ◇◇  '
+          color_mask:
+          - SSWWSS
+          - SSDDSS

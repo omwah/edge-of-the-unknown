@@ -1,0 +1,826 @@
+schema_version: 4
+id: falsehold_raider
+name: Falsehold Raider
+kind: ship
+role: falsehold_raider
+description: An armed merchant hull whose cargo seams conceal batteries and reinforced magazines.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: merchant_drive
+        name: Merchant Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: civilian_bells
+          weight: 1
+          cells:
+          - '     '
+          - ' ▀▜  '
+          - ▄▟█▓╾
+          - ▄█░▒▓
+          - ▄▟█▓╾
+          - ' ▀▀  '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SESSS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - SESSS
+          - SSSSS
+        - id: shoddy_bells
+          weight: 1
+          cells:
+          - ' ▄▖  '
+          - '▄▟▓  '
+          - ' ▓░█▓'
+          - ▄██▒▓
+          - '▄▟▓▘ '
+          - '     '
+          - '     '
+          color_mask:
+          - SESSS
+          - ESSSS
+          - SSESS
+          - ESSSS
+          - ESSSS
+          - SSSSS
+          - SSSSS
+      - id: armored_buttress
+        name: Armored Buttress
+        primary_property: armor
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: ribbed_collar
+          weight: 1
+          cells:
+          - '    '
+          - ▓▀▀▓
+          - █▤▤█
+          - █░░█
+          - █▤▤█
+          - ▓▄▄▓
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: sealed_collar
+          weight: 1
+          cells:
+          - '    '
+          - ◢██◣
+          - █◇ ◇
+          - █▒▒█
+          - █◇ ◇
+          - ◥██◤
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SDSD
+          - SSSS
+          - SDSD
+          - SSSS
+          - SSSS
+      - id: false_holds
+        name: False Cargo Holds
+        primary_property: cargo
+        secondary_properties:
+        - weapons
+        - hull
+        repeat: 5
+        variants:
+        - id: container_seam
+          weight: 1
+          cells:
+          - '      '
+          - ╭────╮
+          - │▒▒▀▒│
+          - ┤░▒░▒├
+          - │▒▒▒▒│
+          - ╰────╯
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSASS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: twin_boxes
+          weight: 1
+          cells:
+          - '      '
+          - ╔═╗╔═╗
+          - ║▒║║▒║
+          - ╬═╬╬═╬
+          - ║▒║║▒║
+          - ╚═╝╚═╝
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: tank_with_vent
+          weight: 1
+          cells:
+          - '      '
+          - ▗▄▄▄▄▖
+          - ▟█▒▒█▙
+          - █▒▒▄█╺
+          - ▜█▒▒█▛
+          - ▝▀▀▀▀▘
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSASS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+      - id: masked_battery
+        name: Masked Battery
+        primary_property: weapons
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: closed
+          weight: 1
+          cells:
+          - '    '
+          - ◢██◣
+          - █▒▒█
+          - █▄██
+          - ◥██◤
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SASS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: revealed
+          weight: 1
+          cells:
+          - ' ▄  '
+          - ▓█▓►
+          - █▄█▀
+          - ▓█▓►
+          - ' ▀  '
+          - '    '
+          - '    '
+          color_mask:
+          - SASS
+          - SSSA
+          - SASA
+          - SSSA
+          - SASS
+          - SSSS
+          - SSSS
+      - id: merchant_prow
+        name: Merchant Prow
+        primary_property: hull
+        secondary_properties:
+        - main_gun
+        repeat: 1
+        variants:
+        - id: blunt
+          weight: 1
+          cells:
+          - ' ▄  '
+          - ' ╿  '
+          - ▟██▙
+          - █◆▓►
+          - ▜██▛
+          - ' ▀  '
+          - '    '
+          color_mask:
+          - SASS
+          - SASS
+          - SSSS
+          - SWSA
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: tapered
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ◢▓█▙
+          - █◆◆╸
+          - ◥▓█▛
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SWWS
+          - SSSS
+          - SSSS
+          - SSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: merchant_drive
+        name: Merchant Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: civilian_bells
+          weight: 1
+          cells:
+          - ' ▀▜ '
+          - ▄▟█╾
+          - ▄█░▓
+          - ▄▜█╾
+          - ' ▀▀ '
+          color_mask:
+          - SESS
+          - ESSS
+          - ESES
+          - ESSS
+          - SESS
+        - id: shoddy_bells
+          weight: 1
+          cells:
+          - '▄▟▓ '
+          - ' ▓░▓'
+          - ▄██▓
+          - '▄▟▓ '
+          - '    '
+          color_mask:
+          - ESSS
+          - SSES
+          - ESSS
+          - ESSS
+          - SSSS
+      - id: armored_buttress
+        name: Armored Buttress
+        primary_property: armor
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: ribbed_collar
+          weight: 1
+          cells:
+          - ▓▀▓
+          - █▤█
+          - █░█
+          - █▤█
+          - ▓▄▓
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+        - id: sealed_collar
+          weight: 1
+          cells:
+          - ◢█◣
+          - █◇◇
+          - █▒█
+          - █◇◇
+          - ◥█◤
+          color_mask:
+          - SSS
+          - SDD
+          - SSS
+          - SDD
+          - SSS
+      - id: false_holds
+        name: False Cargo Holds
+        primary_property: cargo
+        secondary_properties:
+        - weapons
+        - hull
+        repeat: 4
+        variants:
+        - id: container_seam
+          weight: 1
+          cells:
+          - ╭───╮
+          - │▒▒▀│
+          - ┤░▒░├
+          - │▒▒▒│
+          - ╰───╯
+          color_mask:
+          - SSSSS
+          - SSSAS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: twin_boxes
+          weight: 1
+          cells:
+          - ╔═╗╔╗
+          - ║▒║║║
+          - ╬═╬╬╬
+          - ║▒║║║
+          - ╚═╝╚╝
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: tank_with_vent
+          weight: 1
+          cells:
+          - ▗▄▄▄▖
+          - ▟█▒▒▙
+          - █▒▒▄╺
+          - ▜█▒▒▛
+          - ▝▀▀▀▘
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSAS
+          - SSSSS
+          - SSSSS
+      - id: masked_battery
+        name: Masked Battery
+        primary_property: weapons
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: closed
+          weight: 1
+          cells:
+          - ◢█◣
+          - █▒█
+          - █▄█
+          - ◥█◤
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SAS
+          - SSS
+          - SSS
+        - id: revealed
+          weight: 1
+          cells:
+          - ▓█►
+          - █▄▀
+          - ▓█►
+          - ' ▀ '
+          - '   '
+          color_mask:
+          - SSA
+          - SAA
+          - SSA
+          - SAS
+          - SSS
+      - id: merchant_prow
+        name: Merchant Prow
+        primary_property: hull
+        secondary_properties:
+        - main_gun
+        repeat: 1
+        variants:
+        - id: blunt
+          weight: 1
+          cells:
+          - ' ▄ '
+          - ▟█▙
+          - █◆►
+          - ▜█▛
+          - ' ▀ '
+          color_mask:
+          - SSS
+          - SSS
+          - SWA
+          - SSS
+          - SSS
+        - id: tapered
+          weight: 1
+          cells:
+          - '   '
+          - ◢▓▙
+          - █◆╸
+          - ◥▓▛
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SWS
+          - SSS
+          - SSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ' █'
+          - ▄▓
+          - ' █'
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: hold
+          weight: 1
+          cells:
+          - ▄▄
+          - █▒
+          - ▀▀
+          color_mask:
+          - SS
+          - SS
+          - SS
+        - id: gun_hold
+          weight: 1
+          cells:
+          - ▄▄
+          - █◆
+          - ▀▀
+          color_mask:
+          - SA
+          - SW
+          - SA
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: prow
+          weight: 1
+          cells:
+          - '   '
+          - █▀►
+          - '   '
+          color_mask:
+          - SSS
+          - SAA
+          - SSS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: merchant_drive
+        name: Merchant Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: civilian_bells
+          weight: 1
+          cells:
+          - '    ╽╽▓▓╽╽    '
+          - '  ▐▐██░░██▌▌  '
+          - '    ▐▐▐▐▐▐    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSEESSSSSS
+          - SSSSEEEEEESSSS
+        - id: shoddy_bells
+          weight: 1
+          cells:
+          - '    ▓▓▓▓      '
+          - '▗▗▓▓░░██▓▓    '
+          - '  ▐▐  ▐▐▐▐    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSEESSSSSSSS
+          - SSEESSEEEESSSS
+      - id: armored_buttress
+        name: Armored Buttress
+        primary_property: armor
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: ribbed_collar
+          weight: 1
+          cells:
+          - '  ▓▓██████▓▓  '
+          - '  ▌▌▤▤░░▤▤▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: sealed_collar
+          weight: 1
+          cells:
+          - '  ◢◢◇◇██◇◇◣◣  '
+          - '  ██◇◇▒▒◇◇██  '
+          color_mask:
+          - SSSSDDSSDDSSSS
+          - SSSSDDSSDDSSSS
+      - id: false_holds
+        name: False Cargo Holds
+        primary_property: cargo
+        secondary_properties:
+        - weapons
+        - hull
+        repeat: 5
+        variants:
+        - id: container_seam
+          weight: 1
+          cells:
+          - '  ╭╭──┴┴──╮╮  '
+          - '  ││▌▌░░▒▒││  '
+          - '  ││▒▒░░▒▒││  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSAASSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: twin_boxes
+          weight: 1
+          cells:
+          - '  ╔╔══╦╦══╗╗  '
+          - '  ╚╚══╩╩══╝╝  '
+          - '  ║║▒▒║║▒▒║║  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: tank_with_vent
+          weight: 1
+          cells:
+          - '  ▗▗▟▟╹╹▙▙▖▖  '
+          - '  ▐▐▒▒▐▐▒▒▌▌  '
+          - '  ▐▐██▒▒██▌▌  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+      - id: masked_battery
+        name: Masked Battery
+        primary_property: weapons
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: closed
+          weight: 1
+          cells:
+          - '  ◢◢████◣◣    '
+          - '  ██▒▒▐▐██    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSAASSSSSS
+        - id: revealed
+          weight: 1
+          cells:
+          - '  ▲▲▌▌▲▲      '
+          - '▌▌██▐▐██▐▐    '
+          color_mask:
+          - SSAAAAAASSSSSS
+          - AASSAASSAASSSS
+      - id: merchant_prow
+        name: Merchant Prow
+        primary_property: hull
+        secondary_properties:
+        - main_gun
+        repeat: 1
+        variants:
+        - id: blunt
+          weight: 1
+          cells:
+          - '    ▟▟▲▲▙▙    '
+          - '▌▌▐▐██◆◆██▌▌  '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - BBSSSSWWSSSSSS
+        - id: tapered
+          weight: 1
+          cells:
+          - '    ▟▟╻╻▙▙    '
+          - '    ▓▓◆◆▓▓    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSWWSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: merchant_drive
+        name: Merchant Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: civilian_bells
+          weight: 1
+          cells:
+          - '  ╽╽▓▓╽╽  '
+          - ▌▌▜▜██▛▛▌▌
+          color_mask:
+          - SSSSSSSSSS
+          - EESSSSSSEE
+        - id: shoddy_bells
+          weight: 1
+          cells:
+          - '  ▓▓▓▓    '
+          - '▜▜▓▓██▛▛  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: armored_buttress
+        name: Armored Buttress
+        primary_property: armor
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: ribbed_collar
+          weight: 1
+          cells:
+          - ▓▓██████▓▓
+          - ▓▓██████▓▓
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: sealed_collar
+          weight: 1
+          cells:
+          - ◢◢◇◇██◇◇◣◣
+          - ◥◥██████◤◤
+          color_mask:
+          - SSDDSSDDSS
+          - SSSSSSSSSS
+      - id: false_holds
+        name: False Cargo Holds
+        primary_property: cargo
+        secondary_properties:
+        - weapons
+        - hull
+        repeat: 4
+        variants:
+        - id: container_seam
+          weight: 1
+          cells:
+          - ╭╭──┴┴──╮╮
+          - ││▒▒▒▒▒▒││
+          - ╰╰──┬┬──╯╯
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: twin_boxes
+          weight: 1
+          cells:
+          - ╔╔══╦╦══╗╗
+          - ╔╔══╦╦══╗╗
+          - ╚╚══╩╩══╝╝
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: tank_with_vent
+          weight: 1
+          cells:
+          - ▗▗▟▟╹╹▙▙▖▖
+          - ▐▐▒▒▒▒▒▒▌▌
+          - ▝▝▜▜██▛▛▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: masked_battery
+        name: Masked Battery
+        primary_property: weapons
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: closed
+          weight: 1
+          cells:
+          - '◢◢████◣◣  '
+          - '◥◥████◤◤  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: revealed
+          weight: 1
+          cells:
+          - '▲▲▌▌▲▲    '
+          - '▓▓██▓▓    '
+          color_mask:
+          - AAAAAASSSS
+          - SSSSSSSSSS
+      - id: merchant_prow
+        name: Merchant Prow
+        primary_property: hull
+        secondary_properties:
+        - main_gun
+        repeat: 1
+        variants:
+        - id: blunt
+          weight: 1
+          cells:
+          - '  ▟▟▲▲▙▙  '
+          - '  ▜▜██▛▛  '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+        - id: tapered
+          weight: 1
+          cells:
+          - '  ▟▟╻╻▙▙  '
+          - '  ◥◥██◤◤  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ██▓▓██
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: hold
+          weight: 1
+          cells:
+          - ██▒▒██
+          color_mask:
+          - SSSSSS
+        - id: gun_hold
+          weight: 1
+          cells:
+          - ▌▌◆◆▐▐
+          color_mask:
+          - AAWWAA
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: prow
+          weight: 1
+          cells:
+          - '  ▲▲  '
+          - '  ██  '
+          color_mask:
+          - SSAASS
+          - SSSSSS

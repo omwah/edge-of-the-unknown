@@ -28,7 +28,7 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 
-from edge.art.port import PortGenerator
+from edge.art.sprites import SPRITES, fit_box, pad_to
 from edge.spacebattle import rules
 from edge.spacebattle.config import Scenario, SpacebattleConfig, load_config
 from edge.spacebattle.model import (
@@ -419,7 +419,7 @@ behind it, through the perimeter, is the whole battle.\
         self.show_threat = False  # enemy gun-arc threat overlay (T toggles)
         self.log_expanded = False  # combat-log panel starts as a 2-line peek (z expands)
         self.flashes: dict[tuple[int, int], tuple[str, float]] = {}
-        # Main-game PortGenerator starbase art, rasterized once per station.
+        # Main-game sprite-library starbase art, rasterized once per station.
         self._station_art_cache: dict[int, list[tuple[int, int, str, str]]] = {}
         self.starfield = _make_starfield(
             battle.seed, config.width * config.cell_w,
@@ -518,15 +518,29 @@ behind it, through the perimeter, is the whole battle.\
                 cy * self.config.cell_h + self.config.cell_h // 2)
 
     def _station_art(self, s: Ship) -> list[tuple[int, int, str, str]]:
-        """The full main-game starbase art (`edge.art.port.PortGenerator`),
-        rasterized to (dx, dy, char, style) offsets over the station's
-        footprint. Deterministic per (battle seed, station id); cached."""
+        """The full main-game starbase art, rasterized to (dx, dy, char, style)
+        offsets over the station's footprint. Deterministic per (battle seed,
+        station id); cached."""
         cached = self._station_art_cache.get(s.id)
         if cached is None:
             cfg = self.config
-            art = PortGenerator().generate(
-                _random.Random(self.battle.seed ^ (s.id * 0x9E3779B1)),
-                "starbase", s.cls.size * cfg.cell_w, s.cls.size * cfg.cell_h)
+            # This call bypasses `edge.art.generator.generate_sprite` (importing it
+            # would drag the planet/terrain/starfield generators in), so it repeats
+            # that seam here: resolve the footprint to a tier that fits, render
+            # there, then pad back to the footprint. Handing the footprint straight
+            # to the library would centre-crop a wider tier; skipping the pad would
+            # shift the art, because `_blit_station` maps each inked cell to an
+            # offset *within* the footprint and relies on the pad for centring.
+            box_w, box_h = s.cls.size * cfg.cell_w, s.cls.size * cfg.cell_h
+            fw, fh = fit_box("port", "starbase", max_width=box_w, max_height=box_h)
+            art = pad_to(
+                SPRITES.generate_port(
+                    "starbase",
+                    self.battle.seed ^ (s.id * 0x9E3779B1),
+                    min(fw, box_w), min(fh, box_h),
+                ),
+                box_w, box_h,
+            )
             console = self.app.console
             cached = []
             for r, line in enumerate(art.split(allow_blank=True)):

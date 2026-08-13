@@ -30,18 +30,27 @@ scene:
   planet_detail: { min_height: 4, max_height: 16 } # PlanetScreen orbit view planet (independent of above)
   # Station max_height must stay >= round(scale * planet.max_height); a lower cap
   # saturates while the planet is still growing, pinning the station at one size
-  # across most viewports. max_width covers the 2.4 aspect at max_height.
-  port:     { min_width: 6, min_height: 4, max_width: 16, max_height: 6 }
+  # across most viewports. The caps must also clear a whole *tier* of the sprite
+  # art (edge/art/sprites.py `fit_box`) or the art steps down a rung: a port
+  # capped at 6 rows selects trading_port's 7-wide mast rung instead of its
+  # 11x7 silhouette, and a ship capped at 16 columns clears no rung at all
+  # (the narrowest is 17x3, then ~34x5).
+  port:     { min_width: 6, min_height: 4, max_width: 19, max_height: 8 }
   stardock: { min_width: 8, min_height: 4, max_width: 38, max_height: 16 }
   starbase: { min_width: 6, min_height: 4, max_width: 22, max_height: 9 }
-  ship:   { min_width: 6, min_height: 3, max_width: 16, max_height: 5 }
+  ship:   { min_width: 6, min_height: 3, max_width: 36, max_height: 5 }
   max_ships_shown: 3           # sprites shown; extra ships fall to a clickable list
   ship_face_inward_chance: 0.5 # chance the 2nd of two ships is flipped to face the 1st
   # Arrival-view scale hierarchy: the primary body (planet > space find > station)
   # takes most of the free height; everything else is sized relative to it.
   # A rendered primary supplies the live reference height. Docked headers reuse those
   # exact Sector-view sizing inputs rather than scaling against their banner.
-  port_scale: 0.25             # kept modest: an ordinary port is a structure, not a rival body
+  # Kept modest: an ordinary port is a structure, not a rival body. The floor is
+  # set by the art, not taste — below ~0.27 the scaled box never clears 7 rows, and
+  # trading_port's 6-row rung is a bare 7-wide mast rather than its 11-wide
+  # silhouette. 0.3 reaches the silhouette at the larger primaries and still sits
+  # under the 0.35 that playtest flagged as rivalling the planet.
+  port_scale: 0.3
   stardock_scale: 0.6
   starbase_scale: 0.35         # playtest 2026-07-17: at 0.5 a starbase (12 inked rows) rivalled the planet
   ship_scale: 0.2              # below port_scale so traffic never outsizes the port it visits

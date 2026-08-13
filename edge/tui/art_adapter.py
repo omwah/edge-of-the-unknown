@@ -99,8 +99,10 @@ def port_subtype(klass: str) -> str:
     return "stardock" if "stardock" in klass.lower() else "trading_port"
 
 
-def ship_entity(role_or_name: str) -> tuple[str, str]:
-    """(entity_type, subtype) for a ship `role`, or a free-text ship-name fallback."""
+def ship_entity(role_or_name: str, art_subtype: str | None = None) -> tuple[str, str]:
+    """(entity_type, subtype), preferring an explicit configured art sprite."""
+    if art_subtype:
+        return ("ship", art_subtype.strip().lower())
     key = role_or_name.strip().lower()
     if key in _ROLE_ENTITY:
         return _ROLE_ENTITY[key]

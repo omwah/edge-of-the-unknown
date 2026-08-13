@@ -144,9 +144,11 @@ async def test_station_header_vertically_centers_exterior_and_banner() -> None:
         await app.mount(header)
         await pilot.pause()
         icon, banner = list(header.children)
-        # The shipped direct-open port is 6 rows beside an 8-row banner, so the
-        # shorter exterior sits one row lower and their midpoints align exactly.
-        assert icon.region.y == banner.region.y + 1
+        # The shipped direct-open port is 8 rows beside an 8-row banner, so they
+        # start on the same row and their midpoints align exactly. Midpoints are
+        # compared in half-rows (doubled) because an icon whose height is the
+        # opposite parity to the banner's can only centre to within half a row.
+        assert icon.region.y == banner.region.y
         icon_midpoint = 2 * icon.region.y + icon.region.height
         banner_midpoint = 2 * banner.region.y + banner.region.height
         assert icon_midpoint == banner_midpoint

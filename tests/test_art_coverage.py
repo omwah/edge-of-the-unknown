@@ -41,11 +41,14 @@ def test_port_classes_map_to_sprites() -> None:
 
 
 def test_ship_roles_have_sprites() -> None:
-    roles = {CONFIG.starter_ship.role} | {c.role for c in CONFIG.ship_classes}
+    classes = [CONFIG.starter_ship, *CONFIG.ship_classes]
+    roles = {c.role for c in classes}
     assert "transport" in roles  # sanity: the starter hull is a transport
-    for role in roles:
-        entity, subtype = art_adapter.ship_entity(role)
-        assert subtype in set(available_subtypes(entity)), role
+    for ship_class in classes:
+        entity, subtype = art_adapter.ship_entity(
+            ship_class.role, ship_class.art_subtype
+        )
+        assert subtype in set(available_subtypes(entity)), ship_class.id
 
 
 def test_starbase_role_routes_to_a_port_sprite() -> None:
@@ -70,11 +73,12 @@ def test_every_game_type_actually_renders() -> None:
         spr = art_adapter.sprite("planet", art_adapter.planet_subtype(ptype),
                                  seed=1, width=20, height=10)
         assert spr.plain.strip(), ptype
-    roles = {CONFIG.starter_ship.role} | {c.role for c in CONFIG.ship_classes}
-    for role in roles:
-        entity, subtype = art_adapter.ship_entity(role)
+    for ship_class in [CONFIG.starter_ship, *CONFIG.ship_classes]:
+        entity, subtype = art_adapter.ship_entity(
+            ship_class.role, ship_class.art_subtype
+        )
         spr = art_adapter.sprite(entity, subtype, seed=1, width=18, height=6)
-        assert spr.plain.strip(), role
+        assert spr.plain.strip(), ship_class.id
 
 
 def test_validate_art_coverage_passes_on_default_config() -> None:

@@ -1,0 +1,612 @@
+schema_version: 4
+id: junction_pinnace
+name: Junction Pinnace
+kind: ship
+role: junction_pinnace
+description: A tiny courier and landing craft wrapped around drive, compensator, and cabin.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: overdrive
+        name: Overdrive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: big_bell
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ▄▟▓▖
+          - ▄█░▓
+          - ▄▟▓▘
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - ESSS
+          - ESES
+          - ESSS
+          - SSSS
+          - SSSS
+        - id: twin_nozzle
+          weight: 1
+          cells:
+          - '    '
+          - ' ▄▖ '
+          - '▄▟▓ '
+          - ▄▟▓▖
+          - ▄█░▓
+          - ' ▄▟ '
+          - '    '
+          color_mask:
+          - SSSS
+          - SESS
+          - ESSS
+          - ESSS
+          - ESES
+          - SESS
+          - SSSS
+      - id: sail_nodes
+        name: Sail Nodes
+        primary_property: spindrive
+        secondary_properties:
+        - radiator
+        repeat: 1
+        variants:
+        - id: diamond_sails
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ▗▄▄▖
+          - ▓░▓▓
+          - ▝▀▀▘
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SESS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: radiator_sails
+          weight: 1
+          cells:
+          - '    '
+          - ' ◇  '
+          - ▗█▄▖
+          - ▓░▓▓
+          - ▝█▀▘
+          - ' ◇  '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SESS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: cabin
+        name: Cabin
+        primary_property: habitat
+        secondary_properties:
+        - sensors
+        repeat: 3
+        variants:
+        - id: windowed_cabin
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ╭──╮
+          - ┤◆◆├
+          - ├▒▒┤
+          - ╰──╯
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SWWS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: armored_cabin
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ▗▄▄▖
+          - █◆▒█
+          - █▒▒█
+          - ▝▀▀▘
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SWSS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: landing_nose
+        name: Landing Nose
+        primary_property: utility
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: docking_nose
+          weight: 1
+          cells:
+          - '   '
+          - '   '
+          - '◇▙ '
+          - ◇█►
+          - '◇▛ '
+          - '   '
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - DSS
+          - DSS
+          - DSS
+          - SSS
+          - SSS
+        - id: ramp_nose
+          weight: 1
+          cells:
+          - '   '
+          - '   '
+          - '▟█ '
+          - ◇◆►
+          - '▜█ '
+          - '   '
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - DWS
+          - SSS
+          - SSS
+          - SSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: overdrive
+        name: Overdrive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: big_bell
+          weight: 1
+          cells:
+          - '   '
+          - ▄▟▖
+          - ▄█▓
+          - ▄▟▘
+          - '   '
+          color_mask:
+          - SSS
+          - ESS
+          - ESS
+          - ESS
+          - SSS
+        - id: twin_nozzle
+          weight: 1
+          cells:
+          - ' ▄ '
+          - '▄▟ '
+          - ▄▜▖
+          - ▄█▓
+          - ' ▄ '
+          color_mask:
+          - SES
+          - ESS
+          - ESS
+          - ESS
+          - SES
+      - id: sail_nodes
+        name: Sail Nodes
+        primary_property: spindrive
+        secondary_properties:
+        - radiator
+        repeat: 1
+        variants:
+        - id: diamond_sails
+          weight: 1
+          cells:
+          - '   '
+          - ▗▄▖
+          - ▓░▓
+          - ▝▀▘
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SES
+          - SSS
+          - SSS
+        - id: radiator_sails
+          weight: 1
+          cells:
+          - ' ◇ '
+          - ▗█▖
+          - ▓░▓
+          - ▝█▘
+          - ' ◇ '
+          color_mask:
+          - SSS
+          - SSS
+          - SES
+          - SSS
+          - SSS
+      - id: cabin
+        name: Cabin
+        primary_property: habitat
+        secondary_properties:
+        - sensors
+        repeat: 3
+        variants:
+        - id: windowed_cabin
+          weight: 1
+          cells:
+          - '   '
+          - ╭─╮
+          - ┤◆├
+          - ├▒┤
+          - ╰─╯
+          color_mask:
+          - SSS
+          - SSS
+          - SWS
+          - SSS
+          - SSS
+        - id: armored_cabin
+          weight: 1
+          cells:
+          - '   '
+          - ▗▄▖
+          - █◆█
+          - █▒█
+          - ▝▀▘
+          color_mask:
+          - SSS
+          - SSS
+          - SWS
+          - SSS
+          - SSS
+      - id: landing_nose
+        name: Landing Nose
+        primary_property: utility
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: docking_nose
+          weight: 1
+          cells:
+          - '  '
+          - '◇ '
+          - ◇►
+          - '◇ '
+          - '  '
+          color_mask:
+          - SS
+          - DS
+          - DS
+          - DS
+          - SS
+        - id: ramp_nose
+          weight: 1
+          cells:
+          - '  '
+          - '▟ '
+          - ◇►
+          - '▜ '
+          - '  '
+          color_mask:
+          - SS
+          - SS
+          - DS
+          - SS
+          - SS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - '  '
+          - ▄▓
+          - '  '
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 4
+        variants:
+        - id: cabin
+          weight: 1
+          cells:
+          - ' ╭╮'
+          - █◆◆
+          - ' ╰╯'
+          color_mask:
+          - SSS
+          - SWW
+          - SSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: nose
+          weight: 1
+          cells:
+          - ' ◇ '
+          - ◇█►
+          - ' ◇ '
+          color_mask:
+          - SDS
+          - DSS
+          - SDS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: overdrive
+        name: Overdrive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: big_bell
+          weight: 1
+          cells:
+          - '    ▗▗▓▓▖▖    '
+          - '    ▜▜██▛▛    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: twin_nozzle
+          weight: 1
+          cells:
+          - '      ▗▗▓▓    '
+          - '  ▐▐▜▜▛▛██▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSEESSSSSSEESS
+      - id: sail_nodes
+        name: Sail Nodes
+        primary_property: spindrive
+        secondary_properties:
+        - radiator
+        repeat: 1
+        variants:
+        - id: diamond_sails
+          weight: 1
+          cells:
+          - '    ▗▗▓▓▖▖    '
+          - '    ▐▐░░▌▌    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSEESSSSSS
+        - id: radiator_sails
+          weight: 1
+          cells:
+          - '    ▗▗▓▓▖▖    '
+          - '  ◇◇▐▐░░▌▌◇◇  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSEESSSSSS
+      - id: cabin
+        name: Cabin
+        primary_property: habitat
+        secondary_properties:
+        - sensors
+        repeat: 3
+        variants:
+        - id: windowed_cabin
+          weight: 1
+          cells:
+          - '    ╭╭──┬┬╮╮  '
+          - '  ▌▌││◆◆▒▒││  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSBBSSWWSSSSSS
+        - id: armored_cabin
+          weight: 1
+          cells:
+          - '    ▗▗████▖▖  '
+          - '    ▐▐◆◆▒▒▌▌  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSWWSSSSSS
+      - id: landing_nose
+        name: Landing Nose
+        primary_property: utility
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: docking_nose
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ◇◇◇◇◇◇    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSDDDDDDSSSS
+        - id: ramp_nose
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ▜▜◇◇▛▛    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSDDSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: overdrive
+        name: Overdrive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: big_bell
+          weight: 1
+          cells:
+          - '  ▗▗▓▓▖▖  '
+          - '  ▐▐▐▐▐▐  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSEEEEEESS
+        - id: twin_nozzle
+          weight: 1
+          cells:
+          - '    ▗▗▓▓  '
+          - '  ▐▐▐▐▐▐  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSEEEEEESS
+      - id: sail_nodes
+        name: Sail Nodes
+        primary_property: spindrive
+        secondary_properties:
+        - radiator
+        repeat: 1
+        variants:
+        - id: diamond_sails
+          weight: 1
+          cells:
+          - '  ▗▗▓▓▖▖  '
+          - '  ▝▝▓▓▘▘  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: radiator_sails
+          weight: 1
+          cells:
+          - '  ▗▗▓▓▖▖  '
+          - '  ▝▝▓▓▘▘  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: cabin
+        name: Cabin
+        primary_property: habitat
+        secondary_properties:
+        - sensors
+        repeat: 3
+        variants:
+        - id: windowed_cabin
+          weight: 1
+          cells:
+          - '  ╭╭──┬┬╮╮'
+          - '  ╰╰──┴┴╯╯'
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: armored_cabin
+          weight: 1
+          cells:
+          - '  ▗▗████▖▖'
+          - '  ▝▝████▘▘'
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: landing_nose
+        name: Landing Nose
+        primary_property: utility
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: docking_nose
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          color_mask:
+          - SSSSSSSSSS
+        - id: ramp_nose
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          color_mask:
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - '  ▓▓  '
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 3
+        variants:
+        - id: cabin
+          weight: 1
+          cells:
+          - ╭╭◆◆╮╮
+          - '  ██  '
+          color_mask:
+          - SSWWSS
+          - SSSSSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: nose
+          weight: 1
+          cells:
+          - '  ▲▲  '
+          - '  ◇◇  '
+          color_mask:
+          - SSSSSS
+          - SSDDSS

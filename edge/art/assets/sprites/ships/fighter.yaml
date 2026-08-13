@@ -1,0 +1,778 @@
+schema_version: 4
+id: fighter
+name: Fighter
+kind: ship
+role: fighter
+description: A fast, fragile interceptor built as a short path from engine flare to forward gun.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Swept Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: twin_bell
+          weight: 1
+          cells:
+          - '     '
+          - ' ▄▓▖ '
+          - ▄▟█▓╾
+          - ▄█░█▓
+          - ▄▟█▓╾
+          - ' ▀▓▘ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - SSSSS
+          - SSSSS
+        - id: vector_nozzle
+          weight: 1
+          cells:
+          - '     '
+          - ' ▄▄▄ '
+          - ▄▟█▓╾
+          - ▄█░██
+          - ' ▜█▓╾'
+          - '  ▀▘ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SESSS
+          - ESSSS
+          - ESESS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: spindrive
+        name: Drive Swell
+        primary_property: spindrive
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: faceted_core
+          weight: 1
+          cells:
+          - '     '
+          - ' ▄▖  '
+          - '◢██◣ '
+          - █░██╾
+          - '◥██◤ '
+          - ' ▀▘  '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SESSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: annular_ring
+          weight: 1
+          cells:
+          - '     '
+          - ' ▗▓▖ '
+          - ▟█░█▙
+          - █░▒░█
+          - ▜█░█▛
+          - ' ▝▓▘ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: hull
+        name: Narrow Fuselage
+        primary_property: hull
+        secondary_properties:
+        - armor
+        - bridge
+        repeat: 5
+        variants:
+        - id: panel_rib
+          weight: 1
+          cells:
+          - '   '
+          - '   '
+          - ▓▓╾
+          - █▒█
+          - ▓═╾
+          - '   '
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+        - id: fastener_rib
+          weight: 1
+          cells:
+          - '   '
+          - '   '
+          - ▓═╾
+          - █▒◆
+          - ▓═╾
+          - '   '
+          - '   '
+          color_mask:
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+          - SSS
+      - id: screens
+        name: Screened Cockpit
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: canopy
+          weight: 1
+          cells:
+          - '    '
+          - ' ◇  '
+          - '◢█▙ '
+          - ◇◆█╾
+          - '◥█▛ '
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SDSS
+          - SSSS
+          - DWSS
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: armored_canopy
+          weight: 1
+          cells:
+          - '    '
+          - '    '
+          - ◇▟█▙
+          - ◇◆▓╾
+          - ◇▜█▛
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSS
+          - DSSS
+          - DWSS
+          - DSSS
+          - SSSS
+          - SSSS
+      - id: main_gun
+        name: Forward Gun
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: long_barrel
+          weight: 1
+          cells:
+          - '      '
+          - '      '
+          - ' ╾═▙  '
+          - ╾═══▓►
+          - ' ╾═▛  '
+          - '      '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSAASA
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: muzzle_brake
+          weight: 1
+          cells:
+          - '      '
+          - ' ╾▀▙  '
+          - '╾═█▙  '
+          - ╾══█▀►
+          - '╾═█▛  '
+          - ' ╾▀▛  '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSASSS
+          - SSSSSS
+          - SASSAA
+          - SSSSSS
+          - SSASSS
+          - SSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Swept Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: twin_bell
+          weight: 1
+          cells:
+          - ' ▄▓ '
+          - ▄▟█╾
+          - ▄█░▓
+          - ▄▟█╾
+          - ' ▀▓ '
+          color_mask:
+          - SSSS
+          - ESSS
+          - ESES
+          - ESSS
+          - SSSS
+        - id: vector_nozzle
+          weight: 1
+          cells:
+          - ' ▄▗ '
+          - ▄▟█╾
+          - ▄█░█
+          - ' ▜█╾'
+          - '  ▀ '
+          color_mask:
+          - SESS
+          - ESSS
+          - ESES
+          - SSSS
+          - SSSS
+      - id: spindrive
+        name: Drive Swell
+        primary_property: spindrive
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: faceted_core
+          weight: 1
+          cells:
+          - ' ▄▖ '
+          - '◢██ '
+          - █░█╾
+          - '◥██ '
+          - ' ▀▘ '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SESS
+          - SSSS
+          - SSSS
+        - id: annular_ring
+          weight: 1
+          cells:
+          - ' ▗▓ '
+          - ▟█░▙
+          - █░▒█
+          - ▜█░▛
+          - ' ▝▓ '
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+          - SSSS
+      - id: hull
+        name: Narrow Fuselage
+        primary_property: hull
+        secondary_properties:
+        - armor
+        - bridge
+        repeat: 5
+        variants:
+        - id: panel_rib
+          weight: 1
+          cells:
+          - '  '
+          - ▓╾
+          - ██
+          - ▓╾
+          - '  '
+          color_mask:
+          - SS
+          - SS
+          - SS
+          - SS
+          - SS
+        - id: fastener_rib
+          weight: 1
+          cells:
+          - '  '
+          - ▓╾
+          - █◆
+          - ▓╾
+          - '  '
+          color_mask:
+          - SS
+          - SS
+          - SS
+          - SS
+          - SS
+      - id: screens
+        name: Screened Cockpit
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: canopy
+          weight: 1
+          cells:
+          - ' ◇ '
+          - '◢█ '
+          - ◇◆╾
+          - '◥█ '
+          - '   '
+          color_mask:
+          - SDS
+          - SSS
+          - DWS
+          - SSS
+          - SSS
+        - id: armored_canopy
+          weight: 1
+          cells:
+          - '   '
+          - ◇▟▙
+          - ◇◆╾
+          - ◇▜▛
+          - '   '
+          color_mask:
+          - SSS
+          - DSS
+          - DWS
+          - DSS
+          - SSS
+      - id: main_gun
+        name: Forward Gun
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: long_barrel
+          weight: 1
+          cells:
+          - '     '
+          - ' ╾═▙ '
+          - ╾═══►
+          - ' ╾═▛ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSAAA
+          - SSSSS
+          - SSSSS
+        - id: muzzle_brake
+          weight: 1
+          cells:
+          - ' ╾▀▙ '
+          - '╾═█▙ '
+          - ╾══█►
+          - '╾═█▛ '
+          - ' ╾▀▛ '
+          color_mask:
+          - SSASS
+          - SSSSS
+          - SASSA
+          - SSSSS
+          - SSASS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: flare
+          weight: 1
+          cells:
+          - '  '
+          - ▄█
+          - '  '
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: dart
+          weight: 1
+          cells:
+          - ' ╿'
+          - █▒
+          - ' ╽'
+          color_mask:
+          - SS
+          - SS
+          - SS
+        - id: thin
+          weight: 1
+          cells:
+          - '  '
+          - █╾
+          - '  '
+          color_mask:
+          - SS
+          - SS
+          - SS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: muzzle
+          weight: 1
+          cells:
+          - '   '
+          - ═▀►
+          - '   '
+          color_mask:
+          - SSS
+          - AAA
+          - SSS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Swept Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: twin_bell
+          weight: 1
+          cells:
+          - '    ╽╽▓▓╽╽    '
+          - '  ▓▓██░░██▓▓  '
+          - '    ▐▐▐▐▐▐    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSEESSSSSS
+          - SSSSEEEEEESSSS
+        - id: vector_nozzle
+          weight: 1
+          cells:
+          - '    ╽╽██╽╽    '
+          - '  ▝▝██░░██▌▌  '
+          - '    ▐▐▐▐      '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSEESSSSSS
+          - SSSSEEEESSSSSS
+      - id: spindrive
+        name: Drive Swell
+        primary_property: spindrive
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: faceted_core
+          weight: 1
+          cells:
+          - '      ╽╽      '
+          - '  ▗▗██████▖▖  '
+          - '    ◥◥██◤◤    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: annular_ring
+          weight: 1
+          cells:
+          - '    ▟▟██▙▙    '
+          - '  ▓▓░░▒▒░░▓▓  '
+          - '    ▜▜██▛▛    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: hull
+        name: Narrow Fuselage
+        primary_property: hull
+        secondary_properties:
+        - armor
+        - bridge
+        repeat: 5
+        variants:
+        - id: panel_rib
+          weight: 1
+          cells:
+          - '    ╽╽██╽╽    '
+          - '    ▓▓██▓▓    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: fastener_rib
+          weight: 1
+          cells:
+          - '    ╽╽◆◆╽╽    '
+          - '    ▓▓██▓▓    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: screens
+        name: Screened Cockpit
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: canopy
+          weight: 1
+          cells:
+          - '      ╽╽      '
+          - '  ◇◇██◆◆██    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSDDSSWWSSSSSS
+        - id: armored_canopy
+          weight: 1
+          cells:
+          - '    ▟▟╽╽▙▙    '
+          - '    ▜▜◆◆▛▛    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSWWSSSSSS
+      - id: main_gun
+        name: Forward Gun
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: long_barrel
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ▟▟║║▙▙    '
+          - '    ╽╽║║╽╽    '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+        - id: muzzle_brake
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '  ▟▟▟▟██▙▙▙▙  '
+          - '  ╽╽║║║║║║╽╽  '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSAASSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Swept Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: twin_bell
+          weight: 1
+          cells:
+          - '  ╽╽▓▓╽╽  '
+          - ▐▐▜▜██▛▛▌▌
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: vector_nozzle
+          weight: 1
+          cells:
+          - '  ╽╽██╽╽  '
+          - '▐▐▜▜██▛▛  '
+          color_mask:
+          - SSSSSSSSSS
+          - EESSSSSSSS
+      - id: spindrive
+        name: Drive Swell
+        primary_property: spindrive
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: faceted_core
+          weight: 1
+          cells:
+          - '    ╽╽    '
+          - ▐▐██░░██▌▌
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSEESSSS
+        - id: annular_ring
+          weight: 1
+          cells:
+          - '  ▟▟██▙▙  '
+          - ▝▝██░░██▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: hull
+        name: Narrow Fuselage
+        primary_property: hull
+        secondary_properties:
+        - armor
+        - bridge
+        repeat: 5
+        variants:
+        - id: panel_rib
+          weight: 1
+          cells:
+          - '  ╽╽██╽╽  '
+          color_mask:
+          - SSSSSSSSSS
+        - id: fastener_rib
+          weight: 1
+          cells:
+          - '  ╽╽◆◆╽╽  '
+          color_mask:
+          - SSSSSSSSSS
+      - id: screens
+        name: Screened Cockpit
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: canopy
+          weight: 1
+          cells:
+          - '    ╽╽    '
+          - '  ◥◥◇◇◤◤  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSDDSSSS
+        - id: armored_canopy
+          weight: 1
+          cells:
+          - '  ▟▟╽╽▙▙  '
+          - '  ◇◇◇◇◇◇  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSDDDDDDSS
+      - id: main_gun
+        name: Forward Gun
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        repeat: 1
+        variants:
+        - id: long_barrel
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - '  ║║║║║║  '
+          - '    ╽╽    '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSAASSSS
+          - SSSSSSSSSS
+        - id: muzzle_brake
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - ▌▌██║║██▌▌
+          - '  ╽╽╽╽╽╽  '
+          color_mask:
+          - SSSSAASSSS
+          - AASSSSSSAA
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: flare
+          weight: 1
+          cells:
+          - '  ██  '
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: dart
+          weight: 1
+          cells:
+          - ▖▖▒▒▗▗
+          color_mask:
+          - SSSSSS
+        - id: thin
+          weight: 1
+          cells:
+          - '  ╽╽  '
+          color_mask:
+          - SSSSSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: muzzle
+          weight: 1
+          cells:
+          - '  ▲▲  '
+          - '  ║║  '
+          color_mask:
+          - SSAASS
+          - SSAASS

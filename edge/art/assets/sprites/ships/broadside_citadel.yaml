@@ -1,0 +1,802 @@
+schema_version: 4
+id: broadside_citadel
+name: Broadside Citadel
+kind: ship
+role: broadside_citadel
+description: A capital linebreaker built around layered lateral batteries and a fortress spine.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: capital_drive
+        name: Capital Drive
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        - spindrive
+        repeat: 1
+        variants:
+        - id: triple_bell
+          weight: 1
+          cells:
+          - ' ▀▖  '
+          - '▄▟▓▖ '
+          - ▄█░▓╾
+          - ▄███▓
+          - ▄█░▓╾
+          - '▄▜▓▘ '
+          - ' ▀▘  '
+          color_mask:
+          - SESSS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - SESSS
+        - id: armored_cluster
+          weight: 1
+          cells:
+          - ' ▓▄▓ '
+          - ▓▄▟░▓
+          - ▓▄██▓
+          - ▓▄█░█
+          - ▓▄██▓
+          - ▓▄▜░▓
+          - ' ▓▄▓ '
+          color_mask:
+          - SSESS
+          - SESES
+          - SESSS
+          - SESES
+          - SESSS
+          - SESES
+          - SSESS
+      - id: drive_citadel
+        name: Drive Citadel
+        primary_property: armor
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: buttress
+          weight: 1
+          cells:
+          - ▓███═
+          - ' ║   '
+          - ╔╩╦═╗
+          - ║▒▒▒║
+          - ╠◇▒◇╣
+          - ╚╦╩═╝
+          - ▓███═
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SDSDS
+          - SSSSS
+          - SSSSS
+        - id: layered_citadel
+          weight: 1
+          cells:
+          - ◢███◣
+          - ▓█▤█▓
+          - █▤▒▤█
+          - █▒◇▒█
+          - █▤▒▤█
+          - ▓█▤█▓
+          - ◥███◤
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSDSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: broadside_decks
+        name: Broadside Decks
+        primary_property: weapons
+        secondary_properties:
+        - hull
+        - armor
+        repeat: 4
+        variants:
+        - id: open_bays
+          weight: 1
+          cells:
+          - ' ▄▓▄▓ '
+          - ▓▲▓▲▓▓
+          - ╔════╗
+          - ║▒◇▒▒║
+          - ╚════╝
+          - ▓▼▓▼▓▓
+          - ' ▀▓▀▓ '
+          color_mask:
+          - SSSSSS
+          - SASASS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SASASS
+          - SSSSSS
+        - id: gunwalls
+          weight: 1
+          cells:
+          - ▓▀▓▀▓▓
+          - ▟█▙▟█▙
+          - ██████
+          - █▀▒▒▀█
+          - ██████
+          - ▜█▛▜█▛
+          - ▓▄▓▄▓▓
+          color_mask:
+          - SASASS
+          - SSSSSS
+          - SSSSSS
+          - SASSAS
+          - SSSSSS
+          - SSSSSS
+          - SASASS
+      - id: command_keep
+        name: Command Keep
+        primary_property: bridge
+        secondary_properties:
+        - sensors
+        - screens
+        repeat: 1
+        variants:
+        - id: tower
+          weight: 1
+          cells:
+          - '  ▀  '
+          - ' ╭─╮ '
+          - ◢█◆█◣
+          - █☼█◆█
+          - █████
+          - ◥███◤
+          - '  ▾  '
+          color_mask:
+          - SSBSS
+          - SSSSS
+          - SSWSS
+          - SBSWS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: low_keep
+          weight: 1
+          cells:
+          - '     '
+          - ' ▗▄▖ '
+          - ◢█◆█◣
+          - █☼█◆█
+          - █████
+          - ◥███◤
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSWSS
+          - SBSWS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: siege_prow
+        name: Siege Prow
+        primary_property: main_gun
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: triple_battery
+          weight: 1
+          cells:
+          - '      '
+          - '      '
+          - '─█▀█▙ '
+          - ═█▀█▀►
+          - '─█▀█▛ '
+          - '      '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSASSS
+          - ASASAA
+          - SSASSS
+          - SSSSSS
+          - SSSSSS
+        - id: armored_ram
+          weight: 1
+          cells:
+          - '      '
+          - '  ◇█◇ '
+          - ◇████▙
+          - ◇█▀█▀►
+          - ◇████▛
+          - '  ◇█◇ '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSDSDS
+          - DSSSSS
+          - DSASAA
+          - DSSSSS
+          - SSDSDS
+          - SSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: capital_drive
+        name: Capital Drive
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        - spindrive
+        repeat: 1
+        variants:
+        - id: triple_bell
+          weight: 1
+          cells:
+          - '▄▟▓ '
+          - ▄█░╾
+          - ▄██▓
+          - ▄█░╾
+          - '▄▜▓ '
+          color_mask:
+          - ESSS
+          - ESES
+          - ESSS
+          - ESES
+          - ESSS
+        - id: armored_cluster
+          weight: 1
+          cells:
+          - ▓▄▟▓
+          - ▓▄█▓
+          - ▓▄██
+          - ▓▄█▓
+          - ▓▄▜▓
+          color_mask:
+          - SESS
+          - SESS
+          - SESS
+          - SESS
+          - SESS
+      - id: drive_citadel
+        name: Drive Citadel
+        primary_property: armor
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: buttress
+          weight: 1
+          cells:
+          - ' ║  '
+          - ╔═╦╗
+          - ║▒▒║
+          - ╠◇▒╣
+          - ╚═╩╝
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSSS
+          - SDSS
+          - SSSS
+        - id: layered_citadel
+          weight: 1
+          cells:
+          - ▓█▤▓
+          - █▤▒█
+          - █▒◇█
+          - █▤▒█
+          - ▓█▤▓
+          color_mask:
+          - SSSS
+          - SSSS
+          - SSDS
+          - SSSS
+          - SSSS
+      - id: broadside_decks
+        name: Broadside Decks
+        primary_property: weapons
+        secondary_properties:
+        - hull
+        - armor
+        repeat: 3
+        variants:
+        - id: open_bays
+          weight: 1
+          cells:
+          - ▓▲▓▲▓
+          - ╔═══╗
+          - ║▒◇▒║
+          - ╚═══╝
+          - ▓▼▓▼▓
+          color_mask:
+          - SASAS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SASAS
+        - id: gunwalls
+          weight: 1
+          cells:
+          - ▟█▙▟▙
+          - █████
+          - █▀▒▒█
+          - █████
+          - ▜█▛▜▛
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SASSS
+          - SSSSS
+          - SSSSS
+      - id: command_keep
+        name: Command Keep
+        primary_property: bridge
+        secondary_properties:
+        - sensors
+        - screens
+        repeat: 1
+        variants:
+        - id: tower
+          weight: 1
+          cells:
+          - ' ╭─ '
+          - ◢█◆◣
+          - █☼██
+          - ████
+          - ◥██◤
+          color_mask:
+          - SSSS
+          - SSWS
+          - SBSS
+          - SSSS
+          - SSSS
+        - id: low_keep
+          weight: 1
+          cells:
+          - ' ▗▄ '
+          - ◢█◆◣
+          - █☼██
+          - ████
+          - ◥██◤
+          color_mask:
+          - SSSS
+          - SSWS
+          - SBSS
+          - SSSS
+          - SSSS
+      - id: siege_prow
+        name: Siege Prow
+        primary_property: main_gun
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: triple_battery
+          weight: 1
+          cells:
+          - '     '
+          - '─█▀█ '
+          - ═█▀█►
+          - '─█▀█ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSASS
+          - ASASA
+          - SSASS
+          - SSSSS
+        - id: armored_ram
+          weight: 1
+          cells:
+          - '  ◇█ '
+          - ◇███▙
+          - ◇█▀█►
+          - ◇███▛
+          - '  ◇█ '
+          color_mask:
+          - SSDSS
+          - DSSSS
+          - DSASA
+          - DSSSS
+          - SSDSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ▓█
+          - ▄█
+          - ▓█
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: battery
+          weight: 1
+          cells:
+          - ▀►
+          - ██
+          - ▄►
+          color_mask:
+          - AA
+          - SS
+          - AA
+        - id: keep
+          weight: 1
+          cells:
+          - ◇█
+          - █◆
+          - ◇█
+          color_mask:
+          - DS
+          - SW
+          - DS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: siege
+          weight: 1
+          cells:
+          - ' ◇█'
+          - ◇▀►
+          - ' ◇█'
+          color_mask:
+          - SDS
+          - DAA
+          - SDS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: capital_drive
+        name: Capital Drive
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        - spindrive
+        repeat: 1
+        variants:
+        - id: triple_bell
+          weight: 1
+          cells:
+          - '    ╽╽▓▓╽╽    '
+          - ▗▗▓▓░░██░░▓▓▖▖
+          - '  ▐▐▐▐▐▐▐▐▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSEESSEESSSS
+          - SSEEEEEEEEEESS
+        - id: armored_cluster
+          weight: 1
+          cells:
+          - '  ▓▓▓▓██▓▓▓▓  '
+          - ▐▐▜▜██████▛▛▐▐
+          - '  ▓▓▓▓▓▓▓▓▓▓  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - EESSSSSSSSSSEE
+          - SSSSSSSSSSSSSS
+      - id: drive_citadel
+        name: Drive Citadel
+        primary_property: armor
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: buttress
+          weight: 1
+          cells:
+          - ║║  ╔╔══╦╦╗╗║║
+          - ██  ╠╠▒▒▒▒╣╣██
+          - ▓▓  ╚╚══╩╩╝╝▓▓
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: layered_citadel
+          weight: 1
+          cells:
+          - ◢◢▓▓██████▓▓◣◣
+          - ██▤▤▒▒◇◇▒▒▤▤██
+          - ◥◥▓▓██████▓▓◤◤
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSDDSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: broadside_decks
+        name: Broadside Decks
+        primary_property: weapons
+        secondary_properties:
+        - hull
+        - armor
+        repeat: 4
+        variants:
+        - id: open_bays
+          weight: 1
+          cells:
+          - '  ▓▓╔╔══╗╗▓▓  '
+          - ▐▐◄◄║║▒▒║║►►▌▌
+          - ▐▐◄◄║║▒▒║║►►▌▌
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSAASSSSSSAASS
+          - SSAASSSSSSAASS
+        - id: gunwalls
+          weight: 1
+          cells:
+          - ▓▓▟▟██████▙▙▓▓
+          - ▌▌▜▜██▒▒██▛▛▐▐
+          - ▌▌████▌▌████▐▐
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - AASSSSSSSSSSAA
+          - AASSSSAASSSSAA
+      - id: command_keep
+        name: Command Keep
+        primary_property: bridge
+        secondary_properties:
+        - sensors
+        - screens
+        repeat: 1
+        variants:
+        - id: tower
+          weight: 1
+          cells:
+          - '    ◢◢████◣◣  '
+          - ▌▌││◆◆██████▶▶
+          - '    ◥◥████◤◤  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - BBSSWWSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: low_keep
+          weight: 1
+          cells:
+          - '    ◢◢████◣◣  '
+          - '  ▐▐◆◆██████  '
+          - '    ◥◥████◤◤  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSWWSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: siege_prow
+        name: Siege Prow
+        primary_property: main_gun
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: triple_battery
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '    ██████    '
+          - '    ██████    '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: armored_ram
+          weight: 1
+          cells:
+          - '    ▟▟▲▲▙▙    '
+          - '  ██████████  '
+          - '    ██████    '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: capital_drive
+        name: Capital Drive
+        primary_property: thrusters
+        secondary_properties:
+        - reactor
+        - spindrive
+        repeat: 1
+        variants:
+        - id: triple_bell
+          weight: 1
+          cells:
+          - '  ╽╽▓▓╽╽  '
+          - ▜▜██████▛▛
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: armored_cluster
+          weight: 1
+          cells:
+          - ▓▓▓▓██▓▓▓▓
+          - ▐▐▐▐▐▐▐▐▐▐
+          color_mask:
+          - SSSSSSSSSS
+          - EEEEEEEEEE
+      - id: drive_citadel
+        name: Drive Citadel
+        primary_property: armor
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: buttress
+          weight: 1
+          cells:
+          - '  ╔╔══╦╦╗╗'
+          - ══║║▒▒◇◇║║
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSDDSS
+        - id: layered_citadel
+          weight: 1
+          cells:
+          - ▓▓██████▓▓
+          - ██▤▤▒▒▤▤██
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: broadside_decks
+        name: Broadside Decks
+        primary_property: weapons
+        secondary_properties:
+        - hull
+        - armor
+        repeat: 3
+        variants:
+        - id: open_bays
+          weight: 1
+          cells:
+          - ▓▓╔╔══╗╗▓▓
+          - ▓▓║║◇◇║║▓▓
+          - ▓▓╚╚══╝╝▓▓
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: gunwalls
+          weight: 1
+          cells:
+          - ▟▟██████▙▙
+          - ▟▟██▒▒██▙▙
+          - ▜▜██████▛▛
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: command_keep
+        name: Command Keep
+        primary_property: bridge
+        secondary_properties:
+        - sensors
+        - screens
+        repeat: 1
+        variants:
+        - id: tower
+          weight: 1
+          cells:
+          - '  ◢◢████◣◣'
+          - ╰╰██☼☼████
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSBBSSSS
+        - id: low_keep
+          weight: 1
+          cells:
+          - '  ◢◢████◣◣'
+          - ▝▝██☼☼████
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSBBSSSS
+      - id: siege_prow
+        name: Siege Prow
+        primary_property: main_gun
+        secondary_properties:
+        - armor
+        repeat: 1
+        variants:
+        - id: triple_battery
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - '  ▌▌▌▌▌▌  '
+          - '  ││║║││  '
+          color_mask:
+          - SSSSAASSSS
+          - SSAAAAAASS
+          - SSSSAASSSS
+        - id: armored_ram
+          weight: 1
+          cells:
+          - '  ▟▟▲▲▙▙  '
+          - ◇◇██▌▌██◇◇
+          - '  ◇◇◇◇◇◇  '
+          color_mask:
+          - SSSSAASSSS
+          - DDSSAASSDD
+          - SSDDDDDDSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ██████
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: battery
+          weight: 1
+          cells:
+          - ▲▲██▲▲
+          color_mask:
+          - AASSAA
+        - id: keep
+          weight: 1
+          cells:
+          - ██◆◆██
+          color_mask:
+          - SSWWSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: siege
+          weight: 1
+          cells:
+          - ██▲▲██
+          - '  ◇◇  '
+          color_mask:
+          - SSAASS
+          - SSDDSS

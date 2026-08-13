@@ -1,0 +1,345 @@
+schema_version: 4
+id: stardock
+name: Stardock
+kind: port
+role: stardock
+description: 'The Federation flagship station: a beacon mast over a wide docking deck, a tapering body, and an engine glow at its foot.'
+views:
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: null
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: beacon_mast
+        name: Beacon Mast
+        primary_property: beacon
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '               '
+          - '       ▀       '
+          - '       █       '
+          - '      ███      '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSBSSSSSSS
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '       ▀       '
+          - '       █       '
+          - '       █       '
+          - '      ███      '
+          color_mask:
+          - SSSSSSSBSSSSSSS
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - '               '
+          - '               '
+          - '       ▀       '
+          - '      ███      '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSBSSSSSSS
+          - SSSSSSSSSSSSSSS
+      - id: docking_deck
+        name: Docking Deck
+        primary_property: docking
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '    ▟█████▙    '
+          - ╾─▓████◊████▓─╼
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '    ▟█████▙    '
+          - ╾─▓█████████▓─╼
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - '  ▟█████████▙  '
+          - ' ▓███████████▓ '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties: []
+        repeat: 3
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '    ▜██≡██▛    '
+          - '     ▓███▓     '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '    ▜█████▛    '
+          - '     ▓███▓     '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - '    ▜██◊██▛    '
+          - '    ▓█████▓    '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+      - id: engine_taper
+        name: Engine Taper
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '      ▜█▛      '
+          - '       ▄       '
+          - '               '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSESSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '     ▜███▛     '
+          - '      ▓█▓      '
+          - '       ▄       '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSESSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - '       ▄       '
+          - '               '
+          - '               '
+          color_mask:
+          - SSSSSSSESSSSSSS
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: beacon_mast
+        name: Beacon Mast
+        primary_property: beacon
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_3
+          weight: 1
+          cells:
+          - '       ▀       '
+          - '      ███      '
+          color_mask:
+          - SSSSSSSBSSSSSSS
+          - SSSSSSSSSSSSSSS
+      - id: docking_deck
+        name: Docking Deck
+        primary_property: docking
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '    ▟█████▙    '
+          - ╾─▓████◊████▓─╼
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '    ▟█████▙    '
+          - ╾─▓█████████▓─╼
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - '  ▟█████████▙  '
+          - ' ▓███████████▓ '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties: []
+        repeat: 3
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '    ▜██≡██▛    '
+          - '     ▓███▓     '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - '    ▜█████▛    '
+          - '     ▓███▓     '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - '    ▜██◊██▛    '
+          - '    ▓█████▓    '
+          color_mask:
+          - SSSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSSS
+      - id: engine_taper
+        name: Engine Taper
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_3
+          weight: 1
+          cells:
+          - '       ▄       '
+          color_mask:
+          - SSSSSSSESSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: beacon_mast
+        name: Beacon Mast
+        primary_property: beacon
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '    ▀    '
+          color_mask:
+          - SSSSBSSSS
+      - id: arm_band
+        name: Arm Band
+        primary_property: docking
+        secondary_properties: []
+        repeat: 4
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - ╾▟█████▙╼
+          color_mask:
+          - SSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - ╾███████╼
+          color_mask:
+          - SSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - '  █████  '
+          color_mask:
+          - SSSSSSSSS
+      - id: engine_glow
+        name: Engine Glow
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '    ▄    '
+          color_mask:
+          - SSSSESSSS
+    - id: minimal
+      name: Minimal
+      sections:
+      - id: beacon_mast
+        name: Beacon Mast
+        primary_property: beacon
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '    ▀    '
+          color_mask:
+          - SSSSBSSSS
+      - id: arm_band
+        name: Arm Band
+        primary_property: docking
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - ╾▟█████▙╼
+          color_mask:
+          - SSSSSSSSS
+        - id: default_2
+          weight: 1
+          cells:
+          - ╾███████╼
+          color_mask:
+          - SSSSSSSSS
+        - id: default_3
+          weight: 1
+          cells:
+          - '  █████  '
+          color_mask:
+          - SSSSSSSSS
+      - id: engine_glow
+        name: Engine Glow
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: default_1
+          weight: 1
+          cells:
+          - '    ▄    '
+          color_mask:
+          - SSSSESSSS

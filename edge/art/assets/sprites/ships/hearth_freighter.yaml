@@ -1,0 +1,842 @@
+schema_version: 4
+id: hearth_freighter
+name: Hearth Freighter
+kind: ship
+role: hearth_freighter
+description: A century-old modular transport made homelike through repairs, cargo, and a rotating drum.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: retrofitted_drive
+        name: Retrofitted Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: patched_bells
+          weight: 1
+          cells:
+          - '     '
+          - '▄▟▓▖ '
+          - ▄█░▓╾
+          - ▄█▒▒▓
+          - '▄▟▒▓ '
+          - ' ▓▝▘ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - ESESS
+          - SSSSS
+          - SSSSS
+        - id: mismatched_nozzles
+          weight: 1
+          cells:
+          - ' ▄▖  '
+          - '▄▟█▓ '
+          - ' ▓░▓╾'
+          - ▄███▓
+          - '▄▜░▓ '
+          - ' ▄▘  '
+          - '     '
+          color_mask:
+          - SESSS
+          - ESSSS
+          - SSESS
+          - ESSSS
+          - ESESS
+          - SESSS
+          - SSSSS
+      - id: machine_shop
+        name: Machine Shop
+        primary_property: utility
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: workshop
+          weight: 1
+          cells:
+          - '     '
+          - ╭─┬─╮
+          - │◆▒│▓
+          - ├▒☼▒┤
+          - │░▒░│
+          - ╰─┴─╯
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SWSSS
+          - SSBSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: external_rig
+          weight: 1
+          cells:
+          - '     '
+          - ▗▄╥▄▖
+          - █▒◆▒█
+          - █░☼░█
+          - ▝▀╨▀▘
+          - '     '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSWSS
+          - SSBSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: cargo_modules
+        name: Cargo Modules
+        primary_property: cargo
+        secondary_properties:
+        - hull
+        repeat: 4
+        variants:
+        - id: patched_container
+          weight: 1
+          cells:
+          - '      '
+          - ╭───┬╮
+          - │▒▒│▒│
+          - ┤░▒◆▒├
+          - │▒▒│▒│
+          - ╰───┴╯
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSWSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: habitat_pod
+          weight: 1
+          cells:
+          - '  ▄   '
+          - '▗▟██▙ '
+          - '▟◆▒◆▙ '
+          - █▒☼▒▒█
+          - '▜█▒▒▛ '
+          - '▝▀▀▀▘ '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SWSWSS
+          - SSBSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: salvage_rack
+          weight: 1
+          cells:
+          - '      '
+          - ╔═╦══╗
+          - ║░║▒▒║
+          - ╠═╬═╬╣
+          - ║▒║░▒║
+          - ╚═╩══╝
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+      - id: hearth_drum
+        name: Hearth Drum
+        primary_property: habitat
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: turning_drum
+          weight: 1
+          cells:
+          - ' ╭──╮ '
+          - ╱░◆◆░╲
+          - █░╭╮░█
+          - █☼││☼█
+          - █░╰╯░█
+          - ╲░◆◆░╱
+          - ' ╰──╯ '
+          color_mask:
+          - SSSSSS
+          - SSWWSS
+          - SSSSSS
+          - SBSSBS
+          - SSSSSS
+          - SSWWSS
+          - SSSSSS
+        - id: locked_drum
+          weight: 1
+          cells:
+          - '      '
+          - ╭████╮
+          - █▒◆▒◆█
+          - █▒☼▒◆█
+          - █▒◆▒▒█
+          - ╰████╯
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSWSWS
+          - SSBSWS
+          - SSWSSS
+          - SSSSSS
+          - SSSSSS
+      - id: mining_prow
+        name: Mining Prow
+        primary_property: main_gun
+        secondary_properties:
+        - utility
+        repeat: 1
+        variants:
+        - id: cutter
+          weight: 1
+          cells:
+          - '     '
+          - '  ▟▙ '
+          - ══█▓►
+          - '  ▜▛ '
+          - '     '
+          - '     '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSA
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: drill
+          weight: 1
+          cells:
+          - '     '
+          - ' ╭█╮ '
+          - ═█▀▓►
+          - ' ╰█╯ '
+          - '     '
+          - '     '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSASA
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: retrofitted_drive
+        name: Retrofitted Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: patched_bells
+          weight: 1
+          cells:
+          - '▄▟▓ '
+          - ▄█░╾
+          - ▄█▒▓
+          - '▄▟▒ '
+          - ' ▓▝ '
+          color_mask:
+          - ESSS
+          - ESES
+          - ESSS
+          - ESES
+          - SSSS
+        - id: mismatched_nozzles
+          weight: 1
+          cells:
+          - '▄▟█ '
+          - ' ▓░╾'
+          - ▄██▓
+          - '▄▟░ '
+          - ' ▄▟ '
+          color_mask:
+          - ESSS
+          - SSES
+          - ESSS
+          - ESES
+          - SESS
+      - id: machine_shop
+        name: Machine Shop
+        primary_property: utility
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: workshop
+          weight: 1
+          cells:
+          - ╭─┬╮
+          - │◆▒▓
+          - ├▒☼┤
+          - │░▒│
+          - ╰─┴╯
+          color_mask:
+          - SSSS
+          - SWSS
+          - SSBS
+          - SSSS
+          - SSSS
+        - id: external_rig
+          weight: 1
+          cells:
+          - ▗▄╥▖
+          - █▒◆█
+          - █░☼█
+          - ▝▀╨▘
+          - '    '
+          color_mask:
+          - SSSS
+          - SSWS
+          - SSBS
+          - SSSS
+          - SSSS
+      - id: cargo_modules
+        name: Cargo Modules
+        primary_property: cargo
+        secondary_properties:
+        - hull
+        repeat: 3
+        variants:
+        - id: patched_container
+          weight: 1
+          cells:
+          - ╭───╮
+          - │▒▒││
+          - ┤░▒◆├
+          - │▒▒││
+          - ╰───╯
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSWS
+          - SSSSS
+          - SSSSS
+        - id: habitat_pod
+          weight: 1
+          cells:
+          - '▗▟██ '
+          - '▟◆▒◆ '
+          - █▒☼▒█
+          - '▜█▒▒ '
+          - '▝▀▀▀ '
+          color_mask:
+          - SSSSS
+          - SWSWS
+          - SSBSS
+          - SSSSS
+          - SSSSS
+        - id: salvage_rack
+          weight: 1
+          cells:
+          - ╔═╦═╗
+          - ║░║▒║
+          - ╠═╬═╣
+          - ║▒║░║
+          - ╚═╩═╝
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: hearth_drum
+        name: Hearth Drum
+        primary_property: habitat
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: turning_drum
+          weight: 1
+          cells:
+          - ╱░◆◆╲
+          - █░╭╮█
+          - █☼││█
+          - █░╰╯█
+          - ╲░◆◆╱
+          color_mask:
+          - SSWWS
+          - SSSSS
+          - SBSSS
+          - SSSSS
+          - SSWWS
+        - id: locked_drum
+          weight: 1
+          cells:
+          - ╭███╮
+          - █▒◆▒█
+          - █▒☼▒█
+          - █▒◆▒█
+          - ╰███╯
+          color_mask:
+          - SSSSS
+          - SSWSS
+          - SSBSS
+          - SSWSS
+          - SSSSS
+      - id: mining_prow
+        name: Mining Prow
+        primary_property: main_gun
+        secondary_properties:
+        - utility
+        repeat: 1
+        variants:
+        - id: cutter
+          weight: 1
+          cells:
+          - '  ▟ '
+          - ──█►
+          - '  ▜ '
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSSA
+          - SSSS
+          - SSSS
+          - SSSS
+        - id: drill
+          weight: 1
+          cells:
+          - ' ╭█ '
+          - ─█▀►
+          - ' ╰█ '
+          - '    '
+          - '    '
+          color_mask:
+          - SSSS
+          - SSAA
+          - SSSS
+          - SSSS
+          - SSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ' ▓'
+          - ▄█
+          - ' ▓'
+          color_mask:
+          - SS
+          - ES
+          - SS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: cargo
+          weight: 1
+          cells:
+          - ▄▄
+          - █▒
+          - ▀▀
+          color_mask:
+          - SS
+          - SS
+          - SS
+        - id: drum
+          weight: 1
+          cells:
+          - ╭╮
+          - ◆☼
+          - ╰╯
+          color_mask:
+          - SS
+          - WB
+          - SS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: cutter
+          weight: 1
+          cells:
+          - '   '
+          - ─▀►
+          - '   '
+          color_mask:
+          - SSS
+          - SAA
+          - SSS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: retrofitted_drive
+        name: Retrofitted Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: patched_bells
+          weight: 1
+          cells:
+          - '    ╽╽▓▓      '
+          - '  ▓▓░░▒▒▒▒▘▘  '
+          - '  ▐▐▐▐▐▐▐▐    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSEESSEESSSS
+          - SSEEEEEEEESSSS
+        - id: mismatched_nozzles
+          weight: 1
+          cells:
+          - '    ╽╽▓▓      '
+          - '▗▗██░░██░░▖▖  '
+          - '  ▐▐  ▐▐▐▐    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSEESSEESSSS
+          - SSEESSEEEESSSS
+      - id: machine_shop
+        name: Machine Shop
+        primary_property: utility
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: workshop
+          weight: 1
+          cells:
+          - '  ╭╭▓▓┬┬──╮╮  '
+          - '  ├├▒▒☼☼▒▒┤┤  '
+          - '  ╰╰──┴┴──╯╯  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSBBSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: external_rig
+          weight: 1
+          cells:
+          - '  ▗▗████▖▖    '
+          - '  ╞╞◆◆☼☼╢╢    '
+          - '  ▝▝████▘▘    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSWWBBSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: cargo_modules
+        name: Cargo Modules
+        primary_property: cargo
+        secondary_properties:
+        - hull
+        repeat: 4
+        variants:
+        - id: patched_container
+          weight: 1
+          cells:
+          - '  ╭╭──┴┴──╮╮  '
+          - '  ││──◆◆──││  '
+          - '  ││▒▒░░▒▒││  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSWWSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: habitat_pod
+          weight: 1
+          cells:
+          - '      ██      '
+          - '  ██◆◆▒▒▒▒▌▌  '
+          - '▐▐▜▜◆◆▒▒██▌▌  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSWWSSSSSSSS
+          - SSSSWWSSSSSSSS
+        - id: salvage_rack
+          weight: 1
+          cells:
+          - '  ╔╔══╦╦══╗╗  '
+          - '  ║║▒▒║║░░║║  '
+          - '  ║║░░║║▒▒║║  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: hearth_drum
+        name: Hearth Drum
+        primary_property: habitat
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: turning_drum
+          weight: 1
+          cells:
+          - '  ╱╱██████╲╲  '
+          - ││◆◆╭╭──╮╮◆◆││
+          - ╰╰░░░░☼☼░░░░╯╯
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSWWSSSSSSWWSS
+          - SSSSSSBBSSSSSS
+        - id: locked_drum
+          weight: 1
+          cells:
+          - '  ╭╭██████╮╮  '
+          - '  ██▒▒▒▒▒▒██  '
+          - '  ██▒▒▒▒▒▒██  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: mining_prow
+        name: Mining Prow
+        primary_property: main_gun
+        secondary_properties:
+        - utility
+        repeat: 1
+        variants:
+        - id: cutter
+          weight: 1
+          cells:
+          - '    ▲▲        '
+          - '  ▜▜██▛▛      '
+          - '    ││        '
+          color_mask:
+          - SSSSAASSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: drill
+          weight: 1
+          cells:
+          - '    ▲▲        '
+          - '  ██▌▌██      '
+          - '    ││        '
+          color_mask:
+          - SSSSAASSSSSSSS
+          - SSSSAASSSSSSSS
+          - SSSSSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: retrofitted_drive
+        name: Retrofitted Drive
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        repeat: 1
+        variants:
+        - id: patched_bells
+          weight: 1
+          cells:
+          - '  ╽╽▓▓    '
+          - ▜▜████▛▛▓▓
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: mismatched_nozzles
+          weight: 1
+          cells:
+          - '  ╽╽▓▓    '
+          - ▜▜▓▓██▛▛▐▐
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSEE
+      - id: machine_shop
+        name: Machine Shop
+        primary_property: utility
+        secondary_properties:
+        - reactor
+        repeat: 1
+        variants:
+        - id: workshop
+          weight: 1
+          cells:
+          - ╭╭▓▓┬┬──╮╮
+          - ││◆◆▒▒░░││
+          color_mask:
+          - SSSSSSSSSS
+          - SSWWSSSSSS
+        - id: external_rig
+          weight: 1
+          cells:
+          - '▗▗████▖▖  '
+          - '▐▐▒▒░░▌▌  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: cargo_modules
+        name: Cargo Modules
+        primary_property: cargo
+        secondary_properties:
+        - hull
+        repeat: 3
+        variants:
+        - id: patched_container
+          weight: 1
+          cells:
+          - ╭╭──┴┴──╮╮
+          - ││▒▒▒▒▒▒││
+          - ╰╰──┬┬──╯╯
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: habitat_pod
+          weight: 1
+          cells:
+          - '    ██    '
+          - ██▒▒☼☼▒▒▌▌
+          - ▝▝▜▜██▛▛▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSBBSSSS
+          - SSSSSSSSSS
+        - id: salvage_rack
+          weight: 1
+          cells:
+          - ╔╔══╦╦══╗╗
+          - ╠╠══╬╬══╣╣
+          - ╚╚══╩╩══╝╝
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: hearth_drum
+        name: Hearth Drum
+        primary_property: habitat
+        secondary_properties:
+        - bridge
+        repeat: 1
+        variants:
+        - id: turning_drum
+          weight: 1
+          cells:
+          - ╱╱██████╲╲
+          - ◆◆╰╰──╯╯◆◆
+          - ╲╲██████╱╱
+          color_mask:
+          - SSSSSSSSSS
+          - WWSSSSSSWW
+          - SSSSSSSSSS
+        - id: locked_drum
+          weight: 1
+          cells:
+          - ╭╭██████╮╮
+          - ██◆◆☼☼◆◆██
+          - ╰╰██████╯╯
+          color_mask:
+          - SSSSSSSSSS
+          - SSWWBBWWSS
+          - SSSSSSSSSS
+      - id: mining_prow
+        name: Mining Prow
+        primary_property: main_gun
+        secondary_properties:
+        - utility
+        repeat: 1
+        variants:
+        - id: cutter
+          weight: 1
+          cells:
+          - '  ▲▲      '
+          - '  ││      '
+          color_mask:
+          - SSAASSSSSS
+          - SSSSSSSSSS
+        - id: drill
+          weight: 1
+          cells:
+          - '  ▲▲      '
+          - '╰╰██╯╯    '
+          color_mask:
+          - SSAASSSSSS
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ▓▓██▓▓
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 6
+        variants:
+        - id: cargo
+          weight: 1
+          cells:
+          - ██▒▒██
+          color_mask:
+          - SSSSSS
+        - id: drum
+          weight: 1
+          cells:
+          - ╭╭☼☼╮╮
+          color_mask:
+          - SSBBSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: cutter
+          weight: 1
+          cells:
+          - '  ▲▲  '
+          - '  ││  '
+          color_mask:
+          - SSAASS
+          - SSSSSS

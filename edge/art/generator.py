@@ -4,12 +4,10 @@ import random
 from functools import lru_cache
 from rich.text import Text
 
-from edge.art.hull import ARCHETYPE_STYLES
 from edge.art.terrain import TerrainGenerator
 from edge.art.planet import PlanetGenerator
 from edge.art.starfield import StarfieldGenerator, STARFIELD_SUBTYPES
-from edge.art.port import PortGenerator, PORT_SUBTYPES
-from edge.art.ship import ShipGenerator, SHIP_SUBTYPES
+from edge.art.sprites import SPRITES, fit_box, pad_to
 from edge.art.discovery import DiscoveryGenerator, DISCOVERY_GRAMMAR
 from edge.art.static import StaticGenerator, STATIC_SUBTYPES
 
@@ -17,8 +15,6 @@ _TERRAIN_GEN = TerrainGenerator(use_fg_color=True, use_bg_color=True)
 _PLANET_TERRAIN_GEN = TerrainGenerator(use_fg_color=False, use_bg_color=True)
 _PLANET_GEN = PlanetGenerator(terrain_gen=_PLANET_TERRAIN_GEN)
 _STARFIELD_GEN = StarfieldGenerator()
-_PORT_GEN = PortGenerator()
-_SHIP_GEN = ShipGenerator()
 _DISCOVERY_GEN = DiscoveryGenerator()
 _STATIC_GEN = StaticGenerator()
 
@@ -34,9 +30,9 @@ def available_subtypes(entity_type: str) -> list[str]:
     if entity_type == "starfield":
         return list(STARFIELD_SUBTYPES)
     if entity_type == "port":
-        return list(PORT_SUBTYPES)
+        return list(SPRITES.available_subtypes("port"))
     if entity_type == "ship":
-        return list(SHIP_SUBTYPES)
+        return list(SPRITES.available_subtypes("ship"))
     if entity_type == "discovery":
         return list(DISCOVERY_GRAMMAR.keys())
     if entity_type == "static":
@@ -45,13 +41,8 @@ def available_subtypes(entity_type: str) -> list[str]:
 
 
 def available_archetypes() -> list[str]:
-    """Return the archetype ids that have a defined art palette.
-
-    Lets the CLI enumerate and loop over every archetype style (``--archetype-id
-    all``). The 'default' fallback alias is omitted so it doesn't render as a
-    duplicate of the archetype it points at.
-    """
-    return [a for a in ARCHETYPE_STYLES if a != "default"]
+    """Return the archetype ids that have a defined art palette."""
+    return sorted(SPRITES.palettes.archetypes)
 
 
 @lru_cache(maxsize=128)
@@ -104,11 +95,26 @@ def generate_sprite(
     if entity_type == "starfield":
         return _STARFIELD_GEN.generate(rng, subtype, width, height)
 
+    # Ships and stations are tiered YAML art: the requested box is a *bound*, and
+    # `fit_box` resolves it to the richest tier that fits inside it. Asking for
+    # the box directly would let the library centre-crop a too-wide tier and
+    # return the middle of the hull band (see `fit_box`), so Edge pads the tier's
+    # natural render into the requested box itself.
     if entity_type == "port":
-        return _PORT_GEN.generate(rng, subtype, width, height, archetype_id)
+        fw, fh = fit_box("port", subtype, max_width=width, max_height=height,
+                         archetype_id=archetype_id)
+        return pad_to(
+            SPRITES.generate_port(
+                subtype, seed, min(fw, width), min(fh, height), archetype_id),
+            width, height)
 
     if entity_type == "ship":
-        return _SHIP_GEN.generate(rng, subtype, width, height, archetype_id, facing)
+        fw, fh = fit_box("ship", subtype, max_width=width, max_height=height,
+                         archetype_id=archetype_id, facing=facing)
+        return pad_to(
+            SPRITES.generate_ship(
+                subtype, seed, min(fw, width), min(fh, height), archetype_id, facing),
+            width, height)
 
     if entity_type == "discovery":
         return _DISCOVERY_GEN.generate(rng, subtype, width, height, archetype_id)

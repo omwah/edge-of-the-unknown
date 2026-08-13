@@ -1,6 +1,11 @@
 version: 7
 platforms:
 - name: linux-64
+  virtual-packages:
+  - __unix=0=0
+  - __linux=4.18
+  - __glibc=2.28
+  - __archspec=0=x86_64
 environments:
   default:
     channels:
@@ -230,7 +235,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/typing_extensions-4.15.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2025c-hc9c84f9_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/uc-micro-py-2.0.0-pyhcf101f3_0.conda
-      - pypi: .
+      - pypi: ./
       - pypi: https://files.pythonhosted.org/packages/1c/30/c31d800f8d40d663fc84d83548b26aecf613c9c39bd6985c813d623d7b84/pytest_textual_snapshot-1.1.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/96/9a/7a7ffa8ace49ac6a3f422fdd83caf8d0ad0d132f01389f02845379033a7b/tracery-0.1.1.tar.gz
       - pypi: https://files.pythonhosted.org/packages/ed/c7/8cd6b5fa8cc4a5c025d3d36a014dff44436fda8b3003a471253931c77f1b/syrupy-4.8.0-py3-none-any.whl
@@ -3654,11 +3659,13 @@ packages:
   - pkg:pypi/uc-micro-py?source=hash-mapping
   size: 13378
   timestamp: 1772479008776
-- pypi: .
+- pypi: ./
   name: edge-of-the-unknown
   requires_dist:
   - opensimplex>=0.4.5.1,<0.5
   - tracery>=0.1.1
+  - pyyaml
+  - rich
   - anthropic>=0.40 ; extra == 'authoring'
   - google-antigravity>=0.2 ; extra == 'authoring'
   requires_python: '>=3.12'

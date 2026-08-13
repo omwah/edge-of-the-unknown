@@ -7,17 +7,53 @@ nebulas and black holes can be drawn with true circular/elliptical shapes, and
 structures scale geometrically to any requested bounding box.
 """
 
-import random
 import math
-from rich.text import Text
-from opensimplex import OpenSimplex
+import random
+from dataclasses import dataclass
 
-from edge.art.hull import (
-    HullStyle,
-    render_grid,
-    style_for,
-)
+from opensimplex import OpenSimplex
+from rich.text import Text
+
 from edge.art.noise import fractal_noise
+from edge.art.sprites import SPRITES
+
+
+# Discovery-only hull painter vocabulary.  The vendored sprite renderer has its
+# own shading sets; these remain separate because discovery is not sprite-art data.
+BRIGHT_CHARS = frozenset("█")
+DARK_CHARS = frozenset("▒░")
+MID_CHARS = frozenset("▟▙▜▛▓▄▀╾╼─◢◣◥◤▴▾│┌┐└┘┤├▤▦═║╱╲")
+HULL_CHARS = BRIGHT_CHARS | DARK_CHARS | MID_CHARS
+VOID_BG = "black"
+WINDOW_PROB = 0.05
+
+
+@dataclass(frozen=True)
+class HullStyle:
+    """Palette used by discovery hull features."""
+
+    bright: str
+    mid: str
+    dark: str
+    top: tuple[str, ...]
+    bottom: tuple[str, ...]
+    window: tuple[str, ...]
+    facet: str
+
+
+def style_for(archetype_id: str | None) -> HullStyle:
+    """Resolve an archetype to its discovery palette from the vendored catalog."""
+    palette = SPRITES.palettes.resolve(archetype_id)
+    surface = palette.color_set("surface")
+    return HullStyle(
+        bright=surface.color_for_slot(0),
+        mid=surface.color_for_slot(1),
+        dark=surface.color_for_slot(2),
+        facet=surface.color_for_slot(3),
+        top=tuple(palette.color_set("beacon").colors),
+        bottom=tuple(palette.color_set("engine").colors),
+        window=tuple(palette.color_set("window").colors),
+    )
 
 # Export the known grammar keys so generator.py knows what subtypes exist.
 # Since we use an algorithmic switch, we just list them here to satisfy the API.
@@ -587,3 +623,64 @@ class DiscoveryGenerator:
                 row_chars.append("█" if dx * dx + dy * dy < 0.64 else " ")
             rows.append("".join(row_chars))
         return render_grid(rows, style, top_color, bottom_color, rng, width, height)
+
+
+def render_grid(
+    rows: list[str],
+    style: HullStyle,
+    top_color: str,
+    bottom_color: str,
+    rng: random.Random,
+    width: int,
+    height: int,
+) -> Text:
+    """Paint discovery hull glyphs into an exact-size Rich text box."""
+    bright = style.bright
+    mid = style.mid
+    dark = style.dark
+    facet = style.facet
+    windows = style.window
+
+    nh = len(rows)
+    nw = max((len(row) for row in rows), default=0)
+    pad_top = max(0, (height - nh) // 2)
+    crop_top = max(0, (nh - height) // 2)
+
+    map_text = Text()
+    for y in range(height):
+        src = y - pad_top + crop_top
+        if not (0 <= src < nh):
+            line = " " * width
+        elif nw <= width:
+            row = rows[src].center(nw)
+            left = (width - nw) // 2
+            line = (" " * left) + row + (" " * (width - nw - left))
+        else:
+            row = rows[src].center(nw)
+            start = (nw - width) // 2
+            line = row[start:start + width].ljust(width)
+
+        for char in line:
+            if char == " ":
+                map_text.append(" ")
+            elif char == "R":
+                map_text.append("▀", style=top_color)
+            elif char == "Y":
+                map_text.append("▄", style=bottom_color)
+            elif char in HULL_CHARS:
+                if char in BRIGHT_CHARS and rng.random() < WINDOW_PROB:
+                    color = rng.choice(windows)
+                elif char in DARK_CHARS:
+                    color = dark
+                elif char in BRIGHT_CHARS:
+                    color = bright
+                else:
+                    color = mid
+                map_text.append(char, style=f"{color} on {VOID_BG}")
+            else:
+                map_text.append(char, style=f"{facet} on {bright}")
+
+        if y < height - 1:
+            map_text.append("\n")
+
+    return map_text

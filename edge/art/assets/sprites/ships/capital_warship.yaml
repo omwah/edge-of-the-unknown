@@ -1,0 +1,878 @@
+schema_version: 4
+id: capital_warship
+name: Capital Warship
+kind: ship
+role: capital_warship
+description: A command-scale fleet anchor with clustered drives, layered decks, and an embedded heavy prow.
+views:
+  horizontal:
+    name: Horizontal
+    axis: horizontal
+    canonical_facing: right
+    mirror_facing: left
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Capital Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        - reactor
+        repeat: 1
+        variants:
+        - id: triple_bell
+          weight: 1
+          cells:
+          - ' ▄▗▓  '
+          - '▄▟░▓▖ '
+          - '▄▟██▓ '
+          - ▄█░██▓
+          - '▄▜██▓ '
+          - '▄▜░▓▘ '
+          - ' ▄▝▓  '
+          color_mask:
+          - SESSSS
+          - ESESSS
+          - ESSSSS
+          - ESESSS
+          - ESSSSS
+          - ESESSS
+          - SESSSS
+        - id: fortified_cluster
+          weight: 1
+          cells:
+          - ' ▓▄▓▖ '
+          - '▓▄▟░▓ '
+          - ▓▄██▓╾
+          - ▓▄█░██
+          - ▓▄██▓╾
+          - '▓▄▜░▓ '
+          - ' ▓▄▓▘ '
+          color_mask:
+          - SSESSS
+          - SESESS
+          - SESSSS
+          - SESESS
+          - SESSSS
+          - SESESS
+          - SSESSS
+      - id: spindrive
+        name: Drive Bastion
+        primary_property: spindrive
+        secondary_properties:
+        - armor
+        - reactor
+        repeat: 1
+        variants:
+        - id: bastion_cage
+          weight: 1
+          cells:
+          - '      '
+          - ╔══╦═╗
+          - ║▓▓█▓║
+          - ╠▤▤░▤╣
+          - ║▓▓█▓║
+          - ╚══╩═╝
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSESS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: reactor_drum
+          weight: 1
+          cells:
+          - '  ▄▄  '
+          - ' ▟██▙ '
+          - ▟█▒▒█▙
+          - █▒░☼▒█
+          - ▜█▒▒█▛
+          - ' ▜██▛ '
+          - '  ▀▀  '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSEBSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+      - id: hull
+        name: Layered Heavy Hull
+        primary_property: armor
+        secondary_properties:
+        - hull
+        - bridge
+        repeat: 4
+        variants:
+        - id: command_decks
+          weight: 1
+          cells:
+          - '      '
+          - ' ╭◆╮  '
+          - ▟▤▤▤█▙
+          - █▒◆▒▒█
+          - ▜▤▤▤█▛
+          - ' ▀▀▀  '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSWSSS
+          - SSSSSS
+          - SSWSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: battery_deck
+          weight: 1
+          cells:
+          - '      '
+          - ' ▟▀▙  '
+          - ▟▤▤▤█▙
+          - █▒▒▒▒█
+          - ▜▤▤▤█▛
+          - ' ▀▀▀  '
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSASSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+        - id: terrace_deck
+          weight: 1
+          cells:
+          - '      '
+          - ▗▄▓▓▄▖
+          - ▟█▤▤█▙
+          - █▒◆▒◆█
+          - ▜█▤▤█▛
+          - ▝▀▓▓▀▘
+          - '      '
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+          - SSSSSS
+      - id: screens
+        name: Forward Screen Complex
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        - sensors
+        repeat: 1
+        variants:
+        - id: flag_bridge
+          weight: 1
+          cells:
+          - '  ◇  '
+          - ' ╭┴╮ '
+          - ◇▟██▙
+          - ◇█◆◆█
+          - ◇▜██▛
+          - ' ╰┬╯ '
+          - '  ◇  '
+          color_mask:
+          - SSDSS
+          - SSSSS
+          - DSSSS
+          - DSWWS
+          - DSSSS
+          - SSSSS
+          - SSDSS
+        - id: armored_shoulder
+          weight: 1
+          cells:
+          - '     '
+          - ' ◇ ◇ '
+          - ◇◢██◣
+          - ◇█◆▓█
+          - ◇◥██◤
+          - ' ◇ ◇ '
+          - '     '
+          color_mask:
+          - SSSSS
+          - SDSDS
+          - DSSSS
+          - DSWSS
+          - DSSSS
+          - SDSDS
+          - SSSSS
+      - id: main_gun
+        name: Heavy Battery
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        - armor
+        repeat: 1
+        variants:
+        - id: embedded_battery
+          weight: 1
+          cells:
+          - '       '
+          - ' ▗▄▄▄▖ '
+          - '═▟███▙ '
+          - ╾═█▓█▓►
+          - '═▜███▛ '
+          - ' ▝▀▀▀▘ '
+          - '       '
+          color_mask:
+          - SSSSSSS
+          - SSSSSSS
+          - SSSSSSS
+          - SASSSSA
+          - SSSSSSS
+          - SSSSSSS
+          - SSSSSSS
+        - id: twin_spinal
+          weight: 1
+          cells:
+          - '       '
+          - ' ╾═█▙  '
+          - '╾═█▓▓▙ '
+          - ╾═█▀█▀►
+          - '╾═█▓▓▛ '
+          - ' ╾═█▛  '
+          - '       '
+          color_mask:
+          - SSSSSSS
+          - SSSSSSS
+          - SSSSSSS
+          - SASASAA
+          - SSSSSSS
+          - SSSSSSS
+          - SSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Capital Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        - reactor
+        repeat: 1
+        variants:
+        - id: triple_bell
+          weight: 1
+          cells:
+          - '▄▟░▓ '
+          - '▄▟██ '
+          - ▄█░█▓
+          - '▄▜██ '
+          - '▄▜░▓ '
+          color_mask:
+          - ESESS
+          - ESSSS
+          - ESESS
+          - ESSSS
+          - ESESS
+        - id: fortified_cluster
+          weight: 1
+          cells:
+          - '▓▄▟░ '
+          - ▓▄██╾
+          - ▓▄█░█
+          - ▓▄██╾
+          - '▓▄▜░ '
+          color_mask:
+          - SESES
+          - SESSS
+          - SESES
+          - SESSS
+          - SESES
+      - id: spindrive
+        name: Drive Bastion
+        primary_property: spindrive
+        secondary_properties:
+        - armor
+        - reactor
+        repeat: 1
+        variants:
+        - id: bastion_cage
+          weight: 1
+          cells:
+          - ╔══╦╗
+          - ║▓▓█║
+          - ╠▤▤░╣
+          - ║▓▓█║
+          - ╚══╩╝
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSES
+          - SSSSS
+          - SSSSS
+        - id: reactor_drum
+          weight: 1
+          cells:
+          - ' ▟██ '
+          - ▟█▒▒▙
+          - █▒░☼█
+          - ▜█▒▒▛
+          - ' ▜██ '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSEBS
+          - SSSSS
+          - SSSSS
+      - id: hull
+        name: Layered Heavy Hull
+        primary_property: armor
+        secondary_properties:
+        - hull
+        - bridge
+        repeat: 3
+        variants:
+        - id: command_decks
+          weight: 1
+          cells:
+          - ' ╭◆╮ '
+          - ▟▤▤▤▙
+          - █▒◆▒█
+          - ▜▤▤▤▛
+          - ' ▀▀▀ '
+          color_mask:
+          - SSWSS
+          - SSSSS
+          - SSWSS
+          - SSSSS
+          - SSSSS
+        - id: battery_deck
+          weight: 1
+          cells:
+          - ' ▟▀▙ '
+          - ▟▤▤▤▙
+          - █▒▒▒█
+          - ▜▤▤▤▛
+          - ' ▀▀▀ '
+          color_mask:
+          - SSASS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+        - id: terrace_deck
+          weight: 1
+          cells:
+          - ▗▄▓▓▖
+          - ▟█▤▤▙
+          - █▒◆▒█
+          - ▜█▤▤▛
+          - ▝▀▓▓▘
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+          - SSSSS
+      - id: screens
+        name: Forward Screen Complex
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        - sensors
+        repeat: 1
+        variants:
+        - id: flag_bridge
+          weight: 1
+          cells:
+          - ' ╭─ '
+          - ◇▟█▙
+          - ◇█◆█
+          - ◇▜█▛
+          - ' ╰─ '
+          color_mask:
+          - SSSS
+          - DSSS
+          - DSWS
+          - DSSS
+          - SSSS
+        - id: armored_shoulder
+          weight: 1
+          cells:
+          - ' ◇  '
+          - ◇◢█◣
+          - ◇█◆█
+          - ◇◥█◤
+          - ' ◇  '
+          color_mask:
+          - SDSS
+          - DSSS
+          - DSWS
+          - DSSS
+          - SDSS
+      - id: main_gun
+        name: Heavy Battery
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        - armor
+        repeat: 1
+        variants:
+        - id: embedded_battery
+          weight: 1
+          cells:
+          - ' ▗▄▄ '
+          - '═▟██ '
+          - ╾═▓█►
+          - '═▜██ '
+          - ' ▝▀▀ '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SASSA
+          - SSSSS
+          - SSSSS
+        - id: twin_spinal
+          weight: 1
+          cells:
+          - ' ╾█▙ '
+          - '╾═▓▓ '
+          - ╾═▀█►
+          - '╾═▓▓ '
+          - ' ╾█▛ '
+          color_mask:
+          - SSSSS
+          - SSSSS
+          - SAASA
+          - SSSSS
+          - SSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ▄▓
+          - ▄█
+          - ▄▓
+          color_mask:
+          - ES
+          - ES
+          - ES
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 4
+        variants:
+        - id: decks
+          weight: 1
+          cells:
+          - ▀◆▀
+          - █▒█
+          - ▄█▄
+          color_mask:
+          - SWS
+          - SSS
+          - SSS
+        - id: tower
+          weight: 1
+          cells:
+          - ' ▄ '
+          - █◆█
+          - █▀█
+          color_mask:
+          - SSS
+          - SWS
+          - SSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: battery
+          weight: 1
+          cells:
+          - ' ◇  '
+          - '◇▀► '
+          - ' ◇  '
+          color_mask:
+          - SDSS
+          - DAAS
+          - SDSS
+  vertical:
+    name: Vertical
+    axis: vertical
+    canonical_facing: up
+    mirror_facing: down
+    section_order: reversed
+    tiers:
+    - id: full
+      name: Full Detail
+      sections:
+      - id: thrusters
+        name: Capital Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        - reactor
+        repeat: 1
+        variants:
+        - id: triple_bell
+          weight: 1
+          cells:
+          - '      ▓▓      '
+          - ▓▓▓▓██████▓▓▓▓
+          - ▐▐▜▜▜▜██▛▛▛▛▐▐
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - EESSSSSSSSSSEE
+        - id: fortified_cluster
+          weight: 1
+          cells:
+          - '    ╽╽██╽╽    '
+          - ▓▓░░██░░██░░▓▓
+          - ▓▓▐▐▐▐▐▐▐▐▐▐▓▓
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSEESSEESSEESS
+          - SSEEEEEEEEEESS
+      - id: spindrive
+        name: Drive Bastion
+        primary_property: spindrive
+        secondary_properties:
+        - armor
+        - reactor
+        repeat: 1
+        variants:
+        - id: bastion_cage
+          weight: 1
+          cells:
+          - '  ╔╔══╦╦══╗╗  '
+          - '  ╠╠██░░██╣╣  '
+          - '  ║║▓▓▤▤▓▓║║  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSEESSSSSS
+          - SSSSSSSSSSSSSS
+        - id: reactor_drum
+          weight: 1
+          cells:
+          - '    ▟▟██▙▙    '
+          - ▐▐██▒▒☼☼▒▒██▌▌
+          - '  ▜▜██▒▒██▛▛  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSBBSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: hull
+        name: Layered Heavy Hull
+        primary_property: armor
+        secondary_properties:
+        - hull
+        - bridge
+        repeat: 4
+        variants:
+        - id: command_decks
+          weight: 1
+          cells:
+          - '    ▟▟██▙▙    '
+          - '  ╭╭▤▤▒▒▤▤▐▐  '
+          - '  ╰╰▤▤▒▒▤▤▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: battery_deck
+          weight: 1
+          cells:
+          - '    ▟▟██▙▙    '
+          - '  ▟▟▤▤▒▒▤▤▐▐  '
+          - '  ▜▜▤▤▒▒▤▤▐▐  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: terrace_deck
+          weight: 1
+          cells:
+          - '  ▗▗▟▟██▙▙▖▖  '
+          - '  ▓▓▤▤▒▒▤▤▓▓  '
+          - '  ▐▐██▒▒██▌▌  '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+      - id: screens
+        name: Forward Screen Complex
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        - sensors
+        repeat: 1
+        variants:
+        - id: flag_bridge
+          weight: 1
+          cells:
+          - '    ▟▟██▙▙    '
+          - ◇◇││██◆◆██││◇◇
+          - '    ◇◇◇◇◇◇    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - DDSSSSWWSSSSDD
+          - SSSSDDDDDDSSSS
+        - id: armored_shoulder
+          weight: 1
+          cells:
+          - '    ◢◢██◣◣    '
+          - '    ██◆◆██    '
+          - '    ◇◇◇◇◇◇    '
+          color_mask:
+          - SSSSSSSSSSSSSS
+          - SSSSSSWWSSSSSS
+          - SSSSDDDDDDSSSS
+      - id: main_gun
+        name: Heavy Battery
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        - armor
+        repeat: 1
+        variants:
+        - id: embedded_battery
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '  ▐▐██████▌▌  '
+          - '  ▐▐██████▌▌  '
+          - '    ║║╽╽║║    '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+        - id: twin_spinal
+          weight: 1
+          cells:
+          - '      ▲▲      '
+          - '  ▟▟▓▓██▓▓▙▙  '
+          - '  ║║██████║║  '
+          - '    ╽╽╽╽╽╽    '
+          color_mask:
+          - SSSSSSAASSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+          - SSSSSSSSSSSSSS
+    - id: medium
+      name: Medium
+      sections:
+      - id: thrusters
+        name: Capital Thrusters
+        primary_property: thrusters
+        secondary_properties:
+        - spindrive
+        - reactor
+        repeat: 1
+        variants:
+        - id: triple_bell
+          weight: 1
+          cells:
+          - '    ▓▓    '
+          - ░░██░░██░░
+          - ▐▐▐▐▐▐▐▐▐▐
+          color_mask:
+          - SSSSSSSSSS
+          - EESSEESSEE
+          - EEEEEEEEEE
+        - id: fortified_cluster
+          weight: 1
+          cells:
+          - '  ╽╽██╽╽  '
+          - ▜▜██████▛▛
+          - ▓▓▓▓▓▓▓▓▓▓
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: spindrive
+        name: Drive Bastion
+        primary_property: spindrive
+        secondary_properties:
+        - armor
+        - reactor
+        repeat: 1
+        variants:
+        - id: bastion_cage
+          weight: 1
+          cells:
+          - ╔╔══╦╦══╗╗
+          - ║║▓▓▤▤▓▓║║
+          - ╚╚══╩╩══╝╝
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: reactor_drum
+          weight: 1
+          cells:
+          - '  ▟▟██▙▙  '
+          - ██▒▒░░▒▒██
+          - '  ▜▜██▛▛  '
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSEESSSS
+          - SSSSSSSSSS
+      - id: hull
+        name: Layered Heavy Hull
+        primary_property: armor
+        secondary_properties:
+        - hull
+        - bridge
+        repeat: 3
+        variants:
+        - id: command_decks
+          weight: 1
+          cells:
+          - '  ▟▟██▙▙  '
+          - ◆◆▤▤◆◆▤▤▐▐
+          - '  ▜▜██▛▛  '
+          color_mask:
+          - SSSSSSSSSS
+          - WWSSWWSSSS
+          - SSSSSSSSSS
+        - id: battery_deck
+          weight: 1
+          cells:
+          - '  ▟▟██▙▙  '
+          - ▌▌▤▤▒▒▤▤▐▐
+          - '  ▜▜██▛▛  '
+          color_mask:
+          - SSSSSSSSSS
+          - AASSSSSSSS
+          - SSSSSSSSSS
+        - id: terrace_deck
+          weight: 1
+          cells:
+          - ▗▗▟▟██▙▙▖▖
+          - ▓▓▤▤◆◆▤▤▓▓
+          - ▝▝▜▜██▛▛▘▘
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+      - id: screens
+        name: Forward Screen Complex
+        primary_property: screens
+        secondary_properties:
+        - bridge
+        - sensors
+        repeat: 1
+        variants:
+        - id: flag_bridge
+          weight: 1
+          cells:
+          - '  ▟▟██▙▙  '
+          - ╰╰▜▜██▛▛╯╯
+          color_mask:
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: armored_shoulder
+          weight: 1
+          cells:
+          - '  ◢◢██◣◣  '
+          - ◇◇◥◥██◤◤◇◇
+          color_mask:
+          - SSSSSSSSSS
+          - DDSSSSSSDD
+      - id: main_gun
+        name: Heavy Battery
+        primary_property: main_gun
+        secondary_properties:
+        - weapons
+        - armor
+        repeat: 1
+        variants:
+        - id: embedded_battery
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - ▐▐██▓▓██▌▌
+          - '  ║║╽╽║║  '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSSSSSSS
+          - SSSSSSSSSS
+        - id: twin_spinal
+          weight: 1
+          cells:
+          - '    ▲▲    '
+          - ██▓▓▌▌▓▓██
+          - '  ╽╽╽╽╽╽  '
+          color_mask:
+          - SSSSAASSSS
+          - SSSSAASSSS
+          - SSSSSSSSSS
+    - id: compact
+      name: Compact
+      sections:
+      - id: drive
+        name: Drive
+        primary_property: thrusters
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: drive
+          weight: 1
+          cells:
+          - ▓▓██▓▓
+          color_mask:
+          - SSSSSS
+      - id: body
+        name: Body
+        primary_property: hull
+        secondary_properties:
+        - armor
+        repeat: 4
+        variants:
+        - id: decks
+          weight: 1
+          cells:
+          - ▌▌██▐▐
+          - ▌▌██▐▐
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+        - id: tower
+          weight: 1
+          cells:
+          - '  ████'
+          - '  ████'
+          color_mask:
+          - SSSSSS
+          - SSSSSS
+      - id: prow
+        name: Prow
+        primary_property: weapons
+        secondary_properties: []
+        repeat: 1
+        variants:
+        - id: battery
+          weight: 1
+          cells:
+          - '      '
+          - ◇◇▌▌◇◇
+          color_mask:
+          - SSSSSS
+          - DDAADD

@@ -69,7 +69,7 @@ def test_default_scene_art_values() -> None:
     assert (scene.ship.min_height, scene.ship.max_height) == (3, 6)
     assert scene.max_ships_shown == 2
     assert scene.ship_face_inward_chance == 0.5
-    assert (scene.port_scale, scene.stardock_scale, scene.starbase_scale) == (0.25, 0.6, 0.35)
+    assert (scene.port_scale, scene.stardock_scale, scene.starbase_scale) == (0.3, 0.6, 0.35)
 
 
 def test_scene_art_is_optional_with_defaults() -> None:
@@ -81,10 +81,10 @@ def test_scene_art_is_optional_with_defaults() -> None:
     assert scene.max_ships_shown == 3
     # Schema defaults mirror default.yaml so config-less saves get the same
     # non-saturating station caps (max_height ≥ round(scale × planet.max_height)).
-    assert scene.port.max_height == 6
+    assert scene.port.max_height == 8
     assert scene.stardock.max_height == 16
     assert scene.starbase.max_height == 9
-    assert (scene.port_scale, scene.stardock_scale, scene.starbase_scale) == (0.25, 0.6, 0.35)
+    assert (scene.port_scale, scene.stardock_scale, scene.starbase_scale) == (0.3, 0.6, 0.35)
     # Traffic must never outsize the port it visits: ship stays below port on
     # both the scale and the cap, at every viewport.
     assert scene.ship_scale < scene.port_scale

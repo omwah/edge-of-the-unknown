@@ -464,6 +464,7 @@ class SectorShipDTO:
     archetype_id: str | None = None
     contact_id: int | None = None
     player_id: int | None = None
+    art_subtype: str | None = None
 
 
 @dataclass(frozen=True)

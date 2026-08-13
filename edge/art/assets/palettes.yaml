@@ -1,0 +1,284 @@
+schema_version: 2
+fallback_archetype: humanoid_diplomat
+archetypes:
+  humanoid_diplomat:
+    color_sets:
+      surface:
+      - grey85
+      - grey58
+      - grey35
+      - grey15
+      engine:
+      - yellow
+      - bright_yellow
+      beacon:
+      - red
+      - bright_red
+      window:
+      - bright_cyan
+      - bright_yellow
+      - grey100
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#60a5fa'
+  canid_technologist:
+    color_sets:
+      surface:
+      - khaki1
+      - dark_khaki
+      - grey35
+      - dark_orange3
+      engine:
+      - cyan
+      - bright_cyan
+      beacon:
+      - orange1
+      - gold1
+      window:
+      - gold1
+      - bright_white
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#2563eb'
+  tentacled_envoy:
+    color_sets:
+      surface:
+      - pale_turquoise1
+      - cyan
+      - grey30
+      - dark_cyan
+      engine:
+      - turquoise2
+      - cyan
+      beacon:
+      - aquamarine1
+      - cyan
+      window:
+      - pale_turquoise1
+      - bright_white
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#22d3ee'
+  brain_dome_automaton:
+    color_sets:
+      surface:
+      - grey93
+      - grey62
+      - grey30
+      - deep_sky_blue4
+      engine:
+      - dodger_blue1
+      - bright_cyan
+      beacon:
+      - bright_cyan
+      - cyan
+      window:
+      - bright_cyan
+      - grey100
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#38bdf8'
+  ribbon_salvager:
+    color_sets:
+      surface:
+      - tan
+      - dark_orange3
+      - grey23
+      - grey15
+      engine:
+      - orange1
+      - dark_orange
+      beacon:
+      - orange_red1
+      - red
+      window:
+      - orange1
+      - red
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#1d4ed8'
+  temporal_broker:
+    color_sets:
+      surface:
+      - plum1
+      - medium_purple
+      - grey27
+      - purple4
+      engine:
+      - blue_violet
+      - purple
+      beacon:
+      - magenta
+      - violet
+      window:
+      - plum1
+      - bright_white
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#818cf8'
+  cosmic_arbiter:
+    color_sets:
+      surface:
+      - khaki1
+      - gold3
+      - grey42
+      - dark_goldenrod
+      engine:
+      - bright_white
+      - gold1
+      beacon:
+      - gold1
+      - yellow
+      window:
+      - gold1
+      - bright_white
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#0ea5e9'
+  telepath_aristocrat:
+    color_sets:
+      surface:
+      - orchid
+      - purple
+      - grey27
+      - purple4
+      engine:
+      - violet
+      - magenta
+      beacon:
+      - magenta
+      - bright_magenta
+      window:
+      - orchid
+      - bright_white
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#6366f1'
+  engineered_aesthete:
+    color_sets:
+      surface:
+      - pink1
+      - hot_pink3
+      - grey30
+      - medium_violet_red
+      engine:
+      - deep_pink2
+      - hot_pink
+      beacon:
+      - gold1
+      - yellow
+      window:
+      - gold1
+      - pink1
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#3b82f6'
+  amorous_imp:
+    color_sets:
+      surface:
+      - light_pink1
+      - hot_pink
+      - grey30
+      - medium_violet_red
+      engine:
+      - bright_magenta
+      - hot_pink
+      beacon:
+      - hot_pink
+      - magenta
+      window:
+      - light_pink1
+      - bright_white
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#7dd3fc'
+  horned_grudgekeeper:
+    color_sets:
+      surface:
+      - grey66
+      - red3
+      - dark_red
+      - grey15
+      engine:
+      - orange3
+      - red
+      beacon:
+      - red
+      - bright_red
+      window:
+      - red
+      - orange1
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#0284c7'
+  psionic_overlord:
+    color_sets:
+      surface:
+      - slate_blue1
+      - purple4
+      - grey23
+      - grey15
+      engine:
+      - dodger_blue1
+      - blue
+      beacon:
+      - blue_violet
+      - purple
+      window:
+      - slate_blue1
+      - bright_cyan
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#4f46e5'
+  colonial_broodmaster:
+    color_sets:
+      surface:
+      - green_yellow
+      - chartreuse4
+      - grey23
+      - green4
+      engine:
+      - yellow3
+      - chartreuse3
+      beacon:
+      - green_yellow
+      - chartreuse1
+      window:
+      - green_yellow
+      - bright_yellow
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#93c5fd'
+  winged_schemer:
+    color_sets:
+      surface:
+      - grey62
+      - cadet_blue
+      - grey27
+      - grey15
+      engine:
+      - steel_blue
+      - cyan
+      beacon:
+      - dark_cyan
+      - cyan
+      window:
+      - cyan
+      - grey100
+      weapons:
+      - '#DF7070'
+      defensive:
+      - '#0891b2'
