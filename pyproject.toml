@@ -19,6 +19,7 @@ edge-llm-bot = "edge.bot.llm.__main__:main"  # Ollama-piloted bot console (docs/
 edge-server = "edge.server.net:main"  # host a game over websocket JSON-RPC (Phase 4, WP63)
 edge-groundwar = "edge.groundwar.__main__:main"  # ground-combat POC (Starship-Troopers raid)
 edge-spacebattle = "edge.spacebattle.__main__:main"  # space-combat POC (In-Fury-Born fleet action)
+edge-scene-gallery = "edge.tui.scene_gallery:main"  # sector-scene scale-conflict gallery (local only)
 
 # Dev-only extras for the cloud authoring backends (the Ollama backend is plain HTTP, no SDK).
 # The runtime never calls an LLM, so these are not Phase-runtime dependencies.
@@ -69,6 +70,13 @@ serve = "python -m edge.tui --serve"
 host = "edge-server"
 serve-remote = "python -m edge.tui --serve --connect ws://localhost:8765"  # browser → hosted game
 shots = "python -m edge.tui.shots"
+# Sector-scene art review. `scene-gallery` serves the conflict matrix on
+# 127.0.0.1:8766 (loopback by default — `serve` above already owns 8765).
+# Extra args pass through: `pixi run scene-gallery --host 0.0.0.0` to reach it from
+# another machine (unauthenticated), `--serve 8899` for a different port.
+# `scene-preview` prints single compositions to the terminal.
+scene-gallery = "python -m edge.tui.scene_gallery --serve"
+scene-preview = "python -m edge.tui.scene_preview"
 bigbang = "python -m edge.bigbang"
 devtool = "python -m edge.devtool"
 art-gen = "python -m edge.art.cli"
