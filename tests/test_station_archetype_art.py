@@ -144,14 +144,18 @@ async def test_station_header_vertically_centers_exterior_and_banner() -> None:
         await app.mount(header)
         await pilot.pause()
         icon, banner = list(header.children)
-        # The shipped direct-open port is 8 rows beside an 8-row banner, so they
-        # start on the same row and their midpoints align exactly. Midpoints are
-        # compared in half-rows (doubled) because an icon whose height is the
-        # opposite parity to the banner's can only centre to within half a row.
-        assert icon.region.y == banner.region.y
+        # Midpoints are compared in half-rows (doubled) because an icon whose
+        # height is the opposite parity to the banner's can only centre to within
+        # half a row. Alignment is the invariant; equal `region.y` is *not* — the
+        # shipped direct-open port is 12 rows against an 8-row banner, so the
+        # shorter child is offset down to meet it. (It read as 8-vs-8 while the
+        # port cap was 19x8; the taller child is whichever the config makes it.)
+        assert icon.region.height != banner.region.height
         icon_midpoint = 2 * icon.region.y + icon.region.height
         banner_midpoint = 2 * banner.region.y + banner.region.height
         assert icon_midpoint == banner_midpoint
+        # The shorter child is the one that moves, and it stays inside the row.
+        assert min(icon.region.y, banner.region.y) == header.region.y
 
 
 def test_assignment_is_seeded_roster_driven_and_fixed_after_capture() -> None:

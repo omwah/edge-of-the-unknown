@@ -1471,7 +1471,13 @@ class SceneArtConfig(BaseModel):
 
     model_config = _FROZEN
 
-    planet: PlanetSpriteSize = PlanetSpriteSize(max_height=26)  # SectorView primary body
+    # 40 is derived, not taste: every other kind scales off the *rendered* primary
+    # height, so this single number decides where the whole hierarchy stops growing.
+    # At 40 each scale lands exactly on the top rung of its art ladder (port
+    # 0.3×40 = 12, starbase 0.35×40 = 14, ship 0.2×40 → 7); at the old 26 the chain
+    # saturated around terminal height 40 with every rung but stardock's unreachable,
+    # so a 100-row console drew the same sprites as a 40-row one.
+    planet: PlanetSpriteSize = PlanetSpriteSize(max_height=40)  # SectorView primary body
     planet_detail: PlanetSpriteSize = PlanetSpriteSize(max_height=14)  # PlanetScreen orbit view
     # Station max_height must stay ≥ round(scale × planet.max_height) — a lower cap
     # saturates while the planet is still growing, freezing the station at one size
@@ -1480,10 +1486,23 @@ class SceneArtConfig(BaseModel):
     # or the art steps down a rung: a port capped at 6 rows selects trading_port's
     # 7-wide mast rung rather than its 11×7 silhouette, and a ship capped at 16
     # columns clears no rung at all (the narrowest is 17×3, then ~34×5).
-    port: SpriteSize = SpriteSize(max_width=19, max_height=8)
+    # Sized to the *top* rung of each ladder (vertical for stations, horizontal for
+    # ships): trading_port 11×12, starbase 11×14, stardock 15×15, warship 46×7.
+    # Station widths follow the 2.4 aspect in `station_dimensions`; a ship's width is
+    # the open sky, so its cap must reach the widest rung directly. Those rungs are
+    # the ceiling — anything richer needs new tiers authored upstream in
+    # sprite-art-designer, not a bigger cap here (docs/SPRITE_ART_SYNC.md).
+    # Stardock is the one kind whose cap sits *below* `round(scale × planet)`
+    # (0.6 × 40 = 24). That is deliberate: its ladder stops at 15×15, so 16 already
+    # clears the richest art there is, and the non-saturation rule has nothing left
+    # to protect. The cap is not inert — `station_icon_dimensions` falls back to it
+    # for a direct-open docked screen and `StationArtRow` sizes the row from the
+    # box — so raising it to 24 would only pad the docked header to 24 rows around
+    # 15 rows of art.
+    port: SpriteSize = SpriteSize(max_width=28, max_height=12)
     stardock: SpriteSize = SpriteSize(max_width=38, max_height=16)
-    starbase: SpriteSize = SpriteSize(max_width=22, max_height=9)
-    ship: SpriteSize = SpriteSize(max_width=36, max_height=5)
+    starbase: SpriteSize = SpriteSize(max_width=33, max_height=14)
+    ship: SpriteSize = SpriteSize(max_width=46, max_height=7)
     max_ships_shown: int = Field(default=3, gt=0)  # sprites; extras list as text
     ship_face_inward_chance: float = Field(default=0.5, ge=0.0, le=1.0)
     # Arrival-view scale hierarchy (PT-36): a station beside a rendered primary

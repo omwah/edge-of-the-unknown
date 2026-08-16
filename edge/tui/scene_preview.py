@@ -37,10 +37,17 @@ from edge.core.dto import (
 from edge.tui.widgets import _SceneComposer
 
 # (label, width, height) — the canvas the scene gets at each responsive tier.
+# The `huge` row is not a responsive tier the layout switches on; it exists so the
+# preview shows a canvas *past* where the scale chain saturates. Every row here
+# used to stop at 87×36, which is roughly where `planet.max_height` capped out —
+# so the preview rendered identical sprites to a real 200-column terminal and the
+# "everything is tiny on a big console" bug was invisible in the one tool built to
+# catch it. Keep a row comfortably larger than the tallest tier.
 SIZES: tuple[tuple[str, int, int], ...] = (
     ("compact 80×24 screen → 80×20 scene", 80, 20),
     ("standard 100×34 screen → 67×30 scene", 67, 30),
     ("wide 120×40 screen → 87×36 scene", 87, 36),
+    ("huge 200×58 screen → 150×52 scene", 150, 52),
 )
 
 

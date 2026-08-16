@@ -66,13 +66,49 @@ aspect at that height — otherwise the clamp pins the station at one size while
 planet is still growing across normal viewports, and the responsiveness the resolver
 exists to provide is silently erased (this shipped once: `starbase.max_height: 9`
 against `0.5 × 26` froze every starbase at 8 inked rows). The shipped values are
-`port 19×8`, `stardock 38×16`, `starbase 22×9` for scales 0.3 / 0.6 / 0.35 against
-`planet.max_height: 26`, with `ship 36×5` at 0.2. Those values realise the §1 tier
+`port 28×12`, `stardock 38×16`, `starbase 33×14` for scales 0.3 / 0.6 / 0.35 against
+`planet.max_height: 40`, with `ship 46×7` at 0.2. Those values realise the §1 tier
 ordering **planet ≫ Stardock > starbase > port > ship** at every viewport — at a
-full-size planet the chain is 26 ≫ 16 > 9 > 8 > 5 rows — and any retune must
-preserve that strict
+full-size planet the requested chain is 40 ≫ 16 > 14 > 12 > 7 rows, and in *ink*
+(what the eye actually ranks, after the ladder and the crop) 40 ≫ 14 > 10 > 8 > 5 —
+and any retune must preserve that strict
 ordering on both the scales and the caps, or two kinds collapse into reading as
-peers. The port and starbase scales are deliberately small —
+peers.
+
+**`planet.max_height` is the governor of the whole chain, not just the planet.**
+Every other kind derives from the *rendered* primary height, so this one number
+decides where the entire hierarchy stops growing — raise a station cap without it
+and nothing moves. 40 is derived rather than chosen: it is the value at which each
+kind's existing scale lands exactly on the top rung of its art ladder (port
+`0.3 × 40 = 12`, starbase `0.35 × 40 = 14`, ship `0.2 × 40 → 7`), so the scales keep
+their playtested ratios and the best art becomes reachable at the same time. This is
+the second saturation bug, and the subtler one: at `planet.max_height: 26` with
+`port 19×8` / `starbase 22×9` / `ship 36×5`, the chain froze around **terminal height
+40** and every rung but stardock's stayed unreachable at *any* size, so a 100-row
+console drew the same sprites as a 40-row one. `tests/test_sprite_seam.py::
+test_shipped_caps_reach_each_kinds_top_rung` and
+`::test_the_scale_chain_reaches_those_caps_at_a_full_size_planet` pin the two halves
+— cap and scale — so neither can regress alone.
+
+**Stardock is the deliberate exception to the cap rule.** Its cap (16) sits *below*
+`round(0.6 × 40) = 24`, because its ladder stops at `15×15` — 16 already clears the
+richest art there is, so the non-saturation rule has nothing left to protect. Do not
+"fix" this by raising the cap to 24: the cap is **not inert**. A direct-open docked
+screen falls back to the kind's bounds (§2, above) and `StationArtRow` sizes the row
+from the returned box, so a 24-row cap pads the docked Stardock header to 24 rows
+around 15 rows of art — which is how it was caught, as a wall of blank rows in the
+station snapshots. `test_scene_art_is_optional_with_defaults` therefore asserts
+`max_height ≥ min(round(planet.max_height × k), top_rung_height)`: the cap must clear
+whichever of the scale chain and the art ladder binds *first*.
+
+**The art ladder is the real ceiling.** Past these values config can do no more: the
+richest rungs the vendored library holds are `trading_port 11×12`, `starbase 11×14`,
+`stardock 15×15`, and `warship 46×7` (stations author only a `vertical` view). A port
+is therefore never wider than 11 columns however large the terminal. Making one
+bigger needs new tiers authored upstream in `sprite-art-designer` and re-synced
+(`docs/SPRITE_ART_SYNC.md`) — never a bigger cap here, which silently buys nothing.
+
+The port and starbase scales are deliberately small —
 playtest feedback of 2026-07-17: at 0.35–0.4 an ordinary port read as a rival body
 beside the planet, and at 0.5 a starbase (12 inked rows) did the same.
 `port_scale` is nonetheless floored by the art at ~0.27: below that the scaled box
@@ -84,9 +120,11 @@ its job, not the bug described below. Note that a
 starbase hosts the sector's market and takes the port's slot in the scene, so "the
 port is too big" reports usually mean *this* sprite.
 Because a small port scale would otherwise let ships outsize the port at mid
-viewports, `ship_scale` (0.2, cap 5) must stay *below* `port_scale` on both scale
+viewports, `ship_scale` (0.2, cap 7) must stay *below* `port_scale` on both scale
 and cap; `test_default_scene_art_values` asserts the cap inequality and the
-ship-below-port ordering.
+ship-below-port ordering. The inequality binds on **height only** — `ship.max_width`
+(46) exceeds every station's, because ship art composes at roughly 6:1 and its width
+is the open sky rather than a 2.4 aspect off its height.
 A second, intentional quantiser exists in the sprite library: ships and stations
 select from an authored discrete tier ladder and apply archetype-specific section
 repeats rather than continuously tiling a band to the requested height. The selected
@@ -138,11 +176,35 @@ requested generation box—the sizing decision—is shared.
 
 ## 3. Placement: why each thing goes where it goes
 
-- **The primary body rides just right of centre** (disc centre ≈ 60% of width). Centred
-  enough to be the subject, offset enough to leave one coherent region of open sky on
-  its left — a single large void reads better than two slivers, and it gives ships and
-  tags somewhere to breathe. A disc may crop slightly at the edge, like a world filling
-  a viewport; that is deliberate drama, not overflow.
+- **The primary body rides well right of centre and is allowed to run off the edge**
+  (`_PRIMARY_CENTRE`, 78% of width). Offset far enough to leave one coherent region of
+  open sky on its left — a single large void reads better than two slivers, and it is
+  where ships and tags breathe. The disc is deliberately *not* required to fit whole:
+  a world filling the window reads as bigger, not broken, and the columns saved by
+  clipping the limb are exactly the columns traffic needs. `_PRIMARY_MIN_VISIBLE`
+  (70%) is the counterweight — enough of the disc stays on screen that it still reads
+  as a world — and `primary_body_height` solves that bound for the radius.
+
+  This replaced an earlier rule that centred at 60% and forced the whole disc on
+  screen (`(w - 4) // 2`). That spent the scene's width on the object which was
+  already the subject: the planet got bigger, the sky got narrower, and the ship
+  ladder stepped traffic *down* — so growing the planet made the ships smaller. At a
+  120-column scene the change takes ships from the 17-column rung to the full 46×7
+  one while the planet still grows, at a cost of ~8 clipped columns.
+- **The disc yields width to keep one whole ship rung.** The planet and the traffic
+  share a single width budget — ships ride the sky *left* of the primary, so every row
+  the disc gains costs two columns there. Left alone, a growing planet squeezes that sky
+  below the 36-column rung and the ladder drops traffic to its 17-column stub, which is
+  *smaller* than before the planet could grow at all (this is what raising
+  `planet.max_height` to 40 exposed). `_paint_planet` therefore trims the disc back to
+  `_SHIP_SKY_RESERVE` (42 = the 36-column rung plus `_paint_ships`' 6 columns of inset)
+  when it would otherwise cross that line. The gate tests the **rung, not the width**:
+  ship *height* also scales off the planet, so trimming the disc shrinks the very ship
+  the extra columns were for — below ~23 planet rows the trade buys a 36-column berth
+  for a ship only tall enough to draw the 17-column rung, so it is skipped and stepping
+  the ship down stays the intended behaviour (§2). Measured across 525 scene sizes the
+  reserve costs at most 2 planet rows, and only ever where it buys a full ship rung.
+  Belts are exempt: they anchor to the right edge and size from their own sprawl.
 - **The station hovers at the world's lower-left limb**, overlapping the disc's bounding
   box by about a third of its own width. Orbiting infrastructure belongs *at* the world;
   the overlap is what makes it read as "in orbit here" rather than "next to it". Its
@@ -224,19 +286,31 @@ the same world). A sector composes identically every visit, every replay.
 
 ## 7. Tuning knobs
 
-`config/default.yaml → scene:` — `planet.max_height` (rendered subject cap only);
-independent `port`, `stardock`, and `starbase` min/max footprint blocks; independent
-`port_scale`, `stardock_scale`, and `starbase_scale`; `ship_scale`;
-`max_ships_shown` (sprite cap before text-row overflow); and
-`ship_face_inward_chance`. The shipped file currently uses station scales 0.25 / 0.6 /
-0.35 respectively; the schema defaults mirror it, so older config-less saves get the
-same values. When retuning a station scale or `planet.max_height`, re-derive that
-kind's `max_height`/`max_width` per the cap rule in §2 — a stale cap reintroduces the
-frozen-station bug — and preserve the tier ordering (planet ≫ Stardock > starbase >
-port > ship) on both scales and caps; in particular keep `ship_scale`/
-`ship.max_height` below the port's, or traffic outsizes the smallest station kind.
+`config/default.yaml → scene:` — `planet.max_height` (the governor of the whole
+chain, per §2, not merely the subject's own cap); independent `port`, `stardock`, and
+`starbase` min/max footprint blocks; independent `port_scale`, `stardock_scale`, and
+`starbase_scale`; `ship_scale`; `max_ships_shown` (sprite cap before text-row
+overflow); and `ship_face_inward_chance`. The shipped file uses station scales
+0.3 / 0.6 / 0.35 respectively; the schema defaults mirror it, so older config-less
+saves get the same values. When retuning a station scale or `planet.max_height`,
+re-derive that kind's `max_height`/`max_width` per the cap rule in §2 — a stale cap
+reintroduces the frozen-station bug — and preserve the tier ordering (planet ≫
+Stardock > starbase > port > ship) on both scales and caps; in particular keep
+`ship_scale`/`ship.max_height` below the port's, or traffic outsizes the smallest
+station kind.
 
-The centring factor (0.6) and the belt/nebula width multipliers live beside the
-placement code in `_SceneComposer` — they are compositional intent, not balance, and
-moving them means rereading §3. Docked vertical centring lives in `StationArtRow`, not
+**Raising a cap alone changes nothing.** The two ceilings are independent and both
+bind: the scale chain off `planet.max_height` has to reach the cap, and the cap has
+to clear a whole rung of the art. A "sprites are too small" report is almost always
+the first of those — check `planet.max_height` before touching a station block, and
+confirm against the art ladder (§2) that the rung you want exists at all.
+
+The centring factor (`_PRIMARY_CENTRE`, 0.78), the clip bound
+(`_PRIMARY_MIN_VISIBLE`, 0.7), the sky reserve (`_SHIP_SKY_RESERVE` /
+`_SHIP_SKY_MIN_RUNG_ROWS`), and the belt/nebula width multipliers live beside the
+placement code in `edge/tui/widgets.py` — they are compositional intent, not balance,
+and moving them means rereading §3. The first four are consumed by
+`primary_body_height`, which is a module function precisely so the responsiveness
+sweeps in `tests/test_sprite_seam.py` exercise the composer's own rule rather than a
+copy that can drift. Docked vertical centring lives in `StationArtRow`, not
 in per-screen ad-hoc margins.

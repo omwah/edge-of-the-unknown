@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 from contextlib import contextmanager
 
@@ -783,6 +784,102 @@ class Ticker(Vertical):
         self.query_one("#ticker-body", Static).update(self._body_text())
 
 
+# The disc and the traffic share one width budget: ships ride the sky *left* of the
+# primary, so every row the planet gains costs two columns there. These two numbers
+# keep a growing planet from squeezing that sky below a whole ship rung — see
+# `_paint_planet` and docs/SECTOR_SCENE_COMPOSITION.md §3.
+_SHIP_SKY_RESERVE = 42        # ship's middle rung (36 cols) + the 6 `_paint_ships` insets
+_SHIP_SKY_MIN_RUNG_ROWS = 5   # that rung is 36x5, and ship height scales off the planet
+
+# Where the primary body's centre sits, as a fraction of scene width. Pushed well
+# right of centre so the sky that ships and tags live in is one wide, coherent
+# region rather than a sliver — the disc is expected to run off the right edge,
+# like a world filling a viewport. `_PRIMARY_MIN_VISIBLE` is the counterweight:
+# enough of the disc must stay on screen that it still reads as a world.
+_PRIMARY_CENTRE = 0.78
+_PRIMARY_MIN_VISIBLE = 0.7
+
+# How far down the primary's limb a station berths, as a fraction of its height.
+_STATION_LIMB = 0.72
+# A space find that is the scene's primary takes this share of the body budget.
+# Compact phenomena still read as smaller than a world (which takes 0.9) without
+# shrinking to a token — at 0.6 a wormhole rendered 15 rows in a 25-row sky.
+_FIND_PRIMARY = 0.82
+
+
+@dataclass(frozen=True)
+class SpriteRender:
+    """One sprite the composer drew, with everything that determined how it looks.
+
+    The scene is built from many `generate_sprite` calls whose result depends on
+    subtype, seed, archetype, facing, and — most consequentially — the *box* the
+    scene asked for, which the library then quantises to an authored tier. When a
+    sprite comes out the wrong size, `box` vs `drawn` is the whole diagnosis: equal-
+    ish means the scene asked for the wrong thing, wildly different means the ladder
+    stepped somewhere the scene did not expect.
+
+    `ref` is the stable, greppable identifier — the same sprite in the same sector
+    produces the same string every run, so it can be quoted in a bug report and
+    reproduced with `scene_gallery`/`scene_preview`.
+    """
+
+    entity: str
+    subtype: str
+    seed: int
+    box: tuple[int, int]      # what the scene requested
+    drawn: tuple[int, int]    # what was inked, after the tier pick and the crop
+    facing: str = "right"
+    archetype_id: str | None = None
+
+    @property
+    def ref(self) -> str:
+        arch = f"/{self.archetype_id}" if self.archetype_id else ""
+        face = f":{self.facing}" if self.entity == "ship" else ""
+        return (f"{self.entity}:{self.subtype}{arch}{face}"
+                f"@{self.box[0]}x{self.box[1]}"
+                f"->{self.drawn[0]}x{self.drawn[1]}#{self.seed}")
+
+
+def primary_body_height(cfg: SceneArtConfig, w: int, body_h: int, *,
+                        belt: bool = False) -> int:
+    """Rows the primary disc takes in a `w`-wide scene — the head of the scale chain.
+
+    Everything else in the scene derives from this number (DESIGN of the chain is in
+    docs/SECTOR_SCENE_COMPOSITION.md §2), so it is a module function rather than
+    inline arithmetic: the responsiveness tests sweep it over hundreds of viewports
+    and must exercise the same code the composer runs, not a copy that can drift.
+
+    Three bounds apply, tightest wins:
+
+    - the configured cap, `planet.max_height`;
+    - the height budget, 90% of the scene body;
+    - how far the disc may run off the right edge. The disc is *not* required to fit
+      whole — it is anchored at `_PRIMARY_CENTRE` and allowed to clip, because a
+      world filling the window reads as bigger rather than broken, and the width it
+      gives back is the sky ships ride in. `_PRIMARY_MIN_VISIBLE` keeps enough of it
+      on screen to still read as a world; solving that for the radius gives the
+      `visible_cap` below.
+
+    A last pass hands back just enough width to hold one whole ship rung. Without it
+    a mid-width scene grows the disc until the sky can no longer fit the 36-column
+    rung and the ladder drops traffic to its 17-column stub — *smaller* than before
+    the planet was allowed to grow at all. The gate tests the **rung, not the
+    width**: ship height also scales off the planet, so trimming the disc shrinks
+    the very ship the columns were freed for; below ~23 rows the trade buys a wide
+    berth for a ship only tall enough to draw the narrow rung, so it is declined and
+    stepping the ship down stays the intended behaviour (§2). Belts are exempt —
+    they anchor to the right edge and size from their own sprawl.
+    """
+    visible_cap = int(w * (1.0 - _PRIMARY_CENTRE) / (2.0 * _PRIMARY_MIN_VISIBLE - 1.0))
+    ph = max(cfg.planet.min_height,
+             min(cfg.planet.max_height, int(body_h * 0.9), visible_cap))
+    if not belt and int(w * _PRIMARY_CENTRE) - ph < _SHIP_SKY_RESERVE:
+        trimmed = int(w * _PRIMARY_CENTRE) - _SHIP_SKY_RESERVE
+        if round(trimmed * cfg.ship_scale) >= _SHIP_SKY_MIN_RUNG_ROWS:
+            ph = max(cfg.planet.min_height, trimmed)
+    return ph
+
+
 class _SceneComposer:
     """Composites one sector as an *arrival view* (UI_MOCKUPS.md §1, PT-36/PT-44).
 
@@ -817,6 +914,13 @@ class _SceneComposer:
         self._occupied: list[tuple[int, int, int, int]] = []
         # Objects that found no free sky degrade to text rows (still clickable).
         self._deferred: list[tuple[str, str | None, int | str | None]] = []
+        # Every sprite drawn this compose, in draw order (see `SpriteRender`).
+        self.render_log: list[SpriteRender] = []
+        # (kind, x0, y0, x1, y1) for each placed sprite — the exact footprint the
+        # scene gave it. Debug tooling draws these as bounds; nothing in the game
+        # path reads them (`hotspots` is what routes clicks, and it omits objects
+        # that carry no destination).
+        self.sprite_rects: list[tuple[str, int, int, int, int]] = []
         self.station_reference: tuple[int | None, int] | None = None
         self._w = 0
         self._h = 0
@@ -881,7 +985,13 @@ class _SceneComposer:
             art.stylize("dim")
         elif treatment == "hostile":
             art.stylize("on dark_red")
-        return self._crop(art_adapter.text_to_cells(art))
+        cells = self._crop(art_adapter.text_to_cells(art))
+        # Every sprite the scene draws is logged with the box it was asked for and
+        # the size it came back as — the pair that diagnoses a mis-scaled sprite.
+        self.render_log.append(SpriteRender(
+            entity=entity, subtype=subtype, seed=seed, box=(sw, sh),
+            drawn=self._dims(cells), facing=facing, archetype_id=archetype_id))
+        return cells
 
     @staticmethod
     def _crop(cells: list[list[tuple[str, Style | None]]]
@@ -964,6 +1074,8 @@ class _SceneComposer:
         self.hotspots = []
         self._occupied = []
         self._deferred = []
+        self.render_log = []
+        self.sprite_rects = []
         self.station_reference = None
         self._grid = self._starfield(w, h)
 
@@ -987,16 +1099,34 @@ class _SceneComposer:
             disc = next((d for d in sec.discoveries if d.kind == "wormhole"),
                         sec.discoveries[0])
 
+        # The scale chain keys off the *body budget* — the height a world would take
+        # in this scene — not off whichever object happens to be primary. Keying off
+        # the primary collapsed the whole scene whenever that primary was small: a
+        # port-only sector scaled its ships to 20% of an 11-row station and drew them
+        # at the 3-row stub, and a port beside a wormhole asked for a 4-row box and
+        # got the bare mast. When a planet *is* present the two are the same number,
+        # so the everyday arrival is unchanged.
+        ref_h = primary_body_height(self.cfg, w, body_h)
         primary: tuple[int, int, int, int] | None = None
+        planet_primary = False
         if sec.planets:
             primary = self._paint_planet(sec.planets[0], hdr, body_h)
+            planet_primary = True
         elif disc is not None:
             primary = self._paint_discovery(disc, hdr, body_h, as_primary=True)
             disc = None
-        station = self._paint_station(primary, hdr, body_h)
+        # A *body* (planet or space find) owns the right of the scene, so traffic is
+        # confined to the sky on its left. A station does not: it is small, and
+        # confining ships to its left stranded them in a sliver with the rest of the
+        # canvas empty ("ships shouldn't be on the same side with empty space on the
+        # right", playtest 2026-08-15). With no body, ships get the whole width and
+        # the occupancy map keeps them off the station.
+        body = primary
+        station = self._paint_station(primary if planet_primary else None,
+                                      hdr, body_h, sky_left=primary)
         if primary is None:
             primary = station
-        self._paint_ships(primary, hdr)
+        self._paint_ships(body, hdr, ref_h)
         if disc is not None:
             self._paint_discovery(disc, hdr, body_h, as_primary=False)
         self._paint_text_rows()
@@ -1017,18 +1147,18 @@ class _SceneComposer:
         cfg, w, h = self.cfg, self._w, self._h
         sub = art_adapter.planet_subtype(planet.ptype)
         belt = sub in ("asteroid_belt", "asteroid")
-        ph = max(cfg.planet.min_height,
-                 min(cfg.planet.max_height, int(body_h * 0.9), (w - 4) // 2))
+        ph = primary_body_height(cfg, w, body_h, belt=belt)
         if belt:
             # A belt is a field, not a body: let it sprawl wide across the sky.
             pw = min(ph * 3, w - int(w * 0.3) - 1)
             left = max(int(w * 0.3), w - pw - 2)
         else:
             pw = ph * 2  # width locked to 2*height so the disc reads round
-            # The disc rides just right of centre — the world is the scene's
-            # subject, not a wing decoration; the sky to its left is where
-            # ships and the station's tag breathe.
-            left = max(2, int(w * 0.6) - pw // 2)
+            # The disc rides well right of centre and is allowed to run off the
+            # right edge — the world is the scene's subject, not a wing decoration,
+            # and the sky to its left is one wide region where ships and the
+            # station's tag breathe rather than two slivers.
+            left = max(2, int(w * _PRIMARY_CENTRE) - pw // 2)
         top = hdr + max(0, (body_h - ph) // 3)
         # A worked belt visibly empties in the sector view too (PT-52) — same
         # sprite the orbit view draws, same rocks, fewer of them.
@@ -1044,16 +1174,27 @@ class _SceneComposer:
                                        cloud_city=planet.cloud_city_size), top, left)
         rect = (left, top, min(w, left + pw), min(h, top + ph))
         self._reserve(*rect)
+        self.sprite_rects.append(("belt" if belt else "planet", *rect))
         self._tag(f"[b yellow]{planet.name}[/]", rect, "planet", None)
         self.hotspots.append((*rect, "planet", None))
         return rect
 
     def _paint_station(self, primary: tuple[int, int, int, int] | None, hdr: int,
-                       body_h: int) -> tuple[int, int, int, int] | None:
+                       body_h: int, *,
+                       sky_left: tuple[int, int, int, int] | None = None,
+                       ) -> tuple[int, int, int, int] | None:
         """The port — or the starbase that takes its slot (§4.2, WP80). Beside a
         planet it hovers at the lower limb at ~half scale, overlapping the disc's
         bounding box a little so it reads as *at* the world; alone it is the scene's
-        primary body and anchors right like a planet would."""
+        primary body and anchors right like a planet would.
+
+        `primary` is the *scaling* anchor and is passed only for a planet: a station
+        orbits a world, so it takes its size from one. Beside a space find it is on
+        its own and sizes as a lone station — scaling it off a compact phenomenon
+        asked for a 4-row box and drew the bare mast. `sky_left` is the *placement*
+        anchor, which is any rendered primary including a find, so the station still
+        berths beside whatever is actually there.
+        """
         sec, cfg, w, h = self.sec, self.cfg, self._w, self._h
         bases = list(getattr(sec, "starbases", ()) or ())
         if not bases and not sec.ports:
@@ -1076,15 +1217,27 @@ class _SceneComposer:
                                        treatment=b.condition)
         else:
             port = sec.ports[0]
+            # `is_stardock` is the authority, not the display label. The box above
+            # is already chosen from the flag, so deriving the *art* from a
+            # substring of `klass` lets the two disagree — and the failure is silent
+            # and one-directional: the scene requests the 38x16 Stardock box, gets
+            # `trading_port` (which tops out at 11x12), and the flagship reads as an
+            # ordinary port. `port_subtype` still covers everything else.
+            sub = ("stardock" if port.is_stardock
+                   else art_adapter.port_subtype(port.klass))
             # The controlling species' palette (`archetype_id`) styles the sprite.
-            cells = self._sprite_cells("port", art_adapter.port_subtype(port.klass),
+            cells = self._sprite_cells("port", sub,
                                        seed=sec.sector_id, sw=sw, sh=sh,
                                        archetype_id=port.archetype_id)
         cw, chh = self._dims(cells)
-        if primary is not None:
-            px0, py0, _px1, py1 = primary
+        berth = sky_left if sky_left is not None else primary
+        if berth is not None:
+            px0, py0, _px1, py1 = berth
             ph = py1 - py0
-            top = min(py0 + int(ph * 0.55), h - chh - 1)
+            # Low on the limb, not halfway up it: at 0.55 the station sat across the
+            # body's middle and read as pinned to its face rather than orbiting
+            # beneath it (playtest 2026-08-15, four scenes at standard tier).
+            top = min(py0 + int(ph * _STATION_LIMB), h - chh - 1)
             left = max(1, px0 - cw + max(2, cw // 3))
         else:
             # A lone station has no world to pin it, so its berth varies from
@@ -1096,6 +1249,9 @@ class _SceneComposer:
         self._paint(cells, top, left)
         rect = (left, top, min(w, left + cw), min(h, top + chh))
         self._reserve(*rect)
+        self.sprite_rects.append(
+            ("starbase" if bases else
+             "stardock" if sec.ports[0].is_stardock else "port", *rect))
         if bases:
             b = bases[0]
             # Name only — status/owner/market live in the sidebar caption. Click
@@ -1108,15 +1264,59 @@ class _SceneComposer:
             self.hotspots.append((*rect, "port", None))
         return rect
 
-    def _paint_ships(self, primary: tuple[int, int, int, int] | None, hdr: int) -> None:
-        """Up to N ships riding the open sky left of the primary body, staggered by
-        a seeded jitter rather than laid out in equal columns. Ships face the world
-        they've arrived at; with nothing to face, the 2nd of a pair may face the 1st."""
+    def _berths(self, i: int, n: int, cw: int, chh: int, sky_r: int, hdr: int,
+                rng: random.Random) -> Iterator[tuple[int, int]]:
+        """Candidate anchorages for ship `i` of `n`, best first.
+
+        The old rule was "first free row from the top wins", which is why a pair of
+        ships always arrived stacked in the same column with the rest of the sky
+        empty — ship 2 simply took the row under ship 1. Instead each ship gets its
+        own **horizontal band** of the sky and its own **column offset**, jittered
+        inside them, and only widens the search from there. Two ships therefore
+        occupy different heights *and* different columns by construction, and a lone
+        ship still drifts rather than sitting at a fixed mark.
+
+        Yields positions outward from the assigned berth so a crowded scene
+        degrades to "near where it wanted to be" instead of "top-left".
+        """
+        w, h = self._w, self._h
+        top0, bot0 = hdr + 1, h - 2
+        span_x = max(1, min(sky_r, w - 1) - cw - 2)
+        span_y = max(1, bot0 - top0 - chh)
+        # Alternate outward/inward across the sky so consecutive ships never share a
+        # column, then jitter within the ship's own slice of the width.
+        frac = ((i * 2 + 1) % (2 * n)) / (2 * n)
+        cx = 2 + int(span_x * frac) + rng.randrange(0, max(1, span_x // (2 * n) + 1))
+        cx = max(2, min(2 + span_x, cx))
+        band = max(1, span_y // n)
+        cy = top0 + i * band + rng.randrange(0, max(1, band))
+        cy = max(top0, min(bot0 - chh, cy))
+        seen: set[tuple[int, int]] = set()
+        for dy in range(0, span_y + 1):
+            for sy in ((cy + dy, cy - dy) if dy else (cy,)):
+                if not top0 <= sy <= bot0 - chh:
+                    continue
+                for dx in (0, -3, 3, -8, 8, -15, 15, -24, 24):
+                    sx = cx + dx
+                    if not 2 <= sx <= 2 + span_x or (sx, sy) in seen:
+                        continue
+                    seen.add((sx, sy))
+                    yield sx, sy
+
+    def _paint_ships(self, primary: tuple[int, int, int, int] | None, hdr: int,
+                     ref_h: int) -> None:
+        """Up to N ships riding the open sky left of the primary body, each given its
+        own berth rather than stacked at the first free row. Ships face the world
+        they've arrived at; with nothing to face, the 2nd of a pair may face the 1st.
+
+        `ref_h` is the scene's body budget (`primary_body_height`), not the primary's
+        own height: traffic is traffic whatever it is parked next to, and scaling it
+        off a small station or a compact find drew every ship at the 3-row stub.
+        """
         sec, cfg, w, h = self.sec, self.cfg, self._w, self._h
         shown = sec.ships[:cfg.max_ships_shown]
         if not shown:
             return
-        ref_h = (primary[3] - primary[1]) if primary is not None else cfg.ship.max_height * 3
         sh = max(cfg.ship.min_height, min(cfg.ship.max_height, round(ref_h * cfg.ship_scale)))
         sky_r = (primary[0] - 2) if primary is not None else w - 2
         # The height comes off the scale hierarchy; the *width* is whatever sky is
@@ -1132,20 +1332,27 @@ class _SceneComposer:
             facing = "right"
             if primary is None and i == 1 and rng.random() < cfg.ship_face_inward_chance:
                 facing = "left"
-            cells = self._sprite_cells(entity, sub, seed=sec.sector_id * 16 + i,
-                                       sw=sw, sh=sh, facing=facing,
-                                       archetype_id=vessel.archetype_id)
-            cw, chh = self._dims(cells)
-            # A jittered column first, then the sky's left edge and middle — the
-            # first free anchorage (scanning down) wins.
-            span = max(1, min(sky_r, w - 1) - cw - 2)
-            cols = list(dict.fromkeys((2 + rng.randrange(0, span), 2, 2 + span // 2)))
+            # Try the full berth first, then step down the ladder. A ship that can
+            # not fit at its computed size used to fall straight out of the scene to
+            # a text row; now the sky it *does* have picks the rung, which is what
+            # the ladder is for. Only the sprite finally drawn stays in the render
+            # log, so the log keeps describing the picture.
+            log_mark = len(self.render_log)
+            cells: list[list[tuple[str, Style | None]]] = []
+            cw = chh = 0
             spot = None
-            for t in range(hdr + 1, h - chh):
-                for left in cols:
-                    if self._is_free(left - 1, t - 1, left + cw + 1, t + chh + 1):
-                        spot = (left, t)
-                        break
+            for attempt in (sw, sw * 2 // 3, sw // 3):
+                if attempt < cfg.ship.min_width:
+                    continue
+                del self.render_log[log_mark:]
+                cells = self._sprite_cells(entity, sub, seed=sec.sector_id * 16 + i,
+                                           sw=attempt, sh=sh, facing=facing,
+                                           archetype_id=vessel.archetype_id)
+                cw, chh = self._dims(cells)
+                spot = next(
+                    (p for p in self._berths(i, len(shown), cw, chh, sky_r, hdr, rng)
+                     if self._is_free(p[0] - 1, p[1] - 1, p[0] + cw + 1, p[1] + chh + 1)),
+                    None)
                 if spot is not None:
                     break
             cid = vessel.contact_id
@@ -1161,6 +1368,7 @@ class _SceneComposer:
             self._paint(cells, top, left)
             rect = (left, top, min(w, left + cw), min(h, top + chh))
             self._reserve(*rect)
+            self.sprite_rects.append(("ship", *rect))
             self._tag(vessel.name, rect, dest, ref)
             if dest is not None:
                 self.hotspots.append((*rect, dest, ref))
@@ -1174,12 +1382,20 @@ class _SceneComposer:
             if disc.kind == "nebula":
                 # A nebula dwarfs a planet. Its soft SDF rim thins to nothing well
                 # inside the requested box (the crop then trims the blank margin),
-                # so the box is oversized ~40% past the body for the *visible*
-                # cloud to land at planet scale; the paint clips to the canvas.
-                dh = max(6, int(body_h * 1.4))
-                dw = min(dh * 3, w + w // 4)
+                # so the box is oversized well past the body for the *visible* cloud
+                # to land at planet scale; the paint clips to the canvas. The height
+                # multiplier drives how much cloud survives the crop — at 1.4 the
+                # visible band came back squat ("nebula too flat", playtest
+                # 2026-08-15), because the rim faded within a box only half again
+                # the body.
+                dh = max(6, int(body_h * 1.9))
+                dw = min(dh * 3, w + w // 3)
             else:
-                dh = max(4, min(cfg.planet.max_height - 4, int(body_h * 0.6)))
+                # A compact phenomenon is still the thing you came to look at, so it
+                # takes most of the body budget — under a planet's 0.9, not the 0.6
+                # that left a wormhole 15 rows tall in a 25-row sky.
+                dh = max(4, min(cfg.planet.max_height,
+                                int(primary_body_height(cfg, w, body_h) * _FIND_PRIMARY)))
                 dw = dh * 2
         else:
             dh = max(3, min(6, body_h // 4))
@@ -1196,7 +1412,9 @@ class _SceneComposer:
         # identity; a hulk is plainly a hulk, so a wreck wears its name (PT-49).
         named = disc.collected or disc.kind == "wreck"
         if as_primary:
-            left = max(2, int(w * 0.6) - cw // 2)
+            # Same anchor as a planet primary: well right of centre, free to run
+            # off the edge, so the sky it leaves is one coherent region.
+            left = max(2, int(w * _PRIMARY_CENTRE) - cw // 2)
             top = hdr + max(0, (body_h - chh) // 3)
         else:
             # A wreck is something bases and ships keep their distance from: it
@@ -1222,6 +1440,7 @@ class _SceneComposer:
         self._paint(cells, top, left)
         rect = (left, top, min(w, left + cw), min(h, top + chh))
         self._reserve(*rect)
+        self.sprite_rects.append(("discovery", *rect))
         if named:
             # Name only (kind/rarity are the sidebar's story; the sprite shows
             # what it is) — falling back to the label for a nameless legacy row.

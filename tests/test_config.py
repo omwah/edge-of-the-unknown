@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from edge.art.sprites import fit_box
 from edge.config import _merge_dialogue, load_default_config
 from edge.core.config import GameConfig, SceneArtConfig
 
@@ -64,7 +65,7 @@ def test_default_scene_art_values() -> None:
     # default.yaml: caps sized so round(scale × planet.max_height) is never clipped
     # (a lower cap pins the station at one size across most viewports).
     assert (scene.stardock.max_width, scene.stardock.max_height) == (38, 16)
-    assert (scene.starbase.max_width, scene.starbase.max_height) == (22, 9)
+    assert (scene.starbase.max_width, scene.starbase.max_height) == (33, 14)
     assert (scene.ship.min_width, scene.ship.max_width) == (6, 16)
     assert (scene.ship.min_height, scene.ship.max_height) == (3, 6)
     assert scene.max_ships_shown == 2
@@ -76,24 +77,34 @@ def test_scene_art_is_optional_with_defaults() -> None:
     # The whole `scene:` block is optional — GameConfig.scene defaults to these,
     # so configs/saves predating it still validate.
     scene = SceneArtConfig()
-    assert scene.planet.max_width == 2 * scene.planet.max_height == 52
+    assert scene.planet.max_width == 2 * scene.planet.max_height == 80
     assert scene.planet.min_width == 2 * scene.planet.min_height
     assert scene.max_ships_shown == 3
     # Schema defaults mirror default.yaml so config-less saves get the same
     # non-saturating station caps (max_height ≥ round(scale × planet.max_height)).
-    assert scene.port.max_height == 8
+    assert scene.port.max_height == 12
     assert scene.stardock.max_height == 16
-    assert scene.starbase.max_height == 9
+    assert scene.starbase.max_height == 14
     assert (scene.port_scale, scene.stardock_scale, scene.starbase_scale) == (0.3, 0.6, 0.35)
     # Traffic must never outsize the port it visits: ship stays below port on
     # both the scale and the cap, at every viewport.
     assert scene.ship_scale < scene.port_scale
     assert scene.ship.max_height < scene.port.max_height
-    for kind in ("port", "stardock", "starbase"):
+    # A cap must not clamp the station below the size the scale chain would other-
+    # wise reach — but the art ladder is the real ceiling, so a cap that already
+    # clears a kind's top rung has nothing left to protect. Stardock is exactly
+    # that case (0.6 × 40 = 24 against a ladder stopping at 15×15): capping at the
+    # rung keeps the docked header snug instead of padding it to 24 rows around 15
+    # rows of art. See docs/SECTOR_SCENE_COMPOSITION.md §2.
+    for kind, subtype in (("port", "trading_port"), ("stardock", "stardock"),
+                          ("starbase", "starbase")):
         size = scene.station_size(kind)
         scale = {"port": scene.port_scale, "stardock": scene.stardock_scale,
                  "starbase": scene.starbase_scale}[kind]
-        assert size.max_height >= round(scene.planet.max_height * scale)
+        top_rung_height = fit_box("port", subtype, max_width=10_000,
+                                  max_height=10_000)[1]
+        assert size.max_height >= min(round(scene.planet.max_height * scale),
+                                      top_rung_height)
         assert size.max_width >= int(size.max_height * 2.4)
 
 
