@@ -1,12 +1,12 @@
 {
   ".claude/settings.json": {
-    "mtime": 1784443058.538657,
-    "ast_hash": "",
+    "mtime": 1786742739.8122983,
+    "ast_hash": "86ab8cc8bc15404a2ae14a334a1acb26",
     "semantic_hash": ""
   },
   ".codex/hooks.json": {
-    "mtime": 1784443066.224761,
-    "ast_hash": "",
+    "mtime": 1786406866.1002195,
+    "ast_hash": "b175cac11d8f8a0cf06a49a064388308",
     "semantic_hash": ""
   },
   ".opencode/opencode.json": {
@@ -265,8 +265,8 @@
     "semantic_hash": ""
   },
   "edge/core/config.py": {
-    "mtime": 1786596457.250245,
-    "ast_hash": "96b804747110f321f9de0dda16af81cd",
+    "mtime": 1786744214.8804567,
+    "ast_hash": "df4478ed06f0b2574471b65327a9d309",
     "semantic_hash": ""
   },
   "edge/core/contracts.py": {
@@ -665,8 +665,8 @@
     "semantic_hash": ""
   },
   "edge/store/schema.sql": {
-    "mtime": 1784784498.157908,
-    "ast_hash": "",
+    "mtime": 1786406866.1702318,
+    "ast_hash": "4f1ceb477a851bde45af5c2601bf5a56",
     "semantic_hash": ""
   },
   "edge/store/snapshots.py": {
@@ -760,8 +760,8 @@
     "semantic_hash": ""
   },
   "edge/tui/scene_preview.py": {
-    "mtime": 1786406866.1712189,
-    "ast_hash": "705f94c222af617176afd962e892ec0c",
+    "mtime": 1786744497.185217,
+    "ast_hash": "7c60501d191839c392bc01e8d1a4d057",
     "semantic_hash": ""
   },
   "edge/tui/screens/__init__.py": {
@@ -930,8 +930,8 @@
     "semantic_hash": ""
   },
   "edge/tui/widgets.py": {
-    "mtime": 1786595272.0273087,
-    "ast_hash": "feae3e21e7bad817cdb8500242e8258b",
+    "mtime": 1786746848.7238412,
+    "ast_hash": "2956d2bb57c5020d0ed7285fa0f79261",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -960,8 +960,8 @@
     "semantic_hash": ""
   },
   "tests/fixtures/wire/envelopes.json": {
-    "mtime": 1786136808.2535017,
-    "ast_hash": "",
+    "mtime": 1786598782.78651,
+    "ast_hash": "1dfcca05b5808ab89372ef2549b3e84c",
     "semantic_hash": ""
   },
   "tests/helpers.py": {
@@ -1065,8 +1065,8 @@
     "semantic_hash": ""
   },
   "tests/test_config.py": {
-    "mtime": 1786596395.8519046,
-    "ast_hash": "6aa9d725c1920f0aa078f1b72f491d58",
+    "mtime": 1786744244.1247425,
+    "ast_hash": "70f25fa55804a28bf461badcfbf4f69d",
     "semantic_hash": ""
   },
   "tests/test_contact.py": {
@@ -1355,8 +1355,8 @@
     "semantic_hash": ""
   },
   "tests/test_station_archetype_art.py": {
-    "mtime": 1786596415.0118217,
-    "ast_hash": "0477e90750eb7744abff6d6854d8836a",
+    "mtime": 1786744199.279304,
+    "ast_hash": "783328eaa34c628152edb1c40a527f89",
     "semantic_hash": ""
   },
   "tests/test_store.py": {
@@ -1535,8 +1535,8 @@
     "semantic_hash": ""
   },
   "config/default.yaml": {
-    "mtime": 1786596457.248245,
-    "ast_hash": "90c2b28decea5ed2d0554fa0f7ebffe7",
+    "mtime": 1786744564.8478785,
+    "ast_hash": "092a6dfb7d0f75d11490961d2887feb5",
     "semantic_hash": ""
   },
   "config/dialogue/alien_dialogue_species.yaml": {
@@ -1665,8 +1665,8 @@
     "semantic_hash": ""
   },
   "docs/SECTOR_SCENE_COMPOSITION.md": {
-    "mtime": 1786596545.2542317,
-    "ast_hash": "91390fb33069fabce660162f427c4e72",
+    "mtime": 1786746171.5489876,
+    "ast_hash": "63beaafb9a8dddfcfd78e851236893dc",
     "semantic_hash": ""
   },
   "docs/SPACEBATTLE_POC.md": {
@@ -3875,8 +3875,8 @@
     "semantic_hash": ""
   },
   "tests/test_sprite_seam.py": {
-    "mtime": 1786597008.3980725,
-    "ast_hash": "daf9477b94f103d592ca1d84a3843a97",
+    "mtime": 1786746111.2742577,
+    "ast_hash": "a64d2f88cb9bc4b11dd3f83e9a579a93",
     "semantic_hash": ""
   },
   "tests/test_vendored_sprite_art.py": {
@@ -3972,6 +3972,16 @@
   "edge/art/assets/sprites/ships/warship.yaml": {
     "mtime": 1786594454.5967762,
     "ast_hash": "8d97a8f90ee6d2cdcbdf2584cc7d4298",
+    "semantic_hash": ""
+  },
+  "tests/fixtures/tier_renders.json": {
+    "mtime": 1786594454.5977762,
+    "ast_hash": "3262cffec962741dc254e7acb1601c8a",
+    "semantic_hash": ""
+  },
+  "edge/tui/scene_gallery.py": {
+    "mtime": 1786746989.1538353,
+    "ast_hash": "4cfab86d0fc17e53b783e33134eeb865",
     "semantic_hash": ""
   }
 }
