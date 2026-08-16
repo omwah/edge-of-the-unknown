@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/mcduffie/Devel/edge-of-the-unknown/.pixi/envs/default/bin/graphify hook-guard search"
+            "command": "\"${CLAUDE_PROJECT_DIR}/.pixi/envs/default/bin/graphify\" hook-guard search"
           }
         ]
       },
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/mcduffie/Devel/edge-of-the-unknown/.pixi/envs/default/bin/graphify hook-guard read"
+            "command": "\"${CLAUDE_PROJECT_DIR}/.pixi/envs/default/bin/graphify\" hook-guard read"
           }
         ]
       }
