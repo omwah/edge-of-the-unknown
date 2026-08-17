@@ -20,6 +20,7 @@ from textual.widgets import DataTable, Input, Select, Static, TabbedContent, Tab
 
 from rich.style import Style
 
+from edge.art import sprites as art_sprites
 from edge.core.config import SceneArtConfig
 from edge.core.dto import SectorDiscovery, SectorPlanetDTO, SectorShipDTO
 from edge.core.enums import Commodity
@@ -801,10 +802,39 @@ _PRIMARY_MIN_VISIBLE = 0.7
 
 # How far down the primary's limb a station berths, as a fraction of its height.
 _STATION_LIMB = 0.72
+
+# Traffic depth. Ships in one scene must not all draw the same rung: two hulls at
+# identical scale read as a formation on a flat backdrop, and at the top of the
+# ladder they also overpower the station they are visiting (both reported
+# repeatedly in the 2026-08-16 gallery pass — "one ship smaller gives a sense of
+# depth", "ships overpower port", "ships right on top of each other"). Ships are
+# banded down the sky by index, so the band index *is* the depth cue: the higher a
+# ship sits, the further away it reads, and the further one steps down the art
+# ladder. `_SHIP_DEPTH_MAX_STEPS` caps that at two rungs so a third ship still
+# draws as a ship rather than a speck.
+_SHIP_DEPTH_MAX_STEPS = 2
+
+# Clearance a ship keeps from anything already placed, before the fallbacks relax
+# it. The 1-cell occupancy pad is enough to stop an overlap but not enough to stop
+# two hulls — or a hull and a station — from reading as one crowded mass. Tried
+# widest-first; a scene with no room for the standoff falls back to the pad.
+_SHIP_STANDOFF: tuple[tuple[int, int], ...] = ((6, 2), (3, 1), (1, 1))
+# Rows held clear between one ship's band and the next, so the jitter inside a band
+# can never seat two ships flush against each other.
+_SHIP_BAND_GAP = 3
+# How many extra rungs a ship may drop below its depth's rung to find a berth. The
+# ladder — not a shifted berth — is how the scene absorbs "not enough room", because
+# moving the ship instead breaks the depth ordering the rung was chosen for.
+_SHIP_FIT_STEPS = 3
+
 # A space find that is the scene's primary takes this share of the body budget.
 # Compact phenomena still read as smaller than a world (which takes 0.9) without
 # shrinking to a token — at 0.6 a wormhole rendered 15 rows in a 25-row sky.
 _FIND_PRIMARY = 0.82
+# Rows a *secondary* find (the wreck slot beside a world) may reach. It scales with
+# the scene rather than sitting at a fixed 6, but stays capped well below a primary
+# so it never competes with the body it is parked next to.
+_FIND_SECONDARY_MAX = 10
 
 
 @dataclass(frozen=True)
@@ -922,6 +952,9 @@ class _SceneComposer:
         # that carry no destination).
         self.sprite_rects: list[tuple[str, int, int, int, int]] = []
         self.station_reference: tuple[int | None, int] | None = None
+        # True when the primary body drawn was an asteroid belt — a field traffic
+        # flies through rather than a body it must keep clear of (`_paint_planet`).
+        self._belt_primary = False
         self._w = 0
         self._h = 0
 
@@ -1024,6 +1057,27 @@ class _SceneComposer:
         return not any(x0 < ox1 and ox0 < x1 and y0 < oy1 and oy0 < y1
                        for ox0, oy0, ox1, oy1 in self._occupied)
 
+    def _has_clearance(self, x0: int, y0: int, x1: int, y1: int,
+                       pad_x: int, pad_y: int) -> bool:
+        """`_is_free`, plus a standoff that is *clipped* at the canvas edge.
+
+        Merely not overlapping is a weak test: two hulls a cell apart, or a ship
+        alongside a station, still read as one crowded mass rather than two objects
+        at different distances. Callers ask for real clearance and relax it only if
+        the scene has no pocket that holds it.
+
+        The standoff is clamped rather than required to fit, because the rect that
+        must stay on-canvas is the *sprite's* — demanding six free columns to the
+        left of a ship berthed against the screen edge would refuse the one place
+        traffic reliably rides.
+        """
+        if not self._is_free(x0, y0, x1, y1):
+            return False
+        px0, py0 = max(0, x0 - pad_x), max(0, y0 - pad_y)
+        px1, py1 = min(self._w, x1 + pad_x), min(self._h, y1 + pad_y)
+        return not any(px0 < ox1 and ox0 < px1 and py0 < oy1 and oy0 < py1
+                       for ox0, oy0, ox1, oy1 in self._occupied)
+
     def _tag(self, markup: str, rect: tuple[int, int, int, int],
              dest: str | None = None, ref: int | str | None = None) -> None:
         """Float a name tag in free sky against `rect`: centred just below first
@@ -1077,6 +1131,7 @@ class _SceneComposer:
         self.render_log = []
         self.sprite_rects = []
         self.station_reference = None
+        self._belt_primary = False
         self._grid = self._starfield(w, h)
 
         # Header — sector + band, flavor, beacon; centred across the full width.
@@ -1120,15 +1175,23 @@ class _SceneComposer:
         # confining ships to its left stranded them in a sliver with the rest of the
         # canvas empty ("ships shouldn't be on the same side with empty space on the
         # right", playtest 2026-08-15). With no body, ships get the whole width and
-        # the occupancy map keeps them off the station.
-        body = primary
+        # the occupancy map keeps them off the station. A belt is a field rather than
+        # a body, so it behaves like the station case: traffic flies *through* it and
+        # gets the whole canvas (`_paint_planet`).
+        body = None if self._belt_primary else primary
         station = self._paint_station(primary if planet_primary else None,
                                       hdr, body_h, sky_left=primary)
         if primary is None:
             primary = station
-        self._paint_ships(body, hdr, ref_h)
+        # The secondary find berths *before* the traffic. It is the one object with no
+        # ladder to step down and only one shore it may take (`_paint_discovery`), so
+        # placing it after the ships let three hulls occupy the left edge and drop the
+        # wreck out of the picture into a text row. Going first also states the rule
+        # the wreck's standoff exists for: live traffic keeps its distance from a
+        # hulk, not the other way round.
         if disc is not None:
             self._paint_discovery(disc, hdr, body_h, as_primary=False)
+        self._paint_ships(body, hdr, ref_h)
         self._paint_text_rows()
         self._paint_forces(hdr)
 
@@ -1173,7 +1236,17 @@ class _SceneComposer:
                                        sw=pw, sh=ph, depletion=mined,
                                        cloud_city=planet.cloud_city_size), top, left)
         rect = (left, top, min(w, left + pw), min(h, top + ph))
-        self._reserve(*rect)
+        # A belt is a *field*, not a body: it is loose rock spread across the sky,
+        # and things fly through it. Reserving its rect fenced off the two-thirds of
+        # a wide canvas it sprawls over and crushed the port and both ships into the
+        # strip beside it — every belt scene in the 2026-08-16 gallery pass came back
+        # at the bottom of the ratings for exactly that ("use more of the space by
+        # overlapping the asteroid field"). Only a solid body reserves; ships and the
+        # port paint over the rocks, which is what flying through a belt looks like.
+        # `_belt_primary` tells `compose` not to confine traffic to its left either.
+        self._belt_primary = belt
+        if not belt:
+            self._reserve(*rect)
         self.sprite_rects.append(("belt" if belt else "planet", *rect))
         self._tag(f"[b yellow]{planet.name}[/]", rect, "planet", None)
         self.hotspots.append((*rect, "planet", None))
@@ -1265,7 +1338,8 @@ class _SceneComposer:
         return rect
 
     def _berths(self, i: int, n: int, cw: int, chh: int, sky_r: int, hdr: int,
-                rng: random.Random) -> Iterator[tuple[int, int]]:
+                rng: random.Random, *, ceiling: int,
+                confine: bool = True) -> Iterator[tuple[int, int]]:
         """Candidate anchorages for ship `i` of `n`, best first.
 
         The old rule was "first free row from the top wins", which is why a pair of
@@ -1278,25 +1352,63 @@ class _SceneComposer:
 
         Yields positions outward from the assigned berth so a crowded scene
         degrades to "near where it wanted to be" instead of "top-left".
+
+        The band is sized off the *whole* sky and the jitter is kept `_SHIP_BAND_GAP`
+        rows clear of the next band's start. Jittering across the full band let two
+        ships land on adjacent rows whenever one drew near the bottom of its band and
+        the next near the top of its own — which is how a 52-row scene came back with
+        the station and both hulls sharing four rows and forty rows of empty sky
+        ("everything appears in one line horizontally", gallery pass 2026-08-16). The
+        band also runs to the bottom of the scene rather than stopping a ship-height
+        short of it, so the lowest berth actually reaches the lower canvas.
+
+        `ceiling` is the row this ship must stay above — the top of the nearer ship
+        already placed, since `_paint_ships` works nearest-first up the sky. It is what
+        makes the vertical order *monotonic*, and the vertical order is what carries
+        depth: the band index is also the ship's depth (§2.1), so a ship sized as the
+        far one and then allowed to drift down past a nearer one renders the cue
+        backwards — a big hull below a small one, which is what a crowded 87-column
+        scene produced.
+
+        `confine` additionally bars the search from leaving the band. It is relaxed by
+        the caller as a last resort, because the station berthed at the primary's lower
+        limb sits squarely in the near ship's band and pinning that ship inside the
+        band merely shrank it; giving up the band still keeps the ceiling, so a
+        wrong-band berth never costs the depth ordering.
         """
         w, h = self._w, self._h
         top0, bot0 = hdr + 1, h - 2
         span_x = max(1, min(sky_r, w - 1) - cw - 2)
-        span_y = max(1, bot0 - top0 - chh)
         # Alternate outward/inward across the sky so consecutive ships never share a
         # column, then jitter within the ship's own slice of the width.
         frac = ((i * 2 + 1) % (2 * n)) / (2 * n)
         cx = 2 + int(span_x * frac) + rng.randrange(0, max(1, span_x // (2 * n) + 1))
         cx = max(2, min(2 + span_x, cx))
-        band = max(1, span_y // n)
-        cy = top0 + i * band + rng.randrange(0, max(1, band))
-        cy = max(top0, min(bot0 - chh, cy))
+        span_y = max(1, bot0 - top0)
+        # The lowest row this ship may start on: the canvas floor, or the nearer ship's
+        # top less the band gap, whichever binds first.
+        deck = max(top0, min(bot0, ceiling - _SHIP_BAND_GAP) - chh)
+        lo = min(deck, top0 + span_y * i // n)
+        # The last row the jitter may take and still leave the gap before the band
+        # below it — and, for the lowest band, still clear `deck`.
+        hi = min(deck, top0 + span_y * (i + 1) // n - _SHIP_BAND_GAP - chh)
+        cy = lo + rng.randrange(0, max(1, hi - lo + 1))
+        cy = max(top0, min(deck, cy))
+        lim_lo, lim_hi = (lo if confine else top0), deck
+        # Coarse offsets first — they keep a crowded scene from degenerating into a
+        # row of near-identical berths — then a full fine sweep, because the coarse
+        # list alone can step straight over the one pocket that fits. A third ship
+        # squeezed between a port and a planet had exactly two candidate columns, both
+        # under the port, and dropped out of the picture to a text row with clear sky
+        # three columns to its left.
+        offsets = (0, -3, 3, -8, 8, -15, 15, -24, 24,
+                   *(d for k in range(1, span_x + 1) for d in (-k, k)))
         seen: set[tuple[int, int]] = set()
         for dy in range(0, span_y + 1):
             for sy in ((cy + dy, cy - dy) if dy else (cy,)):
-                if not top0 <= sy <= bot0 - chh:
+                if not lim_lo <= sy <= lim_hi:
                     continue
-                for dx in (0, -3, 3, -8, 8, -15, 15, -24, 24):
+                for dx in offsets:
                     sx = cx + dx
                     if not 2 <= sx <= 2 + span_x or (sx, sy) in seen:
                         continue
@@ -1312,6 +1424,21 @@ class _SceneComposer:
         `ref_h` is the scene's body budget (`primary_body_height`), not the primary's
         own height: traffic is traffic whatever it is parked next to, and scaling it
         off a small station or a compact find drew every ship at the 3-row stub.
+
+        Ships are *not* all drawn at the same rung. `_berths` bands them down the sky
+        by index, so the index doubles as a depth cue: the topmost ship is the
+        furthest one and steps down the art ladder, the lowest draws the richest tier
+        the sky allows. That is what stops a pair of hulls reading as a formation
+        pasted on a flat backdrop, and it is also the only lever that keeps traffic
+        from overpowering a station — station art tops out at 11–15 columns while a
+        ship's top rung is 46, so scale parity has to come from the ship's side.
+
+        Placement therefore runs **nearest-first, bottom-up**. The near hull claims the
+        richest rung and the best berth; each further ship is then bounded on both
+        axes of the cue at once — never lower than the ship below it (`ceiling`) and
+        never wider than it (`cap_w`) — so the picture cannot come out with a big hull
+        under a small one. Going far-first inverted it whenever the near ship had to
+        step further down the ladder than the far one to fit at all.
         """
         sec, cfg, w, h = self.sec, self.cfg, self._w, self._h
         shown = sec.ships[:cfg.max_ships_shown]
@@ -1327,34 +1454,71 @@ class _SceneComposer:
         # a ship down a rung instead of shaving columns off the one above.
         sw = max(cfg.ship.min_width, min(cfg.ship.max_width, sky_r - 4))
         rng = random.Random(sec.sector_id)
-        for i, vessel in enumerate(shown):
+        n = len(shown)
+        # Bounds carried up the sky from the nearest ship: `ceiling` is the top row of
+        # the last one placed, `cap_w` its drawn width. Together they hold the depth
+        # cue — each further ship berths above and draws no wider.
+        ceiling, cap_w = h, cfg.ship.max_width
+        # Deferrals are collected rather than appended, so the text rows still read in
+        # traffic order even though placement runs backwards.
+        dropped: list[tuple[str, str | None, int | str | None]] = []
+        for i in reversed(range(n)):
+            vessel = shown[i]
             entity, sub = art_adapter.ship_entity(vessel.role, vessel.art_subtype)
             facing = "right"
             if primary is None and i == 1 and rng.random() < cfg.ship_face_inward_chance:
                 facing = "left"
-            # Try the full berth first, then step down the ladder. A ship that can
-            # not fit at its computed size used to fall straight out of the scene to
-            # a text row; now the sky it *does* have picks the rung, which is what
-            # the ladder is for. Only the sprite finally drawn stays in the render
-            # log, so the log keeps describing the picture.
+            # Depth: band 0 is the top of the sky and the furthest away, so it steps
+            # the most rungs down; the lowest band keeps the full sky. A single ship
+            # is never stepped — there is nothing for it to read as further *than*.
+            steps = min(_SHIP_DEPTH_MAX_STEPS, n - 1 - i)
+            # Only the sprite finally drawn stays in the render log, so the log keeps
+            # describing the picture rather than every rung considered.
             log_mark = len(self.render_log)
             cells: list[list[tuple[str, Style | None]]] = []
             cw = chh = 0
             spot = None
-            for attempt in (sw, sw * 2 // 3, sw // 3):
-                if attempt < cfg.ship.min_width:
+            # Rungs, then clearance, then the band. A ship that will not fit its band
+            # at the rung its depth calls for steps *further* down and tries the same
+            # band again — the ladder is the mechanism for "not enough room", and
+            # stepping down never breaks the cue because it only shrinks a ship that
+            # is already above and no wider than its neighbour.
+            for extra in range(_SHIP_FIT_STEPS):
+                box_w, box_h = art_sprites.rung_below(
+                    entity, sub, max_width=min(sw, cap_w), max_height=sh,
+                    steps=steps + extra,
+                    archetype_id=vessel.archetype_id, facing=facing)
+                if box_w < cfg.ship.min_width:
                     continue
                 del self.render_log[log_mark:]
                 cells = self._sprite_cells(entity, sub, seed=sec.sector_id * 16 + i,
-                                           sw=attempt, sh=sh, facing=facing,
+                                           sw=box_w, sh=box_h, facing=facing,
                                            archetype_id=vessel.archetype_id)
                 cw, chh = self._dims(cells)
+                # Widest standoff first: a ship that merely *fits* beside another
+                # hull or a station still reads as crowding it. Relax only when the
+                # scene has no pocket that holds the clearance.
                 spot = next(
-                    (p for p in self._berths(i, len(shown), cw, chh, sky_r, hdr, rng)
-                     if self._is_free(p[0] - 1, p[1] - 1, p[0] + cw + 1, p[1] + chh + 1)),
+                    (p for pad_x, pad_y in _SHIP_STANDOFF
+                     for p in self._berths(i, n, cw, chh, sky_r, hdr, rng,
+                                           ceiling=ceiling)
+                     if self._has_clearance(p[0], p[1], p[0] + cw, p[1] + chh,
+                                            pad_x, pad_y)),
                     None)
                 if spot is not None:
                     break
+            if spot is None and cells:
+                # Every rung failed inside the band. A berth in the wrong band still
+                # beats dropping the ship out of the picture into a text row, so the
+                # last pass gives up the band — but never the ceiling, so the depth
+                # ordering survives even here.
+                spot = next(
+                    (p for pad_x, pad_y in _SHIP_STANDOFF
+                     for p in self._berths(i, n, cw, chh, sky_r, hdr, rng,
+                                           ceiling=ceiling, confine=False)
+                     if self._has_clearance(p[0], p[1], p[0] + cw, p[1] + chh,
+                                            pad_x, pad_y)),
+                    None)
             cid = vessel.contact_id
             pid = getattr(vessel, "player_id", None)  # another player's ship (WP70)
             dest, ref = (("contact", cid) if cid is not None
@@ -1362,16 +1526,18 @@ class _SceneComposer:
             if spot is None:
                 # No free sky: the ship degrades to a text row rather than paint
                 # over something already placed. It stays hailable either way.
-                self._deferred.append((f"[white]>[/] {vessel.name}", dest, ref))
+                dropped.append((f"[white]>[/] {vessel.name}", dest, ref))
                 continue
             left, top = spot
             self._paint(cells, top, left)
             rect = (left, top, min(w, left + cw), min(h, top + chh))
+            ceiling, cap_w = top, cw
             self._reserve(*rect)
             self.sprite_rects.append(("ship", *rect))
             self._tag(vessel.name, rect, dest, ref)
             if dest is not None:
                 self.hotspots.append((*rect, dest, ref))
+        self._deferred.extend(reversed(dropped))
 
     def _paint_discovery(self, disc: SectorDiscovery, hdr: int, body_h: int, *,
                          as_primary: bool) -> tuple[int, int, int, int] | None:
@@ -1398,7 +1564,11 @@ class _SceneComposer:
                                 int(primary_body_height(cfg, w, body_h) * _FIND_PRIMARY)))
                 dw = dh * 2
         else:
-            dh = max(3, min(6, body_h // 4))
+            # A secondary find grows with the scene like everything else — a hulk
+            # pinned at six rows read as a token on a 52-row canvas ("the wreck could
+            # be larger", gallery pass 2026-08-16). The cap keeps it well under the
+            # world it is parked beside, so the §1 ordering is untouched.
+            dh = max(3, min(_FIND_SECONDARY_MAX, body_h // 4))
             dw = dh * 2 + 2
         cells = self._sprite_cells("discovery", disc.kind, seed=sec.sector_id,
                                    sw=dw, sh=dh)
@@ -1418,12 +1588,19 @@ class _SceneComposer:
             top = hdr + max(0, (body_h - chh) // 3)
         else:
             # A wreck is something bases and ships keep their distance from: it
-            # berths hard against the screen's left edge with a wide standoff from
-            # everything already placed — relaxing the standoff (never the left
-            # bias) only when no isolated pocket of sky exists.
+            # berths hard against the screen's left edge, as low as it can, with as
+            # wide a standoff as that berth allows.
+            #
+            # The **row is the primary key** and the standoff the tiebreak. Searching
+            # standoff-first instead put the hulk wherever the widest clearance
+            # happened to be — mid-height on a crowded 67-column scene, which both
+            # reads wrong (§3: the hulk gets the lower shore) and eats the middle
+            # band the traffic needs. The wide standoff also matters less than it did:
+            # ships now enforce their own clearance from everything (`_SHIP_STANDOFF`),
+            # so keeping traffic off the hulk no longer rests on the hulk's rect alone.
             spot = None
-            for padx, pady in ((14, 5), (8, 3), (4, 2), (1, 1)):
-                for t in range(h - chh - 2, hdr, -1):
+            for t in range(h - chh - 2, hdr, -1):
+                for padx, pady in ((14, 5), (8, 3), (4, 2), (1, 1)):
                     if self._is_free(0, max(0, t - pady),
                                      min(w, 1 + cw + padx),
                                      min(h, t + chh + pady)):

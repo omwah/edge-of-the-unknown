@@ -190,12 +190,21 @@ section repeat upstream moves a rung's natural width, and a rung that no longer
 clears Edge's cap silently steps the render down (or, if nothing clears it,
 crops). The ladders as vendored today:
 
-| Sprite | Ladder (w×h) | Edge cap | Selected |
+| Sprite | Ladder (w×h) | Edge cap | Selected at the cap |
 |---|---|---|---|
-| ships (horizontal) | ~`46×7`, ~`34×5`, `17×3` | 36×5 | `medium` |
-| `trading_port` | `11×12`, `11×7`, `7×6`, `7×3` | 19×8 | `medium` |
-| `starbase` | `11×14`, `11×8`, `5×5`, `5×3` | 22×9 | `medium` |
+| ships (horizontal) | ~`46×7`, ~`34×5`, `17×3` | 46×7 | `full` |
+| `trading_port` | `11×12`, `11×7`, `7×6`, `7×3` | 28×12 | `full` |
+| `starbase` | `11×14`, `11×8`, `5×5`, `5×3` | 33×14 | `full` |
 | `stardock` | `15×15`, `15×11`, `9×6`, `9×3` | 38×16 | `full` |
+
+Every kind reaches its top rung at the shipped caps, so **the ladder — not the config
+— is what now limits sprite size**, and a port is never wider than 11 columns however
+large the terminal. That is a live constraint rather than a curiosity: the 2026-08-16
+scene ratings pass reported *"port too small"* / *"ships overpower port"* across nine
+cells of the review matrix, and Edge answered it from the ship's side (stepping distant
+traffic down its ladder, `docs/SECTOR_SCENE_COMPOSITION.md` §2.1) because there was no
+richer port rung to reach for. **A new port tier authored upstream is the actual fix**
+— see that note's §8.1 for the Edge-side follow-up a sync carrying one must do.
 
 `tests/test_sprite_seam.py::test_every_subtype_renders_a_whole_tier_at_its_scene_box`
 asserts every vendored subtype clears a whole rung at its configured cap. **Run
@@ -203,8 +212,8 @@ it after every sync** — it is the guard that turns this silent failure into a
 loud one, and it lives in Edge because the caps do.
 
 Upstream also has `test_every_station_tier_fits_the_boxes_edge_requests`, which
-hardcodes the boxes Edge requests. Those numbers are now stale relative to
-`config/default.yaml → scene:` (port is 19×8 and ship 36×5 here). Changing the
+hardcodes the boxes Edge requests. Those numbers go stale whenever the `scene:` block
+moves — check them against the table above rather than trusting them. Changing the
 `scene:` block still deserves a word to the art side, or a run of
 `tools/import_edge_ports.py <edge-checkout> --audit` there — but Edge's own seam
 test is the authority, since it reads the caps out of `SceneArtConfig` directly.

@@ -86,6 +86,45 @@ def fit_box(
     return _natural_box(view, view.tiers[-1], archetype)
 
 
+def rung_below(
+    entity_type: str,
+    subtype: str,
+    *,
+    max_width: int,
+    max_height: int,
+    steps: int = 1,
+    archetype_id: str | None = None,
+    facing: str | None = None,
+) -> tuple[int, int]:
+    """The natural box `steps` rungs *below* the richest tier that fits the space.
+
+    Depth in a scene is carried by the ladder, not by shaving columns. A ship
+    further from the viewer must draw a smaller **tier** — prow and drive intact —
+    rather than a centre-crop of the tier above, which is all a narrower box would
+    buy (see `fit_box`). Callers therefore ask this for a box and request *that*,
+    so the library's height-based pick lands on the intended rung.
+
+    `steps=0` is exactly `fit_box`. Steps past the bottom of the ladder clamp to
+    the smallest tier, and entities the library does not ladder pass their box
+    through untouched — there is no rung to step to.
+    """
+    if steps <= 0:
+        return fit_box(entity_type, subtype, max_width=max_width,
+                       max_height=max_height, archetype_id=archetype_id,
+                       facing=facing)
+    if entity_type not in ("ship", "port"):
+        return max_width, max_height
+    sprite = SPRITES.sprites.get(subtype.lower())
+    if sprite is None or sprite.kind != entity_type:
+        return max_width, max_height
+    view = _resolve_view(sprite, facing)
+    archetype = resolve_archetype(archetype_id or SPRITES.palettes.fallback_archetype)
+    boxes = [_natural_box(view, tier, archetype) for tier in view.tiers]
+    top = next((i for i, box in enumerate(boxes)
+                if box[0] <= max_width and box[1] <= max_height), len(boxes) - 1)
+    return boxes[min(top + steps, len(boxes) - 1)]
+
+
 def pad_to(art: Text, width: int, height: int) -> Text:
     """Centre `art` in a `width` x `height` box of blanks, preserving its styles.
 

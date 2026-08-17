@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from types import SimpleNamespace
 
 import pytest
@@ -272,3 +273,115 @@ def test_configured_art_subtype_overrides_role_routing() -> None:
     assert art_adapter.sprite(*routed, seed=3, width=16, height=5).plain != (
         art_adapter.sprite(*role_routed, seed=3, width=16, height=5).plain
     )
+
+
+# --- scene composition: depth, separation, and the belt (gallery pass 2026-08-16) ---
+#
+# These guard the rules in docs/SECTOR_SCENE_COMPOSITION.md §2.1 and §3 that the
+# ratings pass produced. They run the real `_SceneComposer` over the real review
+# matrix (`scene_gallery.cases()`), because the failures they cover appeared at
+# *combinations* — a station berthed in a ship's band, a belt sprawling across a wide
+# canvas — rather than at extremes of any single knob.
+
+_SCENE_SIZES = ((67, 30), (87, 36), (120, 44), (150, 52))
+
+
+@lru_cache(maxsize=1)
+def _composed() -> tuple[tuple[str, int, int, object], ...]:
+    """Every review-matrix case at every tier, composed once for the whole module.
+
+    Composing the matrix is ~30 seconds of sprite rendering, so it is built once and
+    shared rather than per test. The composers are read-only afterwards.
+    """
+    from edge.tui.scene_gallery import cases
+    from edge.tui.widgets import _SceneComposer
+
+    cfg = SceneArtConfig()
+    out = []
+    for name, sector in cases().items():
+        for w, h in _SCENE_SIZES:
+            composer = _SceneComposer(sector, cfg)
+            composer.compose(w, h)
+            out.append((name, w, h, composer))
+    return tuple(out)
+
+
+def _ships(composer: object) -> list[tuple[int, int, int, int]]:
+    """Placed ship rects, top to bottom."""
+    rects = [(x0, y0, x1, y1) for kind, x0, y0, x1, y1
+             in composer.sprite_rects if kind == "ship"]  # type: ignore[attr-defined]
+    return sorted(rects, key=lambda r: r[1])
+
+
+def test_ship_depth_reads_top_to_bottom() -> None:
+    """A ship higher in the sky must never be drawn larger than one below it.
+
+    Traffic carries depth on the tier ladder (§2.1): the topmost ship is the furthest
+    and steps down. The cue only reads if vertical order matches size order, so a
+    bigger hull above a smaller one is the bug — it is what a crowded scene produced
+    before `_berths` grew its monotonic `floor`.
+    """
+    for name, w, h, composer in _composed():
+        widths = [x1 - x0 for x0, _y0, x1, _y1 in _ships(composer)]
+        assert widths == sorted(widths), (
+            f"{name}@{w}x{h}: ships run {widths} top to bottom — a nearer ship is "
+            f"drawn above a further one, so the depth cue reads backwards"
+        )
+
+
+def test_a_multi_ship_scene_varies_its_rungs_when_the_sky_allows() -> None:
+    """Equal-sized hulls read as a formation on a flat backdrop (playtest 2026-08-16).
+
+    Only asserted where the sky is wide enough to hold more than one rung: in a
+    genuinely cramped scene every ship legitimately bottoms out at the same tier.
+    """
+    seen_varied = False
+    for _name, _w, _h, composer in _composed():
+        widths = {x1 - x0 for x0, _y0, x1, _y1 in _ships(composer)}
+        seen_varied = seen_varied or len(widths) > 1
+    assert seen_varied, "no scene in the matrix drew ships at two different rungs"
+
+
+def test_ships_keep_a_vertical_gap_from_each_other() -> None:
+    """Bands are useless if the jitter can still seat two ships flush (§3)."""
+    from edge.tui.widgets import _SHIP_BAND_GAP
+
+    for name, w, h, composer in _composed():
+        rects = _ships(composer)
+        for (_ax0, _ay0, _ax1, ay1), (_bx0, by0, _bx1, _by1) in zip(rects, rects[1:]):
+            assert by0 - ay1 >= _SHIP_BAND_GAP, (
+                f"{name}@{w}x{h}: ships {ay1} and {by0} rows apart — closer than the "
+                f"{_SHIP_BAND_GAP}-row band gap, so they read as one crowded mass"
+            )
+
+
+def test_a_belt_reserves_nothing_and_traffic_uses_the_whole_canvas() -> None:
+    """A belt is a field, not a body: ships fly through it (§3).
+
+    Reserving its rect confined the port and both ships to the strip beside a sprite
+    that sprawls across two thirds of a wide canvas.
+    """
+    for name, w, h, composer in _composed():
+        belts = [(x0, y0, x1, y1) for kind, x0, y0, x1, y1
+                 in composer.sprite_rects if kind == "belt"]
+        if not belts:
+            continue
+        bx0, _by0, _bx1, _by1 = belts[0]
+        assert any(x1 > bx0 for _x0, _y0, x1, _y1 in _ships(composer)), (
+            f"{name}@{w}x{h}: every ship stayed left of the belt at column {bx0} — "
+            f"traffic is being fenced out of a field it should fly through"
+        )
+
+
+def test_no_object_in_the_review_matrix_falls_out_of_the_picture() -> None:
+    """Degrading to a text row is the last resort, not a routine outcome (§4).
+
+    Overflow past `max_ships_shown` is expected and listed separately; what this
+    catches is a *placed* object — a wreck, a third ship — that found no free sky
+    because an earlier placement took the only pocket it could use.
+    """
+    for name, w, h, composer in _composed():
+        assert not composer._deferred, (
+            f"{name}@{w}x{h}: {len(composer._deferred)} object(s) found no free sky: "
+            f"{[markup for markup, _d, _r in composer._deferred]}"
+        )
