@@ -218,6 +218,8 @@
   "216": "art/__init__.py",
   "217": "bigbang/__init__.py",
   "218": "enums.py",
+  "219": ".bindings",
+  "220": ".summary",
   "221": "llm/__init__.py",
   "222": "scripts/__init__.py",
   "223": "core/groundwar/__init__.py",
@@ -245,14 +247,9 @@
   "248": "GroundwarConfig",
   "251": "_build_sheet",
   "257": "test_accounts.py",
-  "258": "LiveSysopService",
   "259": "tui/app.py",
   "262": "CorpDTO",
-  "264": "PlatoonComposer",
   "267": "GroundAssaultScreen",
   "271": "GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes",
-  "274": ".boarded_starbase_id",
-  "275": ".docked_port_sector_id",
-  "276": ".stardock_facilities_sector_id",
   "293": "BotRunner"
 }
