@@ -1,5 +1,5 @@
 {
-  "upstream_commit": "08192b9eab3928d31f8e9ed37d6644095652a768",
+  "upstream_commit": "a5ab4bb96433999fb1049799a7efb02bb108f579",
   "synced": "2026-08-13",
   "files": {
     "edge/art/sprite_art/__init__.py": "9946eb01eb57dbf9e5e72658a6d9aa1483ad41dc00de35ebaf8f9ec20963bbd3",
