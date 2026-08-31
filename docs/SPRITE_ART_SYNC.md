@@ -14,10 +14,10 @@ contracts break *silently* when upstream changes.
 **Upstream:** `sprite-art-designer` (Edge Art Designer), a Python 3.12 / Pixi
 Textual application for authoring procedural Unicode sprite art.
 
-**Baseline:** `08192b9eab3928d31f8e9ed37d6644095652a768` (2026-08-13). Its parent
+**Baseline:** `a5ab4bb96433999fb1049799a7efb02bb108f579` (2026-08-31). Its parent
 `19bc02e` is where `sprite-art-designer/docs/RUNTIME_PACKAGE_SPLIT.md` landed,
 which is the prerequisite for the initial vendoring (see
-`docs/SPRITE_ART_MIGRATION.md`); `08192b9` adds only that plan document and
+`docs/SPRITE_ART_MIGRATION.md`); `a5ab4bb` adds only that plan document and
 touches no vendored file. Update this line, and `edge/art/sprite_art.manifest`,
 on every sync.
 
