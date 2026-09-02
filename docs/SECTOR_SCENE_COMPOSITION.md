@@ -8,6 +8,83 @@ This note records the *theory* behind where things go, so future changes tune th
 intent instead of rediscovering it. The interview decisions of 2026-07-17 are folded
 in throughout.
 
+> **Replacement planned (2026-08-31).** The shipped arrival-view composer described
+> here remains authoritative for the current code, but its sizing references,
+> placement search, depth ladder, and paint order are coupled closely enough that
+> gallery tuning tends to repair one matrix cell while disturbing another. The
+> approved replacement is planned in `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`: a
+> deterministic, presentation-only 2.5D model, calibrated projection strategy,
+> explicit decision trace, and sidebar-only overflow. This note must continue to
+> describe what is actually shipped until that plan lands.
+
+## 0. As implemented: operational rule tree (audit 2026-08-31)
+
+The sections below explain the intent of individual rules. This section records the
+actual control flow in `_SceneComposer.compose`, including the selection and fallback
+branches that were previously visible only by reading the code.
+
+```text
+Create seeded starfield
+└─ Paint header and reserve its rows
+   └─ Select at most one discovery for the scene
+      ├─ Prefer the first wormhole
+      └─ Otherwise take the first discovery
+
+Calculate ref_h: the height a planet would receive in this viewport
+└─ Select and paint the initial primary
+   ├─ Planet present → paint the first planet
+   ├─ No planet, selected discovery present → paint it as primary
+   └─ Otherwise → no body primary
+
+Paint one station
+├─ First starbase wins over every port
+└─ Otherwise paint the first port
+   ├─ With a planet: size from rendered planet height
+   ├─ Beside a space find: place from the find, but size as a lone station
+   └─ Alone: size from body height and choose a seeded random berth
+
+If the selected discovery was not consumed as primary
+└─ Paint it as the one secondary discovery
+
+Paint ships
+├─ Consider only scene.max_ships_shown ships as sprites
+├─ Size from ref_h, not necessarily from the rendered primary
+├─ Place nearest first, bottom-up; carry size/row bounds toward far ships
+├─ Retry smaller authored sprite rungs, then relax the assigned band
+└─ No berth → append an in-scene text row
+
+Paint deferred and excess ships plus the Entity hint as text rows
+└─ Scatter fighter and mine glyphs into cells still free
+```
+
+Tags are painted immediately after their object rather than in a separate annotation
+pass. Later paint normally respects the occupancy map, with deliberate exceptions:
+the station may cross the planet's projected rectangle, and an asteroid belt reserves
+no rectangle so stations and traffic paint through the field.
+
+### 0.1 The current sizing dependency graph is not one chain
+
+The introductory phrase "sized relative to the primary" is a useful visual goal, but
+it is not a literal description of every current calculation:
+
+| object | actual sizing reference |
+|---|---|
+| planet / belt | viewport width and body height through `primary_body_height` |
+| primary nebula | body height directly |
+| other primary discovery | hypothetical planet height (`ref_h`) |
+| station beside a planet | rendered planet height |
+| station beside a discovery or alone | viewport body height |
+| secondary discovery | one quarter of viewport body height, capped |
+| ship | hypothetical planet height (`ref_h`), then authored tier and fit steps |
+| forces | count-derived single glyphs |
+
+Consequently, *semantic primary*, *sizing reference*, *placement anchor*, *paint
+layer*, and *retention priority* are separate ideas in the code but are not represented
+as separate data. `_SceneComposer` decides each while painting, so a gallery cell can
+report the resulting rectangles but cannot explain the complete decision path that
+produced them. That missing intermediate representation is the central problem the
+physical-model replacement plan addresses.
+
 ## 1. The premise: a viewport, not a form
 
 The old scene partitioned the canvas into reserved bands — planet half, port half,
