@@ -218,6 +218,28 @@ moves — check them against the table above rather than trusting them. Changing
 `tools/import_edge_ports.py <edge-checkout> --audit` there — but Edge's own seam
 test is the authority, since it reads the caps out of `SceneArtConfig` directly.
 
+### The generated geometry catalogue
+
+`edge/art/geometry_catalog.json` (`docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`
+§2.5, §9.4) is a generated, checked-in file, not a vendored one — but it is
+derived entirely from the vendored assets, so it silently goes stale the same
+way the tier-ladder caps do. `scripts/gen_geometry_catalog.py` renders every
+`(kind, subtype, view axis, tier, archetype)` the library can distinguish
+(ship and port kinds only — the shipped ladder seam recognizes no others) at
+its natural box across a fixed seed sample, measures the ink envelope with
+`edge.tui.art_adapter.text_to_cells`, and writes the sorted result.
+`tests/test_geometry_catalog.py` runs `python scripts/gen_geometry_catalog.py
+--check` and fails loudly, with the exact refresh command, if the checked-in
+file no longer matches a fresh render — so a resync that retunes a variant
+pool, changes a tier's natural dimensions, or renames an archetype breaks CI
+instead of silently shifting `edge/scene/`'s geometry. Regenerate it (`python
+scripts/gen_geometry_catalog.py`) and commit the result as part of every sync
+that could plausibly change rendered geometry. The catalogue's `render_cost`
+field is a deterministic proxy (composed cell area × section count), not a
+timed measurement — wall-clock timing was tried first and rejected because it
+made the file non-reproducible run-to-run, which defeats the `--check` guard;
+WP-SC05 may replace it with a calibrated figure.
+
 ### New sprites arrive unreachable
 
 A new ship YAML upstream appears in `available_subtypes()` and the in-game sprite

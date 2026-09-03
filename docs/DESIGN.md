@@ -29,7 +29,7 @@ The remainder of this document specifies our design. The lineage and influences 
 
 ## 3. Architecture
 
-Following the twclone/terminal-space consensus, the system is four layers with strict downward-only dependencies:
+Following the twclone/terminal-space consensus, the system is four layers with strict downward-only dependencies. `edge/scene/` (`docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`) is a later addition sitting above `edge/core`: it consumes fog-safe `edge.core` DTOs/config and an injected `ArtGeometryCatalog`, but never imports `edge.art.sprites`, Rich, Textual, I/O, async, a TUI module, or game RNG, and never mutates game state. The art/TUI seam (`edge/art/geometry_catalog.py`, `edge/tui/`) builds the catalogue from the vendored asset metadata and retains all rendering.
 
 ```
 edge/
@@ -53,6 +53,13 @@ edge/
 │   │   ├── topology.py       # Tunnels, deadends, rings, Core Space carving
 │   │   ├── populate.py       # Ports, planets, aliens, discoveries, Stardock placement
 │   │   └── validate.py       # Connectivity, distance, fairness checks
+│   ├── scene/                 # Pure presentation-only physical scene model. No I/O, no async, no Textual/Rich.
+│   │   ├── geometry.py        # Su units, Face/FaceShape, Vec3, Region, CellBox
+│   │   ├── catalog.py         # Injected ArtGeometryCatalog protocol + ladder/continuous records
+│   │   ├── model.py           # PhysicalObject, WorldArrangement, Camera, Projection, ScenePlan, SceneTuning, GlyphRequest
+│   │   ├── classify.py        # Closed registry: fog-safe SectorDTO -> WorldArrangement + glyph requests
+│   │   ├── project.py         # ProjectionStrategy protocol (implementations: WP-SC03)
+│   │   └── solve.py           # Constraint-solver entry point (algorithm: WP-SC06)
 │   ├── engine/               # Time & background simulation (asyncio)
 │   │   ├── ticker.py         # Short tick loop + cron tasks (daily turn reset...)
 │   │   ├── port_economy.py   # Hourly stock regen / order generation
