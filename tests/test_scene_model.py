@@ -209,6 +209,8 @@ def test_camera_cell_aspect_is_an_exact_fraction() -> None:
         fov_den=1,
         near_plane_su=1,
         cell_aspect=Fraction(2, 1),
+        depth_layer_size_su=1,
+        depth_layer_scale=Fraction(4, 5),
     )
     assert camera.cell_aspect == Fraction(2)
 
@@ -229,6 +231,24 @@ def test_scene_tuning_has_no_shipped_default_instance() -> None:
     tuning = SceneTuning(
         face_extent_by_scale_class={"ship": (4, 2)},
         region_by_scale_class={"ship": _region()},
+        target_fraction_by_scale_class={"ship": Fraction(1, 3)},
+        ink_ratio_by_scale_class={"ship": Fraction(4, 5)},
+        structural_mode_thresholds=((0, 0, "compact"),),
+        fixed_fov_num=1,
+        fixed_fov_den=2,
+        cell_aspect=Fraction(2, 1),
+        near_plane_su=1,
+        depth_layers=4,
+        depth_layer_size_su=5,
+        depth_layer_scale=Fraction(4, 5),
+        camera_height_fraction_min=Fraction(1, 4),
+        camera_height_fraction_max=Fraction(3, 4),
+        aim_offsets_su=(0,),
+        max_camera_candidates=16,
+        hysteresis_weight_camera=1,
+        hysteresis_weight_position=1,
+        hysteresis_weight_admission=1,
+        hysteresis_weight_art=1,
     )
     assert tuning.face_extent_by_scale_class["ship"] == (4, 2)
 

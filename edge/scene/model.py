@@ -96,10 +96,24 @@ class Camera:
     aim_x_su: Su
     aim_y_su: Su
     fov_num: int
-    """Fixed FOV as an exact ratio; strategy-specific."""
+    """Fixed FOV as an exact ratio; strategy-specific.
+
+    `FixedFovPerspective` (`edge/scene/project.py`) uses this as the real FOV
+    ratio consumed by `project()`. `DepthLayeredAnchorProjection` does not
+    read it for scale -- its scale comes from `depth_layer_scale` below -- and
+    sets it to an unused placeholder.
+    """
     fov_den: int
     near_plane_su: Su
     cell_aspect: Fraction
+    depth_layer_size_su: Su
+    """Depth-layered strategy only (plan §9.5): the su span of one depth
+    layer. `FixedFovPerspective` sets it to an arbitrary positive placeholder
+    since the field is required on this shared dataclass."""
+    depth_layer_scale: Fraction
+    """Depth-layered strategy only: the exact per-layer multiplicative scale
+    factor (`scale(layer) = depth_layer_scale ** layer_index`).
+    `FixedFovPerspective` sets it to an arbitrary placeholder."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +208,66 @@ class SceneTuning:
     placement, matching plan §2.5 ("their nominal face area and allowed
     orbital placement derive from that planet"); for every other class it is
     an absolute scene-unit region."""
+
+    target_fraction_by_scale_class: Mapping[str, Fraction]
+    """Plan §9.5 `frame()`: the anchor's target projected-ink-height fraction
+    of `viewport.height`, keyed by the anchor's `scale_class`."""
+
+    ink_ratio_by_scale_class: Mapping[str, Fraction]
+    """Plan §9.5 `frame()`'s first-pass ink/natural height ratio used to turn
+    a target ink height into a target natural (request-box) height, keyed by
+    `scale_class`. For a laddered anchor this is only the seed for picking a
+    candidate rung -- the rung actually chosen supplies its own exact
+    `ink_min.height / natural.height` for the final camera solve."""
+
+    structural_mode_thresholds: tuple[tuple[int, int, str], ...]
+    """Plan §9.1 "Structural mode": an ordered `(min_cols, min_rows, mode)`
+    list, first match wins, most permissive (most demanding) first."""
+
+    fixed_fov_num: int
+    """`FixedFovPerspective`'s calibrated FOV ratio numerator (plan §9.5)."""
+
+    fixed_fov_den: int
+
+    cell_aspect: Fraction
+    """Shared terminal cell aspect (plan §9.1), injected once here so both
+    strategies' `frame()` can build a `Camera` without inventing a number."""
+
+    near_plane_su: Su
+    """Shared hard near-plane constraint (plan §9.2), injected once here."""
+
+    depth_layers: int
+    """`DepthLayeredAnchorProjection`'s layer count, bounding the layer-index
+    search `frame()` performs when solving camera placement (plan §9.5)."""
+
+    depth_layer_size_su: Su
+    """`DepthLayeredAnchorProjection`'s su span of one depth layer."""
+
+    depth_layer_scale: Fraction
+    """`DepthLayeredAnchorProjection`'s exact per-layer scale factor."""
+
+    camera_height_fraction_min: Fraction
+    """`candidates()`'s framing-height sweep lower bound, as a fraction of
+    `viewport.height` (plan §9.6's `anchor_target_min`, scoped to WP-SC03's
+    simpler framing-only candidate exploration)."""
+
+    camera_height_fraction_max: Fraction
+    """`candidates()`'s framing-height sweep upper bound."""
+
+    aim_offsets_su: tuple[Su, ...]
+    """`candidates()`'s bounded, centre-out aim offsets to explore, in the
+    order to try them."""
+
+    max_camera_candidates: int
+    """Hard cap on the number of cameras `candidates()` yields."""
+
+    hysteresis_weight_camera: int
+    """Plan §9.6 hysteresis metric weights (WP-SC03 exposes the deterministic
+    per-term computation; the full previous-plan wiring is WP-SC06's)."""
+
+    hysteresis_weight_position: int
+    hysteresis_weight_admission: int
+    hysteresis_weight_art: int
 
 
 @dataclass(frozen=True, slots=True)
