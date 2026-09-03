@@ -1,0 +1,210 @@
+"""The immutable scene model (plan §9.3).
+
+Field names here are binding. Every dataclass is frozen/slotted and every
+collection is a tuple, so a `WorldArrangement` or `ScenePlan` is safe to pass
+around, cache, and compare by value without defensive copies.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from enum import IntEnum, StrEnum
+from fractions import Fraction
+from typing import Literal
+
+from edge.scene.catalog import LadderKey, LadderRung
+from edge.scene.geometry import CellBox, Face, Region, Su, Vec3
+
+
+class SceneRetention(IntEnum):
+    """Gameplay retention priority (plan §2.3). Lower value is retained first."""
+
+    ENTITY = 0
+    ANCHOR = 1
+    ORBITAL = 2
+    HOSTILE_SHIP = 3
+    NEUTRAL_SHIP = 4
+    WRECK = 5
+    FRIENDLY_SHIP = 6
+
+
+class ArtMode(StrEnum):
+    """How an accepted object's art is resolved (plan §2.4, §9.7)."""
+
+    LADDER = "ladder"
+    CONTINUOUS = "continuous"
+    GLYPH = "glyph"
+
+
+@dataclass(frozen=True, slots=True, order=True)
+class SceneKey:
+    """Tagged stable presentation identity; the final deterministic tie-break
+    (plan §2.3, §4.1). Orderable so it can serve directly as the last element
+    of a lexicographic candidate-comparison tuple (plan §9.6)."""
+
+    tag: Literal[
+        "ship", "player", "planet", "port", "starbase", "discovery",
+        "wreck", "entity", "belt", "glyph",
+    ]
+    ident: int
+
+
+@dataclass(frozen=True, slots=True)
+class PhysicalObject:
+    """One classified scene inventory entry, before placement or projection."""
+
+    key: SceneKey
+    parent: SceneKey | None
+    face: Face
+    scale_class: str
+    """Config-named class; ordering is by `face.area_su` (plan §4.4)."""
+    art_mode: ArtMode
+    ladder_key: LadderKey | None
+    continuous_kind: str | None
+    retention: SceneRetention
+    hostility_ordinal: int
+    """0 = most hostile; opaque, from the fog-safe DTO (WP-SC01)."""
+    threat_rank: int
+    region: Region
+    flexible: bool
+    occludes: bool
+    """`False` for permeable fields such as asteroid belts (plan §2.5)."""
+    label: str
+    destination: str | None
+    """Interaction route; never read by the solver."""
+
+
+@dataclass(frozen=True, slots=True)
+class Placement:
+    key: SceneKey
+    position: Vec3
+
+
+@dataclass(frozen=True, slots=True)
+class WorldArrangement:
+    """Viewport-independent identities, parents, allowed regions, and initial
+    deterministic positions; a solve records any viewport-driven flexible move."""
+
+    objects: tuple[PhysicalObject, ...]
+    placements: tuple[Placement, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Camera:
+    position: Vec3
+    aim_x_su: Su
+    aim_y_su: Su
+    fov_num: int
+    """Fixed FOV as an exact ratio; strategy-specific."""
+    fov_den: int
+    near_plane_su: Su
+    cell_aspect: Fraction
+
+
+@dataclass(frozen=True, slots=True)
+class Projection:
+    key: SceneKey
+    bounds: CellBox
+    """Request/container box, integer cells."""
+    depth: Su
+    rung: LadderRung | None
+    box_class: int | None
+    """Index into `ContinuousYield.box_classes`."""
+    ink_est: CellBox
+    """Estimated ink bounds (envelope side per the constraint that reads it)."""
+    ink_actual: CellBox | None
+    """Filled after art resolution (WP-SC07)."""
+    visible_fraction: Fraction
+    label_bounds: CellBox | None
+    accepted: bool
+
+
+@dataclass(frozen=True, slots=True)
+class Decision:
+    rule_id: str
+    """Stable, e.g. ``"min_visible_fraction"``."""
+    key: SceneKey | None
+    outcome: Literal["accept", "move", "reject", "step_down", "reanchor"]
+    inputs: tuple[tuple[str, int | str], ...]
+    reason: str
+    """``""`` unless the dev/gallery switch is on (plan §4.20)."""
+
+
+@dataclass(frozen=True, slots=True)
+class SolveCounters:
+    """Always-recorded structural counts (plan §4.20, §6.2 rule 8)."""
+
+    camera_candidates: int
+    reposition_candidates: int
+    passes: int
+    reanchors: int
+    step_downs: int
+    occlusion_comparisons: int
+    validation_corrections: int
+    glyphs_placed: int
+    glyphs_dropped: int
+    cost_estimated: int
+    cost_actual: int
+
+
+@dataclass(frozen=True, slots=True)
+class ScenePlan:
+    viewport: CellBox
+    mode: str
+    strategy: str
+    camera: Camera
+    projections: tuple[Projection, ...]
+    """Depth-ordered, far to near."""
+    rejected: tuple[SceneKey, ...]
+    fingerprint: str
+    """Hash of the quantised output only."""
+    counters: SolveCounters
+    trace: tuple[Decision, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SceneTuning:
+    """The injected, frozen bundle of every §5 calibrated value.
+
+    Constructed at the TUI seam from validated `scene:` config;
+    `edge/scene/` never reads a config file and never supplies a default for
+    one of its fields. No instance of this type ships with this commit — a
+    caller (production code or a test) must always build its own, and
+    `config/default.yaml` names no `scene:` values yet — so declaring these
+    fields does not ship a default; only WP-SC05's calibration gate does that.
+
+    The two maps below are what the classifier (`edge/scene/classify.py`)
+    needs to turn a fog-safe DTO into a `PhysicalObject`/`Placement` without
+    inventing a number itself: every face extent and placement region is a
+    lookup by `PhysicalObject.scale_class`, never a literal in classifier
+    code. `scale_class` values are plan-fixed strings (`"entity"`, `"anchor"`,
+    `"belt"`, `"orbital"`, `"ship"`, `"wreck"`), not free-form config keys —
+    see `edge.scene.classify.SCALE_CLASSES`.
+    """
+
+    face_extent_by_scale_class: Mapping[str, tuple[Su, Su]]
+    """`(width_su, height_su)` per `scale_class` — the only numbers the
+    classifier needs to build a `Face`; the shape (circle/ellipse/rect/field)
+    is a categorical choice already fixed by plan §2.5, not a tuned number."""
+
+    region_by_scale_class: Mapping[str, Region]
+    """The allowed placement region/depth range per `scale_class`. For
+    `"orbital"` this is interpreted as an offset from the parent planet's own
+    placement, matching plan §2.5 ("their nominal face area and allowed
+    orbital placement derive from that planet"); for every other class it is
+    an absolute scene-unit region."""
+
+
+@dataclass(frozen=True, slots=True)
+class GlyphRequest:
+    """A free-cell-consumer presence mark: a fighter garrison or mine field.
+
+    Plan §2.5, §9.6: fighters and mines never become retained
+    `PhysicalObject`s and never compete in the retention solve. They are a
+    separate classification output the post-solve scatter step (WP-SC06)
+    consumes to place `count` one-cell glyphs into free projected cells.
+    """
+
+    key: SceneKey
+    count: int

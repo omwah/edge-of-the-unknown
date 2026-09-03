@@ -238,6 +238,13 @@ spec-delta commit landing that plan; implementation starts at WP46.
   `edge.tui` import is allowed: `authoring/playtest.py` drives the real contact
   screen for dialogue play-testing, imported lazily so the runtime path never
   pulls it in), `edge/bigbang` (generation, networkx),
+  `edge/scene` (pure, presentation-only physical scene model,
+  `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md` — no I/O, no async, no
+  Textual/Rich imports, no game-state mutation, no game RNG; it consumes
+  fog-safe `edge.core` DTOs/config and an injected `ArtGeometryCatalog`, and
+  never imports `edge.art.sprites`. The art/TUI seam,
+  `edge/art/geometry_catalog.py`, builds that catalogue from the vendored
+  asset metadata and validated `scene:` config and owns all rendering),
   `edge/engine` (asyncio background ticks), `edge/store` (SQLite behind a
   repository interface), `edge/server` (command -> event service; fog of
   war enforced at the `to_public(context)` serialization boundary),
@@ -261,7 +268,8 @@ here.
 ## Conventions
 
 - Python >= 3.12, `ruff` + `mypy --strict` on every real layer — `core/`,
-  `bigbang/`, `store/`, `server/`, `engine/` (the throwaway `tui/` is exempt).
+  `bigbang/`, `store/`, `server/`, `engine/`, `scene/` (the throwaway `tui/`
+  is exempt).
 - Tests: pytest + hypothesis. Property tests for economy invariants;
   golden-master replays of command logs against fixed seeds; bigbang
   validation across many seeds; Textual Pilot for UI flows.
