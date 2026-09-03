@@ -9,6 +9,7 @@ become retained solver objects (plan §2.5).
 from __future__ import annotations
 
 import random
+from fractions import Fraction
 
 from edge.core.dto import (
     SectorAnomalyDTO,
@@ -43,6 +44,38 @@ TUNING = SceneTuning(
         "ship": _REGION,
         "wreck": _REGION,
     },
+    target_fraction_by_scale_class={
+        "entity": Fraction(1, 2),
+        "anchor": Fraction(1, 3),
+        "belt": Fraction(1, 2),
+        "orbital": Fraction(1, 5),
+        "ship": Fraction(1, 6),
+        "wreck": Fraction(1, 8),
+    },
+    ink_ratio_by_scale_class={
+        "entity": Fraction(9, 10),
+        "anchor": Fraction(9, 10),
+        "belt": Fraction(9, 10),
+        "orbital": Fraction(4, 5),
+        "ship": Fraction(4, 5),
+        "wreck": Fraction(4, 5),
+    },
+    structural_mode_thresholds=((150, 52, "wide"), (100, 40, "standard"), (0, 0, "compact")),
+    fixed_fov_num=1,
+    fixed_fov_den=2,
+    cell_aspect=Fraction(2, 1),
+    near_plane_su=1,
+    depth_layers=6,
+    depth_layer_size_su=4,
+    depth_layer_scale=Fraction(4, 5),
+    camera_height_fraction_min=Fraction(1, 8),
+    camera_height_fraction_max=Fraction(3, 4),
+    aim_offsets_su=(0, -1, 1, -2, 2),
+    max_camera_candidates=32,
+    hysteresis_weight_camera=1,
+    hysteresis_weight_position=1,
+    hysteresis_weight_admission=4,
+    hysteresis_weight_art=1,
 )
 
 
