@@ -4,6 +4,12 @@ Status: shipped (WP-PR2-05, `playtest: WP-PR2-05 arrival-view sector scene`)
 Code: `edge/tui/widgets.py` → `_SceneComposer` (the layout) / `SectorScene` (the widget shell)
 Preview: `pixi run python -m edge.tui.scene_preview` (dev-only; every composition × every tier)
 
+> **In progress:** `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md` is replacing this composer
+> with a deterministic physical-model solver (WP-SC01–WP-SC11). This note remains
+> authoritative for *current, shipped* behavior until the replacement's cutover WP
+> (WP-SC11) folds the approved rules in here; forthcoming sections below record what has
+> landed toward that plan without describing it as current.
+
 This note records the *theory* behind where things go, so future changes tune the
 intent instead of rediscovering it. The interview decisions of 2026-07-17 are folded
 in throughout.
@@ -473,3 +479,31 @@ below it"*. A lone station's berth is drawn from a seeded RNG so a chain of port
 sectors does not render as one repeated postcard (§3), so these are taste on one draw
 rather than a rule. Most of what prompted them was crowding, which `_SHIP_STANDOFF`
 removed — re-run the gallery before tuning `_STATION_LIMB` or the lone-station range.
+
+## 9. Forthcoming: fog-safe priority and station-reference projection (WP-SC01)
+
+Not yet wired into `_SceneComposer` — this is what has landed on the server/DTO
+boundary toward `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`'s replacement solver
+(§2.3/§4.6 of that plan). The eventual solver's retention rule reads from this
+projection; the shipped composer above does not yet consume it.
+
+- `SectorShipDTO` carries three new fog-safe fields: `retention_class` (`"hostile"` /
+  `"neutral"` / `"friendly"` / `"player"` / `"unidentified"`), an opaque
+  `hostility_ordinal` (0 = most retention-worthy within its class; ties share an
+  ordinal), and a `combat_threat_rank` (0 = highest threat, scene-wide) — never the raw
+  adjusted disposition or its private inputs (attitude offset, grudge severity,
+  alliance standing). The ordinal orders on `edge.core.aliens.encounter_disposition`,
+  the exact final quantity `core.encounters.roll_encounter` rolls its greeting-vs-
+  violence check against, so the client-visible ordering can never disagree with the
+  real encounter rule. Both are computed once over the sector's whole vessel multiset
+  (`edge.core.aliens.ship_retention_ordinals`) — never per object during DTO
+  construction — so rebuilding the same sector state in any container order reproduces
+  identical values (a requirement for the eventual solver's resize hysteresis, which
+  compares plans built from separately constructed DTOs).
+- `StarbaseDTO` carries the internal `sector_id` (as `PortDTO.sector_id` already does),
+  closing the `expect_sector` gap noted in §2's docked-header contract: `BaseScreen`
+  (`edge/tui/screens/base.py`) now passes it to `StationArtHeader`, so a stale cached
+  `sector_station_reference` is rejected there the same way the Stardock header
+  already rejects one via `PortDTO.sector_id`.
+- Wire version 44. See `edge/server/wire.py`'s `WIRE_VERSION` docstring for the full
+  changelog entry.

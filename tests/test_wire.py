@@ -99,7 +99,7 @@ def test_hand_built_dtos_round_trip() -> None:
             ship_colonist_capacity=100, citadel_next_cost=(300, 5000),
         ),
         dto.StarbaseDTO(
-            starbase_id=4, name="Orbital Platform", sector_display=61, planet_id=5,
+            starbase_id=4, name="Orbital Platform", sector_id=61, sector_display=61, planet_id=5,
             planet_name="Kestrel", owner="yours", standing="yours", operational=True,
             services_operational=True, service_integrity_min_pct=70,
             integrity_pct=80,

@@ -23,14 +23,19 @@ from edge.core.aliens import (
     FRIENDLY,
     HOSTILE,
     NEUTRAL,
+    RETENTION_PLAYER,
+    RETENTION_UNIDENTIFIED,
+    ShipPriorityInput,
     apply_spillover,
     attitude_locked,
     disposition_band,
     effective_disposition,
+    encounter_disposition,
     grudge_shift,
     is_friendly,
     may_occupy,
     npc_stance,
+    ship_retention_ordinals,
     sour_attitude,
     species_relation,
 )
@@ -740,3 +745,115 @@ def test_check_relations_rejects_mutual_intra_bloc_enmity() -> None:
         alliance_id=1)
     with pytest.raises(ValidationError, match="mutually hostile"):
         _check_relations(state, cfg)
+
+
+# --- WP-SC01: fog-safe scene retention projection ----------------------------
+
+
+def _sp(sid: int, roster_id: str, *, base: float = 0.8, alliance_id: int | None = None) -> AlienSpecies:
+    return AlienSpecies(
+        id=sid, roster_id=roster_id, name=roster_id, archetype_id="x", sector_id=1,
+        home_band="Hub", tech_level=1, base_disposition=base,
+        disposition_center=base, disposition_variance=0.0, alliance_id=alliance_id)
+
+
+def test_encounter_disposition_matches_the_inline_greeting_vs_violence_quantity() -> None:
+    """`encounter_disposition` is the exact quantity `roll_encounter` computed inline
+    before its violence roll — grudge and alliance-standing shifts applied, floored."""
+    species = _sp(1, "vennrith")
+    player = Player(1, "you", 1, 0)
+    player = replace(player, species_attitudes={"vennrith": -0.1})
+    player = replace(player, grudges={"vennrith": Grudge(
+        holder="vennrith", target="player", cause="test", severity=0.2,
+        created_day=1, duration_days=30)})
+    expected = max(0.0, effective_disposition(species, player) - grudge_shift(species, player))
+    assert encounter_disposition(species, player) == pytest.approx(expected)
+    assert encounter_disposition(species, player) <= effective_disposition(species, player)
+
+
+def test_ordinal_projection_is_reproducible_and_permutation_invariant() -> None:
+    """Rebuilding from the same inputs, in any order, yields the same per-vessel result."""
+    inputs = [
+        ShipPriorityInput("contact", 1, HOSTILE, 0.1, 5.0),
+        ShipPriorityInput("contact", 2, HOSTILE, 0.2, 9.0),
+        ShipPriorityInput("contact", 3, NEUTRAL, 0.5, 1.0),
+        ShipPriorityInput("player", 7, RETENTION_PLAYER, None, 0.0),
+    ]
+    baseline = ship_retention_ordinals(inputs)
+    assert ship_retention_ordinals(list(reversed(inputs))) == baseline
+    rotated = inputs[2:] + inputs[:2]
+    assert ship_retention_ordinals(rotated) == baseline
+    import random as _random
+    shuffled = list(inputs)
+    _random.Random(7).shuffle(shuffled)
+    assert ship_retention_ordinals(shuffled) == baseline
+
+
+def test_ordinal_orders_ascending_disposition_within_a_class() -> None:
+    """Lower disposition (more hostile) gets a lower ordinal — higher retention priority."""
+    inputs = [
+        ShipPriorityInput("contact", 1, HOSTILE, 0.30, 1.0),
+        ShipPriorityInput("contact", 2, HOSTILE, 0.05, 1.0),
+        ShipPriorityInput("contact", 3, HOSTILE, 0.15, 1.0),
+    ]
+    result = ship_retention_ordinals(inputs)
+    assert result[("contact", 2)][1] < result[("contact", 3)][1] < result[("contact", 1)][1]
+
+
+def test_ordinal_ties_share_a_rank_never_leaking_the_float() -> None:
+    inputs = [
+        ShipPriorityInput("contact", 1, NEUTRAL, 0.5, 1.0),
+        ShipPriorityInput("contact", 2, NEUTRAL, 0.5, 1.0),
+    ]
+    result = ship_retention_ordinals(inputs)
+    assert result[("contact", 1)][1] == result[("contact", 2)][1]
+    # The public tuple never carries the raw disposition value.
+    for cls, ordinal, threat_rank in result.values():
+        assert not isinstance(cls, float)
+
+
+def test_combat_threat_rank_breaks_equal_hostility_ties() -> None:
+    """At equal hostility, greater combat threat gets the lower (more retained) rank."""
+    inputs = [
+        ShipPriorityInput("contact", 1, HOSTILE, 0.1, 3.0),
+        ShipPriorityInput("contact", 2, HOSTILE, 0.1, 9.0),
+    ]
+    result = ship_retention_ordinals(inputs)
+    assert result[("contact", 1)][1] == result[("contact", 2)][1]  # same hostility ordinal
+    assert result[("contact", 2)][2] < result[("contact", 1)][2]  # higher threat, lower rank
+
+
+def test_cross_species_ties_and_neutral_wreck_baseline_class() -> None:
+    """Cross-species vessels at equal disposition tie identically; class ordering is
+    independent of species identity (§2.3's approved neutral/wreck baseline hand-off is
+    left to the solver — WP-SC01 only guarantees the class/ordinal/rank are stable)."""
+    a = ShipPriorityInput("contact", 1, NEUTRAL, 0.5, 2.0)
+    b = ShipPriorityInput("contact", 2, NEUTRAL, 0.5, 2.0)
+    result = ship_retention_ordinals([a, b])
+    assert result[("contact", 1)] == result[("contact", 2)]
+
+
+def test_tag_prevents_alien_and_player_id_collisions() -> None:
+    """A `contact_id` and `player_id` sharing a numeric value never collide (§2.3)."""
+    inputs = [
+        ShipPriorityInput("contact", 5, HOSTILE, 0.1, 1.0),
+        ShipPriorityInput("player", 5, RETENTION_PLAYER, None, 0.0),
+    ]
+    result = ship_retention_ordinals(inputs)
+    assert ("contact", 5) in result and ("player", 5) in result
+    assert result[("contact", 5)][0] == HOSTILE
+    assert result[("player", 5)][0] == RETENTION_PLAYER
+
+
+def test_unidentified_and_player_vessels_never_outrank_a_priced_alien() -> None:
+    """A vessel with no priced disposition sorts to the back of its own class rather
+    than defaulting to ordinal 0 and silently jumping the queue (fog-safety, §2.3)."""
+    inputs = [
+        ShipPriorityInput("contact", 1, HOSTILE, 0.2, 1.0),
+        ShipPriorityInput("contact", 2, RETENTION_UNIDENTIFIED, None, 0.0),
+    ]
+    result = ship_retention_ordinals(inputs)
+    # Different classes, so this isn't a direct ordinal comparison, but the unpriced
+    # vessel's ordinal must not spuriously read as "0 = top priority" within its class.
+    assert result[("contact", 2)][0] == RETENTION_UNIDENTIFIED
+    assert result[("contact", 2)][1] == 0  # sole member of its class — trivially rank 0

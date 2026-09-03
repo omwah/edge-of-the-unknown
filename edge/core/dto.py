@@ -465,6 +465,17 @@ class SectorShipDTO:
     contact_id: int | None = None
     player_id: int | None = None
     art_subtype: str | None = None
+    # Fog-safe scene retention projection (WP-SC01, DESIGN §2.3/§4.6 of the sector-scene
+    # physical-model plan): a coarse retention class ("hostile"/"neutral"/"friendly"/
+    # "player"/"unidentified"), an opaque per-scene within-class hostility ordinal (0 =
+    # most retention-worthy; ties share an ordinal), and a scene-wide combat-threat tie
+    # rank (0 = highest threat). Never the raw adjusted disposition or its private
+    # inputs (attitude offset, grudge severity, alliance standing) — see
+    # `edge.core.aliens.ship_retention_ordinals`. Defaults keep old fixtures/dummy data
+    # valid; a real projection always fills them in.
+    retention_class: str = "unidentified"
+    hostility_ordinal: int = 0
+    combat_threat_rank: int = 0
 
 
 @dataclass(frozen=True)
@@ -1168,6 +1179,12 @@ class StarbaseDTO:
 
     starbase_id: int
     name: str  # hull-class display name, e.g. "Orbital Platform"
+    # Internal sector id the base actually sits in (WP-SC01) — as `PortDTO.sector_id`
+    # already does, so a docked-header `expect_sector` guard can validate the published
+    # `(sector_id, station_kind, object_id)` reference instead of trusting the docking
+    # flow unchecked. `sector_display` remains the band-monotone spatial id the player
+    # sees; this is the click/message-payload id.
+    sector_id: int
     sector_display: int
     planet_id: int | None
     planet_name: str
