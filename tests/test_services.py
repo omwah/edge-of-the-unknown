@@ -157,6 +157,15 @@ def test_starbase_view_matches_resolver() -> None:
     assert tiers <= set(CONFIG.starbase.services.component_stock_tiers)  # type: ignore[union-attr]
 
 
+def test_starbase_view_projects_internal_sector_id() -> None:
+    """WP-SC01: `StarbaseDTO.sector_id` carries the internal sector id (as `PortDTO`
+    already does), so a docked-header `expect_sector` guard can validate the published
+    station reference instead of trusting the docking flow unchecked."""
+    state = _world(base_owner=Ownership("player", 1))
+    view = session.starbase_view(state, 1, 1, CONFIG)
+    assert view.sector_id == 2  # the base's own sector — see `_world`
+
+
 def test_starbase_view_gates_services_and_station_by_standing() -> None:
     # A derelict: station ops (salvage + keystone-first repair slots), no services.
     derelict = _world(base_owner=Ownership("none"), base_operational=False)

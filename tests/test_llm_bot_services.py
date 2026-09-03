@@ -51,7 +51,7 @@ def _hardware() -> list[dto.HardwareItem]:
 
 def _base() -> dto.StarbaseDTO:
     return dto.StarbaseDTO(
-        starbase_id=9, name="Orbital Platform", sector_display=17, planet_id=7,
+        starbase_id=9, name="Orbital Platform", sector_id=17, sector_display=17, planet_id=7,
         planet_name="Far Hope", owner="you", standing="yours", operational=True,
         services_operational=True, service_integrity_min_pct=70, integrity_pct=100,
         subsystems=[], salvage=[], empty_slots=[], claimable=False, claim_cost=0,

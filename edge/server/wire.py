@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 43  # SectorShipDTO.art_subtype (sprite-art migration)
+WIRE_VERSION = 44  # SectorShipDTO retention projection; StarbaseDTO.sector_id (WP-SC01)
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -119,6 +119,15 @@ garrison unit, or AA battery actually fired (previously only the target cell was
 v42: `UndoGroundAction`/`RedoGroundAction` commands + `GroundActionUndone`/
 `GroundActionRedone` events — in-round assault undo/redo; `AssaultExpeditionDTO`
 gains `can_undo`/`can_redo` so the screen can show an honest affordance.
+v44 (WP-SC01, sector-scene physical-model plan §7): `SectorShipDTO` gains
+`retention_class`/`hostility_ordinal`/`combat_threat_rank` — a fog-safe scene-retention
+projection (coarse class + opaque per-scene within-class hostility ordinal + a
+scene-wide combat-threat tie rank) derived from the same final quantity the
+greeting-vs-violence encounter roll orders on, never the raw adjusted disposition or
+its private inputs. `StarbaseDTO` gains `sector_id` (the internal sector id, as
+`PortDTO.sector_id` already carries) so a docked station header's `expect_sector`
+guard can validate the published station reference instead of trusting the docking
+flow unchecked.
 """
 
 

@@ -62,6 +62,21 @@ def _species(sid: int, sector_id: int, name: str) -> AlienSpecies:
     )
 
 
+def _priced_species(
+    sid: int, sector_id: int, roster_id: str, *, base_disposition: float,
+    alliance_id: int | None = None,
+) -> AlienSpecies:
+    """A vessel of a real `CONFIG.roster` species — so `session._alien_priority_input`
+    finds a `SpeciesConfig` and prices a disposition/threat rather than falling back to
+    `RETENTION_UNIDENTIFIED` (WP-SC01)."""
+    return AlienSpecies(
+        id=sid, roster_id=roster_id, name=roster_id, archetype_id="trader",
+        sector_id=sector_id, home_band="Hub", tech_level=1,
+        base_disposition=base_disposition, disposition_center=base_disposition,
+        disposition_variance=0.0, alliance_id=alliance_id,
+    )
+
+
 def test_staged_species_surfaces_as_a_ship_in_its_sector() -> None:
     """A friendly contact is visible as a present vessel so the player can see/hail it."""
     world = _world()
@@ -618,3 +633,129 @@ def test_drift_keeps_dossier_last_seen_while_sector_view_tracks_position() -> No
     assert session.game_view(world, 1, CONFIG).sector.ships == []  # must be re-found
     seen1 = session.computer_view(world, 1, CONFIG).dossier[0].last_seen
     assert seen1 == str(session._display(world, 2))  # still the hail sector, not the live position
+
+
+# --- WP-SC01: fog-safe scene retention projection ----------------------------
+
+
+def _sc01_world() -> UniverseState:
+    from edge.core.models import Region
+    world = _world()
+    world.regions = {1: Region(1, "Hub")}
+    return world
+
+
+def test_projection_orders_by_attitude_grudge_and_alliance_hostility_without_leaking_them() -> None:
+    """Two different species, priced to the *same* final encounter disposition by
+    different private inputs (a grudge vs. a soured alliance standing), still land in
+    the same coarse class with the same opaque ordinal — and neither the raw
+    disposition nor its private inputs are on the wire."""
+    from dataclasses import replace
+
+    from edge.core.models import Grudge
+
+    world = _sc01_world()
+    # quill: base 0.50, soured by a 0.30-severity grudge -> 0.20 (hostile, < 0.35).
+    quill = _priced_species(1, 2, "quill", base_disposition=0.50)
+    # helot: base 0.50, allied to bloc 3, soured by -0.30 standing -> 0.20 (hostile too) —
+    # same base and shift magnitude as quill's grudge so the two land on the identical
+    # float (0.5 - 0.3 either way), a genuine tie rather than a float-precision near-miss.
+    helot = _priced_species(2, 2, "helot", base_disposition=0.50, alliance_id=3)
+    world.species = {1: quill, 2: helot}
+    world.players[1] = replace(
+        world.players[1],
+        grudges={"quill": Grudge(holder="quill", target="player", cause="raid",
+                                 severity=0.30, created_day=1, duration_days=30)},
+        alliance_standing={3: -0.30},
+    )
+    ships = {s.contact_id: s for s in session.game_view(world, 1, CONFIG).sector.ships}
+    quill_dto, helot_dto = ships[1], ships[2]
+    assert quill_dto.retention_class == helot_dto.retention_class == "hostile"
+    assert quill_dto.hostility_ordinal == helot_dto.hostility_ordinal  # equal final disposition
+    # quill (threat 2.0) outranks helot (threat 2.4) on the ordinal alone... no: the
+    # *tie rank* orders on threat — the higher-threat vessel gets the lower rank.
+    assert helot_dto.combat_threat_rank < quill_dto.combat_threat_rank
+    # The raw float and its private inputs never ride the DTO at all.
+    import dataclasses as _dc
+    field_names = {f.name for f in _dc.fields(quill_dto)}
+    assert field_names == {
+        "name", "role", "archetype_id", "contact_id", "player_id", "art_subtype",
+        "retention_class", "hostility_ordinal", "combat_threat_rank",
+    }
+
+
+def test_projection_covers_other_player_and_unidentified_vessels_fog_safely() -> None:
+    world = _sc01_world()
+    world.species = {1: _priced_species(1, 2, "quill", base_disposition=0.1)}
+    # A second player's ship, co-located, is fog-safe: "player" class, never priced.
+    world.ships[2] = Ship(2, "trailblazer", "R.S.", 5, 2, 40)
+    world.players[2] = Player(2, "rival", 2, 0)
+    ships = session.game_view(world, 1, CONFIG).sector.ships
+    by_kind = {("contact" if s.contact_id is not None else "player"): s for s in ships}
+    assert by_kind["contact"].retention_class == "hostile"
+    assert by_kind["player"].retention_class == "player"
+    assert by_kind["player"].player_id == 2 and by_kind["player"].contact_id is None
+
+
+def test_unidentified_species_falls_back_without_crashing() -> None:
+    """A species with no matching roster entry (e.g. a scenario/test fixture kind not in
+    the configured roster) prices as `unidentified` rather than raising or defaulting to
+    a misleadingly specific band."""
+    world = _sc01_world()
+    world.species = {1: _species(1, 2, "Mystery")}  # roster_id "sp1" — not in CONFIG.roster
+    ships = session.game_view(world, 1, CONFIG).sector.ships
+    assert len(ships) == 1 and ships[0].retention_class == "unidentified"
+
+
+def test_ordinal_ordering_matches_encounter_hostility_and_never_exposes_the_float() -> None:
+    """Server-side: sweeping species at a range of dispositions, the projected ordinal
+    orders them exactly as `core.encounters`' greeting-vs-violence roll would — lower
+    disposition -> lower (more retention-worthy) ordinal — without exposing the float."""
+    from edge.core.aliens import encounter_disposition
+
+    world = _sc01_world()
+    dispositions = [0.05, 0.20, 0.34, 0.50, 0.70, 0.95]
+    world.species = {
+        i + 1: _priced_species(i + 1, 2, "quill", base_disposition=d)
+        for i, d in enumerate(dispositions)
+    }
+    ships = {s.contact_id: s for s in session.game_view(world, 1, CONFIG).sector.ships}
+    ordered_by_disp = sorted(world.species.values(),
+                             key=lambda sp: encounter_disposition(sp, world.players[1]))
+    ordinals_in_disp_order = [ships[sp.id].hostility_ordinal for sp in ordered_by_disp
+                              if ships[sp.id].retention_class ==
+                              ships[ordered_by_disp[0].id].retention_class]
+    # Within a shared retention class, ordinals are non-decreasing in true disposition
+    # order — the server never lets a less-hostile vessel out-rank a more-hostile one.
+    assert ordinals_in_disp_order == sorted(ordinals_in_disp_order)
+    for s in ships.values():
+        assert isinstance(s.hostility_ordinal, int) and isinstance(s.combat_threat_rank, int)
+
+
+def test_ordinal_projection_is_unperturbed_by_dict_iteration_order() -> None:
+    """Rebuilding the sector DTO from an unchanged world reproduces every ship's
+    ordinal exactly (WP-SC01's no-container-order-dependence requirement)."""
+    world = _sc01_world()
+    world.species = {
+        1: _priced_species(1, 2, "quill", base_disposition=0.2),
+        2: _priced_species(2, 2, "helot", base_disposition=0.5, alliance_id=3),
+        3: _priced_species(3, 2, "vesk", base_disposition=0.8),
+    }
+    first = {s.contact_id: (s.retention_class, s.hostility_ordinal, s.combat_threat_rank)
+             for s in session.game_view(world, 1, CONFIG).sector.ships}
+    # Rebuild the same state's species dict in reverse insertion order — construction
+    # order must not leak into the result.
+    world.species = dict(reversed(list(world.species.items())))
+    second = {s.contact_id: (s.retention_class, s.hostility_ordinal, s.combat_threat_rank)
+              for s in session.game_view(world, 1, CONFIG).sector.ships}
+    assert first == second
+
+
+def test_sector_ship_dto_new_fields_round_trip_the_wire() -> None:
+    """Local/remote parity: the retention projection survives encode/decode unchanged."""
+    from edge.server import wire
+
+    world = _sc01_world()
+    world.species = {1: _priced_species(1, 2, "quill", base_disposition=0.1)}
+    ship = session.game_view(world, 1, CONFIG).sector.ships[0]
+    assert wire.decode_dto(wire.encode_dto(ship)) == ship

@@ -26,12 +26,11 @@ from dataclasses import dataclass, replace
 from edge.core import citadels, mechanics, starbases
 from edge.core.aliens import (
     FRIENDLY,
-    alliance_standing_shift,
     base_owner_hostile,
     disposition_band,
     effective_disposition,
+    encounter_disposition,
     governor_hostile,
-    grudge_shift,
     owner_hostile,
 )
 from edge.core.config import GameConfig, PackConfig, SpeciesConfig
@@ -135,9 +134,7 @@ def roll_encounter(
     # active grudge the species holds against the player (§6.5, WP27). Non-combatants
     # and shipless kinds can never reach violence.
     if sc.combatant and sc.fleet:
-        disp = max(0.0, effective_disposition(species, player)
-                   - grudge_shift(species, player)
-                   - alliance_standing_shift(player, species))
+        disp = encounter_disposition(species, player)
         hostility, amity = config.aliens.hostility_threshold, config.aliens.amity_threshold
         if disp >= amity:
             violence = 0.0
