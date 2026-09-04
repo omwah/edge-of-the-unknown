@@ -74,6 +74,241 @@ scene:
   starbase_scale: 0.35         # playtest 2026-07-17: at 0.5 a starbase (12 inked rows) rivalled the planet
   ship_scale: 0.2              # below port_scale so traffic never outsizes the port it visits
 
+  # WP-SC05: the reviewer-approved `edge.scene` physical-model calibration
+  # (docs/SCENE_CALIBRATION_REVIEW.md §1-2, approved as-is). Unrelated to
+  # every key above (those still feed the *legacy* `_SceneComposer`); this
+  # block is read only by `edge.art.scene_tuning.build_scene_tuning` /
+  # `build_continuous_yields`, which turn it into a real
+  # `edge.scene.model.SceneTuning` for `edge/scene/solve.py`. Not yet wired
+  # into the running TUI (that is WP-SC08/SC09/SC10/SC11's job) — this is
+  # only "approved numbers are loadable, validated config" (plan §5).
+  # Fraction-valued fields are written as exact "num/den" strings so they
+  # load as `fractions.Fraction`, never a lossy float.
+  physical_model:
+    # Nominal face areas per PhysicalObject.scale_class, display scene units
+    # (not literal km): preserves entity > anchor > belt > orbital > wreck >
+    # ship as bounding-box area (plan §2.2, §9.1). "anchor" is the fallback
+    # bucket a bare planet uses; face_extent_by_kind below overrides it for
+    # nebula/black_hole/wormhole so those phenomena read distinctly larger.
+    face_extent_by_scale_class:
+      entity:  [34, 14]   # area 476 — the foreground subject; largest of all
+      anchor:  [60, 30]   # area 1800 — shared planet/discovery bucket
+      belt:    [90, 16]   # area 1440 — wide flat permeable field
+      orbital: [14, 7]    # area 98 — station; below anchor, above wreck/ship
+      wreck:   [16, 6]    # area 96 — "slightly larger than ships" (plan §2.2)
+      ship:    [12, 5]    # area 60
+    # Per-continuous_kind override: nebula/black_hole visual system >> wormhole
+    # > planet/anchor-fallback (1800), matching plan §2.2's stated hierarchy.
+    face_extent_by_kind:
+      nebula:     [110, 60]  # area 6600 — the largest phenomenon: a diffuse field
+      black_hole: [100, 60]  # area 6000 — comparable to nebula, slightly tighter
+      wormhole:   [76, 40]   # area 3040 — clearly bigger than a bare planet, smaller than nebula/black_hole
+    # Placement/depth-range box per scale class (plan §9.3). Ship/wreck get a
+    # noticeably wider box (x/y span +60%, z span +30%) than every other class
+    # per plan §2.5 ("[ships] receive wider placement regions ... than
+    # stations"); orbital placement stays tied to its parent planet's own
+    # narrower placement (SceneTuning.region_by_scale_class's docstring), so
+    # it is not widened independently of the anchor it orbits.
+    region_by_scale_class:
+      entity:  { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
+      anchor:  { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
+      belt:    { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
+      orbital: { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
+      wreck:   { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 1, z_max: 520 }
+      ship:    { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 1, z_max: 520 }
+    # frame()'s target projected-ink-height fraction of viewport.height per
+    # anchor scale_class (plan §9.5): the Entity frames tighter (1/3) than a
+    # planet/phenomenon (1/2) so it reads as a close subject, not a backdrop;
+    # ships/wrecks are rarely the anchor so their fraction is small/theoretical.
+    target_fraction_by_scale_class:
+      entity: "1/3"
+      anchor: "1/2"
+      belt: "1/2"
+      orbital: "1/5"
+      wreck: "1/8"
+      ship: "1/8"
+    # frame()'s seed ink/natural-height ratio before a laddered anchor snaps
+    # to its own rung's exact ratio (plan §9.5). Ships/stations are dense
+    # authored art (little padding, 9/10); planets/nebulae fade toward the
+    # edge (3/5); belts are the sparsest (1/3, permeable field, plan §2.5).
+    ink_ratio_by_scale_class:
+      entity: "4/5"
+      anchor: "3/5"
+      belt: "1/3"
+      orbital: "9/10"
+      wreck: "4/5"
+      ship: "9/10"
+    # Plan §9.1's three structural modes, first match wins, most demanding
+    # first. Thresholds reuse the WP-SC04 benchmark canvas breakpoints
+    # (87x36, 120x44) so mode selection lines up with sizes already measured.
+    structural_mode_thresholds:
+      - [120, 44, wide]
+      - [87, 36, standard]
+      - [0, 0, compact]
+    # FixedFovPerspective's calibrated FOV ratio: a gentle half-angle (visible
+    # height per depth unit) keeps distant admitted objects legible instead of
+    # shrinking sharply toward the frame edges.
+    fixed_fov_num: 1
+    fixed_fov_den: 2
+    # Matches the shipped legacy composer's width = 2*height disc rule
+    # (docs/SECTOR_SCENE_COMPOSITION.md), so cutover does not silently change
+    # the terminal's visual proportions.
+    cell_aspect: "2"
+    # Smallest workable positive depth — do not let anything sit on the camera plane.
+    near_plane_su: 1
+    # DepthLayeredAnchorProjection: 8 layers give enough depth resolution to
+    # distinguish near/mid/far traffic without an unbounded search space; a
+    # 4/5 per-layer scale gives roughly a 20% size step between adjacent
+    # layers, visually distinguishable at terminal resolution.
+    depth_layers: 8
+    depth_layer_size_su: 6
+    depth_layer_scale: "4/5"
+    # candidates()'s framing-height sweep bounds, as a fraction of
+    # viewport.height (plan §9.6): never frame an anchor smaller than 1/8 of
+    # the viewport (illegible) or larger than 3/4 (crowds out everything else).
+    camera_height_fraction_min: "1/8"
+    camera_height_fraction_max: "3/4"
+    # candidates()'s bounded, centre-out aim offsets, in the order to try
+    # them — enough range to dodge a collision without degenerating into a
+    # full raster scan (plan §6.2 rule 4).
+    aim_offsets_su: [0, -2, 2, -4, 4, -6, 6]
+    # Hard cap on candidates() output (plan §6.2 rule 4): the height sweep
+    # (roughly a dozen distinct rung/cell heights in practice) times the 7
+    # aim offsets above, rounded up for headroom.
+    max_camera_candidates: 64
+    # Plan §9.6 hysteresis metric weights: admission changes (an object
+    # popping in/out) are the most visually jarring resize artifact, so that
+    # term is weighted 4x the others; camera/position/art-size churn are
+    # weighted equally as comparatively minor wobble.
+    hysteresis_weight_camera: 1
+    hysteresis_weight_position: 1
+    hysteresis_weight_admission: 4
+    hysteresis_weight_art: 1
+    # Hard bound on the whole solve pass loop (plan §9.6, §6.2 rule 4): covers
+    # a handful of reposition attempts, at most one reanchor, and a few
+    # box-class step-downs before the loop must terminate.
+    max_passes: 24
+    # One cell of clearance from every viewport edge (plan §2.4: "retain
+    # separation and edge margins rather than eliminate every void cell").
+    edge_margin: 1
+    # Below these cell dimensions an object reads as noise rather than its
+    # own shape; stations/ships need at least 2-3 cells on their short axis
+    # to read as a rectangle rather than a dot.
+    min_projected_cells_by_scale_class:
+      entity: [4, 2]
+      anchor: [6, 3]
+      belt: [6, 2]
+      orbital: [3, 2]
+      ship: [3, 1]
+      wreck: [3, 1]
+    # Matches edge_margin: one blank cell of clearance between distinct
+    # accepted objects' ink-max boxes (plan §9.6 attempt rule 4).
+    separation_margin: 1
+    # The minimum visible fraction the farther object of an occluding pair
+    # must clear (plan §9.6 attempt rule 5). The Entity and the framing
+    # anchor are never partially occluded by construction, so their floor is
+    # 1 (fully visible or rejected); wrecks/ships/stations may be legitimately
+    # partly hidden but must stay >= 3/4 visible to remain readable (plan §2.5).
+    min_visible_fraction_by_scale_class:
+      entity: "1"
+      anchor: "1"
+      belt: "1"
+      orbital: "3/4"
+      ship: "3/4"
+      wreck: "3/4"
+    # Cumulative estimated render-cost ceiling for one solve (plan §4.14,
+    # §9.4): same scale as the catalogue's measured render_cost units — the
+    # checked-in ship/port rungs measure in the tens, and the nebula's
+    # richest box class costs 110 — comfortably covers one rich anchor plus a
+    # handful of laddered ships, tight enough that cost pressure engages.
+    cost_budget: 250
+    # Hard cap on admitted ship count, independent of cost_budget (plan
+    # §2.3), well above any generated-universe DTO inventory measured, but
+    # below the 50-ship synthetic stress case so that case still exercises it.
+    emergency_ship_ceiling: 40
+    # Per-object bound on deterministic reposition offsets tried for one
+    # flexible object across a whole solve (plan §6.2 rule 4, §9.6 step 1).
+    max_reposition_candidates: 16
+    # Plan §9.6's glyph scatter: free-cell placement attempts per
+    # fighter/mine glyph before giving up to the sidebar, and the minimum
+    # cell spacing between placed glyphs so a garrison doesn't read as one block.
+    max_glyph_tries: 20
+    glyph_spacing: 2
+    # Per-continuous-kind ink/cost envelopes (calibration §2): request-box ->
+    # visible-ink relationship, illegibility floor, the anchor step-down
+    # ladder's box classes (descending), and their render_cost (nondecreasing
+    # with box size, same units as the ladder rungs' measured render_cost).
+    continuous:
+      planet:
+        # A disc render fills most of its request box (60-90%); three box
+        # classes give the anchor step-down ladder room to shrink twice
+        # before hitting the legibility floor.
+        ink_fraction_min: "3/5"
+        ink_fraction_max: "9/10"
+        min_extent: [6, 3]
+        box_classes: [[80, 40], [50, 25], [28, 14]]
+        render_cost: [70, 35, 12]
+      nebula:
+        # Cloud phenomena are diffuse (lower ink-fraction floor than a solid
+        # disc) but can be dense at full detail; the largest box class here
+        # is the plan §6.1 cost-dominant case (highest render_cost of the set).
+        ink_fraction_min: "2/5"
+        ink_fraction_max: "9/10"
+        min_extent: [10, 5]
+        box_classes: [[100, 50], [64, 32], [36, 18]]
+        render_cost: [110, 55, 20]
+      black_hole:
+        # Accretion-disc/lensing system (plan §2.1): the visible phenomenon
+        # (not just the event horizon) supplies physical scale, so its
+        # envelope is sized close to the nebula's.
+        ink_fraction_min: "1/2"
+        ink_fraction_max: "9/10"
+        min_extent: [8, 4]
+        box_classes: [[90, 45], [58, 29], [32, 16]]
+        render_cost: [100, 50, 18]
+      wormhole:
+        # "Slightly larger than a planet" (plan §2.2): smaller top box class
+        # than planet/nebula/black_hole above.
+        ink_fraction_min: "1/2"
+        ink_fraction_max: "4/5"
+        min_extent: [6, 3]
+        box_classes: [[50, 25], [32, 16], [18, 9]]
+        render_cost: [40, 20, 8]
+      wreck:
+        # Wrecks are not laddered (ArtMode.CONTINUOUS); a small envelope,
+        # two box classes since a wreck never anchors a crowded scene.
+        ink_fraction_min: "1/2"
+        ink_fraction_max: "4/5"
+        min_extent: [5, 2]
+        box_classes: [[24, 10], [16, 7]]
+        render_cost: [15, 6]
+      entity:
+        # The Entity is unique per sector and never rejected for cost (plan
+        # §2.3 invariant); its ladder only needs room for step-down to have
+        # somewhere to go.
+        ink_fraction_min: "3/5"
+        ink_fraction_max: "9/10"
+        min_extent: [8, 4]
+        box_classes: [[40, 16], [26, 10]]
+        render_cost: [35, 14]
+      belt:
+        # Permeable field (plan §2.5): low ink fraction is expected and
+        # correct, not a rendering failure — mostly negative space with
+        # traffic and stations painted through it.
+        ink_fraction_min: "1/5"
+        ink_fraction_max: "1/2"
+        min_extent: [12, 3]
+        box_classes: [[120, 20], [80, 14]]
+        render_cost: [30, 12]
+    # §3 extended proposals with a natural config home, approved but not yet
+    # read by any WP-SC06 solver code path — kept here so a future work
+    # package wiring these has an already-approved number rather than
+    # inventing one. (Absolute/solver latency budgets are deliberately left
+    # out of shipped config — they gate devtool/benchmark performance
+    # assertions, not a runtime tuning knob; see edge/devtool/scene_benchmark.py.)
+    cost_budget_estimate_tolerance: "1/10"  # plan §4.14: estimate-side budget tolerance
+    ship_depth_objective_weight: 2          # plan §4.13: soft ship-depth/rung-variation tiebreaker
+
 # TUI presentation — the sector-screen warp grid + status sidebar (no rules impact).
 ui:
   warp_columns: 3            # warp-grid width; cells fill the printable area, wrap into rows
