@@ -213,6 +213,8 @@
   "211": "MeshTopology",
   "212": "Stardock service artwork provenance",
   "213": "graphify.js",
+  "214": "load_config",
+  "215": "test_ground_render_glyph_widths.py",
   "216": "art/__init__.py",
   "217": "bigbang/__init__.py",
   "218": "enums.py",
@@ -245,12 +247,8 @@
   "250": "resolve_sector",
   "251": "_build_sheet",
   "252": "InteriorGenerationError",
-  "254": "_connectivity_ok",
-  "257": "test_accounts.py",
-  "258": ".stardock_facilities_sector_id",
   "259": "tui/app.py",
   "261": "terrain.py",
-  "266": "Debris",
   "271": "GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes",
   "293": "BotRunner"
 }
