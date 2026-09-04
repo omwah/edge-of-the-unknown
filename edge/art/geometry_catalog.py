@@ -13,11 +13,12 @@ not hand-edit it (`tests/test_geometry_catalog.py` guards drift, per
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from edge.scene.catalog import ContinuousYield, LadderKey, LadderRung
+from edge.scene.catalog import ArtGeometryCatalog, ContinuousYield, LadderKey, LadderRung
 from edge.scene.geometry import CellBox
 
 DEFAULT_CATALOG_PATH = Path(__file__).parent / "geometry_catalog.json"
@@ -82,3 +83,64 @@ def load_default_geometry_catalog() -> JsonArtGeometryCatalog:
     """The one process-wide catalogue instance, loaded from the shipped file."""
 
     return JsonArtGeometryCatalog.from_file()
+
+
+def continuous_category(kind: str) -> str:
+    """Map a `PhysicalObject.continuous_kind` (a planet `ptype`, a discovery
+    `kind`, or the literal `"entity"`) onto one of the small set of
+    `scene.physical_model.continuous` calibration buckets shipped by WP-SC05
+    (`config/default.yaml -> scene: physical_model: continuous:`).
+
+    Structural, not a tuned number: every `ptype` other than the asteroid-belt
+    one shares the generic ``"planet"`` envelope; the anchor phenomena, the
+    wreck kind, and the Entity each get their own bucket. Mirrors
+    `edge.devtool.scene_calibration._continuous_category` (the calibration
+    review tool this bucketing was designed alongside); reimplemented here,
+    rather than imported, because that module is dev-only and `edge/art/` is
+    the real production art/TUI seam that assembles a working
+    `ArtGeometryCatalog` for a running composer.
+    """
+
+    if kind == "asteroid_belt":
+        return "belt"
+    if kind in ("nebula", "black_hole", "wormhole", "wreck", "entity"):
+        return kind
+    return "planet"  # every other ptype (terrestrial_*, jovian, barren, ...)
+
+
+class ConfiguredArtGeometryCatalog:
+    """The real, production `ArtGeometryCatalog`: laddered ship/port rungs
+    from the checked-in `geometry_catalog.json`, plus continuous-kind yields
+    from WP-SC05's shipped `scene.physical_model.continuous` calibration,
+    looked up through `continuous_category`.
+
+    `JsonArtGeometryCatalog.continuous()` alone raises `KeyError` for every
+    kind (its `_continuous` map ships empty -- calibration was landed as
+    config, not baked into the generated JSON file); this wrapper is what
+    turns a validated `ScenePhysicalModelConfig` and the generated ladder
+    file into one catalogue an art-resolution/solve caller can actually use.
+    """
+
+    def __init__(
+        self, rungs: JsonArtGeometryCatalog, continuous: Mapping[str, ContinuousYield]
+    ) -> None:
+        self._rungs = rungs
+        self._continuous = dict(continuous)
+        self.version = rungs.version
+
+    def rungs(self, key: LadderKey) -> tuple[LadderRung, ...]:
+        return self._rungs.rungs(key)
+
+    def continuous(self, kind: str) -> ContinuousYield:
+        return self._continuous[continuous_category(kind)]
+
+
+def load_geometry_catalog(
+    continuous: Mapping[str, ContinuousYield], path: Path = DEFAULT_CATALOG_PATH
+) -> ArtGeometryCatalog:
+    """Build the real, injectable `ArtGeometryCatalog`: the checked-in ladder
+    file plus a caller-supplied continuous-yield map (typically
+    `edge.art.scene_tuning.build_continuous_yields(cfg.scene.physical_model)`).
+    """
+
+    return ConfiguredArtGeometryCatalog(JsonArtGeometryCatalog.from_file(path), continuous)

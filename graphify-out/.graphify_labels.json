@@ -252,8 +252,16 @@
   "250": "resolve_sector",
   "251": "_build_sheet",
   "252": "InteriorGenerationError",
+  "253": "RemoteError",
+  "254": ".apply",
+  "255": "test_groundwar_cloud_city_assault_view.py",
+  "256": "TechOfferDTO",
+  "257": "InteriorGenerationError",
+  "258": "_connectivity_ok",
   "259": "tui/app.py",
+  "260": "._check_combat_refs",
   "261": "terrain.py",
+  "262": ".rebuild_adjacency",
   "271": "GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes",
   "293": "BotRunner"
 }
