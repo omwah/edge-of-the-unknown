@@ -4,6 +4,28 @@
 
 Supersedes the informal 2026-08-31 figures in plan §6.1 with a reproducible measurement. Strategy comparison numbers use a benchmark-only SceneTuning/catalog overlay -- see module docstring.
 
+## 0. Strategy decision: deferred (2026-09-03)
+
+WP-SC04 calls for comparing and approving one production `ProjectionStrategy`, removing
+the loser. **That pick is explicitly deferred.** After a `candidates()` bug fix
+(anchor z-position was silently assumed to be 0; see the `ui: fix candidates() ignoring
+anchor z-position` commit), candidate-efficiency is now a wash between the two
+strategies -- both reach near-100% distinct-scene coverage of their candidate budget
+across all ten scene compositions in this report. The remaining measured difference is
+per-op cost: `depth_layered_anchor` is roughly 1.5x cheaper per `frame()+candidates()`
+call than `fixed_fov_perspective` (see §3), but both are sub-millisecond and neither has
+been visually compared, because no composed multi-object scene can be rendered before
+WP-SC06 (solver) and WP-SC07 (art resolution) land.
+
+Decision: **keep both strategies wired behind `ProjectionStrategy` rather than deleting
+either now.** WP-SC06/SC07 build against the interface, not a chosen implementation.
+The strategy pick happens later -- either once a real visual comparison is possible
+(WP-SC09's A/B gallery, or an earlier throwaway multi-object render built specifically
+for this decision) or on the numbers here if a visual comparison turns out not to be
+warranted. Until then, no WP may assume a single strategy is "the" production one;
+`edge/tui`/devtool call sites needing a concrete strategy should take it as a parameter
+or config choice rather than hardcoding one.
+
 ## 1. Current composer baseline (reproduces plan §6.1)
 
 | case | size | cold ms | warm median ms | warm p95 ms | warm max ms |
