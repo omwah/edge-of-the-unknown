@@ -254,6 +254,8 @@
   "252": "InteriorGenerationError",
   "253": "RemoteError",
   "254": ".apply",
+  "255": ".compose",
+  "256": "GwGarrisonEconomy",
   "259": "tui/app.py",
   "261": "terrain.py",
   "271": "GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes",

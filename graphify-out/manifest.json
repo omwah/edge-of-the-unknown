@@ -855,8 +855,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/options.py": {
-    "mtime": 1788549155.696886,
-    "ast_hash": "afdebdc48c36689b8e7d3f7f0bf1fac7",
+    "mtime": 1788554467.1218736,
+    "ast_hash": "b287cfe8548c2e573f5261ae054c8cb4",
     "semantic_hash": ""
   },
   "edge/tui/screens/picker.py": {
@@ -910,8 +910,8 @@
     "semantic_hash": ""
   },
   "edge/tui/settings.py": {
-    "mtime": 1788549155.697886,
-    "ast_hash": "bd9411f74ac8f944a0cd27996d4892f8",
+    "mtime": 1788554448.014644,
+    "ast_hash": "108fd23488a4d45e48ef01b99f4160b4",
     "semantic_hash": ""
   },
   "edge/tui/shots.py": {
@@ -4132,6 +4132,21 @@
   "tests/test_scene_paint.py": {
     "mtime": 1788549487.0149765,
     "ast_hash": "96cc10bbfcbfde069d4f22d8e04a0271",
+    "semantic_hash": ""
+  },
+  "edge/tui/physical_scene.py": {
+    "mtime": 1788554743.2801967,
+    "ast_hash": "14dbb275bd97c9d79d4de6141ec9d381",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_labels.py": {
+    "mtime": 1788554773.8825653,
+    "ast_hash": "ab191d44a4555bbadbb98e1025bbef83",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_resize.py": {
+    "mtime": 1788554773.8825653,
+    "ast_hash": "5b2398a3e9f3567b745b677d0c9b3611",
     "semantic_hash": ""
   }
 }
