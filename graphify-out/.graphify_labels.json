@@ -259,7 +259,13 @@
   "257": "test_accounts.py",
   "258": ".stardock_facilities_sector_id",
   "259": "tui/app.py",
-  "267": "GroundAssaultScreen",
+  "260": "MarketDTO",
+  "261": "terrain.py",
+  "262": "detail_table.py",
+  "263": "SurveySettlement",
+  "264": "test_ground_render_glyph_widths.py",
+  "265": "._refresh_art",
+  "266": "Debris",
   "271": "GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes",
   "293": "BotRunner"
 }
