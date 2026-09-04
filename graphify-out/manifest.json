@@ -265,8 +265,8 @@
     "semantic_hash": ""
   },
   "edge/core/config.py": {
-    "mtime": 1788306281.8519213,
-    "ast_hash": "df4478ed06f0b2574471b65327a9d309",
+    "mtime": 1788543192.3004897,
+    "ast_hash": "3422ab48e263788fe880c0e068836590",
     "semantic_hash": ""
   },
   "edge/core/contracts.py": {
@@ -1535,8 +1535,8 @@
     "semantic_hash": ""
   },
   "config/default.yaml": {
-    "mtime": 1788306281.8479211,
-    "ast_hash": "092a6dfb7d0f75d11490961d2887feb5",
+    "mtime": 1788543192.2994897,
+    "ast_hash": "2feeb84ee023695763cb825bbe918228",
     "semantic_hash": ""
   },
   "config/dialogue/alien_dialogue_species.yaml": {
@@ -4095,8 +4095,8 @@
     "semantic_hash": ""
   },
   "tests/test_scene_calibration.py": {
-    "mtime": 1788535659.7762485,
-    "ast_hash": "5c1e949c88ad3265ee62798755ae19bc",
+    "mtime": 1788543192.3004897,
+    "ast_hash": "db9c686e9b230922243079eb161e5df0",
     "semantic_hash": ""
   },
   "tests/test_scene_solve.py": {
@@ -4112,6 +4112,16 @@
   "docs/SCENE_CALIBRATION_REVIEW.json": {
     "mtime": 1788535659.7742484,
     "ast_hash": "8e2318b2c8e9221229f908d7c4507955",
+    "semantic_hash": ""
+  },
+  "edge/art/scene_tuning.py": {
+    "mtime": 1788543192.2994897,
+    "ast_hash": "ddf294d02fdf1ef61aa30f4a5e7b501d",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_tuning_config.py": {
+    "mtime": 1788543192.3004897,
+    "ast_hash": "ea8cc008ec1e6f108a1964c8f88d5f2f",
     "semantic_hash": ""
   }
 }
