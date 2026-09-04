@@ -466,7 +466,8 @@ def _sector_dto(
     planets = [
         dto.SectorPlanetDTO(planet_id=pl.id, name=pl.name, ptype=pl.planet_type,
                             ore_reserve=pl.ore_reserve, ore_reserve_max=pl.ore_reserve_max,
-                            cloud_city_size=pl.cloud_city_size)
+                            cloud_city_size=pl.cloud_city_size,
+                            archetype_id=port_archetype if pl.owner.is_owned else None)
         for pl in state.planets.values() if pl.sector_id == sector.id
     ]
     # A staged species shows as a present vessel so the player can see (and hail) it —

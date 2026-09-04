@@ -164,6 +164,44 @@ def test_planet_classifies_as_anchor_circle() -> None:
     assert planet.occludes is True
 
 
+def test_unowned_planet_has_no_archetype_id() -> None:
+    dto = _sector(planets=[SectorPlanetDTO(planet_id=1, name="Terra Nova", ptype="terrestrial_warm")])
+    arrangement, _ = classify_sector(dto, TUNING)
+    (planet,) = arrangement.objects
+    assert planet.archetype_id is None
+
+
+def test_owned_planet_carries_its_controlling_archetype() -> None:
+    dto = _sector(
+        planets=[
+            SectorPlanetDTO(
+                planet_id=1, name="Terra Nova", ptype="terrestrial_warm",
+                archetype_id="humanoid_diplomat",
+            )
+        ]
+    )
+    arrangement, _ = classify_sector(dto, TUNING)
+    (planet,) = arrangement.objects
+    assert planet.archetype_id == "humanoid_diplomat"
+
+
+def test_anchor_discovery_and_wreck_and_entity_never_get_an_archetype_id() -> None:
+    """No ownership/species association exists at the DTO level for these kinds
+    (plan §9.7 gap fix note) -- `archetype_id` stays a principled `None`."""
+    dto = _sector(
+        discoveries=[
+            SectorDiscovery(discovery_id=1, label="Nebula", kind="nebula", rarity="Rare",
+                             salvageable=False),
+            SectorDiscovery(discovery_id=2, label="Wreck", kind="wreck", rarity="Common",
+                             salvageable=False),
+        ],
+        anomaly=SectorAnomalyDTO(label="A Presence", contact_id=5, contactable=True),
+    )
+    arrangement, _ = classify_sector(dto, TUNING)
+    assert len(arrangement.objects) == 3
+    assert all(o.archetype_id is None for o in arrangement.objects)
+
+
 def test_asteroid_belt_planet_classifies_as_permeable_belt() -> None:
     dto = _sector(planets=[SectorPlanetDTO(planet_id=1, name="The Rocks", ptype="asteroid_belt")])
     arrangement, _ = classify_sector(dto, TUNING)

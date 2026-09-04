@@ -136,6 +136,7 @@ def _planet_object(planet: SectorPlanetDTO, tuning: SceneTuning) -> PhysicalObje
         art_mode=ArtMode.CONTINUOUS,
         ladder_key=None,
         continuous_kind=planet.ptype,
+        archetype_id=planet.archetype_id,
         retention=SceneRetention.ANCHOR,
         hostility_ordinal=0,
         threat_rank=0,
@@ -167,6 +168,7 @@ def _port_object(
             archetype_id=port.archetype_id or "",
         ),
         continuous_kind=None,
+        archetype_id=port.archetype_id or None,
         retention=SceneRetention.ORBITAL,
         hostility_ordinal=0,
         threat_rank=0,
@@ -194,6 +196,7 @@ def _starbase_object(
             archetype_id=starbase.archetype_id or "",
         ),
         continuous_kind=None,
+        archetype_id=starbase.archetype_id or None,
         retention=SceneRetention.ORBITAL,
         hostility_ordinal=0,
         threat_rank=0,
@@ -249,6 +252,7 @@ def _ship_object(ship: SectorShipDTO, tuning: SceneTuning) -> PhysicalObject:
             archetype_id=ship.archetype_id or "",
         ),
         continuous_kind=None,
+        archetype_id=ship.archetype_id or None,
         retention=_SHIP_RETENTION.get(ship.retention_class, SceneRetention.NEUTRAL_SHIP),
         hostility_ordinal=ship.hostility_ordinal,
         threat_rank=ship.combat_threat_rank,
@@ -269,6 +273,10 @@ def _anchor_discovery_object(disc: SectorDiscovery, tuning: SceneTuning) -> Phys
         art_mode=ArtMode.CONTINUOUS,
         ladder_key=None,
         continuous_kind=disc.kind,
+        archetype_id=None,
+        # No ownership/species association exists on `SectorDiscovery` today (plan §9.7
+        # gap fix): a nebula/black hole/wormhole is not associated with any species or
+        # alliance at the DTO level, so this is a principled `None`, not an omission.
         retention=SceneRetention.ANCHOR,
         hostility_ordinal=0,
         threat_rank=0,
@@ -289,6 +297,9 @@ def _wreck_object(disc: SectorDiscovery, tuning: SceneTuning) -> PhysicalObject:
         art_mode=ArtMode.CONTINUOUS,
         ladder_key=None,
         continuous_kind=disc.kind,
+        archetype_id=None,
+        # A wreck's `SectorDiscovery` carries no owning-species signal either (plan §9.7
+        # gap fix note): principled `None`, not fabricated.
         retention=SceneRetention.WRECK,
         hostility_ordinal=0,
         threat_rank=0,
@@ -312,6 +323,9 @@ def _entity_object(dto: SectorDTO, tuning: SceneTuning) -> PhysicalObject | None
         art_mode=ArtMode.CONTINUOUS,
         ladder_key=None,
         continuous_kind="entity",
+        archetype_id=None,
+        # The generated Entity carries no species/owner association at the DTO level
+        # (`SectorAnomalyDTO` has none) -- principled `None`, not fabricated.
         retention=SceneRetention.ENTITY,
         hostility_ordinal=0,
         threat_rank=0,

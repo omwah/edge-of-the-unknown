@@ -22,12 +22,14 @@ Two art paths (plan §9.7's "Implementation" bullet 1):
 * **Continuous kinds (planet/belt/discovery/entity)** render through
   `edge.art.generator.generate_sprite`'s real, already-shipped procedural
   generators (`PlanetGenerator`, `DiscoveryGenerator`) -- these are genuine,
-  calibrated-adjacent renderers, not a placeholder. What *is* still a gap:
-  `PhysicalObject` carries no archetype id for a continuous object (only
-  `LadderKey.archetype_id` exists, for ships/ports), so continuous art always
-  renders with `archetype_id=None` here -- an owner-tinted nebula/wreck is not
-  yet expressible. This is a real, structural absence upstream of this
-  module, not something invented or hidden.
+  calibrated-adjacent renderers, not a placeholder. `PhysicalObject.archetype_id`
+  (plan §9.7 gap fix) now carries the real DTO-level owner/species palette when
+  one exists and is threaded through to `generate_sprite` here, so an owned
+  planet renders owner-tinted. The signal is genuinely absent for the other
+  continuous kinds today -- `SectorDiscovery` (nebula/black_hole/wormhole/wreck)
+  and the generated Entity carry no owning-species association at the DTO
+  level -- so `archetype_id` is `None` for those, a principled absence rather
+  than something invented or hidden.
 
 The composition-local render cache (`RenderCache`) and the render-once-per-
 final-box counter (`RenderCache.renders`/`.hits`) implement plan §6.2 rule 3.
@@ -269,13 +271,14 @@ def _resolve_continuous(
 ) -> tuple[Text, RenderCacheKey]:
     entity_type, subtype = _continuous_entity_subtype(obj)
     treatment = _treatment(obj)
+    archetype = obj.archetype_id or ""
     key = RenderCacheKey(
         entity_type=entity_type, subtype=subtype, seed=seed, box=box,
-        facing="", archetype="", treatment=treatment,
+        facing="", archetype=archetype, treatment=treatment,
     )
 
     def _build() -> Text:
-        raw = generate_sprite(entity_type, subtype, seed, box[0], box[1])
+        raw = generate_sprite(entity_type, subtype, seed, box[0], box[1], obj.archetype_id)
         return _apply_treatment(raw, treatment)
 
     return cache.get(key, _build), key

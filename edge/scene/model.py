@@ -62,6 +62,14 @@ class PhysicalObject:
     art_mode: ArtMode
     ladder_key: LadderKey | None
     continuous_kind: str | None
+    archetype_id: str | None
+    """Owner/species palette for procedural art, uniformly populated across both art
+    modes (plan §9.7 gap fix): for `ArtMode.LADDER` this mirrors `ladder_key.archetype_id`
+    (`""` becomes `None`); for `ArtMode.CONTINUOUS` it is the real DTO-level ownership
+    signal when one exists (currently: an owned planet's `SectorPlanetDTO.archetype_id`,
+    the same "controlling species of the region" fact ports/starbases already use) and
+    `None` otherwise -- a discovery/wreck/entity carries no ownership/species association
+    at the DTO level today, so this is `None` for those, not a fabricated value."""
     retention: SceneRetention
     hostility_ordinal: int
     """0 = most hostile; opaque, from the fog-safe DTO (WP-SC01)."""

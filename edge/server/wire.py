@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 44  # SectorShipDTO retention projection; StarbaseDTO.sector_id (WP-SC01)
+WIRE_VERSION = 45  # SectorPlanetDTO.archetype_id (scene physical-model continuous-kind archetype fix)
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected

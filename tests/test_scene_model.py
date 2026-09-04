@@ -55,6 +55,7 @@ def _object(
         art_mode=art_mode,
         ladder_key=None,
         continuous_kind="nebula",
+        archetype_id=None,
         retention=retention,
         hostility_ordinal=0,
         threat_rank=0,

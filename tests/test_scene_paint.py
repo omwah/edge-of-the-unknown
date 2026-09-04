@@ -71,7 +71,7 @@ def _ship_object(
         key=SceneKey("ship", ident), parent=None,
         face=Face(shape=FaceShape.RECT, width_su=40, height_su=10),
         scale_class="ship", art_mode=ArtMode.LADDER, ladder_key=_SHIP_LADDER_KEY,
-        continuous_kind=None, retention=retention, hostility_ordinal=hostility_ordinal,
+        continuous_kind=None, archetype_id=None, retention=retention, hostility_ordinal=hostility_ordinal,
         threat_rank=1, region=_region(), flexible=True, occludes=True,
         label=f"Ship {ident}", destination=None,
     )
@@ -82,7 +82,7 @@ def _port_object(ident: int) -> PhysicalObject:
         key=SceneKey("port", ident), parent=None,
         face=Face(shape=FaceShape.RECT, width_su=20, height_su=14),
         scale_class="orbital", art_mode=ArtMode.LADDER, ladder_key=_PORT_LADDER_KEY,
-        continuous_kind=None, retention=SceneRetention.ORBITAL, hostility_ordinal=0,
+        continuous_kind=None, archetype_id=None, retention=SceneRetention.ORBITAL, hostility_ordinal=0,
         threat_rank=0, region=_region(), flexible=True, occludes=True,
         label=f"Port {ident}", destination=None,
     )
@@ -93,7 +93,7 @@ def _planet_object(ident: int, ptype: str = "terrestrial_warm") -> PhysicalObjec
         key=SceneKey("planet", ident), parent=None,
         face=Face(shape=FaceShape.CIRCLE, width_su=60, height_su=30),
         scale_class="anchor", art_mode=ArtMode.CONTINUOUS, ladder_key=None,
-        continuous_kind=ptype, retention=SceneRetention.ANCHOR, hostility_ordinal=0,
+        continuous_kind=ptype, archetype_id=None, retention=SceneRetention.ANCHOR, hostility_ordinal=0,
         threat_rank=0, region=_region(), flexible=False, occludes=True,
         label=f"Planet {ident}", destination=None,
     )
@@ -104,7 +104,7 @@ def _belt_object(ident: int) -> PhysicalObject:
         key=SceneKey("planet", ident), parent=None,
         face=Face(shape=FaceShape.FIELD, width_su=200, height_su=20),
         scale_class="belt", art_mode=ArtMode.CONTINUOUS, ladder_key=None,
-        continuous_kind="asteroid_belt", retention=SceneRetention.ANCHOR, hostility_ordinal=0,
+        continuous_kind="asteroid_belt", archetype_id=None, retention=SceneRetention.ANCHOR, hostility_ordinal=0,
         threat_rank=0, region=_region(), flexible=False, occludes=False,
         label=f"Belt {ident}", destination=None,
     )
@@ -115,7 +115,7 @@ def _entity_object(ident: int) -> PhysicalObject:
         key=SceneKey("entity", ident), parent=None,
         face=Face(shape=FaceShape.RECT, width_su=30, height_su=15),
         scale_class="entity", art_mode=ArtMode.CONTINUOUS, ladder_key=None,
-        continuous_kind="entity", retention=SceneRetention.ENTITY, hostility_ordinal=0,
+        continuous_kind="entity", archetype_id=None, retention=SceneRetention.ENTITY, hostility_ordinal=0,
         threat_rank=0, region=_region(), flexible=False, occludes=True,
         label=f"Entity {ident}", destination=None,
     )
@@ -182,6 +182,43 @@ def test_continuous_planet_resolves_via_procedural_generator() -> None:
     painted = paint.painted[0]
     assert painted.scene_box.width > 0 and painted.scene_box.height > 0
     assert painted.art.plain.strip(" \n") != ""
+
+
+def test_continuous_planet_archetype_id_threads_through_to_render_cache_key() -> None:
+    """WP-SC07's noted gap: `scene_paint.py` previously always resolved a continuous
+    object with `archetype_id=None`. An owned planet's `PhysicalObject.archetype_id`
+    must now reach `_resolve_continuous`'s render (and thus its cache key), not be
+    hardcoded away."""
+
+    from dataclasses import replace
+
+    from edge.art.scene_paint import _resolve_continuous, RenderCache
+
+    unowned = _planet_object(1)
+    assert unowned.archetype_id is None
+    owned = replace(unowned, archetype_id="humanoid_diplomat")
+
+    cache = RenderCache()
+    _, unowned_key = _resolve_continuous(unowned, (20, 10), seed=1, cache=cache)
+    _, owned_key = _resolve_continuous(owned, (20, 10), seed=1, cache=cache)
+
+    assert unowned_key.archetype == ""
+    assert owned_key.archetype == "humanoid_diplomat"
+    assert unowned_key != owned_key
+    # Two distinct archetypes must render (never share a cache slot silently).
+    assert cache.renders == 2
+
+
+def test_owned_planet_renders_through_resolve_scene_with_its_archetype() -> None:
+    from dataclasses import replace
+
+    planet = replace(_planet_object(2), archetype_id="humanoid_diplomat")
+    objects = (planet,)
+    placements = (_placement(planet.key, 0, 0, 60),)
+    arrangement, plan = _solve(objects, placements)
+    paint = resolve_scene(plan, arrangement, CATALOG, TUNING)  # type: ignore[arg-type]
+    assert len(paint.painted) == 1
+    assert paint.painted[0].art.plain.strip(" \n") != ""
 
 
 def test_entity_kind_renders_as_a_discovery_subtype() -> None:

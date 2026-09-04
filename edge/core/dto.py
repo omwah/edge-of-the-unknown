@@ -429,6 +429,12 @@ class SectorPlanetDTO:
     # A gas giant's Cloud City (§4.2, PT-54): 0 ⇒ bare clouds. The scene paints the floating
     # city from the same fact the orbit view does, so both show one world.
     cloud_city_size: int = 0
+    # The owning alliance/species' palette, or None when the planet is unowned (§4.2).
+    # Mirrors `SectorPortDTO.archetype_id`'s "controlling species of the region" signal
+    # (`_controlling_archetype`, server/session.py) rather than inventing a new one — the
+    # core `Planet` model carries no `archetype_id` of its own, only `owner: Ownership`,
+    # so this is populated only when that ownership is real.
+    archetype_id: str | None = None
 
 
 @dataclass(frozen=True)
