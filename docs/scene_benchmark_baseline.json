@@ -7,13 +7,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 131.2466,
+      "cold_ms": 126.5634,
       "warm_ms": {
         "n": 4,
-        "median": 11.0937,
-        "p95": 13.4451,
-        "p99": 13.4451,
-        "max": 13.4451
+        "median": 10.197299999999998,
+        "p95": 10.6453,
+        "p99": 10.6453,
+        "max": 10.6453
       }
     },
     {
@@ -21,13 +21,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 189.7504,
+      "cold_ms": 185.5074,
       "warm_ms": {
         "n": 4,
-        "median": 13.85425,
-        "p95": 15.159,
-        "p99": 15.159,
-        "max": 15.159
+        "median": 13.122,
+        "p95": 13.2159,
+        "p99": 13.2159,
+        "max": 13.2159
       }
     },
     {
@@ -35,13 +35,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 319.6966,
+      "cold_ms": 311.2606,
       "warm_ms": {
         "n": 4,
-        "median": 20.2894,
-        "p95": 21.1911,
-        "p99": 21.1911,
-        "max": 21.1911
+        "median": 19.940150000000003,
+        "p95": 20.1358,
+        "p99": 20.1358,
+        "max": 20.1358
       }
     },
     {
@@ -49,13 +49,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 483.3244,
+      "cold_ms": 467.1912,
       "warm_ms": {
         "n": 4,
-        "median": 28.727,
-        "p95": 42.2339,
-        "p99": 42.2339,
-        "max": 42.2339
+        "median": 26.44895,
+        "p95": 27.2749,
+        "p99": 27.2749,
+        "max": 27.2749
       }
     },
     {
@@ -63,13 +63,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 140.4105,
+      "cold_ms": 125.3704,
       "warm_ms": {
         "n": 4,
-        "median": 9.9646,
-        "p95": 10.041,
-        "p99": 10.041,
-        "max": 10.041
+        "median": 9.731950000000001,
+        "p95": 9.9505,
+        "p99": 9.9505,
+        "max": 9.9505
       }
     },
     {
@@ -77,13 +77,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 187.7747,
+      "cold_ms": 186.6135,
       "warm_ms": {
         "n": 4,
-        "median": 12.61365,
-        "p95": 12.7769,
-        "p99": 12.7769,
-        "max": 12.7769
+        "median": 12.44105,
+        "p95": 12.9303,
+        "p99": 12.9303,
+        "max": 12.9303
       }
     },
     {
@@ -91,13 +91,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 322.6229,
+      "cold_ms": 309.0626,
       "warm_ms": {
         "n": 4,
-        "median": 21.5083,
-        "p95": 39.1553,
-        "p99": 39.1553,
-        "max": 39.1553
+        "median": 22.59395,
+        "p95": 41.6343,
+        "p99": 41.6343,
+        "max": 41.6343
       }
     },
     {
@@ -105,13 +105,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 464.6939,
+      "cold_ms": 449.1125,
       "warm_ms": {
         "n": 4,
-        "median": 27.90495,
-        "p95": 35.4614,
-        "p99": 35.4614,
-        "max": 35.4614
+        "median": 26.16675,
+        "p95": 30.7918,
+        "p99": 30.7918,
+        "max": 30.7918
       }
     },
     {
@@ -119,13 +119,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 133.8682,
+      "cold_ms": 133.8174,
       "warm_ms": {
         "n": 4,
-        "median": 11.33645,
-        "p95": 11.7653,
-        "p99": 11.7653,
-        "max": 11.7653
+        "median": 12.22405,
+        "p95": 15.7275,
+        "p99": 15.7275,
+        "max": 15.7275
       }
     },
     {
@@ -133,13 +133,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 193.0857,
+      "cold_ms": 184.2933,
       "warm_ms": {
         "n": 4,
-        "median": 13.95495,
-        "p95": 14.3929,
-        "p99": 14.3929,
-        "max": 14.3929
+        "median": 14.79675,
+        "p95": 16.7318,
+        "p99": 16.7318,
+        "max": 16.7318
       }
     },
     {
@@ -147,13 +147,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 315.0645,
+      "cold_ms": 309.2842,
       "warm_ms": {
         "n": 4,
-        "median": 19.7364,
-        "p95": 41.079,
-        "p99": 41.079,
-        "max": 41.079
+        "median": 21.0059,
+        "p95": 39.4632,
+        "p99": 39.4632,
+        "max": 39.4632
       }
     },
     {
@@ -161,13 +161,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 465.5551,
+      "cold_ms": 462.8538,
       "warm_ms": {
         "n": 4,
-        "median": 27.795,
-        "p95": 28.2013,
-        "p99": 28.2013,
-        "max": 28.2013
+        "median": 27.7915,
+        "p95": 28.4808,
+        "p99": 28.4808,
+        "max": 28.4808
       }
     },
     {
@@ -175,13 +175,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 133.0008,
+      "cold_ms": 130.9716,
       "warm_ms": {
         "n": 4,
-        "median": 12.65155,
-        "p95": 12.7558,
-        "p99": 12.7558,
-        "max": 12.7558
+        "median": 12.47625,
+        "p95": 12.8048,
+        "p99": 12.8048,
+        "max": 12.8048
       }
     },
     {
@@ -189,13 +189,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 193.6175,
+      "cold_ms": 188.9053,
       "warm_ms": {
         "n": 4,
-        "median": 13.9871,
-        "p95": 14.8482,
-        "p99": 14.8482,
-        "max": 14.8482
+        "median": 14.238199999999999,
+        "p95": 14.2516,
+        "p99": 14.2516,
+        "max": 14.2516
       }
     },
     {
@@ -203,13 +203,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 345.6178,
+      "cold_ms": 335.7142,
       "warm_ms": {
         "n": 4,
-        "median": 23.2085,
-        "p95": 24.3409,
-        "p99": 24.3409,
-        "max": 24.3409
+        "median": 20.766,
+        "p95": 22.9332,
+        "p99": 22.9332,
+        "max": 22.9332
       }
     },
     {
@@ -217,13 +217,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 487.6012,
+      "cold_ms": 455.8999,
       "warm_ms": {
         "n": 4,
-        "median": 27.43445,
-        "p95": 29.5094,
-        "p99": 29.5094,
-        "max": 29.5094
+        "median": 27.1411,
+        "p95": 27.3418,
+        "p99": 27.3418,
+        "max": 27.3418
       }
     },
     {
@@ -231,13 +231,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 167.7468,
+      "cold_ms": 164.6595,
       "warm_ms": {
         "n": 4,
-        "median": 20.497,
-        "p95": 43.8266,
-        "p99": 43.8266,
-        "max": 43.8266
+        "median": 19.90775,
+        "p95": 39.6278,
+        "p99": 39.6278,
+        "max": 39.6278
       }
     },
     {
@@ -245,13 +245,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 238.0375,
+      "cold_ms": 242.5326,
       "warm_ms": {
         "n": 4,
-        "median": 25.6286,
-        "p95": 26.0587,
-        "p99": 26.0587,
-        "max": 26.0587
+        "median": 26.926650000000002,
+        "p95": 29.96,
+        "p99": 29.96,
+        "max": 29.96
       }
     },
     {
@@ -259,13 +259,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 426.2252,
+      "cold_ms": 405.0287,
       "warm_ms": {
         "n": 4,
-        "median": 49.17415,
-        "p95": 70.5895,
-        "p99": 70.5895,
-        "max": 70.5895
+        "median": 50.3416,
+        "p95": 67.924,
+        "p99": 67.924,
+        "max": 67.924
       }
     },
     {
@@ -273,13 +273,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 592.8464,
+      "cold_ms": 581.0643,
       "warm_ms": {
         "n": 4,
-        "median": 76.36635000000001,
-        "p95": 85.2888,
-        "p99": 85.2888,
-        "max": 85.2888
+        "median": 72.5293,
+        "p95": 85.78,
+        "p99": 85.78,
+        "max": 85.78
       }
     },
     {
@@ -287,13 +287,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 143.0112,
+      "cold_ms": 140.1487,
       "warm_ms": {
         "n": 4,
-        "median": 21.63515,
-        "p95": 23.4411,
-        "p99": 23.4411,
-        "max": 23.4411
+        "median": 21.3926,
+        "p95": 21.5396,
+        "p99": 21.5396,
+        "max": 21.5396
       }
     },
     {
@@ -301,13 +301,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 208.6331,
+      "cold_ms": 199.1762,
       "warm_ms": {
         "n": 4,
-        "median": 28.96265,
-        "p95": 31.8602,
-        "p99": 31.8602,
-        "max": 31.8602
+        "median": 29.42485,
+        "p95": 30.8719,
+        "p99": 30.8719,
+        "max": 30.8719
       }
     },
     {
@@ -315,13 +315,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 373.0468,
+      "cold_ms": 365.8092,
       "warm_ms": {
         "n": 4,
-        "median": 51.57705,
-        "p95": 52.5548,
-        "p99": 52.5548,
-        "max": 52.5548
+        "median": 49.837999999999994,
+        "p95": 52.972,
+        "p99": 52.972,
+        "max": 52.972
       }
     },
     {
@@ -329,13 +329,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 540.9489,
+      "cold_ms": 525.8012,
       "warm_ms": {
         "n": 4,
-        "median": 66.22815,
-        "p95": 85.5465,
-        "p99": 85.5465,
-        "max": 85.5465
+        "median": 66.77995,
+        "p95": 86.0792,
+        "p99": 86.0792,
+        "max": 86.0792
       }
     },
     {
@@ -343,13 +343,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 144.309,
+      "cold_ms": 141.2846,
       "warm_ms": {
         "n": 4,
-        "median": 23.9876,
-        "p95": 24.6194,
-        "p99": 24.6194,
-        "max": 24.6194
+        "median": 23.65445,
+        "p95": 23.9927,
+        "p99": 23.9927,
+        "max": 23.9927
       }
     },
     {
@@ -357,13 +357,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 209.9316,
+      "cold_ms": 205.3299,
       "warm_ms": {
         "n": 4,
-        "median": 29.609299999999998,
-        "p95": 30.2673,
-        "p99": 30.2673,
-        "max": 30.2673
+        "median": 29.7795,
+        "p95": 29.9434,
+        "p99": 29.9434,
+        "max": 29.9434
       }
     },
     {
@@ -371,13 +371,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 399.5034,
+      "cold_ms": 367.6924,
       "warm_ms": {
         "n": 4,
-        "median": 51.07065,
-        "p95": 52.3259,
-        "p99": 52.3259,
-        "max": 52.3259
+        "median": 50.78985,
+        "p95": 56.2568,
+        "p99": 56.2568,
+        "max": 56.2568
       }
     },
     {
@@ -385,13 +385,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 533.9554,
+      "cold_ms": 517.8691,
       "warm_ms": {
         "n": 4,
-        "median": 66.8262,
-        "p95": 87.2733,
-        "p99": 87.2733,
-        "max": 87.2733
+        "median": 64.99494999999999,
+        "p95": 88.6331,
+        "p99": 88.6331,
+        "max": 88.6331
       }
     },
     {
@@ -399,13 +399,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 141.273,
+      "cold_ms": 136.8085,
       "warm_ms": {
         "n": 4,
-        "median": 21.6982,
-        "p95": 22.1029,
-        "p99": 22.1029,
-        "max": 22.1029
+        "median": 21.02355,
+        "p95": 21.5558,
+        "p99": 21.5558,
+        "max": 21.5558
       }
     },
     {
@@ -413,13 +413,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 211.0342,
+      "cold_ms": 198.3299,
       "warm_ms": {
         "n": 4,
-        "median": 30.77735,
-        "p95": 53.4515,
-        "p99": 53.4515,
-        "max": 53.4515
+        "median": 28.10055,
+        "p95": 49.792,
+        "p99": 49.792,
+        "max": 49.792
       }
     },
     {
@@ -427,13 +427,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 349.5276,
+      "cold_ms": 341.475,
       "warm_ms": {
         "n": 4,
-        "median": 57.092299999999994,
-        "p95": 73.9584,
-        "p99": 73.9584,
-        "max": 73.9584
+        "median": 49.876050000000006,
+        "p95": 72.5099,
+        "p99": 72.5099,
+        "max": 72.5099
       }
     },
     {
@@ -441,13 +441,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 524.6489,
+      "cold_ms": 495.7673,
       "warm_ms": {
         "n": 4,
-        "median": 68.6121,
-        "p95": 94.9734,
-        "p99": 94.9734,
-        "max": 94.9734
+        "median": 66.79060000000001,
+        "p95": 86.2472,
+        "p99": 86.2472,
+        "max": 86.2472
       }
     },
     {
@@ -455,13 +455,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 137.5281,
+      "cold_ms": 130.7336,
       "warm_ms": {
         "n": 4,
-        "median": 15.191600000000001,
-        "p95": 15.8616,
-        "p99": 15.8616,
-        "max": 15.8616
+        "median": 15.16665,
+        "p95": 15.4211,
+        "p99": 15.4211,
+        "max": 15.4211
       }
     },
     {
@@ -469,13 +469,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 205.2274,
+      "cold_ms": 198.9353,
       "warm_ms": {
         "n": 4,
-        "median": 21.0903,
-        "p95": 21.271,
-        "p99": 21.271,
-        "max": 21.271
+        "median": 20.884900000000002,
+        "p95": 20.9869,
+        "p99": 20.9869,
+        "max": 20.9869
       }
     },
     {
@@ -483,13 +483,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 349.0601,
+      "cold_ms": 336.1927,
       "warm_ms": {
         "n": 4,
-        "median": 36.08765,
-        "p95": 59.6313,
-        "p99": 59.6313,
-        "max": 59.6313
+        "median": 35.284800000000004,
+        "p95": 59.092,
+        "p99": 59.092,
+        "max": 59.092
       }
     },
     {
@@ -497,13 +497,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 506.2431,
+      "cold_ms": 482.2172,
       "warm_ms": {
         "n": 4,
-        "median": 47.59265,
-        "p95": 71.6447,
-        "p99": 71.6447,
-        "max": 71.6447
+        "median": 49.10815,
+        "p95": 69.9319,
+        "p99": 69.9319,
+        "max": 69.9319
       }
     },
     {
@@ -511,13 +511,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 134.405,
+      "cold_ms": 135.2561,
       "warm_ms": {
         "n": 4,
-        "median": 14.39795,
-        "p95": 14.5681,
-        "p99": 14.5681,
-        "max": 14.5681
+        "median": 14.793099999999999,
+        "p95": 14.8389,
+        "p99": 14.8389,
+        "max": 14.8389
       }
     },
     {
@@ -525,13 +525,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 201.2241,
+      "cold_ms": 193.3471,
       "warm_ms": {
         "n": 4,
-        "median": 21.92145,
-        "p95": 22.3257,
-        "p99": 22.3257,
-        "max": 22.3257
+        "median": 20.5212,
+        "p95": 20.8482,
+        "p99": 20.8482,
+        "max": 20.8482
       }
     },
     {
@@ -539,13 +539,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 336.5238,
+      "cold_ms": 328.0231,
       "warm_ms": {
         "n": 4,
-        "median": 33.31485,
-        "p95": 58.6107,
-        "p99": 58.6107,
-        "max": 58.6107
+        "median": 33.57525,
+        "p95": 66.6535,
+        "p99": 66.6535,
+        "max": 66.6535
       }
     },
     {
@@ -553,13 +553,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 491.7791,
+      "cold_ms": 475.7713,
       "warm_ms": {
         "n": 4,
-        "median": 43.1434,
-        "p95": 71.9008,
-        "p99": 71.9008,
-        "max": 71.9008
+        "median": 44.0432,
+        "p95": 65.4021,
+        "p99": 65.4021,
+        "max": 65.4021
       }
     },
     {
@@ -567,13 +567,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 987.3625,
+      "cold_ms": 946.7909,
       "warm_ms": {
         "n": 4,
-        "median": 22.762349999999998,
-        "p95": 22.8614,
-        "p99": 22.8614,
-        "max": 22.8614
+        "median": 23.187800000000003,
+        "p95": 23.3612,
+        "p99": 23.3612,
+        "max": 23.3612
       }
     },
     {
@@ -581,13 +581,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 1599.8493,
+      "cold_ms": 1523.9581,
       "warm_ms": {
         "n": 4,
-        "median": 34.3621,
-        "p95": 34.6547,
-        "p99": 34.6547,
-        "max": 34.6547
+        "median": 33.5022,
+        "p95": 36.232,
+        "p99": 36.232,
+        "max": 36.232
       }
     },
     {
@@ -595,13 +595,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 2755.3839,
+      "cold_ms": 2650.0465,
       "warm_ms": {
         "n": 4,
-        "median": 58.1636,
-        "p95": 85.1383,
-        "p99": 85.1383,
-        "max": 85.1383
+        "median": 56.75165,
+        "p95": 83.2307,
+        "p99": 83.2307,
+        "max": 83.2307
       }
     },
     {
@@ -609,13 +609,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 4066.3479,
+      "cold_ms": 3974.1699,
       "warm_ms": {
         "n": 4,
-        "median": 96.5735,
-        "p95": 109.2404,
-        "p99": 109.2404,
-        "max": 109.2404
+        "median": 98.3869,
+        "p95": 113.5167,
+        "p99": 113.5167,
+        "max": 113.5167
       }
     },
     {
@@ -623,13 +623,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 125.716,
+      "cold_ms": 125.7159,
       "warm_ms": {
         "n": 4,
-        "median": 10.1089,
-        "p95": 10.7369,
-        "p99": 10.7369,
-        "max": 10.7369
+        "median": 10.09965,
+        "p95": 10.1206,
+        "p99": 10.1206,
+        "max": 10.1206
       }
     },
     {
@@ -637,13 +637,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 191.6095,
+      "cold_ms": 193.7473,
       "warm_ms": {
         "n": 4,
-        "median": 15.3351,
-        "p95": 16.1822,
-        "p99": 16.1822,
-        "max": 16.1822
+        "median": 15.48795,
+        "p95": 15.8625,
+        "p99": 15.8625,
+        "max": 15.8625
       }
     },
     {
@@ -651,13 +651,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 323.9832,
+      "cold_ms": 323.7005,
       "warm_ms": {
         "n": 4,
-        "median": 25.39945,
-        "p95": 27.1989,
-        "p99": 27.1989,
-        "max": 27.1989
+        "median": 25.63215,
+        "p95": 25.8985,
+        "p99": 25.8985,
+        "max": 25.8985
       }
     },
     {
@@ -665,13 +665,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 477.4335,
+      "cold_ms": 467.5281,
       "warm_ms": {
         "n": 4,
-        "median": 33.92195,
-        "p95": 35.7617,
-        "p99": 35.7617,
-        "max": 35.7617
+        "median": 33.9511,
+        "p95": 36.0654,
+        "p99": 36.0654,
+        "max": 36.0654
       }
     },
     {
@@ -679,13 +679,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 133.5375,
+      "cold_ms": 132.8023,
       "warm_ms": {
         "n": 4,
-        "median": 16.4347,
-        "p95": 19.0189,
-        "p99": 19.0189,
-        "max": 19.0189
+        "median": 16.2496,
+        "p95": 16.32,
+        "p99": 16.32,
+        "max": 16.32
       }
     },
     {
@@ -693,13 +693,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 230.1623,
+      "cold_ms": 225.7078,
       "warm_ms": {
         "n": 4,
-        "median": 23.6817,
-        "p95": 23.8034,
-        "p99": 23.8034,
-        "max": 23.8034
+        "median": 23.7569,
+        "p95": 26.3965,
+        "p99": 26.3965,
+        "max": 26.3965
       }
     },
     {
@@ -707,13 +707,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 347.6317,
+      "cold_ms": 334.6223,
       "warm_ms": {
         "n": 4,
-        "median": 39.07955,
-        "p95": 39.9443,
-        "p99": 39.9443,
-        "max": 39.9443
+        "median": 38.8507,
+        "p95": 42.9373,
+        "p99": 42.9373,
+        "max": 42.9373
       }
     },
     {
@@ -721,13 +721,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 511.3132,
+      "cold_ms": 508.817,
       "warm_ms": {
         "n": 4,
-        "median": 48.564099999999996,
-        "p95": 74.6688,
-        "p99": 74.6688,
-        "max": 74.6688
+        "median": 50.73915,
+        "p95": 82.4519,
+        "p99": 82.4519,
+        "max": 82.4519
       }
     },
     {
@@ -735,13 +735,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 195.4688,
+      "cold_ms": 196.1625,
       "warm_ms": {
         "n": 4,
-        "median": 21.364800000000002,
-        "p95": 21.5045,
-        "p99": 21.5045,
-        "max": 21.5045
+        "median": 22.01755,
+        "p95": 24.2317,
+        "p99": 24.2317,
+        "max": 24.2317
       }
     },
     {
@@ -749,13 +749,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 297.4292,
+      "cold_ms": 301.2606,
       "warm_ms": {
         "n": 4,
-        "median": 30.42905,
-        "p95": 31.7586,
-        "p99": 31.7586,
-        "max": 31.7586
+        "median": 31.3574,
+        "p95": 31.5236,
+        "p99": 31.5236,
+        "max": 31.5236
       }
     },
     {
@@ -763,13 +763,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 510.42,
+      "cold_ms": 513.2553,
       "warm_ms": {
         "n": 4,
-        "median": 51.23655,
-        "p95": 77.8031,
-        "p99": 77.8031,
-        "max": 77.8031
+        "median": 51.86215,
+        "p95": 81.52,
+        "p99": 81.52,
+        "max": 81.52
       }
     },
     {
@@ -777,13 +777,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 741.881,
+      "cold_ms": 732.1687,
       "warm_ms": {
         "n": 4,
-        "median": 70.3134,
-        "p95": 98.9063,
-        "p99": 98.9063,
-        "max": 98.9063
+        "median": 71.02629999999999,
+        "p95": 99.6953,
+        "p99": 99.6953,
+        "max": 99.6953
       }
     },
     {
@@ -791,13 +791,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 171.4538,
+      "cold_ms": 163.0334,
       "warm_ms": {
         "n": 4,
-        "median": 23.12265,
-        "p95": 23.2574,
-        "p99": 23.2574,
-        "max": 23.2574
+        "median": 23.9754,
+        "p95": 25.1307,
+        "p99": 25.1307,
+        "max": 25.1307
       }
     },
     {
@@ -805,13 +805,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 211.3208,
+      "cold_ms": 206.4662,
       "warm_ms": {
         "n": 4,
-        "median": 33.893950000000004,
-        "p95": 33.9724,
-        "p99": 33.9724,
-        "max": 33.9724
+        "median": 33.85505,
+        "p95": 35.7143,
+        "p99": 35.7143,
+        "max": 35.7143
       }
     },
     {
@@ -819,13 +819,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 353.2562,
+      "cold_ms": 354.1377,
       "warm_ms": {
         "n": 4,
-        "median": 53.3741,
-        "p95": 80.1072,
-        "p99": 80.1072,
-        "max": 80.1072
+        "median": 53.89045,
+        "p95": 79.8643,
+        "p99": 79.8643,
+        "max": 79.8643
       }
     },
     {
@@ -833,13 +833,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 504.017,
+      "cold_ms": 506.5881,
       "warm_ms": {
         "n": 4,
-        "median": 68.09185,
-        "p95": 94.0624,
-        "p99": 94.0624,
-        "max": 94.0624
+        "median": 70.2191,
+        "p95": 95.3899,
+        "p99": 95.3899,
+        "max": 95.3899
       }
     },
     {
@@ -847,13 +847,13 @@
       "size": "standard 67x30",
       "width": 67,
       "height": 30,
-      "cold_ms": 122.5993,
+      "cold_ms": 120.2342,
       "warm_ms": {
         "n": 4,
-        "median": 9.97675,
-        "p95": 12.0439,
-        "p99": 12.0439,
-        "max": 12.0439
+        "median": 9.819600000000001,
+        "p95": 10.0796,
+        "p99": 10.0796,
+        "max": 10.0796
       }
     },
     {
@@ -861,13 +861,13 @@
       "size": "wide 87x36",
       "width": 87,
       "height": 36,
-      "cold_ms": 186.8929,
+      "cold_ms": 193.8152,
       "warm_ms": {
         "n": 4,
-        "median": 13.449300000000001,
-        "p95": 16.6978,
-        "p99": 16.6978,
-        "max": 16.6978
+        "median": 14.1441,
+        "p95": 17.4049,
+        "p99": 17.4049,
+        "max": 17.4049
       }
     },
     {
@@ -875,13 +875,13 @@
       "size": "large 120x44",
       "width": 120,
       "height": 44,
-      "cold_ms": 315.0138,
+      "cold_ms": 308.0988,
       "warm_ms": {
         "n": 4,
-        "median": 21.2286,
-        "p95": 48.0782,
-        "p99": 48.0782,
-        "max": 48.0782
+        "median": 21.898400000000002,
+        "p95": 48.409,
+        "p99": 48.409,
+        "max": 48.409
       }
     },
     {
@@ -889,13 +889,13 @@
       "size": "huge 150x52",
       "width": 150,
       "height": 52,
-      "cold_ms": 473.3503,
+      "cold_ms": 453.6792,
       "warm_ms": {
         "n": 4,
-        "median": 26.11945,
-        "p95": 29.7556,
-        "p99": 29.7556,
-        "max": 29.7556
+        "median": 26.5656,
+        "p95": 26.6696,
+        "p99": 26.6696,
+        "max": 26.6696
       }
     }
   ],
@@ -931,27 +931,27 @@
       "max": 0
     },
     "multiplayer_stress": {
-      "1_ships_classify_ms": 0.1166,
-      "5_ships_classify_ms": 0.1158,
-      "20_ships_classify_ms": 0.2701,
+      "1_ships_classify_ms": 0.1037,
+      "5_ships_classify_ms": 0.1097,
+      "20_ships_classify_ms": 0.2695,
       "50_ships_classify_ms": 0.6489
     }
   },
   "replacement": {
     "classify_ms": {
       "n": 16,
-      "median": 0.0727,
-      "p95": 0.0756,
-      "p99": 0.1174,
-      "max": 0.1174
+      "median": 0.07165,
+      "p95": 0.0833,
+      "p99": 0.1234,
+      "max": 0.1234
     },
     "strategies": [
       {
         "strategy": "fixed_fov_perspective",
         "case": "empty+ships",
         "size": "standard 67x30",
-        "frame_ms": 0.0786,
-        "candidates_ms": 0.2711,
+        "frame_ms": 0.0793,
+        "candidates_ms": 0.2758,
         "candidate_count": 64,
         "distinct_quantised_scene_count": 64,
         "deterministic_ordering": true
@@ -961,57 +961,17 @@
         "case": "empty+ships",
         "size": "standard 67x30",
         "frame_ms": 0.073,
-        "candidates_ms": 0.1327,
+        "candidates_ms": 0.1346,
         "candidate_count": 40,
-        "distinct_quantised_scene_count": 15,
+        "distinct_quantised_scene_count": 39,
         "deterministic_ordering": true
       },
       {
         "strategy": "fixed_fov_perspective",
         "case": "empty+ships",
         "size": "wide 87x36",
-        "frame_ms": 0.029,
-        "candidates_ms": 0.2378,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 59,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "empty+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0586,
-        "candidates_ms": 0.1274,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 15,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "empty+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0257,
-        "candidates_ms": 0.2526,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 59,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "empty+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0585,
-        "candidates_ms": 0.1285,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 16,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "empty+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0258,
-        "candidates_ms": 0.2451,
+        "frame_ms": 0.0287,
+        "candidates_ms": 0.2381,
         "candidate_count": 64,
         "distinct_quantised_scene_count": 64,
         "deterministic_ordering": true
@@ -1019,1211 +979,1251 @@
       {
         "strategy": "depth_layered_anchor",
         "case": "empty+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0604,
-        "candidates_ms": 0.1279,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 16,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0387,
-        "candidates_ms": 0.2377,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 7,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0565,
-        "candidates_ms": 0.1281,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "port+ships",
         "size": "wide 87x36",
-        "frame_ms": 0.0251,
-        "candidates_ms": 0.2481,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 14,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0706,
-        "candidates_ms": 0.1298,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0265,
-        "candidates_ms": 0.2405,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 9,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0567,
-        "candidates_ms": 0.1278,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0263,
-        "candidates_ms": 0.2351,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 13,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0569,
-        "candidates_ms": 0.1283,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "stardock+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0372,
-        "candidates_ms": 0.2851,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 7,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "stardock+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0575,
-        "candidates_ms": 0.1286,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "stardock+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0298,
-        "candidates_ms": 0.2377,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 14,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "stardock+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0576,
-        "candidates_ms": 0.1277,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "stardock+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0286,
-        "candidates_ms": 0.2369,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 9,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "stardock+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0568,
-        "candidates_ms": 0.1282,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "stardock+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0252,
-        "candidates_ms": 0.2555,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 13,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "stardock+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0601,
-        "candidates_ms": 0.1288,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "starbase+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0384,
-        "candidates_ms": 0.255,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 44,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "starbase+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0714,
-        "candidates_ms": 0.1296,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 11,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "starbase+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0279,
-        "candidates_ms": 0.2457,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 44,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "starbase+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0572,
-        "candidates_ms": 0.1283,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 11,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "starbase+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0277,
-        "candidates_ms": 0.2392,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 49,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "starbase+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0575,
-        "candidates_ms": 0.1269,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 10,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "starbase+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0256,
-        "candidates_ms": 0.2548,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 58,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "starbase+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0582,
-        "candidates_ms": 0.1414,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 10,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0313,
-        "candidates_ms": 0.2458,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 30,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0567,
+        "frame_ms": 0.0581,
         "candidates_ms": 0.1287,
         "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
+        "distinct_quantised_scene_count": 39,
         "deterministic_ordering": true
       },
       {
         "strategy": "fixed_fov_perspective",
-        "case": "planet+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.02,
-        "candidates_ms": 0.2354,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 33,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0503,
-        "candidates_ms": 0.1283,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+ships",
+        "case": "empty+ships",
         "size": "large 120x44",
-        "frame_ms": 0.0182,
-        "candidates_ms": 0.25,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 36,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0615,
-        "candidates_ms": 0.1291,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0195,
-        "candidates_ms": 0.2419,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 43,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0538,
-        "candidates_ms": 0.1281,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0227,
-        "candidates_ms": 0.2377,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 30,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0501,
-        "candidates_ms": 0.1285,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0179,
-        "candidates_ms": 0.2507,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 33,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0543,
-        "candidates_ms": 0.1297,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0198,
-        "candidates_ms": 0.2414,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 36,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0488,
-        "candidates_ms": 0.1278,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0185,
-        "candidates_ms": 0.2365,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 43,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0493,
-        "candidates_ms": 0.1279,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+stardock+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0208,
-        "candidates_ms": 0.2534,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 30,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+stardock+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0506,
-        "candidates_ms": 0.1307,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+stardock+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.024,
-        "candidates_ms": 0.2355,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 33,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+stardock+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0491,
-        "candidates_ms": 0.128,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+stardock+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0205,
-        "candidates_ms": 0.334,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 36,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+stardock+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.1662,
-        "candidates_ms": 0.2913,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+stardock+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0212,
-        "candidates_ms": 0.2531,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 43,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+stardock+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0492,
-        "candidates_ms": 0.1414,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+starbase+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0219,
-        "candidates_ms": 0.2433,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 30,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+starbase+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0511,
-        "candidates_ms": 0.1273,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+starbase+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0189,
-        "candidates_ms": 0.2361,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 33,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+starbase+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0487,
-        "candidates_ms": 0.128,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+starbase+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0179,
-        "candidates_ms": 0.2635,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 36,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+starbase+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0635,
-        "candidates_ms": 0.1292,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+starbase+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0198,
-        "candidates_ms": 0.2431,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 43,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+starbase+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0535,
-        "candidates_ms": 0.1286,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "wormhole+port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0287,
+        "frame_ms": 0.04,
         "candidates_ms": 0.2385,
         "candidate_count": 64,
-        "distinct_quantised_scene_count": 49,
+        "distinct_quantised_scene_count": 64,
         "deterministic_ordering": true
       },
       {
         "strategy": "depth_layered_anchor",
-        "case": "wormhole+port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0492,
-        "candidates_ms": 0.1281,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 4,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "wormhole+port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0184,
-        "candidates_ms": 0.2518,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 46,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "wormhole+port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0503,
-        "candidates_ms": 0.1292,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 4,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "wormhole+port+ships",
+        "case": "empty+ships",
         "size": "large 120x44",
-        "frame_ms": 0.0193,
-        "candidates_ms": 0.2406,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 52,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "wormhole+port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0495,
-        "candidates_ms": 0.1283,
+        "frame_ms": 0.057,
+        "candidates_ms": 0.1285,
         "candidate_count": 40,
-        "distinct_quantised_scene_count": 6,
+        "distinct_quantised_scene_count": 40,
         "deterministic_ordering": true
       },
       {
         "strategy": "fixed_fov_perspective",
-        "case": "wormhole+port+ships",
+        "case": "empty+ships",
         "size": "huge 150x52",
-        "frame_ms": 0.0182,
-        "candidates_ms": 0.2365,
+        "frame_ms": 0.026,
+        "candidates_ms": 0.2378,
         "candidate_count": 64,
-        "distinct_quantised_scene_count": 54,
+        "distinct_quantised_scene_count": 64,
         "deterministic_ordering": true
       },
       {
         "strategy": "depth_layered_anchor",
-        "case": "wormhole+port+ships",
+        "case": "empty+ships",
         "size": "huge 150x52",
-        "frame_ms": 0.0488,
-        "candidates_ms": 0.1283,
+        "frame_ms": 0.0571,
+        "candidates_ms": 0.1286,
         "candidate_count": 40,
-        "distinct_quantised_scene_count": 6,
+        "distinct_quantised_scene_count": 40,
         "deterministic_ordering": true
       },
       {
         "strategy": "fixed_fov_perspective",
-        "case": "blackhole+port+ships",
+        "case": "port+ships",
         "size": "standard 67x30",
+        "frame_ms": 0.0388,
+        "candidates_ms": 0.241,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0562,
+        "candidates_ms": 0.1301,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0249,
+        "candidates_ms": 0.2596,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0949,
+        "candidates_ms": 0.1322,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0272,
+        "candidates_ms": 0.239,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0581,
+        "candidates_ms": 0.131,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0273,
+        "candidates_ms": 0.2391,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0554,
+        "candidates_ms": 0.1318,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "stardock+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.037,
+        "candidates_ms": 0.2623,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "stardock+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0558,
+        "candidates_ms": 0.1482,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "stardock+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0266,
+        "candidates_ms": 0.2395,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "stardock+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0563,
+        "candidates_ms": 0.1327,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "stardock+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0257,
+        "candidates_ms": 0.2395,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "stardock+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0544,
+        "candidates_ms": 0.1298,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "stardock+ships",
+        "size": "huge 150x52",
         "frame_ms": 0.0262,
-        "candidates_ms": 0.2586,
+        "candidates_ms": 0.2392,
         "candidate_count": 64,
-        "distinct_quantised_scene_count": 49,
+        "distinct_quantised_scene_count": 64,
         "deterministic_ordering": true
       },
       {
         "strategy": "depth_layered_anchor",
-        "case": "blackhole+port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0508,
-        "candidates_ms": 0.1302,
+        "case": "stardock+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0548,
+        "candidates_ms": 0.1301,
         "candidate_count": 40,
-        "distinct_quantised_scene_count": 4,
+        "distinct_quantised_scene_count": 39,
         "deterministic_ordering": true
       },
       {
         "strategy": "fixed_fov_perspective",
-        "case": "blackhole+port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0408,
-        "candidates_ms": 0.251,
+        "case": "starbase+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0374,
+        "candidates_ms": 0.2618,
         "candidate_count": 64,
-        "distinct_quantised_scene_count": 46,
+        "distinct_quantised_scene_count": 64,
         "deterministic_ordering": true
       },
       {
         "strategy": "depth_layered_anchor",
-        "case": "blackhole+port+ships",
+        "case": "starbase+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0566,
+        "candidates_ms": 0.1465,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "starbase+ships",
         "size": "wide 87x36",
-        "frame_ms": 0.0495,
+        "frame_ms": 0.0287,
+        "candidates_ms": 0.238,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "starbase+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0578,
         "candidates_ms": 0.1291,
         "candidate_count": 40,
-        "distinct_quantised_scene_count": 4,
+        "distinct_quantised_scene_count": 40,
         "deterministic_ordering": true
       },
       {
         "strategy": "fixed_fov_perspective",
-        "case": "blackhole+port+ships",
+        "case": "starbase+ships",
         "size": "large 120x44",
-        "frame_ms": 0.0203,
-        "candidates_ms": 0.2429,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 52,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "blackhole+port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0513,
-        "candidates_ms": 0.146,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 6,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "blackhole+port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0205,
-        "candidates_ms": 0.2495,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 54,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "blackhole+port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0512,
-        "candidates_ms": 0.1377,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 6,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "nebula+port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0282,
-        "candidates_ms": 0.2458,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 49,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "nebula+port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0509,
-        "candidates_ms": 0.132,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 4,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "nebula+port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0218,
-        "candidates_ms": 0.2453,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 46,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "nebula+port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0519,
-        "candidates_ms": 0.1378,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 4,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "nebula+port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0205,
-        "candidates_ms": 0.2433,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 52,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "nebula+port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0509,
-        "candidates_ms": 0.132,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 6,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "nebula+port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0185,
-        "candidates_ms": 0.2585,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 54,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "nebula+port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0539,
-        "candidates_ms": 0.1341,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 6,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "wreck+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0308,
-        "candidates_ms": 0.2519,
+        "frame_ms": 0.0269,
+        "candidates_ms": 0.2378,
         "candidate_count": 64,
         "distinct_quantised_scene_count": 64,
         "deterministic_ordering": true
       },
       {
         "strategy": "depth_layered_anchor",
-        "case": "wreck+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0578,
-        "candidates_ms": 0.1343,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 15,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "wreck+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0268,
-        "candidates_ms": 0.2632,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 59,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "wreck+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0691,
-        "candidates_ms": 0.1356,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 15,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "wreck+ships",
+        "case": "starbase+ships",
         "size": "large 120x44",
-        "frame_ms": 0.0277,
-        "candidates_ms": 0.2554,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 59,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "wreck+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0584,
-        "candidates_ms": 0.1342,
+        "frame_ms": 0.0557,
+        "candidates_ms": 0.129,
         "candidate_count": 40,
-        "distinct_quantised_scene_count": 16,
+        "distinct_quantised_scene_count": 39,
         "deterministic_ordering": true
       },
       {
         "strategy": "fixed_fov_perspective",
-        "case": "wreck+ships",
+        "case": "starbase+ships",
         "size": "huge 150x52",
-        "frame_ms": 0.0265,
-        "candidates_ms": 0.2513,
+        "frame_ms": 0.0248,
+        "candidates_ms": 0.2386,
         "candidate_count": 64,
         "distinct_quantised_scene_count": 64,
         "deterministic_ordering": true
       },
       {
         "strategy": "depth_layered_anchor",
-        "case": "wreck+ships",
+        "case": "starbase+ships",
         "size": "huge 150x52",
-        "frame_ms": 0.0577,
-        "candidates_ms": 0.1481,
+        "frame_ms": 0.0554,
+        "candidates_ms": 0.1285,
         "candidate_count": 40,
-        "distinct_quantised_scene_count": 16,
+        "distinct_quantised_scene_count": 39,
         "deterministic_ordering": true
       },
       {
         "strategy": "fixed_fov_perspective",
-        "case": "wormhole+starbase+ships",
+        "case": "planet+ships",
         "size": "standard 67x30",
-        "frame_ms": 0.0229,
-        "candidates_ms": 0.2512,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 49,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "wormhole+starbase+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0514,
-        "candidates_ms": 0.1321,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 4,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "wormhole+starbase+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0192,
-        "candidates_ms": 0.2441,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 46,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "wormhole+starbase+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0508,
-        "candidates_ms": 0.132,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 4,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "wormhole+starbase+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0202,
-        "candidates_ms": 0.2473,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 52,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "wormhole+starbase+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0512,
-        "candidates_ms": 0.1368,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 6,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "wormhole+starbase+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0201,
-        "candidates_ms": 0.2433,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 54,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "wormhole+starbase+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0507,
-        "candidates_ms": 0.132,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 6,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "belt+port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0275,
-        "candidates_ms": 0.2645,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 64,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "belt+port+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0512,
-        "candidates_ms": 0.1333,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 19,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "belt+port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0207,
-        "candidates_ms": 0.2461,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 64,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "belt+port+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0497,
-        "candidates_ms": 0.1316,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 19,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "belt+port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0189,
-        "candidates_ms": 0.2583,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 64,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "belt+port+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0491,
-        "candidates_ms": 0.1461,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 19,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "belt+port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0194,
-        "candidates_ms": 0.2486,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 64,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "belt+port+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.0546,
-        "candidates_ms": 0.1322,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 19,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+port+wreck+traffic",
-        "size": "standard 67x30",
-        "frame_ms": 0.0233,
-        "candidates_ms": 0.2455,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 30,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+port+wreck+traffic",
-        "size": "standard 67x30",
-        "frame_ms": 0.0504,
-        "candidates_ms": 0.1325,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+port+wreck+traffic",
-        "size": "wide 87x36",
-        "frame_ms": 0.0202,
-        "candidates_ms": 0.2487,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 33,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+port+wreck+traffic",
-        "size": "wide 87x36",
-        "frame_ms": 0.052,
-        "candidates_ms": 0.1376,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 1,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+port+wreck+traffic",
-        "size": "large 120x44",
-        "frame_ms": 0.0205,
-        "candidates_ms": 0.244,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 36,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+port+wreck+traffic",
-        "size": "large 120x44",
-        "frame_ms": 0.0504,
-        "candidates_ms": 0.1324,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "planet+port+wreck+traffic",
-        "size": "huge 150x52",
-        "frame_ms": 0.0185,
-        "candidates_ms": 0.259,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 43,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "planet+port+wreck+traffic",
-        "size": "huge 150x52",
-        "frame_ms": 0.0511,
-        "candidates_ms": 0.133,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 2,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "derelict-base+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0309,
-        "candidates_ms": 0.246,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 44,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "derelict-base+ships",
-        "size": "standard 67x30",
-        "frame_ms": 0.0593,
-        "candidates_ms": 0.1322,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 11,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "derelict-base+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0271,
-        "candidates_ms": 0.3251,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 44,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "derelict-base+ships",
-        "size": "wide 87x36",
-        "frame_ms": 0.0605,
-        "candidates_ms": 0.138,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 11,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "derelict-base+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0286,
-        "candidates_ms": 0.2466,
-        "candidate_count": 64,
-        "distinct_quantised_scene_count": 49,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "depth_layered_anchor",
-        "case": "derelict-base+ships",
-        "size": "large 120x44",
-        "frame_ms": 0.0592,
-        "candidates_ms": 0.1319,
-        "candidate_count": 40,
-        "distinct_quantised_scene_count": 10,
-        "deterministic_ordering": true
-      },
-      {
-        "strategy": "fixed_fov_perspective",
-        "case": "derelict-base+ships",
-        "size": "huge 150x52",
-        "frame_ms": 0.027,
+        "frame_ms": 0.0289,
         "candidates_ms": 0.2625,
         "candidate_count": 64,
-        "distinct_quantised_scene_count": 58,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.1006,
+        "candidates_ms": 0.1312,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0205,
+        "candidates_ms": 0.2354,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0475,
+        "candidates_ms": 0.132,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0183,
+        "candidates_ms": 0.2916,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0475,
+        "candidates_ms": 0.1464,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0198,
+        "candidates_ms": 0.2373,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0479,
+        "candidates_ms": 0.1305,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0221,
+        "candidates_ms": 0.2388,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0485,
+        "candidates_ms": 0.1293,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.02,
+        "candidates_ms": 0.2358,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0486,
+        "candidates_ms": 0.1296,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0179,
+        "candidates_ms": 0.2568,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0478,
+        "candidates_ms": 0.1339,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.018,
+        "candidates_ms": 0.2414,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.061,
+        "candidates_ms": 0.1319,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+stardock+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0225,
+        "candidates_ms": 0.2417,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+stardock+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0484,
+        "candidates_ms": 0.1296,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+stardock+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0194,
+        "candidates_ms": 0.2366,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+stardock+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0474,
+        "candidates_ms": 0.1319,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+stardock+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0178,
+        "candidates_ms": 0.2421,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+stardock+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0485,
+        "candidates_ms": 0.13,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+stardock+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0177,
+        "candidates_ms": 0.2557,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+stardock+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0738,
+        "candidates_ms": 0.1313,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+starbase+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0223,
+        "candidates_ms": 0.238,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+starbase+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0494,
+        "candidates_ms": 0.1292,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+starbase+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0204,
+        "candidates_ms": 0.2356,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+starbase+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0479,
+        "candidates_ms": 0.1295,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+starbase+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0399,
+        "candidates_ms": 0.3361,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+starbase+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0492,
+        "candidates_ms": 0.1294,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+starbase+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0181,
+        "candidates_ms": 0.2362,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+starbase+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0478,
+        "candidates_ms": 0.1288,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wormhole+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.031,
+        "candidates_ms": 0.241,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wormhole+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0505,
+        "candidates_ms": 0.1292,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wormhole+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0202,
+        "candidates_ms": 0.2363,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wormhole+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.048,
+        "candidates_ms": 0.1287,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wormhole+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0183,
+        "candidates_ms": 0.2361,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wormhole+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0479,
+        "candidates_ms": 0.1287,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wormhole+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0176,
+        "candidates_ms": 0.2575,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wormhole+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0479,
+        "candidates_ms": 0.1454,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "blackhole+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0278,
+        "candidates_ms": 0.2414,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "blackhole+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0495,
+        "candidates_ms": 0.1296,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "blackhole+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0522,
+        "candidates_ms": 0.2621,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "blackhole+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0504,
+        "candidates_ms": 0.1299,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "blackhole+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0219,
+        "candidates_ms": 0.239,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "blackhole+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0488,
+        "candidates_ms": 0.217,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "blackhole+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0214,
+        "candidates_ms": 0.2387,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "blackhole+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0484,
+        "candidates_ms": 0.1294,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "nebula+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0263,
+        "candidates_ms": 0.293,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "nebula+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0489,
+        "candidates_ms": 0.1821,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "nebula+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0196,
+        "candidates_ms": 0.2377,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "nebula+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0474,
+        "candidates_ms": 0.1283,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "nebula+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0192,
+        "candidates_ms": 0.2358,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "nebula+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0482,
+        "candidates_ms": 0.128,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "nebula+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0177,
+        "candidates_ms": 0.2557,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "nebula+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.047,
+        "candidates_ms": 0.1437,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wreck+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0316,
+        "candidates_ms": 0.238,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wreck+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0569,
+        "candidates_ms": 0.1286,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wreck+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.027,
+        "candidates_ms": 0.2375,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wreck+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0551,
+        "candidates_ms": 0.1302,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wreck+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0286,
+        "candidates_ms": 0.2364,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wreck+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0544,
+        "candidates_ms": 0.1278,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wreck+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0245,
+        "candidates_ms": 0.2578,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wreck+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0597,
+        "candidates_ms": 0.1444,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wormhole+starbase+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0224,
+        "candidates_ms": 0.2403,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wormhole+starbase+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0488,
+        "candidates_ms": 0.1292,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wormhole+starbase+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0194,
+        "candidates_ms": 0.2369,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wormhole+starbase+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0482,
+        "candidates_ms": 0.1285,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wormhole+starbase+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0181,
+        "candidates_ms": 0.2371,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wormhole+starbase+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0479,
+        "candidates_ms": 0.1285,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "wormhole+starbase+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0177,
+        "candidates_ms": 0.2564,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "wormhole+starbase+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0478,
+        "candidates_ms": 0.147,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "belt+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0276,
+        "candidates_ms": 0.2398,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "belt+port+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0502,
+        "candidates_ms": 0.1288,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "belt+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0203,
+        "candidates_ms": 0.2372,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "belt+port+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0474,
+        "candidates_ms": 0.1285,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "belt+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0176,
+        "candidates_ms": 0.2379,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "belt+port+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0474,
+        "candidates_ms": 0.1289,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "belt+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0177,
+        "candidates_ms": 0.2564,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "belt+port+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0501,
+        "candidates_ms": 0.1951,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+port+wreck+traffic",
+        "size": "standard 67x30",
+        "frame_ms": 0.0231,
+        "candidates_ms": 0.3089,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+port+wreck+traffic",
+        "size": "standard 67x30",
+        "frame_ms": 0.0494,
+        "candidates_ms": 0.1349,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+port+wreck+traffic",
+        "size": "wide 87x36",
+        "frame_ms": 0.0318,
+        "candidates_ms": 0.238,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+port+wreck+traffic",
+        "size": "wide 87x36",
+        "frame_ms": 0.0509,
+        "candidates_ms": 0.1305,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+port+wreck+traffic",
+        "size": "large 120x44",
+        "frame_ms": 0.0198,
+        "candidates_ms": 0.2366,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+port+wreck+traffic",
+        "size": "large 120x44",
+        "frame_ms": 0.0492,
+        "candidates_ms": 0.1299,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "planet+port+wreck+traffic",
+        "size": "huge 150x52",
+        "frame_ms": 0.0184,
+        "candidates_ms": 0.2354,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "planet+port+wreck+traffic",
+        "size": "huge 150x52",
+        "frame_ms": 0.048,
+        "candidates_ms": 0.1292,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "derelict-base+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0286,
+        "candidates_ms": 0.2642,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "derelict-base+ships",
+        "size": "standard 67x30",
+        "frame_ms": 0.0781,
+        "candidates_ms": 0.1308,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "derelict-base+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0279,
+        "candidates_ms": 0.2385,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "derelict-base+ships",
+        "size": "wide 87x36",
+        "frame_ms": 0.0592,
+        "candidates_ms": 0.1293,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 40,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "derelict-base+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0275,
+        "candidates_ms": 0.2403,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "depth_layered_anchor",
+        "case": "derelict-base+ships",
+        "size": "large 120x44",
+        "frame_ms": 0.0588,
+        "candidates_ms": 0.129,
+        "candidate_count": 40,
+        "distinct_quantised_scene_count": 39,
+        "deterministic_ordering": true
+      },
+      {
+        "strategy": "fixed_fov_perspective",
+        "case": "derelict-base+ships",
+        "size": "huge 150x52",
+        "frame_ms": 0.0268,
+        "candidates_ms": 0.24,
+        "candidate_count": 64,
+        "distinct_quantised_scene_count": 64,
         "deterministic_ordering": true
       },
       {
         "strategy": "depth_layered_anchor",
         "case": "derelict-base+ships",
         "size": "huge 150x52",
-        "frame_ms": 0.0724,
-        "candidates_ms": 0.1335,
+        "frame_ms": 0.0575,
+        "candidates_ms": 0.1287,
         "candidate_count": 40,
-        "distinct_quantised_scene_count": 10,
+        "distinct_quantised_scene_count": 39,
         "deterministic_ordering": true
       }
     ],
