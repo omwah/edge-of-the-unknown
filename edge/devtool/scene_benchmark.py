@@ -291,6 +291,19 @@ def _benchmark_tuning() -> SceneTuning:
         aim_offsets_su=(0, -2, 2, -4, 4), max_camera_candidates=64,
         hysteresis_weight_camera=1, hysteresis_weight_position=1,
         hysteresis_weight_admission=4, hysteresis_weight_art=1,
+        # WP-SC06 solver bounds -- not calibrated, see docstring above.
+        max_passes=24, edge_margin=1,
+        min_projected_cells_by_scale_class={
+            "entity": (4, 2), "anchor": (6, 3), "belt": (6, 2),
+            "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
+        },
+        separation_margin=1,
+        min_visible_fraction_by_scale_class={
+            "entity": Fraction(1, 1), "anchor": Fraction(1, 1), "belt": Fraction(1, 1),
+            "orbital": Fraction(3, 4), "ship": Fraction(3, 4), "wreck": Fraction(3, 4),
+        },
+        cost_budget=250, emergency_ship_ceiling=40,
+        max_reposition_candidates=16, max_glyph_tries=20, glyph_spacing=2,
     )
 
 
