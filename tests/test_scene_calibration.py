@@ -215,9 +215,17 @@ def test_run_calibration_end_to_end_and_json_roundtrip(tmp_path: Path) -> None:
 
 
 def test_calibration_tool_never_touches_shipped_config() -> None:
-    """The whole point of this tool: `config/default.yaml` must not gain a
-    `scene:` key from running it. This asserts the shipped file is unchanged
-    around its `scene:` block after a full calibration run."""
+    """The whole point of this tool: it must not write to `config/default.yaml`
+    itself. This asserts the shipped file is byte-identical before/after a
+    full calibration run.
+
+    WP-SC05's calibration gate has since been closed by a *human* review and a
+    separate, human-authored commit landing the approved values under
+    `scene: -> physical_model:` (`docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`
+    §5) — so those WP-SC05 tuning key names are now expected to appear in the
+    shipped file; what this test still guards is that *this tool* never
+    performs that write itself.
+    """
 
     repo_root = Path(__file__).resolve().parent.parent
     config_path = repo_root / "config" / "default.yaml"
@@ -225,9 +233,3 @@ def test_calibration_tool_never_touches_shipped_config() -> None:
     run_calibration(sizes=CALIBRATION_SIZES[:1], cost_budget=100)
     after = config_path.read_text()
     assert before == after
-    # The legacy scene: block (SceneArtConfig, plan §5's "keeps the new
-    # scene: keys out of config/default.yaml entirely") stays exactly as it
-    # was: no WP-SC05 tuning key name should appear in it.
-    for wp_sc05_key in ("face_extent_by_scale_class", "target_fraction_by_scale_class",
-                        "ink_ratio_by_scale_class", "camera_height_fraction_min"):
-        assert wp_sc05_key not in after
