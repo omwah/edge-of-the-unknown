@@ -4010,8 +4010,8 @@
     "semantic_hash": ""
   },
   "edge/scene/model.py": {
-    "mtime": 1788414010.8078105,
-    "ast_hash": "839d47a8a485e1e7b8654ef2cdbde024",
+    "mtime": 1788531655.7613282,
+    "ast_hash": "0a9217b3304cc8d27ba33f04832f1bd3",
     "semantic_hash": ""
   },
   "edge/scene/project.py": {
@@ -4020,8 +4020,8 @@
     "semantic_hash": ""
   },
   "edge/scene/solve.py": {
-    "mtime": 1788411623.9528127,
-    "ast_hash": "8eaf0c52c1b6c0560974256f9f080e04",
+    "mtime": 1788531655.7613282,
+    "ast_hash": "ca58bc6d6f0fd40fae0503be36ddb3e1",
     "semantic_hash": ""
   },
   "scripts/gen_geometry_catalog.py": {
@@ -4040,8 +4040,8 @@
     "semantic_hash": ""
   },
   "tests/test_scene_model.py": {
-    "mtime": 1788414010.8078105,
-    "ast_hash": "811a6f649ef496a639e7a5de0863eeba",
+    "mtime": 1788531655.7613282,
+    "ast_hash": "b82c8a3afd0b45b540487aed8e89ed2a",
     "semantic_hash": ""
   },
   "docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md": {
@@ -4050,18 +4050,18 @@
     "semantic_hash": ""
   },
   "edge/scene/classify.py": {
-    "mtime": 1788411623.9528127,
-    "ast_hash": "826a35d19ded5e1a7fff15a29f0fee8f",
+    "mtime": 1788531655.760328,
+    "ast_hash": "6c6477abf52653f80384d0506f8dd262",
     "semantic_hash": ""
   },
   "tests/test_scene_classify.py": {
-    "mtime": 1788414010.8078105,
-    "ast_hash": "bdd16089afc6daaa6302f431dcd4674c",
+    "mtime": 1788531655.7613282,
+    "ast_hash": "f03f077c0aa2c0e4195a083a53e710d1",
     "semantic_hash": ""
   },
   "tests/test_scene_project.py": {
-    "mtime": 1788496119.0412009,
-    "ast_hash": "e770ac7b2d31bdf98cad5f1562aa8256",
+    "mtime": 1788531655.7613282,
+    "ast_hash": "3d6b4b6784bb1e5691f363345a0e9027",
     "semantic_hash": ""
   },
   "docs/scene_benchmark_baseline.json": {
@@ -4070,8 +4070,8 @@
     "semantic_hash": ""
   },
   "edge/devtool/scene_benchmark.py": {
-    "mtime": 1788496119.0412009,
-    "ast_hash": "56d278c9ec924f05ef1cbd49ee35044d",
+    "mtime": 1788531655.760328,
+    "ast_hash": "9fe351c248252798225dacc34924628c",
     "semantic_hash": ""
   },
   "tests/test_scene_benchmark.py": {
@@ -4080,8 +4080,33 @@
     "semantic_hash": ""
   },
   "docs/SCENE_BENCHMARK_BASELINE.md": {
-    "mtime": 1788496119.0402007,
-    "ast_hash": "60ebe358507a3fe517b032f0b48fdfa8",
+    "mtime": 1788500598.5522785,
+    "ast_hash": "4e2275a30b7a7c4cc790836d5aae3f0d",
+    "semantic_hash": ""
+  },
+  "docs/scene_calibration_review.json": {
+    "mtime": 1788531655.760328,
+    "ast_hash": "fc3b940cdaafb70b0a2065873655d6b3",
+    "semantic_hash": ""
+  },
+  "edge/devtool/scene_calibration.py": {
+    "mtime": 1788531655.760328,
+    "ast_hash": "bf81c4f1b6b715cc62ada780d9cf4f7c",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_calibration.py": {
+    "mtime": 1788531655.7613282,
+    "ast_hash": "f7fdbb562f7492ef977125e397e5fc42",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_solve.py": {
+    "mtime": 1788531655.7623281,
+    "ast_hash": "69ff8c32f2ed1152349f8cc73693224a",
+    "semantic_hash": ""
+  },
+  "docs/SCENE_CALIBRATION_REVIEW.md": {
+    "mtime": 1788531655.7593281,
+    "ast_hash": "87905f239e60badfa68642451116bf5b",
     "semantic_hash": ""
   }
 }
