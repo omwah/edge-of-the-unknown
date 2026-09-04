@@ -88,6 +88,24 @@ class WorldArrangement:
 
     objects: tuple[PhysicalObject, ...]
     placements: tuple[Placement, ...]
+    sector_id: int = 0
+    """Internal sector id this arrangement was classified from (WP-SC06 addition).
+
+    `edge/scene/solve.py` needs a stable, fog-safe-adjacent identity to seed
+    its local glyph-scatter RNG (plan §9.6) without touching game RNG or a
+    private DTO field; `classify_sector` fills this from `SectorDTO.sector_id`.
+    Defaulted so existing fixtures that build a `WorldArrangement` directly
+    (WP-SC02/SC03 tests) keep working unchanged.
+    """
+    glyphs: tuple[GlyphRequest, ...] = ()
+    """Free-cell-consumer presence marks (fighters/mines) classified alongside
+    this arrangement (plan §2.5, §9.6). `classify_sector` still also returns
+    these as a separate tuple for its existing WP-SC02 callers; carrying them
+    here too lets `solve()` (whose plan-fixed §9.3 signature takes only an
+    `arrangement`) reach them for the post-solve glyph scatter without a
+    signature change. Defaulted for the same fixture-compatibility reason as
+    `sector_id`.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,6 +286,50 @@ class SceneTuning:
     hysteresis_weight_position: int
     hysteresis_weight_admission: int
     hysteresis_weight_art: int
+
+    # -- WP-SC06 additions: the solver's own bounds/thresholds (plan §9.6, §4). --
+    # `edge/scene/` still never supplies a default for any of these; they are
+    # only declared here so a caller (production seam or test fixture) has
+    # somewhere typed to inject the WP-SC05 calibration values into once
+    # approved.
+
+    max_passes: int
+    """Hard bound on the whole solve pass loop (plan §9.6, §6.2 rule 4)."""
+
+    edge_margin: int
+    """Cells of required clearance from every viewport edge (attempt rule 1)."""
+
+    min_projected_cells_by_scale_class: Mapping[str, tuple[int, int]]
+    """`(min_width, min_height)` cells an accepted projection must clear,
+    keyed by `PhysicalObject.scale_class` (attempt rule 2)."""
+
+    separation_margin: int
+    """Cells by which accepted ink-max boxes are inflated before the pairwise
+    overlap check (attempt rule 4); `occludes=False` objects are skipped."""
+
+    min_visible_fraction_by_scale_class: Mapping[str, Fraction]
+    """The minimum visible fraction the farther object of an occluding pair
+    must clear, keyed by the farther object's `scale_class` (attempt rule 5)."""
+
+    cost_budget: int
+    """Cumulative estimated render-cost ceiling for one solve (attempt rule 7,
+    plan §4.14)."""
+
+    emergency_ship_ceiling: int
+    """Hard cap on admitted ship count, independent of `cost_budget`, guarding
+    against estimator/pathological-input failure (plan §2.3, attempt rule 7)."""
+
+    max_reposition_candidates: int
+    """Per-object bound on how many deterministic reposition offsets the
+    solver will try for one flexible object across the whole solve (plan
+    §6.2 rule 4)."""
+
+    max_glyph_tries: int
+    """Per-glyph bound on free-cell placement attempts (plan §9.6, §4.19)."""
+
+    glyph_spacing: int
+    """Minimum cell distance a newly placed glyph must keep from every
+    already-placed glyph (plan §9.6)."""
 
 
 @dataclass(frozen=True, slots=True)

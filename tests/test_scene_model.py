@@ -249,6 +249,16 @@ def test_scene_tuning_has_no_shipped_default_instance() -> None:
         hysteresis_weight_position=1,
         hysteresis_weight_admission=1,
         hysteresis_weight_art=1,
+        max_passes=32,
+        edge_margin=1,
+        min_projected_cells_by_scale_class={"ship": (3, 1)},
+        separation_margin=1,
+        min_visible_fraction_by_scale_class={"ship": Fraction(1, 2)},
+        cost_budget=500,
+        emergency_ship_ceiling=20,
+        max_reposition_candidates=4,
+        max_glyph_tries=8,
+        glyph_spacing=1,
     )
     assert tuning.face_extent_by_scale_class["ship"] == (4, 2)
 

@@ -76,6 +76,22 @@ TUNING = SceneTuning(
     hysteresis_weight_position=1,
     hysteresis_weight_admission=4,
     hysteresis_weight_art=1,
+    max_passes=64,
+    edge_margin=1,
+    min_projected_cells_by_scale_class={
+        "entity": (2, 2), "anchor": (4, 3), "belt": (4, 2),
+        "orbital": (2, 2), "ship": (3, 1), "wreck": (2, 1),
+    },
+    separation_margin=1,
+    min_visible_fraction_by_scale_class={
+        "entity": Fraction(1, 2), "anchor": Fraction(1, 3), "belt": Fraction(1, 4),
+        "orbital": Fraction(1, 2), "ship": Fraction(1, 2), "wreck": Fraction(1, 3),
+    },
+    cost_budget=1000,
+    emergency_ship_ceiling=50,
+    max_reposition_candidates=4,
+    max_glyph_tries=8,
+    glyph_spacing=1,
 )
 
 

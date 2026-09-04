@@ -408,8 +408,11 @@ def classify_sector(
             position = offset
         placements[key] = Placement(key=key, position=position)
 
+    glyphs = _glyph_requests(dto)
     arrangement = WorldArrangement(
         objects=tuple(objects),
         placements=tuple(placements[obj.key] for obj in objects),
+        sector_id=dto.sector_id,
+        glyphs=glyphs,
     )
-    return arrangement, _glyph_requests(dto)
+    return arrangement, glyphs
