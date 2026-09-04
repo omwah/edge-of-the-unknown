@@ -271,6 +271,7 @@ def _benchmark_tuning() -> SceneTuning:
             "entity": (30, 12), "anchor": (80, 40), "belt": (120, 20),
             "orbital": (18, 9), "ship": (36, 8), "wreck": (24, 10),
         },
+        face_extent_by_kind={},
         region_by_scale_class={cls: region for cls in
                                ("entity", "anchor", "belt", "orbital", "ship", "wreck")},
         target_fraction_by_scale_class={

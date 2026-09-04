@@ -123,33 +123,64 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
         "wreck > ship) as bounding-box area (plan §9.1). Numbers are display "
         "scene units, not literal kilometres — the composer already exaggerates "
         "controlled ratios to stay legible at terminal resolution (plan §2.3). "
-        "OPEN QUESTION for review: `classify_sector` looks up face extent by "
-        "`scale_class` alone, and both a planet and every anchor-scale "
-        "discovery (nebula/black_hole/wormhole) share the single \"anchor\" "
-        "class (`edge/scene/classify.py` `_planet_object`/"
-        "`_anchor_discovery_object`), which is sound because §2.1 says the two "
-        "never coexist in one sector — but it also means the model as landed "
-        "cannot express \"wormhole slightly larger than planet\" or \"nebula ≫ "
-        "wormhole\" as a face-area distinction; only the classifier's discovery "
-        "vs planet FaceShape (ellipse vs circle) differs today. If per-kind "
-        "anchor sizing is wanted, `SceneTuning` needs a `face_extent_by_kind` "
-        "map keyed by `continuous_kind`, which is a WP-SC02 model change, not "
-        "something this calibration pass can retrofit without touching "
-        "`edge/scene/model.py`/`classify.py`."))
+        "`\"anchor\"` here is now only the fallback bucket a planet uses (and "
+        "any anchor-scale kind with no `face_extent_by_kind` override) — see "
+        "`face_extent_by_kind` below for the per-kind nebula/black_hole/"
+        "wormhole distinction plan §2.2 asks for."))
 
-    region_by_scale_class = {cls: region for cls in
-                              ("entity", "anchor", "belt", "orbital", "wreck", "ship")}
+    # Per-kind override (WP-SC02 model addition: `SceneTuning.face_extent_by_kind`,
+    # `edge/scene/classify.py` `_face`). `classify_sector` looks this up first by
+    # `PhysicalObject.continuous_kind`, falling back to `face_extent_by_scale_class`
+    # ("anchor") for any kind not listed here -- a plain planet keeps using the
+    # "anchor" bucket unchanged. Areas below express plan §2.2's apparent-scale
+    # hierarchy: nebula/black_hole visual system ≫ wormhole > planet, all as
+    # bounding-box width*height (plan §9.1), and all ≫ the "anchor" fallback
+    # (1800) a bare planet uses, since these are hierarchy-topping phenomena.
+    face_extent_by_kind = {
+        "nebula": (110, 60),      # area 6600 — the largest phenomenon: a diffuse field
+        "black_hole": (100, 60),  # area 6000 — comparable to nebula, slightly tighter
+        "wormhole": (76, 40),     # area 3040 — clearly bigger than a bare planet (1800),
+                                   # clearly smaller than nebula/black_hole
+    }
+    notes.append(ProposedValue(
+        "face_extent_by_kind",
+        repr(face_extent_by_kind),
+        "Resolves the OPEN QUESTION this review previously flagged: "
+        "`classify_sector` looked up face extent by `scale_class` alone, so a "
+        "planet and every anchor-scale discovery (nebula/black_hole/wormhole) "
+        "shared the single \"anchor\" bucket and could not express \"wormhole "
+        "slightly larger than planet\" or \"nebula ≫ wormhole\" as a face-area "
+        "distinction (only the FaceShape -- ellipse vs circle -- differed). "
+        "`SceneTuning` now carries `face_extent_by_kind`, keyed by "
+        "`continuous_kind`, which `_face()` consults before falling back to "
+        "`face_extent_by_scale_class[\"anchor\"]`; §2.1 still guarantees a "
+        "planet and an anchor-scale discovery never coexist in one sector, so "
+        "this is purely a display-size distinction, never an occlusion "
+        "concern. Ordering: nebula (6600) ≈ black_hole (6000) ≫ wormhole "
+        "(3040) > planet/anchor-fallback (1800), matching plan §2.2's stated "
+        "hierarchy."))
+
+    region = _proposed_region()
+    wide_region = Region(x_min=-320, x_max=320, y_min=-160, y_max=160, z_min=1, z_max=520)
+    region_by_scale_class = {
+        cls: (wide_region if cls in ("ship", "wreck") else region)
+        for cls in ("entity", "anchor", "belt", "orbital", "wreck", "ship")
+    }
     notes.append(ProposedValue(
         "region_by_scale_class",
-        f"one shared region per scale class: {region!r}",
-        "A single generous scene-unit box for every class keeps early "
-        "calibration simple; it does not yet differentiate ship/wreck "
-        "placement freedom from station orbital freedom by *size* (plan §5 "
-        "asks for that distinction). Proposed as a starting point: review "
-        "should decide whether ships/wrecks warrant a wider region than "
-        "stations, per plan §2.5 (\"[ships] receive wider placement "
-        "regions/depth ranges than stations\") — this proposal does not yet "
-        "encode that width difference and should be revised before approval."))
+        f"ship/wreck: {wide_region!r}; every other class: {region!r}",
+        "Resolves the OPEN QUESTION this review previously flagged: a single "
+        "shared region for every scale class did not differentiate ship/wreck "
+        "placement freedom from station orbital freedom by size, though "
+        "`SceneTuning.region_by_scale_class`'s type (`Mapping[str, Region]`) "
+        "was already per-scale-class-capable -- this was purely a proposed-"
+        "value gap, not a model gap. Per plan §2.5 (\"[ships] receive wider "
+        "placement regions/depth ranges than stations\"), ship/wreck now get a "
+        "noticeably wider box on every axis (x/y span +60%, z span +30%) than "
+        "the shared region every other class (entity/anchor/belt/orbital) "
+        "keeps -- orbital placement stays tied to its parent planet's own "
+        "narrower placement per the field's docstring, so it should not widen "
+        "independently of the anchor it orbits."))
 
     target_fraction_by_scale_class = {
         "entity": Fraction(1, 3), "anchor": Fraction(1, 2), "belt": Fraction(1, 2),
@@ -336,6 +367,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
 
     tuning = SceneTuning(
         face_extent_by_scale_class=face_extent_by_scale_class,
+        face_extent_by_kind=face_extent_by_kind,
         region_by_scale_class=region_by_scale_class,
         target_fraction_by_scale_class=target_fraction_by_scale_class,
         ink_ratio_by_scale_class=ink_ratio_by_scale_class,
@@ -959,16 +991,20 @@ def run_calibration(*, sizes: tuple[tuple[str, int, int], ...] = CALIBRATION_SIZ
     ]
 
     open_questions = [
-        "Single shared `\"anchor\"` face_extent bucket for planet and every "
-        "generated discovery kind cannot express per-kind face-area "
-        "differences (nebula ≫ wormhole > planet, plan §2.2) — flagged in "
-        "the face_extent_by_scale_class proposal above; needs a WP-SC02 "
-        "model change (`face_extent_by_kind`), not something calibration "
-        "numbers alone can fix.",
-        "`region_by_scale_class` proposes one shared region size for ships "
-        "vs stations; plan §2.5 asks ships to have *wider* placement "
-        "freedom than stations, which this first-pass proposal does not yet "
-        "encode (see the region_by_scale_class rationale above).",
+        "RESOLVED: the single shared `\"anchor\"` face_extent bucket for "
+        "planet and every generated discovery kind could not express "
+        "per-kind face-area differences (nebula ≫ wormhole > planet, plan "
+        "§2.2). `SceneTuning` now carries `face_extent_by_kind` (a WP-SC02 "
+        "model addition), and `classify_sector` looks it up by "
+        "`continuous_kind` before falling back to `face_extent_by_scale_class`"
+        " — see the face_extent_by_kind proposal above for the numbers.",
+        "RESOLVED: `region_by_scale_class`'s type was already per-scale-class "
+        "(`Mapping[str, Region]`); this proposal previously handed every "
+        "class the same shared box, so ships/wrecks did not yet get the "
+        "*wider* placement freedom plan §2.5 asks for relative to stations. "
+        "The proposal above now gives ship/wreck a distinct, wider region "
+        "(x/y span +60%, z span +30%) than entity/anchor/belt/orbital — a "
+        "calibration-value fix only, no model.py change was needed.",
         "\"Arbitrary station orbit, including the near or far side\" (plan "
         "§2.5) is not yet distinguishable from any other flexible "
         "placement: `classify_sector`'s stable-hash offset picks one point "

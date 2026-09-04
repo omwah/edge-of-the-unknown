@@ -230,6 +230,7 @@ def test_scene_tuning_has_no_shipped_default_instance() -> None:
     # zeros.
     tuning = SceneTuning(
         face_extent_by_scale_class={"ship": (4, 2)},
+        face_extent_by_kind={},
         region_by_scale_class={"ship": _region()},
         target_fraction_by_scale_class={"ship": Fraction(1, 3)},
         ink_ratio_by_scale_class={"ship": Fraction(4, 5)},

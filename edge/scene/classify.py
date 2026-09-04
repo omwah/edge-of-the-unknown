@@ -18,8 +18,11 @@ never from list position, and the returned tuples are always sorted by
 `SceneKey`.
 
 No numeric tuning value is invented here. Every face extent and placement
-region is looked up from the injected `SceneTuning` by `scale_class`; the
-*shape* (circle/ellipse/rect/field) and the *scale_class*/*retention*
+region is looked up from the injected `SceneTuning`, primarily by
+`scale_class`, though a planet/anchor-discovery face extent is looked up
+first by `continuous_kind` (`SceneTuning.face_extent_by_kind`) when that kind
+has an entry, falling back to the scale_class lookup otherwise (plan §2.2);
+the *shape* (circle/ellipse/rect/field) and the *scale_class*/*retention*
 assignment are categorical decisions already fixed by
 `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md` §2, not tuned numbers.
 """
@@ -105,8 +108,15 @@ def _stable_offset(region: Region, key: str) -> Vec3:
     return Vec3(x, y, z)
 
 
-def _face(tuning: SceneTuning, scale_class: str, shape: FaceShape) -> Face:
-    width, height = tuning.face_extent_by_scale_class[scale_class]
+def _face(
+    tuning: SceneTuning, scale_class: str, shape: FaceShape, continuous_kind: str | None = None
+) -> Face:
+    """`continuous_kind`, when given and present in `face_extent_by_kind`,
+    overrides the scale-class extent (plan §2.2 per-kind apparent scale)."""
+    if continuous_kind is not None and continuous_kind in tuning.face_extent_by_kind:
+        width, height = tuning.face_extent_by_kind[continuous_kind]
+    else:
+        width, height = tuning.face_extent_by_scale_class[scale_class]
     return Face(shape=shape, width_su=width, height_su=height)
 
 
@@ -121,7 +131,7 @@ def _planet_object(planet: SectorPlanetDTO, tuning: SceneTuning) -> PhysicalObje
     return PhysicalObject(
         key=SceneKey("planet", planet.planet_id),
         parent=None,
-        face=_face(tuning, scale_class, shape),
+        face=_face(tuning, scale_class, shape, continuous_kind=planet.ptype),
         scale_class=scale_class,
         art_mode=ArtMode.CONTINUOUS,
         ladder_key=None,
@@ -254,7 +264,7 @@ def _anchor_discovery_object(disc: SectorDiscovery, tuning: SceneTuning) -> Phys
     return PhysicalObject(
         key=SceneKey("discovery", disc.discovery_id),
         parent=None,
-        face=_face(tuning, "anchor", FaceShape.ELLIPSE),
+        face=_face(tuning, "anchor", FaceShape.ELLIPSE, continuous_kind=disc.kind),
         scale_class="anchor",
         art_mode=ArtMode.CONTINUOUS,
         ladder_key=None,

@@ -220,6 +220,18 @@ class SceneTuning:
     classifier needs to build a `Face`; the shape (circle/ellipse/rect/field)
     is a categorical choice already fixed by plan §2.5, not a tuned number."""
 
+    face_extent_by_kind: Mapping[str, tuple[Su, Su]]
+    """`(width_su, height_su)` per `PhysicalObject.continuous_kind`, overriding
+    `face_extent_by_scale_class` for kinds that need apparent-scale distinction
+    within a shared `scale_class` (plan §2.2: nebula/black_hole visual system
+    ≫ wormhole > planet, all classed "anchor"). `edge.scene.classify._face`
+    looks this up first by `continuous_kind`; a kind with no entry here falls
+    back to `face_extent_by_scale_class[scale_class]` unchanged, so an empty
+    mapping reproduces the old scale_class-only behaviour exactly. Keyed by
+    the same kind strings already used for `PhysicalObject.continuous_kind`
+    (planet `ptype` values and `SectorDiscovery.kind` values, e.g. "nebula",
+    "black_hole", "wormhole"); need not cover every kind."""
+
     region_by_scale_class: Mapping[str, Region]
     """The allowed placement region/depth range per `scale_class`. For
     `"orbital"` this is interpreted as an offset from the parent planet's own

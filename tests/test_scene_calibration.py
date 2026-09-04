@@ -72,6 +72,53 @@ def test_proposed_tuning_has_a_rationale_for_every_field() -> None:
         assert cls in tuning.ink_ratio_by_scale_class
 
 
+def test_proposed_face_extent_by_kind_orders_anchor_phenomena_by_area() -> None:
+    """Plan §2.2's apparent-scale hierarchy: nebula/black_hole visual system
+    ≫ wormhole > planet (which has no per-kind override, so it falls back to
+    the shared "anchor" scale_class bucket)."""
+    tuning, notes = proposed_tuning()
+    assert any(n.field == "face_extent_by_kind" for n in notes)
+    for kind in ("nebula", "black_hole", "wormhole"):
+        assert kind in tuning.face_extent_by_kind
+
+    def area(w_h: tuple[int, int]) -> int:
+        return w_h[0] * w_h[1]
+
+    nebula_area = area(tuning.face_extent_by_kind["nebula"])
+    black_hole_area = area(tuning.face_extent_by_kind["black_hole"])
+    wormhole_area = area(tuning.face_extent_by_kind["wormhole"])
+    planet_area = area(tuning.face_extent_by_scale_class["anchor"])
+    assert nebula_area > wormhole_area > planet_area
+    assert black_hole_area > wormhole_area > planet_area
+
+
+def test_proposed_region_gives_ship_and_wreck_wider_freedom_than_stations() -> None:
+    """Plan §2.5: ships receive wider placement regions/depth ranges than
+    stations. `region_by_scale_class`'s type is already per-scale-class
+    (`Mapping[str, Region]`); this checks the *proposed values* differentiate
+    ship/wreck from orbital/anchor/belt/entity, not just the type."""
+    tuning, notes = proposed_tuning()
+    assert any(n.field == "region_by_scale_class" for n in notes)
+    ship_region = tuning.region_by_scale_class["ship"]
+    wreck_region = tuning.region_by_scale_class["wreck"]
+    orbital_region = tuning.region_by_scale_class["orbital"]
+    anchor_region = tuning.region_by_scale_class["anchor"]
+
+    def span(region: object) -> tuple[int, int, int]:
+        return (
+            region.x_max - region.x_min,  # type: ignore[attr-defined]
+            region.y_max - region.y_min,  # type: ignore[attr-defined]
+            region.z_max - region.z_min,  # type: ignore[attr-defined]
+        )
+
+    ship_span, wreck_span, orbital_span = span(ship_region), span(wreck_region), span(orbital_region)
+    assert ship_span == wreck_span
+    for axis in range(3):
+        assert ship_span[axis] > orbital_span[axis]
+    # Orbital/anchor/belt/entity still share the one common (narrower) region.
+    assert orbital_region == anchor_region
+
+
 def test_proposed_continuous_yields_cover_every_classify_category() -> None:
     yields, notes = proposed_continuous_yields()
     assert notes

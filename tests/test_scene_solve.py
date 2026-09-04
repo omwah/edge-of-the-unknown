@@ -102,6 +102,7 @@ def _region() -> Region:
 def _tuning(**overrides: object) -> SceneTuning:
     base: dict[str, object] = dict(
         face_extent_by_scale_class={"ship": (40, 10), "anchor": (60, 30), "wreck": (20, 8)},
+        face_extent_by_kind={},
         region_by_scale_class={"ship": _region(), "anchor": _region(), "wreck": _region()},
         target_fraction_by_scale_class={
             "ship": Fraction(1, 6), "anchor": Fraction(1, 2), "wreck": Fraction(1, 8),

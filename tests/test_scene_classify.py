@@ -36,6 +36,11 @@ TUNING = SceneTuning(
         "ship": (20, 5),
         "wreck": (10, 4),
     },
+    face_extent_by_kind={
+        "nebula": (50, 25),
+        "black_hole": (48, 24),
+        "wormhole": (36, 18),
+    },
     region_by_scale_class={
         "entity": _REGION,
         "anchor": _REGION,
@@ -263,6 +268,44 @@ def test_anchor_discovery_kinds_classify_as_anchor_scale() -> None:
         assert obj.scale_class == "anchor"
         assert obj.retention == SceneRetention.ANCHOR
         assert obj.key.tag == "discovery"
+
+
+def test_anchor_discovery_kinds_use_face_extent_by_kind_override() -> None:
+    expected = {
+        "nebula": (50, 25),
+        "black_hole": (48, 24),
+        "wormhole": (36, 18),
+    }
+    for kind, extent in expected.items():
+        dto = _sector(
+            discoveries=[
+                SectorDiscovery(
+                    discovery_id=1, label=f"{kind} label", kind=kind, rarity="Rare", salvageable=True
+                )
+            ]
+        )
+        arrangement, _ = classify_sector(dto, TUNING)
+        (obj,) = arrangement.objects
+        assert (obj.face.width_su, obj.face.height_su) == extent
+
+    # Ordering matches plan §2.2: nebula/black_hole >~ wormhole > planet (which
+    # has no override and falls back to the shared "anchor" bucket).
+    nebula_area = expected["nebula"][0] * expected["nebula"][1]
+    black_hole_area = expected["black_hole"][0] * expected["black_hole"][1]
+    wormhole_area = expected["wormhole"][0] * expected["wormhole"][1]
+    planet_area = TUNING.face_extent_by_scale_class["anchor"][0] * (
+        TUNING.face_extent_by_scale_class["anchor"][1]
+    )
+    assert nebula_area > wormhole_area > planet_area
+    assert black_hole_area > wormhole_area
+
+
+def test_planet_has_no_kind_override_and_uses_anchor_scale_class_fallback() -> None:
+    dto = _sector(planets=[SectorPlanetDTO(planet_id=1, name="Terra Nova", ptype="terrestrial_warm")])
+    arrangement, _ = classify_sector(dto, TUNING)
+    (planet,) = arrangement.objects
+    width, height = TUNING.face_extent_by_scale_class["anchor"]
+    assert (planet.face.width_su, planet.face.height_su) == (width, height)
 
 
 def test_wreck_discovery_classifies_as_wreck_scale() -> None:

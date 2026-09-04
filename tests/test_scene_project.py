@@ -129,6 +129,7 @@ def _anchor_object() -> PhysicalObject:
 def _tuning(**overrides: object) -> SceneTuning:
     base: dict[str, object] = dict(
         face_extent_by_scale_class={"ship": (40, 10), "anchor": (60, 30)},
+        face_extent_by_kind={},
         region_by_scale_class={"ship": _region(), "anchor": _region()},
         target_fraction_by_scale_class={"ship": Fraction(1, 6), "anchor": Fraction(1, 3)},
         ink_ratio_by_scale_class={"ship": Fraction(9, 10), "anchor": Fraction(3, 5)},
