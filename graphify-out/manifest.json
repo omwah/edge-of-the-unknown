@@ -4015,8 +4015,8 @@
     "semantic_hash": ""
   },
   "edge/scene/project.py": {
-    "mtime": 1788414010.8078105,
-    "ast_hash": "b2937824c4c204264f144704bd89277c",
+    "mtime": 1788491338.453509,
+    "ast_hash": "359ecf1052203b1bc4281cbdbfb66a4c",
     "semantic_hash": ""
   },
   "edge/scene/solve.py": {
@@ -4062,6 +4062,26 @@
   "tests/test_scene_project.py": {
     "mtime": 1788414010.8078105,
     "ast_hash": "0d305cb440d33924878fde0f3767ddf3",
+    "semantic_hash": ""
+  },
+  "docs/scene_benchmark_baseline.json": {
+    "mtime": 1788491338.453509,
+    "ast_hash": "8f6e5213677fed4b2f7ad0b51b76a2c0",
+    "semantic_hash": ""
+  },
+  "edge/devtool/scene_benchmark.py": {
+    "mtime": 1788491338.453509,
+    "ast_hash": "0906df51e36a4251401780a0ef7ea6ae",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_benchmark.py": {
+    "mtime": 1788491338.453509,
+    "ast_hash": "b102bcb1fb4b7f2c1c4185af89c428c0",
+    "semantic_hash": ""
+  },
+  "docs/SCENE_BENCHMARK_BASELINE.md": {
+    "mtime": 1788491338.453509,
+    "ast_hash": "91c40c6c35c78c3d63631ac0b7a88ef9",
     "semantic_hash": ""
   }
 }
