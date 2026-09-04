@@ -87,6 +87,7 @@ class ProjectionStrategy(Protocol):
         self,
         camera: Camera,
         anchor: PhysicalObject,
+        anchor_pos: Vec3,
         viewport: CellBox,
         cfg: SceneTuning,
     ) -> Iterator[Camera]: ...
@@ -234,13 +235,15 @@ class FixedFovPerspective:
         self,
         camera: Camera,
         anchor: PhysicalObject,
+        anchor_pos: Vec3,
         viewport: CellBox,
         cfg: SceneTuning,
     ) -> Iterator[Camera]:
         # "Current" height: what the anchor projects to at the input camera's
-        # own depth (its z-distance from the camera plane), so the sweep can
-        # order candidates nearest-to-current first (plan §9.6).
-        current_dz = Fraction(-camera.position.z)
+        # own depth (its z-distance from the camera plane, per the anchor's
+        # actual world z-position -- `frame()`'s own convention, plan §9.5),
+        # so the sweep can order candidates nearest-to-current first (§9.6).
+        current_dz = Fraction(anchor_pos.z - camera.position.z)
         current_h = (
             round_half_even(
                 Fraction(anchor.face.height_su)
@@ -273,7 +276,7 @@ class FixedFovPerspective:
                     return
                 yield replace(
                     camera,
-                    position=Vec3(camera.position.x, camera.position.y, -dz_su),
+                    position=Vec3(camera.position.x, camera.position.y, anchor_pos.z - dz_su),
                     aim_x_su=aim_x_su,
                 )
                 count += 1
@@ -344,6 +347,7 @@ class DepthLayeredAnchorProjection:
         self,
         camera: Camera,
         anchor: PhysicalObject,
+        anchor_pos: Vec3,
         viewport: CellBox,
         cfg: SceneTuning,
     ) -> Iterator[Camera]:
@@ -371,7 +375,7 @@ class DepthLayeredAnchorProjection:
                     return
                 yield replace(
                     camera,
-                    position=Vec3(camera.position.x, camera.position.y, -dz_su),
+                    position=Vec3(camera.position.x, camera.position.y, anchor_pos.z - dz_su),
                     aim_x_su=aim_x_su,
                 )
                 count += 1

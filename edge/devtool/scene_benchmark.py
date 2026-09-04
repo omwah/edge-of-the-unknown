@@ -54,8 +54,8 @@ from edge.core.models import UniverseState
 from edge.core.rules import JoinGame, apply_result, reduce
 from edge.scene.catalog import ArtGeometryCatalog, ContinuousYield, LadderKey, LadderRung
 from edge.scene.classify import classify_sector
-from edge.scene.geometry import CellBox, Region
-from edge.scene.model import PhysicalObject, SceneTuning, WorldArrangement
+from edge.scene.geometry import CellBox, Region, Vec3
+from edge.scene.model import PhysicalObject, SceneTuning
 from edge.scene.project import (
     DepthLayeredAnchorProjection,
     FixedFovPerspective,
@@ -395,10 +395,9 @@ def _pick_anchor(objects: tuple[PhysicalObject, ...]) -> PhysicalObject | None:
 
 
 def _distinct_scene_count(
-    strategy: ProjectionStrategy, arrangement: WorldArrangement, anchor: PhysicalObject,
-    candidates: list[Any], viewport: CellBox,
+    strategy: ProjectionStrategy, anchor: PhysicalObject,
+    candidates: list[Any], viewport: CellBox, at: Vec3,
 ) -> int:
-    at = next(p.position for p in arrangement.placements if p.key == anchor.key)
     boxes = set()
     for camera in candidates:
         box = strategy.project(camera, anchor, at, viewport)
@@ -425,6 +424,7 @@ def benchmark_replacement(*, repeats: int = 3) -> ReplacementReport:
         anchor = _pick_anchor(arrangement.objects)
         if anchor is None:
             continue
+        anchor_pos = next(p.position for p in arrangement.placements if p.key == anchor.key)
         for size_label, w, h in BASELINE_SIZES:
             viewport = CellBox(0, 0, w, h)
             for strategy in strategies:
@@ -433,14 +433,18 @@ def benchmark_replacement(*, repeats: int = 3) -> ReplacementReport:
                 frame_ms = _ms(time.perf_counter() - t0)
 
                 t0 = time.perf_counter()
-                candidates = list(strategy.candidates(camera, anchor, viewport, tuning))
+                candidates = list(strategy.candidates(camera, anchor, anchor_pos, viewport, tuning))
                 candidates_ms = _ms(time.perf_counter() - t0)
 
-                distinct = _distinct_scene_count(strategy, arrangement, anchor, candidates, viewport)
+                distinct = _distinct_scene_count(
+                    strategy, anchor, candidates, viewport, anchor_pos
+                )
 
                 deterministic = True
                 for _ in range(repeats - 1):
-                    repeat_candidates = list(strategy.candidates(camera, anchor, viewport, tuning))
+                    repeat_candidates = list(
+                        strategy.candidates(camera, anchor, anchor_pos, viewport, tuning)
+                    )
                     if [(c.position, c.aim_x_su) for c in repeat_candidates] != \
                        [(c.position, c.aim_x_su) for c in candidates]:
                         deterministic = False

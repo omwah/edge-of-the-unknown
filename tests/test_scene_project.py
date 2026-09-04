@@ -306,8 +306,8 @@ def test_candidates_ordering_is_deterministic_and_bounded() -> None:
             depth_layer_size_su=cfg.depth_layer_size_su,
             depth_layer_scale=cfg.depth_layer_scale,
         )
-        run_a = list(strategy.candidates(camera, ship, VIEWPORT, cfg))
-        run_b = list(strategy.candidates(camera, ship, VIEWPORT, cfg))
+        run_a = list(strategy.candidates(camera, ship, Vec3(0, 0, 0), VIEWPORT, cfg))
+        run_b = list(strategy.candidates(camera, ship, Vec3(0, 0, 0), VIEWPORT, cfg))
         assert run_a == run_b, f"{strategy.name} candidate ordering is not deterministic"
         assert len(run_a) <= cfg.max_camera_candidates
         assert run_a, f"{strategy.name} produced no candidates"
@@ -328,7 +328,66 @@ def test_candidates_never_exceeds_configured_cap() -> None:
             depth_layer_size_su=cfg.depth_layer_size_su,
             depth_layer_scale=cfg.depth_layer_scale,
         )
-        assert len(list(strategy.candidates(camera, ship, VIEWPORT, cfg))) <= 3
+        assert len(list(strategy.candidates(camera, ship, Vec3(0, 0, 0), VIEWPORT, cfg))) <= 3
+
+
+def test_candidates_at_nonzero_anchor_z_vary_height_and_track_frame() -> None:
+    """Regression for the bug where `candidates()` dropped the anchor's
+    actual world z-position and silently assumed su z=0 -- for a laddered
+    anchor placed far from the origin (like the real port+ships gallery
+    case at z~340), that made every swept height floor to the camera's
+    near-plane depth and every projected box collapse to `max(1, ...)`
+    regardless of the swept target height, and made the nearest-to-current
+    candidate land nowhere near `frame()`'s own framing.
+
+    With the fix, `candidates()` receives `anchor_pos` and uses
+    `anchor_pos.z - dz_su` (matching `frame()`'s own convention), so swept
+    heights produce genuinely different projected box heights, and the
+    candidate nearest the framed height roughly reproduces `frame()`'s own
+    projected height for the same anchor/viewport.
+    """
+    cfg = _tuning()
+    ship = _ship_object(1)
+    anchor_pos = Vec3(0, 0, 340)
+    arrangement = WorldArrangement(
+        objects=(ship,),
+        placements=(Placement(key=ship.key, position=anchor_pos),),
+    )
+    for strategy in STRATEGIES:
+        framed_camera = strategy.frame(arrangement, ship.key, VIEWPORT, cfg, CATALOG)
+        framed_box = strategy.project(framed_camera, ship, anchor_pos, VIEWPORT)
+
+        candidates = list(
+            strategy.candidates(framed_camera, ship, anchor_pos, VIEWPORT, cfg)
+        )
+        assert candidates, f"{strategy.name} produced no candidates"
+
+        heights = set()
+        for camera in candidates:
+            # A candidate camera must still see the anchor as being at its
+            # real z -- i.e. anchor_pos.z - camera.position.z is a sane,
+            # positive depth, not (pre-fix) a huge or nonsensical one.
+            dz = anchor_pos.z - camera.position.z
+            assert 0 < dz < anchor_pos.z, (
+                strategy.name, dz, camera.position, anchor_pos,
+            )
+            box = strategy.project(camera, ship, anchor_pos, VIEWPORT)
+            heights.add(box.height)
+
+        # The swept heights must produce more than one distinct projected
+        # box height -- pre-fix, every candidate's dz was wildly wrong (and
+        # roughly constant across the sweep relative to the true anchor
+        # depth), collapsing every box to the height floor.
+        assert len(heights) > 1, (strategy.name, heights)
+
+        # Among the swept candidates, at least one should land close to
+        # frame()'s own projected height for this anchor/viewport -- pre-fix,
+        # every candidate was off by hundreds of su of depth, so none did.
+        closest_gap = min(
+            abs(strategy.project(camera, ship, anchor_pos, VIEWPORT).height - framed_box.height)
+            for camera in candidates
+        )
+        assert closest_gap <= 2, (strategy.name, closest_gap, framed_box.height)
 
 
 # ---------------------------------------------------------------------------
