@@ -250,18 +250,31 @@ class FixedFovPerspective:
             else 0
         )
         count = 0
+        seen: set[tuple[int, int]] = set()
         for h in _height_sweep(viewport, cfg, current_h):
             dz = Fraction(viewport.height * camera.fov_den, camera.fov_num) * Fraction(
                 anchor.face.height_su, h
             )
             dz_su = max(math.floor(dz), cfg.near_plane_su + 1)
             for dx in cfg.aim_offsets_su:
+                aim_x_su = camera.aim_x_su + dx
+                # §6.2 rule 4: distinct swept heights can floor to the same integer
+                # depth, and a laddered anchor's finite rung count collapses many
+                # heights onto the same rendered box outright -- both leave `project()`
+                # producing byte-identical output for two different swept heights. A
+                # candidate whose (depth, aim) pair was already yielded is guaranteed
+                # to reproject to the same quantised scene, so it is dropped here
+                # rather than spent from `max_camera_candidates`'s bounded budget.
+                key = (dz_su, aim_x_su)
+                if key in seen:
+                    continue
+                seen.add(key)
                 if count >= cfg.max_camera_candidates:
                     return
                 yield replace(
                     camera,
                     position=Vec3(camera.position.x, camera.position.y, -dz_su),
-                    aim_x_su=camera.aim_x_su + dx,
+                    aim_x_su=aim_x_su,
                 )
                 count += 1
 
@@ -336,16 +349,30 @@ class DepthLayeredAnchorProjection:
     ) -> Iterator[Camera]:
         current_layer = 0
         count = 0
+        seen: set[tuple[int, int]] = set()
         layers = sorted(range(cfg.depth_layers), key=lambda layer: (abs(layer - current_layer), layer))
         for layer in layers:
             dz_su = layer * cfg.depth_layer_size_su + 1
             for dx in cfg.aim_offsets_su:
+                aim_x_su = camera.aim_x_su + dx
+                # §6.2 rule 4, mirroring `FixedFovPerspective.candidates()` above:
+                # each layer's depth is distinct by construction, but a repeated
+                # (depth, aim) pair still cannot happen here except by a future
+                # `cfg` change, so this dedup is a cheap, always-correct guard
+                # rather than dead code -- it does not, by itself, catch a laddered
+                # anchor whose finite rung count makes two *different* depths render
+                # the same box; that needs the catalog `candidates()` does not
+                # receive, and stays WP-SC06's job (see module docstring).
+                key = (dz_su, aim_x_su)
+                if key in seen:
+                    continue
+                seen.add(key)
                 if count >= cfg.max_camera_candidates:
                     return
                 yield replace(
                     camera,
                     position=Vec3(camera.position.x, camera.position.y, -dz_su),
-                    aim_x_su=camera.aim_x_su + dx,
+                    aim_x_su=aim_x_su,
                 )
                 count += 1
 
