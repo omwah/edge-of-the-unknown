@@ -20,6 +20,7 @@ class OptionsScreen(ModalScreen[None]):
         Binding("t", "toggle_theme", "Theme"),
         Binding("r", "toggle_motion", "Reduced motion"),
         Binding("a", "toggle_art", "Art detail"),
+        Binding("l", "toggle_labels", "Scene labels"),
         Binding("d", "toggle_density", "Density"),
         Binding("o", "toggle_onboarding", "Onboarding"),
         Binding("g", "toggle_greyed", "Greyed replies"),
@@ -39,11 +40,12 @@ class OptionsScreen(ModalScreen[None]):
             yield ClickableEntry(self._theme_line(), dest="opt", ref="theme")
             yield ClickableEntry(self._motion_line(), dest="opt", ref="motion")
             yield ClickableEntry(self._art_line(), dest="opt", ref="art")
+            yield ClickableEntry(self._labels_line(), dest="opt", ref="labels")
             yield ClickableEntry(self._density_line(), dest="opt", ref="density")
             yield ClickableEntry(self._onboarding_line(), dest="opt", ref="onboarding")
             yield ClickableEntry(self._greyed_line(), dest="opt", ref="greyed")
             yield ClickableEntry(self._auto_end_line(), dest="opt", ref="auto_end")
-            yield Static("[dim]T/R/A/D/O/G/U change · Esc closes · preferences are local[/]",
+            yield Static("[dim]T/R/A/L/D/O/G/U change · Esc closes · preferences are local[/]",
                          id="options-footer")
 
     def _theme_line(self) -> str:
@@ -61,6 +63,10 @@ class OptionsScreen(ModalScreen[None]):
     def _art_line(self) -> str:
         value = self.app.ui_settings.art_detail  # type: ignore[attr-defined]
         return f"  [b]A[/] Art detail: [cyan]{value}[/]"
+
+    def _labels_line(self) -> str:
+        value = self.app.ui_settings.scene_labels  # type: ignore[attr-defined]
+        return f"  [b]L[/] Scene labels: [cyan]{value}[/]"
 
     def _density_line(self) -> str:
         value = self.app.ui_settings.density  # type: ignore[attr-defined]
@@ -83,6 +89,8 @@ class OptionsScreen(ModalScreen[None]):
             self.action_toggle_motion()
         elif ref == "art":
             self.action_toggle_art()
+        elif ref == "labels":
+            self.action_toggle_labels()
         elif ref == "density":
             self.action_toggle_density()
         elif ref == "onboarding":
@@ -109,6 +117,13 @@ class OptionsScreen(ModalScreen[None]):
         values = ["full", "compact", "minimal"]
         value = values[(values.index(settings.art_detail) + 1) % len(values)]
         self.app.update_ui_settings(art_detail=value)  # type: ignore[attr-defined]
+        self._redraw()
+
+    def action_toggle_labels(self) -> None:
+        settings = self.app.ui_settings  # type: ignore[attr-defined]
+        values = ["labeled", "hidden", "hover_hint"]
+        value = values[(values.index(settings.scene_labels) + 1) % len(values)]
+        self.app.update_ui_settings(scene_labels=value)  # type: ignore[attr-defined]
         self._redraw()
 
     def action_toggle_density(self) -> None:
@@ -140,8 +155,8 @@ class OptionsScreen(ModalScreen[None]):
     def _redraw(self) -> None:
         entries = list(self.query(ClickableEntry))
         lines = [self._theme_line(), self._motion_line(), self._art_line(),
-                 self._density_line(), self._onboarding_line(), self._greyed_line(),
-                 self._auto_end_line()]
+                 self._labels_line(), self._density_line(), self._onboarding_line(),
+                 self._greyed_line(), self._auto_end_line()]
         for entry, line in zip(entries, lines, strict=False):
             entry.update(line)
 

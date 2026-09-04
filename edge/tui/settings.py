@@ -19,6 +19,13 @@ class UISettings:
     theme: str = "edge-ansi"
     reduced_motion: bool = False
     art_detail: Literal["full", "compact", "minimal"] = "full"
+    # Independent scene-label preference (WP-SC08, plan §2.6): whether/how object
+    # names float over the physical-model scene. Deliberately not coupled to
+    # `art_detail` or `reduced_motion` — none of the three may silently override
+    # another. "labeled" attaches names to accepted sprites, "hidden" leaves the
+    # art unannotated, "hover_hint" reveals the same hint on mouse hover *and*
+    # keyboard focus of the hotspot.
+    scene_labels: Literal["labeled", "hidden", "hover_hint"] = "labeled"
     density: Literal["comfortable", "compact"] = "comfortable"
     show_onboarding: bool = True
     show_disabled_options: bool = False
