@@ -173,14 +173,21 @@ def test_secondary_objects_are_admitted_across_the_matrix(strategy: ProjectionSt
     ever reach its ladder's worst rung is now rejected outright rather than
     shown degraded, and -- since a rejected/repositioned orbital changes
     which camera the joint solve scores best -- ship/wreck admission shifts
-    too even though no rung floor applies to them. Measured on this module's
-    matrix after the fix: ~77% (`fixed_fov_perspective`) / ~84%
-    (`depth_layered_anchor`), down from ~95%/~99%
-    (`docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`'s minimum-richness section
-    has the full real-gallery-matrix before/after). The floor below is
-    dropped to stay well under that, so ordinary calibration drift does not
-    make it flaky, while still failing loudly if independent, camera-blind
-    placement ever comes back.
+    too even though no rung floor applies to them. That took this module's
+    matrix to ~77% (`fixed_fov_perspective`) / ~84% (`depth_layered_anchor`),
+    from ~95%/~99%.
+
+    Two later fixes (`docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md` ->
+    "Retention scoring counted against the shrinking admitted set" and
+    "Cost-aware rung selection") recovered most of that and then some: the
+    pass loop's retention ladder had been *improving* its own score by
+    ejecting objects, and rung selection had been picking the richest fitting
+    rung and then refusing it on cost instead of taking the cheaper authored
+    tier that also fit. Measured on this module's matrix after both: **91.7%**
+    (`fixed_fov_perspective`) / **94.8%** (`depth_layered_anchor`). The floor
+    below sits under that with room for ordinary calibration drift, while
+    still failing loudly if either regression -- or independent, camera-blind
+    placement -- ever comes back.
     """
     total = admitted = 0
     for sector in matrix().values():
@@ -192,7 +199,7 @@ def test_secondary_objects_are_admitted_across_the_matrix(strategy: ProjectionSt
                 admitted += obj.key in accepted
     assert total > 0
     rate = Fraction(admitted, total)
-    assert rate >= Fraction(70, 100), f"{admitted}/{total} secondary objects admitted"
+    assert rate >= Fraction(85, 100), f"{admitted}/{total} secondary objects admitted"
 
 
 # ---------------------------------------------------------------------------
@@ -216,9 +223,22 @@ def _assert_hard_rules(plan: ScenePlan, objects: list[PhysicalObject], viewport:
         # A complete authored rung, never `fit_box`'s crop (attempt rule 3, §4.7).
         if obj.art_mode is ArtMode.LADDER:
             assert proj.rung is not None
-            assert proj.rung == _select_rung(CATALOG, obj, proj.bounds, TUNING)
             assert proj.rung.natural.width <= proj.bounds.width
             assert proj.rung.natural.height <= proj.bounds.height
+            # Rung selection is cost-aware (plan §4.14, the cost-aware
+            # `_select_rung` fix): the chosen rung is the richest one that
+            # fits *and* that retention-ordered spending could still afford,
+            # so it is either the richest fitting rung or a strictly cheaper
+            # one -- never a more expensive class than geometry allows, and
+            # never below `min_rung_index_from_end_by_scale_class`'s floor.
+            richest = _select_rung(CATALOG, obj, proj.bounds, TUNING)
+            assert richest is not None
+            assert proj.rung.render_cost <= richest.render_cost
+            all_rungs = CATALOG.rungs(obj.ladder_key) if obj.ladder_key else ()
+            worst_allowed = max(r.index for r in all_rungs) - (
+                TUNING.min_rung_index_from_end_by_scale_class.get(obj.scale_class, 0)
+            )
+            assert proj.rung.index <= worst_allowed
         else:
             assert obj.continuous_kind is not None
             floor = CATALOG.continuous(obj.continuous_kind).min_extent

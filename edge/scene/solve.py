@@ -100,7 +100,11 @@ def _contained(bounds: CellBox, viewport: CellBox, margin: int) -> bool:
 
 
 def _select_rung(
-    catalog: ArtGeometryCatalog, obj: PhysicalObject, bounds: CellBox, cfg: SceneTuning
+    catalog: ArtGeometryCatalog,
+    obj: PhysicalObject,
+    bounds: CellBox,
+    cfg: SceneTuning,
+    max_cost: int | None = None,
 ) -> LadderRung | None:
     """Plan §4.7/§9.6 attempt rule 3 (laddered): the richest complete authored
     rung whose natural box fits inside the projected box. Never the shipped
@@ -116,6 +120,20 @@ def _select_rung(
     actually present in *this* ladder, so the exclusion scales correctly even
     though port/starbase/stardock ladders have 4 rungs and ship ladders have
     3.
+
+    `max_cost`, when given, additionally excludes rungs the caller cannot
+    afford out of the remaining `cost_budget` (plan §4.14). It is a
+    *selection* input, not a post-hoc veto, because the two differ: picking
+    the richest fitting rung first and then refusing it on cost drops an
+    object that had a perfectly good cheaper authored tier available at the
+    very same position. That was a real, measured defect -- e.g.
+    `port+ships @ 120x44` under `FixedFovPerspective` rejected its warship
+    with `cost_budget` while the whole scene had spent 85 of 250, because
+    every sampled depth projected a box big enough for a rung-0 hull
+    (`render_cost` 350-436) and the rung-2 hull (34) that also fit was never
+    considered. Callers reasoning about pure geometry (`_z_ok_near_and_size`
+    and so `_feasible_z_interval`) pass `None` and stay cost-blind, which
+    keeps the feasible-z band a property of the camera and the ladder alone.
     """
     if obj.ladder_key is None:
         return None
@@ -128,6 +146,8 @@ def _select_rung(
     fits = [
         r for r in allowed if r.natural.width <= bounds.width and r.natural.height <= bounds.height
     ]
+    if max_cost is not None:
+        fits = [r for r in fits if r.render_cost <= max_cost]
     if not fits:
         return None
     return max(fits, key=lambda r: (r.natural.height, r.natural.width, -r.index))
@@ -257,13 +277,19 @@ _Outcome = Literal["accept", "move", "reject", "step_down", "reanchor"]
 
 
 def _decision(
-    rule_id: str, key: SceneKey | None, outcome: _Outcome, *, trace_prose: bool, reason: str = ""
+    rule_id: str,
+    key: SceneKey | None,
+    outcome: _Outcome,
+    *,
+    trace_prose: bool,
+    reason: str = "",
+    inputs: tuple[tuple[str, int | str], ...] = (),
 ) -> Decision:
     return Decision(
         rule_id=rule_id,
         key=key,
         outcome=outcome,
-        inputs=(),
+        inputs=inputs,
         reason=reason if trace_prose else "",
     )
 
@@ -445,9 +471,20 @@ def _evaluate_placement(
 
     rung: LadderRung | None = None
     if obj.art_mode is ArtMode.LADDER:
-        rung = _select_rung(catalog, obj, bounds, cfg)
+        # Cost-aware from the start (plan §4.14): the richest rung that both
+        # fits *and* is affordable out of what retention order has left. See
+        # `_select_rung`'s `max_cost` note for why picking richest-then-vetoing
+        # dropped objects that had a cheaper authored tier right there.
+        rung = _select_rung(catalog, obj, bounds, cfg, remaining_cost)
         if rung is None:
-            return None, "no_clearing_rung"
+            # Distinguish the two causes in the trace: a purely geometric
+            # "nothing authored fits here" is a different fact for a reviewer
+            # than "something fits but the budget is spent" (plan §4.20).
+            return None, (
+                "no_clearing_rung"
+                if _select_rung(catalog, obj, bounds, cfg) is None
+                else "cost_budget"
+            )
     else:
         assert obj.continuous_kind is not None
         yield_ = catalog.continuous(obj.continuous_kind)
@@ -503,11 +540,11 @@ def _evaluate_placement(
                 imposed.append((other.obj.key, visible))
 
     box_class = anchor_box_class if (obj.key == anchor_key and rung is None) else None
-    # Cost is a hard rule like any other (plan §4.14), checked here rather than
-    # after the fact so a tight budget makes an object take a cheaper candidate
-    # -- a farther depth selects a smaller, cheaper rung -- instead of being
-    # dropped outright. This costs no extra search: it refuses one already-
-    # generated candidate, and the object's bounded candidate list continues.
+    # Cost is a hard rule like any other (plan §4.14). A laddered object has
+    # already been *selected* within budget above, so this only ever binds a
+    # continuous one, whose box class is fixed by the anchor step-down ladder
+    # rather than chosen here -- for that one there is no cheaper alternative
+    # at this position, so refusing the candidate is the whole remedy.
     cost = (
         rung.render_cost if rung is not None
         else catalog.continuous(str(obj.continuous_kind)).render_cost[box_class or 0]
@@ -773,7 +810,7 @@ def _actual_cost(
 
 
 def _rejected_by_retention(
-    attempt: _Attempt, admitted: list[PhysicalObject]
+    attempt: _Attempt, inventory: list[PhysicalObject]
 ) -> tuple[int, ...]:
     """How many objects of each `SceneRetention` tier this attempt rejected,
     indexed by tier value ascending (plan §4.5: "higher retention priority is
@@ -793,9 +830,21 @@ def _rejected_by_retention(
     the two attempts tier-by-tier, most-protected tier first, makes any
     rejection at a higher tier strictly worse than any number of
     lower-tier gains, regardless of total count.
+
+    `inventory` is the solve's **full**, never-shrunk admitted list, not the
+    pass's current one -- see `solve`'s `inventory` local and the plan's
+    "Retention scoring counted against the shrinking admitted set" section.
+    An object the fallback ladder has already ejected is still counted as
+    rejected here, because from the *viewer's* point of view it is: it is
+    absent from the scene either way. Scoring against the pass-local list
+    instead made ejection itself improve the score -- a pass that had shed
+    everything but the anchor reported zero rejections and so beat an
+    earlier pass that placed the anchor and both ships but missed one
+    station, which is the same §4.5 inversion this tuple exists to prevent,
+    reached from the opposite direction.
     """
     counts = [0] * len(SceneRetention)
-    for obj in admitted:
+    for obj in inventory:
         if obj.key not in attempt.accepted:
             counts[int(obj.retention)] += 1
     return tuple(counts)
@@ -943,7 +992,7 @@ def _feasible_z_interval(
 
 def _score(
     attempt: _Attempt,
-    admitted: list[PhysicalObject],
+    inventory: list[PhysicalObject],
     anchor_key: SceneKey,
     target_height: int,
     previous: ScenePlan | None,
@@ -951,7 +1000,13 @@ def _score(
 ) -> tuple[tuple[int, ...], int, int, int, int, int, str]:
     """Plan §9.6 `better_of`'s lexicographic tuple, all ascending-better --
     with the retention-priority guard (`_rejected_by_retention`) prepended
-    ahead of the raw accepted-count term (see that function's docstring)."""
+    ahead of the raw accepted-count term (see that function's docstring).
+
+    `inventory` is the solve's full, never-shrunk admitted list so that both
+    of the first two terms measure the same fixed denominator across every
+    pass; comparing attempts drawn from differently-sized admitted sets is
+    what the pass loop does by construction.
+    """
     anchor_bounds = attempt.bounds.get(anchor_key)
     anchor_height = anchor_bounds.height if anchor_bounds is not None else 0
     min_slack = attempt.min_separation_slack
@@ -965,7 +1020,7 @@ def _score(
     fingerprint = _fingerprint(attempt.camera, entries)
     hysteresis = _hysteresis(attempt, anchor_key, anchor_height, previous, cfg)
     return (
-        _rejected_by_retention(attempt, admitted),
+        _rejected_by_retention(attempt, inventory),
         -len(attempt.accepted),
         attempt.min_violations,
         abs(anchor_height - target_height),
@@ -1096,6 +1151,11 @@ def solve(
     placements: dict[SceneKey, Vec3] = {p.key: p.position for p in arrangement.placements}
     admitted = [o for o in arrangement.objects if o.art_mode is not ArtMode.GLYPH]
     admitted.sort(key=lambda o: (o.retention, o.hostility_ordinal, -o.threat_rank, o.key))
+    # The full inventory, fixed for the whole solve. `admitted` shrinks as the
+    # fallback ladder ejects objects; `inventory` never does, so `_score`'s
+    # retention term measures every attempt against the same denominator
+    # (see `_rejected_by_retention`).
+    inventory = list(admitted)
 
     if not admitted:
         base_camera = _base_starfield_camera(cfg)
@@ -1118,6 +1178,7 @@ def solve(
         {p.key: p.depth for p in previous.projections if p.accepted} if previous is not None else {}
     )
     z_memo: dict[tuple[SceneKey, int, int, int], tuple[int, int] | None] = {}
+    last_failure: dict[SceneKey, str] = {}
 
     best: _Attempt | None = None
     best_score: tuple[tuple[int, ...], int, int, int, int, int, str] | None = None
@@ -1160,7 +1221,16 @@ def solve(
             )
             counters["occlusion_comparisons"] += attempt.occlusion_comparisons
             counters["reposition_candidates"] += attempt.placement_evaluations
-            score = _score(attempt, admitted, anchor.key, target_h, previous, cfg_current)
+            # Plan §4.20 legibility: remember why each object last failed a
+            # hard rule under *some* camera, so a later `retention_reject`
+            # (which by construction happens in a pass where the object is
+            # no longer in `admitted`, and so carries no hard-rule decision
+            # of its own) can still name the underlying cause instead of
+            # reporting only "lowest retention priority".
+            for decision in attempt.decisions:
+                if decision.key is not None and decision.outcome == "reject":
+                    last_failure[decision.key] = decision.rule_id
+            score = _score(attempt, inventory, anchor.key, target_h, previous, cfg_current)
             if best_score is None or score < best_score:
                 best = attempt
                 best_score = score
@@ -1208,7 +1278,19 @@ def solve(
         if admitted and admitted[-1].key != anchor.key:
             drop = admitted[-1]
             admitted = admitted[:-1]
-            trace.append(_decision("retention_reject", drop.key, "reject", trace_prose=trace_prose, reason="lowest retention priority"))
+            cause = last_failure.get(drop.key, "")
+            trace.append(
+                _decision(
+                    "retention_reject", drop.key, "reject", trace_prose=trace_prose,
+                    reason=(
+                        "lowest retention priority; last hard-rule failure was "
+                        f"{cause}" if cause else
+                        "lowest retention priority; this object cleared every hard "
+                        "rule but the scene as a whole did not"
+                    ),
+                    inputs=(("last_failure", cause),) if cause else (),
+                )
+            )
             continue
 
         break

@@ -1831,6 +1831,100 @@ Calibration, from the real gallery case/size matrix (`edge.tui.scene_gallery`'s
   neither of which this fix touches. Recorded here as an open follow-up
   rather than shipped half-working.
 
+**Retention scoring counted against the shrinking admitted set (post-WP-SC09
+fix).** Maintainer review of real rendered output reported scenes being dropped
+"for no discernible reason based on available space — those scenes had more
+empty space than the legacy composition." That was a real defect, and a §4.5
+inversion reached from the direction `_rejected_by_retention`'s own docstring
+did not anticipate.
+
+`_score`'s first term counted, per retention tier, how many objects *the
+current pass's* `admitted` list this attempt failed to place. But the pass
+loop's fallback ladder **shrinks `admitted` monotonically**, so ejecting an
+object also removes it from the denominator — and therefore *improves the
+score*. A pass that had shed everything reported zero rejections and beat every
+earlier, fuller attempt. Traced on `planet+port+ships @ 67x30`
+(`FixedFovPerspective`):
+
+```text
+pass 1  cam z=185  acc=3/4  cost=138   rej={port: no_feasible_depth}
+        -> score retention term (0,0,1,0,0,0,0)
+pass 6  cam z=193  acc=1/1  cost=12    rej={}
+        -> score retention term (0,0,0,0,0,0,0)   <- lexicographically better
+final plan: the planet alone, 12 of a 250 cost budget, in a 67x30 viewport
+```
+
+The planet and both ships had already been placed together, legally, under a
+pass-1 camera; the only genuine failure was the port, which at that viewport
+truly cannot clear a non-excluded rung (its parent-relative depth puts it at
+`dz >= 113` where a height-6 rung needs `dz <= 70`). The scoring bug then
+discarded the two ships as well.
+
+The fix is one line of scope: `solve` captures `inventory = list(admitted)`
+before the pass loop and `_score` counts rejections against **that** fixed set,
+so every attempt from every pass is measured against the same denominator. The
+early-exit test (`attempt.hard_ok(len(admitted))`) deliberately still uses the
+pass's own `admitted`, or a scene that legitimately needs to shed could never
+terminate early. Nothing else in the comparison tuple changed.
+
+Legibility followed the same complaint (§4.20): a `retention_reject` is by
+construction emitted in a pass where the object is no longer in `admitted`, so
+it carried no hard-rule `Decision` of its own and the trace really did say only
+"lowest retention priority". `solve` now remembers each object's last
+hard-rule failure across attempts and records it on the `retention_reject`
+`Decision` as `inputs=(("last_failure", rule_id),)` (plus prose under the dev
+switch). `Decision.inputs` had been unused; this is its first consumer.
+
+**Cost-aware rung selection (post-WP-SC09 fix).** The same complaint had a
+second, independent cause. `_select_rung` picked the richest fitting rung and
+`_evaluate_placement` *then* refused it if `render_cost` exceeded the remaining
+budget — so an object was dropped outright even when a cheaper authored rung
+fitted the very same projected box. Traced on `port+ships @ 120x44`
+(`FixedFovPerspective`): the warship was rejected with `cost_budget` while the
+whole scene had spent **85 of 250**, because every sampled depth projected a box
+roomy enough for a rung-0 hull (`render_cost` 350–436) and the rung-2 hull (34)
+that also fitted was never considered. The comment claiming "a farther depth
+selects a smaller, cheaper rung" assumed the bounded depth strata would find
+one; with `_DEPTH_STRATA` = 4 and `max_reposition_candidates` = 16 they often
+did not.
+
+`_select_rung` now takes an optional `max_cost` and filters the fitting set by
+affordability **before** ranking, so cost shapes the *selection* rather than
+vetoing it. This is a step-down only — `max_cost` can only remove candidates —
+so §4.14's "may never move it to a higher cost class" is structural. Callers
+reasoning about pure geometry (`_z_ok_near_and_size`, and so
+`_feasible_z_interval`) pass `None` and stay cost-blind, keeping the feasible-z
+band a property of the camera and the ladder alone. `_evaluate_placement`
+re-runs the cost-blind selection once on failure purely to report
+`no_clearing_rung` and `cost_budget` as distinct trace causes.
+
+**Measured result of the two fixes** (`edge/tui/scene_gallery.py::cases()` ×
+`SIZES`, 196 secondary objects, real `build_scene_tuning()` /
+`load_geometry_catalog()` config):
+
+| | `FixedFovPerspective` | `DepthLayeredAnchorProjection` |
+|---|---:|---:|
+| after the minimum-richness floor (`1b0cb1e`) | 75.5% | 81.6% |
+| + retention scoring against the full inventory | 88.3% | 94.9% |
+| **+ cost-aware rung selection** | **91.3%** | **94.9%** |
+
+Ship/wreck admission specifically moved 75.0%/82.4% → 97.1%/100%. The residual
+rejections are now individually explicable rather than blanket
+`retention_reject`s: nine `no_feasible_depth` orbitals (the minimum-richness
+floor working as designed on small canvases), one `separation`, and — on
+`nebula+port+ships` and `blackhole+port+ships` at 67×30 under
+`FixedFovPerspective` only — a genuine region-geometry limit worth recording.
+There, fitting a 110×60 su nebula into a 65×28 usable canvas forces the camera
+back to `z ≈ -93` (width binds: `scale <= 65 / (110 × 2) = 0.295`), while
+`region_by_scale_class["ship"].z_min` is 1, so no ship can come nearer than
+`dz = 94`, where its box projects 15 cells wide against a 17-cell narrowest
+authored rung. That is a placement-region calibration limit (§5), not a solver
+defect, and it is left as-is rather than retuning an approved region value.
+
+`tests/test_scene_size_and_drops.py` is the CI guard for both fixes, and
+`tests/test_scene_joint_placement.py`'s admission floor rose from 70% back to
+85% (its own smaller matrix now measures 91.7%/94.8%).
+
 **Glyph scatter**, after the solve and after paint (§4.19):
 
 ```text
