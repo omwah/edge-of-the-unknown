@@ -415,6 +415,146 @@ def _rejected_by_retention(
     return tuple(counts)
 
 
+def _z_ok_near_and_size(
+    z: int,
+    camera: Camera,
+    obj: PhysicalObject,
+    viewport: CellBox,
+    cfg: SceneTuning,
+    catalog: ArtGeometryCatalog,
+    strategy: ProjectionStrategy,
+) -> tuple[bool, bool]:
+    """Evaluate `obj` at depth `z`, placed at the camera's own aim point (the
+    same best-case-xy convention `_visible_xy_extent_from_scale` already uses
+    for the xy half of this fix), against every depth-dependent hard rule
+    `_attempt()` applies: near-plane, edge-margin/containment ("too big"),
+    `min_projected_size`, and (ladder) `no_clearing_rung` / (continuous)
+    `min_ink_extent` ("too small").
+
+    Returns `(not_too_big, not_too_small)`. Both are independently monotonic
+    in `z` for either strategy -- `scale(z)` is non-increasing in `z` for
+    both `FixedFovPerspective`'s continuous divide-by-depth and
+    `DepthLayeredAnchorProjection`'s step function, so a farther z can never
+    project a *larger* box than a nearer one -- which is what lets
+    `_feasible_z_interval` binary-search each bound independently instead of
+    needing a closed-form inversion per strategy.
+    """
+    at = Vec3(camera.position.x + camera.aim_x_su, camera.position.y + camera.aim_y_su, z)
+    try:
+        bounds = strategy.project(camera, obj, at, viewport)
+    except NearPlaneViolation:
+        return False, False
+    not_too_big = _contained(bounds, viewport, cfg.edge_margin)
+    min_w, min_h = cfg.min_projected_cells_by_scale_class[obj.scale_class]
+    not_too_small = bounds.width >= min_w and bounds.height >= min_h
+    if not_too_small:
+        if obj.art_mode is ArtMode.LADDER:
+            not_too_small = _select_rung(catalog, obj, bounds) is not None
+        else:
+            assert obj.continuous_kind is not None
+            yield_ = catalog.continuous(obj.continuous_kind)
+            ink_min_box = _ink_box(obj, bounds, None, catalog, side="min")
+            not_too_small = (
+                ink_min_box.width >= yield_.min_extent.width
+                and ink_min_box.height >= yield_.min_extent.height
+            )
+    return not_too_big, not_too_small
+
+
+def _feasible_z_interval(
+    camera: Camera,
+    obj: PhysicalObject,
+    viewport: CellBox,
+    cfg: SceneTuning,
+    catalog: ArtGeometryCatalog,
+    strategy: ProjectionStrategy,
+    z_min: int,
+    z_max: int,
+) -> tuple[int, int] | None:
+    """The z-subinterval of `[z_min, z_max]` (an object's own region depth
+    bounds) where `obj` clears every depth-dependent hard rule -- the same
+    "invert the forward math to find the exact feasible band" technique the
+    xy fix applies to `visible_xy_extent`, extended to z (plan §9.6
+    frustum-aware reposition, z half).
+
+    Rather than deriving a closed-form inversion of `scale(z)` per strategy
+    (`FixedFovPerspective`'s `Fraction` divide vs.
+    `DepthLayeredAnchorProjection`'s discrete per-layer power -- two
+    different formulas, and for a laddered object a further per-rung
+    natural-size threshold on top), this reuses `strategy.project()` and the
+    exact same `_contained`/`_select_rung`/`_ink_box` functions `_attempt()`
+    itself calls as an oracle, and finds each bound by bounded binary search
+    (`O(log(z_max - z_min))` `project()` calls, never an open-ended scan --
+    plan §6.2 rule 4). This is possible, and exact, because
+    `_z_ok_near_and_size`'s two indicators are each monotonic in z: the
+    "too big" (near-plane/edge-margin) failure can only happen for z too
+    close to the camera, and the "too small" (min-size/no-clearing-rung/
+    min-ink-extent) failure can only happen for z too far -- so a laddered
+    object's discrete rung ladder does not need a union over rungs here:
+    since every rung's natural box only ever changes the *threshold* size at
+    which "too small" flips (never the direction), the set of feasible rungs
+    collapses to a single contiguous z-band exactly like the continuous
+    case, with the smallest authored rung's natural size setting the far
+    edge.
+
+    Returns `None` when no z in `[z_min, z_max]` clears every rule (the
+    feasible band is empty, or `z_min > z_max`) -- the caller falls back to
+    the untouched full region z-range in that case, exactly the pre-fix
+    behaviour, so this can only ever help, never newly reject a placement.
+    """
+    if z_min > z_max:
+        return None
+    # Near-plane clamp: `_z_ok_near_and_size` reports `(False, False)` for any
+    # z that violates the near-plane check (`dz <= 0` or `z < near_plane_su`),
+    # which is a *third*, independent failure mode, not "too small" -- z near
+    # `z_min` is frequently *behind* the camera for a wide region (a ship's
+    # region commonly starts at world z=0/1 while the framed camera sits far
+    # forward of the anchor), so treating that `False` as "too small at the
+    # near end" would corrupt the monotonic assumption the two searches below
+    # depend on. Restricting both searches to the sub-range that already
+    # clears the near-plane check removes the confound before it can bite.
+    z_valid_min = max(z_min, camera.near_plane_su, camera.position.z + 1)
+    if z_valid_min > z_max:
+        return None
+
+    lo_big, lo_small = _z_ok_near_and_size(z_valid_min, camera, obj, viewport, cfg, catalog, strategy)
+    hi_big, hi_small = _z_ok_near_and_size(z_max, camera, obj, viewport, cfg, catalog, strategy)
+
+    if lo_big:
+        z_lo = z_valid_min
+    elif not hi_big:
+        return None
+    else:
+        lo, hi = z_valid_min, z_max
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            mid_big, _ = _z_ok_near_and_size(mid, camera, obj, viewport, cfg, catalog, strategy)
+            if mid_big:
+                hi = mid
+            else:
+                lo = mid
+        z_lo = hi
+
+    if hi_small:
+        z_hi = z_max
+    elif not lo_small:
+        return None
+    else:
+        lo, hi = z_valid_min, z_max
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            _, mid_small = _z_ok_near_and_size(mid, camera, obj, viewport, cfg, catalog, strategy)
+            if mid_small:
+                lo = mid
+            else:
+                hi = mid
+        z_hi = lo
+
+    if z_lo > z_hi:
+        return None
+    return (z_lo, z_hi)
+
+
 def _score(
     attempt: _Attempt,
     admitted: list[PhysicalObject],
@@ -650,8 +790,23 @@ def solve(
             counters["reposition_candidates"] += 1
             region = target.region
             offset_key = f"{target.key.tag}:{target.key.ident}|reposition|{attempt_no}"
-            new_z = region.z_min + _hash_index(offset_key + "|z", region.z_max - region.z_min + 1)
-            # Frustum-aware reposition (docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md
+            # Frustum-aware reposition, z half (docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md
+            # §2.5/§9.6 fix, follow-up to the xy-only fix below): the blind
+            # z hash draw over the object's full nominal region used to ignore
+            # that only a narrow depth band -- clearing near-plane, edge-margin,
+            # min_projected_size, and (ladder) no_clearing_rung / (continuous)
+            # min_ink_extent all at once -- can ever pass `_attempt()`'s hard
+            # rules at all. `_feasible_z_interval` finds that band (or `None` if
+            # this object has no feasible depth at all against the current
+            # pass's framed camera) and the z draw is narrowed to it; a `None`
+            # result falls back to the untouched full region z-range, exactly
+            # the pre-fix behaviour, so this can only ever help.
+            z_interval = _feasible_z_interval(
+                camera, target, viewport, cfg_current, catalog, strategy, region.z_min, region.z_max
+            )
+            z_lo, z_hi = z_interval if z_interval is not None else (region.z_min, region.z_max)
+            new_z = z_lo + _hash_index(offset_key + "|z", z_hi - z_lo + 1)
+            # Frustum-aware reposition, xy half (docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md
             # §2.5/§9.6 fix): `target.region` is deliberately wide -- ships/wrecks
             # receive placement freedom far beyond a station's -- but only the
             # slice of it a camera the solver would actually place can show is

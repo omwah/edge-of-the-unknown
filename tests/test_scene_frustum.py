@@ -232,9 +232,12 @@ def test_gallery_matrix_admits_secondary_objects_at_a_much_higher_rate() -> None
                         if obj.key in accepted:
                             admitted += 1
     assert total > 0
-    assert admitted / total >= 0.10, (
+    assert admitted / total >= 0.20, (
         f"secondary-object admission rate regressed to {admitted}/{total} "
-        f"({admitted / total:.1%}), at or below the pre-fix ~5.6% baseline"
+        f"({admitted / total:.1%}), below the z-feasibility-fix floor "
+        "(measured ~26.2% fixed_fov / ~33.1% depth_layered after the z fix, "
+        "vs. ~19.8%/~6.4% with xy-only frustum-awareness and ~14.0%/~5.2% "
+        "pre-fix)"
     )
 
 
@@ -333,3 +336,161 @@ def test_intersect_region_xy_returns_none_on_no_overlap() -> None:
     assert intersect_region_xy(region, (20, 30, 20, 30)) is None
     assert intersect_region_xy(region, None) is None
     assert intersect_region_xy(region, (-5, 5, -5, 5)) == (0, 5, 0, 5)
+
+
+# ---------------------------------------------------------------------------
+# 5. z-feasibility (follow-up fix): the reposition fallback narrows *which
+#    z* it draws from, not just which xy, to the depth band where the object
+#    can actually clear near-plane, edge-margin, min-projected-size, and
+#    (ladder) no-clearing-rung / (continuous) min-ink-extent.
+# ---------------------------------------------------------------------------
+
+from edge.scene.solve import _feasible_z_interval, _z_ok_near_and_size  # noqa: E402
+
+
+def test_feasible_z_interval_matches_direct_probing() -> None:
+    """The interval `_feasible_z_interval` returns must agree with a direct,
+    brute-force per-z probe over the same region -- this is the ground truth
+    the binary search is meant to reproduce exactly, just without the linear
+    scan.
+    """
+    cfg = _tuning()
+    ship = _ship_object(1)
+    region = ship.region
+    for strategy in STRATEGIES:
+        camera = Camera(
+            position=Vec3(0, 0, -40), aim_x_su=0, aim_y_su=0,
+            fov_num=cfg.fixed_fov_num, fov_den=cfg.fixed_fov_den,
+            near_plane_su=cfg.near_plane_su, cell_aspect=cfg.cell_aspect,
+            depth_layer_size_su=cfg.depth_layer_size_su, depth_layer_scale=cfg.depth_layer_scale,
+        )
+        got = _feasible_z_interval(
+            camera, ship, VIEWPORT, cfg, CATALOG, strategy, region.z_min, region.z_max
+        )
+        brute_feasible = [
+            z for z in range(region.z_min, region.z_max + 1)
+            if all(_z_ok_near_and_size(z, camera, ship, VIEWPORT, cfg, CATALOG, strategy))
+        ]
+        if not brute_feasible:
+            assert got is None
+        else:
+            assert got is not None, (
+                f"{strategy.name}: brute force found feasible z "
+                f"{brute_feasible[0]}..{brute_feasible[-1]} but the binary "
+                "search returned None"
+            )
+            z_lo, z_hi = got
+            assert z_lo == brute_feasible[0]
+            assert z_hi == brute_feasible[-1]
+            # Every z strictly inside the reported band must also brute-force
+            # feasible -- i.e. the band is not merely "endpoints happen to
+            # match", it is the true contiguous feasible interval.
+            assert set(range(z_lo, z_hi + 1)) == set(brute_feasible)
+
+
+def test_feasible_z_interval_excludes_region_behind_the_camera() -> None:
+    """A region whose near edge starts behind the camera's near plane (a
+    common real shape: a ship's nominal region reaches back toward world
+    z=0/1 while the framed camera sits far forward of the anchor) must not
+    be reported as "too small at the near end" -- that was the bug this
+    follow-up fix corrects: `_z_ok_near_and_size` reports `(False, False)`
+    for a near-plane violation, which is a distinct failure mode from "too
+    small", and conflating them made the binary search return `None` even
+    when a real feasible band existed farther out.
+    """
+    cfg = _tuning()
+    ship = _ship_object(1)
+    region = Region(x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=1, z_max=300)
+    for strategy in STRATEGIES:
+        camera = Camera(
+            position=Vec3(0, 0, 200), aim_x_su=0, aim_y_su=0,
+            fov_num=cfg.fixed_fov_num, fov_den=cfg.fixed_fov_den,
+            near_plane_su=cfg.near_plane_su, cell_aspect=cfg.cell_aspect,
+            depth_layer_size_su=cfg.depth_layer_size_su, depth_layer_scale=cfg.depth_layer_scale,
+        )
+        # region.z_min=1 is far behind camera.position.z=200 -> near-plane
+        # violated there, but z in (200, 300] should still have a real
+        # feasible band since the ship's face is well within min-size floors
+        # close to the camera.
+        got = _feasible_z_interval(
+            camera, ship, VIEWPORT, cfg, CATALOG, strategy, region.z_min, region.z_max
+        )
+        assert got is not None, (
+            f"{strategy.name}: a region reaching behind the camera's near "
+            "plane must not blank out a real feasible band farther out"
+        )
+        z_lo, z_hi = got
+        assert z_lo > camera.position.z
+
+
+def test_feasible_z_interval_never_produces_a_float() -> None:
+    cfg = _tuning()
+    ship = _ship_object(1)
+    region = ship.region
+    for strategy in STRATEGIES:
+        camera = Camera(
+            position=Vec3(0, 0, -40), aim_x_su=0, aim_y_su=0,
+            fov_num=cfg.fixed_fov_num, fov_den=cfg.fixed_fov_den,
+            near_plane_su=cfg.near_plane_su, cell_aspect=cfg.cell_aspect,
+            depth_layer_size_su=cfg.depth_layer_size_su, depth_layer_scale=cfg.depth_layer_scale,
+        )
+        got = _feasible_z_interval(
+            camera, ship, VIEWPORT, cfg, CATALOG, strategy, region.z_min, region.z_max
+        )
+        if got is not None:
+            for term in got:
+                assert isinstance(term, int) and not isinstance(term, bool)
+
+
+def test_feasible_z_interval_is_bounded_work() -> None:
+    """Plan §6.2 rule 4: no accept/reject search is ever an open-ended scan.
+    `_feasible_z_interval` must cost `O(log(z_max - z_min))` `project()`
+    calls (two binary searches plus a couple of endpoint probes), never a
+    linear scan over the region's full depth span.
+    """
+    import math
+
+    cfg = _tuning()
+    ship = _ship_object(1)
+    region = Region(x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=1, z_max=1_000_000)
+    for strategy in STRATEGIES:
+        camera = Camera(
+            position=Vec3(0, 0, -40), aim_x_su=0, aim_y_su=0,
+            fov_num=cfg.fixed_fov_num, fov_den=cfg.fixed_fov_den,
+            near_plane_su=cfg.near_plane_su, cell_aspect=cfg.cell_aspect,
+            depth_layer_size_su=cfg.depth_layer_size_su, depth_layer_scale=cfg.depth_layer_scale,
+        )
+        calls = 0
+        orig_project = strategy.project
+
+        def counted_project(*args: object, **kwargs: object) -> CellBox:
+            nonlocal calls
+            calls += 1
+            return orig_project(*args, **kwargs)  # type: ignore[arg-type]
+
+        strategy.project = counted_project  # type: ignore[method-assign]
+        try:
+            _feasible_z_interval(camera, ship, VIEWPORT, cfg, CATALOG, strategy, region.z_min, region.z_max)
+        finally:
+            strategy.project = orig_project  # type: ignore[method-assign]
+        span = region.z_max - region.z_min
+        assert calls <= 4 * math.ceil(math.log2(span + 1)) + 8, (
+            f"{strategy.name}: _feasible_z_interval made {calls} project() "
+            f"calls over a span of {span} -- expected O(log(span)), not a scan"
+        )
+
+
+def test_feasible_z_interval_is_deterministic() -> None:
+    cfg = _tuning()
+    ship = _ship_object(1)
+    region = ship.region
+    for strategy in STRATEGIES:
+        camera = Camera(
+            position=Vec3(0, 0, -40), aim_x_su=0, aim_y_su=0,
+            fov_num=cfg.fixed_fov_num, fov_den=cfg.fixed_fov_den,
+            near_plane_su=cfg.near_plane_su, cell_aspect=cfg.cell_aspect,
+            depth_layer_size_su=cfg.depth_layer_size_su, depth_layer_scale=cfg.depth_layer_scale,
+        )
+        first = _feasible_z_interval(camera, ship, VIEWPORT, cfg, CATALOG, strategy, region.z_min, region.z_max)
+        second = _feasible_z_interval(camera, ship, VIEWPORT, cfg, CATALOG, strategy, region.z_min, region.z_max)
+        assert first == second

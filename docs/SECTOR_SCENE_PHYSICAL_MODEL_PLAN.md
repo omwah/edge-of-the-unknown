@@ -1561,6 +1561,56 @@ of resampling a near-uniformly-invisible box every time. No new unbounded work i
 reposition fallback still spends exactly `cfg.max_reposition_candidates` attempts per
 flexible object, and still shows up in `SolveCounters.reposition_candidates` as before.
 
+**Frustum-aware reposition, z half (follow-up fix).** The xy fix above left z drawn
+uniformly from the object's full nominal `region.z_min..z_max` — measured real-world
+impact: 0.0% → 14.0% (`FixedFovPerspective`) / 0.0% → 5.2% (`DepthLayeredAnchorProjection`)
+admission across the 172 secondary objects in `edge/tui/scene_gallery.py`'s full
+case/size matrix, with the remaining rejections dominated by `no_clearing_rung`,
+`min_projected_size`, and residual `edge_margin` — because the workable z-band for a
+typical ship is only ~10% of its region's z-span, and z sampling still ignored this
+entirely. `edge/scene/solve.py::_feasible_z_interval` closes that gap: rather than
+deriving a closed-form inversion of `scale(z)` per strategy (`FixedFovPerspective`'s
+`Fraction` divide vs. `DepthLayeredAnchorProjection`'s discrete per-layer power, plus a
+further per-rung natural-size threshold for a laddered object), it reuses
+`strategy.project()` and the exact same `_contained`/`_select_rung`/`_ink_box` functions
+`_attempt()` itself calls as an oracle, and finds the feasible z-band by two bounded
+binary searches (`O(log(region.z_max - region.z_min))` `project()` calls, never a scan
+— §6.2 rule 4) rather than a linear probe. This works exactly because, for either
+strategy, `scale(z)` is non-increasing in z, so the "too big" (near-plane/edge-margin)
+failure can only occur for z too close to the camera and the "too small"
+(`min_projected_size`/`no_clearing_rung`/`min_ink_extent`) failure can only occur for z
+too far — each is independently monotonic, so a laddered object's discrete rung ladder
+does not need a union over rungs: every rung's natural size only ever moves the
+*threshold* at which "too small" flips, never the direction, so the feasible rungs
+collapse to one contiguous z-band exactly like the continuous case, with the smallest
+authored rung's natural size setting the far edge.
+
+One subtlety the first version of this fix got wrong and had to correct:
+`_z_ok_near_and_size`'s near-plane check reports `(False, False)` for a `z` that fails
+the near-plane test (`dz <= 0` or `z < camera.near_plane_su`) — a *third*, independent
+failure mode from "too small," and a common real shape, since a ship's region commonly
+reaches back toward world z≈0 while the pass's framed camera sits far forward of the
+anchor. Treating that `False` as "too small at the near end" broke the monotonicity the
+binary searches depend on and made the interval come back empty far more often than the
+true geometry warranted. The fix clamps both searches to the sub-range that already
+clears the near-plane check (`z_valid_min = max(z_min, camera.near_plane_su,
+camera.position.z + 1)`) before searching for the too-big/too-small thresholds within it.
+
+The z interval is intersected with `region.z_min..z_max` exactly like the xy fix (a
+`None` result, or `z_valid_min > z_max`, falls back to the untouched full region z-range
+— this can only ever help, never newly reject a placement the pre-fix behaviour would
+have allowed), and the resulting z feeds the existing xy computation unchanged, so the
+final sampled point comes from the true joint (x, y, z) feasible volume rather than a
+feasible xy slice at a blind z. Measured real-world impact after this fix: 19.8% → 26.2%
+(`FixedFovPerspective`) / 6.4% → 33.1% (`DepthLayeredAnchorProjection`) — a clear further
+improvement over the xy-only fix, though still short of "high, legacy-composer-like"
+reliability; the remaining rejections trace to the estimate being evaluated against the
+pass's framed camera rather than the eventual accepted candidate camera (`candidates()`
+still sweeps height/aim around it), to only one flexible object being repositioned per
+fallback-ladder iteration, and to `separation`/`no_clearing_rung` failures that are
+governed by other objects' positions and authored rung granularity rather than by z
+alone.
+
 **Glyph scatter**, after the solve and after paint (§4.19):
 
 ```text
