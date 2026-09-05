@@ -1449,7 +1449,7 @@ def solve(arrangement, viewport, cfg, catalog, strategy, previous):
             if plan.hard_ok:
                 return finish(plan)                 # glyph scatter + fingerprint
         if repositionable(admitted):                # 1) move flexible objects
-            reposition_worst(admitted, cfg); continue
+            reposition_worst(admitted, cfg); continue   # frustum-aware (below)
         if anchor.art_mode is CONTINUOUS and anchor.box_class < last_class:
             step_down(anchor); continue             # 2) anchor box class (2.3, 4.14)
         if len(admitted) > 0:                       # 3) reject lowest priority
@@ -1483,13 +1483,30 @@ expensive checks run on few objects:
 **Comparing candidates.** `better_of` compares this integer tuple, all ascending-better:
 
 ```text
-(-count_admitted,
+(rejected_by_retention_tier,      # tuple, most-protected tier first (see below)
+ -count_admitted,
   count_min_violations,
   abs(anchor_height - target_height),
  -min_separation_slack,
   hysteresis_delta(plan, previous),
   plan.fingerprint)                 # stable final tie-break, never iteration order
 ```
+
+`rejected_by_retention_tier` is a length-`len(SceneRetention)` tuple counting how many
+objects of each retention tier this attempt rejected, tier-value order (most protected
+first). It exists because the raw `-count_admitted` term alone violates §4.5 across the
+pass loop, not within one attempt: the pass loop's own fallback ladder monotonically
+shrinks `admitted` (rule 3 above), so a **later** pass's `best` candidate is drawn from a
+*smaller* admitted set than an **earlier** pass's — and `-count_admitted` compares those
+two attempts' raw totals with no regard for which objects they contain. A pass that still
+had every ship in `admitted` and happened to fit three of them while rejecting the (higher
+priority) anchor previously could out-score a later pass that fit the anchor alone,
+because 3 > 1 — silently dropping the object retention exists to protect. Comparing
+tier-by-tier first makes any rejection at a higher tier strictly worse than any number of
+lower-tier gains, so `best` can never again prefer "more low-priority objects, minus the
+anchor" over "the anchor, minus some low-priority objects." This was a latent gap: it
+never manifested before the reposition fix below, because flexible objects rarely
+succeeded together often enough to reach it.
 
 **Hysteresis metric** (integer L1, weights from config, `0` when `previous is None`):
 
@@ -1503,6 +1520,46 @@ delta = w_cam * abs(anchor_height_now - anchor_height_prev)
 Hysteresis is only ever the fifth term of the comparison tuple, which is what makes
 "hysteresis never defeats a hard rule" (§4.11) structural rather than a matter of weight
 tuning.
+
+**Frustum-aware reposition (post-WP-SC09 fix).** `region_by_scale_class` deliberately
+gives a non-anchor scale class (ship/wreck) a placement region far wider than the camera,
+framed only against the anchor, can ever show at once (§2.5) — the initial hash-derived
+placement in `classify.py` samples that whole region blind (it is viewport-independent by
+design, plan §9.3), and `reposition_worst`'s original fallback resampled the *same* full
+region again on every retry, with no camera awareness at all. Because the visible slice of
+a wide region is typically under 10% of its volume, this gave each reposition attempt well
+under a 2% chance of landing somewhere `attempt`'s hard rules could ever accept, so a
+non-anchor object was rejected almost every time even in the simplest scenes (e.g. a port
+with two ships losing both). The fix narrows *where within the region* `reposition_worst`
+samples, never the region itself:
+
+```text
+def reposition_worst(target, cfg, camera, viewport, strategy):
+    z = hash_index(region.z_min..z_max)                  # unchanged: still the full region
+    extent = strategy.visible_xy_extent(camera, viewport, z, target.face, cfg)
+    x_lo, x_hi, y_lo, y_hi = intersect(region.xy, extent) or region.xy   # fall back untouched
+    x = hash_index(x_lo..x_hi); y = hash_index(y_lo..y_hi)
+    return Vec3(x, y, z)
+```
+
+`visible_xy_extent` (`edge/scene/project.py`, one method per `ProjectionStrategy`) inverts
+`project()`'s own forward formulas: given a camera, viewport, depth `z`, and a face size,
+it solves for the su-space `(x_min, x_max, y_min, y_max)` box within which that face,
+placed anywhere inside, projects fully inside the viewport with `cfg.edge_margin`
+clearance — exactly the containment test `attempt` applies after the fact, computed in
+advance instead of by trial placement. It is an *estimate* against the pass's currently
+framed camera (the one `strategy.frame()` returns for the anchor, not necessarily the
+exact candidate `attempt` ultimately accepts, since `candidates()` still sweeps height/aim
+around it) — sampling from its intersection with the object's own region only biases the
+existing bounded hash draw toward where a camera the solver would plausibly use can show
+the object; it never claims an exact guarantee, and a `None`/empty intersection (near-plane
+failure, or a face too large to fit at that depth at all) falls back to the untouched full
+region, exactly the pre-fix behaviour for that one draw. This keeps the "wide region" design
+intent of §2.5 intact — a ship can still land at any depth in its full region, including the
+far side of it — while making that freedom actually reachable by the bounded search instead
+of resampling a near-uniformly-invisible box every time. No new unbounded work is added: the
+reposition fallback still spends exactly `cfg.max_reposition_candidates` attempts per
+flexible object, and still shows up in `SolveCounters.reposition_candidates` as before.
 
 **Glyph scatter**, after the solve and after paint (§4.19):
 

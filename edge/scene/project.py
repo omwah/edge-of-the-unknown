@@ -31,7 +31,7 @@ from fractions import Fraction
 from typing import Protocol
 
 from edge.scene.catalog import ArtGeometryCatalog, LadderRung
-from edge.scene.geometry import CellBox, Vec3
+from edge.scene.geometry import CellBox, Face, Region, Su, Vec3
 from edge.scene.model import (
     ArtMode,
     Camera,
@@ -99,6 +99,15 @@ class ProjectionStrategy(Protocol):
         at: Vec3,
         viewport: CellBox,
     ) -> CellBox: ...
+
+    def visible_xy_extent(
+        self,
+        camera: Camera,
+        viewport: CellBox,
+        z: Su,
+        face: Face,
+        cfg: SceneTuning,
+    ) -> tuple[Su, Su, Su, Su] | None: ...
 
 
 class NearPlaneViolation(ValueError):
@@ -196,6 +205,58 @@ def _height_sweep(viewport: CellBox, cfg: SceneTuning, current_h: int) -> tuple[
     heights = list(range(h_lo, h_hi + 1))
     heights.sort(key=lambda h: (abs(h - current_h), h))
     return tuple(heights)
+
+
+def _visible_xy_extent_from_scale(
+    camera: Camera,
+    viewport: CellBox,
+    face: Face,
+    cfg: SceneTuning,
+    scale: Fraction,
+) -> tuple[Su, Su, Su, Su] | None:
+    """Invert `project()`'s own forward formulas (plan §9.6's frustum-aware
+    reposition fix) to find the su-space (x_min, x_max, y_min, y_max) box
+    that a `face`-sized object, placed anywhere inside it at the depth this
+    `scale` was computed for, projects fully inside `viewport` with
+    `cfg.edge_margin` clearance on every side -- exactly the same
+    containment test `_contained()` (`edge/scene/solve.py`) applies after
+    the fact, computed here in advance instead of by trial placement.
+
+    Both `ProjectionStrategy` implementations share this: only their scale
+    formula differs (a `Fraction` divide by depth vs. a discrete per-layer
+    power), and both already reduce to one exact `scale` `Fraction` by the
+    time `project()` computes `w_cells`/`h_cells`/`cx`/`cy` -- this function
+    starts from that same `scale` and runs the position algebra in reverse.
+
+    Returns `None` when `scale <= 0` (no visibility at this depth, mirroring
+    `NearPlaneViolation`) or when the face is too large to fit inside the
+    margin-clipped viewport at this depth at all (an empty extent) -- the
+    caller falls back to the object's full nominal region in that case,
+    exactly as if this helper did not exist, so it can only ever help, never
+    newly reject a placement `_attempt()` would otherwise have allowed.
+
+    Deterministic, exact-`Fraction`/`int` only (plan §4.1): the two `- 1`
+    terms below are an integer safety margin absorbing `project()`'s own
+    `floor()` rounding at the edges, not a tuned or approximated value, so a
+    `(x, y)` drawn from inside the returned box is *conservatively*
+    guaranteed to clear `_contained()`, never merely likely to.
+    """
+    if scale <= 0:
+        return None
+    w_cells = round_half_even(Fraction(face.width_su) * scale * camera.cell_aspect)
+    h_cells = round_half_even(Fraction(face.height_su) * scale)
+    cx_max = Fraction(viewport.width, 2) - cfg.edge_margin - Fraction(w_cells, 2) - 1
+    cy_max = Fraction(viewport.height, 2) - cfg.edge_margin - Fraction(h_cells, 2) - 1
+    if cx_max < 0 or cy_max < 0:
+        return None
+    x_denom = scale * camera.cell_aspect
+    x_half_su = math.floor(cx_max / x_denom) if x_denom > 0 else 0
+    y_half_su = math.floor(cy_max / scale)
+    if x_half_su < 0 or y_half_su < 0:
+        return None
+    cx0 = camera.position.x + camera.aim_x_su
+    cy0 = camera.position.y + camera.aim_y_su
+    return (cx0 - x_half_su, cx0 + x_half_su, cy0 - y_half_su, cy0 + y_half_su)
 
 
 class FixedFovPerspective:
@@ -302,6 +363,20 @@ class FixedFovPerspective:
         row = math.floor(Fraction(viewport.height, 2) - cy - Fraction(h_cells, 2))
         return CellBox(col, row, max(1, w_cells), max(1, h_cells))
 
+    def visible_xy_extent(
+        self,
+        camera: Camera,
+        viewport: CellBox,
+        z: Su,
+        face: Face,
+        cfg: SceneTuning,
+    ) -> tuple[Su, Su, Su, Su] | None:
+        dz = Fraction(z - camera.position.z)
+        if dz <= 0 or z < camera.near_plane_su:
+            return None
+        scale = Fraction(viewport.height * camera.fov_den, camera.fov_num) / dz
+        return _visible_xy_extent_from_scale(camera, viewport, face, cfg, scale)
+
 
 class DepthLayeredAnchorProjection:
     """Depth quantised into `cfg.depth_layers` discrete layers, each with an
@@ -401,6 +476,44 @@ class DepthLayeredAnchorProjection:
         col = math.floor(Fraction(viewport.width, 2) + cx - Fraction(w_cells, 2))
         row = math.floor(Fraction(viewport.height, 2) - cy - Fraction(h_cells, 2))
         return CellBox(col, row, max(1, w_cells), max(1, h_cells))
+
+    def visible_xy_extent(
+        self,
+        camera: Camera,
+        viewport: CellBox,
+        z: Su,
+        face: Face,
+        cfg: SceneTuning,
+    ) -> tuple[Su, Su, Su, Su] | None:
+        dz = z - camera.position.z
+        if dz <= 0 or z < camera.near_plane_su:
+            return None
+        layer_index = dz // camera.depth_layer_size_su
+        scale = camera.depth_layer_scale**layer_index
+        return _visible_xy_extent_from_scale(camera, viewport, face, cfg, scale)
+
+
+def intersect_region_xy(
+    region: Region, extent: tuple[Su, Su, Su, Su] | None
+) -> tuple[Su, Su, Su, Su] | None:
+    """Clamp `region`'s x/y bounds to a `visible_xy_extent()` result.
+
+    Returns `None` when there is no overlap (or `extent` is `None`, meaning
+    "no visibility estimate at this depth" -- the caller falls back to
+    `region`'s own bounds unchanged in that case), so a caller never has to
+    special-case "no camera yet" separately from "camera exists but this
+    object's region does not reach where it can see".
+    """
+    if extent is None:
+        return None
+    x_min, x_max, y_min, y_max = extent
+    ix_min = max(region.x_min, x_min)
+    ix_max = min(region.x_max, x_max)
+    iy_min = max(region.y_min, y_min)
+    iy_max = min(region.y_max, y_max)
+    if ix_min > ix_max or iy_min > iy_max:
+        return None
+    return (ix_min, ix_max, iy_min, iy_max)
 
 
 def hysteresis_delta(

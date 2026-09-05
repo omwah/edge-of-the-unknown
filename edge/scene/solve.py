@@ -34,6 +34,7 @@ from edge.scene.model import (
     Projection,
     SceneKey,
     ScenePlan,
+    SceneRetention,
     SceneTuning,
     SolveCounters,
     WorldArrangement,
@@ -42,6 +43,7 @@ from edge.scene.project import (
     NearPlaneViolation,
     ProjectionStrategy,
     hysteresis_delta,
+    intersect_region_xy,
     structural_mode,
 )
 
@@ -384,15 +386,46 @@ def _attempt(
     return result
 
 
+def _rejected_by_retention(
+    attempt: _Attempt, admitted: list[PhysicalObject]
+) -> tuple[int, ...]:
+    """How many objects of each `SceneRetention` tier this attempt rejected,
+    indexed by tier value ascending (plan §4.5: "higher retention priority is
+    never dropped for a lower one").
+
+    Comparing two attempts' full accepted *count* alone (as a bare
+    `-len(attempt.accepted)`) is exactly the hierarchy violation §4.5
+    forbids: across the solver's own pass loop, a later pass's `admitted`
+    superset can differ from an earlier pass's (retention-priority ejection
+    shrinks it monotonically, per this module's fallback ladder), so a
+    "more objects accepted" attempt from one pass can otherwise outscore a
+    "the one object retention actually protects is accepted" attempt from
+    another -- silently dropping the anchor itself in favour of several
+    lower-priority ships if ships alone happen to fit more easily than the
+    full scene (the frustum-aware reposition fix directly increases how
+    often ships *do* fit, which is exactly what surfaced this). Comparing
+    the two attempts tier-by-tier, most-protected tier first, makes any
+    rejection at a higher tier strictly worse than any number of
+    lower-tier gains, regardless of total count.
+    """
+    counts = [0] * len(SceneRetention)
+    for obj in admitted:
+        if obj.key not in attempt.accepted:
+            counts[int(obj.retention)] += 1
+    return tuple(counts)
+
+
 def _score(
     attempt: _Attempt,
-    admitted_count: int,
+    admitted: list[PhysicalObject],
     anchor_key: SceneKey,
     target_height: int,
     previous: ScenePlan | None,
     cfg: SceneTuning,
-) -> tuple[int, int, int, int, int, str]:
-    """Plan §9.6 `better_of`'s exact lexicographic tuple, all ascending-better."""
+) -> tuple[tuple[int, ...], int, int, int, int, int, str]:
+    """Plan §9.6 `better_of`'s lexicographic tuple, all ascending-better --
+    with the retention-priority guard (`_rejected_by_retention`) prepended
+    ahead of the raw accepted-count term (see that function's docstring)."""
     anchor_bounds = attempt.bounds.get(anchor_key)
     anchor_height = anchor_bounds.height if anchor_bounds is not None else 0
     min_slack = attempt.min_separation_slack
@@ -406,6 +439,7 @@ def _score(
     fingerprint = _fingerprint(attempt.camera, entries)
     hysteresis = _hysteresis(attempt, anchor_key, anchor_height, previous, cfg)
     return (
+        _rejected_by_retention(attempt, admitted),
         -len(attempt.accepted),
         attempt.min_violations,
         abs(anchor_height - target_height),
@@ -550,7 +584,7 @@ def solve(
     reposition_attempts: dict[SceneKey, int] = {}
 
     best: _Attempt | None = None
-    best_score: tuple[int, int, int, int, int, str] | None = None
+    best_score: tuple[tuple[int, ...], int, int, int, int, int, str] | None = None
     best_anchor_key: SceneKey | None = None
 
     current_anchor_key: SceneKey | None = None
@@ -589,7 +623,7 @@ def solve(
                 anchor.key, anchor_box_class, trace_prose=trace_prose,
             )
             counters["occlusion_comparisons"] += attempt.occlusion_comparisons
-            score = _score(attempt, len(admitted), anchor.key, target_h, previous, cfg_current)
+            score = _score(attempt, admitted, anchor.key, target_h, previous, cfg_current)
             if best_score is None or score < best_score:
                 best = attempt
                 best_score = score
@@ -616,10 +650,31 @@ def solve(
             counters["reposition_candidates"] += 1
             region = target.region
             offset_key = f"{target.key.tag}:{target.key.ident}|reposition|{attempt_no}"
+            new_z = region.z_min + _hash_index(offset_key + "|z", region.z_max - region.z_min + 1)
+            # Frustum-aware reposition (docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md
+            # §2.5/§9.6 fix): `target.region` is deliberately wide -- ships/wrecks
+            # receive placement freedom far beyond a station's -- but only the
+            # slice of it a camera the solver would actually place can show is
+            # ever worth sampling. Intersecting with `strategy.visible_xy_extent()`
+            # at this attempt's depth turns "resample the whole region and hope"
+            # into "resample the part of the region that can possibly pass
+            # `_contained()`", without narrowing the region itself or spending any
+            # extra bounded-search budget -- this replaces one hash draw with
+            # another, it does not add a loop. `camera` here is the current pass's
+            # *framed* camera (fixed once per anchor/step, before the per-candidate
+            # height/aim sweep) -- an estimate, not the eventual winning candidate,
+            # so a `None`/empty intersection (near-plane failure, or a face too
+            # large to fit at this depth) falls back to the untouched full region,
+            # exactly WP-SC06's original behaviour for this object.
+            extent = strategy.visible_xy_extent(camera, viewport, new_z, target.face, cfg_current)
+            xy = intersect_region_xy(region, extent)
+            x_min, x_max, y_min, y_max = xy if xy is not None else (
+                region.x_min, region.x_max, region.y_min, region.y_max
+            )
             new_pos = Vec3(
-                region.x_min + _hash_index(offset_key + "|x", region.x_max - region.x_min + 1),
-                region.y_min + _hash_index(offset_key + "|y", region.y_max - region.y_min + 1),
-                region.z_min + _hash_index(offset_key + "|z", region.z_max - region.z_min + 1),
+                x_min + _hash_index(offset_key + "|x", x_max - x_min + 1),
+                y_min + _hash_index(offset_key + "|y", y_max - y_min + 1),
+                new_z,
             )
             placements[target.key] = new_pos
             trace.append(_decision("reposition", target.key, "move", trace_prose=trace_prose))
@@ -717,6 +772,18 @@ def _finish(
     *,
     trace_prose: bool = False,
 ) -> ScenePlan:
+    # Plan invariant 20: the winning attempt's own per-object hard-rule
+    # rejection `Decision`s (near_plane/edge_margin/min_projected_size/
+    # no_clearing_rung/min_ink_extent/separation/min_visible_fraction --
+    # `_attempt()`'s `result.decisions`) were only ever discarded here, so
+    # even `trace_prose=True` reported reanchor/reposition/step_down/
+    # retention_reject events but never *why* a specific object failed inside
+    # the accepted candidate camera. Every other rule appends to `trace`
+    # unconditionally (only each `Decision`'s own `reason` text is gated on
+    # `trace_prose`, via `_decision()`), so these are merged in the same way
+    # here for consistency, in candidate-evaluation order (they were recorded
+    # in that order by `_attempt()`).
+    trace.extend(attempt.decisions)
     projections: list[Projection] = []
     accepted_boxes: list[CellBox] = []
     for obj in admitted:
