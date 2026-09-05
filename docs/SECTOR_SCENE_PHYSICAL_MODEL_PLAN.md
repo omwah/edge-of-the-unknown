@@ -1611,6 +1611,152 @@ fallback-ladder iteration, and to `separation`/`no_clearing_rung` failures that 
 governed by other objects' positions and authored rung granularity rather than by z
 alone.
 
+**Joint secondary-object placement (post-WP-SC09 redesign).** The two
+frustum-aware reposition fixes above each closed exactly the gap they targeted
+and then plateaued — 0.0% → 14.0%/5.2% → 26.2%/33.1% admission of the 172
+secondary (non-anchor, `flexible=True`) objects in `edge/tui/scene_gallery.py`'s
+full case×size matrix, against **93.0%** for the legacy `_SceneComposer` measured
+on the same inventories. The plateau was structural, not a matter of one more
+per-axis fix: **`§9.6`'s pass loop placed every flexible object independently,
+once, before the camera search, and judged the result against a camera the
+placement had never seen.** Concretely, three defects compounded:
+
+1. *Placement was outside the candidate loop.* `reposition_worst` estimated
+   feasibility against the pass's **framed** camera, while `attempt` judged the
+   result against whichever camera `candidates()`'s height/aim sweep eventually
+   accepted. The frustum machinery was aimed at the wrong frustum.
+2. *Objects could not see each other.* `separation` is a **joint** constraint,
+   but each object drew its position with no knowledge of where the others had
+   landed, so two ships routinely drew overlapping positions and the solver had
+   no mechanism to negotiate.
+3. *Only one object moved per pass,* and each pass then re-ran the entire
+   camera sweep against the unchanged placements of everything else.
+
+The redesign moves placement **inside** `_attempt`, making it part of a
+candidate camera's own evaluation rather than a separate step around it:
+
+```text
+def _attempt(camera, admitted, base_positions, ...):
+    placed = []
+    cost = ships = 0
+    for obj in admitted:                      # retention order, §4.5/§4.6
+        if cost + cheapest_cost(obj) > cfg.cost_budget: reject "cost_budget"
+        if is_ship and ships + 1 > ceiling:   reject "emergency_ship_ceiling"
+        if not obj.flexible:                  # anchors/planets/Entity: 1 candidate
+            evaluate(obj, base_positions[obj.key])
+            continue
+        region = absolute_region(obj, placed) # parent-relative for orbitals
+        band   = feasible_z_interval(camera, obj, region.z)   # memoised
+        if band is None: reject "no_feasible_depth"           # exact: no xy helps
+        for z in depth_strata(obj.key, band, preferred=(base.z, previous.z)):
+            box = project(obj, at aim centre, z)              # size at this depth
+            for slot in shuffled(obj.key, z, slot_lattice(viewport, box)):
+                if slot collides an already-placed inflated ink box: continue
+                x, y = su_for_screen(strategy, camera, z, slot, box)  # inverse
+                clamp (x, y) into region ∩ visible_xy_extent
+                evaluate(obj, Vec3(x, y, z))   # every hard rule, vs `placed`
+                if accepted: break
+        # budget: at most cfg.max_reposition_candidates full evaluations
+```
+
+Why each piece:
+
+- **Screen-space slot search.** Edge margin, separation, and occlusion are all
+  *screen-space* constraints. Sampling su space and hoping is what produced the
+  <2% hit rate; sampling the screen lattice and inverting through
+  `ProjectionStrategy.scale_at()` (a new protocol method, exact `Fraction`, one
+  per strategy) samples exactly the quantity the rules measure. A slot is
+  rejected against already-placed boxes by integer rectangle arithmetic *before*
+  any projection work, so the expensive full evaluation is spent only on slots
+  that already look free.
+- **Greedy, in retention order.** Objects negotiate by ordering, not by
+  backtracking: the higher-priority object always chooses first and is never
+  moved to make room. This is a deliberate bounded-work tradeoff (§6.2 rule 4) —
+  an exhaustive joint search over `n` objects and `k` positions is `k**n` — and
+  it is *also* the only ordering that structurally cannot violate §4.5, since
+  the object that wins a contested slot is always the higher-priority one. The
+  cost: a scene where moving a high-priority ship would have let two others fit
+  keeps the one placement it found. No such case appeared in the matrix.
+- **Cost spent in retention order.** §4.14's words, now literal, in two places:
+  the running cost is checked against the object's *cheapest authored rung*
+  before any placement search is spent on it, and again against the *selected*
+  rung inside `_evaluate_placement`, as one more hard rule beside separation and
+  occlusion — so a candidate too dear for the remaining budget is refused and
+  the object's bounded candidate list continues to a cheaper (farther) one
+  rather than the object being dropped. The pre-redesign `_attempt` summed the
+  whole scene and, on overflow, cleared the *entire* admitted set — which with a
+  50-ship stress inventory produced an empty plan (a §4.18 violation the pass
+  loop could not recover from, since `max_passes` is far below the number of
+  ships to shed). The pass loop's anchor box-class step-down still runs before
+  any *retention* rejection, so §4.14's ordering requirement holds: a
+  cost-refused object is reconsidered on the next pass against the cheaper
+  anchor, and `step_downs` is observed reaching the bottom of the ladder on the
+  stress cases before the reject rung fires.
+- **Parent-relative regions.** `region_by_scale_class["orbital"]` is documented
+  as an offset from the parent planet; the old reposition sampled it absolutely
+  and pulled stations out of orbit. `_absolute_region` re-adds the parent origin
+  (parents are placed first because `ANCHOR < ORBITAL` in retention order).
+- **Empty feasible z-band is now an honest reject,** not a fallback to the full
+  region. `_feasible_z_interval` evaluates the depth-dependent rules at the
+  camera's aim point, the most permissive xy there is, and the min-size/rung/
+  ink-extent rules are xy-independent — so an empty band proves no placement can
+  pass *under this camera*. The object still gets a fresh chance under every
+  other camera candidate, which the old single-shot draw did not.
+
+**Deviations from the original §9.6 pseudocode** (none touches a §4 invariant):
+
+| §9.6 as written | Now | Why |
+|---|---|---|
+| `attempt(cam, admitted, …)` projects fixed placements | `_attempt` also *places* | the fix; see above |
+| fallback ladder `reposition → step_down → reject` | `step_down → reject` | reposition is subsumed; a pass is no longer spent on it |
+| `reposition_worst` / per-object reposition budget | `cfg.max_reposition_candidates` is the per-object, per-camera full-evaluation budget | same config key, same counter, new (documented) semantics |
+| `candidates()` yields only swept heights | yields the framed camera first | §9.6 says "nearest-to-current first"; "current" was being dropped, and for a *continuous* anchor the approved WP-SC05 numbers put `frame()`'s own height (`target_fraction / ink_ratio`, e.g. `1/2 ÷ 3/5 = 5/6`) outside `[camera_height_fraction_min, max]` = `[1/8, 3/4]`, so the framed camera was unreachable for every planet/nebula scene |
+| cost/ceiling checked as a whole-candidate sum | spent per object in retention order | §4.14's own wording; see above |
+
+New code-level (not config) search bounds, as §6.2 rule 4 permits: `_SLOT_COLS`
+= 7, `_SLOT_ROWS` = 5, `_DEPTH_STRATA` = 4. New trace rule ids:
+`no_feasible_depth`, `no_feasible_placement`, `cost_budget`,
+`emergency_ship_ceiling`. `SolveCounters.reposition_candidates` now reports
+placement evaluations; every other counter is unchanged.
+
+**Measured result** (`edge/tui/scene_gallery.py::cases()` × `SIZES`, 172
+secondary objects, real `build_scene_tuning()`/`load_geometry_catalog()` config):
+
+| | `FixedFovPerspective` | `DepthLayeredAnchorProjection` |
+|---|---:|---:|
+| WP-SC06 as shipped | 0.0% | 0.0% |
+| + xy frustum fix | 14.0% | 5.2% |
+| + z feasibility fix | 26.2% | 33.1% |
+| + framed camera as candidate #0 | 27.9% | 33.1% |
+| **+ joint placement** | **94.8%** (163/172) | **99.4%** (171/172) |
+| legacy `_SceneComposer` baseline | 93.0% (160/172) | 93.0% (160/172) |
+
+**Open observation, not a §4 violation.** On the §6.3 synthetic stress
+inventories the 50-ship case admits *fewer* objects than the 20-ship case under
+`FixedFovPerspective` (3 vs 8; `DepthLayeredAnchorProjection` holds at 8). Both
+are cost-bound — `cost_estimated` is 246–250 against a 250 budget, and the
+anchor has already stepped its box class down to the bottom rung
+(`step_downs` = 2) — so §4.14 is satisfied: cost really is being spent in
+retention order. What differs is *which* rung the first-placed ships take. The
+retention sort tie-breaks on `SceneKey`, so a 50-ship inventory presents a
+different ship first than a 20-ship one, and a first ship that lands at a near
+depth takes a rich, expensive rung and starves the rest. Cost is checked inside
+`_evaluate_placement`, so a candidate too dear for the remaining budget is
+refused and the object's bounded candidate list continues to a cheaper (farther)
+one — but the *first* objects are never under budget pressure and so never look
+for a cheaper rung. Correcting this would mean a new soft objective trading rung
+richness against admitted count, which is a §5 calibration decision (and would
+pull against §4.13's depth-variation objective), so it is recorded here rather
+than invented. It does not appear at any inventory size a generated universe
+produces.
+
+Solver-only wall clock on the plan §6.3 synthetic stress inventories
+(150×52, one planet plus N ships, no art rendered): 1 ship 0.5–10 ms, 5 ships
+2–44 ms, 20 ships 0.7–1.2 s, 50 ships 0.7–1.2 s. `tests/test_scene_joint_placement.py`
+is the CI guard for the admission rate, the hard rules on every admitted object,
+determinism, retention order, the bounded counters, and §2.5's wide-region
+intent.
+
 **Glyph scatter**, after the solve and after paint (§4.19):
 
 ```text

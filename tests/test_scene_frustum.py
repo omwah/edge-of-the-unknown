@@ -316,10 +316,12 @@ def test_visible_xy_extent_never_produces_a_float(z: int, cam_z: int, aim_x: int
 
 
 # ---------------------------------------------------------------------------
-# 4. Bounded search: the reposition fallback never exceeds
-#    `max_reposition_candidates` attempts per flexible object, and the count
-#    surfaces in `SolveCounters` exactly as before -- the frustum intersection
-#    adds no new unbounded work, only re-aims the same bounded hash draw.
+# 4. Bounded search: joint placement (the WP-SC09 redesign) spends at most
+#    `max_reposition_candidates` full rule evaluations per flexible object
+#    *per camera candidate*, and `SolveCounters.reposition_candidates` reports
+#    the total actually consumed. The old per-solve reposition step it
+#    replaced is gone, so the ceiling is now the product of the three bounded
+#    loops rather than "objects x attempts".
 # ---------------------------------------------------------------------------
 
 
@@ -327,8 +329,13 @@ def test_reposition_stays_bounded_and_counted() -> None:
     for strategy in STRATEGIES:
         cfg = _tuning(max_reposition_candidates=4)
         plan = solve(_scene(5), VIEWPORT, cfg, CATALOG, strategy)
-        # 5 flexible ships x at most 4 attempts each is the hard ceiling.
-        assert plan.counters.reposition_candidates <= 5 * 4
+        ceiling = (
+            cfg.max_passes
+            * plan.counters.camera_candidates
+            * 5
+            * max(cfg.max_reposition_candidates, 1)
+        )
+        assert 0 < plan.counters.reposition_candidates <= ceiling
 
 
 def test_intersect_region_xy_returns_none_on_no_overlap() -> None:

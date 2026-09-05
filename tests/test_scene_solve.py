@@ -472,7 +472,9 @@ def test_unplaced_glyphs_never_enter_scene_text_only_the_sidebar(strategy: Proje
 
 
 def test_trace_prose_is_empty_unless_requested() -> None:
-    cfg = _tuning(cost_budget=60)  # forces some reject/step_down decisions to exist
+    # A cost budget below one ship's rung cost guarantees the pass loop must
+    # reject something, so there is always a prose-bearing decision to gate.
+    cfg = _tuning(cost_budget=1)
     scene = _crowded_scene(6)
     quiet = solve(scene, VIEWPORT, cfg, CATALOG, FixedFovPerspective())
     loud = solve(scene, VIEWPORT, cfg, CATALOG, FixedFovPerspective(), trace_prose=True)

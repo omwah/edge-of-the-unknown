@@ -1,7 +1,12 @@
 """The constraint solver: bounded search, admission, and hysteresis.
 
-Plan §9.6 is the literal pass-loop/attempt/comparison reference; plan §4 is
-the acceptance contract and wins wherever this module and §9.6 disagree.
+Plan §9.6 is the pass-loop/attempt/comparison reference; plan §4 is the
+acceptance contract and wins wherever this module and §9.6 disagree. The
+deviations §9.6's original pseudocode no longer describes are enumerated in
+the plan's "Joint secondary-object placement (post-WP-SC09 redesign)" section
+-- above all, that flexible objects are placed *inside* `_attempt`, jointly
+and in retention order, against the exact candidate camera being evaluated,
+rather than independently and camera-blind before the search.
 
 Everything here is integer or `fractions.Fraction`; no accepted/rejected
 decision, ordering, or rounding ever consumes a `float` (plan §4.1). No art is
@@ -19,11 +24,12 @@ from __future__ import annotations
 import hashlib
 import math
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
 from fractions import Fraction
 from typing import Literal
 
 from edge.scene.catalog import ArtGeometryCatalog, LadderRung
-from edge.scene.geometry import CellBox, Vec3
+from edge.scene.geometry import CellBox, Region, Vec3
 from edge.scene.model import (
     ArtMode,
     Camera,
@@ -185,6 +191,11 @@ to compare -- deliberately "as good as it gets", never read back as a float.
 @dataclass
 class _Attempt:
     camera: Camera
+    positions: dict[SceneKey, Vec3] = field(default_factory=dict)
+    """The position each object was actually *placed* at under this candidate
+    camera. Joint placement (see `_attempt`) makes this per-attempt state, not
+    solver-wide state: two candidate cameras frame different volumes and so
+    reach different placements for the same object."""
     bounds: dict[SceneKey, CellBox] = field(default_factory=dict)
     rung: dict[SceneKey, LadderRung | None] = field(default_factory=dict)
     box_class: dict[SceneKey, int | None] = field(default_factory=dict)
@@ -192,12 +203,38 @@ class _Attempt:
     accepted: set[SceneKey] = field(default_factory=set)
     min_violations: int = 0
     occlusion_comparisons: int = 0
+    placement_evaluations: int = 0
     cost_estimated: int = 0
     min_separation_slack: int = _LARGE_SLACK
     decisions: list[Decision] = field(default_factory=list)
 
     def hard_ok(self, admitted_count: int) -> bool:
         return len(self.accepted) == admitted_count
+
+
+@dataclass(frozen=True, slots=True)
+class _PlacedObject:
+    """One object already committed inside a joint-placement attempt: what a
+    later, lower-priority object must place itself around."""
+
+    obj: PhysicalObject
+    position: Vec3
+    bounds: CellBox
+    rung: LadderRung | None
+    ink_min: CellBox
+    ink_max_inflated: CellBox
+
+
+# Structural search bounds for joint placement. Plan §6.2 rule 4 admits
+# "explicit configured **or code-level** maxima"; these are search *structure*
+# (how finely the free-space scan samples the frame), not calibrated visual
+# tuning, so they live here rather than becoming unapproved `scene:` values.
+_SLOT_COLS = 7
+"""Columns in the deterministic screen-space free-slot lattice."""
+_SLOT_ROWS = 5
+"""Rows in that lattice."""
+_DEPTH_STRATA = 4
+"""Depths sampled from a flexible object's feasible z-band, per camera."""
 
 
 _Outcome = Literal["accept", "move", "reject", "step_down", "reanchor"]
@@ -215,175 +252,499 @@ def _decision(
     )
 
 
+def _absolute_region(obj: PhysicalObject, positions: dict[SceneKey, Vec3]) -> Region:
+    """`obj.region` resolved to absolute scene units.
+
+    `SceneTuning.region_by_scale_class` documents the `"orbital"` region as an
+    *offset from the parent planet's own placement*, and
+    `edge.scene.classify.classify_sector` composes a child's initial position
+    as `parent_position + offset` accordingly. The pre-redesign reposition
+    fallback sampled `target.region` absolutely and so pulled a station clean
+    out of its own orbit; joint placement re-adds the parent origin here.
+    Parents are placed before children because the retention order
+    (`ANCHOR` < `ORBITAL`) already visits them first, and a parent that has
+    not been placed at all falls back to the origin, exactly as
+    `classify_sector` does.
+    """
+    region = obj.region
+    ox = oy = oz = 0
+    parent = obj.parent
+    if parent is not None and parent in positions:
+        origin = positions[parent]
+        ox, oy, oz = origin.x, origin.y, origin.z
+    return Region(
+        x_min=region.x_min + ox,
+        x_max=region.x_max + ox,
+        y_min=region.y_min + oy,
+        y_max=region.y_max + oy,
+        z_min=region.z_min + oz,
+        z_max=region.z_max + oz,
+    )
+
+
+def _su_for_screen(
+    strategy: ProjectionStrategy,
+    camera: Camera,
+    viewport: CellBox,
+    z: int,
+    want_col: int,
+    want_row: int,
+    box: CellBox,
+) -> tuple[int, int] | None:
+    """Run `project()`'s position algebra backwards: the integer su `(x, y)`
+    that puts a `box`-sized object's top-left corner at `(want_col, want_row)`
+    at depth `z`.
+
+    `project()` computes, for both strategies,
+
+        col = floor(vw/2 + (x - camx - aimx) * scale * cell_aspect - w/2)
+        row = floor(vh/2 - (y - camy - aimy) * scale       - h/2)
+
+    so given the strategy's exact `scale_at()` `Fraction` this inverts to an
+    exact rational and floors once (plan §9.1: `floor` for positions). The
+    result is an *estimate* only in the sense that the two floors do not
+    commute perfectly -- the caller always re-`project()`s and re-checks every
+    hard rule, so a one-cell drift costs a candidate, never correctness.
+    """
+    scale = strategy.scale_at(camera, viewport, z)
+    if scale is None or scale <= 0:
+        return None
+    x_denom = scale * camera.cell_aspect
+    if x_denom <= 0:
+        return None
+    cx = Fraction(want_col) - Fraction(viewport.width, 2) + Fraction(box.width, 2)
+    cy = Fraction(viewport.height, 2) - Fraction(want_row) - Fraction(box.height, 2)
+    x = camera.position.x + camera.aim_x_su + math.floor(cx / x_denom)
+    y = camera.position.y + camera.aim_y_su + math.floor(cy / scale)
+    return x, y
+
+
+def _slot_lattice(viewport: CellBox, margin: int, box: CellBox) -> tuple[tuple[int, int], ...]:
+    """The deterministic screen-space free-slot lattice a flexible object of
+    projected size `box` may be placed on: `_SLOT_COLS * _SLOT_ROWS` top-left
+    positions spread evenly across the margin-clipped viewport.
+
+    Searching in *screen* space rather than su space is the point: separation,
+    edge margin, and occlusion are all screen-space constraints, so a lattice
+    here samples exactly the quantity the hard rules measure, and a slot can be
+    rejected against already-placed boxes by integer rectangle arithmetic
+    before any projection work happens.
+    """
+    col_lo = margin
+    col_hi = viewport.width - margin - box.width
+    row_lo = margin
+    row_hi = viewport.height - margin - box.height
+    if col_hi < col_lo or row_hi < row_lo:
+        return ()
+    def _spread(lo: int, hi: int, count: int) -> list[int]:
+        if count <= 1 or hi == lo:
+            return [lo + (hi - lo) // 2]
+        return [lo + ((hi - lo) * i) // (count - 1) for i in range(count)]
+    cols = _spread(col_lo, col_hi, _SLOT_COLS)
+    rows = _spread(row_lo, row_hi, _SLOT_ROWS)
+    return tuple((c, r) for r in rows for c in cols)
+
+
+@lru_cache(maxsize=4096)
+def _shuffled(key: SceneKey, salt: str, count: int) -> tuple[int, ...]:
+    """A deterministic, key-dependent permutation of `range(count)`.
+
+    Not randomness and not game RNG: a stable sort on a content hash, exactly
+    like `_hash_index`. It exists to keep plan §2.5's "wide region" design
+    intent real -- two ships in the same sector, and the same ship across
+    different sectors/viewports, try the frame's depths and free slots in
+    *different* orders, so admitted traffic spreads over the whole feasible
+    volume instead of funnelling into whichever slot happens to be first.
+
+    Cached because joint placement asks for the same permutation once per
+    (object, depth) per camera candidate; the cache is a pure memo of a pure
+    function, so it changes no result.
+    """
+    return tuple(
+        sorted(
+            range(count),
+            key=lambda i: (_hash_index(f"{key.tag}:{key.ident}|{salt}|{i}", 1 << 32), i),
+        )
+    )
+
+
+def _depth_strata(key: SceneKey, z_lo: int, z_hi: int, preferred: tuple[int, ...]) -> tuple[int, ...]:
+    """Up to `_DEPTH_STRATA` depths sampled from a feasible z-band `[z_lo,
+    z_hi]`, in a deterministic per-object order, with any `preferred` depths
+    that fall inside the band tried first.
+
+    `preferred` carries the object's classified base depth and (on a resize)
+    its depth in the previous plan -- plan §4.11's "minimize ... placement ...
+    change after all hard rules are satisfied", expressed as candidate order
+    rather than as a score term, so it can never overturn a hard rule or a
+    retention decision.
+    """
+    if z_hi < z_lo:
+        return ()
+    span = z_hi - z_lo
+    sampled = tuple(z_lo + (span * (2 * i + 1)) // (2 * _DEPTH_STRATA) for i in range(_DEPTH_STRATA))
+    order = _shuffled(key, "depth", len(sampled))
+    out: list[int] = []
+    for z in preferred:
+        if z_lo <= z <= z_hi and z not in out:
+            out.append(z)
+    for i in order:
+        if sampled[i] not in out:
+            out.append(sampled[i])
+    return tuple(out)
+
+
+def _evaluate_placement(
+    obj: PhysicalObject,
+    pos: Vec3,
+    camera: Camera,
+    viewport: CellBox,
+    cfg: SceneTuning,
+    catalog: ArtGeometryCatalog,
+    strategy: ProjectionStrategy,
+    placed: list[_PlacedObject],
+    anchor_key: SceneKey,
+    anchor_box_class: int | None,
+    remaining_cost: int,
+    result: _Attempt,
+) -> tuple[_PlacedObject | None, str]:
+    """Every hard rule of plan §9.6's `attempt`, for one object at one
+    position, against the objects already committed in this attempt.
+
+    Rules run in the plan's cheapest-and-most-rejecting-first order:
+    near-plane, containment/edge margin, minimum projected size, ladder rung /
+    continuous minimum ink extent, pairwise separation, then depth occlusion.
+    Returns `(placement, "")` on success or `(None, rule_id)` on the first
+    rule that refuses it.
+    """
+    try:
+        bounds = strategy.project(camera, obj, pos, viewport)
+    except NearPlaneViolation:
+        return None, "near_plane"
+    if not _contained(bounds, viewport, cfg.edge_margin):
+        return None, "edge_margin"
+    min_w, min_h = cfg.min_projected_cells_by_scale_class[obj.scale_class]
+    if bounds.width < min_w or bounds.height < min_h:
+        return None, "min_projected_size"
+
+    rung: LadderRung | None = None
+    if obj.art_mode is ArtMode.LADDER:
+        rung = _select_rung(catalog, obj, bounds)
+        if rung is None:
+            return None, "no_clearing_rung"
+    else:
+        assert obj.continuous_kind is not None
+        yield_ = catalog.continuous(obj.continuous_kind)
+        probe = _ink_box(obj, bounds, None, catalog, side="min")
+        if probe.width < yield_.min_extent.width or probe.height < yield_.min_extent.height:
+            return None, "min_ink_extent"
+
+    ink_min = _ink_box(obj, bounds, rung, catalog, side="min")
+    ink_max_inflated = _inflate(
+        _ink_box(obj, bounds, rung, catalog, side="max"), cfg.separation_margin
+    )
+
+    slack = _LARGE_SLACK
+    if obj.occludes:
+        for other in placed:
+            if not other.obj.occludes:
+                continue
+            gap = _rect_gap(ink_max_inflated, other.ink_max_inflated)
+            if gap < 0:
+                return None, "separation"
+            slack = min(slack, gap)
+
+    # Occlusion by depth: the *farther* object of a pair must stay above its
+    # class's minimum visible fraction. A new object can only ever lose here,
+    # never unseat an already-committed one -- placement runs in retention
+    # order, so everything already committed outranks it (plan §4.5).
+    own_visible = Fraction(1)
+    # Visible fractions this placement would impose on already-committed
+    # objects, applied only if the placement is committed -- a candidate that
+    # is refused below must leave no trace on the attempt (plan §4.1: nothing
+    # the solver decides may depend on which candidates were tried).
+    imposed: list[tuple[SceneKey, Fraction]] = []
+    if obj.occludes:
+        for other in placed:
+            if not other.obj.occludes:
+                continue
+            if pos.z == other.position.z:
+                continue
+            result.occlusion_comparisons += 1
+            if pos.z > other.position.z:
+                near_box, far_ink, far_class = other.ink_max_inflated, ink_min, obj.scale_class
+            else:
+                near_box, far_ink, far_class = ink_max_inflated, other.ink_min, other.obj.scale_class
+            area = far_ink.width * far_ink.height
+            if area <= 0:
+                continue
+            visible = Fraction(area - _overlap_area(near_box, far_ink), area)
+            if visible < cfg.min_visible_fraction_by_scale_class[far_class]:
+                return None, "min_visible_fraction"
+            if pos.z > other.position.z:
+                own_visible = min(own_visible, visible)
+            else:
+                imposed.append((other.obj.key, visible))
+
+    box_class = anchor_box_class if (obj.key == anchor_key and rung is None) else None
+    # Cost is a hard rule like any other (plan §4.14), checked here rather than
+    # after the fact so a tight budget makes an object take a cheaper candidate
+    # -- a farther depth selects a smaller, cheaper rung -- instead of being
+    # dropped outright. This costs no extra search: it refuses one already-
+    # generated candidate, and the object's bounded candidate list continues.
+    cost = (
+        rung.render_cost if rung is not None
+        else catalog.continuous(str(obj.continuous_kind)).render_cost[box_class or 0]
+    )
+    if cost > remaining_cost:
+        return None, "cost_budget"
+
+    if slack < result.min_separation_slack:
+        result.min_separation_slack = slack
+    result.bounds[obj.key] = bounds
+    result.rung[obj.key] = rung
+    result.box_class[obj.key] = box_class
+    result.visible_fraction[obj.key] = own_visible
+    for other_key, fraction in imposed:
+        result.visible_fraction[other_key] = min(result.visible_fraction[other_key], fraction)
+    result.positions[obj.key] = pos
+    return _PlacedObject(
+        obj=obj, position=pos, bounds=bounds, rung=rung, ink_min=ink_min,
+        ink_max_inflated=ink_max_inflated,
+    ), ""
+
+
 def _attempt(
     camera: Camera,
     admitted: list[PhysicalObject],
-    placements: dict[SceneKey, Vec3],
+    base_positions: dict[SceneKey, Vec3],
     viewport: CellBox,
     cfg: SceneTuning,
     catalog: ArtGeometryCatalog,
     strategy: ProjectionStrategy,
     anchor_key: SceneKey,
     anchor_box_class: int | None,
+    previous_depths: dict[SceneKey, int],
+    z_memo: dict[tuple[SceneKey, int, int, int], tuple[int, int] | None],
     *,
     trace_prose: bool,
 ) -> _Attempt:
-    """Project every currently-admitted object under one candidate camera and
-    check the hard rules of plan §9.6 in cheapest-and-most-rejecting-first
-    order. Returns which objects survived; the caller (`solve`) decides what
-    to do about the rest -- `_attempt` never mutates `admitted`.
+    """Place *and* admit every currently-admitted object under one candidate
+    camera (the WP-SC09 joint-placement redesign; see the plan's
+    "Joint secondary-object placement" section).
+
+    The pre-redesign `_attempt` projected fixed, camera-blind placements and
+    could only report which of them happened to survive; whether a ship was
+    placed somewhere the accepted camera could show it was decided *outside*
+    the candidate loop, against a different (merely framed) camera. Here,
+    placement is part of the candidate's own evaluation:
+
+    * objects are visited in retention-priority order -- the exact
+      `(retention, hostility_ordinal, -threat_rank, key)` order `solve` sorts
+      `admitted` into -- so a higher-priority object always chooses its
+      position before, and independently of, every lower-priority one
+      (plan §4.5/§4.6);
+    * an inflexible object has exactly one candidate position, its classified
+      one, so anchors/planets/the Entity are unmoved (plan §2.4/§4.3);
+    * a flexible object searches its own feasible volume *against this
+      camera*: the z-band `_feasible_z_interval` proves workable, then, at
+      each sampled depth, a screen-space lattice of free slots that clears
+      every already-committed object's inflated ink box.
+
+    This is a deterministic **greedy** joint search, not an exhaustive one: it
+    never backtracks to move a higher-priority object so a lower-priority one
+    can fit. That is the bounded-work tradeoff plan §6.2 rule 4 requires --
+    an exhaustive joint search over `n` objects and `k` positions is `k**n` --
+    and it is also the only ordering that cannot violate §4.5, since the
+    object that "wins" a contested slot is always the higher-priority one.
+    `_attempt` never mutates `admitted` or `base_positions`.
     """
     result = _Attempt(camera=camera)
-    surviving: list[PhysicalObject] = []
-
-    for obj in admitted:
-        pos = placements[obj.key]
-        try:
-            bounds = strategy.project(camera, obj, pos, viewport)
-        except NearPlaneViolation:
-            result.min_violations += 1
-            result.decisions.append(
-                _decision("near_plane", obj.key, "reject", trace_prose=trace_prose, reason="behind near plane")
-            )
-            continue
-        if not _contained(bounds, viewport, cfg.edge_margin):
-            result.min_violations += 1
-            result.decisions.append(
-                _decision("edge_margin", obj.key, "reject", trace_prose=trace_prose, reason="outside viewport")
-            )
-            continue
-        min_w, min_h = cfg.min_projected_cells_by_scale_class[obj.scale_class]
-        if bounds.width < min_w or bounds.height < min_h:
-            result.min_violations += 1
-            result.decisions.append(
-                _decision(
-                    "min_projected_size", obj.key, "reject", trace_prose=trace_prose, reason="too small to read"
-                )
-            )
-            continue
-
-        rung: LadderRung | None = None
-        box_class: int | None = None
-        if obj.art_mode is ArtMode.LADDER:
-            rung = _select_rung(catalog, obj, bounds)
-            if rung is None:
-                result.min_violations += 1
-                result.decisions.append(
-                    _decision(
-                        "no_clearing_rung", obj.key, "reject", trace_prose=trace_prose,
-                        reason="no authored rung fits; never cropped",
-                    )
-                )
-                continue
-        else:
-            assert obj.continuous_kind is not None
-            yield_ = catalog.continuous(obj.continuous_kind)
-            ink_min_box = _ink_box(obj, bounds, None, catalog, side="min")
-            if ink_min_box.width < yield_.min_extent.width or ink_min_box.height < yield_.min_extent.height:
-                result.min_violations += 1
-                result.decisions.append(
-                    _decision(
-                        "min_ink_extent", obj.key, "reject", trace_prose=trace_prose,
-                        reason="below minimum continuous ink extent",
-                    )
-                )
-                continue
-            if obj.key == anchor_key:
-                box_class = anchor_box_class
-
-        result.bounds[obj.key] = bounds
-        result.rung[obj.key] = rung
-        result.box_class[obj.key] = box_class
-        result.visible_fraction[obj.key] = Fraction(1)
-        result.accepted.add(obj.key)
-        surviving.append(obj)
-
-    # Rule 4: separation. `surviving` is already in retention-priority order,
-    # so on overlap the later (lower-priority) object of the pair loses.
-    min_slack = _LARGE_SLACK
-    for i, a in enumerate(surviving):
-        if a.key not in result.accepted or not a.occludes:
-            continue
-        ink_a = _inflate(_ink_box(a, result.bounds[a.key], result.rung[a.key], catalog, side="max"), cfg.separation_margin)
-        for b in surviving[i + 1 :]:
-            if b.key not in result.accepted or not b.occludes:
-                continue
-            ink_b = _inflate(
-                _ink_box(b, result.bounds[b.key], result.rung[b.key], catalog, side="max"), cfg.separation_margin
-            )
-            gap = _rect_gap(ink_a, ink_b)
-            min_slack = min(min_slack, gap)
-            if gap < 0:
-                result.accepted.discard(b.key)
-                result.decisions.append(
-                    _decision("separation", b.key, "reject", trace_prose=trace_prose, reason="too close to " + str(a.key))
-                )
-
-    # Rule 5: occlusion by depth. Nearer (smaller z; equal-z ties broken by
-    # larger face area first, per §4.8/§9.6) checked against farther.
-    ordered = sorted(
-        (o for o in surviving if o.key in result.accepted),
-        key=lambda o: (placements[o.key].z, -o.face.area_su, o.key),
-    )
-    for i, nearer in enumerate(ordered):
-        if nearer.key not in result.accepted or not nearer.occludes:
-            continue
-        occluder = _ink_box(
-            nearer, result.bounds[nearer.key], result.rung[nearer.key], catalog, side="max"
-        )
-        for farther in ordered[i + 1 :]:
-            if farther.key not in result.accepted or not farther.occludes:
-                continue
-            if placements[farther.key].z <= placements[nearer.key].z:
-                continue  # strictly farther only; equal depth handled by the sort above
-            farther_ink = _ink_box(
-                farther, result.bounds[farther.key], result.rung[farther.key], catalog, side="min"
-            )
-            result.occlusion_comparisons += 1
-            area = farther_ink.width * farther_ink.height
-            if area <= 0:
-                continue
-            overlap = _overlap_area(occluder, farther_ink)
-            visible = Fraction(area - overlap, area)
-            result.visible_fraction[farther.key] = min(result.visible_fraction[farther.key], visible)
-            threshold = cfg.min_visible_fraction_by_scale_class[farther.scale_class]
-            if visible < threshold:
-                result.accepted.discard(farther.key)
-                result.decisions.append(
-                    _decision(
-                        "min_visible_fraction", farther.key, "reject", trace_prose=trace_prose,
-                        reason="occluded below minimum visible fraction",
-                    )
-                )
-
-    # Rule 7: cumulative cost and emergency ship ceiling.
+    placed: list[_PlacedObject] = []
     cost = 0
     ship_count = 0
-    for obj in surviving:
-        if obj.key not in result.accepted:
-            continue
-        if obj.art_mode is ArtMode.LADDER:
-            rung_obj = result.rung[obj.key]
-            assert rung_obj is not None
-            cost += rung_obj.render_cost
-        else:
-            assert obj.continuous_kind is not None
-            yield_ = catalog.continuous(obj.continuous_kind)
-            idx = result.box_class[obj.key] or 0
-            cost += yield_.render_cost[idx]
-        if obj.key.tag in ("ship", "player"):
-            ship_count += 1
-    result.cost_estimated = cost
-    if cost > cfg.cost_budget or ship_count > cfg.emergency_ship_ceiling:
-        # A cost/ceiling violation fails the whole candidate (plan §4.14) --
-        # unlike separation/occlusion, this is not attributable to one object,
-        # so it does not discard anyone here; it only clears `hard_ok`. The
-        # outer pass loop's step-down/reject fallbacks are what actually act
-        # on it.
-        result.accepted.clear()
 
-    result.min_separation_slack = min_slack
+    for obj in admitted:
+        base = base_positions[obj.key]
+        reason = "no_feasible_placement"
+        committed: _PlacedObject | None = None
+
+        # Plan §4.14: "Cost is spent in retention order." Spending it *here*,
+        # as the greedy walk reaches each object, is what makes that literal --
+        # the pre-redesign `_attempt` summed the whole scene and, on overflow,
+        # cleared the entire admitted set, so a 50-ship inventory produced an
+        # empty plan instead of the affordable high-priority prefix (and, with
+        # `max_passes` far below the number of ships to shed, the pass loop's
+        # reject ladder could never converge on one either -- a §4.18
+        # violation). The cheapest authored rung / box class bounds an object's
+        # cost from below, so an object that cannot be afforded even at its
+        # cheapest is refused before any placement search is spent on it.
+        floor_cost = _cheapest_cost(obj, catalog)
+        is_ship = obj.key.tag in ("ship", "player")
+        if is_ship and ship_count + 1 > cfg.emergency_ship_ceiling:
+            result.min_violations += 1
+            result.positions.setdefault(obj.key, base)
+            result.decisions.append(
+                _decision(
+                    "emergency_ship_ceiling", obj.key, "reject", trace_prose=trace_prose,
+                    reason="emergency ship ceiling reached",
+                )
+            )
+            continue
+        if cost + floor_cost > cfg.cost_budget:
+            result.min_violations += 1
+            result.positions.setdefault(obj.key, base)
+            result.decisions.append(
+                _decision(
+                    "cost_budget", obj.key, "reject", trace_prose=trace_prose,
+                    reason="render-cost budget exhausted in retention order",
+                )
+            )
+            continue
+
+        if not obj.flexible:
+            result.placement_evaluations += 1
+            committed, why = _evaluate_placement(
+                obj, base, camera, viewport, cfg, catalog, strategy, placed,
+                anchor_key, anchor_box_class, cfg.cost_budget - cost, result,
+            )
+            if committed is None:
+                reason = why
+        else:
+            region = _absolute_region(obj, result.positions)
+            x_min, x_max = region.x_min, region.x_max
+            y_min, y_max = region.y_min, region.y_max
+            z_min, z_max = region.z_min, region.z_max
+            # One bounded binary-search pair per (object, camera), memoised
+            # across the pass loop because `candidates()` re-yields the same
+            # camera set on every pass. The memo is a pure function of its key
+            # -- object, camera depth, and aim -- so it changes no result.
+            memo_key = (obj.key, camera.position.z, camera.aim_x_su, camera.aim_y_su)
+            if memo_key in z_memo:
+                z_band = z_memo[memo_key]
+            else:
+                z_band = _feasible_z_interval(
+                    camera, obj, viewport, cfg, catalog, strategy, z_min, z_max
+                )
+                z_memo[memo_key] = z_band
+            if z_band is None:
+                # `_feasible_z_interval` evaluates the depth-dependent rules at
+                # the camera's own aim point, which is the most permissive xy
+                # there is: a box too large to be contained when centred cannot
+                # be contained anywhere, and the minimum-size/rung/ink-extent
+                # rules do not depend on xy at all. An empty band therefore
+                # means *no* placement of this object can pass under this
+                # camera, so the slot scan below is skipped outright rather
+                # than spending its budget proving it. (The pre-redesign
+                # reposition fallback fell back to the full region here; it had
+                # to, because it drew a single blind sample and a fallback was
+                # its only alternative to giving up. Joint placement gets the
+                # same object a fresh chance under every other camera
+                # candidate, so the honest early reject is strictly better than
+                # a sample that cannot pass.)
+                result.min_violations += 1
+                result.positions.setdefault(obj.key, base)
+                result.decisions.append(
+                    _decision(
+                        "no_feasible_depth", obj.key, "reject", trace_prose=trace_prose,
+                        reason="no depth in this object's region clears the hard rules "
+                               "under this camera",
+                    )
+                )
+                continue
+            z_lo, z_hi = z_band
+            preferred: list[int] = [base.z]
+            prev_z = previous_depths.get(obj.key)
+            if prev_z is not None:
+                preferred.append(prev_z)
+            budget = cfg.max_reposition_candidates
+            for z in _depth_strata(obj.key, z_lo, z_hi, tuple(preferred)):
+                if committed is not None or budget <= 0:
+                    break
+                extent = strategy.visible_xy_extent(camera, viewport, z, obj.face, cfg)
+                xy = intersect_region_xy(region, extent)
+                bounds_probe: CellBox | None = None
+                try:
+                    bounds_probe = strategy.project(
+                        camera, obj,
+                        Vec3(camera.position.x + camera.aim_x_su, camera.position.y + camera.aim_y_su, z),
+                        viewport,
+                    )
+                except NearPlaneViolation:
+                    continue
+                slots = _slot_lattice(viewport, cfg.edge_margin, bounds_probe)
+                if not slots:
+                    continue
+                order = _shuffled(obj.key, f"slot|{z}", len(slots))
+                for index in order:
+                    if budget <= 0:
+                        break
+                    col, row = slots[index]
+                    probe = _inflate(
+                        CellBox(col, row, bounds_probe.width, bounds_probe.height),
+                        cfg.separation_margin,
+                    )
+                    if obj.occludes and any(
+                        p.obj.occludes and _rect_gap(probe, p.ink_max_inflated) < 0 for p in placed
+                    ):
+                        continue
+                    su = _su_for_screen(strategy, camera, viewport, z, col, row, bounds_probe)
+                    if su is None:
+                        continue
+                    x = min(max(su[0], x_min), x_max)
+                    y = min(max(su[1], y_min), y_max)
+                    if xy is not None:
+                        x = min(max(x, xy[0]), xy[1])
+                        y = min(max(y, xy[2]), xy[3])
+                    budget -= 1
+                    result.placement_evaluations += 1
+                    candidate, why = _evaluate_placement(
+                        obj, Vec3(x, y, z), camera, viewport, cfg, catalog, strategy, placed,
+                        anchor_key, anchor_box_class, cfg.cost_budget - cost, result,
+                    )
+                    if candidate is not None:
+                        committed = candidate
+                        break
+                    reason = why
+
+        if committed is None:
+            result.min_violations += 1
+            result.positions.setdefault(obj.key, base)
+            result.decisions.append(
+                _decision(reason, obj.key, "reject", trace_prose=trace_prose, reason=reason)
+            )
+            continue
+
+        cost += _actual_cost(committed, catalog, result.box_class[obj.key])
+        ship_count += is_ship
+        placed.append(committed)
+        result.accepted.add(obj.key)
+
+    result.cost_estimated = cost
     return result
+
+
+def _cheapest_cost(obj: PhysicalObject, catalog: ArtGeometryCatalog) -> int:
+    """The least this object could possibly cost to render: its cheapest
+    authored rung, or its cheapest continuous box class (plan §4.14 -- ladder
+    costs assume no monotonicity by rung, so this is a `min`, not the last
+    entry)."""
+    if obj.art_mode is ArtMode.LADDER:
+        assert obj.ladder_key is not None
+        rungs = catalog.rungs(obj.ladder_key)
+        return min((r.render_cost for r in rungs), default=0)
+    assert obj.continuous_kind is not None
+    return min(catalog.continuous(obj.continuous_kind).render_cost, default=0)
+
+
+def _actual_cost(
+    entry: _PlacedObject, catalog: ArtGeometryCatalog, box_class: int | None
+) -> int:
+    if entry.rung is not None:
+        return entry.rung.render_cost
+    assert entry.obj.continuous_kind is not None
+    return catalog.continuous(entry.obj.continuous_kind).render_cost[box_class or 0]
+
 
 
 def _rejected_by_retention(
@@ -721,11 +1082,21 @@ def solve(
         "camera_candidates": 0, "reposition_candidates": 0, "passes": 0, "reanchors": 0,
         "step_downs": 0, "occlusion_comparisons": 0,
     }
-    reposition_attempts: dict[SceneKey, int] = {}
+    # Plan §4.11: the only placement state carried across a resize is the
+    # previous plan's per-object depth, used purely as the first entry of a
+    # flexible object's own deterministic candidate order (`_depth_strata`).
+    # It cannot overturn a hard rule -- every candidate, preferred or not, goes
+    # through the identical `_evaluate_placement` -- and it never reaches the
+    # comparison tuple, where hysteresis stays the low-priority term §4.11
+    # specifies.
+    previous_depths: dict[SceneKey, int] = (
+        {p.key: p.depth for p in previous.projections if p.accepted} if previous is not None else {}
+    )
+    z_memo: dict[tuple[SceneKey, int, int, int], tuple[int, int] | None] = {}
 
     best: _Attempt | None = None
     best_score: tuple[tuple[int, ...], int, int, int, int, int, str] | None = None
-    best_anchor_key: SceneKey | None = None
+    best_admitted: list[PhysicalObject] | None = None
 
     current_anchor_key: SceneKey | None = None
     step_index = 0
@@ -760,81 +1131,35 @@ def solve(
             counters["camera_candidates"] += 1
             attempt = _attempt(
                 cand_camera, admitted, placements, viewport, cfg_current, catalog, strategy,
-                anchor.key, anchor_box_class, trace_prose=trace_prose,
+                anchor.key, anchor_box_class, previous_depths, z_memo, trace_prose=trace_prose,
             )
             counters["occlusion_comparisons"] += attempt.occlusion_comparisons
+            counters["reposition_candidates"] += attempt.placement_evaluations
             score = _score(attempt, admitted, anchor.key, target_h, previous, cfg_current)
             if best_score is None or score < best_score:
                 best = attempt
                 best_score = score
-                best_anchor_key = anchor.key
+                best_admitted = admitted
             if attempt.hard_ok(len(admitted)):
                 found_hard_ok = True
                 break
         if found_hard_ok:
-            assert best is not None and best_anchor_key is not None
+            assert best is not None and best_admitted is not None
             return _finish(
-                best, admitted, all_objects, placements, viewport, mode, strategy.name, catalog,
+                best, best_admitted, all_objects, viewport, mode, strategy.name, catalog,
                 counters, trace, arrangement, cfg, trace_prose=trace_prose,
             )
 
-        # Fallback ladder, in order: reposition -> anchor step-down -> reject.
-        flexible_candidates = [
-            o for o in reversed(admitted)
-            if o.flexible and reposition_attempts.get(o.key, 0) < cfg.max_reposition_candidates
-        ]
-        if flexible_candidates:
-            target = flexible_candidates[0]
-            attempt_no = reposition_attempts.get(target.key, 0)
-            reposition_attempts[target.key] = attempt_no + 1
-            counters["reposition_candidates"] += 1
-            region = target.region
-            offset_key = f"{target.key.tag}:{target.key.ident}|reposition|{attempt_no}"
-            # Frustum-aware reposition, z half (docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md
-            # §2.5/§9.6 fix, follow-up to the xy-only fix below): the blind
-            # z hash draw over the object's full nominal region used to ignore
-            # that only a narrow depth band -- clearing near-plane, edge-margin,
-            # min_projected_size, and (ladder) no_clearing_rung / (continuous)
-            # min_ink_extent all at once -- can ever pass `_attempt()`'s hard
-            # rules at all. `_feasible_z_interval` finds that band (or `None` if
-            # this object has no feasible depth at all against the current
-            # pass's framed camera) and the z draw is narrowed to it; a `None`
-            # result falls back to the untouched full region z-range, exactly
-            # the pre-fix behaviour, so this can only ever help.
-            z_interval = _feasible_z_interval(
-                camera, target, viewport, cfg_current, catalog, strategy, region.z_min, region.z_max
-            )
-            z_lo, z_hi = z_interval if z_interval is not None else (region.z_min, region.z_max)
-            new_z = z_lo + _hash_index(offset_key + "|z", z_hi - z_lo + 1)
-            # Frustum-aware reposition, xy half (docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md
-            # §2.5/§9.6 fix): `target.region` is deliberately wide -- ships/wrecks
-            # receive placement freedom far beyond a station's -- but only the
-            # slice of it a camera the solver would actually place can show is
-            # ever worth sampling. Intersecting with `strategy.visible_xy_extent()`
-            # at this attempt's depth turns "resample the whole region and hope"
-            # into "resample the part of the region that can possibly pass
-            # `_contained()`", without narrowing the region itself or spending any
-            # extra bounded-search budget -- this replaces one hash draw with
-            # another, it does not add a loop. `camera` here is the current pass's
-            # *framed* camera (fixed once per anchor/step, before the per-candidate
-            # height/aim sweep) -- an estimate, not the eventual winning candidate,
-            # so a `None`/empty intersection (near-plane failure, or a face too
-            # large to fit at this depth) falls back to the untouched full region,
-            # exactly WP-SC06's original behaviour for this object.
-            extent = strategy.visible_xy_extent(camera, viewport, new_z, target.face, cfg_current)
-            xy = intersect_region_xy(region, extent)
-            x_min, x_max, y_min, y_max = xy if xy is not None else (
-                region.x_min, region.x_max, region.y_min, region.y_max
-            )
-            new_pos = Vec3(
-                x_min + _hash_index(offset_key + "|x", x_max - x_min + 1),
-                y_min + _hash_index(offset_key + "|y", y_max - y_min + 1),
-                new_z,
-            )
-            placements[target.key] = new_pos
-            trace.append(_decision("reposition", target.key, "move", trace_prose=trace_prose))
-            continue
-
+        # Fallback ladder, in order: anchor box-class step-down -> retention
+        # reject. The pre-redesign ladder had a third, first rung -- move one
+        # flexible object per pass, against the pass's *framed* camera, and
+        # re-run the whole camera sweep. Joint placement subsumes it: every
+        # flexible object now chooses its position inside `_attempt`, against
+        # the exact candidate camera being judged, so there is nothing left for
+        # a separate blind reposition step to do and passes are no longer spent
+        # on it. `SolveCounters.reposition_candidates` therefore now reports
+        # the placement candidates joint placement actually evaluated (see the
+        # plan's "Joint secondary-object placement" section).
         yield_max_index = None
         anchor_continuous_kind = anchor.continuous_kind
         if anchor.art_mode is ArtMode.CONTINUOUS and anchor_continuous_kind is not None:
@@ -863,13 +1188,13 @@ def solve(
 
         break
 
-    if best is None or best_anchor_key is None:
+    if best is None or best_admitted is None:
         base_camera = _base_starfield_camera(cfg)
         plan = _starfield_plan(viewport, mode, strategy.name, base_camera)
         return _with_glyph_trace(plan, arrangement, viewport, cfg)
 
     return _finish(
-        best, admitted, all_objects, placements, viewport, mode, strategy.name, catalog,
+        best, best_admitted, all_objects, viewport, mode, strategy.name, catalog,
         counters, trace, arrangement, cfg, trace_prose=trace_prose,
     )
 
@@ -893,9 +1218,10 @@ def _as_world_arrangement(
     admitted: list[PhysicalObject], placements: dict[SceneKey, Vec3], arrangement: WorldArrangement
 ) -> WorldArrangement:
     """`ProjectionStrategy.frame()` takes a `WorldArrangement`; the solver
-    works from a possibly-shrunk `admitted` list and a possibly-repositioned
-    `placements` map, so this rebuilds the minimal view `frame()` needs
-    without mutating the caller's original arrangement.
+    works from a possibly-shrunk `admitted` list, so this rebuilds the minimal
+    view `frame()` needs without mutating the caller's original arrangement.
+    `placements` is the classifier's immutable base map -- joint placement
+    keeps its per-candidate positions on the `_Attempt`, never here.
     """
     objs = tuple(admitted)
     plc = tuple(Placement(key=o.key, position=placements[o.key]) for o in admitted)
@@ -915,7 +1241,6 @@ def _finish(
     attempt: _Attempt,
     admitted: list[PhysicalObject],
     all_objects: dict[SceneKey, PhysicalObject],
-    placements: dict[SceneKey, Vec3],
     viewport: CellBox,
     mode: str,
     strategy_name: str,
@@ -953,7 +1278,7 @@ def _finish(
             Projection(
                 key=obj.key,
                 bounds=bounds,
-                depth=placements[obj.key].z,
+                depth=attempt.positions[obj.key].z,
                 rung=rung,
                 box_class=box_class,
                 ink_est=ink_est,

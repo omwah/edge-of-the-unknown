@@ -109,6 +109,8 @@ class ProjectionStrategy(Protocol):
         cfg: SceneTuning,
     ) -> tuple[Su, Su, Su, Su] | None: ...
 
+    def scale_at(self, camera: Camera, viewport: CellBox, z: Su) -> Fraction | None: ...
+
 
 class NearPlaneViolation(ValueError):
     """A camera placed an object at or behind `camera.near_plane_su`.
@@ -315,6 +317,24 @@ class FixedFovPerspective:
         )
         count = 0
         seen: set[tuple[int, int]] = set()
+        # Candidate #0 is the framed camera itself (plan §9.6: "nearest-to-
+        # current first" -- "current" being the camera `frame()` just solved
+        # for this anchor). It was previously dropped: the sweep only ever
+        # yielded heights inside `[camera_height_fraction_min,
+        # camera_height_fraction_max] * viewport.height`, and for a
+        # *continuous* anchor `frame()`'s own solved height is
+        # `target_fraction / ink_ratio * viewport.height`, which the approved
+        # WP-SC05 numbers put *outside* that window (planet: 1/2 / 3/5 = 5/6 >
+        # 3/4). The framed camera was therefore unreachable for every
+        # planet/nebula/black-hole/wormhole scene, and every candidate the
+        # solver could see was strictly farther away than the one framing
+        # chose -- which shrank secondary ships below `min_projected_size` /
+        # every authored rung. Yielding it first costs one candidate from the
+        # same bounded budget and retunes no approved value.
+        for cam0 in (camera,):
+            seen.add((anchor_pos.z - cam0.position.z, cam0.aim_x_su))
+            yield cam0
+            count += 1
         for h in _height_sweep(viewport, cfg, current_h):
             dz = Fraction(viewport.height * camera.fov_den, camera.fov_num) * Fraction(
                 anchor.face.height_su, h
@@ -371,11 +391,24 @@ class FixedFovPerspective:
         face: Face,
         cfg: SceneTuning,
     ) -> tuple[Su, Su, Su, Su] | None:
+        scale = self.scale_at(camera, viewport, z)
+        if scale is None:
+            return None
+        return _visible_xy_extent_from_scale(camera, viewport, face, cfg, scale)
+
+    def scale_at(self, camera: Camera, viewport: CellBox, z: Su) -> Fraction | None:
+        """The exact su-to-cell scale factor `project()` uses at depth `z`, or
+        `None` when `z` violates the near plane (plan §9.2).
+
+        Exposed so the solver can run `project()`'s position algebra
+        *backwards* -- turn a wanted screen cell into the su position that
+        lands an object there -- without duplicating either strategy's scale
+        formula (see `edge/scene/solve.py::_su_for_screen`).
+        """
         dz = Fraction(z - camera.position.z)
         if dz <= 0 or z < camera.near_plane_su:
             return None
-        scale = Fraction(viewport.height * camera.fov_den, camera.fov_num) / dz
-        return _visible_xy_extent_from_scale(camera, viewport, face, cfg, scale)
+        return Fraction(viewport.height * camera.fov_den, camera.fov_num) / dz
 
 
 class DepthLayeredAnchorProjection:
@@ -429,6 +462,16 @@ class DepthLayeredAnchorProjection:
         current_layer = 0
         count = 0
         seen: set[tuple[int, int]] = set()
+        # Candidate #0 is the framed camera itself, for the same reason as
+        # `FixedFovPerspective.candidates()` above (plan §9.6 "nearest-to-
+        # current first"): `frame()` picks the layer whose exact scale puts
+        # the anchor closest to its calibrated target height, and the layer
+        # sweep below -- which always restarts from layer 0 -- has no reason
+        # to visit that layer before exhausting nearer ones.
+        for cam0 in (camera,):
+            seen.add((anchor_pos.z - cam0.position.z, cam0.aim_x_su))
+            yield cam0
+            count += 1
         layers = sorted(range(cfg.depth_layers), key=lambda layer: (abs(layer - current_layer), layer))
         for layer in layers:
             dz_su = layer * cfg.depth_layer_size_su + 1
@@ -485,12 +528,20 @@ class DepthLayeredAnchorProjection:
         face: Face,
         cfg: SceneTuning,
     ) -> tuple[Su, Su, Su, Su] | None:
+        scale = self.scale_at(camera, viewport, z)
+        if scale is None:
+            return None
+        return _visible_xy_extent_from_scale(camera, viewport, face, cfg, scale)
+
+    def scale_at(self, camera: Camera, viewport: CellBox, z: Su) -> Fraction | None:
+        """This strategy's discrete per-layer scale at depth `z` (see
+        `FixedFovPerspective.scale_at` for why the protocol carries it)."""
         dz = z - camera.position.z
         if dz <= 0 or z < camera.near_plane_su:
             return None
         layer_index = dz // camera.depth_layer_size_su
-        scale = camera.depth_layer_scale**layer_index
-        return _visible_xy_extent_from_scale(camera, viewport, face, cfg, scale)
+        scale: Fraction = camera.depth_layer_scale**layer_index
+        return scale
 
 
 def intersect_region_xy(
