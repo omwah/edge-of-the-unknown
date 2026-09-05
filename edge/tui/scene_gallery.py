@@ -596,6 +596,25 @@ dialog a,dialog button{font:600 13px/1 ui-sans-serif,system-ui,sans-serif;
                        text-decoration:none;display:inline-block}
 dialog a{background:var(--accent);color:#fff;border-color:var(--accent)}
 .toolbar button[disabled]{opacity:.45;cursor:not-allowed}
+
+/* --- expand-to-full-size ----------------------------------------------------
+   A/B/C compare mode packs each variant into a `flex:1 1 360px` column, so a
+   wide canvas (150x52) is mostly hidden behind horizontal scroll — exactly the
+   case where comparing detail across composers matters most. The expand button
+   clones one card's `.scene` (art + bounds overlay, so `show-bounds` still
+   applies) into an oversized dialog instead of a scaled-down one, so the art is
+   read at its native character grid with nothing competing for width. */
+.expand-btn{background:none;border:1px solid var(--rule);border-radius:6px;
+            color:var(--muted);cursor:pointer;font-size:14px;line-height:1;
+            padding:4px 8px;flex:none}
+.expand-btn:hover,.expand-btn:focus-visible{border-color:var(--accent);
+                                            color:var(--accent)}
+dialog#expand-dialog{width:min(96vw,1400px);max-width:96vw}
+dialog#expand-dialog header{display:flex;align-items:baseline;justify-content:space-between;
+                            gap:12px}
+dialog#expand-dialog .composer-label{display:block;margin-bottom:2px}
+dialog#expand-dialog .pad{padding:0;max-height:82vh;overflow:auto}
+dialog#expand-dialog .pad .scene{padding:16px}
 """
 
 
@@ -747,6 +766,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  /* Expand: clone this card's `.scene` (art + bounds overlay, so the
+     `show-bounds` toggle still applies) into the oversized dialog. Cloning
+     rather than moving the node means the card behind the dialog stays intact
+     and reusable if the dialog is opened again for a sibling variant. */
+  $$('.expand-btn').forEach(btn => btn.addEventListener('click', () => {
+    const card = btn.closest('.case');
+    const label = $('.composer-label', card);
+    const expandLabel = $('#expand-label');
+    if (label) { expandLabel.textContent = label.textContent; expandLabel.hidden = false; }
+    else { expandLabel.hidden = true; }
+    $('#expand-title').textContent = card.dataset.scene;
+    const body = $('#expand-body');
+    body.replaceChildren();
+    body.appendChild($('.scene', card).cloneNode(true));
+    $('#expand-dialog').showModal();
+  }));
+
   refreshCounts();
   applyFilters();
 });
@@ -849,10 +885,13 @@ def _card_html(sid: str, name: str, w: int, h: int, art: Text, drawn: dict[str, 
         f'data-sprites="{_attr_json(refs)}"')
     label_html = (f'<div class=composer-label>{html.escape(composer_label)}</div>'
                   if composer_label else "")
+    expand_btn = (
+        '<button type=button class=expand-btn title="Expand to full size" '
+        'aria-label="Expand to full size">&#10530;</button>')
     card = (
         f"<div class='case {'flagged' if flags else 'ok'}' id=\"{_slug(sid)}\" {data}>"
         f"<header>{label_html}<h3>{html.escape(sid)}</h3>"
-        f"<span class=dims>{dims}</span></header>"
+        f"<span class=dims>{dims}</span>{expand_btn}</header>"
         f"<div class=body>"
         f"<div class=main>"
         f"<div class=scene>{frag}{_bounds_html_entries(bounds)}</div>{flag_html}"
@@ -997,6 +1036,16 @@ least one conflict.</p>
     <a id=export-download download=scene-complaints.json>Download JSON</a>
     <button type=button onclick="this.closest('dialog').close()">Close</button>
   </footer>
+</dialog>
+<dialog id=expand-dialog>
+  <header>
+    <div>
+      <span id=expand-label class=composer-label hidden></span>
+      <h3 id=expand-title style="margin:2px 0 0"></h3>
+    </div>
+    <button type=button onclick="this.closest('dialog').close()">Close</button>
+  </header>
+  <div class=pad id=expand-body></div>
 </dialog>
 <script>{_PAGE_JS}</script>
 </body>
