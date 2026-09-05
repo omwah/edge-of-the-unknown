@@ -201,6 +201,26 @@ scene:
       orbital: [3, 2]
       ship: [3, 1]
       wreck: [3, 1]
+    # Minimum-richness floor (maintainer feedback: composers were shrinking
+    # ports/stardocks/starbases and never using ships' larger sizes even on
+    # large screens). `min_projected_cells_by_scale_class` above is smaller
+    # than every ladder's smallest rung, so it imposed no real floor -- this
+    # instead excludes the worst N rung indices (index 0 = richest, ascending
+    # = worse) of a laddered object's own ladder from ever being selected,
+    # forcing the solver to place it closer or reject it, never show it
+    # degraded. Every port/starbase/stardock ladder has 4 authored rungs;
+    # excluding the worst 1 leaves 3 usable tiers.
+    #
+    # `ship` is deliberately absent from this map: measurement (real gallery
+    # case/size matrix, both strategies) showed that excluding even the
+    # single worst ship rung (of 3) collapses DepthLayeredAnchorProjection's
+    # ship/wreck admission rate from ~99% to ~3% -- its coarse per-layer
+    # depth-scale step (4/5 across 8 layers) rarely lands inside the
+    # narrower band where 2-of-3 ship rungs both clear. Fixing the ship
+    # "never uses larger sizes" complaint needs a depth-layer-granularity
+    # change first; see docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md.
+    min_rung_index_from_end_by_scale_class:
+      orbital: 1
     # Matches edge_margin: one blank cell of clearance between distinct
     # accepted objects' ink-max boxes (plan §9.6 attempt rule 4).
     separation_margin: 1

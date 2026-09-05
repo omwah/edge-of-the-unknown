@@ -323,6 +323,19 @@ class SceneTuning:
     """`(min_width, min_height)` cells an accepted projection must clear,
     keyed by `PhysicalObject.scale_class` (attempt rule 2)."""
 
+    min_rung_index_from_end_by_scale_class: Mapping[str, int]
+    """Minimum-richness floor (maintainer feedback: composers were shrinking
+    ports/stardocks/starbases and never using ships' larger tiers): the
+    number of worst (highest-`LadderRung.index`) rungs of a laddered object's
+    ladder that `_select_rung` must never select, keyed by `scale_class`. A
+    value of `1` means "never the single worst rung"; a scale class absent
+    from this mapping (or a continuous/non-laddered object) is unaffected.
+    This is a genuine exclusion on what counts as "clears" at a given
+    projected size, not a post-hoc filter -- an object that can only ever fit
+    an excluded rung is rejected outright (plan's "no cropping / no degraded
+    compromise" philosophy), never shown at a worse tier than this floor
+    allows."""
+
     separation_margin: int
     """Cells by which accepted ink-max boxes are inflated before the pairwise
     overlap check (attempt rule 4); `occludes=False` objects are skipped."""

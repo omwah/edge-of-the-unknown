@@ -127,6 +127,7 @@ def _tuning(**overrides: object) -> SceneTuning:
         max_passes=48,
         edge_margin=1,
         min_projected_cells_by_scale_class={"ship": (3, 1), "anchor": (4, 3), "wreck": (2, 1)},
+        min_rung_index_from_end_by_scale_class={},
         separation_margin=1,
         min_visible_fraction_by_scale_class={
             "ship": Fraction(1, 3), "anchor": Fraction(1, 4), "wreck": Fraction(1, 4),
@@ -535,3 +536,95 @@ def test_an_object_with_no_ladder_key_match_is_rejected_not_cropped() -> None:
     plan = solve(scene, VIEWPORT, cfg, CATALOG, FixedFovPerspective())
     assert ship.key not in {p.key for p in plan.projections}
     assert ship.key in plan.rejected
+
+
+# ---------------------------------------------------------------------------
+# Minimum-richness floor (`min_rung_index_from_end_by_scale_class`): the
+# solver must never select the worst N rungs of a laddered object's own
+# ladder for a floored scale class, must fall back to rejection (not a
+# degraded rung) when nothing else clears, must stay deterministic, and must
+# leave unfloored scale classes/continuous kinds untouched.
+# ---------------------------------------------------------------------------
+
+
+@given(z=st.integers(min_value=2, max_value=299))
+@settings(max_examples=25, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@pytest.mark.parametrize("strategy", STRATEGIES, ids=lambda s: s.name)
+def test_floored_scale_class_never_selects_the_worst_rung(
+    strategy: ProjectionStrategy, z: int
+) -> None:
+    """`_SHIP_RUNGS` has 3 rungs (index 0..2); a floor of 1 must never let
+    the worst (index 2) rung reach an accepted projection, whatever depth the
+    flexible ship's region search lands it at."""
+    cfg = _tuning(min_rung_index_from_end_by_scale_class={"ship": 1})
+    anchor = _anchor_object()
+    ship = _ship_object(0)
+    scene = _arrangement(
+        (anchor, ship), (_placement(anchor.key, 0, 0, 40), _placement(ship.key, 0, 0, z))
+    )
+    plan = solve(scene, VIEWPORT, cfg, CATALOG, strategy)
+    for projection in plan.projections:
+        if projection.key == ship.key:
+            assert projection.rung is not None
+            assert projection.rung.index <= 1, (
+                f"floored ship accepted at worst rung index {projection.rung.index}"
+            )
+
+
+def test_floored_scale_class_rejects_rather_than_degrades() -> None:
+    """A floor of 1 with only 2 rungs left (index 0, 1) still authored, but
+    positioned so only the worst (excluded) rung's natural box would ever
+    clear the projected box: the object must be rejected outright, never
+    admitted at the excluded rung."""
+    cfg_floor = _tuning(min_rung_index_from_end_by_scale_class={"ship": 1})
+    cfg_no_floor = _tuning()
+    anchor = _anchor_object()
+    # A region floored to stay far (z 200-300): the solver's reposition
+    # search -- which would otherwise dodge the floor by moving the ship
+    # closer -- has nowhere closer to go, so this isolates the pure
+    # reject-vs-degrade fallback from the (also correct, separately covered)
+    # reposition behaviour.
+    far_region = replace(_region(), z_min=200, z_max=300)
+    ship = replace(_ship_object(0), region=far_region)
+    scene = _arrangement(
+        (anchor, ship), (_placement(anchor.key, 0, 0, 40), _placement(ship.key, 0, 0, 250))
+    )
+    baseline = solve(scene, VIEWPORT, cfg_no_floor, CATALOG, FixedFovPerspective())
+    baseline_ship = next((p for p in baseline.projections if p.key == ship.key), None)
+    if baseline_ship is None or baseline_ship.rung is None or baseline_ship.rung.index != 2:
+        pytest.skip("fixture depth does not isolate the worst-rung-only case on this build")
+    floored = solve(scene, VIEWPORT, cfg_floor, CATALOG, FixedFovPerspective())
+    accepted_keys = {p.key for p in floored.projections}
+    assert ship.key not in accepted_keys
+    assert ship.key in floored.rejected
+
+
+@pytest.mark.parametrize("strategy", STRATEGIES, ids=lambda s: s.name)
+def test_minimum_richness_floor_is_deterministic(strategy: ProjectionStrategy) -> None:
+    cfg = _tuning(min_rung_index_from_end_by_scale_class={"ship": 1})
+    scene = _basic_scene()
+    first = solve(scene, VIEWPORT, cfg, CATALOG, strategy)
+    second = solve(scene, VIEWPORT, cfg, CATALOG, strategy)
+    assert first.fingerprint == second.fingerprint
+    assert [(p.key, p.rung) for p in first.projections] == [
+        (p.key, p.rung) for p in second.projections
+    ]
+
+
+@pytest.mark.parametrize("strategy", STRATEGIES, ids=lambda s: s.name)
+def test_minimum_richness_floor_does_not_constrain_unfloored_kinds(
+    strategy: ProjectionStrategy,
+) -> None:
+    """A floor keyed only to `"ship"` must not touch a continuous-kind
+    (`"wreck"`) object's own box-class selection -- there is no rung index to
+    exclude for a non-laddered kind, and the mapping is per-scale-class, not
+    global."""
+    cfg_floor = _tuning(min_rung_index_from_end_by_scale_class={"ship": 1})
+    cfg_no_floor = _tuning()
+    wreck = _wreck_object(0)
+    scene = _arrangement((wreck,), (_placement(wreck.key, 0, 0, 250),))
+    floored = solve(scene, VIEWPORT, cfg_floor, CATALOG, strategy)
+    unfloored = solve(scene, VIEWPORT, cfg_no_floor, CATALOG, strategy)
+    floored_keys = {p.key: p.box_class for p in floored.projections}
+    unfloored_keys = {p.key: p.box_class for p in unfloored.projections}
+    assert floored_keys == unfloored_keys

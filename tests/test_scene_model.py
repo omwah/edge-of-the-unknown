@@ -254,6 +254,7 @@ def test_scene_tuning_has_no_shipped_default_instance() -> None:
         max_passes=32,
         edge_margin=1,
         min_projected_cells_by_scale_class={"ship": (3, 1)},
+        min_rung_index_from_end_by_scale_class={},
         separation_margin=1,
         min_visible_fraction_by_scale_class={"ship": Fraction(1, 2)},
         cost_budget=500,

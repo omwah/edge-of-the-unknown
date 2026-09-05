@@ -116,6 +116,7 @@ def _tuning(**overrides: object) -> SceneTuning:
         max_passes=48,
         edge_margin=1,
         min_projected_cells_by_scale_class={"ship": (3, 1), "anchor": (4, 3), "wreck": (2, 1)},
+        min_rung_index_from_end_by_scale_class={},
         separation_margin=1,
         min_visible_fraction_by_scale_class={
             "ship": Fraction(1, 3), "anchor": Fraction(1, 4), "wreck": Fraction(1, 4),

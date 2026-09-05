@@ -298,6 +298,7 @@ def _benchmark_tuning() -> SceneTuning:
             "entity": (4, 2), "anchor": (6, 3), "belt": (6, 2),
             "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
         },
+        min_rung_index_from_end_by_scale_class={"orbital": 1},
         separation_margin=1,
         min_visible_fraction_by_scale_class={
             "entity": Fraction(1, 1), "anchor": Fraction(1, 1), "belt": Fraction(1, 1),

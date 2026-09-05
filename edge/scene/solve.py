@@ -99,18 +99,34 @@ def _contained(bounds: CellBox, viewport: CellBox, margin: int) -> bool:
     )
 
 
-def _select_rung(catalog: ArtGeometryCatalog, obj: PhysicalObject, bounds: CellBox) -> LadderRung | None:
+def _select_rung(
+    catalog: ArtGeometryCatalog, obj: PhysicalObject, bounds: CellBox, cfg: SceneTuning
+) -> LadderRung | None:
     """Plan §4.7/§9.6 attempt rule 3 (laddered): the richest complete authored
     rung whose natural box fits inside the projected box. Never the shipped
     `fit_box` clamp -- an object with no clearing rung returns `None` and is
     rejected, never cropped.
+
+    The `min_rung_index_from_end_by_scale_class` floor (minimum-richness fix)
+    excludes the worst `N` rung indices of this object's ladder from
+    consideration entirely -- not just from the ranking, but from what
+    "clears" means -- so an object that can only ever fit one of the excluded
+    rungs is rejected outright rather than shown at a degraded tier. `index`
+    ascends from 0 (richest); the worst `N` are the top `N` index values
+    actually present in *this* ladder, so the exclusion scales correctly even
+    though port/starbase/stardock ladders have 4 rungs and ship ladders have
+    3.
     """
     if obj.ladder_key is None:
         return None
+    all_rungs = catalog.rungs(obj.ladder_key)
+    if not all_rungs:
+        return None
+    exclude_from_end = cfg.min_rung_index_from_end_by_scale_class.get(obj.scale_class, 0)
+    max_index = max(r.index for r in all_rungs)
+    allowed = [r for r in all_rungs if r.index <= max_index - exclude_from_end]
     fits = [
-        r
-        for r in catalog.rungs(obj.ladder_key)
-        if r.natural.width <= bounds.width and r.natural.height <= bounds.height
+        r for r in allowed if r.natural.width <= bounds.width and r.natural.height <= bounds.height
     ]
     if not fits:
         return None
@@ -429,7 +445,7 @@ def _evaluate_placement(
 
     rung: LadderRung | None = None
     if obj.art_mode is ArtMode.LADDER:
-        rung = _select_rung(catalog, obj, bounds)
+        rung = _select_rung(catalog, obj, bounds, cfg)
         if rung is None:
             return None, "no_clearing_rung"
     else:
@@ -579,7 +595,7 @@ def _attempt(
         # violation). The cheapest authored rung / box class bounds an object's
         # cost from below, so an object that cannot be afforded even at its
         # cheapest is refused before any placement search is spent on it.
-        floor_cost = _cheapest_cost(obj, catalog)
+        floor_cost = _cheapest_cost(obj, catalog, cfg)
         is_ship = obj.key.tag in ("ship", "player")
         if is_ship and ship_count + 1 > cfg.emergency_ship_ceiling:
             result.min_violations += 1
@@ -724,15 +740,24 @@ def _attempt(
     return result
 
 
-def _cheapest_cost(obj: PhysicalObject, catalog: ArtGeometryCatalog) -> int:
+def _cheapest_cost(obj: PhysicalObject, catalog: ArtGeometryCatalog, cfg: SceneTuning) -> int:
     """The least this object could possibly cost to render: its cheapest
     authored rung, or its cheapest continuous box class (plan §4.14 -- ladder
     costs assume no monotonicity by rung, so this is a `min`, not the last
-    entry)."""
+    entry).
+
+    Excludes the same worst-`N` rung indices `_select_rung` refuses to select
+    (minimum-richness fix), so the floor's cost estimate stays a true lower
+    bound on what this object could actually be rendered at."""
     if obj.art_mode is ArtMode.LADDER:
         assert obj.ladder_key is not None
         rungs = catalog.rungs(obj.ladder_key)
-        return min((r.render_cost for r in rungs), default=0)
+        if not rungs:
+            return 0
+        exclude_from_end = cfg.min_rung_index_from_end_by_scale_class.get(obj.scale_class, 0)
+        max_index = max(r.index for r in rungs)
+        allowed = [r for r in rungs if r.index <= max_index - exclude_from_end]
+        return min((r.render_cost for r in allowed), default=0)
     assert obj.continuous_kind is not None
     return min(catalog.continuous(obj.continuous_kind).render_cost, default=0)
 
@@ -810,7 +835,7 @@ def _z_ok_near_and_size(
     not_too_small = bounds.width >= min_w and bounds.height >= min_h
     if not_too_small:
         if obj.art_mode is ArtMode.LADDER:
-            not_too_small = _select_rung(catalog, obj, bounds) is not None
+            not_too_small = _select_rung(catalog, obj, bounds, cfg) is not None
         else:
             assert obj.continuous_kind is not None
             yield_ = catalog.continuous(obj.continuous_kind)

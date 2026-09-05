@@ -166,10 +166,21 @@ def _secondary(objects: list[PhysicalObject]) -> list[PhysicalObject]:
 def test_secondary_objects_are_admitted_across_the_matrix(strategy: ProjectionStrategy) -> None:
     """Before the joint-placement redesign this rate was 26.2% / 33.1% -- a
     port with two ships lost both ships, every time -- against roughly 93% for
-    the legacy `_SceneComposer` on the same inventories. The floor below is
-    deliberately well under the measured rate so ordinary calibration drift
-    does not make it flaky, while still failing loudly if independent,
-    camera-blind placement ever comes back.
+    the legacy `_SceneComposer` on the same inventories.
+
+    The minimum-richness floor (`min_rung_index_from_end_by_scale_class`,
+    `orbital: 1`) legitimately lowers this: an orbital object that can only
+    ever reach its ladder's worst rung is now rejected outright rather than
+    shown degraded, and -- since a rejected/repositioned orbital changes
+    which camera the joint solve scores best -- ship/wreck admission shifts
+    too even though no rung floor applies to them. Measured on this module's
+    matrix after the fix: ~77% (`fixed_fov_perspective`) / ~84%
+    (`depth_layered_anchor`), down from ~95%/~99%
+    (`docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`'s minimum-richness section
+    has the full real-gallery-matrix before/after). The floor below is
+    dropped to stay well under that, so ordinary calibration drift does not
+    make it flaky, while still failing loudly if independent, camera-blind
+    placement ever comes back.
     """
     total = admitted = 0
     for sector in matrix().values():
@@ -181,7 +192,7 @@ def test_secondary_objects_are_admitted_across_the_matrix(strategy: ProjectionSt
                 admitted += obj.key in accepted
     assert total > 0
     rate = Fraction(admitted, total)
-    assert rate >= Fraction(85, 100), f"{admitted}/{total} secondary objects admitted"
+    assert rate >= Fraction(70, 100), f"{admitted}/{total} secondary objects admitted"
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +216,7 @@ def _assert_hard_rules(plan: ScenePlan, objects: list[PhysicalObject], viewport:
         # A complete authored rung, never `fit_box`'s crop (attempt rule 3, §4.7).
         if obj.art_mode is ArtMode.LADDER:
             assert proj.rung is not None
-            assert proj.rung == _select_rung(CATALOG, obj, proj.bounds)
+            assert proj.rung == _select_rung(CATALOG, obj, proj.bounds, TUNING)
             assert proj.rung.natural.width <= proj.bounds.width
             assert proj.rung.natural.height <= proj.bounds.height
         else:

@@ -87,6 +87,7 @@ TUNING = SceneTuning(
         "entity": (2, 2), "anchor": (4, 3), "belt": (4, 2),
         "orbital": (2, 2), "ship": (3, 1), "wreck": (2, 1),
     },
+    min_rung_index_from_end_by_scale_class={},
     separation_margin=1,
     min_visible_fraction_by_scale_class={
         "entity": Fraction(1, 2), "anchor": Fraction(1, 3), "belt": Fraction(1, 4),

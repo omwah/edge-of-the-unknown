@@ -1573,6 +1573,7 @@ class ScenePhysicalModelConfig(BaseModel):
     max_passes: int = Field(gt=0)
     edge_margin: int = Field(ge=0)
     min_projected_cells_by_scale_class: dict[str, tuple[int, int]]
+    min_rung_index_from_end_by_scale_class: dict[str, int] = Field(default_factory=dict)
     separation_margin: int = Field(ge=0)
     min_visible_fraction_by_scale_class: dict[str, FractionValue]
     cost_budget: int = Field(gt=0)
@@ -1660,6 +1661,23 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
         min_projected_cells_by_scale_class={
             "entity": (4, 2), "anchor": (6, 3), "belt": (6, 2),
             "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
+        },
+        # Minimum-richness floor (maintainer feedback: composers were shrinking
+        # ports/stardocks/starbases to their worst rung and never using ships'
+        # larger tiers, because `min_projected_cells_by_scale_class` above is
+        # smaller than every ladder's *smallest* rung and so imposes no real
+        # floor). Every port/starbase/stardock ladder has 4 rungs (index
+        # 0=richest..3=worst); excluding the worst 1 leaves 3 usable tiers.
+        # Every ship ladder has 3 rungs; excluding the worst 1 leaves 2 usable
+        # tiers. `wreck` is deliberately absent (unaffected).
+        # `ship` is deliberately absent: measurement showed excluding even the
+        # single worst ship rung collapses `DepthLayeredAnchorProjection`
+        # admission from ~99% to ~3% (its coarse per-layer depth-scale step
+        # rarely lands inside the narrower band 2-of-3 ship rungs both clear)
+        # -- see docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md's minimum-richness
+        # section for the measured numbers and the follow-up this leaves open.
+        min_rung_index_from_end_by_scale_class={
+            "orbital": 1,
         },
         separation_margin=1,
         min_visible_fraction_by_scale_class={

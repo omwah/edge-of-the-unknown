@@ -76,6 +76,7 @@ def build_scene_tuning(cfg: ScenePhysicalModelConfig) -> SceneTuning:
         max_passes=cfg.max_passes,
         edge_margin=cfg.edge_margin,
         min_projected_cells_by_scale_class=dict(cfg.min_projected_cells_by_scale_class),
+        min_rung_index_from_end_by_scale_class=dict(cfg.min_rung_index_from_end_by_scale_class),
         separation_margin=cfg.separation_margin,
         min_visible_fraction_by_scale_class=dict(cfg.min_visible_fraction_by_scale_class),
         cost_budget=cfg.cost_budget,

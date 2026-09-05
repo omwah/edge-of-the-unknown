@@ -313,6 +313,19 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
         "its own shape; stations/ships need at least 2-3 cells on their "
         "short axis to read as a rectangle rather than a dot."))
 
+    min_rung_index_from_end_by_scale_class = {"orbital": 1}
+    notes.append(ProposedValue(
+        "min_rung_index_from_end_by_scale_class", repr(min_rung_index_from_end_by_scale_class),
+        "Minimum-richness floor: never select the worst 1 rung of a "
+        "port/starbase/stardock's 4-rung ladder (maintainer feedback that "
+        "composers were shrinking to the worst tier, which the "
+        "min_projected_cells floor above does not prevent since it is "
+        "smaller than every ladder's smallest rung). `ship` is deliberately "
+        "excluded: measurement showed the same floor on ships collapses "
+        "DepthLayeredAnchorProjection admission from ~99% to ~3% via its "
+        "coarse per-layer depth-scale step -- a depth-layer-granularity fix "
+        "is needed first."))
+
     separation_margin = 1
     notes.append(ProposedValue("separation_margin", str(separation_margin),
                                 "Matches edge_margin: one blank cell of clearance "
@@ -385,6 +398,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
         hysteresis_weight_art=hysteresis_weight_art,
         max_passes=max_passes, edge_margin=edge_margin,
         min_projected_cells_by_scale_class=min_projected_cells_by_scale_class,
+        min_rung_index_from_end_by_scale_class=min_rung_index_from_end_by_scale_class,
         separation_margin=separation_margin,
         min_visible_fraction_by_scale_class=min_visible_fraction_by_scale_class,
         cost_budget=cost_budget, emergency_ship_ceiling=emergency_ship_ceiling,

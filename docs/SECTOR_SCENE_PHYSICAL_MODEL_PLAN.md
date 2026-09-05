@@ -1757,6 +1757,80 @@ is the CI guard for the admission rate, the hard rules on every admitted object,
 determinism, retention order, the bounded counters, and §2.5's wide-region
 intent.
 
+**Minimum-richness floor (post-WP-SC09 fix).** Maintainer review of real
+rendered output (`pixi run scene-gallery --serve --compare`) surfaced two
+complaints: composers were shrinking ports/stardocks/starbases to their worst
+authored rung, and ships were rarely landing on their larger tiers even on
+large viewports. Inspecting the checked-in `edge/art/geometry_catalog.json`
+confirmed the root cause: `min_projected_cells_by_scale_class`'s `orbital`
+(3, 2) and `ship` (3, 1) floors are both *smaller than the smallest authored
+rung of every ladder* (e.g. `trading_port`'s worst vertical rung is 7x3;
+`capital_warship`'s worst horizontal rung is 18x3) — so they impose no real
+constraint on which rung `_select_rung` (`edge/scene/solve.py`) picks.
+
+The fix adds a second, genuine exclusion alongside that floor:
+`SceneTuning.min_rung_index_from_end_by_scale_class` (`Mapping[str, int]`,
+config field `scene.physical_model.min_rung_index_from_end_by_scale_class`,
+built by `edge.art.scene_tuning.build_scene_tuning`) names, per
+`PhysicalObject.scale_class`, how many of the *worst* (highest-`index`)
+rungs of a laddered object's own ladder `_select_rung` must never select —
+not a bigger absolute cell-count floor, since natural rung sizes vary
+substantially by subtype/axis (a single number tuned to exclude one
+subtype's worst rung would under- or over-constrain another's). `index`
+ascends from 0 (richest) per `LadderRung`'s docstring; the exclusion is
+computed against `max(r.index for r in catalog.rungs(key))` for that
+specific ladder, not a hardcoded rung count, so it scales correctly even
+though port/starbase/stardock ladders have 4 rungs and ship ladders have 3.
+
+This plugs into the *existing* rung-selection/z-feasibility machinery as an
+additional exclusion on what "clears" means, not a post-hoc filter:
+`_select_rung` filters `catalog.rungs(key)` down to the allowed subset before
+ranking or fit-testing, and every caller that reasons about whether some rung
+clears at a given projected size or depth (`_evaluate_placement`,
+`_z_ok_near_and_size` -> `_feasible_z_interval`, `_cheapest_cost`'s render-cost
+floor) goes through it, so an object that can only ever reach an excluded
+rung is rejected outright — never shown degraded — consistently with this
+plan's no-cropping philosophy. `_feasible_z_interval`'s monotonic-band
+argument (§9.6 above) is unaffected: shrinking the *set* of rungs `_select_rung`
+will ever return does not change the direction in which the natural-size
+threshold moves as z increases, only which authored size sets the far edge.
+
+Calibration, from the real gallery case/size matrix (`edge.tui.scene_gallery`'s
+`cases()` x `SIZES`, both projection strategies) via
+`build_scene_tuning()`/`load_geometry_catalog()` ->
+`classify_sector()` -> `solve()`:
+
+- `orbital: 1` (never the single worst of 4 rungs) ships in
+  `config/default.yaml`. Rung-distribution proof: before, 34/196
+  (`FixedFovPerspective`) and 37/196 (`DepthLayeredAnchorProjection`) admitted
+  ports/starbases/stardocks used the worst rung; after, 0 in both — fully
+  eliminated, redistributed to indices 0-2. This costs some admission,
+  directly (an orbital that could only reach the excluded rung is now
+  rejected) and indirectly (a richer orbital rung costs more `render_cost`,
+  leaving less of `cost_budget` for the ships sharing the same solve, and a
+  rejected/repositioned orbital changes which camera the joint solve scores
+  best): orbital/ship/wreck admission across the full matrix moved from
+  ~95.4%/99.5% to ~75.5%/81.6% (`FixedFovPerspective`/
+  `DepthLayeredAnchorProjection`). `tests/test_scene_joint_placement.py`'s
+  admission-rate floor was lowered from 85% to 70% to match, documented
+  in-line with the same numbers on that module's smaller matrix (~77%/~84%).
+- `ship` is **deliberately absent** from the shipped map. Measurement showed
+  that excluding even the single worst of a ship's 3 rungs collapses
+  `DepthLayeredAnchorProjection`'s ship/wreck admission from ~99% to ~3%: that
+  strategy's depth is quantised into `depth_layers` (8) discrete steps of
+  `depth_layer_scale` (4/5) each, and the narrower "2-of-3 rungs both clear"
+  z-band the floor demands frequently falls entirely between two of those
+  steps, so almost no depth layer lands inside it. `FixedFovPerspective`'s
+  continuous depth scaling does not have this failure mode (its admission
+  actually rose slightly under a ship floor, from cost/camera-selection
+  interaction), so the ship complaint is confirmed real but not fixable by
+  this mechanism alone — the maintainer's "ships never use the larger sizes
+  even on large screens" observation most likely also implicates
+  `target_fraction_by_scale_class["ship"]` (1/8, i.e. ships are framed small
+  by design) and/or the depth-layered strategy's coarse layer granularity,
+  neither of which this fix touches. Recorded here as an open follow-up
+  rather than shipped half-working.
+
 **Glyph scatter**, after the solve and after paint (§4.19):
 
 ```text
