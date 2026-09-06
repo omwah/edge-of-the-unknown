@@ -185,10 +185,18 @@ def test_secondary_objects_are_admitted_across_the_matrix(strategy: ProjectionSt
     ejecting objects, and rung selection had been picking the richest fitting
     rung and then refusing it on cost instead of taking the cheaper authored
     tier that also fit. Measured on this module's matrix after both: **91.7%**
-    (`fixed_fov_perspective`) / **94.8%** (`depth_layered_anchor`). The floor
-    below sits under that with room for ordinary calibration drift, while
-    still failing loudly if either regression -- or independent, camera-blind
-    placement -- ever comes back.
+    (`fixed_fov_perspective`) / **94.8%** (`depth_layered_anchor`).
+
+    The WP-SC12 legacy-parity work (plan -> "Station size parity") then took
+    this matrix to **100%/100%** (96 of 96 secondary objects on both
+    strategies), by fixing the parent-relative station region, the near-plane
+    region floor, the camera candidate budget's loop order, the paint stage's
+    two object-dropping bugs, and the separation rule's treatment of a station
+    beside the body it orbits. The floor below is raised to 95% to match --
+    still under the measured rate with room for ordinary calibration drift,
+    but no longer so slack that losing a station in every parented scene would
+    pass. `tests/test_scene_legacy_parity.py` is the by-name guard over the
+    wider gallery matrix.
     """
     total = admitted = 0
     for sector in matrix().values():
@@ -200,7 +208,7 @@ def test_secondary_objects_are_admitted_across_the_matrix(strategy: ProjectionSt
                 admitted += obj.key in accepted
     assert total > 0
     rate = Fraction(admitted, total)
-    assert rate >= Fraction(85, 100), f"{admitted}/{total} secondary objects admitted"
+    assert rate >= Fraction(95, 100), f"{admitted}/{total} secondary objects admitted"
 
 
 # ---------------------------------------------------------------------------
