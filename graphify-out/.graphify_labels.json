@@ -262,5 +262,14 @@
   "260": "GwResolve",
   "261": "_parse_fraction",
   "262": "SceneContinuousYieldConfig",
-  "271": "GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes"
+  "263": "_load",
+  "264": "canvas.py",
+  "265": "_inhabitants",
+  "266": ".compose",
+  "267": "sprites.py",
+  "268": "books",
+  "269": ".docked_port_sector_id",
+  "270": ".stardock_facilities_sector_id",
+  "271": "GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes",
+  "272": ".component_price"
 }
