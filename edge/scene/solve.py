@@ -297,7 +297,8 @@ def _decision(
 def _absolute_region(obj: PhysicalObject, positions: dict[SceneKey, Vec3]) -> Region:
     """`obj.region` resolved to absolute scene units.
 
-    `SceneTuning.region_by_scale_class` documents the `"orbital"` region as an
+    `SceneTuning.region_by_scale_class` documents a station region
+    (`"orbital"` and `"stardock"`) as an
     *offset from the parent planet's own placement*, and
     `edge.scene.classify.classify_sector` composes a child's initial position
     as `parent_position + offset` accordingly. The pre-redesign reposition

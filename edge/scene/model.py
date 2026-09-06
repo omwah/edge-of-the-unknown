@@ -241,11 +241,15 @@ class SceneTuning:
     "black_hole", "wormhole"); need not cover every kind."""
 
     region_by_scale_class: Mapping[str, Region]
-    """The allowed placement region/depth range per `scale_class`. For
-    `"orbital"` this is interpreted as an offset from the parent planet's own
-    placement, matching plan §2.5 ("their nominal face area and allowed
-    orbital placement derive from that planet"); for every other class it is
-    an absolute scene-unit region."""
+    """The allowed placement region/depth range per `scale_class`. For the two
+    station classes, `"orbital"` and `"stardock"`, this is interpreted as an
+    offset from the parent planet's own placement, matching plan §2.5 ("their
+    nominal face area and allowed orbital placement derive from that planet");
+    for every other class it is an absolute scene-unit region. In practice the
+    distinction is carried by `PhysicalObject.parent` rather than by the class
+    name — `edge.scene.solve._absolute_region` re-adds the parent origin for
+    any object that has one — so a station with no planet in its sector falls
+    back to an absolute region without a special case."""
 
     target_fraction_by_scale_class: Mapping[str, Fraction]
     """Plan §9.5 `frame()`: the anchor's target projected-ink-height fraction
