@@ -2284,6 +2284,14 @@ wreck. Sweeping both bounded placement budgets (`_DEPTH_STRATA` 4/5/6/8 x
 between the two strategies; it never removes it. Asserted by name in
 `tests/test_scene_legacy_parity.py` so it cannot silently become two.
 
+At the shipped `_DEPTH_STRATA` = 4 the miss falls on
+`DepthLayeredAnchorProjection` alone. `FixedFovPerspective` paints all seven
+objects there — legacy's six plus the fourth ship — a strict superset, which
+is why its column reads 232/232. Since that is also the strategy without the
+magnification wall, and so the likely production pick under WP-SC04/SC11, the
+honest summary of this work is *full parity on the strategy that can ship, and
+one invariant-bound trade on the one that cannot magnify*.
+
 `DepthLayeredAnchorProjection`'s ships remain flat at rung 2 at every canvas —
 the already-documented "cannot magnify" limitation, unchanged by this work and
 still asserted by
