@@ -2090,7 +2090,9 @@ composer produces.* Measured against that bar before this change, over
 88.8% / 96.6% of the objects legacy paints were painted at all, and 23 of 52 /
 17 of 52 admitted stations landed on legacy's authored rung.
 
-`edge/devtool/scene_parity.py` is the measurement, and
+`edge/devtool/scene_parity.py` is the measurement
+(`pixi run python -m edge.devtool.scene_parity`),
+`docs/scene_parity_baseline.json` the per-cell record it emits, and
 `tests/test_scene_legacy_parity.py` the CI guard. Parity is judged on the
 **authored ladder rung**, not the ink-cropped cell box: the sprite library picks
 a tier from the requested *height* alone and then ink-crops it (verified against
@@ -2266,6 +2268,9 @@ sampled port/Stardock/starbase cells (three lone cases and three parented cases
 x four canvases). Ship rung richness is equal or better at every canvas (rung-0
 counts 8/8/9/10 against the previous 8/6/9/9, on a larger admitted population),
 so the parity work costs the ship-size fix nothing.
+`tests/test_scene_joint_placement.py`'s own narrower matrix reads 100%/100%
+(96 of 96 secondary objects) against the 91.7%/94.8% recorded above, and its
+admission floor rises from 85% to 95% to match.
 
 **The one remaining miss, and why it is not fixable here.**
 `planet+port+wreck+traffic @ 67x30` loses its wreck under
