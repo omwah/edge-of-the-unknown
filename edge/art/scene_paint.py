@@ -382,14 +382,34 @@ class ScenePaint:
     validation_corrections: int
 
 
+def _render_seed(obj: PhysicalObject, sector_id: int) -> int:
+    """The render seed for one object, matching the legacy composer's choice.
+
+    Within one authored rung the seed still selects a *variant*, and variants
+    differ in ink extent — a Stardock's 15x15 tier ink-crops to 15x14 at one
+    seed and 13x12 at another. Legacy seeds a port render from the sector id
+    (`_SceneComposer._paint_station`) and a starbase from `starbase_id`; the
+    latter already equals `obj.key.ident`, so only the port needed aligning
+    for the two composers to draw the identical sprite at the identical size
+    (WP-SC12). Everything else keeps its own stable identity."""
+
+    if obj.key.tag == "port":
+        return sector_id
+    return obj.key.ident
+
+
 def _resolve_and_render(
-    obj: PhysicalObject, projection: Projection, catalog: ArtGeometryCatalog, cache: RenderCache
+    obj: PhysicalObject,
+    projection: Projection,
+    catalog: ArtGeometryCatalog,
+    cache: RenderCache,
+    sector_id: int,
 ) -> tuple[Text, CellBox, LadderRung | None]:
     """Render `projection` at its currently-selected size and return
     `(art, container_bounds, rung)`. `container_bounds` may differ from
     `projection.bounds` after a shrink."""
 
-    seed = obj.key.ident
+    seed = _render_seed(obj, sector_id)
     if obj.art_mode is ArtMode.LADDER:
         assert projection.rung is not None
         art, _ = _resolve_ladder(obj, projection.rung, seed, cache)
@@ -477,7 +497,8 @@ def resolve_scene(
     resolved: dict[SceneKey, tuple[Text, CellBox, CellBox, Projection]] = {}
     for projection in plan.projections:
         obj = objects[projection.key]
-        art, container, rung = _resolve_and_render(obj, projection, catalog, cache)
+        art, container, rung = _resolve_and_render(
+            obj, projection, catalog, cache, arrangement.sector_id)
         cropped, local_bbox = _crop_to_ink(art)
         scene_ink = CellBox(
             container.col + local_bbox.col, container.row + local_bbox.row,
@@ -496,7 +517,12 @@ def resolve_scene(
     for key in order:
         obj = objects[key]
         projection = live_projection[key]
-        max_env = _max_ink_envelope(obj, projection.bounds, projection.rung, catalog)
+        # Judge the render against the box it was *rendered into*, not the
+        # solver's request box. For a continuous object with a box class those
+        # differ (`_resolve_and_render` clips the class box to `bounds`), so
+        # comparing a 28x14 render's ink against 90% of a 56x14 request mixed
+        # two different boxes and fired the correction spuriously.
+        max_env = _max_ink_envelope(obj, live_natural[key], projection.rung, catalog)
         actual = live_ink[key]
         exceeds = actual.width > max_env.width or actual.height > max_env.height
         if not exceeds:
@@ -512,13 +538,14 @@ def resolve_scene(
                 del live_art[key]
                 del live_natural[key]
                 break
-            art, container, _ = _resolve_and_render(obj, shrunk, catalog, cache)
+            art, container, _ = _resolve_and_render(
+                obj, shrunk, catalog, cache, arrangement.sector_id)
             cropped, local_bbox = _crop_to_ink(art)
             scene_ink = CellBox(
                 container.col + local_bbox.col, container.row + local_bbox.row,
                 local_bbox.width, local_bbox.height,
             )
-            new_max_env = _max_ink_envelope(obj, shrunk.bounds, shrunk.rung, catalog)
+            new_max_env = _max_ink_envelope(obj, container, shrunk.rung, catalog)
             if scene_ink.width <= new_max_env.width and scene_ink.height <= new_max_env.height:
                 live_projection[key] = shrunk
                 live_ink[key] = scene_ink
@@ -537,33 +564,54 @@ def resolve_scene(
 
     # Re-check separation/occlusion with the (possibly corrected) actual ink,
     # nearer-first so a nearer object's occlusion of a farther one is judged
-    # with both sides' real boxes. A conflict drops the *farther*/lower
-    # priority side -- never raises anyone's cost class, never reopens the
-    # camera search.
+    # with both sides' real boxes. A conflict drops the **lower-retention**
+    # side -- never raises anyone's cost class, never reopens the camera
+    # search.
+    #
+    # Dropping by depth alone (which this did before WP-SC12) states a
+    # different rule from the solver's, and a strictly worse one: the solver
+    # visits objects in retention order and refuses the *later, lower-priority*
+    # candidate, never unseating a committed one (plan §4.5). Here the farther
+    # object is very often the anchor -- `min_visible_fraction["anchor"]` is
+    # `1`, so a single overlapping cell was enough -- and the scene lost its
+    # planet to two ships. `planet+port+ships @ 67x30` under
+    # `FixedFovPerspective` produced exactly that: a plan that admitted the
+    # planet and both ships painted the ships alone.
     remaining = sorted(live_ink, key=lambda k: (live_projection[k].depth, -objects[k].face.area_su, k))
     for i, key in enumerate(remaining):
         obj = objects[key]
         if key not in live_ink or not obj.occludes:
             continue
-        near_box = _inflate(live_ink[key], tuning.separation_margin)
         for other_key in remaining[i + 1 :]:
             other = objects[other_key]
+            if key not in live_ink:
+                break
             if other_key not in live_ink or not other.occludes:
                 continue
             if live_projection[other_key].depth <= live_projection[key].depth:
                 continue
+            near_box = _inflate(live_ink[key], tuning.separation_margin)
             far_box = _inflate(live_ink[other_key], tuning.separation_margin)
-            if _rect_gap(near_box, far_box) < 0:
-                area = live_ink[other_key].width * live_ink[other_key].height
-                overlap = _overlap_area(live_ink[key], live_ink[other_key])
-                visible = Fraction(max(area - overlap, 0), area) if area > 0 else Fraction(1)
-                threshold = tuning.min_visible_fraction_by_scale_class.get(other.scale_class, Fraction(0))
-                if visible < threshold:
-                    dropped.append(other_key)
-                    del live_ink[other_key]
-                    del live_projection[other_key]
-                    del live_art[other_key]
-                    del live_natural[other_key]
+            if _rect_gap(near_box, far_box) >= 0:
+                continue
+            area = live_ink[other_key].width * live_ink[other_key].height
+            overlap = _overlap_area(live_ink[key], live_ink[other_key])
+            visible = Fraction(max(area - overlap, 0), area) if area > 0 else Fraction(1)
+            threshold = tuning.min_visible_fraction_by_scale_class.get(other.scale_class, Fraction(0))
+            if visible >= threshold:
+                continue
+            # Lower retention loses; ties (same tier) fall back to the
+            # farther object, the pre-WP-SC12 behaviour, and finally to the
+            # key so the choice is never container-order dependent (§4.8).
+            loser = max(
+                (key, other_key),
+                key=lambda k: (int(objects[k].retention), live_projection[k].depth, k),
+            )
+            dropped.append(loser)
+            del live_ink[loser]
+            del live_projection[loser]
+            del live_art[loser]
+            del live_natural[loser]
 
     painted = [
         PaintedObject(key=key, art=live_art[key], scene_box=live_ink[key],

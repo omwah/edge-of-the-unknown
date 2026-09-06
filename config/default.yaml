@@ -111,8 +111,38 @@ scene:
       # anchor 1800 > entity 476 > stardock 200 > orbital 98 > wreck 96 >
       # ship 60, so §4.4's ordering holds and a Stardock still never
       # out-frames a planet.
-      stardock: [10, 20]  # area 200 — the headline station
-      orbital:  [14, 7]   # area 98 — ordinary port/starbase
+      # Every station face is now sized off its own ladder (WP-SC12): the su
+      # height is its richest authored rung's natural height, and the su width
+      # gives that rung's cell aspect room once cell_aspect 2 is applied.
+      #
+      # Height first, because it is a hard ceiling under
+      # `DepthLayeredAnchorProjection`: that strategy's scale is
+      # `depth_layer_scale ** layer` with `0 < depth_layer_scale < 1`, so scale
+      # never exceeds 1 and a station can never project taller than its own su
+      # face height at any viewport or budget. At the previous 7 su an ordinary
+      # port could reach 7 cells against a rung 0 that needs 12, so that
+      # strategy drew every port and starbase a tier below the legacy composer
+      # no matter what the solver did. Setting the face to the rung it must be
+      # able to reach removes the ceiling instead of working around it, and
+      # costs `FixedFovPerspective` nothing — there the target-height depth
+      # search picks whatever depth yields the target size, so a larger face
+      # only means a slightly farther one.
+      #
+      # Widths keep the legacy composer's own 2.4:1 station aspect
+      # (`station_dimensions`' `int(height * 2.4)`) to within a tenth once
+      # cell_aspect 2 is applied: 2*14/12 = 2.33, 2*17/14 = 2.43.
+      #
+      # Areas keep §4.4's ordering and now state §2.2's Stardock > starbase >
+      # port for the first time: anchor 1800 > entity 476 > stardock 352 >
+      # starbase 238 > port 168 > wreck 96 > ship 60.
+      stardock: [22, 16]  # area 352 — the headline station (rung 0 is 15x15)
+      # Split off the shared "orbital" bucket (WP-SC12): plan §2.2 orders
+      # Stardock > starbase > port and the legacy composer has always sized a
+      # starbase above a port (starbase_scale 0.35 vs port_scale 0.3), which
+      # one shared class could express neither as apparent scale nor as two
+      # different station-size parity targets.
+      starbase: [17, 14]  # area 238 — defence platform (rung 0 is 11x14)
+      orbital:  [14, 12]  # area 168 — trading port (rung 0 is 11x12)
       wreck:    [16, 6]   # area 96 — "slightly larger than ships" (plan §2.2)
       ship:     [12, 5]   # area 60
     # Per-continuous_kind override: nebula/black_hole visual system >> wormhole
@@ -128,15 +158,58 @@ scene:
     # narrower placement (SceneTuning.region_by_scale_class's docstring), so
     # it is not widened independently of the anchor it orbits.
     region_by_scale_class:
-      entity:   { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
-      anchor:   { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
-      belt:     { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
-      # Stardock orbits exactly like any other station — same parent-relative
-      # box as `orbital`. Only its apparent scale differs, not its orbit.
-      stardock: { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
-      orbital:  { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
-      wreck:    { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 1, z_max: 520 }
-      ship:     { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 1, z_max: 520 }
+      # The z bands are re-based (WP-SC12; the *spans* are unchanged apart
+      # from the anchor's, see below). They used to all start at 1, which is
+      # also `near_plane_su` — and `project()` refuses any object at an
+      # absolute `z < near_plane_su` outright. Since the camera is solved to
+      # sit *in front of* the scene anchor by its framing distance, an anchor
+      # near a z_min of 1 put the camera at a negative z with nothing legally
+      # placeable in front of it, so no secondary object could ever be nearer
+      # than the anchor. That is what pinned a lone port beside a wormhole /
+      # nebula / black hole to its rung 1 (7 cells) where the legacy composer
+      # draws rung 0 (12): reaching 12 cells needed the port at z = -20.
+      #
+      # An anchor's own z-span buys nothing — it is inflexible, and its
+      # apparent size comes from the camera the solver frames to it, not from
+      # its depth — so the anchor classes take a shallow 600..699 band and the
+      # secondary classes keep their own span widths re-based to straddle it:
+      # ~300 su of room in front of the nearest anchor (enough for a station
+      # to come forward to its parity size) and ~100-120 su behind the
+      # farthest.
+      entity:   { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 600, z_max: 699 }
+      anchor:   { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 600, z_max: 699 }
+      belt:     { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 600, z_max: 699 }
+      # Every station kind gets the same *absolute* box, used when it has no
+      # planet to orbit; where it may sit relative to a parent planet is the
+      # separate `orbit_offset_region_by_scale_class` below.
+      # z reaches 300, 100 su nearer than the anchor band's floor, so a
+      # station that is *itself* the scene anchor can still come forward to
+      # its own parity size: the camera is framed from the station's
+      # classified depth by `target_fraction_by_scale_class`, which is a
+      # framing fraction and not the parity target, and a lone starbase at
+      # 120x44 landed 4 su short of the depth its rung 0 needs.
+      stardock: { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 300, z_max: 799 }
+      starbase: { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 300, z_max: 799 }
+      orbital:  { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 300, z_max: 799 }
+      wreck:    { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 300, z_max: 819 }
+      ship:     { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 300, z_max: 819 }
+    # Where an object with a parent planet may sit *relative to that planet*
+    # (WP-SC12). Before this existed, the parent-relative reading of a station
+    # region was only a docstring: the shipped value was the absolute anchor
+    # box (z 1..400) applied as an offset, so a station was always at least
+    # 1 su behind its planet and up to 400 behind, far past the depth at which
+    # any authored rung still clears once the anchor is framed to fill the
+    # viewport — every parented station in the gallery matrix was rejected
+    # `no_feasible_depth`. z is symmetric at +/-120 su: twice the planet's own
+    # 60 su nominal face width, so a station may orbit anywhere within a
+    # couple of planet radii, in front of the world as readily as behind it
+    # (which is where the legacy composer draws it — at the disc's near limb).
+    # x/y match the absolute box; the screen-space slot lattice is what
+    # actually chooses a station's position within them.
+    orbit_offset_region_by_scale_class:
+      stardock: { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: -120, z_max: 120 }
+      starbase: { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: -120, z_max: 120 }
+      orbital:  { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: -120, z_max: 120 }
     # frame()'s target projected-ink-height fraction of viewport.height per
     # anchor scale_class (plan §9.5): the Entity frames tighter (1/3) than a
     # planet/phenomenon (1/2) so it reads as a close subject, not a backdrop;
@@ -151,6 +224,7 @@ scene:
       # (1/3) rather than like an incidental port (1/5) — still well short of
       # a planet's 1/2, which it must never read as.
       stardock: "1/3"
+      starbase: "1/4"
       orbital: "1/5"
       wreck: "1/8"
       ship: "1/8"
@@ -167,6 +241,7 @@ scene:
       # ratio of 0.73-0.80 across archetypes, unlike the flat 1.00 of its
       # lower tiers, and rung 0 is the tier the floor below aims at.
       stardock: "4/5"
+      starbase: "9/10"
       orbital: "9/10"
       wreck: "4/5"
       ship: "9/10"
@@ -235,7 +310,14 @@ scene:
       # the cell floor and the rung floor state the same thing instead of one
       # silently dominating the other.
       stardock: [15, 11]
-      orbital: [3, 2]
+      # Same rule as stardock, now that each station kind has its own class
+      # (WP-SC12): the natural box of the poorest rung its richness floor
+      # below still permits — starbase rung 1 is 11x8, trading_port rung 2 is
+      # 7x6 but its rung 1 (11x7) is the poorest tier the legacy composer ever
+      # selects for a port in the parity matrix, and a 7x6 "bare can" is the
+      # degraded look the minimum-richness fix exists to stop.
+      starbase: [11, 8]
+      orbital: [11, 7]
       ship: [3, 1]
       wreck: [3, 1]
     # Minimum-richness floor (maintainer feedback: composers were shrinking
@@ -271,21 +353,33 @@ scene:
     # would have been drawn as cans.
     min_rung_index_from_end_by_scale_class:
       orbital: 1
+      starbase: 1
       stardock: 2
     # Matches edge_margin: one blank cell of clearance between distinct
     # accepted objects' ink-max boxes (plan §9.6 attempt rule 4).
     separation_margin: 1
     # The minimum visible fraction the farther object of an occluding pair
-    # must clear (plan §9.6 attempt rule 5). The Entity and the framing
-    # anchor are never partially occluded by construction, so their floor is
-    # 1 (fully visible or rejected); wrecks/ships/stations may be legitimately
-    # partly hidden but must stay >= 3/4 visible to remain readable (plan §2.5).
+    # must clear (plan §9.6 attempt rule 5). The Entity keeps a floor of 1 --
+    # plan §4.15 makes it the foreground subject, so nothing is ever in front
+    # of it anyway. The framing anchor and the belt drop from 1 to 3/4
+    # (WP-SC12): "never partially occluded" was an assumption, and it is not
+    # what the arrival view has ever looked like. The legacy composer berths a
+    # station *at the primary body's lower limb, overlapping the disc's
+    # bounding box a little so it reads as at the world* -- that is the whole
+    # point of the placement -- and `_paint_station` does not consult the
+    # occupancy map at all. A floor of 1 made a single overlapping cell fatal,
+    # so on a canvas whose sky is mostly filled by the body the station could
+    # only be admitted at a depth far enough back to clear it entirely, which
+    # is a smaller authored rung than legacy draws (and on the narrower
+    # canvases, no admissible depth at all). 3/4 is the same floor every other
+    # class already carries.
     min_visible_fraction_by_scale_class:
       entity: "1"
-      anchor: "1"
-      belt: "1"
+      anchor: "3/4"
+      belt: "3/4"
       # Same as any other station: a Stardock is bigger, not un-occludable.
       stardock: "3/4"
+      starbase: "3/4"
       orbital: "3/4"
       ship: "3/4"
       wreck: "3/4"
@@ -329,17 +423,73 @@ scene:
     # cell spacing between placed glyphs so a garrison doesn't read as one block.
     max_glyph_tries: 20
     glyph_spacing: 2
+    # --- station-size parity (WP-SC12) -------------------------------------
+    # The acceptance bar for replacing the legacy `_SceneComposer` is that a
+    # port / Stardock / starbase renders at the size that composer produces.
+    # These two blocks state that size in the physical model's own vocabulary
+    # -- a target *projected ink height* in cells -- and the solver orders a
+    # station's bounded depth candidates by closeness to it (plan §4.13's
+    # "soft objective expressed in projected height"). It is candidate
+    # ordering only: every candidate still goes through every hard rule.
+    #
+    # `station_size_reference` reproduces the legacy composer's
+    # `primary_body_height` (edge/tui/widgets.py), the head of its scale
+    # chain. Every coefficient is lifted from that function, not fitted:
+    #   height_fraction  = its `body_h * 0.9`
+    #   header_rows      = the rows it reserves before the body budget
+    #                      (hdr + 1 = 4 for a beacon-less sector)
+    #   width_fraction   = its visible_cap, (1 - 0.78) / (2*0.7 - 1) = 0.55
+    #   max_cells/min_cells = SceneArtConfig.planet.max_height/min_height
+    # Legacy's fourth term, the _SHIP_SKY_RESERVE trim, is deliberately not
+    # reproduced: it buys horizontal sky for a ship berthed beside a
+    # right-anchored disc, a placement rule the physical model does not
+    # share, and it is rung-neutral -- it moves the reference only at 87x36
+    # (28 -> 25), where every station kind selects the same authored rung
+    # either way.
+    #
+    # This is *not* the model's own anchor size, and deliberately so. A 60x30
+    # su anchor face at cell_aspect 2 projects w = 4h, and §4.7/§4.17 forbid
+    # cropping, so the largest whole anchor a viewport can hold is
+    # (width - 2*edge_margin)/4 = 16/21/29/37 cells at 67x30/87x36/120x44/
+    # 150x52 -- below the legacy composer's 23/25/36/40, because legacy lets
+    # its disc run off the right edge. Keying station size to the projected
+    # anchor would propagate that difference into every station; keying it to
+    # this reference does not.
+    station_size_reference:
+      height_fraction: "9/10"
+      header_rows: 4
+      width_fraction: "11/20"
+      max_cells: 40
+      min_cells: 4
+    # Per-kind scale and clamps, mirroring SceneArtConfig.station_dimensions'
+    # two branches exactly: `round(primary_height * <kind>_scale)` when the
+    # station orbits a planet, `int(body_height * 0.6)` when it does not, both
+    # clamped to that kind's own SpriteSize min/max height.
+    station_target_by_scale_class:
+      orbital:  { parent_scale: "3/10", lone_scale: "3/5", min_cells: 3, max_cells: 12 }
+      starbase: { parent_scale: "7/20", lone_scale: "3/5", min_cells: 3, max_cells: 14 }
+      stardock: { parent_scale: "3/5",  lone_scale: "3/5", min_cells: 3, max_cells: 16 }
     # Per-continuous-kind ink/cost envelopes (calibration §2): request-box ->
     # visible-ink relationship, illegibility floor, the anchor step-down
     # ladder's box classes (descending), and their render_cost (nondecreasing
     # with box size, same units as the ladder rungs' measured render_cost).
+    # `ink_fraction_max` is a *ceiling* the resolved render must not exceed
+    # (edge/art/scene_paint.py::_max_ink_envelope), so it has to sit at or
+    # above what the shipped generator actually inks. The WP-SC05 values were
+    # estimates; measuring every generator across its own box classes at three
+    # sizes and five seeds shows all but the nebula fill 100% of their request
+    # box on at least one axis (planet 1.000, belt 1.000, black_hole 1.000,
+    # wormhole 1.000, wreck 1.000, entity 1.000, nebula 0.833). A 9/10 or 4/5
+    # ceiling therefore fired the bounded validation correction on *every*
+    # such object and -- with no cheaper box class left -- dropped it outright
+    # (WP-SC12).
     continuous:
       planet:
         # A disc render fills most of its request box (60-90%); three box
         # classes give the anchor step-down ladder room to shrink twice
         # before hitting the legibility floor.
         ink_fraction_min: "3/5"
-        ink_fraction_max: "9/10"
+        ink_fraction_max: "1"
         min_extent: [6, 3]
         box_classes: [[80, 40], [50, 25], [28, 14]]
         render_cost: [70, 35, 12]
@@ -357,7 +507,7 @@ scene:
         # (not just the event horizon) supplies physical scale, so its
         # envelope is sized close to the nebula's.
         ink_fraction_min: "1/2"
-        ink_fraction_max: "9/10"
+        ink_fraction_max: "1"
         min_extent: [8, 4]
         box_classes: [[90, 45], [58, 29], [32, 16]]
         render_cost: [100, 50, 18]
@@ -365,7 +515,7 @@ scene:
         # "Slightly larger than a planet" (plan §2.2): smaller top box class
         # than planet/nebula/black_hole above.
         ink_fraction_min: "1/2"
-        ink_fraction_max: "4/5"
+        ink_fraction_max: "1"
         min_extent: [6, 3]
         box_classes: [[50, 25], [32, 16], [18, 9]]
         render_cost: [40, 20, 8]
@@ -373,7 +523,7 @@ scene:
         # Wrecks are not laddered (ArtMode.CONTINUOUS); a small envelope,
         # two box classes since a wreck never anchors a crowded scene.
         ink_fraction_min: "1/2"
-        ink_fraction_max: "4/5"
+        ink_fraction_max: "1"
         min_extent: [5, 2]
         box_classes: [[24, 10], [16, 7]]
         render_cost: [15, 6]
@@ -382,16 +532,23 @@ scene:
         # §2.3 invariant); its ladder only needs room for step-down to have
         # somewhere to go.
         ink_fraction_min: "3/5"
-        ink_fraction_max: "9/10"
+        ink_fraction_max: "1"
         min_extent: [8, 4]
         box_classes: [[40, 16], [26, 10]]
         render_cost: [35, 14]
       belt:
-        # Permeable field (plan §2.5): low ink fraction is expected and
-        # correct, not a rendering failure — mostly negative space with
-        # traffic and stations painted through it.
-        ink_fraction_min: "1/5"
-        ink_fraction_max: "1/2"
+        # `ink_fraction_min` is 3/5, not the WP-SC05 estimate of 1/5 (WP-SC12).
+        # A permeable field *reads* as mostly negative space, but the estimate
+        # confused that with the ink *bounding box*, which is what this
+        # fraction measures: sweeping the real belt generator over its own box
+        # classes at three sizes and five seeds puts the ink bbox at
+        # 0.650-1.000 of the request box on width and 0.800-1.000 on height.
+        # At 1/5 the `min_extent` floor below demanded a 15-cell-tall belt,
+        # while an 11.25:1 projected aspect caps a belt at ~10 cells on a
+        # 120-wide canvas — so the belt was unadmittable at every calibrated
+        # viewport, and every `belt+…` scene lost its primary body.
+        ink_fraction_min: "3/5"
+        ink_fraction_max: "1"
         min_extent: [12, 3]
         box_classes: [[120, 20], [80, 14]]
         render_cost: [30, 12]

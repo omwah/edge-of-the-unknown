@@ -7,10 +7,12 @@ around, cache, and compare by value without defensive copies.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from fractions import Fraction
+from types import MappingProxyType
 from typing import Literal
 
 from edge.scene.catalog import LadderKey, LadderRung
@@ -203,6 +205,85 @@ class ScenePlan:
     trace: tuple[Decision, ...]
 
 
+_EMPTY_REGIONS: Mapping[str, Region] = MappingProxyType({})
+_EMPTY_TARGETS: Mapping[str, "StationTarget"] = MappingProxyType({})
+"""Shared immutable empties, so `SceneTuning`'s optional WP-SC12 mappings can
+default without a mutable class attribute on a frozen slotted dataclass."""
+
+
+@dataclass(frozen=True, slots=True)
+class StationSizeReference:
+    """The scene's reference body height in cells — the head of the station
+    scale chain (plan §9.6 "Station size parity").
+
+    `reference_body_height()` below is the whole of it: a viewport-only
+    function, injected coefficient by coefficient, that the solver uses to
+    resolve a parented station's target projected height. It is deliberately
+    *not* the physical model's own projected anchor height: the anchor is
+    bound by the no-crop invariants (§4.7/§4.17) to what fits whole inside the
+    viewport, which on a narrow canvas is smaller than the legacy composer's
+    deliberately-cropped disc, and keying station size to it would propagate
+    that difference into every station.
+    """
+
+    height_fraction: Fraction
+    header_rows: int
+    width_fraction: Fraction
+    max_cells: int
+    min_cells: int
+
+    def reference_body_height(self, viewport: CellBox) -> int:
+        """The reference body height for `viewport`, in cells.
+
+        Exact `int`/`Fraction` only (plan §4.1): `math.floor` on a `Fraction`,
+        never a float, and the result feeds an accept/reject decision.
+        `floor` (not round-half-even) because the two legacy terms this
+        reproduces are `int(body_h * 0.9)` and `int(w * 0.55)`, both
+        truncating.
+        """
+        by_height = math.floor(
+            self.height_fraction * max(viewport.height - self.header_rows, 0)
+        )
+        by_width = math.floor(self.width_fraction * viewport.width)
+        return max(self.min_cells, min(self.max_cells, by_height, by_width))
+
+
+@dataclass(frozen=True, slots=True)
+class StationTarget:
+    """One station scale class's target projected ink height (plan §4.13).
+
+    `parent_scale` applies when the station orbits a planet (its
+    `PhysicalObject.parent` is set); `lone_scale` applies to the header-less
+    viewport height when it does not. Both are clamped to
+    `[min_cells, max_cells]`.
+    """
+
+    parent_scale: Fraction
+    lone_scale: Fraction
+    min_cells: int
+    max_cells: int
+
+    def target_height(
+        self, viewport: CellBox, reference: StationSizeReference, *, parented: bool
+    ) -> int:
+        """The target projected ink height in cells, clamped.
+
+        The two roundings mirror `SceneArtConfig.station_dimensions`'s own two
+        branches exactly: `round(primary_height * scale)` when parented (so
+        round-half-even, which is what Python's `round` does), and
+        `int(body_height * 0.6)` when not (so truncating).
+        """
+        if parented:
+            exact = Fraction(reference.reference_body_height(viewport)) * self.parent_scale
+            cells = round(exact)
+            assert isinstance(cells, int)
+        else:
+            cells = math.floor(
+                Fraction(max(viewport.height - reference.header_rows, 0)) * self.lone_scale
+            )
+        return max(self.min_cells, min(self.max_cells, cells))
+
+
 @dataclass(frozen=True, slots=True)
 class SceneTuning:
     """The injected, frozen bundle of every §5 calibrated value.
@@ -367,6 +448,34 @@ class SceneTuning:
     glyph_spacing: int
     """Minimum cell distance a newly placed glyph must keep from every
     already-placed glyph (plan §9.6)."""
+
+    # -- WP-SC12 additions: station-size parity (plan §9.6 "Station size
+    # parity"). Defaulted so every existing fixture that builds a
+    # `SceneTuning` by hand keeps working: with no station target declared,
+    # a station's depth search is the unchanged near-to-far walk.
+
+    orbit_offset_region_by_scale_class: Mapping[str, Region] = _EMPTY_REGIONS
+    """Where an object with a `parent` may sit **relative to that parent**,
+    per `scale_class`. `region_by_scale_class` above stays the absolute
+    region, used for the same class when the object has no parent.
+
+    Splitting the two is what makes the parent-relative reading of a station
+    region real. `region_by_scale_class`'s docstring has always described a
+    station's region as an offset from its planet, but the shipped value was
+    the *absolute* anchor box (`z 1..400`) — so a parented station was always
+    at least 1 su behind its planet and up to 400 behind, never near enough to
+    the camera to clear a usable authored rung. A class absent from this
+    mapping falls back to `region_by_scale_class` for both cases, exactly the
+    pre-WP-SC12 behaviour."""
+
+    station_size_reference: StationSizeReference | None = None
+    """The reference body height a parented station's target scales off."""
+
+    station_target_by_scale_class: Mapping[str, StationTarget] = _EMPTY_TARGETS
+    """Per-`scale_class` target projected ink height. A class named here has
+    its bounded depth candidates *ordered by closeness to that target*
+    (plan §4.13's "soft objective expressed in projected height") instead of
+    walked near-to-far; a class absent from it is unaffected."""
 
 
 @dataclass(frozen=True, slots=True)

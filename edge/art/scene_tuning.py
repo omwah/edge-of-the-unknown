@@ -21,7 +21,7 @@ from __future__ import annotations
 from edge.core.config import ScenePhysicalModelConfig, SceneRegionConfig
 from edge.scene.catalog import ContinuousYield
 from edge.scene.geometry import CellBox, Region
-from edge.scene.model import SceneTuning
+from edge.scene.model import SceneTuning, StationSizeReference, StationTarget
 
 
 def _region(cfg: SceneRegionConfig) -> Region:
@@ -84,6 +84,29 @@ def build_scene_tuning(cfg: ScenePhysicalModelConfig) -> SceneTuning:
         max_reposition_candidates=cfg.max_reposition_candidates,
         max_glyph_tries=cfg.max_glyph_tries,
         glyph_spacing=cfg.glyph_spacing,
+        orbit_offset_region_by_scale_class={
+            scale_class: _region(region)
+            for scale_class, region in cfg.orbit_offset_region_by_scale_class.items()
+        },
+        station_size_reference=(
+            None if cfg.station_size_reference is None
+            else StationSizeReference(
+                height_fraction=cfg.station_size_reference.height_fraction,
+                header_rows=cfg.station_size_reference.header_rows,
+                width_fraction=cfg.station_size_reference.width_fraction,
+                max_cells=cfg.station_size_reference.max_cells,
+                min_cells=cfg.station_size_reference.min_cells,
+            )
+        ),
+        station_target_by_scale_class={
+            scale_class: StationTarget(
+                parent_scale=target.parent_scale,
+                lone_scale=target.lone_scale,
+                min_cells=target.min_cells,
+                max_cells=target.max_cells,
+            )
+            for scale_class, target in cfg.station_target_by_scale_class.items()
+        },
     )
 
 

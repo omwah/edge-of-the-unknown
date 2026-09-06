@@ -52,6 +52,7 @@ from edge.scene.solve import (
     _overlap_area,
     _rect_gap,
     _select_rung,
+    _separation_exempt,
     solve,
 )
 
@@ -208,6 +209,7 @@ def test_secondary_objects_are_admitted_across_the_matrix(strategy: ProjectionSt
 
 
 def _assert_hard_rules(plan: ScenePlan, objects: list[PhysicalObject], viewport: CellBox) -> None:
+    anchor_key = max(objects, key=lambda o: (o.face.area_su, o.key)).key
     by_key = {o.key: o for o in objects}
     accepted = [p for p in plan.projections if p.accepted]
     ink_max: dict[object, CellBox] = {}
@@ -252,8 +254,13 @@ def _assert_hard_rules(plan: ScenePlan, objects: list[PhysicalObject], viewport:
         for b in accepted[i + 1 :]:
             if not by_key[b.key].occludes:
                 continue
-            # Separation (attempt rule 4).
-            assert _rect_gap(ink_max[a.key], ink_max[b.key]) >= 0, (a.key, b.key)
+            # Separation (attempt rule 4), minus its one documented exemption:
+            # a station and the scene anchor may touch, because the arrival
+            # view's idiom is a station hovering *at* the world it serves
+            # (WP-SC12, `edge.scene.solve._separation_exempt`). Occlusion
+            # below still binds that pair.
+            if not _separation_exempt(by_key[a.key], by_key[b.key], anchor_key, TUNING):
+                assert _rect_gap(ink_max[a.key], ink_max[b.key]) >= 0, (a.key, b.key)
             # Occlusion: the farther object stays above its visibility floor
             # (attempt rule 5). Separation already forbids ink overlap between
             # occluding pairs, so this is a belt-and-braces re-derivation from

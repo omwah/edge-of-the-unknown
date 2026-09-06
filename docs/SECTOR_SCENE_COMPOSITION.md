@@ -584,3 +584,47 @@ projection; the shipped composer above does not yet consume it.
   already rejects one via `PortDTO.sector_id`.
 - Wire version 44. See `edge/server/wire.py`'s `WIRE_VERSION` docstring for the full
   changelog entry.
+
+
+## 10. The physical model now matches this composer's station sizes (WP-SC12)
+
+Nothing in §§0-9 changes: `_SceneComposer` and `SceneArtConfig`'s
+`planet`/`port`/`stardock`/`starbase`/`ship` sizes, scales and caps are
+untouched, and the legacy composer is still what live play renders.
+
+What changed is on the other side of the cutover. The replacement pipeline
+(`edge/scene/`, `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`) now reproduces this
+document's station scale chain exactly, so a port / Stardock / starbase renders
+at the same size under either composer. Read that plan's "Station size parity"
+subsection of §9.6 for the mechanism and the measurements; the parts that touch
+*this* note are:
+
+- **`primary_body_height` is now load-bearing across the seam.** The physical
+  model carries it as `scene.physical_model.station_size_reference`, coefficient
+  by coefficient — `9/10` for the `body_h * 0.9` term, `4` header rows,
+  `11/20` for `visible_cap`, and `planet.max_height`/`min_height` as the clamps.
+  **If you retune `_PRIMARY_CENTRE`, `_PRIMARY_MIN_VISIBLE`, `planet.max_height`
+  or the `0.9` body-budget factor, update that config block in the same change**,
+  or the two composers silently disagree about station size. The one term
+  deliberately *not* mirrored is the `_SHIP_SKY_RESERVE` trim, which is a
+  legacy-layout artifact and is rung-neutral across the calibrated canvases.
+- **`port_scale` / `starbase_scale` / `stardock_scale` are mirrored too**, as
+  `scene.physical_model.station_target_by_scale_class[*].parent_scale`
+  (`3/10`, `7/20`, `3/5`), with `lone_scale` `3/5` for the planetless branch and
+  each kind's `SpriteSize` min/max height as the clamps. Same rule: change one
+  side, change the other.
+- **The `scene:` block gained two fields and one scale class.**
+  `orbit_offset_region_by_scale_class` says where a station may sit *relative to
+  its parent planet* (the absolute `region_by_scale_class` is now only used when
+  a station has no planet), and `starbase` is its own `scale_class` beside
+  `stardock` and `orbital`, so §1's `Stardock > starbase > port` ordering is
+  finally expressed as apparent scale rather than shared between two kinds.
+- **The port render seed matches.** `_paint_station` seeds a port sprite from
+  `sec.sector_id` and a starbase from `starbase_id`; the physical model now does
+  the same, so within one authored tier both composers pick the same variant and
+  the ink boxes agree cell for cell, not merely tier for tier.
+
+`edge/devtool/scene_parity.py` measures the whole claim
+(`pixi run python -m edge.devtool.scene_parity`), and
+`tests/test_scene_legacy_parity.py` guards it in CI. One cell of the matrix is a
+known, named miss — see the plan.

@@ -335,13 +335,25 @@ class FixedFovPerspective:
             seen.add((anchor_pos.z - cam0.position.z, cam0.aim_x_su))
             yield cam0
             count += 1
-        for h in _height_sweep(viewport, cfg, current_h):
-            dz = Fraction(viewport.height * camera.fov_den, camera.fov_num) * Fraction(
-                anchor.face.height_su, h
-            )
-            dz_su = max(math.floor(dz), cfg.near_plane_su + 1)
-            for dx in cfg.aim_offsets_su:
-                aim_x_su = camera.aim_x_su + dx
+        # Aim offsets outside, framing heights inside (WP-SC12). The height
+        # sweep is the *coarse* axis — it is what decides whether the anchor
+        # fits the viewport at all — while an aim offset is a few cells of
+        # lateral nudge. Running heights in the inner loop spent
+        # `max_camera_candidates` on `len(aim_offsets_su)` copies of the same
+        # handful of heights nearest the framed one: with 64 candidates and 7
+        # offsets only ~9 of the 34 available heights at 150x52 were ever
+        # reached. A wide, low-ink-fraction anchor frames far outside that
+        # window — an asteroid belt's own framed height is 45 cells against a
+        # sweep that tops out at 39, so every reachable candidate projected it
+        # 350 cells wide and it failed `edge_margin` in every `belt+…` scene.
+        # Same bound, same "nearest-to-current first" order within an offset.
+        for dx in cfg.aim_offsets_su:
+            aim_x_su = camera.aim_x_su + dx
+            for h in _height_sweep(viewport, cfg, current_h):
+                dz = Fraction(viewport.height * camera.fov_den, camera.fov_num) * Fraction(
+                    anchor.face.height_su, h
+                )
+                dz_su = max(math.floor(dz), cfg.near_plane_su + 1)
                 # §6.2 rule 4: distinct swept heights can floor to the same integer
                 # depth, and a laddered anchor's finite rung count collapses many
                 # heights onto the same rendered box outright -- both leave `project()`
@@ -473,10 +485,16 @@ class DepthLayeredAnchorProjection:
             yield cam0
             count += 1
         layers = sorted(range(cfg.depth_layers), key=lambda layer: (abs(layer - current_layer), layer))
-        for layer in layers:
-            dz_su = layer * cfg.depth_layer_size_su + 1
-            for dx in cfg.aim_offsets_su:
-                aim_x_su = camera.aim_x_su + dx
+        # Aim offsets outside, depth layers inside, mirroring
+        # `FixedFovPerspective.candidates()` above so the two strategies spend
+        # the same bounded budget the same way (WP-SC12). With only
+        # `depth_layers` = 8 layers against a 64-candidate cap this changes
+        # nothing reachable here; it is kept identical so a future cap or
+        # layer-count change cannot make the two diverge silently.
+        for dx in cfg.aim_offsets_su:
+            aim_x_su = camera.aim_x_su + dx
+            for layer in layers:
+                dz_su = layer * cfg.depth_layer_size_su + 1
                 # §6.2 rule 4, mirroring `FixedFovPerspective.candidates()` above:
                 # each layer's depth is distinct by construction, but a repeated
                 # (depth, aim) pair still cannot happen here except by a future

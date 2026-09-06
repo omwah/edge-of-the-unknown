@@ -1521,6 +1521,81 @@ class SceneContinuousYieldConfig(BaseModel):
         return self
 
 
+class SceneStationSizeReferenceConfig(BaseModel):
+    """The scene's *reference body height* in cells — the head of the station
+    scale chain (WP-SC12 station-size parity).
+
+    This reproduces the legacy `_SceneComposer`'s `primary_body_height`
+    (`edge/tui/widgets.py`) as a viewport-only function, because the
+    acceptance bar for the physical-model cutover is that a port/Stardock/
+    starbase renders at the size the legacy composer produces. Every
+    coefficient below is *lifted* from that function, not fitted:
+
+    * `height_fraction` = its `body_h * 0.9` term;
+    * `header_rows` = the header rows legacy reserves before the body budget
+      (`hdr + 1` = 4 for a beacon-less sector, the common case and the one
+      the gallery fixtures produce);
+    * `width_fraction` = its `visible_cap`, `(1 - _PRIMARY_CENTRE) /
+      (2 * _PRIMARY_MIN_VISIBLE - 1)` = `(1 - 0.78) / 0.4` = `11/20`;
+    * `max_cells`/`min_cells` = `SceneArtConfig.planet.max_height/min_height`.
+
+    Legacy's fourth term — the `_SHIP_SKY_RESERVE` trim — is deliberately
+    *not* reproduced: it is a legacy-layout artifact (it buys horizontal sky
+    for a ship berthed beside a right-anchored disc, a placement rule the
+    physical model does not share), and it is measurably rung-neutral, moving
+    the reference only at 87x36 (28 -> 25) where every station kind selects
+    the same authored rung either way.
+
+    This is *not* the physical model's own anchor size. The projected anchor
+    is bound by §4.7/§4.17's no-crop rule to `(width - 2*edge_margin)/4` cells
+    (a 60x30 su face at `cell_aspect` 2 projects `w = 4h`), where legacy lets
+    its disc run off the right edge; the two therefore genuinely differ on a
+    narrow canvas, and station size is keyed to this reference rather than to
+    the anchor so that difference does not propagate into station parity.
+    """
+
+    model_config = _FROZEN
+
+    height_fraction: FractionValue
+    header_rows: int = Field(ge=0)
+    width_fraction: FractionValue
+    max_cells: int = Field(gt=0)
+    min_cells: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _check_bounds(self) -> SceneStationSizeReferenceConfig:
+        if self.min_cells > self.max_cells:
+            raise ValueError(f"min_cells {self.min_cells} > max_cells {self.max_cells}")
+        return self
+
+
+class SceneStationTargetConfig(BaseModel):
+    """One station scale class's target *projected ink height*, in cells
+    (WP-SC12 station-size parity, plan §4.13's "soft objective expressed in
+    projected height").
+
+    `parent_scale` multiplies the reference body height when the station
+    orbits a planet; `lone_scale` multiplies the header-less viewport height
+    when it does not. Both mirror `SceneArtConfig.station_dimensions`'s two
+    branches exactly — `round(primary_height * <kind>_scale)` and
+    `int(body_height * 0.6)` — and `min_cells`/`max_cells` are that kind's own
+    `SpriteSize` bounds.
+    """
+
+    model_config = _FROZEN
+
+    parent_scale: FractionValue
+    lone_scale: FractionValue
+    min_cells: int = Field(gt=0)
+    max_cells: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _check_bounds(self) -> SceneStationTargetConfig:
+        if self.min_cells > self.max_cells:
+            raise ValueError(f"min_cells {self.min_cells} > max_cells {self.max_cells}")
+        return self
+
+
 class ScenePhysicalModelConfig(BaseModel):
     """WP-SC05's approved `edge.scene.model.SceneTuning` + per-kind
     `ContinuousYield` calibration values (`docs/SCENE_CALIBRATION_REVIEW.md`
@@ -1546,6 +1621,17 @@ class ScenePhysicalModelConfig(BaseModel):
     face_extent_by_scale_class: dict[str, tuple[int, int]]
     face_extent_by_kind: dict[str, tuple[int, int]] = Field(default_factory=dict)
     region_by_scale_class: dict[str, SceneRegionConfig]
+    # The *offset from its parent planet* an orbiting object may take, for the
+    # scale classes that have a parent (WP-SC12). `region_by_scale_class` above
+    # stays the absolute region, used when the same object has no parent (a
+    # station in a planetless sector). Splitting the two is what makes the
+    # parent-relative reading of a station's region real: before this, the
+    # shipped `orbital`/`stardock` region was the *absolute* anchor box
+    # (z 1..400) applied as an offset, so a station was always at least 1 su
+    # *behind* its planet and up to 400 behind — it could never be near enough
+    # to the camera to clear a usable authored rung, and every parented station
+    # in the gallery matrix was rejected `no_feasible_depth`.
+    orbit_offset_region_by_scale_class: dict[str, SceneRegionConfig] = Field(default_factory=dict)
     target_fraction_by_scale_class: dict[str, FractionValue]
     ink_ratio_by_scale_class: dict[str, FractionValue]
     structural_mode_thresholds: tuple[tuple[int, int, str], ...]
@@ -1582,6 +1668,12 @@ class ScenePhysicalModelConfig(BaseModel):
     max_glyph_tries: int = Field(gt=0)
     glyph_spacing: int = Field(ge=0)
 
+    # -- station-size parity (WP-SC12, plan §4.13) --
+    station_size_reference: SceneStationSizeReferenceConfig | None = None
+    station_target_by_scale_class: dict[str, SceneStationTargetConfig] = Field(
+        default_factory=dict
+    )
+
     # -- continuous-kind ink/cost envelopes (plan §2.2, §9.4, calibration §2) --
     continuous: dict[str, SceneContinuousYieldConfig]
 
@@ -1613,6 +1705,29 @@ class ScenePhysicalModelConfig(BaseModel):
                     f"scene.physical_model.{name} is missing scale_class(es) "
                     f"{sorted(missing)} present in face_extent_by_scale_class"
                 )
+        # A station target is only reachable if the class also declares where
+        # it may orbit; a class that declares one and not the other is a
+        # half-wired calibration, so say so at load rather than silently
+        # falling back to the absolute region (WP-SC12).
+        targets = set(self.station_target_by_scale_class)
+        orbits = set(self.orbit_offset_region_by_scale_class)
+        if targets != orbits:
+            raise ValueError(
+                "scene.physical_model.station_target_by_scale_class and "
+                ".orbit_offset_region_by_scale_class must name the same scale "
+                f"classes; got {sorted(targets)} vs {sorted(orbits)}"
+            )
+        if targets and self.station_size_reference is None:
+            raise ValueError(
+                "scene.physical_model.station_target_by_scale_class needs "
+                "station_size_reference to resolve a parented target height"
+            )
+        unknown = targets - scale_classes
+        if unknown:
+            raise ValueError(
+                f"scene.physical_model.station_target_by_scale_class names "
+                f"unknown scale_class(es) {sorted(unknown)}"
+            )
         return self
 
 
@@ -1624,28 +1739,39 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
     comments) so the shipped config file stays self-documenting; the two
     must be kept in sync (a config test checks it)."""
 
-    wide = SceneRegionConfig(x_min=-320, x_max=320, y_min=-160, y_max=160, z_min=1, z_max=520)
-    narrow = SceneRegionConfig(x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=1, z_max=400)
+    wide = SceneRegionConfig(x_min=-320, x_max=320, y_min=-160, y_max=160, z_min=300, z_max=819)
+    narrow = SceneRegionConfig(x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=300, z_max=799)
+    # Anchor-capable classes take a shallow, deep band so the camera — solved
+    # to sit in front of the anchor — still leaves absolute-z room for a
+    # secondary object nearer than it (WP-SC12; see config/default.yaml).
+    deep = SceneRegionConfig(x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=600, z_max=699)
+    orbit = SceneRegionConfig(x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=-120, z_max=120)
     return ScenePhysicalModelConfig(
         face_extent_by_scale_class={
             "entity": (34, 14), "anchor": (60, 30), "belt": (90, 16),
-            "stardock": (10, 20), "orbital": (14, 7), "wreck": (16, 6), "ship": (12, 5),
+            "stardock": (22, 16), "starbase": (17, 14), "orbital": (14, 12),
+            "wreck": (16, 6), "ship": (12, 5),
         },
         face_extent_by_kind={
             "nebula": (110, 60), "black_hole": (100, 60), "wormhole": (76, 40),
         },
         region_by_scale_class={
-            "entity": narrow, "anchor": narrow, "belt": narrow,
-            "stardock": narrow, "orbital": narrow,
+            "entity": deep, "anchor": deep, "belt": deep,
+            "stardock": narrow, "starbase": narrow, "orbital": narrow,
             "wreck": wide, "ship": wide,
+        },
+        orbit_offset_region_by_scale_class={
+            "stardock": orbit, "starbase": orbit, "orbital": orbit,
         },
         target_fraction_by_scale_class={
             "entity": "1/3", "anchor": "1/2", "belt": "1/2",
-            "stardock": "1/3", "orbital": "1/5", "wreck": "1/8", "ship": "1/8",
+            "stardock": "1/3", "starbase": "1/4", "orbital": "1/5",
+            "wreck": "1/8", "ship": "1/8",
         },
         ink_ratio_by_scale_class={
             "entity": "4/5", "anchor": "3/5", "belt": "1/3",
-            "stardock": "4/5", "orbital": "9/10", "wreck": "4/5", "ship": "9/10",
+            "stardock": "4/5", "starbase": "9/10", "orbital": "9/10",
+            "wreck": "4/5", "ship": "9/10",
         },
         structural_mode_thresholds=(
             (120, 44, "wide"), (87, 36, "standard"), (0, 0, "compact"),
@@ -1661,7 +1787,8 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
         max_passes=24, edge_margin=1,
         min_projected_cells_by_scale_class={
             "entity": (4, 2), "anchor": (6, 3), "belt": (6, 2),
-            "stardock": (15, 11), "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
+            "stardock": (15, 11), "starbase": (11, 8), "orbital": (11, 7),
+            "ship": (3, 1), "wreck": (3, 1),
         },
         # Minimum-richness floor (maintainer feedback: composers were shrinking
         # ports/stardocks/starbases to their worst rung and never using ships'
@@ -1679,37 +1806,62 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
         # -- see docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md's minimum-richness
         # section for the measured numbers and the follow-up this leaves open.
         min_rung_index_from_end_by_scale_class={
-            "orbital": 1, "stardock": 2,
+            "orbital": 1, "starbase": 1, "stardock": 2,
         },
         separation_margin=1,
         min_visible_fraction_by_scale_class={
-            "entity": "1", "anchor": "1", "belt": "1",
-            "stardock": "3/4", "orbital": "3/4", "ship": "3/4", "wreck": "3/4",
+            "entity": "1", "anchor": "3/4", "belt": "3/4",
+            "stardock": "3/4", "starbase": "3/4", "orbital": "3/4",
+            "ship": "3/4", "wreck": "3/4",
         },
         cost_budget=800, emergency_ship_ceiling=40,
         max_reposition_candidates=16,
         max_glyph_tries=20, glyph_spacing=2,
+        station_size_reference=SceneStationSizeReferenceConfig(
+            height_fraction="9/10", header_rows=4, width_fraction="11/20",
+            max_cells=40, min_cells=4,
+        ),
+        station_target_by_scale_class={
+            "orbital": SceneStationTargetConfig(
+                parent_scale="3/10", lone_scale="3/5", min_cells=3, max_cells=12),
+            "starbase": SceneStationTargetConfig(
+                parent_scale="7/20", lone_scale="3/5", min_cells=3, max_cells=14),
+            "stardock": SceneStationTargetConfig(
+                parent_scale="3/5", lone_scale="3/5", min_cells=3, max_cells=16),
+        },
         continuous={
+            # `ink_fraction_max` is a *ceiling* the resolved render must not
+            # exceed (`edge/art/scene_paint.py::_max_ink_envelope`), so it has
+            # to be at or above what the shipped generator actually inks. The
+            # WP-SC05 values were estimates; measuring every generator across
+            # its own box classes at three sizes and five seeds
+            # (`edge.devtool.scene_calibration`'s method) shows all but the
+            # nebula fill 100% of their request box on at least one axis, so a
+            # `9/10`/`4/5` ceiling made the bounded validation correction fire
+            # on *every* planet/black hole/wormhole/wreck/entity and — with no
+            # cheaper box class left — drop the object outright. Measured
+            # ink/box maxima: planet 1.000, belt 1.000, black_hole 1.000,
+            # wormhole 1.000, wreck 1.000, entity 1.000, nebula 0.833.
             "planet": SceneContinuousYieldConfig(
-                ink_fraction_min="3/5", ink_fraction_max="9/10", min_extent=(6, 3),
+                ink_fraction_min="3/5", ink_fraction_max="1", min_extent=(6, 3),
                 box_classes=((80, 40), (50, 25), (28, 14)), render_cost=(70, 35, 12)),
             "nebula": SceneContinuousYieldConfig(
                 ink_fraction_min="2/5", ink_fraction_max="9/10", min_extent=(10, 5),
                 box_classes=((100, 50), (64, 32), (36, 18)), render_cost=(110, 55, 20)),
             "black_hole": SceneContinuousYieldConfig(
-                ink_fraction_min="1/2", ink_fraction_max="9/10", min_extent=(8, 4),
+                ink_fraction_min="1/2", ink_fraction_max="1", min_extent=(8, 4),
                 box_classes=((90, 45), (58, 29), (32, 16)), render_cost=(100, 50, 18)),
             "wormhole": SceneContinuousYieldConfig(
-                ink_fraction_min="1/2", ink_fraction_max="4/5", min_extent=(6, 3),
+                ink_fraction_min="1/2", ink_fraction_max="1", min_extent=(6, 3),
                 box_classes=((50, 25), (32, 16), (18, 9)), render_cost=(40, 20, 8)),
             "wreck": SceneContinuousYieldConfig(
-                ink_fraction_min="1/2", ink_fraction_max="4/5", min_extent=(5, 2),
+                ink_fraction_min="1/2", ink_fraction_max="1", min_extent=(5, 2),
                 box_classes=((24, 10), (16, 7)), render_cost=(15, 6)),
             "entity": SceneContinuousYieldConfig(
-                ink_fraction_min="3/5", ink_fraction_max="9/10", min_extent=(8, 4),
+                ink_fraction_min="3/5", ink_fraction_max="1", min_extent=(8, 4),
                 box_classes=((40, 16), (26, 10)), render_cost=(35, 14)),
             "belt": SceneContinuousYieldConfig(
-                ink_fraction_min="1/5", ink_fraction_max="1/2", min_extent=(12, 3),
+                ink_fraction_min="3/5", ink_fraction_max="1", min_extent=(12, 3),
                 box_classes=((120, 20), (80, 14)), render_cost=(30, 12)),
         },
         cost_budget_estimate_tolerance="1/10",

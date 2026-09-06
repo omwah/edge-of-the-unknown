@@ -101,10 +101,18 @@ def test_build_scene_tuning_matches_config_exactly() -> None:
         k: tuple(v) for k, v in pm.face_extent_by_kind.items()
     }
     assert tuning.region_by_scale_class["ship"] == Region(
-        x_min=-320, x_max=320, y_min=-160, y_max=160, z_min=1, z_max=520,
+        x_min=-320, x_max=320, y_min=-160, y_max=160, z_min=300, z_max=819,
     )
     assert tuning.region_by_scale_class["anchor"] == Region(
-        x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=1, z_max=400,
+        x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=600, z_max=699,
+    )
+    # WP-SC12: a station's orbit is an offset from its parent, distinct from
+    # the absolute region it uses when it has no planet.
+    assert tuning.orbit_offset_region_by_scale_class["orbital"] == Region(
+        x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=-120, z_max=120,
+    )
+    assert tuning.region_by_scale_class["orbital"] == Region(
+        x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=300, z_max=799,
     )
     assert tuning.target_fraction_by_scale_class["entity"] == Fraction(1, 3)
     assert tuning.ink_ratio_by_scale_class["ship"] == Fraction(9, 10)
@@ -126,7 +134,7 @@ def test_build_scene_tuning_matches_config_exactly() -> None:
             tuning.hysteresis_weight_admission, tuning.hysteresis_weight_art) == (1, 1, 4, 1)
     assert tuning.max_passes == 24
     assert tuning.edge_margin == 1
-    assert tuning.min_projected_cells_by_scale_class["orbital"] == (3, 2)
+    assert tuning.min_projected_cells_by_scale_class["orbital"] == (11, 7)
     assert tuning.separation_margin == 1
     assert tuning.min_visible_fraction_by_scale_class["entity"] == Fraction(1, 1)
     assert tuning.cost_budget == 800
@@ -134,6 +142,21 @@ def test_build_scene_tuning_matches_config_exactly() -> None:
     assert tuning.max_reposition_candidates == 16
     assert tuning.max_glyph_tries == 20
     assert tuning.glyph_spacing == 2
+
+    # WP-SC12 station-size parity: the reference body height and the per-kind
+    # targets, both lifted from the legacy composer's own scale chain.
+    reference = tuning.station_size_reference
+    assert reference is not None
+    assert (reference.height_fraction, reference.header_rows) == (Fraction(9, 10), 4)
+    assert (reference.width_fraction, reference.max_cells, reference.min_cells) == (
+        Fraction(11, 20), 40, 4,
+    )
+    assert set(tuning.station_target_by_scale_class) == {"orbital", "starbase", "stardock"}
+    assert tuning.station_target_by_scale_class["orbital"].parent_scale == Fraction(3, 10)
+    assert tuning.station_target_by_scale_class["starbase"].parent_scale == Fraction(7, 20)
+    assert tuning.station_target_by_scale_class["stardock"].parent_scale == Fraction(3, 5)
+    for target in tuning.station_target_by_scale_class.values():
+        assert target.lone_scale == Fraction(3, 5)
 
 
 def test_build_continuous_yields_matches_config_exactly() -> None:

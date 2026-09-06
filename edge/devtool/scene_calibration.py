@@ -116,7 +116,11 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
                                  # Stardock > starbase > port); 10x20 su is the
                                  # box that projects to its authored 15x15 rung
                                  # at scale 1 once cell_aspect 2 is applied
-        "orbital": (14, 7),      # area 98 — ordinary port/starbase
+        # WP-SC12 split `starbase` off the shared station bucket; this
+        # WP-SC05 review tool carries it so every `classify.SCALE_CLASSES`
+        # entry still resolves here. Shipped values live in config.
+        "starbase": (17, 14),    # area 238 — defence platform
+        "orbital": (14, 7),      # area 98 — ordinary port
         "wreck": (16, 6),        # area 96 — "slightly larger than ships" (plan §2.2)
         "ship": (12, 5),         # area 60
     }
@@ -176,7 +180,8 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
     wide_region = Region(x_min=-320, x_max=320, y_min=-160, y_max=160, z_min=1, z_max=520)
     region_by_scale_class = {
         cls: (wide_region if cls in ("ship", "wreck") else region)
-        for cls in ("entity", "anchor", "belt", "stardock", "orbital", "wreck", "ship")
+        for cls in ("entity", "anchor", "belt", "stardock", "starbase", "orbital",
+                    "wreck", "ship")
     }
     notes.append(ProposedValue(
         "region_by_scale_class",
@@ -197,6 +202,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
     target_fraction_by_scale_class = {
         "entity": Fraction(1, 3), "anchor": Fraction(1, 2), "belt": Fraction(1, 2),
         "stardock": Fraction(1, 3),
+        "starbase": Fraction(1, 4),
         "orbital": Fraction(1, 5), "wreck": Fraction(1, 8), "ship": Fraction(1, 8),
     }
     notes.append(ProposedValue(
@@ -210,6 +216,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
     ink_ratio_by_scale_class = {
         "entity": Fraction(4, 5), "anchor": Fraction(3, 5), "belt": Fraction(1, 3),
         "stardock": Fraction(4, 5),
+        "starbase": Fraction(9, 10),
         "orbital": Fraction(9, 10), "wreck": Fraction(4, 5), "ship": Fraction(9, 10),
     }
     notes.append(ProposedValue(
@@ -319,7 +326,8 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
 
     min_projected_cells_by_scale_class = {
         "entity": (4, 2), "anchor": (6, 3), "belt": (6, 2),
-        "stardock": (15, 11), "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
+        "stardock": (15, 11), "starbase": (11, 8), "orbital": (11, 7),
+        "ship": (3, 1), "wreck": (3, 1),
     }
     notes.append(ProposedValue(
         "min_projected_cells_by_scale_class", repr(min_projected_cells_by_scale_class),
@@ -331,7 +339,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
         "catalogue), so the cell floor and the rung floor state the same "
         "thing rather than one silently dominating."))
 
-    min_rung_index_from_end_by_scale_class = {"orbital": 1, "stardock": 2}
+    min_rung_index_from_end_by_scale_class = {"orbital": 1, "starbase": 1, "stardock": 2}
     notes.append(ProposedValue(
         "min_rung_index_from_end_by_scale_class", repr(min_rung_index_from_end_by_scale_class),
         "Minimum-richness floor: never select the worst 1 rung of an "
@@ -360,6 +368,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
     min_visible_fraction_by_scale_class = {
         "entity": Fraction(1, 1), "anchor": Fraction(1, 1), "belt": Fraction(1, 1),
         "stardock": Fraction(3, 4),
+        "starbase": Fraction(3, 4),
         "orbital": Fraction(3, 4), "ship": Fraction(3, 4), "wreck": Fraction(3, 4),
     }
     notes.append(ProposedValue(

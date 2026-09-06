@@ -54,7 +54,7 @@ from edge.scene.model import (
 )
 
 SCALE_CLASSES: tuple[str, ...] = (
-    "entity", "anchor", "belt", "stardock", "orbital", "ship", "wreck",
+    "entity", "anchor", "belt", "stardock", "starbase", "orbital", "ship", "wreck",
 )
 """The closed, plan-fixed set of `scale_class` values this classifier assigns.
 
@@ -69,7 +69,15 @@ the only place full subsystem swaps and colonist enlistment happen). It is a
 scale class, not a retention tier: Stardock is still `SceneRetention.ORBITAL`
 and still competes for admission exactly like any other station. What differs
 is its nominal face area, and therefore the projected box it asks for and the
-authored rung that box can clear."""
+authored rung that box can clear.
+
+`"starbase"` splits off the same shared `"orbital"` bucket for the same
+reason, one tier down (WP-SC12). Plan §2.2 orders `Stardock > starbase >
+port`, and the legacy composer has always sized a starbase above a port
+(`SceneArtConfig.starbase_scale` 0.35 vs `port_scale` 0.3) — but with both
+sharing one scale class the physical model could express neither the size
+ordering nor the two different station-size parity targets. `"orbital"` now
+means an ordinary trading port."""
 
 _ANCHOR_DISCOVERY_KINDS = frozenset({"nebula", "black_hole", "wormhole"})
 """Sector-space anchor-scale phenomena (plan §2.1, §2.2)."""
@@ -197,14 +205,24 @@ def _port_object(
     )
 
 
+def _starbase_scale_class(tuning: SceneTuning) -> str:
+    """`"starbase"` where the injected tuning declares it, else `"orbital"`.
+
+    The split is a WP-SC12 addition; a `SceneTuning` built before it (every
+    hand-built test fixture, and any caller that has not adopted the new
+    class) simply keeps the shared station bucket, exactly as before."""
+    return "starbase" if "starbase" in tuning.face_extent_by_scale_class else "orbital"
+
+
 def _starbase_object(
     starbase: SectorStarbaseDTO, tuning: SceneTuning, parent: SceneKey | None
 ) -> PhysicalObject:
+    scale_class = _starbase_scale_class(tuning)
     return PhysicalObject(
         key=SceneKey("starbase", starbase.starbase_id),
         parent=parent,
-        face=_face(tuning, "orbital", FaceShape.RECT),
-        scale_class="orbital",
+        face=_face(tuning, scale_class, FaceShape.RECT),
+        scale_class=scale_class,
         art_mode=ArtMode.LADDER,
         ladder_key=LadderKey(
             kind="port",
@@ -217,12 +235,25 @@ def _starbase_object(
         retention=SceneRetention.ORBITAL,
         hostility_ordinal=0,
         threat_rank=0,
-        region=_region(tuning, "orbital"),
+        region=_region(tuning, scale_class),
         flexible=True,
         occludes=True,
         label=starbase.name,
         destination=f"starbase:{starbase.starbase_id}",
     )
+
+
+def _placement_region(tuning: SceneTuning, obj: PhysicalObject, *, parented: bool) -> Region:
+    """Where `obj` may be placed: its parent-relative orbit offset box when it
+    has a parent and its class declares one, else its absolute region.
+
+    `edge.scene.solve._absolute_region` applies the identical rule at solve
+    time; this is the classifier's matching initial draw, so a station's
+    hash-derived starting position is inside the same volume the solver will
+    later search."""
+    if parented and obj.scale_class in tuning.orbit_offset_region_by_scale_class:
+        return tuning.orbit_offset_region_by_scale_class[obj.scale_class]
+    return obj.region
 
 
 def _ship_key(ship: SectorShipDTO) -> SceneKey:
@@ -437,7 +468,10 @@ def classify_sector(
     placements: dict[SceneKey, Placement] = {}
     for key in _placement_order(tuple(objects)):
         obj = by_key[key]
-        offset = _stable_offset(obj.region, f"{key.tag}:{key.ident}")
+        parented = obj.parent is not None and obj.parent in placements
+        offset = _stable_offset(
+            _placement_region(tuning, obj, parented=parented), f"{key.tag}:{key.ident}"
+        )
         if obj.parent is not None and obj.parent in placements:
             parent_position = placements[obj.parent].position
             position = Vec3(

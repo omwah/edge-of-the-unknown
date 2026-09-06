@@ -294,25 +294,37 @@ def _decision(
     )
 
 
-def _absolute_region(obj: PhysicalObject, positions: dict[SceneKey, Vec3]) -> Region:
-    """`obj.region` resolved to absolute scene units.
+def _absolute_region(
+    obj: PhysicalObject, positions: dict[SceneKey, Vec3], cfg: SceneTuning
+) -> Region:
+    """Where `obj` may be placed, in absolute scene units.
 
-    `SceneTuning.region_by_scale_class` documents a station region
-    (`"orbital"` and `"stardock"`) as an
-    *offset from the parent planet's own placement*, and
-    `edge.scene.classify.classify_sector` composes a child's initial position
-    as `parent_position + offset` accordingly. The pre-redesign reposition
-    fallback sampled `target.region` absolutely and so pulled a station clean
-    out of its own orbit; joint placement re-adds the parent origin here.
-    Parents are placed before children because the retention order
-    (`ANCHOR` < `ORBITAL`) already visits them first, and a parent that has
-    not been placed at all falls back to the origin, exactly as
-    `classify_sector` does.
+    An object with a placed parent uses
+    `SceneTuning.orbit_offset_region_by_scale_class` — a genuine offset box —
+    re-based onto the parent's own position; everything else uses its
+    absolute `obj.region` unchanged. Parents are placed before children
+    because the retention order (`ANCHOR` < `ORBITAL`) already visits them
+    first, and a parent that has not been placed at all falls back to the
+    absolute region, exactly as `classify_sector` does.
+
+    Before WP-SC12 there was only one region and it was *both*: the shipped
+    `orbital`/`stardock` value was the absolute anchor box (`z 1..400`) while
+    `region_by_scale_class`'s docstring described it as a parent offset, so a
+    parented station was always at least 1 su behind its planet and up to 400
+    behind. With the anchor framed to fill the viewport the camera sits close,
+    so that put every parented station far past the depth at which any
+    authored rung still clears — the `no_feasible_depth` rejection that lost
+    the port in every `planet+port+…` cell of the gallery matrix. A class with
+    no orbit-offset entry keeps the old behaviour exactly.
     """
-    region = obj.region
-    ox = oy = oz = 0
     parent = obj.parent
-    if parent is not None and parent in positions:
+    parented = parent is not None and parent in positions
+    region = obj.region
+    if parented and obj.scale_class in cfg.orbit_offset_region_by_scale_class:
+        region = cfg.orbit_offset_region_by_scale_class[obj.scale_class]
+    ox = oy = oz = 0
+    if parented:
+        assert parent is not None
         origin = positions[parent]
         ox, oy, oz = origin.x, origin.y, origin.z
     return Region(
@@ -464,6 +476,196 @@ def _depth_strata(key: SceneKey, z_lo: int, z_hi: int, preferred: tuple[int, ...
     return tuple(out)
 
 
+def _separation_exempt(
+    obj: PhysicalObject, other: PhysicalObject, anchor_key: SceneKey, cfg: SceneTuning
+) -> bool:
+    """True for the one pair the separation margin must not apply to: a
+    station and the scene anchor (WP-SC12).
+
+    Separation exists so two objects do not read as a single mass (plan §2.4).
+    A station beside the body it serves is the one case where the opposite is
+    true: the arrival view's whole idiom is that the station hovers *at* the
+    world, and the legacy composer says so explicitly — `_paint_station`
+    berths it at the primary body's lower limb "overlapping the disc's
+    bounding box a little so it reads as *at* the world", and never consults
+    the occupancy map at all.
+
+    Requiring a clear gap instead pushed the station out to whatever depth
+    left room beside the body, which is a smaller authored rung than legacy
+    draws, and on a canvas the body mostly fills there was no such depth. The
+    exemption is narrow: only this pair, only the separation *margin*.
+    Occlusion still applies in full — the anchor must still stay above
+    `min_visible_fraction_by_scale_class["anchor"]`, so the station may sit
+    against the body but never bury it.
+    """
+    if not cfg.station_target_by_scale_class:
+        return False
+    if obj.key == anchor_key:
+        return other.scale_class in cfg.station_target_by_scale_class
+    if other.key == anchor_key:
+        return obj.scale_class in cfg.station_target_by_scale_class
+    return False
+
+
+def _projected_height_at(
+    obj: PhysicalObject,
+    z: int,
+    camera: Camera,
+    viewport: CellBox,
+    strategy: ProjectionStrategy,
+) -> int | None:
+    """`obj`'s projected box height at depth `z`, placed at the camera's aim
+    point (the same best-case-xy convention `_z_ok_near_and_size` uses), or
+    `None` when `z` violates the near plane."""
+    at = Vec3(camera.position.x + camera.aim_x_su, camera.position.y + camera.aim_y_su, z)
+    try:
+        return strategy.project(camera, obj, at, viewport).height
+    except NearPlaneViolation:
+        return None
+
+
+def _depth_for_target_height(
+    obj: PhysicalObject,
+    target_h: int,
+    camera: Camera,
+    viewport: CellBox,
+    strategy: ProjectionStrategy,
+    z_lo: int,
+    z_hi: int,
+) -> int:
+    """The depth in `[z_lo, z_hi]` whose projected height is closest to
+    `target_h` (station-size parity, plan §9.6 "Station size parity").
+
+    Projected height is non-increasing in `z` for both strategies (see
+    `_z_ok_near_and_size`), so this is one bounded binary search —
+    `O(log(z_hi - z_lo))` `project()` calls, never a scan (§6.2 rule 4) — for
+    the largest `z` still projecting at least `target_h`, then an exact
+    integer comparison of that `z` against `z + 1` to pick the nearer of the
+    two heights straddling the target.
+
+    Ties go to the farther depth — the *smaller* apparent size —
+    deterministically. With a strategy whose depth is quantised the two
+    straddling heights are often exactly equidistant from the target, and the
+    legacy composer clamps a station's height rather than letting it grow, so
+    the conservative direction is down: `DepthLayeredAnchorProjection` at
+    120x44 can put a parented port at 12 cells or at 10 against a target of
+    11, and 10 is the tier legacy draws while 12 is one richer.
+
+    `[z_lo, z_hi]` is always the already-proven feasible band, so every depth
+    considered here clears the near plane and the caller re-runs every hard
+    rule on the result regardless.
+    """
+    def height(z: int) -> int:
+        got = _projected_height_at(obj, z, camera, viewport, strategy)
+        return got if got is not None else 0
+
+    if z_hi <= z_lo:
+        return z_lo
+    if height(z_lo) <= target_h:
+        return z_lo
+    if height(z_hi) >= target_h:
+        return z_hi
+    lo, hi = z_lo, z_hi  # height(lo) > target_h >= ... > height(hi)
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if height(mid) >= target_h:
+            lo = mid
+        else:
+            hi = mid
+    # `lo` is at or above the target, `hi` the first below it: keep whichever
+    # is closer, ties to `hi` (the farther depth, the smaller size).
+    return lo if (height(lo) - target_h) < (target_h - height(hi)) else hi
+
+
+_NO_RUNG = 1 << 20
+"""Sentinel rung index for a depth at which nothing authored clears, so it
+sorts behind every real rung without a special case."""
+
+
+def _target_rung_index(
+    obj: PhysicalObject, target_h: int, catalog: ArtGeometryCatalog, cfg: SceneTuning
+) -> int | None:
+    """The authored rung a `target_h`-cell-tall request resolves to.
+
+    The sprite library picks a tier from the requested **height** alone
+    (`edge/art/sprites.py::fit_box`), which is why the legacy composer's
+    `station_dimensions` height is enough to say which tier it draws; this
+    reads the same choice off the catalogue. `None` for a non-laddered object
+    or an empty ladder.
+    """
+    if obj.ladder_key is None:
+        return None
+    rungs = catalog.rungs(obj.ladder_key)
+    if not rungs:
+        return None
+    exclude_from_end = cfg.min_rung_index_from_end_by_scale_class.get(obj.scale_class, 0)
+    max_index = max(r.index for r in rungs)
+    allowed = [r for r in rungs if r.index <= max_index - exclude_from_end]
+    if not allowed:
+        return None
+    fits = [r for r in allowed if r.natural.height <= target_h]
+    if fits:
+        return max(fits, key=lambda r: (r.natural.height, -r.index)).index
+    return max(r.index for r in allowed)
+
+
+def _by_closest_size(
+    obj: PhysicalObject,
+    depths: tuple[int, ...],
+    target_h: int,
+    target_rung: int | None,
+    camera: Camera,
+    viewport: CellBox,
+    cfg: SceneTuning,
+    catalog: ArtGeometryCatalog,
+    strategy: ProjectionStrategy,
+) -> tuple[int, ...]:
+    """`depths` reordered so the depth rendering the target *size* comes first.
+
+    The authored rung is the primary key, because the rung is the size
+    decision — projected height only chooses between tiers, and two depths a
+    cell apart in projected height can be a whole tier apart or identical.
+    `DepthLayeredAnchorProjection` shows why the distinction matters: its
+    depth is quantised, so at 120x44 a parented starbase can project 14 cells
+    or 11 against a target of 13. Ranking on height alone takes 14 (off by 1)
+    and draws rung 0; ranking on rung takes 11, which is the rung 13 resolves
+    to and the tier the legacy composer draws.
+
+    Projected height breaks a rung tie, and the farther depth (the smaller
+    apparent size) breaks that. Integer comparisons only, so the ordering is
+    platform-stable (§4.1).
+    """
+    def key(z: int) -> tuple[int, int, int]:
+        height = _projected_height_at(obj, z, camera, viewport, strategy)
+        if height is None:
+            return (_NO_RUNG, _NO_RUNG, -z)
+        rung_gap = 0
+        if target_rung is not None:
+            at = Vec3(
+                camera.position.x + camera.aim_x_su, camera.position.y + camera.aim_y_su, z
+            )
+            try:
+                bounds = strategy.project(camera, obj, at, viewport)
+            except NearPlaneViolation:
+                return (_NO_RUNG, _NO_RUNG, -z)
+            rung = _select_rung(catalog, obj, bounds, cfg)
+            rung_gap = _NO_RUNG if rung is None else abs(rung.index - target_rung)
+        return (rung_gap, abs(height - target_h), -z)
+
+    return tuple(sorted(depths, key=key))
+
+
+def _station_target_height(
+    obj: PhysicalObject, viewport: CellBox, cfg: SceneTuning, *, parented: bool
+) -> int | None:
+    """`obj`'s target projected ink height, or `None` when its scale class
+    declares none (every non-station class today)."""
+    target = cfg.station_target_by_scale_class.get(obj.scale_class)
+    if target is None or cfg.station_size_reference is None:
+        return None
+    return target.target_height(viewport, cfg.station_size_reference, parented=parented)
+
+
 def _evaluate_placement(
     obj: PhysicalObject,
     pos: Vec3,
@@ -529,6 +731,8 @@ def _evaluate_placement(
     if obj.occludes:
         for other in placed:
             if not other.obj.occludes:
+                continue
+            if _separation_exempt(obj, other.obj, anchor_key, cfg):
                 continue
             gap = _rect_gap(ink_max_inflated, other.ink_max_inflated)
             if gap < 0:
@@ -692,7 +896,7 @@ def _attempt(
             if committed is None:
                 reason = why
         else:
-            region = _absolute_region(obj, result.positions)
+            region = _absolute_region(obj, result.positions, cfg)
             x_min, x_max = region.x_min, region.x_max
             y_min, y_max = region.y_min, region.y_max
             z_min, z_max = region.z_min, region.z_max
@@ -738,11 +942,39 @@ def _attempt(
             # classified `base.z` is deliberately *not* preferred here -- see
             # `_depth_strata`.
             preferred: list[int] = []
+            # Station-size parity (plan §9.6 "Station size parity"): a scale
+            # class with a declared target projected height puts the depth
+            # achieving that height first, ahead of the previous plan's depth
+            # and the near-to-far strata. Both are candidate *ordering* only —
+            # every candidate still goes through the identical
+            # `_evaluate_placement`, so this can no more overturn a hard rule
+            # than §4.11's hysteresis ordering can.
+            target_h = _station_target_height(
+                obj, viewport, cfg,
+                parented=obj.parent is not None and obj.parent in result.positions,
+            )
+            if target_h is not None:
+                preferred.append(
+                    _depth_for_target_height(
+                        obj, target_h, camera, viewport, strategy, z_lo, z_hi
+                    )
+                )
             prev_z = previous_depths.get(obj.key)
-            if prev_z is not None:
+            if prev_z is not None and prev_z not in preferred:
                 preferred.append(prev_z)
             budget = cfg.max_reposition_candidates
-            for z in _depth_strata(obj.key, z_lo, z_hi, tuple(preferred)):
+            strata = _depth_strata(obj.key, z_lo, z_hi, tuple(preferred))
+            if target_h is not None:
+                # Order the whole bounded candidate list by how close each
+                # depth lands to the target *size*, so a refused first choice
+                # falls back to the next-closest size rather than to the
+                # nearest (and therefore largest) depth left.
+                strata = _by_closest_size(
+                    obj, strata, target_h,
+                    _target_rung_index(obj, target_h, catalog, cfg),
+                    camera, viewport, cfg, catalog, strategy,
+                )
+            for z in strata:
                 if committed is not None or budget <= 0:
                     break
                 extent = strategy.visible_xy_extent(camera, viewport, z, obj.face, cfg)
@@ -769,7 +1001,10 @@ def _attempt(
                         cfg.separation_margin,
                     )
                     if obj.occludes and any(
-                        p.obj.occludes and _rect_gap(probe, p.ink_max_inflated) < 0 for p in placed
+                        p.obj.occludes
+                        and not _separation_exempt(obj, p.obj, anchor_key, cfg)
+                        and _rect_gap(probe, p.ink_max_inflated) < 0
+                        for p in placed
                     ):
                         continue
                     su = _su_for_screen(strategy, camera, viewport, z, col, row, bounds_probe)

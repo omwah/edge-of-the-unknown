@@ -169,8 +169,13 @@ def test_every_retention_reject_names_its_underlying_cause(
     reproducible from the trace. A `retention_reject` for an object that ever
     failed a hard rule carries that rule id in `Decision.inputs`."""
     seen = False
+    # A cramped canvas beside the calibrated ones, because the WP-SC12 parity
+    # work admits every object of every `_matrix()` case at every size in
+    # `SIZES` — the guard would otherwise pass vacuously on a trace that no
+    # longer contains a single `retention_reject`. 40x14 is below the smallest
+    # calibrated viewport and forces the fallback ladder to shed.
     for sector in _matrix().values():
-        for w, h in SIZES:
+        for w, h in (*SIZES, (40, 14)):
             plan = _solved(sector, strategy, w, h)
             hard = {
                 d.key for d in plan.trace

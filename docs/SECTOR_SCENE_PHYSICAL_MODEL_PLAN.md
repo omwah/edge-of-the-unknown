@@ -2081,6 +2081,209 @@ for glyph in sorted(glyphs, key=lambda g: g.key):
     else: counters.glyphs_dropped += 1  ->  sidebar entry, never scene text
 ```
 
+**Station size parity (post-WP-SC09 fix, WP-SC12).** The maintainer set an
+explicit acceptance bar for replacing the legacy `_SceneComposer`: *the new
+pipeline must not reject any object the legacy composer would show for the same
+sector DTO, and a port / Stardock / starbase must render at the size the legacy
+composer produces.* Measured against that bar before this change, over
+`edge/tui/scene_gallery.py`'s `cases()` x `SIZES` matrix and both strategies:
+88.8% / 96.6% of the objects legacy paints were painted at all, and 23 of 52 /
+17 of 52 admitted stations landed on legacy's authored rung.
+
+`edge/devtool/scene_parity.py` is the measurement, and
+`tests/test_scene_legacy_parity.py` the CI guard. Parity is judged on the
+**authored ladder rung**, not the ink-cropped cell box: the sprite library picks
+a tier from the requested *height* alone and then ink-crops it (verified against
+the real renderer for all three station subtypes across requested heights
+3..17 — the drawn box is exactly a step function whose steps land on the rung
+boundaries), so the rung *is* the size decision. Both are reported; after the
+seed alignment below they agree exactly.
+
+Seven defects were found, each independently evidenced.
+
+*1. The parent-relative station region was never parent-relative.*
+`region_by_scale_class`'s docstring has always described a station's region as
+an offset from its planet, but the shipped value was the **absolute anchor box**
+(`z 1..400`) applied as one. A parented station was therefore always at least
+1 su *behind* its planet and up to 400 behind, and with the anchor framed to
+fill the viewport the camera sits close, so every parented station was far past
+the depth at which any permitted rung still clears —
+`planet+port+ships @ 67x30` needed `dz <= 64` for its 7-cell rung and could not
+come nearer than `dz = 129`. Every `planet+...` cell of the matrix lost its
+station to `no_feasible_depth`. `SceneTuning.orbit_offset_region_by_scale_class`
+is now a genuine offset box (`z` symmetric at +/-120 su, twice the planet's own
+60 su nominal face width), used by `_absolute_region` and by the classifier's
+initial draw whenever the object has a placed parent; `region_by_scale_class`
+stays the absolute region for a station with no planet. A class with no
+orbit-offset entry keeps the old behaviour exactly.
+
+*2. Every region's `z_min` was the near plane.* `project()` refuses any object
+at absolute `z < near_plane_su` (= 1), and the camera is solved to sit *in front
+of* the anchor by its framing distance — so an anchor near a `z_min` of 1 put
+the camera at a negative z with nothing legally placeable in front of it, and no
+secondary object could ever be nearer than the anchor. That is what pinned a
+lone port beside a wormhole to 7 cells (rung 1) where legacy draws 12 (rung 0):
+reaching 12 needed the port at `z = -20`. An anchor's own z-span buys nothing —
+it is inflexible, and its apparent size comes from the camera framed to it — so
+the anchor classes now take a shallow `600..699` band and the secondary classes
+keep their span widths re-based to straddle it (stations `300..799`,
+ships/wrecks `300..819`).
+
+*3. The camera candidate budget was spent on the wrong axis.* `candidates()` ran
+`for height: for aim_offset`, so `max_camera_candidates` (64) bought
+`len(aim_offsets_su)` (7) copies of the handful of heights nearest the framed
+one — only ~9 of the 34 available heights at 150x52. The framing height is the
+coarse axis (it decides whether the anchor fits at all); an aim offset is a few
+cells of lateral nudge. An asteroid belt frames at 45 cells against a sweep
+topping out at 39, so every reachable candidate projected it ~350 cells wide and
+it failed `edge_margin` in every `belt+...` scene. The loops are swapped in both
+strategies; same bound, same nearest-to-current order within an offset.
+
+*4. `ink_fraction_max` was below what the generators actually ink.* It is a
+*ceiling* the resolved render must not exceed, so it has to sit at or above the
+truth. Measuring every continuous generator across its own box classes at three
+sizes and five seeds: planet 1.000, belt 1.000, black_hole 1.000, wormhole
+1.000, wreck 1.000, entity 1.000, nebula 0.833 — against shipped estimates of
+`9/10` and `4/5`. The bounded validation correction therefore fired on *every*
+such object and, with no cheaper box class left, dropped it:
+`planet+port+ships @ 67x30` solved a plan containing the planet and both ships
+and painted the ships alone. Set to `1` for all but the nebula.
+`_max_ink_envelope` was also judging the render against `projection.bounds`
+rather than the `container` it actually rendered into, which for a box-classed
+continuous object are different boxes; it now reads the container.
+
+*5. The paint stage's occlusion re-check dropped by depth, not by retention.*
+The solver visits objects in retention order and refuses the *later,
+lower-priority* candidate, never unseating a committed one (§4.5).
+`resolve_scene` instead dropped the farther object of a conflicting pair — and
+the farther object is very often the anchor. It now drops the lower-`retention`
+side, ties falling back to the farther object and then to the key, so the two
+stages state the same rule.
+
+*6. Separation forbade the arrival view's own idiom.* Legacy `_paint_station`
+berths a station at the primary body's lower limb *"overlapping the disc's
+bounding box a little so it reads as at the world"*, and never consults the
+occupancy map. Requiring a clear separation gap pushed the station out to
+whatever depth left room beside the body — a smaller rung than legacy draws, and
+on a canvas the body mostly fills, no admissible depth at all.
+`_separation_exempt` narrows the separation margin to skip exactly one pair, a
+station and the scene anchor. Occlusion still binds it in full, so the station
+may sit against the body but never bury it — and `min_visible_fraction` for
+`anchor`/`belt` moves from `1` to the `3/4` every other class already carries,
+since "the anchor is never partially occluded" was an assumption the arrival
+view has never actually honoured.
+
+*7. Station size had no target at all.* Rung selection served whatever depth the
+joint placement happened to reach. `SceneTuning.station_target_by_scale_class`
+now gives each station class a target **projected ink height** — §4.13's "soft
+objective expressed in projected height", applied to stations — and
+`_by_closest_size` orders that object's bounded depth candidates by how close
+each lands to it. The *rung* is the primary sort key and projected height only
+the tie-break, because two depths a cell apart can be a whole tier apart or
+identical: `DepthLayeredAnchorProjection` at 120x44 can put a parented starbase
+at 14 cells or 11 against a target of 13, and ranking on height takes 14
+(rung 0) where ranking on rung takes 11, which is the tier legacy draws. Ties go
+to the farther depth — the smaller size — because legacy clamps a station's
+height rather than letting it grow. This is candidate *ordering* only: every
+candidate still goes through the identical `_evaluate_placement`, so it can no
+more overturn a hard rule than §4.11's hysteresis ordering can.
+
+The target itself is `SceneTuning.station_size_reference`, which reproduces the
+legacy composer's `primary_body_height` as a viewport-only function. Every
+coefficient is lifted from that function rather than fitted: `height_fraction`
+`9/10` is its `body_h * 0.9`; `header_rows` 4 is the rows it reserves;
+`width_fraction` `11/20` is its `visible_cap`,
+`(1 - _PRIMARY_CENTRE) / (2 * _PRIMARY_MIN_VISIBLE - 1)`;
+`max_cells`/`min_cells` are `SceneArtConfig.planet.max_height/min_height`. Its
+`_SHIP_SKY_RESERVE` trim is deliberately not reproduced — that term buys
+horizontal sky for a ship berthed beside a right-anchored disc, a placement rule
+the physical model does not share — and it is measurably rung-neutral, moving
+the reference only at 87x36 (28 -> 25) where every station kind selects the same
+rung either way. `station_target_by_scale_class` then mirrors
+`station_dimensions`' own two branches exactly: `round(reference * <kind>_scale)`
+when the station orbits a planet, `floor(body_height * 3/5)` when it does not,
+both clamped to that kind's `SpriteSize` bounds.
+
+**This reference is deliberately not the physical model's own anchor size,** and
+the reason is a genuine architectural limit worth recording. A 60x30 su anchor
+face at `cell_aspect` 2 projects `w = 4h`, and §4.7/§4.17 forbid cropping, so
+the largest *whole* anchor a viewport can hold is
+`(width - 2 * edge_margin) / 4` = 16 / 21 / 29 / 37 cells at 67x30 / 87x36 /
+120x44 / 150x52 — below the legacy composer's 23 / 25 / 36 / 40, because legacy
+anchors its disc at `_PRIMARY_CENTRE` and lets it run off the right edge. Anchor
+size parity is therefore unreachable without contradicting a §4-numbered
+invariant. Keying station size to the reference rather than to the projected
+anchor keeps that difference from propagating into the station, which is what
+the acceptance bar names.
+
+Two supporting recalibrations, both measured:
+
+- **Station faces are sized off their own ladders.** A station's su face height
+  is now its richest authored rung's natural height (port 12, starbase 14,
+  Stardock 16) because that height is a hard ceiling under
+  `DepthLayeredAnchorProjection` — its scale never exceeds 1, so at the previous
+  7 su a port could reach 7 cells against a rung 0 that needs 12, and that
+  strategy drew every port and starbase a tier below legacy no matter what the
+  solver did. Widths keep legacy's own 2.4:1 station aspect to within a tenth
+  once `cell_aspect` 2 is applied (`2*14/12 = 2.33`, `2*17/14 = 2.43`). It costs
+  `FixedFovPerspective` nothing: there the target-height depth search picks
+  whatever depth yields the target size, so a larger face only means a slightly
+  farther one. `starbase` is also split off the shared `orbital` bucket, one
+  tier below `stardock`, since one class could express neither §2.2's
+  `Stardock > starbase > port` ordering nor two different parity targets. Areas
+  now read `anchor 1800 > entity 476 > stardock 352 > starbase 238 > port 168 >
+  wreck 96 > ship 60`, so §4.4 holds and §2.2 is stated for the first time.
+- **The belt's `ink_fraction_min` was 1/5 against a measured 0.65-1.000.** The
+  WP-SC05 estimate confused "a permeable field reads as mostly negative space"
+  with the ink *bounding box*, which is what the fraction measures. At 1/5 the
+  `min_extent` floor demanded a 15-cell-tall belt while an 11.25:1 projected
+  aspect caps one at ~10 cells on a 120-wide canvas, so the belt was
+  unadmittable at every calibrated viewport and every `belt+...` scene lost its
+  primary body. Now 3/5, just under the measured minimum.
+
+Finally, **the port render seed is aligned with legacy's.** Within one authored
+rung the seed still selects a *variant*, and variants differ in ink extent — a
+Stardock's 15x15 tier ink-crops to 15x14 at seed 103 and 13x12 at seed 64.
+Legacy seeds a port from the sector id and a starbase from `starbase_id`; the
+latter already equalled `SceneKey.ident`, so only the port needed aligning for
+the two composers to draw the identical sprite at the identical size.
+
+**Measured result** (`edge/tui/scene_gallery.py::cases()` x `SIZES`, 64 cells
+and 232 legacy-painted objects per strategy, real `build_scene_tuning()` /
+`load_geometry_catalog()` config):
+
+| | `FixedFovPerspective` | `DepthLayeredAnchorProjection` |
+|---|---:|---:|
+| legacy objects also painted, before | 206/232 (88.8%) | 224/232 (96.6%) |
+| **legacy objects also painted, after** | **232/232 (100.0%)** | **231/232 (99.6%)** |
+| stations on legacy's rung, before | 23/52 | 17/52 |
+| **stations on legacy's rung, after** | **52/52** | **52/52** |
+| secondary-object admission (§9.6's own metric), before | 91.3% | 94.9% |
+| **secondary-object admission, after** | **100.0%** (172/172) | **99.4%** (171/172) |
+
+Station ink boxes match legacy's exactly — not merely to the rung — in all 24
+sampled port/Stardock/starbase cells (three lone cases and three parented cases
+x four canvases). Ship rung richness is equal or better at every canvas (rung-0
+counts 8/8/9/10 against the previous 8/6/9/9, on a larger admitted population),
+so the parity work costs the ship-size fix nothing.
+
+**The one remaining miss, and why it is not fixable here.**
+`planet+port+wreck+traffic @ 67x30` loses its wreck under
+`DepthLayeredAnchorProjection` (and under `FixedFovPerspective` instead, if
+`_DEPTH_STRATA` is raised). Legacy paints three ships — `max_ships_shown` — plus
+the wreck; the physical model paints four ships and has no room left for the
+wreck. That is the same *number* of objects, a different set, and §4.6 ("Neutral
+ships precede wrecks") is a numbered invariant, so the model cannot prefer the
+wreck. Sweeping both bounded placement budgets (`_DEPTH_STRATA` 4/5/6/8 x
+`max_reposition_candidates` 16/24/32, 12 combinations) only moves the miss
+between the two strategies; it never removes it. Asserted by name in
+`tests/test_scene_legacy_parity.py` so it cannot silently become two.
+
+`DepthLayeredAnchorProjection`'s ships remain flat at rung 2 at every canvas —
+the already-documented "cannot magnify" limitation, unchanged by this work and
+still asserted by
+`tests/test_scene_size_and_drops.py::test_depth_layered_projection_cannot_magnify_and_this_is_known`.
+
 ### 9.7 Art resolution and paint (WP-SC07)
 
 ```text
