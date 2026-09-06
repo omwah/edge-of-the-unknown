@@ -1,16 +1,16 @@
 # Graph Report - agent-a16dfc35b001f29fd  (2026-09-06)
 
 ## Corpus Check
-- 420 files · ~9,569,015 words
+- 421 files · ~9,583,156 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 11515 nodes · 49485 edges · 255 communities (229 shown, 26 thin omitted)
+- 11515 nodes · 49485 edges · 257 communities (231 shown, 26 thin omitted)
 - Extraction: 67% EXTRACTED · 33% INFERRED · 0% AMBIGUOUS · INFERRED: 16093 edges (avg confidence: 0.52)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `3085dffa`
+- Built from commit: `738d008d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -260,6 +260,8 @@
 - Sector scene benchmark
 - render_stardock_art
 - GroundwarConfig
+- derive_aspects
+- sync_sprite_art.py
 - test_sig_corpus.py
 - Debris
 - tui/app.py
@@ -284,17 +286,17 @@
   tests/test_groundwar_world.py → edge/bigbang/validate.py
 - `test_roster_archetypes_have_palettes()` --calls--> `available_archetypes()`  [EXTRACTED]
   tests/test_art_coverage.py → edge/art/generator.py
+- `test_station_key_requires_all_three_parts()` --calls--> `StationKey`  [EXTRACTED]
+  tests/test_scene_paint.py → edge/art/scene_paint.py
 - `test_a_tier_cannot_be_emptied_for_any_archetype()` --indirect_call--> `SpriteValidationError`  [INFERRED]
   tests/test_vendored_sprite_art.py → edge/art/sprite_art/model.py
 - `test_only_vertical_views_may_reverse_their_section_order()` --indirect_call--> `SpriteValidationError`  [INFERRED]
-  tests/test_vendored_sprite_art.py → edge/art/sprite_art/model.py
-- `test_palette_catalog_rejects_extra_archetype()` --indirect_call--> `SpriteValidationError`  [INFERRED]
   tests/test_vendored_sprite_art.py → edge/art/sprite_art/model.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (255 total, 26 thin omitted)
+## Communities (257 total, 26 thin omitted)
 
 ### Community 0 - "Commodity"
 Cohesion: 0.07
@@ -306,7 +308,7 @@ Nodes (8): Deploy fighters/mines/beacons and work the devices (§10/§14 — WP7
 
 ### Community 2 - "OutEdges"
 Cohesion: 0.02
-Nodes (339): _pick_planet(), A droppable Assault-access world in already-charted space (`TravelTo`-reachable), apply_ground_assault_consequences(), apply_spillover(), effective_disposition(), is_criminal(), Whether the player's alignment marks them criminal in the governor's eyes (§10)., Reputation spillover from a `delta` attitude change toward `subject_id` (§6.4). (+331 more)
+Nodes (338): _pick_planet(), A droppable Assault-access world in already-charted space (`TravelTo`-reachable), apply_ground_assault_consequences(), apply_spillover(), effective_disposition(), is_criminal(), Whether the player's alignment marks them criminal in the governor's eyes (§10)., Reputation spillover from a `delta` attitude change toward `subject_id` (§6.4). (+330 more)
 
 ### Community 3 - "shortest_path"
 Cohesion: 0.12
@@ -314,7 +316,7 @@ Nodes (41): NpcEntry, owner_tag(), A string tag for a force/holding owner — th
 
 ### Community 4 - "dto.py"
 Cohesion: 0.04
-Nodes (116): JsonArtGeometryCatalog, load_default_geometry_catalog(), Concrete `ArtGeometryCatalog` backed by the generated JSON file.      Continuous, The one process-wide catalogue instance, loaded from the shipped file., SectorDTO, _bench_region(), benchmark_current_composer(), benchmark_decision_prose_gating() (+108 more)
+Nodes (115): JsonArtGeometryCatalog, load_default_geometry_catalog(), Concrete `ArtGeometryCatalog` backed by the generated JSON file.      Continuous, The one process-wide catalogue instance, loaded from the shipped file., SectorDTO, _bench_region(), benchmark_current_composer(), benchmark_decision_prose_gating() (+107 more)
 
 ### Community 5 - "encounters.py"
 Cohesion: 0.02
@@ -330,7 +332,7 @@ Nodes (185): 4. Matrix cells: production classifier + both strategies, belt+port
 
 ### Community 8 - "backends.py"
 Cohesion: 0.03
-Nodes (153): base_owner_hostile(), Whether an operational base's owner treats the player as an enemy (§4.2, WP40)., assault_war_delta(), corps_at_war(), owner_at_war_with_player(), player_corp(), player_owns(), Corporations: membership, shared ownership, and corp war (DESIGN §4, WP66) — pur (+145 more)
+Nodes (137): _archetype(), assign_station_archetypes(), _builder(), Deterministic builder-archetype assignment for ports and orbital bases., Resolve the species whose configured archetype designed the structure., Stamp every structure's builder archetype after alien regions exist (§5)., base_owner_hostile(), Whether an operational base's owner treats the player as an enemy (§4.2, WP40). (+129 more)
 
 ### Community 9 - "test_groundwar_force.py"
 Cohesion: 0.09
@@ -353,8 +355,8 @@ Cohesion: 0.03
 Nodes (83): One traversed sector on a plotted route — what the player reads (§11, WP14)., RouteHopDTO, Shown while the terminal is below the 80×24 floor (WP-UI05).      It never traps, SizeNoticeScreen, Summarize the authoritative plotted DTO without duplicating route rules., _derive_tag(), A short uppercase tag from the corp name — internal id, never typed (WP80+)., HaggleScreen (+75 more)
 
 ### Community 14 - "SqliteRepository"
-Cohesion: 0.04
-Nodes (111): _archetype(), assign_station_archetypes(), _builder(), Deterministic builder-archetype assignment for ports and orbital bases., Resolve the species whose configured archetype designed the structure., Stamp every structure's builder archetype after alien regions exist (§5)., _best_roundtrip_margin(), _check_degree_cap() (+103 more)
+Cohesion: 0.05
+Nodes (90): missile_capacity(), Ground missiles the owned suits can chamber (the magazine ceiling)., Game, A ship hull (DESIGN §4).      A player hull carries `subsystems` (the engine-roo, Holds occupied — trade cargo plus loose (uninstalled) components.          Loose, Colonists aboard, summed across every people the ship carries., Top-level game record (DESIGN §4)., A node in the warp graph (DESIGN §4). `warps_out` are sector ids. (+82 more)
 
 ### Community 15 - "test_vendored_sprite_art.py"
 Cohesion: 0.06
@@ -414,7 +416,7 @@ Nodes (28): has_save(), Path, The directory holding save slots (``EDGE_SAVE_DIR`
 
 ### Community 30 - "Battle"
 Cohesion: 0.07
-Nodes (14): Battle, Debris, Event, Side, One cell of drifting wreckage (graveyard scenarios). Blocks fire lines     and s, A missile salvo in flight — a board object chasing its target ship., One log/FX entry drained by the UI after each rules call., A ship (any footprint cell), wing, rock, or wreckage sits here — one         pie (+6 more)
+Nodes (14): Battle, Event, Side, One cell of rocky debris (belt scenarios). Blocks fire lines and wings;     dest, A missile salvo in flight — a board object chasing its target ship., One log/FX entry drained by the UI after each rules call., A ship (any footprint cell), wing, rock, or wreckage sits here — one         pie, Every board cell of the piece's footprint (anchored on the centre).         Ship (+6 more)
 
 ### Community 31 - "test_llm_bot_services.py"
 Cohesion: 0.04
@@ -441,8 +443,8 @@ Cohesion: 0.05
 Nodes (39): 1. Outcome, 2.1 Physical relationship tree, 2.2 Apparent-scale hierarchy, 2.3 Retention hierarchy, 2.4 Camera and projection, 2.5 Camera-facing 2.5D shapes and placement freedom, 2.6 Labels and accessibility, 2. Approved design contract (+31 more)
 
 ### Community 37 - "ground_assault.py"
-Cohesion: 0.05
-Nodes (71): apply_ground_recovery(), Recover persisted planetary Resolve by one daily tick (GW-WP11, D8/D14).      Th, missile_capacity(), Suits of every class carried., Ground missiles the owned suits can chamber (the magazine ceiling)., suits_total(), A ship hull (DESIGN §4).      A player hull carries `subsystems` (the engine-roo, Holds occupied — trade cargo plus loose (uninstalled) components.          Loose (+63 more)
+Cohesion: 0.09
+Nodes (42): apply_ground_recovery(), Recover persisted planetary Resolve by one daily tick (GW-WP11, D8/D14).      Th, garrison_training(), produce(), Infantry minted this tick from a colonist-allocation training share (GW plan D11, Run one production tick for `planet`, returning the updated world (§8).      A n, planet_growth(), Run BNT production for every owned planet (§4.2, §8).      Pure and deterministi (+34 more)
 
 ### Community 38 - "DetailTable"
 Cohesion: 0.06
@@ -453,8 +455,8 @@ Cohesion: 0.09
 Nodes (35): Axis, Reusable procedural Unicode sprite-art reader and renderer., _int_mapping(), load_palette_catalog(), _mapping(), Any, YAML I/O for the sprite-art schema., _section_from_data() (+27 more)
 
 ### Community 40 - "economy.py"
-Cohesion: 0.13
-Nodes (18): DialogueConfigMismatchError, RuntimeError, The saved ticker schedule, or None for a fresh game (WP12)., The save was made with a different dialogue pack; replay would fail mid-way., EngineState, The persisted ticker schedule (WP12): the tick counter + each cron's next-due ti, CheckpointCodecError, _decode() (+10 more)
+Cohesion: 0.27
+Nodes (12): CheckpointCodecError, _decode(), _encode(), payload_checksum(), Any, ValueError, Versioned, safe checkpoint encoding for authoritative universe state.  Checkpoin, Overlay checkpointed authoritative state onto a freshly generated base. (+4 more)
 
 ### Community 41 - "AssaultOperation"
 Cohesion: 0.06
@@ -478,7 +480,7 @@ Nodes (42): GroundwarApp, Pressed, Screen, The reusable composer committed a squ
 
 ### Community 46 - "Game"
 Cohesion: 0.06
-Nodes (54): may_occupy(), npc_stance(), One sector vessel's raw retention inputs, before opaque ordinal projection., Project `(retention_class, hostility_ordinal, combat_threat_rank)` per vessel., `a`'s stance toward `b` on a −1..1 scale (§6.4) — asymmetric, alliance-derived., `a`'s live stance toward `b` (§6.4) — the relation matrix minus any active grudg, Whether `species` is allowed to sit in `sector_id` (Phase-2 alliance rules, WP16, ship_retention_ordinals() (+46 more)
+Nodes (53): may_occupy(), npc_stance(), One sector vessel's raw retention inputs, before opaque ordinal projection., Project `(retention_class, hostility_ordinal, combat_threat_rank)` per vessel., `a`'s stance toward `b` on a −1..1 scale (§6.4) — asymmetric, alliance-derived., `a`'s live stance toward `b` (§6.4) — the relation matrix minus any active grudg, Whether `species` is allowed to sit in `sector_id` (Phase-2 alliance rules, WP16, ship_retention_ordinals() (+45 more)
 
 ### Community 47 - "test_citadels.py"
 Cohesion: 0.06
@@ -489,8 +491,8 @@ Cohesion: 0.10
 Nodes (46): _engagement(), _fight_state(), _foe(), _forced_knockout_config(), WP25 — combat rounds: the escape floor, arcs, missiles, and full-fight goldens (, A spinal attacker recharges between volleys — even rounds are safe from it., Hull 0 (§10, WP26): the ship, cargo, and stores are lost; the escape pod —     a, A config where every hull-reaching volley knocks a component out of exactly (+38 more)
 
 ### Community 49 - "test_market.py"
-Cohesion: 0.06
-Nodes (39): A sample alien contact for the screenshot harness (UI_MOCKUPS.md §6).      A fri, The Terra Nova orbit scene (UI_MOCKUPS.md §3) for the screenshot harness., sample_contact(), sample_planet(), EncounterScreen, _outcome_note(), ComposeResult, Pressed (+31 more)
+Cohesion: 0.05
+Nodes (45): A sample alien contact for the screenshot harness (UI_MOCKUPS.md §6).      A fri, The Terra Nova orbit scene (UI_MOCKUPS.md §3) for the screenshot harness., sample_contact(), sample_planet(), EncounterScreen, _outcome_note(), ComposeResult, Pressed (+37 more)
 
 ### Community 50 - "generate_with_player"
 Cohesion: 0.11
@@ -522,11 +524,11 @@ Nodes (38): One outbound warp — the single, information-rich warp affordance (
 
 ### Community 57 - "combat.py"
 Cohesion: 0.04
-Nodes (115): _anchor_discovery_object(), _entity_object(), _face(), _glyph_requests(), _placement_order(), _placement_region(), _planet_object(), _port_ladder_subtype() (+107 more)
+Nodes (117): _anchor_discovery_object(), _entity_object(), _face(), _glyph_requests(), _placement_order(), _placement_region(), _planet_object(), _port_ladder_subtype() (+109 more)
 
 ### Community 58 - "LocalMapDTO"
 Cohesion: 0.02
-Nodes (155): ABC, BaseException, CronFn, CronResolver, Fewest-hop path from `src` to `dst` (inclusive), or None if unreachable.      BF, shortest_path(), The pure reducer for a persisted cron name (raises on an unknown name)., resolve_cron() (+147 more)
+Nodes (161): ABC, BaseException, CronFn, CronResolver, Fewest-hop path from `src` to `dst` (inclusive), or None if unreachable.      BF, shortest_path(), The pure reducer for a persisted cron name (raises on an unknown name)., resolve_cron() (+153 more)
 
 ### Community 59 - "test_multiplayer.py"
 Cohesion: 0.13
@@ -541,16 +543,16 @@ Cohesion: 0.04
 Nodes (85): CitadelError, Exception, A citadel build/treasury operation was rejected (raised by the reducers)., Exception, A JSON-RPC error returned by the server (a rules rejection or a transport fault), A remote rules rejection compatible with every local rule-error catch.      JSON, RemoteError, RemoteRulesError (+77 more)
 
 ### Community 62 - "fractal_noise"
-Cohesion: 0.06
-Nodes (54): _can_hold_a_people(), _Cast, ground_target_counts(), _guarantee_targets(), _inhabitant(), is_assaultable_for_a_fresh_player(), is_friendly_inhabited(), Random (+46 more)
+Cohesion: 0.04
+Nodes (103): _can_hold_a_people(), _Cast, ground_target_counts(), _guarantee_targets(), _inhabitant(), is_assaultable_for_a_fresh_player(), is_friendly_inhabited(), Random (+95 more)
 
 ### Community 63 - "RecordingRunner"
-Cohesion: 0.04
-Nodes (108): _cell_box(), ConfiguredArtGeometryCatalog, continuous_category(), Any, Loads `edge/art/geometry_catalog.json` into `edge.scene.catalog.ArtGeometryCatal, The real, production `ArtGeometryCatalog`: laddered ship/port rungs     from the, Map a `PhysicalObject.continuous_kind` (a planet `ptype`, a discovery     `kind`, _apply_treatment() (+100 more)
+Cohesion: 0.03
+Nodes (123): _cell_box(), ConfiguredArtGeometryCatalog, continuous_category(), load_geometry_catalog(), Any, Path, Loads `edge/art/geometry_catalog.json` into `edge.scene.catalog.ArtGeometryCatal, The real, production `ArtGeometryCatalog`: laddered ship/port rungs     from the (+115 more)
 
 ### Community 64 - "LandingAnimationMixin"
 Cohesion: 0.02
-Nodes (70): Open the `I` status drawer (WP-UI12): the full ship readout plus a focusable, ComposeResult, Picked, StatusDrawerScreen — the `I` status drawer (UI_UX_OVERHAUL_PLAN.md WP-UI12).  A, Walk object rows only; the ship readout is deliberately skipped., StatusDrawerScreen, accel_title(), _code_markup() (+62 more)
+Nodes (73): Open the `I` status drawer (WP-UI12): the full ship readout plus a focusable, ComposeResult, Picked, StatusDrawerScreen — the `I` status drawer (UI_UX_OVERHAUL_PLAN.md WP-UI12).  A, Walk object rows only; the ship readout is deliberately skipped., StatusDrawerScreen, accel_title(), _code_markup() (+65 more)
 
 ### Community 65 - "BaseScreen"
 Cohesion: 0.05
@@ -574,7 +576,7 @@ Nodes (22): bearing(), _bfs_tree(), compute_embedding(), _leaf_weights(), Seeded
 
 ### Community 70 - "test_numbering.py"
 Cohesion: 0.03
-Nodes (88): build_graph(), generate(), Build the warp graph and return its adjacency plus the region groups., Generate a validated universe from `(seed, config)`; raise on repeated failure., assign_spiral_spatial_ids(), Assign the spiral's contiguous display sequence beginning at ``S10001``.      Un, bfs_distances(), Forward hop distance from `src` to every reachable sector.      Accepts any int- (+80 more)
+Nodes (89): build_graph(), generate(), Build the warp graph and return its adjacency plus the region groups., Generate a validated universe from `(seed, config)`; raise on repeated failure., assign_spiral_spatial_ids(), Assign the spiral's contiguous display sequence beginning at ``S10001``.      Un, bfs_distances(), Forward hop distance from `src` to every reachable sector.      Accepts any int- (+81 more)
 
 ### Community 71 - "assault.py"
 Cohesion: 0.07
@@ -626,7 +628,7 @@ Nodes (12): FindKind, Random, Shared archaeological find identities promoted fro
 
 ### Community 84 - "PlaytestService"
 Cohesion: 0.04
-Nodes (103): Assemble the player's `SeizureProgress` against a bloc's ladder (pure; WP50)., seizure_progress(), AllianceConfig, One alliance / rival bloc in the roster (DESIGN §6.3).      Joinability (WP38):, A Core-seizure ladder is meaningful only on a `covets_core` bloc (§6.3, WP50)., AllianceLeadershipChanged, GovernanceChanged, Core Space changed hands to a new governing alliance (§6.3, §4.2, WP49).      `c (+95 more)
+Nodes (103): The player's progress toward championing a bloc into the Core (§6.3, WP50)., Assemble the player's `SeizureProgress` against a bloc's ladder (pure; WP50)., seizure_progress(), SeizureProgress, AllianceConfig, A `covets_core` bloc's Core-seizure ladder (DESIGN §6.3, WP50).      The price a, One alliance / rival bloc in the roster (DESIGN §6.3).      Joinability (WP38):, A Core-seizure ladder is meaningful only on a `covets_core` bloc (§6.3, WP50). (+95 more)
 
 ### Community 85 - "survey.py"
 Cohesion: 0.06
@@ -689,16 +691,16 @@ Cohesion: 0.19
 Nodes (26): _begin(), _land(), _op(), GW-WP06 — authoritative survey actions, persistence, and reward settlement.  Dri, A march used to stop the instant fresh disturbed ground came into sight — cheap, GW-WP13-FU1: a settlement gives its one hint and no more, even if unhinted sites, A silently-dropped `SurveyOperation`/`SurveyProgress` field resets to its defaul, Set the shuttle down on the generated landing zone (GW-WP07-FU2).      Choosing (+18 more)
 
 ### Community 100 - "ComputerScreen"
-Cohesion: 0.02
-Nodes (67): AllianceRowDTO, One bloc on the Computer's Alliances tab (§6.3, WP38 — surfaced WP72)., ComputerScreen, ComposeResult, Picked, Pressed, TabActivated, Repaint the Route tab from the plotted `RouteDTO` (or the empty state). (+59 more)
+Cohesion: 0.03
+Nodes (56): AllianceRowDTO, One bloc on the Computer's Alliances tab (§6.3, WP38 — surfaced WP72)., ComputerScreen, ComposeResult, Picked, Pressed, TabActivated, Repaint the Route tab from the plotted `RouteDTO` (or the empty state). (+48 more)
 
 ### Community 101 - "test_cli.py"
 Cohesion: 0.15
 Nodes (31): CaptureFixture, _demo_save(), _header(), _list_output(), MonkeyPatch, Path, WP9 — the `python -m edge.bigbang` CLI inspector (DESIGN §5)., Rich pads rows to the table width; the renderer strips that so output diffs (+23 more)
 
 ### Community 102 - "_DockStructureArt"
-Cohesion: 0.03
-Nodes (98): admission_met(), admission_tasks_done(), _alliance_key(), alliance_rivals(), alliance_standing(), apply_join_standing(), apply_resign_standing(), attitude_offset() (+90 more)
+Cohesion: 0.04
+Nodes (92): admission_met(), admission_tasks_done(), _alliance_key(), alliance_rivals(), alliance_standing(), apply_join_standing(), apply_resign_standing(), attitude_offset() (+84 more)
 
 ### Community 103 - "TextPrompt"
 Cohesion: 0.25
@@ -725,8 +727,8 @@ Cohesion: 0.04
 Nodes (76): Console, _archetype_paged_sheets(), banner(), _export_all_types(), main(), ArgumentParser, Namespace, Text (+68 more)
 
 ### Community 109 - "model_validator"
-Cohesion: 0.08
-Nodes (52): DataObject, accrue_interest(), deposit(), execute_trade(), haggle_acceptance_probability(), HaggleResult, improvement_fraction(), Random (+44 more)
+Cohesion: 0.09
+Nodes (50): DataObject, accrue_interest(), deposit(), execute_trade(), haggle_acceptance_probability(), HaggleResult, improvement_fraction(), Random (+42 more)
 
 ### Community 110 - "market_settlement"
 Cohesion: 0.08
@@ -750,7 +752,7 @@ Nodes (53): range, generate_with_player(), Any, `generate()` then `enroll()` —
 
 ### Community 115 - "webviz.py"
 Cohesion: 0.02
-Nodes (231): _pick_planet(), A Survey-access world in already-charted space, with something left to find., advance_build(), building(), citadel_foe(), has_gun(), level_config(), _levels() (+223 more)
+Nodes (227): _pick_planet(), A Survey-access world in already-charted space, with something left to find., advance_build(), building(), citadel_foe(), has_gun(), level_config(), _levels() (+219 more)
 
 ### Community 116 - "_Rect"
 Cohesion: 0.39
@@ -770,7 +772,7 @@ Nodes (16): concourse_asset(), Path, Text, Static Stardock service raster select
 
 ### Community 120 - "ServiceHub"
 Cohesion: 0.04
-Nodes (91): DrawFn, EconomyConfig, Economy constants (DESIGN §8). All latinum figures in slips., The pricing inputs for one commodity., The Stardock latinum price for a component tier, or None if barter-only., port_unit_price(), Quoted price for a line using the economy config's per-commodity tunables., _with_stock() (+83 more)
+Nodes (93): DrawFn, EconomyConfig, Economy constants (DESIGN §8). All latinum figures in slips., The pricing inputs for one commodity., The Stardock latinum price for a component tier, or None if barter-only., port_unit_price(), Move stock `regen_frac` of the way toward `desired_frac * capacity`., Quoted price for a line using the economy config's per-commodity tunables. (+85 more)
 
 ### Community 121 - "PlaytestControls"
 Cohesion: 0.10
@@ -798,7 +800,7 @@ Nodes (67): A deterministic offline backend — emits a minimal valid grammar (d
 
 ### Community 127 - "art/terrain.py"
 Cohesion: 0.04
-Nodes (51): One subsystem panel: its derived aspect and its slot grid (§4.1)., Subsystem, EmptyState, Swap the copy in place (e.g. 'nothing here' vs 'nothing matches')., A consistent 'nothing here' block: what is empty and what fills it., _BayPanel, ComponentWorkbench, ComponentWorkbenchProfile (+43 more)
+Nodes (52): One subsystem panel: its derived aspect and its slot grid (§4.1)., Subsystem, EmptyState, Any, Swap the copy in place (e.g. 'nothing here' vs 'nothing matches')., A consistent 'nothing here' block: what is empty and what fills it., _BayPanel, ComponentWorkbench (+44 more)
 
 ### Community 128 - "Work packages"
 Cohesion: 0.06
@@ -833,8 +835,8 @@ Cohesion: 0.12
 Nodes (11): _FlashHost, LandingAnimationMixin, Any, Protocol, Text, Rebuild per-cell lookup dicts; called once whenever `view`'s identity changes., Screen-specific components beyond `id(view)` that must also force a rebuild., What `FlashTrackerMixin` needs from the `Screen` it is mixed into. (+3 more)
 
 ### Community 137 - "sysop_password"
-Cohesion: 0.04
-Nodes (27): _as_int(), Clamp an over-cap typed value back to `maximum` in place, so the field can, FieldPrompt, Any, ComposeResult, Pressed, Static, Submitted (+19 more)
+Cohesion: 0.05
+Nodes (25): _as_int(), Clamp an over-cap typed value back to `maximum` in place, so the field can, FieldPrompt, ComposeResult, Pressed, Static, Submitted, The shared one-field prompt: inline validation, no silent failures.      Subclas (+17 more)
 
 ### Community 138 - "1. Category A — Deliberate seams from the session logs (status verified)"
 Cohesion: 0.11
@@ -989,8 +991,8 @@ Cohesion: 0.10
 Nodes (19): 0.1 The current sizing dependency graph is not one chain, 0. As implemented: operational rule tree (audit 2026-08-31), 10. The physical model now matches this composer's station sizes (WP-SC12), 1. The premise: a viewport, not a form, 2.1 Traffic reads its depth off the ladder, 2. The scale chains, 3. Placement: why each thing goes where it goes, 4.1 Docked station headers (+11 more)
 
 ### Community 177 - "Lead"
-Cohesion: 0.15
-Nodes (7): ListPicker, ComposeResult, Picked, `options` are (markup label, ref) rows; the ref comes back on dismiss., The shared ListPicker is fully keyboard-driven: ↑/↓ move the highlight,     Ente, test_list_picker_keyboard_navigation(), test_list_picker_uses_shared_modal_box_and_fits_80x24()
+Cohesion: 0.14
+Nodes (33): natural_fallback_dimensions(), The richest complete authored rung's natural `(width, height)` for a     direct-, _arrangement(), _belt_object(), _entity_object(), _placement(), _planet_object(), _port_object() (+25 more)
 
 ### Community 178 - "_Rect"
 Cohesion: 0.13
@@ -1113,8 +1115,8 @@ Cohesion: 0.31
 Nodes (12): _drop_entity(), _inject(), _knows_a_far_discovery(), Phase-4 — the intel "map" mechanic end to end through the reducers (DESIGN §6.7), Log-coordinates is a reply on the offer_coordinates node, not the greeting — you, Remove the roaming Entity so a test can isolate the regular coordinate-tip mecha, Point the species' knowledge at a real, reachable, unexplored rare+ discovery., test_accept_lead_without_a_tip_is_rejected() (+4 more)
 
 ### Community 208 - "UniverseState"
-Cohesion: 0.05
-Nodes (90): A named cluster from generation (DESIGN §4/§5)., Region, computer_view(), _contracts_view(), engine_room_view(), _event_player(), _event_turn_cost(), event_visible_to() (+82 more)
+Cohesion: 0.04
+Nodes (95): build_subsystems(), Subsystem, Instantiate a hull's starting subsystems from its config layout (§4.1).      Ret, A named cluster from generation (DESIGN §4/§5)., Region, computer_view(), _contracts_view(), engine_room_view() (+87 more)
 
 ### Community 209 - "GroundPlace"
 Cohesion: 0.03
@@ -1129,8 +1131,8 @@ Cohesion: 0.33
 Nodes (5): LiveSysopService, Any, Event, Blocking `apply(player_id, DevPatch)` facade over the hosted admin RPC., Apply an intervention to the authoritative live game as the target player.
 
 ### Community 214 - "load_config"
-Cohesion: 0.04
-Nodes (79): load_geometry_catalog(), Path, Build the real, injectable `ArtGeometryCatalog`: the checked-in ladder     file, build_continuous_yields(), build_scene_tuning(), _cell_box(), Construct the per-kind `ContinuousYield` envelopes (calibration §2)     that `ed, Construct the frozen `SceneTuning` bundle from validated config.      A near-mec (+71 more)
+Cohesion: 0.11
+Nodes (30): build_continuous_yields(), build_scene_tuning(), _cell_box(), Construct the per-kind `ContinuousYield` envelopes (calibration §2)     that `ed, Construct the frozen `SceneTuning` bundle from validated config.      A near-mec, load_config(), Load and validate a YAML game config from `path`.      A `roster_file:` pointer, _default_physical_model() (+22 more)
 
 ### Community 215 - "test_ground_render_glyph_widths.py"
 Cohesion: 0.25
@@ -1176,17 +1178,25 @@ Nodes (6): 0. Strategy decision: deferred (2026-09-03), 1. Current composer base
 Cohesion: 0.22
 Nodes (10): _deterministic_color_env(), _isolated_save_dir(), Any, MonkeyPatch, Path, Shared pytest fixtures., Point the TUI save slot at a per-test scratch dir.      `EdgeApp.start_new_game`, Pin terminal color detection so snapshot captures are machine-independent. (+2 more)
 
+### Community 249 - "derive_aspects"
+Cohesion: 0.10
+Nodes (23): player_foe(), Build the combat foe for a *defending player's* live ship (§14, WP67 — attacker-, _counts(), derive_aspects(), Ship, (active component count, summed tier bonus) for a subsystem's filled slots., Compute the derived scalars for `ship` from its subsystems (§4.1).      A hull w, Suits of every class carried. (+15 more)
+
+### Community 250 - "sync_sprite_art.py"
+Cohesion: 0.47
+Nodes (9): check(), designer_commit(), Path, Sync the runtime sprite-art package and assets from a designer checkout., relative(), sha256(), sync(), tracked_files() (+1 more)
+
 ### Community 251 - "test_sig_corpus.py"
 Cohesion: 0.08
 Nodes (46): AssaultExpeditionDTO, Fog-safe, selected-actor-aware tactical assault view (GW-WP12).      The server, The active operation's fog-safe viewport, or ``None`` while in orbit., AssaultResultModal, The settled outcome of an assault that has already resolved (win or loss)., _dropped(), A one-sector, droppable hostile world (mirrors `test_groundwar_access.py`'s, Every `fire_at`/`do_jump` already refuses once `battle.outcome` is set, but (+38 more)
 
-### Community 256 - "Debris"
+### Community 252 - "Debris"
 Cohesion: 0.40
-Nodes (4): One cell of rocky debris (belt scenarios). Blocks fire lines and wings;     dest, Rock, Scatter rocky-debris clumps across the midfield (belt scenarios) — a     random-, seed_rocks()
+Nodes (4): Debris, One cell of drifting wreckage (graveyard scenarios). Blocks fire lines     and s, Scatter drifting-wreckage clumps across the midfield (graveyard     scenarios) —, seed_debris()
 
 ### Community 259 - "tui/app.py"
 Cohesion: 0.02
-Nodes (126): EdgeApp, Any, Resize, Screen, The screen `on_mount` pushes for local (non-remote-play) sessions.          A se, Recompute the layout tier and apply its class across the screen stack., Push, then stamp the current tier class on the new screen (WP-UI07).          Mo, Overlay the below-minimum notice under 80×24; pop it on regrowth (WP-UI05). (+118 more)
+Nodes (127): EdgeApp, Any, Resize, Screen, The screen `on_mount` pushes for local (non-remote-play) sessions.          A se, Recompute the layout tier and apply its class across the screen stack., Push, then stamp the current tier class on the new screen (WP-UI07).          Mo, Overlay the below-minimum notice under 80×24; pop it on regrowth (WP-UI05). (+119 more)
 
 ### Community 263 - "_load"
 Cohesion: 0.40
@@ -1204,11 +1214,11 @@ Nodes (6): GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouet
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `GameConfig` connect `OutEdges` to `Commodity`, `authoring/cli.py`, `shortest_path`, `dto.py`, `encounters.py`, `_load`, `backends.py`, `test_groundwar_force.py`, `PlanetScreen`, `SqliteRepository`, `groundwar/interior.py`, `SpiralTopology`, `GroundExpeditionScreen`, `reduce`, `sysop.py`, `GameConfig`, `test_terrain_bands.py`, `load_default_config`, `fractal_noise`, `contracts.py`, `ground_assault.py`, `economy.py`, `AssaultOperation`, `conftest.py`, `groundwar/app.py`, `Game`, `generate_with_player`, `ServiceProtocol`, `test_groundwar_access.py`, `LocalMapDTO`, `core/config.py`, `fractal_noise`, `test_service.py`, `test_numbering.py`, `assault.py`, `test_groundwar_settlement.py`, `UniverseState`, `GroundPlace`, `PlaytestService`, `survey.py`, `load_config`, `enums.py`, `TopologyModeConfig`, `test_groundwar_survey_actions.py`, `test_groundwar_assault.py`, `_computer_view`, `AlienSpecies`, `render_stardock_art`, `_DockStructureArt`, `TextPrompt`, `_luminance`, `test_engine.py`, `Ownership`, `webviz.py`, `TavernDTO`, `TerritoryScreen`, `MarketDTO`, `test_ui_base_keys.py`, `ServiceHub`, `sysop.py`?**
+- **Why does `GameConfig` connect `OutEdges` to `Commodity`, `authoring/cli.py`, `shortest_path`, `dto.py`, `encounters.py`, `_load`, `backends.py`, `test_groundwar_force.py`, `PlanetScreen`, `SqliteRepository`, `groundwar/interior.py`, `SpiralTopology`, `GroundExpeditionScreen`, `reduce`, `sysop.py`, `GameConfig`, `test_terrain_bands.py`, `load_default_config`, `fractal_noise`, `contracts.py`, `ground_assault.py`, `AssaultOperation`, `conftest.py`, `groundwar/app.py`, `Game`, `generate_with_player`, `ServiceProtocol`, `test_groundwar_access.py`, `LocalMapDTO`, `core/config.py`, `fractal_noise`, `test_service.py`, `test_numbering.py`, `assault.py`, `test_groundwar_settlement.py`, `UniverseState`, `GroundPlace`, `PlaytestService`, `survey.py`, `load_config`, `enums.py`, `TopologyModeConfig`, `test_groundwar_survey_actions.py`, `test_groundwar_assault.py`, `_computer_view`, `AlienSpecies`, `render_stardock_art`, `_DockStructureArt`, `TextPrompt`, `_luminance`, `test_engine.py`, `Ownership`, `webviz.py`, `TavernDTO`, `TerritoryScreen`, `MarketDTO`, `test_ui_base_keys.py`, `ServiceHub`, `derive_aspects`, `sysop.py`?**
   _High betweenness centrality (0.121) - this node is a cross-community bridge._
-- **Why does `Commodity` connect `Commodity` to `OutEdges`, `encounters.py`, `test_mechanics.py`, `backends.py`, `sysop_password`, `test_devtool.py`, `test_groundwar_force.py`, `test_net.py`, `EdgeApp`, `SqliteRepository`, `test_bigbang_inhabitants.py`, `GameService`, `BaseModel`, `BigBangConfig`, `SpiralTopology`, `reduce`, `test_terrain_bands.py`, `load_default_config`, `fractal_noise`, `_SceneComposer`, `ground_assault.py`, `test_groundwar_cloud_city_assault_tactics.py`, `economy.py`, `AssaultOperation`, `conftest.py`, `BattleScreen`, `AlienContactScreen`, `test_groundwar_access.py`, `test_pvp.py`, `LocalMapDTO`, `test_multiplayer.py`, `core/config.py`, `fractal_noise`, `LandingAnimationMixin`, `test_service.py`, `assault.py`, `test_groundwar_settlement.py`, `ActionCatalog`, `UniverseState`, `PlaytestService`, `load_config`, `test_dialogue_playtest.py`, `GameClient`, `enums.py`, `_computer_view`, `AmountStepper`, `ComputerScreen`, `_DockStructureArt`, `_luminance`, `test_engine.py`, `model_validator`, `test_discovery_names.py`, `webviz.py`, `TavernDTO`, `TerritoryScreen`, `test_ui_base_keys.py`, `MarketDTO`, `ServiceHub`, `sysop.py`, `brain.py`, `art/terrain.py`?**
+- **Why does `Commodity` connect `Commodity` to `OutEdges`, `encounters.py`, `test_mechanics.py`, `backends.py`, `sysop_password`, `test_devtool.py`, `test_groundwar_force.py`, `test_net.py`, `EdgeApp`, `SqliteRepository`, `test_bigbang_inhabitants.py`, `GameService`, `BaseModel`, `BigBangConfig`, `SpiralTopology`, `reduce`, `test_terrain_bands.py`, `load_default_config`, `fractal_noise`, `_SceneComposer`, `ground_assault.py`, `test_groundwar_cloud_city_assault_tactics.py`, `AssaultOperation`, `conftest.py`, `BattleScreen`, `AlienContactScreen`, `test_groundwar_access.py`, `test_pvp.py`, `LocalMapDTO`, `test_multiplayer.py`, `core/config.py`, `fractal_noise`, `LandingAnimationMixin`, `test_service.py`, `assault.py`, `test_groundwar_settlement.py`, `ActionCatalog`, `UniverseState`, `PlaytestService`, `load_config`, `test_dialogue_playtest.py`, `GameClient`, `enums.py`, `_computer_view`, `AmountStepper`, `ComputerScreen`, `_DockStructureArt`, `_luminance`, `test_engine.py`, `model_validator`, `test_discovery_names.py`, `webviz.py`, `TavernDTO`, `TerritoryScreen`, `test_ui_base_keys.py`, `MarketDTO`, `ServiceHub`, `derive_aspects`, `sysop.py`, `brain.py`, `art/terrain.py`?**
   _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `UniverseState` connect `OutEdges` to `Commodity`, `shortest_path`, `dto.py`, `encounters.py`, `test_mechanics.py`, `backends.py`, `test_groundwar_force.py`, `SqliteRepository`, `GameService`, `inspect.py`, `BigBangConfig`, `SpiralTopology`, `GroundExpeditionScreen`, `reduce`, `test_terrain_bands.py`, `load_default_config`, `contracts.py`, `ground_assault.py`, `economy.py`, `AssaultOperation`, `conftest.py`, `groundwar/app.py`, `Game`, `generate_with_player`, `ServiceProtocol`, `test_groundwar_access.py`, `LocalMapDTO`, `fractal_noise`, `test_service.py`, `test_numbering.py`, `assault.py`, `ActionCatalog`, `test_engine_room.py`, `CorpPanels`, `UniverseState`, `playtest.py`, `PlaytestService`, `survey.py`, `enums.py`, `GameClient`, `_computer_view`, `test_dialogue.py`, `_DockStructureArt`, `test_engine.py`, `test_groundwar_assault_actions.py`, `model_validator`, `_orbit`, `test_discovery_names.py`, `Ownership`, `TavernDTO`, `webviz.py`, `MarketDTO`, `test_ui_base_keys.py`, `ServiceHub`, `test_sig_corpus.py`?**
+- **Why does `UniverseState` connect `OutEdges` to `Commodity`, `shortest_path`, `dto.py`, `encounters.py`, `test_mechanics.py`, `backends.py`, `test_groundwar_force.py`, `SqliteRepository`, `GameService`, `inspect.py`, `BigBangConfig`, `SpiralTopology`, `GroundExpeditionScreen`, `reduce`, `test_terrain_bands.py`, `load_default_config`, `contracts.py`, `ground_assault.py`, `economy.py`, `AssaultOperation`, `conftest.py`, `groundwar/app.py`, `Game`, `generate_with_player`, `ServiceProtocol`, `test_groundwar_access.py`, `LocalMapDTO`, `fractal_noise`, `test_service.py`, `test_numbering.py`, `assault.py`, `ActionCatalog`, `test_engine_room.py`, `CorpPanels`, `UniverseState`, `playtest.py`, `PlaytestService`, `survey.py`, `enums.py`, `GameClient`, `_computer_view`, `test_dialogue.py`, `_DockStructureArt`, `test_engine.py`, `test_groundwar_assault_actions.py`, `model_validator`, `_orbit`, `test_discovery_names.py`, `Ownership`, `TavernDTO`, `webviz.py`, `MarketDTO`, `test_ui_base_keys.py`, `ServiceHub`, `derive_aspects`, `test_sig_corpus.py`?**
   _High betweenness centrality (0.058) - this node is a cross-community bridge._
 - **Are the 181 inferred relationships involving `GameConfig` (e.g. with `HomeClusterError` and `BigBangError`) actually correct?**
   _`GameConfig` has 181 INFERRED edges - model-reasoned connections that need verification._

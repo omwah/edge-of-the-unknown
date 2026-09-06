@@ -4045,8 +4045,8 @@
     "semantic_hash": ""
   },
   "docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md": {
-    "mtime": 1788703574.6594913,
-    "ast_hash": "13f078ed17d384c04088e31a14bdd389",
+    "mtime": 1788704917.5863783,
+    "ast_hash": "b433e42b384fa18c554dd36ca1dc2941",
     "semantic_hash": ""
   },
   "edge/scene/classify.py": {
@@ -4165,8 +4165,8 @@
     "semantic_hash": ""
   },
   "tests/test_scene_joint_placement.py": {
-    "mtime": 1788680832.60037,
-    "ast_hash": "a9726d7cb02f3a28de88f7db839f652c",
+    "mtime": 1788704584.0791771,
+    "ast_hash": "8d4a8ee383c77c7cd64e18a4a576f0a4",
     "semantic_hash": ""
   },
   "tests/test_scene_size_and_drops.py": {
@@ -4175,13 +4175,18 @@
     "semantic_hash": ""
   },
   "edge/devtool/scene_parity.py": {
-    "mtime": 1788681599.4350595,
-    "ast_hash": "7e5e8871a82c05b611bff3770c9da60e",
+    "mtime": 1788704699.5165157,
+    "ast_hash": "23060bac1267d56ed51a71e3606532cb",
     "semantic_hash": ""
   },
   "tests/test_scene_legacy_parity.py": {
-    "mtime": 1788680448.814795,
-    "ast_hash": "94e2765650e890685a5b4ab5b17dd996",
+    "mtime": 1788704760.065192,
+    "ast_hash": "d2e8afb933113aa9efe0de8e83b7fa4c",
+    "semantic_hash": ""
+  },
+  "docs/scene_parity_baseline.json": {
+    "mtime": 1788704882.3947995,
+    "ast_hash": "68f3e6e7a87c368ceeee7b3f6afae5bb",
     "semantic_hash": ""
   }
 }
