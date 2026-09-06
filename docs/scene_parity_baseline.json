@@ -6127,16 +6127,16 @@
         "rung": 1
       },
       {
-        "slot": "ship:Kalt Corvette",
-        "kind": "ship",
-        "width": 17,
-        "height": 3,
-        "rung": null
-      },
-      {
         "slot": "ship:Vesk Trader",
         "kind": "ship",
         "width": 48,
+        "height": 5,
+        "rung": null
+      },
+      {
+        "slot": "ship:Kalt Corvette",
+        "kind": "ship",
+        "width": 36,
         "height": 5,
         "rung": null
       }

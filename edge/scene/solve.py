@@ -666,6 +666,40 @@ def _station_target_height(
     return target.target_height(viewport, cfg.station_size_reference, parented=parented)
 
 
+
+def _prefer_clear_of_anchor(
+    order: tuple[int, ...],
+    slots: tuple[tuple[int, int], ...],
+    box: CellBox,
+    obj: PhysicalObject,
+    placed: list[_PlacedObject],
+    anchor_key: SceneKey,
+    cfg: SceneTuning,
+) -> tuple[int, ...]:
+    """`order` partitioned into slots that clear the anchor's ink and slots
+    that do not, each keeping its original relative order.
+
+    Only ever reorders, so it cannot change what is admissible — every slot in
+    `order` is still tried, and the caller's bounded budget is unchanged. It
+    exists solely so `_separation_exempt`'s allowance (a station may touch the
+    body it orbits) does not become a preference for sitting on top of it.
+    """
+    if not cfg.station_target_by_scale_class:
+        return order
+    if obj.scale_class not in cfg.station_target_by_scale_class:
+        return order
+    anchor = next((p for p in placed if p.obj.key == anchor_key), None)
+    if anchor is None:
+        return order
+    clear: list[int] = []
+    over: list[int] = []
+    for index in order:
+        col, row = slots[index]
+        probe = CellBox(col, row, box.width, box.height)
+        (over if _rect_gap(probe, anchor.ink_max_inflated) < 0 else clear).append(index)
+    return tuple((*clear, *over))
+
+
 def _evaluate_placement(
     obj: PhysicalObject,
     pos: Vec3,
@@ -992,6 +1026,19 @@ def _attempt(
                 if not slots:
                     continue
                 order = _shuffled(obj.key, f"slot|{z}", len(slots))
+                # The separation exemption (`_separation_exempt`) lets a
+                # station *touch* the scene anchor; it should not make one
+                # settle on the anchor's face when there is clear sky. Slots
+                # that clear the anchor's ink outright are tried first, in the
+                # unchanged `_shuffled` order, and the overlapping ones only
+                # after -- so a crowded scene still admits the station (which
+                # is what the exemption is for) while an uncrowded one berths
+                # it beside the body, the way the legacy composer does. This is
+                # candidate ordering only; nothing is newly refused, and the
+                # partition is an integer rectangle test (§4.1).
+                order = _prefer_clear_of_anchor(
+                    order, slots, bounds_probe, obj, placed, anchor_key, cfg
+                )
                 for index in order:
                     if budget <= 0:
                         break
