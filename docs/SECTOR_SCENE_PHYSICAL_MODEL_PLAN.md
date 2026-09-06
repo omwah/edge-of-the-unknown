@@ -2175,6 +2175,24 @@ may sit against the body but never bury it — and `min_visible_fraction` for
 since "the anchor is never partially occluded" was an assumption the arrival
 view has never actually honoured.
 
+*6b. ...but the exemption should not become a preference.* Letting a station
+touch the anchor made an uncrowded scene berth it on the anchor's face, which
+is the very placement the legacy composer's own comments call wrong ("at 0.55
+the station sat across the body's middle and read as pinned to its face rather
+than orbiting beneath it"). `_prefer_clear_of_anchor` partitions the slot
+lattice so anchor-clearing slots are tried first, in the unchanged `_shuffled`
+order, with overlapping ones after — ordering only, so nothing is newly
+refused and the per-object budget is untouched. Measured: it reorders 80 of
+4540 station slot walks and moves 5 of the 104 rendered stations, all in
+`belt+...` scenes, with identical sizes and no admission change. It cannot
+fire in a `planet+...` scene: a 60x30 su anchor projects `w = 4h`, so the
+planet's request box spans essentially the full canvas width at every
+calibrated viewport and *every* slot overlaps it. A station beside a planet
+therefore still renders over the disc — as it does in the legacy composer,
+which berths it overlapping the disc's bounding box on purpose, though at the
+lower limb rather than wherever the lattice lands. Placement parity is not
+part of the acceptance bar and is not claimed here.
+
 *7. Station size had no target at all.* Rung selection served whatever depth the
 joint placement happened to reach. `SceneTuning.station_target_by_scale_class`
 now gives each station class a target **projected ink height** — §4.13's "soft
