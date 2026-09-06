@@ -9,8 +9,24 @@ its own `tests/__snapshots__/test_physical_scene_snapshots/` directory —
 nothing under `tests/__snapshots__/test_ui_snapshots/` (or any other existing
 snapshot directory) is read or written by this file.
 
-Regenerate accepted baselines with `pytest --snapshot-update
-tests/test_physical_scene_snapshots.py`.
+Regenerate accepted baselines with a *preceding* module that has already
+started a real `EdgeApp`::
+
+    pytest --snapshot-update tests/test_onboarding.py \
+                             tests/test_physical_scene_snapshots.py
+
+Running `--snapshot-update` on this file **alone** records a wrong baseline,
+and the mistake is invisible until the next full-suite run. Rich decides its
+colour system from the environment once and caches it; until some earlier test
+has driven a Textual app, the export comes back essentially unstyled -- 34
+`<text>` nodes and 2 palette classes against the 1236-1341 nodes and 10
+classes the same scene produces inside the suite. Only the *styling* differs
+(the glyph layout is identical either way), but `snap_compare` is a byte
+comparison, so a baseline recorded in isolation fails in the suite and vice
+versa. The suite is the environment that matters, so the baselines here are
+recorded to match it. `tests/test_ui_snapshots.py` never hit this because it
+sorts last and so has always been recorded with the suite's colour system
+already warm.
 """
 
 from __future__ import annotations
