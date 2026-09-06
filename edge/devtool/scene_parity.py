@@ -47,7 +47,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from edge.art.geometry_catalog import load_geometry_catalog
@@ -424,8 +424,8 @@ def main() -> None:
                 [
                     {
                         "scene": cell.scene_id,
-                        "legacy": [vars(e) for e in cell.legacy],
-                        "physical": [vars(e) for e in cell.physical],
+                        "legacy": [asdict(e) for e in cell.legacy],
+                        "physical": [asdict(e) for e in cell.physical],
                         "missing": list(cell.missing),
                         "extra": list(cell.extra),
                         "size_mismatch": [list(m) for m in cell.size_mismatch],
