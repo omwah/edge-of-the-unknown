@@ -53,12 +53,23 @@ from edge.scene.model import (
     WorldArrangement,
 )
 
-SCALE_CLASSES: tuple[str, ...] = ("entity", "anchor", "belt", "orbital", "ship", "wreck")
+SCALE_CLASSES: tuple[str, ...] = (
+    "entity", "anchor", "belt", "stardock", "orbital", "ship", "wreck",
+)
 """The closed, plan-fixed set of `scale_class` values this classifier assigns.
 
 `SceneTuning.face_extent_by_scale_class` and `.region_by_scale_class` must
 supply an entry for every class this classifier actually reaches at
-runtime (fewer, if a sector never contains e.g. a wreck)."""
+runtime (fewer, if a sector never contains e.g. a wreck).
+
+`"stardock"` splits the one *headline* station off the shared `"orbital"`
+bucket (plan §2.2's `Stardock > starbase > port` ordering, and AGENTS.md's
+"Planets & orbital starbases": Stardock is Core Space's flagship location and
+the only place full subsystem swaps and colonist enlistment happen). It is a
+scale class, not a retention tier: Stardock is still `SceneRetention.ORBITAL`
+and still competes for admission exactly like any other station. What differs
+is its nominal face area, and therefore the projected box it asks for and the
+authored rung that box can clear."""
 
 _ANCHOR_DISCOVERY_KINDS = frozenset({"nebula", "black_hole", "wormhole"})
 """Sector-space anchor-scale phenomena (plan §2.1, §2.2)."""
@@ -155,11 +166,17 @@ def _port_ladder_subtype(port: SectorPortDTO) -> str:
 def _port_object(
     port: SectorPortDTO, tuning: SceneTuning, parent: SceneKey | None
 ) -> PhysicalObject:
+    # `SectorPortDTO.is_stardock` is the only signal distinguishing the
+    # flagship from an ordinary trading post, and it already selects a
+    # distinct authored ladder (`_port_ladder_subtype`). It now also selects
+    # a distinct *scale class*, so the richer ladder is actually reachable --
+    # see `SCALE_CLASSES`.
+    scale_class = "stardock" if port.is_stardock else "orbital"
     return PhysicalObject(
         key=SceneKey("port", port.port_id),
         parent=parent,
-        face=_face(tuning, "orbital", FaceShape.RECT),
-        scale_class="orbital",
+        face=_face(tuning, scale_class, FaceShape.RECT),
+        scale_class=scale_class,
         art_mode=ArtMode.LADDER,
         ladder_key=LadderKey(
             kind="port",
@@ -172,7 +189,7 @@ def _port_object(
         retention=SceneRetention.ORBITAL,
         hostility_ordinal=0,
         threat_rank=0,
-        region=_region(tuning, "orbital"),
+        region=_region(tuning, scale_class),
         flexible=True,
         occludes=True,
         label=port.name,

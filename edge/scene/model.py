@@ -219,7 +219,7 @@ class SceneTuning:
     inventing a number itself: every face extent and placement region is a
     lookup by `PhysicalObject.scale_class`, never a literal in classifier
     code. `scale_class` values are plan-fixed strings (`"entity"`, `"anchor"`,
-    `"belt"`, `"orbital"`, `"ship"`, `"wreck"`), not free-form config keys —
+    `"belt"`, `"stardock"`, `"orbital"`, `"ship"`, `"wreck"`), not free-form config keys —
     see `edge.scene.classify.SCALE_CLASSES`.
     """
 

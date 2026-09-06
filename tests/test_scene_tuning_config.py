@@ -39,7 +39,7 @@ def test_default_yaml_loads_and_validates_physical_model() -> None:
     cfg = _cfg()
     pm = cfg.scene.physical_model
     assert isinstance(pm, ScenePhysicalModelConfig)
-    assert pm.cost_budget == 250
+    assert pm.cost_budget == 800
     assert pm.max_camera_candidates == 64
 
 
@@ -129,7 +129,7 @@ def test_build_scene_tuning_matches_config_exactly() -> None:
     assert tuning.min_projected_cells_by_scale_class["orbital"] == (3, 2)
     assert tuning.separation_margin == 1
     assert tuning.min_visible_fraction_by_scale_class["entity"] == Fraction(1, 1)
-    assert tuning.cost_budget == 250
+    assert tuning.cost_budget == 800
     assert tuning.emergency_ship_ceiling == 40
     assert tuning.max_reposition_candidates == 16
     assert tuning.max_glyph_tries == 20

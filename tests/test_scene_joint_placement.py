@@ -418,7 +418,17 @@ def test_stress_inventories_stay_bounded_and_counted(count: int, strategy: Proje
         counters.camera_candidates * (len(objects) + 1) * max(TUNING.max_reposition_candidates, 1)
     )
     assert counters.reposition_candidates <= ceiling
-    assert elapsed < 15.0, f"{count}-ship solve took {elapsed:.1f}s"
+    # A smoke bound, not a §6.4 latency budget (those live in the benchmark on
+    # a controlled machine; §6.2 says CI asserts structural counts, not
+    # wall clock). Raised from 15s when `cost_budget` went 250 -> 800: the old
+    # budget refused every ship past the eighth at the cheap pre-check, so the
+    # stress cases were fast only because they were rendering almost nothing.
+    # At 800 they admit 15-24 ships and the solve is 11-16s locally, which is
+    # plan §6.2 rule 5's "object-count scaling is visible" working as designed
+    # -- and §6.3 files 20/50-ship inventories as future-multiplayer stress,
+    # not a generated-world distribution. Real inventories are unaffected:
+    # 1 ship 10ms/<1ms and 5 ships 48ms/2ms, byte-identical to the old budget.
+    assert elapsed < 40.0, f"{count}-ship solve took {elapsed:.1f}s"
     _assert_hard_rules(plan, objects, CellBox(0, 0, 150, 52))
     # Plan §4.18: a starfield-only plan is valid only when nothing can fit; a
     # busy sector must not produce one.

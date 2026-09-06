@@ -412,27 +412,54 @@ def _shuffled(key: SceneKey, salt: str, count: int) -> tuple[int, ...]:
 
 def _depth_strata(key: SceneKey, z_lo: int, z_hi: int, preferred: tuple[int, ...]) -> tuple[int, ...]:
     """Up to `_DEPTH_STRATA` depths sampled from a feasible z-band `[z_lo,
-    z_hi]`, in a deterministic per-object order, with any `preferred` depths
-    that fall inside the band tried first.
+    z_hi]`, **nearest first**, with any `preferred` depths that fall inside
+    the band tried ahead of them.
 
-    `preferred` carries the object's classified base depth and (on a resize)
-    its depth in the previous plan -- plan §4.11's "minimize ... placement ...
-    change after all hard rules are satisfied", expressed as candidate order
-    rather than as a score term, so it can never overturn a hard rule or a
-    retention decision.
+    `preferred` carries only the object's depth in the previous plan, when
+    there is one -- plan §4.11's "minimize ... placement ... change after all
+    hard rules are satisfied", expressed as candidate order rather than as a
+    score term, so it can never overturn a hard rule or a retention decision.
+
+    Two deliberate changes from the joint-placement redesign's first version,
+    both aimed at the maintainer's "composers never use the larger sizes for
+    the ships even on large screens" report (see the plan's "Ship apparent
+    size" section):
+
+    * the object's **classified base depth is no longer tried first**. For a
+      flexible object that draw is a viewport-independent hash over the whole
+      nominal region (plan §9.3) with no relationship to what the camera can
+      show; it won whenever it happened to land in the feasible band, which
+      pinned ship size to a coin flip. Its x/y counterparts were already
+      unused for flexible objects (the screen-space slot lattice supersedes
+      them), so this is the last vestige of the blind draw.
+    * the sampled depths are ordered **near to far** instead of by a content
+      hash. `z_lo` is the nearest depth the frame can contain, so a
+      near-first walk takes the largest apparent size -- and therefore the
+      richest authored rung -- the frame and the already-placed objects
+      allow, falling back outward only when a nearer depth is actually
+      refused.
+
+    This does not flatten depth variation (plan §4.13, §2.5): placement runs
+    in retention order against committed neighbours, so the first ship takes
+    the near band and every later one is pushed outward by separation.
+    Measured across the gallery matrix, admitted ships still reach 54
+    distinct depths and box heights from 4 to 20 cells under
+    `FixedFovPerspective`, and mean ship box height now *rises* with the
+    canvas (6.3 / 7.1 / 8.4 / 9.1 cells at 67x30 / 87x36 / 120x44 / 150x52)
+    where before it was flat at 5.0-5.4. Screen *position* variety is
+    unaffected -- the slot lattice is still walked in `_shuffled` order.
     """
     if z_hi < z_lo:
         return ()
     span = z_hi - z_lo
     sampled = tuple(z_lo + (span * (2 * i + 1)) // (2 * _DEPTH_STRATA) for i in range(_DEPTH_STRATA))
-    order = _shuffled(key, "depth", len(sampled))
     out: list[int] = []
     for z in preferred:
         if z_lo <= z <= z_hi and z not in out:
             out.append(z)
-    for i in order:
-        if sampled[i] not in out:
-            out.append(sampled[i])
+    for z in sampled:
+        if z not in out:
+            out.append(z)
     return tuple(out)
 
 
@@ -706,7 +733,10 @@ def _attempt(
                 )
                 continue
             z_lo, z_hi = z_band
-            preferred: list[int] = [base.z]
+            # Only the previous plan's depth (resize hysteresis, §4.11). The
+            # classified `base.z` is deliberately *not* preferred here -- see
+            # `_depth_strata`.
+            preferred: list[int] = []
             prev_z = previous_depths.get(obj.key)
             if prev_z is not None:
                 preferred.append(prev_z)

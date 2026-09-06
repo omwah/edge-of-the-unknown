@@ -1629,22 +1629,23 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
     return ScenePhysicalModelConfig(
         face_extent_by_scale_class={
             "entity": (34, 14), "anchor": (60, 30), "belt": (90, 16),
-            "orbital": (14, 7), "wreck": (16, 6), "ship": (12, 5),
+            "stardock": (10, 20), "orbital": (14, 7), "wreck": (16, 6), "ship": (12, 5),
         },
         face_extent_by_kind={
             "nebula": (110, 60), "black_hole": (100, 60), "wormhole": (76, 40),
         },
         region_by_scale_class={
-            "entity": narrow, "anchor": narrow, "belt": narrow, "orbital": narrow,
+            "entity": narrow, "anchor": narrow, "belt": narrow,
+            "stardock": narrow, "orbital": narrow,
             "wreck": wide, "ship": wide,
         },
         target_fraction_by_scale_class={
             "entity": "1/3", "anchor": "1/2", "belt": "1/2",
-            "orbital": "1/5", "wreck": "1/8", "ship": "1/8",
+            "stardock": "1/3", "orbital": "1/5", "wreck": "1/8", "ship": "1/8",
         },
         ink_ratio_by_scale_class={
             "entity": "4/5", "anchor": "3/5", "belt": "1/3",
-            "orbital": "9/10", "wreck": "4/5", "ship": "9/10",
+            "stardock": "4/5", "orbital": "9/10", "wreck": "4/5", "ship": "9/10",
         },
         structural_mode_thresholds=(
             (120, 44, "wide"), (87, 36, "standard"), (0, 0, "compact"),
@@ -1660,7 +1661,7 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
         max_passes=24, edge_margin=1,
         min_projected_cells_by_scale_class={
             "entity": (4, 2), "anchor": (6, 3), "belt": (6, 2),
-            "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
+            "stardock": (15, 11), "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
         },
         # Minimum-richness floor (maintainer feedback: composers were shrinking
         # ports/stardocks/starbases to their worst rung and never using ships'
@@ -1668,8 +1669,9 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
         # smaller than every ladder's *smallest* rung and so imposes no real
         # floor). Every port/starbase/stardock ladder has 4 rungs (index
         # 0=richest..3=worst); excluding the worst 1 leaves 3 usable tiers.
-        # Every ship ladder has 3 rungs; excluding the worst 1 leaves 2 usable
-        # tiers. `wreck` is deliberately absent (unaffected).
+        # `wreck` is deliberately absent (unaffected).
+        # `stardock` excludes the worst 2, leaving only its 15x15 and 15x11
+        # tiers: it is a headline location, not "not the worst tier".
         # `ship` is deliberately absent: measurement showed excluding even the
         # single worst ship rung collapses `DepthLayeredAnchorProjection`
         # admission from ~99% to ~3% (its coarse per-layer depth-scale step
@@ -1677,14 +1679,14 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
         # -- see docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md's minimum-richness
         # section for the measured numbers and the follow-up this leaves open.
         min_rung_index_from_end_by_scale_class={
-            "orbital": 1,
+            "orbital": 1, "stardock": 2,
         },
         separation_margin=1,
         min_visible_fraction_by_scale_class={
             "entity": "1", "anchor": "1", "belt": "1",
-            "orbital": "3/4", "ship": "3/4", "wreck": "3/4",
+            "stardock": "3/4", "orbital": "3/4", "ship": "3/4", "wreck": "3/4",
         },
-        cost_budget=250, emergency_ship_ceiling=40,
+        cost_budget=800, emergency_ship_ceiling=40,
         max_reposition_candidates=16,
         max_glyph_tries=20, glyph_spacing=2,
         continuous={

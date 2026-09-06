@@ -112,21 +112,33 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
         "entity": (34, 14),      # area 476 — the foreground subject; largest of all
         "anchor": (60, 30),      # area 1800 — shared planet/discovery bucket
         "belt": (90, 16),        # area 1440 — wide flat permeable field
-        "orbital": (14, 7),      # area 98 — station; below anchor, above wreck/ship
+        "stardock": (10, 20),    # area 200 — the headline station (plan §2.2:
+                                 # Stardock > starbase > port); 10x20 su is the
+                                 # box that projects to its authored 15x15 rung
+                                 # at scale 1 once cell_aspect 2 is applied
+        "orbital": (14, 7),      # area 98 — ordinary port/starbase
         "wreck": (16, 6),        # area 96 — "slightly larger than ships" (plan §2.2)
         "ship": (12, 5),         # area 60
     }
     notes.append(ProposedValue(
         "face_extent_by_scale_class",
         repr(face_extent_by_scale_class),
-        "Preserves plan §2.2's ordering (entity > anchor > belt > orbital > "
-        "wreck > ship) as bounding-box area (plan §9.1). Numbers are display "
+        "Preserves plan §2.2's ordering (entity > anchor > belt > stardock > "
+        "orbital > wreck > ship) as bounding-box area (plan §9.1). Numbers are display "
         "scene units, not literal kilometres — the composer already exaggerates "
         "controlled ratios to stay legible at terminal resolution (plan §2.3). "
         "`\"anchor\"` here is now only the fallback bucket a planet uses (and "
         "any anchor-scale kind with no `face_extent_by_kind` override) — see "
         "`face_extent_by_kind` below for the per-kind nebula/black_hole/"
-        "wormhole distinction plan §2.2 asks for."))
+        "wormhole distinction plan §2.2 asks for. `\"stardock\"` splits the "
+        "one headline station off the shared station bucket, for the same "
+        "reason: plan §2.2 orders Stardock > starbase > port, and at the "
+        "shared 14x7 extent every admitted Stardock in the gallery matrix "
+        "rendered at rung 2 of 4 (a 9x6 can) rather than its authored 15x15 "
+        "tier. 10x20 su is the smallest extent measured at which both "
+        "projection strategies reach rung 0 wherever they admit a Stardock "
+        "at all; its 1:2 aspect projects to a square cell box under "
+        "cell_aspect 2, matching the authored art."))
 
     # Per-kind override (WP-SC02 model addition: `SceneTuning.face_extent_by_kind`,
     # `edge/scene/classify.py` `_face`). `classify_sector` looks this up first by
@@ -164,7 +176,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
     wide_region = Region(x_min=-320, x_max=320, y_min=-160, y_max=160, z_min=1, z_max=520)
     region_by_scale_class = {
         cls: (wide_region if cls in ("ship", "wreck") else region)
-        for cls in ("entity", "anchor", "belt", "orbital", "wreck", "ship")
+        for cls in ("entity", "anchor", "belt", "stardock", "orbital", "wreck", "ship")
     }
     notes.append(ProposedValue(
         "region_by_scale_class",
@@ -184,6 +196,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
 
     target_fraction_by_scale_class = {
         "entity": Fraction(1, 3), "anchor": Fraction(1, 2), "belt": Fraction(1, 2),
+        "stardock": Fraction(1, 3),
         "orbital": Fraction(1, 5), "wreck": Fraction(1, 8), "ship": Fraction(1, 8),
     }
     notes.append(ProposedValue(
@@ -196,6 +209,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
 
     ink_ratio_by_scale_class = {
         "entity": Fraction(4, 5), "anchor": Fraction(3, 5), "belt": Fraction(1, 3),
+        "stardock": Fraction(4, 5),
         "orbital": Fraction(9, 10), "wreck": Fraction(4, 5), "ship": Fraction(9, 10),
     }
     notes.append(ProposedValue(
@@ -305,26 +319,37 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
 
     min_projected_cells_by_scale_class = {
         "entity": (4, 2), "anchor": (6, 3), "belt": (6, 2),
-        "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
+        "stardock": (15, 11), "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
     }
     notes.append(ProposedValue(
         "min_projected_cells_by_scale_class", repr(min_projected_cells_by_scale_class),
         "Below these cell dimensions an object reads as noise rather than "
         "its own shape; stations/ships need at least 2-3 cells on their "
-        "short axis to read as a rectangle rather than a dot."))
+        "short axis to read as a rectangle rather than a dot. `stardock` is "
+        "instead set to the natural box of the poorest rung its richness "
+        "floor still permits (rung 1, 15x11, read off the checked-in "
+        "catalogue), so the cell floor and the rung floor state the same "
+        "thing rather than one silently dominating."))
 
-    min_rung_index_from_end_by_scale_class = {"orbital": 1}
+    min_rung_index_from_end_by_scale_class = {"orbital": 1, "stardock": 2}
     notes.append(ProposedValue(
         "min_rung_index_from_end_by_scale_class", repr(min_rung_index_from_end_by_scale_class),
-        "Minimum-richness floor: never select the worst 1 rung of a "
-        "port/starbase/stardock's 4-rung ladder (maintainer feedback that "
+        "Minimum-richness floor: never select the worst 1 rung of an "
+        "ordinary port/starbase's 4-rung ladder (maintainer feedback that "
         "composers were shrinking to the worst tier, which the "
         "min_projected_cells floor above does not prevent since it is "
-        "smaller than every ladder's smallest rung). `ship` is deliberately "
+        "smaller than every ladder's smallest rung). `stardock` excludes the "
+        "worst 2, leaving only its 15x15 and 15x11 tiers: \"not the worst "
+        "tier\" is the right bar for an incidental port, but a headline "
+        "location has to be recognisable. Measured with the 10x20 stardock "
+        "face, every admitted Stardock in the gallery matrix lands on rung 0 "
+        "under both strategies, with overall secondary-object admission "
+        "unchanged. `ship` is deliberately "
         "excluded: measurement showed the same floor on ships collapses "
         "DepthLayeredAnchorProjection admission from ~99% to ~3% via its "
-        "coarse per-layer depth-scale step -- a depth-layer-granularity fix "
-        "is needed first."))
+        "coarse per-layer depth-scale step. The ship complaint is addressed "
+        "by cost_budget instead -- a ship's two richest tiers cost 178-436 "
+        "against the old 250 budget and so were literally unaffordable."))
 
     separation_margin = 1
     notes.append(ProposedValue("separation_margin", str(separation_margin),
@@ -334,6 +359,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
 
     min_visible_fraction_by_scale_class = {
         "entity": Fraction(1, 1), "anchor": Fraction(1, 1), "belt": Fraction(1, 1),
+        "stardock": Fraction(3, 4),
         "orbital": Fraction(3, 4), "ship": Fraction(3, 4), "wreck": Fraction(3, 4),
     }
     notes.append(ProposedValue(
@@ -345,15 +371,26 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
         "stations may be legitimately partly hidden behind a nearer object "
         "but must stay at least 3/4 visible to remain readable (plan §2.5)."))
 
-    cost_budget = 250
+    cost_budget = 800
     notes.append(ProposedValue(
         "cost_budget", str(cost_budget),
         "Same scale as the catalogue's measured `render_cost` units (plan "
-        "§9.4): the checked-in ship/port rungs measure in the tens, and the "
-        "nebula's richest proposed box class above costs 110 -- this budget "
-        "comfortably covers one rich anchor plus a handful of laddered "
-        "ships, and is deliberately tight enough that the cost-pressure "
-        "illustration below actually engages."))
+        "§9.4), which work out at 0.66-1.11 cost per natural sprite cell "
+        "across the whole checked-in catalogue -- so one unit is very nearly "
+        "one cell of authored sprite box. The previously proposed 250 rested "
+        "on a false reading of that catalogue (\"ship/port rungs measure in "
+        "the tens\": only the *worst* rungs do -- ship rung 0 costs 350-436, "
+        "rung 1 178-244, and Stardock rung 0 costs 200), which made every "
+        "ship's two richest authored tiers unaffordable on every canvas and "
+        "directly caused the reported \"composers never use the larger sizes "
+        "for the ships\". 800 is the smallest value measured, sweeping "
+        "250/400/600/800/1000/1400/2000 over the real gallery case/size "
+        "matrix under both strategies, at which ordinary scenes stop being "
+        "cost-limited in rung richness -- the admitted ship rung "
+        "distribution is identical at 800, 1000, 1400 and 2000 -- while "
+        "still binding the plan §6.3 stress inventories, which is the "
+        "budget's actual job (the 20/50-ship cases run at 786/800, 712/800, "
+        "750/800 and 794/800; at 1400 they fall under budget entirely)."))
 
     emergency_ship_ceiling = 40
     notes.append(ProposedValue(

@@ -91,12 +91,30 @@ scene:
     # bucket a bare planet uses; face_extent_by_kind below overrides it for
     # nebula/black_hole/wormhole so those phenomena read distinctly larger.
     face_extent_by_scale_class:
-      entity:  [34, 14]   # area 476 — the foreground subject; largest of all
-      anchor:  [60, 30]   # area 1800 — shared planet/discovery bucket
-      belt:    [90, 16]   # area 1440 — wide flat permeable field
-      orbital: [14, 7]    # area 98 — station; below anchor, above wreck/ship
-      wreck:   [16, 6]    # area 96 — "slightly larger than ships" (plan §2.2)
-      ship:    [12, 5]    # area 60
+      entity:   [34, 14]  # area 476 — the foreground subject; largest of all
+      anchor:   [60, 30]  # area 1800 — shared planet/discovery bucket
+      belt:     [90, 16]  # area 1440 — wide flat permeable field
+      # Stardock is its own scale class, not a bigger number inside the
+      # shared station bucket: plan §2.2 orders Stardock > starbase > port,
+      # and AGENTS.md makes it Core Space's flagship location. Shipping it at
+      # the "orbital" 14x7 was why every admitted Stardock in the gallery
+      # matrix rendered at rung 2 of 4 (a 9x6 can) and never at its authored
+      # 15x15 tier — with cell_aspect 2 a 14x7 face can only project a
+      # 14-cell-high box at scale 1, and no camera a real scene produces gets
+      # a parent-orbiting station near enough to beat that.
+      # 10x20 is the su box whose projection is 15x15 cells at scale 1 with a
+      # cell to spare (aspect 1:2 mirrors the authored rung's square cell
+      # shape once cell_aspect is applied), and it is the smallest extent
+      # measured at which *both* strategies reach rung 0 everywhere they
+      # admit a Stardock at all (8x16 and 9x18 both fall short under
+      # depth_layered; 12x24 buys nothing further). Area 200 keeps
+      # anchor 1800 > entity 476 > stardock 200 > orbital 98 > wreck 96 >
+      # ship 60, so §4.4's ordering holds and a Stardock still never
+      # out-frames a planet.
+      stardock: [10, 20]  # area 200 — the headline station
+      orbital:  [14, 7]   # area 98 — ordinary port/starbase
+      wreck:    [16, 6]   # area 96 — "slightly larger than ships" (plan §2.2)
+      ship:     [12, 5]   # area 60
     # Per-continuous_kind override: nebula/black_hole visual system >> wormhole
     # > planet/anchor-fallback (1800), matching plan §2.2's stated hierarchy.
     face_extent_by_kind:
@@ -110,12 +128,15 @@ scene:
     # narrower placement (SceneTuning.region_by_scale_class's docstring), so
     # it is not widened independently of the anchor it orbits.
     region_by_scale_class:
-      entity:  { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
-      anchor:  { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
-      belt:    { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
-      orbital: { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
-      wreck:   { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 1, z_max: 520 }
-      ship:    { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 1, z_max: 520 }
+      entity:   { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
+      anchor:   { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
+      belt:     { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
+      # Stardock orbits exactly like any other station — same parent-relative
+      # box as `orbital`. Only its apparent scale differs, not its orbit.
+      stardock: { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
+      orbital:  { x_min: -200, x_max: 200, y_min: -100, y_max: 100, z_min: 1, z_max: 400 }
+      wreck:    { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 1, z_max: 520 }
+      ship:     { x_min: -320, x_max: 320, y_min: -160, y_max: 160, z_min: 1, z_max: 520 }
     # frame()'s target projected-ink-height fraction of viewport.height per
     # anchor scale_class (plan §9.5): the Entity frames tighter (1/3) than a
     # planet/phenomenon (1/2) so it reads as a close subject, not a backdrop;
@@ -124,6 +145,12 @@ scene:
       entity: "1/3"
       anchor: "1/2"
       belt: "1/2"
+      # Only read when the class is the scene anchor. A Stardock is the
+      # anchor exactly when nothing bigger shares its sector, and then it is
+      # the destination the player came for, so it frames like the Entity
+      # (1/3) rather than like an incidental port (1/5) — still well short of
+      # a planet's 1/2, which it must never read as.
+      stardock: "1/3"
       orbital: "1/5"
       wreck: "1/8"
       ship: "1/8"
@@ -135,6 +162,11 @@ scene:
       entity: "4/5"
       anchor: "3/5"
       belt: "1/3"
+      # Measured off the checked-in catalogue rather than assumed: the
+      # stardock ladder's richest rung (15x15) has an ink_min/natural height
+      # ratio of 0.73-0.80 across archetypes, unlike the flat 1.00 of its
+      # lower tiers, and rung 0 is the tier the floor below aims at.
+      stardock: "4/5"
       orbital: "9/10"
       wreck: "4/5"
       ship: "9/10"
@@ -198,6 +230,11 @@ scene:
       entity: [4, 2]
       anchor: [6, 3]
       belt: [6, 2]
+      # The natural box of the poorest rung the stardock richness floor below
+      # still permits (rung 1, 15x11, read off the checked-in catalogue), so
+      # the cell floor and the rung floor state the same thing instead of one
+      # silently dominating the other.
+      stardock: [15, 11]
       orbital: [3, 2]
       ship: [3, 1]
       wreck: [3, 1]
@@ -216,11 +253,25 @@ scene:
     # single worst ship rung (of 3) collapses DepthLayeredAnchorProjection's
     # ship/wreck admission rate from ~99% to ~3% -- its coarse per-layer
     # depth-scale step (4/5 across 8 layers) rarely lands inside the
-    # narrower band where 2-of-3 ship rungs both clear. Fixing the ship
-    # "never uses larger sizes" complaint needs a depth-layer-granularity
-    # change first; see docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md.
+    # narrower band where 2-of-3 ship rungs both clear. The ship "never uses
+    # larger sizes" complaint is instead addressed by cost_budget below
+    # (its two richest tiers cost 178-436 and were literally unaffordable);
+    # see docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md.
+    #
+    # `stardock` excludes the worst *2* of its 4 rungs, leaving only 15x15
+    # and 15x11. "Never the worst tier" is the right bar for an incidental
+    # port; a headline location should be recognisable, and at rung 2 (9x6)
+    # it is a can. Measured across the gallery matrix with the 10x20 face
+    # above: every admitted Stardock lands on rung 0 under both strategies
+    # (6 of 8 cells, the two misses being 67x30/87x36 planet+stardock, where
+    # a parent-orbiting station is too far behind the planet to clear any
+    # permitted rung -- the same honest no_feasible_depth an ordinary port
+    # already hits there). Overall secondary-object admission is unchanged
+    # at 91.3%/94.9%, so the floor costs nothing but the two Stardocks that
+    # would have been drawn as cans.
     min_rung_index_from_end_by_scale_class:
       orbital: 1
+      stardock: 2
     # Matches edge_margin: one blank cell of clearance between distinct
     # accepted objects' ink-max boxes (plan §9.6 attempt rule 4).
     separation_margin: 1
@@ -233,15 +284,39 @@ scene:
       entity: "1"
       anchor: "1"
       belt: "1"
+      # Same as any other station: a Stardock is bigger, not un-occludable.
+      stardock: "3/4"
       orbital: "3/4"
       ship: "3/4"
       wreck: "3/4"
     # Cumulative estimated render-cost ceiling for one solve (plan §4.14,
-    # §9.4): same scale as the catalogue's measured render_cost units — the
-    # checked-in ship/port rungs measure in the tens, and the nebula's
-    # richest box class costs 110 — comfortably covers one rich anchor plus a
-    # handful of laddered ships, tight enough that cost pressure engages.
-    cost_budget: 250
+    # §9.4), in the catalogue's measured render_cost units. One unit is
+    # very nearly one cell of authored sprite box: `render_cost` is
+    # `width * height * sections` normalised so the cheapest rung is 10,
+    # which across the whole checked-in catalogue works out at 0.66-1.11
+    # cost per natural cell (median 1.11).
+    #
+    # The previous value, 250, rested on a false premise — its comment said
+    # "the checked-in ship/port rungs measure in the tens", but only the
+    # *worst* rungs do: ship rung 0 costs 350-436 and rung 1 178-244, and
+    # Stardock rung 0 costs 200. A 250 budget therefore made every ship's
+    # two richest authored tiers unaffordable on every canvas, which is the
+    # direct cause of the "composers never use the larger sizes for the
+    # ships" report.
+    #
+    # 800 is the smallest value measured (real gallery case/size matrix,
+    # both strategies, sweeping 250/400/600/800/1000/1400/2000) at which
+    # ordinary scenes stop being cost-limited in rung richness: the admitted
+    # ship rung distribution is byte-identical at 800, 1000, 1400 and 2000,
+    # so above 800 the binding constraint is geometry, not cost. It also
+    # still binds the plan §6.3 synthetic stress inventories, which is the
+    # budget's actual job — the 20/50-ship cases run at 786/800, 712/800,
+    # 750/800 and 794/800 with the anchor stepped down its box-class ladder,
+    # whereas at 1400 they fall under budget (1054/1400) and the only
+    # remaining bound would be emergency_ship_ceiling. As a sanity check on
+    # scale, 800 cost units is roughly 800 cells of sprite box, about a
+    # tenth of the largest supported 150x52 canvas.
+    cost_budget: 800
     # Hard cap on admitted ship count, independent of cost_budget (plan
     # §2.3), well above any generated-universe DTO inventory measured, but
     # below the 50-ship synthetic stress case so that case still exercises it.

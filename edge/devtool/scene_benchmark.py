@@ -269,17 +269,20 @@ def _benchmark_tuning() -> SceneTuning:
     return SceneTuning(
         face_extent_by_scale_class={
             "entity": (30, 12), "anchor": (80, 40), "belt": (120, 20),
-            "orbital": (18, 9), "ship": (36, 8), "wreck": (24, 10),
+            "stardock": (13, 26), "orbital": (18, 9), "ship": (36, 8), "wreck": (24, 10),
         },
         face_extent_by_kind={},
         region_by_scale_class={cls: region for cls in
-                               ("entity", "anchor", "belt", "orbital", "ship", "wreck")},
+                               ("entity", "anchor", "belt", "stardock", "orbital",
+                                "ship", "wreck")},
         target_fraction_by_scale_class={
             "entity": Fraction(1, 4), "anchor": Fraction(1, 2), "belt": Fraction(1, 2),
+            "stardock": Fraction(1, 3),
             "orbital": Fraction(1, 5), "ship": Fraction(1, 6), "wreck": Fraction(1, 6),
         },
         ink_ratio_by_scale_class={
             "entity": Fraction(4, 5), "anchor": Fraction(3, 5), "belt": Fraction(1, 2),
+            "stardock": Fraction(4, 5),
             "orbital": Fraction(9, 10), "ship": Fraction(9, 10), "wreck": Fraction(4, 5),
         },
         structural_mode_thresholds=(
@@ -296,12 +299,13 @@ def _benchmark_tuning() -> SceneTuning:
         max_passes=24, edge_margin=1,
         min_projected_cells_by_scale_class={
             "entity": (4, 2), "anchor": (6, 3), "belt": (6, 2),
-            "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
+            "stardock": (15, 11), "orbital": (3, 2), "ship": (3, 1), "wreck": (3, 1),
         },
-        min_rung_index_from_end_by_scale_class={"orbital": 1},
+        min_rung_index_from_end_by_scale_class={"orbital": 1, "stardock": 2},
         separation_margin=1,
         min_visible_fraction_by_scale_class={
             "entity": Fraction(1, 1), "anchor": Fraction(1, 1), "belt": Fraction(1, 1),
+            "stardock": Fraction(3, 4),
             "orbital": Fraction(3, 4), "ship": Fraction(3, 4), "wreck": Fraction(3, 4),
         },
         cost_budget=250, emergency_ship_ceiling=40,

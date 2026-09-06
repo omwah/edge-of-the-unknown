@@ -1800,6 +1800,16 @@ Calibration, from the real gallery case/size matrix (`edge.tui.scene_gallery`'s
 `build_scene_tuning()`/`load_geometry_catalog()` ->
 `classify_sector()` -> `solve()`:
 
+> **Superseded in part.** The two bullets below record this fix as it landed.
+> Stardock has since been split into its own `scale_class` with its own
+> `stardock: 2` floor (see "Stardock as its own scale class" below), so
+> `orbital: 1` now governs only ordinary ports and starbases; and the ship
+> complaint the second bullet leaves open has since been diagnosed and fixed
+> — it was `cost_budget` and `_depth_strata`'s blind base depth, not the rung
+> floor (see "Ship apparent size and the cost budget" below). The admission
+> percentages quoted here were also measured before the retention-scoring and
+> cost-aware-rung fixes and are superseded by that section's table.
+
 - `orbital: 1` (never the single worst of 4 rungs) ships in
   `config/default.yaml`. Rung-distribution proof: before, 34/196
   (`FixedFovPerspective`) and 37/196 (`DepthLayeredAnchorProjection`) admitted
@@ -1924,6 +1934,141 @@ defect, and it is left as-is rather than retuning an approved region value.
 `tests/test_scene_size_and_drops.py` is the CI guard for both fixes, and
 `tests/test_scene_joint_placement.py`'s admission floor rose from 70% back to
 85% (its own smaller matrix now measures 91.7%/94.8%).
+
+**Stardock as its own scale class (post-WP-SC09 fix).** The minimum-richness
+floor above left Stardock at "not the worst of 4 rungs", which the maintainer
+correctly rejected: Stardock is Core Space's flagship location (AGENTS.md,
+"Planets & orbital starbases"; plan §2.2 orders `Stardock > starbase > port`),
+not an incidental trading post. Measured before the fix, **every** admitted
+Stardock across the gallery matrix rendered at rung 2 of 4 — a 9x6 can — under
+both strategies, never its authored 15x15 tier.
+
+The cause was that `classify.py` gave Stardock the shared `"orbital"`
+scale class, so it inherited a 14x7 su face. Nothing downstream could recover
+from that: rung selection serves *projected height* (§2.4), a 14x7 face
+projects at most a 14-cell-high box (`DepthLayeredAnchorProjection`'s scale
+never exceeds 1), and a parent-orbiting station is always at least the anchor's
+own framing distance away, so the 15-cell rung 0 was unreachable at every
+viewport. `target_fraction_by_scale_class` could not help either — it is only
+read when the class *is* the anchor, and even then it proved inert for a
+flexible object (see the ship section below).
+
+`"stardock"` is therefore a seventh `scale_class`
+(`edge.scene.classify.SCALE_CLASSES`), selected off the `SectorPortDTO.is_stardock`
+flag that already picks the distinct authored ladder. It is a **scale** class,
+not a retention tier: Stardock stays `SceneRetention.ORBITAL` and competes for
+admission exactly like any other station, because the complaint was about size,
+and `SceneRetention` is an `IntEnum` compared numerically, so inserting a tier
+would renumber every tier below it. Its shipped values, and why:
+
+| field | value | basis |
+|---|---|---|
+| `face_extent_by_scale_class` | `(10, 20)` | the su box projecting to the authored 15x15 rung at scale 1 under `cell_aspect` 2, with a cell spare; 1:2 aspect mirrors the art's square cell shape. Smallest extent measured at which *both* strategies reach rung 0 wherever they admit a Stardock (8x16 and 9x18 fall short under depth-layered; 12x24 buys nothing). Area 200 keeps `anchor 1800 > entity 476 > stardock 200 > orbital 98 > wreck 96 > ship 60`, so §4.4 holds and a Stardock still never out-frames a planet. |
+| `region_by_scale_class` | same as `orbital` | a Stardock orbits like any station; only apparent scale differs. |
+| `min_rung_index_from_end_by_scale_class` | `2` | leaves only the 15x15 and 15x11 tiers. |
+| `min_projected_cells_by_scale_class` | `(15, 11)` | the natural box of the poorest rung that floor permits, so the cell floor and the rung floor state the same thing. |
+| `target_fraction_by_scale_class` | `1/3` | read only when a Stardock is the anchor, i.e. when nothing bigger shares the sector; then it is the destination the player came for, so it frames like the Entity rather than an incidental port — still short of a planet's `1/2`. |
+| `ink_ratio_by_scale_class` | `4/5` | measured, not assumed: the stardock ladder's rung 0 has an `ink_min`/natural height ratio of 0.73–0.80 across archetypes, unlike the flat 1.00 of its lower tiers. |
+| `min_visible_fraction_by_scale_class` | `3/4` | unchanged from `orbital`; bigger, not un-occludable. |
+
+Result across the gallery matrix: admitted-Stardock rung index goes from `{2: 6}`
+to `{0: 6}` under **both** strategies, with overall secondary-object admission
+unchanged (91.3% / 94.9%). Two of the eight Stardock cells stay rejected —
+`planet+stardock+ships` at 67x30 and 87x36 — with the same honest
+`no_feasible_depth` an ordinary port already hits there.
+
+**Ship apparent size and the cost budget (post-WP-SC09 fix).** The
+minimum-richness section above recorded "ships never use their larger tiers"
+as confirmed but unfixed. Two causes were found, neither of them the rung
+floor.
+
+*Cause 1: the two richest ship tiers were unaffordable on every canvas.*
+`render_cost` is `width x height x sections` normalised so the cheapest rung is
+10, which works out at 0.66–1.11 cost per natural sprite cell across the whole
+checked-in catalogue — one unit is very nearly one cell. Ship rung 0 costs
+350–436 and rung 1 178–244, against a `cost_budget` of **250**. No ship could
+ever be drawn above its worst tier, on any viewport, in any scene. The 250 was
+justified in `config/default.yaml` by the claim that "the checked-in ship/port
+rungs measure in the tens", which is true only of the *worst* rungs — the
+budget rested on a misreading of the catalogue. Sweeping
+250/400/600/800/1000/1400/2000 over the real matrix under both strategies, the
+admitted ship rung distribution is identical at 800 and above, so 800 is the
+smallest value at which the binding constraint is geometry rather than cost;
+it still binds the §6.3 stress inventories (786/800, 712/800, 750/800,
+794/800), which is the budget's actual job, whereas at 1400 they fall under it
+entirely and only `emergency_ship_ceiling` would remain.
+
+*Cause 2: a flexible object's depth came from a blind, viewport-independent
+hash draw.* `_depth_strata` tried `preferred=(base.z, previous.z)` first and
+then walked the feasible band in hash-shuffled order, taking the first depth
+that passed. `base.z` is the classifier's uniform draw over the object's whole
+*nominal region* (viewport-independent by design, §9.3), so whenever it landed
+inside the feasible band — which it usually did — it decided ship size by coin
+flip. Its x/y counterparts were already superseded by the screen-space slot
+lattice; z was the last vestige. `_depth_strata` now drops `base.z` from
+`preferred` (keeping the previous plan's depth, which is §4.11's real
+hysteresis input) and walks the sampled depths **near to far**, so a flexible
+object takes the largest apparent size — and therefore the richest authored
+rung — the frame and its already-committed neighbours allow, moving outward
+only when a nearer depth is genuinely refused.
+
+This does not flatten §4.13's depth variation: placement runs in retention
+order against committed neighbours, so the first ship takes the near band and
+separation pushes each later one outward. Admitted ships still reach 54
+distinct depths and box heights from 4 to 20 cells under `FixedFovPerspective`,
+and screen *position* variety is untouched (the slot lattice is still walked in
+`_shuffled` order).
+
+Also measured and worth recording as a negative result:
+`target_fraction_by_scale_class["ship"]` is **inert**. Sweeping it 1/8 → 1/6 →
+1/5 → 1/4 → 1/3 changes not one admitted rung, box, or depth anywhere in the
+matrix. A flexible anchor's framed camera only sets a starting depth scale;
+`candidates()`'s own sweep is bounded by `camera_height_fraction_*`, not by the
+target fraction, and joint placement then re-chooses the object's depth inside
+`_attempt` regardless. It is left at 1/8 rather than retuned to no effect.
+
+**Measured ship rung index by canvas size** (gallery matrix, admitted ships):
+
+| | 67x30 | 87x36 | 120x44 | 150x52 |
+|---|---|---|---|---|
+| `FixedFovPerspective`, before | `{1:1, 2:17}` h̄ 5.5 | `{1:1, 2:21}` h̄ 5.3 | `{1:1, 2:30}` h̄ 4.8 | `{1:1, 2:30}` h̄ 4.9 |
+| `FixedFovPerspective`, after | `{0:8, 2:22}` h̄ **6.3** | `{0:6, 1:4, 2:24}` h̄ **7.1** | `{0:9, 1:5, 2:20}` h̄ **8.4** | `{0:9, 1:5, 2:20}` h̄ **9.1** |
+| `DepthLayeredAnchorProjection`, before | `{2:20}` h̄ 4.5 | `{2:24}` h̄ 4.5 | `{2:34}` h̄ 4.5 | `{2:34}` h̄ 4.5 |
+| `DepthLayeredAnchorProjection`, after | `{2:34}` h̄ 4.9 | `{2:34}` h̄ 5.0 | `{2:34}` h̄ 5.0 | `{2:34}` h̄ 5.0 |
+
+Mean ship box height now rises monotonically with the canvas under perspective,
+where before it was flat — that correlation is what the maintainer's report was
+missing, and it had never been measured.
+
+**`DepthLayeredAnchorProjection` cannot magnify, and that is why its ships stay
+flat.** Its scale is `depth_layer_scale ** layer` with
+`layer = dz // depth_layer_size_su >= 0` and `0 < depth_layer_scale < 1`, so
+**scale never exceeds 1** and an object's projected box never exceeds its own su
+face size (times `cell_aspect` on width) at *any* viewport or budget. With
+`ship: [12, 5]` the ceiling is 24x5 cells, and every authored ship rung 1 is
+26–36 cells wide, so rung 2 is the only reachable tier — confirmed by the cost
+sweep, where that strategy's ship distribution is byte-identical from a 250
+budget to a 100000 one. Fixing it means giving the strategy a viewport-derived
+base scale (a new `Camera` field, re-derived in `frame()`), which re-baselines
+every number that strategy produces. That is recorded here as a scoped
+follow-up rather than folded into this change, and asserted as a known
+limitation by
+`tests/test_scene_size_and_drops.py::test_depth_layered_projection_cannot_magnify_and_this_is_known`
+so it cannot change silently. It does not block cutover: WP-SC04/SC11 still
+select one production strategy, and `FixedFovPerspective` does not have this
+failure mode.
+
+**Solver cost of the budget raise.** More affordable art means more admitted
+objects means more placement work — plan §6.2 rule 5's "object-count scaling is
+visible", working as designed. Real inventories are unaffected (1 ship
+10ms/<1ms, 5 ships 48ms/2ms, byte-identical to the 250 budget), but the §6.3
+synthetic stress cases move from 8 admitted objects at 1.4–1.9s to 15–24
+admitted at 11–16s, because the old budget refused every ship past the eighth
+at the cheap pre-check. §6.3 files 20/50-ship inventories as future-multiplayer
+stress rather than a generated-world distribution, so this is accepted; the CI
+smoke bound in `tests/test_scene_joint_placement.py` moved 15s → 40s and says
+why. A §6.4 latency decision on those inventories, if one is wanted, belongs to
+the benchmark on a controlled machine, not here.
 
 **Glyph scatter**, after the solve and after paint (§4.19):
 
