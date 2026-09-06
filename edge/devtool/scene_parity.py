@@ -187,11 +187,16 @@ def measure_legacy(
 
     # Ships are recorded by name so admission parity compares the *same*
     # vessels, not just a count. Legacy paints `sec.ships[:max_ships_shown]`
-    # minus whatever `_paint_ships` deferred to a text row.
+    # minus whatever `_paint_ships` deferred to a text row -- and it appends to
+    # `sprite_rects` in **reverse** DTO order, because `_paint_ships` places
+    # nearest-first (`for i in reversed(range(n))`). Reversing here is what
+    # pairs each recorded rect with the vessel that actually drew it; without
+    # it the name set still matched (so admission parity was right) but every
+    # per-ship size was attached to the wrong hull.
     shown = [s.name for s in sector.ships[: cfg.max_ships_shown]]
     deferred = "\n".join(text for text, _dest, _ref in composer._deferred)
     painted_ships = [name for name in shown if name not in deferred]
-    ship_iter = iter(painted_ships)
+    ship_iter = iter(reversed(painted_ships))
 
     out: list[Painted] = []
     for kind, x0, y0, x1, y1 in composer.sprite_rects:
@@ -204,7 +209,10 @@ def measure_legacy(
             del target_w
             rung = legacy_station_rung(catalog, kind, _archetype_of(sector, kind), target_h)
         if kind == "ship":
-            slot = f"ship:{next(ship_iter, '?')}"
+            # No `'?'` default: a count mismatch between `sprite_rects` and the
+            # deferral list is a harness bug, and a `ship:?` slot would quietly
+            # *match* a `ship:?` on the other side instead of failing.
+            slot = f"ship:{next(ship_iter)}"
         else:
             slot = _SLOT.get(kind, kind)
             if slot == "discovery":
@@ -216,6 +224,9 @@ def measure_legacy(
     # Legacy paints its discoveries in a fixed order (primary find, then the
     # secondary wreck); disambiguate repeated "discovery" slots by index so a
     # two-find scene compares element-wise.
+    assert next(ship_iter, None) is None, (
+        f"legacy painted fewer ship rects than names it kept for {sector.sector_id}"
+    )
     seen: Counter[str] = Counter()
     numbered: list[Painted] = []
     for entry in out:

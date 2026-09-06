@@ -123,16 +123,30 @@ def test_the_known_miss_is_exactly_what_is_documented() -> None:
     assert len(legacy_ships) == cfg.max_ships_shown
     assert len(sector.ships) > cfg.max_ships_shown
 
+    by_strategy = {}
     for strategy in STRATEGIES:
         physical = measure_physical(sector, strategy, tuning, catalog, 67, 30)
         ships = [entry for entry in physical if entry.slot.startswith("ship:")]
         wrecks = [entry for entry in physical if entry.slot.startswith("discovery")]
-        # Exactly one of the two is true: the model shows the extra ship
-        # instead of the wreck, or it manages both (in which case the
-        # exemption is stale).
-        assert len(ships) > cfg.max_ships_shown or wrecks, strategy.name
-        # Same total object count as legacy, not fewer.
+        # Never fewer objects than legacy shows, on either strategy.
         assert len(physical) >= len(legacy), strategy.name
+        # The extra ship legacy caps away is what crowds the scene, on both.
+        assert len(ships) > cfg.max_ships_shown, strategy.name
+        by_strategy[strategy.name] = bool(wrecks)
+
+    # Asserted per strategy, not as an either/or: `FixedFovPerspective` fits
+    # the wreck *and* the fourth ship (a strict superset of legacy), while
+    # `DepthLayeredAnchorProjection` does not. Written this way so a future
+    # fix to the depth-layered case fails here and prompts deleting the
+    # exemption in `KNOWN_MISSES`, rather than passing silently.
+    assert by_strategy["fixed_fov_perspective"], (
+        "fixed_fov_perspective now drops the wreck too — the KNOWN_MISSES "
+        "exemption no longer describes reality"
+    )
+    assert not by_strategy["depth_layered_anchor"], (
+        "depth_layered_anchor now fits the wreck as well — delete its entry "
+        "from KNOWN_MISSES and this assertion"
+    )
 
 
 def test_legacy_station_rung_matches_the_real_renderer() -> None:
