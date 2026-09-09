@@ -424,7 +424,19 @@ def _resolve_and_render(
     catalog_yield = catalog.continuous(obj.continuous_kind)
     if projection.box_class is not None:
         box = catalog_yield.box_classes[projection.box_class]
-        width, height = min(box.width, projection.bounds.width), min(box.height, projection.bounds.height)
+        # Scale the box_class down uniformly to fit inside `bounds`, never per
+        # axis independently -- box_classes are authored at the sprite
+        # library's own aspect ratio (matching `cell_aspect` for a round body
+        # like a planet/black hole/wormhole), and clamping each axis to
+        # `bounds` on its own distorts that ratio whenever `bounds` isn't
+        # exactly proportional to the box, painting an oval instead of a
+        # circle.
+        scale = min(
+            Fraction(projection.bounds.width, box.width),
+            Fraction(projection.bounds.height, box.height),
+            Fraction(1),
+        )
+        width, height = math.floor(box.width * scale), math.floor(box.height * scale)
     else:
         width, height = projection.bounds.width, projection.bounds.height
     art, _ = _resolve_continuous(obj, (max(width, 1), max(height, 1)), seed, cache)

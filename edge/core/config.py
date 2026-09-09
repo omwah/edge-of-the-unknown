@@ -1748,7 +1748,7 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
     orbit = SceneRegionConfig(x_min=-200, x_max=200, y_min=-100, y_max=100, z_min=-120, z_max=120)
     return ScenePhysicalModelConfig(
         face_extent_by_scale_class={
-            "entity": (34, 14), "anchor": (60, 30), "belt": (90, 16),
+            "entity": (34, 14), "anchor": (60, 30), "belt": (48, 32),
             "stardock": (22, 16), "starbase": (17, 14), "orbital": (14, 12),
             "wreck": (16, 6), "ship": (12, 5),
         },
@@ -1862,7 +1862,7 @@ def _default_physical_model() -> ScenePhysicalModelConfig:
                 box_classes=((40, 16), (26, 10)), render_cost=(35, 14)),
             "belt": SceneContinuousYieldConfig(
                 ink_fraction_min="3/5", ink_fraction_max="1", min_extent=(12, 3),
-                box_classes=((120, 20), (80, 14)), render_cost=(30, 12)),
+                box_classes=((300, 100), (150, 50), (80, 27)), render_cost=(60, 30, 12)),
         },
         cost_budget_estimate_tolerance="1/10",
         ship_depth_objective_weight=2,

@@ -93,7 +93,7 @@ scene:
     face_extent_by_scale_class:
       entity:   [34, 14]  # area 476 — the foreground subject; largest of all
       anchor:   [60, 30]  # area 1800 — shared planet/discovery bucket
-      belt:     [90, 16]  # area 1440 — wide flat permeable field
+      belt:     [48, 32]  # area 1536 — wide flat permeable field
       # Stardock is its own scale class, not a bigger number inside the
       # shared station bucket: plan §2.2 orders Stardock > starbase > port,
       # and AGENTS.md makes it Core Space's flagship location. Shipping it at
@@ -550,8 +550,26 @@ scene:
         ink_fraction_min: "3/5"
         ink_fraction_max: "1"
         min_extent: [12, 3]
-        box_classes: [[120, 20], [80, 14]]
-        render_cost: [30, 12]
+        # A belt frames like any other anchor (target_fraction_by_scale_class
+        # 1/2 of viewport.height / ink_fraction_min 3/5 above -- an ~0.83 *
+        # viewport.height natural request), but the old top box class [120,20]
+        # silently capped every belt at 20 rows regardless of what the camera
+        # framed it for -- 13/5 rows at 150x52 against the legacy composer's
+        # ~40/104 (§2's "sprawl wide", widgets.py `_paint_planet`), reading as
+        # a thin strip rather than a field that dominates the background.
+        # [320, 54] is generous headroom above the largest calibrated viewport
+        # (150x52's ~44-row framed natural height, plus its own 5.625:1 face
+        # aspect implying ~250 cells wide before the frustum/edge-margin check
+        # in `frame()` narrows it back down) -- `_resolve_and_render`'s
+        # uniform-scale clamp (never per-axis) always shrinks this class down
+        # to the actual solved `bounds`, so an oversized top class costs
+        # nothing but headroom; it is never rendered at its own full size.
+        # Matches face_extent_by_scale_class.belt's own cell-space ratio
+        # (48:32 su * cell_aspect 2 on width = 3:1) so the uniform-scale clamp
+        # in `_resolve_and_render` never has one axis outrun the other and
+        # cap the belt below what the camera actually framed for it.
+        box_classes: [[300, 100], [150, 50], [80, 27]]
+        render_cost: [60, 30, 12]
     # §3 extended proposals with a natural config home, approved but not yet
     # read by any WP-SC06 solver code path — kept here so a future work
     # package wiring these has an already-approved number rather than

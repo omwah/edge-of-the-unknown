@@ -1580,7 +1580,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 64,
+        "width": 32,
         "height": 16,
         "rung": null
       },
@@ -1632,7 +1632,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 61,
+        "width": 30,
         "height": 15,
         "rung": null
       },
@@ -1684,7 +1684,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 42,
         "height": 21,
         "rung": null
       },
@@ -1736,7 +1736,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 77,
+        "width": 38,
         "height": 19,
         "rung": null
       },
@@ -1802,7 +1802,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 58,
         "height": 29,
         "rung": null
       }
@@ -1840,7 +1840,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 48,
         "height": 24,
         "rung": null
       },
@@ -1906,7 +1906,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 72,
         "height": 36,
         "rung": null
       }
@@ -1958,7 +1958,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 60,
         "height": 30,
         "rung": null
       }
@@ -2003,7 +2003,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 64,
+        "width": 32,
         "height": 16,
         "rung": null
       },
@@ -2069,7 +2069,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 61,
+        "width": 30,
         "height": 15,
         "rung": null
       },
@@ -2135,7 +2135,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 72,
+        "width": 36,
         "height": 18,
         "rung": null
       },
@@ -2201,7 +2201,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 61,
+        "width": 30,
         "height": 15,
         "rung": null
       },
@@ -2267,7 +2267,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 52,
         "height": 26,
         "rung": null
       },
@@ -2340,7 +2340,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 48,
         "height": 24,
         "rung": null
       },
@@ -2406,7 +2406,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 60,
         "height": 30,
         "rung": null
       },
@@ -2486,7 +2486,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 60,
         "height": 30,
         "rung": null
       }
@@ -2531,7 +2531,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 48,
+        "width": 24,
         "height": 12,
         "rung": null
       },
@@ -2597,7 +2597,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 49,
+        "width": 24,
         "height": 12,
         "rung": null
       },
@@ -2663,7 +2663,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 42,
         "height": 21,
         "rung": null
       },
@@ -2729,7 +2729,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 77,
+        "width": 38,
         "height": 19,
         "rung": null
       },
@@ -2809,7 +2809,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 58,
         "height": 29,
         "rung": null
       },
@@ -2861,7 +2861,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 48,
         "height": 24,
         "rung": null
       },
@@ -2927,7 +2927,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 58,
         "height": 29,
         "rung": null
       },
@@ -2993,7 +2993,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 48,
         "height": 24,
         "rung": null
       },
@@ -3059,7 +3059,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 64,
+        "width": 32,
         "height": 16,
         "rung": null
       },
@@ -3125,7 +3125,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 61,
+        "width": 30,
         "height": 15,
         "rung": null
       },
@@ -3191,7 +3191,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 40,
         "height": 20,
         "rung": null
       },
@@ -3257,7 +3257,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 61,
+        "width": 30,
         "height": 15,
         "rung": null
       },
@@ -3323,7 +3323,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 52,
         "height": 26,
         "rung": null
       },
@@ -3396,7 +3396,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 48,
         "height": 24,
         "rung": null
       },
@@ -3455,7 +3455,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 58,
         "height": 29,
         "rung": null
       },
@@ -3521,7 +3521,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 48,
         "height": 24,
         "rung": null
       },
@@ -3587,7 +3587,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 50,
+        "width": 32,
         "height": 16,
         "rung": null
       },
@@ -3653,7 +3653,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 50,
+        "width": 32,
         "height": 16,
         "rung": null
       },
@@ -3719,7 +3719,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 50,
+        "width": 44,
         "height": 22,
         "rung": null
       },
@@ -3785,7 +3785,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 50,
+        "width": 40,
         "height": 20,
         "rung": null
       },
@@ -4115,7 +4115,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 53,
+        "width": 32,
         "height": 16,
         "rung": null
       },
@@ -4181,7 +4181,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 42,
+        "width": 26,
         "height": 13,
         "rung": null
       },
@@ -4247,7 +4247,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 73,
+        "width": 44,
         "height": 20,
         "rung": null
       },
@@ -4313,7 +4313,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 66,
+        "width": 40,
         "height": 19,
         "rung": null
       },
@@ -4379,7 +4379,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 90,
+        "width": 60,
         "height": 28,
         "rung": null
       },
@@ -4445,7 +4445,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 82,
+        "width": 50,
         "height": 23,
         "rung": null
       },
@@ -4511,7 +4511,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 90,
+        "width": 76,
         "height": 36,
         "rung": null
       },
@@ -4577,7 +4577,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 90,
+        "width": 76,
         "height": 36,
         "rung": null
       },
@@ -4643,7 +4643,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 31,
+        "width": 20,
         "height": 10,
         "rung": null
       },
@@ -4709,7 +4709,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 25,
+        "width": 16,
         "height": 8,
         "rung": null
       },
@@ -4775,8 +4775,8 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 45,
-        "height": 15,
+        "width": 25,
+        "height": 16,
         "rung": null
       },
       {
@@ -4841,7 +4841,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 37,
+        "width": 23,
         "height": 13,
         "rung": null
       },
@@ -4907,8 +4907,8 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 54,
-        "height": 20,
+        "width": 38,
+        "height": 21,
         "rung": null
       },
       {
@@ -4973,7 +4973,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 54,
+        "width": 37,
         "height": 20,
         "rung": null
       },
@@ -5039,8 +5039,8 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 54,
-        "height": 24,
+        "width": 46,
+        "height": 25,
         "rung": null
       },
       {
@@ -5105,8 +5105,8 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 54,
-        "height": 23,
+        "width": 45,
+        "height": 24,
         "rung": null
       },
       {
@@ -5164,8 +5164,8 @@
       {
         "slot": "discovery#1",
         "kind": "wreck",
-        "width": 13,
-        "height": 4,
+        "width": 6,
+        "height": 3,
         "rung": null
       },
       {
@@ -5216,7 +5216,7 @@
       {
         "slot": "discovery#1",
         "kind": "wreck",
-        "width": 21,
+        "width": 13,
         "height": 4,
         "rung": null
       },
@@ -5268,7 +5268,7 @@
       {
         "slot": "discovery#1",
         "kind": "wreck",
-        "width": 21,
+        "width": 13,
         "height": 4,
         "rung": null
       },
@@ -5320,7 +5320,7 @@
       {
         "slot": "discovery#1",
         "kind": "wreck",
-        "width": 21,
+        "width": 13,
         "height": 4,
         "rung": null
       },
@@ -5424,7 +5424,7 @@
       {
         "slot": "discovery#1",
         "kind": "wreck",
-        "width": 21,
+        "width": 13,
         "height": 4,
         "rung": null
       },
@@ -5528,7 +5528,7 @@
       {
         "slot": "discovery#1",
         "kind": "wreck",
-        "width": 21,
+        "width": 13,
         "height": 4,
         "rung": null
       },
@@ -5587,7 +5587,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 50,
+        "width": 32,
         "height": 16,
         "rung": null
       },
@@ -5653,7 +5653,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 50,
+        "width": 32,
         "height": 16,
         "rung": null
       },
@@ -5719,7 +5719,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 50,
+        "width": 44,
         "height": 22,
         "rung": null
       },
@@ -5785,7 +5785,7 @@
       {
         "slot": "discovery#1",
         "kind": "discovery",
-        "width": 50,
+        "width": 40,
         "height": 20,
         "rung": null
       },
@@ -6113,13 +6113,6 @@
     ],
     "physical": [
       {
-        "slot": "body",
-        "kind": "planet",
-        "width": 55,
-        "height": 5,
-        "rung": null
-      },
-      {
         "slot": "station",
         "kind": "port",
         "width": 11,
@@ -6127,16 +6120,23 @@
         "rung": 1
       },
       {
-        "slot": "ship:Vesk Trader",
-        "kind": "ship",
-        "width": 48,
-        "height": 5,
+        "slot": "body",
+        "kind": "planet",
+        "width": 63,
+        "height": 21,
         "rung": null
       },
       {
         "slot": "ship:Kalt Corvette",
         "kind": "ship",
-        "width": 36,
+        "width": 17,
+        "height": 3,
+        "rung": null
+      },
+      {
+        "slot": "ship:Vesk Trader",
+        "kind": "ship",
+        "width": 48,
         "height": 5,
         "rung": null
       }
@@ -6179,18 +6179,18 @@
     ],
     "physical": [
       {
-        "slot": "body",
-        "kind": "planet",
-        "width": 59,
-        "height": 5,
-        "rung": null
-      },
-      {
         "slot": "station",
         "kind": "port",
         "width": 11,
         "height": 6,
         "rung": 1
+      },
+      {
+        "slot": "body",
+        "kind": "planet",
+        "width": 60,
+        "height": 20,
+        "rung": null
       },
       {
         "slot": "ship:Vesk Trader",
@@ -6245,13 +6245,6 @@
     ],
     "physical": [
       {
-        "slot": "body",
-        "kind": "planet",
-        "width": 79,
-        "height": 7,
-        "rung": null
-      },
-      {
         "slot": "station",
         "kind": "port",
         "width": 11,
@@ -6259,16 +6252,23 @@
         "rung": 1
       },
       {
-        "slot": "ship:Kalt Corvette",
-        "kind": "ship",
-        "width": 17,
-        "height": 3,
+        "slot": "body",
+        "kind": "planet",
+        "width": 81,
+        "height": 27,
         "rung": null
       },
       {
         "slot": "ship:Vesk Trader",
         "kind": "ship",
         "width": 48,
+        "height": 5,
+        "rung": null
+      },
+      {
+        "slot": "ship:Kalt Corvette",
+        "kind": "ship",
+        "width": 36,
         "height": 5,
         "rung": null
       }
@@ -6311,18 +6311,18 @@
     ],
     "physical": [
       {
-        "slot": "body",
-        "kind": "planet",
-        "width": 72,
-        "height": 7,
-        "rung": null
-      },
-      {
         "slot": "station",
         "kind": "port",
         "width": 11,
         "height": 6,
         "rung": 1
+      },
+      {
+        "slot": "body",
+        "kind": "planet",
+        "width": 77,
+        "height": 25,
+        "rung": null
       },
       {
         "slot": "ship:Vesk Trader",
@@ -6377,18 +6377,18 @@
     ],
     "physical": [
       {
-        "slot": "body",
-        "kind": "planet",
-        "width": 113,
-        "height": 10,
-        "rung": null
-      },
-      {
         "slot": "station",
         "kind": "port",
         "width": 11,
         "height": 6,
         "rung": 1
+      },
+      {
+        "slot": "body",
+        "kind": "planet",
+        "width": 111,
+        "height": 37,
+        "rung": null
       },
       {
         "slot": "ship:Vesk Trader",
@@ -6443,13 +6443,6 @@
     ],
     "physical": [
       {
-        "slot": "body",
-        "kind": "planet",
-        "width": 113,
-        "height": 10,
-        "rung": null
-      },
-      {
         "slot": "station",
         "kind": "port",
         "width": 11,
@@ -6468,6 +6461,13 @@
         "kind": "ship",
         "width": 17,
         "height": 3,
+        "rung": null
+      },
+      {
+        "slot": "body",
+        "kind": "planet",
+        "width": 96,
+        "height": 32,
         "rung": null
       }
     ],
@@ -6509,13 +6509,6 @@
     ],
     "physical": [
       {
-        "slot": "body",
-        "kind": "planet",
-        "width": 119,
-        "height": 13,
-        "rung": null
-      },
-      {
         "slot": "station",
         "kind": "port",
         "width": 11,
@@ -6523,16 +6516,23 @@
         "rung": 0
       },
       {
-        "slot": "ship:Vesk Trader",
-        "kind": "ship",
-        "width": 48,
-        "height": 5,
+        "slot": "body",
+        "kind": "planet",
+        "width": 132,
+        "height": 44,
         "rung": null
       },
       {
         "slot": "ship:Kalt Corvette",
         "kind": "ship",
         "width": 36,
+        "height": 5,
+        "rung": null
+      },
+      {
+        "slot": "ship:Vesk Trader",
+        "kind": "ship",
+        "width": 48,
         "height": 5,
         "rung": null
       }
@@ -6575,13 +6575,6 @@
     ],
     "physical": [
       {
-        "slot": "body",
-        "kind": "planet",
-        "width": 119,
-        "height": 13,
-        "rung": null
-      },
-      {
         "slot": "station",
         "kind": "port",
         "width": 11,
@@ -6600,6 +6593,13 @@
         "kind": "ship",
         "width": 17,
         "height": 3,
+        "rung": null
+      },
+      {
+        "slot": "body",
+        "kind": "planet",
+        "width": 96,
+        "height": 32,
         "rung": null
       }
     ],
@@ -6657,7 +6657,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 32,
+        "width": 16,
         "height": 8,
         "rung": null
       },
@@ -6760,7 +6760,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 28,
+        "width": 24,
         "height": 12,
         "rung": null
       },
@@ -6858,7 +6858,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 72,
+        "width": 36,
         "height": 18,
         "rung": null
       },
@@ -6961,7 +6961,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 61,
+        "width": 30,
         "height": 15,
         "rung": null
       },
@@ -7071,7 +7071,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 52,
         "height": 26,
         "rung": null
       },
@@ -7174,7 +7174,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 48,
         "height": 24,
         "rung": null
       },
@@ -7284,7 +7284,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 60,
         "height": 30,
         "rung": null
       },
@@ -7415,7 +7415,7 @@
       {
         "slot": "body",
         "kind": "planet",
-        "width": 80,
+        "width": 60,
         "height": 30,
         "rung": null
       }
