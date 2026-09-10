@@ -627,7 +627,7 @@ def port_view(state: UniverseState, player_id: int, port_id: int, config: GameCo
         commodities=lines, display_id=_display(state, port.sector_id),
         archetype_id=port.archetype_id or _controlling_archetype(state, port.sector_id),
         purse=port.latinum, purse_enabled=config.economy.market.enabled,
-        holds_used=ship.holds_used, holds_total=ship.holds_total,
+        holds_used=ship.holds_used, holds_total=ship.holds_total, port_id=port.id,
     )
 
 

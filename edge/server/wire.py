@@ -36,7 +36,7 @@ from edge.core.events import Event
 from edge.core.rules import Command
 from edge.store import codec
 
-WIRE_VERSION = 45  # SectorPlanetDTO.archetype_id (scene physical-model continuous-kind archetype fix)
+WIRE_VERSION = 46  # PortDTO.port_id (scene physical-model station-reference lookup key)
 """Bumps on any breaking change to the envelope or a codec entry (client/server handshake).
 
 v2 (WP70): `AttackSpecies` command; `SectorShipDTO.player_id` (other players projected
@@ -128,6 +128,10 @@ its private inputs. `StarbaseDTO` gains `sector_id` (the internal sector id, as
 `PortDTO.sector_id` already carries) so a docked station header's `expect_sector`
 guard can validate the published station reference instead of trusting the docking
 flow unchecked.
+v46 (WP-SC10, sector-scene physical-model plan §7): `PortDTO` gains `port_id` (the
+internal port entity id, alongside its existing `sector_id`) so a docked port header
+can look up its published `(sector_id, station_kind, object_id)` station reference by
+its own identity rather than assuming one port per sector.
 """
 
 

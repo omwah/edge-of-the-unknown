@@ -16,6 +16,7 @@ from textual.app import App, SystemCommand
 from textual.binding import Binding
 from textual.screen import Screen
 
+from edge.art.scene_paint import StationReference
 from edge.config import load_default_config
 from edge.server.service import DialogueConfigMismatchError, LoadProgress
 from edge.core.config import SceneArtConfig, UIConfig
@@ -68,9 +69,11 @@ class EdgeApp(App[None]):
         # SectorView sprite-scene sizes + warp-grid options; replaced from config
         # when a game starts.
         self.scene_art = SceneArtConfig()
-        # Last station sizing inputs from the rendered SectorScene. Docked headers
-        # feed them through the same resolver instead of guessing the hidden scene.
-        self.sector_station_reference: tuple[int, int | None, int] | None = None
+        # The last rendered SectorScene's published `(sector_id, station_kind,
+        # object_id) -> (width, height)` station reference (plan §4 invariant 12).
+        # Docked headers look themselves up in it instead of guessing the hidden
+        # scene.
+        self.sector_station_reference: StationReference | None = None
         self.ui_config = UIConfig()
         self.max_warps_per_sector = 6  # TW2002 cap; reserves the warp grid's row count
         self.computer_tab = "trade"  # last Computer subview, restored when reopened with [C]

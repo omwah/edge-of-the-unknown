@@ -854,13 +854,10 @@ async def test_click_port_art_docks() -> None:
         await app.screen.recompose()
         await pilot.pause()
         scene = app.screen.query_one(SectorScene)
-        scene.render()  # publishes the exact viewport-dependent station inputs
+        scene.render()  # publishes the exact viewport-dependent station reference
         reference = app.sector_station_reference
         assert reference is not None
-        _sector_id, primary_height, body_height = reference
-        kind = "stardock" if port.klass.value == 9 else "port"
-        rendered = app.scene_art.station_dimensions(
-            kind, primary_height=primary_height, body_height=body_height)
+        (_key, rendered), = reference.entries
         await _click_hotspot(pilot, scene, dest="port")
         assert isinstance(app.screen, (PortScreen, StardockScreen))
         await pilot.pause()

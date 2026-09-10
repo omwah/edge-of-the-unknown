@@ -57,6 +57,12 @@ class PortDTO:
     purse_enabled: bool = False  # legacy economy keeps `purse` informational only
     holds_used: int = 0  # player cargo occupancy for trade impact copy
     holds_total: int = 0
+    # Internal port entity id (scene physical-model plan WP-SC10) — as `StarbaseDTO`
+    # already carries `starbase_id` alongside `sector_id`. Ports and starbases can
+    # share a sector, so a docked station header needs both `sector_id` and this id
+    # to look up its published `(sector_id, station_kind, object_id)` station
+    # reference exactly; `sector_id` alone is not a safe proxy.
+    port_id: int = 0
 
 
 @dataclass(frozen=True)

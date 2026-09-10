@@ -284,7 +284,8 @@ resupplies a missile on Hardware; [b]A[/]/[b]W[/] bank 1,000 slips at a time."""
             # rejected rather than trusted unchecked.
             StationArtHeader(
                 "starbase", v.archetype_id or "humanoid_diplomat", service,
-                identity=v.starbase_id, condition=condition, expect_sector=v.sector_id),
+                identity=v.starbase_id, condition=condition, expect_sector=v.sector_id,
+                object_id=v.starbase_id),
             content,
         )
 

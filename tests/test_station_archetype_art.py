@@ -83,27 +83,32 @@ def test_station_dimensions_preserve_original_primary_and_lone_branches() -> Non
 
 
 def test_docked_header_reuses_the_sector_composers_resolved_size() -> None:
+    from edge.art.scene_paint import StationKey, StationReference
+
     cfg = SceneArtConfig()
-    app = SimpleNamespace(
-        scene_art=cfg,
-        sector_station_reference=(7, 20, 99),
-    )
-    assert station_icon_dimensions(app, "port", False) == cfg.station_dimensions(
-        "port", primary_height=20, body_height=99)
+    ref = StationReference(entries=((StationKey(7, "port", 42), (12, 5)),))
+    app = SimpleNamespace(scene_art=cfg, sector_station_reference=ref)
+    assert station_icon_dimensions(
+        app, "port", False, expect_sector=7, object_id=42) == (12, 5)
 
 
 def test_docked_header_rejects_a_reference_from_another_sector() -> None:
-    """The published reference is only trusted for the sector being drawn: a caller
-    that names its sector must never be sized by a stale cache from elsewhere."""
+    """The published reference is only trusted for an exact `(sector_id, kind,
+    object_id)` match: a caller that names its own key must never be sized by a
+    stale or mismatched entry."""
+    from edge.art.scene_paint import StationKey, StationReference
+
     cfg = SceneArtConfig()
-    app = SimpleNamespace(
-        scene_art=cfg,
-        sector_station_reference=(7, 20, 99),
-    )
-    assert station_icon_dimensions(app, "port", False, expect_sector=7) == (
-        cfg.station_dimensions("port", primary_height=20, body_height=99))
-    # Mismatch ⇒ fall back to the kind's bounds, exactly like a direct-open screen.
-    assert station_icon_dimensions(app, "port", False, expect_sector=8) == (
+    ref = StationReference(entries=((StationKey(7, "port", 42), (12, 5)),))
+    app = SimpleNamespace(scene_art=cfg, sector_station_reference=ref)
+    assert station_icon_dimensions(
+        app, "port", False, expect_sector=7, object_id=42) == (12, 5)
+    # Sector mismatch ⇒ fall back to the kind's bounds, like a direct-open screen
+    # (no archetype id is available here for the richer authored-rung fallback).
+    assert station_icon_dimensions(app, "port", False, expect_sector=8, object_id=42) == (
+        cfg.port.max_width, cfg.port.max_height)
+    # Object mismatch within the same sector is rejected the same way.
+    assert station_icon_dimensions(app, "port", False, expect_sector=7, object_id=99) == (
         cfg.port.max_width, cfg.port.max_height)
 
 

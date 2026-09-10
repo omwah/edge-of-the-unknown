@@ -21,6 +21,7 @@ from textual.widgets import DataTable, Input, Select, Static, TabbedContent, Tab
 from rich.style import Style
 
 from edge.art import sprites as art_sprites
+from edge.art.scene_paint import StationKey, StationReference
 from edge.core.config import SceneArtConfig
 from edge.core.dto import SectorDiscovery, SectorPlanetDTO, SectorShipDTO
 from edge.core.enums import Commodity
@@ -951,7 +952,11 @@ class _SceneComposer:
         # path reads them (`hotspots` is what routes clicks, and it omits objects
         # that carry no destination).
         self.sprite_rects: list[tuple[str, int, int, int, int]] = []
-        self.station_reference: tuple[int | None, int] | None = None
+        # (station_kind, object_id, width, height) for the one docked-capable
+        # station this scene painted, or None. `SectorScene.render` turns this into
+        # the published `(sector_id, station_kind, object_id)` `StationReference`
+        # a docked header looks itself up in (plan §4 invariant 12, WP-SC10).
+        self.station_reference: tuple[str, int, int, int] | None = None
         # True when the primary body drawn was an asteroid belt — a field traffic
         # flies through rather than a body it must keep clear of (`_paint_planet`).
         self._belt_primary = False
@@ -1274,15 +1279,18 @@ class _SceneComposer:
             return None
         primary_height = ((primary[3] - primary[1]) if primary is not None else None)
         if bases:
+            kind, object_id = "starbase", bases[0].starbase_id
             sw, sh = cfg.station_dimensions(
-                "starbase", primary_height=primary_height, body_height=body_h)
+                kind, primary_height=primary_height, body_height=body_h)
         elif sec.ports[0].is_stardock:
+            kind, object_id = "stardock", sec.ports[0].port_id
             sw, sh = cfg.station_dimensions(
-                "stardock", primary_height=primary_height, body_height=body_h)
+                kind, primary_height=primary_height, body_height=body_h)
         else:
+            kind, object_id = "port", sec.ports[0].port_id
             sw, sh = cfg.station_dimensions(
-                "port", primary_height=primary_height, body_height=body_h)
-        self.station_reference = (primary_height, body_h)
+                kind, primary_height=primary_height, body_height=body_h)
+        self.station_reference = (kind, object_id, sw, sh)
         if bases:
             b = bases[0]
             cells = self._sprite_cells("port", "starbase", seed=b.starbase_id,
@@ -1713,9 +1721,10 @@ class SectorScene(Static):
         out = composer.compose(w, h)
         self._hotspots = composer.hotspots
         if composer.station_reference is not None:
-            primary_height, body_height = composer.station_reference
+            kind, object_id, width, height = composer.station_reference
+            key = StationKey(self._sector.sector_id, kind, object_id)
             self.app.sector_station_reference = (  # type: ignore[attr-defined]
-                self._sector.sector_id, primary_height, body_height)
+                StationReference(entries=((key, (width, height)),)))
         return out
 
     def on_click(self, event: events.Click) -> None:

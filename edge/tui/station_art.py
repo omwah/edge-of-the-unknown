@@ -10,6 +10,8 @@ from textual.app import active_app
 from textual.containers import Horizontal
 from textual.widgets import Static
 
+from edge.art.geometry_catalog import load_default_geometry_catalog
+from edge.art.scene_paint import natural_fallback_dimensions
 from edge.art.stations import render_station_art
 from edge.core.config import SceneArtConfig
 from edge.tui import art_adapter
@@ -21,24 +23,35 @@ _FALLBACK = "[dim]◇═══ station link ═══◇[/]"
 def station_icon_dimensions(app: object | None,
                             kind: Literal["port", "stardock", "starbase"],
                             _cinematic: bool, *,
-                            expect_sector: int | None = None) -> tuple[int, int]:
+                            expect_sector: int | None = None,
+                            object_id: int | None = None) -> tuple[int, int]:
     """Exterior-art footprint beside a service banner, from scene config.
 
-    `expect_sector` is the internal sector id of the station being drawn, when the
-    caller knows it. The docking flow always renders the station's SectorScene last,
-    so the published reference should match; a mismatch means the cache is stale
-    (a bug in that invariant), and the stale sizes must not leak into this header.
+    `expect_sector`/`object_id` are the internal sector id and the port/starbase's
+    own entity id of the station being drawn, when the caller knows them. The
+    docking flow always renders the station's SectorScene last, so the published
+    `(sector_id, station_kind, object_id)` reference (plan §4 invariant 12) should
+    have an exact-match entry; a miss (no preceding render, a stale/mismatched
+    sector, or a caller that hasn't threaded `object_id` through yet) falls back to
+    the richest authored rung rather than trusting a partial or stale key.
     """
     cfg = getattr(app, "scene_art", None) or SceneArtConfig()
-    cached = getattr(app, "sector_station_reference", None)
-    if cached is not None:
-        sector_id, primary_height, body_height = cached
-        if expect_sector is None or sector_id == expect_sector:
-            return cfg.station_dimensions(
-                kind, primary_height=primary_height, body_height=body_height)
+    ref = getattr(app, "sector_station_reference", None)
+    if ref is not None and expect_sector is not None and object_id is not None:
+        size = ref.lookup(expect_sector, kind, object_id)
+        if size is not None:
+            return size
     # Direct-open developer/test screens have no preceding Sector render (and a
-    # stale reference from another sector is treated the same). There is no
-    # rendered primary/body height to reconstruct, so use the kind's bounds.
+    # stale/mismatched reference from another sector or station is treated the
+    # same). Try the richest complete authored rung for this kind rather than
+    # `SceneArtConfig`'s padded bounds — but every generated rung is keyed by a
+    # real archetype id (`natural_fallback_dimensions` needs one to find a match;
+    # this call site doesn't have the station's archetype to offer, so it misses
+    # today and falls through). Threading an archetype id into this fallback is
+    # left for a follow-up; `cfg.station_size` remains the honest last resort.
+    fallback = natural_fallback_dimensions(load_default_geometry_catalog(), kind)
+    if fallback is not None:
+        return fallback
     size = cfg.station_size(kind)
     return size.max_width, size.max_height
 
@@ -52,12 +65,14 @@ class StationArtRow(Horizontal):
         icon: Static,
         banner: Static,
         expect_sector: int | None = None,
+        object_id: int | None = None,
         **kwargs: object,
     ) -> None:
         self._station_kind = kind
         self._station_icon = icon
         self._station_banner = banner
         self._expect_sector = expect_sector
+        self._object_id = object_id
         super().__init__(icon, banner, **kwargs)  # type: ignore[arg-type]
         app = active_app.get(None)
         cinematic = getattr(getattr(app, "layout_tier", None), "value", "standard") == "wide"
@@ -65,7 +80,8 @@ class StationArtRow(Horizontal):
 
     def _center_art(self, app: object | None, cinematic: bool) -> None:
         icon_width, icon_height = station_icon_dimensions(
-            app, self._station_kind, cinematic, expect_sector=self._expect_sector)
+            app, self._station_kind, cinematic,
+            expect_sector=self._expect_sector, object_id=self._object_id)
         banner_height = 12 if cinematic else 8
         row_height = max(icon_height, banner_height)
         self.styles.height = row_height
@@ -88,7 +104,8 @@ class _StationArt(Static):
                  condition: str, *, icon: bool, identity: int,
                  cinematic: bool = False, theme: str = "",
                  icon_size: tuple[int, int] | None = None,
-                 expect_sector: int | None = None) -> None:
+                 expect_sector: int | None = None,
+                 object_id: int | None = None) -> None:
         # Open on the art we drew last time, not the text fallback (PT-42): a screen that
         # rebuilds itself on every action would otherwise flash the placeholder until
         # `on_mount` re-rendered, which reads as the art "resetting" each time you act.
@@ -105,6 +122,7 @@ class _StationArt(Static):
         self._icon = icon
         self._identity = identity
         self._expect_sector = expect_sector
+        self._object_id = object_id
         if icon_size is not None:
             self.styles.width, self.styles.height = icon_size
 
@@ -118,7 +136,8 @@ class _StationArt(Static):
     def _refresh(self) -> None:
         cinematic = getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "wide"
         icon_size = (station_icon_dimensions(self.app, self._kind, cinematic,
-                                             expect_sector=self._expect_sector)
+                                             expect_sector=self._expect_sector,
+                                             object_id=self._object_id)
                      if self._icon else None)
         self._key = (self._kind, self._archetype, self._service, self._condition,
                      self._icon, self._identity, cinematic, str(self.app.theme), icon_size)
@@ -169,22 +188,24 @@ class StationArtHeader(StationArtRow):
 
     def __init__(self, kind: Literal["port", "starbase"], archetype_id: str, service: str, *,
                  identity: int, condition: str = "open",
-                 expect_sector: int | None = None) -> None:
+                 expect_sector: int | None = None,
+                 object_id: int | None = None) -> None:
         # Read the tier/theme here, at compose time, where the app is reachable, so each
         # panel opens on the art it last drew *at this size* (edge.tui.art_memory).
         app = active_app.get(None)
         cinematic = getattr(getattr(app, "layout_tier", None), "value", "standard") == "wide"
         theme = str(getattr(app, "theme", ""))
         icon_size = station_icon_dimensions(app, kind, cinematic,
-                                            expect_sector=expect_sector)
+                                            expect_sector=expect_sector, object_id=object_id)
         super().__init__(
             kind,
             _StationArt(kind, archetype_id, service, condition,
                         icon=True, identity=identity, cinematic=cinematic, theme=theme,
-                        icon_size=icon_size, expect_sector=expect_sector),
+                        icon_size=icon_size, expect_sector=expect_sector, object_id=object_id),
             _StationArt(kind, archetype_id, service, condition,
                         icon=False, identity=identity, cinematic=cinematic, theme=theme),
             expect_sector=expect_sector,
+            object_id=object_id,
         )
 
     def on_mount(self) -> None:
