@@ -1000,7 +1000,20 @@ Verification:
 - Consumer tests, docked-header reference/fallback tests, Pilot flows, and both switch
   positions pass.
 
-Docs: none beyond noting the migrated consumer list here.
+Docs: consumer disposition — `station_art.py`/`screens/stardock.py`/`screens/base.py`/
+`screens/port.py` migrated onto the WP-SC07 `StationReference` (required adding
+`PortDTO.port_id`, wire v46, since ports had no entity id distinct from `sector_id`);
+`scene_preview.py` gained a `--composer` flag reusing `scene_gallery.py`'s
+`COMPOSERS`/`render_physical` seam; `scene_gallery.py` was already there;
+`art_adapter.py`/`dummy.py`/`shots.py` were audited and found to have no
+composer-specific coupling to migrate (pure vocabulary/sample/end-to-end-Pilot
+consumers respectively). **Found in the process, not fixed here:** a port/starbase
+with no `archetype_id` (reachable in real play when no alliance controls its
+sector — `session.py`'s `_controlling_archetype` fallback can return `None`) crashes
+`edge.scene.project`'s `frame()` if that station becomes the sole/anchor body, because
+the generated ladder catalogue has no `archetype_id=""` rungs. Not a live-play risk
+while the legacy composer stays default, but WP-SC05/SC06 should close it before
+WP-SC11 flips the default.
 
 Commit: `ui: WP-SC10 migrate scene consumers`
 

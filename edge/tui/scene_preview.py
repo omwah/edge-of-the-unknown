@@ -7,6 +7,7 @@ no app — so layout/scale decisions can be judged quickly at every tier:
     python -m edge.tui.scene_preview --case belt        # one case
     python -m edge.tui.scene_preview --size 87x36       # one size
     python -m edge.tui.scene_preview --list             # case names
+    python -m edge.tui.scene_preview --composer fixed_fov_perspective  # WP-SC10
 
 Sizes default to the space the scene actually gets per tier: compact 80×20
 (where today the object list replaces the scene — rendered here to judge
@@ -34,6 +35,7 @@ from edge.core.dto import (
     SectorShipDTO,
     SectorStarbaseDTO,
 )
+from edge.tui.scene_gallery import COMPOSERS, DEFAULT_COMPOSER, _STRATEGIES, render_physical
 from edge.tui.widgets import _SceneComposer
 
 # (label, width, height) — the canvas the scene gets at each responsive tier.
@@ -146,8 +148,12 @@ def _cases() -> dict[str, SectorDTO]:
         "port-only": SectorDTO(
             region="Waystation Verge", sector_id=640, display_id=640, band="Expanse",
             flavor="a single docking light blinks in the dark", beacon=None,
+            # A real projected sector always supplies an archetype_id (session.py's
+            # port_view falls back to the region's controlling species); an empty one
+            # only crashes the physical-model solver when the port is the sole/anchor
+            # body, as it is here, so this fixture must not be the exception.
             ports=[SectorPortDTO(port_id=64, name="Verge Depot", klass="Class 1 (SBB)",
-                                 is_stardock=False)],
+                                 is_stardock=False, archetype_id="humanoid_diplomat")],
         ),
     }
 
@@ -158,6 +164,9 @@ def main() -> None:
     parser.add_argument("--case", help="render only this case (see --list)")
     parser.add_argument("--size", help="render only WxH, e.g. 87x36")
     parser.add_argument("--list", action="store_true", help="list case names and exit")
+    parser.add_argument("--composer", choices=COMPOSERS, default=DEFAULT_COMPOSER,
+                        help="which composer renders the scene (WP-SC10); "
+                             f"default {DEFAULT_COMPOSER!r} matches live play")
     args = parser.parse_args()
 
     cases = _cases()
@@ -173,10 +182,14 @@ def main() -> None:
 
     console = Console()
     cfg = SceneArtConfig()
+    strategy = _STRATEGIES[args.composer]
     for name, sector in cases.items():
         for label, w, h in sizes:
-            console.print(Rule(f"{name} — {label}"))
-            console.print(_SceneComposer(sector, cfg).compose(w, h))
+            console.print(Rule(f"{name} — {label} [{args.composer}]"))
+            if strategy is None:
+                console.print(_SceneComposer(sector, cfg).compose(w, h))
+            else:
+                console.print(render_physical(sector, strategy, w, h).art)
             console.print()
 
 
