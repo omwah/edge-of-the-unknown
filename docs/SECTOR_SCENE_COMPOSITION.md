@@ -634,3 +634,190 @@ subsection of §9.6 for the mechanism and the measurements; the parts that touch
 (`pixi run python -m edge.devtool.scene_parity`), and
 `tests/test_scene_legacy_parity.py` guards it in CI. One cell of the matrix is a
 known, named miss — see the plan.
+
+## 11. The physical model's solver: units, retention, and placement
+
+§10 covers where the physical model's station *sizes* land relative to this
+composer's own scale chain. This section covers the mechanics that decide
+*what* the physical model shows and *where* — the counterpart, for
+`edge/scene/` + `edge/art/scene_paint.py`, to §§0-6 above for `_SceneComposer`.
+Nothing here changes when either composer is selected; both are live and
+independently tested (§0's status line, `tests/test_scene_legacy_parity.py`).
+
+### 11.1 Units: exact arithmetic, no floats in a decision
+
+An **ink cell** is a rendered cell whose character is not `" "` — the same test
+`_SceneComposer._paint` already applies so stars show through sprite gaps
+(§4.1); the physical model's catalogue and paint stage use the identical rule
+rather than inventing a second one. **Ink bounds** are the smallest rectangle
+enclosing a render's ink cells; **ink count** is how many there are. Bounds
+drive geometry (does this fit); count drives cost and density only.
+
+World positions, radii, depths, and face extents are integers in a **scene
+unit (su)** — there is no world-space float, and the su-to-cell relationship
+exists only once a `ProjectionStrategy` projects a position, so su carries no
+fixed cell size of its own. Every intermediate that feeds a comparison or a
+rounding is a `fractions.Fraction`, never a `float` — cell rounding is `floor`
+for positions and round-half-even for extents, applied to the exact fraction,
+so a boundary case is defined rather than platform-dependent. `float` appears
+only in diagnostic fields nothing reads back. `cell_aspect` (a `Fraction` from
+config; `2/1` mirrors this composer's own `width = 2 x height` disc rule, §2)
+converts a square su face into the taller-than-wide terminal cell grid.
+
+A **scale class** (`edge.scene.classify.SCALE_CLASSES`) is a config-named
+bucket — `anchor`, `entity`, `stardock`, `starbase`, `orbital`, `wreck`,
+`ship`, `belt` — ordered by nominal face area (`width_su * height_su` of the
+axis-aligned bounding box, exact even for a circle/ellipse, since a class's
+shape is fixed per kind and bounding-box area changes no ordering versus
+`pi*a*b`). The shipped areas read `anchor 1800 > entity 476 > stardock 352 >
+starbase 238 > port 168 > wreck 96 > ship 60`, which is this composer's own
+§1 tier ordering (planet ≫ Stardock > starbase > port > ship) expressed as
+apparent scale rather than merely as config scale factors. Stardock and
+starbase are their own scale classes — not shades of a shared `orbital` — for
+exactly the reason §2's caps insist Stardock never crops through
+`trading_port`: without a distinct class, `Stardock > starbase > port` had no
+size lever separate from the shared bucket's single target.
+
+A **structural mode** (`wide` / `standard` / `compact`) is selected from the
+drawable scene viewport by an ordered list of `(min_cols, min_rows, mode)`
+thresholds, most-permissive first — independent of terminal tier and of
+`art_detail`, the way this composer's own bands are.
+
+### 11.2 Retention order: what survives when the scene must shed something
+
+`SceneRetention` (`edge.scene.model`, an `IntEnum`, lower value retained
+first) orders `ENTITY, ANCHOR, ORBITAL, HOSTILE_SHIP, NEUTRAL_SHIP, WRECK,
+FRIENDLY_SHIP`. The Entity hint and the primary body are protected before
+anything else — they are what makes the sector legible at all — hostile
+traffic outranks neutral and wreck because a threat is plot-critical to show,
+and ordinary friendly traffic is shed first because it is the least
+consequential thing on screen. This plays the same role §3's ship-depth and
+station-limb rules play for the legacy composer: a promise about what a
+crowded scene keeps, stated as a numbered order instead of a placement
+heuristic.
+
+### 11.3 The solve loop
+
+`edge.scene.solve.solve()` searches an all-integer/rational space — the whole
+comparison between two candidate scenes is a lexicographic tuple of integers,
+never a weighted float score, which is what keeps the promise auditable rather
+than a matter of taste:
+
+1. Sort admitted objects by `(retention, hostility_ordinal, -threat_rank,
+   key)` — the fog-safe ordinal from `SectorShipDTO` (never the raw disposition
+   or its private inputs, §9 above) breaks ties within a retention tier the
+   same way the real encounter rule would.
+2. Pick the **anchor** — the admitted object with the largest face area — and
+   ask the active `ProjectionStrategy` to frame a camera against it.
+3. Sweep camera candidates (height first, since that decides whether the
+   anchor fits at all, then a bounded lateral aim offset) and attempt each:
+   project every object, then place and admit them in retention order inside
+   one joint evaluation (§11.4).
+4. If no candidate's hard rules all pass, fall back in order: step the anchor
+   down its own box-class ladder (a continuous kind only), then reject the
+   single lowest-retention object and retry. A rejected object is never
+   re-admitted within the same solve, so the loop is monotone and terminates.
+5. Compare every attempted candidate — including failing ones — on an integer
+   tuple: how many objects of each retention tier it rejected (most-protected
+   tier first, so no number of low-priority admissions ever outweighs one
+   higher-tier rejection), then admitted count, minimum-size violations,
+   distance from the anchor's target size, separation slack, an integer
+   hysteresis penalty against the previous plan, and finally the plan's own
+   content hash as a stable tie-break — never iteration order.
+
+The **hard rules**, cheapest and most-rejecting first: near-plane and viewport
+containment; minimum projected size for the object's scale class; a ladder
+rung (or continuous box class) that actually clears; separation between
+inflated ink boxes (skipped for permeable fields — the physical model's
+belt, exactly like §3's "a belt is a field, not a body"); occlusion by depth,
+enforcing a minimum visible fraction of the farther object of any overlapping
+pair; equal-depth scale-class ordering; and the scene's cumulative render-cost
+budget plus an emergency ship-count ceiling.
+
+**Hysteresis** — an integer L1 distance between this candidate and the
+previous plan's camera height, object positions, admitted set, and art
+box sizes, weighted from config — is only ever the second-to-last term of the
+comparison tuple, so it can reduce jitter between resizes but can never
+outrank a hard rule or a retention-tier difference. This is the physical
+model's counterpart to this composer having no equivalent concept at all: a
+legacy scene simply re-derives from scratch every render, while the physical
+model deliberately damps resize churn.
+
+### 11.4 Joint secondary-object placement
+
+Everything except the anchor and other fixed-position objects (a planet's
+orbiting station, say) is `flexible`, and flexible objects are placed inside
+the same per-candidate evaluation that checks the hard rules, not as a
+separate step before or after the camera search — the two were tried apart
+early on and the split could not reach a workable admission rate, because a
+position chosen against one camera was then judged against whatever camera
+the sweep eventually settled on. Placement proceeds in strict retention order:
+
+- each object's placement **region** — the su box it may move within, and for
+  an orbiting object an offset from its already-placed parent rather than an
+  absolute box — narrows to the feasible depth band for the current camera
+  (found by two bounded binary searches over `strategy.project()`, since
+  "too big" and "too small" are each monotonic in depth for both shipped
+  strategies) intersected with the visible screen-space extent at each
+  sampled depth;
+- within that band, candidate depths are walked **near to far** (the nearest
+  workable depth wins the richest reachable art, matching this composer's own
+  "near hull claims the richest rung" rule in §2.1), and at each depth a
+  handful of screen-space lattice slots are tried, rejecting any that overlap
+  an already-placed object's inflated ink box by cheap integer rectangle
+  arithmetic before spending a real projection on it;
+- the object's cost is checked against the shared budget **before** its
+  cheapest rung is attempted and again against whichever rung placement
+  actually selects, so a candidate too dear for what remains is skipped in
+  favor of a cheaper, farther one rather than the object being dropped
+  outright;
+- because placement is greedy and ordered by retention, a higher-priority
+  object is never moved to make room for a lower one — the object that wins a
+  contested slot is always the one this composer would also protect first.
+
+Two rung-selection rules ride on top of the depth/slot search, both aimed at
+the same complaint — objects rendering at their worst authored tier even on a
+roomy canvas:
+
+- **A minimum-richness floor.** `min_rung_index_from_end_by_scale_class`
+  excludes a scale class's worst rungs from `_select_rung` outright (as a real
+  exclusion on the candidate set, not a bigger absolute cell-count floor,
+  since authored rung sizes vary too much by subtype for one number to bind
+  correctly everywhere) — a station never renders at the single poorest tier
+  of its ladder, matching this composer's §2 art-ladder ceiling in spirit:
+  config cannot buy a bigger rung than the art has, but it can refuse the
+  worst one that does exist. Ships are deliberately excluded from this floor —
+  `DepthLayeredAnchorProjection`'s quantised depth steps make the resulting
+  z-band fall between layers often enough to collapse ship admission instead
+  of improving it.
+- **Cost-aware rung selection.** `_select_rung` filters by an optional
+  affordability ceiling *before* ranking rungs, so the cheapest rung that
+  still fits the projected box is preferred over refusing the object outright
+  because the richest fitting rung was too dear. This can only ever remove a
+  candidate, never promote one to a higher cost class, so it cannot violate
+  the render-cost-in-retention-order rule above.
+
+### 11.5 Art resolution and paint
+
+For each accepted projection, far to near: resolve the rung's natural box (or
+the continuous kind's selected box class), render at that box with a seed
+drawn from stable identity (sector id for a port, matching this composer's own
+`_paint_station` seed, so the two composers draw the identical variant at the
+identical size within one authored rung), crop to ink, and paint into the
+scene's cell grid with transparent spaces exactly as this composer's own
+`_paint` does. If the actual ink exceeds the estimate used during solving, one
+bounded correction re-checks the affected hard rules against the real box —
+shrinking one rung or box class, or rejecting — but never raises the object's
+cost class and never restarts the camera search. The render cache is keyed by
+`(entity_type, subtype, seed, box, facing, archetype, treatment)`, and the
+docked-header contract (§2/§4.1 above) is served from the same resolved
+`(sector_id, station_kind, object_id) -> natural size` mapping this composer's
+`sector_station_reference` already publishes — one seam, two composers.
+
+Glyphs (fighters, mines) scatter after every ink box is placed: a local,
+sector-seeded RNG walks free cells and drops a glyph that clears a configured
+spacing from ones already placed; a glyph that finds no room in a bounded
+number of tries is dropped from the scene and reported through the sidebar
+instead, never as scene text — the physical model has no in-scene text-row
+overflow at all (unlike this composer's `_deferred` text rows, §4); its
+equivalent promise is named sidebar overflow.
