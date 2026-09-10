@@ -1,27 +1,30 @@
 # Sector-scene composition — the arrival view
 
-Status: shipped (WP-PR2-05, `playtest: WP-PR2-05 arrival-view sector scene`)
-Code: `edge/tui/widgets.py` → `_SceneComposer` (the layout) / `SectorScene` (the widget shell)
-Preview: `pixi run python -m edge.tui.scene_preview` (dev-only; every composition × every tier)
+Status: **the physical-model composer (`edge/scene` + `edge/art/scene_paint.py`) is
+the shipped default (WP-SC11)**; the composer described in most of this note —
+`_SceneComposer`/legacy — is a permanent, config-selectable alternative, not
+deprecated scaffolding. Select it with `scene.composer: legacy` in `config/default.yaml`
+(default is `physical`, with `scene.projection_strategy: fixed_fov_perspective |
+depth_layered_anchor` selecting the physical model's own strategy). See
+`docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md` for the physical model's full design and
+work-package history (WP-SC01–WP-SC11); this note's sections below describe the
+*legacy* composer's theory and remain accurate for it, but "current"/"shipped" in the
+prose below refers to legacy specifically, not the new default.
 
-> **In progress:** `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md` is replacing this composer
-> with a deterministic physical-model solver (WP-SC01–WP-SC11). This note remains
-> authoritative for *current, shipped* behavior until the replacement's cutover WP
-> (WP-SC11) folds the approved rules in here; forthcoming sections below record what has
-> landed toward that plan without describing it as current.
+Code: `edge/tui/widgets.py` → `_SceneComposer` (the legacy layout) / `SectorScene` (the
+widget shell, which dispatches to either composer per `SceneArtConfig.composer`) /
+`_render_physical_scene` (the physical-model path, painting the same header/flavor/
+beacon chrome and starfield background around the physical model's own object layout).
+Preview: `pixi run python -m edge.tui.scene_preview --composer <legacy|fixed_fov_perspective|depth_layered_anchor>`
+(dev-only; every composition × every tier × either composer).
 
-This note records the *theory* behind where things go, so future changes tune the
-intent instead of rediscovering it. The interview decisions of 2026-07-17 are folded
-in throughout.
-
-> **Replacement planned (2026-08-31).** The shipped arrival-view composer described
-> here remains authoritative for the current code, but its sizing references,
-> placement search, depth ladder, and paint order are coupled closely enough that
-> gallery tuning tends to repair one matrix cell while disturbing another. The
-> approved replacement is planned in `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`: a
-> deterministic, presentation-only 2.5D model, calibrated projection strategy,
-> explicit decision trace, and sidebar-only overflow. This note must continue to
-> describe what is actually shipped until that plan lands.
+This note records the *theory* behind where the legacy composer puts things, so
+future changes to it tune the intent instead of rediscovering it. The interview
+decisions of 2026-07-17 are folded in throughout. It predates the physical model and
+was the sole shipped composer through WP-SC10; WP-SC11 made the physical model the
+default while keeping this composer as a live alternative and a reference model for
+tests (`tests/test_scene_legacy_parity.py`, `tests/test_ui_snapshots.py`'s pinned
+`composer="legacy"` suite).
 
 ## 0. As implemented: operational rule tree (audit 2026-08-31)
 
@@ -590,9 +593,12 @@ projection; the shipped composer above does not yet consume it.
 
 Nothing in §§0-9 changes: `_SceneComposer` and `SceneArtConfig`'s
 `planet`/`port`/`stardock`/`starbase`/`ship` sizes, scales and caps are
-untouched, and the legacy composer is still what live play renders.
+untouched. (At the time this section was written the legacy composer was still
+what live play rendered by default; WP-SC11 has since made the physical model
+the default — see this note's top-of-file Status line.)
 
-What changed is on the other side of the cutover. The replacement pipeline
+What changed here, before that later default flip, was on the other side of
+the eventual cutover. The replacement pipeline
 (`edge/scene/`, `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`) now reproduces this
 document's station scale chain exactly, so a port / Stardock / starbase renders
 at the same size under either composer. Read that plan's "Station size parity"

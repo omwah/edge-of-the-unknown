@@ -26,6 +26,13 @@ ticker:
 # SectorView sprite scene — sizes/counts only, no rules impact (presentation).
 # Sprites are sized to the space available, clamped to [min, max] per axis.
 scene:
+  # WP-SC11: which composer/projection strategy actually renders the sector scene.
+  # "physical" (edge.scene + edge.art.scene_paint) is the approved default; "legacy"
+  # (the _SceneComposer every other key in this block configures) is a permanent,
+  # config-selectable alternative and reference model, not scaffolding awaiting
+  # deletion. projection_strategy is read only when composer is "physical".
+  composer: physical
+  projection_strategy: fixed_fov_perspective
   # 40 is derived, not taste: every other kind scales off the *rendered* primary
   # height, so this is the one number that decides where the whole hierarchy stops
   # growing. At 40 each kind's scale lands exactly on the top rung of its art

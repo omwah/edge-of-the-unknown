@@ -136,8 +136,13 @@ MapScreen, MessagesScreen** (shell). The rest are Phase 2-3 (marked per screen).
   their own extent so words stay legible, with stars in the margins. Planet / port /
   ship / unlogged-discovery **click hotspots** post the same `ClickableEntry.Picked`
   the keys do. All sprite sizes come from config `scene:` (`SceneArtConfig`).
-  The composition is an **arrival view**, not a grid of layout bands (`_SceneComposer`,
-  WP-PR2-05): under the centred **header** (`[id] REGION (Band)` + flavor + beacon),
+  The composition is an **arrival view**, not a grid of layout bands. The header
+  (`[id] REGION (Band)` + flavor + beacon) and starfield/click contract described
+  above are shared by both shipped composers (`SceneArtConfig.composer`); the specific
+  placement algorithm below is the legacy composer's (`_SceneComposer`, WP-PR2-05) —
+  the physical-model composer (default since WP-SC11,
+  `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md`) achieves the same visual hierarchy
+  through its own deterministic solver rather than this band logic. Under that header,
   the **largest body present** — the planet, else a space find, else the station —
   anchors toward the **right edge** at the biggest size that fits (its disc may crop
   slightly, like a world filling a viewport); a **port/starbase hovers at its lower

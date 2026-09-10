@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import random
+from collections import OrderedDict
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -21,7 +23,22 @@ from textual.widgets import DataTable, Input, Select, Static, TabbedContent, Tab
 from rich.style import Style
 
 from edge.art import sprites as art_sprites
-from edge.art.scene_paint import StationKey, StationReference
+from edge.art.geometry_catalog import load_geometry_catalog
+from edge.art.scene_paint import (
+    ScenePaint,
+    StationKey,
+    StationReference,
+    build_station_reference,
+    paint_grid,
+    resolve_scene,
+)
+from edge.art.scene_tuning import build_continuous_yields, build_scene_tuning
+from edge.scene.catalog import ArtGeometryCatalog
+from edge.scene.classify import classify_sector
+from edge.scene.geometry import CellBox
+from edge.scene.model import PhysicalObject, SceneTuning
+from edge.scene.project import DepthLayeredAnchorProjection, FixedFovPerspective, ProjectionStrategy
+from edge.scene.solve import solve as solve_scene
 from edge.core.config import SceneArtConfig
 from edge.core.dto import SectorDiscovery, SectorPlanetDTO, SectorShipDTO
 from edge.core.enums import Commodity
@@ -911,6 +928,164 @@ def primary_body_height(cfg: SceneArtConfig, w: int, body_h: int, *,
     return ph
 
 
+# ---------------------------------------------------------------------------
+# WP-SC11: the physical-model composer path (`edge.scene`/`edge.art.scene_paint`),
+# wired alongside the legacy `_SceneComposer` below. `SceneArtConfig.composer`
+# selects which one `SectorScene.render` actually runs; both stay live
+# indefinitely (plan §7 WP-SC11 revision) rather than one replacing the other.
+# ---------------------------------------------------------------------------
+
+_PHYSICAL_STRATEGIES: dict[str, ProjectionStrategy] = {
+    "fixed_fov_perspective": FixedFovPerspective(),
+    "depth_layered_anchor": DepthLayeredAnchorProjection(),
+}
+
+_physical_pipeline_cache: tuple[int, SceneTuning, ArtGeometryCatalog] | None = None
+"""Single-slot cache keyed by `id(cfg.physical_model)`: a game's config object is
+loaded once and held for the session, so identity is a safe, cheap cache key --
+this avoids rebuilding the tuning/catalogue (`edge.art.scene_tuning`,
+`edge.art.geometry_catalog`) on every resize, mirroring `scene_gallery.py`'s
+`_physical_pipeline` `lru_cache`, which this widget cannot use directly (module-
+level caches there are keyed by no arguments at all, assuming one process-wide
+config; the running app's config can change across a load)."""
+
+
+def _physical_pipeline(cfg: SceneArtConfig) -> tuple[SceneTuning, ArtGeometryCatalog]:
+    global _physical_pipeline_cache
+    key = id(cfg.physical_model)
+    if _physical_pipeline_cache is not None and _physical_pipeline_cache[0] == key:
+        return _physical_pipeline_cache[1], _physical_pipeline_cache[2]
+    pm = cfg.physical_model
+    tuning = build_scene_tuning(pm)
+    catalog = load_geometry_catalog(build_continuous_yields(pm))
+    _physical_pipeline_cache = (key, tuning, catalog)
+    return tuning, catalog
+
+
+def _grid_to_text(grid: list[list[tuple[str, Style | None]]], w: int, h: int) -> Text:
+    out = Text()
+    for y in range(h):
+        row = grid[y] if y < len(grid) else []
+        for x in range(w):
+            ch, style = row[x] if x < len(row) else (" ", None)
+            out.append(ch, style=style)
+        if y < h - 1:
+            out.append("\n")
+    return out
+
+
+def _physical_destination(dest: str | None) -> tuple[str, int | str | None] | None:
+    """Split a `PhysicalObject.destination` ("kind:ref") into the `(dest, ref)`
+    pair `ClickableEntry.Picked` expects; every real ref is an int (plan §9.3:
+    `edge.scene.classify` never invents a non-numeric one)."""
+    if dest is None:
+        return None
+    kind, _, ref = dest.partition(":")
+    return kind, (int(ref) if ref else None)
+
+
+def _starfield_grid(sector_id: int, w: int, h: int) -> list[list[tuple[str, Style | None]]]:
+    """The same procedural starfield base every composer draws behind its sprites
+    (`_SceneComposer._starfield`) -- the art/TUI seam's job, never `edge.scene`'s
+    (plan §3: "the art/TUI seam ... retains starfield/cell painting")."""
+    cells = art_adapter.text_to_cells(art_adapter.sprite(
+        "starfield", "standard", seed=sector_id ^ 0x5EED, width=w, height=h))
+    grid: list[list[tuple[str, Style | None]]] = [[(" ", None)] * w for _ in range(h)]
+    for y in range(min(h, len(cells))):
+        for x in range(min(w, len(cells[y]))):
+            ch, style = cells[y][x]
+            if ch != " ":
+                grid[y][x] = (ch, style)
+    return grid
+
+
+def _stamp_center_into(
+    grid: list[list[tuple[str, Style | None]]], markup: str, row: int, w: int
+) -> None:
+    """Stamp one centred markup line into `grid` (mirrors `_SceneComposer._stamp_center`,
+    which the physical composer has no equivalent object for -- the sector title/flavor/
+    beacon line is presentation chrome, not a `PhysicalObject`)."""
+    if not 0 <= row < len(grid):
+        return
+    n = Text.from_markup(markup).cell_len
+    x0 = max(0, (w - n) // 2)
+    line = art_adapter.text_to_cells(Text.from_markup(markup))[0:1]
+    for c, (ch, style) in enumerate(line[0] if line else []):
+        x = x0 + c
+        if 0 <= x < w:
+            grid[row][x] = (ch, style)
+
+
+class PhysicalScenePaint:
+    """One resolved physical-model render: the painted `Text`, hotspots, and the
+    `StationReference` this sector's docked stations publish. Cached per
+    `(sector, strategy, viewport)` by `SectorScene` (plan §6.2 rule 6's widget-
+    owned bounded `ScenePlan` cache -- keyed on a coarser but equivalent
+    fingerprint, since a fresh `SectorDTO` is rebuilt every server tick and is
+    never the same object twice)."""
+
+    __slots__ = ("art", "hotspots", "station_reference")
+
+    def __init__(
+        self, art: Text,
+        hotspots: list[tuple[int, int, int, int, str, int | str | None]],
+        station_reference: StationReference,
+    ) -> None:
+        self.art = art
+        self.hotspots = hotspots
+        self.station_reference = station_reference
+
+
+def _render_physical_scene(
+    sector: SectorDTO, cfg: SceneArtConfig, w: int, h: int
+) -> PhysicalScenePaint:
+    tuning, catalog = _physical_pipeline(cfg)
+    strategy = _PHYSICAL_STRATEGIES[cfg.projection_strategy]
+
+    # Header/flavor/beacon chrome (`_SceneComposer.compose`'s exact layout): not a
+    # `PhysicalObject`, so the seam paints it directly and hands the physical model
+    # only the body rows below it -- matching plan §2.4's "Select responsive
+    # structural modes from the actual drawable scene viewport, after header/UI
+    # subtraction".
+    grid = _starfield_grid(sector.sector_id, w, h)
+    title = f"[{sector.display_id}] {sector.region}" + (f" ({sector.band})" if sector.band else "")
+    _stamp_center_into(grid, f"[b cyan]{title}[/]", 0, w)
+    _stamp_center_into(grid, f"[i #8a8a8a]░▒▓ {sector.flavor} ▓▒░[/]", 1, w)
+    row = 2
+    if sector.beacon:
+        _stamp_center_into(grid, f"[yellow]![/] {sector.beacon}", row, w)
+        row += 1
+    hdr = row + 1  # one blank line under the header
+    body_h = max(0, h - hdr)
+
+    arrangement, glyph_requests = classify_sector(sector, tuning)
+    viewport = CellBox(0, 0, w, body_h)
+    plan = solve_scene(arrangement, viewport, tuning, catalog, strategy)
+    paint: ScenePaint = resolve_scene(plan, arrangement, catalog, tuning)
+    body_grid = paint_grid(paint, viewport)
+    for y in range(min(body_h, len(body_grid))):
+        for x in range(min(w, len(body_grid[y]))):
+            ch, style = body_grid[y][x]
+            if ch != " ":
+                grid[hdr + y][x] = (ch, style)
+    art = _grid_to_text(grid, w, h)
+
+    objects_by_key: dict[Any, PhysicalObject] = {obj.key: obj for obj in arrangement.objects}
+    hotspots: list[tuple[int, int, int, int, str, int | str | None]] = []
+    for obj in paint.painted:
+        source = objects_by_key.get(obj.key)
+        routed = _physical_destination(source.destination if source is not None else None)
+        if routed is None:
+            continue
+        dest, ref = routed
+        b = obj.scene_box
+        hotspots.append((b.col, hdr + b.row, b.col + b.width, hdr + b.row + b.height, dest, ref))
+
+    station_reference = build_station_reference(sector.sector_id, paint, arrangement)
+    del glyph_requests  # scattered by `resolve_scene`/`paint_grid`; not routed to clicks (§2.5)
+    return PhysicalScenePaint(art, hotspots, station_reference)
+
+
 class _SceneComposer:
     """Composites one sector as an *arrival view* (UI_MOCKUPS.md §1, PT-36/PT-44).
 
@@ -1690,8 +1865,10 @@ class SectorScene(Static):
     One Static because a terminal cell holds a single glyph and Textual does not
     blend overlapping widgets/layers — compositing everything over the starfield
     here is the only way to show stars *behind* the sprites (their negative-space
-    cells stay transparent). The layout itself lives in `_SceneComposer`; this
-    widget feeds it the widget size and routes its hotspot rects as
+    cells stay transparent). `SceneArtConfig.composer` selects which composer
+    actually lays out the scene: the legacy `_SceneComposer` below, or the
+    physical-model pipeline (`edge.scene`/`edge.art.scene_paint`); either way
+    this widget feeds it the widget size and routes its hotspot rects as
     ``ClickableEntry.Picked`` (mirroring the keys).
     """
 
@@ -1699,12 +1876,19 @@ class SectorScene(Static):
     SectorScene { width: 1fr; height: 1fr; background: transparent; }
     """
 
+    _PLAN_CACHE_CAPACITY = 8
+    """Small and bounded (plan §6.2 rule 6): a handful of recent viewports for
+    the current sector, not a cross-sector history. Dies with the widget."""
+
     def __init__(self, sector: SectorDTO, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._sector = sector
         # (x0, y0, x1, y1, dest, ref) recorded each render; on_click maps a hit to
         # the same ClickableEntry.Picked the keyboard/text affordances post.
         self._hotspots: list[tuple[int, int, int, int, str, int | str | None]] = []
+        # Physical-composer path only: the legacy composer is cheap enough (§6.1
+        # baseline) to need no equivalent cache.
+        self._physical_plan_cache: OrderedDict[str, PhysicalScenePaint] = OrderedDict()
 
     def on_resize(self) -> None:
         self.refresh()
@@ -1712,12 +1896,38 @@ class SectorScene(Static):
     def _scene_cfg(self) -> SceneArtConfig:
         return getattr(self.app, "scene_art", None) or SceneArtConfig()
 
+    def _physical_scene_fingerprint(self, cfg: SceneArtConfig, w: int, h: int) -> str:
+        """Fog-safe sector content + strategy + viewport (plan §6.2 rule 6). A
+        fresh `SectorDTO` is rebuilt every server tick and is never the same
+        object twice, so identity can't key this cache -- content can, via a
+        cheap deterministic hash of the frozen-dataclass `repr()`."""
+        content = hashlib.blake2b(repr(self._sector).encode(), digest_size=16).hexdigest()
+        return f"{content}|{cfg.projection_strategy}|{w}x{h}"
+
+    def _render_physical(self, cfg: SceneArtConfig, w: int, h: int) -> PhysicalScenePaint:
+        fingerprint = self._physical_scene_fingerprint(cfg, w, h)
+        cached = self._physical_plan_cache.get(fingerprint)
+        if cached is not None:
+            self._physical_plan_cache.move_to_end(fingerprint)
+            return cached
+        result = _render_physical_scene(self._sector, cfg, w, h)
+        self._physical_plan_cache[fingerprint] = result
+        if len(self._physical_plan_cache) > self._PLAN_CACHE_CAPACITY:
+            self._physical_plan_cache.popitem(last=False)
+        return result
+
     def render(self) -> Text:
         w, h = self.size.width, self.size.height
         if w < 8 or h < 6:
             self._hotspots = []
             return Text("")
-        composer = _SceneComposer(self._sector, self._scene_cfg())
+        cfg = self._scene_cfg()
+        if cfg.composer == "physical":
+            painted = self._render_physical(cfg, w, h)
+            self._hotspots = painted.hotspots
+            self.app.sector_station_reference = painted.station_reference  # type: ignore[attr-defined]
+            return painted.art
+        composer = _SceneComposer(self._sector, cfg)
         out = composer.compose(w, h)
         self._hotspots = composer.hotspots
         if composer.station_reference is not None:

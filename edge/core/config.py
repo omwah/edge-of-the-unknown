@@ -1931,6 +1931,18 @@ class SceneArtConfig(BaseModel):
     # `build_continuous_yields`, not yet by any running composer.
     physical_model: ScenePhysicalModelConfig = Field(default_factory=_default_physical_model)
 
+    # WP-SC11: the approved runtime switch selecting which composer/strategy
+    # actually renders the sector scene. `"physical"` (this WP's approved default)
+    # runs `edge.scene`/`edge.art.scene_paint` with `projection_strategy`; `"legacy"`
+    # keeps running the `_SceneComposer` every field above this comment configures.
+    # Neither implementation is deprecated: `"legacy"` and `"depth_layered_anchor"`
+    # are permanent, config-selectable alternatives and reference models for tests
+    # (plan §7 WP-SC11 revision), not scaffolding awaiting deletion.
+    composer: Literal["physical", "legacy"] = "physical"
+    projection_strategy: Literal["fixed_fov_perspective", "depth_layered_anchor"] = (
+        "fixed_fov_perspective"
+    )
+
     def station_size(self, kind: Literal["port", "stardock", "starbase"]) -> SpriteSize:
         """The per-type footprint bounds shared by Sector and docked station views."""
         return {"port": self.port, "stardock": self.stardock,

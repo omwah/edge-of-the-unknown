@@ -13,6 +13,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.pilot import Pilot
 
+import edge.tui.app as app_module
 from edge.core.dto import Slot, Subsystem
 from edge.tui.app import EdgeApp
 from edge.tui.component_workbench import (
@@ -24,6 +25,23 @@ from edge.tui.component_workbench import (
 )
 
 SIZES = {"compact": (80, 24), "standard": (100, 34), "wide": (120, 40)}
+
+
+@pytest.fixture(autouse=True)
+def _pin_legacy_composer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """This module's baselines predate the physical-model composer (WP-SC11) and
+    are general UI smoke coverage, not a composer-specific suite -- pin every
+    capture in it to `composer="legacy"` so the WP-SC11 default flip doesn't
+    silently repurpose them as unreviewed physical-model baselines (plan's own
+    "must not silently rot the kept alternative" rule). The physical model has
+    its own dedicated suite in `test_physical_scene_snapshots.py`."""
+    real_load = app_module.load_default_config
+
+    def _legacy_load() -> object:
+        cfg = real_load()
+        return cfg.model_copy(update={"scene": cfg.scene.model_copy(update={"composer": "legacy"})})
+
+    monkeypatch.setattr(app_module, "load_default_config", _legacy_load)
 
 
 @pytest.mark.parametrize("size", SIZES.values(), ids=SIZES.keys())
