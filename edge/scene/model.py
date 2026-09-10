@@ -65,13 +65,17 @@ class PhysicalObject:
     ladder_key: LadderKey | None
     continuous_kind: str | None
     archetype_id: str | None
-    """Owner/species palette for procedural art, uniformly populated across both art
-    modes (plan §9.7 gap fix): for `ArtMode.LADDER` this mirrors `ladder_key.archetype_id`
-    (`""` becomes `None`); for `ArtMode.CONTINUOUS` it is the real DTO-level ownership
-    signal when one exists (currently: an owned planet's `SectorPlanetDTO.archetype_id`,
-    the same "controlling species of the region" fact ports/starbases already use) and
-    `None` otherwise -- a discovery/wreck/entity carries no ownership/species association
-    at the DTO level today, so this is `None` for those, not a fabricated value."""
+    """Owner/species palette for procedural art (plan §9.7 gap fix). This is the real
+    DTO-level ownership signal when one exists (a port/starbase/ship's own
+    `archetype_id`, or an owned planet's `SectorPlanetDTO.archetype_id`) and `None`
+    otherwise -- a discovery/wreck/entity carries no ownership/species association at
+    the DTO level today, so this is `None` for those, not a fabricated value. For
+    `ArtMode.LADDER` this is *not* the same string as `ladder_key.archetype_id`: the
+    ladder key always carries a real archetype (substituting
+    `SceneTuning.fallback_archetype_id` when the DTO has none, so the geometry
+    catalogue -- which has no `archetype_id=""` rungs -- still has a match), while this
+    field stays the true `None` for "no owner" so callers reading it for
+    ownership/display purposes are never handed a fabricated one."""
     retention: SceneRetention
     hostility_ordinal: int
     """0 = most hostile; opaque, from the fog-safe DTO (WP-SC01)."""
@@ -448,6 +452,16 @@ class SceneTuning:
     glyph_spacing: int
     """Minimum cell distance a newly placed glyph must keep from every
     already-placed glyph (plan §9.6)."""
+
+    fallback_archetype_id: str
+    """The archetype id `edge.scene.classify` substitutes for a port/starbase/ship
+    with no `archetype_id` of its own (reachable in real play — e.g. a port in a
+    sector no alliance controls) when building its `LadderKey`. Must match the
+    injected `ArtGeometryCatalog`'s own no-archetype fallback (the art seam
+    generates catalogue rungs for `SPRITES.palettes.fallback_archetype`, never for
+    an empty string) or the classifier hands the solver a key the catalogue has no
+    rungs for at all, which `edge.scene.project.frame()` cannot recover from when
+    that object is the anchor."""
 
     # -- WP-SC12 additions: station-size parity (plan §9.6 "Station size
     # parity"). Defaulted so every existing fixture that builds a

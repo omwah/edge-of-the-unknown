@@ -18,6 +18,7 @@ instruction.
 
 from __future__ import annotations
 
+from edge.art.sprites import SPRITES
 from edge.core.config import ScenePhysicalModelConfig, SceneRegionConfig
 from edge.scene.catalog import ContinuousYield
 from edge.scene.geometry import CellBox, Region
@@ -107,6 +108,13 @@ def build_scene_tuning(cfg: ScenePhysicalModelConfig) -> SceneTuning:
             )
             for scale_class, target in cfg.station_target_by_scale_class.items()
         },
+        # Not calibration: this is the vendored art library's own no-archetype
+        # substitution (`SPRITES.palettes.fallback_archetype`), the same one every
+        # other art call site already falls back to implicitly. The generated
+        # geometry catalogue has rungs for this archetype and none for `""`
+        # (scripts/gen_geometry_catalog.py), so the classifier must use the same
+        # value `edge.scene.model.SceneTuning.fallback_archetype_id` documents.
+        fallback_archetype_id=SPRITES.palettes.fallback_archetype,
     )
 
 

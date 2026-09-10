@@ -49,6 +49,7 @@ from pathlib import Path
 from typing import Any
 
 from edge.art.geometry_catalog import JsonArtGeometryCatalog, load_default_geometry_catalog
+from edge.art.sprites import SPRITES
 from edge.core.dto import (
     SectorAnomalyDTO,
     SectorDTO,
@@ -450,6 +451,7 @@ def proposed_tuning() -> tuple[SceneTuning, list[ProposedValue]]:
         cost_budget=cost_budget, emergency_ship_ceiling=emergency_ship_ceiling,
         max_reposition_candidates=max_reposition_candidates,
         max_glyph_tries=max_glyph_tries, glyph_spacing=glyph_spacing,
+        fallback_archetype_id=SPRITES.palettes.fallback_archetype,
     )
     return tuning, notes
 

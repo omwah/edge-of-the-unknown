@@ -190,7 +190,7 @@ def _port_object(
             kind="port",
             subtype=_port_ladder_subtype(port),
             axis="vertical",
-            archetype_id=port.archetype_id or "",
+            archetype_id=port.archetype_id or tuning.fallback_archetype_id,
         ),
         continuous_kind=None,
         archetype_id=port.archetype_id or None,
@@ -228,7 +228,7 @@ def _starbase_object(
             kind="port",
             subtype="starbase",
             axis="vertical",
-            archetype_id=starbase.archetype_id or "",
+            archetype_id=starbase.archetype_id or tuning.fallback_archetype_id,
         ),
         continuous_kind=None,
         archetype_id=starbase.archetype_id or None,
@@ -297,7 +297,7 @@ def _ship_object(ship: SectorShipDTO, tuning: SceneTuning) -> PhysicalObject:
             kind="ship",
             subtype=(ship.art_subtype or ship.role).lower(),
             axis="horizontal",
-            archetype_id=ship.archetype_id or "",
+            archetype_id=ship.archetype_id or tuning.fallback_archetype_id,
         ),
         continuous_kind=None,
         archetype_id=ship.archetype_id or None,
@@ -308,7 +308,15 @@ def _ship_object(ship: SectorShipDTO, tuning: SceneTuning) -> PhysicalObject:
         flexible=True,
         occludes=True,
         label=ship.name,
-        destination=f"ship:{key.ident}",
+        # `ClickableEntry.Picked` (edge/tui/widgets.py) routes on "contact"/"player"
+        # with the DTO's own `contact_id`/`player_id` as ref -- never on `key.ident`
+        # (this scene key's own hashed identity, which the click dispatcher does not
+        # know), matching the legacy composer's ship hotspots/`ContactRow` exactly.
+        destination=(
+            f"contact:{ship.contact_id}" if ship.contact_id is not None
+            else f"player:{ship.player_id}" if ship.player_id is not None
+            else None
+        ),
     )
 
 
@@ -332,7 +340,13 @@ def _anchor_discovery_object(disc: SectorDiscovery, tuning: SceneTuning) -> Phys
         flexible=False,
         occludes=True,
         label=disc.name or disc.label,
-        destination=f"discovery:{disc.discovery_id}",
+        # A resolved wormhole clicks straight through to its far side (legacy
+        # composer: `dest, ref = "wormhole", disc.warp_to`), never the generic
+        # scan/salvage "discovery" route every other anchor discovery uses.
+        destination=(
+            f"wormhole:{disc.warp_to}" if disc.kind == "wormhole" and disc.warp_to is not None
+            else f"discovery:{disc.discovery_id}"
+        ),
     )
 
 
@@ -381,7 +395,10 @@ def _entity_object(dto: SectorDTO, tuning: SceneTuning) -> PhysicalObject | None
         flexible=False,
         occludes=True,
         label=dto_anomaly.label,
-        destination=f"entity:{dto_anomaly.contact_id}" if dto_anomaly.contactable else None,
+        # The Entity hails like any other contact (legacy composer/`ObjectRow`:
+        # `dest, ref = "contact", anomaly.contact_id`) -- there is no "entity" dest
+        # in `ClickableEntry.Picked`'s vocabulary.
+        destination=f"contact:{dto_anomaly.contact_id}" if dto_anomaly.contactable else None,
     )
 
 

@@ -1007,13 +1007,15 @@ Docs: consumer disposition — `station_art.py`/`screens/stardock.py`/`screens/b
 `COMPOSERS`/`render_physical` seam; `scene_gallery.py` was already there;
 `art_adapter.py`/`dummy.py`/`shots.py` were audited and found to have no
 composer-specific coupling to migrate (pure vocabulary/sample/end-to-end-Pilot
-consumers respectively). **Found in the process, not fixed here:** a port/starbase
-with no `archetype_id` (reachable in real play when no alliance controls its
-sector — `session.py`'s `_controlling_archetype` fallback can return `None`) crashes
-`edge.scene.project`'s `frame()` if that station becomes the sole/anchor body, because
-the generated ladder catalogue has no `archetype_id=""` rungs. Not a live-play risk
-while the legacy composer stays default, but WP-SC05/SC06 should close it before
-WP-SC11 flips the default.
+consumers respectively). A port/starbase/ship with no `archetype_id` (reachable in
+real play when no alliance controls its sector — `session.py`'s
+`_controlling_archetype` fallback can return `None`) used to crash
+`edge.scene.project`'s `frame()` when that object became the sole/anchor body, because
+the generated ladder catalogue has no `archetype_id=""` rungs (only
+`SPRITES.palettes.fallback_archetype`'s). Fixed by adding
+`SceneTuning.fallback_archetype_id` (populated in `edge/art/scene_tuning.py` from
+`SPRITES.palettes.fallback_archetype`) and using it in `edge/scene/classify.py`'s
+three `LadderKey` sites instead of `archetype_id or ""`.
 
 Commit: `ui: WP-SC10 migrate scene consumers`
 

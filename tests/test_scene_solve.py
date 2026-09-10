@@ -137,6 +137,7 @@ def _tuning(**overrides: object) -> SceneTuning:
         max_reposition_candidates=3,
         max_glyph_tries=6,
         glyph_spacing=1,
+        fallback_archetype_id="humanoid_diplomat",
     )
     base.update(overrides)
     return SceneTuning(**base)  # type: ignore[arg-type]

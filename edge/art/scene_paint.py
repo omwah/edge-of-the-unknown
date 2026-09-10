@@ -772,13 +772,36 @@ class StationReference:
         return None
 
 
-def build_station_reference(sector_id: int, paint: ScenePaint) -> StationReference:
+def _public_station_kind(obj: PhysicalObject) -> str:
+    """The docked-header vocabulary's station kind -- "port", "stardock", or
+    "starbase" -- for a classified port/starbase object.
+
+    This is deliberately *not* `SceneKey.tag`: a Stardock is a port-kind subtype
+    (plan §2.4, "starbase and Stardock are port-kind subtypes"), so its tag is
+    the ordinary `"port"` and only its `ladder_key.subtype` says "stardock". A
+    lookup keyed on the tag alone would collide an ordinary port and a Stardock
+    in the same sector and would never match a docked header, which asks for
+    "stardock" by name (`edge/tui/station_art.py`)."""
+
+    if obj.key.tag == "starbase":
+        return "starbase"
+    if obj.ladder_key is not None and obj.ladder_key.subtype == "stardock":
+        return "stardock"
+    return "port"
+
+
+def build_station_reference(
+    sector_id: int, paint: ScenePaint, arrangement: WorldArrangement
+) -> StationReference:
     """Publish the natural `(width, height)` -- the selected rung's own
     `natural` box, never the ink-cropped `scene_box` and never a padded
-    container -- for every painted port/starbase (`SceneKey.tag`)."""
+    container -- for every painted port/starbase, keyed by the docked-header
+    vocabulary's station kind (`_public_station_kind`), not `SceneKey.tag`."""
 
+    objects_by_key = {obj.key: obj for obj in arrangement.objects}
     entries = tuple(
-        (StationKey(sector_id, obj.key.tag, obj.key.ident), (obj.natural_box.width, obj.natural_box.height))
+        (StationKey(sector_id, _public_station_kind(objects_by_key[obj.key]), obj.key.ident),
+         (obj.natural_box.width, obj.natural_box.height))
         for obj in paint.painted
         if obj.key.tag in ("port", "starbase")
     )

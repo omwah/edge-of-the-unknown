@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Any
 
 from edge.art.geometry_catalog import JsonArtGeometryCatalog, load_default_geometry_catalog
+from edge.art.sprites import SPRITES
 from edge.bigbang.generator import generate
 from edge.config import load_default_config
 from edge.core.config import GameConfig, SceneArtConfig
@@ -310,6 +311,7 @@ def _benchmark_tuning() -> SceneTuning:
         },
         cost_budget=250, emergency_ship_ceiling=40,
         max_reposition_candidates=16, max_glyph_tries=20, glyph_spacing=2,
+        fallback_archetype_id=SPRITES.palettes.fallback_archetype,
     )
 
 

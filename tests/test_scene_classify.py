@@ -103,6 +103,7 @@ TUNING = SceneTuning(
     max_reposition_candidates=4,
     max_glyph_tries=8,
     glyph_spacing=1,
+    fallback_archetype_id="humanoid_diplomat",
 )
 
 
@@ -286,6 +287,21 @@ def test_ship_uses_wp_sc01_retention_fields_without_recomputing_them() -> None:
     assert ship.art_mode is ArtMode.LADDER
 
 
+def test_ship_destination_routes_on_contact_or_player_not_scene_identity() -> None:
+    """`ClickableEntry.Picked` (edge/tui/widgets.py) only knows "contact"/"player"
+    dests with the DTO's own id as ref -- never this scene's own hashed `key.ident`,
+    which the click dispatcher has no way to resolve back to a contact/player."""
+    dto = _sector(ships=[_ship("Raider", contact_id=7, player_id=None)])
+    arrangement, _ = classify_sector(dto, TUNING)
+    (ship,) = arrangement.objects
+    assert ship.destination == "contact:7"
+
+    dto2 = _sector(ships=[_ship("Wanderer", contact_id=None, player_id=3)])
+    arrangement2, _ = classify_sector(dto2, TUNING)
+    (ship2,) = arrangement2.objects
+    assert ship2.destination == "player:3"
+
+
 def test_ship_retention_class_mapping_covers_every_dto_value() -> None:
     mapping = {
         "hostile": SceneRetention.HOSTILE_SHIP,
@@ -365,6 +381,32 @@ def test_wreck_discovery_classifies_as_wreck_scale() -> None:
     assert obj.key.tag == "wreck"
 
 
+def test_resolved_wormhole_destination_routes_straight_to_its_far_side() -> None:
+    """A resolved wormhole clicks straight through (legacy composer: `dest, ref =
+    "wormhole", disc.warp_to`) -- never the generic scan/salvage "discovery" route
+    every other anchor discovery uses."""
+    dto = _sector(
+        discoveries=[
+            SectorDiscovery(discovery_id=9, label="the Hollow Gate", kind="wormhole",
+                            rarity="Rare", salvageable=False, collected=True, warp_to=414),
+        ]
+    )
+    arrangement, _ = classify_sector(dto, TUNING)
+    (obj,) = arrangement.objects
+    assert obj.destination == "wormhole:414"
+
+    # Unresolved (no far side known yet) falls back to the ordinary scan route.
+    dto2 = _sector(
+        discoveries=[
+            SectorDiscovery(discovery_id=9, label="the Hollow Gate", kind="wormhole",
+                            rarity="Rare", salvageable=True),
+        ]
+    )
+    arrangement2, _ = classify_sector(dto2, TUNING)
+    (obj2,) = arrangement2.objects
+    assert obj2.destination == "discovery:9"
+
+
 def test_surface_site_discovery_kinds_are_not_sector_scene_objects() -> None:
     dto = _sector(
         discoveries=[
@@ -380,7 +422,7 @@ def test_entity_classifies_as_top_retention_and_optional_destination() -> None:
     arrangement, _ = classify_sector(dto, TUNING)
     (entity,) = arrangement.objects
     assert entity.retention == SceneRetention.ENTITY
-    assert entity.destination == "entity:5"
+    assert entity.destination == "contact:5"  # routes like any other hailable contact
 
     dto_not_contactable = _sector(
         anomaly=SectorAnomalyDTO(label="A Presence", contact_id=5, contactable=False)

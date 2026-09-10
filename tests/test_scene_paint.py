@@ -369,7 +369,7 @@ def test_station_reference_publishes_natural_box_for_a_port() -> None:
     placements = (_placement(anchor.key, 0, 0, 60), _placement(port.key, 10, 0, 40))
     arrangement, plan = _solve(objects, placements)
     paint = resolve_scene(plan, arrangement, CATALOG, TUNING)  # type: ignore[arg-type]
-    ref = build_station_reference(sector_id=99, paint=paint)
+    ref = build_station_reference(sector_id=99, paint=paint, arrangement=arrangement)
     port_painted = next((p for p in paint.painted if p.key == port.key), None)
     if port_painted is None:
         pytest.skip("port not admitted at this viewport/camera solve")
@@ -384,12 +384,40 @@ def test_station_reference_rejects_mismatched_keys() -> None:
     placements = (_placement(anchor.key, 0, 0, 60), _placement(port.key, 10, 0, 40))
     arrangement, plan = _solve(objects, placements)
     paint = resolve_scene(plan, arrangement, CATALOG, TUNING)  # type: ignore[arg-type]
-    ref = build_station_reference(sector_id=99, paint=paint)
+    ref = build_station_reference(sector_id=99, paint=paint, arrangement=arrangement)
     # Wrong sector, wrong kind, wrong object id: all rejected (None), never
     # silently inferred from another entry.
     assert ref.lookup(100, "port", port.key.ident) is None
     assert ref.lookup(99, "starbase", port.key.ident) is None
     assert ref.lookup(99, "port", port.key.ident + 999) is None
+
+
+def test_station_reference_keys_a_stardock_by_ladder_subtype_not_scene_tag() -> None:
+    """A Stardock's `SceneKey.tag` is the ordinary "port" (plan §2.4: Stardock is a
+    port-kind subtype) -- a docked header asking for "stardock" by name must still
+    find it, and it must not collide with an ordinary port in the same sector."""
+    anchor = _planet_object(1)
+    stardock_key = LadderKey(kind="port", subtype="stardock", axis="vertical",
+                             archetype_id=_SHIP_ARCHETYPE)
+    stardock = PhysicalObject(
+        key=SceneKey("port", 2), parent=None,
+        face=Face(shape=FaceShape.RECT, width_su=22, height_su=16),
+        scale_class="stardock", art_mode=ArtMode.LADDER, ladder_key=stardock_key,
+        continuous_kind=None, archetype_id=None, retention=SceneRetention.ORBITAL,
+        hostility_ordinal=0, threat_rank=0, region=_region(), flexible=True,
+        occludes=True, label="Stardock", destination=None,
+    )
+    objects = (anchor, stardock)
+    placements = (_placement(anchor.key, 0, 0, 60), _placement(stardock.key, 10, 0, 40))
+    arrangement, plan = _solve(objects, placements)
+    paint = resolve_scene(plan, arrangement, CATALOG, TUNING)  # type: ignore[arg-type]
+    ref = build_station_reference(sector_id=99, paint=paint, arrangement=arrangement)
+    painted = next((p for p in paint.painted if p.key == stardock.key), None)
+    if painted is None:
+        pytest.skip("stardock not admitted at this viewport/camera solve")
+    assert ref.lookup(99, "stardock", stardock.key.ident) == (
+        painted.natural_box.width, painted.natural_box.height)
+    assert ref.lookup(99, "port", stardock.key.ident) is None
 
 
 def test_station_key_requires_all_three_parts() -> None:

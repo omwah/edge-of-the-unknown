@@ -262,6 +262,7 @@ def test_scene_tuning_has_no_shipped_default_instance() -> None:
         max_reposition_candidates=4,
         max_glyph_tries=8,
         glyph_spacing=1,
+        fallback_archetype_id="humanoid_diplomat",
     )
     assert tuning.face_extent_by_scale_class["ship"] == (4, 2)
 
