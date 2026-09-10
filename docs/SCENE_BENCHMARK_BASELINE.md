@@ -1,30 +1,28 @@
 # Sector scene benchmark
 
-**PENDING HUMAN REVIEW / APPROVAL** -- this document reports measurements only; WP-SC04's "approve one production strategy" decision is a separate, human step. Do not read any number here as an approval.
+WP-SC04's strategy decision is recorded in §0 below; the rest of this document reports measurements.
 
 Supersedes the informal 2026-08-31 figures in plan §6.1 with a reproducible measurement. Strategy comparison numbers use a benchmark-only SceneTuning/catalog overlay -- see module docstring.
 
-## 0. Strategy decision: deferred (2026-09-03)
+## 0. Strategy decision: `fixed_fov_perspective` default, both kept
 
-WP-SC04 calls for comparing and approving one production `ProjectionStrategy`, removing
-the loser. **That pick is explicitly deferred.** After a `candidates()` bug fix
-(anchor z-position was silently assumed to be 0; see the `ui: fix candidates() ignoring
-anchor z-position` commit), candidate-efficiency is now a wash between the two
-strategies -- both reach near-100% distinct-scene coverage of their candidate budget
-across all ten scene compositions in this report. The remaining measured difference is
-per-op cost: `depth_layered_anchor` is roughly 1.5x cheaper per `frame()+candidates()`
-call than `fixed_fov_perspective` (see §3), but both are sub-millisecond and neither has
-been visually compared, because no composed multi-object scene can be rendered before
-WP-SC06 (solver) and WP-SC07 (art resolution) land.
+WP-SC04's "approve one production strategy, remove the loser" is resolved as: approve
+one production **default** strategy, keep both. **`fixed_fov_perspective` is the
+approved default `ProjectionStrategy`; `depth_layered_anchor` is kept, not deleted, as a
+permanent config-selectable strategy and reference model for tests** -- the same
+treatment the legacy composer gets from WP-SC11. `edge/tui`/devtool call sites needing a
+concrete strategy take it as a parameter or config choice (`scene.projection_strategy:
+fixed_fov_perspective | depth_layered_anchor`) rather than hardcoding one.
 
-Decision: **keep both strategies wired behind `ProjectionStrategy` rather than deleting
-either now.** WP-SC06/SC07 build against the interface, not a chosen implementation.
-The strategy pick happens later -- either once a real visual comparison is possible
-(WP-SC09's A/B gallery, or an earlier throwaway multi-object render built specifically
-for this decision) or on the numbers here if a visual comparison turns out not to be
-warranted. Until then, no WP may assume a single strategy is "the" production one;
-`edge/tui`/devtool call sites needing a concrete strategy should take it as a parameter
-or config choice rather than hardcoding one.
+Candidate-efficiency is a wash between the two strategies -- both reach near-100%
+distinct-scene coverage of their candidate budget across all ten scene compositions in
+this report. `depth_layered_anchor` is roughly 1.5x cheaper per `frame()+candidates()`
+call than `fixed_fov_perspective` (see §3), but both are sub-millisecond, so cost alone
+does not settle the pick. The measured legacy-parity work (plan §9.6) supplies the
+deciding reason: `depth_layered_anchor` has a coarse layer granularity that produces one
+invariant-bound admission miss (`planet+port+wreck+traffic @ 67x30` drops its wreck)
+that `fixed_fov_perspective` does not share at the shipped `_DEPTH_STRATA`. See plan
+§9.6's "one remaining miss" discussion for the full analysis.
 
 ## 1. Current composer baseline (reproduces plan §6.1)
 

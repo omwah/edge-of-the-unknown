@@ -8,7 +8,10 @@
 >
 > **Status: reviewed plan — composition interview and review corrections approved
 > 2026-09-01, with the art-seam, cost, determinism, and packaging corrections of the
-> second review folded in the same day.**
+> second review folded in the same day. The legacy composer is kept permanently as a
+> config-selectable fallback and reference model for tests (see WP-SC11).
+> `fixed_fov_perspective` is the approved default `ProjectionStrategy`; `depth_layered_anchor`
+> is likewise kept as a config option and reference strategy (see §2.4, WP-SC04, WP-SC11).**
 
 ## 1. Outcome
 
@@ -20,8 +23,9 @@ strategy frames the
 highest-ranked subject, projects the accepted objects into terminal-cell bounds, and
 selects an existing sprite tier for laddered art or a continuous render box for
 procedural art. Fixed-FOV perspective and depth-layered anchor projection implement the
-same contract; calibration and explicit review choose the shipped default from measured
-composition quality and cost rather than this plan preselecting one.
+same contract; `fixed_fov_perspective` is the approved shipped default, chosen from
+measured composition quality and cost, and `depth_layered_anchor` remains a
+config-selectable strategy rather than being deleted (see WP-SC11).
 
 The system must make every decision inspectable. For each accepted or rejected object,
 the gallery and tests must be able to report its physical parent, face shape/area,
@@ -159,9 +163,11 @@ rung the projection selects.
 ### 2.4 Camera and projection
 
 - Expose projection behind one typed strategy interface. Calibration compares fixed-FOV
-  perspective and depth-layered anchor projection; only the explicitly approved winner
-  proceeds into the production solver. The interface remains extensible, but the losing
-  experimental implementation is removed rather than doubling later test paths.
+  perspective and depth-layered anchor projection. **Both remain in the shipped
+  solver as config-selectable strategies, the same way the legacy composer is kept
+  alongside the physical model (see WP-SC11)** — `fixed_fov_perspective` is the
+  approved default; `depth_layered_anchor` stays available as a config option and a
+  reference strategy for tests, never deleted as a "losing" experiment.
 - Select responsive structural modes from the actual drawable scene viewport, after
   header/UI subtraction, never from the overall terminal tier.
 - Use a hybrid responsive model: all modes share the physical hierarchy and solver;
@@ -350,8 +356,10 @@ The model should expose immutable records equivalent to:
   initial deterministic positions; a solve records any viewport-driven flexible move.
 - `Camera`: fixed FOV, position, aim/target, near plane, cell-aspect correction.
 - `ProjectionStrategy`: the typed interface used to compare fixed-FOV perspective and
-  depth-layered anchor projection in calibration; only the approved implementation
-  enters the production solver.
+  depth-layered anchor projection in calibration. Both implementations enter the
+  production solver as config-selectable strategies: `fixed_fov_perspective` is the
+  approved default, `depth_layered_anchor` remains selectable and is retained as a
+  reference strategy for tests.
 - `Projection`: screen bounds, depth, optional ladder rung or continuous box class,
   estimated and actual ink bounds, visible fraction, label bounds, accepted/rejected
   state.
@@ -633,18 +641,20 @@ No numerical budget is selected in this plan without that approval. Total time h
 absolute ceiling because unchanged procedural generation and Rich conversion make a
 relative total-time comparison noisy; solver time and structural counts are assessed
 separately. WP-SC06 and WP-SC07 must publish benchmark deltas against the frozen
-baseline. WP-SC11 cannot cut over if any approved budget fails, if candidate/sprite-
-render counts exceed their hard bounds, or if a visual improvement depends on repeated
-speculative sprite rendering.
+baseline. WP-SC11 cannot promote the physical model to the default if any approved
+budget fails, if candidate/sprite-render counts exceed their hard bounds, or if a visual
+improvement depends on repeated speculative sprite rendering.
 
 **If neither strategy can meet the budgets, the answer is no-go, not a slow cutover.**
-The shipped composer remains authoritative; `edge/scene/` stays in the tree as unwired,
+The shipped composer remains the default; `edge/scene/` stays in the tree as unwired,
 strict-typed, tested code with the measured no-go recorded in this plan, and the
-WP-SC09 dev switch simply keeps defaulting to the legacy path. Nothing half-migrated
-ships: WP-SC10's consumer migration does not land under a no-go, and the WP-SC01 DTO
-projection — which is independently useful and already wire-versioned — stays. Reopening
-requires new evidence or a fresh interview on the visual-quality-versus-cost trade, not a
-quieter reading of the same numbers.
+WP-SC09/WP-SC11 config switch simply keeps defaulting to the legacy path. Nothing
+half-migrated ships: WP-SC10's consumer migration does not land under a no-go, and the
+WP-SC01 DTO projection — which is independently useful and already wire-versioned —
+stays. Reopening requires new evidence or a fresh interview on the visual-quality-
+versus-cost trade, not a quieter reading of the same numbers. A no-go and a go now
+differ only in which composer is the config *default* — both remain shippable,
+selectable code either way.
 
 ## 7. Work packages
 
@@ -797,9 +807,13 @@ Implementation:
   generated wreck visibility from runtime wreck and multiplayer stress inventories.
 - Report how many distinct quantised scenes each camera search produces and eliminate
   candidates that cannot cross a cell or art-rung boundary.
-- Compare and approve one production strategy, its framing model, fixed FOV if relevant,
-  class-specific target fractions, and structural viewport modes. Remove the losing
-  implementation after recording the evidence; keep the typed interface.
+- Compare and approve one production **default** strategy, its framing model, fixed FOV
+  if relevant, class-specific target fractions, and structural viewport modes.
+  `fixed_fov_perspective` is the approved default — `depth_layered_anchor` is kept, not
+  removed, as a config-selectable strategy and a reference model for parity/regression
+  tests (see WP-SC11, and the measured `DepthLayeredAnchorProjection` parity miss
+  recorded in §9.6's legacy-parity discussion). The typed interface stays extensible
+  either way.
 - If neither strategy can meet the budgets, record the no-go per §6.4 and stop here
   rather than proceeding to WP-SC05 on the expectation that calibration will recover it.
 
@@ -994,49 +1008,72 @@ Commit: `ui: WP-SC10 migrate scene consumers`
 
 Depends on: WP-SC01–WP-SC10.
 
+The legacy composer and the non-default `ProjectionStrategy` are both kept, not removed:
+the legacy composer and `depth_layered_anchor` are permanent, config-selectable
+alternatives — each a fallback and a reference model that tests may run the defaults'
+behavior against. This section's cutover is "make the physical model with
+`fixed_fov_perspective` the default," not "delete the losers."
+
 Implementation:
 
-- Cut over and remove the legacy composer only after the complete A/B gallery is
-  accepted, performance budgets and automated tests pass, and one hands-on playtest
-  session explicitly accepts the replacement. These evidence gates define the rollback
-  window; elapsed time does not.
-- Remove obsolete constants/config only after no production, preview, gallery, docked-
-  header, dummy, shot, or screen consumer remains. Explicitly disposition
-  `max_ships_shown` (replaced by cost plus the emergency ceiling) and
-  `ship_face_inward_chance` (retain only if the selected strategy still uses its idiom).
-- Break loudly on the removed keys rather than deprecating them. `SceneArtConfig` sets
-  `extra="forbid"`, so a config file that still names a removed key fails validation
-  outright — which is the intended signal at this stage of a single-player, pre-1.0
-  project with no external config population to protect. The same commit must sweep every
-  YAML in the repo (`config/`, scenarios, and test fixtures) so nothing in-tree is left
-  naming a deleted key, and the removal is called out in the commit message.
-- Rebaseline final snapshots with human review of every changed image, using WP-SC09's
-  isolated replacement snapshots as the comparison rather than one wholesale blind
-  update.
+- Make the physical-model composer running `fixed_fov_perspective` the **default**
+  only after the complete A/B gallery is accepted, performance budgets and automated
+  tests pass, and one hands-on playtest session explicitly accepts the replacement.
+  These evidence gates define the readiness bar; elapsed time does not.
+- **Do not remove the legacy composer, `DepthLayeredAnchorProjection`, or the WP-SC09
+  dev switch.** Promote the switch from a dev-only toggle to a documented,
+  schema-validated `scene:` config option (e.g. `scene.composer: physical | legacy` and,
+  under `physical`, `scene.projection_strategy: fixed_fov_perspective |
+  depth_layered_anchor`) that selects the composer and strategy at runtime, defaulting to
+  `physical`/`fixed_fov_perspective` once approved. All implementations stay in the tree,
+  tested, and covered by the A/B gallery indefinitely — neither the legacy path nor
+  `depth_layered_anchor` is deprecated scaffolding awaiting deletion.
+- Do not disposition `max_ships_shown` or `ship_face_inward_chance` as dead config to be
+  deleted: both remain live, legacy-composer-only settings for as long as the legacy
+  composer ships. `SceneArtConfig` continues to accept them; only the *physical* model's
+  keys are validated under its own `extra="forbid"` schema.
+- Keep both YAML surfaces intact — no sweep to delete "removed keys," because none are
+  removed. New physical-model keys are added to `config/default.yaml → scene:` alongside
+  the existing legacy keys, each documented as to which composer reads it.
+- Rebaseline default snapshots with human review of every changed image (the physical
+  model becoming the default changes what an un-configured snapshot renders), using
+  WP-SC09's isolated replacement snapshots as the comparison rather than one wholesale
+  blind update. Keep a parallel legacy-composer snapshot suite alive under the
+  `legacy` config selection so both paths stay under regression coverage.
 - Reconcile `DESIGN.md` §11, `UI_MOCKUPS.md`, `PLAYTEST_NOTES.md`, and
-  `SECTOR_SCENE_COMPOSITION.md`; preserve shipped-history rationale where useful.
-- Update `config/default.yaml → scene:` and schema comments together. Reconcile
+  `SECTOR_SCENE_COMPOSITION.md` to describe two supported composers (default: physical,
+  optional: legacy) rather than a single surviving one; preserve shipped-history
+  rationale where useful.
+- Update `config/default.yaml → scene:` and schema comments together, documenting the
+  `composer` selector and which keys belong to which composer. Reconcile
   `SPRITE_ART_SYNC.md` only if requested boxes/ladder assumptions changed; never edit
   vendored files here. Run `graphify update .`.
 
 Verification:
 
-- Create a disposition table for every existing composition test — as a checked-in
-  checklist file, not a claim in a commit message, since this is the step most likely to
-  be compressed under time pressure: carry unchanged,
-  restate against a numbered §4 invariant, replace with an equivalent new assertion, or
-  delete with a written implementation-specific reason. Explicitly cover ship depth,
-  `rung_below`/rung variation, vertical gaps, belt permeability, sky reserve, whole-art
-  survival, and the former no-object-falls-out contract now replaced by named sidebar
-  overflow. Budget new assertions where current coverage is absent rather than treating
-  the table as sufficient coverage.
+- Create a disposition table for every existing legacy-composer composition test — as a
+  checked-in checklist file, not a claim in a commit message, since this is the step
+  most likely to be compressed under time pressure: carry unchanged as a legacy-path
+  regression test, restate against a numbered §4 invariant for the physical model,
+  duplicate so both composers keep independent coverage, or delete with a written
+  implementation-specific reason. Because the legacy composer is retained rather than
+  removed, the default disposition is "keep as legacy coverage," not "delete" — deletion
+  still requires a written reason. Explicitly cover ship depth, `rung_below`/rung
+  variation, vertical gaps, belt permeability, sky reserve, whole-art survival, and the
+  former no-object-falls-out contract, replaced *for the physical model* by named
+  sidebar overflow (the legacy composer keeps its existing contract). Budget new
+  assertions where current coverage is absent rather than treating the table as
+  sufficient coverage.
 - All §4 invariants; art seam, config, wire, settings, Pilot, snapshots, local/remote
   parity, ruff, and strict mypy pass.
 - Final controlled benchmarks satisfy approved absolute total-time, solver, candidate,
   render-count, cold/warm/resize, phenomenon, and 50-ship stress budgets.
 - No document describes in-scene text overflow or direct paint-as-decision as current.
+- The `legacy` composer and the `depth_layered_anchor` strategy selections still boot,
+  render, and pass their retained snapshot/parity suites — cutover to a new default must
+  not silently rot either kept alternative.
 
-Commit: `ui: WP-SC11 cut over physical scenes`
+Commit: `ui: WP-SC11 default to the physical-model scene composer`
 
 ## 8. Non-goals
 
