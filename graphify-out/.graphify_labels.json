@@ -269,5 +269,9 @@
   "267": ".stardock_facilities_sector_id",
   "268": "test_corpus_stays_valid",
   "269": ".docked_port_sector_id",
-  "271": "GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes"
+  "270": "generate_feature_grid",
+  "271": "GW-M22 — Scale: multi-cell buildings, a bigger board, city silhouettes",
+  "272": ".char_at",
+  "273": "_boundary_ring",
+  "274": "place_count"
 }
