@@ -71,7 +71,7 @@ patience — too many rejected offers close negotiation for the day."""
         )
         yield StationArtHeader(
             "port", port.archetype_id or "humanoid_diplomat", "trade",
-            identity=port.sector_id, expect_sector=port.sector_id,
+            identity=port.sector_id, expect_sector=port.sector_id, object_id=port.port_id,
         )
         yield TradePanel(port, latinum=latinum, show_title=False, id="port-body")
         yield Footer()

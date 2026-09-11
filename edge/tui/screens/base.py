@@ -278,12 +278,14 @@ resupplies a missile on Hardware; [b]A[/]/[b]W[/] bank 1,000 slips at a time."""
     def _art_pane(v: StarbaseDTO, service: str, content: Widget) -> Vertical:
         condition = v.standing if v.standing in ("derelict", "hostile") else "open"
         return Vertical(
-            # No `expect_sector` guard here: StarbaseDTO carries only the display id
-            # (`sector_display`), not the internal sector id the Sector composer
-            # publishes, so this header trusts the docking-flow invariant unchecked.
+            # `expect_sector=v.sector_id` guards against a stale cached station
+            # reference (WP-SC01): StarbaseDTO now carries the internal sector id
+            # alongside `sector_display`, so a mismatched Sector composer reference is
+            # rejected rather than trusted unchecked.
             StationArtHeader(
                 "starbase", v.archetype_id or "humanoid_diplomat", service,
-                identity=v.starbase_id, condition=condition),
+                identity=v.starbase_id, condition=condition, expect_sector=v.sector_id,
+                object_id=v.starbase_id),
             content,
         )
 

@@ -173,6 +173,7 @@ def sample_port() -> PortDTO:
             CommodityLine("Equipment", "BUY", 580, 1000, 14, 15, 8),
         ],
         display_id=3,
+        port_id=3,
     )
 
 
@@ -381,4 +382,5 @@ def sample_stardock_port() -> PortDTO:
             CommodityLine("Equipment", "SELL", 820, 1000, 15, 15, 8),
         ],
         display_id=7,
+        port_id=7,
     )

@@ -10,7 +10,7 @@ bands (default hostility 0.35 / amity 0.65, §6).
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
 from edge.core.config import (
@@ -131,6 +131,21 @@ def is_criminal(player: Player, config: AliensConfig) -> bool:
     return player.alignment < config.criminal_alignment
 
 
+def encounter_disposition(species: AlienSpecies, player: Player) -> float:
+    """The final disposition quantity the greeting-vs-violence roll orders on (§10).
+
+    Effective disposition shifted down by any active grudge the species holds against
+    the player (§6.5, WP27) and by ill standing with the species' alliance (§6.3),
+    floored at 0.0 — exactly the quantity `core.encounters.roll_encounter` computes
+    inline before its violence roll. Factored out here so a second consumer (the
+    WP-SC01 fog-safe retention ordinal, §2.3) orders on the identical quantity rather
+    than a parallel reimplementation that could silently drift from the real rule.
+    """
+    return max(0.0, effective_disposition(species, player)
+               - grudge_shift(species, player)
+               - alliance_standing_shift(player, species))
+
+
 def disposition_band(value: float, config: AliensConfig) -> str:
     """Name the band a disposition value falls in (hostile / neutral / friendly, §6)."""
     if value < config.hostility_threshold:
@@ -138,6 +153,79 @@ def disposition_band(value: float, config: AliensConfig) -> str:
     if value >= config.amity_threshold:
         return FRIENDLY
     return NEUTRAL
+
+
+# --- Fog-safe scene retention projection (WP-SC01, §2.3) --------------------
+
+# Coarse retention classes a `SectorShipDTO` may carry. The first three mirror
+# `disposition_band`'s alien bands; `PLAYER` is another player's vessel (no encounter-
+# disposition concept applies to them) and `UNIDENTIFIED` is the defensive fallback for
+# a vessel whose species carries no roster config to price a disposition/threat from.
+# Never derived from container/list position (§2.3) — see `ship_retention_ordinals`.
+RETENTION_PLAYER = "player"
+RETENTION_UNIDENTIFIED = "unidentified"
+
+
+@dataclass(frozen=True, slots=True)
+class ShipPriorityInput:
+    """One sector vessel's raw retention inputs, before opaque ordinal projection.
+
+    `tag`/`presentation_id` name the vessel the same way its `SectorShipDTO` does
+    (`"contact"`/`contact_id` for an alien, `"player"`/`player_id` for another
+    player's ship) — tagged because the two id spaces are independently assigned and
+    would otherwise collide. `retention_class` is `None` only for an alien vessel
+    whose disposition could not be priced (`RETENTION_UNIDENTIFIED` fallback);
+    `disposition` is `None` for anything with no encounter-disposition concept
+    (another player's ship, or an unpriced alien). `threat` is the combat-threat
+    quantity the tie rank orders on.
+    """
+
+    tag: str
+    presentation_id: int
+    retention_class: str | None
+    disposition: float | None
+    threat: float
+
+
+def ship_retention_ordinals(
+    ships: Sequence[ShipPriorityInput],
+) -> dict[tuple[str, int], tuple[str, int, int]]:
+    """Project `(retention_class, hostility_ordinal, combat_threat_rank)` per vessel.
+
+    A pure function of the *multiset* of `ships` — never their order (§2.3 requires
+    the same result whether a sector's ships are built alien-first or player-first,
+    or in any other container order). ``hostility_ordinal`` is the dense rank (0 =
+    most-retention-worthy) of a vessel's `disposition` among vessels sharing its
+    `retention_class` — lower final encounter disposition means higher retention
+    priority (§2.3), so the ordinal orders ascending disposition. Vessels with equal
+    disposition share an ordinal; the raw float is never exposed, only its rank.
+    ``combat_threat_rank`` is the scene-wide dense rank (0 = highest threat) of
+    `threat`, the tie-break invariant #6 (`docs/DESIGN.md`, WP-SC01 §4.6) wants
+    when hostility is equal. A vessel with no priced disposition (`None`) is ranked
+    last within its class (ordinal = the class's vessel count with a real value),
+    so an unidentified/player vessel never silently outranks a priced one.
+    """
+    by_class: dict[str, list[float]] = {}
+    for s in ships:
+        cls = s.retention_class or RETENTION_UNIDENTIFIED
+        if s.disposition is not None:
+            by_class.setdefault(cls, []).append(s.disposition)
+    class_ranks = {
+        cls: {value: i for i, value in enumerate(sorted(set(values)))}
+        for cls, values in by_class.items()
+    }
+    unpriced_ordinal = {cls: len(ranks) for cls, ranks in class_ranks.items()}
+    threats = sorted({s.threat for s in ships}, reverse=True)
+    threat_rank = {value: i for i, value in enumerate(threats)}
+    result: dict[tuple[str, int], tuple[str, int, int]] = {}
+    for s in ships:
+        cls = s.retention_class or RETENTION_UNIDENTIFIED
+        if s.disposition is not None:
+            ordinal = class_ranks.get(cls, {}).get(s.disposition, 0)
+        else:
+            ordinal = unpriced_ordinal.get(cls, 0)
+        result[(s.tag, s.presentation_id)] = (cls, ordinal, threat_rank[s.threat])
+    return result
 
 
 def is_friendly(value: float, config: AliensConfig) -> bool:

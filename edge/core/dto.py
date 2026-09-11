@@ -57,6 +57,12 @@ class PortDTO:
     purse_enabled: bool = False  # legacy economy keeps `purse` informational only
     holds_used: int = 0  # player cargo occupancy for trade impact copy
     holds_total: int = 0
+    # Internal port entity id (scene physical-model plan WP-SC10) — as `StarbaseDTO`
+    # already carries `starbase_id` alongside `sector_id`. Ports and starbases can
+    # share a sector, so a docked station header needs both `sector_id` and this id
+    # to look up its published `(sector_id, station_kind, object_id)` station
+    # reference exactly; `sector_id` alone is not a safe proxy.
+    port_id: int = 0
 
 
 @dataclass(frozen=True)
@@ -429,6 +435,12 @@ class SectorPlanetDTO:
     # A gas giant's Cloud City (§4.2, PT-54): 0 ⇒ bare clouds. The scene paints the floating
     # city from the same fact the orbit view does, so both show one world.
     cloud_city_size: int = 0
+    # The owning alliance/species' palette, or None when the planet is unowned (§4.2).
+    # Mirrors `SectorPortDTO.archetype_id`'s "controlling species of the region" signal
+    # (`_controlling_archetype`, server/session.py) rather than inventing a new one — the
+    # core `Planet` model carries no `archetype_id` of its own, only `owner: Ownership`,
+    # so this is populated only when that ownership is real.
+    archetype_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -465,6 +477,17 @@ class SectorShipDTO:
     contact_id: int | None = None
     player_id: int | None = None
     art_subtype: str | None = None
+    # Fog-safe scene retention projection (WP-SC01, DESIGN §2.3/§4.6 of the sector-scene
+    # physical-model plan): a coarse retention class ("hostile"/"neutral"/"friendly"/
+    # "player"/"unidentified"), an opaque per-scene within-class hostility ordinal (0 =
+    # most retention-worthy; ties share an ordinal), and a scene-wide combat-threat tie
+    # rank (0 = highest threat). Never the raw adjusted disposition or its private
+    # inputs (attitude offset, grudge severity, alliance standing) — see
+    # `edge.core.aliens.ship_retention_ordinals`. Defaults keep old fixtures/dummy data
+    # valid; a real projection always fills them in.
+    retention_class: str = "unidentified"
+    hostility_ordinal: int = 0
+    combat_threat_rank: int = 0
 
 
 @dataclass(frozen=True)
@@ -1168,6 +1191,12 @@ class StarbaseDTO:
 
     starbase_id: int
     name: str  # hull-class display name, e.g. "Orbital Platform"
+    # Internal sector id the base actually sits in (WP-SC01) — as `PortDTO.sector_id`
+    # already does, so a docked-header `expect_sector` guard can validate the published
+    # `(sector_id, station_kind, object_id)` reference instead of trusting the docking
+    # flow unchecked. `sector_display` remains the band-monotone spatial id the player
+    # sees; this is the click/message-payload id.
+    sector_id: int
     sector_display: int
     planet_id: int | None
     planet_name: str

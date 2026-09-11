@@ -42,11 +42,16 @@ import io
 import json
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from rich.console import Console
 from rich.text import Text
 
+from edge.art.geometry_catalog import ArtGeometryCatalog, load_geometry_catalog
+from edge.art.scene_paint import paint_grid, resolve_scene
+from edge.art.scene_tuning import build_continuous_yields, build_scene_tuning
+from edge.config import load_config
 from edge.core.config import SceneArtConfig
 from edge.core.dto import (
     SectorDiscovery,
@@ -57,7 +62,25 @@ from edge.core.dto import (
     SectorShipDTO,
     SectorStarbaseDTO,
 )
+from edge.scene.classify import classify_sector
+from edge.scene.geometry import CellBox
+from edge.scene.model import ScenePlan, SceneTuning
+from edge.scene.project import DepthLayeredAnchorProjection, FixedFovPerspective, ProjectionStrategy
+from edge.scene.solve import solve
 from edge.tui.widgets import _SceneComposer
+
+# WP-SC09 dev switch (`docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md` §6.4/WP-SC09):
+# both the legacy `_SceneComposer` and the two new-pipeline `ProjectionStrategy`
+# implementations stay available side by side, defaulting to legacy. There is
+# no config knob that reaches real play — this switch lives entirely in this
+# dev-only gallery tool; `edge/tui/screens/*.py` never sees it.
+_STRATEGIES: dict[str, ProjectionStrategy | None] = {
+    "legacy": None,
+    "fixed_fov_perspective": FixedFovPerspective(),
+    "depth_layered_anchor": DepthLayeredAnchorProjection(),
+}
+COMPOSERS: tuple[str, ...] = tuple(_STRATEGIES)
+DEFAULT_COMPOSER = "legacy"
 
 # The canvas the scene gets at each tier, plus two past where the old chain
 # saturated — the conflicts this tool exists for only appear on a large canvas.
@@ -85,7 +108,21 @@ class Measured:
 
 
 def _ship(name: str, role: str, cid: int) -> SectorShipDTO:
-    return SectorShipDTO(name=name, role=role, archetype_id=None, contact_id=cid)
+    # `archetype_id` matters only to the new pipeline (WP-SC09): the legacy
+    # composer never reads it, but `edge.scene.classify.classify_sector`
+    # keys every ship's `LadderKey` on it, and an empty/`None` archetype has
+    # no catalogue rungs at all (`edge/art/geometry_catalog.json` only ships
+    # per-species archetypes). A real, always-present archetype lets every
+    # gallery case actually admit and paint through the new composer too.
+    return SectorShipDTO(name=name, role=role, archetype_id=_ARCHETYPE, contact_id=cid)
+
+
+# A species archetype present for every ship/port/starbase subtype in the
+# shipped catalogue (`edge/art/geometry_catalog.json`) — used as every
+# fixture's `archetype_id` below so the new pipeline (WP-SC09) can resolve a
+# real ladder rung, not just the legacy composer (which never reads the
+# field at all).
+_ARCHETYPE = "humanoid_diplomat"
 
 
 def _port(name: str = "Verge Depot", *, stardock: bool = False) -> SectorPortDTO:
@@ -94,14 +131,14 @@ def _port(name: str = "Verge Depot", *, stardock: bool = False) -> SectorPortDTO
     # state the game never produces.
     return SectorPortDTO(port_id=64, name=name,
                          klass="Stardock" if stardock else "Class 1 (SBB)",
-                         is_stardock=stardock)
+                         is_stardock=stardock, archetype_id=_ARCHETYPE)
 
 
 def _base(name: str = "Orbital Platform", planet_id: int | None = None,
           condition: str = "open") -> SectorStarbaseDTO:
     return SectorStarbaseDTO(starbase_id=4, name=name, owner="yours",
                              operational=condition == "open", planet_id=planet_id,
-                             condition=condition)
+                             condition=condition, archetype_id=_ARCHETYPE)
 
 
 def _find(kind: str, name: str, *, collected: bool = True) -> SectorDiscovery:
@@ -263,6 +300,110 @@ def _conflicts(drawn: dict[str, Measured], composer: _SceneComposer,
     return out
 
 
+@lru_cache(maxsize=1)
+def _physical_pipeline() -> tuple[SceneTuning, ArtGeometryCatalog]:
+    """The real, config-driven `SceneTuning`/`ArtGeometryCatalog` pair (WP-SC05),
+    loaded once and shared across every physical-pipeline render in this process
+    — the same `config/default.yaml -> scene.physical_model` a live game would
+    use, never invented calibration numbers."""
+
+    cfg = load_config("config/default.yaml")
+    pm = cfg.scene.physical_model
+    return build_scene_tuning(pm), load_geometry_catalog(build_continuous_yields(pm))
+
+
+def _grid_to_text(grid: list[list[tuple[str, object]]], w: int, h: int) -> Text:
+    out = Text()
+    for y in range(h):
+        row = grid[y] if y < len(grid) else []
+        for x in range(w):
+            ch, style = row[x] if x < len(row) else (" ", None)
+            out.append(ch, style=style)  # type: ignore[arg-type]
+        if y < h - 1:
+            out.append("\n")
+    return out
+
+
+def _conflicts_physical(drawn: dict[str, Measured], plan: ScenePlan) -> list[str]:
+    """WP-SC09: the same §1 hierarchy check as `_conflicts`, but built entirely
+    from `ScenePlan`/`ScenePaint` invariants (accepted objects' `scene_box`,
+    `plan.rejected`) — no rectangle-scraping of the rendered text."""
+
+    out: list[str] = []
+    ranked = [(k, m) for k, m in drawn.items() if k in _RANK]
+    for a_kind, a in ranked:
+        for b_kind, b in ranked:
+            if _RANK[a_kind] < _RANK[b_kind] and a.height <= b.height:
+                out.append(
+                    f"{b_kind} ({b.width}x{b.height}) is not smaller than "
+                    f"{a_kind} ({a.width}x{a.height}) — they read as peers"
+                )
+    if plan.rejected:
+        out.append(f"{len(plan.rejected)} object(s) rejected by the solver "
+                   f"(no clearing placement)")
+    return out
+
+
+@dataclass
+class PhysicalRender:
+    """One new-pipeline cell's result: the painted art plus everything the
+    gallery needs, built entirely from `ScenePlan`/`ScenePaint` (WP-SC09
+    bullet 3 — no implementation-specific rectangle heuristics)."""
+
+    plan: ScenePlan
+    art: Text
+    drawn: dict[str, Measured]
+    flags: list[str]
+    bounds: list[tuple[str, int, int, int, int]]
+    refs: list[str]
+
+
+def render_physical(sector: SectorDTO, strategy: ProjectionStrategy, w: int,
+                    h: int) -> PhysicalRender:
+    """Render one scene through the new `edge.scene`/`edge.art.scene_paint`
+    pipeline: `classify_sector` -> `solve` -> `resolve_scene` -> `paint_grid`,
+    from the same fixture DTO, real config-built tuning/catalogue, and
+    `strategy` under test (WP-SC09 bullet 2 — identical inputs across
+    composers)."""
+
+    tuning, catalog = _physical_pipeline()
+    arrangement, _glyphs = classify_sector(sector, tuning)
+    viewport = CellBox(0, 0, w, h)
+    plan = solve(arrangement, viewport, tuning, catalog, strategy)
+    paint = resolve_scene(plan, arrangement, catalog, tuning)
+    grid = paint_grid(paint, viewport)
+    art = _grid_to_text(grid, w, h)
+
+    drawn: dict[str, Measured] = {}
+    bounds: list[tuple[str, int, int, int, int]] = []
+    refs: list[str] = []
+    for obj in paint.painted:
+        kind = obj.key.tag
+        b = obj.scene_box
+        bounds.append((kind, b.col, b.row, b.col + b.width, b.row + b.height))
+        refs.append(f"{kind}:{obj.key.ident}@{obj.natural_box.width}x{obj.natural_box.height}")
+        prev = drawn.get(kind)
+        if prev is None or b.height > prev.height:
+            drawn[kind] = Measured(kind, b.width, b.height, (prev.count if prev else 0) + 1)
+        elif prev is not None:
+            prev.count += 1
+    flags = _conflicts_physical(drawn, plan)
+    return PhysicalRender(plan=plan, art=art, drawn=drawn, flags=flags, bounds=bounds, refs=refs)
+
+
+def variant_scene_id(case: str, w: int, h: int, composer: str) -> str:
+    """Stable per-variant gallery id (WP-SC09 bullet 3: stable ids retained).
+
+    The legacy id is unchanged from `scene_id()` so existing localStorage
+    ratings/comments keyed against it keep working; the two new-pipeline
+    strategies get an explicit suffix so all three can be reviewed
+    independently in the same page.
+    """
+
+    base = scene_id(case, w, h)
+    return base if composer == "legacy" else f"{base}!{composer}"
+
+
 _PAGE_CSS = """
 /* The subject is a terminal: neutrals carry a cool slate bias off the phosphor
    ground rather than warm paper, and the whole page is monospace-led — the art
@@ -360,6 +501,15 @@ body.show-bounds .bounds{opacity:1}
 .k-starbase{color:#4db6ac}
 .k-port{color:#7bc96f}
 .k-ship{color:#ff7b72}
+.k-wreck,.k-entity,.k-player,.k-glyph{color:#9aa5b1}
+/* --- WP-SC09 A/B/C compare mode ---------------------------------------- */
+.variant-group{margin:18px 0}
+.variant-group>h3{font-size:13px;margin:0 0 8px;color:var(--muted);
+                   text-transform:none;letter-spacing:0}
+.variant-row{display:flex;gap:12px;overflow-x:auto;align-items:flex-start}
+.variant-row>.case{flex:1 1 360px;min-width:300px;margin:0}
+.composer-label{font:600 11px/1 ui-sans-serif,system-ui,sans-serif;
+                text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
 .toolbar{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;
          background:var(--bg);border-bottom:1px solid var(--rule);
          padding:12px 0;margin:0 0 8px}
@@ -446,6 +596,25 @@ dialog a,dialog button{font:600 13px/1 ui-sans-serif,system-ui,sans-serif;
                        text-decoration:none;display:inline-block}
 dialog a{background:var(--accent);color:#fff;border-color:var(--accent)}
 .toolbar button[disabled]{opacity:.45;cursor:not-allowed}
+
+/* --- expand-to-full-size ----------------------------------------------------
+   A/B/C compare mode packs each variant into a `flex:1 1 360px` column, so a
+   wide canvas (150x52) is mostly hidden behind horizontal scroll — exactly the
+   case where comparing detail across composers matters most. The expand button
+   clones one card's `.scene` (art + bounds overlay, so `show-bounds` still
+   applies) into an oversized dialog instead of a scaled-down one, so the art is
+   read at its native character grid with nothing competing for width. */
+.expand-btn{background:none;border:1px solid var(--rule);border-radius:6px;
+            color:var(--muted);cursor:pointer;font-size:14px;line-height:1;
+            padding:4px 8px;flex:none}
+.expand-btn:hover,.expand-btn:focus-visible{border-color:var(--accent);
+                                            color:var(--accent)}
+dialog#expand-dialog{width:min(96vw,1400px);max-width:96vw}
+dialog#expand-dialog header{display:flex;align-items:baseline;justify-content:space-between;
+                            gap:12px}
+dialog#expand-dialog .composer-label{display:block;margin-bottom:2px}
+dialog#expand-dialog .pad{padding:0;max-height:82vh;overflow:auto}
+dialog#expand-dialog .pad .scene{padding:16px}
 """
 
 
@@ -597,6 +766,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  /* Expand: clone this card's `.scene` (art + bounds overlay, so the
+     `show-bounds` toggle still applies) into the oversized dialog. Cloning
+     rather than moving the node means the card behind the dialog stays intact
+     and reusable if the dialog is opened again for a sibling variant. */
+  $$('.expand-btn').forEach(btn => btn.addEventListener('click', () => {
+    const card = btn.closest('.case');
+    const label = $('.composer-label', card);
+    const expandLabel = $('#expand-label');
+    if (label) { expandLabel.textContent = label.textContent; expandLabel.hidden = false; }
+    else { expandLabel.hidden = true; }
+    $('#expand-title').textContent = card.dataset.scene;
+    const body = $('#expand-body');
+    body.replaceChildren();
+    body.appendChild($('.scene', card).cloneNode(true));
+    $('#expand-dialog').showModal();
+  }));
+
   refreshCounts();
   applyFilters();
 });
@@ -650,10 +836,10 @@ def _review_html(sid: str) -> str:
         "</aside>")
 
 
-def _bounds_html(composer: _SceneComposer) -> str:
-    """Absolute-positioned rectangles on each sprite's exact placed footprint."""
+def _bounds_html_entries(entries: list[tuple[str, int, int, int, int]]) -> str:
+    """Absolute-positioned rectangles on each object's exact placed footprint."""
     boxes = []
-    for kind, x0, y0, x1, y1 in composer.sprite_rects:
+    for kind, x0, y0, x1, y1 in entries:
         boxes.append(
             f'<div class="bound k-{kind}" data-k="{html.escape(kind)} '
             f'{x1 - x0}x{y1 - y0}" style="left:{x0}ch;top:{y0 * _CELL_H:.2f}px;'
@@ -661,66 +847,128 @@ def _bounds_html(composer: _SceneComposer) -> str:
     return f'<div class=bounds>{"".join(boxes)}</div>'
 
 
+def _bounds_html(composer: _SceneComposer) -> str:
+    return _bounds_html_entries(list(composer.sprite_rects))
+
+
+def _card_html(sid: str, name: str, w: int, h: int, art: Text, drawn: dict[str, Measured],
+               flags: list[str], refs: list[str], bounds: list[tuple[str, int, int, int, int]],
+               composer_label: str | None) -> tuple[str, set[str]]:
+    """One reviewable `.case` card, shared by every composer variant.
+
+    Returns the card's HTML plus the sprite kinds it drew (for the kind
+    filter). `composer_label`, when given, stamps which composer produced
+    this cell — used only in compare mode, where several cards share one
+    scene/size pairing.
+    """
+
+    console = Console(width=w, record=True, file=io.StringIO(),
+                      force_terminal=True, color_system="truecolor")
+    console.print(art)
+    frag = _pin_wide_glyphs(console.export_html(
+        inline_styles=True, code_format='<pre style="margin:0">{code}</pre>'))
+    dims = "  ".join(
+        f"{k}&nbsp;{m.width}x{m.height}" + (f"&nbsp;x{m.count}" if m.count > 1 else "")
+        for k, m in sorted(drawn.items(), key=lambda kv: _RANK.get(kv[0], 9)))
+    flag_html = (
+        "<ul class=flags>" + "".join(f"<li>{html.escape(f)}</li>" for f in flags) + "</ul>"
+        if flags else "<div class=clean>hierarchy holds</div>")
+    refs_html = "".join(f"<li>{html.escape(r)}</li>" for r in refs)
+    kinds = sorted(drawn)
+    data = (
+        f'data-scene="{html.escape(sid, quote=True)}" '
+        f'data-case="{html.escape(name, quote=True)}" '
+        f'data-size="{w}x{h}" '
+        f'data-kinds="{html.escape(" ".join(kinds), quote=True)}" '
+        f'data-measured="{_attr_json({k: f"{m.width}x{m.height}" for k, m in drawn.items()})}" '
+        f'data-flags="{_attr_json(flags)}" '
+        f'data-sprites="{_attr_json(refs)}"')
+    label_html = (f'<div class=composer-label>{html.escape(composer_label)}</div>'
+                  if composer_label else "")
+    expand_btn = (
+        '<button type=button class=expand-btn title="Expand to full size" '
+        'aria-label="Expand to full size">&#10530;</button>')
+    card = (
+        f"<div class='case {'flagged' if flags else 'ok'}' id=\"{_slug(sid)}\" {data}>"
+        f"<header>{label_html}<h3>{html.escape(sid)}</h3>"
+        f"<span class=dims>{dims}</span>{expand_btn}</header>"
+        f"<div class=body>"
+        f"<div class=main>"
+        f"<div class=scene>{frag}{_bounds_html_entries(bounds)}</div>{flag_html}"
+        f"<details class=refs><summary>sprite ids "
+        f"({len(refs)})</summary><ul>{refs_html}</ul></details>"
+        f"</div>"
+        f"{_review_html(sid)}"
+        f"</div></div>")
+    return card, set(kinds)
+
+
+_COMPOSER_LABEL = {
+    "legacy": "Legacy (_SceneComposer)",
+    "fixed_fov_perspective": "New pipeline — FixedFovPerspective",
+    "depth_layered_anchor": "New pipeline — DepthLayeredAnchorProjection",
+}
+
+
 def _render_html(cfg: SceneArtConfig, chosen: dict[str, SectorDTO],
-                 sizes: tuple[tuple[str, int, int], ...]) -> str:
+                 sizes: tuple[tuple[str, int, int], ...], *,
+                 composer: str = DEFAULT_COMPOSER, compare: bool = False) -> str:
+    """Build the gallery page.
+
+    `composer` selects which single composer renders every cell when
+    `compare` is off (WP-SC09's dev switch; defaults to `legacy`, matching
+    live play). `compare=True` ignores `composer` and instead renders every
+    case through all three composers side by side, from identical DTO,
+    tuning/catalogue, and viewport inputs — legacy vs both new-pipeline
+    `ProjectionStrategy` implementations, so neither is hidden.
+    """
+
     rows: list[str] = []
     body: list[str] = []
     all_kinds: set[str] = set()
+    variants = COMPOSERS if compare else (composer,)
     # Grouped by canvas size: comparing the same composition across sizes is the
     # slow read, but comparing every composition *at one size* is how you judge
     # whether the hierarchy holds — so size is the outer axis.
     for label, w, h in sizes:
         cards: list[str] = []
         for name, sector in chosen.items():
-            # `file=StringIO` keeps the ANSI out of stdout; `record` captures it.
-            console = Console(width=w, record=True, file=io.StringIO(),
-                              force_terminal=True, color_system="truecolor")
-            composer, art, drawn, flags = measure(sector, cfg, w, h)
-            console.print(art)
-            frag = _pin_wide_glyphs(console.export_html(
-                inline_styles=True,
-                code_format='<pre style="margin:0">{code}</pre>'))
-            sid = scene_id(name, w, h)
-            dims = "  ".join(
-                f"{k}&nbsp;{m.width}x{m.height}" + (f"&nbsp;x{m.count}" if m.count > 1 else "")
-                for k, m in sorted(drawn.items(), key=lambda kv: _RANK.get(kv[0], 9)))
-            flag_html = (
-                "<ul class=flags>"
-                + "".join(f"<li>{html.escape(f)}</li>" for f in flags)
-                + "</ul>"
-                if flags else
-                "<div class=clean>hierarchy holds</div>")
-            refs = "".join(f"<li>{html.escape(r.ref)}</li>"
-                           for r in composer.render_log)
-            kinds = sorted(drawn)
-            all_kinds.update(kinds)
-            data = (
-                f'data-scene="{html.escape(sid, quote=True)}" '
-                f'data-case="{html.escape(name, quote=True)}" '
-                f'data-size="{w}x{h}" '
-                f'data-kinds="{html.escape(" ".join(kinds), quote=True)}" '
-                f'data-measured="{_attr_json({k: f"{m.width}x{m.height}" for k, m in drawn.items()})}" '
-                f'data-flags="{_attr_json(flags)}" '
-                f'data-sprites="{_attr_json([r.ref for r in composer.render_log])}"')
-            cards.append(
-                f"<div class='case {'flagged' if flags else 'ok'}' "
-                f'id="{_slug(sid)}" {data}>'
-                f'<header><h3>{html.escape(sid)}</h3>'
-                f"<span class=dims>{dims}</span></header>"
-                f"<div class=body>"
-                f"<div class=main>"
-                f"<div class=scene>{frag}{_bounds_html(composer)}</div>{flag_html}"
-                f"<details class=refs><summary>sprite ids "
-                f"({len(composer.render_log)})</summary><ul>{refs}</ul></details>"
-                f"</div>"
-                f"{_review_html(sid)}"
-                f"</div></div>")
+            variant_cards: list[str] = []
+            summary_flags: list[str] = []
+            summary_sid = variant_scene_id(name, w, h, "legacy" if compare else composer)
+            for variant in variants:
+                if variant == "legacy":
+                    scene_composer, art, drawn, flags = measure(sector, cfg, w, h)
+                    bounds = list(scene_composer.sprite_rects)
+                    refs = [r.ref for r in scene_composer.render_log]
+                else:
+                    result = render_physical(sector, _STRATEGIES[variant], w, h)  # type: ignore[arg-type]
+                    art, drawn, flags = result.art, result.drawn, result.flags
+                    bounds, refs = result.bounds, result.refs
+                sid = variant_scene_id(name, w, h, variant)
+                card, kinds = _card_html(
+                    sid, name, w, h, art, drawn, flags, refs, bounds,
+                    _COMPOSER_LABEL[variant] if compare else None)
+                variant_cards.append(card)
+                all_kinds.update(kinds)
+                if variant == ("legacy" if compare else composer):
+                    summary_flags = flags
+            if compare:
+                cards.append(
+                    f'<div class=variant-group id="{_slug(summary_sid)}-group" '
+                    f'data-scene="{html.escape(summary_sid, quote=True)}">'
+                    f"<h3>{html.escape(name)} @ {w}x{h}</h3>"
+                    f'<div class=variant-row>{"".join(variant_cards)}</div></div>')
+            else:
+                cards.append(variant_cards[0])
+            jump_target = f"{_slug(summary_sid)}-group" if compare else _slug(summary_sid)
             rows.append(
-                f'<tr><td class=n><a class=jump href="#{_slug(sid)}">'
-                f"{html.escape(sid)}</a></td>"
-                f"<td class='n {'bad' if flags else ''}'>"
-                f"<span class='count {'zero' if not flags else ''}'>{len(flags)}</span></td>"
-                f"<td>{html.escape(flags[0]) if flags else ''}</td></tr>")
+                f'<tr><td class=n><a class=jump href="#{jump_target}">'
+                f"{html.escape(summary_sid)}</a></td>"
+                f"<td class='n {'bad' if summary_flags else ''}'>"
+                f"<span class='count {'zero' if not summary_flags else ''}'>"
+                f"{len(summary_flags)}</span></td>"
+                f"<td>{html.escape(summary_flags[0]) if summary_flags else ''}</td></tr>")
         body.append(
             f'<section class=sizegroup data-size="{w}x{h}">'
             f"<h2>{html.escape(label)}</h2>{''.join(cards)}</section>")
@@ -788,6 +1036,16 @@ least one conflict.</p>
     <a id=export-download download=scene-complaints.json>Download JSON</a>
     <button type=button onclick="this.closest('dialog').close()">Close</button>
   </footer>
+</dialog>
+<dialog id=expand-dialog>
+  <header>
+    <div>
+      <span id=expand-label class=composer-label hidden></span>
+      <h3 id=expand-title style="margin:2px 0 0"></h3>
+    </div>
+    <button type=button onclick="this.closest('dialog').close()">Close</button>
+  </header>
+  <div class=pad id=expand-body></div>
 </dialog>
 <script>{_PAGE_JS}</script>
 </body>
@@ -883,6 +1141,15 @@ def main() -> None:
                              "your network.")
     parser.add_argument("--no-open", action="store_true",
                         help="with --serve, do not launch a browser")
+    # WP-SC09 dev switch: defaults to the legacy composer, matching live play.
+    # `--compare` ignores `--composer` and renders all three side by side.
+    parser.add_argument("--composer", choices=COMPOSERS, default=DEFAULT_COMPOSER,
+                        help=f"which composer renders each cell (default: "
+                             f"{DEFAULT_COMPOSER}, matching live play)")
+    parser.add_argument("--compare", action="store_true",
+                        help="A/B/C: render every case through legacy, "
+                             "FixedFovPerspective, and DepthLayeredAnchorProjection "
+                             "side by side, from identical inputs")
     args = parser.parse_args()
 
     chosen = cases()
@@ -897,33 +1164,45 @@ def main() -> None:
         sizes = ((args.size, int(sw), int(sh)),)
 
     cfg = SceneArtConfig()
+    n_variants = len(COMPOSERS) if args.compare else 1
     if args.serve is not None or args.html:
         # Rendering every scene twice over (measure, then colour-capture) takes the
         # better part of a minute at full matrix size; say so rather than look hung.
-        print(f"building {len(chosen) * len(sizes)} scenes "
-              f"({len(chosen)} compositions x {len(sizes)} sizes)...", flush=True)
+        print(f"building {len(chosen) * len(sizes) * n_variants} scenes "
+              f"({len(chosen)} compositions x {len(sizes)} sizes"
+              f"{' x 3 composers' if args.compare else ''})...", flush=True)
     if args.serve is not None:
-        _serve(_render_html(cfg, chosen, sizes), args.serve, host=args.host,
-               open_browser=not args.no_open)
+        _serve(_render_html(cfg, chosen, sizes, composer=args.composer,
+                            compare=args.compare),
+               args.serve, host=args.host, open_browser=not args.no_open)
         return
     if args.html:
-        args.html.write_text(_render_html(cfg, chosen, sizes), encoding="utf-8")
+        args.html.write_text(
+            _render_html(cfg, chosen, sizes, composer=args.composer, compare=args.compare),
+            encoding="utf-8")
         print(f"wrote {args.html}")
         return
 
     console = Console()
     for name, sector in chosen.items():
         for _label, w, h in sizes:
-            composer, _art, drawn, flags = measure(sector, cfg, w, h)
-            dims = "  ".join(f"{k} {m.width}x{m.height}"
-                             for k, m in sorted(drawn.items(),
-                                                key=lambda kv: _RANK.get(kv[0], 9)))
-            console.print(f"[b]{scene_id(name, w, h)}[/]  {dims}")
-            for f in flags:
-                console.print(f"   [red]▲[/] {f}")
-            if args.case or args.size:  # a focused run is a debugging run
-                for r in composer.render_log:
-                    console.print(f"   [dim]·[/] [cyan]{r.ref}[/]")
+            for variant in (COMPOSERS if args.compare else (args.composer,)):
+                if variant == "legacy":
+                    scene_composer, _art, drawn, flags = measure(sector, cfg, w, h)
+                    refs = [r.ref for r in scene_composer.render_log]
+                else:
+                    result = render_physical(sector, _STRATEGIES[variant], w, h)  # type: ignore[arg-type]
+                    drawn, flags, refs = result.drawn, result.flags, result.refs
+                dims = "  ".join(f"{k} {m.width}x{m.height}"
+                                 for k, m in sorted(drawn.items(),
+                                                    key=lambda kv: _RANK.get(kv[0], 9)))
+                sid = variant_scene_id(name, w, h, variant)
+                console.print(f"[b]{sid}[/]  {dims}")
+                for f in flags:
+                    console.print(f"   [red]▲[/] {f}")
+                if args.case or args.size:  # a focused run is a debugging run
+                    for ref in refs:
+                        console.print(f"   [dim]·[/] [cyan]{ref}[/]")
 
 
 if __name__ == "__main__":

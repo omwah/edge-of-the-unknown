@@ -1,6 +1,6 @@
 {
   ".claude/settings.json": {
-    "mtime": 1786742739.8122983,
+    "mtime": 1788306281.8469212,
     "ast_hash": "86ab8cc8bc15404a2ae14a334a1acb26",
     "semantic_hash": ""
   },
@@ -40,7 +40,7 @@
     "semantic_hash": ""
   },
   "edge/art/discovery.py": {
-    "mtime": 1786595272.0243156,
+    "mtime": 1788306281.850983,
     "ast_hash": "7a62dd65c3c67a697df1849fbd0419c9",
     "semantic_hash": ""
   },
@@ -50,7 +50,7 @@
     "semantic_hash": ""
   },
   "edge/art/generator.py": {
-    "mtime": 1786596875.5731518,
+    "mtime": 1788306281.850983,
     "ast_hash": "65d367e0ef66aa0a538fcdacb24c0dd9",
     "semantic_hash": ""
   },
@@ -250,8 +250,8 @@
     "semantic_hash": ""
   },
   "edge/core/aliens.py": {
-    "mtime": 1786406866.158502,
-    "ast_hash": "8d501c4e3ea6ef06cfeba2e47936d41d",
+    "mtime": 1788406186.318087,
+    "ast_hash": "28a64b1f4b1e9a88ca75c0181e285930",
     "semantic_hash": ""
   },
   "edge/core/citadels.py": {
@@ -265,8 +265,8 @@
     "semantic_hash": ""
   },
   "edge/core/config.py": {
-    "mtime": 1786744214.8804567,
-    "ast_hash": "df4478ed06f0b2574471b65327a9d309",
+    "mtime": 1789015125.6984596,
+    "ast_hash": "f0fca83faffe3fb55aa607ca4c294f0d",
     "semantic_hash": ""
   },
   "edge/core/contracts.py": {
@@ -290,8 +290,8 @@
     "semantic_hash": ""
   },
   "edge/core/dto.py": {
-    "mtime": 1786595272.0253086,
-    "ast_hash": "32c5defa74cea830fb64a974995d514b",
+    "mtime": 1789006733.810961,
+    "ast_hash": "8b1f5326932d4d344b5bc7935a1a9f18",
     "semantic_hash": ""
   },
   "edge/core/economy.py": {
@@ -300,8 +300,8 @@
     "semantic_hash": ""
   },
   "edge/core/encounters.py": {
-    "mtime": 1786406866.1592188,
-    "ast_hash": "70a87aac7840cb1fa697faf74a4e719e",
+    "mtime": 1788406186.3190873,
+    "ast_hash": "0fb25bc47d6cbba1393b96d09b74a029",
     "semantic_hash": ""
   },
   "edge/core/engine_room.py": {
@@ -605,13 +605,13 @@
     "semantic_hash": ""
   },
   "edge/server/session.py": {
-    "mtime": 1786595272.0263088,
-    "ast_hash": "10e45c0844b3df35040f5c2b841ad77c",
+    "mtime": 1789006744.6030865,
+    "ast_hash": "165ad68c41a53027df905f2efa8e09fa",
     "semantic_hash": ""
   },
   "edge/server/wire.py": {
-    "mtime": 1786598734.0378375,
-    "ast_hash": "7d658507c3c48050cc879b13e58fcc54",
+    "mtime": 1789006777.2234662,
+    "ast_hash": "f870b6f625e0658118bdca9ec9e153bf",
     "semantic_hash": ""
   },
   "edge/spacebattle/__init__.py": {
@@ -625,7 +625,7 @@
     "semantic_hash": ""
   },
   "edge/spacebattle/app.py": {
-    "mtime": 1786596890.275166,
+    "mtime": 1788306281.8539214,
     "ast_hash": "4dd48c74d25e59f5c7e299e7813c9ec8",
     "semantic_hash": ""
   },
@@ -695,12 +695,12 @@
     "semantic_hash": ""
   },
   "edge/tui/app.py": {
-    "mtime": 1786406866.1707587,
-    "ast_hash": "0b5e4bb4e45c9f396e5b3bd3c4125acf",
+    "mtime": 1789007252.7960014,
+    "ast_hash": "243a47403382c3ceb2956bba73df96e0",
     "semantic_hash": ""
   },
   "edge/tui/art_adapter.py": {
-    "mtime": 1786595272.0263088,
+    "mtime": 1788306281.8539214,
     "ast_hash": "4f25c501c523f92b8772dc338c0e88d5",
     "semantic_hash": ""
   },
@@ -735,8 +735,8 @@
     "semantic_hash": ""
   },
   "edge/tui/dummy.py": {
-    "mtime": 1786406866.1707587,
-    "ast_hash": "a350afee2c1f89c1ff8ba563aa4ba632",
+    "mtime": 1789006754.1651978,
+    "ast_hash": "a61a64b5504edd6818d438bfe2f21b1c",
     "semantic_hash": ""
   },
   "edge/tui/onboarding.py": {
@@ -760,8 +760,8 @@
     "semantic_hash": ""
   },
   "edge/tui/scene_preview.py": {
-    "mtime": 1786744497.185217,
-    "ast_hash": "7c60501d191839c392bc01e8d1a4d057",
+    "mtime": 1789011050.2861764,
+    "ast_hash": "e2005c78ecc00c9aafd94ec6e75c1f42",
     "semantic_hash": ""
   },
   "edge/tui/screens/__init__.py": {
@@ -785,8 +785,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/base.py": {
-    "mtime": 1786406866.172065,
-    "ast_hash": "cb5e36ec8ca16308a055510542b4142f",
+    "mtime": 1789006956.25555,
+    "ast_hash": "bf81aafc7cce0ebda1dccd3ed56cb99d",
     "semantic_hash": ""
   },
   "edge/tui/screens/computer.py": {
@@ -855,8 +855,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/options.py": {
-    "mtime": 1786406866.173219,
-    "ast_hash": "afdebdc48c36689b8e7d3f7f0bf1fac7",
+    "mtime": 1788556881.9028602,
+    "ast_hash": "b287cfe8548c2e573f5261ae054c8cb4",
     "semantic_hash": ""
   },
   "edge/tui/screens/picker.py": {
@@ -870,8 +870,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/port.py": {
-    "mtime": 1786406866.173219,
-    "ast_hash": "64cbb91f708c836891bf0af5dfb61210",
+    "mtime": 1789006950.6994853,
+    "ast_hash": "8ca2dade539c19ad8d99915b60c6ca6a",
     "semantic_hash": ""
   },
   "edge/tui/screens/rumor.py": {
@@ -885,8 +885,8 @@
     "semantic_hash": ""
   },
   "edge/tui/screens/stardock.py": {
-    "mtime": 1786406866.174219,
-    "ast_hash": "7d464b5b4573fb91f87a717b38321e5f",
+    "mtime": 1789006973.172747,
+    "ast_hash": "12c3d3f2f5966ede1a9eb1fa770417b7",
     "semantic_hash": ""
   },
   "edge/tui/screens/status_drawer.py": {
@@ -910,8 +910,8 @@
     "semantic_hash": ""
   },
   "edge/tui/settings.py": {
-    "mtime": 1786406866.174219,
-    "ast_hash": "bd9411f74ac8f944a0cd27996d4892f8",
+    "mtime": 1788556881.9028602,
+    "ast_hash": "108fd23488a4d45e48ef01b99f4160b4",
     "semantic_hash": ""
   },
   "edge/tui/shots.py": {
@@ -925,18 +925,18 @@
     "semantic_hash": ""
   },
   "edge/tui/station_art.py": {
-    "mtime": 1786406866.174219,
-    "ast_hash": "2cdd34432d3e69c0feebeee172ab0edd",
+    "mtime": 1789007039.1815152,
+    "ast_hash": "13b0182e77d256523994ea9534ffc901",
     "semantic_hash": ""
   },
   "edge/tui/widgets.py": {
-    "mtime": 1786925498.6120167,
-    "ast_hash": "f5d7a388f13726735c28dab6cbf9064b",
+    "mtime": 1789015656.1462107,
+    "ast_hash": "71a81706c92ef70da69f9c1c459c7270",
     "semantic_hash": ""
   },
   "pyproject.toml": {
-    "mtime": 1786754352.80664,
-    "ast_hash": "999421eecbef94b04d630343cc5146e8",
+    "mtime": 1788411623.9898133,
+    "ast_hash": "d219db1d716c34a219b8fe2d8fe51a0a",
     "semantic_hash": ""
   },
   "scripts/build_design_pdf.sh": {
@@ -960,8 +960,8 @@
     "semantic_hash": ""
   },
   "tests/fixtures/wire/envelopes.json": {
-    "mtime": 1786598782.78651,
-    "ast_hash": "1dfcca05b5808ab89372ef2549b3e84c",
+    "mtime": 1789006803.9320102,
+    "ast_hash": "08cfe3aff92b2f08390bb6726d9d2c32",
     "semantic_hash": ""
   },
   "tests/helpers.py": {
@@ -975,8 +975,8 @@
     "semantic_hash": ""
   },
   "tests/test_aliens.py": {
-    "mtime": 1786406866.276803,
-    "ast_hash": "1514a922dd3462c8d8a70adbbf1360d7",
+    "mtime": 1788406186.3200872,
+    "ast_hash": "c8e9099aa8c07cc73124a5f549c82a4d",
     "semantic_hash": ""
   },
   "tests/test_alliances.py": {
@@ -990,7 +990,7 @@
     "semantic_hash": ""
   },
   "tests/test_art_coverage.py": {
-    "mtime": 1786595272.0273087,
+    "mtime": 1788306281.902922,
     "ast_hash": "1e384d5194d5aca26a446c0c3a3e1d1d",
     "semantic_hash": ""
   },
@@ -1065,7 +1065,7 @@
     "semantic_hash": ""
   },
   "tests/test_config.py": {
-    "mtime": 1786744244.1247425,
+    "mtime": 1788306281.902922,
     "ast_hash": "70f25fa55804a28bf461badcfbf4f69d",
     "semantic_hash": ""
   },
@@ -1235,8 +1235,8 @@
     "semantic_hash": ""
   },
   "tests/test_llm_bot_services.py": {
-    "mtime": 1786406866.2812202,
-    "ast_hash": "f4d307592912e422c0320d8a8ab3f2a1",
+    "mtime": 1788406186.3210871,
+    "ast_hash": "0f14f032247214fd8d6776163bab3482",
     "semantic_hash": ""
   },
   "tests/test_llm_bot_tui.py": {
@@ -1320,13 +1320,13 @@
     "semantic_hash": ""
   },
   "tests/test_services.py": {
-    "mtime": 1786406866.2832203,
-    "ast_hash": "f231145deebdc2224920b6f9a2a6e33d",
+    "mtime": 1788406186.3210871,
+    "ast_hash": "064ff48c84645f8d2fafc160b60c07a0",
     "semantic_hash": ""
   },
   "tests/test_session.py": {
-    "mtime": 1786406866.2832203,
-    "ast_hash": "d924d56038b85f1fdec1f726c4dc0d50",
+    "mtime": 1788406186.3210871,
+    "ast_hash": "a49e82f681e23c3263be0542c4ab43f5",
     "semantic_hash": ""
   },
   "tests/test_settings.py": {
@@ -1355,8 +1355,8 @@
     "semantic_hash": ""
   },
   "tests/test_station_archetype_art.py": {
-    "mtime": 1786744199.279304,
-    "ast_hash": "783328eaa34c628152edb1c40a527f89",
+    "mtime": 1789007049.477635,
+    "ast_hash": "17c510849bccf02e0ba0fbb96560d55d",
     "semantic_hash": ""
   },
   "tests/test_store.py": {
@@ -1390,8 +1390,8 @@
     "semantic_hash": ""
   },
   "tests/test_tui_flow.py": {
-    "mtime": 1786406866.2842202,
-    "ast_hash": "fd1333df989141a38ea7aaa3a58e22fb",
+    "mtime": 1789007058.5557406,
+    "ast_hash": "02a947371f411b60c45faa521c930093",
     "semantic_hash": ""
   },
   "tests/test_ui_actions.py": {
@@ -1475,8 +1475,8 @@
     "semantic_hash": ""
   },
   "tests/test_ui_snapshots.py": {
-    "mtime": 1786406866.2862203,
-    "ast_hash": "1500221a92fe59670c838c91f0e4c8fa",
+    "mtime": 1789015400.344955,
+    "ast_hash": "f5826934f1439b0cc0a8db1307bc18e6",
     "semantic_hash": ""
   },
   "tests/test_ui_stardock_keys.py": {
@@ -1500,8 +1500,8 @@
     "semantic_hash": ""
   },
   "tests/test_wire.py": {
-    "mtime": 1786406866.2862203,
-    "ast_hash": "2e255420b764e9ed62a49bc067ebd7dd",
+    "mtime": 1788406186.3210871,
+    "ast_hash": "cbe960c9e7223993e4afe3a593053fbf",
     "semantic_hash": ""
   },
   "tests/test_wp_pr12.py": {
@@ -1510,8 +1510,8 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1786596150.2639005,
-    "ast_hash": "a825944845f400e74d42136681a8f970",
+    "mtime": 1788411623.9498127,
+    "ast_hash": "6256c36bbf2d067495dde3799d9fde47",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -1535,8 +1535,8 @@
     "semantic_hash": ""
   },
   "config/default.yaml": {
-    "mtime": 1786744564.8478785,
-    "ast_hash": "092a6dfb7d0f75d11490961d2887feb5",
+    "mtime": 1789015135.794588,
+    "ast_hash": "d624b87d2f48ed8e32bb2d9d64cc6363",
     "semantic_hash": ""
   },
   "config/dialogue/alien_dialogue_species.yaml": {
@@ -1560,12 +1560,12 @@
     "semantic_hash": ""
   },
   "docs/DESIGN.md": {
-    "mtime": 1786406866.104218,
-    "ast_hash": "0f608a5cbdd32f60c83ee9778599e720",
+    "mtime": 1788411623.9518127,
+    "ast_hash": "b46082d0203eede984737d99f5cbcd6a",
     "semantic_hash": ""
   },
   "docs/DESIGN_ARTGEN.md": {
-    "mtime": 1786596126.5291007,
+    "mtime": 1788306281.8479211,
     "ast_hash": "f3d94990d0b61a54b2ef7449a6dd9c32",
     "semantic_hash": ""
   },
@@ -1665,8 +1665,8 @@
     "semantic_hash": ""
   },
   "docs/SECTOR_SCENE_COMPOSITION.md": {
-    "mtime": 1786925640.327011,
-    "ast_hash": "8e0d7f95914dff12628b444c097574b2",
+    "mtime": 1789015919.2645595,
+    "ast_hash": "6f6fa1a7ac3fd168dbb77769379a8592",
     "semantic_hash": ""
   },
   "docs/SPACEBATTLE_POC.md": {
@@ -1700,8 +1700,8 @@
     "semantic_hash": ""
   },
   "docs/UI_MOCKUPS.md": {
-    "mtime": 1786406866.1092181,
-    "ast_hash": "b9797c1f904039033975d59c2be78d4d",
+    "mtime": 1789015945.127889,
+    "ast_hash": "58e63d99ad278241b98d11eacec1b21a",
     "semantic_hash": ""
   },
   "docs/UI_UX_OVERHAUL_PLAN.md": {
@@ -1730,7 +1730,7 @@
     "semantic_hash": ""
   },
   "images/ui/starbases/PROVENANCE.md": {
-    "mtime": 1786595272.0273087,
+    "mtime": 1788306281.8889217,
     "ast_hash": "a3cf6c45059c94a932d50c32af5f2035",
     "semantic_hash": ""
   },
@@ -1740,8 +1740,8 @@
     "semantic_hash": ""
   },
   "tests/fixtures/wire/fingerprint.txt": {
-    "mtime": 1786598745.1990657,
-    "ast_hash": "32c9dbd181846d2b61aaf00271744c12",
+    "mtime": 1789006787.7594101,
+    "ast_hash": "6a93e12c347d66d2856be9e24191eee6",
     "semantic_hash": ""
   },
   "docs/ui/shots/action-menu.svg": {
@@ -3835,158 +3835,368 @@
     "semantic_hash": ""
   },
   "edge/art/sprite_art/__init__.py": {
-    "mtime": 1786571897.2227428,
+    "mtime": 1788306281.850983,
     "ast_hash": "e399105d740b5d66ff5bcd9b39df97ac",
     "semantic_hash": ""
   },
   "edge/art/sprite_art/glyphs.py": {
-    "mtime": 1786421331.2499037,
+    "mtime": 1788306281.850983,
     "ast_hash": "b93337917de10a1a1fd371295c1a885c",
     "semantic_hash": ""
   },
   "edge/art/sprite_art/io.py": {
-    "mtime": 1786421331.2499037,
+    "mtime": 1788306281.850983,
     "ast_hash": "569d52145218cea88932cc77327bb52d",
     "semantic_hash": ""
   },
   "edge/art/sprite_art/library.py": {
-    "mtime": 1786421331.2499037,
+    "mtime": 1788306281.8519213,
     "ast_hash": "b8c7cf7ac98973e382c0db237a89d6ec",
     "semantic_hash": ""
   },
   "edge/art/sprite_art/model.py": {
-    "mtime": 1786594454.5967762,
+    "mtime": 1788306281.8519213,
     "ast_hash": "5b44c7fc9c36b09876be26f4ba40e5d5",
     "semantic_hash": ""
   },
   "edge/art/sprite_art/render.py": {
-    "mtime": 1786594454.5967762,
+    "mtime": 1788306281.8519213,
     "ast_hash": "0fca6668349bb8ed31b87625f9189a07",
     "semantic_hash": ""
   },
   "edge/art/sprites.py": {
-    "mtime": 1786925449.6943283,
+    "mtime": 1788306281.8519213,
     "ast_hash": "105fb07d07d070cb2d6344f8876d7316",
     "semantic_hash": ""
   },
   "scripts/sync_sprite_art.py": {
-    "mtime": 1786595272.036309,
+    "mtime": 1788306281.8899217,
     "ast_hash": "4c2acafb45c5e6a3a2e874c99334819f",
     "semantic_hash": ""
   },
   "tests/test_sprite_seam.py": {
-    "mtime": 1786925449.6953282,
+    "mtime": 1788306281.902922,
     "ast_hash": "0399888f1137929e176f02c07a39accb",
     "semantic_hash": ""
   },
   "tests/test_vendored_sprite_art.py": {
-    "mtime": 1786596729.0707781,
+    "mtime": 1788306281.9039218,
     "ast_hash": "1e184910cf8057b41cafde15188e5324",
     "semantic_hash": ""
   },
   "docs/SPRITE_ART_MIGRATION.md": {
-    "mtime": 1786598863.1892688,
+    "mtime": 1788306281.8489213,
     "ast_hash": "db1b66627a573632285a93db61f4fda8",
     "semantic_hash": ""
   },
   "docs/SPRITE_ART_SYNC.md": {
-    "mtime": 1786596742.0379624,
-    "ast_hash": "2bca21899c97ecb75c91fda0b903a4e3",
+    "mtime": 1788411623.9518127,
+    "ast_hash": "7d6e373a465ee2a1e2704ee7fc66a4f9",
     "semantic_hash": ""
   },
   "edge/art/assets/palettes.yaml": {
-    "mtime": 1786421331.244678,
+    "mtime": 1788306281.8489213,
     "ast_hash": "3932c389cd3a0c5840a57d29c1c32b68",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ports/starbase.yaml": {
-    "mtime": 1786559048.3906283,
+    "mtime": 1788306281.8504596,
     "ast_hash": "25b0907fd69897b887f2b8fa4ff6a3eb",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ports/stardock.yaml": {
-    "mtime": 1786421331.2464056,
+    "mtime": 1788306281.850639,
     "ast_hash": "250959c0b869e47a9bf7d3275fdb8fb2",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ports/trading_port.yaml": {
-    "mtime": 1786594454.593776,
+    "mtime": 1788306281.850639,
     "ast_hash": "b6ecb2f410e830766433e29d86817ea1",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/broadside_citadel.yaml": {
-    "mtime": 1786594454.593776,
+    "mtime": 1788306281.850639,
     "ast_hash": "5b7682ca5f01e81fd5511378ca5acb24",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/capital_warship.yaml": {
-    "mtime": 1786594454.593776,
+    "mtime": 1788306281.850983,
     "ast_hash": "bd8d5327030e6a2e3e870d3d63f65738",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/falsehold_raider.yaml": {
-    "mtime": 1786594454.5947762,
+    "mtime": 1788306281.850983,
     "ast_hash": "294e71e9badecd90354b9c20ff2c0557",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/fighter.yaml": {
-    "mtime": 1786594454.5947762,
+    "mtime": 1788306281.850983,
     "ast_hash": "ca68daa32f4eb73d4bb0ff78abfca1ef",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/hearth_freighter.yaml": {
-    "mtime": 1786594454.5947762,
+    "mtime": 1788306281.850983,
     "ast_hash": "851376c6d7652628afbc1d1a9f5bf7e2",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/junction_pinnace.yaml": {
-    "mtime": 1786594454.5947762,
+    "mtime": 1788306281.850983,
     "ast_hash": "2b6979e11b7d327e0f64b53ab9f0b40b",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/marrow_dart.yaml": {
-    "mtime": 1786594454.5947762,
+    "mtime": 1788306281.850983,
     "ast_hash": "0bb2f88f1f258bb74fac7dff1dbbf826",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/needle_picket.yaml": {
-    "mtime": 1786594454.595776,
+    "mtime": 1788306281.850983,
     "ast_hash": "36b237c368247125d09544a607d59aed",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/pearl_shell.yaml": {
-    "mtime": 1786594454.595776,
+    "mtime": 1788306281.850983,
     "ast_hash": "dc0d638e939ddec57f179ab2ed37f703",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/radiant_lance.yaml": {
-    "mtime": 1786594454.595776,
+    "mtime": 1788306281.850983,
     "ast_hash": "321cc8cfa0383fa4cc294f7e47ff4852",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/transport.yaml": {
-    "mtime": 1786594454.595776,
+    "mtime": 1788306281.850983,
     "ast_hash": "6a91c854063461c83c7a4c1c405c869b",
     "semantic_hash": ""
   },
   "edge/art/assets/sprites/ships/warship.yaml": {
-    "mtime": 1786594454.5967762,
+    "mtime": 1788306281.850983,
     "ast_hash": "8d97a8f90ee6d2cdcbdf2584cc7d4298",
     "semantic_hash": ""
   },
   "tests/fixtures/tier_renders.json": {
-    "mtime": 1786594454.5977762,
+    "mtime": 1788306281.902922,
     "ast_hash": "3262cffec962741dc254e7acb1601c8a",
     "semantic_hash": ""
   },
   "edge/tui/scene_gallery.py": {
-    "mtime": 1786754654.3419995,
-    "ast_hash": "0f795170b3cfdbadec6b9561bf19a46e",
+    "mtime": 1788622704.4721432,
+    "ast_hash": "aff5b5ec78ccda716e97f62c6095bb9c",
     "semantic_hash": ""
   },
-  "scene-complaints.json": {
-    "mtime": 1786922904.7074125,
-    "ast_hash": "1d0b5dd92b78a27e020f4c3396fae3ce",
+  "edge/art/geometry_catalog.json": {
+    "mtime": 1788411623.9528127,
+    "ast_hash": "93492c14f702a7be5d658651e3cfa90d",
+    "semantic_hash": ""
+  },
+  "edge/art/geometry_catalog.py": {
+    "mtime": 1788546636.1541414,
+    "ast_hash": "c03ddde277ffa1b73e1632c82beb4d85",
+    "semantic_hash": ""
+  },
+  "edge/scene/__init__.py": {
+    "mtime": 1788411623.9528127,
+    "ast_hash": "85301fec9505b467da76efec8a80836e",
+    "semantic_hash": ""
+  },
+  "edge/scene/catalog.py": {
+    "mtime": 1788411623.9528127,
+    "ast_hash": "3afe09067ee8abdf7142172174e9beed",
+    "semantic_hash": ""
+  },
+  "edge/scene/geometry.py": {
+    "mtime": 1788411623.9528127,
+    "ast_hash": "4165b57d5c14e3831b28f1541aacdd46",
+    "semantic_hash": ""
+  },
+  "edge/scene/model.py": {
+    "mtime": 1789012836.435358,
+    "ast_hash": "ed4c422b097bcd5f654238274485f64c",
+    "semantic_hash": ""
+  },
+  "edge/scene/project.py": {
+    "mtime": 1788920355.8175867,
+    "ast_hash": "039046591d23f61f131d9ac114bf040f",
+    "semantic_hash": ""
+  },
+  "edge/scene/solve.py": {
+    "mtime": 1788920355.8185866,
+    "ast_hash": "aa80c6fd1484174b1388adb801068421",
+    "semantic_hash": ""
+  },
+  "scripts/gen_geometry_catalog.py": {
+    "mtime": 1788411623.9898133,
+    "ast_hash": "4447c1c567cb5f5916a32b33ec8c2e40",
+    "semantic_hash": ""
+  },
+  "tests/test_geometry_catalog.py": {
+    "mtime": 1788411623.9898133,
+    "ast_hash": "549c5fecbe9954a9ca20a3977d867b96",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_import_boundaries.py": {
+    "mtime": 1788411623.9908133,
+    "ast_hash": "79cb51d5af419552900f607fc61d926e",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_model.py": {
+    "mtime": 1789012895.814113,
+    "ast_hash": "74aeb46f8865408b323e8acbc1620cff",
+    "semantic_hash": ""
+  },
+  "docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md": {
+    "mtime": 1789013000.113439,
+    "ast_hash": "d91d288485a80182db0acd9fb98b9c22",
+    "semantic_hash": ""
+  },
+  "edge/scene/classify.py": {
+    "mtime": 1789014923.5678868,
+    "ast_hash": "7c34cea65eb5473516e0dfb623d2a53a",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_classify.py": {
+    "mtime": 1789014966.642435,
+    "ast_hash": "c1b8d8877f0f90a1a9fafcece9d9e898",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_project.py": {
+    "mtime": 1789012905.6821506,
+    "ast_hash": "43e68b2b56144a23fc0daa8791014ae4",
+    "semantic_hash": ""
+  },
+  "docs/scene_benchmark_baseline.json": {
+    "mtime": 1788496119.0402007,
+    "ast_hash": "67eed22f9678b39a2f2dec2090766165",
+    "semantic_hash": ""
+  },
+  "edge/devtool/scene_benchmark.py": {
+    "mtime": 1789012920.2344234,
+    "ast_hash": "076c792f50783c2238ee10231784f1fa",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_benchmark.py": {
+    "mtime": 1788491338.453509,
+    "ast_hash": "b102bcb1fb4b7f2c1c4185af89c428c0",
+    "semantic_hash": ""
+  },
+  "docs/SCENE_BENCHMARK_BASELINE.md": {
+    "mtime": 1789005102.9997227,
+    "ast_hash": "d6430bf4bcebdf52944ea8440d15acb0",
+    "semantic_hash": ""
+  },
+  "docs/scene_calibration_review.json": {
+    "mtime": 1788531655.760328,
+    "ast_hash": "fc3b940cdaafb70b0a2065873655d6b3",
+    "semantic_hash": ""
+  },
+  "edge/devtool/scene_calibration.py": {
+    "mtime": 1789012933.1355875,
+    "ast_hash": "d8b86641501369e39f27a61dc52eb5fa",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_calibration.py": {
+    "mtime": 1788543192.3004897,
+    "ast_hash": "db9c686e9b230922243079eb161e5df0",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_solve.py": {
+    "mtime": 1789012905.668749,
+    "ast_hash": "4030867ee57c828de8cf8684381005f6",
+    "semantic_hash": ""
+  },
+  "docs/SCENE_CALIBRATION_REVIEW.md": {
+    "mtime": 1788535659.7752485,
+    "ast_hash": "356513075912a65a1170acc924a9a6fa",
+    "semantic_hash": ""
+  },
+  "docs/SCENE_CALIBRATION_REVIEW.json": {
+    "mtime": 1788535659.7742484,
+    "ast_hash": "8e2318b2c8e9221229f908d7c4507955",
+    "semantic_hash": ""
+  },
+  "edge/art/scene_tuning.py": {
+    "mtime": 1789012868.8557703,
+    "ast_hash": "70e3124f7fdf5e7e35722a76c6cac5b4",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_tuning_config.py": {
+    "mtime": 1788920355.861587,
+    "ast_hash": "039ee1c629cbba2337e403c38d227d6e",
+    "semantic_hash": ""
+  },
+  "edge/art/scene_paint.py": {
+    "mtime": 1789015012.905024,
+    "ast_hash": "2541833d6e7f2fbfe85d142aa498b725",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_paint.py": {
+    "mtime": 1789015044.3894246,
+    "ast_hash": "647eb5bd0ad29448f61aef196e99bfc1",
+    "semantic_hash": ""
+  },
+  "edge/tui/physical_scene.py": {
+    "mtime": 1788556881.9028602,
+    "ast_hash": "14dbb275bd97c9d79d4de6141ec9d381",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_labels.py": {
+    "mtime": 1788556881.9408607,
+    "ast_hash": "ab191d44a4555bbadbb98e1025bbef83",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_resize.py": {
+    "mtime": 1788556881.9418607,
+    "ast_hash": "5b2398a3e9f3567b745b677d0c9b3611",
+    "semantic_hash": ""
+  },
+  "tests/test_physical_scene_snapshots.py": {
+    "mtime": 1788920355.8605871,
+    "ast_hash": "68f39009e4f47eef63d4f210ae0ae2e1",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_gallery_ab.py": {
+    "mtime": 1788561183.5456192,
+    "ast_hash": "5ebb724cfa5dca0d643378d2224e2c4e",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_frustum.py": {
+    "mtime": 1789012905.6951787,
+    "ast_hash": "fa91d09b69e2a34d50c5923a41f2fc55",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_joint_placement.py": {
+    "mtime": 1788920355.861587,
+    "ast_hash": "8d4a8ee383c77c7cd64e18a4a576f0a4",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_size_and_drops.py": {
+    "mtime": 1788920355.861587,
+    "ast_hash": "44302c4697a4909d0b04a543b46dbec7",
+    "semantic_hash": ""
+  },
+  "edge/devtool/scene_parity.py": {
+    "mtime": 1788920355.8175867,
+    "ast_hash": "23060bac1267d56ed51a71e3606532cb",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_legacy_parity.py": {
+    "mtime": 1788920355.861587,
+    "ast_hash": "d2e8afb933113aa9efe0de8e83b7fa4c",
+    "semantic_hash": ""
+  },
+  "docs/scene_parity_baseline.json": {
+    "mtime": 1788927017.6873846,
+    "ast_hash": "a26946121af9bfa2eadcbc7bf045ce98",
+    "semantic_hash": ""
+  },
+  "tests/test_scene_preview_composers.py": {
+    "mtime": 1789010998.7085917,
+    "ast_hash": "a2ae498e1936ee8a7d4b55b7aca5f97d",
+    "semantic_hash": ""
+  },
+  "docs/SCENE_COMPOSITION_TEST_DISPOSITION.md": {
+    "mtime": 1789015996.047539,
+    "ast_hash": "5af7de06f6063bc4b283ee8d9d593577",
     "semantic_hash": ""
   }
 }

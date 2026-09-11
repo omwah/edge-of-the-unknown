@@ -98,11 +98,12 @@ class _DockStructureArt(Static):
     """Responsive Stardock silhouette paired with each service banner."""
 
     def __init__(self, sector_id: int, archetype_id: str | None, cinematic: bool,
-                 icon_size: tuple[int, int]) -> None:
+                 icon_size: tuple[int, int], object_id: int | None = None) -> None:
         self._key = ("dock-structure", sector_id, archetype_id, cinematic, icon_size)
         super().__init__(remembered(self._key) or "", classes="dock-structure-art")
         self._sector_id = sector_id
         self._archetype_id = archetype_id
+        self._object_id = object_id
         self.styles.width, self.styles.height = icon_size
 
     def on_mount(self) -> None:
@@ -114,7 +115,8 @@ class _DockStructureArt(Static):
     def _refresh_art(self) -> None:
         wide = getattr(getattr(self.app, "layout_tier", None), "value", "standard") == "wide"
         width, height = station_icon_dimensions(self.app, "stardock", wide,
-                                                expect_sector=self._sector_id)
+                                                expect_sector=self._sector_id,
+                                                object_id=self._object_id)
         self._key = ("dock-structure", self._sector_id, self._archetype_id,
                      wide, (width, height))
         self.styles.width, self.styles.height = width, height
@@ -385,14 +387,16 @@ footer."""
         cinematic = getattr(self.app.layout_tier, "value", "standard") == "wide"
         theme = str(self.app.theme)
         sector_id: int = port.sector_id  # type: ignore[attr-defined]
+        object_id: int = port.port_id  # type: ignore[attr-defined]
         icon_size = station_icon_dimensions(self.app, "stardock", cinematic,
-                                            expect_sector=sector_id)
+                                            expect_sector=sector_id, object_id=object_id)
         header = StationArtRow(
             "stardock",
             _DockStructureArt(sector_id, port.archetype_id, cinematic,  # type: ignore[attr-defined]
-                              icon_size),
+                              icon_size, object_id=object_id),
             _StardockServiceArt(tab, cinematic, theme),
             expect_sector=sector_id,
+            object_id=object_id,
             classes="service-art-header",
         )
         return header

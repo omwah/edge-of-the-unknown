@@ -98,7 +98,7 @@ extend-exclude = ["edge/art/sprite_art"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["edge/core", "edge/dialogue", "edge/bigbang", "edge/store", "edge/server", "edge/engine"]
+files = ["edge/core", "edge/dialogue", "edge/bigbang", "edge/store", "edge/server", "edge/engine", "edge/scene"]
 # The dev-only authoring pipeline does I/O and talks to untyped LLM SDKs; it is exempt from
 # mypy-strict like the throwaway tui (DESIGN §6.7 — never imported by runtime).
 exclude = "edge/dialogue/authoring/"

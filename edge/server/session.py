@@ -21,6 +21,7 @@ from edge.dialogue.intel import pick_intel_target, pick_rumor
 from edge.core import dto
 from edge.server import mapgraph
 from edge.server import navstrip
+from edge.core import aliens
 from edge.core import citadels
 from edge.core import combat
 from edge.core import contracts
@@ -34,6 +35,7 @@ from edge.core.aliens import (
     core_status,
     disposition_band,
     effective_disposition,
+    encounter_disposition,
     resolve_species_by_kind,
     seizure_progress,
 )
@@ -388,6 +390,28 @@ def _species_ship_role(species: AlienSpecies, config: GameConfig) -> str:
     return "fighter"
 
 
+def _alien_priority_input(
+    species: AlienSpecies, player: Player, config: GameConfig,
+) -> aliens.ShipPriorityInput:
+    """One alien vessel's raw scene-retention inputs (WP-SC01, §2.3).
+
+    Orders on `aliens.encounter_disposition` — the same final quantity
+    `core.encounters.roll_encounter` rolls the greeting-vs-violence check against — so
+    the fog-safe ordinal the client sees preserves the exact ordering the real
+    encounter logic uses, without exposing the float or its private inputs (attitude
+    offset, grudge severity, alliance standing). A species with no roster config to
+    price a threat/disposition from falls back to `RETENTION_UNIDENTIFIED`.
+    """
+    roster = config.roster
+    sc = roster.species_by_id(species.roster_id) if roster is not None else None
+    if sc is None:
+        return aliens.ShipPriorityInput(
+            "contact", species.id, aliens.RETENTION_UNIDENTIFIED, None, 0.0)
+    disp = encounter_disposition(species, player)
+    return aliens.ShipPriorityInput(
+        "contact", species.id, disposition_band(disp, config.aliens), disp, sc.threat_rating)
+
+
 def _controlling_archetype(state: UniverseState, sector_id: int) -> str | None:
     """The palette of the species controlling `sector_id`'s region, or None (§4).
 
@@ -442,7 +466,8 @@ def _sector_dto(
     planets = [
         dto.SectorPlanetDTO(planet_id=pl.id, name=pl.name, ptype=pl.planet_type,
                             ore_reserve=pl.ore_reserve, ore_reserve_max=pl.ore_reserve_max,
-                            cloud_city_size=pl.cloud_city_size)
+                            cloud_city_size=pl.cloud_city_size,
+                            archetype_id=port_archetype if pl.owner.is_owned else None)
         for pl in state.planets.values() if pl.sector_id == sector.id
     ]
     # A staged species shows as a present vessel so the player can see (and hail) it —
@@ -452,31 +477,43 @@ def _sector_dto(
     entity = entity_species(state, config)
     here_species = [sp for sp in sorted(state.species.values(), key=lambda s: s.id)
                     if sp.sector_id == sector.id and (entity is None or sp.id != entity.id)]
-    ships = [
-        dto.SectorShipDTO(
+    other_here = [
+        (pid, other) for pid, other in sorted(state.players.items())
+        if pid != player.id
+        and (other_ship := state.ships.get(other.ship_id)) is not None
+        and other_ship.sector_id == sector.id
+    ]
+    # Fog-safe scene retention priority (WP-SC01, §2.3/§4.6): computed once over the
+    # whole sector's vessel multiset — never per-object — so the ordinal is a pure
+    # function of sector state, unperturbed by which vessel this loop reaches first.
+    priority = aliens.ship_retention_ordinals(
+        [_alien_priority_input(sp, player, config) for sp in here_species]
+        + [aliens.ShipPriorityInput("player", pid, aliens.RETENTION_PLAYER, None, 0.0)
+           for pid, _ in other_here])
+    ships = []
+    for sp in here_species:
+        cls, ordinal, threat_rank = priority[("contact", sp.id)]
+        ships.append(dto.SectorShipDTO(
             name=f"{sp.name} vessel", role=_species_ship_role(sp, config),
             archetype_id=sp.archetype_id, contact_id=sp.id,
             art_subtype=config.ship_class(_species_ship_class_id(sp, config)).art_subtype,
-        )
-        for sp in here_species
-    ]
+            retention_class=cls, hostility_ordinal=ordinal, combat_threat_rank=threat_rank,
+        ))
     # Other players' ships (§14, WP70 — the WP67 projection promise): visible whenever
     # co-located, like any vessel; `player_id` is the AttackPlayer target. The corp tag
     # and outlaw marker ride in the name (fog-safe: name/corp/bounty are public identity).
-    for pid, other in sorted(state.players.items()):
-        if pid == player.id:
-            continue
-        other_ship = state.ships.get(other.ship_id)
-        if other_ship is None or other_ship.sector_id != sector.id:
-            continue
+    for pid, other in other_here:
+        other_ship = state.ships[other.ship_id]
         corp = state.corporations.get(other.corp_id) if other.corp_id is not None else None
         label = other.name + (f" [{corp.tag}]" if corp is not None else "")
         if other.bounty > 0:
             label += " ☠"
         other_class = config.ship_class(other_ship.type_id)
+        cls, ordinal, threat_rank = priority[("player", pid)]
         ships.append(dto.SectorShipDTO(
             name=label, role=other_class.role,
             player_id=pid, art_subtype=other_class.art_subtype,
+            retention_class=cls, hostility_ordinal=ordinal, combat_threat_rank=threat_rank,
         ))
     here = core_hops.get(sector.id, 0)
     came_from = player.entered_from.get(sector.id)
@@ -590,7 +627,7 @@ def port_view(state: UniverseState, player_id: int, port_id: int, config: GameCo
         commodities=lines, display_id=_display(state, port.sector_id),
         archetype_id=port.archetype_id or _controlling_archetype(state, port.sector_id),
         purse=port.latinum, purse_enabled=config.economy.market.enabled,
-        holds_used=ship.holds_used, holds_total=ship.holds_total,
+        holds_used=ship.holds_used, holds_total=ship.holds_total, port_id=port.id,
     )
 
 
@@ -1731,7 +1768,7 @@ def starbase_view(
         klass_name = base.ship_class_id
     return dto.StarbaseDTO(
         starbase_id=base.id, name=klass_name,
-        sector_display=_display(state, base.sector_id),
+        sector_id=base.sector_id, sector_display=_display(state, base.sector_id),
         planet_id=base.planet_id, planet_name=planet.name if planet is not None else "",
         owner=_ownership_label(state, base.owner, player_id),
         standing=standing, operational=operational,

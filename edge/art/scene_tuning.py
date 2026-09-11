@@ -1,0 +1,136 @@
+"""Builds `edge.scene.model.SceneTuning` from validated `scene.physical_model`
+config (WP-SC05).
+
+`edge/scene/` never reads config files itself (`edge/scene/model.py`'s
+`SceneTuning` docstring, AGENTS.md's `edge/scene` layering note); this is the
+art/TUI seam that does — the same pattern `edge/art/geometry_catalog.py`
+established for the injected `ArtGeometryCatalog` (WP-SC02). A caller (the
+eventual WP-SC08/SC09 TUI wiring, or a test) passes a validated
+`edge.core.config.ScenePhysicalModelConfig` in and gets back a real, frozen
+`SceneTuning` plus the per-kind `ContinuousYield` envelopes that
+`edge.art.geometry_catalog.JsonArtGeometryCatalog` needs for its `continuous()`
+lookups.
+
+Not wired into any running composer by this commit — see `SceneTuning`'s own
+docstring and `docs/SECTOR_SCENE_PHYSICAL_MODEL_PLAN.md` §5's closing
+instruction.
+"""
+
+from __future__ import annotations
+
+from edge.art.sprites import SPRITES
+from edge.core.config import ScenePhysicalModelConfig, SceneRegionConfig
+from edge.scene.catalog import ContinuousYield
+from edge.scene.geometry import CellBox, Region
+from edge.scene.model import SceneTuning, StationSizeReference, StationTarget
+
+
+def _region(cfg: SceneRegionConfig) -> Region:
+    return Region(
+        x_min=cfg.x_min, x_max=cfg.x_max,
+        y_min=cfg.y_min, y_max=cfg.y_max,
+        z_min=cfg.z_min, z_max=cfg.z_max,
+    )
+
+
+def _cell_box(extent: tuple[int, int]) -> CellBox:
+    width, height = extent
+    return CellBox(col=0, row=0, width=width, height=height)
+
+
+def build_scene_tuning(cfg: ScenePhysicalModelConfig) -> SceneTuning:
+    """Construct the frozen `SceneTuning` bundle from validated config.
+
+    A near-mechanical field-for-field copy — `ScenePhysicalModelConfig`'s
+    field names mirror `SceneTuning`'s exactly (see that config class's
+    docstring) — plus the two shape conversions config can express but the
+    pure `edge.scene` dataclasses cannot import: `SceneRegionConfig` ->
+    `Region`, and the config's plain `(num, den)`-free `Fraction`s pass
+    straight through unchanged.
+    """
+
+    return SceneTuning(
+        face_extent_by_scale_class=dict(cfg.face_extent_by_scale_class),
+        face_extent_by_kind=dict(cfg.face_extent_by_kind),
+        region_by_scale_class={
+            scale_class: _region(region)
+            for scale_class, region in cfg.region_by_scale_class.items()
+        },
+        target_fraction_by_scale_class=dict(cfg.target_fraction_by_scale_class),
+        ink_ratio_by_scale_class=dict(cfg.ink_ratio_by_scale_class),
+        structural_mode_thresholds=cfg.structural_mode_thresholds,
+        fixed_fov_num=cfg.fixed_fov_num,
+        fixed_fov_den=cfg.fixed_fov_den,
+        cell_aspect=cfg.cell_aspect,
+        near_plane_su=cfg.near_plane_su,
+        depth_layers=cfg.depth_layers,
+        depth_layer_size_su=cfg.depth_layer_size_su,
+        depth_layer_scale=cfg.depth_layer_scale,
+        camera_height_fraction_min=cfg.camera_height_fraction_min,
+        camera_height_fraction_max=cfg.camera_height_fraction_max,
+        aim_offsets_su=cfg.aim_offsets_su,
+        max_camera_candidates=cfg.max_camera_candidates,
+        hysteresis_weight_camera=cfg.hysteresis_weight_camera,
+        hysteresis_weight_position=cfg.hysteresis_weight_position,
+        hysteresis_weight_admission=cfg.hysteresis_weight_admission,
+        hysteresis_weight_art=cfg.hysteresis_weight_art,
+        max_passes=cfg.max_passes,
+        edge_margin=cfg.edge_margin,
+        min_projected_cells_by_scale_class=dict(cfg.min_projected_cells_by_scale_class),
+        min_rung_index_from_end_by_scale_class=dict(cfg.min_rung_index_from_end_by_scale_class),
+        separation_margin=cfg.separation_margin,
+        min_visible_fraction_by_scale_class=dict(cfg.min_visible_fraction_by_scale_class),
+        cost_budget=cfg.cost_budget,
+        emergency_ship_ceiling=cfg.emergency_ship_ceiling,
+        max_reposition_candidates=cfg.max_reposition_candidates,
+        max_glyph_tries=cfg.max_glyph_tries,
+        glyph_spacing=cfg.glyph_spacing,
+        orbit_offset_region_by_scale_class={
+            scale_class: _region(region)
+            for scale_class, region in cfg.orbit_offset_region_by_scale_class.items()
+        },
+        station_size_reference=(
+            None if cfg.station_size_reference is None
+            else StationSizeReference(
+                height_fraction=cfg.station_size_reference.height_fraction,
+                header_rows=cfg.station_size_reference.header_rows,
+                width_fraction=cfg.station_size_reference.width_fraction,
+                max_cells=cfg.station_size_reference.max_cells,
+                min_cells=cfg.station_size_reference.min_cells,
+            )
+        ),
+        station_target_by_scale_class={
+            scale_class: StationTarget(
+                parent_scale=target.parent_scale,
+                lone_scale=target.lone_scale,
+                min_cells=target.min_cells,
+                max_cells=target.max_cells,
+            )
+            for scale_class, target in cfg.station_target_by_scale_class.items()
+        },
+        # Not calibration: this is the vendored art library's own no-archetype
+        # substitution (`SPRITES.palettes.fallback_archetype`), the same one every
+        # other art call site already falls back to implicitly. The generated
+        # geometry catalogue has rungs for this archetype and none for `""`
+        # (scripts/gen_geometry_catalog.py), so the classifier must use the same
+        # value `edge.scene.model.SceneTuning.fallback_archetype_id` documents.
+        fallback_archetype_id=SPRITES.palettes.fallback_archetype,
+    )
+
+
+def build_continuous_yields(cfg: ScenePhysicalModelConfig) -> dict[str, ContinuousYield]:
+    """Construct the per-kind `ContinuousYield` envelopes (calibration §2)
+    that `edge.scene.catalog.ArtGeometryCatalog.continuous()` looks up by
+    `PhysicalObject.continuous_kind` category bucket."""
+
+    return {
+        kind: ContinuousYield(
+            kind=kind,
+            ink_fraction_min=envelope.ink_fraction_min,
+            ink_fraction_max=envelope.ink_fraction_max,
+            min_extent=_cell_box(envelope.min_extent),
+            box_classes=tuple(_cell_box(box) for box in envelope.box_classes),
+            render_cost=envelope.render_cost,
+        )
+        for kind, envelope in cfg.continuous.items()
+    }
